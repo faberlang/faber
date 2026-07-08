@@ -16,7 +16,7 @@ fn temp_dir(label: &str) -> PathBuf {
 #[test]
 fn interpret_policy_defaults_to_single_fab_file() {
     let fab = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../radix/crates/exempla/corpus/incipit/salve-munde.fab");
+        .join("../examples/corpus/incipit/salve-munde.fab");
     let args = RunArgs {
         path: fab.clone(),
         target: radix::tool::CliTarget::Rust,

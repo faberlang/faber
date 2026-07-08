@@ -10,7 +10,7 @@ use std::process::{Command, Stdio};
 
 fn exempla(path: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../radix/crates/exempla/corpus")
+        .join("../examples/corpus")
         .join(path)
 }
 

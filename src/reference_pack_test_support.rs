@@ -13,7 +13,7 @@ pub(crate) fn env_lock() -> MutexGuard<'static, ()> {
 
 pub(crate) fn repo_exempla_root() -> PathBuf {
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let root = manifest.join("../radix/crates/exempla/corpus");
+    let root = manifest.join("../examples/corpus");
     assert!(
         root.join("index.toml").is_file(),
         "expected repo exempla at {}",

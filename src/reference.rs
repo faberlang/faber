@@ -11,7 +11,7 @@ pub use crate::reference_parse::{entry_from_exempla, legacy_entry_from_redirect}
 /// Environment variable that overrides reference pack discovery.
 pub const REFERENCE_ROOT_ENV: &str = "FABER_REFERENCE_ROOT";
 
-/// Installed pack layout (`exempla/` subtree) vs repo dev tree (`crates/exempla/corpus/`).
+/// Installed pack layout (`exempla/` subtree) vs repo dev tree (`examples/corpus/`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReferenceLayout {
     /// Release sidecar: `<root>/exempla/**/*.fab`.
@@ -558,6 +558,9 @@ fn dev_repo_root() -> Option<PathBuf> {
     for mut dir in starts {
         loop {
             for rel in [
+                "examples/corpus/index.toml",
+                "corpus/index.toml",
+                // Historical private tree (pre-split); keep for older checkouts.
                 "crates/exempla/corpus/index.toml",
                 "radix/crates/exempla/corpus/index.toml",
             ] {

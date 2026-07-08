@@ -1,7 +1,7 @@
 //! Disk-backed reference registry for `faber explain`.
 //!
 //! This module indexes exempla reference-pack entries loaded from disk
-//! (`crates/exempla/corpus/` in development, `share/faber/reference/` when installed)
+//! (`examples/corpus/` in development, `share/faber/reference/` when installed)
 //! and exposes rendering-friendly lookup/search results. `.fab` parsing lives in
 //! [`crate::reference_parse`]; this module owns registry indexing and validation.
 //!
