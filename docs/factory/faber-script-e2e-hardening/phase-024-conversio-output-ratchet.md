@@ -22,8 +22,8 @@ for the same program.
 
 ## Validation Plan
 
-- `timeout 120 cargo test -p radix stepper_runs_conversio_exemplum -- --nocapture`
-- `timeout 120 cargo run -p faber-cli -- run crates/exempla/corpus/conversio/conversio.fab`
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_conversio_exemplum -- --nocapture`
+- `timeout 120 cargo run -- run ../radix/crates/exempla/corpus/conversio/conversio.fab`
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture`
 - `timeout 120 cargo fmt --all -- --check`
 - `git diff --check`

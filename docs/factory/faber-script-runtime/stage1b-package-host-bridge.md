@@ -1,7 +1,7 @@
 # Stage 1b — Package Host Import Bridge (Delivery Spec)
 
 **Campaign stage**: Stage 1b — Package Host Import Bridge
-**Lowers from**: `docs/factory/faber-script-runtime/CAMPAIGN.md`
+**Lowers from**: [`CAMPAIGN.md`](CAMPAIGN.md)
 **Batching posture**: discovery-first (prove the bridge on `solum`; the mechanism is module-agnostic so `processus`/`aleator`/`json` follow for free)
 **Status**: complete (2026-07-06)
 **Date**: 2026-07-06
@@ -30,7 +30,7 @@ fail-closed diagnostic; the program never reaches `run_entry`.
 
 **Why not C1 (lowering-context bridge policy):** core-stdlib's convergence model
 is that provider satisfaction is a *runtime dispatch* concern (the frame
-gateway / `crates/faber/src/frame.rs` route table), not a compile-time
+gateway / `../faber-runtime/src/frame.rs` route table), not a compile-time
 classification. Making `LoweringContext` interpretation-mode-aware would bake
 "interpretation uses the kernel" into the compiler — wrong layer, and Stage 8
 would have to rip it out.
@@ -55,9 +55,9 @@ place once the manifest subset is satisfied over `ad`.
 The source cleanse (core-stdlib Stage 8) is **complete as a structural
 milestone**: `@ externa`/`@ subsidia` are gone and every verb is pure Faber over
 `ad`. It is **not** an operational milestone. ~81 verbs across 15
-`stdlib/norma/*.fab` modules still `mori` ("deferred pending Stage 2 dispatch"),
+`../norma/src/*.fab` modules still `mori` ("deferred pending Stage 2 dispatch"),
 and most `ad` routes no-op in the frame gateway
-(`crates/faber/src/frame.rs` dispatch handles only `runtime:echo`, `tempus:*`,
+(`../faber-runtime/src/frame.rs` dispatch handles only `runtime:echo`, `tempus:*`,
 and the `solum:*` write verbs; everything else is `_ => {}`). This is acceptable
 by design: the current priority is a functional script runtime, and real stdlib
 implementations land verb-by-verb afterward. Until those host handlers exist, the
@@ -70,7 +70,7 @@ deletion.
 ## Parity Dependency (governed by core-stdlib)
 
 The bridge consumes the **script/package parity contract** (core-stdlib Stage 7):
-`faber:*` kernel verbs are a subset of `stdlib/norma/<module>.fab` public
+`faber:*` kernel verbs are a subset of `../norma/src/<module>.fab` public
 surface, enforced by `kernel_manifest_verbs_are_subset_of_norma_public_surface`.
 Stage 1b adds a core-stdlib track-ledger entry recording that interpreted
 `norma:solum`/`norma:processus` satisfaction is delegated to the `faber:*`
@@ -92,7 +92,7 @@ consumes it.
 
 ## Repo-Aware Baseline
 
-- `crates/faber-cli/src/package/mir.rs` — `run_package_mir`,
+- `src/package/mir.rs` — `run_package_mir`,
   `library_import_diagnostics`, `library_identity_label`.
 - `crates/radix/src/kernel/{mod,manifest}.rs` — manifest, `lookup_module`,
   `resolve_kernel_module_name`, parity verbs.
@@ -131,10 +131,10 @@ closes in Stage 6).
 ## Validation
 
 ```bash
-timeout 1200 cargo test -p faber-cli --test run_integration_test script_norma
-timeout 1200 cargo test -p faber-cli --test run_integration_test
-.timeout 1200 cargo clippy -p faber-cli --all-targets -- -D warnings
-timeout 1200 cargo build --release -p faber-cli
+timeout 1200 cargo test --test run_integration_test script_norma
+timeout 1200 cargo test --test run_integration_test
+.timeout 1200 cargo clippy --all-targets -- -D warnings
+timeout 1200 cargo build --release
 ```
 
 All green at closeout: `run_integration_test` 33/33 (30 Stage 1 + 3 new Stage 1b:
@@ -144,7 +144,7 @@ argv bridge), bin 185, lib 189, clippy clean, release build OK.
 Pre-existing failures unrelated to this stage (diagnostic-rendering rot from the
 structured-diagnostics workstream — prose messages replaced with `SEM` codes;
 this stage touched no diagnostic rendering):
-- `package_check_diagnostics_uses_expanded_renderer` (faber-cli emit_integration_test, SEM010)
+- `package_check_diagnostics_uses_expanded_renderer` (`faber` emit_integration_test, SEM010)
 - `kernel::tests::kernel_glob_import_rejects_unknown_module_early` (radix, SEM008) — in the kernel module this stage additively touched; the manifest predicate added here is purely additive and cannot affect glob rejection or the `SEM008` rendering. Left for the diagnostics owner.
 
 ## Companion Skill Plan

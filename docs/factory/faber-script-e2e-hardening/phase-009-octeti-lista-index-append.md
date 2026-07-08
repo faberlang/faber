@@ -32,7 +32,7 @@ Evidence:
   `index receiver type mismatch`.
 - MIR lowers `buf.accipe(0)` to `runtime collection index(_0, const int 0)`.
 - MIR lowers `buf.appende(b)` to `runtime collection append(_0, _1)`.
-- `stdlib/norma/README.md` records that `octeti` is semantic sugar for
+- `../norma/src/README.md` records that `octeti` is semantic sugar for
   `lista<numerus<u8>>` and carries every `lista` method.
 - `docs/design/lista-intrinsics.md` defines `accipe`, `appende`, and
   `longitudo` as compiler-owned methods.
@@ -64,7 +64,7 @@ Out of scope:
 
 Checkpoint target:
 
-- `cargo run -p faber-cli -- run crates/exempla/corpus/octeti/unify.fab`
+- `cargo run -- run ../radix/crates/exempla/corpus/octeti/unify.fab`
   passes.
 
 Gate expectations:
@@ -81,13 +81,13 @@ Release checkpoint:
 Planned commands:
 
 ```bash
-timeout 120 cargo test -p radix stepper_runs_octeti_unify_fixture
-timeout 120 cargo test -p radix stepper_appends_octeti_byte_in_place
-cargo run -p faber-cli -- run crates/exempla/corpus/octeti/unify.fab
-timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture
-cargo run -p radix --bin radix -- emit -t sexp crates/exempla/corpus/octeti/unify.fab
-cargo run -p radix --bin radix -- emit -t wasm-text crates/exempla/corpus/octeti/unify.fab
-cargo run -p radix --bin radix -- emit -t llvm-text crates/exempla/corpus/octeti/unify.fab
+timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_octeti_unify_fixture
+timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_appends_octeti_byte_in_place
+cargo run -- run ../radix/crates/exempla/corpus/octeti/unify.fab
+timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture
+cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t sexp ../radix/crates/exempla/corpus/octeti/unify.fab
+cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t wasm-text ../radix/crates/exempla/corpus/octeti/unify.fab
+cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t llvm-text ../radix/crates/exempla/corpus/octeti/unify.fab
 cargo fmt --all -- --check
 git diff --check
 ```

@@ -4,8 +4,8 @@
 **Mode**: draft/maintain -- routing artifact; do not implement directly from
 this file.
 **Target repo**: `/Users/ianzepp/work/faberlang/faber`
-**Primary surfaces**: `crates/faber-cli/`, `crates/scena/`,
-`crates/radix/src/mir/stepper/`, `crates/faber-cli/src/package/mir.rs`
+**Primary surfaces**: `src/` (this repo; script host absorbed former scena),
+sibling radix `crates/radix/src/mir/stepper/`, `src/package/mir.rs`
 
 ---
 
@@ -13,9 +13,8 @@ this file.
 
 Create a first-class source-execution lane for Faber scripts and packages. The
 user-facing entry point is `faber script`, backed by the MIR stepper and package
-MIR runner. A separate `scena` binary becomes the runtime power tool for timing,
-benchmarking, support diagnostics, and eventually trace-oriented scripting
-inspection.
+MIR runner. Interpreted execution lives in this repo (former `scena` embed API absorbed into
+`src/script/`). Sibling radix owns the MIR stepper engine.
 
 This campaign is about interpreted execution only. The generated Rust/Cargo
 package path stays owned by `faber run`, `faber build`, and `faber test`.
@@ -129,13 +128,13 @@ from this campaign artifact.
 - `AGENTS.md`: `faber run`/`faber build` are application-lane Rust package
   paths; MIR/scena is a systems/script lane and must not be confused with
   package build.
-- `crates/faber-cli/src/cli/mod.rs`: `RunArgs` currently exposes
+- `src/cli/mod.rs`: `RunArgs` currently exposes
   `--interpret` and `--compile`; `faber` already has `run`, `repl`, `host`, and
   compiler-compatibility aliases.
-- `crates/faber-cli/src/commands/run.rs`: single files interpret by default;
+- `src/commands/run.rs`: single files interpret by default;
   package directories compile by default; `--interpret` routes packages,
   manifestless importing files, and archives through package MIR.
-- `crates/faber-cli/src/package/mir.rs`: interpreted package execution uses
+- `src/package/mir.rs`: interpreted package execution uses
   `analyze_package`, package MIR linking, validation, and `run_entry`; library
   imports are currently unsupported and must fail explicitly.
 - `crates/radix/src/mir/stepper/kernel/{solum,processus}.rs`: the stepper
@@ -143,12 +142,12 @@ from this campaign artifact.
   coreutils-style development loops.
 - `crates/radix/src/kernel/mod.rs`: `faber:*` kernel imports are currently
   script-mode only; package builds reject them.
-- `docs/factory/coreutils/CAMPAIGN.md`: Stage 1b identifies package-mode kernel
+- sibling examples `docs/factory/coreutils/CAMPAIGN.md`: Stage 1b identifies package-mode kernel
   import resolution as the blocker for file-backed stepper slices. The clean
   source-shape decision is one import string for package source: `norma:*`.
-- `crates/scena/Cargo.toml`: `scena` is currently library-only and describes
+- `former scena crate (now `src/script/`) Cargo.toml`: the script host is currently library-embedded and describes
   itself as the in-process Faber script stage.
-- `crates/scena/src/lib.rs`: public script embed API is `run_source`,
+- `former scena crate (now `src/script/`) src/lib.rs`: public script embed API is `run_source`,
   `run_named`, `run_with_session`, and host/diagnostic exports.
 - `crates/radix/src/tool/cli.rs` and `crates/radix/src/bin/radix.rs`: `radix`
   owns compiler developer commands: `lex`, `parse`, `hir`, `mir`, `cli-ir`,
@@ -264,7 +263,7 @@ run plumbing.
 - `cargo build --release -p scena --bin scena` succeeds.
 - `scena run [path]` executes the same supported script/package/archive surface
   as `faber script`.
-- Shared execution helpers avoid copy-pasting `faber-cli` command logic where a
+- Shared execution helpers avoid copy-pasting ``faber`` command logic where a
   library seam is more maintainable.
 - `radix` phase-inspection commands are not duplicated.
 
@@ -343,7 +342,7 @@ Finalize the public command story and update docs/help.
 | --- | --- |
 | Command UX for ordinary source execution | Stage 1 (`faber script`) |
 | Package source imports host I/O and must work in both `faber script` and compiled package gates | Stage 1b package host import bridge; require `norma:*` as the package source spelling |
-| Coreutils file-backed stepper slices need `solum`/`processus` host effects | Stage 1b here, coordinated with `docs/factory/coreutils/CAMPAIGN.md` Stage 1b |
+| Coreutils file-backed stepper slices need `solum`/`processus` host effects | Stage 1b here, coordinated with sibling examples `docs/factory/coreutils/CAMPAIGN.md` Stage 1b |
 | Runtime diagnostics, timing, benchmark, or support introspection | Stages 2-5 (`scena`) |
 | Compiler phase dumps or target emit inspection | `radix`, not this campaign |
 | Generated Rust, Cargo cache behavior, package build/test | Existing application-lane work, not this campaign |
@@ -373,11 +372,11 @@ Finalize the public command story and update docs/help.
 Each delivery spec should choose focused validation. Likely commands:
 
 ```bash
-timeout 1200 cargo test -p faber-cli run_interpret
-timeout 1200 cargo test -p faber-cli package_mir
+timeout 1200 cargo test run_interpret
+timeout 1200 cargo test package_mir
 timeout 1200 cargo test -p scena
-timeout 1200 cargo test -p radix mir::stepper
-timeout 1200 cargo build --release -p faber-cli
+timeout 1200 cargo test --manifest-path ../radix/Cargo.toml -p radix mir::stepper
+timeout 1200 cargo build --release
 timeout 1200 cargo build --release -p scena --bin scena
 ```
 

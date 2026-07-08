@@ -1,7 +1,7 @@
 # Stage 0 — Delivery Baseline (Script Runtime Campaign)
 
 **Campaign stage**: Stage 0 — Delivery Baseline
-**Lowers from**: `docs/factory/faber-script-runtime/CAMPAIGN.md`
+**Lowers from**: [`CAMPAIGN.md`](CAMPAIGN.md)
 **Batching posture**: discovery-first (docs-only; no code change)
 **Status**: complete
 **Date**: 2026-07-06
@@ -34,7 +34,7 @@ No code, help text, or test changes belong to this stage.
 
 ## Repo-Aware Baseline
 
-### Dispatch entry points (`crates/faber-cli/src/commands/run.rs`)
+### Dispatch entry points (`src/commands/run.rs`)
 
 `cmd_run(args)` calls `should_interpret(&args, &input_path)`:
 
@@ -56,7 +56,7 @@ When compiling, `cmd_run_compiled(args)` runs the full package lane:
 `invoke_cargo_build` → spawn the binary, forwarding `args.args` and the process
 exit code.
 
-### Single-source stepper entry (`crates/faber-cli/src/script.rs`)
+### Single-source stepper entry (`src/script.rs`)
 
 - `interpret_source(name, source, host)` — analyze/lower/interpret one source
   string; returns `Result<ExitCode, RunSourceError>`.
@@ -66,7 +66,7 @@ exit code.
 These sit on top of `scena`/`radix` stepper primitives (`StdioHost`,
 `run_source`).
 
-### Package MIR runner (`crates/faber-cli/src/package/mir.rs::run_package_mir`)
+### Package MIR runner (`src/package/mir.rs::run_package_mir`)
 
 Pipeline: `analyze_package` → error check → `library_import_diagnostics` →
 `plan_cli_package` → `local_namespace_call_targets` → `select_entry_unit` →
@@ -96,23 +96,22 @@ diagnostic; none fall back to Cargo):
   imports (`kernel_script_mode_only_message`).
 - The kernel manifest (`manifest.rs`) declares four modules — `solum`,
   `processus`, `aleator`, `json` — each with a `verbs` list that is a **subset**
-  of the matching `stdlib/norma/<module>.fab` public surface (parity contract).
+  of the matching sibling `../norma/src/<module>.fab` public surface (parity contract).
 - `faber:*` import paths are flat (`faber:solum`); nested paths
   (`faber:hal/solum`) are invalid.
 - Consequently: application/package source must spell host imports as
   `norma:*`; direct script/kernel source spells them `faber:*`. They are **not**
   interchangeable. The Stage 1b bridge must keep this invariant.
 
-### `scena` crate (`crates/scena/`)
+### Script host (former script host (former scena))
 
-Library-only today (no `[[bin]]`). Public embed API: `run_source`,
-`run_named`, `run_with_session`, plus re-exported host/diagnostic types
-(`Host`, `StdioHost`, `BufferHost`, `Config`, `Session`, `RunSourceError`).
-`run_with_session` runs source through `radix::mir::run_source` inside a
-trap that converts `processus.exi`/`exi` into an `ExitCode` rather than exiting
-the embedder.
+The standalone script host (former scena) is **gone** — absorbed into this repo (`src/script/`
+and package MIR host). Public embed API remains conceptually `run_source` /
+session-based interpret through `radix::mir::run_source` with a trap that
+converts `processus.exi`/`exi` into an `ExitCode` rather than exiting the
+embedder.
 
-### Test inventory — `crates/faber-cli/tests/run_integration_test.rs`
+### Test inventory — `tests/run_integration_test.rs`
 
 All interpreted-execution coverage lives in this one subprocess test file and
 exercises `faber run --interpret <path>` against the built `faber` binary
@@ -159,7 +158,7 @@ exercises `faber run --interpret <path>` against the built `faber` binary
 - `run_interpret_package_inputs_execute_without_cargo_or_rust_emit`
 - `run_interpret_manifestless_single_file_uses_single_source_stepper`
 
-Additional unit-level coverage in `crates/faber-cli/src/commands/run_test.rs`
+Additional unit-level coverage in `src/commands/run_test.rs`
 proves the dispatch predicates: `should_interpret` defaults,
 `is_single_fab_file`, `is_package_interpret_input` (manifest, manifestless
 import, manifestless single-file negative).

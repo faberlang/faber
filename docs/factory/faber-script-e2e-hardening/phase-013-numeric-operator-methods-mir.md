@@ -2,7 +2,7 @@
 
 ## Target
 
-`crates/exempla/corpus/intrinseca/numeric-operator-methods.fab` fails in script
+`../radix/crates/exempla/corpus/intrinseca/numeric-operator-methods.fab` fails in script
 mode on compiler-owned numeric receiver operator methods:
 
 ```text
@@ -47,12 +47,12 @@ runtime/provider calls.
 
 ## Validation
 
-- `timeout 120 cargo test -p radix <focused filters>`
-- `cargo run -p faber-cli -- run
-  crates/exempla/corpus/intrinseca/numeric-operator-methods.fab`
-- `cargo run -p radix --bin radix -- mir
-  crates/exempla/corpus/intrinseca/numeric-operator-methods.fab`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix <focused filters>`
+- `cargo run -- run
+  ../radix/crates/exempla/corpus/intrinseca/numeric-operator-methods.fab`
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- mir
+  ../radix/crates/exempla/corpus/intrinseca/numeric-operator-methods.fab`
 - Targeted S-expression, Wasm, and LLVM `radix emit` checks for
-  `crates/exempla/corpus/intrinseca/numeric-operator-methods.fab`
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+  `../radix/crates/exempla/corpus/intrinseca/numeric-operator-methods.fab`
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture`

@@ -63,8 +63,8 @@ Out of scope:
 
 Checkpoint target:
 
-- `cargo run -p faber-cli -- run
-  crates/exempla/corpus/conversio/collectiones.fab` passes or moves to a new,
+- `cargo run -- run
+  ../radix/crates/exempla/corpus/conversio/collectiones.fab` passes or moves to a new,
   recorded blocker after set conversion.
 
 Gate expectations:
@@ -81,9 +81,9 @@ Release checkpoint:
 Planned commands:
 
 ```bash
-timeout 120 cargo test -p radix stepper_runs_collection_conversio_fixture
-cargo run -p faber-cli -- run crates/exempla/corpus/conversio/collectiones.fab
-timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture
+timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_collection_conversio_fixture
+cargo run -- run ../radix/crates/exempla/corpus/conversio/collectiones.fab
+timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture
 cargo fmt --all -- --check
 git diff --check
 ```

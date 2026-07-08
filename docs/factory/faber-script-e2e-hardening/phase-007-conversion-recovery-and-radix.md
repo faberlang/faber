@@ -67,11 +67,11 @@ Out of scope:
 
 Checkpoint target:
 
-- `cargo run -p faber-cli -- run
-  crates/exempla/corpus/conversio/octeti.fab` passes or moves to a new recorded
+- `cargo run -- run
+  ../radix/crates/exempla/corpus/conversio/octeti.fab` passes or moves to a new recorded
   blocker.
-- `cargo run -p faber-cli -- run
-  crates/exempla/corpus/conversio/radix.fab` passes or moves to a new recorded
+- `cargo run -- run
+  ../radix/crates/exempla/corpus/conversio/radix.fab` passes or moves to a new recorded
   blocker.
 
 Gate expectations:
@@ -88,11 +88,11 @@ Release checkpoint:
 Planned commands:
 
 ```bash
-timeout 120 cargo test -p radix stepper_runs_radix_conversio_fixture
-timeout 120 cargo test -p radix stepper_runs_octeti_conversio_fixture
-cargo run -p faber-cli -- run crates/exempla/corpus/conversio/octeti.fab
-cargo run -p faber-cli -- run crates/exempla/corpus/conversio/radix.fab
-timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture
+timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_radix_conversio_fixture
+timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_octeti_conversio_fixture
+cargo run -- run ../radix/crates/exempla/corpus/conversio/octeti.fab
+cargo run -- run ../radix/crates/exempla/corpus/conversio/radix.fab
+timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture
 cargo fmt --all -- --check
 git diff --check
 ```

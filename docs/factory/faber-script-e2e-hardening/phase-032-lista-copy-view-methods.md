@@ -33,10 +33,10 @@ fall through to generic unresolved method-call diagnostics.
 
 ## Validation Plan
 
-- `timeout 120 cargo test -p radix lowers_lista_copy_view_methods -- --nocapture`
-- `timeout 120 cargo test -p radix stepper_runs_lista_methodi_copiae_fixture -- --nocapture`
-- Direct `faber run` for `crates/exempla/corpus/lista/methodi-copiae.fab`.
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix lowers_lista_copy_view_methods -- --nocapture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_lista_methodi_copiae_fixture -- --nocapture`
+- Direct `faber run` for `../radix/crates/exempla/corpus/lista/methodi-copiae.fab`.
 - Representative `radix emit` probes for Rust, S-expression, Wasm, and LLVM.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture`
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture`
 - `timeout 120 cargo fmt --all -- --check`
 - `git diff --check`

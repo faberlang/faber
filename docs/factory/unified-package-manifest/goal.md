@@ -168,8 +168,8 @@ Deliverables:
 Gate:
 
 ```bash
-timeout 120 cargo test -p faber-cli --lib manifest
-timeout 120 cargo test -p faber-cli --lib discover
+timeout 120 cargo test --lib manifest
+timeout 120 cargo test --lib discover
 ```
 
 ### Phase 2 — Git URL Install and Manifest-Based Provider Roots
@@ -194,8 +194,8 @@ Deliverables:
 Gate:
 
 ```bash
-timeout 120 cargo test -p faber-cli install
-timeout 120 cargo test -p faber-cli --lib library_resolver
+timeout 120 cargo test install
+timeout 120 cargo test --lib library_resolver
 ```
 
 ### Phase 3 — Backend Library Build Graph
@@ -225,8 +225,8 @@ Deliverables:
 Gate:
 
 ```bash
-timeout 120 cargo test -p faber-cli --lib package
-timeout 120 cargo test -p radix -- backend_smoke
+timeout 120 cargo test --lib package
+timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix -- backend_smoke
 ```
 
 ### Phase 4 — Target Binding Manifests
@@ -247,8 +247,8 @@ Deliverables:
 Gate:
 
 ```bash
-timeout 120 cargo test -p faber-cli --lib binding
-timeout 120 cargo test -p faber-cli --lib package
+timeout 120 cargo test --lib binding
+timeout 120 cargo test --lib package
 ```
 
 ## Open Questions
@@ -269,11 +269,10 @@ timeout 120 cargo test -p faber-cli --lib package
 At goal closeout:
 
 ```bash
-timeout 120 cargo test -p faber-cli --lib manifest
-timeout 120 cargo test -p faber-cli --lib library_resolver
-timeout 120 cargo test -p faber-cli install
-./scripta/check-factory-goal-status
+timeout 120 cargo test --lib manifest
+timeout 120 cargo test --lib library_resolver
+timeout 120 cargo test install
 ```
 
-Broaden to `./scripta/test` once Phase 3 or Phase 4 changes package build
-behavior.
+Broaden to sibling radix `./scripta/test` once Phase 3 or Phase 4 changes package
+build behavior that needs compiler gates.

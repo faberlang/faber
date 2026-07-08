@@ -1,7 +1,7 @@
 # Stage 1 — `faber script` (Delivery Spec)
 
 **Campaign stage**: Stage 1 — `faber script`
-**Lowers from**: `docs/factory/faber-script-runtime/CAMPAIGN.md`
+**Lowers from**: [`CAMPAIGN.md`](CAMPAIGN.md)
 **Batching posture**: batch-by-default
 **Status**: complete (2026-07-06)
 **Date**: 2026-07-06
@@ -47,17 +47,17 @@ See [`stage0-baseline.md`](stage0-baseline.md) for the full dispatch map,
 package-MIR unsupported surfaces, kernel policy, and the 30-function
 `--interpret` test inventory. Relevant seams:
 
-- `crates/faber-cli/src/commands/run.rs` — `cmd_run`, `should_interpret`,
+- `src/commands/run.rs` — `cmd_run`, `should_interpret`,
   `is_single_fab_file`, `cmd_run_interpret`, `is_package_interpret_input`,
   `manifestless_file_declares_import`, `eprint_archive_diagnostics`,
   `cmd_run_compiled`.
-- `crates/faber-cli/src/commands/script.rs` — `cmd_eval` (`-c`), `cmd_repl`.
-- `crates/faber-cli/src/script.rs` — single-source stepper entry
+- `src/commands/script.rs` — `cmd_eval` (`-c`), `cmd_repl`.
+- `src/script.rs` — single-source stepper entry
   (`interpret_source`, `interpret_source_or_exit`).
-- `crates/faber-cli/src/cli/mod.rs` — `Command` enum, `RunArgs`.
-- `crates/faber-cli/src/commands/mod.rs` — `dispatch`.
-- `crates/faber-cli/tests/run_integration_test.rs` — 30 `run --interpret` tests.
-- `crates/faber-cli/src/commands/run_test.rs` — dispatch-predicate unit tests.
+- `src/cli/mod.rs` — `Command` enum, `RunArgs`.
+- `src/commands/mod.rs` — `dispatch`.
+- `tests/run_integration_test.rs` — 30 `run --interpret` tests.
+- `src/commands/run_test.rs` — dispatch-predicate unit tests.
 
 ## Stage Graph
 
@@ -92,7 +92,7 @@ package-MIR unsupported surfaces, kernel policy, and the 30-function
 ## Implementation Work
 
 Single delivery-sized unit, one factory phase, single writer (no parallelism —
-all edits touch `faber-cli`). Order: stages 1→4 as listed.
+all edits touch this repo). Order: stages 1→4 as listed.
 
 ## Checkpoints And Gates
 
@@ -108,7 +108,7 @@ all edits touch `faber-cli`). Order: stages 1→4 as listed.
 **Batching / Split Decision**: batch-by-default. One coherent slice: command +
 shared plumbing + test migration + help. Split would only be warranted if the
 shared-plumbing refactor and the CLI surface contended on the same files with
-conflicting validation — they do not (all in `faber-cli`, one writer).
+conflicting validation — they do not (all in this repo, one writer).
 
 **Release checkpoint**: `defer-release`. `faber script` is additive and
 `run --interpret` still works; the user-visible lane split is not closed until
@@ -119,13 +119,13 @@ mid-campaign release decision by the user).
 
 ```bash
 # Targeted interpret surface (migrated to `faber script`) — 30/30 pass
-timeout 1200 cargo test -p faber-cli --test run_integration_test
+timeout 1200 cargo test --test run_integration_test
 # Dispatch predicate unit tests
-timeout 1200 cargo test -p faber-cli --bin faber 'commands::script'
-timeout 1200 cargo test -p faber-cli --bin faber 'commands::run'
+timeout 1200 cargo test --bin faber 'commands::script'
+timeout 1200 cargo test --bin faber 'commands::run'
 # Lint + build
-timeout 1200 cargo clippy -p faber-cli --all-targets -- -D warnings
-timeout 1200 cargo build --release -p faber-cli
+timeout 1200 cargo clippy --all-targets -- -D warnings
+timeout 1200 cargo build --release
 ```
 
 All green at closeout (lib 189, bin 185, integration 30, format 4, hygiene 1,

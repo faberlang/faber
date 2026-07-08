@@ -11,10 +11,10 @@ numeric operand mismatch
 
 Confirmed examples:
 
-- `crates/exempla/corpus/assignatio/assignatio.fab`
-- `crates/exempla/corpus/ego/ego.fab`
-- `crates/exempla/corpus/redde/redde.fab`
-- `crates/exempla/corpus/sub/sub.fab`
+- `../radix/crates/exempla/corpus/assignatio/assignatio.fab`
+- `../radix/crates/exempla/corpus/ego/ego.fab`
+- `../radix/crates/exempla/corpus/redde/redde.fab`
+- `../radix/crates/exempla/corpus/sub/sub.fab`
 
 Rust codegen already emits `textus + textus` as string concatenation. MIR
 lowering also preserves the result type as `textus`; the stepper currently routes
@@ -43,11 +43,11 @@ two strings. Non-text non-numeric operands should still fail closed.
 
 ## Validation
 
-- `timeout 120 cargo test -p radix <focused filters>`
-- `cargo run -p faber-cli -- run
-  crates/exempla/corpus/assignatio/assignatio.fab`
-- `cargo run -p faber-cli -- run crates/exempla/corpus/ego/ego.fab`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix <focused filters>`
+- `cargo run -- run
+  ../radix/crates/exempla/corpus/assignatio/assignatio.fab`
+- `cargo run -- run ../radix/crates/exempla/corpus/ego/ego.fab`
 - Targeted S-expression, Wasm, and LLVM `radix emit` checks for a representative
   text-add fixture
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture`

@@ -2,7 +2,7 @@
 
 ## Target
 
-`crates/exempla/corpus/binarius/binarius.fab` exposes eager logical evaluation in
+`../radix/crates/exempla/corpus/binarius/binarius.fab` exposes eager logical evaluation in
 script mode:
 
 ```fab
@@ -40,9 +40,9 @@ branch-shaped control flow.
 
 ## Validation
 
-- `timeout 120 cargo test -p radix <focused filters>`
-- `cargo run -p faber-cli -- run crates/exempla/corpus/binarius/binarius.fab`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix <focused filters>`
+- `cargo run -- run ../radix/crates/exempla/corpus/binarius/binarius.fab`
 - Targeted S-expression, Wasm, and LLVM `radix emit` checks for
-  `crates/exempla/corpus/binarius/binarius.fab`
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+  `../radix/crates/exempla/corpus/binarius/binarius.fab`
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture`

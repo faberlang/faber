@@ -36,6 +36,6 @@ current script-mode obligation. They must not hide runnable MIR debt.
 
 ## Validation
 
-- `timeout 120 cargo test -p exempla script_expected_failure -- --nocapture`
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p exempla script_expected_failure -- --nocapture`
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture`

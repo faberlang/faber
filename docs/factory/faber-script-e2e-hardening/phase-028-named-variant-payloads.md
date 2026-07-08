@@ -38,12 +38,12 @@ agree on the same field metadata; symbol ids are not payload indices.
 
 ## Validation Plan
 
-- `timeout 120 cargo test -p radix stepper_runs_finge_fixture -- --nocapture`
-- `timeout 120 cargo test -p radix stepper_runs_omnia_fixture -- --nocapture`
-- `timeout 120 cargo test -p radix stepper_runs_discerne_insanum_fixture -- --nocapture`
-- `timeout 120 cargo test -p radix stepper_runs_unio_fixture -- --nocapture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_finge_fixture -- --nocapture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_omnia_fixture -- --nocapture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_discerne_insanum_fixture -- --nocapture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_unio_fixture -- --nocapture`
 - Direct `faber run` for all four fixtures.
 - Representative `radix emit` probes for Rust, S-expression, Wasm, and LLVM.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture`
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture`
 - `timeout 120 cargo fmt --all -- --check`
 - `git diff --check`

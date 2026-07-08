@@ -35,7 +35,7 @@ Evidence:
 - Harness: `crates/exempla/src/exempla_e2e/script.rs`.
 - Shared helpers: `crates/exempla/src/exempla_e2e/common.rs`.
 - Live baseline command:
-  `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture`.
+  `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture`.
 
 Live baseline on this phase start:
 
@@ -86,8 +86,8 @@ Release checkpoint:
 Planned commands:
 
 ```bash
-timeout 120 cargo test -p exempla script_expected_failure
-timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture
+timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p exempla script_expected_failure
+timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture
 cargo fmt --all -- --check
 git diff --check
 ```

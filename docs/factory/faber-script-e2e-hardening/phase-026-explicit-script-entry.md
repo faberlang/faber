@@ -34,10 +34,10 @@ but they are not script entries and must not be executed by `faber run`.
 
 ## Validation Plan
 
-- `timeout 120 cargo test -p radix stepper_rejects_omitte_without_incipit -- --nocapture`
-- `timeout 120 cargo run -p faber-cli -- run crates/exempla/corpus/omitte/omitte.fab`
-- `timeout 120 cargo run -p radix --bin radix -- emit -t rust crates/exempla/corpus/omitte/omitte.fab`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_rejects_omitte_without_incipit -- --nocapture`
+- `timeout 120 cargo run -- run ../radix/crates/exempla/corpus/omitte/omitte.fab`
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t rust ../radix/crates/exempla/corpus/omitte/omitte.fab`
 - Representative `radix emit` probes for S-expression, Wasm, and LLVM.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture`
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture`
 - `timeout 120 cargo fmt --all -- --check`
 - `git diff --check`

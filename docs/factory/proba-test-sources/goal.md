@@ -22,10 +22,11 @@ difference from `.fab` is placement in the source graph:
 - `.proba` files are test sources, discovered by `faber test`, and may not be
   imported by `.fab` or `.proba` files.
 
-This gives the standard library its own test files without using
+This gives the standard library its own test files without using sibling radix
 `crates/exempla/corpus`, which should remain focused on language/core
 intrinsics and reference surfaces. `.proba` is the preferred home for stdlib
-behavior tests, not the only legal location for tests.
+behavior tests (sibling `norma` and packages), not the only legal location for
+tests.
 
 ## Problem
 
@@ -61,8 +62,8 @@ test code part of production/library code.
   `.proba files are test sources and cannot be imported; move shared helpers to a .fab module`.
 - Keep `.proba` out of normal `faber build`, `faber run`, and package library
   import graphs unless the command is explicitly test-oriented.
-- Establish stdlib test placement such as `stdlib/norma/hash.proba` and
-  `stdlib/norma/hash/sha256.proba`.
+- Establish stdlib test placement such as `../norma/src/hash.proba` and
+  `../norma/src/hash/sha256.proba`.
 
 ## Non-goals
 
@@ -91,15 +92,15 @@ test code part of production/library code.
 ## Reference Packet
 
 - `EBNF.md`
-- `crates/faber-cli/src/commands/test.rs`
-- `crates/faber-cli/src/package/compile.rs`
-- `crates/faber-cli/src/package/import_graph.rs`
-- `crates/faber-cli/src/package/modules.rs`
-- `crates/faber-cli/src/package_test.rs`
+- `src/commands/test.rs`
+- `src/package/compile.rs`
+- `src/package/import_graph.rs`
+- `src/package/modules.rs`
+- `src/package_test.rs`
 - `crates/radix/src/codegen/rust` test-harness emission
-- `stdlib/norma/`
-- `crates/exempla/corpus/probandum/probandum.fab`
-- `crates/exempla/corpus/proba/proba.fab`
+- `../norma/src/`
+- `../radix/crates/exempla/corpus/probandum/probandum.fab`
+- `../radix/crates/exempla/corpus/proba/proba.fab`
 
 ## Constraints And Invariants
 
@@ -135,8 +136,8 @@ test code part of production/library code.
    - Reject provider/library import paths ending in `.proba` if such a path is
      ever accepted by a resolver.
 4. Stdlib test layout:
-   - Add initial fixture tests under `stdlib/norma/*.proba` or
-     `stdlib/norma/<module>/*.proba`.
+   - Add initial fixture tests under `../norma/src/*.proba` or
+     `../norma/src/<module>/*.proba`.
    - Ensure `.proba` can import `norma:*` public facades and nested internal
      stdlib modules where appropriate.
 5. Validation:
@@ -163,10 +164,10 @@ test code part of production/library code.
 ## Validation
 
 ```bash
-cargo test -p faber-cli -- proba
-cargo test -p faber-cli -- test_selection
-cargo run -p faber-cli -- test <fixture-package>
-cargo run -p faber-cli -- build <fixture-package>
+cargo test -- proba
+cargo test -- test_selection
+cargo run -- test <fixture-package>
+cargo run -- build <fixture-package>
 ```
 
 Add a repository script such as `./scripta/test-stdlib` only after the first
@@ -174,7 +175,7 @@ stdlib `.proba` fixture proves the command shape.
 
 ## Open Questions
 
-- Should stdlib `.proba` discovery be part of ordinary `faber test stdlib/norma`
+- Should stdlib `.proba` discovery be part of ordinary `faber test sibling norma/src`
   or a dedicated `./scripta/test-stdlib` wrapper first?
 - Should `.proba` files generate module names with a `_proba` suffix to avoid
   collision with sibling `.fab` modules of the same stem?

@@ -20,30 +20,30 @@ Invariant:
 
 Validation:
 
-- `timeout 120 cargo test -p radix lowers_nested_json_valor_literal
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix lowers_nested_json_valor_literal
   -- --nocapture` passed.
-- `timeout 120 cargo test -p radix stepper_runs_destructura_literal_fixture
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_destructura_literal_fixture
   -- --nocapture` passed.
-- `timeout 120 cargo run -p faber-cli -- run
-  crates/exempla/corpus/destructura/literal.fab` passed and printed the four
+- `timeout 120 cargo run -- run
+  ../radix/crates/exempla/corpus/destructura/literal.fab` passed and printed the four
   debug-map valor lines from the fixture.
-- `timeout 120 cargo run -p radix --bin radix -- mir
-  crates/exempla/corpus/destructura/literal.fab` showed recursive `construct
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- mir
+  ../radix/crates/exempla/corpus/destructura/literal.fab` showed recursive `construct
   map` operations for the nested `extra.medium` object, with no unsupported
   MIR or path diagnostics.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t rust
-  crates/exempla/corpus/destructura/literal.fab` emitted recursive
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t rust
+  ../radix/crates/exempla/corpus/destructura/literal.fab` emitted recursive
   `faber::Valor::Tabula` construction.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t sexp
-  crates/exempla/corpus/destructura/literal.fab` failed on the existing
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t sexp
+  ../radix/crates/exempla/corpus/destructura/literal.fab` failed on the existing
   S-expression `valor` default gap: `default value for type Primitive(Valor)`.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t wasm
-  crates/exempla/corpus/destructura/literal.fab` failed on the existing Wasm
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t wasm
+  ../radix/crates/exempla/corpus/destructura/literal.fab` failed on the existing Wasm
   `valor` type gap: `type Primitive(Valor)`.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t llvm
-  crates/exempla/corpus/destructura/literal.fab` emitted nested aggregate map
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t llvm
+  ../radix/crates/exempla/corpus/destructura/literal.fab` emitted nested aggregate map
   helper calls including a pointer-valued nested map.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture` passed.
 - `timeout 120 cargo fmt --all -- --check` passed.
 - `git diff --check` passed.
@@ -69,7 +69,7 @@ Invariant:
 
 Validation:
 
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture` passed after cleanup.
 
 Live script e2e effect:
@@ -102,35 +102,35 @@ Invariant:
 
 Validation:
 
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   lista_higher_order_methods_are_classified_for_mir -- --nocapture` passed.
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   lowers_lista_reducta_with_synthetic_reducer -- --nocapture` passed.
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   stepper_runs_lista_methodi_functionales_fixture -- --nocapture` passed.
-- `timeout 120 cargo run -p faber-cli -- run
-  crates/exempla/corpus/lista/methodi-functionales.fab` passed and printed
+- `timeout 120 cargo run -- run
+  ../radix/crates/exempla/corpus/lista/methodi-functionales.fab` passed and printed
   `[2, 4]`, `[2, 4, 6, 8, 10]`, and `15`.
-- `timeout 120 cargo run -p radix --bin radix -- mir
-  crates/exempla/corpus/lista/methodi-functionales.fab` showed `filtrata`,
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- mir
+  ../radix/crates/exempla/corpus/lista/methodi-functionales.fab` showed `filtrata`,
   `mappata`, and `reducta` as ordinary MIR loop flow using collection
   `length`, collection `append`, and synthetic closure calls `f1`, `f2`, and
   `f3`, with no unresolved method/path diagnostics.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t rust
-  crates/exempla/corpus/lista/methodi-functionales.fab` emitted native
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t rust
+  ../radix/crates/exempla/corpus/lista/methodi-functionales.fab` emitted native
   iterator `filter`, `map`, and `fold` code.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t sexp
-  crates/exempla/corpus/lista/methodi-functionales.fab` failed on the existing
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t sexp
+  ../radix/crates/exempla/corpus/lista/methodi-functionales.fab` failed on the existing
   S-expression array default gap: `default value for type Array(TypeId(1))`.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t wasm
-  crates/exempla/corpus/lista/methodi-functionales.fab` emitted existing
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t wasm
+  ../radix/crates/exempla/corpus/lista/methodi-functionales.fab` emitted existing
   `length` and `append` runtime import probes, with no new `reducta` import
   surface.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t llvm
-  crates/exempla/corpus/lista/methodi-functionales.fab` emitted ordinary
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t llvm
+  ../radix/crates/exempla/corpus/lista/methodi-functionales.fab` emitted ordinary
   closure calls, aggregate index calls, and existing `length`/`append` runtime
   declarations.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture` passed.
 - `timeout 120 cargo fmt --all -- --check` passed.
 - `git diff --check` passed.
@@ -162,34 +162,34 @@ Invariant:
 
 Validation:
 
-- `timeout 120 cargo test -p radix lowers_lista_copy_view_methods
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix lowers_lista_copy_view_methods
   -- --nocapture` passed.
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   stepper_runs_lista_methodi_copiae_fixture -- --nocapture` passed.
-- `timeout 120 cargo run -p faber-cli -- run
-  crates/exempla/corpus/lista/methodi-copiae.fab` passed and printed all
+- `timeout 120 cargo run -- run
+  ../radix/crates/exempla/corpus/lista/methodi-copiae.fab` passed and printed all
   seven pinned list copy/view method lines.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t rust
-  crates/exempla/corpus/lista/methodi-copiae.fab` emitted clone-backed
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t rust
+  ../radix/crates/exempla/corpus/lista/methodi-copiae.fab` emitted clone-backed
   `addita`, slice-backed `sectio`, iterator `take`/`skip`, saturating
   `ultima`, `reverse`, and `sort`.
-- `timeout 120 cargo run -p radix --bin radix -- mir
-  crates/exempla/corpus/lista/methodi-copiae.fab` showed runtime collection
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- mir
+  ../radix/crates/exempla/corpus/lista/methodi-copiae.fab` showed runtime collection
   operations for `append_immutable`, `slice`, `take`, `take_last`,
   `drop_first`, `reverse`, and `sort`, with no unresolved method/path
   diagnostics.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t sexp
-  crates/exempla/corpus/lista/methodi-copiae.fab` failed on the existing
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t sexp
+  ../radix/crates/exempla/corpus/lista/methodi-copiae.fab` failed on the existing
   S-expression array default gap: `default value for type Array(TypeId(1))`.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t wasm
-  crates/exempla/corpus/lista/methodi-copiae.fab` emitted runtime import
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t wasm
+  ../radix/crates/exempla/corpus/lista/methodi-copiae.fab` emitted runtime import
   probes for `append_immutable`, `slice`, `take`, `take_last`, `drop_first`,
   `reverse`, and `sort`.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t llvm
-  crates/exempla/corpus/lista/methodi-copiae.fab` emitted runtime declarations
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t llvm
+  ../radix/crates/exempla/corpus/lista/methodi-copiae.fab` emitted runtime declarations
   and calls for `append_immutable`, `slice`, `take`, `take_last`,
   `drop_first`, `reverse`, and `sort`.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture` passed.
 - `timeout 120 cargo fmt --all -- --check` passed.
 - `git diff --check` passed.
@@ -221,31 +221,31 @@ Invariant:
 
 Validation:
 
-- `timeout 120 cargo test -p radix lowers_lista_mutatio_methods
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix lowers_lista_mutatio_methods
   -- --nocapture` passed.
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   stepper_runs_lista_methodi_mutatio_fixture -- --nocapture` passed.
-- `timeout 120 cargo test -p radix stepper_runs_morphologia_fixture
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_morphologia_fixture
   -- --nocapture` passed.
-- `timeout 120 cargo run -p faber-cli -- run
-  crates/exempla/corpus/lista/methodi-mutatio.fab` passed and printed
+- `timeout 120 cargo run -- run
+  ../radix/crates/exempla/corpus/lista/methodi-mutatio.fab` passed and printed
   `[1, 2, 4]` and `3`.
-- `timeout 120 cargo run -p faber-cli -- run
-  crates/exempla/corpus/morphologia/morphologia.fab` passed and printed all
+- `timeout 120 cargo run -- run
+  ../radix/crates/exempla/corpus/morphologia/morphologia.fab` passed and printed all
   nine pinned morphology method lines.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t rust
-  crates/exempla/corpus/lista/methodi-mutatio.fab` emitted `push`, guarded
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t rust
+  ../radix/crates/exempla/corpus/lista/methodi-mutatio.fab` emitted `push`, guarded
   front removal, `reverse`, and `sort`.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t sexp
-  crates/exempla/corpus/lista/methodi-mutatio.fab` failed on the existing
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t sexp
+  ../radix/crates/exempla/corpus/lista/methodi-mutatio.fab` failed on the existing
   S-expression array default gap: `default value for type Array(TypeId(1))`.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t wasm
-  crates/exempla/corpus/lista/methodi-mutatio.fab` emitted runtime import
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t wasm
+  ../radix/crates/exempla/corpus/lista/methodi-mutatio.fab` emitted runtime import
   probes for `append`, `remove_first`, `reverse_in_place`, and `sort`.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t llvm
-  crates/exempla/corpus/lista/methodi-mutatio.fab` emitted runtime declarations
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t llvm
+  ../radix/crates/exempla/corpus/lista/methodi-mutatio.fab` emitted runtime declarations
   and calls for `append`, `remove_first`, `reverse_in_place`, and `sort`.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture` passed.
 - `timeout 120 cargo fmt --all -- --check` passed.
 - `git diff --check` passed.
@@ -283,36 +283,36 @@ Invariant:
 
 Validation:
 
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   allows_no_value_return_for_nihil_side_effect_function -- --nocapture` passed.
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   lowers_ordo_elige_statement_continues_after_match -- --nocapture` passed.
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   lowers_all_returning_variant_discerne_without_fallthrough_return
   -- --nocapture` passed.
-- `timeout 120 cargo test -p radix stepper_runs_ordo_fixture
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_ordo_fixture
   -- --nocapture` passed.
-- `timeout 120 cargo test -p radix stepper_runs_discerne_fixture
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_discerne_fixture
   -- --nocapture` passed.
-- `timeout 120 cargo run -p faber-cli -- run
-  crates/exempla/corpus/ordo/ordo.fab` passed and printed `rubrum` and
+- `timeout 120 cargo run -- run
+  ../radix/crates/exempla/corpus/ordo/ordo.fab` passed and printed `rubrum` and
   `actum`.
-- `timeout 120 cargo run -p faber-cli -- run
-  crates/exempla/corpus/discerne/discerne.fab` passed and printed
+- `timeout 120 cargo run -- run
+  ../radix/crates/exempla/corpus/discerne/discerne.fab` passed and printed
   `discerne exempla parata`.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t rust
-  crates/exempla/corpus/ordo/ordo.fab` emitted native Rust enum matches for
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t rust
+  ../radix/crates/exempla/corpus/ordo/ordo.fab` emitted native Rust enum matches for
   `Color` and `Condicio`.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t sexp
-  crates/exempla/corpus/ordo/ordo.fab` failed on the existing S-expression enum
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t sexp
+  ../radix/crates/exempla/corpus/ordo/ordo.fab` failed on the existing S-expression enum
   default gap: `default value for type Enum(DefId(4096))`.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t wasm
-  crates/exempla/corpus/ordo/ordo.fab` emitted the existing variant aggregate
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t wasm
+  ../radix/crates/exempla/corpus/ordo/ordo.fab` emitted the existing variant aggregate
   and diagnostic import probes.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t llvm
-  crates/exempla/corpus/ordo/ordo.fab` emitted branch joins from successful
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t llvm
+  ../radix/crates/exempla/corpus/ordo/ordo.fab` emitted branch joins from successful
   variant arms to the post-`elige` blocks.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture` passed.
 - `timeout 120 cargo fmt --all -- --check` passed.
 - `git diff --check` passed.
@@ -344,26 +344,26 @@ Invariant:
 
 Validation:
 
-- `timeout 120 cargo test -p radix lowers_tacet_to_noop -- --nocapture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix lowers_tacet_to_noop -- --nocapture`
   passed.
-- `timeout 120 cargo test -p radix stepper_runs_tacet_fixture -- --nocapture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_tacet_fixture -- --nocapture`
   passed.
-- `timeout 120 cargo run -p faber-cli -- run
-  crates/exempla/corpus/tacet/tacet.fab` passed and printed `cond verum` and
+- `timeout 120 cargo run -- run
+  ../radix/crates/exempla/corpus/tacet/tacet.fab` passed and printed `cond verum` and
   `finis`.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t rust
-  crates/exempla/corpus/tacet/tacet.fab` emitted the existing explicit no-op
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t rust
+  ../radix/crates/exempla/corpus/tacet/tacet.fab` emitted the existing explicit no-op
   comment in Rust output.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t sexp
-  crates/exempla/corpus/tacet/tacet.fab` emitted ordinary control flow with no
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t sexp
+  ../radix/crates/exempla/corpus/tacet/tacet.fab` emitted ordinary control flow with no
   no-op runtime surface.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t wasm
-  crates/exempla/corpus/tacet/tacet.fab` emitted the existing diagnostic import
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t wasm
+  ../radix/crates/exempla/corpus/tacet/tacet.fab` emitted the existing diagnostic import
   probe and no no-op runtime surface.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t llvm
-  crates/exempla/corpus/tacet/tacet.fab` emitted ordinary branch flow with no
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t llvm
+  ../radix/crates/exempla/corpus/tacet/tacet.fab` emitted ordinary branch flow with no
   no-op runtime surface.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture` passed.
 - `timeout 120 cargo fmt --all -- --check` passed.
 - `git diff --check` passed.
@@ -393,39 +393,39 @@ Invariant:
 
 Validation:
 
-- `timeout 120 cargo test -p radix stepper_runs_finge_fixture
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_finge_fixture
   -- --nocapture` passed.
-- `timeout 120 cargo test -p radix stepper_runs_omnia_fixture
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_omnia_fixture
   -- --nocapture` passed.
-- `timeout 120 cargo test -p radix stepper_runs_discerne_insanum_fixture
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_discerne_insanum_fixture
   -- --nocapture` passed.
-- `timeout 120 cargo test -p radix stepper_runs_unio_fixture
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_unio_fixture
   -- --nocapture` passed.
-- `timeout 120 cargo run -p faber-cli -- run
-  crates/exempla/corpus/finge/finge.fab` passed and printed
+- `timeout 120 cargo run -- run
+  ../radix/crates/exempla/corpus/finge/finge.fab` passed and printed
   `finge expressiones paratae`.
-- `timeout 120 cargo run -p faber-cli -- run
-  crates/exempla/corpus/omnia/omnia.fab` passed and printed `activa`.
-- `timeout 120 cargo run -p faber-cli -- run
-  crates/exempla/corpus/integratio/discerne-insanum.fab` passed and printed
+- `timeout 120 cargo run -- run
+  ../radix/crates/exempla/corpus/omnia/omnia.fab` passed and printed `activa`.
+- `timeout 120 cargo run -- run
+  ../radix/crates/exempla/corpus/integratio/discerne-insanum.fab` passed and printed
   the three variant destructuring lines.
-- `timeout 120 cargo run -p faber-cli -- run
-  crates/exempla/corpus/unio/unio.fab` passed and printed inline union values
+- `timeout 120 cargo run -- run
+  ../radix/crates/exempla/corpus/unio/unio.fab` passed and printed inline union values
   plus tagged variant descriptions.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t rust
-  crates/exempla/corpus/integratio/discerne-insanum.fab` emitted native Rust
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t rust
+  ../radix/crates/exempla/corpus/integratio/discerne-insanum.fab` emitted native Rust
   enum variants and `match` destructuring.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t sexp
-  crates/exempla/corpus/integratio/discerne-insanum.fab` failed on the
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t sexp
+  ../radix/crates/exempla/corpus/integratio/discerne-insanum.fab` failed on the
   existing S-expression enum default gap: `default value for type
   Enum(DefId(4096))`.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t wasm
-  crates/exempla/corpus/integratio/discerne-insanum.fab` emitted the existing
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t wasm
+  ../radix/crates/exempla/corpus/integratio/discerne-insanum.fab` emitted the existing
   binary Wasm variant aggregate and variant-field probe helpers.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t llvm
-  crates/exempla/corpus/integratio/discerne-insanum.fab` emitted the existing
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t llvm
+  ../radix/crates/exempla/corpus/integratio/discerne-insanum.fab` emitted the existing
   LLVM variant aggregate and variant-field probe helpers.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture` passed.
 - `timeout 120 cargo fmt --all -- --check` passed.
 - `git diff --check` passed.
@@ -457,31 +457,31 @@ Invariant:
 
 Validation:
 
-- `timeout 120 cargo test -p radix stepper_runs_optionalis_fixture
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_optionalis_fixture
   -- --nocapture` passed.
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   stepper_runs_optional_chain_operator_fixture -- --nocapture` passed.
-- `timeout 120 cargo test -p radix stepper_keeps_ordinary_index_strict
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_keeps_ordinary_index_strict
   -- --nocapture` passed.
-- `timeout 120 cargo run -p faber-cli -- run
-  crates/exempla/corpus/optionalis/optionalis.fab` passed and printed omitted
+- `timeout 120 cargo run -- run
+  ../radix/crates/exempla/corpus/optionalis/optionalis.fab` passed and printed omitted
   optional fields, missing optional indices, and coalesced fallback output.
-- `timeout 120 cargo run -p faber-cli -- run
-  crates/exempla/corpus/operatores/optional-chain.fab` passed and printed
+- `timeout 120 cargo run -- run
+  ../radix/crates/exempla/corpus/operatores/optional-chain.fab` passed and printed
   optional field and optional index output.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t rust
-  crates/exempla/corpus/optionalis/optionalis.fab` emitted `None` for omitted
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t rust
+  ../radix/crates/exempla/corpus/optionalis/optionalis.fab` emitted `None` for omitted
   `sponte` fields and `.get(...).cloned()` for optional index access.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t sexp
-  crates/exempla/corpus/optionalis/optionalis.fab` failed on the existing
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t sexp
+  ../radix/crates/exempla/corpus/optionalis/optionalis.fab` failed on the existing
   S-expression struct default gap: `default value for type Struct(DefId(4097))`.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t wasm
-  crates/exempla/corpus/optionalis/optionalis.fab` emitted the existing binary
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t wasm
+  ../radix/crates/exempla/corpus/optionalis/optionalis.fab` emitted the existing binary
   Wasm optional aggregate field/index probe.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t llvm
-  crates/exempla/corpus/optionalis/optionalis.fab` emitted the existing LLVM
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t llvm
+  ../radix/crates/exempla/corpus/optionalis/optionalis.fab` emitted the existing LLVM
   optional aggregate field/index probe.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture` passed.
 - `timeout 120 cargo fmt --all -- --check` passed.
 - `git diff --check` passed.
@@ -508,27 +508,27 @@ Invariant:
 
 Validation:
 
-- `timeout 120 cargo test -p radix stepper_rejects_omitte_without_incipit
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_rejects_omitte_without_incipit
   -- --nocapture` passed.
-- `timeout 120 cargo test -p radix function_name_prefers_source_and_entry
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix function_name_prefers_source_and_entry
   -- --nocapture` passed.
-- `timeout 120 cargo run -p faber-cli -- run
-  crates/exempla/corpus/omitte/omitte.fab` failed cleanly with
+- `timeout 120 cargo run -- run
+  ../radix/crates/exempla/corpus/omitte/omitte.fab` failed cleanly with
   `error: no entry function in MIR program` instead of panicking through the
   skipped test body.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t rust
-  crates/exempla/corpus/omitte/omitte.fab` emitted the existing ignored Rust
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t rust
+  ../radix/crates/exempla/corpus/omitte/omitte.fab` emitted the existing ignored Rust
   test shape.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t sexp
-  crates/exempla/corpus/omitte/omitte.fab` failed on the existing
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t sexp
+  ../radix/crates/exempla/corpus/omitte/omitte.fab` failed on the existing
   S-expression assert runtime-call gap: `runtime_call Assert`.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t wasm
-  crates/exempla/corpus/omitte/omitte.fab` emitted the existing binary Wasm
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t wasm
+  ../radix/crates/exempla/corpus/omitte/omitte.fab` emitted the existing binary Wasm
   probe with `database_connection` and assert import names.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t llvm
-  crates/exempla/corpus/omitte/omitte.fab` emitted the existing LLVM assert
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t llvm
+  ../radix/crates/exempla/corpus/omitte/omitte.fab` emitted the existing LLVM assert
   runtime-call probe.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture` passed.
 - `timeout 120 cargo fmt --all -- --check` passed.
 - `git diff --check` passed.
@@ -562,26 +562,26 @@ MIR-boundary backend status:
 
 Validation:
 
-- `timeout 120 cargo test -p radix stepper_runs_regex_conversio_fixture
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_regex_conversio_fixture
   -- --nocapture` passed.
-- `timeout 120 cargo test -p radix stepper_runs_lege_regex_fixture
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_lege_regex_fixture
   -- --nocapture` passed.
-- `timeout 120 cargo run -p faber-cli -- run
-  crates/exempla/corpus/literalia/regex.fab` passed and printed regex pattern
+- `timeout 120 cargo run -- run
+  ../radix/crates/exempla/corpus/literalia/regex.fab` passed and printed regex pattern
   carrier text.
-- `printf 'salve\n' | timeout 120 cargo run -p faber-cli -- run
-  crates/exempla/corpus/lege/lege.fab` passed and printed `(?g)\d+` followed
+- `printf 'salve\n' | timeout 120 cargo run -- run
+  ../radix/crates/exempla/corpus/lege/lege.fab` passed and printed `(?g)\d+` followed
   by the supplied line.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t sexp
-  crates/exempla/corpus/literalia/regex.fab` failed on the existing
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t sexp
+  ../radix/crates/exempla/corpus/literalia/regex.fab` failed on the existing
   S-expression regex default gap: `default value for type Primitive(Regex)`.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t wasm
-  crates/exempla/corpus/literalia/regex.fab` emitted the existing binary Wasm
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t wasm
+  ../radix/crates/exempla/corpus/literalia/regex.fab` emitted the existing binary Wasm
   probe with regex literal import names.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t llvm
-  crates/exempla/corpus/literalia/regex.fab` emitted the existing LLVM probe
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t llvm
+  ../radix/crates/exempla/corpus/literalia/regex.fab` emitted the existing LLVM probe
   with regex literal declarations.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture` passed.
 - `timeout 120 cargo fmt --all -- --check` passed.
 - `git diff --check` passed.
@@ -603,15 +603,15 @@ MIR-boundary backend status:
 
 Validation:
 
-- `timeout 120 cargo run -p faber-cli -- run
-  crates/exempla/corpus/conversio/conversio.fab` passed and printed `0.0` for
+- `timeout 120 cargo run -- run
+  ../radix/crates/exempla/corpus/conversio/conversio.fab` passed and printed `0.0` for
   the recovered `fractus` value.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t rust
-  crates/exempla/corpus/conversio/conversio.fab` showed Rust emission lowering
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t rust
+  ../radix/crates/exempla/corpus/conversio/conversio.fab` showed Rust emission lowering
   `f2` as `f64` with `unwrap_or(0.0)`.
-- `timeout 120 cargo test -p radix stepper_runs_conversio_exemplum
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_conversio_exemplum
   -- --nocapture` passed.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture` passed.
 - `timeout 120 cargo fmt --all -- --check` passed.
 - `git diff --check` passed.
@@ -635,26 +635,26 @@ MIR-boundary backend status:
 
 Validation:
 
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   conversio_capitalized_user_type_target_parses_as_type -- --nocapture`
   passed.
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   stepper_runs_valor_genus_conversio_fixture -- --nocapture` passed.
-- `timeout 120 cargo test -p radix valor_bridge_scalars -- --nocapture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix valor_bridge_scalars -- --nocapture`
   passed after the bridge API started accepting optional interner context.
-- `timeout 120 cargo run -p faber-cli -- run
-  crates/exempla/corpus/conversio/valor-genus.fab` passed and printed the
+- `timeout 120 cargo run -- run
+  ../radix/crates/exempla/corpus/conversio/valor-genus.fab` passed and printed the
   current struct debug representation for `roundtrip`.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t sexp
-  crates/exempla/corpus/conversio/valor-genus.fab` failed on the existing
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t sexp
+  ../radix/crates/exempla/corpus/conversio/valor-genus.fab` failed on the existing
   S-expression valor default gap: `default value for type Primitive(Valor)`.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t wasm
-  crates/exempla/corpus/conversio/valor-genus.fab` failed on the existing Wasm
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t wasm
+  ../radix/crates/exempla/corpus/conversio/valor-genus.fab` failed on the existing Wasm
   valor type gap: `MIR-to-WASM unsupported: type Primitive(Valor)`.
-- `timeout 120 cargo run -p radix --bin radix -- emit -t llvm
-  crates/exempla/corpus/conversio/valor-genus.fab` emitted the existing
+- `timeout 120 cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t llvm
+  ../radix/crates/exempla/corpus/conversio/valor-genus.fab` emitted the existing
   pointer-carrier runtime conversion probe for valor/genus conversion.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture` passed.
 - `timeout 120 cargo fmt --all -- --check` passed.
 - `git diff --check` passed.
@@ -679,39 +679,39 @@ MIR-boundary backend status:
 
 Validation:
 
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   lowers_tensor_intrinsic_methods_to_collection_ops -- --nocapture` passed.
-- `timeout 120 cargo test -p radix stepper_runs_tensor_shape_fixture
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_tensor_shape_fixture
   -- --nocapture` passed.
-- `timeout 120 cargo test -p radix stepper_runs_tensor_textus_fixture
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_tensor_textus_fixture
   -- --nocapture` passed.
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   stepper_runs_tensor_arithmetic_elementwise_fixture -- --nocapture` passed.
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   stepper_runs_tensor_arithmetic_reduction_fixture -- --nocapture` passed.
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   stepper_runs_valor_tensor_conversio_fixture -- --nocapture` passed after array
   display switched from debug output to list output.
-- `cargo run -p faber-cli -- run crates/exempla/corpus/tensor/shape.fab`
+- `cargo run -- run ../radix/crates/exempla/corpus/tensor/shape.fab`
   passed and printed `2`, `[2, 3]`, `2`, `9.0`, `3`.
-- `cargo run -p faber-cli -- run crates/exempla/corpus/tensor/textus.fab`
+- `cargo run -- run ../radix/crates/exempla/corpus/tensor/textus.fab`
   passed and printed `alpha`.
-- `cargo run -p faber-cli -- run
-  crates/exempla/corpus/tensor/arithmetic-elementwise.fab` passed and printed
+- `cargo run -- run
+  ../radix/crates/exempla/corpus/tensor/arithmetic-elementwise.fab` passed and printed
   `[1.0, 4.0, 9.0, 16.0]`.
-- `cargo run -p faber-cli -- run
-  crates/exempla/corpus/tensor/arithmetic-reduction.fab` passed and printed
+- `cargo run -- run
+  ../radix/crates/exempla/corpus/tensor/arithmetic-reduction.fab` passed and printed
   `21.0`, `3.5`.
-- `cargo run -p radix --bin radix -- emit -t sexp
-  crates/exempla/corpus/tensor/shape.fab` failed on the existing S-expression
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t sexp
+  ../radix/crates/exempla/corpus/tensor/shape.fab` failed on the existing S-expression
   array default gap: `default value for type Array(...)`.
-- `cargo run -p radix --bin radix -- emit -t wasm
-  crates/exempla/corpus/tensor/shape.fab` failed on the existing Wasm tensor type
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t wasm
+  ../radix/crates/exempla/corpus/tensor/shape.fab` failed on the existing Wasm tensor type
   gap: `MIR-to-WASM unsupported: type Tensor(...)`.
-- `cargo run -p radix --bin radix -- emit -t llvm
-  crates/exempla/corpus/tensor/shape.fab` emitted an experimental LLVM probe
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t llvm
+  ../radix/crates/exempla/corpus/tensor/shape.fab` emitted an experimental LLVM probe
   declaring the new tensor runtime calls.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture` failed as expected on the remaining unclassified live failure.
 - `cargo fmt --all -- --check` passed.
 - `git diff --check` passed.
@@ -738,9 +738,9 @@ MIR-boundary backend status:
 
 Validation:
 
-- `timeout 120 cargo test -p exempla script_expected_failure -- --nocapture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p exempla script_expected_failure -- --nocapture`
   passed.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture` failed as expected on remaining unclassified live failures.
 - `cargo fmt --all -- --check` passed.
 - `git diff --check` passed.
@@ -764,24 +764,24 @@ MIR-boundary backend status:
 
 Validation:
 
-- `timeout 120 cargo test -p radix validates_valor_array_carrier_aggregate
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix validates_valor_array_carrier_aggregate
   -- --nocapture` passed.
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   stepper_runs_valor_tensor_conversio_fixture -- --nocapture` passed.
-- `cargo run -p faber-cli -- run
-  crates/exempla/corpus/conversio/valor-tensor.fab` passed and printed the
+- `cargo run -- run
+  ../radix/crates/exempla/corpus/conversio/valor-tensor.fab` passed and printed the
   current stepper array carrier debug form:
   `Array(RefCell { value: [Int(1), Int(2), Int(3), Int(4)] })`.
-- `cargo run -p radix --bin radix -- emit -t sexp
-  crates/exempla/corpus/conversio/valor-tensor.fab` failed on the existing
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t sexp
+  ../radix/crates/exempla/corpus/conversio/valor-tensor.fab` failed on the existing
   S-expression valor default gap: `default value for type Primitive(Valor)`.
-- `cargo run -p radix --bin radix -- emit -t wasm
-  crates/exempla/corpus/conversio/valor-tensor.fab` failed on the existing Wasm
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t wasm
+  ../radix/crates/exempla/corpus/conversio/valor-tensor.fab` failed on the existing Wasm
   valor type gap: `MIR-to-WASM unsupported: type Primitive(Valor)`.
-- `cargo run -p radix --bin radix -- emit -t llvm
-  crates/exempla/corpus/conversio/valor-tensor.fab` emitted an experimental
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t llvm
+  ../radix/crates/exempla/corpus/conversio/valor-tensor.fab` emitted an experimental
   LLVM probe with pointer-carrier runtime conversion calls.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture` failed as expected on remaining unclassified live failures.
 - `cargo fmt --all -- --check` passed.
 - `git diff --check` passed.
@@ -807,24 +807,24 @@ MIR-boundary backend status:
 
 Validation:
 
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   lowers_tensor_longitudo_to_collection_length -- --nocapture` passed.
-- `timeout 120 cargo test -p radix stepper_runs_tensor_decl_fixture
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_tensor_decl_fixture
   -- --nocapture` passed.
-- `cargo run -p faber-cli -- run crates/exempla/corpus/tensor/decl.fab`
+- `cargo run -- run ../radix/crates/exempla/corpus/tensor/decl.fab`
   passed and printed `0`.
-- `cargo run -p faber-cli -- run crates/exempla/corpus/conversio/tensor.fab`
+- `cargo run -- run ../radix/crates/exempla/corpus/conversio/tensor.fab`
   passed and printed `4`, `4`, and five `0` lines.
-- `cargo run -p radix --bin radix -- emit -t sexp
-  crates/exempla/corpus/tensor/decl.fab` failed on the existing tensor default
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t sexp
+  ../radix/crates/exempla/corpus/tensor/decl.fab` failed on the existing tensor default
   value gap: `default value for type Tensor(...)`.
-- `cargo run -p radix --bin radix -- emit -t wasm
-  crates/exempla/corpus/tensor/decl.fab` failed on the existing Wasm tensor type
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t wasm
+  ../radix/crates/exempla/corpus/tensor/decl.fab` failed on the existing Wasm tensor type
   gap: `MIR-to-WASM unsupported: type Tensor(...)`.
-- `cargo run -p radix --bin radix -- emit -t llvm
-  crates/exempla/corpus/tensor/decl.fab` emitted an experimental LLVM probe with
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t llvm
+  ../radix/crates/exempla/corpus/tensor/decl.fab` emitted an experimental LLVM probe with
   `__faber_aggregate_tensor_0` and `__faber_runtime_length_1_ptr_to_i64`.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture` failed as expected on remaining unclassified live failures.
 - `cargo fmt --all -- --check` passed.
 - `git diff --check` passed.
@@ -852,9 +852,9 @@ MIR-boundary backend status:
 
 Validation:
 
-- `timeout 120 cargo test -p exempla script_expected_failure -- --nocapture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p exempla script_expected_failure -- --nocapture`
   passed.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture` failed as expected on remaining unclassified live failures.
 - `cargo fmt --all -- --check` passed.
 - `git diff --check` passed.
@@ -883,13 +883,13 @@ MIR-boundary backend status:
 
 Validation:
 
-- `cargo run -p faber-cli -- run crates/exempla/corpus/binarius/binarius.fab`
+- `cargo run -- run ../radix/crates/exempla/corpus/binarius/binarius.fab`
   passed and printed direct booleans as `verum` and `falsum`.
-- `cargo run -p faber-cli -- run crates/exempla/corpus/vel/vel.fab` passed and
+- `cargo run -- run ../radix/crates/exempla/corpus/vel/vel.fab` passed and
   printed direct `falsum`.
-- `timeout 120 cargo test -p exempla script_expected_failure -- --nocapture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p exempla script_expected_failure -- --nocapture`
   passed.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture` failed as expected on remaining unclassified live failures.
 - `cargo fmt --all -- --check` passed.
 - `git diff --check` passed.
@@ -911,23 +911,23 @@ MIR-boundary backend status:
 
 Validation:
 
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   lowers_logical_operators_to_short_circuit_branches -- --nocapture` passed.
-- `timeout 120 cargo test -p radix stepper_short_circuits_logical_operands
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_short_circuits_logical_operands
   -- --nocapture` passed.
-- `cargo run -p faber-cli -- run crates/exempla/corpus/binarius/binarius.fab`
+- `cargo run -- run ../radix/crates/exempla/corpus/binarius/binarius.fab`
   passed and no longer prints `hoc non videatur` for `falsum et carum()`.
-- `cargo run -p radix --bin radix -- emit -t sexp
-  crates/exempla/corpus/binarius/binarius.fab` failed before the logical section
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t sexp
+  ../radix/crates/exempla/corpus/binarius/binarius.fab` failed before the logical section
   on the existing S-expression option default gap:
   `default value for type Option(TypeId(0))`.
-- `cargo run -p radix --bin radix -- emit -t wasm
-  crates/exempla/corpus/binarius/binarius.fab` emitted an experimental Wasm
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t wasm
+  ../radix/crates/exempla/corpus/binarius/binarius.fab` emitted an experimental Wasm
   probe for the branch-shaped MIR.
-- `cargo run -p radix --bin radix -- emit -t llvm
-  crates/exempla/corpus/binarius/binarius.fab` emitted an experimental LLVM
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t llvm
+  ../radix/crates/exempla/corpus/binarius/binarius.fab` emitted an experimental LLVM
   probe with branch-shaped logical control flow.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture` failed as expected on remaining unclassified live failures.
 - `cargo fmt --all -- --check` passed.
 - `git diff --check` passed.
@@ -952,9 +952,9 @@ MIR-boundary backend status:
 
 Validation:
 
-- `timeout 120 cargo test -p exempla script_expected_failure -- --nocapture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p exempla script_expected_failure -- --nocapture`
   passed.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture` failed as expected on remaining unclassified live failures.
 - `cargo fmt --all -- --check` passed.
 - `git diff --check` passed.
@@ -976,29 +976,29 @@ MIR-boundary backend status:
 
 Validation:
 
-- `timeout 120 cargo test -p radix stepper_concatenates_textus_addition
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_concatenates_textus_addition
   -- --nocapture` passed.
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   stepper_runs_assignatio_fixture_with_textus_addition -- --nocapture` passed.
-- `cargo run -p faber-cli -- run
-  crates/exempla/corpus/assignatio/assignatio.fab` passed and printed `20`,
+- `cargo run -- run
+  ../radix/crates/exempla/corpus/assignatio/assignatio.fab` passed and printed `20`,
   `25`, `15`, `30`, `10`, `salve munde`.
-- `cargo run -p faber-cli -- run crates/exempla/corpus/ego/ego.fab` passed and
+- `cargo run -- run ../radix/crates/exempla/corpus/ego/ego.fab` passed and
   printed `capsa: prima`.
-- `cargo run -p faber-cli -- run crates/exempla/corpus/redde/redde.fab` passed
+- `cargo run -- run ../radix/crates/exempla/corpus/redde/redde.fab` passed
   and printed `30`, `Salve, Munde`, `42`, `0`, `20`.
-- `cargo run -p faber-cli -- run crates/exempla/corpus/sub/sub.fab` passed and
+- `cargo run -- run ../radix/crates/exempla/corpus/sub/sub.fab` passed and
   printed `Lupa latrat`.
-- `cargo run -p radix --bin radix -- emit -t sexp
-  crates/exempla/corpus/assignatio/assignatio.fab` emitted a Racket probe with
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t sexp
+  ../radix/crates/exempla/corpus/assignatio/assignatio.fab` emitted a Racket probe with
   `string-append`.
-- `cargo run -p radix --bin radix -- emit -t wasm
-  crates/exempla/corpus/assignatio/assignatio.fab` emitted an experimental Wasm
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t wasm
+  ../radix/crates/exempla/corpus/assignatio/assignatio.fab` emitted an experimental Wasm
   probe importing `__faber_text_concat`.
-- `cargo run -p radix --bin radix -- emit -t llvm
-  crates/exempla/corpus/assignatio/assignatio.fab` emitted an experimental LLVM
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t llvm
+  ../radix/crates/exempla/corpus/assignatio/assignatio.fab` emitted an experimental LLVM
   probe importing `__faber_text_concat_2_ptr_ptr_to_ptr`.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture` failed as expected on remaining unclassified live failures.
 - `cargo fmt --all -- --check` passed.
 - `git diff --check` passed.
@@ -1020,27 +1020,27 @@ MIR-boundary backend status:
 
 Validation:
 
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   lowers_numeric_operator_methods_to_binary_mir -- --nocapture` passed.
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   stepper_runs_numeric_operator_methods_fixture -- --nocapture` passed.
-- `cargo run -p faber-cli -- run
-  crates/exempla/corpus/intrinseca/numeric-operator-methods.fab` passed and
+- `cargo run -- run
+  ../radix/crates/exempla/corpus/intrinseca/numeric-operator-methods.fab` passed and
   printed `9`, `15`, `8`.
-- `cargo run -p radix --bin radix -- mir
-  crates/exempla/corpus/intrinseca/numeric-operator-methods.fab` passed and
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- mir
+  ../radix/crates/exempla/corpus/intrinseca/numeric-operator-methods.fab` passed and
   shows `+`, `*`, and `&` binary MIR for `addita`, `multiplicata`, and
   `coniuncta`, plus assignment back into `acc` for `adde`.
-- `cargo run -p radix --bin radix -- emit -t sexp
-  crates/exempla/corpus/intrinseca/numeric-operator-methods.fab` emitted a
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t sexp
+  ../radix/crates/exempla/corpus/intrinseca/numeric-operator-methods.fab` emitted a
   Racket probe with `+`, `*`, and `bitwise-and`.
-- `cargo run -p radix --bin radix -- emit -t wasm
-  crates/exempla/corpus/intrinseca/numeric-operator-methods.fab` emitted an
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t wasm
+  ../radix/crates/exempla/corpus/intrinseca/numeric-operator-methods.fab` emitted an
   experimental Wasm probe.
-- `cargo run -p radix --bin radix -- emit -t llvm
-  crates/exempla/corpus/intrinseca/numeric-operator-methods.fab` emitted an
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t llvm
+  ../radix/crates/exempla/corpus/intrinseca/numeric-operator-methods.fab` emitted an
   experimental LLVM probe with `fadd`, `fmul`, and `and`.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture` failed as expected on remaining unclassified live failures.
 - `cargo fmt --all -- --check` passed.
 - `git diff --check` passed.
@@ -1065,29 +1065,29 @@ MIR-boundary backend status:
 
 Validation:
 
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   promoted_tabula_methods_share_mir_ops_with_registry -- --nocapture` passed.
-- `timeout 120 cargo test -p radix lowers_tabula_runtime_methods_to_intrinsics
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix lowers_tabula_runtime_methods_to_intrinsics
   -- --nocapture` passed.
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   stepper_runs_tabula_methodi_accessus_fixture -- --nocapture` passed.
-- `cargo run -p faber-cli -- run
-  crates/exempla/corpus/tabula/methodi-accessus.fab` passed and printed
+- `cargo run -- run
+  ../radix/crates/exempla/corpus/tabula/methodi-accessus.fab` passed and printed
   `95`, `nihil`, `0`, `verum`, `verum`, `1`, `falsum`.
-- `cargo run -p radix --bin radix -- mir
-  crates/exempla/corpus/tabula/methodi-accessus.fab` passed and shows
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- mir
+  ../radix/crates/exempla/corpus/tabula/methodi-accessus.fab` passed and shows
   `runtime collection put` for both `puncta.pone(...)` calls.
-- `cargo run -p radix --bin radix -- emit -t sexp
-  crates/exempla/corpus/tabula/methodi-accessus.fab` failed on the existing
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t sexp
+  ../radix/crates/exempla/corpus/tabula/methodi-accessus.fab` failed on the existing
   S-expression map default gap: `default value for type Map(TypeId(0),
   TypeId(1))`.
-- `cargo run -p radix --bin radix -- emit -t wasm
-  crates/exempla/corpus/tabula/methodi-accessus.fab` failed on the existing
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t wasm
+  ../radix/crates/exempla/corpus/tabula/methodi-accessus.fab` failed on the existing
   Wasm option-carrier gap: `option coalesce mixed wasm carriers`.
-- `cargo run -p radix --bin radix -- emit -t llvm
-  crates/exempla/corpus/tabula/methodi-accessus.fab` emitted an experimental
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t llvm
+  ../radix/crates/exempla/corpus/tabula/methodi-accessus.fab` emitted an experimental
   LLVM probe with `__faber_runtime_put_3_ptr_ptr_i64`.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture` failed as expected on remaining unclassified live failures.
 
 Live script e2e effect:
@@ -1110,28 +1110,28 @@ MIR-boundary backend status:
 
 Validation:
 
-- `timeout 120 cargo test -p radix approximata -- --nocapture` passed.
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix approximata -- --nocapture` passed.
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   lowers_numeric_runtime_methods_to_intrinsics -- --nocapture` passed.
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   stepper_runs_fractus_approximata_fixture -- --nocapture` passed.
-- `cargo run -p faber-cli -- run
-  crates/exempla/corpus/intrinseca/fractus-approximata.fab` passed and
+- `cargo run -- run
+  ../radix/crates/exempla/corpus/intrinseca/fractus-approximata.fab` passed and
   printed `verum`, `falsum`.
-- `cargo run -p radix --bin radix -- mir
-  crates/exempla/corpus/intrinseca/fractus-approximata.fab` passed and shows
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- mir
+  ../radix/crates/exempla/corpus/intrinseca/fractus-approximata.fab` passed and shows
   `runtime collection approximate(_0, _1, const float 0.2) -> ty#3`.
-- `cargo run -p radix --bin radix -- emit -t sexp
-  crates/exempla/corpus/intrinseca/fractus-approximata.fab` failed on the
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t sexp
+  ../radix/crates/exempla/corpus/intrinseca/fractus-approximata.fab` failed on the
   existing S-expression collection runtime-call gap:
   `runtime_call Collection(Approximate)`.
-- `cargo run -p radix --bin radix -- emit -t wasm
-  crates/exempla/corpus/intrinseca/fractus-approximata.fab` emitted an
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t wasm
+  ../radix/crates/exempla/corpus/intrinseca/fractus-approximata.fab` emitted an
   experimental Wasm probe with `approximate_3_f64_f64_f64_to_i32`.
-- `cargo run -p radix --bin radix -- emit -t llvm
-  crates/exempla/corpus/intrinseca/fractus-approximata.fab` emitted an
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t llvm
+  ../radix/crates/exempla/corpus/intrinseca/fractus-approximata.fab` emitted an
   experimental LLVM probe with `__faber_runtime_approximate_3_f64_f64_f64_to_i1`.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture` failed as expected on remaining unclassified live failures.
 
 Live script e2e effect:
@@ -1155,26 +1155,26 @@ MIR-boundary backend status:
 
 Validation:
 
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   lista_summa_is_promoted_to_mir_collection_sum` passed.
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   stepper_runs_in_parameter_summa_fixture` passed.
-- `timeout 120 cargo test -p radix stepper_sums_empty_numerus_lista`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_sums_empty_numerus_lista`
   passed.
-- `cargo run -p faber-cli -- run crates/exempla/corpus/in/in.fab` passed and
+- `cargo run -- run ../radix/crates/exempla/corpus/in/in.fab` passed and
   printed `6`.
-- `cargo run -p radix --bin radix -- mir crates/exempla/corpus/in/in.fab`
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- mir ../radix/crates/exempla/corpus/in/in.fab`
   passed and shows `runtime collection sum(_0) -> ty#1`.
-- `cargo run -p radix --bin radix -- emit -t sexp
-  crates/exempla/corpus/in/in.fab` failed on the existing S-expression
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t sexp
+  ../radix/crates/exempla/corpus/in/in.fab` failed on the existing S-expression
   collection runtime-call gap: `runtime_call Collection(Sum)`.
-- `cargo run -p radix --bin radix -- emit -t wasm
-  crates/exempla/corpus/in/in.fab` emitted an experimental Wasm probe with
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t wasm
+  ../radix/crates/exempla/corpus/in/in.fab` emitted an experimental Wasm probe with
   `sum_1_aggregate_to_i64`.
-- `cargo run -p radix --bin radix -- emit -t llvm
-  crates/exempla/corpus/in/in.fab` emitted an experimental LLVM probe with
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t llvm
+  ../radix/crates/exempla/corpus/in/in.fab` emitted an experimental LLVM probe with
   `__faber_runtime_sum_1_ptr_to_i64`.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture` failed as expected on remaining unclassified live failures.
 
 Live script e2e effect:
@@ -1199,22 +1199,22 @@ MIR-boundary backend status:
 
 Validation:
 
-- `timeout 120 cargo test -p radix stepper_runs_octeti_unify_fixture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_octeti_unify_fixture`
   passed.
-- `timeout 120 cargo test -p radix stepper_appends_octeti_byte_in_place`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_appends_octeti_byte_in_place`
   passed.
-- `cargo run -p faber-cli -- run crates/exempla/corpus/octeti/unify.fab`
+- `cargo run -- run ../radix/crates/exempla/corpus/octeti/unify.fab`
   passed and printed `4`, `222`, `2`.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture`
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture`
   failed as expected on remaining unclassified live failures.
-- `cargo run -p radix --bin radix -- emit -t sexp
-  crates/exempla/corpus/octeti/unify.fab` failed on existing collection
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t sexp
+  ../radix/crates/exempla/corpus/octeti/unify.fab` failed on existing collection
   runtime-call support (`Collection(Length)`).
-- `cargo run -p radix --bin radix -- emit -t wasm-text
-  crates/exempla/corpus/octeti/unify.fab` failed on existing
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t wasm-text
+  ../radix/crates/exempla/corpus/octeti/unify.fab` failed on existing
   `SizedNumeric(Numerus, U8)` support.
-- `cargo run -p radix --bin radix -- emit -t llvm-text
-  crates/exempla/corpus/octeti/unify.fab` emitted an experimental probe.
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t llvm-text
+  ../radix/crates/exempla/corpus/octeti/unify.fab` emitted an experimental probe.
 
 Live script e2e effect:
 
@@ -1235,21 +1235,21 @@ MIR-boundary backend status:
 
 Validation:
 
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   stepper_runs_instans_conversio_fixture` passed.
-- `cargo run -p faber-cli -- run
-  crates/exempla/corpus/conversio/instans.fab` passed and printed
+- `cargo run -- run
+  ../radix/crates/exempla/corpus/conversio/instans.fab` passed and printed
   seconds/millis/micros/nanos/narrowed RFC3339 values at declared precision.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture`
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture`
   failed as expected on remaining unclassified live failures.
-- `cargo run -p radix --bin radix -- emit -t sexp
-  crates/exempla/corpus/conversio/instans.fab` failed on the existing
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t sexp
+  ../radix/crates/exempla/corpus/conversio/instans.fab` failed on the existing
   `default value for type Primitive(Valor)` backend gap.
-- `cargo run -p radix --bin radix -- emit -t wasm-text
-  crates/exempla/corpus/conversio/instans.fab` failed on the existing
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t wasm-text
+  ../radix/crates/exempla/corpus/conversio/instans.fab` failed on the existing
   `type Primitive(Valor)` backend gap.
-- `cargo run -p radix --bin radix -- emit -t llvm-text
-  crates/exempla/corpus/conversio/instans.fab` emitted an experimental probe.
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t llvm-text
+  ../radix/crates/exempla/corpus/conversio/instans.fab` emitted an experimental probe.
 
 Live script e2e effect:
 
@@ -1270,17 +1270,17 @@ MIR-boundary backend status:
 
 Validation:
 
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   stepper_runs_octeti_conversio_fixture` passed.
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   stepper_runs_radix_conversio_fixture` passed.
-- `cargo run -p faber-cli -- run
-  crates/exempla/corpus/conversio/octeti.fab` passed and printed `2`, `hi`,
+- `cargo run -- run
+  ../radix/crates/exempla/corpus/conversio/octeti.fab` passed and printed `2`, `hi`,
   `?`, `2`, `hi`, `x`.
-- `cargo run -p faber-cli -- run
-  crates/exempla/corpus/conversio/radix.fab` passed and printed `255`, `10`,
+- `cargo run -- run
+  ../radix/crates/exempla/corpus/conversio/radix.fab` passed and printed `255`, `10`,
   `493`.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture`
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture`
   failed as expected on remaining unclassified live failures.
 - `cargo fmt --all -- --check` passed with the repository's existing rustfmt
   `struct_lit_width` warning.
@@ -1312,11 +1312,11 @@ MIR-boundary backend status:
 
 Validation:
 
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   stepper_runs_collection_conversio_fixture` passed.
-- `cargo run -p faber-cli -- run
-  crates/exempla/corpus/conversio/collectiones.fab` passed.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture`
+- `cargo run -- run
+  ../radix/crates/exempla/corpus/conversio/collectiones.fab` passed.
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture`
   failed as expected on remaining unclassified live failures.
 
 Live script e2e effect:
@@ -1340,16 +1340,16 @@ MIR-boundary backend status:
 
 Validation:
 
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   stepper_handles_direct_conversio_inside_fac_cape` passed.
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   stepper_propagates_failable_runtime_conversio_through_try_call` passed.
-- `cargo run -p radix --bin radix -- mir
-  crates/exempla/corpus/conversio/fallibilis.fab` passed and now shows
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- mir
+  ../radix/crates/exempla/corpus/conversio/fallibilis.fab` passed and now shows
   `tutumDirect` using `try_call f4(_0)`.
-- `cargo run -p faber-cli -- run
-  crates/exempla/corpus/conversio/fallibilis.fab` passed.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture`
+- `cargo run -- run
+  ../radix/crates/exempla/corpus/conversio/fallibilis.fab` passed.
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture`
   failed as expected on remaining unclassified live failures.
 
 Live script e2e effect:
@@ -1371,18 +1371,18 @@ MIR-boundary backend status:
 
 Validation:
 
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   stepper_propagates_failable_runtime_conversio_through_try_call` passed.
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   stepper_keeps_inline_conversio_recovery_local` passed.
-- `timeout 120 cargo test -p radix
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix
   stepper_keeps_non_failable_conversio_failure_hard` passed.
-- `cargo run -p radix --bin radix -- mir
-  crates/exempla/corpus/conversio/fallibilis.fab` passed.
-- `cargo run -p faber-cli -- run
-  crates/exempla/corpus/conversio/fallibilis.fab` still fails with
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- mir
+  ../radix/crates/exempla/corpus/conversio/fallibilis.fab` passed.
+- `cargo run -- run
+  ../radix/crates/exempla/corpus/conversio/fallibilis.fab` still fails with
   `textus to instans conversion failed`.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture`
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture`
   failed as expected on remaining unclassified live failures.
 
 Live script e2e effect:
@@ -1403,23 +1403,23 @@ Live script e2e effect:
 
 Validation:
 
-- `timeout 120 cargo test -p radix stepper_runs_instans_runtime_conversio`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_instans_runtime_conversio`
   passed.
-- `timeout 180 cargo test -p radix instans` passed.
-- `cargo run -p radix --bin radix -- mir
-  crates/exempla/corpus/conversio/instans.fab` passed.
-- `cargo run -p radix --bin radix -- mir
-  crates/exempla/corpus/conversio/fallibilis.fab` passed.
-- `cargo run -p faber-cli -- run
-  crates/exempla/corpus/conversio/instans.fab` still aborts at a runtime
+- `timeout 180 cargo test --manifest-path ../radix/Cargo.toml -p radix instans` passed.
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- mir
+  ../radix/crates/exempla/corpus/conversio/instans.fab` passed.
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- mir
+  ../radix/crates/exempla/corpus/conversio/fallibilis.fab` passed.
+- `cargo run -- run
+  ../radix/crates/exempla/corpus/conversio/instans.fab` still aborts at a runtime
   assertion after conversions lower and execute. The remaining mismatch is the
   exemplar/Rust precision expectation around converting a seconds-precision
   `instans` to `instans<ms>`.
-- `cargo run -p faber-cli -- run
-  crates/exempla/corpus/conversio/fallibilis.fab` now fails with
+- `cargo run -- run
+  ../radix/crates/exempla/corpus/conversio/fallibilis.fab` now fails with
   `textus to instans conversion failed`; that is the next failable-conversion
   propagation gap rather than an unsupported `instans` conversion target.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture`
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture`
   failed as expected on remaining unclassified live failures.
 
 Live script e2e effect:
@@ -1449,12 +1449,12 @@ MIR-boundary backend status:
 
 Validation:
 
-- `timeout 120 cargo test -p radix lowers_top_level_const_paths_inside_functions`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix lowers_top_level_const_paths_inside_functions`
   passed.
-- `cargo run -p radix --bin radix -- mir
-  crates/exempla/corpus/conversio/fallibilis.fab` passed and no longer reports
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- mir
+  ../radix/crates/exempla/corpus/conversio/fallibilis.fab` passed and no longer reports
   `path that does not resolve to a local value`.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture`
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture`
   failed as expected on remaining unclassified live failures.
 - `cargo fmt --all -- --check` passed with the repository's existing rustfmt
   `struct_lit_width` warning.
@@ -1484,8 +1484,8 @@ MIR-boundary backend status:
 
 Validation:
 
-- `timeout 120 cargo test -p exempla script_expected_failure` passed.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p exempla script_expected_failure` passed.
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture`
   failed as expected on unclassified live failures.
 - `cargo fmt --all -- --check` passed with the repository's existing rustfmt
   `struct_lit_width` warning.

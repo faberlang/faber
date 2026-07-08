@@ -2,7 +2,7 @@
 
 ## Target
 
-`crates/exempla/corpus/tabula/methodi-accessus.fab` fails in script mode on
+`../radix/crates/exempla/corpus/tabula/methodi-accessus.fab` fails in script mode on
 two `puncta.pone(key, value)` calls:
 
 ```text
@@ -38,11 +38,11 @@ validates the key/value types, and returns `vacuum`.
 
 ## Validation
 
-- `timeout 120 cargo test -p radix <focused filters>`
-- `cargo run -p faber-cli -- run
-  crates/exempla/corpus/tabula/methodi-accessus.fab`
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix <focused filters>`
+- `cargo run -- run
+  ../radix/crates/exempla/corpus/tabula/methodi-accessus.fab`
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored
   --nocapture`
 - Targeted S-expression, Wasm, and LLVM `radix emit` checks for
-  `crates/exempla/corpus/tabula/methodi-accessus.fab`, recording any backend
+  `../radix/crates/exempla/corpus/tabula/methodi-accessus.fab`, recording any backend
   gaps.

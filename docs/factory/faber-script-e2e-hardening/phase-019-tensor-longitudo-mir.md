@@ -31,10 +31,10 @@ tensor method catalog or introduce a new tensor runtime representation.
 
 ## Validation
 
-- `timeout 120 cargo test -p radix lowers_tensor_longitudo_to_collection_length -- --nocapture`
-- `timeout 120 cargo test -p radix stepper_runs_tensor_decl_fixture -- --nocapture`
-- `cargo run -p faber-cli -- run crates/exempla/corpus/tensor/decl.fab`
-- `cargo run -p radix --bin radix -- emit -t sexp crates/exempla/corpus/tensor/decl.fab`
-- `cargo run -p radix --bin radix -- emit -t wasm crates/exempla/corpus/tensor/decl.fab`
-- `cargo run -p radix --bin radix -- emit -t llvm crates/exempla/corpus/tensor/decl.fab`
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix lowers_tensor_longitudo_to_collection_length -- --nocapture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_tensor_decl_fixture -- --nocapture`
+- `cargo run -- run ../radix/crates/exempla/corpus/tensor/decl.fab`
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t sexp ../radix/crates/exempla/corpus/tensor/decl.fab`
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t wasm ../radix/crates/exempla/corpus/tensor/decl.fab`
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t llvm ../radix/crates/exempla/corpus/tensor/decl.fab`
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture`

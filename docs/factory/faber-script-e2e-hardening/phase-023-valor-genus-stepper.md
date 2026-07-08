@@ -25,6 +25,6 @@ syntax.
 
 - Parser regression for `payload ↦ Persona`.
 - Focused stepper regression for `conversio/valor-genus.fab`.
-- Direct `faber-cli run` for `conversio/valor-genus.fab`.
+- Direct ``faber run`` for `conversio/valor-genus.fab`.
 - Script e2e harness to confirm the unexpected failure is resolved.
 - Formatter and diff whitespace checks.

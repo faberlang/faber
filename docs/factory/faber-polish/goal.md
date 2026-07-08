@@ -30,7 +30,7 @@ possible.
 - Polish must never block compilation. It runs strictly advisory.
 - Polish does not replace `check`. It composes with it.
 - Polish is not a formatter. `faber format` is tracked separately in
-  `docs/factory/faber-format/`.
+  sibling radix `docs/factory/faber-format/`.
 - Polish does not weaken existing lint policy. The current `lint.rs` rules stay
   severity-promoted as today; polish adds a parallel advisory lane.
 
@@ -44,7 +44,7 @@ possible.
   one.
 - `SemanticErrorKind::Warning` is the existing carrier. Suggestions need an
   extension to this model, not a new result type (see Design Decision A).
-- The `Command` enum (`crates/faber/src/cli/mod.rs:24`) and dispatch
+- The `Command` enum (`../faber-runtime/src/cli/mod.rs:24`) and dispatch
   (`commands/mod.rs`) make a new variant mechanical to add.
 
 ## Design Decisions
@@ -165,10 +165,10 @@ Checkpoint: `faber polish --fix` rewrites a fixture file and a follow-up
 ## Validation Commands
 
 ```bash
-cargo test -p radix semantic::passes::polish -- --nocapture
-cargo test -p radix diagnostics::render -- --nocapture
+cargo test --manifest-path ../radix/Cargo.toml -p radix semantic::passes::polish -- --nocapture
+cargo test --manifest-path ../radix/Cargo.toml -p radix diagnostics::render -- --nocapture
 cargo test -p faber cli -- --nocapture
-cargo test -p radix
+cargo test --manifest-path ../radix/Cargo.toml -p radix
 ./scripta/lint
 ```
 
@@ -177,7 +177,7 @@ cargo test -p radix
 - `faber polish [INPUT]` reports HIR-time idiom suggestions without blocking
   compilation.
 - Suggestions render with span, label, and (where applicable) replacement.
-- No regression in `cargo test -p radix` or `cargo test -p faber`.
+- No regression in `cargo test --manifest-path ../radix/Cargo.toml -p radix` or `cargo test -p faber`.
 - Parse-time rules are documented in the ledger as a deferred family with clear
   next-phase recommendations, not silently dropped.
 

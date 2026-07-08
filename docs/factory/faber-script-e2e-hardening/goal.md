@@ -4,19 +4,22 @@
 **Created**: 2026-06-29
 **Target repo**: `/Users/ianzepp/work/faberlang/faber`
 **Factory artifact dir**: `docs/factory/faber-script-e2e-hardening/`
-**Primary surfaces**: `crates/exempla/src/exempla_e2e/script.rs`, `crates/radix/src/mir/`, `crates/radix/src/mir/stepper/`, `crates/radix/src/driver/`
+**Primary surfaces**: this repo's `faber script` / interpret host (`src/`);
+sibling radix `crates/exempla/src/exempla_e2e/script.rs`,
+`crates/radix/src/mir/`, `crates/radix/src/mir/stepper/`, `crates/radix/src/driver/`
 **MIR-adjacent codegen surfaces**: S-expression, Wasm, and LLVM codegen paths
+(sibling radix)
 
-**Predecessor factory** (complete):
+**Predecessor factory** (complete; lives in private radix):
 
-- [`../faber-script-kernel/goal.md`](../faber-script-kernel/goal.md) — v1 `faber:*`
-  host kernel (`solum`, `processus`, `aleator`, `json`). This factory owns
-  language-surface MIR/stepper debt; kernel import dispatch is not in scope.
+- sibling radix [`docs/factory/faber-script-kernel/goal.md`](../../../../radix/docs/factory/faber-script-kernel/goal.md)
+  — v1 `faber:*` host kernel. This factory owns language-surface MIR/stepper debt;
+  kernel import dispatch is not in scope.
 
-**Related factories**:
-- [`../mir-lowering/goal.md`](../mir-lowering/goal.md)
-- [`../exempla-e2e-speed/plan.md`](../exempla-e2e-speed/plan.md)
-- [`../backend-smoke-check/goal.md`](../backend-smoke-check/goal.md)
+**Related factories** (sibling radix):
+- [`docs/factory/mir-lowering/`](../../../../radix/docs/factory/mir-lowering/)
+- [`docs/factory/exempla-e2e-speed/`](../../../../radix/docs/factory/exempla-e2e-speed/)
+- [`docs/factory/backend-smoke-check/`](../../../../radix/docs/factory/backend-smoke-check/)
 
 ---
 
@@ -28,7 +31,7 @@ reasonable MIR/script execution surfaces represented in exempla.
 The harness is:
 
 ```bash
-timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture
+timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture
 ```
 
 It is valuable because it is fast, mostly in-memory, and exercises the real
@@ -221,21 +224,21 @@ if they accurately describe non-script surfaces.
 Primary gate:
 
 ```bash
-timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture
+timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture
 ```
 
 Common supporting checks:
 
 ```bash
-timeout 120 cargo test -p radix <focused-filter>
-timeout 120 cargo test -p exempla <focused-filter>
+timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix <focused-filter>
+timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p exempla <focused-filter>
 cargo fmt --all -- --check
 git diff --check
 ```
 
 When a phase changes S-expression, Wasm, or LLVM codegen, add the matching
 focused backend check for that surface. Prefer a targeted unit test, emitter
-snapshot, or `cargo run -p radix --bin radix -- emit -t <target> <exemplum>`
+snapshot, or `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t <target> <exemplum>`
 check. Do not run full S-expression, Wasm, or LLVM end-to-end harnesses as
 routine inner-loop validation.
 

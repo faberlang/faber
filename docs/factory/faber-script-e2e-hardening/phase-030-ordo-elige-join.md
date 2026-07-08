@@ -36,14 +36,14 @@ no-value returns.
 
 ## Validation Plan
 
-- `timeout 120 cargo test -p radix lowers_ordo_elige_statement_continues_after_match -- --nocapture`
-- `timeout 120 cargo test -p radix lowers_all_returning_variant_discerne_without_fallthrough_return -- --nocapture`
-- `timeout 120 cargo test -p radix allows_no_value_return_for_nihil_side_effect_function -- --nocapture`
-- `timeout 120 cargo test -p radix stepper_runs_ordo_fixture -- --nocapture`
-- `timeout 120 cargo test -p radix stepper_runs_discerne_fixture -- --nocapture`
-- Direct `faber run` for `crates/exempla/corpus/ordo/ordo.fab`.
-- Direct `faber run` for `crates/exempla/corpus/discerne/discerne.fab`.
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix lowers_ordo_elige_statement_continues_after_match -- --nocapture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix lowers_all_returning_variant_discerne_without_fallthrough_return -- --nocapture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix allows_no_value_return_for_nihil_side_effect_function -- --nocapture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_ordo_fixture -- --nocapture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_discerne_fixture -- --nocapture`
+- Direct `faber run` for `../radix/crates/exempla/corpus/ordo/ordo.fab`.
+- Direct `faber run` for `../radix/crates/exempla/corpus/discerne/discerne.fab`.
 - Representative `radix emit` probes for Rust, S-expression, Wasm, and LLVM.
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture`
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture`
 - `timeout 120 cargo fmt --all -- --check`
 - `git diff --check`

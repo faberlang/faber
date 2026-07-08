@@ -38,7 +38,7 @@ MirRuntimeAbiFamily::RuntimeSermo    => StepperDispatchStatus::Defer,        // 
 // Defer = "Stepper does not yet dispatch; tracked deferred debt (Stage 4 / ad factory)"
 ```
 
-Every `norma:*` verb body is `redde ad '<route>' ↦ T` (see `stdlib/norma/*.fab`).
+Every `norma:*` verb body is `redde ad '<route>' ↦ T` (see sibling `../norma/src/*.fab`).
 So **no norma verb can execute over the gateway until sermo dispatch is
 implemented.** The `frame.rs` gateway handlers (`tempus:nunc`, `solum:scribe`,
 `runtime:echo`, …) already exist but are **unreachable from the stepper today.**
@@ -56,7 +56,7 @@ It is **shared deferred debt, not owned by this campaign.**
 ```mermaid
 flowchart TD
   GATE["<b>GATE</b>: implement RuntimeSermo stepper dispatch<br/>(redde ad → sermo → frame.rs → materialize T)"]
-  EMBED["Embed stdlib/norma/*.fab for the interpreter<br/>(today: disk-resolved for compiled lane only)"]
+  EMBED["Resolve sibling norma/src via FABER_LIBRARY_HOME"]
   LINK["Link norma units into interpreted package-MIR<br/>(resolve norma:x.y as direct call, not Package provider)"]
   RETIRE["Retire Stage 1b bridge<br/>(delete bridge_norma_providers_to_kernel + norma relax)"]
   COLLAPSE["Collapse dispatch split<br/>(single-file = degenerate package; one path)"]
@@ -74,20 +74,20 @@ gate lands.** The gate is also independently useful (unblocks arbitrary
 | Surface | State | Evidence |
 | --- | --- | --- |
 | Stepper `redde ad` / sermo dispatch | **Deferred (not executed)** | `capability.rs`: `RuntimeSermo => Defer` |
-| `frame.rs` gateway route handlers | **Exist, unreachable from stepper** | `crates/faber/src/frame.rs` (`tempus:*`, `solum:*` writes, `runtime:echo`); no-op `_ => {}` for the rest |
+| `frame.rs` gateway route handlers | **Exist, unreachable from stepper** | `../faber-runtime/src/frame.rs` (`tempus:*`, `solum:*` writes, `runtime:echo`); no-op `_ => {}` for the rest |
 | `ad` response materializer (Valor → `T`) | Partial; known type gaps | core-stdlib ledger: octeti write paths, complex genera |
-| stdlib `norma:*` source | On disk; analyzed by compiled lane only | no `include_str!` of `stdlib/norma` in interpreter crates |
+| stdlib `norma:*` source | On disk; analyzed by compiled lane only | no `include_str!` of sibling `norma/src` in interpreter crates |
 | `norma:*` import → provider kind | Opaque `Package` provider | `crates/radix/src/mir/lower/context.rs:246` `record_import_item` |
 | HIR implicit-entry synthesis (no `incipit`) | **Exists** | `crates/radix/src/hir/lower/mod.rs:189` — single-file-as-package already works |
 | Multi-unit package linking | Exists | `run_package_mir` merges units into one MIR program |
-| Stage 1b bridge | Active (kernel subset) | `crates/faber-cli/src/package/mir.rs` |
+| Stage 1b bridge | Active (kernel subset) | `src/package/mir.rs` |
 
 ## Work breakdown (gated)
 
 | # | Work | Exists? | Size | Gates |
 | --- | --- | --- | --- | --- |
 | **1** | **Implement `RuntimeSermo` stepper dispatch**: lower `redde ad '<route>' (args) ↦ T` to a sermo conversation through the Host boundary → `frame.rs` dispatch → materialize response as `T`. Includes no-op-route error policy and the materializer type coverage. | **No (Defer)** | **Large — the gate** | 2–5 |
-| 2 | Embed `stdlib/norma/*.fab` for the interpreter (`include_str!` into scena/faber) so `faber script` works without a repo checkout. | No | Medium | 3 |
+| 2 | Resolve sibling `norma/src` for the interpreter via library-home (not monorepo `stdlib/norma`). | Partial | Medium | 3 |
 | 3 | Link norma units into interpreted package-MIR: load+analyze norma source, resolve `norma:solum.lege` as a direct call to the inlined function, not a `Package` provider. Touches `record_import_item`, `library.rs`, `mir.rs`. | Partial | Medium | 4 |
 | 4 | Retire the Stage 1b bridge: delete `bridge_norma_providers_to_kernel` + the `library_import_diagnostics` norma relaxation. `faber:*` kernel stays for direct script syntax. | — | Small | 5 |
 | 5 | Collapse the dispatch split: route all `faber script` to package-MIR; remove `manifestless_file_declares_import` + single-source CLI dispatch. `scena::run_source` survives as the embed/REPL API. | Synthesis exists | Small | — |

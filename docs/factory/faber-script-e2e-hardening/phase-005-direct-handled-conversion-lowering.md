@@ -33,7 +33,7 @@ Constraints and non-goals:
 
 Evidence:
 
-- `tutumDirect` in `crates/exempla/corpus/conversio/fallibilis.fab` currently
+- `tutumDirect` in `../radix/crates/exempla/corpus/conversio/fallibilis.fab` currently
   lowers a direct handled conversion as an ordinary runtime conversion statement
   followed by `return`, leaving the handler block disconnected.
 - Existing MIR already supports failable synthetic functions and `TryCall`.
@@ -70,8 +70,8 @@ Out of scope:
 
 Checkpoint target:
 
-- `cargo run -p faber-cli -- run
-  crates/exempla/corpus/conversio/fallibilis.fab` passes or moves to a new,
+- `cargo run -- run
+  ../radix/crates/exempla/corpus/conversio/fallibilis.fab` passes or moves to a new,
   recorded blocker after `tutumDirect`.
 
 Gate expectations:
@@ -89,10 +89,10 @@ Release checkpoint:
 Planned commands:
 
 ```bash
-timeout 120 cargo test -p radix stepper_handles_direct_conversio_inside_fac_cape
-cargo run -p radix --bin radix -- mir crates/exempla/corpus/conversio/fallibilis.fab
-cargo run -p faber-cli -- run crates/exempla/corpus/conversio/fallibilis.fab
-timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture
+timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_handles_direct_conversio_inside_fac_cape
+cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- mir ../radix/crates/exempla/corpus/conversio/fallibilis.fab
+cargo run -- run ../radix/crates/exempla/corpus/conversio/fallibilis.fab
+timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture
 cargo fmt --all -- --check
 git diff --check
 ```

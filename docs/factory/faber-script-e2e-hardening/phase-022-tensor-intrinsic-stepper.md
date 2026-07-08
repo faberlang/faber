@@ -48,16 +48,16 @@ semantics.
 
 ## Validation
 
-- `timeout 120 cargo test -p radix lowers_tensor_intrinsic_methods_to_collection_ops -- --nocapture`
-- `timeout 120 cargo test -p radix stepper_runs_tensor_shape_fixture -- --nocapture`
-- `timeout 120 cargo test -p radix stepper_runs_tensor_textus_fixture -- --nocapture`
-- `timeout 120 cargo test -p radix stepper_runs_tensor_arithmetic_elementwise_fixture -- --nocapture`
-- `timeout 120 cargo test -p radix stepper_runs_tensor_arithmetic_reduction_fixture -- --nocapture`
-- `cargo run -p faber-cli -- run crates/exempla/corpus/tensor/shape.fab`
-- `cargo run -p faber-cli -- run crates/exempla/corpus/tensor/textus.fab`
-- `cargo run -p faber-cli -- run crates/exempla/corpus/tensor/arithmetic-elementwise.fab`
-- `cargo run -p faber-cli -- run crates/exempla/corpus/tensor/arithmetic-reduction.fab`
-- `cargo run -p radix --bin radix -- emit -t sexp crates/exempla/corpus/tensor/shape.fab`
-- `cargo run -p radix --bin radix -- emit -t wasm crates/exempla/corpus/tensor/shape.fab`
-- `cargo run -p radix --bin radix -- emit -t llvm crates/exempla/corpus/tensor/shape.fab`
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix lowers_tensor_intrinsic_methods_to_collection_ops -- --nocapture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_tensor_shape_fixture -- --nocapture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_tensor_textus_fixture -- --nocapture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_tensor_arithmetic_elementwise_fixture -- --nocapture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_tensor_arithmetic_reduction_fixture -- --nocapture`
+- `cargo run -- run ../radix/crates/exempla/corpus/tensor/shape.fab`
+- `cargo run -- run ../radix/crates/exempla/corpus/tensor/textus.fab`
+- `cargo run -- run ../radix/crates/exempla/corpus/tensor/arithmetic-elementwise.fab`
+- `cargo run -- run ../radix/crates/exempla/corpus/tensor/arithmetic-reduction.fab`
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t sexp ../radix/crates/exempla/corpus/tensor/shape.fab`
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t wasm ../radix/crates/exempla/corpus/tensor/shape.fab`
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t llvm ../radix/crates/exempla/corpus/tensor/shape.fab`
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture`

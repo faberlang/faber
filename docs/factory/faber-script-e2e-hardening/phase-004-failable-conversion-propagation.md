@@ -100,11 +100,11 @@ Release checkpoint:
 Planned commands:
 
 ```bash
-timeout 120 cargo test -p radix stepper_propagates_failable_runtime_conversio
-timeout 120 cargo test -p radix stepper_keeps_inline_conversio_recovery_local
-timeout 120 cargo test -p radix stepper_keeps_non_failable_conversio_failure_hard
-cargo run -p faber-cli -- run crates/exempla/corpus/conversio/fallibilis.fab
-timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture
+timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_propagates_failable_runtime_conversio
+timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_keeps_inline_conversio_recovery_local
+timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_keeps_non_failable_conversio_failure_hard
+cargo run -- run ../radix/crates/exempla/corpus/conversio/fallibilis.fab
+timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture
 cargo fmt --all -- --check
 git diff --check
 ```

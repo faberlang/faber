@@ -31,10 +31,10 @@ Constraints and non-goals:
 
 Evidence:
 
-- `crates/exempla/corpus/conversio/fallibilis.fab` defines
+- `../radix/crates/exempla/corpus/conversio/fallibilis.fab` defines
   `fixum instans epochZero` and references it inside multiple functions.
-- `cargo run -p radix --bin radix -- emit -t rust
-  crates/exempla/corpus/conversio/fallibilis.fab` emits `pub const epochZero`
+- `cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t rust
+  ../radix/crates/exempla/corpus/conversio/fallibilis.fab` emits `pub const epochZero`
   and uses it from functions.
 - `crates/radix/src/mir/lower.rs` currently lowers top-level consts only as
   entry-prefix locals in `lower_entry`.
@@ -91,9 +91,9 @@ Release checkpoint:
 Planned commands:
 
 ```bash
-timeout 120 cargo test -p radix <focused-filter>
-cargo run -p radix --bin radix -- mir crates/exempla/corpus/conversio/fallibilis.fab
-timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture
+timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix <focused-filter>
+cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- mir ../radix/crates/exempla/corpus/conversio/fallibilis.fab
+timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture
 cargo fmt --all -- --check
 git diff --check
 ```

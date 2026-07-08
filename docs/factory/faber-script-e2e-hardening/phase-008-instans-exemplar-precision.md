@@ -20,7 +20,7 @@ Functional requirements:
 
 Constraints and non-goals:
 
-- Do not change the runtime precision contract in `crates/faber/src/instans.rs`.
+- Do not change the runtime precision contract in `../faber-runtime/src/instans.rs`.
 - Do not weaken the fixture assertions; correct stale expected values instead.
 - Do not change Rust codegen's broader `valor` literal boxing behavior in this
   phase; the generated binary is currently not a reliable oracle for this file.
@@ -31,9 +31,9 @@ Constraints and non-goals:
 Evidence:
 
 - `conversio/instans.fab` currently aborts in script mode.
-- `crates/faber/src/instans.rs` truncates construction to declared precision,
-  and `crates/faber/src/instans_test.rs` asserts that behavior.
-- `docs/factory/instans-primitive/goal.md` records construction zeroing finer
+- `../faber-runtime/src/instans.rs` truncates construction to declared precision,
+  and `../faber-runtime/src/instans_test.rs` asserts that behavior.
+- sibling radix `docs/factory/instans-primitive/goal.md` records construction zeroing finer
   bits and coarse-to-fine widening as lossless zero-padding.
 - Runtime tests prove `1979-05-27T16:32:00+0900` normalizes to the same instant
   as `1979-05-27T07:32:00Z`; the fixture currently uses `07:32+0900`, which is
@@ -47,7 +47,7 @@ Evidence:
 
 1. Correct `conversio/instans.fab` expected milliseconds and offset literal.
 2. Add a focused stepper fixture test for the real exemplar.
-3. Run `faber-cli run` for the fixture.
+3. Run ``faber run`` for the fixture.
 4. Run the script e2e gate and record count movement.
 5. Inspect MIR-boundary codegen status for the fixture and record blockers.
 
@@ -55,7 +55,7 @@ Evidence:
 
 Primary write surfaces:
 
-- `crates/exempla/corpus/conversio/instans.fab`
+- `../radix/crates/exempla/corpus/conversio/instans.fab`
 - `crates/radix/src/mir/stepper_test.rs`
 - `docs/factory/faber-script-e2e-hardening/ledger.md`
 
@@ -63,13 +63,13 @@ Out of scope:
 
 - `faber::Instans` runtime precision semantics.
 - Rust codegen `valor` literal boxing.
-- `crates/exempla/corpus/instans/instans.fab` frontend cleanup.
+- `../radix/crates/exempla/corpus/instans/instans.fab` frontend cleanup.
 
 ## Checkpoints And Gates
 
 Checkpoint target:
 
-- `cargo run -p faber-cli -- run crates/exempla/corpus/conversio/instans.fab`
+- `cargo run -- run ../radix/crates/exempla/corpus/conversio/instans.fab`
   passes.
 
 Gate expectations:
@@ -86,12 +86,12 @@ Release checkpoint:
 Planned commands:
 
 ```bash
-timeout 120 cargo test -p radix stepper_runs_instans_conversio_fixture
-cargo run -p faber-cli -- run crates/exempla/corpus/conversio/instans.fab
-timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture
-cargo run -p radix --bin radix -- emit -t sexp crates/exempla/corpus/conversio/instans.fab
-cargo run -p radix --bin radix -- emit -t wasm-text crates/exempla/corpus/conversio/instans.fab
-cargo run -p radix --bin radix -- emit -t llvm-text crates/exempla/corpus/conversio/instans.fab
+timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix stepper_runs_instans_conversio_fixture
+cargo run -- run ../radix/crates/exempla/corpus/conversio/instans.fab
+timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture
+cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t sexp ../radix/crates/exempla/corpus/conversio/instans.fab
+cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t wasm-text ../radix/crates/exempla/corpus/conversio/instans.fab
+cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- emit -t llvm-text ../radix/crates/exempla/corpus/conversio/instans.fab
 cargo fmt --all -- --check
 git diff --check
 ```

@@ -39,14 +39,14 @@ Evidence:
 - Grammar: `EBNF.md` defines runtime conversion as
   `conversio := '↦' typeAnnotation typeParams? inlineRecovery?`.
 - Exempla:
-  - `crates/exempla/corpus/conversio/instans.fab`
-  - `crates/exempla/corpus/conversio/fallibilis.fab`
+  - `../radix/crates/exempla/corpus/conversio/instans.fab`
+  - `../radix/crates/exempla/corpus/conversio/fallibilis.fab`
 - Rust reference:
   - `crates/radix/src/driver/mod_test.rs`
   - `crates/radix/src/codegen/rust/tests/failable_test.rs`
 - Runtime API:
-  - `crates/faber/src/instans.rs`
-  - `crates/faber/src/valor.rs`
+  - `../faber-runtime/src/instans.rs`
+  - `../faber-runtime/src/valor.rs`
 - Stepper surfaces:
   - `crates/radix/src/mir/stepper/value.rs`
   - `crates/radix/src/mir/stepper/conversio.rs`
@@ -101,10 +101,10 @@ Release checkpoint:
 Planned commands:
 
 ```bash
-timeout 120 cargo test -p radix instans
-cargo run -p radix --bin radix -- mir crates/exempla/corpus/conversio/instans.fab
-cargo run -p radix --bin radix -- mir crates/exempla/corpus/conversio/fallibilis.fab
-timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture
+timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix instans
+cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- mir ../radix/crates/exempla/corpus/conversio/instans.fab
+cargo run --manifest-path ../radix/Cargo.toml -p radix --bin radix -- mir ../radix/crates/exempla/corpus/conversio/fallibilis.fab
+timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture
 cargo fmt --all -- --check
 git diff --check
 ```

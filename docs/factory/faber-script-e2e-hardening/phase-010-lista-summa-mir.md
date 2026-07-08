@@ -2,7 +2,7 @@
 
 ## Target
 
-`crates/exempla/corpus/in/in.fab` fails in script mode because its helper body
+`../radix/crates/exempla/corpus/in/in.fab` fails in script mode because its helper body
 uses `values.summa()`:
 
 ```text
@@ -43,8 +43,8 @@ introducing generic reducer lowering.
 
 ## Validation
 
-- `timeout 120 cargo test -p radix <focused stepper filters>`
-- `cargo run -p faber-cli -- run crates/exempla/corpus/in/in.fab`
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix <focused stepper filters>`
+- `cargo run -- run ../radix/crates/exempla/corpus/in/in.fab`
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture`
 - Targeted S-expression, Wasm, and LLVM `radix emit` checks for
-  `crates/exempla/corpus/in/in.fab`, recording any architectural backend gaps.
+  `../radix/crates/exempla/corpus/in/in.fab`, recording any architectural backend gaps.

@@ -29,5 +29,5 @@ fixtures that do not import `norma:*`.
 
 ## Validation
 
-- `timeout 120 cargo test -p exempla script_expected_failure -- --nocapture`
-- `timeout 300 cargo test -p exempla exempla_script_e2e -- --ignored --nocapture`
+- `timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p exempla script_expected_failure -- --nocapture`
+- `timeout 300 cargo test --manifest-path ../radix/Cargo.toml -p exempla exempla_script_e2e -- --ignored --nocapture`

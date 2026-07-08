@@ -45,19 +45,20 @@ No HIR. No typecheck required for layout-only rules (optional `check` mode for C
 
 ---
 
-## Crate placement (likely)
+## Module placement (likely)
 
-Lossless layout lives in the same formatter package as canonical emit:
+Lossless layout lives beside canonical emit in the compiler-owned formatter
+module (**not** a separate Cargo crate):
 
 ```text
-crates/forma/        — formatter crate (name locked; distinct from forma literal)
-  canonical.rs       — HIR-backed emit in forma (not radix codegen)
-  lossless.rs        — token layout engine (this goal)
+sibling radix crates/radix/src/forma/   — radix::forma (formatter)
+  … canonical / author paths today
+  lossless.rs                          — token layout engine (this goal; TBD)
 ```
 
-The **forma** crate name is shared with the language's `` `...` `` captured-string
-literal — disambiguate in docs as **forma crate** vs **forma literal**. Phase 0 of
-the parent goal records the split module layout inside `crates/forma`.
+The **forma** language construct (`` `...` `` captured-string literal) is distinct
+from the `radix::forma` formatter module. Product entry remains `faber format`
+in this repo.
 
 ---
 
