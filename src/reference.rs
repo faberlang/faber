@@ -557,9 +557,14 @@ fn dev_repo_root() -> Option<PathBuf> {
 
     for mut dir in starts {
         loop {
-            let index = dir.join("crates/exempla/corpus/index.toml");
-            if index.is_file() {
-                return Some(dir.join("crates/exempla/corpus"));
+            for rel in [
+                "crates/exempla/corpus/index.toml",
+                "radix/crates/exempla/corpus/index.toml",
+            ] {
+                let index = dir.join(rel);
+                if index.is_file() {
+                    return Some(index.parent().expect("corpus dir").to_path_buf());
+                }
             }
             if !dir.pop() {
                 break;

@@ -40,11 +40,9 @@ fn run_faber_emit_faber_stdin(source: &str) -> String {
 }
 
 fn workspace_root() -> std::path::PathBuf {
+    // Sibling private radix tree (faberlang/radix).
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(|p| p.parent())
-        .expect("workspace root")
-        .to_path_buf()
+        .join("../radix")
 }
 
 fn temp_dir(label: &str) -> PathBuf {

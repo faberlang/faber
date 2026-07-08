@@ -23,10 +23,10 @@ fn temp_dir(label: &str) -> PathBuf {
 }
 
 fn workspace_root() -> PathBuf {
+    // faberlang container root (siblings: norma, radix, examples).
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
-        .and_then(|p| p.parent())
-        .expect("workspace root")
+        .expect("faberlang container")
         .to_path_buf()
 }
 

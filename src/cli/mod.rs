@@ -6,7 +6,7 @@ use clap::{Parser, Subcommand};
 pub use emit::{EmitArgs, FaberCliTarget};
 use std::path::PathBuf;
 
-const FABER_AFTER_HELP: &str = include_str!("../../../../docs/help/faber-after-help.md");
+const FABER_AFTER_HELP: &str = include_str!("../../docs/help/faber-after-help.md");
 
 /// Root parser for the `faber` binary.
 #[derive(Parser, Debug)]

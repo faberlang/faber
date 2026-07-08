@@ -6779,7 +6779,7 @@ version = "0.3.0"
     assert!(cargo_toml.contains("edition = \"2021\""));
     assert!(cargo_toml.contains("0.3.0"));
     assert!(cargo_toml.contains("[dependencies]"));
-    assert!(cargo_toml.contains("faber = { path = "));
+    assert!(cargo_toml.contains("package = \"faber-runtime\"") && cargo_toml.contains("path = "));
     assert!(!cargo_toml.contains("norma = { path = "));
     assert!(!cargo_toml.contains("tokio = { version = "));
 
