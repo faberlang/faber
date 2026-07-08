@@ -244,11 +244,11 @@ incipit argumenta args {
             .expect("read generated runner manifest");
     assert!(
         runner_manifest.contains(&format!(
-            r#"faber-cli = {{ path = "{}", version = "={}" }}"#,
+            r#"faber = {{ path = "{}", version = "={}" }}"#,
             env!("CARGO_MANIFEST_DIR"),
             env!("CARGO_PKG_VERSION")
         )),
-        "runner manifest must pin the faber-cli path dependency version:\n{runner_manifest}"
+        "runner manifest must pin the faber path dependency version:\n{runner_manifest}"
     );
 
     let (run_stdout, run_stderr, run_ok) = run_faber(&[

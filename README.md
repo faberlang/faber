@@ -10,17 +10,21 @@ the user-facing product surface.
 
 ```text
 faberlang/
-  faber/      this repo (public CLI)
-  radix/      private compiler + runtime crates
-  norma/      public standard library source
-  examples/   public application examples
+  faber/           this repo (public CLI)
+  faber-runtime/   public Rust runtime types (`use faber::…`)
+  radix/           private compiler (formatter is `radix::forma`)
+  norma/           public standard library source
+  examples/        public application examples
+  cista/           public package-store CLI/lib
 ```
 
 Path dependencies (not published):
 
-- `../radix/crates/radix` — compiler library
-- `../radix/crates/forma` — formatter
-- `../radix/crates/faber-runtime` — generated Rust runtime (`use faber::…`)
+- `../radix/crates/radix` — compiler library (includes `radix::forma` formatter and MIR stepper)
+- `../radix/crates/hygiene-ratchet` — hygiene tests only (dev-dependency)
+
+Generated packages from `faber build` depend on sibling **`faber-runtime`**
+(package name `faber-runtime`, crate name `faber`), not on this CLI crate.
 
 ## Build
 
