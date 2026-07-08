@@ -1,6 +1,6 @@
 //! Subprocess checks for `faber format --stdout` (requires built `faber` binary).
 
-use forma::test_gate::{assert_author_idempotent, assert_author_reparses};
+use radix::forma::test_gate::{assert_author_idempotent, assert_author_reparses};
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};

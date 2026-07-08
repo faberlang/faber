@@ -60,7 +60,7 @@ fn generated_code_needs_tokio(rust_code: &str) -> bool {
 fn faber_runtime_path() -> PathBuf {
     // Public `faber` repo lives beside private `radix` under faberlang/.
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../radix/crates/faber-runtime")
+        .join("../faber-runtime")
 }
 
 /// Write the generated Rust crate tree under the layout's `target/faber/` directory.

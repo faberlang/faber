@@ -1,6 +1,6 @@
 //! `faber format` — author-mode formatter (default) with canonical/check/stdout.
 
-use forma::{compile_author, compile_canonical, FormatCompileResult};
+use radix::forma::{compile_author, compile_canonical, FormatCompileResult};
 use radix::codegen::Target;
 use radix::driver::{split_frontmatter, Config, Session};
 use std::fs;

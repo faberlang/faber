@@ -1,7 +1,7 @@
 //! `faber format` author pipeline: compile_author, normalization, re-parse.
 
 use super::format::{formatted_source_for_write, normalize_trailing_newline, source_for_compare};
-use forma::test_gate::{assert_author_idempotent, assert_author_reparses, author_format_once};
+use radix::forma::test_gate::{assert_author_idempotent, assert_author_reparses, author_format_once};
 use radix::driver::{Config, Session};
 use std::fs;
 use std::io::Read;
@@ -16,7 +16,7 @@ fn exempla(path: &str) -> PathBuf {
 
 fn author_format_pipeline(name: &str, source: &str) -> String {
     let session = Session::new(Config::default());
-    let result = forma::compile_author(&session, name, source);
+    let result = radix::forma::compile_author(&session, name, source);
     assert!(
         result.success(),
         "author format failed for {name}: {:?}",

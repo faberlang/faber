@@ -210,7 +210,6 @@ name = "faber"
 version = "0.38.0"
 dependencies = [
  "clap",
- "forma",
  "hygiene-ratchet",
  "postcard",
  "radix",
@@ -232,14 +231,6 @@ checksum = "843fba2746e448b37e26a819579957415c8cef339bf08564fe8b7ddbd959573c"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
-]
-
-[[package]]
-name = "forma"
-version = "0.37.0"
-dependencies = [
- "radix",
- "rustc-hash",
 ]
 
 [[package]]
