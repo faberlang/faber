@@ -43,3 +43,8 @@ from source requires a sibling Radix checkout.
 - `faber format`, `faber explain`, `faber targets`
 
 See `faber --help` and after-help text for the full surface.
+
+## Factory goals
+
+Open product-lane factory tracks for this CLI live under
+[`docs/factory/`](docs/factory/) (moved out of private Radix on 2026-07-08).
