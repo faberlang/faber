@@ -4550,6 +4550,10 @@ fn package_fixture_runs_norma_http_runtime_against_local_server() {
 [package]
 name = "norma-http-fixture"
 version = "0.1.0"
+
+[paths]
+source = "src"
+entry = "main.fab"
 "#,
     )
     .expect("manifest");
@@ -4657,6 +4661,10 @@ fn check_package_typechecks_builtin_library_file_imports_against_interfaces() {
 [package]
 name = "norma-json-solve-interface"
 version = "0.1.0"
+
+[paths]
+source = "src"
+entry = "main.fab"
 "#,
     )
     .expect("write manifest");
@@ -7034,6 +7042,10 @@ fn emit_generated_crate_writes_cargo_toml_and_main_rs_under_target_faber() {
 [package]
 name = "emit-test"
 version = "0.3.0"
+
+[paths]
+source = "src"
+entry = "main.fab"
 "#,
     )
     .expect("manifest");

@@ -39,9 +39,8 @@ fn run_faber_emit_faber_stdin(source: &str) -> String {
     stdout
 }
 
-fn workspace_root() -> std::path::PathBuf {
-    // Sibling private radix tree (faberlang/radix).
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../radix")
+fn corpus_root() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/corpus")
 }
 
 fn temp_dir(label: &str) -> PathBuf {
@@ -103,7 +102,7 @@ entry = "main.fab"
 
 #[test]
 fn emit_wgsl_text_on_single_fab_file_succeeds() {
-    let kernel = workspace_root().join("crates/exempla/corpus/vector/kernel.fab");
+    let kernel = corpus_root().join("vector/kernel.fab");
     let (stdout, stderr, ok) = run_faber_emit(&[
         "emit",
         "-t",
@@ -119,7 +118,7 @@ fn emit_wgsl_text_on_single_fab_file_succeeds() {
 
 #[test]
 fn emit_llvm_text_on_single_fab_file_succeeds() {
-    let source = workspace_root().join("crates/exempla/corpus/incipit/salve-munde.fab");
+    let source = corpus_root().join("incipit/salve-munde.fab");
     let (stdout, stderr, ok) = run_faber_emit(&[
         "emit",
         "-t",
@@ -135,7 +134,7 @@ fn emit_llvm_text_on_single_fab_file_succeeds() {
 
 #[test]
 fn emit_reflection_prints_wgsl_sidecar_json() {
-    let kernel = workspace_root().join("crates/exempla/corpus/vector/kernel.fab");
+    let kernel = corpus_root().join("vector/kernel.fab");
     let (stdout, stderr, ok) = run_faber_emit(&[
         "emit",
         "--reflection",

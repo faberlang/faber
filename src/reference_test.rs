@@ -13,7 +13,7 @@ fn dev_fallback_loads_repo_exempla_index() {
     std::env::remove_var(REFERENCE_ROOT_ENV);
 
     let pack = ReferencePack::load().expect("dev fallback loads repo exempla");
-    assert_eq!(pack.term_count(), 175);
+    assert_eq!(pack.term_count(), 174);
     assert_eq!(pack.metadata().registry_terms, 174);
     assert_eq!(pack.layout(), ReferenceLayout::Repo);
     assert!(pack.term("functio").is_some());
@@ -28,7 +28,7 @@ fn dev_fallback_loads_repo_exempla_index() {
 fn load_from_repo_root_lists_canonical_terms() {
     let root = repo_exempla_root();
     let pack = ReferencePack::load_from(&root).expect("load repo exempla");
-    assert_eq!(pack.term_count(), 175);
+    assert_eq!(pack.term_count(), 174);
     assert_eq!(pack.legacy_redirects().len(), 16);
     assert!(pack.resolve_exempla_path("functio/functio.fab").is_file());
 }

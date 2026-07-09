@@ -32,13 +32,7 @@ fn workspace_root() -> PathBuf {
 
 fn norma_library_home() -> PathBuf {
     let workspace = workspace_root();
-    for candidate in [
-        workspace.parent(),
-        workspace.parent().and_then(|p| p.parent()),
-    ]
-    .into_iter()
-    .flatten()
-    {
+    for candidate in workspace.ancestors() {
         if candidate.join("norma/src").exists() {
             return candidate.to_path_buf();
         }
