@@ -122,7 +122,7 @@ pub(super) fn install_library(
     })?;
 
     let source = install_source(library_or_url)?;
-    let checkout = temp_checkout_dir(&home, library_or_url);
+    let checkout = temp_checkout_dir(&home, library_or_url)?;
     git_clone(&source, &checkout)?;
     let manifest_path = checkout.join("faber.toml");
     let install = read_install_manifest(&manifest_path)?;
@@ -291,10 +291,13 @@ fn git_origin_url(target: &std::path::Path) -> Result<String, InstallError> {
     })
 }
 
-fn temp_checkout_dir(home: &std::path::Path, input: &str) -> PathBuf {
+fn temp_checkout_dir(home: &std::path::Path, input: &str) -> Result<PathBuf, InstallError> {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .expect("clock")
+        .map_err(|err| InstallError::Io {
+            path: home.to_path_buf(),
+            message: format!("failed to derive temporary checkout name from system clock: {err}"),
+        })?
         .as_nanos();
     let stem = input
         .chars()
@@ -306,7 +309,7 @@ fn temp_checkout_dir(home: &std::path::Path, input: &str) -> PathBuf {
             }
         })
         .collect::<String>();
-    home.join(format!(".faber-install-{stem}-{nanos}"))
+    Ok(home.join(format!(".faber-install-{stem}-{nanos}")))
 }
 
 fn valid_library_name(name: &str) -> bool {
