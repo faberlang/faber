@@ -26,6 +26,7 @@
 //! packages so old examples keep deterministic binary names and target paths
 //! while `faber.toml` remains the preferred package surface.
 
+pub mod binding;
 mod cargo;
 mod cmd;
 mod codegen;
@@ -42,6 +43,7 @@ mod modules;
 mod paths;
 mod reader;
 
+pub use binding::verify_library_bindings;
 #[allow(unused_imports)]
 // used by `commands/run.rs` and `commands/test.rs` in the binary crate
 pub(crate) use cargo::invoke_cargo_build;
@@ -57,6 +59,7 @@ pub(crate) use compile::{analyze_package, AnalyzedPackage, AnalyzedPackageUnit};
 pub use compile::{check_package, compile_package, compile_package_with_test_selection};
 #[allow(unused_imports)] // public package API; used by integration tests and external callers
 pub use discovery::{discover_build_layout, sanitize_crate_name, BuildLayout};
+pub(crate) use manifest::validate_manifest;
 #[allow(unused_imports)] // public package API; used by integration tests and external callers
 pub use manifest::{
     read_manifest, FaberManifest, ManifestBuild, ManifestLibrary, ManifestPackage, ManifestPaths,

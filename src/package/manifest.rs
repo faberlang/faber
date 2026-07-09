@@ -29,6 +29,10 @@ pub struct FaberManifest {
     #[serde(default)]
     pub reader: ManifestReader,
 
+    /// Target-specific build and binding metadata, e.g. `[target.rust]`.
+    #[serde(default)]
+    pub target: BTreeMap<String, ManifestTarget>,
+
     /// Direct exact dependency pins (`name = "version"`). Resolved paths live in `faber.lock`.
     #[serde(default)]
     pub dependencies: BTreeMap<String, String>,
@@ -100,6 +104,17 @@ pub struct ManifestReader {
 
     /// Optional reader-pack path relative to the package root.
     pub pack: Option<String>,
+}
+
+/// `[target.<name>]` metadata for target-specific implementation data.
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ManifestTarget {
+    /// Binding manifest path, relative to the package root.
+    pub bindings: Option<String>,
+
+    /// Target dependency pins, e.g. `[target.rust.dependencies]`.
+    pub dependencies: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq, Eq)]
@@ -193,7 +208,7 @@ pub fn read_manifest(path: &Path) -> Result<FaberManifest, Box<Diagnostic>> {
     })
 }
 
-pub(super) fn validate_manifest(
+pub(crate) fn validate_manifest(
     manifest: &FaberManifest,
     path: &Path,
 ) -> Result<(), Box<Diagnostic>> {
@@ -306,6 +321,36 @@ pub(super) fn validate_manifest(
                 ))
                 .with_file(path.display().to_string()),
             ));
+        }
+    }
+
+    for (target, config) in &manifest.target {
+        if target.trim().is_empty() {
+            return Err(Box::new(
+                Diagnostic::error("faber.toml [target] key must not be empty")
+                    .with_file(path.display().to_string())
+                    .with_arg("issue", "invalid_target_table"),
+            ));
+        }
+        if let Some(bindings) = config.bindings.as_deref() {
+            if bindings.trim().is_empty() {
+                return Err(Box::new(
+                    Diagnostic::error("faber.toml target bindings path must not be empty")
+                        .with_file(path.display().to_string())
+                        .with_arg("issue", "invalid_target_bindings"),
+                ));
+            }
+        }
+        for (name, version) in &config.dependencies {
+            if name.trim().is_empty() || version.trim().is_empty() {
+                return Err(Box::new(
+                    Diagnostic::error(
+                        "faber.toml target dependency names and versions must be non-empty",
+                    )
+                    .with_file(path.display().to_string())
+                    .with_arg("issue", "invalid_target_dependency"),
+                ));
+            }
         }
     }
 

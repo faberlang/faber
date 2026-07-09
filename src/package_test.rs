@@ -11,7 +11,8 @@ use super::{
     discover_package, emit_generated_crate, invoke_cargo_build, library_cached_file_interface,
     library_resolver_from_config, load_package, read_manifest, run_package_fmir_image,
     run_package_fmir_text_image, run_package_mir, run_package_mir_artifact, sanitize_crate_name,
-    use_package_compiler, use_package_compiler_from_args, BuildLayout, LibraryInterfaceCache,
+    use_package_compiler, use_package_compiler_from_args, verify_library_bindings, BuildLayout,
+    LibraryInterfaceCache,
 };
 use super::{fmir_image_test_summary, fmir_text_image_test_summary};
 use crate::library::{LibraryProviderKind, LibraryResolver, ResolvedLibraryModule};
@@ -5411,6 +5412,142 @@ entry = "main.fab"
         result.success(),
         "expected package directory compile success"
     );
+}
+
+#[test]
+fn binding_manifest_verifies_bodyless_declarations_and_shim() {
+    let dir = test_temp_dir("binding-manifest-valid");
+    fs::create_dir_all(dir.join("src/sqlite")).expect("create source");
+    fs::create_dir_all(dir.join("bindings")).expect("create bindings");
+    fs::create_dir_all(dir.join("rust")).expect("create rust shim");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"[package]
+name = "sqlite"
+version = "0.1.0"
+edition = "2026"
+
+[library]
+provider = "sqlite"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["rust"]
+
+[target.rust]
+bindings = "bindings/rust.toml"
+
+[target.rust.dependencies]
+rusqlite = "0.32"
+"#,
+    )
+    .expect("write manifest");
+    fs::write(
+        dir.join("src/sqlite.fab"),
+        "functio exsequi(textus via) → textus\nfunctio local() → textus { redde \"ok\" }\n",
+    )
+    .expect("write source");
+    fs::write(dir.join("rust/shim.rs"), "pub fn exsequi() {}\n").expect("write shim");
+    fs::write(
+        dir.join("bindings/rust.toml"),
+        r#"[functions."sqlite:sqlite.exsequi"]
+symbol = "crate::shim::exsequi"
+
+[shim]
+path = "rust/shim.rs"
+"#,
+    )
+    .expect("write bindings");
+
+    let report = verify_library_bindings(&dir, "rust").expect("verify bindings");
+    assert_eq!(report.declarations, 2);
+    assert_eq!(report.bindings, 1);
+    assert_eq!(report.shim, Some(dir.join("rust/shim.rs")));
+}
+
+#[test]
+fn binding_manifest_requires_bodyless_declaration_binding() {
+    let dir = test_temp_dir("binding-manifest-missing");
+    fs::create_dir_all(dir.join("src")).expect("create source");
+    fs::create_dir_all(dir.join("bindings")).expect("create bindings");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"[package]
+name = "sqlite"
+
+[library]
+provider = "sqlite"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["rust"]
+
+[target.rust]
+bindings = "bindings/rust.toml"
+"#,
+    )
+    .expect("write manifest");
+    fs::write(
+        dir.join("src/sqlite.fab"),
+        "functio exsequi(textus via) → textus\n",
+    )
+    .expect("write source");
+    fs::write(dir.join("bindings/rust.toml"), "").expect("write bindings");
+
+    let diagnostics = verify_library_bindings(&dir, "rust").expect_err("missing binding");
+    assert!(diagnostics
+        .iter()
+        .any(|diag| diagnostic_has_issue(diag, "binding_required_missing")));
+}
+
+#[test]
+fn binding_manifest_rejects_unknown_declaration_rows() {
+    let dir = test_temp_dir("binding-manifest-unknown");
+    fs::create_dir_all(dir.join("src")).expect("create source");
+    fs::create_dir_all(dir.join("bindings")).expect("create bindings");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"[package]
+name = "sqlite"
+
+[library]
+provider = "sqlite"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["rust"]
+
+[target.rust]
+bindings = "bindings/rust.toml"
+"#,
+    )
+    .expect("write manifest");
+    fs::write(
+        dir.join("src/sqlite.fab"),
+        "functio local() → textus { redde \"ok\" }\n",
+    )
+    .expect("write source");
+    fs::write(
+        dir.join("bindings/rust.toml"),
+        r#"[functions."sqlite:sqlite.missing"]
+symbol = "crate::shim::missing"
+"#,
+    )
+    .expect("write bindings");
+
+    let diagnostics = verify_library_bindings(&dir, "rust").expect_err("unknown binding");
+    assert!(diagnostics
+        .iter()
+        .any(|diag| diagnostic_has_issue(diag, "binding_unknown_declaration")));
 }
 
 #[test]

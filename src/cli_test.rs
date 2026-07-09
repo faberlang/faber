@@ -186,6 +186,17 @@ fn cli_parses_verify_subcommand() {
 }
 
 #[test]
+fn cli_parses_verify_library_subcommand() {
+    let cli = Cli::try_parse_from(["faber", "verify-library", "--target", "rust", "sqlite"])
+        .expect("parse verify-library");
+    let Some(crate::cli::Command::VerifyLibrary(args)) = cli.command else {
+        panic!("expected verify-library subcommand");
+    };
+    assert_eq!(args.target, "rust");
+    assert_eq!(args.input, std::path::PathBuf::from("sqlite"));
+}
+
+#[test]
 fn cli_parses_install_subcommand() {
     let cli = Cli::try_parse_from(["faber", "install", "norma"]).expect("parse install");
     let Some(crate::cli::Command::Install(args)) = cli.command else {

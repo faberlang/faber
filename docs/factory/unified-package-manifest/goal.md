@@ -1,6 +1,6 @@
 # Goal: Unified Faber Package Manifest
 
-**Status**: active — Phases 1–2 complete; Phases 3–4 remain open
+**Status**: active — Phases 1–2 and Phase 4 binding verification complete; Phase 3 backend build graph remains open
 **Created**: 2026-07-08
 **Target repo**: `/Users/ianzepp/work/faberlang/faber`
 **Factory artifact dir**: `docs/factory/unified-package-manifest/`
@@ -254,6 +254,18 @@ timeout 120 cargo test --manifest-path ../radix/Cargo.toml -p radix -- backend_s
 ```
 
 ### Phase 4 — Target Binding Manifests
+
+Status: complete for the binding-manifest verification surface (2026-07-09).
+Faber manifests now accept `[target.rust]` with `bindings` and target-specific
+dependency pins. `faber verify-library --target rust <package>` loads
+`bindings/rust.toml`, validates binding rows against real Faber function
+declarations, requires bindings for declarations without Faber bodies, checks
+Rust shim source presence, and reports explicit binding diagnostics. This
+provides the SQLite package contract gate without implementing the Phase 3
+generated-library build graph. Gates passed:
+`timeout 120 cargo test --lib binding_manifest -- --format terse`,
+`timeout 120 cargo test cli_parses_verify_library_subcommand -- --format terse`,
+and `timeout 120 cargo test --lib manifest -- --format terse`.
 
 Replace source-level implementation linkage annotations with target-specific
 binding manifests loaded like reader packs.

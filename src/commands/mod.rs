@@ -121,6 +121,7 @@ fn dispatch(command: Command) {
                 package: args.package,
             });
         }
+        Command::VerifyLibrary(args) => cmd_verify_library(args),
         Command::Init(args) => cmd_init(args),
         Command::Install(args) => cmd_install(args),
         Command::Explain(args) => cmd_explain(args),
@@ -171,6 +172,33 @@ fn dispatch(command: Command) {
             config: args.config,
         }),
         Command::Host(args) => cmd_host(args.command),
+    }
+}
+
+fn cmd_verify_library(args: crate::cli::VerifyLibraryArgs) {
+    let root = if args
+        .input
+        .file_name()
+        .is_some_and(|name| name == "faber.toml")
+    {
+        args.input
+            .parent()
+            .map(std::path::Path::to_path_buf)
+            .unwrap_or_else(|| std::path::PathBuf::from("."))
+    } else {
+        args.input
+    };
+    match package::verify_library_bindings(&root, &args.target) {
+        Ok(report) => {
+            println!(
+                "ok: verified {} declarations and {} bindings for target {}",
+                report.declarations, report.bindings, args.target
+            );
+        }
+        Err(diagnostics) => {
+            eprint_compile_diagnostics(&diagnostics);
+            std::process::exit(1);
+        }
     }
 }
 

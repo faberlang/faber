@@ -46,6 +46,9 @@ pub enum Command {
     /// Run aspect verification on a single file
     Verify(radix::tool::VerifyArgs),
 
+    /// Verify a library package's target binding manifest
+    VerifyLibrary(VerifyLibraryArgs),
+
     /// Create a new Faber package
     Init(InitArgs),
 
@@ -193,6 +196,17 @@ pub struct InitArgs {
 pub struct InstallArgs {
     /// Public Faber source library name, such as `norma`
     pub library: String,
+}
+
+/// Arguments for `faber verify-library`.
+#[derive(clap::Args, Debug)]
+pub struct VerifyLibraryArgs {
+    /// Target binding surface to verify.
+    #[arg(long, default_value = "rust")]
+    pub target: String,
+
+    /// Library package root or faber.toml path.
+    pub input: PathBuf,
 }
 
 /// Arguments for `faber explain`.
