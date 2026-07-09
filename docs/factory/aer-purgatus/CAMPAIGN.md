@@ -1,6 +1,6 @@
 # Campaign: Aer Purgatus — Code-Smell Remediation
 
-**Status**: proposed — ready for delivery; Goal 1 selected
+**Status**: planned — four delivery specs ready; Goal 1 selected for factory
 **Date**: 2026-07-09
 **Mode**: routing artifact — does not implement code directly
 **Control-plane repo**: `/Users/ianzepp/work/faberlang/faber`
@@ -79,8 +79,8 @@ owns the contract.
 
 For each goal:
 
-1. Run `delivery` over the entire goal and save its delivery spec before code
-   changes.
+1. Read the saved delivery spec for the selected goal and verify its live-code
+   assumptions before code changes.
 2. Run one `factory` phase for the coherent goal by default.
 3. Validate in the owning repo first, then run the named cross-repo gates.
 4. Review against the goal invariant and delete the displaced implementation.
@@ -102,8 +102,9 @@ goal and ledger; this campaign must not create a competing async design.
 | `norma:json` parse/emit signatures and implementation | `norma` | Goal 2 |
 | First-party Faber JSON construction/parsing, AI workbench commands, FVI codec, harness fixtures | `examples`, `norma`, and other owning sibling repos | Goal 3 |
 | Migration audits and compiler/application exempla | owning repo; `radix` owns corpus harness integration | Goal 3 |
-| `src/frame.rs` and runtime tests | `faber-runtime` | Goal 4 |
-| `ad` codegen, host trait/adapter, async lowering goal and ledger | `radix` | Goal 4 |
+| `src/frame.rs`, runtime dispatch/collector protocol, and runtime tests | `faber-runtime` | Goal 4 |
+| Public bounded-worker native host adapter | `faber-runtime/hosts/native` | Goal 4 |
+| `ad` codegen, route-requirement analysis, async lowering goal and ledger | `radix` | Goal 4 |
 | Generated package dependency construction and package E2E tests | `faber` | Goal 4 |
 
 Out of campaign:
@@ -129,6 +130,7 @@ Out of campaign:
 | Source | Evidence / authority |
 | --- | --- |
 | `radix/EBNF.md` and `examples/corpus/` | Faber declaration and `ad` language contract |
+| `radix/crates/radix/src/{driver.rs,file_interface.rs}` and `faber/src/package/file_interface.rs` | Supported analyzed-unit/interface seam already exposes portable callable signatures |
 | `faber/src/package/binding.rs` | Current line scanner, binding keys, shim-path checks |
 | `faber/src/package_test.rs` | Current verification fixtures and missing negative coverage |
 | `faber/docs/factory/unified-package-manifest/goal.md` | Original target-binding intent; Phase 4 completion claim is historical evidence, not proof of correctness |
@@ -136,11 +138,12 @@ Out of campaign:
 | `radix/docs/factory/inline-json-valor/{contract.md,goal.md}` | Object-rooted source-literal rule and the historical decision to type literals as `valor` |
 | `radix/docs/factory/json-genus-contract/goal.md` | Completed JSON-safe genus validation and one-way `nomen` boxing behavior |
 | `faber-runtime/src/valor.rs` | Dynamic carrier is broader than JSON (`Octeti`, tagged `Instans`, unrestricted root shape) |
-| `examples/ai-workbench/packages/faber-ai/src/commands/{chat,embed,generate,index,query}.fab` | Duplicated emitters and partial scanners |
+| `examples/ai-workbench/packages/faber-ai/src/commands/{chat,embed,generate,index,model,query}.fab` and `examples/vivilite/src/main.fab` | Live first-party manual emitters/scanners; campaign intake omitted two active paths |
 | `faber-runtime/src/frame.rs` | Sync/async receivers, materializers, blocking fallback dispatch |
 | `radix/hosts/macos-arm64/src/kernel/host.rs` | Current synchronous host attachment |
 | `radix/crates/radix/src/codegen/frame_shim.rs` | Generated concrete host hook |
 | `faber/src/package/cargo.rs` | Generated default macOS host path dependency |
+| `faber/src/package/manifest.rs` | Rust target metadata has bindings/dependencies but no explicit host selection |
 | `radix/docs/factory/async-ad-lowering/{goal.md,ledger.md}` | Existing async design authority and open phase state |
 
 All six active repositories were clean when this campaign was drafted.
@@ -149,10 +152,13 @@ All six active repositories were clean when this campaign was drafted.
 
 | Goal | State | Next action |
 | --- | --- | --- |
-| 1 — Compiler-grounded binding contracts | selected | Lower the full goal through `delivery`; establish the frontend contract representation and backend proof mechanism. |
-| 2 — Formal object-rooted JSON document | planned | Lower after Goal 1; lock the public type spelling and runtime representation before implementation. |
-| 3 — First-party JSON migration and FVI adoption | blocked on Goal 2 | After the formal type lands, inventory and batch-migrate manual Faber JSON paths. |
-| 4 — Honest async `sermo` boundary | planned; overlaps active Radix goal | Reconcile live async ledger during delivery, then execute remaining work under one design authority. |
+| 1 — Compiler-grounded binding contracts | **selected for factory** | Execute [`goal-1-binding-contracts-delivery.md`](goal-1-binding-contracts-delivery.md), beginning with B1/B2. |
+| 2 — Formal object-rooted JSON document | delivery ready; queued | Execute [`goal-2-json-document-delivery.md`](goal-2-json-document-delivery.md) after Goal 1 closes. |
+| 3 — First-party JSON migration and FVI adoption | delivery ready; implementation blocked on Goal 2 | Execute [`goal-3-json-migration-delivery.md`](goal-3-json-migration-delivery.md) after Goal 2 J6. |
+| 4 — Honest async `sermo` boundary | delivery ready; authority reconciliation first | Execute [`goal-4-async-sermo-delivery.md`](goal-4-async-sermo-delivery.md) after reconciling the live Radix ledger. |
+
+The four saved delivery documents are the factory production inputs. Their
+status is planning evidence only; no implementation stage is marked complete.
 
 ## Campaign Path
 
@@ -160,11 +166,11 @@ All six active repositories were clean when this campaign was drafted.
 
 | Field | Value |
 | --- | --- |
-| **Status** | selected — ready for delivery |
+| **Status** | selected — ready for factory |
 | **Source** | `faber/src/package/binding.rs`; unified-package-manifest Phase 4 |
 | **Invariant** | Binding verification derives declarations and signatures from the supported compiler frontend, and every referenced file remains inside the package root. |
 | **Why first** | It has an immediate false-verification risk and a bounded package-tool surface. |
-| **Lowers to** | `delivery` → saved spec under `faber/docs/factory/aer-purgatus/`, then `factory` |
+| **Lowers to** | [`goal-1-binding-contracts-delivery.md`](goal-1-binding-contracts-delivery.md) → `factory` |
 | **Batch posture** | discovery-first, then batch |
 
 Required implementation outcome:
@@ -200,17 +206,17 @@ Gate:
 
 | Field | Value |
 | --- | --- |
-| **Status** | planned |
+| **Status** | delivery ready — queued after Goal 1 |
 | **Source** | inline-json-valor contract; JSON-genus contract; EBNF; runtime `Valor`; `norma:json` |
 | **Invariant** | A Faber JSON document is object-rooted and recursively JSON-safe. It may widen to `valor`, but arbitrary `valor` enters it only through checked conversion. |
 | **Why now** | Inline literals and `@ json genus` already prove JSON safety, but separate paths erase that proof into a broader carrier. |
-| **Lowers to** | `delivery` in `radix/docs/factory/`, then cross-repo `factory` |
+| **Lowers to** | [`goal-2-json-document-delivery.md`](goal-2-json-document-delivery.md) → cross-repo `factory` |
 | **Batch posture** | split-on-boundary |
 
 Required implementation outcome:
 
-- Choose and document one canonical public type spelling before grammar edits.
-  The type is a JSON **document**, not an arbitrary-root JSON node.
+- Use canonical public spelling `json` and runtime spelling `faber::Json`. The
+  type is a JSON **document**, not an arbitrary-root JSON node.
 - Add a runtime representation that enforces a `Tabula` root and recursively
   permits only null, booleans, finite numbers, text, arrays, and objects. Prefer
   a validated wrapper over the existing carrier unless delivery evidence proves
@@ -260,11 +266,11 @@ Gate:
 
 | Field | Value |
 | --- | --- |
-| **Status** | blocked on Goal 2 |
+| **Status** | delivery ready — implementation blocked on Goal 2 |
 | **Source** | post-Goal-2 migration inventory; AI workbench command files and harnesses |
 | **Invariant** | First-party Faber code uses the formal JSON document and typed genera instead of maintaining local JSON grammars or assembling JSON text. |
 | **Why after Goal 2** | Migration is the product proof that the new type pays rent; doing it earlier would target an obsolete `valor` API. |
-| **Lowers to** | `delivery` after Goal 2 closeout, saved in the owning application/docs repo, then `factory` |
+| **Lowers to** | [`goal-3-json-migration-delivery.md`](goal-3-json-migration-delivery.md) → `factory` after Goal 2 closeout |
 | **Batch posture** | discovery-first, then batch |
 
 Required implementation outcome:
@@ -282,8 +288,9 @@ Required implementation outcome:
 - Add one shared FVI codec/schema module in `faber-ai`. Parse each document once
   into the formal JSON type, convert to typed FVI genera, and keep FVI
   schema/version validation separate from JSON syntax.
-- Migrate chat, embed, generate, index, and query output to typed JSON documents;
-  preserve deterministic compact output and stable command schemas.
+- Migrate chat, embed, generate, index, query, the additionally discovered
+  `model` command, and `vivilite` to typed JSON documents; preserve
+  deterministic compact output and stable command schemas.
 - Extend the audit beyond AI workbench to other active Norma/examples Faber
   sources. Do not rewrite unrelated Rust tooling JSON merely because it emits
   JSON; Rust code should use its own typed serializer authority.
@@ -309,26 +316,30 @@ Gate:
 
 | Field | Value |
 | --- | --- |
-| **Status** | planned — existing async goal active |
+| **Status** | delivery ready — existing async authority must be reconciled |
 | **Source** | Radix async-ad-lowering goal/ledger plus live runtime and package code |
 | **Invariant** | Async `ad` never performs blocking host work while polling, always has a completion producer, and depends only on a portable runtime host contract. |
 | **Why last** | Highest cross-repo and behavioral risk; benefits from the campaign's first three established delivery patterns. |
-| **Lowers to** | reconcile existing goal → `delivery` for the remaining coherent slice → `factory` |
+| **Lowers to** | reconcile existing goal → [`goal-4-async-sermo-delivery.md`](goal-4-async-sermo-delivery.md) → `factory` |
 | **Batch posture** | split-on-boundary |
 
 Required implementation outcome:
 
 - Reconcile the existing async goal and ledger with the extracted
   `faber-runtime` repo and the host bridge that landed on 2026-07-09.
-- Define a portable host-dispatch contract owned by the runtime boundary.
+- Replace the cross-thread `Rc<RefCell<_>>` conversation core with an explicit
+  thread-safe state machine and define a `Send + Sync` portable host-dispatch
+  contract owned by the runtime boundary.
   Generated code calls that contract rather than constructing
   `faber_host_macos_arm64::HostKernel`.
-- Select/install platform hosts through package/build configuration without a
-  default private Radix path dependency and without emitted-code string sniffing.
+- Select the public native application host explicitly with
+  `[target.rust] host = "native"`; an absent host permits runtime-only routes.
+  Build dependencies from analyzed route/executor requirements without a
+  default private Radix path or emitted-code string sniffing.
 - Ensure async receive has a real producer or returns a structured no-route or
   detached error. No unsupported route may remain pending forever.
-- Move timer, filesystem, and process work out of `Future::poll`; use genuinely
-  non-blocking facilities or an explicit bounded blocking-worker boundary.
+- Move timer, filesystem, and process work out of `Future::poll` into a public
+  native host adapter with an explicit bounded blocking-worker boundary.
 - Replace copy-paired sync/async collectors with one collector state machine or
   policy core driven by sync and async receivers. Preserve the materialization
   table and failable-conversio behavior.
@@ -396,6 +407,11 @@ Campaign routing is ready when:
 - [x] Goal 1 is selected as the next campaign stage.
 - [x] Overlap with unified-package-manifest and async-ad-lowering is explicit.
 - [x] Clean-break and stop conditions are recorded.
+- [x] A detailed saved delivery document exists for each of the four goals.
+- [x] Goal 2's public spelling, representation, number/root policy, conversion
+      matrix, and Norma clean break are decided.
+- [x] Goal 4's thread-safe producer, explicit host-selection, collector, async
+      posture, cancellation, and same-route policies are decided.
 
 Campaign implementation is complete when:
 
@@ -426,23 +442,25 @@ Closeout validation is the union of the four goal gates plus:
 - affected AI workbench harnesses with explicit timeouts;
 - standard format/lint gates in every touched repository.
 
-## Open Questions
+## Resolved Delivery Decisions
 
-These are delivery-level decisions, not blockers to campaign routing:
+- Goal 1 reuses the analyzed `FileInterface`/`InterfaceCallable` seam and uses
+  Radix-owned typed Rust adapters; Faber owns containment and the probe crate.
+- Goal 2's public spelling is `json`, represented by private-field
+  `faber::Json(Valor)`. It is object-rooted, recursively validated, numerically
+  strict, and distinct from `valor`.
+- `norma:json` delegates to formal conversions and deletes the incomplete
+  parser/serializer and old broad signatures.
+- Goal 3 centralizes FVI wire genera in the owning AI workbench package, parses
+  once, separates schema/domain validation, and audits all active first-party
+  Faber sources rather than only the original five.
+- Goal 4 requires cross-thread runtime state and a `Send + Sync` nonblocking
+  producer contract. Generated packages explicitly select a public native host;
+  async/sync Norma wrappers use one capability route and one collector policy.
 
-- Which existing Radix API is the narrowest stable source for top-level
-  declaration contracts?
-- Should Rust binding proof use generated typed function pointers, generated
-  adapters, or the normal backend library crate build? It must prove existence
-  and compatibility, not merely parse paths.
-- What is the canonical public spelling of the formal JSON document type? The
-  spelling must coexist cleanly with the `norma:json` module binding.
-- Should the runtime JSON document be a validated wrapper around
-  `Valor::Tabula`, or a distinct recursive representation? Prefer the wrapper
-  unless delivery evidence shows it cannot preserve the invariant cleanly.
-- Does the runtime host contract need cross-thread `Send + Sync` in the first
-  delivery, or can a documented single-thread executor contract satisfy every
-  current package host? Delivery must decide from actual producer topology.
+Factory-time questions that remain are implementation discoveries recorded in
+the individual delivery specs. None changes these product or architecture
+decisions.
 
 ## Stop Conditions
 
