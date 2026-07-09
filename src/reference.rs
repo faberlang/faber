@@ -566,7 +566,9 @@ fn dev_repo_root() -> Option<PathBuf> {
             ] {
                 let index = dir.join(rel);
                 if index.is_file() {
-                    return Some(index.parent().expect("corpus dir").to_path_buf());
+                    if let Some(parent) = index.parent() {
+                        return Some(parent.to_path_buf());
+                    }
                 }
             }
             if !dir.pop() {
