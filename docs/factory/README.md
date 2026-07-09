@@ -29,6 +29,12 @@ cargo test --manifest-path ../radix/Cargo.toml -p radix -- <filter>
 
 Each `goal.md` / `CAMPAIGN.md` owns its **Status** line.
 
+## Open campaigns
+
+| Campaign | Status | Entry |
+| --- | --- | --- |
+| Aer Purgatus code-smell remediation | proposed — ready for delivery; Goal 1 selected | [`aer-purgatus/CAMPAIGN.md`](aer-purgatus/CAMPAIGN.md) |
+
 ## Open goals
 
 | Goal | Status | Entry |
