@@ -8,30 +8,33 @@
 
 ## Summary
 
-Aer Purgatus coordinates three bounded corrections for proof-grade code that has
+Aer Purgatus coordinates four bounded corrections for proof-grade code that has
 started carrying product-grade responsibility:
 
 1. replace textual Faber binding inspection with compiler-grounded contract
    verification;
-2. replace duplicated application-local JSON scanners and emitters with one
-   canonical FVI codec over Norma JSON;
-3. replace synchronous, platform-coupled async `sermo` scaffolding with an
+2. introduce one formal, object-rooted JSON document type that preserves the
+   compiler's JSON-safety proof;
+3. migrate manual JSON construction and parsing to the formal type, with FVI as
+   the first substantial application proof;
+4. replace synchronous, platform-coupled async `sermo` scaffolding with an
    honest host and executor boundary.
 
 Each goal is a separate campaign stage and lowers to its own delivery spec and
 factory run. The campaign does not authorize opportunistic cleanup outside
-those three seams.
+those four seams.
 
 ## Problem
 
-Recent implementation work is well tested at its happy paths, but three seams
+Recent implementation work is well tested at its happy paths, but four seams
 encode language or runtime policy through local approximations:
 
 | Goal | Smell | Product risk |
 | --- | --- | --- |
 | 1 — Binding contracts | `verify-library` scans source lines and checks non-empty symbol strings. | False acceptance and rejection; nested methods and layout become accidental API facts. |
-| 2 — FVI codec | Five AI workbench commands copy JSON emission; index/query copy partial JSON scanners. | Parser drift, incomplete RFC handling, repeated fixes, avoidable rescans. |
-| 3 — Async `sermo` | Async materializers sit over synchronous host dispatch, blocking fallbacks, and a default private macOS host dependency. | Executor blocking, latent hangs, platform coupling, sync/async drift. |
+| 2 — Formal JSON document | Inline JSON, `@ json genus`, `valor`, and Norma codecs prove overlapping facts but erase them into unconstrained `valor` through separate lowering paths. | JSON safety is lost at conversion boundaries; root-object policy and renamed fields are inconsistent. |
+| 3 — JSON migration | Five AI workbench commands copy JSON emission; index/query copy partial JSON scanners; other first-party Faber source still assembles JSON text manually. | Parser drift, incomplete RFC handling, repeated fixes, avoidable rescans. |
+| 4 — Async `sermo` | Async materializers sit over synchronous host dispatch, blocking fallbacks, and a default private macOS host dependency. | Executor blocking, latent hangs, platform coupling, sync/async drift. |
 
 The shared smell is a local representation pretending to be the authority. The
 remedy is not another wrapper: each goal moves enforcement to the layer that
@@ -44,13 +47,18 @@ owns the contract.
 - Binding verification proves both sides of the contract: the Faber declaration
   and the selected backend symbol/signature.
 - All package-relative manifest paths are contained by the package root.
-- AI workbench JSON is parsed and emitted by one shared codec using
-  `norma:json`; FVI schema checks are separate from JSON syntax handling.
+- Faber has one formal JSON document type whose root is an object and whose
+  nested values are recursively JSON-safe. It is distinct from unrestricted
+  `valor`, even if its runtime representation reuses `Valor::Tabula`.
+- Inline JSON objects, `@ json genus` conversion, and `norma:json` parsing and
+  emission converge on that formal type and one lowering contract.
+- First-party Faber source no longer hand-builds or partially scans JSON where
+  the formal type applies. FVI schema checks stay separate from JSON syntax.
 - Async `ad` waits without blocking an executor thread, unknown routes terminate
   with structured errors, and sync/async collectors share one policy core.
 - Generated packages do not acquire a private `radix/hosts/macos-arm64` path
   dependency merely because source contains `ad`.
-- The three old approximation paths are deleted. No compatibility fallback keeps
+- The old approximation paths are deleted. No compatibility fallback keeps
   them alive.
 
 ## Development Posture
@@ -59,9 +67,9 @@ owns the contract.
   no textual-parser fallback, duplicate JSON helper, or legacy host hook remains.
 - **Truthful boundaries.** Tests prove the architectural invariant, not only the
   current fixture shape.
-- **Behavior changes are explicit.** Legal JSON becomes more broadly accepted;
-  invalid or escaping package paths become rejected; async unsupported routes
-  become errors rather than indefinite waits.
+- **Behavior changes are explicit.** JSON follows one object-rooted document
+  contract; invalid or escaping package paths become rejected; async unsupported
+  routes become errors rather than indefinite waits.
 - **Cross-repo changes commit in their owning repositories.** The factory parent
   validates every repo diff and reports each commit.
 - **No attribution archaeology.** Git does not identify which model authored a
@@ -79,7 +87,7 @@ For each goal:
 5. Commit intentional changes in each repository and record hashes here.
 6. Return to this campaign and select the next incomplete goal.
 
-Goal 3 must also reconcile the existing Radix
+Goal 4 must also reconcile the existing Radix
 [`async-ad-lowering`](../../../../radix/docs/factory/async-ad-lowering/goal.md)
 goal and ledger; this campaign must not create a competing async design.
 
@@ -89,16 +97,20 @@ goal and ledger; this campaign must not create a competing async design.
 | --- | --- | --- |
 | `src/package/binding.rs`, manifest path validation, `verify-library` tests | `faber` | Goal 1 |
 | Frontend API needed to expose declaration contracts | `radix` | Goal 1, only if the supported API is insufficient |
-| `ai-workbench/packages/faber-ai/src/commands/*.fab`, shared package modules, harness fixtures | `examples` | Goal 2 |
-| `norma:json` / `norma:valor` defects exposed by the migration | `norma` | Goal 2, only for real general-purpose gaps |
-| `src/frame.rs` and runtime tests | `faber-runtime` | Goal 3 |
-| `ad` codegen, host trait/adapter, async lowering goal and ledger | `radix` | Goal 3 |
-| Generated package dependency construction and package E2E tests | `faber` | Goal 3 |
+| JSON primitive/type tables, inline literal typing, conversio, `@ json genus`, codegen, EBNF, corpus harness | `radix` | Goal 2 |
+| Formal JSON runtime representation and checked `valor` bridge | `faber-runtime` | Goal 2 |
+| `norma:json` parse/emit signatures and implementation | `norma` | Goal 2 |
+| First-party Faber JSON construction/parsing, AI workbench commands, FVI codec, harness fixtures | `examples`, `norma`, and other owning sibling repos | Goal 3 |
+| Migration audits and compiler/application exempla | owning repo; `radix` owns corpus harness integration | Goal 3 |
+| `src/frame.rs` and runtime tests | `faber-runtime` | Goal 4 |
+| `ad` codegen, host trait/adapter, async lowering goal and ledger | `radix` | Goal 4 |
+| Generated package dependency construction and package E2E tests | `faber` | Goal 4 |
 
 Out of campaign:
 
 - general package manifest Phase 3 build-graph work unrelated to verification;
-- a new JSON library or JSON syntax in the compiler;
+- top-level JSON array documents or a public arbitrary-root JSON-node type;
+- broad custom JSON encoders, serde-style hooks, or null-omission policy;
 - HTTP server multiplexing, daemon transport, or broad host-provider expansion;
 - unrelated `frame.rs` cleanup or AI workbench product features;
 - compatibility shims for the displaced approximation paths.
@@ -108,8 +120,9 @@ Out of campaign:
 | Goal | Posture | Permitted split boundary |
 | --- | --- | --- |
 | 1 — Binding contracts | discovery-first, then batch | Split only if Radix needs a new stable frontend query API before Faber can implement verification. |
-| 2 — FVI codec | batch-by-default | Split only if a demonstrated Norma JSON defect must land independently before the application migration. |
-| 3 — Async `sermo` | split-on-boundary | Runtime wait/collector core may land before compiler/package integration; do not split sync/async policy or leave the private host dependency as an accepted final state. |
+| 2 — Formal JSON document | split-on-boundary | Runtime/type foundation may land before compiler and Norma integration; no split may leave inline JSON or `@ json genus` permanently typed as unconstrained `valor`. |
+| 3 — JSON migration | discovery-first, then batch | Inventory/classification may precede migration; after the pattern is proven, batch all homogeneous first-party Faber call sites. |
+| 4 — Async `sermo` | split-on-boundary | Runtime wait/collector core may land before compiler/package integration; do not split sync/async policy or leave the private host dependency as an accepted final state. |
 
 ## Ground Truth Researched
 
@@ -120,6 +133,9 @@ Out of campaign:
 | `faber/src/package_test.rs` | Current verification fixtures and missing negative coverage |
 | `faber/docs/factory/unified-package-manifest/goal.md` | Original target-binding intent; Phase 4 completion claim is historical evidence, not proof of correctness |
 | `norma/src/json/{solve,pange}.fab` | Current native RFC-oriented JSON authority |
+| `radix/docs/factory/inline-json-valor/{contract.md,goal.md}` | Object-rooted source-literal rule and the historical decision to type literals as `valor` |
+| `radix/docs/factory/json-genus-contract/goal.md` | Completed JSON-safe genus validation and one-way `nomen` boxing behavior |
+| `faber-runtime/src/valor.rs` | Dynamic carrier is broader than JSON (`Octeti`, tagged `Instans`, unrestricted root shape) |
 | `examples/ai-workbench/packages/faber-ai/src/commands/{chat,embed,generate,index,query}.fab` | Duplicated emitters and partial scanners |
 | `faber-runtime/src/frame.rs` | Sync/async receivers, materializers, blocking fallback dispatch |
 | `radix/hosts/macos-arm64/src/kernel/host.rs` | Current synchronous host attachment |
@@ -134,8 +150,9 @@ All six active repositories were clean when this campaign was drafted.
 | Goal | State | Next action |
 | --- | --- | --- |
 | 1 — Compiler-grounded binding contracts | selected | Lower the full goal through `delivery`; establish the frontend contract representation and backend proof mechanism. |
-| 2 — Canonical FVI JSON codec | planned | Lower after Goal 1, or independently if it touches only `examples`/`norma`. |
-| 3 — Honest async `sermo` boundary | planned; overlaps active Radix goal | Reconcile live async ledger during delivery, then execute remaining work under one design authority. |
+| 2 — Formal object-rooted JSON document | planned | Lower after Goal 1; lock the public type spelling and runtime representation before implementation. |
+| 3 — First-party JSON migration and FVI adoption | blocked on Goal 2 | After the formal type lands, inventory and batch-migrate manual Faber JSON paths. |
+| 4 — Honest async `sermo` boundary | planned; overlaps active Radix goal | Reconcile live async ledger during delivery, then execute remaining work under one design authority. |
 
 ## Campaign Path
 
@@ -179,52 +196,123 @@ Gate:
 - Delivery-selected Rust probe integration test with an explicit timeout.
 - `cargo fmt --all -- --check` and `git diff --check` in every touched Rust repo.
 
-### Goal 2 — One Canonical FVI JSON Codec
+### Goal 2 — Formal Object-Rooted JSON Document Type
 
 | Field | Value |
 | --- | --- |
 | **Status** | planned |
-| **Source** | AI workbench command files; `norma:json`; `norma:valor` |
-| **Invariant** | AI workbench code owns FVI schema policy, not a second JSON grammar or five serializers. |
-| **Why now** | Every new command or escaping fix currently multiplies maintenance work. |
-| **Lowers to** | `delivery` in `examples/docs/factory/`, then `factory` |
-| **Batch posture** | batch-by-default |
+| **Source** | inline-json-valor contract; JSON-genus contract; EBNF; runtime `Valor`; `norma:json` |
+| **Invariant** | A Faber JSON document is object-rooted and recursively JSON-safe. It may widen to `valor`, but arbitrary `valor` enters it only through checked conversion. |
+| **Why now** | Inline literals and `@ json genus` already prove JSON safety, but separate paths erase that proof into a broader carrier. |
+| **Lowers to** | `delivery` in `radix/docs/factory/`, then cross-repo `factory` |
+| **Batch posture** | split-on-boundary |
 
 Required implementation outcome:
 
-- Add one shared `faber-ai` codec module for FVI documents and command-result
-  JSON. Commands import it; they do not define local `json_escape`, scanners, or
-  object-string assembly.
-- Parse with `norma:json.solve` and emit with `norma:json.pange`. Use
-  `norma:valor` or typed conversion for field extraction.
-- Keep JSON syntax validation separate from FVI schema/version validation.
-- Parse each input document once. Validate required fields, exact numeric
-  expectations, vector dimensions, normalization, and record structure from the
-  parsed value tree.
-- Preserve deterministic compact output and stable command schemas.
-- Delete all displaced JSON helper copies from chat, embed, generate, index, and
-  query.
+- Choose and document one canonical public type spelling before grammar edits.
+  The type is a JSON **document**, not an arbitrary-root JSON node.
+- Add a runtime representation that enforces a `Tabula` root and recursively
+  permits only null, booleans, finite numbers, text, arrays, and objects. Prefer
+  a validated wrapper over the existing carrier unless delivery evidence proves
+  a separate recursive enum is cleaner.
+- Keep `valor` as the unrestricted dynamic/frame carrier. Provide explicit
+  infallible JSON-to-`valor` widening and failable `valor`-to-JSON narrowing.
+- Type bare inline `{ "key": ... }` literals as the formal JSON document instead
+  of unconstrained `valor`. Preserve the source rule that top-level arrays are
+  Faber `lista`, while arrays remain legal inside JSON objects.
+- Make `@ json genus` convert bidirectionally with the formal JSON type. Apply
+  `@ json { nomen = "wire_name" }` on both boxing and extraction paths, including
+  nested genera and collections.
+- Route inline literals and JSON-genus conversion through one semantic/lowering
+  contract instead of parallel JSON-object builders.
+- Change `norma:json.solve`/`tempta` to produce the formal JSON type and reject
+  scalar or array roots. Change `json.pange` to accept the formal type.
+- Keep syntax parsing, document-root validation, schema/genus conversion, and
+  wire rendering as separate layers with structured failures.
+- Add a canonical corpus exemplum proving inline construction, genus round-trip,
+  renamed fields, nested arrays/objects, text parse/emit, and checked `valor`
+  narrowing.
+- Update EBNF, reader/type vocabulary, target emission, MIR/stepper behavior,
+  and user documentation as required by the chosen type.
+- Update the direct canonical callers needed to keep compiler, runtime, Norma,
+  and corpus gates green. Goal 3 owns the broader first-party cleanup inventory.
+- Record a release/version decision at Goal 2 closeout because changing inline
+  literal typing and `norma:json` signatures is a public clean break.
 
 Gate:
 
+- Type tests distinguish formal JSON from `valor` and reject implicit narrowing.
+- Inline object literals infer the formal type; top-level array/scalar JSON
+  documents are rejected by both source and Norma parsing boundaries.
+- `@ json genus → JSON → @ json genus` round-trips every supported field family
+  and uses `nomen` symmetrically.
+- JSON-to-`valor` widening preserves the tree; invalid-root, `Octeti`, tagged
+  `Instans`, and non-finite `valor` narrowing fail structurally.
+- Rust application output and MIR stepper behavior agree for the canonical
+  exemplum; other emit targets fail closed until explicitly supported.
+- `timeout 300 cargo test -p radix json -- --format terse`
+- `timeout 180 cargo test --manifest-path ../faber-runtime/Cargo.toml json`
+- `timeout 180 ./scripta/check-reader-pack-completeness`
+- `timeout 180 ../norma/scripta/check-source`
+- `cargo fmt --all -- --check` and `git diff --check` in every touched repo.
+
+### Goal 3 — First-Party JSON Migration And FVI Adoption
+
+| Field | Value |
+| --- | --- |
+| **Status** | blocked on Goal 2 |
+| **Source** | post-Goal-2 migration inventory; AI workbench command files and harnesses |
+| **Invariant** | First-party Faber code uses the formal JSON document and typed genera instead of maintaining local JSON grammars or assembling JSON text. |
+| **Why after Goal 2** | Migration is the product proof that the new type pays rent; doing it earlier would target an obsolete `valor` API. |
+| **Lowers to** | `delivery` after Goal 2 closeout, saved in the owning application/docs repo, then `factory` |
+| **Batch posture** | discovery-first, then batch |
+
+Required implementation outcome:
+
+- Inventory active first-party Faber source for manual JSON string assembly,
+  copied escaping, partial scanners, repeated `valor` field walking, and schema
+  models that should be `@ json genus`. Record each site as migrate, retain with
+  rationale, or out of scope.
+- Establish one migration pattern: typed `@ json genus` models for stable
+  schemas, the formal JSON document for ad hoc object-rooted payloads, and
+  `norma:json` only at wire boundaries.
+- Batch-migrate homogeneous sites after that pattern passes. Delete displaced
+  `json_quote`, `json_escape`, delimiter scanners, field substring searches, and
+  object concatenation rather than wrapping them.
+- Add one shared FVI codec/schema module in `faber-ai`. Parse each document once
+  into the formal JSON type, convert to typed FVI genera, and keep FVI
+  schema/version validation separate from JSON syntax.
+- Migrate chat, embed, generate, index, and query output to typed JSON documents;
+  preserve deterministic compact output and stable command schemas.
+- Extend the audit beyond AI workbench to other active Norma/examples Faber
+  sources. Do not rewrite unrelated Rust tooling JSON merely because it emits
+  JSON; Rust code should use its own typed serializer authority.
+- Add a lightweight regression audit that detects reintroduced application-local
+  JSON grammars without banning legitimate string or protocol work broadly.
+
+Gate:
+
+- Migration ledger has no unexplained first-party Faber manual-JSON site in the
+  selected scope.
 - Existing chat/embed/generate/index/query harnesses remain green.
-- New fixtures cover legal whitespace, reordered fields, all JSON escapes,
-  Unicode escapes, control-character emission, nested delimiters, malformed
-  syntax, duplicate/unknown schema fields according to the selected FVI policy,
-  and dimension/type errors.
+- New fixtures cover legal whitespace, reordered fields, every JSON escape,
+  Unicode, control characters, nested delimiters, malformed syntax, schema
+  errors, and vector dimension/type errors.
 - Python `json` readback validates every JSON stdout and written artifact.
 - `cargo run --manifest-path ../faber/Cargo.toml -- check ai-workbench/packages/faber-ai`
 - Run each affected `ai-workbench/harness/check-*.py` with an explicit timeout.
-- `git diff --check` in `examples` and `norma` if touched.
+- Run the migration regression audit and `../norma/scripta/check-source` when
+  Norma changes.
+- `git diff --check` in every touched repo.
 
-### Goal 3 — Honest Async `Sermo` And Host Boundary
+### Goal 4 — Honest Async `Sermo` And Host Boundary
 
 | Field | Value |
 | --- | --- |
 | **Status** | planned — existing async goal active |
 | **Source** | Radix async-ad-lowering goal/ledger plus live runtime and package code |
 | **Invariant** | Async `ad` never performs blocking host work while polling, always has a completion producer, and depends only on a portable runtime host contract. |
-| **Why last** | Highest cross-repo and behavioral risk; benefits from the campaign's first two established delivery patterns. |
+| **Why last** | Highest cross-repo and behavioral risk; benefits from the campaign's first three established delivery patterns. |
 | **Lowers to** | reconcile existing goal → `delivery` for the remaining coherent slice → `factory` |
 | **Batch posture** | split-on-boundary |
 
@@ -268,17 +356,20 @@ Gate:
 
 ```text
 Goal 1 ─────────────── independent, selected first
-Goal 2 ─────────────── independent; may run after Goal 1
-Goal 3 ─────────────── must reconcile async-ad-lowering authority first
-Campaign closeout ──── requires all three goals and cross-repo validation
+Goal 2 ────────┬────── formal JSON document foundation
+               └──► Goal 3 broad JSON migration and FVI adoption
+Goal 4 ─────────────── must reconcile async-ad-lowering authority first
+Campaign closeout ──── requires all four goals and cross-repo validation
 ```
 
 - A delivery may not mix files from two goals merely because both are cleanup.
 - If Goal 1 requires a Radix frontend API, expose semantic facts rather than raw
   parser internals or a Faber-specific text helper.
-- If Goal 2 exposes a real Norma JSON defect, fix the general JSON contract and
-  prove it in Norma before resuming the FVI migration.
-- Goal 3 must preserve one route per capability and the existing `sermo ↦ T`
+- Goal 2 owns the JSON type and codec contract. Goal 3 consumes it and must not
+  add a second representation or application-local grammar.
+- Goal 3 cannot begin implementation until Goal 2 closeout proves the public
+  type, `@ json genus` round-trip, and Norma wire boundaries.
+- Goal 4 must preserve one route per capability and the existing `sermo ↦ T`
   materialization policy.
 - Any unexpected dirty path in a touched repo stops that goal before edits.
 - Lock-producing Git commands run serially within each repository.
@@ -287,15 +378,19 @@ Campaign closeout ──── requires all three goals and cross-repo validatio
 
 1. `verify-library` rejects a deliberately wrong Rust signature and accepts a
    multiline, annotated Faber interface without textual heuristics.
-2. All five AI workbench commands have zero local JSON grammar/emitter helpers.
-3. An `@ futura` package route yields while another task runs and builds without
+2. Inline JSON, `@ json genus`, and `norma:json` all produce or consume the same
+   object-rooted formal JSON document type.
+3. All selected first-party Faber sources, including the five AI workbench
+   commands, have zero unexplained local JSON grammar/emitter helpers.
+4. An `@ futura` package route yields while another task runs and builds without
    a private Radix host path.
 
 ## Acceptance Criteria
 
 Campaign routing is ready when:
 
-- [x] Exactly three goals map to the three observed smells.
+- [x] Four goals map to the observed smells, with formal JSON construction and
+      its dependent cleanup migration kept as separate delivery units.
 - [x] Each goal has an invariant, owning repos, implementation outcome, gate,
       batching posture, and downstream lowering route.
 - [x] Goal 1 is selected as the next campaign stage.
@@ -304,9 +399,10 @@ Campaign routing is ready when:
 
 Campaign implementation is complete when:
 
-- [ ] All three goals have executed delivery specs and factory evidence.
-- [ ] The line-based binding scanner, copied JSON helpers, synchronous generated
-      host hook, and default private macOS host dependency are absent.
+- [ ] All four goals have executed delivery specs and factory evidence.
+- [ ] The line-based binding scanner, unconstrained inline-JSON `valor` typing,
+      asymmetric JSON-genus extraction, copied JSON helpers, synchronous
+      generated host hook, and default private macOS host dependency are absent.
 - [ ] All stage gates and cross-repo closeout gates pass.
 - [ ] Existing overlapping goals/ledgers contain no stale completion claims.
 - [ ] Every touched repository is clean and all commits are recorded here.
@@ -322,7 +418,7 @@ Artifact checks:
 - Each stage lowers through `delivery` before `factory`.
 - `faber/docs/factory/README.md` indexes this campaign.
 
-Closeout validation is the union of the three goal gates plus:
+Closeout validation is the union of the four goal gates plus:
 
 - `timeout 240 cargo test --manifest-path faber/Cargo.toml`
 - `timeout 240 cargo test --manifest-path faber-runtime/Cargo.toml`
@@ -339,6 +435,11 @@ These are delivery-level decisions, not blockers to campaign routing:
 - Should Rust binding proof use generated typed function pointers, generated
   adapters, or the normal backend library crate build? It must prove existence
   and compatibility, not merely parse paths.
+- What is the canonical public spelling of the formal JSON document type? The
+  spelling must coexist cleanly with the `norma:json` module binding.
+- Should the runtime JSON document be a validated wrapper around
+  `Valor::Tabula`, or a distinct recursive representation? Prefer the wrapper
+  unless delivery evidence shows it cannot preserve the invariant cleanly.
 - Does the runtime host contract need cross-thread `Send + Sync` in the first
   delivery, or can a documented single-thread executor contract satisfy every
   current package host? Delivery must decide from actual producer topology.
@@ -347,13 +448,14 @@ These are delivery-level decisions, not blockers to campaign routing:
 
 Pause and return to the user rather than improvising when:
 
-- a proposed fix requires changing Faber grammar or the public `sermo ↦ T`
-  materialization contract;
+- work outside Goal 2 requires a new Faber grammar surface, or any goal requires
+  changing the public `sermo ↦ T` materialization contract;
 - Rust ABI mapping for a Faber type is undefined and cannot be derived from live
   codegen;
 - removing the private host dependency requires a publication, deployment,
   credential, or external registry action;
-- a Norma JSON limitation would require a new language feature rather than a
-  library correction;
+- a proposal weakens the object-root rule, silently aliases arbitrary `valor` to
+  the formal JSON type, or preserves the old Norma signatures as a second
+  canonical route;
 - a stage encounters foreign uncommitted changes in its allowed paths;
 - a validation failure reveals policy debt outside the selected goal.
