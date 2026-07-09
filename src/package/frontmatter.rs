@@ -103,14 +103,16 @@ pub(super) fn validate_frontmatter_against_manifest(
         }
     }
     if let Some(entry) = frontmatter.paths_entry() {
-        if let Some(diag) = frontmatter_manifest_conflict(
-            &file,
-            "[paths].entry",
-            entry,
-            "paths.entry",
-            &manifest.paths.entry,
-        ) {
-            return Some(diag);
+        if let Some(manifest_entry) = manifest.paths.entry.as_deref() {
+            if let Some(diag) = frontmatter_manifest_conflict(
+                &file,
+                "[paths].entry",
+                entry,
+                "paths.entry",
+                manifest_entry,
+            ) {
+                return Some(diag);
+            }
         }
     }
 

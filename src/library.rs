@@ -366,7 +366,7 @@ fn is_valid_module_segment(segment: &str) -> bool {
             .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-'))
 }
 
-fn is_valid_provider_segment(segment: &str) -> bool {
+pub(crate) fn is_valid_provider_segment(segment: &str) -> bool {
     !segment.is_empty()
         && segment
             .chars()

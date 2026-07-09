@@ -1,6 +1,6 @@
 # Goal: Unified Faber Package Manifest
 
-**Status**: proposed
+**Status**: active — Phase 1 complete; Phases 2–4 remain open
 **Created**: 2026-07-08
 **Target repo**: `/Users/ianzepp/work/faberlang/faber`
 **Factory artifact dir**: `docs/factory/unified-package-manifest/`
@@ -149,6 +149,14 @@ Faber source is the API contract; backend manifests are implementation data.
 ## Implementation Phases
 
 ### Phase 1 — Library-Aware `faber.toml`
+
+Status: complete (2026-07-09). Faber manifests now accept library package
+metadata with `[library].provider`, `build.kind = "lib"`, and
+`build.targets`; binary manifests require `[paths].entry` and keep singular
+`build.target`. Validation rejects unknown fields and invalid provider/package
+names. Gates passed:
+`timeout 120 cargo test --lib manifest -- --format terse` and
+`timeout 120 cargo test --lib discover -- --format terse`.
 
 Add the manifest schema and validation needed to represent library packages.
 

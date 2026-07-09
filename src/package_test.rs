@@ -3478,6 +3478,9 @@ fn rust_field_names_snake_case_manifest_policy_renames_generated_fields() {
 [package]
 name = "field-policy"
 
+[paths]
+entry = "main.fab"
+
 [build]
 rust_field_names = "snake_case"
 "#,
@@ -3549,6 +3552,9 @@ fn rust_field_names_snake_case_manifest_policy_rejects_field_collisions() {
 [package]
 name = "field-policy"
 
+[paths]
+entry = "main.fab"
+
 [build]
 rust_field_names = "snake_case"
 "#,
@@ -3592,6 +3598,9 @@ fn rust_field_names_snake_case_manifest_policy_renames_variant_fields() {
         r#"
 [package]
 name = "field-policy"
+
+[paths]
+entry = "main.fab"
 
 [build]
 rust_field_names = "snake_case"
@@ -5414,11 +5423,185 @@ name = "defaults"
     assert_eq!(manifest.package.version, "0.1.0");
     assert_eq!(manifest.package.edition, "2026");
     assert_eq!(manifest.paths.source, "src");
-    assert_eq!(manifest.paths.entry, "main.fab");
+    assert_eq!(manifest.paths.entry, None);
+    assert!(manifest.library.is_none());
     assert_eq!(manifest.build.target, "rust");
+    assert!(manifest.build.targets.is_empty());
     assert_eq!(manifest.build.kind, "bin");
     assert!(manifest.reader.locale.is_none());
     assert!(manifest.reader.pack.is_none());
+}
+
+#[test]
+fn read_manifest_accepts_source_library_without_entry() {
+    let dir = test_temp_dir("manifest-library");
+    let manifest = dir.join("faber.toml");
+    fs::write(
+        &manifest,
+        r#"
+[package]
+name = "norma"
+version = "0.1.0"
+
+[library]
+provider = "norma"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("write manifest");
+
+    let manifest = read_manifest(&manifest).expect("read manifest");
+    assert_eq!(manifest.package.name, "norma");
+    assert_eq!(
+        manifest
+            .library
+            .as_ref()
+            .map(|library| library.provider.as_str()),
+        Some("norma")
+    );
+    assert_eq!(manifest.paths.source, "src");
+    assert_eq!(manifest.paths.entry, None);
+    assert_eq!(manifest.build.kind, "lib");
+    assert_eq!(manifest.build.targets, vec!["rust".to_owned()]);
+}
+
+#[test]
+fn discover_package_accepts_library_manifest_without_entry() {
+    let dir = test_temp_dir("manifest-library-discover");
+    let src = dir.join("src");
+    fs::create_dir_all(&src).expect("create src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "libpkg"
+
+[library]
+provider = "libpkg"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("write manifest");
+
+    let spec = discover_package(&dir).expect("discover library manifest");
+    assert_eq!(spec.source_root, src);
+    assert_eq!(spec.entry, spec.source_root);
+}
+
+#[test]
+fn compile_package_rejects_binary_manifest_without_entry() {
+    let dir = test_temp_dir("manifest-bin-missing-entry");
+    fs::create_dir_all(dir.join("src")).expect("create src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "missing-entry"
+
+[paths]
+source = "src"
+"#,
+    )
+    .expect("write manifest");
+
+    let result = compile_package(&Config::default(), &dir);
+    assert!(result.output.is_none());
+    assert!(result
+        .diagnostics
+        .iter()
+        .any(|diag| diagnostic_has_issue(diag, "missing_binary_entry")));
+}
+
+#[test]
+fn compile_package_rejects_invalid_manifest_provider_names() {
+    let dir = test_temp_dir("manifest-invalid-provider");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "bad provider"
+
+[library]
+provider = "bad/provider"
+
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("write manifest");
+
+    let result = compile_package(&Config::default(), &dir);
+    assert!(result.output.is_none());
+    assert!(result
+        .diagnostics
+        .iter()
+        .any(|diag| diagnostic_has_issue(diag, "invalid_package_name")));
+}
+
+#[test]
+fn compile_package_rejects_invalid_manifest_library_provider() {
+    let dir = test_temp_dir("manifest-invalid-library-provider");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "libpkg"
+
+[library]
+provider = "bad/provider"
+
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("write manifest");
+
+    let result = compile_package(&Config::default(), &dir);
+    assert!(result.output.is_none());
+    assert!(result
+        .diagnostics
+        .iter()
+        .any(|diag| diagnostic_has_issue(diag, "invalid_library_provider")));
+}
+
+#[test]
+fn compile_package_rejects_library_manifest_without_targets() {
+    let dir = test_temp_dir("manifest-lib-missing-targets");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "libpkg"
+
+[library]
+provider = "libpkg"
+
+[build]
+kind = "lib"
+"#,
+    )
+    .expect("write manifest");
+
+    let result = compile_package(&Config::default(), &dir);
+    assert!(result.output.is_none());
+    assert!(result
+        .diagnostics
+        .iter()
+        .any(|diag| diagnostic_has_issue(diag, "missing_library_targets")));
 }
 
 #[test]
@@ -5701,6 +5884,9 @@ fn compile_package_rejects_unsupported_manifest_target() {
 [package]
 name = "bad-target"
 
+[paths]
+entry = "main.fab"
+
 [build]
 target = "go"
 "#,
@@ -5728,6 +5914,9 @@ fn discover_package_accepts_manifest_package_mir_targets() {
                 r#"
 [package]
 name = "manifest-target"
+
+[paths]
+entry = "main.fab"
 
 [build]
 target = "{target}"
@@ -5846,6 +6035,9 @@ fn load_package_rejects_frontmatter_manifest_build_conflict() {
         r#"
 [package]
 name = "conflict-demo"
+
+[paths]
+entry = "main.fab"
 
 [build]
 target = "rust"

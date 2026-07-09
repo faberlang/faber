@@ -188,7 +188,12 @@ fn parse_manifest(path: &Path) -> PackageDiscoveryResult {
     validate_manifest(&manifest, path)?;
 
     let source_root = package_root.join(&manifest.paths.source);
-    let entry = source_root.join(&manifest.paths.entry);
+    let entry = manifest
+        .paths
+        .entry
+        .as_deref()
+        .map(|entry| source_root.join(entry))
+        .unwrap_or_else(|| source_root.clone());
     Ok(PackageSpec { source_root, entry })
 }
 

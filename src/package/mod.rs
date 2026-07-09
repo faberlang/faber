@@ -59,7 +59,7 @@ pub use compile::{check_package, compile_package, compile_package_with_test_sele
 pub use discovery::{discover_build_layout, sanitize_crate_name, BuildLayout};
 #[allow(unused_imports)] // public package API; used by integration tests and external callers
 pub use manifest::{
-    read_manifest, FaberManifest, ManifestBuild, ManifestPackage, ManifestPaths,
+    read_manifest, FaberManifest, ManifestBuild, ManifestLibrary, ManifestPackage, ManifestPaths,
     ManifestRustFieldNames,
 };
 // binary-only package interpretation route consumes this through `commands`.
