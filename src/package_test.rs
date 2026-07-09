@@ -306,6 +306,99 @@ incipit {
 }
 
 #[test]
+fn compile_package_prefers_locked_norma_interfaces_over_library_home_without_dependency() {
+    let dir = test_temp_dir("locked-norma-platform-default");
+    let src = dir.join("src");
+    let locked_interfaces = dir.join("store").join("norma/0.1.0/interfaces");
+    let library_home = dir.join("library-home");
+    fs::create_dir_all(&src).expect("create src");
+    fs::create_dir_all(locked_interfaces.join("solum")).expect("create locked interfaces");
+    fs::create_dir_all(library_home.join("norma/src/solum")).expect("create fallback interfaces");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "locked-norma-platform-default"
+version = "0.1.0"
+
+[paths]
+entry = "src/main.fab"
+"#,
+    )
+    .expect("write manifest");
+    fs::write(
+        dir.join("faber.lock"),
+        format!(
+            r#"
+[[package]]
+name = "norma"
+version = "0.1.0"
+source = "path"
+package_root = "{}"
+kind = "source"
+target_language = "rust"
+target_triple = "host"
+target_manifest = "{}"
+interface_root = "{}"
+artifact = ""
+crate = "norma"
+rustc = ""
+"#,
+            dir.join("store/norma/0.1.0").display(),
+            dir.join("store/norma/0.1.0/targets/cista.toml").display(),
+            locked_interfaces.display(),
+        ),
+    )
+    .expect("write lock");
+    fs::write(
+        locked_interfaces.join("solum/path.fab"),
+        r#"
+functio locked_label() → textus {
+  redde "locked"
+}
+"#,
+    )
+    .expect("write locked norma interface");
+    fs::write(
+        library_home.join("norma/src/solum/path.fab"),
+        r#"
+functio fallback_label() → textus {
+  redde "fallback"
+}
+"#,
+    )
+    .expect("write fallback norma interface");
+    let entry = src.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+importa ex "norma:solum/path" privata path
+
+incipit {
+  nota path.locked_label()
+}
+"#,
+    )
+    .expect("write entry");
+
+    let result = compile_package(&Config::default().with_stdlib(library_home), &entry);
+    assert!(
+        result.success(),
+        "expected locked norma platform default compile success, got {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+    let Some(Output::Rust(output)) = result.output else {
+        panic!("expected rust output");
+    };
+    assert!(output.code.contains("locked_label"));
+    assert!(!output.code.contains("fallback_label"));
+}
+
+#[test]
 fn package_emits_rustfmt_clean_generated_main_for_multifile_package() {
     let dir = test_temp_dir("rustfmt-clean-multifile-package");
     let entry = dir.join("main.fab");
