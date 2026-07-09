@@ -28,3 +28,10 @@ cargo test --manifest-path ../radix/Cargo.toml -p radix -- <filter>
 ```
 
 Each `goal.md` / `CAMPAIGN.md` owns its **Status** line.
+
+## Open goals
+
+| Goal | Status | Entry |
+| ---- | ------ | ----- |
+| SQLite library package | proposed - blocked on unified manifest target bindings | [`sqlite-library-package/goal.md`](sqlite-library-package/goal.md) |
+| Unified package manifest | active - Phase 1 complete; Phases 2-4 open | [`unified-package-manifest/goal.md`](unified-package-manifest/goal.md) |
