@@ -1,6 +1,7 @@
 # Goal: SQLite Library Package
 
-**Status**: proposed - blocked on unified package manifest target bindings
+**Status**: Stage 1 API/fixture contract complete - implementation blocked on
+unified package manifest target bindings
 **Created**: 2026-07-09
 **Target workspace**: `/Users/ianzepp/work/faberlang`
 **Factory artifact dir**: `faber/docs/factory/sqlite-library-package/`
@@ -76,6 +77,7 @@ facade design.
 ## Reference Packet
 
 - `docs/factory/unified-package-manifest/goal.md`
+- `docs/factory/sqlite-library-package/stage-1-api-fixture-contract.md`
 - `../../../../cista/docs/factory/cista-package-store/goal.md`
 - `../../../../examples/cista-lab/source/mathesis/`
 - `../../../../examples/docs/factory/vivilite/goal.md`
@@ -169,6 +171,9 @@ this goal parked until unified manifest Phase 1 is complete and the Phase 4
 binding-manifest shape is selected or close enough for a delivery spec.
 
 ### Stage 1 - API And Fixture Contract
+
+Status: complete. See
+[`stage-1-api-fixture-contract.md`](stage-1-api-fixture-contract.md).
 
 Draft the Faber source facade and fixture database contract:
 
