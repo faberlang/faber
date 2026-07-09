@@ -7185,6 +7185,93 @@ fn config_with_library_home(library_home: &Path) -> Config {
     Config::default().with_stdlib(library_home.to_path_buf())
 }
 
+fn write_installed_library_manifest(
+    library_home: &Path,
+    provider: &str,
+    source_root: &str,
+    module_path: Option<&str>,
+) {
+    let package_root = library_home.join(provider);
+    fs::create_dir_all(&package_root).expect("create installed package root");
+    fs::write(
+        package_root.join("faber.toml"),
+        format!(
+            r#"
+[package]
+name = "{provider}"
+version = "0.1.0"
+
+[library]
+provider = "{provider}"
+
+[paths]
+source = "{source_root}"
+
+[build]
+kind = "lib"
+targets = ["rust"]
+"#
+        ),
+    )
+    .expect("write installed manifest");
+    if let Some(module_path) = module_path {
+        let path = package_root
+            .join(source_root)
+            .join(format!("{module_path}.fab"));
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("create installed source root");
+        }
+        fs::write(
+            path,
+            r#"
+functio label() → textus {
+    redde "installed"
+}
+"#,
+        )
+        .expect("write installed module");
+    }
+}
+
+#[test]
+fn library_resolver_reports_installed_manifest_missing_source_root() {
+    let library_home = test_temp_dir("installed-missing-source-root-home");
+    write_installed_library_manifest(&library_home, "altlib", "interfaces", None);
+
+    let dir = test_temp_dir("installed-missing-source-root-app");
+    fs::create_dir_all(dir.join("src")).expect("create app src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "installed-missing-source-root-app"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("write app manifest");
+    fs::write(
+        dir.join("src/main.fab"),
+        r#"
+importa ex "altlib:math/add" privata add
+
+incipit {
+    nota add.label()
+}
+"#,
+    )
+    .expect("write app entry");
+
+    let result = compile_package(&config_with_library_home(&library_home), &dir);
+    assert!(result.output.is_none());
+    assert!(result.diagnostics.iter().any(|diag| {
+        diagnostic_has_issue(diag, "missing_installed_library_source_root")
+            && diagnostic_has_arg(diag, "provider", "altlib")
+    }));
+}
+
 fn transitive_test_diagnostic_facts(
     result: &radix::CompileResult,
 ) -> Vec<(Option<&str>, Option<&str>)> {

@@ -555,6 +555,33 @@ pub(super) fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) 
         .with_arg("specifier", specifier)
         .with_arg("provider", provider)
         .with_arg("library_home", library_home.display().to_string()),
+        LibraryResolveError::InvalidInstalledManifest {
+            specifier,
+            provider,
+            manifest_path,
+            reason,
+        } => Diagnostic::error(format!(
+            "installed library provider `{provider}` for import `{specifier}` has an invalid manifest at {}: {reason}",
+            manifest_path.display()
+        ))
+        .with_file(file.display().to_string())
+        .with_arg("issue", "invalid_installed_library_manifest")
+        .with_arg("specifier", specifier)
+        .with_arg("provider", provider)
+        .with_arg("manifest_path", manifest_path.display().to_string()),
+        LibraryResolveError::MissingInstalledSourceRoot {
+            specifier,
+            provider,
+            source_root,
+        } => Diagnostic::error(format!(
+            "installed library provider `{provider}` for import `{specifier}` is missing source root {}",
+            source_root.display()
+        ))
+        .with_file(file.display().to_string())
+        .with_arg("issue", "missing_installed_library_source_root")
+        .with_arg("specifier", specifier)
+        .with_arg("provider", provider)
+        .with_arg("source_root", source_root.display().to_string()),
         LibraryResolveError::UnknownModule {
             specifier,
             package,

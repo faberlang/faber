@@ -13,6 +13,9 @@ mod format_test;
 pub mod host;
 mod init;
 mod install;
+#[cfg(test)]
+#[path = "install_test.rs"]
+mod install_test;
 mod run;
 mod script;
 mod test;

@@ -34,4 +34,4 @@ Each `goal.md` / `CAMPAIGN.md` owns its **Status** line.
 | Goal | Status | Entry |
 | ---- | ------ | ----- |
 | SQLite library package | proposed - blocked on unified manifest target bindings | [`sqlite-library-package/goal.md`](sqlite-library-package/goal.md) |
-| Unified package manifest | active - Phase 1 complete; Phases 2-4 open | [`unified-package-manifest/goal.md`](unified-package-manifest/goal.md) |
+| Unified package manifest | active - Phases 1-2 complete; Phases 3-4 open | [`unified-package-manifest/goal.md`](unified-package-manifest/goal.md) |

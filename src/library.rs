@@ -118,6 +118,33 @@ pub(crate) enum LibraryResolveError {
         library_home: PathBuf,
     },
 
+    /// A provider repo exists but does not expose a readable top-level manifest.
+    InvalidInstalledManifest {
+        /// Original import specifier from source.
+        specifier: String,
+
+        /// Provider package selected by the specifier.
+        provider: String,
+
+        /// Manifest path that failed validation.
+        manifest_path: PathBuf,
+
+        /// Targeted reason for the invalid package install.
+        reason: String,
+    },
+
+    /// A provider manifest points at a source root that does not exist.
+    MissingInstalledSourceRoot {
+        /// Original import specifier from source.
+        specifier: String,
+
+        /// Provider package selected by the specifier.
+        provider: String,
+
+        /// Source root computed from the installed top-level manifest.
+        source_root: PathBuf,
+    },
+
     /// A provider package was named, but no matching interface exists.
     UnknownModule {
         /// Original import specifier from source.
@@ -305,9 +332,9 @@ impl LibraryResolver {
         }
 
         let library_home = self.library_home_for(specifier)?;
-        let provider_root = library_home.join(provider).join("src");
+        let provider_repo = library_home.join(provider);
 
-        if !provider_root.is_dir() {
+        if !provider_repo.is_dir() {
             // Prefer an explicit dependency-declaration diagnostic when the
             // package has a [dependencies] table and this provider is not Norma
             // library-home layout.
@@ -324,6 +351,7 @@ impl LibraryResolver {
             });
         }
 
+        let provider_root = installed_provider_source_root(specifier, provider, &provider_repo)?;
         let interface_path = provider_root.join(format!("{module_path}.fab"));
         if !interface_path.exists() {
             return Err(LibraryResolveError::UnknownModule {
@@ -355,6 +383,83 @@ impl LibraryResolver {
             }
         })
     }
+}
+
+fn installed_provider_source_root(
+    specifier: &str,
+    provider: &str,
+    provider_repo: &Path,
+) -> Result<PathBuf, LibraryResolveError> {
+    let manifest_path = provider_repo.join("faber.toml");
+    if !manifest_path.is_file() {
+        let fallback = provider_repo.join("src");
+        if fallback.is_dir() {
+            return Ok(fallback);
+        }
+        return Err(LibraryResolveError::InvalidInstalledManifest {
+            specifier: specifier.to_owned(),
+            provider: provider.to_owned(),
+            manifest_path,
+            reason: "missing top-level faber.toml".to_owned(),
+        });
+    }
+
+    crate::package::discover_package(provider_repo).map_err(|diag| {
+        LibraryResolveError::InvalidInstalledManifest {
+            specifier: specifier.to_owned(),
+            provider: provider.to_owned(),
+            manifest_path: manifest_path.clone(),
+            reason: diag.message,
+        }
+    })?;
+    let manifest = crate::package::read_manifest(&manifest_path).map_err(|diag| {
+        LibraryResolveError::InvalidInstalledManifest {
+            specifier: specifier.to_owned(),
+            provider: provider.to_owned(),
+            manifest_path: manifest_path.clone(),
+            reason: diag.message,
+        }
+    })?;
+
+    if manifest.build.kind != "lib" {
+        return Err(LibraryResolveError::InvalidInstalledManifest {
+            specifier: specifier.to_owned(),
+            provider: provider.to_owned(),
+            manifest_path,
+            reason: "faber.toml build.kind must be \"lib\"".to_owned(),
+        });
+    }
+
+    let Some(library) = manifest.library.as_ref() else {
+        return Err(LibraryResolveError::InvalidInstalledManifest {
+            specifier: specifier.to_owned(),
+            provider: provider.to_owned(),
+            manifest_path,
+            reason: "faber.toml [library] is required".to_owned(),
+        });
+    };
+
+    if library.provider != provider {
+        return Err(LibraryResolveError::InvalidInstalledManifest {
+            specifier: specifier.to_owned(),
+            provider: provider.to_owned(),
+            manifest_path,
+            reason: format!(
+                "faber.toml library.provider is `{}`, expected `{provider}`",
+                library.provider
+            ),
+        });
+    }
+
+    let source_root = provider_repo.join(&manifest.paths.source);
+    if !source_root.is_dir() {
+        return Err(LibraryResolveError::MissingInstalledSourceRoot {
+            specifier: specifier.to_owned(),
+            provider: provider.to_owned(),
+            source_root,
+        });
+    }
+    Ok(source_root)
 }
 
 fn is_valid_module_segment(segment: &str) -> bool {

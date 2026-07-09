@@ -1,6 +1,6 @@
 # Goal: Unified Faber Package Manifest
 
-**Status**: active — Phase 1 complete; Phases 2–4 remain open
+**Status**: active — Phases 1–2 complete; Phases 3–4 remain open
 **Created**: 2026-07-08
 **Target repo**: `/Users/ianzepp/work/faberlang/faber`
 **Factory artifact dir**: `docs/factory/unified-package-manifest/`
@@ -181,6 +181,22 @@ timeout 120 cargo test --lib discover
 ```
 
 ### Phase 2 — Git URL Install and Manifest-Based Provider Roots
+
+Status: complete (2026-07-09). `faber install` now accepts library names and
+Git/path sources, clones into a temporary checkout, requires a top-level
+installable library `faber.toml`, installs under the declared provider, rejects
+conflicting existing installs by package identity or remote, and provider
+resolution reads the installed manifest's `[paths].source`. Consumer proof:
+`commands::install_test::install_git_path_library_and_consume_non_default_source_root`
+installs a local Git library whose source root is `interfaces/` and compiles an
+application importing `altmath:math/add` from that installed package. Negative
+proof:
+`package::tests::library_resolver_reports_installed_manifest_missing_source_root`
+checks missing installed source-root diagnostics, and
+`commands::install_test::install_rejects_existing_provider_with_different_remote_or_identity`
+checks conflicting installs. Gates passed:
+`timeout 120 cargo test install` and
+`timeout 120 cargo test --lib library_resolver`.
 
 Make `faber install` install any Faber library repo that declares a valid
 top-level `faber.toml`.
