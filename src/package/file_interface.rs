@@ -153,6 +153,7 @@ fn snapshot_struct(
     Ok(InterfaceStructExport {
         name: analysis.interner.resolve(strukt.name).to_owned(),
         fields,
+        annotation_contract: None,
     })
 }
 

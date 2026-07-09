@@ -576,8 +576,34 @@ pub(super) fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) 
         ))
         .with_file(file.display().to_string())
         .with_arg("issue", "missing_library_home")
+        .with_arg("specifier", specifier),
+        LibraryResolveError::MissingLockedPackage {
+            specifier,
+            provider,
+            version,
+        } => {
+            let version_hint = version
+                .as_deref()
+                .map(|v| format!(" (`{provider} = \"{v}\"`)"))
+                .unwrap_or_default();
+            Diagnostic::error(format!(
+                "library import `{specifier}` is declared in faber.toml{version_hint} but missing from faber.lock; install the package with the package manager"
+            ))
+            .with_file(file.display().to_string())
+            .with_arg("issue", "missing_locked_package")
+            .with_arg("specifier", specifier)
+            .with_arg("provider", provider)
+        }
+        LibraryResolveError::UndeclaredProvider {
+            specifier,
+            provider,
+        } => Diagnostic::error(format!(
+            "library import `{specifier}` uses undeclared provider `{provider}`; add it to faber.toml [dependencies] and install it"
+        ))
+        .with_file(file.display().to_string())
+        .with_arg("issue", "undeclared_library_provider")
         .with_arg("specifier", specifier)
-        .with_arg("hint", hint),
+        .with_arg("provider", provider),
     }
 }
 

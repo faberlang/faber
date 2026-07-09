@@ -35,6 +35,7 @@ mod file_interface;
 mod frontmatter;
 mod import_graph;
 mod library;
+mod lockfile;
 mod manifest;
 mod mir;
 mod modules;
@@ -149,6 +150,50 @@ pub(crate) fn library_resolver_from_config(config: &radix::driver::Config) -> Li
         .as_ref()
         .map(|path| LibraryResolver::new(path.clone()))
         .unwrap_or_else(LibraryResolver::default)
+}
+
+/// Build a library resolver for a package root, attaching `faber.toml`
+/// dependencies and `faber.lock` interface roots when present.
+pub(crate) fn library_resolver_for_package(
+    config: &radix::driver::Config,
+    package_root: &std::path::Path,
+) -> Result<LibraryResolver, Vec<Diagnostic>> {
+    let mut resolver = library_resolver_from_config(config);
+    let manifest_path = package_root.join(MANIFEST_FILE);
+    if !manifest_path.is_file() {
+        return Ok(resolver);
+    }
+    let manifest = match read_manifest(&manifest_path) {
+        Ok(manifest) => manifest,
+        Err(diag) => return Err(vec![*diag]),
+    };
+    let lock = match lockfile::read_lock(package_root) {
+        Ok(lock) => lock,
+        Err(diag) => return Err(vec![*diag]),
+    };
+    let mut lock_diags =
+        lockfile::validate_dependencies_against_lock(package_root, &manifest.dependencies, lock.as_ref());
+    if lock_diags.iter().any(Diagnostic::is_error) {
+        return Err(lock_diags);
+    }
+    // Non-error path notes are unused for now; keep only errors.
+    lock_diags.clear();
+
+    let mut locked = std::collections::BTreeMap::new();
+    if let Some(lock) = lock.as_ref() {
+        for package in &lock.packages {
+            locked.insert(
+                package.name.clone(),
+                crate::library::LockedLibraryPackage {
+                    name: package.name.clone(),
+                    version: package.version.clone(),
+                    interface_root: package.interface_root_path(),
+                },
+            );
+        }
+    }
+    resolver = resolver.with_package_lock(manifest.dependencies, locked);
+    Ok(resolver)
 }
 
 pub(crate) fn load_package(

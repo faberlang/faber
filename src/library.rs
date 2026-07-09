@@ -17,9 +17,24 @@
 //! - Old built-in slash forms such as `norma/json` are rejected instead of
 //!   silently reinterpreted.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 pub(crate) const FABER_LIBRARY_HOME_ENV: &str = "FABER_LIBRARY_HOME";
+
+/// Locked package interface root used for build-time resolution.
+///
+/// Paths are absolute file-system locations from `faber.lock`. Faber does not
+/// discover package-manager store roots.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct LockedLibraryPackage {
+    /// Declared package/provider name.
+    pub name: String,
+    /// Exact version pin from the lock.
+    pub version: String,
+    /// Directory containing `.fab` interface files for this package.
+    pub interface_root: PathBuf,
+}
 
 /// Origin class for a resolved library module.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -126,6 +141,28 @@ pub(crate) enum LibraryResolveError {
         /// Setup hint for the operator.
         hint: String,
     },
+
+    /// Provider is declared in faber.toml but missing from faber.lock.
+    MissingLockedPackage {
+        /// Original import specifier from source.
+        specifier: String,
+
+        /// Provider package name.
+        provider: String,
+
+        /// Declared version pin, when known.
+        version: Option<String>,
+    },
+
+    /// Provider-qualified import is not declared in faber.toml dependencies
+    /// and is not available from the bundled library home.
+    UndeclaredProvider {
+        /// Original import specifier from source.
+        specifier: String,
+
+        /// Provider package name.
+        provider: String,
+    },
 }
 
 /// Resolver for built-in and package-backed Faber library imports.
@@ -133,9 +170,15 @@ pub(crate) enum LibraryResolveError {
 /// `resolve` returns `Ok(None)` when the specifier is not provider-shaped. That
 /// lets package loading fall through to local import resolution without
 /// treating every plain package path as a library error.
+///
+/// Locked packages (from `faber.lock`) are preferred over library-home layout.
+/// Bundled Norma continues to resolve from library home until it is itself
+/// locked. Faber never discovers package-manager store roots.
 #[derive(Debug, Clone)]
 pub(crate) struct LibraryResolver {
     library_home: Option<PathBuf>,
+    locked: BTreeMap<String, LockedLibraryPackage>,
+    declared: BTreeMap<String, String>,
 }
 
 impl LibraryResolver {
@@ -143,6 +186,8 @@ impl LibraryResolver {
     pub(crate) fn new(library_home: impl Into<PathBuf>) -> Self {
         Self {
             library_home: Some(library_home.into()),
+            locked: BTreeMap::new(),
+            declared: BTreeMap::new(),
         }
     }
 
@@ -150,7 +195,20 @@ impl LibraryResolver {
     pub(crate) fn default() -> Self {
         Self {
             library_home: default_library_home(),
+            locked: BTreeMap::new(),
+            declared: BTreeMap::new(),
         }
+    }
+
+    /// Attach declared dependencies and locked package interface roots.
+    pub(crate) fn with_package_lock(
+        mut self,
+        declared: BTreeMap<String, String>,
+        locked: BTreeMap<String, LockedLibraryPackage>,
+    ) -> Self {
+        self.declared = declared;
+        self.locked = locked;
+        self
     }
 
     /// Resolve a Faber import specifier to a library interface, if applicable.
@@ -206,17 +264,6 @@ impl LibraryResolver {
             });
         }
 
-        let library_home = self.library_home_for(specifier)?;
-        let provider_root = library_home.join(provider).join("src");
-
-        if !provider_root.is_dir() {
-            return Err(LibraryResolveError::UnknownProvider {
-                specifier: specifier.to_owned(),
-                provider: provider.to_owned(),
-                library_home,
-            });
-        }
-
         let segments = module_path.split('/').collect::<Vec<_>>();
         if !segments
             .iter()
@@ -225,6 +272,55 @@ impl LibraryResolver {
             return Err(LibraryResolveError::InvalidProviderSpecifier {
                 specifier: specifier.to_owned(),
                 reason: "module path must not contain empty, dot, or dot-dot segments".to_owned(),
+            });
+        }
+
+        if let Some(locked) = self.locked.get(provider) {
+            let interface_path = locked.interface_root.join(format!("{module_path}.fab"));
+            if !interface_path.exists() {
+                return Err(LibraryResolveError::UnknownModule {
+                    specifier: specifier.to_owned(),
+                    package: provider.to_owned(),
+                    expected_path: interface_path,
+                    known_modules: known_modules(&locked.interface_root),
+                });
+            }
+            return Ok(Some(ResolvedLibraryModule::new(
+                provider,
+                segments
+                    .iter()
+                    .map(|segment| (*segment).to_owned())
+                    .collect(),
+                interface_path,
+                LibraryProviderKind::PackageDependency,
+            )));
+        }
+
+        if self.declared.contains_key(provider) {
+            return Err(LibraryResolveError::MissingLockedPackage {
+                specifier: specifier.to_owned(),
+                provider: provider.to_owned(),
+                version: self.declared.get(provider).cloned(),
+            });
+        }
+
+        let library_home = self.library_home_for(specifier)?;
+        let provider_root = library_home.join(provider).join("src");
+
+        if !provider_root.is_dir() {
+            // Prefer an explicit dependency-declaration diagnostic when the
+            // package has a [dependencies] table and this provider is not Norma
+            // library-home layout.
+            if !self.declared.is_empty() && provider != "norma" {
+                return Err(LibraryResolveError::UndeclaredProvider {
+                    specifier: specifier.to_owned(),
+                    provider: provider.to_owned(),
+                });
+            }
+            return Err(LibraryResolveError::UnknownProvider {
+                specifier: specifier.to_owned(),
+                provider: provider.to_owned(),
+                library_home,
             });
         }
 

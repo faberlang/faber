@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
@@ -23,6 +24,10 @@ pub struct FaberManifest {
     /// Reader-locale settings used to select a source and diagnostic surface.
     #[serde(default)]
     pub reader: ManifestReader,
+
+    /// Direct exact dependency pins (`name = "version"`). Resolved paths live in `faber.lock`.
+    #[serde(default)]
+    pub dependencies: BTreeMap<String, String>,
 }
 
 /// `[package]` metadata from `faber.toml`.
@@ -247,6 +252,23 @@ pub(super) fn validate_manifest(
             return Err(Box::new(
                 Diagnostic::error("faber.toml reader.pack requires reader.locale")
                     .with_file(path.display().to_string()),
+            ));
+        }
+    }
+
+    for (name, version) in &manifest.dependencies {
+        if name.trim().is_empty() {
+            return Err(Box::new(
+                Diagnostic::error("faber.toml [dependencies] key must not be empty")
+                    .with_file(path.display().to_string()),
+            ));
+        }
+        if version.trim().is_empty() {
+            return Err(Box::new(
+                Diagnostic::error(format!(
+                    "faber.toml dependency `{name}` version must be a non-empty exact string"
+                ))
+                .with_file(path.display().to_string()),
             ));
         }
     }

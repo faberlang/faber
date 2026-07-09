@@ -22,12 +22,12 @@ use super::import_graph::{
     build_mount_plan, library_import_binding, resolve_import, ImportResolution,
 };
 use super::{
-    analysis_source_for_file, attach_library_provenance, discover_package, library_cached_analysis,
-    library_cached_file_interface, library_generates_rust_module, library_imported_function_params,
-    library_interface_export_names, library_interface_has_module, library_module_segments,
-    library_resolver_from_config, load_package, load_package_with_reader_pack,
-    load_reader_pack_for_input, program_export_names, read_manifest, LibraryImportBinding,
-    LibraryInterfaceCache, PackageFile,
+    analysis_source_for_file, attach_library_provenance, discover_build_layout, discover_package,
+    library_cached_analysis, library_cached_file_interface, library_generates_rust_module,
+    library_imported_function_params, library_interface_export_names, library_interface_has_module,
+    library_module_segments, library_resolver_for_package, load_package,
+    load_package_with_reader_pack, load_reader_pack_for_input, program_export_names, read_manifest,
+    LibraryImportBinding, LibraryInterfaceCache, PackageFile,
 };
 
 pub(crate) struct AnalyzedPackage {
@@ -92,8 +92,25 @@ pub(crate) fn analyze_package(
 ) -> Result<AnalyzedPackage, Vec<Diagnostic>> {
     let config = effective_package_config(config, input)?;
     let spec = discover_package(input).map_err(|diag| vec![*diag])?;
-    let library_resolver = library_resolver_from_config(&config);
+    let package_root = package_root_for_input(input);
+    let library_resolver = library_resolver_for_package(&config, &package_root)?;
     analyze_package_spec(&config, spec, &library_resolver)
+}
+
+fn package_root_for_input(input: &Path) -> PathBuf {
+    match discover_build_layout(input) {
+        Ok(layout) => layout.package_root,
+        Err(_) => {
+            if input.is_file() {
+                input
+                    .parent()
+                    .unwrap_or_else(|| Path::new("."))
+                    .to_path_buf()
+            } else {
+                input.to_path_buf()
+            }
+        }
+    }
 }
 
 fn compile_package_internal(
@@ -131,7 +148,16 @@ fn compile_package_internal(
         }
     };
 
-    let library_resolver = library_resolver_from_config(&config);
+    let package_root = package_root_for_input(input);
+    let library_resolver = match library_resolver_for_package(&config, &package_root) {
+        Ok(resolver) => resolver,
+        Err(diagnostics) => {
+            return CompileResult {
+                output: None,
+                diagnostics,
+            };
+        }
+    };
     let field_name_policy = match package_field_name_policy(&spec) {
         Ok(policy) => policy,
         Err(diag) => {
