@@ -1,8 +1,10 @@
 //! `faber format` author pipeline: compile_author, normalization, re-parse.
 
 use super::format::{formatted_source_for_write, normalize_trailing_newline, source_for_compare};
-use radix::forma::test_gate::{assert_author_idempotent, assert_author_reparses, author_format_once};
 use radix::driver::{Config, Session};
+use radix::forma::test_gate::{
+    assert_author_idempotent, assert_author_reparses, author_format_once,
+};
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -82,9 +84,7 @@ fn format_test_gate_matches_compile_author_pipeline_for_salve() {
 fn faber_binary() -> PathBuf {
     std::env::var("CARGO_BIN_EXE_faber")
         .map(PathBuf::from)
-        .unwrap_or_else(|_| {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/debug/faber")
-        })
+        .unwrap_or_else(|_| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/debug/faber"))
 }
 
 fn run_faber_format_stdout(path: &Path) -> String {

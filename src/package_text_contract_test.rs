@@ -16,8 +16,7 @@ const BIDI_ISOLATE_START: &str = "\u{2068}";
 const BIDI_ISOLATE_END: &str = "\u{2069}";
 
 fn reader_locale_examples_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../examples/reader-locale")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale")
 }
 
 fn reader_locale_fault_path(locale: &str, rel: &str) -> PathBuf {

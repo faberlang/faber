@@ -176,14 +176,12 @@ struct ExcludedTermsFile {
 fn load_index_manifest() -> IndexManifestView {
     let index: IndexManifest =
         toml::from_str(include_str!("../../examples/corpus/index.toml")).expect("index");
-    let legacy: LegacyRedirectsFile = toml::from_str(include_str!(
-        "../../examples/corpus/legacy-redirects.toml"
-    ))
-    .expect("legacy redirects");
-    let excluded: ExcludedTermsFile = toml::from_str(include_str!(
-        "../../examples/corpus/excluded-terms.toml"
-    ))
-    .expect("excluded terms");
+    let legacy: LegacyRedirectsFile =
+        toml::from_str(include_str!("../../examples/corpus/legacy-redirects.toml"))
+            .expect("legacy redirects");
+    let excluded: ExcludedTermsFile =
+        toml::from_str(include_str!("../../examples/corpus/excluded-terms.toml"))
+            .expect("excluded terms");
     let legacy_canonical = legacy
         .redirects
         .iter()

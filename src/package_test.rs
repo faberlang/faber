@@ -5406,8 +5406,7 @@ locale = "zh-Hans"
 
 #[test]
 fn installed_reader_locale_reference_examples_compile_from_installed_packs() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../examples/reader-locale");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale");
 
     for (locale, path, function, binding, greeting) in [
         (
@@ -5569,8 +5568,7 @@ locale = "zh-Hans"
 
 #[test]
 fn thai_reader_locale_example_compiles_from_manifest() {
-    let example = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../examples/reader-locale/th-TH");
+    let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale/th-TH");
 
     let result = compile_package(&Config::default(), &example);
 
@@ -6804,6 +6802,59 @@ fn emit_generated_crate_works_without_manifest_using_fallback_name() {
 
     let cargo = fs::read_to_string(&layout.generated_cargo_manifest).expect("cargo");
     assert!(cargo.contains(&format!("name = \"{}\"", layout.binary_name())));
+}
+
+#[test]
+fn generated_package_ad_uses_host_bridge_before_materialization() {
+    let pkg = test_temp_dir("package-ad-host-bridge");
+    let data = pkg.join("data.txt");
+    fs::write(&data, "salve host").expect("write data fixture");
+    let path_lit = format!("{:?}", data.to_string_lossy());
+    let entry = pkg.join("main.fab");
+    fs::write(
+        &entry,
+        format!(
+            r#"
+incipit {{
+    fixum textus body ← ad 'solum:lege' ({path_lit}) ↦ textus
+    nota body
+}}
+"#
+        ),
+    )
+    .expect("write entry");
+
+    let result = compile_package(&Config::default(), &entry);
+    assert!(
+        result.success(),
+        "expected package compile success, got {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+    let Some(Output::Rust(output)) = result.output else {
+        panic!("expected rust output");
+    };
+    assert!(output
+        .code
+        .contains("__faber_attach_sermo(&mut sermo_frame);"));
+
+    let layout = discover_build_layout(&entry).expect("layout");
+    emit_generated_crate(&layout, &output.code, None).expect("emit generated crate");
+    let cargo = fs::read_to_string(&layout.generated_cargo_manifest).expect("cargo");
+    assert!(cargo.contains("faber-host-macos-arm64 = { path = "));
+    assert!(cargo.contains("default = [\"__faber_host_macos_arm64\"]"));
+    assert!(cargo.contains("__faber_host_macos_arm64 = [\"dep:faber-host-macos-arm64\"]"));
+
+    let binary = invoke_cargo_build(&layout, false).expect("cargo build");
+    let run = Command::new(binary).output().expect("run generated binary");
+    assert!(run.status.success(), "generated binary failed: {:?}", run);
+    assert_eq!(
+        String::from_utf8(run.stdout).expect("stdout utf8"),
+        "salve host\n"
+    );
 }
 
 // ---------------------------------------------------------------------------

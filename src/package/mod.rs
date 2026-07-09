@@ -171,8 +171,11 @@ pub(crate) fn library_resolver_for_package(
         Ok(lock) => lock,
         Err(diag) => return Err(vec![*diag]),
     };
-    let mut lock_diags =
-        lockfile::validate_dependencies_against_lock(package_root, &manifest.dependencies, lock.as_ref());
+    let mut lock_diags = lockfile::validate_dependencies_against_lock(
+        package_root,
+        &manifest.dependencies,
+        lock.as_ref(),
+    );
     if lock_diags.iter().any(Diagnostic::is_error) {
         return Err(lock_diags);
     }

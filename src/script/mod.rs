@@ -11,9 +11,9 @@ use radix::mir::run_source as radix_run_source;
 use std::panic::AssertUnwindSafe;
 use std::process::ExitCode;
 
-pub use radix::mir::{Host, RunSourceError, StdioHost};
 #[cfg(test)]
 pub use radix::mir::BufferHost;
+pub use radix::mir::{Host, RunSourceError, StdioHost};
 pub use trap::raw_exit_code;
 
 /// Default diagnostic identity for [`run_source`].
