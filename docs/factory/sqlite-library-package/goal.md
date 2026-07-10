@@ -1,7 +1,7 @@
 # Goal: SQLite Library Package
 
-**Status**: Stage 1 API/fixture contract complete — Phase 4 verification and
-G4 Rust library path-dep linkage available; Stage 2 product implementation open
+**Status**: Stage 2 Rust binding prototype complete in the SQLite packet;
+generated application linkage and parameterized rusqlite operations proven
 **Created**: 2026-07-09
 **Refreshed**: 2026-07-10
 **Target workspace**: `/Users/ianzepp/work/faberlang`
@@ -192,6 +192,15 @@ This stage may proceed before the Rust binding implementation if it is kept as
 docs/interfaces only.
 
 ### Stage 2 - Rust Binding Prototype
+
+Status: packet implementation complete (2026-07-10). The package binds
+`exsequi`, `quaere`, and `scalar` through bundled `rusqlite`; binding
+verification, shim tests, and a generated application build prove the linkage
+path. `exsequi` temporarily returns its effect object as `valor` because the
+current binding probe/linker cannot represent a Rust shim returning a
+Faber-defined genus. Restoring the Stage 1 `SQLiteEffect` return type is a
+bounded ABI follow-up, not something this prototype hides behind an unverified
+Rust struct.
 
 After application linkage for verified target bindings is available:
 

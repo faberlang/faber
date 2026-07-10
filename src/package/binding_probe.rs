@@ -171,10 +171,33 @@ fn probe_manifest(dependencies: &BTreeMap<String, String>) -> Result<String, tom
     );
     package.insert("edition".to_owned(), toml::Value::String("2021".to_owned()));
 
-    let dependencies = dependencies
+    let mut dependencies = dependencies
         .iter()
-        .map(|(name, version)| (name.clone(), toml::Value::String(version.clone())))
-        .collect();
+        .map(|(name, requirement)| {
+            let value = requirement
+                .trim()
+                .parse::<toml::Value>()
+                .unwrap_or_else(|_| toml::Value::String(requirement.clone()));
+            (name.clone(), value)
+        })
+        .collect::<toml::map::Map<_, _>>();
+    dependencies.entry("faber".to_owned()).or_insert_with(|| {
+        let mut runtime = toml::map::Map::new();
+        runtime.insert(
+            "package".to_owned(),
+            toml::Value::String("faber-runtime".to_owned()),
+        );
+        runtime.insert(
+            "path".to_owned(),
+            toml::Value::String(
+                Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("../faber-runtime")
+                    .display()
+                    .to_string(),
+            ),
+        );
+        toml::Value::Table(runtime)
+    });
     let mut manifest = toml::map::Map::new();
     manifest.insert("package".to_owned(), toml::Value::Table(package));
     manifest.insert("dependencies".to_owned(), toml::Value::Table(dependencies));
@@ -184,6 +207,7 @@ fn probe_manifest(dependencies: &BTreeMap<String, String>) -> Result<String, tom
 fn probe_source(shim: Option<&Path>, probes: &[String]) -> String {
     let mut source = String::new();
     if let Some(shim) = shim {
+        let shim = fs::canonicalize(shim).unwrap_or_else(|_| shim.to_path_buf());
         source.push_str(&format!(
             "#[path = {:?}]\nmod shim;\n\n",
             shim.display().to_string()
@@ -221,3 +245,7 @@ fn probe_root() -> PathBuf {
         std::process::id(),
     ))
 }
+
+#[cfg(test)]
+#[path = "binding_probe_test.rs"]
+mod tests;
