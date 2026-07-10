@@ -25,26 +25,9 @@ fn render_generated_cargo_toml(name: &str, version: &str, rust_code: &str) -> St
         "faber = {{ package = \"faber-runtime\", path = \"{}\" }}\n",
         faber_path.display(),
     );
-    let needs_host_bridge = generated_code_needs_host_bridge(rust_code);
-    if needs_host_bridge {
-        deps.push_str(&format!(
-            "faber-host-macos-arm64 = {{ path = \"{}\", optional = true }}\n",
-            faber_host_macos_arm64_path().display(),
-        ));
-    }
     if generated_code_needs_tokio(rust_code) {
         deps.push_str("tokio = { version = \"1\", features = [\"rt\", \"net\", \"time\"] }\n");
     }
-
-    let features = if needs_host_bridge {
-        r#"
-[features]
-default = ["__faber_host_macos_arm64"]
-__faber_host_macos_arm64 = ["dep:faber-host-macos-arm64"]
-"#
-    } else {
-        ""
-    };
 
     format!(
         r#"[package]
@@ -63,11 +46,10 @@ edition = "2021"
 # `cargo build/test --manifest-path target/faber/Cargo.toml`.
 
 [dependencies]
-{deps}{features}"#,
+{deps}"#,
         name = name,
         version = version,
-        deps = deps,
-        features = features
+        deps = deps
     )
 }
 
@@ -75,18 +57,9 @@ fn generated_code_needs_tokio(rust_code: &str) -> bool {
     rust_code.contains("tokio::") || rust_code.contains("__faber_block_on")
 }
 
-fn generated_code_needs_host_bridge(rust_code: &str) -> bool {
-    rust_code.contains("__faber_attach_sermo(")
-}
-
 fn faber_runtime_path() -> PathBuf {
     // Public `faber` repo lives beside private `radix` under faberlang/.
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../faber-runtime")
-}
-
-fn faber_host_macos_arm64_path() -> PathBuf {
-    // The macOS host proof crate currently lives in the private radix workspace.
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../radix/hosts/macos-arm64")
 }
 
 /// Write the generated Rust crate tree under the layout's `target/faber/` directory.

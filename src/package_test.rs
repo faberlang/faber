@@ -7243,8 +7243,8 @@ fn emit_generated_crate_works_without_manifest_using_fallback_name() {
 }
 
 #[test]
-fn generated_package_ad_uses_host_bridge_before_materialization() {
-    let pkg = test_temp_dir("package-ad-host-bridge");
+fn generated_package_ad_avoids_private_host_bridge_dependency() {
+    let pkg = test_temp_dir("package-ad-runtime-route");
     let data = pkg.join("data.txt");
     fs::write(&data, "salve host").expect("write data fixture");
     let path_lit = format!("{:?}", data.to_string_lossy());
@@ -7275,16 +7275,14 @@ incipit {{
     let Some(Output::Rust(output)) = result.output else {
         panic!("expected rust output");
     };
-    assert!(output
-        .code
-        .contains("__faber_attach_sermo(&mut sermo_frame);"));
+    assert!(!output.code.contains("__faber_attach_sermo"));
 
     let layout = discover_build_layout(&entry).expect("layout");
     emit_generated_crate(&layout, &output.code, None).expect("emit generated crate");
     let cargo = fs::read_to_string(&layout.generated_cargo_manifest).expect("cargo");
-    assert!(cargo.contains("faber-host-macos-arm64 = { path = "));
-    assert!(cargo.contains("default = [\"__faber_host_macos_arm64\"]"));
-    assert!(cargo.contains("__faber_host_macos_arm64 = [\"dep:faber-host-macos-arm64\"]"));
+    assert!(!cargo.contains("faber-host-macos-arm64"));
+    assert!(!cargo.contains("__faber_host_macos_arm64"));
+    assert!(!cargo.contains("../radix/hosts/macos-arm64"));
 
     let binary = invoke_cargo_build(&layout, false).expect("cargo build");
     let run = Command::new(binary).output().expect("run generated binary");
