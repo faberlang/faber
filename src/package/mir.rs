@@ -11,7 +11,7 @@ use super::library_resolver_from_config;
 use radix::cli::{
     CliCommand, CliDefault, CliExit, CliMode, CliOperand, CliOption, CliProgram, CliType,
 };
-use radix::diagnostics::Diagnostic;
+use radix::diagnostics::{Diagnostic, DiagnosticPhase};
 use radix::driver::Config;
 use radix::hir::{
     DefId, HirBlock, HirCallArg, HirCape, HirCasuArm, HirExpression, HirExpressionKind,
@@ -610,7 +610,7 @@ fn with_prepared_package_mir_with_cli_mode_and_consumer<R>(
     validate_program(&lowered.program, &lowered.validation).map_err(|errors| {
         errors
             .into_iter()
-            .map(|error| mir_diag(&entry_path, error.message))
+            .map(|error| mir_lowering_diag(&entry_path, error.message))
             .collect::<Vec<_>>()
     })?;
     if consumer == PackageMirConsumer::Interpreted {
@@ -4513,7 +4513,7 @@ fn lower_unit<'a>(
     result.map_err(|errors| {
         errors
             .into_iter()
-            .map(|error| mir_diag(&unit.path, error.message))
+            .map(|error| mir_lowering_diag(&unit.path, error.message))
             .collect()
     })
 }
@@ -4793,6 +4793,10 @@ fn shift_environment_id(id: &mut MirClosureEnvironmentId, offset: u32) {
 
 fn mir_diag(path: &Path, message: impl Into<String>) -> Diagnostic {
     Diagnostic::error(message).with_file(path.display().to_string())
+}
+
+fn mir_lowering_diag(path: &Path, message: impl Into<String>) -> Diagnostic {
+    mir_diag(path, message).with_phase(DiagnosticPhase::Mir)
 }
 
 fn mir_issue_diag(path: &Path, issue: &'static str, message: impl Into<String>) -> Diagnostic {
