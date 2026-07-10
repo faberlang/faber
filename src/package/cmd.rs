@@ -4,12 +4,15 @@ use radix::tool::DiagnosticMode;
 use radix::{CompileResult, Output};
 use std::path::Path;
 
-use super::cargo::{emit_generated_crate, invoke_cargo_build};
+use super::cargo::{
+    emit_generated_crate, emit_generated_crate_with_runtime_plan, invoke_cargo_build,
+};
 use super::manifest::manifest_build_target;
 use super::{
     build_package_fmir_binary_bundle, build_package_fmir_image, build_package_fmir_text_image,
     build_package_mir_artifact, check_package, compile_package, config_with_reader_locale,
-    discover_build_layout, read_manifest, BuildLayout, MANIFEST_FILE,
+    discover_build_layout, package_host_selection_diagnostic, package_rust_runtime_plan,
+    read_manifest, BuildLayout, MANIFEST_FILE,
 };
 
 /// Execute the user-facing `faber build` command.
@@ -113,7 +116,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
     let result = if is_package {
         compile_package(&config, &input_path)
     } else {
-        let compiler = radix::Compiler::new(config);
+        let compiler = radix::Compiler::new(config.clone());
         compiler.compile(&input_path)
     };
 
@@ -143,7 +146,35 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
         } else {
             None
         };
-        match emit_generated_crate(&layout, &output_code(output), meta.as_ref()) {
+        let runtime_plan = match package_rust_runtime_plan(&config, &input_path) {
+            Ok(plan) => plan,
+            Err(diagnostics) => {
+                radix::tool::print_diagnostics(
+                    &diagnostics,
+                    DiagnosticMode::Normal,
+                    reader_pack.as_ref(),
+                );
+                eprintln!("runtime plan failed");
+                std::process::exit(1);
+            }
+        };
+        if let Some(diagnostic) =
+            package_host_selection_diagnostic(&runtime_plan, &layout.manifest_path)
+        {
+            radix::tool::print_diagnostics(
+                &[diagnostic],
+                DiagnosticMode::Normal,
+                reader_pack.as_ref(),
+            );
+            eprintln!("runtime plan failed");
+            std::process::exit(1);
+        }
+        match emit_generated_crate_with_runtime_plan(
+            &layout,
+            &output_code(output),
+            meta.as_ref(),
+            &runtime_plan,
+        ) {
             Ok(_crate_root) => {
                 let binary_path = match invoke_cargo_build(&layout, command.release) {
                     Ok(p) => p,

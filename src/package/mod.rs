@@ -47,16 +47,20 @@ mod reader;
 mod source_files;
 
 pub use binding::verify_library_bindings;
+#[cfg(test)]
+pub(crate) use cargo::emit_generated_crate_with_runtime_plan;
 #[allow(unused_imports)]
 // used by `commands/run.rs` and `commands/test.rs` in the binary crate
 pub(crate) use cargo::invoke_cargo_build;
 pub use cargo::{emit_generated_crate, invoke_cargo_test};
+pub(crate) use cargo::{package_host_selection_diagnostic, RustRuntimePlan};
 #[cfg(test)]
 pub use cmd::use_package_compiler;
 pub use cmd::{
     cmd_build, cmd_check_package, cmd_emit_package, should_treat_as_package_from_args,
     use_package_compiler_from_args,
 };
+pub(crate) use compile::package_rust_runtime_plan;
 #[allow(unused_imports)] // package MIR stages consume this crate-visible analysis API.
 pub(crate) use compile::{analyze_package, AnalyzedPackage, AnalyzedPackageUnit};
 pub use compile::{check_package, compile_package, compile_package_with_test_selection};
@@ -66,7 +70,7 @@ pub(crate) use manifest::validate_manifest;
 #[allow(unused_imports)] // public package API; used by integration tests and external callers
 pub use manifest::{
     read_manifest, FaberManifest, ManifestBuild, ManifestLibrary, ManifestPackage, ManifestPaths,
-    ManifestRustFieldNames,
+    ManifestRustFieldNames, ManifestRustHost,
 };
 // binary-only package interpretation route consumes this through `commands`.
 #[allow(unused_imports)] // generated fmir-bin runner crates consume this public API.

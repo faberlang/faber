@@ -8,7 +8,8 @@ use radix::diagnostics::Diagnostic;
 use radix::driver::{
     analyze_source_with_cli_program_and_import_contract, AnalyzedUnit, Config, Session,
 };
-use radix::hir::HirItemKind;
+use radix::hir::visit::{walk_expr, HirVisitor};
+use radix::hir::{HirExpressionKind, HirItemKind};
 use radix::lexer::Interner;
 use radix::syntax::{ImportDecl, ImportKind, StmtKind};
 use radix::{CompileResult, Output, RustOutput};
@@ -27,7 +28,7 @@ use super::{
     library_imported_function_params, library_interface_export_names, library_interface_has_module,
     library_module_segments, library_resolver_for_package, load_package,
     load_package_with_reader_pack, load_reader_pack_for_input, program_export_names, read_manifest,
-    LibraryImportBinding, LibraryInterfaceCache, PackageFile,
+    LibraryImportBinding, LibraryInterfaceCache, PackageFile, RustRuntimePlan,
 };
 
 pub(crate) struct AnalyzedPackage {
@@ -63,6 +64,49 @@ struct GeneratedPackageRust {
     diagnostics: Vec<Diagnostic>,
 }
 
+fn rust_runtime_plan_for_package(package: &AnalyzedPackage) -> RustRuntimePlan {
+    let host = manifest_path_for_spec(&package.spec)
+        .and_then(|path| read_manifest(&path).ok())
+        .and_then(|manifest| manifest.target.get("rust").and_then(|target| target.host));
+    let mut plan = RustRuntimePlan {
+        needs_tokio: package.units.iter().any(|unit| {
+            unit.analysis.hir.entry_is_async
+                || unit.analysis.hir.items.iter().any(hir_item_is_async)
+        }),
+        host,
+        non_runtime_routes: BTreeSet::new(),
+    };
+    for unit in &package.units {
+        let mut collector = AdRouteCollector {
+            interner: &unit.analysis.interner,
+            routes: &mut plan.non_runtime_routes,
+        };
+        collector.visit_program(&unit.analysis.hir);
+    }
+    plan
+}
+
+fn hir_item_is_async(item: &radix::hir::HirItem) -> bool {
+    matches!(&item.kind, HirItemKind::Function(function) if function.is_async)
+}
+
+struct AdRouteCollector<'a> {
+    interner: &'a Interner,
+    routes: &'a mut BTreeSet<String>,
+}
+
+impl HirVisitor for AdRouteCollector<'_> {
+    fn visit_expr(&mut self, expr: &radix::hir::HirExpression) {
+        if let HirExpressionKind::Ad { route, .. } = expr.kind {
+            let route = self.interner.resolve(route).to_owned();
+            if !route.starts_with("runtime:") {
+                self.routes.insert(route);
+            }
+        }
+        walk_expr(self, expr);
+    }
+}
+
 /// Compile a package source graph into one backend output.
 ///
 /// Package compilation currently targets Rust only because it must assemble
@@ -83,6 +127,19 @@ pub fn compile_package_with_test_selection(
     test_selection: Option<&RustTestSelection>,
 ) -> CompileResult {
     compile_package_internal(config, input, test_selection)
+}
+
+#[allow(clippy::result_large_err)]
+pub(crate) fn package_rust_runtime_plan(
+    config: &Config,
+    input: &Path,
+) -> Result<RustRuntimePlan, Vec<Diagnostic>> {
+    let config = effective_package_config(config, input)?;
+    let spec = discover_package(input).map_err(|diag| vec![*diag])?;
+    let package_root = package_root_for_input(input);
+    let library_resolver = library_resolver_for_package(&config, &package_root)?;
+    let package = analyze_package_spec(&config, spec, &library_resolver)?;
+    Ok(rust_runtime_plan_for_package(&package))
 }
 
 #[allow(clippy::result_large_err)]

@@ -1,31 +1,72 @@
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use radix::codegen::Target;
 use radix::diagnostics::Diagnostic;
 
-use super::{BuildLayout, FaberManifest};
+use super::{BuildLayout, FaberManifest, ManifestRustHost};
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct RustRuntimePlan {
+    pub(crate) needs_tokio: bool,
+    pub(crate) host: Option<ManifestRustHost>,
+    pub(crate) non_runtime_routes: BTreeSet<String>,
+}
+
+impl RustRuntimePlan {
+    pub(crate) fn legacy_from_generated_code(rust_code: &str) -> Self {
+        Self {
+            needs_tokio: generated_code_needs_tokio(rust_code),
+            host: None,
+            non_runtime_routes: BTreeSet::new(),
+        }
+    }
+}
+
+pub(crate) fn package_host_selection_diagnostic(
+    plan: &RustRuntimePlan,
+    manifest_path: &Path,
+) -> Option<Diagnostic> {
+    if plan.non_runtime_routes.is_empty() || plan.host.is_some() {
+        return None;
+    }
+    let routes = plan
+        .non_runtime_routes
+        .iter()
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(", ");
+    Some(
+        Diagnostic::error(format!(
+            "package uses non-runtime ad routes without [target.rust] host selection: {routes}"
+        ))
+        .with_file(manifest_path.display().to_string())
+        .with_arg("issue", "package_host_selection_required")
+        .with_arg("routes", routes),
+    )
+}
 
 /// Generate a minimal, deterministic `Cargo.toml` for the emitted Rust crate.
 ///
 /// The Rust edition is fixed at 2021 for backend output; Faber source edition
 /// is manifest metadata for the language frontend and does not imply a Rust
 /// edition. `binary_name` must already be sanitized for Cargo.
-fn generate_cargo_toml(meta: &FaberManifest, binary_name: &str, rust_code: &str) -> String {
+fn generate_cargo_toml(meta: &FaberManifest, binary_name: &str, plan: &RustRuntimePlan) -> String {
     let version = if meta.package.version.trim().is_empty() {
         "0.1.0"
     } else {
         meta.package.version.trim()
     };
-    render_generated_cargo_toml(binary_name, version, rust_code)
+    render_generated_cargo_toml(binary_name, version, plan)
 }
 
-fn render_generated_cargo_toml(name: &str, version: &str, rust_code: &str) -> String {
+fn render_generated_cargo_toml(name: &str, version: &str, plan: &RustRuntimePlan) -> String {
     let faber_path = faber_runtime_path();
     let mut deps = format!(
         "faber = {{ package = \"faber-runtime\", path = \"{}\" }}\n",
         faber_path.display(),
     );
-    if generated_code_needs_tokio(rust_code) {
+    if plan.needs_tokio {
         deps.push_str("tokio = { version = \"1\", features = [\"rt\", \"net\", \"time\"] }\n");
     }
 
@@ -72,6 +113,20 @@ pub fn emit_generated_crate(
     rust_code: &str,
     meta: Option<&FaberManifest>,
 ) -> Result<PathBuf, Box<Diagnostic>> {
+    emit_generated_crate_with_runtime_plan(
+        layout,
+        rust_code,
+        meta,
+        &RustRuntimePlan::legacy_from_generated_code(rust_code),
+    )
+}
+
+pub(crate) fn emit_generated_crate_with_runtime_plan(
+    layout: &BuildLayout,
+    rust_code: &str,
+    meta: Option<&FaberManifest>,
+    plan: &RustRuntimePlan,
+) -> Result<PathBuf, Box<Diagnostic>> {
     use std::fs;
 
     let src_dir = layout.generated_crate_root.join("src");
@@ -80,9 +135,9 @@ pub fn emit_generated_crate(
     }
 
     let cargo_src = if let Some(m) = meta {
-        generate_cargo_toml(m, layout.binary_name(), rust_code)
+        generate_cargo_toml(m, layout.binary_name(), plan)
     } else {
-        render_generated_cargo_toml(layout.binary_name(), "0.1.0", rust_code)
+        render_generated_cargo_toml(layout.binary_name(), "0.1.0", plan)
     };
     if let Err(err) = fs::write(&layout.generated_cargo_manifest, &cargo_src) {
         return Err(Box::new(Diagnostic::io_error(

@@ -8,10 +8,11 @@ use super::{
     analyze_package, build_package_fmir_image, build_package_fmir_text_image,
     build_package_mir_artifact, check_package, compile_package,
     compile_package_with_test_selection, config_with_reader_locale, discover_build_layout,
-    discover_package, emit_generated_crate, invoke_cargo_build, library_cached_file_interface,
-    library_resolver_from_config, load_package, read_manifest, run_package_fmir_image,
-    run_package_fmir_text_image, run_package_mir, run_package_mir_artifact, sanitize_crate_name,
-    use_package_compiler, use_package_compiler_from_args, validate_manifest,
+    discover_package, emit_generated_crate, emit_generated_crate_with_runtime_plan,
+    invoke_cargo_build, library_cached_file_interface, library_resolver_from_config, load_package,
+    package_host_selection_diagnostic, package_rust_runtime_plan, read_manifest,
+    run_package_fmir_image, run_package_fmir_text_image, run_package_mir, run_package_mir_artifact,
+    sanitize_crate_name, use_package_compiler, use_package_compiler_from_args, validate_manifest,
     verify_library_bindings, BuildLayout, LibraryInterfaceCache,
 };
 use super::{fmir_image_test_summary, fmir_text_image_test_summary};
@@ -7271,6 +7272,118 @@ entry = "main.fab"
 
     // No nested target created by the writer
     assert!(!layout.generated_crate_root.join("target").exists());
+}
+
+#[test]
+fn package_runtime_plan_keeps_runtime_only_routes_hostless() {
+    let pkg = test_temp_dir("runtime-plan-runtime-only");
+    fs::create_dir_all(pkg.join("src")).expect("src");
+    fs::write(
+        pkg.join("faber.toml"),
+        r#"
+[package]
+name = "runtime-plan-runtime-only"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        pkg.join("src/main.fab"),
+        r#"incipit { fixum textus body ← ad 'runtime:echo' ("ok") ↦ textus nota body }"#,
+    )
+    .expect("entry");
+
+    let plan = package_rust_runtime_plan(&Config::default(), &pkg).expect("runtime plan");
+
+    assert!(plan.non_runtime_routes.is_empty());
+    assert!(plan.host.is_none());
+    assert!(!plan.needs_tokio);
+}
+
+#[test]
+fn package_runtime_plan_requires_host_for_non_runtime_routes() {
+    let pkg = test_temp_dir("runtime-plan-host-required");
+    fs::create_dir_all(pkg.join("src")).expect("src");
+    fs::write(
+        pkg.join("faber.toml"),
+        r#"
+[package]
+name = "runtime-plan-host-required"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        pkg.join("src/main.fab"),
+        r#"incipit { fixum textus body ← ad 'solum:lege' ("data.txt") ↦ textus nota body }"#,
+    )
+    .expect("entry");
+
+    let plan = package_rust_runtime_plan(&Config::default(), &pkg).expect("runtime plan");
+
+    assert_eq!(
+        plan.non_runtime_routes.iter().cloned().collect::<Vec<_>>(),
+        vec!["solum:lege".to_owned()]
+    );
+    assert!(plan.host.is_none());
+    let diagnostic = package_host_selection_diagnostic(&plan, &pkg.join("faber.toml"))
+        .expect("missing host selection diagnostic");
+    assert!(diagnostic_has_issue(
+        &diagnostic,
+        "package_host_selection_required"
+    ));
+}
+
+#[test]
+fn package_runtime_plan_drives_tokio_dependency_without_source_scan() {
+    let pkg = test_temp_dir("runtime-plan-async-entry");
+    fs::create_dir_all(pkg.join("src")).expect("src");
+    fs::write(
+        pkg.join("faber.toml"),
+        r#"
+[package]
+name = "runtime-plan-async-entry"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        pkg.join("src/main.fab"),
+        r#"incipiet { fixum textus body ← ad 'runtime:echo' ("ok") ↦ textus nota body }"#,
+    )
+    .expect("entry");
+
+    let layout = discover_build_layout(&pkg).expect("layout");
+    let compile_result = compile_package(&Config::default(), &pkg);
+    assert!(compile_result.success(), "compile should succeed");
+    let code = match &compile_result.output {
+        Some(radix::Output::Rust(r)) => r.code.clone(),
+        _ => panic!("expected rust output"),
+    };
+    let plan = package_rust_runtime_plan(&Config::default(), &pkg).expect("runtime plan");
+    assert!(plan.needs_tokio);
+
+    emit_generated_crate_with_runtime_plan(
+        &layout,
+        &code,
+        Some(&read_manifest(&layout.manifest_path).unwrap()),
+        &plan,
+    )
+    .expect("emit");
+    let cargo_toml = fs::read_to_string(&layout.generated_cargo_manifest).expect("read cargo");
+
+    assert!(cargo_toml.contains("tokio = { version = "));
+    assert!(!cargo_toml.contains("faber-host-macos-arm64"));
+    assert!(!cargo_toml.contains("../radix/hosts/macos-arm64"));
 }
 
 #[test]
