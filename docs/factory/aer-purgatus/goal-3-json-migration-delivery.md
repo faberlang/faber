@@ -1,7 +1,7 @@
 # Delivery: First-Party JSON Migration And FVI Adoption
 
-**Status**: in progress — M1 inventory complete; M2/M3 FVI index/query
-slice landed; M4 provider emitters landed
+**Status**: complete — M1 inventory, M2/M3 FVI index/query, M4 provider
+emitters, M5 residual apps, and M6 audit landed
 **Date**: 2026-07-09
 **Campaign**: [`CAMPAIGN.md`](CAMPAIGN.md)
 **Primary repo**: `/Users/ianzepp/work/faberlang/examples`
@@ -403,7 +403,7 @@ scanners, FVI markers, provider payload boundaries, and direct
 | `examples/ai-workbench/packages/faber-ai/src/commands/generate.fab` | JSON stdout and JSONL event artifact output | metadata/diagnostic events and command summary | M2/M4 | `check-generate.py` | done: output uses command-local `@ json` response/event genera; JSONL artifact shape preserved; manual string builders deleted |
 | `examples/ai-workbench/packages/faber-ai/src/commands/chat.fab` | JSON stdout and JSONL event artifact output | metadata/diagnostic events and command summary | M2/M4 | `check-chat.py` | done: output uses command-local `@ json` response/event genera; JSONL artifact shape preserved; manual string builders deleted |
 | `examples/ai-workbench/packages/faber-ai/src/commands/model.fab` | JSON stdout for alias/local model inspection | alias/model summary, tensors, diagnostics | M4 | `check-model-inspect.py` | done: command summary output uses typed JSON; binary metadata parsing remains in `norma:model` as non-JSON format parsing |
-| `examples/vivilite/src/main.fab` | JSON stdout for status and board output | status object and board object with task/need/want item arrays | M5 | package tests tagged `vivilite`; CLI route smoke if available | migrate output helpers to `@ json` genera and `json.pange`; delete `json_escape`, `jq`, `lb`, `rb`, `q`, `qq`, `pair*` |
+| `examples/vivilite/src/main.fab` | JSON stdout for status and board output | status object and board object with task/need/want item arrays | M5 | package tests tagged `vivilite`; CLI route smoke if available | done: status and board output use `@ json` genera; deleted `json_escape`, `jq`, `lb`, `rb`, `q`, `qq`, and `pair*` |
 | `norma/src/model.fab` | safetensors/GGUF binary metadata parsing | scans binary-derived safetensors header text and GGUF fields, not first-party application JSON | retained | `check-model-inspect.py`; `norma` source checks | out of Goal 3 migration unless a command starts treating its output as JSON text; keep as binary-format parser |
 | `norma/src/json*.fab` | formal JSON facade/parser/serializer | owns `json` document codec from Goal 2 | retained | `../norma/scripta/check-source` | out of application audit allowlist; this is the canonical JSON implementation |
 | `examples/script-kernel/glob-import.fab` | corpus demonstration of `json.solve`/`json.pange` | already uses formal `norma:json` facade | retained | corpus/exempla gates | no migration needed |
@@ -505,3 +505,59 @@ Results:
 - Model inspect harness: 11 cases passed.
 - Index regression harness: 10 cases passed.
 - Query regression harness: 16 cases passed.
+
+## M5/M6 Landing Evidence
+
+Landed implementation:
+
+- `examples` commit `07da6f9 feat(json): migrate vivilite board output`
+- `examples` commit `707d41f test(json): add manual json ratchet`
+
+Implementation notes:
+
+- `vivilite` status and board JSON output now use `@ json` wire genera.
+- The old `json_escape`, `jq`, brace, quote, and pair helpers were deleted from
+  `vivilite`.
+- AI workbench residual old string-concat coercions and diagnostics in
+  `index`, `query`, and `main` were converted to current formatting syntax.
+- The last non-output `json_*` helper in `model` was renamed to
+  `figura_textus` so the ratchet can treat `json_*` helpers as forbidden in
+  active first-party app source.
+- `examples/scripta/check-no-manual-json.py` scans active first-party app
+  sources (`faber-ai` and `vivilite`) for known manual JSON helper/scanner
+  names and JSON-looking concatenation builders.
+
+Validation:
+
+```bash
+cd /Users/ianzepp/work/faberlang
+timeout 180 cargo run --manifest-path faber/Cargo.toml -- check examples/ai-workbench/packages/faber-ai
+timeout 600 python3 examples/ai-workbench/harness/check-embed.py
+timeout 600 python3 examples/ai-workbench/harness/check-generate.py
+timeout 600 python3 examples/ai-workbench/harness/check-chat.py
+timeout 600 python3 examples/ai-workbench/harness/check-index.py
+timeout 600 python3 examples/ai-workbench/harness/check-query.py
+timeout 600 python3 examples/ai-workbench/harness/check-model-inspect.py
+timeout 180 cargo run --manifest-path faber/Cargo.toml -- check examples/vivilite
+timeout 180 cargo run --manifest-path faber/Cargo.toml -- test examples/vivilite
+timeout 180 python3 examples/scripta/check-no-manual-json.py --self-test
+timeout 180 python3 examples/scripta/check-no-manual-json.py --check
+git -C examples diff --check
+```
+
+Results:
+
+- Faber AI package semantic check passed with pre-existing unused warnings.
+- Embed harness: 11 cases passed.
+- Generate harness: 8 cases passed.
+- Chat harness: 9 cases passed.
+- Index harness: 10 cases passed.
+- Query harness: 16 cases passed.
+- Model inspect harness: 11 cases passed.
+- Vivilite package check passed.
+- Vivilite tests: 3 passed.
+- Audit self-test rejected seeded manual JSON helper and builder.
+- Audit clean-tree check passed.
+- Examples diff whitespace check passed.
+
+Goal 3 is closed. Goal 4 owns the remaining async `sermo` boundary work.

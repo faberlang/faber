@@ -1,6 +1,6 @@
 # Campaign: Aer Purgatus — Code-Smell Remediation
 
-**Status**: active — Goals 1 and 2 complete; Goal 3 selected for factory
+**Status**: active — Goals 1, 2, and 3 complete; Goal 4 pending
 **Date**: 2026-07-09
 **Mode**: routing artifact — does not implement code directly
 **Control-plane repo**: `/Users/ianzepp/work/faberlang/faber`
@@ -154,7 +154,7 @@ All six active repositories were clean when this campaign was drafted.
 | --- | --- | --- |
 | 1 — Compiler-grounded binding contracts | **complete** | Factory gate passed; evidence and commits recorded below. |
 | 2 — Formal object-rooted JSON document | **complete** | Factory gate passed; evidence and commits recorded below. |
-| 3 — First-party JSON migration and FVI adoption | **selected for factory** | Execute [`goal-3-json-migration-delivery.md`](goal-3-json-migration-delivery.md). |
+| 3 — First-party JSON migration and FVI adoption | **complete** | Factory gate passed; evidence and commits recorded below. |
 | 4 — Honest async `sermo` boundary | delivery ready; authority reconciliation first | Execute [`goal-4-async-sermo-delivery.md`](goal-4-async-sermo-delivery.md) after reconciling the live Radix ledger. |
 
 The four saved delivery documents are the factory production inputs. Stage
@@ -313,7 +313,7 @@ Factory evidence:
 
 | Field | Value |
 | --- | --- |
-| **Status** | selected — Goal 2 closeout complete |
+| **Status** | complete — factory gate passed 2026-07-09 |
 | **Source** | post-Goal-2 migration inventory; AI workbench command files and harnesses |
 | **Invariant** | First-party Faber code uses the formal JSON document and typed genera instead of maintaining local JSON grammars or assembling JSON text. |
 | **Why after Goal 2** | Migration is the product proof that the new type pays rent; doing it earlier would target an obsolete `valor` API. |
@@ -358,6 +358,33 @@ Gate:
 - Run the migration regression audit and `../norma/scripta/check-source` when
   Norma changes.
 - `git diff --check` in every touched repo.
+
+Factory evidence:
+
+- Examples `4426314` (`feat(ai): migrate FVI index query to formal json`)
+  migrates FVI index/query readers to formal `json` documents and typed local
+  FVI genera, deleting the partial scanner path.
+- Radix `fa0a1dea6` (`fix(json): support nested genus document conversion`) and
+  Norma `c9fc4ae` (`fix(json): avoid primitive-name parser collision`) unblock
+  nested typed FVI conversion and source-level primitive name use.
+- Examples `e1c18d3` (`feat(ai): migrate provider emitters to formal json`)
+  migrates embed/generate/chat/model JSON output to typed `@ json` wire genera.
+- Radix `c48b097ef` (`fix(host): route bounded solum byte reads`) adds bounded
+  file byte/range host support and routes byte payloads as `Valor::Octeti`.
+- Examples `07da6f9` (`feat(json): migrate vivilite board output`) migrates
+  `vivilite` status/board JSON output to typed genera and removes the old
+  brace/quote/pair helper family.
+- Examples `707d41f` (`test(json): add manual json ratchet`) adds
+  `examples/scripta/check-no-manual-json.py`, proves seeded helper/builder
+  rejection, and keeps active first-party app sources clean.
+- Faber control-plane commits `757e7ca`, `463c549`, `f8d6b40`, and this
+  closeout update record M1, M2/M3, M4, and final evidence in the delivery
+  document.
+- Gates passed: Faber AI package check; embed 11, generate 8, chat 9, model
+  inspect 11, index 10, and query 16 harness cases; vivilite package check and
+  3 tests; audit self-test and clean-tree check; examples diff whitespace
+  check. Radix host solum/process regressions, formatter, and diff checks
+  passed for the host support commit.
 
 ### Goal 4 — Honest Async `Sermo` And Host Boundary
 
