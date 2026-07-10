@@ -4,13 +4,16 @@ use std::path::{Path, PathBuf};
 use radix::codegen::Target;
 use radix::diagnostics::Diagnostic;
 
-use super::{BuildLayout, FaberManifest, ManifestRustHost};
+use super::{provider_crate_path, BuildLayout, FaberManifest, ManifestRustHost, ProviderManifest};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct RustRuntimePlan {
     pub(crate) needs_tokio: bool,
     pub(crate) host: Option<ManifestRustHost>,
     pub(crate) non_runtime_routes: BTreeSet<String>,
+    pub(crate) selected_providers: BTreeSet<String>,
+    pub(crate) provider_manifests: Vec<ProviderManifest>,
+    pub(crate) provider_error: Option<String>,
 }
 
 impl RustRuntimePlan {
@@ -19,6 +22,9 @@ impl RustRuntimePlan {
             needs_tokio: generated_code_needs_tokio(rust_code),
             host: None,
             non_runtime_routes: BTreeSet::new(),
+            selected_providers: BTreeSet::new(),
+            provider_manifests: Vec::new(),
+            provider_error: None,
         }
     }
 }
@@ -27,7 +33,16 @@ pub(crate) fn package_host_selection_diagnostic(
     plan: &RustRuntimePlan,
     manifest_path: &Path,
 ) -> Option<Diagnostic> {
-    if plan.non_runtime_routes.is_empty() || plan.host.is_some() {
+    if let Some(error) = &plan.provider_error {
+        return Some(
+            Diagnostic::error(error.clone())
+                .with_file(manifest_path.display().to_string())
+                .with_arg("issue", "host_provider_selection_invalid"),
+        );
+    }
+    if (plan.non_runtime_routes.is_empty() && plan.selected_providers.is_empty())
+        || plan.host.is_some()
+    {
         return None;
     }
     let routes = plan
@@ -36,13 +51,25 @@ pub(crate) fn package_host_selection_diagnostic(
         .cloned()
         .collect::<Vec<_>>()
         .join(", ");
+    let providers = plan
+        .selected_providers
+        .iter()
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(", ");
+    let detail = if routes.is_empty() {
+        format!("providers [{providers}]")
+    } else {
+        format!("routes [{routes}]")
+    };
     Some(
         Diagnostic::error(format!(
-            "package uses non-runtime ad routes without [target.rust] host selection: {routes}"
+            "package uses host providers without [target.rust] host selection: {detail}"
         ))
         .with_file(manifest_path.display().to_string())
         .with_arg("issue", "package_host_selection_required")
-        .with_arg("routes", routes),
+        .with_arg("routes", routes)
+        .with_arg("providers", providers),
     )
 }
 
@@ -68,9 +95,19 @@ fn render_generated_cargo_toml(name: &str, version: &str, plan: &RustRuntimePlan
     );
     if matches!(plan.host, Some(ManifestRustHost::Native)) {
         deps.push_str(&format!(
-            "faber_host_native = {{ package = \"faber-host-native\", path = \"{}\" }}\n",
-            faber_host_native_path().display()
+            "host_kernel = {{ package = \"host-kernel\", path = \"{}\" }}\n",
+            host_kernel_path().display()
         ));
+        deps.push_str(&format!(
+            "host_native = {{ package = \"host-native\", path = \"{}\" }}\n",
+            host_native_path().display()
+        ));
+        for provider in &plan.selected_providers {
+            deps.push_str(&format!(
+                "{provider} = {{ package = \"{provider}\", path = \"{}\" }}\n",
+                provider_crate_path(provider).display()
+            ));
+        }
     }
     if plan.needs_tokio {
         deps.push_str("tokio = { version = \"1\", features = [\"rt\", \"net\", \"time\"] }\n");
@@ -109,8 +146,12 @@ fn faber_runtime_path() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../faber-runtime")
 }
 
-fn faber_host_native_path() -> PathBuf {
-    faber_runtime_path().join("hosts/native")
+fn host_kernel_path() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../host-kernel-rs")
+}
+
+fn host_native_path() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../host-native-rs")
 }
 
 /// Write the generated Rust crate tree under the layout's `target/faber/` directory.
@@ -159,7 +200,18 @@ pub(crate) fn emit_generated_crate_with_runtime_plan(
     // Policy: keep an outer generated marker even when backend codegen already
     // writes its own header, because this file belongs to the package builder's
     // generated crate contract.
-    let rust_code = install_native_host_if_selected(rust_code, plan);
+    let rust_code = rust_code.to_owned();
+    if matches!(plan.host, Some(ManifestRustHost::Native)) {
+        if let Err(err) = write_host_registration(&src_dir, plan) {
+            return Err(Box::new(Diagnostic::io_error(&src_dir, err)));
+        }
+        if let Err(err) = write_host_manifest(&layout.generated_crate_root, plan) {
+            return Err(Box::new(Diagnostic::io_error(
+                &layout.generated_crate_root,
+                err,
+            )));
+        }
+    }
     let final_code = format!(
         "// Generated by faber build — do not edit by hand.\n\
          // Crate layout: target/faber/  (see plan.md)\n\
@@ -181,21 +233,32 @@ fn format_package_rust_source(source: &str) -> String {
     radix::tool::format_generated_code(Target::Rust, source).unwrap_or_else(|_| source.to_owned())
 }
 
-fn install_native_host_if_selected(rust_code: &str, plan: &RustRuntimePlan) -> String {
-    if !matches!(plan.host, Some(ManifestRustHost::Native)) {
-        return rust_code.to_owned();
-    }
-    let Some(main_start) = rust_code.find("fn main() {") else {
-        return rust_code.to_owned();
-    };
-    let insert_at = main_start + "fn main() {".len();
-    let mut source = String::with_capacity(rust_code.len() + 128);
-    source.push_str(&rust_code[..insert_at]);
-    source.push_str(
-        "\n    faber_host_native::install().expect(\"install Faber native host dispatch\");",
+fn write_host_registration(src_dir: &Path, plan: &RustRuntimePlan) -> std::io::Result<()> {
+    let path = src_dir.join("host_register.rs");
+    let mut source = String::from(
+        "pub fn install_or_exit() {\n    let mut kernel = host_kernel::Kernel::new();\n",
     );
-    source.push_str(&rust_code[insert_at..]);
-    source
+    for provider in &plan.selected_providers {
+        source.push_str(&format!(
+            "    if let Err(error) = {provider}::register(&mut kernel) {{\n        eprintln!(\"host provider {provider} initialization failed: {{error}}\");\n        std::process::exit(70);\n    }}\n"
+        ));
+    }
+    source.push_str(
+        "    let host = host_native::NativeHost::new(kernel);\n    if let Err(error) = faber::install_host_dispatch(std::sync::Arc::new(host)) {\n        eprintln!(\"host dispatch initialization failed: {error}\");\n        std::process::exit(70);\n    }\n}\n",
+    );
+    std::fs::write(path, source)
+}
+
+fn write_host_manifest(root: &Path, plan: &RustRuntimePlan) -> std::io::Result<()> {
+    let value = serde_json::json!({
+        "manifest_version": 1,
+        "providers": plan.provider_manifests,
+        "required_routes": plan.non_runtime_routes,
+    });
+    std::fs::write(
+        root.join("host-manifest.json"),
+        serde_json::to_vec_pretty(&value).expect("host manifest serialization is infallible"),
+    )
 }
 
 /// Invoke Cargo to build the generated crate and return the expected binary path.

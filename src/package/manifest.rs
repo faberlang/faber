@@ -36,6 +36,10 @@ pub struct FaberManifest {
     /// Direct exact dependency pins (`name = "version"`). Resolved paths live in `faber.lock`.
     #[serde(default)]
     pub dependencies: BTreeMap<String, String>,
+
+    /// Explicit additions to the native host provider selection.
+    #[serde(default)]
+    pub dispatch: ManifestDispatch,
 }
 
 /// `[package]` metadata from `faber.toml`.
@@ -118,6 +122,15 @@ pub struct ManifestTarget {
 
     /// Target dependency pins, e.g. `[target.rust.dependencies]`.
     pub dependencies: BTreeMap<String, String>,
+}
+
+/// `[dispatch]` package policy for native host providers.
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ManifestDispatch {
+    /// Explicit provider additions; route analysis still supplies inferred
+    /// providers, so this list never silently removes a required family.
+    pub providers: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
@@ -331,6 +344,28 @@ pub(crate) fn validate_manifest(
                 .with_file(path.display().to_string()),
             ));
         }
+    }
+
+    for provider in &manifest.dispatch.providers {
+        if provider.trim().is_empty() || !crate::library::is_valid_provider_segment(provider) {
+            return Err(Box::new(
+                Diagnostic::error(format!(
+                    "faber.toml [dispatch].providers entry `{provider}` is invalid"
+                ))
+                .with_file(path.display().to_string())
+                .with_arg("issue", "invalid_dispatch_provider"),
+            ));
+        }
+    }
+
+    if !manifest.dispatch.providers.is_empty() && manifest.build.target != "rust" {
+        return Err(Box::new(
+            Diagnostic::error(
+                "faber.toml [dispatch] is only supported for the Rust package target",
+            )
+            .with_file(path.display().to_string())
+            .with_arg("issue", "dispatch_target_unsupported"),
+        ));
     }
 
     for (target, config) in &manifest.target {

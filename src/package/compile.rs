@@ -27,8 +27,9 @@ use super::{
     library_cached_analysis, library_cached_file_interface, library_generates_rust_module,
     library_imported_function_params, library_interface_export_names, library_interface_has_module,
     library_module_segments, library_resolver_for_package, load_package,
-    load_package_with_reader_pack, load_reader_pack_for_input, program_export_names, read_manifest,
-    LibraryImportBinding, LibraryInterfaceCache, PackageFile, RustRuntimePlan,
+    load_package_with_reader_pack, load_provider_manifests, load_reader_pack_for_input,
+    program_export_names, read_manifest, selected_providers_for_routes, LibraryImportBinding,
+    LibraryInterfaceCache, PackageFile, RustRuntimePlan,
 };
 
 pub(crate) struct AnalyzedPackage {
@@ -65,9 +66,14 @@ struct GeneratedPackageRust {
 }
 
 fn rust_runtime_plan_for_package(package: &AnalyzedPackage) -> RustRuntimePlan {
-    let host = manifest_path_for_spec(&package.spec)
-        .and_then(|path| read_manifest(&path).ok())
+    let manifest = manifest_path_for_spec(&package.spec).and_then(|path| read_manifest(&path).ok());
+    let host = manifest
+        .as_ref()
         .and_then(|manifest| manifest.target.get("rust").and_then(|target| target.host));
+    let explicit_providers = manifest
+        .as_ref()
+        .map(|manifest| manifest.dispatch.providers.clone())
+        .unwrap_or_default();
     let mut plan = RustRuntimePlan {
         needs_tokio: package.units.iter().any(|unit| {
             unit.analysis.hir.entry_is_async
@@ -75,6 +81,9 @@ fn rust_runtime_plan_for_package(package: &AnalyzedPackage) -> RustRuntimePlan {
         }),
         host,
         non_runtime_routes: BTreeSet::new(),
+        selected_providers: BTreeSet::new(),
+        provider_manifests: Vec::new(),
+        provider_error: None,
     };
     for unit in &package.units {
         let mut collector = AdRouteCollector {
@@ -82,6 +91,14 @@ fn rust_runtime_plan_for_package(package: &AnalyzedPackage) -> RustRuntimePlan {
             routes: &mut plan.non_runtime_routes,
         };
         collector.visit_program(&unit.analysis.hir);
+    }
+    plan.selected_providers =
+        selected_providers_for_routes(&plan.non_runtime_routes, &explicit_providers);
+    if matches!(plan.host, Some(super::ManifestRustHost::Native)) {
+        match load_provider_manifests(&plan.selected_providers, &plan.non_runtime_routes) {
+            Ok(manifests) => plan.provider_manifests = manifests,
+            Err(error) => plan.provider_error = Some(error.message),
+        }
     }
     plan
 }
@@ -278,6 +295,10 @@ fn generate_package_rust(
     let mut module_tree = ModuleNode::default();
     let mut diagnostics = std::mem::take(&mut package.diagnostics);
     let mut library_cache = LibraryInterfaceCache::default();
+    let native_host_bootstrap = manifest_path_for_spec(&package.spec)
+        .and_then(|path| read_manifest(&path).ok())
+        .and_then(|manifest| manifest.target.get("rust").and_then(|target| target.host))
+        .is_some_and(|host| matches!(host, super::ManifestRustHost::Native));
 
     for index in 0..package.units.len() {
         let (before, rest) = package.units.split_at_mut(index);
@@ -291,6 +312,9 @@ fn generate_package_rust(
             library_resolver,
         );
         let path = unit.path.display().to_string();
+        // Only the package entry owns `main` and the generated host_register
+        // module; library units stay free of the bootstrap seam.
+        let unit_host_bootstrap = native_host_bootstrap && unit.is_entry;
         let rust = match generate_package_unit_rust(
             unit,
             &siblings,
@@ -298,6 +322,7 @@ fn generate_package_rust(
             &mut library_cache,
             test_selection,
             field_name_policy,
+            unit_host_bootstrap,
         ) {
             Ok(output) => output,
             Err(err) => {
@@ -361,6 +386,7 @@ fn generate_package_unit_rust(
     library_cache: &mut LibraryInterfaceCache,
     test_selection: Option<&RustTestSelection>,
     field_name_policy: RustFieldNamePolicy,
+    native_host_bootstrap: bool,
 ) -> Result<String, radix::codegen::CodegenError> {
     let mut imported_function_params = build_local_import_function_params(
         &unit.analysis.hir,
@@ -395,6 +421,7 @@ fn generate_package_unit_rust(
         unit.is_entry,
         test_selection,
         field_name_policy,
+        native_host_bootstrap,
         Some(imported_function_params),
         Some(imported_namespace_info),
     )
@@ -486,6 +513,7 @@ fn insert_generated_library_modules(
             false,
             test_selection,
             field_name_policy,
+            false,
             None,
             None,
         )
@@ -728,6 +756,7 @@ fn generate_rust_code_for_analysis(
     is_entry: bool,
     test_selection: Option<&RustTestSelection>,
     field_name_policy: RustFieldNamePolicy,
+    native_host_bootstrap: bool,
     imported_function_params: Option<radix::codegen::rust::ImportedFunctionParams<'_>>,
     imported_namespace_info: Option<radix::codegen::rust::ImportedNamespaceInfo<'_>>,
 ) -> Result<String, radix::codegen::CodegenError> {
@@ -750,6 +779,7 @@ fn generate_rust_code_for_analysis(
             }
             codegen.set_gpu_builtins(&analysis.gpu_builtins);
             codegen.set_field_name_policy(field_name_policy);
+            codegen.set_native_host_bootstrap(native_host_bootstrap);
             return codegen
                 .generate_cli(&analysis.hir, &analysis.types, cli_program)
                 .map(|output| output.code);
@@ -769,6 +799,7 @@ fn generate_rust_code_for_analysis(
             imported_namespace_info,
             gpu_builtins: &analysis.gpu_builtins,
             field_name_policy,
+            native_host_bootstrap,
         },
     )
     .map(|output| output.code)

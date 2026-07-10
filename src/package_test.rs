@@ -7467,12 +7467,56 @@ entry = "main.fab"
         plan.non_runtime_routes.iter().cloned().collect::<Vec<_>>(),
         vec!["solum:lege".to_owned()]
     );
+    assert_eq!(
+        plan.selected_providers.iter().cloned().collect::<Vec<_>>(),
+        vec!["solum".to_owned()]
+    );
     assert!(plan.host.is_none());
     let diagnostic = package_host_selection_diagnostic(&plan, &pkg.join("faber.toml"))
         .expect("missing host selection diagnostic");
     assert!(diagnostic_has_issue(
         &diagnostic,
         "package_host_selection_required"
+    ));
+}
+
+#[test]
+fn package_runtime_plan_rejects_unknown_native_provider() {
+    let pkg = test_temp_dir("runtime-plan-unknown-provider");
+    fs::create_dir_all(pkg.join("src")).expect("src");
+    fs::write(
+        pkg.join("faber.toml"),
+        r#"
+[package]
+name = "runtime-plan-unknown-provider"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[target.rust]
+host = "native"
+
+[dispatch]
+providers = ["notaprovider"]
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        pkg.join("src/main.fab"),
+        r#"incipit { fixum textus body ← ad 'runtime:echo' ("ok") ↦ textus nota body }"#,
+    )
+    .expect("entry");
+
+    let plan = package_rust_runtime_plan(&Config::default(), &pkg).expect("runtime plan");
+    assert_eq!(plan.host, Some(ManifestRustHost::Native));
+    assert!(plan.selected_providers.contains("notaprovider"));
+    assert!(plan.provider_error.is_some(), "expected missing provider error");
+    let diagnostic = package_host_selection_diagnostic(&plan, &pkg.join("faber.toml"))
+        .expect("provider selection diagnostic");
+    assert!(diagnostic_has_issue(
+        &diagnostic,
+        "host_provider_selection_invalid"
     ));
 }
 
@@ -7632,6 +7676,17 @@ incipit {{
     };
     let plan = package_rust_runtime_plan(&Config::default(), &pkg).expect("runtime plan");
     assert_eq!(plan.host, Some(ManifestRustHost::Native));
+    assert_eq!(
+        plan.selected_providers.iter().cloned().collect::<Vec<_>>(),
+        vec!["solum".to_owned()]
+    );
+    assert!(plan.provider_error.is_none(), "{:?}", plan.provider_error);
+    assert!(
+        plan.provider_manifests
+            .iter()
+            .any(|manifest| manifest.provider == "solum"),
+        "expected solum provider manifest"
+    );
 
     emit_generated_crate_with_runtime_plan(
         &layout,
@@ -7641,16 +7696,42 @@ incipit {{
     )
     .expect("emit generated crate");
     let cargo = fs::read_to_string(&layout.generated_cargo_manifest).expect("cargo");
-    assert!(cargo.contains("faber-host-native"));
-    assert!(cargo.contains("faber_host_native"));
+    assert!(cargo.contains("host-kernel"));
+    assert!(cargo.contains("host_kernel"));
+    assert!(cargo.contains("host-native"));
+    assert!(cargo.contains("host_native"));
+    assert!(cargo.contains("solum"));
+    assert!(!cargo.contains("faber-host-native"));
+    assert!(!cargo.contains("faber_host_native"));
     assert!(!cargo.contains("faber-host-macos-arm64"));
     assert!(!cargo.contains("../radix/hosts/macos-arm64"));
     let generated_main = fs::read_to_string(&layout.generated_rust_entry).expect("main");
-    assert!(generated_main.contains("faber_host_native::install()"));
+    assert!(generated_main.contains("mod host_register;"));
+    assert!(generated_main.contains("host_register::install_or_exit();"));
+    let host_register = fs::read_to_string(
+        layout
+            .generated_crate_root
+            .join("src")
+            .join("host_register.rs"),
+    )
+    .expect("host_register");
+    assert!(host_register.contains("solum::register(&mut kernel)"));
+    assert!(host_register.contains("host_native::NativeHost::new(kernel)"));
+    assert!(host_register.contains("faber::install_host_dispatch"));
+    let host_manifest = fs::read_to_string(layout.generated_crate_root.join("host-manifest.json"))
+        .expect("host-manifest.json");
+    assert!(host_manifest.contains("solum:lege"));
+    assert!(host_manifest.contains("\"provider\": \"solum\""));
 
     let binary = invoke_cargo_build(&layout, false).expect("cargo build");
     let run = Command::new(binary).output().expect("run generated binary");
-    assert!(run.status.success(), "generated binary failed: {:?}", run);
+    assert!(
+        run.status.success(),
+        "generated binary failed: status={:?} stdout={:?} stderr={:?}",
+        run.status,
+        String::from_utf8_lossy(&run.stdout),
+        String::from_utf8_lossy(&run.stderr)
+    );
     assert_eq!(
         String::from_utf8(run.stdout).expect("stdout utf8"),
         "salve native\n"
