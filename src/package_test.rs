@@ -4900,6 +4900,7 @@ incipit {
     nota err
   }
 }
+
 "#,
     )
     .expect("write entry");
@@ -4939,6 +4940,56 @@ incipit {
     assert!(!output.code.contains("norma::yaml::solve"));
     assert!(!output.code.contains("norma::json::pange"));
     assert!(!output.code.contains("norma::json::solve"));
+}
+
+#[test]
+fn compile_package_preserves_norma_runtime_types_and_failable_calls() {
+    let dir = test_temp_dir("norma-runtime-type-and-failable-calls");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+importa ex "norma:json" privata json
+importa ex "norma:valor" privata valor
+
+incipit {
+    fixum json doc ← { "wire_name": "Ada" }
+    fixum textus wire ← json.pange(doc)
+    fixum valor tree ← { "wire_name": "Ada" } ↦ valor
+    fixum valor child ← valor.cape(tree, "wire_name")
+    fac {
+        fixum json parsed ← json.solve(wire)
+        nota parsed, child
+    }
+    cape err {
+        nota err
+    }
+}
+"#,
+    )
+    .expect("write entry");
+
+    let result = compile_package(&Config::default(), &entry);
+    assert!(
+        result.success(),
+        "expected typed Norma package compile success, got {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+    let Some(Output::Rust(output)) = result.output else {
+        panic!("expected rust output");
+    };
+    assert!(!output.code.contains("use faber::Valor as valor;"));
+    assert!(output.code.contains("let tree: faber::Valor"));
+    assert!(output
+        .code
+        .contains("match crate::json::solve(wire.clone())"));
+    assert!(output
+        .code
+        .contains("crate::chorda::discissa(via.clone(), \".\".to_string()"));
 }
 
 #[test]

@@ -31,6 +31,7 @@ struct LibraryInterfaceItem {
     exported_name: String,
     local_name: String,
     kind: LibraryItemKind,
+    is_failable: bool,
 }
 
 struct CachedLibraryInterface {
@@ -696,6 +697,7 @@ pub(crate) fn attach_library_provenance(
                     identity: identity.clone(),
                     exported_name: interface_item.exported_name,
                     kind: interface_item.kind,
+                    is_failable: interface_item.is_failable,
                     rust_runtime_type,
                     elide_rust_decl,
                 },
@@ -838,24 +840,42 @@ fn library_interface_item(
     stmt: &radix::syntax::Stmt,
     interner: &Interner,
 ) -> Option<LibraryInterfaceItem> {
-    let (name, kind) = match &stmt.kind {
+    let (name, kind, is_failable) = match &stmt.kind {
         StmtKind::Interface(interface) => (
             interner.resolve(interface.name.name),
             LibraryItemKind::Interface,
+            false,
         ),
-        StmtKind::Func(func) => (interner.resolve(func.name.name), LibraryItemKind::Function),
+        StmtKind::Func(func) => (
+            interner.resolve(func.name.name),
+            LibraryItemKind::Function,
+            func.err.is_some(),
+        ),
         StmtKind::TypeAlias(alias) => (
             interner.resolve(alias.name.name),
             LibraryItemKind::TypeAlias,
+            false,
         ),
-        StmtKind::Class(class) => (interner.resolve(class.name.name), LibraryItemKind::Struct),
-        StmtKind::Enum(enm) => (interner.resolve(enm.name.name), LibraryItemKind::Enum),
-        StmtKind::Union(union) => (interner.resolve(union.name.name), LibraryItemKind::Enum),
+        StmtKind::Class(class) => (
+            interner.resolve(class.name.name),
+            LibraryItemKind::Struct,
+            false,
+        ),
+        StmtKind::Enum(enm) => (
+            interner.resolve(enm.name.name),
+            LibraryItemKind::Enum,
+            false,
+        ),
+        StmtKind::Union(union) => (
+            interner.resolve(union.name.name),
+            LibraryItemKind::Enum,
+            false,
+        ),
         StmtKind::Var(var) => {
             let radix::syntax::BindingPattern::Ident(ident) = &var.binding else {
                 return None;
             };
-            (interner.resolve(ident.name), LibraryItemKind::Const)
+            (interner.resolve(ident.name), LibraryItemKind::Const, false)
         }
         _ => return None,
     };
@@ -863,6 +883,7 @@ fn library_interface_item(
         exported_name: name.to_owned(),
         local_name: name.to_owned(),
         kind,
+        is_failable,
     })
 }
 
