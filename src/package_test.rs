@@ -7739,6 +7739,132 @@ incipit {{
 }
 
 #[test]
+fn generated_package_native_host_async_solum_runs() {
+    // P6 package E2E: async entry + public native host + solum provider.
+    // Cancel/saturation/shutdown remain proven in host-native unit tests;
+    // package path proves install + async dispatch through HostDispatch.
+    let pkg = test_temp_dir("package-native-host-async-solum");
+    fs::create_dir_all(pkg.join("src")).expect("create src");
+    fs::write(
+        pkg.join("faber.toml"),
+        r#"
+[package]
+name = "native-host-async-solum"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[target.rust]
+host = "native"
+"#,
+    )
+    .expect("write manifest");
+    let data = pkg.join("data.txt");
+    fs::write(&data, "salve async").expect("write data fixture");
+    let path_lit = format!("{:?}", data.to_string_lossy());
+    fs::write(
+        pkg.join("src/main.fab"),
+        format!(
+            r#"
+incipiet {{
+    fixum textus body ← ad 'solum:lege' ({path_lit}) ↦ textus
+    nota body
+}}
+"#
+        ),
+    )
+    .expect("write entry");
+
+    let layout = discover_build_layout(&pkg).expect("layout");
+    let compile_result = compile_package(&Config::default(), &pkg);
+    assert!(
+        compile_result.success(),
+        "compile should succeed: {:?}",
+        compile_result.diagnostics
+    );
+    let code = match &compile_result.output {
+        Some(radix::Output::Rust(r)) => r.code.clone(),
+        _ => panic!("expected rust output"),
+    };
+    let plan = package_rust_runtime_plan(&Config::default(), &pkg).expect("runtime plan");
+    assert_eq!(plan.host, Some(ManifestRustHost::Native));
+    assert!(plan.needs_tokio);
+    assert!(plan.selected_providers.contains("solum"));
+    assert!(plan.provider_error.is_none(), "{:?}", plan.provider_error);
+
+    emit_generated_crate_with_runtime_plan(
+        &layout,
+        &code,
+        Some(&read_manifest(&layout.manifest_path).unwrap()),
+        &plan,
+    )
+    .expect("emit generated crate");
+    let cargo = fs::read_to_string(&layout.generated_cargo_manifest).expect("cargo");
+    assert!(cargo.contains("host_native"));
+    assert!(cargo.contains("solum"));
+    assert!(cargo.contains("tokio = { version = "));
+    assert!(!cargo.contains("../radix/hosts/macos-arm64"));
+    let generated_main = fs::read_to_string(&layout.generated_rust_entry).expect("main");
+    assert!(generated_main.contains("host_register::install_or_exit();"));
+    assert!(
+        generated_main.contains("__faber_block_on") || generated_main.contains("tokio::"),
+        "expected async runtime wiring in generated main"
+    );
+
+    let binary = invoke_cargo_build(&layout, false).expect("cargo build");
+    let run = Command::new(binary).output().expect("run generated binary");
+    assert!(
+        run.status.success(),
+        "generated async binary failed: status={:?} stdout={:?} stderr={:?}",
+        run.status,
+        String::from_utf8_lossy(&run.stdout),
+        String::from_utf8_lossy(&run.stderr)
+    );
+    assert_eq!(
+        String::from_utf8(run.stdout).expect("stdout utf8"),
+        "salve async\n"
+    );
+}
+
+#[test]
+fn generated_package_native_host_rejects_unknown_route_provider() {
+    let pkg = test_temp_dir("package-native-host-unknown-route");
+    fs::create_dir_all(pkg.join("src")).expect("create src");
+    fs::write(
+        pkg.join("faber.toml"),
+        r#"
+[package]
+name = "native-host-unknown-route"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[target.rust]
+host = "native"
+"#,
+    )
+    .expect("write manifest");
+    fs::write(
+        pkg.join("src/main.fab"),
+        r#"incipit { fixum textus body ← ad 'ignotum:route' ("x") ↦ textus nota body }"#,
+    )
+    .expect("write entry");
+
+    let plan = package_rust_runtime_plan(&Config::default(), &pkg).expect("runtime plan");
+    assert_eq!(plan.host, Some(ManifestRustHost::Native));
+    assert!(plan.selected_providers.contains("ignotum"));
+    assert!(plan.provider_error.is_some(), "expected missing provider");
+    let diagnostic = package_host_selection_diagnostic(&plan, &pkg.join("faber.toml"))
+        .expect("provider selection diagnostic");
+    assert!(diagnostic_has_issue(
+        &diagnostic,
+        "host_provider_selection_invalid"
+    ));
+}
+
+#[test]
 fn generated_package_norma_json_facade_uses_formal_conversio() {
     let pkg = test_temp_dir("package-norma-json-formal-facade");
     let entry = pkg.join("main.fab");

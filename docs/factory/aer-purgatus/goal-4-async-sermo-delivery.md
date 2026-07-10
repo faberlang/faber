@@ -1,6 +1,13 @@
 # Delivery: Honest Async `Sermo` And Host Boundary
 
 **Status**: complete — async codegen, proof-pair route migration, runtime producer handoff, private host removal, public native host crate, package host selection, and caller-drop cancellation delivered
+**Supersession (2026-07-10 Platform P)**: package `host = "native"` now attaches
+`host-kernel-rs` + `host-native-rs` + `host-providers-rs/*` via generated
+`host_register.rs`, not `faber-runtime/hosts/native` (`faber-host-native`).
+That interim crate may remain for legacy/local experiments; **do not** direct
+new package implementation there. Authority:
+`radix/docs/design/host-provider-gateway.md` and
+`radix/docs/factory/host-gateway-coverage/goal-p-host-provider-foundation.md`.
 **Date**: 2026-07-09
 **Campaign**: [`CAMPAIGN.md`](CAMPAIGN.md)
 **Primary repos**: `faber-runtime`, `radix`, `faber`, `norma`
@@ -252,16 +259,17 @@ contract through a small runtime dispatcher. Remove
 
 ### Portable native host decision
 
-Create a small public native application host crate under the public runtime
-repository, preferably:
+**Historical (Goal 4 land):** a public native adapter was first placed at
 
 ```text
 faber-runtime/hosts/native/   package = "faber-host-native"
 ```
 
-It implements `HostDispatch` for the native Norma routes required by the
-application emitter. It is deliberately separate from the private
-`radix/hosts/macos-arm64` Wasm host proof and has no Wasmtime dependency.
+**Current product path (Platform P):** split public repos — `host-kernel-rs`
+(router/protocol), `host-native-rs` (`HostDispatch` + bounded workers),
+`host-providers-rs/crates/{family}` (effect handlers). Generated packages never
+depend on `radix/hosts/macos-arm64`. The interim `faber-host-native` path is
+superseded for new work.
 
 Blocking OS APIs run on a bounded worker facility owned by this host:
 
@@ -289,11 +297,13 @@ Extend `[target.rust]` with an explicit host policy. Canonical delivery spelling
 host = "native"
 ```
 
-`host = "native"` adds the public `faber-host-native` dependency and initializes
-one dispatcher. An absent host means runtime-only routes; if structured route
-analysis finds a non-runtime `ad` requirement, package validation fails with a
-diagnostic asking for a host selection. Unknown host values fail manifest
-deserialization/validation. Do not silently default to the developer's OS.
+`host = "native"` adds public `host-kernel` / `host-native` / selected provider
+path dependencies, writes `host_register.rs` + `host-manifest.json`, and
+installs one `HostDispatch` via `faber::install_host_dispatch`. An absent host
+means runtime-only routes; if structured route analysis finds a non-runtime
+`ad` requirement, package validation fails with a diagnostic asking for a host
+selection. Unknown host values fail manifest deserialization/validation. Do not
+silently default to the developer's OS.
 
 Faber builds a structured `RustRuntimePlan` (exact name local) from:
 
