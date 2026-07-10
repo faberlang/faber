@@ -1,6 +1,6 @@
 # Delivery: Formal Object-Rooted JSON Document
 
-**Status**: ready for factory after Goal 1 checkpoint
+**Status**: complete — factory gate passed 2026-07-09
 **Date**: 2026-07-09
 **Campaign**: [`CAMPAIGN.md`](CAMPAIGN.md)
 **Primary repos**: `radix`, `faber-runtime`, `norma`, `examples`
@@ -416,6 +416,46 @@ Norma signature changes are published contracts. Goal closeout must prepare a
 minor-version release note at minimum; the campaign decides whether to release
 immediately after dependent Goal 3 or defer the actual tag to the next normal
 Faber release.
+
+## Factory Evidence
+
+- Faber runtime `c5a60b1` (`feat(json): add object-rooted runtime document`)
+  introduced `faber::Json`, object-root validation, recursive value validation,
+  duplicate-key rejecting parsing, compact rendering, and checked bridges to and
+  from `Valor`.
+- Radix `e75cac7a6` (`feat(json): make json a formal document type`) made
+  `json` a formal primitive across frontend, HIR/MIR, Rust codegen, stepper,
+  reader vocabulary, docs, and fail-closed unsupported targets.
+- Norma `000d109` (`feat(json): expose object-rooted json documents`) moved
+  `norma:json` to the formal document type and removed the old broad `valor`
+  signatures.
+- Examples `d8d0e1b` (`feat(json): add canonical json corpus`) added the
+  canonical corpus proof and explicit broad-`valor` widening where intended.
+
+Validated gates:
+
+- `timeout 180 cargo test json -- --format terse`
+- `timeout 180 cargo test -- --format terse`
+- `timeout 180 cargo clippy --all-targets -- -D warnings`
+- `cargo fmt --all -- --check`
+- `git diff --check`
+- `timeout 300 cargo test -p radix json -- --format terse`
+- `timeout 300 cargo test -p radix conversio -- --format terse`
+- `timeout 300 cargo test -p radix mir -- --format terse`
+- `timeout 300 cargo test -p radix codegen::ts -- --format terse`
+- `timeout 300 cargo test -p radix codegen::go -- --format terse`
+- `timeout 300 cargo test -p radix -- --format terse`
+- `timeout 180 ./scripta/check-reader-pack-completeness`
+- `timeout 180 ./scripta/check-ebnf-vocabulary`
+- `timeout 180 ./scripta/check-exempla-pack`
+- `timeout 180 ./scripta/check-exempla-frontmatter`
+- `timeout 180 ./scripta/check-source`
+- `timeout 180 cargo run --manifest-path ../faber/Cargo.toml -- run ../examples/corpus/json/json.fab`
+- `timeout 180 cargo run -p radix --bin radix -- mir ../examples/corpus/json/json.fab`
+
+`./scripta/test` still reports an unrelated pre-existing retired-surface
+guardrail in `faber` tests containing `externa`; the JSON corpus issue surfaced
+by that run was fixed and all focused Goal 2 gates pass.
 
 ## Validation
 

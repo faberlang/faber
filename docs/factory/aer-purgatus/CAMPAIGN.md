@@ -1,6 +1,6 @@
 # Campaign: Aer Purgatus — Code-Smell Remediation
 
-**Status**: active — Goal 1 complete; Goal 2 selected for factory
+**Status**: active — Goals 1 and 2 complete; Goal 3 selected for factory
 **Date**: 2026-07-09
 **Mode**: routing artifact — does not implement code directly
 **Control-plane repo**: `/Users/ianzepp/work/faberlang/faber`
@@ -153,8 +153,8 @@ All six active repositories were clean when this campaign was drafted.
 | Goal | State | Next action |
 | --- | --- | --- |
 | 1 — Compiler-grounded binding contracts | **complete** | Factory gate passed; evidence and commits recorded below. |
-| 2 — Formal object-rooted JSON document | **selected for factory** | Execute [`goal-2-json-document-delivery.md`](goal-2-json-document-delivery.md). |
-| 3 — First-party JSON migration and FVI adoption | delivery ready; implementation blocked on Goal 2 | Execute [`goal-3-json-migration-delivery.md`](goal-3-json-migration-delivery.md) after Goal 2 J6. |
+| 2 — Formal object-rooted JSON document | **complete** | Factory gate passed; evidence and commits recorded below. |
+| 3 — First-party JSON migration and FVI adoption | **selected for factory** | Execute [`goal-3-json-migration-delivery.md`](goal-3-json-migration-delivery.md). |
 | 4 — Honest async `sermo` boundary | delivery ready; authority reconciliation first | Execute [`goal-4-async-sermo-delivery.md`](goal-4-async-sermo-delivery.md) after reconciling the live Radix ledger. |
 
 The four saved delivery documents are the factory production inputs. Stage
@@ -226,7 +226,7 @@ Factory evidence:
 
 | Field | Value |
 | --- | --- |
-| **Status** | selected — ready for factory |
+| **Status** | complete — factory gate passed 2026-07-09 |
 | **Source** | inline-json-valor contract; JSON-genus contract; EBNF; runtime `Valor`; `norma:json` |
 | **Invariant** | A Faber JSON document is object-rooted and recursively JSON-safe. It may widen to `valor`, but arbitrary `valor` enters it only through checked conversion. |
 | **Why now** | Inline literals and `@ json genus` already prove JSON safety, but separate paths erase that proof into a broader carrier. |
@@ -282,11 +282,38 @@ Gate:
 - `timeout 180 ../norma/scripta/check-source`
 - `cargo fmt --all -- --check` and `git diff --check` in every touched repo.
 
+Factory evidence:
+
+- Faber runtime `c5a60b1` (`feat(json): add object-rooted runtime document`)
+  adds the private `faber::Json` wrapper, object-rooted recursive validation,
+  duplicate-key rejecting parse, compact wire rendering, path-aware errors, and
+  checked `Valor` bridges.
+- Radix `e75cac7a6` (`feat(json): make json a formal document type`) adds the
+  `json` primitive, bare-object literal typing, checked `valor`/`textus`
+  conversion, bidirectional `@ json` genus conversion with symmetric `nomen`,
+  MIR/stepper support, fail-closed TS/Go diagnostics, and reader/docs updates.
+- Norma `000d109` (`feat(json): expose object-rooted json documents`) changes
+  `norma:json` so parse/tempta return formal `json` documents and pange accepts
+  `json`, with the old broad `valor` surface removed.
+- Examples `d8d0e1b` (`feat(json): add canonical json corpus`) adds
+  `examples/corpus/json/json.fab` and updates broad-`valor` exempla to use
+  explicit widening.
+- Gates passed: runtime JSON and full runtime tests, runtime clippy/format/diff;
+  Radix JSON/conversio/MIR/TS/Go/full package tests, reader-pack and EBNF
+  checks, clippy/format/diff; Norma source/diff checks; canonical JSON run and
+  MIR routes; corpus pack/index/diff checks. `./scripta/test` still reports the
+  pre-existing retired-surface guardrail in `faber` tests containing `externa`;
+  the JSON corpus findings from that run were fixed and the focused JSON gates
+  pass.
+- Correctness, red-green, cleanliness, housekeeping, bonsai, and per-file
+  polish completed for the changed JSON surfaces. Release decision:
+  `release-prep`, coordinated with Goal 3 before any tag.
+
 ### Goal 3 — First-Party JSON Migration And FVI Adoption
 
 | Field | Value |
 | --- | --- |
-| **Status** | delivery ready — implementation blocked on Goal 2 |
+| **Status** | selected — Goal 2 closeout complete |
 | **Source** | post-Goal-2 migration inventory; AI workbench command files and harnesses |
 | **Invariant** | First-party Faber code uses the formal JSON document and typed genera instead of maintaining local JSON grammars or assembling JSON text. |
 | **Why after Goal 2** | Migration is the product proof that the new type pays rent; doing it earlier would target an obsolete `valor` API. |
