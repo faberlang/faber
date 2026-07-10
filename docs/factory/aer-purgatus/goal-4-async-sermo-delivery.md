@@ -52,6 +52,9 @@ Delivered slices:
 - Faber `4979410` removes generated Cargo dependency/features for the private
   `radix/hosts/macos-arm64` host path and keeps the package E2E proof running
   through runtime route production.
+- Faber `651f6cc` adds the manifest schema for explicit
+  `[target.rust] host = "native"` and rejects host policy on non-Rust target
+  tables.
 
 Validation run:
 
@@ -69,6 +72,8 @@ Validation run:
 - `timeout 300 cargo test -p radix ad -- --format terse`
 - `timeout 180 cargo test -p radix --test hygiene`
 - `timeout 300 cargo test --lib generated_package_ad_avoids_private_host_bridge_dependency -- --format terse` in `faber`
+- `timeout 240 cargo test --lib rust_target_manifest_accepts_native_host_policy -- --format terse` in `faber`
+- `timeout 240 cargo test --lib non_rust_target_manifest_rejects_host_policy -- --format terse` in `faber`
 - `timeout 180 cargo test --test hygiene` in `faber`
 
 Remaining blockers before closeout:
@@ -77,9 +82,10 @@ Remaining blockers before closeout:
   for built-in routes rather than the final public `HostDispatch` /
   `ResponseSender` contract with cancellation, bounded queues, and shutdown.
 - `faber/src/package/cargo.rs` still detects Tokio/executor need from emitted
-  Rust text. The private macOS host scan/path is gone, but the final structured
-  `RustRuntimePlan` and explicit `[target.rust] host = "native"` validation are
-  still open.
+  Rust text. The private macOS host scan/path is gone and
+  `[target.rust] host = "native"` parses/validates, but the final structured
+  `RustRuntimePlan`, route-requirement enforcement, and native-host dependency
+  selection are still open.
 - The public native host adapter, bounded-worker queue policy, cancellation
   suppression of late worker frames, concurrent timer proof, and package host
   selection remain unimplemented.

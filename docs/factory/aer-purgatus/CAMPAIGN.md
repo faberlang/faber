@@ -155,7 +155,7 @@ All six active repositories were clean when this campaign was drafted.
 | 1 — Compiler-grounded binding contracts | **complete** | Factory gate passed; evidence and commits recorded below. |
 | 2 — Formal object-rooted JSON document | **complete** | Factory gate passed; evidence and commits recorded below. |
 | 3 — First-party JSON migration and FVI adoption | **complete** | Factory gate passed; evidence and commits recorded below. |
-| 4 — Honest async `sermo` boundary | **partial** — codegen, proof pairs, runtime producer handoff, and private host removal delivered; public host selection open | Replace interim built-in producer threads with the final runtime host-dispatch contract, public native host, structured package runtime plan, and explicit package host selection before closeout. |
+| 4 — Honest async `sermo` boundary | **partial** — codegen, proof pairs, runtime producer handoff, private host removal, and manifest host spelling delivered; public host implementation open | Replace interim built-in producer threads with the final runtime host-dispatch contract, public native host, structured package runtime plan, and route-requirement enforcement before closeout. |
 
 The four saved delivery documents are the factory production inputs. Stage
 completion lives in this campaign's Current State and in each delivery
@@ -390,7 +390,7 @@ Factory evidence:
 
 | Field | Value |
 | --- | --- |
-| **Status** | partial — async codegen, proof-pair route migration, runtime producer handoff, and private host removal delivered; public host selection open |
+| **Status** | partial — async codegen, proof-pair route migration, runtime producer handoff, private host removal, and manifest host spelling delivered; public host implementation open |
 | **Source** | Radix async-ad-lowering goal/ledger plus live runtime and package code |
 | **Invariant** | Async `ad` never performs blocking host work while polling, always has a completion producer, and depends only on a portable runtime host contract. |
 | **Why last** | Highest cross-repo and behavioral risk; benefits from the campaign's first three established delivery patterns. |
@@ -461,6 +461,9 @@ Partial factory evidence:
   generated Cargo output from adding the private `radix/hosts/macos-arm64`
   dependency/features and proves a package `solum:lege` route still builds and
   runs through runtime route production.
+- Faber `651f6cc` (`feat(package): accept explicit native host policy`) adds
+  `[target.rust] host = "native"` manifest parsing/validation and rejects host
+  policy on non-Rust target tables.
 - Gates passed: focused Radix async materializer tests, `faber check` on both
   async corpus files and the existing `solum.lege` proof, `faber emit -t rust`
   verification that generated proof-pair Rust contains neither `solum:leget`
@@ -470,8 +473,8 @@ Partial factory evidence:
 - Not complete: runtime production is still an interim built-in route handoff,
   not the public `HostDispatch` / `ResponseSender` contract with cancellation,
   bounded queues, and shutdown; Faber still needs a structured runtime plan for
-  Tokio/executor and explicit `[target.rust] host = "native"` selection; the
-  public native host adapter and concurrent timer proof remain open. The Faber
+  Tokio/executor, route-requirement enforcement, and native-host dependency
+  selection; the public native host adapter and concurrent timer proof remain open. The Faber
   full package suite currently also exposes open Goal 2 `norma:json` residuals
   that still expect `valor` instead of the formal `json` type.
 
