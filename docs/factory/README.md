@@ -33,7 +33,8 @@ Each `goal.md` / `CAMPAIGN.md` owns its **Status** line.
 
 | Campaign | Status | Entry |
 | --- | --- | --- |
-| Aer Purgatus code-smell remediation | active — Goal 1 complete; Goal 2 selected for factory | [`aer-purgatus/CAMPAIGN.md`](aer-purgatus/CAMPAIGN.md) |
+| Aer Purgatus code-smell remediation | active — Goals 1–2 complete; Goal 3 selected for factory | [`aer-purgatus/CAMPAIGN.md`](aer-purgatus/CAMPAIGN.md) |
+| Tabular data access (census, SQLite, ViviLite) | proposed — not selected | [`tabular-data-access/CAMPAIGN.md`](tabular-data-access/CAMPAIGN.md) |
 
 ## Open goals
 
