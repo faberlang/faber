@@ -1,6 +1,6 @@
 # Delivery: First-Party JSON Migration And FVI Adoption
 
-**Status**: factory-ready, implementation blocked on Goal 2 closeout
+**Status**: in progress — M1 inventory complete, M2 selected
 **Date**: 2026-07-09
 **Campaign**: [`CAMPAIGN.md`](CAMPAIGN.md)
 **Primary repo**: `/Users/ianzepp/work/faberlang/examples`
@@ -378,6 +378,30 @@ No blocking product question remains. M1 must resolve from live evidence:
 2. which provider payloads are intentionally opaque versus structurally read;
 3. whether newly discovered first-party sites have additional owning-package
    harnesses beyond the six named lanes.
+
+## M1 Inventory Ledger
+
+Generated/build/archive directories were excluded from the live scan. Active
+first-party `.fab` source was searched for manual JSON emitters, partial JSON
+scanners, FVI markers, provider payload boundaries, and direct
+`norma:json` use.
+
+| Path | Boundary | Schema / behavior | Stage | Fixture / gate | Disposition |
+| --- | --- | --- | --- | --- | --- |
+| `examples/ai-workbench/packages/faber-ai/src/commands/embed.fab` | JSON stdout and Stage 2 FVI artifact output | command summary, blocked/oracle Stage 2 vector artifact (`fvi-stage2`) | M2/M4 | `check-embed.py`; index fixtures consume Stage 2 artifacts | migrate emitters to shared `@ json` FVI/response genera; delete `json_quote`, `json_escape`, `json_string` after last caller |
+| `examples/ai-workbench/packages/faber-ai/src/commands/index.fab` | Stage 2 FVI input parse, Stage 3 FVI output, JSON stdout | `fvi-stage2` input; `fvi-stage3-index` output; repeated substring scanners (`field_textus`, `field_numerus`, `array_end`, `json_unescape`) | M2/M3 | `check-index.py`; query fixtures consume Stage 3 indexes | parse once through `norma:json.solve`, convert to shared FVI genera, validate counts/dimensions, delete scanners |
+| `examples/ai-workbench/packages/faber-ai/src/commands/query.fab` | Stage 3 index input parse, query-vector input parse, JSON stdout | `fvi-stage3-index`, `fvi-stage3-query-vector`, scored result output; repeated substring/object/array scanners | M2/M3 | `check-query.py` | parse both documents once, convert to shared FVI genera, validate dimensions/counts, delete scanners |
+| `examples/ai-workbench/packages/faber-ai/src/commands/generate.fab` | JSON stdout and JSONL event artifact output | metadata/diagnostic events and command summary | M2/M4 | `check-generate.py` | migrate output to shared response/event genera; preserve JSONL artifact shape; delete manual string builders |
+| `examples/ai-workbench/packages/faber-ai/src/commands/chat.fab` | JSON stdout and JSONL event artifact output | metadata/diagnostic events and command summary | M2/M4 | `check-chat.py` | migrate output to shared response/event genera; preserve JSONL artifact shape; delete manual string builders |
+| `examples/ai-workbench/packages/faber-ai/src/commands/model.fab` | JSON stdout for alias/local model inspection | alias/model summary, tensors, diagnostics | M4 | `check-model-inspect.py` | migrate command summary output to typed JSON; retain binary metadata parsing in `norma:model` as non-JSON format parsing |
+| `examples/vivilite/src/main.fab` | JSON stdout for status and board output | status object and board object with task/need/want item arrays | M5 | package tests tagged `vivilite`; CLI route smoke if available | migrate output helpers to `@ json` genera and `json.pange`; delete `json_escape`, `jq`, `lb`, `rb`, `q`, `qq`, `pair*` |
+| `norma/src/model.fab` | safetensors/GGUF binary metadata parsing | scans binary-derived safetensors header text and GGUF fields, not first-party application JSON | retained | `check-model-inspect.py`; `norma` source checks | out of Goal 3 migration unless a command starts treating its output as JSON text; keep as binary-format parser |
+| `norma/src/json*.fab` | formal JSON facade/parser/serializer | owns `json` document codec from Goal 2 | retained | `../norma/scripta/check-source` | out of application audit allowlist; this is the canonical JSON implementation |
+| `examples/script-kernel/glob-import.fab` | corpus demonstration of `json.solve`/`json.pange` | already uses formal `norma:json` facade | retained | corpus/exempla gates | no migration needed |
+
+No additional active first-party Faber JSON grammar owner was found outside
+AI workbench, `vivilite`, the canonical Norma JSON implementation, and retained
+binary-format parsing in `norma:model`.
 
 Stop and return to campaign routing if a selected consumer requires arbitrary
 root JSON, if FVI documents cannot fit the formal object-root contract, or if a
