@@ -13,7 +13,7 @@ use super::{
     package_host_selection_diagnostic, package_rust_runtime_plan, read_manifest,
     run_package_fmir_image, run_package_fmir_text_image, run_package_mir, run_package_mir_artifact,
     sanitize_crate_name, use_package_compiler, use_package_compiler_from_args, validate_manifest,
-    verify_library_bindings, BuildLayout, LibraryInterfaceCache,
+    verify_library_bindings, BuildLayout, LibraryInterfaceCache, ManifestRustHost,
 };
 use super::{fmir_image_test_summary, fmir_text_image_test_summary};
 use crate::library::{LibraryProviderKind, LibraryResolver, ResolvedLibraryModule};
@@ -7449,6 +7449,75 @@ incipit {{
     assert_eq!(
         String::from_utf8(run.stdout).expect("stdout utf8"),
         "salve host\n"
+    );
+}
+
+#[test]
+fn generated_package_native_host_selects_public_dependency_and_runs() {
+    let pkg = test_temp_dir("package-native-host-route");
+    fs::create_dir_all(pkg.join("src")).expect("create src");
+    fs::write(
+        pkg.join("faber.toml"),
+        r#"
+[package]
+name = "native-host-route"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[target.rust]
+host = "native"
+"#,
+    )
+    .expect("write manifest");
+    let data = pkg.join("data.txt");
+    fs::write(&data, "salve native").expect("write data fixture");
+    let path_lit = format!("{:?}", data.to_string_lossy());
+    fs::write(
+        pkg.join("src/main.fab"),
+        format!(
+            r#"
+incipit {{
+    fixum textus body ← ad 'solum:lege' ({path_lit}) ↦ textus
+    nota body
+}}
+"#
+        ),
+    )
+    .expect("write entry");
+
+    let layout = discover_build_layout(&pkg).expect("layout");
+    let compile_result = compile_package(&Config::default(), &pkg);
+    assert!(compile_result.success(), "compile should succeed");
+    let code = match &compile_result.output {
+        Some(radix::Output::Rust(r)) => r.code.clone(),
+        _ => panic!("expected rust output"),
+    };
+    let plan = package_rust_runtime_plan(&Config::default(), &pkg).expect("runtime plan");
+    assert_eq!(plan.host, Some(ManifestRustHost::Native));
+
+    emit_generated_crate_with_runtime_plan(
+        &layout,
+        &code,
+        Some(&read_manifest(&layout.manifest_path).unwrap()),
+        &plan,
+    )
+    .expect("emit generated crate");
+    let cargo = fs::read_to_string(&layout.generated_cargo_manifest).expect("cargo");
+    assert!(cargo.contains("faber-host-native"));
+    assert!(cargo.contains("faber_host_native"));
+    assert!(!cargo.contains("faber-host-macos-arm64"));
+    assert!(!cargo.contains("../radix/hosts/macos-arm64"));
+    let generated_main = fs::read_to_string(&layout.generated_rust_entry).expect("main");
+    assert!(generated_main.contains("faber_host_native::install()"));
+
+    let binary = invoke_cargo_build(&layout, false).expect("cargo build");
+    let run = Command::new(binary).output().expect("run generated binary");
+    assert!(run.status.success(), "generated binary failed: {:?}", run);
+    assert_eq!(
+        String::from_utf8(run.stdout).expect("stdout utf8"),
+        "salve native\n"
     );
 }
 
