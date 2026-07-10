@@ -1,6 +1,6 @@
 # Campaign: Aer Purgatus — Code-Smell Remediation
 
-**Status**: active — Goals 1, 2, 3, and 4 complete; cross-goal residual queue remains
+**Status**: complete — Goals 1, 2, 3, and 4 complete; aer-purgatus residual queue clear
 **Date**: 2026-07-09
 **Mode**: routing artifact — does not implement code directly
 **Control-plane repo**: `/Users/ianzepp/work/faberlang/faber`
@@ -298,6 +298,24 @@ Factory evidence:
 - Examples `d8d0e1b` (`feat(json): add canonical json corpus`) adds
   `examples/corpus/json/json.fab` and updates broad-`valor` exempla to use
   explicit widening.
+- Radix `ab7055599` (`fix(mir): render json maps as wire textus`) makes MIR
+  `json ↦ textus` render Map-shaped JSON values through the same checked
+  `Json::to_wire` path as Rust codegen.
+- Norma `c443bd5` (`fix(json): delegate norma facade to formal conversio`) and
+  Faber `8073519` (`test(package): expect formal norma json facade`) remove the
+  hand-written Norma JSON codec from the public authority path and update
+  package tests to the formal `json` surface.
+- Radix `55f43afd7` (`fix(json): box instans as text in json genus`) makes
+  `@ json` genus instans fields box as RFC3339 text for JSON while preserving
+  tagged `Valor::Instans` for broad `↦ valor`.
+- Radix `c3251350f` (`fix(mir): require json family for wire keys`) makes MIR
+  honor only `@ json { nomen = ... }` for JSON wire keys when other annotations
+  are present.
+- Faber runtime `2d58173` (`fix(json): report invalid number parse path`) adds
+  path-aware nested invalid-number parse diagnostics.
+- Examples `3bc206f` (`test(json): expand norma wire corpus proof`) expands the
+  canonical JSON corpus proof to cover `norma:json`, `solve`, `tempta`, `pange`,
+  and wire reparse through `genus → json → textus → json → genus`.
 - Gates passed: runtime JSON and full runtime tests, runtime clippy/format/diff;
   Radix JSON/conversio/MIR/TS/Go/full package tests, reader-pack and EBNF
   checks, clippy/format/diff; Norma source/diff checks; canonical JSON run and
@@ -390,7 +408,7 @@ Factory evidence:
 
 | Field | Value |
 | --- | --- |
-| **Status** | partial — async codegen, proof-pair route migration, runtime host-dispatch contract, private host removal, and manifest host spelling delivered; public host implementation open |
+| **Status** | complete — factory gate passed 2026-07-10 |
 | **Source** | Radix async-ad-lowering goal/ledger plus live runtime and package code |
 | **Invariant** | Async `ad` never performs blocking host work while polling, always has a completion producer, and depends only on a portable runtime host contract. |
 | **Why last** | Highest cross-repo and behavioral risk; benefits from the campaign's first three established delivery patterns. |
@@ -495,9 +513,8 @@ Partial factory evidence:
   negative proof, package runtime-plan tests, native host workspace tests/clippy,
   generated native-host package E2E, caller-drop cancellation frame tests,
   Faber hygiene, and scoped diff checks.
-- Cross-goal note: the Faber full package suite currently also exposes open
-  Goal 2 `norma:json` residuals that still expect `valor` instead of the formal
-  `json` type.
+- Cross-goal residual note resolved: after Goal 2 follow-up commits, `timeout
+  240 cargo test --lib package -- --format terse` in `faber` passes.
 
 ## Dependency Rules
 
