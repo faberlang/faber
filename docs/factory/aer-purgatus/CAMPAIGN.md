@@ -468,19 +468,26 @@ Partial factory evidence:
 - Faber `651f6cc` (`feat(package): accept explicit native host policy`) adds
   `[target.rust] host = "native"` manifest parsing/validation and rejects host
   policy on non-Rust target tables.
+- Faber `8daa2da` (`feat(package): derive cargo runtime plan from analysis`)
+  adds a structured package `RustRuntimePlan` from analyzed HIR and manifest
+  metadata. Package builds now use that plan for Tokio dependency selection and
+  reject non-runtime `ad` routes without a selected Rust host before Cargo
+  emission.
 - Gates passed: focused Radix async materializer tests, `faber check` on both
   async corpus files and the existing `solum.lege` proof, `faber emit -t rust`
   verification that generated proof-pair Rust contains neither `solum:leget`
   nor `tempus:expectet`, `norma/scripta/check-source`, runtime frame/full
   tests and clippy, Radix `ad` + hygiene, Faber package E2E private-host
-  negative proof, Faber hygiene, and scoped diff checks.
+  negative proof, package runtime-plan tests, Faber hygiene, and scoped diff
+  checks.
 - Not complete: caller-drop cancellation, shutdown, bounded queues, and
   late-worker suppression remain to be proven at the runtime/native-host
-  boundary; Faber still needs a structured runtime plan for Tokio/executor,
-  route-requirement enforcement, and native-host dependency selection; the
-  public native host adapter and concurrent timer proof remain open. The Faber
-  full package suite currently also exposes open Goal 2 `norma:json` residuals
-  that still expect `valor` instead of the formal `json` type.
+  boundary; Faber package builds now use analyzed HIR for Tokio/executor and
+  non-runtime route requirements, but native-host dependency selection remains
+  open until `faber-host-native` exists; the public native host adapter and
+  concurrent timer proof remain open. The Faber full package suite currently
+  also exposes open Goal 2 `norma:json` residuals that still expect `valor`
+  instead of the formal `json` type.
 
 ## Dependency Rules
 

@@ -60,6 +60,10 @@ Delivered slices:
 - Faber `651f6cc` adds the manifest schema for explicit
   `[target.rust] host = "native"` and rejects host policy on non-Rust target
   tables.
+- Faber `8daa2da` adds a structured package `RustRuntimePlan` derived from
+  analyzed HIR and manifest metadata. Package `build` now uses that plan for
+  Tokio dependency selection and fails before Cargo emission when non-runtime
+  `ad` routes are present without a selected Rust host.
 
 Validation run:
 
@@ -80,6 +84,7 @@ Validation run:
 - `timeout 300 cargo test --lib generated_package_ad_avoids_private_host_bridge_dependency -- --format terse` in `faber`
 - `timeout 240 cargo test --lib rust_target_manifest_accepts_native_host_policy -- --format terse` in `faber`
 - `timeout 240 cargo test --lib non_rust_target_manifest_rejects_host_policy -- --format terse` in `faber`
+- `timeout 240 cargo test --lib package_runtime_plan -- --format terse` in `faber`
 - `timeout 180 cargo test --test hygiene` in `faber`
 
 Remaining blockers before closeout:
@@ -90,10 +95,10 @@ Remaining blockers before closeout:
   caller-drop cancellation, shutdown, bounded queues, and late-worker
   suppression remain part of the native-host/runtime closeout.
 - `faber/src/package/cargo.rs` still detects Tokio/executor need from emitted
-  Rust text. The private macOS host scan/path is gone and
-  `[target.rust] host = "native"` parses/validates, but the final structured
-  `RustRuntimePlan`, route-requirement enforcement, and native-host dependency
-  selection are still open.
+  Rust text only for the legacy non-package generated-crate fallback. Package
+  builds use analyzed HIR for Tokio/executor and non-runtime route requirements.
+  Native-host dependency selection remains open until the public
+  `faber-host-native` crate exists.
 - The public native host adapter, bounded-worker queue policy, cancellation
   suppression of late worker frames, concurrent timer proof, and package host
   selection remain unimplemented.
