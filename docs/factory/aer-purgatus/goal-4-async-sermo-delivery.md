@@ -1,6 +1,6 @@
 # Delivery: Honest Async `Sermo` And Host Boundary
 
-**Status**: partial — async codegen and proof-pair route migration delivered; runtime/package host boundary open
+**Status**: partial — async codegen, proof-pair route migration, runtime producer handoff, and private host removal delivered; public host selection still open
 **Date**: 2026-07-09
 **Campaign**: [`CAMPAIGN.md`](CAMPAIGN.md)
 **Primary repos**: `faber-runtime`, `radix`, `faber`, `norma`
@@ -41,6 +41,17 @@ Delivered slices:
   `solum.lege` / `@ futura solum.leget<T>` share `solum:lege`, and
   `tempus.expectet` / `@ futura tempus.dormiet` share `tempus:dormiet`.
 - Examples `76a482f` adds async corpus proofs for those two same-route pairs.
+- Faber runtime `3ae9583` replaces `Rc<RefCell<_>>` conversation state with
+  `Arc<Mutex<_>>` plus a blocking receive condition variable, moves built-in
+  route work onto producer threads, and makes unsupported routes resolve to an
+  error terminal instead of pending indefinitely.
+- Faber runtime `092b67c` threads materialization target shape into route
+  producers for `textus`, `lista<textus>`, `octeti`, and scalar materializers.
+- Radix `5daeefb36` deletes generated `__faber_attach_sermo` calls and the
+  private macOS host shim from Rust `ad` codegen.
+- Faber `4979410` removes generated Cargo dependency/features for the private
+  `radix/hosts/macos-arm64` host path and keeps the package E2E proof running
+  through runtime route production.
 
 Validation run:
 
@@ -52,17 +63,30 @@ Validation run:
 - `timeout 180 cargo run --manifest-path faber/Cargo.toml -- emit -t rust examples/corpus/ad/async-solum-leget.fab`
 - `timeout 180 cargo run --manifest-path faber/Cargo.toml -- emit -t rust examples/corpus/ad/async-tempus-dormiet.fab`
 - `timeout 180 norma/scripta/check-source`
+- `timeout 240 cargo test frame -- --format terse` in `faber-runtime`
+- `timeout 240 cargo clippy --all-targets -- -D warnings` in `faber-runtime`
+- `timeout 240 cargo test -- --format terse` in `faber-runtime`
+- `timeout 300 cargo test -p radix ad -- --format terse`
+- `timeout 180 cargo test -p radix --test hygiene`
+- `timeout 300 cargo test --lib generated_package_ad_avoids_private_host_bridge_dependency -- --format terse` in `faber`
+- `timeout 180 cargo test --test hygiene` in `faber`
 
 Remaining blockers before closeout:
 
-- `faber-runtime/src/frame.rs` still uses `Rc<RefCell<_>>` and
-  `ensure_runtime_response_inner` from receive/materialization paths, so host
-  work can still run at the wrong boundary.
-- `faber/src/package/cargo.rs` still sniffs generated Rust and defaults to the
-  private `faber-host-macos-arm64` feature path.
-- The public native host adapter, explicit `[target.rust] host = "native"`
-  selection, thread-safe producer contract, and concurrent timer proof remain
-  unimplemented.
+- `faber-runtime/src/frame.rs` still uses an internal producer-thread handoff
+  for built-in routes rather than the final public `HostDispatch` /
+  `ResponseSender` contract with cancellation, bounded queues, and shutdown.
+- `faber/src/package/cargo.rs` still detects Tokio/executor need from emitted
+  Rust text. The private macOS host scan/path is gone, but the final structured
+  `RustRuntimePlan` and explicit `[target.rust] host = "native"` validation are
+  still open.
+- The public native host adapter, bounded-worker queue policy, cancellation
+  suppression of late worker frames, concurrent timer proof, and package host
+  selection remain unimplemented.
+- `timeout 240 cargo test --lib package -- --format terse` in `faber` currently
+  fails two unrelated `norma:json` package tests because open Goal 2 residuals
+  still expect `json.solve`/`json.pange` to round-trip through `valor` instead
+  of the formal `json` document type.
 
 ## Normalized Spec
 

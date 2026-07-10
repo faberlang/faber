@@ -155,7 +155,7 @@ All six active repositories were clean when this campaign was drafted.
 | 1 — Compiler-grounded binding contracts | **complete** | Factory gate passed; evidence and commits recorded below. |
 | 2 — Formal object-rooted JSON document | **complete** | Factory gate passed; evidence and commits recorded below. |
 | 3 — First-party JSON migration and FVI adoption | **complete** | Factory gate passed; evidence and commits recorded below. |
-| 4 — Honest async `sermo` boundary | **partial** — codegen and proof pairs delivered; runtime/package host boundary open | Replace receive-time runtime fallback, thread-safe producer state, public native host, and explicit package host selection before closeout. |
+| 4 — Honest async `sermo` boundary | **partial** — codegen, proof pairs, runtime producer handoff, and private host removal delivered; public host selection open | Replace interim built-in producer threads with the final runtime host-dispatch contract, public native host, structured package runtime plan, and explicit package host selection before closeout. |
 
 The four saved delivery documents are the factory production inputs. Stage
 completion lives in this campaign's Current State and in each delivery
@@ -390,7 +390,7 @@ Factory evidence:
 
 | Field | Value |
 | --- | --- |
-| **Status** | partial — async codegen and proof-pair route migration delivered; runtime/package host boundary open |
+| **Status** | partial — async codegen, proof-pair route migration, runtime producer handoff, and private host removal delivered; public host selection open |
 | **Source** | Radix async-ad-lowering goal/ledger plus live runtime and package code |
 | **Invariant** | Async `ad` never performs blocking host work while polling, always has a completion producer, and depends only on a portable runtime host contract. |
 | **Why last** | Highest cross-repo and behavioral risk; benefits from the campaign's first three established delivery patterns. |
@@ -447,15 +447,33 @@ Partial factory evidence:
   `tempus.expectet` / `@ futura tempus.dormiet` share `tempus:dormiet`.
 - Examples `76a482f` (`test(ad): add async sermo corpus proofs`) adds corpus
   proofs for the `solum` and `tempus` async same-route pairs.
+- Faber runtime `3ae9583` (`fix(frame): hand off runtime route responses`)
+  replaces `Rc<RefCell<_>>` conversation state with a thread-safe shared core,
+  moves built-in route work onto producer threads, and makes unsupported routes
+  terminal instead of indefinitely pending.
+- Faber runtime `092b67c` (`fix(frame): pass materialization targets to route
+  producers`) threads target shape into runtime route production for `textus`,
+  `lista<textus>`, `octeti`, and scalar materializers.
+- Radix `5daeefb36` (`fix(codegen): drop private host attach shim`) deletes
+  generated `__faber_attach_sermo` calls and the private macOS host shim from
+  Rust `ad` codegen.
+- Faber `4979410` (`fix(package): remove private host cargo dependency`) stops
+  generated Cargo output from adding the private `radix/hosts/macos-arm64`
+  dependency/features and proves a package `solum:lege` route still builds and
+  runs through runtime route production.
 - Gates passed: focused Radix async materializer tests, `faber check` on both
   async corpus files and the existing `solum.lege` proof, `faber emit -t rust`
   verification that generated proof-pair Rust contains neither `solum:leget`
-  nor `tempus:expectet`, `norma/scripta/check-source`, and diff checks.
-- Not complete: `faber-runtime/src/frame.rs` still uses
-  `ensure_runtime_response_inner` from receive/materialization paths, and
-  `faber/src/package/cargo.rs` still derives Tokio/private-host dependencies by
-  sniffing emitted Rust. The campaign closeout gate remains red until those
-  approximation paths are removed.
+  nor `tempus:expectet`, `norma/scripta/check-source`, runtime frame/full
+  tests and clippy, Radix `ad` + hygiene, Faber package E2E private-host
+  negative proof, Faber hygiene, and scoped diff checks.
+- Not complete: runtime production is still an interim built-in route handoff,
+  not the public `HostDispatch` / `ResponseSender` contract with cancellation,
+  bounded queues, and shutdown; Faber still needs a structured runtime plan for
+  Tokio/executor and explicit `[target.rust] host = "native"` selection; the
+  public native host adapter and concurrent timer proof remain open. The Faber
+  full package suite currently also exposes open Goal 2 `norma:json` residuals
+  that still expect `valor` instead of the formal `json` type.
 
 ## Dependency Rules
 
