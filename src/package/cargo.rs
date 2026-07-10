@@ -8,6 +8,9 @@ use super::{provider_crate_path, BuildLayout, FaberManifest, ManifestRustHost, P
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct RustRuntimePlan {
+    /// Whether the generated crate path-links `faber-runtime` (HIR/plan fact).
+    pub(crate) needs_faber: bool,
+    /// Whether the generated crate depends on `tokio` (async/cede HIR fact).
     pub(crate) needs_tokio: bool,
     pub(crate) host: Option<ManifestRustHost>,
     pub(crate) non_runtime_routes: BTreeSet<String>,
@@ -19,9 +22,13 @@ pub(crate) struct RustRuntimePlan {
 }
 
 impl RustRuntimePlan {
-    pub(crate) fn legacy_from_generated_code(rust_code: &str) -> Self {
+    /// Plan for emit paths that only have generated source and no analysis
+    /// context (tests / fallback). Always links faber-runtime; never sniffs
+    /// emitted text for policy.
+    pub(crate) fn default_generated_crate_plan() -> Self {
         Self {
-            needs_tokio: generated_code_needs_tokio(rust_code),
+            needs_faber: true,
+            needs_tokio: false,
             host: None,
             non_runtime_routes: BTreeSet::new(),
             selected_providers: BTreeSet::new(),
@@ -29,6 +36,15 @@ impl RustRuntimePlan {
             provider_error: None,
             library_path_deps: Vec::new(),
         }
+    }
+
+    /// True when the build must emit a Cargo crate (not a bare `.rs` file).
+    pub(crate) fn requires_generated_crate(&self) -> bool {
+        self.needs_faber
+            || self.needs_tokio
+            || self.host.is_some()
+            || !self.library_path_deps.is_empty()
+            || !self.selected_providers.is_empty()
     }
 }
 
@@ -91,11 +107,13 @@ fn generate_cargo_toml(meta: &FaberManifest, binary_name: &str, plan: &RustRunti
 }
 
 fn render_generated_cargo_toml(name: &str, version: &str, plan: &RustRuntimePlan) -> String {
-    let faber_path = faber_runtime_path();
-    let mut deps = format!(
-        "faber = {{ package = \"faber-runtime\", path = \"{}\" }}\n",
-        faber_path.display(),
-    );
+    let mut deps = String::new();
+    if plan.needs_faber {
+        deps.push_str(&format!(
+            "faber = {{ package = \"faber-runtime\", path = \"{}\" }}\n",
+            faber_runtime_path().display(),
+        ));
+    }
     if matches!(plan.host, Some(ManifestRustHost::Native)) {
         deps.push_str(&format!(
             "host_kernel = {{ package = \"host-kernel\", path = \"{}\" }}\n",
@@ -146,10 +164,6 @@ edition = "2021"
     )
 }
 
-fn generated_code_needs_tokio(rust_code: &str) -> bool {
-    rust_code.contains("tokio::") || rust_code.contains("__faber_block_on")
-}
-
 fn faber_runtime_path() -> PathBuf {
     // Public `faber` repo lives beside private `radix` under faberlang/.
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../faber-runtime")
@@ -177,7 +191,7 @@ pub fn emit_generated_crate(
         layout,
         rust_code,
         meta,
-        &RustRuntimePlan::legacy_from_generated_code(rust_code),
+        &RustRuntimePlan::default_generated_crate_plan(),
     )
 }
 

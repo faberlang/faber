@@ -4,9 +4,7 @@ use radix::tool::DiagnosticMode;
 use radix::{CompileResult, Output};
 use std::path::Path;
 
-use super::cargo::{
-    emit_generated_crate, emit_generated_crate_with_runtime_plan, invoke_cargo_build,
-};
+use super::cargo::{emit_generated_crate_with_runtime_plan, invoke_cargo_build};
 use super::manifest::manifest_build_target;
 use super::{
     build_package_fmir_binary_bundle, build_package_fmir_image, build_package_fmir_text_image,
@@ -213,30 +211,44 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
 
     let code = output_code(output);
 
-    // Single-file Rust builds that reference `faber::` emit a generated Cargo crate
-    // under `target/faber/` (package-build parity). Programs without runtime deps
-    // keep the legacy single `.rs` file emission path unchanged.
-    if target == radix::codegen::Target::Rust && generated_code_needs_faber(&code) {
-        let package_root = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        let stem = input_path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .filter(|s| !s.is_empty())
-            .unwrap_or("faber_out");
-        let layout = BuildLayout::from_package_root(&package_root, stem);
-        match emit_generated_crate(&layout, &code, None) {
-            Ok(_) => match invoke_cargo_build(&layout, command.release) {
-                Ok(binary_path) => {
-                    println!("{}", binary_path.display());
-                    return;
+    // Single-file Rust builds that need faber-runtime / tokio (from HIR facts,
+    // not emitted-text sniffing) emit a generated Cargo crate under
+    // `target/faber/`. Programs without those deps keep the bare `.rs` path.
+    if target == radix::codegen::Target::Rust {
+        match single_file_rust_runtime_plan(&config, &input_path) {
+            Ok(plan) if plan.requires_generated_crate() => {
+                let package_root = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+                let stem = input_path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or("faber_out");
+                let layout = BuildLayout::from_package_root(&package_root, stem);
+                match emit_generated_crate_with_runtime_plan(&layout, &code, None, &plan) {
+                    Ok(_) => match invoke_cargo_build(&layout, command.release) {
+                        Ok(binary_path) => {
+                            println!("{}", binary_path.display());
+                            return;
+                        }
+                        Err(d) => {
+                            eprintln!("error: {}", d.message);
+                            std::process::exit(1);
+                        }
+                    },
+                    Err(d) => {
+                        eprintln!("error: {}", d.message);
+                        std::process::exit(1);
+                    }
                 }
-                Err(d) => {
-                    eprintln!("error: {}", d.message);
-                    std::process::exit(1);
-                }
-            },
-            Err(d) => {
-                eprintln!("error: {}", d.message);
+            }
+            Ok(_) => {}
+            Err(diagnostics) => {
+                radix::tool::print_diagnostics(
+                    &diagnostics,
+                    DiagnosticMode::Normal,
+                    reader_pack.as_ref(),
+                );
+                eprintln!("runtime plan failed");
                 std::process::exit(1);
             }
         }
@@ -264,8 +276,52 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
     println!("{}", output_path.display());
 }
 
-fn generated_code_needs_faber(rust_code: &str) -> bool {
-    rust_code.contains("faber::")
+/// Structured runtime plan for a single `.fab` file (no package manifest).
+///
+/// Uses HIR/type facts via [`radix::codegen::collect_rust_needs`] — never scans
+/// generated Rust text for `faber::` / `tokio::`.
+fn single_file_rust_runtime_plan(
+    config: &radix::Config,
+    input_path: &Path,
+) -> Result<super::RustRuntimePlan, Vec<radix::Diagnostic>> {
+    use radix::driver::{analyze_source, Session};
+    use std::collections::BTreeSet;
+    use std::fs;
+
+    let source = fs::read_to_string(input_path).map_err(|err| {
+        vec![radix::Diagnostic::error(format!(
+            "failed to read '{}': {err}",
+            input_path.display()
+        ))]
+    })?;
+    let session = Session::new(config.clone());
+    let name = input_path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("input.fab");
+    let analysis = analyze_source(&session, name, &source).map_err(|diagnostics| diagnostics)?;
+    let needs = radix::codegen::collect_rust_needs(
+        &analysis.hir,
+        &analysis.types,
+        BTreeSet::new(),
+        None,
+    );
+    let needs_tokio = analysis.hir.entry_is_async
+        || analysis
+            .hir
+            .items
+            .iter()
+            .any(|item| matches!(&item.kind, radix::hir::HirItemKind::Function(f) if f.is_async));
+    Ok(super::RustRuntimePlan {
+        needs_faber: needs.needs_faber_runtime,
+        needs_tokio,
+        host: None,
+        non_runtime_routes: BTreeSet::new(),
+        selected_providers: BTreeSet::new(),
+        provider_manifests: Vec::new(),
+        provider_error: None,
+        library_path_deps: Vec::new(),
+    })
 }
 
 fn resolve_build_target(command: &radix::tool::BuildCommand, input_path: &Path) -> Target {

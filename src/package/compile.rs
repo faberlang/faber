@@ -90,11 +90,16 @@ fn rust_runtime_plan_for_package(package: &AnalyzedPackage) -> RustRuntimePlan {
             (crate_name.clone(), path)
         })
         .collect();
+    // Runtime deps come from HIR/type facts and the G4 artifact plan — never
+    // from scanning emitted Rust text (`faber::` / `tokio::` contains).
+    let needs_tokio = package.units.iter().any(|unit| {
+        unit.analysis.hir.entry_is_async || unit.analysis.hir.items.iter().any(hir_item_is_async)
+    });
+    // Package Rust emission always plans `rust:runtime:faber` (see artifact_plan).
+    let needs_faber = true;
     let mut plan = RustRuntimePlan {
-        needs_tokio: package.units.iter().any(|unit| {
-            unit.analysis.hir.entry_is_async
-                || unit.analysis.hir.items.iter().any(hir_item_is_async)
-        }),
+        needs_faber,
+        needs_tokio,
         host,
         non_runtime_routes: BTreeSet::new(),
         selected_providers: BTreeSet::new(),

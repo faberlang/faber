@@ -7526,6 +7526,65 @@ providers = ["notaprovider"]
 }
 
 #[test]
+fn package_runtime_plan_selects_faber_and_tokio_without_text_sniff() {
+    // Phase 3: Cargo runtime deps must come from HIR/plan facts, never
+    // `rust_code.contains("faber::")` / `contains("tokio::")`.
+    let pkg = test_temp_dir("runtime-plan-no-text-sniff");
+    fs::create_dir_all(pkg.join("src")).expect("src");
+    fs::write(
+        pkg.join("faber.toml"),
+        r#"
+[package]
+name = "runtime-plan-no-text-sniff"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        pkg.join("src/main.fab"),
+        r#"incipiet { fixum textus body ← ad 'runtime:echo' ("ok") ↦ textus nota body }"#,
+    )
+    .expect("entry");
+
+    let layout = discover_build_layout(&pkg).expect("layout");
+    let package = analyze_package(&Config::default(), &pkg).expect("analyze");
+    let artifact = super::artifact_plan::plan_package(&package, Target::Rust);
+    assert!(
+        artifact.has_runtime_dependency("rust:runtime:faber"),
+        "artifact plan must list faber runtime"
+    );
+    assert!(
+        artifact.has_runtime_dependency("rust:runtime:tokio"),
+        "async entry must plan tokio runtime node"
+    );
+
+    let plan = package_rust_runtime_plan(&Config::default(), &pkg).expect("runtime plan");
+    assert!(plan.needs_faber);
+    assert!(plan.needs_tokio);
+
+    let compile_result = compile_package(&Config::default(), &pkg);
+    assert!(compile_result.success(), "compile should succeed");
+    let code = match &compile_result.output {
+        Some(radix::Output::Rust(r)) => r.code.clone(),
+        _ => panic!("expected rust output"),
+    };
+    // Emit uses the plan, not a text scan of `code`.
+    emit_generated_crate_with_runtime_plan(
+        &layout,
+        &code,
+        Some(&read_manifest(&layout.manifest_path).unwrap()),
+        &plan,
+    )
+    .expect("emit");
+    let cargo_toml = fs::read_to_string(&layout.generated_cargo_manifest).expect("read cargo");
+    assert!(cargo_toml.contains("faber = { package = \"faber-runtime\""));
+    assert!(cargo_toml.contains("tokio = { version = "));
+}
+
+#[test]
 fn package_runtime_plan_drives_tokio_dependency_without_source_scan() {
     let pkg = test_temp_dir("runtime-plan-async-entry");
     fs::create_dir_all(pkg.join("src")).expect("src");

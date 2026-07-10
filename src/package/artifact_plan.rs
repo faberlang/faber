@@ -107,6 +107,13 @@ impl ArtifactPlan {
     pub fn to_debug_json(&self) -> Result<String, String> {
         serde_json::to_string_pretty(self).map_err(|err| err.to_string())
     }
+
+    /// Whether the plan includes a named runtime dependency node (e.g. `rust:runtime:tokio`).
+    pub fn has_runtime_dependency(&self, id: &str) -> bool {
+        self.nodes
+            .iter()
+            .any(|node| node.kind == ArtifactKind::RuntimeDependency && node.id == id)
+    }
 }
 
 /// Build an artifact plan from a shared analyzed package for one target.
@@ -512,6 +519,31 @@ fn plan_rust_artifacts(
             depends_on: Vec::new(),
         },
     );
+
+    // Tokio is selected from HIR async facts (same rule as RustRuntimePlan), not
+    // from scanning generated text for `tokio::` / `__faber_block_on`.
+    let needs_tokio = package.units.iter().any(|unit| {
+        unit.analysis.hir.entry_is_async
+            || unit.analysis.hir.items.iter().any(|item| {
+                matches!(
+                    &item.kind,
+                    radix::hir::HirItemKind::Function(function) if function.is_async
+                )
+            })
+    });
+    if needs_tokio {
+        push_unique_node(
+            nodes,
+            seen,
+            ArtifactNode {
+                id: "rust:runtime:tokio".to_owned(),
+                kind: ArtifactKind::RuntimeDependency,
+                target: Some("rust"),
+                path: PathBuf::from("tokio"),
+                depends_on: Vec::new(),
+            },
+        );
+    }
 
     for (provider, crate_name) in linked {
         let crate_path = package
