@@ -5450,7 +5450,11 @@ rusqlite = "0.32"
         "functio exsequi(textus via) → textus\nfunctio local() → textus { redde \"ok\" }\n",
     )
     .expect("write source");
-    fs::write(dir.join("rust/shim.rs"), "pub fn exsequi() {}\n").expect("write shim");
+    fs::write(
+        dir.join("rust/shim.rs"),
+        "pub fn exsequi(via: String) -> String { via }\n",
+    )
+    .expect("write shim");
     fs::write(
         dir.join("bindings/rust.toml"),
         r#"[functions."sqlite:sqlite.exsequi"]

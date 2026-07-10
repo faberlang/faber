@@ -2,10 +2,13 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use radix::diagnostics::Diagnostic;
+use radix::diagnostics::{Diagnostic, DiagnosticPhase};
+use radix::driver::Config;
 use serde::Deserialize;
 
-use super::{read_manifest, validate_manifest};
+use super::binding_probe::run_rust_binding_probe;
+use super::file_interface::extract_callable_contracts;
+use super::{analyze_package, read_manifest, resolve_package_member, validate_manifest};
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -29,10 +32,15 @@ struct ShimBinding {
     path: String,
 }
 
-#[derive(Debug, Eq, PartialEq)]
-struct SourceDeclaration {
+#[derive(Debug, Clone, PartialEq)]
+struct BindingContract {
     key: String,
+    file: PathBuf,
+    span: radix::lexer::Span,
+    callable: radix::file_interface::InterfaceCallable,
     has_body: bool,
+    unit_index: usize,
+    def_id: radix::hir::DefId,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -84,17 +92,43 @@ pub fn verify_library_bindings(
         )]);
     };
 
-    let binding_path = package_root.join(bindings_path);
+    let binding_path = match resolve_package_member(package_root, bindings_path, &manifest_path) {
+        Ok(path) => path,
+        Err(diagnostic) => return Err(vec![diagnostic]),
+    };
     let binding_manifest = read_binding_manifest(&binding_path)?;
-    let source_root = package_root.join(&manifest.paths.source);
+    let source_root =
+        match resolve_package_member(package_root, &manifest.paths.source, &manifest_path) {
+            Ok(path) => path,
+            Err(diagnostic) => return Err(vec![diagnostic]),
+        };
+    if !source_root.is_dir() {
+        return Err(vec![diagnostic(
+            &manifest_path,
+            format!(
+                "package source directory is missing: {}",
+                source_root.display()
+            ),
+            "binding_source_root_missing",
+        )]);
+    }
     let provider = manifest
         .library
         .as_ref()
         .map(|library| library.provider.as_str())
         .unwrap_or(&manifest.package.name);
-    let declarations = collect_source_declarations(provider, &source_root)?;
+    let (package, declarations) = collect_binding_contracts(provider, package_root)?;
     validate_bindings(&binding_path, &binding_manifest, &declarations)?;
     let shim = validate_shim(package_root, &binding_path, &binding_manifest)?;
+    prove_rust_bindings(
+        target,
+        &binding_path,
+        &target_config.dependencies,
+        shim.as_deref(),
+        &binding_manifest,
+        &declarations,
+        &package,
+    )?;
 
     Ok(BindingVerification {
         declarations: declarations.len(),
@@ -114,79 +148,62 @@ fn read_binding_manifest(path: &Path) -> Result<BindingManifest, Vec<Diagnostic>
     })
 }
 
-fn collect_source_declarations(
+fn collect_binding_contracts(
     provider: &str,
-    source_root: &Path,
-) -> Result<Vec<SourceDeclaration>, Vec<Diagnostic>> {
+    package_root: &Path,
+) -> Result<(super::AnalyzedPackage, Vec<BindingContract>), Vec<Diagnostic>> {
+    let package = analyze_package(&Config::default().with_bodyless_functions(), package_root)?;
     let mut declarations = Vec::new();
-    collect_source_declarations_in(provider, source_root, source_root, &mut declarations)?;
-    Ok(declarations)
-}
-
-fn collect_source_declarations_in(
-    provider: &str,
-    source_root: &Path,
-    dir: &Path,
-    declarations: &mut Vec<SourceDeclaration>,
-) -> Result<(), Vec<Diagnostic>> {
-    let entries = fs::read_dir(dir).map_err(|err| vec![Diagnostic::io_error(dir, err)])?;
-    for entry in entries {
-        let entry = entry.map_err(|err| {
-            vec![
-                Diagnostic::error(format!("failed to read source directory entry: {err}"))
-                    .with_file(dir.display().to_string())
-                    .with_arg("issue", "binding_source_read_failed"),
-            ]
-        })?;
-        let path = entry.path();
-        if path.is_dir() {
-            collect_source_declarations_in(provider, source_root, &path, declarations)?;
-        } else if path.extension().is_some_and(|ext| ext == "fab") {
-            collect_file_declarations(provider, source_root, &path, declarations)?;
+    let mut keys = BTreeSet::new();
+    let mut diagnostics = Vec::new();
+    for (unit_index, unit) in package.units.iter().enumerate() {
+        let module = unit.module_segments.join("/");
+        let contracts = match extract_callable_contracts(
+            &unit.analysis,
+            &unit.export_names,
+            &unit.path.display().to_string(),
+        ) {
+            Ok(contracts) => contracts,
+            Err(diagnostic) => {
+                diagnostics.push(diagnostic);
+                continue;
+            }
+        };
+        for contract in contracts {
+            let key = format!("{provider}:{module}.{}", contract.name);
+            if !keys.insert(key.clone()) {
+                diagnostics.push(
+                    Diagnostic::error(format!("duplicate Faber binding contract `{key}`"))
+                        .with_phase(DiagnosticPhase::Analysis)
+                        .with_file(unit.path.display().to_string())
+                        .with_span(contract.span)
+                        .with_arg("issue", "binding_duplicate_contract")
+                        .with_arg("binding", key),
+                );
+                continue;
+            }
+            declarations.push(BindingContract {
+                key,
+                file: unit.path.clone(),
+                span: contract.span,
+                callable: contract.callable,
+                has_body: contract.has_body,
+                unit_index,
+                def_id: contract.def_id,
+            });
         }
     }
-    Ok(())
-}
-
-fn collect_file_declarations(
-    provider: &str,
-    source_root: &Path,
-    path: &Path,
-    declarations: &mut Vec<SourceDeclaration>,
-) -> Result<(), Vec<Diagnostic>> {
-    let source = fs::read_to_string(path).map_err(|err| vec![Diagnostic::io_error(path, err)])?;
-    let module = path
-        .strip_prefix(source_root)
-        .unwrap_or(path)
-        .with_extension("")
-        .components()
-        .map(|component| component.as_os_str().to_string_lossy().into_owned())
-        .collect::<Vec<_>>()
-        .join("/");
-    for line in source.lines() {
-        let trimmed = line.trim_start();
-        let Some(rest) = trimmed.strip_prefix("functio ") else {
-            continue;
-        };
-        let Some((name, _)) = rest.split_once('(') else {
-            continue;
-        };
-        let name = name.trim();
-        if name.is_empty() {
-            continue;
-        }
-        declarations.push(SourceDeclaration {
-            key: format!("{provider}:{module}.{name}"),
-            has_body: trimmed.contains('{'),
-        });
+    if diagnostics.is_empty() {
+        Ok((package, declarations))
+    } else {
+        Err(diagnostics)
     }
-    Ok(())
 }
 
 fn validate_bindings(
     path: &Path,
     manifest: &BindingManifest,
-    declarations: &[SourceDeclaration],
+    declarations: &[BindingContract],
 ) -> Result<(), Vec<Diagnostic>> {
     let declaration_keys = declarations
         .iter()
@@ -198,37 +215,45 @@ fn validate_bindings(
         .map(String::as_str)
         .collect::<BTreeSet<_>>();
 
+    let mut diagnostics = Vec::new();
     for (key, binding) in &manifest.functions {
         if binding.symbol.trim().is_empty() {
-            return Err(vec![diagnostic(
+            diagnostics.push(diagnostic(
                 path,
                 format!("binding `{key}` has an empty Rust symbol"),
                 "binding_symbol_empty",
-            )]);
+            ));
         }
         if !declaration_keys.contains(key.as_str()) {
-            return Err(vec![diagnostic(
+            diagnostics.push(diagnostic(
                 path,
                 format!("binding `{key}` does not match a Faber declaration"),
                 "binding_unknown_declaration",
-            )]);
+            ));
         }
     }
 
     for declaration in declarations {
         if !declaration.has_body && !binding_keys.contains(declaration.key.as_str()) {
-            return Err(vec![diagnostic(
-                path,
-                format!(
+            diagnostics.push(
+                Diagnostic::error(format!(
                     "declaration `{}` has no Faber body and no binding",
                     declaration.key
-                ),
-                "binding_required_missing",
-            )]);
+                ))
+                .with_phase(DiagnosticPhase::Analysis)
+                .with_file(declaration.file.display().to_string())
+                .with_span(declaration.span)
+                .with_arg("issue", "binding_required_missing")
+                .with_arg("binding", declaration.key.clone()),
+            );
         }
     }
 
-    Ok(())
+    if diagnostics.is_empty() {
+        Ok(())
+    } else {
+        Err(diagnostics)
+    }
 }
 
 fn validate_shim(
@@ -246,7 +271,8 @@ fn validate_shim(
             "binding_shim_path_empty",
         )]);
     }
-    let path = package_root.join(&shim.path);
+    let path = resolve_package_member(package_root, &shim.path, binding_path)
+        .map_err(|diagnostic| vec![diagnostic])?;
     if !path.is_file() {
         return Err(vec![diagnostic(
             binding_path,
@@ -257,8 +283,85 @@ fn validate_shim(
     Ok(Some(path))
 }
 
+#[allow(clippy::too_many_arguments)]
+fn prove_rust_bindings(
+    target: &str,
+    binding_path: &Path,
+    dependencies: &BTreeMap<String, String>,
+    shim: Option<&Path>,
+    manifest: &BindingManifest,
+    declarations: &[BindingContract],
+    package: &super::AnalyzedPackage,
+) -> Result<(), Vec<Diagnostic>> {
+    if manifest.functions.is_empty() {
+        return Ok(());
+    }
+    if target != "rust" {
+        return Err(vec![diagnostic(
+            binding_path,
+            format!("binding contract probes are not supported for target `{target}`"),
+            "binding_probe_target_unsupported",
+        )]);
+    }
+
+    let by_key = declarations
+        .iter()
+        .map(|declaration| (declaration.key.as_str(), declaration))
+        .collect::<BTreeMap<_, _>>();
+    let mut probes = Vec::new();
+    let mut diagnostics = Vec::new();
+    for (index, (key, binding)) in manifest.functions.iter().enumerate() {
+        let Some(declaration) = by_key.get(key.as_str()).copied() else {
+            continue;
+        };
+        let unit = &package.units[declaration.unit_index];
+        match radix::codegen::rust::render_binding_probe(
+            &unit.analysis,
+            declaration.def_id,
+            &binding.symbol,
+            &format!("__faber_binding_probe_{index}"),
+        ) {
+            Ok(probe) => probes.push(format!(
+                "// binding: {key}\n// contract: {:?}\n{probe}",
+                declaration.callable
+            )),
+            Err(error) => diagnostics.push(
+                Diagnostic::error(format!(
+                    "binding `{key}` cannot be represented as a Rust ABI probe: {}",
+                    error.message
+                ))
+                .with_phase(DiagnosticPhase::Codegen)
+                .with_file(declaration.file.display().to_string())
+                .with_span(declaration.span)
+                .with_args(error.args)
+                .with_arg("issue", "binding_probe_render_failed")
+                .with_arg("binding", key.clone()),
+            ),
+        }
+    }
+    if !diagnostics.is_empty() {
+        return Err(diagnostics);
+    }
+
+    run_rust_binding_probe(binding_path, dependencies, shim, &probes).map_err(|diagnostic| {
+        vec![diagnostic.with_arg(
+            "bindings",
+            manifest
+                .functions
+                .keys()
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(","),
+        )]
+    })
+}
+
 fn diagnostic(path: &Path, message: impl Into<String>, issue: &'static str) -> Diagnostic {
     Diagnostic::error(message.into())
         .with_file(path.display().to_string())
         .with_arg("issue", issue)
 }
+
+#[cfg(test)]
+#[path = "binding_test.rs"]
+mod tests;

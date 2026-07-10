@@ -140,6 +140,24 @@ verification to share it. If the live package analyzer can expose its analyzed
 file set without a new Radix API, keep the new query in Faber. Radix changes are
 justified only for target-neutral declaration facts or Rust ABI rendering.
 
+### Factory revision — 2026-07-09
+
+Live execution found that `EBNF.md` permits an optional function body and the
+package HIR represents `body: None`, but the default parser still emitted
+`PARSE012` before library analysis could observe that contract. Goal 1 therefore
+requires a narrow library-analysis parser option in addition to the planned
+Radix Rust-probe renderer. Ordinary application parsing remains fail-closed;
+only manifest-backed library loading and the explicit binding-analysis session
+enable signature-only top-level functions. This restores the existing grammar
+contract rather than adding a new surface.
+
+The same inspection corrected one ABI assumption: current Rust declaration
+emission keeps `de`/`in`/`ex` as semantic ownership policy but uses an owned
+parameter type for all three (`in` additionally makes the local binding
+mutable). The probe therefore preserves each mode in the target-neutral
+`InterfaceCallable` while proving the exact Rust ABI that normal codegen emits;
+it must not invent reference types that generated packages do not use.
+
 ## Stage Graph
 
 ```text

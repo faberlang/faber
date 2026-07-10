@@ -12,6 +12,49 @@ use radix::hir::{
 use radix::semantic::{FuncSig, ParamMode, ParamType, TypeParamConstraint};
 use std::collections::BTreeSet;
 
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct AnalyzedCallableContract {
+    pub(crate) def_id: radix::hir::DefId,
+    pub(crate) span: radix::lexer::Span,
+    pub(crate) name: String,
+    pub(crate) callable: radix::file_interface::InterfaceCallable,
+    pub(crate) has_body: bool,
+}
+
+#[allow(clippy::result_large_err)]
+pub(crate) fn extract_callable_contracts(
+    analysis: &AnalyzedUnit,
+    export_names: &[String],
+    file_label: &str,
+) -> Result<Vec<AnalyzedCallableContract>, Diagnostic> {
+    let public_exports = export_names.iter().collect::<BTreeSet<_>>();
+    analysis
+        .hir
+        .items
+        .iter()
+        .filter_map(|item| {
+            let HirItemKind::Function(function) = &item.kind else {
+                return None;
+            };
+            let name = analysis.interner.resolve(function.name).to_owned();
+            if !public_exports.contains(&name) {
+                return None;
+            }
+            Some(
+                snapshot_function(function, analysis, file_label).map(|callable| {
+                    AnalyzedCallableContract {
+                        def_id: item.def_id,
+                        span: item.span,
+                        name,
+                        callable,
+                        has_body: function.body.is_some(),
+                    }
+                }),
+            )
+        })
+        .collect()
+}
+
 #[allow(clippy::result_large_err)]
 pub(crate) fn extract_file_interface(
     analysis: &AnalyzedUnit,

@@ -27,6 +27,7 @@
 //! while `faber.toml` remains the preferred package surface.
 
 pub mod binding;
+mod binding_probe;
 mod cargo;
 mod cmd;
 mod codegen;
@@ -38,10 +39,12 @@ mod import_graph;
 mod library;
 mod lockfile;
 mod manifest;
+mod member_path;
 mod mir;
 mod modules;
 mod paths;
 mod reader;
+mod source_files;
 
 pub use binding::verify_library_bindings;
 #[allow(unused_imports)]
@@ -84,23 +87,23 @@ pub(crate) use discovery::{discover_package, is_manifest_backed_or_directory_pac
 
 use crate::library::LibraryResolver;
 use radix::diagnostics::Diagnostic;
-use radix::driver::{peel_raw_source, source_load_diagnostic, FileFrontmatter};
+use radix::driver::FileFrontmatter;
 use radix::lexer::Interner;
-use radix::parser;
 use radix::syntax::{Program, StmtKind, Visibility};
 use std::collections::{BTreeSet, VecDeque};
-use std::fs;
 use std::path::PathBuf;
 
 pub(crate) use discovery::PackageSpec;
-use frontmatter::{manifest_path_for_spec, validate_frontmatter_against_manifest};
+use frontmatter::manifest_path_for_spec;
 use import_graph::{
     detect_import_cycles, import_unsupported_diagnostic, library_import_binding,
     library_import_kind_diagnostic, resolve_import, ImportResolution,
 };
 use library::expand_library_imports;
+pub(crate) use member_path::resolve_package_member;
 use modules::module_segments_for_file;
 use paths::normalize_path;
+use source_files::{load_package_source, package_source_files};
 
 pub(crate) use library::{
     analysis_source_for_file, attach_library_provenance, library_cached_analysis,
@@ -137,14 +140,6 @@ pub(super) struct LibraryImportBinding {
     visibility: Visibility,
     import_span: radix::lexer::Span,
     module: crate::library::ResolvedLibraryModule,
-}
-
-struct LoadedPackageSource {
-    raw_source: String,
-    body: String,
-    frontmatter: Option<FileFrontmatter>,
-    program: Program,
-    interner: Interner,
 }
 
 pub(crate) fn library_resolver_from_config(config: &radix::driver::Config) -> LibraryResolver {
@@ -215,7 +210,12 @@ pub(crate) fn load_package_with_reader_pack(
     reader_pack: Option<&radix::reader_locale::ReaderLocalePack>,
 ) -> Result<Vec<PackageFile>, Vec<Diagnostic>> {
     let manifest = manifest_path_for_spec(spec).and_then(|path| read_manifest(&path).ok());
-    let mut queue = VecDeque::from([spec.entry.clone()]);
+    let initial_files = if spec.entry.is_dir() {
+        package_source_files(&spec.entry)?
+    } else {
+        vec![spec.entry.clone()]
+    };
+    let mut queue = VecDeque::from(initial_files);
     let mut seen = BTreeSet::new();
     let mut files = Vec::new();
     let mut diagnostics = Vec::new();
@@ -296,96 +296,6 @@ pub(crate) fn load_package_with_reader_pack(
         }
         Ok(files)
     }
-}
-
-fn load_package_source(
-    canonical: &PathBuf,
-    manifest: Option<&FaberManifest>,
-    reader_pack: Option<&radix::reader_locale::ReaderLocalePack>,
-    diagnostics: &mut Vec<Diagnostic>,
-) -> Option<LoadedPackageSource> {
-    let raw_source = match fs::read_to_string(canonical) {
-        Ok(source) => source,
-        Err(err) => {
-            diagnostics.push(Diagnostic::io_error(canonical, err));
-            return None;
-        }
-    };
-
-    let display_name = canonical.display().to_string();
-    let peeled = match peel_raw_source(&display_name, &raw_source) {
-        Ok(peeled) => peeled,
-        Err(error) => {
-            diagnostics.push(source_load_diagnostic(&display_name, error));
-            return None;
-        }
-    };
-
-    if let Some(manifest) = manifest {
-        if let Some(diag) =
-            validate_frontmatter_against_manifest(canonical, peeled.frontmatter.as_ref(), manifest)
-        {
-            diagnostics.push(diag);
-            return None;
-        }
-    }
-
-    let radix::driver::PeeledSource {
-        body, frontmatter, ..
-    } = peeled;
-    let body = body.to_owned();
-
-    let lex_result = match reader_pack {
-        Some(pack) => radix::lexer::lex_with_reader_pack(&body, pack),
-        None => radix::lexer::lex(&body),
-    };
-    diagnostics.extend(
-        lex_result.reader_fallbacks.iter().map(|fallback| {
-            Diagnostic::from_reader_locale_fallback(&display_name, &body, fallback)
-        }),
-    );
-    diagnostics.extend(lex_result.reader_suggestions.iter().map(|suggestion| {
-        Diagnostic::from_reader_locale_suggestion(&display_name, &body, suggestion)
-    }));
-    if !lex_result.success() {
-        diagnostics.extend(
-            lex_result
-                .errors
-                .iter()
-                .map(|err| Diagnostic::from_lex_error(&display_name, &body, err)),
-        );
-        return None;
-    }
-
-    let parse = parser::parse(lex_result);
-    if !parse.success() {
-        diagnostics.extend(
-            parse
-                .errors
-                .iter()
-                .map(|err| Diagnostic::from_parse_error(&display_name, &body, err)),
-        );
-        return None;
-    }
-
-    let radix::parser::ParseResult {
-        program, interner, ..
-    } = parse;
-    let Some(program) = program else {
-        diagnostics.push(
-            Diagnostic::error("successful package parse result missing program")
-                .with_file(canonical.display().to_string()),
-        );
-        return None;
-    };
-
-    Some(LoadedPackageSource {
-        raw_source,
-        body,
-        frontmatter,
-        program,
-        interner,
-    })
 }
 
 #[cfg(test)]
