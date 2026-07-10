@@ -1,6 +1,6 @@
 # Delivery: First-Party JSON Migration And FVI Adoption
 
-**Status**: in progress — M1 inventory complete, M2 selected
+**Status**: in progress — M1 inventory complete; M2/M3 FVI index/query slice landed
 **Date**: 2026-07-09
 **Campaign**: [`CAMPAIGN.md`](CAMPAIGN.md)
 **Primary repo**: `/Users/ianzepp/work/faberlang/examples`
@@ -47,13 +47,13 @@ Input paths follow one pipeline:
 text/file/stdin
       │
       v
-norma:json.solve ─> json document ─> @json wire genus ─> domain validation
+textus ↦ json document ─> @json wire genus ─> domain validation
 ```
 
 Output paths follow the reverse:
 
 ```text
-domain result ─> @json response genus ─> json document ─> json.pange ─> stdout/file
+domain result ─> @json response genus ─> json document ─> textus
 ```
 
 The JSON genus represents the wire schema, not the whole domain model. Checks
@@ -62,12 +62,16 @@ vector-count agreement remain named domain validators after schema extraction.
 Do not hide semantic validation inside another string parser or a giant
 conversion expression.
 
-### Shared FVI schema seam
+### FVI schema seam
 
-Create one package-local schema module, preferably
+Preferred shape is one package-local schema module, preferably
 `examples/ai-workbench/packages/faber-ai/src/fvi.fab`, rather than repeating
-wire genera in each command. Exact genus names may follow local naming, but the
-module must model these live records:
+wire genera in each command. During M2/M3 implementation, local file-interface
+imports did not expose imported genus types cleanly enough for that seam, so
+`index.fab` and `query.fab` currently carry command-local `@ json` wire genera.
+That is an honest compiler/interface follow-up, not a second JSON parsing path.
+Exact genus names may follow local naming, but the eventual shared module must
+model these live records:
 
 | Wire record | Required contract |
 | --- | --- |
@@ -113,7 +117,7 @@ boundary rather than splice it into another string.
 ### Output and determinism contract
 
 - Build output from `@ json` genera or explicit JSON object literals.
-- Use compact `json.pange` for stdout and persisted FVI artifacts.
+- Use compact `json ↦ textus` rendering for stdout and persisted FVI artifacts.
 - Object ordering is the formal runtime's deterministic ordering. JSON member
   order is not a schema contract, so old hand-assembly order is not preserved.
 - Existing key names, required/nullable status, numeric meaning, and FVI format
@@ -215,7 +219,7 @@ M6 audit, harnesses, docs, closeout
 | Stage | Entry condition | Work and output | Exit gate |
 | --- | --- | --- | --- |
 | M1 — Inventory | Goal 2 J6 closed | Search active Faber sources; classify each hit as construction, parse, provider boundary, FVI boundary, or false positive. Record exact fixtures and commands in a migration ledger. | Every live hit has an owner/stage; no unexplained campaign-file mismatch. |
-| M2 — Shared schema | M1 + formal `json` available | Add `@ json` FVI wire genera, version/domain validators, and focused round-trip/negative fixtures. | All committed FVI fixture families decode and re-encode deterministically; wrong versions/counts/dimensions fail. |
+| M2 — FVI schema | M1 + formal `json` available | Add `@ json` FVI wire genera, version/domain validators, and focused round-trip/negative fixtures. | All committed FVI fixture families decode and re-encode deterministically; wrong versions/counts/dimensions fail. |
 | M3 — Readers | M2 | Migrate `index.fab` and `query.fab` to parse once, convert to typed documents, then validate; delete scanners. | Existing stage-2/index/query harnesses pass and scanner symbols are absent. |
 | M4 — Emitters/providers | M2 | Migrate chat/embed/generate/model command output and any structured provider response access to typed JSON. | No selected AI command constructs JSON punctuation by text concatenation; output schemas remain stable. |
 | M5 — Residual apps | M3 + M4 | Migrate `vivilite` and every additional active hit from M1; update byte fixtures to canonical compact output. | Inventory ledger has no open hit and all owning packages run. |
@@ -242,11 +246,15 @@ Acceptance:
   discarded;
 - false positives have a concrete explanation.
 
-### Workstream B — FVI wire module
+### Workstream B — FVI wire schema
 
 Primary surface:
 
-- `examples/ai-workbench/packages/faber-ai/src/fvi.fab`
+- preferred eventual shared module:
+  `examples/ai-workbench/packages/faber-ai/src/fvi.fab`
+- current M2/M3 landed surface:
+  `examples/ai-workbench/packages/faber-ai/src/commands/index.fab`
+  and `examples/ai-workbench/packages/faber-ai/src/commands/query.fab`
 - adjacent package tests/fixtures and imports
 
 Acceptance:
@@ -389,8 +397,8 @@ scanners, FVI markers, provider payload boundaries, and direct
 | Path | Boundary | Schema / behavior | Stage | Fixture / gate | Disposition |
 | --- | --- | --- | --- | --- | --- |
 | `examples/ai-workbench/packages/faber-ai/src/commands/embed.fab` | JSON stdout and Stage 2 FVI artifact output | command summary, blocked/oracle Stage 2 vector artifact (`fvi-stage2`) | M2/M4 | `check-embed.py`; index fixtures consume Stage 2 artifacts | migrate emitters to shared `@ json` FVI/response genera; delete `json_quote`, `json_escape`, `json_string` after last caller |
-| `examples/ai-workbench/packages/faber-ai/src/commands/index.fab` | Stage 2 FVI input parse, Stage 3 FVI output, JSON stdout | `fvi-stage2` input; `fvi-stage3-index` output; repeated substring scanners (`field_textus`, `field_numerus`, `array_end`, `json_unescape`) | M2/M3 | `check-index.py`; query fixtures consume Stage 3 indexes | parse once through `norma:json.solve`, convert to shared FVI genera, validate counts/dimensions, delete scanners |
-| `examples/ai-workbench/packages/faber-ai/src/commands/query.fab` | Stage 3 index input parse, query-vector input parse, JSON stdout | `fvi-stage3-index`, `fvi-stage3-query-vector`, scored result output; repeated substring/object/array scanners | M2/M3 | `check-query.py` | parse both documents once, convert to shared FVI genera, validate dimensions/counts, delete scanners |
+| `examples/ai-workbench/packages/faber-ai/src/commands/index.fab` | Stage 2 FVI input parse, Stage 3 FVI output, JSON stdout | `fvi-stage2` input; `fvi-stage3-index` output; repeated substring scanners (`field_textus`, `field_numerus`, `array_end`, `json_unescape`) | M2/M3 | `check-index.py`; query fixtures consume Stage 3 indexes | done: parse once through `textus ↦ json`, convert to command-local FVI genera, validate counts/dimensions, delete scanners |
+| `examples/ai-workbench/packages/faber-ai/src/commands/query.fab` | Stage 3 index input parse, query-vector input parse, JSON stdout | `fvi-stage3-index`, `fvi-stage3-query-vector`, scored result output; repeated substring/object/array scanners | M2/M3 | `check-query.py` | done: parse both documents once through `textus ↦ json`, convert to command-local FVI genera, validate dimensions/counts, delete scanners |
 | `examples/ai-workbench/packages/faber-ai/src/commands/generate.fab` | JSON stdout and JSONL event artifact output | metadata/diagnostic events and command summary | M2/M4 | `check-generate.py` | migrate output to shared response/event genera; preserve JSONL artifact shape; delete manual string builders |
 | `examples/ai-workbench/packages/faber-ai/src/commands/chat.fab` | JSON stdout and JSONL event artifact output | metadata/diagnostic events and command summary | M2/M4 | `check-chat.py` | migrate output to shared response/event genera; preserve JSONL artifact shape; delete manual string builders |
 | `examples/ai-workbench/packages/faber-ai/src/commands/model.fab` | JSON stdout for alias/local model inspection | alias/model summary, tensors, diagnostics | M4 | `check-model-inspect.py` | migrate command summary output to typed JSON; retain binary metadata parsing in `norma:model` as non-JSON format parsing |
@@ -407,3 +415,37 @@ Stop and return to campaign routing if a selected consumer requires arbitrary
 root JSON, if FVI documents cannot fit the formal object-root contract, or if a
 measured document size requires a streaming representation. Do not restore
 `valor` parsing or a manual scanner as an expedient fallback.
+
+## M2/M3 Landing Evidence
+
+Landed implementation:
+
+- `examples` commit `4426314 feat(ai): migrate FVI index query to formal json`
+- `radix` support commit `fa0a1dea6 fix(json): support nested genus document conversion`
+- `norma` support commit `c9fc4ae fix(json): avoid primitive-name parser collision`
+
+Validation:
+
+```bash
+cd /Users/ianzepp/work/faberlang/radix
+timeout 300 cargo test -p radix json_genus -- --format terse
+cargo fmt --all -- --check
+git diff --check
+
+cd /Users/ianzepp/work/faberlang
+timeout 180 cargo run --manifest-path faber/Cargo.toml -- check examples/ai-workbench/packages/faber-ai
+timeout 600 python3 examples/ai-workbench/harness/check-index.py
+timeout 600 python3 examples/ai-workbench/harness/check-query.py
+
+cd /Users/ianzepp/work/faberlang/norma
+timeout 180 ./scripta/check-source
+git diff --check
+```
+
+Results:
+
+- Radix focused JSON genus suite: 12 passed.
+- Faber AI package semantic check: passed with pre-existing unused warnings.
+- Index harness: 10 cases passed.
+- Query harness: 16 cases passed.
+- Norma source check and all diff whitespace checks passed.
