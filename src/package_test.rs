@@ -1659,7 +1659,18 @@ incipit {
 
 #[test]
 fn package_mir_json_corpus_emits_verifier_valid_llvm() {
-    let entry = Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/corpus/json/json.fab");
+    assert_package_corpus_llvm_smoke("json/json.fab", "package-json-corpus");
+}
+
+#[test]
+fn package_mir_stage4b_instans_emits_verifier_valid_llvm() {
+    assert_package_corpus_llvm_smoke("instans/instans.fab", "package-stage4b-instans");
+}
+
+fn assert_package_corpus_llvm_smoke(relative: &str, label: &str) {
+    let entry = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../examples/corpus")
+        .join(relative);
     let emitted = with_lowered_package_mir(
         &Config::default().with_stdlib(dev_norma_library_home()),
         &entry,
@@ -1675,16 +1686,16 @@ fn package_mir_json_corpus_emits_verifier_valid_llvm() {
             )
         },
     )
-    .expect("JSON corpus package lowers to MIR")
-    .expect("JSON corpus package emits LLVM");
+    .expect("corpus package lowers to MIR")
+    .expect("corpus package emits LLVM");
 
     if Command::new("llvm-as")
         .arg("--version")
         .output()
         .is_ok_and(|output| output.status.success())
     {
-        let llvm_path = test_temp_dir("package-json-llvm").join("json.ll");
-        fs::write(&llvm_path, emitted).expect("write package JSON LLVM");
+        let llvm_path = test_temp_dir(label).join("module.ll");
+        fs::write(&llvm_path, emitted).expect("write package corpus LLVM");
         let output = Command::new("llvm-as")
             .arg(&llvm_path)
             .arg("-o")
@@ -1693,7 +1704,7 @@ fn package_mir_json_corpus_emits_verifier_valid_llvm() {
             .expect("run llvm-as");
         assert!(
             output.status.success(),
-            "llvm-as rejected package JSON: {}",
+            "llvm-as rejected package corpus {relative}: {}",
             String::from_utf8_lossy(&output.stderr)
         );
     }
