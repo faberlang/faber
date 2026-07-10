@@ -1,6 +1,7 @@
 # Delivery: First-Party JSON Migration And FVI Adoption
 
-**Status**: in progress — M1 inventory complete; M2/M3 FVI index/query slice landed
+**Status**: in progress — M1 inventory complete; M2/M3 FVI index/query
+slice landed; M4 provider emitters landed
 **Date**: 2026-07-09
 **Campaign**: [`CAMPAIGN.md`](CAMPAIGN.md)
 **Primary repo**: `/Users/ianzepp/work/faberlang/examples`
@@ -396,12 +397,12 @@ scanners, FVI markers, provider payload boundaries, and direct
 
 | Path | Boundary | Schema / behavior | Stage | Fixture / gate | Disposition |
 | --- | --- | --- | --- | --- | --- |
-| `examples/ai-workbench/packages/faber-ai/src/commands/embed.fab` | JSON stdout and Stage 2 FVI artifact output | command summary, blocked/oracle Stage 2 vector artifact (`fvi-stage2`) | M2/M4 | `check-embed.py`; index fixtures consume Stage 2 artifacts | migrate emitters to shared `@ json` FVI/response genera; delete `json_quote`, `json_escape`, `json_string` after last caller |
+| `examples/ai-workbench/packages/faber-ai/src/commands/embed.fab` | JSON stdout and Stage 2 FVI artifact output | command summary, blocked/oracle Stage 2 vector artifact (`fvi-stage2`) | M2/M4 | `check-embed.py`; index fixtures consume Stage 2 artifacts | done: emitters use command-local `@ json` FVI/response genera; deleted `json_quote`, `json_escape`, `json_string`, and old string-concat diagnostics |
 | `examples/ai-workbench/packages/faber-ai/src/commands/index.fab` | Stage 2 FVI input parse, Stage 3 FVI output, JSON stdout | `fvi-stage2` input; `fvi-stage3-index` output; repeated substring scanners (`field_textus`, `field_numerus`, `array_end`, `json_unescape`) | M2/M3 | `check-index.py`; query fixtures consume Stage 3 indexes | done: parse once through `textus ↦ json`, convert to command-local FVI genera, validate counts/dimensions, delete scanners |
 | `examples/ai-workbench/packages/faber-ai/src/commands/query.fab` | Stage 3 index input parse, query-vector input parse, JSON stdout | `fvi-stage3-index`, `fvi-stage3-query-vector`, scored result output; repeated substring/object/array scanners | M2/M3 | `check-query.py` | done: parse both documents once through `textus ↦ json`, convert to command-local FVI genera, validate dimensions/counts, delete scanners |
-| `examples/ai-workbench/packages/faber-ai/src/commands/generate.fab` | JSON stdout and JSONL event artifact output | metadata/diagnostic events and command summary | M2/M4 | `check-generate.py` | migrate output to shared response/event genera; preserve JSONL artifact shape; delete manual string builders |
-| `examples/ai-workbench/packages/faber-ai/src/commands/chat.fab` | JSON stdout and JSONL event artifact output | metadata/diagnostic events and command summary | M2/M4 | `check-chat.py` | migrate output to shared response/event genera; preserve JSONL artifact shape; delete manual string builders |
-| `examples/ai-workbench/packages/faber-ai/src/commands/model.fab` | JSON stdout for alias/local model inspection | alias/model summary, tensors, diagnostics | M4 | `check-model-inspect.py` | migrate command summary output to typed JSON; retain binary metadata parsing in `norma:model` as non-JSON format parsing |
+| `examples/ai-workbench/packages/faber-ai/src/commands/generate.fab` | JSON stdout and JSONL event artifact output | metadata/diagnostic events and command summary | M2/M4 | `check-generate.py` | done: output uses command-local `@ json` response/event genera; JSONL artifact shape preserved; manual string builders deleted |
+| `examples/ai-workbench/packages/faber-ai/src/commands/chat.fab` | JSON stdout and JSONL event artifact output | metadata/diagnostic events and command summary | M2/M4 | `check-chat.py` | done: output uses command-local `@ json` response/event genera; JSONL artifact shape preserved; manual string builders deleted |
+| `examples/ai-workbench/packages/faber-ai/src/commands/model.fab` | JSON stdout for alias/local model inspection | alias/model summary, tensors, diagnostics | M4 | `check-model-inspect.py` | done: command summary output uses typed JSON; binary metadata parsing remains in `norma:model` as non-JSON format parsing |
 | `examples/vivilite/src/main.fab` | JSON stdout for status and board output | status object and board object with task/need/want item arrays | M5 | package tests tagged `vivilite`; CLI route smoke if available | migrate output helpers to `@ json` genera and `json.pange`; delete `json_escape`, `jq`, `lb`, `rb`, `q`, `qq`, `pair*` |
 | `norma/src/model.fab` | safetensors/GGUF binary metadata parsing | scans binary-derived safetensors header text and GGUF fields, not first-party application JSON | retained | `check-model-inspect.py`; `norma` source checks | out of Goal 3 migration unless a command starts treating its output as JSON text; keep as binary-format parser |
 | `norma/src/json*.fab` | formal JSON facade/parser/serializer | owns `json` document codec from Goal 2 | retained | `../norma/scripta/check-source` | out of application audit allowlist; this is the canonical JSON implementation |
@@ -449,3 +450,58 @@ Results:
 - Index harness: 10 cases passed.
 - Query harness: 16 cases passed.
 - Norma source check and all diff whitespace checks passed.
+
+## M4 Landing Evidence
+
+Landed implementation:
+
+- `examples` commit `e1c18d3 feat(ai): migrate provider emitters to formal json`
+- `radix` support commit `c48b097ef fix(host): route bounded solum byte reads`
+
+Implementation notes:
+
+- `embed`, `generate`, `chat`, and `model` now render selected command JSON
+  outputs through command-local `@ json` wire genera.
+- The old manual JSON quote/escape/string helpers were deleted from the
+  selected provider command files.
+- The touched provider command files no longer use old `+` string-concat
+  syntax for diagnostics or JSON-adjacent string construction.
+- Alias maps in the touched commands use `solum.carpe` line reads instead of
+  typed `solum.lege<lista<textus>>`.
+- `radix` host support now exposes bounded byte reads through `solum:partem`
+  and text range search through `solum:inveni`; byte payloads route as
+  `Valor::Octeti` so `sermo ↦ octeti` materialization matches runtime
+  invariants.
+
+Validation:
+
+```bash
+cd /Users/ianzepp/work/faberlang/radix
+timeout 300 cargo test -p faber-host-macos-arm64 routes_solum_text_file_operations_from_ordered_payloads -- --format terse
+timeout 300 cargo test -p faber-host-macos-arm64 routes_processus_capture_accepts_root_text_list_opener -- --format terse
+timeout 120 cargo fmt --all -- --check
+git diff --check
+
+cd /Users/ianzepp/work/faberlang
+timeout 180 cargo run --manifest-path faber/Cargo.toml -- check examples/ai-workbench/packages/faber-ai
+timeout 600 python3 examples/ai-workbench/harness/check-embed.py
+timeout 600 python3 examples/ai-workbench/harness/check-generate.py
+timeout 600 python3 examples/ai-workbench/harness/check-chat.py
+timeout 600 python3 examples/ai-workbench/harness/check-model-inspect.py
+timeout 600 python3 examples/ai-workbench/harness/check-index.py
+timeout 600 python3 examples/ai-workbench/harness/check-query.py
+git -C examples diff --check
+```
+
+Results:
+
+- Host solum text/byte route test: 1 passed.
+- Host process root text-list args regression: 1 passed.
+- Radix formatter and diff whitespace checks passed.
+- Faber AI package semantic check passed with pre-existing unused warnings.
+- Embed harness: 11 cases passed.
+- Generate harness: 8 cases passed.
+- Chat harness: 9 cases passed.
+- Model inspect harness: 11 cases passed.
+- Index regression harness: 10 cases passed.
+- Query regression harness: 16 cases passed.
