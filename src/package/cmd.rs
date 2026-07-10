@@ -300,18 +300,13 @@ fn single_file_rust_runtime_plan(
         .and_then(|s| s.to_str())
         .unwrap_or("input.fab");
     let analysis = analyze_source(&session, name, &source).map_err(|diagnostics| diagnostics)?;
-    let needs = radix::codegen::collect_rust_needs(
-        &analysis.hir,
-        &analysis.types,
-        BTreeSet::new(),
-        None,
-    );
-    let needs_tokio = analysis.hir.entry_is_async
-        || analysis
-            .hir
-            .items
-            .iter()
-            .any(|item| matches!(&item.kind, radix::hir::HirItemKind::Function(f) if f.is_async));
+    let needs =
+        radix::codegen::collect_rust_needs(&analysis.hir, &analysis.types, BTreeSet::new(), None);
+    let needs_tokio =
+        analysis.hir.entry_is_async
+            || analysis.hir.items.iter().any(
+                |item| matches!(&item.kind, radix::hir::HirItemKind::Function(f) if f.is_async),
+            );
     Ok(super::RustRuntimePlan {
         needs_faber: needs.needs_faber_runtime,
         needs_tokio,
