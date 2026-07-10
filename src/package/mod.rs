@@ -77,6 +77,8 @@ pub use manifest::{
 pub use mir::run_fmir_image_bytes_with_stdio;
 #[cfg(test)]
 pub(super) use mir::test_support::{fmir_image_test_summary, fmir_text_image_test_summary};
+#[allow(unused_imports)] // External backend harnesses consume the public package-MIR callback.
+pub use mir::with_lowered_package_mir;
 #[allow(unused_imports)] // FMIR stages consume this crate-visible image API.
 pub(crate) use mir::{
     build_package_fmir_binary_bundle, build_package_fmir_image, build_package_fmir_text_image,

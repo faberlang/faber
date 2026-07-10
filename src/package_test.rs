@@ -13,7 +13,8 @@ use super::{
     package_host_selection_diagnostic, package_rust_runtime_plan, read_manifest,
     run_package_fmir_image, run_package_fmir_text_image, run_package_mir, run_package_mir_artifact,
     sanitize_crate_name, use_package_compiler, use_package_compiler_from_args, validate_manifest,
-    verify_library_bindings, BuildLayout, LibraryInterfaceCache, ManifestRustHost,
+    verify_library_bindings, with_lowered_package_mir, BuildLayout, LibraryInterfaceCache,
+    ManifestRustHost,
 };
 use super::{fmir_image_test_summary, fmir_text_image_test_summary};
 use crate::library::{LibraryProviderKind, LibraryResolver, ResolvedLibraryModule};
@@ -1623,6 +1624,37 @@ incipit argumenta args {
             .collect::<Vec<_>>()
     );
     assert_eq!(host.stdout_lines, vec!["Ian".to_owned()]);
+}
+
+#[test]
+fn package_mir_callback_receives_validated_norma_program() {
+    let dir = test_temp_dir("package-mir-callback");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+importa ex "norma:solum" privata solum
+importa ex "norma:toml" privata toml
+
+incipit {
+  solum.scribe("/tmp/faber-package-mir-callback.txt", "salve")
+}
+"#,
+    )
+    .expect("write entry");
+
+    let reached = with_lowered_package_mir(
+        &Config::default().with_stdlib(dev_norma_library_home()),
+        &entry,
+        |lowered| {
+            assert!(!lowered.program.functions.is_empty());
+            assert!(lowered.validation.interner.is_some());
+            true
+        },
+    )
+    .expect("package MIR callback should receive linked Norma program");
+
+    assert!(reached);
 }
 
 #[test]

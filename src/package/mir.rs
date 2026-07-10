@@ -42,6 +42,25 @@ type SourceRewrites = HashMap<(PathBuf, DefId), DefId>;
 type CliRecordFieldsByLocal = HashMap<Symbol, Vec<MirRuntimeRecordField>>;
 type CliEntryRecords = HashMap<PathBuf, CliRecordFieldsByLocal>;
 
+/// Analyze, link, and validate a package as MIR, then lend the result to a target probe.
+///
+/// Package ownership remains inside Faber so callers cannot retain validation
+/// references or reconstruct library resolution independently.
+pub fn with_lowered_package_mir<R>(
+    config: &Config,
+    input: &Path,
+    run: impl for<'a> FnOnce(&LoweredMirUnit<'a>) -> R,
+) -> Result<R, Vec<Diagnostic>> {
+    with_prepared_package_mir_with_cli_mode_and_consumer(
+        config,
+        input,
+        &[],
+        CliPlanningMode::Parsed,
+        PackageMirConsumer::ExternalTarget,
+        |_, lowered| Ok(run(lowered)),
+    )
+}
+
 // HIR lowering allocates generated DefIds starting at 1_000_000. Package MIR
 // linked function-source ids must live above that range or rewritten namespace
 // calls can collide with import/local bindings and lower as indirect calls.
@@ -115,6 +134,12 @@ enum FmirPackageImageFormat {
     Source,
     FmirText,
     Fmir,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PackageMirConsumer {
+    Interpreted,
+    ExternalTarget,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -540,6 +565,24 @@ fn with_prepared_package_mir_with_cli_mode<R>(
     cli_mode: CliPlanningMode,
     run: impl for<'a> FnOnce(&PreparedPackageMir<'a>, &LoweredMirUnit<'a>) -> Result<R, Vec<Diagnostic>>,
 ) -> Result<R, Vec<Diagnostic>> {
+    with_prepared_package_mir_with_cli_mode_and_consumer(
+        config,
+        input,
+        argumenta,
+        cli_mode,
+        PackageMirConsumer::Interpreted,
+        run,
+    )
+}
+
+fn with_prepared_package_mir_with_cli_mode_and_consumer<R>(
+    config: &Config,
+    input: &Path,
+    argumenta: &[String],
+    cli_mode: CliPlanningMode,
+    consumer: PackageMirConsumer,
+    run: impl for<'a> FnOnce(&PreparedPackageMir<'a>, &LoweredMirUnit<'a>) -> Result<R, Vec<Diagnostic>>,
+) -> Result<R, Vec<Diagnostic>> {
     let mut package = analyze_package(config, input)?;
     if package
         .diagnostics
@@ -548,12 +591,14 @@ fn with_prepared_package_mir_with_cli_mode<R>(
     {
         return Err(package.diagnostics);
     }
-    if let Some(diagnostics) = library_import_diagnostics(&package) {
-        return Err(diagnostics);
+    if consumer == PackageMirConsumer::Interpreted {
+        if let Some(diagnostics) = library_import_diagnostics(&package) {
+            return Err(diagnostics);
+        }
     }
     let cli_plan = plan_cli_package(&mut package, argumenta, cli_mode)?;
 
-    let links = local_namespace_call_targets(config, &package)?;
+    let links = local_namespace_call_targets(config, &package, consumer)?;
     let entry_index = select_entry_unit(&package)?;
     let entry_path = package.units[entry_index].path.clone();
     let source_paths = package.units.iter().map(|unit| unit.path.clone()).collect();
@@ -568,7 +613,9 @@ fn with_prepared_package_mir_with_cli_mode<R>(
             .map(|error| mir_diag(&entry_path, error.message))
             .collect::<Vec<_>>()
     })?;
-    bridge_norma_providers_to_kernel(&mut lowered, &entry_path)?;
+    if consumer == PackageMirConsumer::Interpreted {
+        bridge_norma_providers_to_kernel(&mut lowered, &entry_path)?;
+    }
     let runtime_requirements = collect_package_runtime_requirements(&lowered, &cli_plan);
     let prepared = PreparedPackageMir {
         entry_path: entry_path.clone(),
@@ -2996,6 +3043,7 @@ fn package_mir_runtime_record_i32(value: &MirRuntimeRecordValue) -> Option<i32> 
 fn local_namespace_call_targets(
     config: &Config,
     package: &AnalyzedPackage,
+    consumer: PackageMirConsumer,
 ) -> Result<PackageMirLinks, Vec<Diagnostic>> {
     let library_resolver = library_resolver_from_config(config);
     let units_by_path = package
@@ -3020,6 +3068,7 @@ fn local_namespace_call_targets(
             let ImportResolution::Local(target_path) = resolution else {
                 if matches!(resolution, ImportResolution::Library(_))
                     && !is_bridged_norma_import_path(import_path)
+                    && consumer == PackageMirConsumer::Interpreted
                 {
                     diagnostics.push(
                         Diagnostic::error(format!(
