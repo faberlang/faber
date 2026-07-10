@@ -1306,6 +1306,7 @@ fn collect_runtime_call_requirement(
         | MirIntrinsic::Panic
         | MirIntrinsic::SermoOpen
         | MirIntrinsic::SermoSetOpener
+        | MirIntrinsic::Sermo(_)
         | MirIntrinsic::Cede
         | MirIntrinsic::GpuBuiltin(_) => {}
         MirIntrinsic::ReadLine => {

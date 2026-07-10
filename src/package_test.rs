@@ -1658,6 +1658,48 @@ incipit {
 }
 
 #[test]
+fn package_mir_json_corpus_emits_verifier_valid_llvm() {
+    let entry = Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/corpus/json/json.fab");
+    let emitted = with_lowered_package_mir(
+        &Config::default().with_stdlib(dev_norma_library_home()),
+        &entry,
+        |lowered| {
+            let interner = lowered
+                .validation
+                .interner
+                .expect("package MIR carries interner");
+            radix::mir::emit_llvm_text_probe_with_context(
+                &lowered.program,
+                &lowered.validation,
+                interner,
+            )
+        },
+    )
+    .expect("JSON corpus package lowers to MIR")
+    .expect("JSON corpus package emits LLVM");
+
+    if Command::new("llvm-as")
+        .arg("--version")
+        .output()
+        .is_ok_and(|output| output.status.success())
+    {
+        let llvm_path = test_temp_dir("package-json-llvm").join("json.ll");
+        fs::write(&llvm_path, emitted).expect("write package JSON LLVM");
+        let output = Command::new("llvm-as")
+            .arg(&llvm_path)
+            .arg("-o")
+            .arg(llvm_path.with_extension("bc"))
+            .output()
+            .expect("run llvm-as");
+        assert!(
+            output.status.success(),
+            "llvm-as rejected package JSON: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
+#[test]
 fn package_mir_bridges_norma_solum_file_mutation_verbs() {
     let dir = test_temp_dir("package-mir-solum-mutation");
     let entry = dir.join("main.fab");
