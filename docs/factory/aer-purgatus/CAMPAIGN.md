@@ -568,14 +568,14 @@ Campaign routing is ready when:
 
 Campaign implementation is complete when:
 
-- [ ] All four goals have executed delivery specs and factory evidence.
-- [ ] The line-based binding scanner, unconstrained inline-JSON `valor` typing,
+- [x] All four goals have executed delivery specs and factory evidence.
+- [x] The line-based binding scanner, unconstrained inline-JSON `valor` typing,
       asymmetric JSON-genus extraction, copied JSON helpers, synchronous
       generated host hook, and default private macOS host dependency are absent.
-- [ ] All stage gates and cross-repo closeout gates pass.
-- [ ] Existing overlapping goals/ledgers contain no stale completion claims.
-- [ ] Every touched repository is clean and all commits are recorded here.
-- [ ] A release/version decision is recorded. Default is explicit deferral until
+- [x] All stage gates and cross-repo closeout gates pass.
+- [x] Existing overlapping goals/ledgers contain no stale completion claims.
+- [x] Every touched repository is clean and all commits are recorded here.
+- [x] A release/version decision is recorded. Default is explicit deferral until
       the next normal Faber release unless a goal changes a published contract.
 
 ## Validation
