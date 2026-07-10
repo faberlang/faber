@@ -1,8 +1,9 @@
 # SQLite Package Stage 1 API And Fixture Contract
 
-**Status**: complete planning artifact - implementation blocked on unified
-package manifest Phase 4 target binding manifests.
+**Status**: Stage 1 contract complete — Phase 4 verification available;
+implementation blocked on the Phase 3 backend library build graph.
 **Created**: 2026-07-09
+**Refreshed**: 2026-07-10
 **Applies to**: Stage 2 Rust binding prototype and Stage 3 ViviLite read oracle.
 
 ## Invariant
@@ -191,9 +192,10 @@ Required error cases:
 - write statement passed through `quaere` if SQLite reports no query columns;
 - duplicate column labels documented by a test using aliases as the remedy.
 
-## Agent-Ready Stage 2 Binding Spec
+## Stage 2 Binding Draft — Phase 4-Verified Surface
 
-Stage 2 package layout:
+Candidate Stage 2 package layout; detailed delivery research must decide how
+Phase 3 packages the Rust implementation crate:
 
 ```text
 sqlite/
@@ -209,7 +211,7 @@ sqlite/
     work_items.sql
 ```
 
-`faber.toml` shape, pending Phase 4 exact schema:
+`faber.toml` shape using the verified Phase 4 fields:
 
 ```toml
 [package]
@@ -234,17 +236,18 @@ bindings = "bindings/rust.toml"
 rusqlite = { version = "0.32", features = ["bundled"] }
 ```
 
-Binding manifest shape, pending Phase 4 exact key grammar:
+Binding manifest shape using the verified `provider:module/path.function` key
+grammar and shim module:
 
 ```toml
 [functions."sqlite:sqlite.exsequi"]
-symbol = "sqlite_rust::exsequi"
+symbol = "crate::shim::exsequi"
 
 [functions."sqlite:sqlite.quaere"]
-symbol = "sqlite_rust::quaere"
+symbol = "crate::shim::quaere"
 
 [functions."sqlite:sqlite.scalar"]
-symbol = "sqlite_rust::scalar"
+symbol = "crate::shim::scalar"
 
 [shim]
 path = "rust/src/lib.rs"
@@ -253,8 +256,8 @@ path = "rust/src/lib.rs"
 Stage 2 acceptance:
 
 - `faber install <sqlite-package-path>` installs provider `sqlite`.
-- `faber verify-library --target rust <sqlite-package-path>` or the selected
-  Phase 4 equivalent validates all three bindings.
+- `faber verify-library --target rust <sqlite-package-path>` validates all three
+  bindings.
 - A fixture consumer imports `sqlite:sqlite`, reads the SQL fixture with
   `quaere`, and compares semantic `valor` rows.
 - `exsequi` inserts one row using bound params and returns
@@ -273,6 +276,7 @@ Fixture setup outline:
 
 ```bash
 fixture="$(mktemp -d)"
+vivi mailspace init --project "$fixture"
 vivi mailspace identity add codex --project "$fixture"
 vivi mailspace identity add reviewer --project "$fixture"
 vivi task send --project "$fixture" --from codex --to codex --subject "Task A" --body "body"
@@ -305,12 +309,12 @@ ViviLite Stage 2 is read-only. Write compatibility belongs to ViviLite Stage 3.
 
 ## Blockers
 
-- Unified package manifest Phase 4 is a hard blocker for the real Rust binding
-  package: it must define binding manifest schema, missing-binding diagnostics,
-  shim inclusion, target dependencies, and a library verification command.
-- Unified package manifest Phase 3 may be required if Rust binding packages must
-  participate in application Cargo graphs as generated or path dependency
-  crates.
-- The Faber declaration form for "body supplied by target binding" is still an
-  open Phase 4 question. Stage 2 may write the facade only after that syntax is
-  selected.
+- Unified package manifest Phase 4 is complete for verification. It defines the
+  binding manifest, bodyless-declaration contract, missing-binding diagnostics,
+  shim/dependency probe, and `faber verify-library` command.
+- Unified package manifest Phase 3 remains the implementation blocker: a built
+  application does not yet consume the verified library shim and target
+  dependencies through a generated/backend library graph.
+- Detailed delivery research must decide the SQLite package repository/path,
+  prove the Phase 3 linkage route, and define the later dynamic-row-to-census
+  adapter. This Stage 1 contract does not settle those questions.

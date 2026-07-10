@@ -1,7 +1,8 @@
 # Campaign: Tabular Data Access — Census, SQLite, ViviLite
 
-**Status**: proposed — not selected for factory
+**Status**: proposed — prerequisite facts refreshed; not selected for factory
 **Date**: 2026-07-10
+**Refreshed**: 2026-07-10
 **Mode**: routing artifact — does not implement code directly
 **Control-plane repo**: `/Users/ianzepp/work/faberlang/faber`
 **Working repos**: `radix`, `faber`, `faber-runtime`, `norma`, `examples`
@@ -18,12 +19,14 @@ packages. Three ordered goals:
 3. **ViviLite integration** — regular-Vivi `.vivi/mail.sqlite` read path (then
    write), oracle parity with `vivi`, file-backed lane retained.
 
-**Not part of aer-purgatus.** That campaign may still migrate ViviLite JSON
-output (Goal 3 M5) on the file-backed `.vivilite/` lane only — no census or
-SQLite prerequisites there.
+**Not part of aer-purgatus.** Aer Purgatus completed on 2026-07-10 without
+pulling census or SQLite into its scope. Its ViviLite JSON work stayed on the
+file-backed `.vivilite/` lane.
 
-**Board:** want `688cd65` — defer SQLite/census for ViviLite until this
-campaign is selected.
+**Board:** want `688cd65` remains open and records the decision to defer
+SQLite/census for ViviLite until this campaign is selected. Its stated
+done-when (opening a separate campaign) is now satisfied; closing or promoting
+the want remains a separate operator action.
 
 ## Problem
 
@@ -54,12 +57,13 @@ regular Vivi storage compatibility and shared developer types belong here.
   parameter/row contracts per sqlite Stage 1 contract.
 - **Census-first typing.** Prefer `census<S>` returns for app-facing SQL APIs
   once Goal 1 reaches series/census shells.
-- **Clean break from aer-purgatus scope.** Do not pull census or SQLite into the
-  active four-goal remediation pass as prerequisites.
+- **Clean break from aer-purgatus scope.** The completed remediation campaign
+  did not adopt census or SQLite as prerequisites.
 
 ## Implementation Workflow
 
-1. Operator selects this campaign (after aer-purgatus or in a dedicated season).
+1. Operator selects this campaign. Aer Purgatus is complete and is no longer a
+   sequencing gate.
 2. Flesh out per-goal delivery specs under this directory or linked factory dirs.
 3. Execute each goal through `factory` in order; update Status here only.
 4. Do not implement from this routing artifact alone.
@@ -87,12 +91,25 @@ regular Vivi storage compatibility and shared developer types belong here.
 | Goal | State | Factory entry | Next action |
 | --- | --- | --- | --- |
 | 1 — Census types (`schema`, `series<S>`, `census<S>`) | proposed — parked | [`radix/docs/factory/census-types/goal.md`](../../../../radix/docs/factory/census-types/goal.md) | Flesh delivery spec when campaign opens; implement compiler/runtime per census plan |
-| 2 — SQLite library shim (`sqlite:sqlite`) | Stage 1 contract complete; Stage 2 not landed | [`sqlite-library-package/goal.md`](../sqlite-library-package/goal.md) | Thin rusqlite prototype; census-typed `quaere` when Goal 1 shells exist |
+| 2 — SQLite library shim (`sqlite:sqlite`) | Stage 1 contract complete; Phase 4 binding verification available; Stage 2 not landed | [`sqlite-library-package/goal.md`](../sqlite-library-package/goal.md) | Research/delivery must route the open Phase 3 backend build graph (or prove an equivalent build path) before application linkage |
 | 3 — ViviLite SQL integration | Stage 0–1 file-backed complete; Stage 2+ deferred | [`examples/docs/factory/vivilite/goal.md`](../../../../examples/docs/factory/vivilite/goal.md) | Read oracle via shim; typed board/status; keep `.vivilite/` lane |
 
 Delivery specs for Goals 1–3 are **not authored yet**. Link existing factory
 goals above; lower to `goal-*-delivery.md` files in this directory when the
 campaign is selected.
+
+## Prerequisite And Status Check — 2026-07-10
+
+| Surface | Verified state | Campaign implication |
+| --- | --- | --- |
+| Aer Purgatus | Complete; Goals 1–4 and residual queue closed | No longer a sequencing prerequisite |
+| Census types | Proposed/parked; no `schema`, typed `series<S>`, or `census<S>` implementation landed | Goal 1 still begins with delivery/spec lock work |
+| Unified manifest Phases 1–2 | Complete | Library manifests, install, and provider-root resolution are available |
+| Unified manifest Phase 4 | Binding-manifest verification complete | Bodyless Faber declarations, binding keys, shim presence, target dependencies, and Rust ABI probes can be verified |
+| Unified manifest Phase 3 | Backend library build graph open | Current hard gate for linking a verified native-binding library into a built application, unless research proves an equivalent path |
+| SQLite package | Stage 1 API/fixture contract complete; no package or Rust binding prototype landed | Goal 2 is not implementation-ready from the contract alone |
+| ViviLite | Stage 0–1 file-backed package and tests landed; SQLite lane absent | Goal 3 remains deferred behind a usable SQLite read path |
+| Vivi want `688cd65` | Open; stated done-when is satisfied by this campaign artifact | Preserve as sequencing evidence; operator may close/promote separately |
 
 ## Dependency Order
 
@@ -106,14 +123,17 @@ Goal 2 (sqlite shim — dynamic rows minimum; census<S> returns when ready)
 Goal 3 (ViviLite tie-in — read oracle, then write compatibility)
 ```
 
-Unified package manifest Phases 3–4 remain prerequisites for Goal 2 binding
-linkage (Phase 4 verification complete; Phase 3 build graph may still gate).
+Unified package manifest Phase 4 verification is complete and is no longer a
+blocker. Phase 3's backend library build graph, or an explicitly proven
+equivalent path that links the verified shim and target dependencies into an
+application build, remains the Goal 2 linkage gate.
 
 ## Related Artifacts
 
 | Artifact | Role |
 | --- | --- |
 | [`sqlite-library-package/stage-1-api-fixture-contract.md`](../sqlite-library-package/stage-1-api-fixture-contract.md) | API + valor map + ViviLite oracle contract |
+| [`unified-package-manifest/goal.md`](../unified-package-manifest/goal.md) | Authoritative Phase 1–4 package prerequisite state |
 | [`radix/docs/factory/census-types/plan.md`](../../../../radix/docs/factory/census-types/plan.md) | Census stage graph |
 | [`norma/src/arca.fab`](../../../../norma/src/arca.fab) | Long-term async DB device (parallel API vocabulary) |
 | Vivi want `688cd65` | Sequencing policy vs aer-purgatus |

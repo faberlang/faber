@@ -33,7 +33,7 @@ Each `goal.md` / `CAMPAIGN.md` owns its **Status** line.
 
 | Campaign | Status | Entry |
 | --- | --- | --- |
-| Tabular data access (census, SQLite, ViviLite) | proposed — not selected | [`tabular-data-access/CAMPAIGN.md`](tabular-data-access/CAMPAIGN.md) |
+| Tabular data access (census, SQLite, ViviLite) | proposed — prerequisite facts refreshed; not selected | [`tabular-data-access/CAMPAIGN.md`](tabular-data-access/CAMPAIGN.md) |
 
 ## Completed campaigns
 
@@ -45,5 +45,5 @@ Each `goal.md` / `CAMPAIGN.md` owns its **Status** line.
 
 | Goal | Status | Entry |
 | ---- | ------ | ----- |
-| SQLite library package | Stage 1 API/fixture contract complete - blocked on unified manifest target bindings | [`sqlite-library-package/goal.md`](sqlite-library-package/goal.md) |
-| Unified package manifest | active - Phases 1-2 complete; Phases 3-4 open | [`unified-package-manifest/goal.md`](unified-package-manifest/goal.md) |
+| SQLite library package | Stage 1 contract complete — Phase 4 verification available; blocked on Phase 3 build graph | [`sqlite-library-package/goal.md`](sqlite-library-package/goal.md) |
+| Unified package manifest | active — Phases 1–2 and Phase 4 verification complete; Phase 3 build graph open | [`unified-package-manifest/goal.md`](unified-package-manifest/goal.md) |

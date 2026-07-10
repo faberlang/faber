@@ -1,8 +1,9 @@
 # Goal: SQLite Library Package
 
-**Status**: Stage 1 API/fixture contract complete - implementation blocked on
-unified package manifest target bindings
+**Status**: Stage 1 API/fixture contract complete — Phase 4 verification
+available; implementation blocked on the Phase 3 backend library build graph
 **Created**: 2026-07-09
+**Refreshed**: 2026-07-10
 **Target workspace**: `/Users/ianzepp/work/faberlang`
 **Factory artifact dir**: `faber/docs/factory/sqlite-library-package/`
 **Primary surfaces**: unified `faber.toml` library packages, target binding
@@ -16,8 +17,9 @@ such as ViviLite.
 Provide SQLite to Faber applications as a Faber-oriented library package, not as
 a compiler builtin and not as a new permanent `cista.toml` package shape. The
 package should expose a Faber source API such as `sqlite:sqlite` and implement
-that API through target-specific Rust bindings over `rusqlite` once unified
-package manifests support library packages and binding manifests.
+that API through target-specific Rust bindings over `rusqlite`. Unified
+manifests can now describe and verify that library/binding contract; the open
+backend library build graph still must link it into an application build.
 
 The first consumer is expected to be `examples` ViviLite, which can begin with
 file-backed scaffolding but eventually needs SQLite to read and write the same
@@ -40,9 +42,11 @@ facade design.
 ## Goals
 
 - Define a Faber-facing SQLite API package with provider `sqlite`.
-- Use unified `faber.toml` library metadata for the package once available.
+- Use the shipped unified `faber.toml` library metadata for the package.
 - Use target-specific Rust binding manifests for `rusqlite` implementation
-  linkage once Phase 4 of unified manifests exists.
+  verification through the shipped Phase 4 contract.
+- Route application build/linkage through unified manifest Phase 3 or an
+  explicitly proven equivalent build path.
 - Keep SQLite outside `norma` for v1; it is a concrete native dependency, not a
   backend-agnostic standard-library primitive.
 - Return query rows as `valor` objects for the first contract.
@@ -68,7 +72,7 @@ facade design.
 
 | Source | Evidence |
 | --- | --- |
-| [`unified-package-manifest/goal.md`](../unified-package-manifest/goal.md) | `faber.toml` is the intended authority for applications and libraries; Phase 4 owns target binding manifests. |
+| [`unified-package-manifest/goal.md`](../unified-package-manifest/goal.md) | `faber.toml` is the package authority; Phases 1–2 and Phase 4 verification are complete, while Phase 3 backend library linkage remains open. |
 | [`../README.md`](../README.md) | Public `faber` repo owns package product surface. |
 | `../../../../cista/docs/factory/cista-package-store/goal.md` | Current Cista work separates store concerns from Faber package authority and warns against conflating with unified manifest. |
 | `../../../../examples/cista-lab/` | Existing lab proves interface/source plus target binding ideas but uses the old split-manifest staging shape. |
@@ -134,8 +138,9 @@ functio quaere(textus via, textus sql, lista<valor> params) → lista<valor> ⇥
 functio scalar(textus via, textus sql, lista<valor> params) → valor ∪ nihil ⇥ textus
 ```
 
-The syntax above is illustrative until the unified manifest binding phase
-selects the external-body declaration form.
+The bodyless function declarations above are the current Phase 4 form for
+"body supplied by target binding." Detailed delivery research must still prove
+the facade and shim through the application build path.
 
 Rust target:
 
@@ -149,26 +154,27 @@ Rust target:
 
 | Dependency | Required for | Notes |
 | --- | --- | --- |
-| Unified package manifest Phase 1 | Record SQLite as a library package | Already queued in Vivi as `ccb9c7c`. |
-| Unified package manifest Phase 2 | Install/resolve provider roots by manifest | Needed before consumers can import installed `sqlite:*`. |
-| Unified package manifest Phase 4 | Rust target binding manifests | Required for real `rusqlite` implementation linkage. |
+| Unified package manifest Phase 1 | Record SQLite as a library package | Complete. |
+| Unified package manifest Phase 2 | Install/resolve provider roots by manifest | Complete. |
+| Unified package manifest Phase 4 | Verify bodyless declarations, binding rows, shim source, dependencies, and Rust ABI | Complete for `faber verify-library`; it does not provide application linkage. |
+| Unified package manifest Phase 3 | Link generated/backend library artifacts into application Cargo graphs | Open; current implementation gate for a usable SQLite consumer. |
 | SQLite read API | ViviLite regular-Vivi read parity | Allows `board --json` and list/show validation against `.vivi/mail.sqlite`. |
 | SQLite write API | ViviLite write compatibility | Only after read parity and storage semantics are understood. |
 
-Phase 3 of unified manifests may also be needed if SQLite package build/linkage
-requires generated library crates to participate in application Cargo graphs.
-Do not assume Phase 4 alone is sufficient until the binding prototype proves the
-build path.
+Phase 4 verifies the native binding contract in an isolated Rust probe. The
+current application Cargo generator does not consume a library package's shim
+and target dependencies, so Phase 3 or an explicitly proven equivalent path is
+the remaining build/linkage prerequisite.
 
 ## Implementation Shape
 
-### Stage 0 - Hold Until Manifest Direction Is Ready
+### Stage 0 - Hold Until Backend Library Linkage Is Ready
 
-Status: proposed.
+Status: Phase 1–2 and Phase 4 gates satisfied; Phase 3 linkage gate open.
 
 Do not implement SQLite through the old split `cista.toml` staging shape. Keep
-this goal parked until unified manifest Phase 1 is complete and the Phase 4
-binding-manifest shape is selected or close enough for a delivery spec.
+this goal parked for implementation until the Phase 3 build graph is delivered
+or detailed research proves and records an equivalent application linkage path.
 
 ### Stage 1 - API And Fixture Contract
 
@@ -187,7 +193,7 @@ docs/interfaces only.
 
 ### Stage 2 - Rust Binding Prototype
 
-After unified target binding manifests are available:
+After application linkage for verified target bindings is available:
 
 - add Rust shim over `rusqlite`;
 - bind `exsequi`, `quaere`, and `scalar`;
@@ -249,8 +255,6 @@ Compare JSON semantically rather than by raw field order.
 
 ## Open Questions
 
-- What declaration form marks a Faber function as implemented by target
-  bindings after `@ externa` / `@ subsidia` are retired?
 - Should SQLite package source live in a new sibling repo, under `examples` as
   a lab first, or under a future public package namespace?
 - Should first errors stay `⇥ textus`, or define `SQLiteError` immediately?
@@ -259,12 +263,17 @@ Compare JSON semantically rather than by raw field order.
 - Which subset of Vivi `.vivi/mail.sqlite` is stable enough to treat as a
   compatibility target?
 
+Resolved prerequisite facts: Phase 4 uses bodyless Faber function declarations
+for target-supplied implementations and keys bindings as
+`provider:module/path.function`. These are current contracts, not open design
+questions for the SQLite delivery.
+
 ## Stop Conditions
 
 - Stop if implementation starts from a durable `cista.toml` package shape
   instead of unified `faber.toml`.
-- Stop if the plan requires changing Faber source syntax to encode Rust linkage
-  before the unified manifest goal selects the binding-manifest contract.
+- Stop if the plan invents a second source annotation or binding-key form instead
+  of using the shipped bodyless-declaration and target-manifest contract.
 - Stop if generated Rust would build by shelling out to `sqlite3` rather than
   linking an intentional Rust target dependency.
 - Stop if ViviLite write compatibility would mutate real project mailspaces

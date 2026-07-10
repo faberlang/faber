@@ -117,8 +117,10 @@ symbol = "crate::shim::pange"
 path = "rust/shim.rs"
 ```
 
-The exact binding key grammar can evolve, but the policy should stay stable:
-Faber source is the API contract; backend manifests are implementation data.
+The current binding key grammar is
+`provider:module/path.function`. Changing it requires an explicit clean-break
+design; Faber source remains the API contract and backend manifests remain
+implementation data.
 
 ## Goals
 
@@ -224,6 +226,10 @@ timeout 120 cargo test --lib library_resolver
 
 ### Phase 3 — Backend Library Build Graph
 
+Status: open. Phase 4 can verify a native-binding library in isolation, but
+application builds do not yet consume its generated/backend library artifact,
+shim, and target dependencies through a package graph.
+
 Compile Faber library dependencies for the same backend target as the
 application and link generated backend artifacts intentionally.
 
@@ -276,9 +282,10 @@ Deliverables:
 - Load binding manifests from `[target.rust].bindings`.
 - Validate every declaration without a Faber body has a selected-target binding.
 - Validate every binding row points to a real Faber declaration.
-- Support Rust shim source inclusion and declared Cargo dependencies.
-- Fail clearly when building for a target with missing bindings.
-- Add a `faber verify-library --target rust` or equivalent validation path.
+- Support Rust shim source inclusion and declared Cargo dependencies in the
+  verification probe; application build linkage remains Phase 3.
+- Fail clearly during verification when a selected target has missing bindings.
+- Add `faber verify-library --target rust` validation.
 
 Gate:
 
@@ -293,12 +300,12 @@ timeout 120 cargo test --lib package
   eventually also accept `targets`?
 - Should `[dependencies]` live in `faber.toml` now, or remain deferred until the
   package-store/lockfile direction is ready?
-- What is the minimal Faber declaration syntax for "body supplied elsewhere"
-  after `externa`/`subsidia` are removed?
-- Should binding manifests key by provider/module/function string, declaration
-  ID, or file-relative module plus export name?
 - How much Rust shim generation should the compiler own versus requiring
   explicit shim files?
+
+Resolved in Phase 4: a Faber function declaration without a body means its body
+is supplied by the selected target binding, and binding rows use
+`provider:module/path.function` keys.
 
 ## Validation
 
