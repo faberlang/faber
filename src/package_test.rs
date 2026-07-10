@@ -277,7 +277,7 @@ importa ex "norma:json/solve" privata solve ut json_solve
 
 incipit {
   fac {
-    fixum valor parsed ← json_solve.solve("{}")
+    fixum json parsed ← json_solve.solve("{}")
     nota parsed
   }
   cape err {
@@ -4893,7 +4893,7 @@ incipit {
   fixum valor yaml_doc ← yaml.solve("count: 1")
   fixum _ yaml_text ← yaml.pange(yaml_doc)
   fac {
-    fixum valor json_doc ← json.solve("{\"count\": 1}")
+    fixum json json_doc ← json.solve("{\"count\": 1}")
     fixum _ json_text ← json.pange(json_doc)
   }
   cape err {
@@ -7519,6 +7519,53 @@ incipit {{
         String::from_utf8(run.stdout).expect("stdout utf8"),
         "salve native\n"
     );
+}
+
+#[test]
+fn generated_package_norma_json_facade_uses_formal_conversio() {
+    let pkg = test_temp_dir("package-norma-json-formal-facade");
+    let entry = pkg.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+importa ex "norma:json" privata json
+
+incipit {
+    fac {
+        fixum json duplicate ← json.solve("{\"id\": 1, \"id\": 2}")
+        nota duplicate
+    }
+    cape err {
+        nota "duplicate rejected"
+    }
+
+    fac {
+        fixum json unicode ← json.solve("{\"music\": \"\\uD834\\uDD1E\"}")
+        nota json.pange(unicode)
+    }
+    cape err {
+        nota err
+    }
+}
+"#,
+    )
+    .expect("write entry");
+
+    let result = compile_package(&Config::default(), &entry);
+    assert!(
+        result.success(),
+        "compile should succeed: {:?}",
+        result.diagnostics
+    );
+    let Some(Output::Rust(output)) = result.output else {
+        panic!("expected rust output");
+    };
+    assert!(output.code.contains("faber::Json::parse"));
+    assert!(output.code.contains(".to_wire()"));
+    assert!(!output
+        .code
+        .contains("non-BMP \\\\u escapes not yet supported"));
+    assert!(!output.code.contains("out.pone"));
 }
 
 // ---------------------------------------------------------------------------
