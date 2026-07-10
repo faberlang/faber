@@ -1,6 +1,6 @@
 # Delivery: Honest Async `Sermo` And Host Boundary
 
-**Status**: factory-ready after authority reconciliation; campaign-scheduled after Goal 3
+**Status**: partial — async codegen and proof-pair route migration delivered; runtime/package host boundary open
 **Date**: 2026-07-09
 **Campaign**: [`CAMPAIGN.md`](CAMPAIGN.md)
 **Primary repos**: `faber-runtime`, `radix`, `faber`, `norma`
@@ -30,6 +30,39 @@ The current defect spans four layers:
 
 This goal corrects all four together. A green wake-registration test without a
 nonblocking producer path is not completion.
+
+## 2026-07-09 Partial Delivery Note
+
+Delivered slices:
+
+- Radix `55aeed472` lowers `@ futura` / `incipiet` `sermo ↦ T` conversions to
+  async runtime materializers while preserving sync helper emission.
+- Norma `4cf0c5e` migrates the required proof pairs:
+  `solum.lege` / `@ futura solum.leget<T>` share `solum:lege`, and
+  `tempus.expectet` / `@ futura tempus.dormiet` share `tempus:dormiet`.
+- Examples `76a482f` adds async corpus proofs for those two same-route pairs.
+
+Validation run:
+
+- `timeout 300 cargo test -p radix async_sermo_materializer_uses_async_runtime_helper -- --format terse`
+- `timeout 300 cargo test -p radix async_entry_sermo_materializer_uses_block_on_and_async_helper -- --format terse`
+- `timeout 180 cargo run --manifest-path faber/Cargo.toml -- check examples/corpus/ad/async-solum-leget.fab`
+- `timeout 180 cargo run --manifest-path faber/Cargo.toml -- check examples/corpus/ad/async-tempus-dormiet.fab`
+- `timeout 180 cargo run --manifest-path faber/Cargo.toml -- check examples/corpus/ad/solum-lege-generic.fab`
+- `timeout 180 cargo run --manifest-path faber/Cargo.toml -- emit -t rust examples/corpus/ad/async-solum-leget.fab`
+- `timeout 180 cargo run --manifest-path faber/Cargo.toml -- emit -t rust examples/corpus/ad/async-tempus-dormiet.fab`
+- `timeout 180 norma/scripta/check-source`
+
+Remaining blockers before closeout:
+
+- `faber-runtime/src/frame.rs` still uses `Rc<RefCell<_>>` and
+  `ensure_runtime_response_inner` from receive/materialization paths, so host
+  work can still run at the wrong boundary.
+- `faber/src/package/cargo.rs` still sniffs generated Rust and defaults to the
+  private `faber-host-macos-arm64` feature path.
+- The public native host adapter, explicit `[target.rust] host = "native"`
+  selection, thread-safe producer contract, and concurrent timer proof remain
+  unimplemented.
 
 ## Normalized Spec
 

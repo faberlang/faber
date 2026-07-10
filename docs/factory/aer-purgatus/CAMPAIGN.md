@@ -1,6 +1,6 @@
 # Campaign: Aer Purgatus — Code-Smell Remediation
 
-**Status**: active — Goals 1, 2, and 3 complete; Goal 4 pending
+**Status**: active — Goals 1, 2, and 3 complete; Goal 4 partially delivered
 **Date**: 2026-07-09
 **Mode**: routing artifact — does not implement code directly
 **Control-plane repo**: `/Users/ianzepp/work/faberlang/faber`
@@ -155,7 +155,7 @@ All six active repositories were clean when this campaign was drafted.
 | 1 — Compiler-grounded binding contracts | **complete** | Factory gate passed; evidence and commits recorded below. |
 | 2 — Formal object-rooted JSON document | **complete** | Factory gate passed; evidence and commits recorded below. |
 | 3 — First-party JSON migration and FVI adoption | **complete** | Factory gate passed; evidence and commits recorded below. |
-| 4 — Honest async `sermo` boundary | delivery ready; authority reconciliation first | Execute [`goal-4-async-sermo-delivery.md`](goal-4-async-sermo-delivery.md) after reconciling the live Radix ledger. |
+| 4 — Honest async `sermo` boundary | **partial** — codegen and proof pairs delivered; runtime/package host boundary open | Replace receive-time runtime fallback, thread-safe producer state, public native host, and explicit package host selection before closeout. |
 
 The four saved delivery documents are the factory production inputs. Stage
 completion lives in this campaign's Current State and in each delivery
@@ -390,7 +390,7 @@ Factory evidence:
 
 | Field | Value |
 | --- | --- |
-| **Status** | delivery ready — existing async authority must be reconciled |
+| **Status** | partial — async codegen and proof-pair route migration delivered; runtime/package host boundary open |
 | **Source** | Radix async-ad-lowering goal/ledger plus live runtime and package code |
 | **Invariant** | Async `ad` never performs blocking host work while polling, always has a completion producer, and depends only on a portable runtime host contract. |
 | **Why last** | Highest cross-repo and behavioral risk; benefits from the campaign's first three established delivery patterns. |
@@ -436,6 +436,26 @@ Gate:
 - `timeout 180 cargo test --manifest-path ../faber/Cargo.toml package_host`
 - Delivery-selected package E2E route tests with explicit timeouts.
 - `cargo fmt --all -- --check` and `git diff --check` in every touched Rust repo.
+
+Partial factory evidence:
+
+- Radix `55aeed472` (`fix(codegen): lower async sermo materialization`) threads
+  nearest-callable async posture through Rust expression emission and selects
+  async `sermo` materializer helpers for `@ futura` functions and `incipiet`.
+- Norma `4cf0c5e` (`feat(async): unify sermo proof pair routes`) migrates
+  `solum.leget<T>` to `@ futura` over `solum:lege` and makes
+  `tempus.expectet` / `@ futura tempus.dormiet` share `tempus:dormiet`.
+- Examples `76a482f` (`test(ad): add async sermo corpus proofs`) adds corpus
+  proofs for the `solum` and `tempus` async same-route pairs.
+- Gates passed: focused Radix async materializer tests, `faber check` on both
+  async corpus files and the existing `solum.lege` proof, `faber emit -t rust`
+  verification that generated proof-pair Rust contains neither `solum:leget`
+  nor `tempus:expectet`, `norma/scripta/check-source`, and diff checks.
+- Not complete: `faber-runtime/src/frame.rs` still uses
+  `ensure_runtime_response_inner` from receive/materialization paths, and
+  `faber/src/package/cargo.rs` still derives Tokio/private-host dependencies by
+  sniffing emitted Rust. The campaign closeout gate remains red until those
+  approximation paths are removed.
 
 ## Dependency Rules
 
