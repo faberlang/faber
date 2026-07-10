@@ -157,8 +157,9 @@ All six active repositories were clean when this campaign was drafted.
 | 3 — First-party JSON migration and FVI adoption | delivery ready; implementation blocked on Goal 2 | Execute [`goal-3-json-migration-delivery.md`](goal-3-json-migration-delivery.md) after Goal 2 J6. |
 | 4 — Honest async `sermo` boundary | delivery ready; authority reconciliation first | Execute [`goal-4-async-sermo-delivery.md`](goal-4-async-sermo-delivery.md) after reconciling the live Radix ledger. |
 
-The four saved delivery documents are the factory production inputs. Their
-status is planning evidence only; no implementation stage is marked complete.
+The four saved delivery documents are the factory production inputs. Stage
+completion lives in this campaign's Current State and in each delivery
+document's Status line.
 
 ## Campaign Path
 
