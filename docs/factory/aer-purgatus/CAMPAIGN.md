@@ -1,6 +1,6 @@
 # Campaign: Aer Purgatus — Code-Smell Remediation
 
-**Status**: active — Goals 1, 2, and 3 complete; Goal 4 partially delivered
+**Status**: active — Goals 1, 2, 3, and 4 complete; cross-goal residual queue remains
 **Date**: 2026-07-09
 **Mode**: routing artifact — does not implement code directly
 **Control-plane repo**: `/Users/ianzepp/work/faberlang/faber`
@@ -155,7 +155,7 @@ All six active repositories were clean when this campaign was drafted.
 | 1 — Compiler-grounded binding contracts | **complete** | Factory gate passed; evidence and commits recorded below. |
 | 2 — Formal object-rooted JSON document | **complete** | Factory gate passed; evidence and commits recorded below. |
 | 3 — First-party JSON migration and FVI adoption | **complete** | Factory gate passed; evidence and commits recorded below. |
-| 4 — Honest async `sermo` boundary | **partial** — codegen, proof pairs, runtime host-dispatch contract, private host removal, structured package runtime plan, public native host crate, and package host selection delivered | Finish caller-drop cancellation closeout before final Goal 4 gate. |
+| 4 — Honest async `sermo` boundary | **complete** | Factory gate passed; evidence and commits recorded below. |
 
 The four saved delivery documents are the factory production inputs. Stage
 completion lives in this campaign's Current State and in each delivery
@@ -483,17 +483,21 @@ Partial factory evidence:
   `[target.rust] host = "native"` add the public native host dependency, inject
   a generated install call, and build/run a generated `solum:lege` package
   without any private `radix/hosts` path.
+- Faber runtime `9047bbd` (`fix(frame): cancel dropped async receives`) stores
+  the active cancellation token on each conversation and makes dropping a
+  pending async receive cancel the producer path, so late success/producer-drop
+  resolves as `cancel`.
 - Gates passed: focused Radix async materializer tests, `faber check` on both
   async corpus files and the existing `solum.lege` proof, `faber emit -t rust`
   verification that generated proof-pair Rust contains neither `solum:leget`
   nor `tempus:expectet`, `norma/scripta/check-source`, runtime frame/full
   tests and clippy, Radix `ad` + hygiene, Faber package E2E private-host
   negative proof, package runtime-plan tests, native host workspace tests/clippy,
-  generated native-host package E2E, Faber hygiene, and scoped diff checks.
-- Not complete: caller-drop cancellation remains to be proven end-to-end across
-  generated async materializers and the runtime cancellation token. The Faber
-  full package suite currently also exposes open Goal 2 `norma:json` residuals
-  that still expect `valor` instead of the formal `json` type.
+  generated native-host package E2E, caller-drop cancellation frame tests,
+  Faber hygiene, and scoped diff checks.
+- Cross-goal note: the Faber full package suite currently also exposes open
+  Goal 2 `norma:json` residuals that still expect `valor` instead of the formal
+  `json` type.
 
 ## Dependency Rules
 

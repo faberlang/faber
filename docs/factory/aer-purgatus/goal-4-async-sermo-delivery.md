@@ -1,6 +1,6 @@
 # Delivery: Honest Async `Sermo` And Host Boundary
 
-**Status**: partial — async codegen, proof-pair route migration, runtime producer handoff, private host removal, public native host crate, and package host selection delivered; caller-drop cancellation closeout still open
+**Status**: complete — async codegen, proof-pair route migration, runtime producer handoff, private host removal, public native host crate, package host selection, and caller-drop cancellation delivered
 **Date**: 2026-07-09
 **Campaign**: [`CAMPAIGN.md`](CAMPAIGN.md)
 **Primary repos**: `faber-runtime`, `radix`, `faber`, `norma`
@@ -75,6 +75,10 @@ Delivered slices:
   `faber-host-native` dependency, inject one generated host install call, and
   proves a generated package using `solum:lege` builds/runs without a
   `radix/hosts` path.
+- Faber runtime `9047bbd` stores the active runtime cancellation token on each
+  conversation and makes dropping a pending async receive cancel the producer
+  path. Late `done` or producer-drop after cancellation now resolves as a
+  `cancel` terminal instead of a success/error.
 
 Validation run:
 
@@ -99,24 +103,23 @@ Validation run:
 - `timeout 240 cargo test -p faber-host-native -- --format terse` in `faber-runtime`
 - `timeout 240 cargo clippy --workspace --all-targets -- -D warnings` in `faber-runtime`
 - `timeout 240 cargo test --workspace -- --format terse` in `faber-runtime`
+- `timeout 240 cargo test frame -- --format terse` in `faber-runtime`
 - `timeout 300 cargo test --lib generated_package_native_host_selects_public_dependency_and_runs -- --format terse` in `faber`
 - `timeout 240 cargo clippy --all-targets -- -D warnings` in `faber`
 - `timeout 180 cargo test --test hygiene` in `faber`
 
-Remaining blockers before closeout:
+Closeout notes:
 
 - `faber-runtime/src/frame.rs` now uses the public `HostDispatch` /
   `ResponseSender` contract for built-in route production. Cancellation is
   observable by senders and suppresses content after cancellation. The public
   native host covers bounded queue saturation, shutdown rejection, unsupported
-  routes, worker panic, and late timer cancellation; full caller-drop
-  cancellation from async materializers remains open.
+  routes, worker panic, late timer cancellation, and caller-drop cancellation
+  from pending async materializers.
 - `faber/src/package/cargo.rs` still detects Tokio/executor need from emitted
   Rust text only for the legacy non-package generated-crate fallback. Package
   builds use analyzed HIR for Tokio/executor and non-runtime route requirements.
   Native-host dependency selection is delivered for `host = "native"`.
-- End-to-end caller-drop cancellation remains unproven across generated async
-  materializers and the runtime cancellation token.
 - `timeout 240 cargo test --lib package -- --format terse` in `faber` currently
   fails two unrelated `norma:json` package tests because open Goal 2 residuals
   still expect `json.solve`/`json.pange` to round-trip through `valor` instead
