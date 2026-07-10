@@ -1538,7 +1538,7 @@ entry = "main.fab"
         r#"importa ex "norma:solum" privata fileio
 
 incipit {
-  nota fileio.leget("/nonexistent")
+  fixum octeti bytes ← fileio.hauriet("/nonexistent")
 }
 "#,
     )
@@ -1549,7 +1549,7 @@ incipit {
     assert!(!ok, "unsupported norma:solum verb should fail closed");
     assert_eq!(stdout, "");
     assert!(
-        stderr.contains("package MIR kernel bridge does not support `norma:solum.leget`"),
+        stderr.contains("package MIR kernel bridge does not support `norma:solum.hauriet`"),
         "expected kernel bridge fail-closed diagnostic:\n{stderr}"
     );
     assert_no_generated_rust(&package);
