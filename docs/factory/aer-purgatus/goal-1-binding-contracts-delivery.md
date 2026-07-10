@@ -1,6 +1,6 @@
 # Delivery: Compiler-Grounded Binding Contracts
 
-**Status**: ready for factory — selected Aer Purgatus unit
+**Status**: complete — factory gate passed 2026-07-09
 **Date**: 2026-07-09
 **Campaign**: [`CAMPAIGN.md`](CAMPAIGN.md)
 **Primary repo**: `/Users/ianzepp/work/faberlang/faber`

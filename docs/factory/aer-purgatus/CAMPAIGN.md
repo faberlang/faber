@@ -1,6 +1,6 @@
 # Campaign: Aer Purgatus — Code-Smell Remediation
 
-**Status**: planned — four delivery specs ready; Goal 1 selected for factory
+**Status**: active — Goal 1 complete; Goal 2 selected for factory
 **Date**: 2026-07-09
 **Mode**: routing artifact — does not implement code directly
 **Control-plane repo**: `/Users/ianzepp/work/faberlang/faber`
@@ -152,8 +152,8 @@ All six active repositories were clean when this campaign was drafted.
 
 | Goal | State | Next action |
 | --- | --- | --- |
-| 1 — Compiler-grounded binding contracts | **selected for factory** | Execute [`goal-1-binding-contracts-delivery.md`](goal-1-binding-contracts-delivery.md), beginning with B1/B2. |
-| 2 — Formal object-rooted JSON document | delivery ready; queued | Execute [`goal-2-json-document-delivery.md`](goal-2-json-document-delivery.md) after Goal 1 closes. |
+| 1 — Compiler-grounded binding contracts | **complete** | Factory gate passed; evidence and commits recorded below. |
+| 2 — Formal object-rooted JSON document | **selected for factory** | Execute [`goal-2-json-document-delivery.md`](goal-2-json-document-delivery.md). |
 | 3 — First-party JSON migration and FVI adoption | delivery ready; implementation blocked on Goal 2 | Execute [`goal-3-json-migration-delivery.md`](goal-3-json-migration-delivery.md) after Goal 2 J6. |
 | 4 — Honest async `sermo` boundary | delivery ready; authority reconciliation first | Execute [`goal-4-async-sermo-delivery.md`](goal-4-async-sermo-delivery.md) after reconciling the live Radix ledger. |
 
@@ -166,7 +166,7 @@ status is planning evidence only; no implementation stage is marked complete.
 
 | Field | Value |
 | --- | --- |
-| **Status** | selected — ready for factory |
+| **Status** | complete — factory gate passed 2026-07-09 |
 | **Source** | `faber/src/package/binding.rs`; unified-package-manifest Phase 4 |
 | **Invariant** | Binding verification derives declarations and signatures from the supported compiler frontend, and every referenced file remains inside the package root. |
 | **Why first** | It has an immediate false-verification risk and a bounded package-tool surface. |
@@ -202,11 +202,30 @@ Gate:
 - Delivery-selected Rust probe integration test with an explicit timeout.
 - `cargo fmt --all -- --check` and `git diff --check` in every touched Rust repo.
 
+Factory evidence:
+
+- Faber `063dd1f` (`polish(binding): prove compiler-grounded library contracts`)
+  replaces the line scanner with analyzed package contracts, contained path
+  resolution, bounded Cargo probes, structured diagnostics, and the full
+  positive/negative fixture matrix.
+- Radix `70b60cbeb` (`polish(parser): scope bodyless functions to library
+  analysis`) restores the optional-body grammar only for explicit library
+  analysis; ordinary compilation remains fail-closed.
+- Radix `0392894d7` (`polish(codegen): render exact Rust binding probes`) exposes
+  the narrow renderer backed by normal Rust signature policy.
+- Gates passed: Faber binding 20/20, manifest 41/41, package 209/209, hygiene,
+  clippy, format, and diff checks; Radix file-interface 10/10, binding-related
+  42/42, probe 2/2, default bodyless rejection, hygiene, repo-native lint,
+  format, and diff checks.
+- Correctness, read-only review/bonsai, cleanliness, housekeeping, and per-file
+  polish completed with no deferred findings. Release decision: `defer-release`
+  until the next normal Faber release.
+
 ### Goal 2 — Formal Object-Rooted JSON Document Type
 
 | Field | Value |
 | --- | --- |
-| **Status** | delivery ready — queued after Goal 1 |
+| **Status** | selected — ready for factory |
 | **Source** | inline-json-valor contract; JSON-genus contract; EBNF; runtime `Valor`; `norma:json` |
 | **Invariant** | A Faber JSON document is object-rooted and recursively JSON-safe. It may widen to `valor`, but arbitrary `valor` enters it only through checked conversion. |
 | **Why now** | Inline literals and `@ json genus` already prove JSON safety, but separate paths erase that proof into a broader carrier. |

@@ -33,7 +33,7 @@ Each `goal.md` / `CAMPAIGN.md` owns its **Status** line.
 
 | Campaign | Status | Entry |
 | --- | --- | --- |
-| Aer Purgatus code-smell remediation | planned — four delivery specs ready; Goal 1 selected for factory | [`aer-purgatus/CAMPAIGN.md`](aer-purgatus/CAMPAIGN.md) |
+| Aer Purgatus code-smell remediation | active — Goal 1 complete; Goal 2 selected for factory | [`aer-purgatus/CAMPAIGN.md`](aer-purgatus/CAMPAIGN.md) |
 
 ## Open goals
 
