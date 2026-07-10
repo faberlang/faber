@@ -113,8 +113,17 @@ pub struct ManifestTarget {
     /// Binding manifest path, relative to the package root.
     pub bindings: Option<String>,
 
+    /// Runtime host policy for generated applications.
+    pub host: Option<ManifestRustHost>,
+
     /// Target dependency pins, e.g. `[target.rust.dependencies]`.
     pub dependencies: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ManifestRustHost {
+    Native,
 }
 
 #[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq, Eq)]
@@ -340,6 +349,16 @@ pub(crate) fn validate_manifest(
                         .with_arg("issue", "invalid_target_bindings"),
                 ));
             }
+        }
+        if config.host.is_some() && target != "rust" {
+            return Err(Box::new(
+                Diagnostic::error(
+                    "faber.toml target host policy is only supported for target.rust",
+                )
+                .with_file(path.display().to_string())
+                .with_arg("issue", "invalid_target_host")
+                .with_arg("target", target.to_owned()),
+            ));
         }
         for (name, version) in &config.dependencies {
             if name.trim().is_empty() || version.trim().is_empty() {

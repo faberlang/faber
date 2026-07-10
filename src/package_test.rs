@@ -11,8 +11,8 @@ use super::{
     discover_package, emit_generated_crate, invoke_cargo_build, library_cached_file_interface,
     library_resolver_from_config, load_package, read_manifest, run_package_fmir_image,
     run_package_fmir_text_image, run_package_mir, run_package_mir_artifact, sanitize_crate_name,
-    use_package_compiler, use_package_compiler_from_args, verify_library_bindings, BuildLayout,
-    LibraryInterfaceCache,
+    use_package_compiler, use_package_compiler_from_args, validate_manifest,
+    verify_library_bindings, BuildLayout, LibraryInterfaceCache,
 };
 use super::{fmir_image_test_summary, fmir_text_image_test_summary};
 use crate::library::{LibraryProviderKind, LibraryResolver, ResolvedLibraryModule};
@@ -3694,6 +3694,52 @@ rust_field_names = "camel"
         .diagnostics
         .iter()
         .any(|diag| diagnostic_has_issue(diag, "invalid_package_manifest")));
+}
+
+#[test]
+fn rust_target_manifest_accepts_native_host_policy() {
+    let dir = test_temp_dir("rust-target-native-host-policy");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "native-host-policy"
+
+[target.rust]
+host = "native"
+"#,
+    )
+    .expect("write manifest");
+
+    let manifest = read_manifest(&dir.join("faber.toml")).expect("read manifest");
+    assert!(manifest
+        .target
+        .get("rust")
+        .and_then(|target| target.host)
+        .is_some());
+}
+
+#[test]
+fn non_rust_target_manifest_rejects_host_policy() {
+    let dir = test_temp_dir("non-rust-target-host-policy");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "bad-host-policy"
+
+[paths]
+entry = "main.fab"
+
+[target.scena]
+host = "native"
+"#,
+    )
+    .expect("write manifest");
+    let manifest_path = dir.join("faber.toml");
+    let manifest = read_manifest(&manifest_path).expect("read manifest");
+    let err = validate_manifest(&manifest, &manifest_path).expect_err("host policy must fail");
+    assert!(diagnostic_has_issue(&err, "invalid_target_host"));
 }
 
 #[test]
