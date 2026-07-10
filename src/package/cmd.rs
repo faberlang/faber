@@ -146,7 +146,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
         } else {
             None
         };
-        let runtime_plan = match package_rust_runtime_plan(&config, &input_path) {
+        let mut runtime_plan = match package_rust_runtime_plan(&config, &input_path) {
             Ok(plan) => plan,
             Err(diagnostics) => {
                 radix::tool::print_diagnostics(
@@ -168,6 +168,24 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
             );
             eprintln!("runtime plan failed");
             std::process::exit(1);
+        }
+        // G4: emit native-binding library crates before the application crate links them.
+        match super::library_link::emit_linked_library_crates(&layout.package_root, &layout) {
+            Ok(linked) => {
+                runtime_plan.library_path_deps = linked
+                    .into_iter()
+                    .map(|lib| (lib.crate_name, lib.crate_root))
+                    .collect();
+            }
+            Err(diagnostics) => {
+                radix::tool::print_diagnostics(
+                    &diagnostics,
+                    DiagnosticMode::Normal,
+                    reader_pack.as_ref(),
+                );
+                eprintln!("library dependency graph failed");
+                std::process::exit(1);
+            }
         }
         match emit_generated_crate_with_runtime_plan(
             &layout,

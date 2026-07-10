@@ -26,6 +26,7 @@
 //! packages so old examples keep deterministic binary names and target paths
 //! while `faber.toml` remains the preferred package surface.
 
+pub mod artifact_plan;
 pub mod binding;
 mod binding_probe;
 mod cargo;
@@ -38,6 +39,7 @@ mod file_interface;
 mod frontmatter;
 mod import_graph;
 mod library;
+mod library_link;
 mod lockfile;
 mod manifest;
 mod member_path;
@@ -47,6 +49,7 @@ mod paths;
 mod reader;
 mod source_files;
 
+pub use artifact_plan::ArtifactPlan;
 pub use binding::verify_library_bindings;
 #[cfg(test)]
 pub(crate) use cargo::emit_generated_crate_with_runtime_plan;
@@ -116,8 +119,8 @@ use paths::normalize_path;
 use source_files::{load_package_source, package_source_files};
 
 pub(crate) use library::{
-    analysis_source_for_file, attach_library_provenance, library_cached_analysis,
-    library_cached_file_interface, library_generates_rust_module, library_imported_function_params,
+    analysis_source_for_file, library_cached_analysis, library_cached_file_interface,
+    library_generates_rust_module, library_imported_function_params,
     library_interface_export_names, library_interface_has_module, library_module_segments,
     program_export_names, LibraryInterfaceCache,
 };

@@ -4597,9 +4597,10 @@ incipit {
     assert!(output.code.contains("crate::yaml::pange"));
     assert!(
         output.code.contains("crate::yaml::solve")
-            && (output.code.contains("use faber::Valor as valor;")
+            && (output.code.contains("faber::Valor")
+                || output.code.contains("use faber::Valor as valor;")
                 || output.code.contains(": valor")),
-        "expected valor alias yaml binding, got:\n{}",
+        "expected valor/yaml binding via faber::Valor, got:\n{}",
         output.code
     );
     assert!(
@@ -4729,9 +4730,10 @@ incipiet {
     assert!(output.code.contains(".corpus_json()"));
     assert!(
         output.code.contains(".corpus_json()")
-            && (output.code.contains("use faber::Valor as valor;")
+            && (output.code.contains("faber::Valor")
+                || output.code.contains("use faber::Valor as valor;")
                 || output.code.contains(": valor")),
-        "expected valor alias corpus_json binding, got:\n{}",
+        "expected corpus_json valor binding via faber::Valor, got:\n{}",
         output.code
     );
     assert!(
@@ -7511,7 +7513,10 @@ providers = ["notaprovider"]
     let plan = package_rust_runtime_plan(&Config::default(), &pkg).expect("runtime plan");
     assert_eq!(plan.host, Some(ManifestRustHost::Native));
     assert!(plan.selected_providers.contains("notaprovider"));
-    assert!(plan.provider_error.is_some(), "expected missing provider error");
+    assert!(
+        plan.provider_error.is_some(),
+        "expected missing provider error"
+    );
     let diagnostic = package_host_selection_diagnostic(&plan, &pkg.join("faber.toml"))
         .expect("provider selection diagnostic");
     assert!(diagnostic_has_issue(
@@ -8581,4 +8586,221 @@ fn use_package_compiler_from_args_honors_force_package_for_probe_targets() {
         &input,
         true
     ));
+}
+
+#[test]
+fn g4_artifact_plan_is_deterministic_for_analyzed_package() {
+    let dir = test_temp_dir("g4-plan");
+    fs::create_dir_all(dir.join("src")).expect("src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "g4-plan"
+version = "0.1.0"
+
+[paths]
+entry = "main.fab"
+"#,
+    )
+    .expect("manifest");
+    fs::write(dir.join("src/main.fab"), "incipit { }\n").expect("entry");
+    let package = analyze_package(&Config::default(), &dir).expect("analyze");
+    let a = super::artifact_plan::plan_package(&package, Target::Rust);
+    let b = super::artifact_plan::plan_package(&package, Target::Rust);
+    assert!(a.supported);
+    assert_eq!(a.to_debug_json().unwrap(), b.to_debug_json().unwrap());
+    assert!(a.nodes.iter().any(|n| n.id.starts_with("rust:entry:")));
+}
+
+#[test]
+fn g4_native_library_links_into_application_build() {
+    let root = test_temp_dir("g4-lib-link");
+    let lib = root.join("libmath");
+    let app = root.join("app");
+    fs::create_dir_all(lib.join("src")).expect("lib src");
+    fs::create_dir_all(lib.join("bindings")).expect("bindings");
+    fs::create_dir_all(lib.join("rust")).expect("rust");
+    fs::create_dir_all(app.join("src")).expect("app src");
+
+    fs::write(
+        lib.join("faber.toml"),
+        r#"[package]
+name = "libmath"
+version = "0.1.0"
+edition = "2026"
+
+[library]
+provider = "libmath"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["rust"]
+
+[target.rust]
+bindings = "bindings/rust.toml"
+"#,
+    )
+    .expect("lib manifest");
+    fs::write(
+        lib.join("src/math.fab"),
+        "functio double(numerus n) → numerus\n",
+    )
+    .expect("lib source");
+    fs::write(
+        lib.join("rust/shim.rs"),
+        "pub fn double(n: i64) -> i64 { n * 2 }\n",
+    )
+    .expect("shim");
+    fs::write(
+        lib.join("bindings/rust.toml"),
+        r#"[functions."libmath:math.double"]
+symbol = "crate::shim::double"
+
+[shim]
+path = "rust/shim.rs"
+"#,
+    )
+    .expect("bindings");
+
+    // Interface root for lock/resolver: same as package source.
+    let interface_root = lib.join("src");
+    fs::write(
+        app.join("faber.toml"),
+        r#"[package]
+name = "g4-app"
+version = "0.1.0"
+
+[paths]
+entry = "main.fab"
+
+[dependencies]
+libmath = "0.1.0"
+"#,
+    )
+    .expect("app manifest");
+    fs::write(
+        app.join("faber.lock"),
+        format!(
+            r#"
+[[package]]
+name = "libmath"
+version = "0.1.0"
+source = "path"
+package_root = "{package_root}"
+kind = "lib"
+target_language = "rust"
+target_triple = "host"
+target_manifest = ""
+interface_root = "{interface_root}"
+artifact = ""
+crate = "libmath"
+rustc = ""
+"#,
+            package_root = lib.display(),
+            interface_root = interface_root.display(),
+        ),
+    )
+    .expect("lock");
+    fs::write(
+        app.join("src/main.fab"),
+        r#"
+importa ex "libmath:math" privata math
+
+incipit {
+  fixum numerus n ← math.double(21)
+  nota n
+}
+"#,
+    )
+    .expect("app entry");
+
+    let report = verify_library_bindings(&lib, "rust").expect("library verifies");
+    assert_eq!(report.bindings, 1);
+
+    let result = compile_package(&Config::default(), &app);
+    assert!(
+        result.success(),
+        "expected app compile success, got {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.message.clone()))
+            .collect::<Vec<_>>()
+    );
+    let Some(Output::Rust(output)) = result.output else {
+        panic!("expected rust output");
+    };
+    // Calls route through the linked crate, not an inlined panic body.
+    assert!(
+        output.code.contains("libmath::math::double") || output.code.contains("libmath::double"),
+        "expected external library call path, got:\n{}",
+        output.code
+    );
+    assert!(
+        !output.code.contains("reached Rust codegen without a body"),
+        "bodyless library must not be inlined as panic stubs"
+    );
+
+    let layout = discover_build_layout(&app).expect("layout");
+    let linked = super::library_link::emit_linked_library_crates(&app, &layout)
+        .expect("emit library crates");
+    assert_eq!(linked.len(), 1);
+    assert!(linked[0].crate_root.join("src/lib.rs").is_file());
+    assert!(linked[0].crate_root.join("Cargo.toml").is_file());
+
+    let mut plan = package_rust_runtime_plan(&Config::default(), &app).expect("runtime plan");
+    plan.library_path_deps = linked
+        .into_iter()
+        .map(|l| (l.crate_name, l.crate_root))
+        .collect();
+    let meta = read_manifest(&layout.manifest_path).ok();
+    emit_generated_crate_with_runtime_plan(&layout, &output.code, meta.as_ref(), &plan)
+        .expect("emit app crate");
+    let binary = invoke_cargo_build(&layout, false).expect("cargo build app with library dep");
+    assert!(binary.is_file(), "binary missing at {}", binary.display());
+
+    let run = Command::new(&binary).output().expect("run linked binary");
+    assert!(
+        run.status.success(),
+        "run failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&run.stdout),
+        String::from_utf8_lossy(&run.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&run.stdout);
+    assert!(
+        stdout.contains("42"),
+        "expected doubled value 42, got {stdout:?}"
+    );
+}
+
+#[test]
+fn g4_package_target_rejects_unsupported_after_analysis() {
+    let dir = test_temp_dir("g4-reject");
+    fs::create_dir_all(dir.join("src")).expect("src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "g4-reject"
+version = "0.1.0"
+
+[paths]
+entry = "main.fab"
+"#,
+    )
+    .expect("manifest");
+    fs::write(dir.join("src/main.fab"), "incipit { }\n").expect("entry");
+    let result = compile_package(&Config::default().with_target(Target::Wasm), &dir);
+    assert!(!result.success());
+    assert!(result.diagnostics.iter().any(|d| diagnostic_has_issue(
+        d,
+        "package_target_unsupported"
+    ) || diagnostic_has_issue(
+        d,
+        "package_target_assembly_pending"
+    )));
 }

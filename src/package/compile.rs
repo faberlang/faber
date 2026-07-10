@@ -23,13 +23,13 @@ use super::import_graph::{
     build_mount_plan, library_import_binding, resolve_import, ImportResolution,
 };
 use super::{
-    analysis_source_for_file, attach_library_provenance, discover_build_layout, discover_package,
-    library_cached_analysis, library_cached_file_interface, library_generates_rust_module,
-    library_imported_function_params, library_interface_export_names, library_interface_has_module,
-    library_module_segments, library_resolver_for_package, load_package,
-    load_package_with_reader_pack, load_provider_manifests, load_reader_pack_for_input,
-    program_export_names, read_manifest, selected_providers_for_routes, LibraryImportBinding,
-    LibraryInterfaceCache, PackageFile, RustRuntimePlan,
+    analysis_source_for_file, discover_build_layout, discover_package, library_cached_analysis,
+    library_cached_file_interface, library_generates_rust_module, library_imported_function_params,
+    library_interface_export_names, library_interface_has_module, library_module_segments,
+    library_resolver_for_package, load_package, load_package_with_reader_pack,
+    load_provider_manifests, load_reader_pack_for_input, program_export_names, read_manifest,
+    selected_providers_for_routes, LibraryImportBinding, LibraryInterfaceCache, PackageFile,
+    RustRuntimePlan,
 };
 
 pub(crate) struct AnalyzedPackage {
@@ -37,6 +37,8 @@ pub(crate) struct AnalyzedPackage {
     pub(crate) units: Vec<AnalyzedPackageUnit>,
     pub(crate) entry_frontmatter: Option<radix::driver::FileFrontmatter>,
     pub(crate) diagnostics: Vec<Diagnostic>,
+    /// Provider → Cargo crate name for native-binding library path deps (G4).
+    pub(crate) linked_library_crates: std::collections::BTreeMap<String, String>,
 }
 
 impl AnalyzedPackage {
@@ -74,6 +76,20 @@ fn rust_runtime_plan_for_package(package: &AnalyzedPackage) -> RustRuntimePlan {
         .as_ref()
         .map(|manifest| manifest.dispatch.providers.clone())
         .unwrap_or_default();
+    let library_path_deps = package
+        .linked_library_crates
+        .values()
+        .map(|crate_name| {
+            let path = package
+                .spec
+                .package_root
+                .join("target")
+                .join("faber")
+                .join("deps")
+                .join(crate_name);
+            (crate_name.clone(), path)
+        })
+        .collect();
     let mut plan = RustRuntimePlan {
         needs_tokio: package.units.iter().any(|unit| {
             unit.analysis.hir.entry_is_async
@@ -84,6 +100,7 @@ fn rust_runtime_plan_for_package(package: &AnalyzedPackage) -> RustRuntimePlan {
         selected_providers: BTreeSet::new(),
         provider_manifests: Vec::new(),
         provider_error: None,
+        library_path_deps,
     };
     for unit in &package.units {
         let mut collector = AdRouteCollector {
@@ -192,16 +209,8 @@ fn compile_package_internal(
     input: &Path,
     test_selection: Option<&RustTestSelection>,
 ) -> CompileResult {
-    if config.target != Target::Rust {
-        return CompileResult {
-            output: None,
-            diagnostics: vec![Diagnostic::error(
-                "package compilation currently supports Rust target only",
-            )
-            .with_file(input.display().to_string())],
-        };
-    }
-
+    // G4: analyze once before target rejection so Go/TS planners and diagnostics
+    // share the same package graph (no reloading source per target).
     let config = match effective_package_config(config, input) {
         Ok(config) => config,
         Err(diagnostics) => {
@@ -250,6 +259,32 @@ fn compile_package_internal(
             }
         }
     };
+
+    if config.target != Target::Rust {
+        let plan = super::artifact_plan::plan_package(&package, config.target);
+        if !plan.supported {
+            return CompileResult {
+                output: None,
+                diagnostics: vec![Diagnostic::error(plan.rejection.unwrap_or_else(|| {
+                    "package compilation does not support this target".to_owned()
+                }))
+                .with_file(input.display().to_string())
+                .with_arg("issue", "package_target_unsupported")
+                .with_arg("target", plan.target)],
+            };
+        }
+        // Planner seams exist; full product emit for Go/TS is later deliveries.
+        return CompileResult {
+            output: None,
+            diagnostics: vec![Diagnostic::error(format!(
+                "package compilation has a {} artifact plan but full product assembly is not implemented yet",
+                plan.target
+            ))
+            .with_file(input.display().to_string())
+            .with_arg("issue", "package_target_assembly_pending")
+            .with_arg("target", plan.target)],
+        };
+    }
     let effective_test_selection =
         merge_entry_test_selection(test_selection, package.entry_frontmatter.as_ref());
 
@@ -357,6 +392,7 @@ fn generate_package_rust(
         test_selection,
         field_name_policy,
         &mut module_tree,
+        &package.linked_library_crates,
     ) {
         diagnostics.push(diag);
     }
@@ -494,12 +530,17 @@ fn insert_generated_library_modules(
     test_selection: Option<&RustTestSelection>,
     field_name_policy: RustFieldNamePolicy,
     module_tree: &mut ModuleNode,
+    linked_library_crates: &std::collections::BTreeMap<String, String>,
 ) -> Result<(), Diagnostic> {
     let mut seen = BTreeSet::new();
     for import in units
         .iter()
         .flat_map(|unit| unit.expanded_library_imports.iter())
     {
+        // Native-binding package deps are separate Cargo crates (G4), not inlined modules.
+        if linked_library_crates.contains_key(&import.module.package) {
+            continue;
+        }
         let key = library_module_segments(import);
         if !seen.insert(key.clone()) {
             continue;
@@ -546,6 +587,8 @@ fn analyze_package_spec(
     let mut library_cache = LibraryInterfaceCache::default();
     let mut units = Vec::new();
     let mut analyzed_interfaces_by_path = BTreeMap::new();
+    // Linked crates are known from the package root + lock before unit analysis.
+    let linked_library_crates = linked_crates_for_package_root(&spec.package_root);
 
     for file in package_analysis_order(&spec, &files, library_resolver) {
         let file_cli = mount_plan.module_cli.get(&file.path).cloned();
@@ -598,11 +641,12 @@ fn analyze_package_spec(
             }
         };
         let provenance_imports = file.library_imports.clone();
-        if let Err(diag) = attach_library_provenance(
+        if let Err(diag) = super::library::attach_library_provenance_with_links(
             &mut analysis,
             &provenance_imports,
             library_resolver,
             &mut library_cache,
+            Some(&linked_library_crates),
         ) {
             diagnostics.push(diag);
             continue;
@@ -654,7 +698,41 @@ fn analyze_package_spec(
         units,
         entry_frontmatter,
         diagnostics,
+        linked_library_crates,
     })
+}
+
+fn linked_crates_for_package_root(
+    package_root: &Path,
+) -> std::collections::BTreeMap<String, String> {
+    // Build a lightweight shell package for the lock/manifest scan only.
+    let shell = AnalyzedPackage {
+        spec: super::PackageSpec {
+            package_root: package_root.to_path_buf(),
+            source_root: package_root.to_path_buf(),
+            entry: package_root.to_path_buf(),
+        },
+        units: Vec::new(),
+        entry_frontmatter: None,
+        diagnostics: Vec::new(),
+        linked_library_crates: std::collections::BTreeMap::new(),
+    };
+    super::artifact_plan::linked_library_crate_map(&shell)
+}
+
+/// Generate module-mode Rust for a library package unit (G4 library crates).
+pub(crate) fn generate_library_unit_rust(
+    unit: &AnalyzedPackageUnit,
+) -> Result<String, radix::codegen::CodegenError> {
+    generate_rust_code_for_analysis(
+        &unit.analysis,
+        false,
+        None,
+        RustFieldNamePolicy::Preserve,
+        false,
+        None,
+        None,
+    )
 }
 
 fn package_analysis_order<'a>(

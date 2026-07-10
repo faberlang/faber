@@ -1,7 +1,7 @@
 # Goal: SQLite Library Package
 
-**Status**: Stage 1 API/fixture contract complete — Phase 4 verification
-available; implementation blocked on the Phase 3 backend library build graph
+**Status**: Stage 1 API/fixture contract complete — Phase 4 verification and
+G4 Rust library path-dep linkage available; Stage 2 product implementation open
 **Created**: 2026-07-09
 **Refreshed**: 2026-07-10
 **Target workspace**: `/Users/ianzepp/work/faberlang`

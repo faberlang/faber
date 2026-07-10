@@ -132,6 +132,18 @@ pub(crate) fn validate_dependencies_against_lock(
 }
 
 fn validate_locked_paths(locked: &LockedPackage, diagnostics: &mut Vec<Diagnostic>) {
+    let package_root = PathBuf::from(&locked.package_root);
+    if !package_root.is_dir() {
+        diagnostics.push(
+            Diagnostic::error(format!(
+                "locked package_root for `{}` is missing or not a directory: {}",
+                locked.name,
+                package_root.display()
+            ))
+            .with_arg("issue", "locked_package_root_missing")
+            .with_arg("package", locked.name.clone()),
+        );
+    }
     let interface_root = locked.interface_root_path();
     if !interface_root.is_dir() {
         diagnostics.push(
@@ -143,6 +155,13 @@ fn validate_locked_paths(locked: &LockedPackage, diagnostics: &mut Vec<Diagnosti
             .with_arg("issue", "locked_interface_root_missing")
             .with_arg("package", locked.name.clone()),
         );
+    }
+    // G4: source/library packages are compiled into the application artifact graph
+    // at build time. Prebuilt `artifact` / `target_manifest` files are required only
+    // for prebuilt lock entries (kind neither source nor lib).
+    let source_compiled = locked.kind == "source" || locked.kind == "lib";
+    if source_compiled {
+        return;
     }
     let artifact = locked.artifact_path();
     if !artifact.is_file() {

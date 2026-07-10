@@ -1,6 +1,6 @@
 # Goal: Unified Faber Package Manifest
 
-**Status**: active — Phases 1–2 and Phase 4 binding verification complete; Phase 3 backend build graph remains open
+**Status**: active — Phases 1–4 complete for Rust native-binding library path-dep linkage (HIR v1 G4); Go/TS product assembly remains later
 **Created**: 2026-07-08
 **Target repo**: `/Users/ianzepp/work/faberlang/faber`
 **Factory artifact dir**: `docs/factory/unified-package-manifest/`
@@ -226,9 +226,10 @@ timeout 120 cargo test --lib library_resolver
 
 ### Phase 3 — Backend Library Build Graph
 
-Status: open. Phase 4 can verify a native-binding library in isolation, but
-application builds do not yet consume its generated/backend library artifact,
-shim, and target dependencies through a package graph.
+Status: complete for Rust native-binding path (2026-07-10, HIR v1 G4). Application
+builds emit dependency library crates under `target/faber/deps/`, path-link them
+from the generated app Cargo.toml, and fail closed when a locked library lacks
+Rust target support. Go/TS product assembly is still later planner work.
 
 Compile Faber library dependencies for the same backend target as the
 application and link generated backend artifacts intentionally.

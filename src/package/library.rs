@@ -104,24 +104,41 @@ fn synthetic_library_item_def_id(
     DefId(0x8000_0000 | ((hasher.finish() as u32) & 0x7fff_ffff))
 }
 
-fn library_generated_call_path(module: &ResolvedLibraryModule, exported_name: &str) -> String {
-    let mut path = String::from("crate");
+fn library_generated_call_path_with_crate(
+    module: &ResolvedLibraryModule,
+    exported_name: &str,
+    linked_crate: Option<&str>,
+) -> String {
+    let mut path = match linked_crate {
+        Some(crate_name) => rust_ident(crate_name),
+        None => String::from("crate"),
+    };
     for segment in &module.module_path {
         path.push_str("::");
-        path.push_str(segment);
+        path.push_str(&rust_ident(segment));
     }
     path.push_str("::");
     path.push_str(exported_name);
     path
 }
 
-fn library_reexport_path(module: &ResolvedLibraryModule) -> String {
-    let mut path = String::from("crate");
+fn library_reexport_path_with_crate(
+    module: &ResolvedLibraryModule,
+    linked_crate: Option<&str>,
+) -> String {
+    let mut path = match linked_crate {
+        Some(crate_name) => rust_ident(crate_name),
+        None => String::from("crate"),
+    };
     for segment in &module.module_path {
         path.push_str("::");
-        path.push_str(segment);
+        path.push_str(&rust_ident(segment));
     }
     path
+}
+
+fn rust_ident(name: &str) -> String {
+    name.replace('-', "_")
 }
 
 struct TransitiveLibraryWalk {
@@ -262,7 +279,13 @@ fn read_and_parse_library_interface(
     let display_name = module.interface_path.display().to_string();
     let peeled = peel_raw_source(&display_name, &raw_source)
         .map_err(|error| source_load_diagnostic(&display_name, error))?;
-    let parse = parser::parse(radix::lexer::lex(peeled.body));
+    // Library interfaces may declare bodyless functions bound by target manifests (G4).
+    let parse = parser::parse_with_options(
+        radix::lexer::lex(peeled.body),
+        parser::ParseOptions {
+            allow_bodyless_functions: true,
+        },
+    );
     if !parse.success() {
         let mut message = format!(
             "library interface `{}` failed to parse",
@@ -463,7 +486,8 @@ fn analyze_cached_library_interface(
         cached.peeled_body.clone()
     };
 
-    let session = Session::new(Config::default());
+    // Native-binding library interfaces declare bodyless functions (G4).
+    let session = Session::new(Config::default().with_bodyless_functions());
     let mut analysis = match analyze_source_with_cli_program_and_import_contract(
         &session,
         &import.module.interface_path.display().to_string(),
@@ -559,6 +583,18 @@ pub(crate) fn attach_library_provenance(
     library_resolver: &LibraryResolver,
     library_cache: &mut LibraryInterfaceCache,
 ) -> Result<(), Diagnostic> {
+    attach_library_provenance_with_links(analysis, imports, library_resolver, library_cache, None)
+}
+
+/// Attach library provenance, routing native-binding package deps to external crates (G4).
+#[allow(clippy::result_large_err)]
+pub(crate) fn attach_library_provenance_with_links(
+    analysis: &mut radix::driver::AnalyzedUnit,
+    imports: &[LibraryImportBinding],
+    library_resolver: &LibraryResolver,
+    library_cache: &mut LibraryInterfaceCache,
+    linked_library_crates: Option<&BTreeMap<String, String>>,
+) -> Result<(), Diagnostic> {
     if imports.is_empty() {
         return Ok(());
     }
@@ -593,6 +629,7 @@ pub(crate) fn attach_library_provenance(
         .collect::<Vec<_>>();
     for import in imports {
         let identity = library_identity(&import.module);
+        let linked_crate = linked_library_crates.and_then(|map| map.get(&import.module.package));
         let rust_runtime_module = None;
         let rust_runtime_methods = BTreeMap::new();
         let interface_items = library_interface_items(import, library_resolver, library_cache)?;
@@ -643,9 +680,12 @@ pub(crate) fn attach_library_provenance(
                 .exports
                 .insert(binding_def_id, exported_members.into_iter().collect());
             for child_import in public_library_imports(import, library_resolver, library_cache)? {
+                let child_crate = linked_library_crates
+                    .and_then(|map| map.get(&child_import.module.package))
+                    .map(String::as_str);
                 analysis.libraries.reexports.insert(
                     (binding_def_id, child_import.binding),
-                    library_reexport_path(&child_import.module),
+                    library_reexport_path_with_crate(&child_import.module, child_crate),
                 );
             }
         } else if has_namespace_binding {
@@ -670,7 +710,11 @@ pub(crate) fn attach_library_provenance(
         }
 
         for interface_item in interface_items {
-            let rust_runtime_type = library_item_call_path(&import.module, &interface_item);
+            let rust_runtime_type = library_item_call_path_with_crate(
+                &import.module,
+                &interface_item,
+                linked_crate.map(String::as_str),
+            );
             let elide_rust_decl = false;
             let def_id = lookup_library_item_def_id(
                 &hir_items,
@@ -740,12 +784,17 @@ fn public_library_imports(
     Ok(imports)
 }
 
-fn library_item_call_path(
+fn library_item_call_path_with_crate(
     module: &ResolvedLibraryModule,
     item: &LibraryInterfaceItem,
+    linked_crate: Option<&str>,
 ) -> Option<String> {
     if item.kind == LibraryItemKind::Function {
-        return Some(library_generated_call_path(module, &item.exported_name));
+        return Some(library_generated_call_path_with_crate(
+            module,
+            &item.exported_name,
+            linked_crate,
+        ));
     }
     None
 }

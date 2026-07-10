@@ -12,6 +12,8 @@ use super::MANIFEST_FILE;
 /// this type describes the Faber source graph only, not the generated Cargo
 /// crate that may later be emitted under `target/faber/`.
 pub(crate) struct PackageSpec {
+    /// Directory containing `faber.toml`, or the legacy package root.
+    pub(in crate::package) package_root: PathBuf,
     pub(in crate::package) source_root: PathBuf,
     pub(in crate::package) entry: PathBuf,
 }
@@ -159,6 +161,7 @@ pub(crate) fn discover_package(input: &Path) -> PackageDiscoveryResult {
         }
 
         return Ok(PackageSpec {
+            package_root: root.clone(),
             entry: root.join("main.fab"),
             source_root: root,
         });
@@ -173,6 +176,7 @@ pub(crate) fn discover_package(input: &Path) -> PackageDiscoveryResult {
         .unwrap_or_else(|| Path::new("."))
         .to_path_buf();
     Ok(PackageSpec {
+        package_root: root.clone(),
         source_root: root,
         entry,
     })
@@ -194,7 +198,11 @@ fn parse_manifest(path: &Path) -> PackageDiscoveryResult {
         .as_deref()
         .map(|entry| source_root.join(entry))
         .unwrap_or_else(|| source_root.clone());
-    Ok(PackageSpec { source_root, entry })
+    Ok(PackageSpec {
+        package_root,
+        source_root,
+        entry,
+    })
 }
 
 fn parse_manifest_with_entry(path: &Path, entry: PathBuf) -> PackageDiscoveryResult {
@@ -207,7 +215,11 @@ fn parse_manifest_with_entry(path: &Path, entry: PathBuf) -> PackageDiscoveryRes
     validate_manifest(&manifest, path)?;
 
     let source_root = package_root.join(&manifest.paths.source);
-    Ok(PackageSpec { source_root, entry })
+    Ok(PackageSpec {
+        package_root,
+        source_root,
+        entry,
+    })
 }
 
 /// Discover a `BuildLayout` for the given input (directory, manifest file, or entry file).

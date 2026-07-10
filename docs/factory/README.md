@@ -45,5 +45,5 @@ Each `goal.md` / `CAMPAIGN.md` owns its **Status** line.
 
 | Goal | Status | Entry |
 | ---- | ------ | ----- |
-| SQLite library package | Stage 1 contract complete — Phase 4 verification available; blocked on Phase 3 build graph | [`sqlite-library-package/goal.md`](sqlite-library-package/goal.md) |
-| Unified package manifest | active — Phases 1–2 and Phase 4 verification complete; Phase 3 build graph open | [`unified-package-manifest/goal.md`](unified-package-manifest/goal.md) |
+| SQLite library package | Stage 1 contract complete — Phase 4 verification + G4 Rust linkage path available; Stage 2 product open | [`sqlite-library-package/goal.md`](sqlite-library-package/goal.md) |
+| Unified package manifest | active — Phases 1–4 Rust native-binding path complete (G4); Go/TS product assembly later | [`unified-package-manifest/goal.md`](unified-package-manifest/goal.md) |

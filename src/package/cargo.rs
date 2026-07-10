@@ -14,6 +14,8 @@ pub(crate) struct RustRuntimePlan {
     pub(crate) selected_providers: BTreeSet<String>,
     pub(crate) provider_manifests: Vec<ProviderManifest>,
     pub(crate) provider_error: Option<String>,
+    /// Faber library path dependencies: (crate_name, absolute crate root).
+    pub(crate) library_path_deps: Vec<(String, PathBuf)>,
 }
 
 impl RustRuntimePlan {
@@ -25,6 +27,7 @@ impl RustRuntimePlan {
             selected_providers: BTreeSet::new(),
             provider_manifests: Vec::new(),
             provider_error: None,
+            library_path_deps: Vec::new(),
         }
     }
 }
@@ -111,6 +114,12 @@ fn render_generated_cargo_toml(name: &str, version: &str, plan: &RustRuntimePlan
     }
     if plan.needs_tokio {
         deps.push_str("tokio = { version = \"1\", features = [\"rt\", \"net\", \"time\"] }\n");
+    }
+    for (crate_name, crate_path) in &plan.library_path_deps {
+        deps.push_str(&format!(
+            "{crate_name} = {{ path = \"{}\" }}\n",
+            crate_path.display()
+        ));
     }
 
     format!(
