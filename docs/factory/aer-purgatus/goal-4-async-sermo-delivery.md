@@ -47,6 +47,11 @@ Delivered slices:
   error terminal instead of pending indefinitely.
 - Faber runtime `092b67c` threads materialization target shape into route
   producers for `textus`, `lista<textus>`, `octeti`, and scalar materializers.
+- Faber runtime `89f2708` routes built-in producers through the public
+  `HostDispatch` / `ResponseSender` / `Cancellation` contract, exports those
+  types from the runtime crate root, enforces one terminal frame per sender
+  lease, and turns last-sender drop before terminal into a producer-dropped
+  error terminal.
 - Radix `5daeefb36` deletes generated `__faber_attach_sermo` calls and the
   private macOS host shim from Rust `ad` codegen.
 - Faber `4979410` removes generated Cargo dependency/features for the private
@@ -69,6 +74,7 @@ Validation run:
 - `timeout 240 cargo test frame -- --format terse` in `faber-runtime`
 - `timeout 240 cargo clippy --all-targets -- -D warnings` in `faber-runtime`
 - `timeout 240 cargo test -- --format terse` in `faber-runtime`
+- `timeout 240 cargo test frame -- --format terse` in `faber-runtime`
 - `timeout 300 cargo test -p radix ad -- --format terse`
 - `timeout 180 cargo test -p radix --test hygiene`
 - `timeout 300 cargo test --lib generated_package_ad_avoids_private_host_bridge_dependency -- --format terse` in `faber`
@@ -78,9 +84,11 @@ Validation run:
 
 Remaining blockers before closeout:
 
-- `faber-runtime/src/frame.rs` still uses an internal producer-thread handoff
-  for built-in routes rather than the final public `HostDispatch` /
-  `ResponseSender` contract with cancellation, bounded queues, and shutdown.
+- `faber-runtime/src/frame.rs` now uses the public `HostDispatch` /
+  `ResponseSender` contract for built-in route production. Cancellation is
+  observable by senders and suppresses content after cancellation, but full
+  caller-drop cancellation, shutdown, bounded queues, and late-worker
+  suppression remain part of the native-host/runtime closeout.
 - `faber/src/package/cargo.rs` still detects Tokio/executor need from emitted
   Rust text. The private macOS host scan/path is gone and
   `[target.rust] host = "native"` parses/validates, but the final structured

@@ -155,7 +155,7 @@ All six active repositories were clean when this campaign was drafted.
 | 1 — Compiler-grounded binding contracts | **complete** | Factory gate passed; evidence and commits recorded below. |
 | 2 — Formal object-rooted JSON document | **complete** | Factory gate passed; evidence and commits recorded below. |
 | 3 — First-party JSON migration and FVI adoption | **complete** | Factory gate passed; evidence and commits recorded below. |
-| 4 — Honest async `sermo` boundary | **partial** — codegen, proof pairs, runtime producer handoff, private host removal, and manifest host spelling delivered; public host implementation open | Replace interim built-in producer threads with the final runtime host-dispatch contract, public native host, structured package runtime plan, and route-requirement enforcement before closeout. |
+| 4 — Honest async `sermo` boundary | **partial** — codegen, proof pairs, runtime host-dispatch contract, private host removal, and manifest host spelling delivered; public host implementation open | Finish caller-drop cancellation/shutdown, public native host, structured package runtime plan, and route-requirement enforcement before closeout. |
 
 The four saved delivery documents are the factory production inputs. Stage
 completion lives in this campaign's Current State and in each delivery
@@ -390,7 +390,7 @@ Factory evidence:
 
 | Field | Value |
 | --- | --- |
-| **Status** | partial — async codegen, proof-pair route migration, runtime producer handoff, private host removal, and manifest host spelling delivered; public host implementation open |
+| **Status** | partial — async codegen, proof-pair route migration, runtime host-dispatch contract, private host removal, and manifest host spelling delivered; public host implementation open |
 | **Source** | Radix async-ad-lowering goal/ledger plus live runtime and package code |
 | **Invariant** | Async `ad` never performs blocking host work while polling, always has a completion producer, and depends only on a portable runtime host contract. |
 | **Why last** | Highest cross-repo and behavioral risk; benefits from the campaign's first three established delivery patterns. |
@@ -454,6 +454,10 @@ Partial factory evidence:
 - Faber runtime `092b67c` (`fix(frame): pass materialization targets to route
   producers`) threads target shape into runtime route production for `textus`,
   `lista<textus>`, `octeti`, and scalar materializers.
+- Faber runtime `89f2708` (`fix(frame): route producers through response
+  sender`) exposes and uses the runtime `HostDispatch`, `ResponseSender`, and
+  `Cancellation` contract for built-in routes, with one-terminal enforcement
+  and producer-dropped terminal coverage.
 - Radix `5daeefb36` (`fix(codegen): drop private host attach shim`) deletes
   generated `__faber_attach_sermo` calls and the private macOS host shim from
   Rust `ad` codegen.
@@ -470,11 +474,11 @@ Partial factory evidence:
   nor `tempus:expectet`, `norma/scripta/check-source`, runtime frame/full
   tests and clippy, Radix `ad` + hygiene, Faber package E2E private-host
   negative proof, Faber hygiene, and scoped diff checks.
-- Not complete: runtime production is still an interim built-in route handoff,
-  not the public `HostDispatch` / `ResponseSender` contract with cancellation,
-  bounded queues, and shutdown; Faber still needs a structured runtime plan for
-  Tokio/executor, route-requirement enforcement, and native-host dependency
-  selection; the public native host adapter and concurrent timer proof remain open. The Faber
+- Not complete: caller-drop cancellation, shutdown, bounded queues, and
+  late-worker suppression remain to be proven at the runtime/native-host
+  boundary; Faber still needs a structured runtime plan for Tokio/executor,
+  route-requirement enforcement, and native-host dependency selection; the
+  public native host adapter and concurrent timer proof remain open. The Faber
   full package suite currently also exposes open Goal 2 `norma:json` residuals
   that still expect `valor` instead of the formal `json` type.
 
