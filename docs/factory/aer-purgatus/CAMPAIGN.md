@@ -155,7 +155,7 @@ All six active repositories were clean when this campaign was drafted.
 | 1 — Compiler-grounded binding contracts | **complete** | Factory gate passed; evidence and commits recorded below. |
 | 2 — Formal object-rooted JSON document | **complete** | Factory gate passed; evidence and commits recorded below. |
 | 3 — First-party JSON migration and FVI adoption | **complete** | Factory gate passed; evidence and commits recorded below. |
-| 4 — Honest async `sermo` boundary | **partial** — codegen, proof pairs, runtime host-dispatch contract, private host removal, and manifest host spelling delivered; public host implementation open | Finish caller-drop cancellation/shutdown, public native host, structured package runtime plan, and route-requirement enforcement before closeout. |
+| 4 — Honest async `sermo` boundary | **partial** — codegen, proof pairs, runtime host-dispatch contract, private host removal, structured package runtime plan, public native host crate, and package host selection delivered | Finish caller-drop cancellation closeout before final Goal 4 gate. |
 
 The four saved delivery documents are the factory production inputs. Stage
 completion lives in this campaign's Current State and in each delivery
@@ -473,21 +473,27 @@ Partial factory evidence:
   metadata. Package builds now use that plan for Tokio dependency selection and
   reject non-runtime `ad` routes without a selected Rust host before Cargo
   emission.
+- Faber runtime `81feb5d` (`feat(frame): add native host dispatcher crate`) adds
+  public package `faber-host-native`, runtime host-dispatch installation, and a
+  bounded worker queue for the selected timer, filesystem, and process routes.
+- Faber runtime `a5716c8` (`test(host): cover native terminal failures`) proves
+  queue saturation, unsupported route, shutdown rejection, worker panic, and
+  cancellation terminal paths for the native host.
+- Faber `1d360cc` (`feat(package): select native host dependency`) makes
+  `[target.rust] host = "native"` add the public native host dependency, inject
+  a generated install call, and build/run a generated `solum:lege` package
+  without any private `radix/hosts` path.
 - Gates passed: focused Radix async materializer tests, `faber check` on both
   async corpus files and the existing `solum.lege` proof, `faber emit -t rust`
   verification that generated proof-pair Rust contains neither `solum:leget`
   nor `tempus:expectet`, `norma/scripta/check-source`, runtime frame/full
   tests and clippy, Radix `ad` + hygiene, Faber package E2E private-host
-  negative proof, package runtime-plan tests, Faber hygiene, and scoped diff
-  checks.
-- Not complete: caller-drop cancellation, shutdown, bounded queues, and
-  late-worker suppression remain to be proven at the runtime/native-host
-  boundary; Faber package builds now use analyzed HIR for Tokio/executor and
-  non-runtime route requirements, but native-host dependency selection remains
-  open until `faber-host-native` exists; the public native host adapter and
-  concurrent timer proof remain open. The Faber full package suite currently
-  also exposes open Goal 2 `norma:json` residuals that still expect `valor`
-  instead of the formal `json` type.
+  negative proof, package runtime-plan tests, native host workspace tests/clippy,
+  generated native-host package E2E, Faber hygiene, and scoped diff checks.
+- Not complete: caller-drop cancellation remains to be proven end-to-end across
+  generated async materializers and the runtime cancellation token. The Faber
+  full package suite currently also exposes open Goal 2 `norma:json` residuals
+  that still expect `valor` instead of the formal `json` type.
 
 ## Dependency Rules
 

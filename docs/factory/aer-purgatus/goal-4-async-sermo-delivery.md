@@ -1,6 +1,6 @@
 # Delivery: Honest Async `Sermo` And Host Boundary
 
-**Status**: partial — async codegen, proof-pair route migration, runtime producer handoff, and private host removal delivered; public host selection still open
+**Status**: partial — async codegen, proof-pair route migration, runtime producer handoff, private host removal, public native host crate, and package host selection delivered; caller-drop cancellation closeout still open
 **Date**: 2026-07-09
 **Campaign**: [`CAMPAIGN.md`](CAMPAIGN.md)
 **Primary repos**: `faber-runtime`, `radix`, `faber`, `norma`
@@ -64,6 +64,17 @@ Delivered slices:
   analyzed HIR and manifest metadata. Package `build` now uses that plan for
   Tokio dependency selection and fails before Cargo emission when non-runtime
   `ad` routes are present without a selected Rust host.
+- Faber runtime `81feb5d` adds `faber-runtime/hosts/native` as public package
+  `faber-host-native`, installs a process host dispatcher through the runtime
+  `HostDispatch` seam, and routes timer, filesystem, and process work through a
+  bounded standard-thread worker queue.
+- Faber runtime `a5716c8` adds explicit native-host terminal-failure coverage
+  for queue saturation, unsupported routes, shutdown rejection, worker panic,
+  and cancellation during blocked timer work.
+- Faber `1d360cc` makes `[target.rust] host = "native"` select the public
+  `faber-host-native` dependency, inject one generated host install call, and
+  proves a generated package using `solum:lege` builds/runs without a
+  `radix/hosts` path.
 
 Validation run:
 
@@ -85,23 +96,27 @@ Validation run:
 - `timeout 240 cargo test --lib rust_target_manifest_accepts_native_host_policy -- --format terse` in `faber`
 - `timeout 240 cargo test --lib non_rust_target_manifest_rejects_host_policy -- --format terse` in `faber`
 - `timeout 240 cargo test --lib package_runtime_plan -- --format terse` in `faber`
+- `timeout 240 cargo test -p faber-host-native -- --format terse` in `faber-runtime`
+- `timeout 240 cargo clippy --workspace --all-targets -- -D warnings` in `faber-runtime`
+- `timeout 240 cargo test --workspace -- --format terse` in `faber-runtime`
+- `timeout 300 cargo test --lib generated_package_native_host_selects_public_dependency_and_runs -- --format terse` in `faber`
+- `timeout 240 cargo clippy --all-targets -- -D warnings` in `faber`
 - `timeout 180 cargo test --test hygiene` in `faber`
 
 Remaining blockers before closeout:
 
 - `faber-runtime/src/frame.rs` now uses the public `HostDispatch` /
   `ResponseSender` contract for built-in route production. Cancellation is
-  observable by senders and suppresses content after cancellation, but full
-  caller-drop cancellation, shutdown, bounded queues, and late-worker
-  suppression remain part of the native-host/runtime closeout.
+  observable by senders and suppresses content after cancellation. The public
+  native host covers bounded queue saturation, shutdown rejection, unsupported
+  routes, worker panic, and late timer cancellation; full caller-drop
+  cancellation from async materializers remains open.
 - `faber/src/package/cargo.rs` still detects Tokio/executor need from emitted
   Rust text only for the legacy non-package generated-crate fallback. Package
   builds use analyzed HIR for Tokio/executor and non-runtime route requirements.
-  Native-host dependency selection remains open until the public
-  `faber-host-native` crate exists.
-- The public native host adapter, bounded-worker queue policy, cancellation
-  suppression of late worker frames, concurrent timer proof, and package host
-  selection remain unimplemented.
+  Native-host dependency selection is delivered for `host = "native"`.
+- End-to-end caller-drop cancellation remains unproven across generated async
+  materializers and the runtime cancellation token.
 - `timeout 240 cargo test --lib package -- --format terse` in `faber` currently
   fails two unrelated `norma:json` package tests because open Goal 2 residuals
   still expect `json.solve`/`json.pange` to round-trip through `valor` instead
