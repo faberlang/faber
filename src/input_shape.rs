@@ -9,7 +9,9 @@ pub(crate) fn verify_input_is_package_shaped(input: &[String], force_package: bo
         return true;
     }
     let path = std::path::Path::new(first);
-    path.is_dir() || path.file_name().is_some_and(|name| name == "faber.toml")
+    path.is_dir()
+        || path.file_name().is_some_and(|name| name == "faber.toml")
+        || path.extension().is_none()
 }
 
 pub(crate) fn reader_locale_supports_input(input: &[String], force_package: bool) -> bool {
@@ -75,6 +77,18 @@ mod tests {
             &["main.fab".to_owned()],
             false
         ));
+        assert!(!verify_input_is_package_shaped(
+            &["main.txt".to_owned()],
+            false
+        ));
+    }
+
+    #[test]
+    fn verify_input_is_package_shaped_accepts_missing_extensionless_package_paths() {
+        assert!(verify_input_is_package_shaped(
+            &["missing-package".to_owned()],
+            false
+        ));
     }
 
     #[test]
@@ -89,6 +103,10 @@ mod tests {
         ));
         assert!(reader_locale_supports_input(
             &["pkg/faber.toml".to_owned()],
+            false
+        ));
+        assert!(reader_locale_supports_input(
+            &["missing-package".to_owned()],
             false
         ));
         assert!(reader_locale_supports_input(
@@ -118,6 +136,10 @@ mod tests {
         );
         assert_eq!(
             reader_locale_without_package_error(Some("la"), &["pkg/faber.toml".to_owned()], false),
+            None
+        );
+        assert_eq!(
+            reader_locale_without_package_error(Some("la"), &["missing-package".to_owned()], false),
             None
         );
         assert_eq!(
