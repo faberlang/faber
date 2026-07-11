@@ -31,21 +31,6 @@ pub struct Cli {
     pub command: Option<Command>,
 }
 
-impl Cli {
-    pub fn parse_validated() -> Self {
-        Self::parse()
-    }
-
-    #[cfg(test)]
-    pub fn try_parse_from_validated<I, T>(itr: I) -> Result<Self, clap::Error>
-    where
-        I: IntoIterator<Item = T>,
-        T: Into<std::ffi::OsString> + Clone,
-    {
-        Self::try_parse_from(itr)
-    }
-}
-
 /// User-facing `faber` subcommands.
 #[derive(Subcommand, Debug)]
 pub enum Command {
