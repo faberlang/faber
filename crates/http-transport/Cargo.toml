@@ -11,7 +11,7 @@ path = "src/lib.rs"
 
 [dependencies]
 bytes = "1"
-faber = { package = "faber-runtime", path = "../../../../../faber-runtime" }
+faber = { package = "faber-runtime", path = "../../../faber-runtime" }
 http = "1"
 http-body-util = "0.1"
 hyper = { version = "1", features = ["server", "http1"] }
