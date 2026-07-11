@@ -29,6 +29,12 @@ fn write_plain_file(label: &str, contents: &str) -> PathBuf {
     path
 }
 
+fn reader_locale_example_root(locale: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../examples/reader-locale")
+        .join(locale)
+}
+
 fn workspace_root() -> PathBuf {
     // faberlang container root (siblings: norma, radix, examples).
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -633,6 +639,50 @@ fn check_reader_locale_rejects_forced_package_stdin_input() {
     assert!(
         stderr.contains("--reader-locale zh-Hans requires a package path or .fab entry file"),
         "expected stdin shape rejection, got:\n{stderr}"
+    );
+}
+
+#[test]
+fn check_reader_locale_accepts_direct_entry_file_input() {
+    let source = reader_locale_example_root("zh-Hans").join("src/main.fab");
+
+    let (stdout, stderr, ok) = run_faber(&[
+        "check",
+        "--reader-locale",
+        "zh-Hans",
+        source.to_str().expect("utf8 source path"),
+    ]);
+
+    assert!(ok, "single-file check with reader locale failed:\n{stderr}");
+    assert!(
+        stdout.is_empty(),
+        "successful check should not write stdout: {stdout}"
+    );
+    assert!(
+        stderr.contains(&format!("ok: {}", source.display())),
+        "expected successful check marker, got:\n{stderr}"
+    );
+}
+
+#[test]
+fn check_reader_locale_accepts_manifest_file_input() {
+    let manifest = reader_locale_example_root("zh-Hans").join("faber.toml");
+
+    let (stdout, stderr, ok) = run_faber(&[
+        "check",
+        "--reader-locale",
+        "zh-Hans",
+        manifest.to_str().expect("utf8 manifest path"),
+    ]);
+
+    assert!(ok, "manifest check with reader locale failed:\n{stderr}");
+    assert!(
+        stdout.is_empty(),
+        "successful check should not write stdout: {stdout}"
+    );
+    assert!(
+        stderr.contains(&format!("ok: {}", manifest.display())),
+        "expected successful check marker, got:\n{stderr}"
     );
 }
 
