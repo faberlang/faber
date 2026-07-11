@@ -369,6 +369,31 @@ fn emit_reader_locale_rejects_forced_package_stdin_input() {
 }
 
 #[test]
+fn emit_reader_locale_rejects_existing_non_package_file() {
+    let plain = write_plain_file("emit-reader-locale-plain-file", "temp");
+
+    let (stdout, stderr, ok) = run_faber_emit(&[
+        "emit",
+        "--reader-locale",
+        "th-TH",
+        plain.to_str().expect("plain path"),
+    ]);
+
+    assert!(
+        !ok,
+        "emit should reject existing non-package files for reader-locale input"
+    );
+    assert!(
+        stdout.is_empty(),
+        "rejected emit should not write stdout: {stdout}"
+    );
+    assert!(
+        stderr.contains("--reader-locale th-TH requires a package path or .fab entry file"),
+        "expected reader-locale shape rejection, got:\n{stderr}"
+    );
+}
+
+#[test]
 fn emit_reader_locale_forced_package_rejects_existing_non_package_file() {
     let plain = write_plain_file("emit-reader-locale-force-package", "temp");
 

@@ -264,6 +264,31 @@ fn build_reader_locale_rejects_forced_package_stdin_input() {
 }
 
 #[test]
+fn build_reader_locale_rejects_existing_non_package_file() {
+    let plain = write_plain_file("build-reader-locale-plain-file", "temp");
+
+    let (stdout, stderr, ok) = run_faber(&[
+        "build",
+        "--reader-locale",
+        "th-TH",
+        plain.to_str().expect("plain path"),
+    ]);
+
+    assert!(
+        !ok,
+        "build should reject existing non-package files for reader-locale input"
+    );
+    assert!(
+        stdout.is_empty(),
+        "rejected build should not write stdout: {stdout}"
+    );
+    assert!(
+        stderr.contains("--reader-locale th-TH requires a package path or .fab entry file"),
+        "expected reader-locale shape rejection, got:\n{stderr}"
+    );
+}
+
+#[test]
 fn build_reader_locale_rejects_multiple_direct_inputs() {
     let entry_a = write_single_file(
         "build-reader-locale-multi-a",
@@ -415,6 +440,31 @@ fn run_reader_locale_rejects_stdin_input() {
 }
 
 #[test]
+fn run_reader_locale_rejects_existing_non_package_file() {
+    let plain = write_plain_file("run-reader-locale-plain-file", "temp");
+
+    let (stdout, stderr, ok) = run_faber(&[
+        "run",
+        "--reader-locale",
+        "th-TH",
+        plain.to_str().expect("plain path"),
+    ]);
+
+    assert!(
+        !ok,
+        "run should reject existing non-package files for reader-locale input"
+    );
+    assert!(
+        stdout.is_empty(),
+        "rejected run should not write stdout: {stdout}"
+    );
+    assert!(
+        stderr.contains("--reader-locale th-TH requires a package path or .fab entry file"),
+        "expected reader-locale shape rejection, got:\n{stderr}"
+    );
+}
+
+#[test]
 fn run_reader_locale_rejects_multiple_direct_inputs() {
     let entry_a = write_single_file("run-reader-locale-multi-a", "incipit { nota \"salve\" }\n");
     let entry_b = write_single_file("run-reader-locale-multi-b", "incipit { nota \"vale\" }\n");
@@ -531,6 +581,31 @@ fn test_reader_locale_missing_package_path_surfaces_missing_path_error() {
 }
 
 #[test]
+fn test_reader_locale_rejects_existing_non_package_file() {
+    let plain = write_plain_file("test-reader-locale-plain-file", "temp");
+
+    let (stdout, stderr, ok) = run_faber(&[
+        "test",
+        "--reader-locale",
+        "th-TH",
+        plain.to_str().expect("plain path"),
+    ]);
+
+    assert!(
+        !ok,
+        "test should reject existing non-package files for reader-locale input"
+    );
+    assert!(
+        stdout.is_empty(),
+        "rejected test should not write stdout: {stdout}"
+    );
+    assert!(
+        stderr.contains("--reader-locale th-TH requires a package path or .fab entry file"),
+        "expected reader-locale shape rejection, got:\n{stderr}"
+    );
+}
+
+#[test]
 fn test_reader_locale_rejects_stdin_input() {
     let (stdout, stderr, ok) = run_faber(&["test", "--reader-locale", "zh-Hans", "-"]);
 
@@ -558,6 +633,31 @@ fn check_reader_locale_rejects_forced_package_stdin_input() {
     assert!(
         stderr.contains("--reader-locale zh-Hans requires a package path or .fab entry file"),
         "expected stdin shape rejection, got:\n{stderr}"
+    );
+}
+
+#[test]
+fn check_reader_locale_rejects_existing_non_package_file() {
+    let plain = write_plain_file("check-reader-locale-plain-file", "temp");
+
+    let (stdout, stderr, ok) = run_faber(&[
+        "check",
+        "--reader-locale",
+        "th-TH",
+        plain.to_str().expect("plain path"),
+    ]);
+
+    assert!(
+        !ok,
+        "check should reject existing non-package files for reader-locale input"
+    );
+    assert!(
+        stdout.is_empty(),
+        "rejected check should not write stdout: {stdout}"
+    );
+    assert!(
+        stderr.contains("--reader-locale th-TH requires a package path or .fab entry file"),
+        "expected reader-locale shape rejection, got:\n{stderr}"
     );
 }
 
