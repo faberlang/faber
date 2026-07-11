@@ -1,12 +1,9 @@
-pub(crate) fn verify_input_is_package_shaped(input: &[String], force_package: bool) -> bool {
+pub(crate) fn verify_input_is_package_shaped(input: &[String], _force_package: bool) -> bool {
     let Some(first) = input.first() else {
         return false;
     };
     if first == "-" {
         return false;
-    }
-    if force_package {
-        return true;
     }
     let path = std::path::Path::new(first);
     path.is_dir()
@@ -112,6 +109,7 @@ mod tests {
         ));
         let file = TempPlainFile::new();
         assert!(!verify_input_is_package_shaped(&[file.input()], false));
+        assert!(!verify_input_is_package_shaped(&[file.input()], true));
     }
 
     #[test]

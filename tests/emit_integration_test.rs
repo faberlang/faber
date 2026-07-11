@@ -59,6 +59,13 @@ fn temp_dir(label: &str) -> PathBuf {
     dir
 }
 
+fn write_plain_file(label: &str, contents: &str) -> PathBuf {
+    let dir = temp_dir(label);
+    let path = dir.join("plain.txt");
+    fs::write(&path, contents).expect("write plain file");
+    path
+}
+
 fn run_faber(args: &[&str]) -> (String, String, bool) {
     let mut child = Command::new(env!("CARGO_BIN_EXE_faber"))
         .args(args)
@@ -358,6 +365,32 @@ fn emit_reader_locale_rejects_forced_package_stdin_input() {
     assert!(
         stderr.contains("--reader-locale th-TH requires a package path or .fab entry file"),
         "expected stdin shape rejection, got:\n{stderr}"
+    );
+}
+
+#[test]
+fn emit_reader_locale_forced_package_rejects_existing_non_package_file() {
+    let plain = write_plain_file("emit-reader-locale-force-package", "temp");
+
+    let (stdout, stderr, ok) = run_faber_emit(&[
+        "emit",
+        "--package",
+        "--reader-locale",
+        "th-TH",
+        plain.to_str().expect("plain path"),
+    ]);
+
+    assert!(
+        !ok,
+        "forced package reader-locale should reject existing non-package files"
+    );
+    assert!(
+        stdout.is_empty(),
+        "rejected emit should not write stdout: {stdout}"
+    );
+    assert!(
+        stderr.contains("--reader-locale th-TH requires a package path or .fab entry file"),
+        "expected reader-locale shape rejection, got:\n{stderr}"
     );
 }
 
