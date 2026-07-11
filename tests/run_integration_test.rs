@@ -281,8 +281,12 @@ fn build_reader_locale_rejects_multiple_direct_inputs() {
         "rejected build should not write stdout: {stdout}"
     );
     assert!(
-        stderr.contains("--reader-locale th-TH requires a package path or .fab entry file"),
-        "expected multiple-input reader-locale rejection, got:\n{stderr}"
+        stderr.contains("unexpected argument"),
+        "expected clap to reject the extra build input, got:\n{stderr}"
+    );
+    assert!(
+        stderr.contains("Usage: faber build [OPTIONS] <INPUT>"),
+        "expected single-input build usage in clap error, got:\n{stderr}"
     );
 }
 
