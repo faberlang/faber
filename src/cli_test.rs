@@ -35,6 +35,16 @@ fn cli_parses_repl_subcommand() {
 }
 
 #[test]
+fn cli_parses_repl_subcommand_with_forwarded_args() {
+    let cli = Cli::try_parse_from(["faber", "repl", "--", "--flag", "value"])
+        .expect("parse repl forwarded args");
+    let Some(crate::cli::Command::Repl(args)) = cli.command else {
+        panic!("expected repl subcommand");
+    };
+    assert_eq!(args.args, vec!["--flag".to_owned(), "value".to_owned()]);
+}
+
+#[test]
 fn cli_parses_targets_subcommand() {
     let cli = Cli::try_parse_from(["faber", "targets"]).expect("parse targets");
     assert!(cli.eval_source.is_none());
@@ -288,6 +298,27 @@ fn cli_parses_reader_locale_on_check_emit_build_and_format() {
 }
 
 #[test]
+fn cli_parses_check_flags_and_multiple_inputs() {
+    let check = Cli::try_parse_from([
+        "faber",
+        "check",
+        "--diagnostics",
+        "--permissive",
+        "--package",
+        "main.fab",
+        "other.fab",
+    ])
+    .expect("parse check flags");
+    let Some(crate::cli::Command::Check(args)) = check.command else {
+        panic!("expected check subcommand");
+    };
+    assert!(args.diagnostics);
+    assert!(args.permissive);
+    assert!(args.package);
+    assert_eq!(args.input, vec!["main.fab", "other.fab"]);
+}
+
+#[test]
 fn cli_rejects_conflicting_format_output_modes() {
     let error = Cli::try_parse_from(["faber", "format", "--check", "--stdout", "main.fab"])
         .expect_err("format output mode conflict");
@@ -353,6 +384,27 @@ fn cli_init_defaults_to_current_directory() {
         panic!("expected init subcommand");
     };
     assert_eq!(args.path, std::path::PathBuf::from("."));
+}
+
+#[test]
+fn cli_script_and_test_default_to_current_directory() {
+    let script = Cli::try_parse_from(["faber", "script"]).expect("parse script defaults");
+    let Some(crate::cli::Command::Script(script_args)) = script.command else {
+        panic!("expected script subcommand");
+    };
+    assert_eq!(script_args.path, std::path::PathBuf::from("."));
+    assert!(script_args.args.is_empty());
+
+    let test = Cli::try_parse_from(["faber", "test"]).expect("parse test defaults");
+    let Some(crate::cli::Command::Test(test_args)) = test.command else {
+        panic!("expected test subcommand");
+    };
+    assert_eq!(test_args.path, std::path::PathBuf::from("."));
+    assert!(test_args.filter.is_none());
+    assert!(!test_args.exact);
+    assert!(!test_args.nocapture);
+    assert!(!test_args.ignored);
+    assert!(!test_args.include_ignored);
 }
 
 #[test]
