@@ -130,7 +130,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
         std::process::exit(1);
     };
 
-    // G6 GO3: package Go builds write target/faber/go and invoke `go build`.
+    // G6 GO3/GO4: package Go builds write target/faber/go and invoke `go build`.
     if is_package && target == radix::codegen::Target::Go {
         let layout = match discover_build_layout(&input_path) {
             Ok(l) => l,
@@ -141,7 +141,8 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
         };
         let go_layout = GoBuildLayout::from_package(&layout);
         let code = output_code(output);
-        if let Err(d) = emit_go_module(&go_layout, &code, &[]) {
+        let modules = super::compile::take_go_package_modules();
+        if let Err(d) = emit_go_module(&go_layout, &code, &modules) {
             eprintln!("error: {}", d.message);
             std::process::exit(1);
         }

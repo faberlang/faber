@@ -9109,14 +9109,16 @@ incipit argumenta args exitus 0 {
 }
 
 #[test]
-fn g6_go3_multi_module_package_is_deferred() {
-    let dir = test_temp_dir("g6-go3-multi");
+
+
+fn g6_go4_multi_module_namespace_package_builds() {
+    let dir = test_temp_dir("g6-go4-multi");
     fs::create_dir_all(dir.join("src")).expect("src");
     fs::write(
         dir.join("faber.toml"),
         r#"
 [package]
-name = "g6-go3-multi"
+name = "g6-go4-multi"
 version = "0.1.0"
 
 [paths]
@@ -9125,7 +9127,6 @@ entry = "main.fab"
 "#,
     )
     .expect("manifest");
-    // Local import pulls a second package unit → multi-module assembly path.
     fs::write(
         dir.join("src/helper.fab"),
         "functio identity(textus s) → textus {\n  redde s\n}\n",
@@ -9134,12 +9135,12 @@ entry = "main.fab"
     fs::write(
         dir.join("src/main.fab"),
         r#"
-importa ex "./helper" privata identity
+importa ex "./helper" privata helper
 
 @ cli "tool"
 @ operandus ceteri textus ignored
 incipit argumenta args exitus 0 {
-  fixum textus _ ← identity("x")
+  fixum textus _ ← helper.identity("x")
 }
 "#,
     )
@@ -9147,21 +9148,80 @@ incipit argumenta args exitus 0 {
 
     let result = compile_package(&Config::default().with_target(Target::Go), &dir);
     assert!(
-        result
-            .diagnostics
-            .iter()
-            .any(|d| diagnostic_has_issue(d, "package_go_multi_module_pending"))
-            || (result.success() == false
-                && result.diagnostics.iter().any(|d| {
-                    d.message.contains("multi-module") || diagnostic_has_issue(d, "package_go_multi_module_pending")
-                })),
-        "expected multi-module pending or related fail, got success={} diags={:?}",
         result.success(),
+        "go multi-module compile failed: {:?}",
         result
             .diagnostics
             .iter()
-            .map(|d| (d.message.clone(), d.args.clone()))
+            .map(|d| d.message.clone())
             .collect::<Vec<_>>()
     );
-    assert!(!result.success());
+    let Some(Output::Go(output)) = result.output else {
+        panic!("expected Go output");
+    };
+    assert!(
+        output.code.contains("var helper = struct")
+            || output.code.contains("var helper ="),
+        "expected namespace var for helper:\n{}",
+        output.code
+    );
+    assert!(
+        output.code.contains("Identity:") || output.code.contains("Identity "),
+        "expected capitalized Identity field:\n{}",
+        output.code
+    );
+
+    let modules = super::take_go_package_modules();
+    assert!(
+        !modules.is_empty(),
+        "expected non-entry module files"
+    );
+    assert!(
+        modules.iter().any(|(_, body)| body.contains("func identity")),
+        "expected identity func in module: {modules:?}"
+    );
+
+    let layout = discover_build_layout(&dir).expect("layout");
+    let go_layout = super::GoBuildLayout::from_package(&layout);
+    super::emit_go_module(&go_layout, &output.code, &modules).expect("emit go");
+    let binary = super::invoke_go_build(&go_layout).expect("go build");
+    let status = Command::new(&binary).status().expect("run");
+    assert_eq!(status.code(), Some(0));
+}
+
+#[test]
+fn g6_go4_coreutils_true_package_go_builds() {
+    let path = PathBuf::from("/Users/ianzepp/work/faberlang/examples/coreutils/packages/true");
+    if !path.exists() {
+        eprintln!("skip: coreutils true package missing at {}", path.display());
+        return;
+    }
+    let result = compile_package(&Config::default().with_target(Target::Go), &path);
+    assert!(
+        result.success(),
+        "true package go compile failed: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| d.message.clone())
+            .collect::<Vec<_>>()
+    );
+    let Some(Output::Go(output)) = result.output else {
+        panic!("expected Go");
+    };
+    assert!(
+        output.code.contains("gnu_argv") || output.code.contains("var "),
+        "expected argv namespace in entry:\n{}",
+        output.code
+    );
+    let modules = super::take_go_package_modules();
+    let layout = discover_build_layout(&path).expect("layout");
+    let go_layout = super::GoBuildLayout::from_package(&layout);
+    super::emit_go_module(&go_layout, &output.code, &modules).expect("emit");
+    let binary = super::invoke_go_build(&go_layout).expect("go build true");
+    let status = Command::new(&binary)
+        .args(["ignored"])
+        .status()
+        .expect("run true");
+    assert_eq!(status.code(), Some(0), "GNU true should exit 0");
 }

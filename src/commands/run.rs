@@ -114,7 +114,8 @@ fn cmd_run_go(args: RunArgs) {
         }
     };
     let go_layout = package::GoBuildLayout::from_package(&layout);
-    if let Err(d) = package::emit_go_module(&go_layout, &code, &[]) {
+    let modules = package::take_go_package_modules();
+    if let Err(d) = package::emit_go_module(&go_layout, &code, &modules) {
         eprintln!("error: {}", d.message);
         std::process::exit(1);
     }

@@ -341,10 +341,11 @@ fn compile_package_internal(
     }
 }
 
-/// G6 GO3 — emit package Go entry (CLI SupportedNarrow or plain entry).
+/// G6 GO3/GO4 — emit package Go for entry (+ sibling modules as same-package files).
 ///
-/// v1 assembly is **entry-unit only**: multi-module Go packages (sibling `.fab`
-/// imports) remain `package_go_multi_module_pending` until GO4 expands linking.
+/// Local Faber imports become same-package namespace vars (`binding.Field`) that
+/// point at package-level functions from sibling units. Norma/stdlib imports
+/// remain elided by Go codegen.
 fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> CompileResult {
     let mut diagnostics = package.diagnostics.clone();
     let Some(entry) = package.entry_unit() else {
@@ -361,25 +362,49 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
         };
     };
 
-    if package.units.len() > 1 {
-        return CompileResult {
-            output: None,
-            diagnostics: {
+    // Generate non-entry modules first (signatures feed namespace vars).
+    let mut module_files: Vec<(String, String)> = Vec::new();
+    let mut unit_funcs: std::collections::BTreeMap<PathBuf, Vec<super::go_build::GoFuncSig>> =
+        std::collections::BTreeMap::new();
+
+    for unit in &package.units {
+        if unit.is_entry {
+            continue;
+        }
+        match radix::codegen::generate_from_analyzed(Target::Go, &unit.analysis) {
+            Ok(Output::Go(output)) => {
+                let body = super::go_build::strip_go_preamble(&output.code);
+                let funcs = super::go_build::parse_go_func_sigs(&body);
+                unit_funcs.insert(unit.path.clone(), funcs);
+                let file = super::go_build::module_go_file_name(&unit.module_segments, &unit.path);
+                module_files.push((file, body));
+            }
+            Ok(_) => {
                 diagnostics.push(
-                    Diagnostic::error(
-                        "Go package assembly supports a single entry unit in this slice; multi-module packages are deferred"
-                            .to_owned(),
-                    )
-                    .with_file(input.display().to_string())
-                    .with_arg("issue", "package_go_multi_module_pending")
-                    .with_arg("target", "go"),
+                    Diagnostic::error("Go module codegen returned a non-Go output".to_owned())
+                        .with_file(unit.path.display().to_string())
+                        .with_arg("issue", "package_go_codegen_failed"),
                 );
-                diagnostics
-            },
-        };
+                return CompileResult {
+                    output: None,
+                    diagnostics,
+                };
+            }
+            Err(err) => {
+                let mut diag = Diagnostic::error(err.message).with_file(unit.path.display().to_string());
+                for arg in err.args {
+                    diag = diag.with_arg(arg.name, arg.value);
+                }
+                diagnostics.push(diag);
+                return CompileResult {
+                    output: None,
+                    diagnostics,
+                };
+            }
+        }
     }
 
-    let code = match entry.analysis.cli_program.as_ref() {
+    let entry_code = match entry.analysis.cli_program.as_ref() {
         Some(cli) => match radix::codegen::generate_go_cli(
             &entry.analysis.hir,
             &entry.analysis.types,
@@ -426,10 +451,101 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
         },
     };
 
+    // Namespace vars for local imports (entry and siblings).
+    let mut namespace_block = String::new();
+    for unit in &package.units {
+        for item in &unit.analysis.hir.items {
+            let HirItemKind::Import(import) = &item.kind else {
+                continue;
+            };
+            let import_path = unit.analysis.interner.resolve(import.path);
+            if import_path.starts_with("norma:") || import_path.starts_with("norma/") {
+                continue;
+            }
+            let Some(target_path) = resolve_local_import_path(&package.spec, &unit.path, import_path)
+            else {
+                continue;
+            };
+            let canon = normalize_path_buf(&target_path);
+            let Some(funcs) = unit_funcs
+                .iter()
+                .find(|(p, _)| normalize_path_buf(p) == canon)
+                .map(|(_, f)| f.as_slice())
+            else {
+                diagnostics.push(
+                    Diagnostic::error(format!(
+                        "Go multi-module assembly could not find unit for import `{import_path}`"
+                    ))
+                    .with_file(unit.path.display().to_string())
+                    .with_arg("issue", "package_go_import_unit_missing")
+                    .with_arg("target", "go"),
+                );
+                return CompileResult {
+                    output: None,
+                    diagnostics,
+                };
+            };
+            for it in &import.items {
+                let binding = it
+                    .alias
+                    .map(|a| unit.analysis.interner.resolve(a))
+                    .unwrap_or_else(|| unit.analysis.interner.resolve(it.name));
+                namespace_block.push_str(&super::go_build::render_namespace_var(binding, funcs));
+                namespace_block.push('\n');
+            }
+        }
+    }
+
+    let entry_code = super::go_build::inject_after_imports(&entry_code, &namespace_block);
+
+    // Side-channel: multi-file emit for build/run (Output is entry main.go only).
+    GO_PACKAGE_MODULES.with(|slot| {
+        *slot.borrow_mut() = module_files;
+    });
+
     CompileResult {
-        output: Some(Output::Go(GoOutput { code })),
+        output: Some(Output::Go(GoOutput { code: entry_code })),
         diagnostics,
     }
+}
+
+std::thread_local! {
+    static GO_PACKAGE_MODULES: std::cell::RefCell<Vec<(String, String)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Take multi-module Go files produced by the last `compile_package` Go assembly.
+pub(crate) fn take_go_package_modules() -> Vec<(String, String)> {
+    GO_PACKAGE_MODULES.with(|slot| std::mem::take(&mut *slot.borrow_mut()))
+}
+
+fn resolve_local_import_path(
+    spec: &super::PackageSpec,
+    from_file: &Path,
+    import_path: &str,
+) -> Option<PathBuf> {
+    let dummy = crate::library::LibraryResolver::default();
+    match resolve_import(spec, &dummy, from_file, import_path) {
+        ImportResolution::Local(path) => Some(normalize_path_buf(&path)),
+        _ => {
+            let base = from_file.parent()?;
+            let candidate = base.join(import_path);
+            let with_fab = if candidate.extension().is_some() {
+                candidate
+            } else {
+                candidate.with_extension("fab")
+            };
+            if with_fab.exists() {
+                Some(normalize_path_buf(&with_fab))
+            } else {
+                None
+            }
+        }
+    }
+}
+
+fn normalize_path_buf(path: &Path) -> PathBuf {
+    std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
 }
 
 fn generate_package_rust(

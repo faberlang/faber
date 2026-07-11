@@ -71,6 +71,7 @@ pub(crate) use compile::package_rust_runtime_plan;
 #[allow(unused_imports)] // package MIR stages consume this crate-visible analysis API.
 pub(crate) use compile::{analyze_package, AnalyzedPackage, AnalyzedPackageUnit};
 pub use compile::{check_package, compile_package, compile_package_with_test_selection};
+pub(crate) use compile::take_go_package_modules;
 #[allow(unused_imports)] // public package API; used by integration tests and external callers
 pub use discovery::{discover_build_layout, sanitize_crate_name, BuildLayout};
 pub(crate) use dispatch::{
