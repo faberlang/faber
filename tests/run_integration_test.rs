@@ -513,8 +513,7 @@ incipit {
 
 #[test]
 fn test_reader_locale_missing_package_path_surfaces_missing_path_error() {
-    let (stdout, stderr, ok) =
-        run_faber(&["test", "--reader-locale", "th-TH", "missing-package"]);
+    let (stdout, stderr, ok) = run_faber(&["test", "--reader-locale", "th-TH", "missing-package"]);
 
     assert!(!ok, "missing package path should fail");
     assert!(
