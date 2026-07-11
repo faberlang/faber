@@ -458,8 +458,26 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
         },
     };
 
+    // P1 (53ff0a7): flatten to package main fails open if two units emit the same
+    // package-level func name — catch at Faber compile, not go build.
+    if let Some(diag) = go_package_func_name_collision_diagnostic(
+        entry.path.as_path(),
+        &entry_code,
+        &module_files,
+        &unit_funcs,
+    ) {
+        diagnostics.push(diag);
+        return CompileResult {
+            output: None,
+            diagnostics,
+        };
+    }
+
     // Namespace vars for local imports + narrow Norma host shims (entry + siblings).
+    // WHY (79df18a): inject each binding name at most once — multi-unit packages
+    // that all `importa … privata consolum` must not redeclare `var consolum`.
     let mut namespace_block = String::new();
+    let mut injected_bindings: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     let mut needs_os_for_shim = false;
     for unit in &package.units {
         for item in &unit.analysis.hir.items {
@@ -473,8 +491,12 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
                     let binding = it
                         .alias
                         .map(|a| unit.analysis.interner.resolve(a))
-                        .unwrap_or_else(|| unit.analysis.interner.resolve(it.name));
-                    namespace_block.push_str(&super::go_build::render_norma_consolum_shim(binding));
+                        .unwrap_or_else(|| unit.analysis.interner.resolve(it.name))
+                        .to_owned();
+                    if !injected_bindings.insert(binding.clone()) {
+                        continue;
+                    }
+                    namespace_block.push_str(&super::go_build::render_norma_consolum_shim(&binding));
                     namespace_block.push('\n');
                     needs_os_for_shim = true;
                 }
@@ -511,8 +533,12 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
                 let binding = it
                     .alias
                     .map(|a| unit.analysis.interner.resolve(a))
-                    .unwrap_or_else(|| unit.analysis.interner.resolve(it.name));
-                namespace_block.push_str(&super::go_build::render_namespace_var(binding, funcs));
+                    .unwrap_or_else(|| unit.analysis.interner.resolve(it.name))
+                    .to_owned();
+                if !injected_bindings.insert(binding.clone()) {
+                    continue;
+                }
+                namespace_block.push_str(&super::go_build::render_namespace_var(&binding, funcs));
                 namespace_block.push('\n');
             }
         }
@@ -572,6 +598,46 @@ fn resolve_local_import_path(
 
 fn normalize_path_buf(path: &Path) -> PathBuf {
     std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+}
+
+/// Detect package-level Go function name collisions across flattened modules.
+///
+/// WHY: multi-module assembly emits every unit into the same `package main`.
+/// Two `functio identity` in different `.fab` files become two `func identity`
+/// and only fail at `go build` without this gate (correctness 53ff0a7).
+fn go_package_func_name_collision_diagnostic(
+    entry_path: &Path,
+    entry_code: &str,
+    _module_files: &[(String, String)],
+    unit_funcs: &std::collections::BTreeMap<PathBuf, Vec<super::go_build::GoFuncSig>>,
+) -> Option<Diagnostic> {
+    // name → first owner description
+    let mut owners: std::collections::BTreeMap<String, String> = std::collections::BTreeMap::new();
+
+    for f in super::go_build::parse_go_func_sigs(entry_code) {
+        owners.insert(f.name, format!("entry {}", entry_path.display()));
+    }
+    for (path, funcs) in unit_funcs {
+        let owner = path.display().to_string();
+        for f in funcs {
+            if let Some(prior) = owners.get(&f.name) {
+                return Some(
+                    Diagnostic::error(format!(
+                        "Go package assembly: function `{}` is declared in both {prior} and {owner}; \
+                         flattened `package main` cannot host colliding names",
+                        f.name
+                    ))
+                    .with_file(path.display().to_string())
+                    .with_arg("issue", "package_go_func_name_collision")
+                    .with_arg("function", f.name.clone())
+                    .with_arg("prior", prior.clone())
+                    .with_arg("target", "go"),
+                );
+            }
+            owners.insert(f.name.clone(), owner.clone());
+        }
+    }
+    None
 }
 
 /// Ensure a single-line or parenthesized Go import block includes `pkg`.

@@ -8672,6 +8672,258 @@ entry = "main.fab"
     assert!(a.nodes.iter().any(|n| n.id.starts_with("rust:entry:")));
 }
 
+fn examples_sqlite_lib() -> Option<PathBuf> {
+    let lib = PathBuf::from("/Users/ianzepp/work/faberlang/examples/sqlite");
+    if lib.exists() {
+        Some(lib)
+    } else {
+        None
+    }
+}
+
+/// Build a temp app that path-deps the shipped `examples/sqlite` package.
+fn write_sqlite_consumer_app(app: &Path, lib: &Path, entry_body: &str) {
+    fs::create_dir_all(app.join("src")).expect("app src");
+    let interface_root = lib.join("src");
+    fs::write(
+        app.join("faber.toml"),
+        r#"[package]
+name = "g8-sqlite-app"
+version = "0.1.0"
+
+[paths]
+entry = "main.fab"
+
+[dependencies]
+sqlite = "0.1.0"
+"#,
+    )
+    .expect("app manifest");
+    fs::write(
+        app.join("faber.lock"),
+        format!(
+            r#"
+[[package]]
+name = "sqlite"
+version = "0.1.0"
+source = "path"
+package_root = "{package_root}"
+kind = "lib"
+target_language = "rust"
+target_triple = "host"
+target_manifest = ""
+interface_root = "{interface_root}"
+artifact = ""
+crate = "sqlite"
+rustc = ""
+"#,
+            package_root = lib.display(),
+            interface_root = interface_root.display(),
+        ),
+    )
+    .expect("lock");
+    fs::write(app.join("src/main.fab"), entry_body).expect("entry");
+}
+
+fn build_and_run_sqlite_app(app: &Path) -> std::process::Output {
+    let result = compile_package(&Config::default(), app);
+    assert!(
+        result.success(),
+        "expected sqlite consumer compile, got {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| d.message.clone())
+            .collect::<Vec<_>>()
+    );
+    let layout = discover_build_layout(app).expect("layout");
+    let mut runtime_plan = package_rust_runtime_plan(&Config::default(), app).expect("plan");
+    let linked = super::library_link::emit_linked_library_crates(app, &layout).expect("link");
+    runtime_plan.library_path_deps = linked
+        .into_iter()
+        .map(|lib| (lib.crate_name, lib.crate_root))
+        .collect();
+    let Some(Output::Rust(output)) = result.output else {
+        panic!("expected Rust");
+    };
+    emit_generated_crate_with_runtime_plan(&layout, &output.code, None, &runtime_plan)
+        .expect("emit crate");
+    let binary = invoke_cargo_build(&layout, false).expect("cargo build app+sqlite");
+    Command::new(&binary).output().expect("run app")
+}
+
+#[test]
+/// G8 DB1 evidence: shipped `examples/sqlite` verifies and links into an app.
+fn g8_sqlite_package_verifies_and_links_application() {
+    let Some(lib) = examples_sqlite_lib() else {
+        eprintln!("skip: examples/sqlite missing");
+        return;
+    };
+    let report = verify_library_bindings(&lib, "rust").expect("sqlite library verifies");
+    assert_eq!(report.bindings, 4, "exsequi/quaere/scalar/transactio");
+
+    let root = test_temp_dir("g8-sqlite-app");
+    let app = root.join("app");
+    write_sqlite_consumer_app(
+        &app,
+        &lib,
+        r#"
+importa ex "sqlite:sqlite" privata sqlite
+
+incipit {
+  fac {
+    fixum valor ∪ nihil cell ← sqlite.scalar(":memory:", "SELECT 1", vacua)
+    nota cell
+  }
+  cape err {
+    mone err
+  }
+}
+"#,
+    );
+    let output = build_and_run_sqlite_app(&app);
+    assert_eq!(output.status.code(), Some(0), "sqlite consumer should exit 0");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("Numerus(1)") || stdout.contains("1"),
+        "expected scalar 1 on stdout, got {stdout:?}"
+    );
+}
+
+#[test]
+/// G8 DB2: SQL engine errors surface as ⇥ textus and recover through cape.
+fn g8_sqlite_sql_error_is_recoverable() {
+    let Some(lib) = examples_sqlite_lib() else {
+        eprintln!("skip: examples/sqlite missing");
+        return;
+    };
+    let root = test_temp_dir("g8-sqlite-sql-err");
+    let app = root.join("app");
+    write_sqlite_consumer_app(
+        &app,
+        &lib,
+        r#"
+importa ex "sqlite:sqlite" privata sqlite
+
+incipit {
+  fac {
+    fixum valor ∪ nihil _ ← sqlite.scalar(":memory:", "SELECT FROM", vacua)
+    nota "unexpected-ok"
+  }
+  cape err {
+    mone err
+  }
+}
+"#,
+    );
+    let output = build_and_run_sqlite_app(&app);
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !stdout.contains("unexpected-ok"),
+        "SQL error must not take success path: {stdout:?}"
+    );
+    assert!(
+        !stderr.trim().is_empty(),
+        "expected mone of SQL error on stderr, got empty"
+    );
+}
+
+#[test]
+/// G8 DB2: invalid filesystem path is ⇥ textus, not panic.
+fn g8_sqlite_invalid_path_is_recoverable() {
+    let Some(lib) = examples_sqlite_lib() else {
+        eprintln!("skip: examples/sqlite missing");
+        return;
+    };
+    let root = test_temp_dir("g8-sqlite-bad-path");
+    let app = root.join("app");
+    write_sqlite_consumer_app(
+        &app,
+        &lib,
+        r#"
+importa ex "sqlite:sqlite" privata sqlite
+
+incipit {
+  fac {
+    fixum valor ∪ nihil _ ← sqlite.scalar("/no/such/faber/g8/path.sqlite", "SELECT 1", vacua)
+    nota "unexpected-ok"
+  }
+  cape err {
+    mone err
+  }
+}
+"#,
+    );
+    let output = build_and_run_sqlite_app(&app);
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!stdout.contains("unexpected-ok"), "path error must cape: {stdout:?}");
+    assert!(!stderr.trim().is_empty(), "expected path error on stderr");
+}
+
+#[test]
+/// G8 DB3: package exposes transactio binding (semantics covered by shim unit tests).
+fn g8_sqlite_transactio_binding_verified() {
+    let Some(lib) = examples_sqlite_lib() else {
+        eprintln!("skip: examples/sqlite missing");
+        return;
+    };
+    let report = verify_library_bindings(&lib, "rust").expect("sqlite library verifies");
+    assert!(
+        report.bindings >= 4,
+        "expected transactio among bindings, got {}",
+        report.bindings
+    );
+    // Deterministic commit/rollback proofs live in examples/sqlite/rust (shim_test).
+}
+
+#[test]
+/// G8 DB2: zero-row scalar maps to nihil (Option empty) through the product path.
+fn g8_sqlite_empty_scalar_is_nihil() {
+    let Some(lib) = examples_sqlite_lib() else {
+        eprintln!("skip: examples/sqlite missing");
+        return;
+    };
+    let root = test_temp_dir("g8-sqlite-empty");
+    let app = root.join("app");
+    write_sqlite_consumer_app(
+        &app,
+        &lib,
+        r#"
+importa ex "sqlite:sqlite" privata sqlite
+
+incipit {
+  fac {
+    fixum valor ∪ nihil cell ← sqlite.scalar(":memory:", "SELECT 1 WHERE 0", vacua)
+    si cell ≡ nihil {
+      nota "empty-ok"
+    }
+    secus {
+      nota "unexpected-value"
+    }
+  }
+  cape err {
+    mone err
+  }
+}
+"#,
+    );
+    let output = build_and_run_sqlite_app(&app);
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("empty-ok"),
+        "expected empty-ok for zero-row scalar, got {stdout:?}"
+    );
+    assert!(
+        !stdout.contains("unexpected-value"),
+        "zero rows must be nihil: {stdout:?}"
+    );
+}
+
 #[test]
 fn g4_native_library_links_into_application_build() {
     let root = test_temp_dir("g4-lib-link");
@@ -9221,6 +9473,137 @@ fn g6_go4_coreutils_true_package_go_builds() {
         .status()
         .expect("run true");
     assert_eq!(status.code(), Some(0), "GNU true should exit 0");
+}
+
+#[test]
+fn g6_consolum_shim_dedupes_across_units() {
+    let dir = test_temp_dir("g6-consolum-dedupe");
+    fs::create_dir_all(dir.join("src")).expect("src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "g6-consolum-dedupe"
+version = "0.1.0"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        dir.join("src/helper.fab"),
+        r#"
+importa ex "norma:consolum" privata consolum
+
+functio shout(textus s) → vacuum {
+  consolum.scribe(s)
+}
+"#,
+    )
+    .expect("helper");
+    fs::write(
+        dir.join("src/main.fab"),
+        r#"
+importa ex "norma:consolum" privata consolum
+importa ex "./helper" privata helper
+
+@ cli "tool"
+@ operandus ceteri textus ignored
+incipit argumenta args exitus 0 {
+  helper.shout("hi")
+  consolum.dic("x")
+}
+"#,
+    )
+    .expect("entry");
+
+    let result = compile_package(&Config::default().with_target(Target::Go), &dir);
+    assert!(
+        result.success(),
+        "dual consolum import should compile: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| d.message.clone())
+            .collect::<Vec<_>>()
+    );
+    let Some(Output::Go(output)) = result.output else {
+        panic!("expected Go");
+    };
+    let decls = output.code.matches("var consolum").count();
+    assert_eq!(
+        decls, 1,
+        "expected exactly one consolum shim, got {decls}:\n{}",
+        output.code
+    );
+    let modules = super::take_go_package_modules();
+    let layout = discover_build_layout(&dir).expect("layout");
+    let go_layout = super::GoBuildLayout::from_package(&layout);
+    super::emit_go_module(&go_layout, &output.code, &modules).expect("emit");
+    let binary = super::invoke_go_build(&go_layout).expect("go build dual consolum");
+    let status = Command::new(&binary).status().expect("run");
+    assert_eq!(status.code(), Some(0));
+}
+
+#[test]
+fn g6_go4_func_name_collision_fails_closed() {
+    let dir = test_temp_dir("g6-go4-collision");
+    fs::create_dir_all(dir.join("src")).expect("src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "g6-go4-collision"
+version = "0.1.0"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("manifest");
+    // Two non-entry modules export the same function name.
+    fs::write(
+        dir.join("src/a.fab"),
+        "functio identity(textus s) → textus {\n  redde s\n}\n",
+    )
+    .expect("a");
+    fs::write(
+        dir.join("src/b.fab"),
+        "functio identity(textus s) → textus {\n  redde s + \"!\"\n}\n",
+    )
+    .expect("b");
+    fs::write(
+        dir.join("src/main.fab"),
+        r#"
+importa ex "./a" privata a
+importa ex "./b" privata b
+@ cli "tool"
+@ operandus ceteri textus ignored
+incipit argumenta args exitus 0 {
+  fixum textus _ ← a.identity("x")
+  fixum textus __ ← b.identity("y")
+}
+"#,
+    )
+    .expect("entry");
+
+    let result = compile_package(&Config::default().with_target(Target::Go), &dir);
+    assert!(!result.success(), "expected compile failure on collision");
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| diagnostic_has_issue(d, "package_go_func_name_collision")),
+        "expected package_go_func_name_collision: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.message.clone(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
 }
 
 #[test]
