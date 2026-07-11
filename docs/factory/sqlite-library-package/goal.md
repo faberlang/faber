@@ -1,7 +1,7 @@
 # Goal: SQLite Library Package
 
-**Status**: Stage 2 Rust binding prototype and Stage 3 read consumer complete;
-Stage 4 write prerequisites now include atomic batches and SHA-256 hashing
+**Status**: Stage 2 Rust binding prototype, Stage 3 read consumer, and first
+Stage 4 Vivi-compatible work-item creation path complete
 **Created**: 2026-07-09
 **Refreshed**: 2026-07-11
 **Target workspace**: `/Users/ianzepp/work/faberlang`
@@ -227,9 +227,11 @@ and match selected `vivi` JSON outputs:
 
 ### Stage 4 - Write Compatibility
 
-Status: atomic parameterized batches and the Faber-visible
-`sqlite:sqlite.sha256_hex` content-ID helper are complete in the packet. Exact
-message composition plus atomic blob/catalog/event persistence remain open.
+Status: atomic parameterized batches, the Faber-visible
+`sqlite:sqlite.sha256_hex` content-ID helper, exact work-item message
+composition, content-addressed blob storage, and atomic blob/catalog/event row
+persistence are complete in the packet. Sent-copy parity and the remaining
+mutation commands remain open.
 
 Add mutation surfaces only after read parity:
 
