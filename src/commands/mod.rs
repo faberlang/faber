@@ -22,7 +22,6 @@ mod test;
 
 use crate::cli::Command;
 use crate::package;
-use clap::Parser;
 use radix::tool::{self, BuildCommand, CheckCommand, DiagnosticMode, EmitCommand, VerifyCommand};
 
 use explain::cmd_explain;
@@ -55,7 +54,7 @@ pub(super) fn eprint_compile_diagnostics(diagnostics: &[radix::diagnostics::Diag
 
 /// Parse argv and dispatch to the selected command handler.
 pub fn run() {
-    let cli = crate::cli::Cli::parse();
+    let cli = crate::cli::Cli::parse_validated();
     if let Some(source) = cli.eval_source {
         cmd_eval(source, cli.eval_args);
         return;

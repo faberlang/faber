@@ -2,7 +2,7 @@
 
 mod emit;
 
-use clap::{Parser, Subcommand};
+use clap::{error::ErrorKind, CommandFactory, Parser, Subcommand};
 pub use emit::{EmitArgs, FaberCliTarget};
 use std::path::PathBuf;
 
@@ -29,6 +29,34 @@ pub struct Cli {
 
     #[command(subcommand)]
     pub command: Option<Command>,
+}
+
+impl Cli {
+    pub fn parse_validated() -> Self {
+        let cli = Self::parse();
+        if let Err(err) = cli.validate() {
+            err.exit();
+        }
+        cli
+    }
+
+    #[cfg(test)]
+    pub fn try_parse_from_validated<I, T>(itr: I) -> Result<Self, clap::Error>
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<std::ffi::OsString> + Clone,
+    {
+        let cli = Self::try_parse_from(itr)?;
+        cli.validate()?;
+        Ok(cli)
+    }
+
+    fn validate(&self) -> Result<(), clap::Error> {
+        let Some(Command::Explain(args)) = self.command.as_ref() else {
+            return Ok(());
+        };
+        args.validate()
+    }
 }
 
 /// User-facing `faber` subcommands.
@@ -235,6 +263,44 @@ pub struct ExplainArgs {
     /// Term, alias, or legacy spelling to explain
     #[arg(conflicts_with_all = ["search", "list", "category"])]
     pub term: Option<String>,
+}
+
+impl ExplainArgs {
+    fn validate(&self) -> Result<(), clap::Error> {
+        if self.reader_locale.is_some() {
+            if self.list {
+                return Err(explain_arg_error(
+                    ErrorKind::ArgumentConflict,
+                    "--reader-locale cannot be combined with --list",
+                ));
+            }
+            if self.search.is_some() {
+                return Err(explain_arg_error(
+                    ErrorKind::ArgumentConflict,
+                    "--reader-locale cannot be combined with --search",
+                ));
+            }
+            if self.category.is_some() {
+                return Err(explain_arg_error(
+                    ErrorKind::ArgumentConflict,
+                    "--reader-locale cannot be combined with --category",
+                ));
+            }
+            if self.term.is_none() {
+                return Err(explain_arg_error(
+                    ErrorKind::MissingRequiredArgument,
+                    "the following required arguments were not provided:\n  <TERM>",
+                ));
+            }
+        }
+
+        Ok(())
+    }
+}
+
+fn explain_arg_error(kind: ErrorKind, message: &str) -> clap::Error {
+    let mut command = Cli::command();
+    command.error(kind, message)
 }
 
 /// Arguments for `faber repl`.

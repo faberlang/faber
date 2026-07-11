@@ -354,7 +354,7 @@ fn cli_rejects_conflicting_format_output_modes() {
 
 #[test]
 fn cli_parses_reader_locale_on_explain() {
-    let explain = Cli::try_parse_from([
+    let explain = Cli::try_parse_from_validated([
         "faber",
         "explain",
         "--reader-locale",
@@ -374,15 +374,15 @@ fn cli_parses_reader_locale_on_explain() {
 
 #[test]
 fn cli_parses_explain_query_modes() {
-    let json =
-        Cli::try_parse_from(["faber", "explain", "--json", "nihil"]).expect("parse explain json");
+    let json = Cli::try_parse_from_validated(["faber", "explain", "--json", "nihil"])
+        .expect("parse explain json");
     let Some(crate::cli::Command::Explain(json_args)) = json.command else {
         panic!("expected explain subcommand");
     };
     assert!(json_args.json);
     assert_eq!(json_args.term.as_deref(), Some("nihil"));
 
-    let search = Cli::try_parse_from(["faber", "explain", "--search", "host"])
+    let search = Cli::try_parse_from_validated(["faber", "explain", "--search", "host"])
         .expect("parse explain search");
     let Some(crate::cli::Command::Explain(search_args)) = search.command else {
         panic!("expected explain subcommand");
@@ -390,14 +390,15 @@ fn cli_parses_explain_query_modes() {
     assert_eq!(search_args.search.as_deref(), Some("host"));
     assert!(search_args.term.is_none());
 
-    let list = Cli::try_parse_from(["faber", "explain", "--list"]).expect("parse explain list");
+    let list =
+        Cli::try_parse_from_validated(["faber", "explain", "--list"]).expect("parse explain list");
     let Some(crate::cli::Command::Explain(list_args)) = list.command else {
         panic!("expected explain subcommand");
     };
     assert!(list_args.list);
     assert!(list_args.term.is_none());
 
-    let category = Cli::try_parse_from(["faber", "explain", "--category", "diagnostics"])
+    let category = Cli::try_parse_from_validated(["faber", "explain", "--category", "diagnostics"])
         .expect("parse explain category");
     let Some(crate::cli::Command::Explain(category_args)) = category.command else {
         panic!("expected explain subcommand");
@@ -408,18 +409,19 @@ fn cli_parses_explain_query_modes() {
 
 #[test]
 fn cli_rejects_conflicting_explain_query_modes() {
-    let mixed = Cli::try_parse_from(["faber", "explain", "--list", "nihil"])
+    let mixed = Cli::try_parse_from_validated(["faber", "explain", "--list", "nihil"])
         .expect_err("list and term should conflict");
     let mixed_rendered = mixed.to_string();
     assert!(mixed_rendered.contains("--list"));
 
-    let search_json = Cli::try_parse_from(["faber", "explain", "--search", "host", "--json"])
-        .expect_err("search and json should conflict");
+    let search_json =
+        Cli::try_parse_from_validated(["faber", "explain", "--search", "host", "--json"])
+            .expect_err("search and json should conflict");
     let search_json_rendered = search_json.to_string();
     assert!(search_json_rendered.contains("--search"));
     assert!(search_json_rendered.contains("--json"));
 
-    let search_category = Cli::try_parse_from([
+    let search_category = Cli::try_parse_from_validated([
         "faber",
         "explain",
         "--search",
@@ -431,14 +433,30 @@ fn cli_rejects_conflicting_explain_query_modes() {
     let search_category_rendered = search_category.to_string();
     assert!(search_category_rendered.contains("--search"));
     assert!(search_category_rendered.contains("--category"));
+
+    let list_reader_locale =
+        Cli::try_parse_from_validated(["faber", "explain", "--list", "--reader-locale", "la"])
+            .expect_err("list and reader locale should conflict");
+    let list_reader_locale_rendered = list_reader_locale.to_string();
+    assert!(list_reader_locale_rendered.contains("--list"));
+    assert!(list_reader_locale_rendered.contains("--reader-locale"));
 }
 
 #[test]
 fn cli_rejects_explain_json_without_term() {
-    let error =
-        Cli::try_parse_from(["faber", "explain", "--json"]).expect_err("json requires a term");
+    let error = Cli::try_parse_from_validated(["faber", "explain", "--json"])
+        .expect_err("json requires a term");
     let rendered = error.to_string();
     assert!(rendered.contains("--json"));
+    assert!(rendered.contains("<TERM>") || rendered.contains("<term>"));
+}
+
+#[test]
+fn cli_rejects_explain_reader_locale_without_term() {
+    let error = Cli::try_parse_from_validated(["faber", "explain", "--reader-locale", "la"])
+        .expect_err("reader locale requires a term");
+    let rendered = error.to_string();
+    assert!(rendered.contains("required arguments were not provided"));
     assert!(rendered.contains("<TERM>") || rendered.contains("<term>"));
 }
 
