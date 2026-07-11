@@ -12,6 +12,7 @@
 //! tool assumptions.
 
 mod explain_render;
+mod input_shape;
 mod io_buf;
 pub(crate) mod library;
 

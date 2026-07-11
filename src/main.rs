@@ -6,6 +6,7 @@
 
 mod cli;
 mod commands;
+mod input_shape;
 mod io_buf;
 mod library;
 mod package;
