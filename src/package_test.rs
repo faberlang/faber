@@ -7359,6 +7359,10 @@ fn linked_library_emit_skips_entry_file_layouts_without_manifest() {
     let entry = dir.join("main.fab");
     fs::write(&entry, "incipit { nota \"no manifest\" }").expect("entry");
 
+    let deps = super::artifact_plan::native_library_deps(&dir)
+        .expect("entry-file layouts without manifest should not require native deps");
+    assert!(deps.is_empty());
+
     let layout = discover_build_layout(&entry).expect("layout");
     let linked = super::library_link::emit_linked_library_crates(&layout.package_root, &layout)
         .expect("entry-file layouts without manifest should not require native deps");

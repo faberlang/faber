@@ -257,6 +257,10 @@ pub struct RunArgs {
     #[arg(default_value = ".")]
     pub path: PathBuf,
 
+    /// Reader locale used to select a package-local reader pack.
+    #[arg(long = "reader-locale", value_name = "LOCALE")]
+    pub reader_locale: Option<String>,
+
     /// Runtime target to build and execute.
     #[arg(short = 't', long = "target", value_enum, default_value_t = radix::tool::CliTarget::Rust)]
     pub target: radix::tool::CliTarget,
@@ -311,6 +315,10 @@ pub struct TestArgs {
     /// Package path to test
     #[arg(default_value = ".")]
     pub path: PathBuf,
+
+    /// Reader locale used to select a package-local reader pack.
+    #[arg(long = "reader-locale", value_name = "LOCALE")]
+    pub reader_locale: Option<String>,
 
     /// Test name filter passed to the Rust test harness (matches on generated proba_* names)
     #[arg(value_name = "FILTER")]

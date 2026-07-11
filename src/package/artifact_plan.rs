@@ -237,6 +237,9 @@ pub(crate) fn native_library_deps(
     package_root: &Path,
 ) -> Result<Vec<(String, LockedPackage, FaberManifest)>, Vec<Diagnostic>> {
     let manifest_path = package_root.join(super::MANIFEST_FILE);
+    if !manifest_path.is_file() {
+        return Ok(Vec::new());
+    }
     let manifest = match read_manifest(&manifest_path) {
         Ok(manifest) => manifest,
         Err(diag) => return Err(vec![*diag]),

@@ -16,6 +16,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 fn should_interpret(args: &RunArgs, path: &Path) -> bool {
+    if args.reader_locale.is_some() {
+        return false;
+    }
     if Target::from(args.target) != Target::Rust {
         return false;
     }
@@ -31,6 +34,10 @@ fn should_interpret(args: &RunArgs, path: &Path) -> bool {
 /// Builds a package as Rust or interprets a single `.fab` file.
 pub(super) fn cmd_run(args: RunArgs) {
     let input_path = PathBuf::from(&args.path);
+    if args.interpret && args.reader_locale.is_some() {
+        eprintln!("error: --reader-locale is not supported with `faber run --interpret`");
+        std::process::exit(1);
+    }
     match Target::from(args.target) {
         Target::Rust => {}
         Target::Go => {
@@ -233,7 +240,17 @@ fn cmd_run_compiled(args: RunArgs) {
 
     // POLICY: `run` is package-scoped, so stale generated crates are never
     // trusted over the current Faber sources.
-    let config = radix::driver::Config::default().with_target(radix::codegen::Target::Rust);
+    let (config, _reader_pack) = match package::config_with_reader_locale(
+        radix::codegen::Target::Rust,
+        &input_path,
+        args.reader_locale.as_deref(),
+    ) {
+        Ok(pair) => pair,
+        Err(diag) => {
+            eprintln!("error: {}", diag.message);
+            std::process::exit(1);
+        }
+    };
     let result = package::compile_package(&config, &input_path);
 
     super::eprint_compile_diagnostics(&result.diagnostics);

@@ -24,7 +24,17 @@ pub(super) fn cmd_test(args: TestArgs) {
 
     // POLICY: tests are package-scoped so generated harness metadata and source
     // selection stay aligned.
-    let config = radix::driver::Config::default().with_target(radix::codegen::Target::Rust);
+    let (config, _reader_pack) = match package::config_with_reader_locale(
+        radix::codegen::Target::Rust,
+        &input_path,
+        args.reader_locale.as_deref(),
+    ) {
+        Ok(pair) => pair,
+        Err(diag) => {
+            eprintln!("error: {}", diag.message);
+            std::process::exit(1);
+        }
+    };
     let result =
         package::compile_package_with_test_selection(&config, &input_path, test_selection.as_ref());
 

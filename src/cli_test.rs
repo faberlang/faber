@@ -277,7 +277,7 @@ fn cli_parses_fmir_bin_target_for_build_and_run() {
 }
 
 #[test]
-fn cli_parses_reader_locale_on_check_emit_build_and_format() {
+fn cli_parses_reader_locale_on_check_emit_build_run_test_and_format() {
     let check = Cli::try_parse_from(["faber", "check", "--reader-locale", "zh-Hans", "main.fab"])
         .expect("parse check reader locale");
     let Some(crate::cli::Command::Check(args)) = check.command else {
@@ -304,6 +304,20 @@ fn cli_parses_reader_locale_on_check_emit_build_and_format() {
         .expect("parse build reader locale");
     let Some(crate::cli::Command::Build(args)) = build.command else {
         panic!("expected build subcommand");
+    };
+    assert_eq!(args.reader_locale.as_deref(), Some("zh-Hans"));
+
+    let run = Cli::try_parse_from(["faber", "run", "--reader-locale", "zh-Hans", "main.fab"])
+        .expect("parse run reader locale");
+    let Some(crate::cli::Command::Run(args)) = run.command else {
+        panic!("expected run subcommand");
+    };
+    assert_eq!(args.reader_locale.as_deref(), Some("zh-Hans"));
+
+    let test = Cli::try_parse_from(["faber", "test", "--reader-locale", "zh-Hans", "main.fab"])
+        .expect("parse test reader locale");
+    let Some(crate::cli::Command::Test(args)) = test.command else {
+        panic!("expected test subcommand");
     };
     assert_eq!(args.reader_locale.as_deref(), Some("zh-Hans"));
 

@@ -19,6 +19,7 @@ fn interpret_policy_defaults_to_single_fab_file() {
         .join("../examples/corpus/incipit/salve-munde.fab");
     let args = RunArgs {
         path: fab.clone(),
+        reader_locale: None,
         target: radix::tool::CliTarget::Rust,
         release: false,
         interpret: false,
@@ -33,6 +34,7 @@ fn compile_flag_overrides_single_fab_file() {
     let fab = PathBuf::from("script.fab");
     let args = RunArgs {
         path: fab.clone(),
+        reader_locale: None,
         target: radix::tool::CliTarget::Rust,
         release: false,
         interpret: false,
@@ -47,6 +49,7 @@ fn package_directory_defaults_to_compiled_run_policy() {
     let dir = temp_dir("compiled-package-policy");
     let args = RunArgs {
         path: dir.clone(),
+        reader_locale: None,
         target: radix::tool::CliTarget::Rust,
         release: false,
         interpret: false,
@@ -62,7 +65,24 @@ fn scena_target_never_uses_script_interpret_policy() {
     let fab = PathBuf::from("script.fab");
     let args = RunArgs {
         path: fab.clone(),
+        reader_locale: None,
         target: radix::tool::CliTarget::Scena,
+        release: false,
+        interpret: false,
+        compile: false,
+        args: Vec::new(),
+    };
+
+    assert!(!should_interpret(&args, &fab));
+}
+
+#[test]
+fn reader_locale_forces_compiled_run_policy_for_single_fab_file() {
+    let fab = PathBuf::from("script.fab");
+    let args = RunArgs {
+        path: fab.clone(),
+        reader_locale: Some("zh-Hans".to_owned()),
+        target: radix::tool::CliTarget::Rust,
         release: false,
         interpret: false,
         compile: false,

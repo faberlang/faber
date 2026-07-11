@@ -241,6 +241,53 @@ incipit {
 }
 
 #[test]
+fn run_reader_locale_accepts_direct_entry_file_input() {
+    let source = write_single_file(
+        "run-reader-locale-single-file",
+        r#"
+incipit {
+  nota "salve"
+}
+"#,
+    );
+
+    let (stdout, stderr, ok) = run_faber(&[
+        "run",
+        "--reader-locale",
+        "zh-Hans",
+        source.to_str().expect("utf8 source path"),
+    ]);
+
+    assert!(ok, "single-file run with reader locale failed:\n{stderr}");
+    assert_eq!(stdout, "salve\n");
+}
+
+#[test]
+fn test_reader_locale_accepts_direct_entry_file_input() {
+    let source = write_single_file(
+        "test-reader-locale-single-file",
+        r#"
+incipit {
+  nota "salve"
+}
+"#,
+    );
+
+    let (stdout, stderr, ok) = run_faber(&[
+        "test",
+        "--reader-locale",
+        "zh-Hans",
+        source.to_str().expect("utf8 source path"),
+    ]);
+
+    assert!(ok, "single-file test with reader locale failed:\n{stderr}");
+    assert!(
+        stdout.contains("test result: ok."),
+        "expected cargo test success output, got:\n{stdout}"
+    );
+}
+
+#[test]
 fn fmir_bin_package_forwards_runtime_arg_after_source_is_removed() {
     let package = write_basic_package(
         "fmir-bin-cli",
