@@ -257,6 +257,36 @@ fn build_reader_locale_rejects_forced_package_stdin_input() {
 }
 
 #[test]
+fn build_reader_locale_rejects_multiple_direct_inputs() {
+    let entry_a = write_single_file(
+        "build-reader-locale-multi-a",
+        "incipit { nota \"salve\" }\n",
+    );
+    let entry_b = write_single_file("build-reader-locale-multi-b", "incipit { nota \"vale\" }\n");
+
+    let (stdout, stderr, ok) = run_faber(&[
+        "build",
+        "--reader-locale",
+        "th-TH",
+        entry_a.to_str().expect("entry path"),
+        entry_b.to_str().expect("entry path"),
+    ]);
+
+    assert!(
+        !ok,
+        "build should reject reader-locale when multiple direct inputs are supplied"
+    );
+    assert!(
+        stdout.is_empty(),
+        "rejected build should not write stdout: {stdout}"
+    );
+    assert!(
+        stderr.contains("--reader-locale th-TH requires a package path or .fab entry file"),
+        "expected multiple-input reader-locale rejection, got:\n{stderr}"
+    );
+}
+
+#[test]
 fn build_reader_locale_accepts_manifest_file_input() {
     let package = write_basic_package(
         "build-reader-locale-manifest",
@@ -370,6 +400,33 @@ fn run_reader_locale_rejects_stdin_input() {
     assert!(
         stderr.contains("--reader-locale zh-Hans requires a package path or .fab entry file"),
         "expected stdin reader-locale rejection, got:\n{stderr}"
+    );
+}
+
+#[test]
+fn run_reader_locale_rejects_multiple_direct_inputs() {
+    let entry_a = write_single_file("run-reader-locale-multi-a", "incipit { nota \"salve\" }\n");
+    let entry_b = write_single_file("run-reader-locale-multi-b", "incipit { nota \"vale\" }\n");
+
+    let (stdout, stderr, ok) = run_faber(&[
+        "run",
+        "--reader-locale",
+        "th-TH",
+        entry_a.to_str().expect("entry path"),
+        entry_b.to_str().expect("entry path"),
+    ]);
+
+    assert!(
+        !ok,
+        "run should reject reader-locale when multiple direct inputs are supplied"
+    );
+    assert!(
+        stdout.is_empty(),
+        "rejected run should not write stdout: {stdout}"
+    );
+    assert!(
+        stderr.contains("unexpected argument"),
+        "expected multiple-input parse rejection, got:\n{stderr}"
     );
 }
 

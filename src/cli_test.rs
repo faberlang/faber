@@ -164,7 +164,7 @@ fn cli_parses_scena_target_for_build_and_run() {
         panic!("expected build subcommand");
     };
     assert_eq!(args.target, Some(radix::tool::CliTarget::Scena));
-    assert_eq!(args.input, "pkg");
+    assert_eq!(args.input, vec!["pkg"]);
 
     let run = Cli::try_parse_from(["faber", "run", "--target", "scena", "pkg", "--", "Ian"])
         .expect("parse run scena target");
@@ -206,7 +206,7 @@ fn cli_leaves_build_target_unset_when_omitted() {
         panic!("expected build subcommand");
     };
     assert_eq!(args.target, None);
-    assert_eq!(args.input, "pkg");
+    assert_eq!(args.input, vec!["pkg"]);
 }
 
 #[test]
@@ -231,7 +231,7 @@ fn cli_parses_build_output_and_mode_flags() {
     assert!(args.release);
     assert!(args.format);
     assert!(args.linter);
-    assert_eq!(args.input, "pkg");
+    assert_eq!(args.input, vec!["pkg"]);
 }
 
 #[test]
@@ -242,7 +242,7 @@ fn cli_parses_fmir_text_target_for_build() {
         panic!("expected build subcommand");
     };
     assert_eq!(args.target, Some(radix::tool::CliTarget::FmirText));
-    assert_eq!(args.input, "pkg");
+    assert_eq!(args.input, vec!["pkg"]);
 }
 
 #[test]
@@ -253,7 +253,7 @@ fn cli_parses_fmir_target_for_build() {
         panic!("expected build subcommand");
     };
     assert_eq!(args.target, Some(radix::tool::CliTarget::Fmir));
-    assert_eq!(args.input, "pkg");
+    assert_eq!(args.input, vec!["pkg"]);
 }
 
 #[test]
@@ -264,7 +264,7 @@ fn cli_parses_fmir_bin_target_for_build_and_run() {
         panic!("expected build subcommand");
     };
     assert_eq!(args.target, Some(radix::tool::CliTarget::FmirBin));
-    assert_eq!(args.input, "pkg");
+    assert_eq!(args.input, vec!["pkg"]);
 
     let run = Cli::try_parse_from(["faber", "run", "--target", "fmir-bin", "pkg", "--", "Ian"])
         .expect("parse run fmir-bin target");

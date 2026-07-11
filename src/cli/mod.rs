@@ -157,7 +157,8 @@ pub struct BuildArgs {
     pub reader_locale: Option<String>,
 
     /// Input file or package path
-    pub input: String,
+    #[arg(value_name = "INPUT", required = true)]
+    pub input: Vec<String>,
 }
 
 /// Arguments for `faber check`.
@@ -246,7 +247,7 @@ pub struct ExplainArgs {
 #[derive(clap::Args, Debug)]
 pub struct ReplArgs {
     /// Arguments available to script cells via `processus.argumenta()`
-    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+    #[arg(allow_hyphen_values = true, last = true)]
     pub args: Vec<String>,
 }
 
@@ -278,7 +279,7 @@ pub struct RunArgs {
     pub compile: bool,
 
     /// Arguments passed to the executed program (after --)
-    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+    #[arg(allow_hyphen_values = true, last = true)]
     pub args: Vec<String>,
 }
 
@@ -289,7 +290,7 @@ pub struct FmirRunArgs {
     pub image: PathBuf,
 
     /// Arguments passed to the FMIR program.
-    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+    #[arg(allow_hyphen_values = true, last = true)]
     pub args: Vec<String>,
 }
 
@@ -305,7 +306,7 @@ pub struct ScriptArgs {
     pub path: PathBuf,
 
     /// Arguments passed to the interpreted program (after --)
-    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+    #[arg(allow_hyphen_values = true, last = true)]
     pub args: Vec<String>,
 }
 
