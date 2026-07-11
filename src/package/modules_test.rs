@@ -1,5 +1,5 @@
 use super::{module_segments_for_file, sanitize_rust_module_ident};
-use std::path::Path;
+use std::path::PathBuf;
 
 #[test]
 fn sanitize_maps_worktree_hyphen_slug_to_valid_ident() {
@@ -20,13 +20,14 @@ fn module_segments_sanitize_outside_source_root_absolute_hyphen_path() {
     // Outside-package shared files (e.g. coreutils common/) fall back to the
     // absolute path when strip_prefix fails. Hyphenated worktree slugs must still
     // emit legal Rust module segments.
-    let source_root = Path::new(
-        "/Users/ianzepp/work/faberlang/worktrees/faber-hir-v1/examples/coreutils/packages/echo",
-    );
-    let file = Path::new(
-        "/Users/ianzepp/work/faberlang/worktrees/faber-hir-v1/examples/coreutils/common/gnu/format.fab",
-    );
-    let segments = module_segments_for_file(source_root, file, None);
+    let workspace_root = PathBuf::from("/")
+        .join("tmp")
+        .join("faberlang")
+        .join("worktrees")
+        .join("faber-hir-v1");
+    let source_root = workspace_root.join("examples/coreutils/packages/echo");
+    let file = workspace_root.join("examples/coreutils/common/gnu/format.fab");
+    let segments = module_segments_for_file(&source_root, &file, None);
     assert!(
         segments
             .iter()

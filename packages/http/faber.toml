@@ -1,0 +1,25 @@
+[package]
+name = "http"
+version = "0.1.0"
+edition = "2026"
+
+[library]
+provider = "http"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["rust"]
+
+[target.rust]
+bindings = "bindings/rust.toml"
+
+[target.rust.dependencies]
+bytes = "1"
+faber_http_transport = "{ package = \"faber-http-transport\", path = \"../../crates/http-transport\" }"
+tokio = "{ version = \"1\", features = [\"rt-multi-thread\", \"sync\", \"time\"] }"
+
+# Binding probe injects `faber-runtime` automatically when absent (see binding_probe.rs).
+# App link path-deps come from G4 library_link, not this table.

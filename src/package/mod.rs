@@ -50,13 +50,19 @@ mod paths;
 mod reader;
 mod source_files;
 
+#[allow(unused_imports)]
+// public package API for library callers; binary crate does not use it.
 pub use artifact_plan::ArtifactPlan;
 pub use binding::verify_library_bindings;
 // used by `commands/run.rs` / tests for G4 library path-deps on package emit
+#[allow(unused_imports)]
+// library crate tests use this re-export; binary crate imports cargo directly.
 pub(crate) use cargo::emit_generated_crate_with_runtime_plan;
 #[allow(unused_imports)]
 // used by `commands/run.rs` and `commands/test.rs` in the binary crate
 pub(crate) use cargo::invoke_cargo_build;
+#[allow(unused_imports)]
+// public package API for tests/library callers; binary crate uses narrower seams.
 pub use cargo::{emit_generated_crate, invoke_cargo_test};
 pub(crate) use cargo::{package_host_selection_diagnostic, RustRuntimePlan};
 #[cfg(test)]
@@ -66,6 +72,7 @@ pub use cmd::{
     use_package_compiler_from_args,
 };
 pub(crate) use compile::package_rust_runtime_plan;
+#[allow(unused_imports)] // binary-only run path consumes this crate-visible helper.
 pub(crate) use compile::take_go_package_modules;
 #[allow(unused_imports)] // package MIR stages consume this crate-visible analysis API.
 pub(crate) use compile::{analyze_package, AnalyzedPackage, AnalyzedPackageUnit};
@@ -73,7 +80,7 @@ pub use compile::{check_package, compile_package, compile_package_with_test_sele
 #[allow(unused_imports)] // public package API; used by integration tests and external callers
 pub use discovery::{discover_build_layout, sanitize_crate_name, BuildLayout};
 pub(crate) use dispatch::{
-    load_provider_manifests, provider_crate_path, selected_providers_for_routes, ProviderManifest,
+    load_provider_manifests, selected_providers_for_routes, ProviderManifest,
 };
 #[allow(unused_imports)] // binary `commands/run` consumes run_go_binary
 pub(crate) use go_build::{emit_go_module, invoke_go_build, run_go_binary, GoBuildLayout};

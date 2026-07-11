@@ -9,13 +9,18 @@
 //! break (see `docs/factory/faber-script-runtime/stage0-baseline.md`).
 
 use crate::cli::{FmirRunArgs, RunArgs};
+use crate::input_shape::reader_locale_without_package_error;
 use crate::package;
 use radix::codegen::Target;
+use radix::diagnostics::Diagnostic;
 use radix::mir::StdioHost;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 fn should_interpret(args: &RunArgs, path: &Path) -> bool {
+    if args.reader_locale.is_some() {
+        return false;
+    }
     if Target::from(args.target) != Target::Rust {
         return false;
     }
@@ -31,6 +36,18 @@ fn should_interpret(args: &RunArgs, path: &Path) -> bool {
 /// Builds a package as Rust or interprets a single `.fab` file.
 pub(super) fn cmd_run(args: RunArgs) {
     let input_path = PathBuf::from(&args.path);
+    if let Some(message) = reader_locale_without_package_error(
+        args.reader_locale.as_deref(),
+        &[args.path.display().to_string()],
+        false,
+    ) {
+        eprintln!("error: {message}");
+        std::process::exit(1);
+    }
+    if args.interpret && args.reader_locale.is_some() {
+        eprintln!("error: --reader-locale is not supported with `faber run --interpret`");
+        std::process::exit(1);
+    }
     match Target::from(args.target) {
         Target::Rust => {}
         Target::Go => {
@@ -89,10 +106,33 @@ fn run_target_name(target: Target) -> &'static str {
     }
 }
 
+fn run_config(
+    target: Target,
+    input_path: &Path,
+    reader_locale: Option<&str>,
+) -> Result<radix::driver::Config, Box<Diagnostic>> {
+    package::config_with_reader_locale(target, input_path, reader_locale)
+        .map(|(config, _reader_pack)| config)
+}
+
+fn run_config_or_exit(
+    target: Target,
+    input_path: &Path,
+    reader_locale: Option<&str>,
+) -> radix::driver::Config {
+    match run_config(target, input_path, reader_locale) {
+        Ok(config) => config,
+        Err(diag) => {
+            eprintln!("error: {}", diag.message);
+            std::process::exit(1);
+        }
+    }
+}
+
 /// G6 GO3 — package compile → go build → exec with forwarded argv.
 fn cmd_run_go(args: RunArgs) {
     let input_path = PathBuf::from(&args.path);
-    let config = radix::driver::Config::default().with_target(Target::Go);
+    let config = run_config_or_exit(Target::Go, &input_path, args.reader_locale.as_deref());
     let result = package::compile_package(&config, &input_path);
     super::eprint_compile_diagnostics(&result.diagnostics);
     let Some(output) = result.output else {
@@ -139,7 +179,7 @@ fn cmd_run_scena(args: RunArgs) {
     let input_path = PathBuf::from(&args.path);
     let argumenta = args.args.clone();
     let mut host = StdioHost::with_argumenta(args.args);
-    let config = radix::driver::Config::default().with_target(Target::Scena);
+    let config = run_config_or_exit(Target::Scena, &input_path, args.reader_locale.as_deref());
     let artifact = match package::build_package_mir_artifact(&config, &input_path, &argumenta) {
         Ok(artifact) => artifact,
         Err(diagnostics) => {
@@ -158,7 +198,7 @@ fn cmd_run_scena(args: RunArgs) {
 fn cmd_run_fmir_text(args: RunArgs) {
     let input_path = PathBuf::from(&args.path);
     let mut host = StdioHost::with_argumenta(args.args);
-    let config = radix::driver::Config::default().with_target(Target::FmirText);
+    let config = run_config_or_exit(Target::FmirText, &input_path, args.reader_locale.as_deref());
     let image = match package::build_package_fmir_text_image(&config, &input_path, &[]) {
         Ok(image) => image,
         Err(diagnostics) => {
@@ -177,7 +217,7 @@ fn cmd_run_fmir_text(args: RunArgs) {
 fn cmd_run_fmir(args: RunArgs) {
     let input_path = PathBuf::from(&args.path);
     let mut host = StdioHost::with_argumenta(args.args);
-    let config = radix::driver::Config::default().with_target(Target::Fmir);
+    let config = run_config_or_exit(Target::Fmir, &input_path, args.reader_locale.as_deref());
     let image = match package::build_package_fmir_image(&config, &input_path, &[]) {
         Ok(image) => image,
         Err(diagnostics) => {
@@ -195,7 +235,7 @@ fn cmd_run_fmir(args: RunArgs) {
 
 fn cmd_run_fmir_bin(args: RunArgs) {
     let input_path = PathBuf::from(&args.path);
-    let config = radix::driver::Config::default().with_target(Target::FmirBin);
+    let config = run_config_or_exit(Target::FmirBin, &input_path, args.reader_locale.as_deref());
     let bundle =
         match package::build_package_fmir_binary_bundle(&config, &input_path, &[], args.release) {
             Ok(bundle) => bundle,
@@ -233,7 +273,7 @@ fn cmd_run_compiled(args: RunArgs) {
 
     // POLICY: `run` is package-scoped, so stale generated crates are never
     // trusted over the current Faber sources.
-    let config = radix::driver::Config::default().with_target(radix::codegen::Target::Rust);
+    let config = run_config_or_exit(Target::Rust, &input_path, args.reader_locale.as_deref());
     let result = package::compile_package(&config, &input_path);
 
     super::eprint_compile_diagnostics(&result.diagnostics);

@@ -2,15 +2,27 @@ use radix::diagnostics::{Diagnostic, DiagnosticPhase};
 use radix::driver::AnalyzedUnit;
 use radix::file_interface::{
     snapshot_interface_callable_with_resolver, snapshot_interface_type_with_resolver, FileExport,
-    FileExportKind, FileInterface, FileInterfaceError, InterfaceMethodExport,
-    InterfaceNominalExport, InterfaceStructExport, InterfaceStructField,
+    FileExportKind, FileInterface, FileInterfaceError, InterfaceAnnotationContract,
+    InterfaceAnnotationContractField, InterfaceMethodExport, InterfaceNominalExport,
+    InterfaceQualifiedIdentity, InterfaceStructExport, InterfaceStructField,
 };
 use radix::hir::{
-    HirConst, HirFunction, HirInterface, HirInterfaceMethod, HirItemKind, HirParamMode,
-    HirTypeParamConstraint,
+    DefId, HirConst, HirFunction, HirInterface, HirInterfaceMethod, HirItemKind, HirParamMode,
+    HirStruct, HirTypeParamConstraint,
 };
 use radix::semantic::{FuncSig, ParamMode, ParamType, TypeParamConstraint};
 use std::collections::BTreeSet;
+
+/// Portable export identity for annotation contracts on library file interfaces.
+///
+/// WHY: importers match framework contracts by provider/package/module/export, not
+/// unit-local `DefId`. Callers pass package/library provenance when extracting.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ExportIdentityContext {
+    pub provider: String,
+    pub package: Option<String>,
+    pub module_path: Vec<String>,
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct AnalyzedCallableContract {
@@ -56,10 +68,21 @@ pub(crate) fn extract_callable_contracts(
 }
 
 #[allow(clippy::result_large_err)]
+#[allow(dead_code)] // retained for tests / callers without package identity
 pub(crate) fn extract_file_interface(
     analysis: &AnalyzedUnit,
     export_names: &[String],
     file_label: &str,
+) -> Result<FileInterface, Diagnostic> {
+    extract_file_interface_with_identity(analysis, export_names, file_label, None)
+}
+
+#[allow(clippy::result_large_err)]
+pub(crate) fn extract_file_interface_with_identity(
+    analysis: &AnalyzedUnit,
+    export_names: &[String],
+    file_label: &str,
+    export_identity: Option<&ExportIdentityContext>,
 ) -> Result<FileInterface, Diagnostic> {
     let public_exports = export_names.iter().collect::<BTreeSet<_>>();
     let mut interface = FileInterface::new();
@@ -85,9 +108,14 @@ pub(crate) fn extract_file_interface(
                 )
                 .map_err(|err| interface_error(file_label, &name, err))?,
             ),
-            HirItemKind::Struct(strukt) => {
-                FileExportKind::Struct(snapshot_struct(strukt, analysis, file_label, &name)?)
-            }
+            HirItemKind::Struct(strukt) => FileExportKind::Struct(snapshot_struct(
+                strukt,
+                analysis,
+                file_label,
+                &name,
+                item.def_id,
+                export_identity,
+            )?),
             HirItemKind::Enum(enm) => FileExportKind::Enum(InterfaceNominalExport {
                 name: analysis.interner.resolve(enm.name).to_owned(),
                 methods: Vec::new(),
@@ -169,10 +197,12 @@ fn snapshot_interface_method(
 
 #[allow(clippy::result_large_err)]
 fn snapshot_struct(
-    strukt: &radix::hir::HirStruct,
+    strukt: &HirStruct,
     analysis: &AnalyzedUnit,
     file_label: &str,
     name: &str,
+    def_id: DefId,
+    export_identity: Option<&ExportIdentityContext>,
 ) -> Result<InterfaceStructExport, Diagnostic> {
     let fields = strukt
         .fields
@@ -193,10 +223,54 @@ fn snapshot_struct(
         })
         .collect::<Result<Vec<_>, Diagnostic>>()?;
 
+    let annotation_contract = annotation_contract_export(analysis, def_id, name, export_identity);
+
     Ok(InterfaceStructExport {
         name: analysis.interner.resolve(strukt.name).to_owned(),
         fields,
-        annotation_contract: None,
+        annotation_contract,
+    })
+}
+
+fn annotation_contract_export(
+    analysis: &AnalyzedUnit,
+    def_id: DefId,
+    export_name: &str,
+    export_identity: Option<&ExportIdentityContext>,
+) -> Option<InterfaceAnnotationContract> {
+    let contract = analysis
+        .annotation_contracts
+        .registry
+        .get(def_id)
+        .or_else(|| {
+            analysis
+                .annotation_contracts
+                .registry
+                .iter()
+                .find(|contract| analysis.interner.resolve(contract.name) == export_name)
+        })?;
+
+    let fields = contract
+        .fields
+        .iter()
+        .map(|field| InterfaceAnnotationContractField {
+            name: analysis.interner.resolve(field.name).to_owned(),
+            ty: field.ty.as_str().to_owned(),
+            optional: field.optional,
+        })
+        .collect();
+
+    let qualified_identity = export_identity.map(|ctx| InterfaceQualifiedIdentity {
+        provider: ctx.provider.clone(),
+        package: ctx.package.clone(),
+        module_path: ctx.module_path.clone(),
+        export_name: export_name.to_owned(),
+    });
+
+    Some(InterfaceAnnotationContract {
+        target: contract.target.as_str().to_owned(),
+        fields,
+        qualified_identity,
     })
 }
 

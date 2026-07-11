@@ -31,15 +31,6 @@ pub(super) fn cmd_explain(args: ExplainArgs) {
     }
 
     if let Some(query) = args.search {
-        if args.json {
-            eprintln!("error: --json cannot be combined with --search");
-            std::process::exit(2);
-        }
-        if args.term.is_some() {
-            eprintln!("error: --search cannot be combined with a term");
-            std::process::exit(2);
-        }
-
         let registry = load_registry();
         let hits = registry.search(&query);
         if hits.is_empty() {

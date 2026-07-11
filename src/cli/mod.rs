@@ -35,6 +35,7 @@ pub struct Cli {
 #[derive(Subcommand, Debug)]
 pub enum Command {
     /// Compile a file or package and write output to disk
+    #[command(override_usage = "faber build [OPTIONS] <INPUT>")]
     Build(BuildArgs),
 
     /// Show supported targets and current capability notes
@@ -157,6 +158,7 @@ pub struct BuildArgs {
     pub reader_locale: Option<String>,
 
     /// Input file or package path
+    #[arg(value_name = "INPUT")]
     pub input: String,
 }
 
@@ -213,26 +215,32 @@ pub struct VerifyLibraryArgs {
 #[derive(clap::Args, Debug)]
 pub struct ExplainArgs {
     /// Emit a machine-readable JSON explanation
-    #[arg(long)]
+    #[arg(long, requires = "term")]
     pub json: bool,
 
     /// Reader locale used to select diagnostic explanation text
-    #[arg(long = "reader-locale", value_name = "LOCALE")]
+    #[arg(
+        long = "reader-locale",
+        value_name = "LOCALE",
+        requires = "term",
+        conflicts_with_all = ["search", "list", "category"]
+    )]
     pub reader_locale: Option<String>,
 
     /// Search across explain entries and show ranked matches
-    #[arg(long)]
+    #[arg(long, conflicts_with_all = ["list", "category", "term", "json"])]
     pub search: Option<String>,
 
     /// List canonical explain terms
-    #[arg(long)]
+    #[arg(long, conflicts_with_all = ["search", "category", "term", "json"])]
     pub list: bool,
 
     /// List canonical and legacy entries in a category
-    #[arg(long)]
+    #[arg(long, conflicts_with_all = ["search", "list", "term", "json"])]
     pub category: Option<String>,
 
     /// Term, alias, or legacy spelling to explain
+    #[arg(conflicts_with_all = ["search", "list", "category"])]
     pub term: Option<String>,
 }
 
@@ -240,7 +248,7 @@ pub struct ExplainArgs {
 #[derive(clap::Args, Debug)]
 pub struct ReplArgs {
     /// Arguments available to script cells via `processus.argumenta()`
-    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+    #[arg(allow_hyphen_values = true, last = true)]
     pub args: Vec<String>,
 }
 
@@ -250,6 +258,10 @@ pub struct RunArgs {
     /// Package path to run (defaults to current directory)
     #[arg(default_value = ".")]
     pub path: PathBuf,
+
+    /// Reader locale used to select a package-local reader pack.
+    #[arg(long = "reader-locale", value_name = "LOCALE")]
+    pub reader_locale: Option<String>,
 
     /// Runtime target to build and execute.
     #[arg(short = 't', long = "target", value_enum, default_value_t = radix::tool::CliTarget::Rust)]
@@ -268,7 +280,7 @@ pub struct RunArgs {
     pub compile: bool,
 
     /// Arguments passed to the executed program (after --)
-    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+    #[arg(allow_hyphen_values = true, last = true)]
     pub args: Vec<String>,
 }
 
@@ -279,7 +291,7 @@ pub struct FmirRunArgs {
     pub image: PathBuf,
 
     /// Arguments passed to the FMIR program.
-    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+    #[arg(allow_hyphen_values = true, last = true)]
     pub args: Vec<String>,
 }
 
@@ -295,7 +307,7 @@ pub struct ScriptArgs {
     pub path: PathBuf,
 
     /// Arguments passed to the interpreted program (after --)
-    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+    #[arg(allow_hyphen_values = true, last = true)]
     pub args: Vec<String>,
 }
 
@@ -305,6 +317,10 @@ pub struct TestArgs {
     /// Package path to test
     #[arg(default_value = ".")]
     pub path: PathBuf,
+
+    /// Reader locale used to select a package-local reader pack.
+    #[arg(long = "reader-locale", value_name = "LOCALE")]
+    pub reader_locale: Option<String>,
 
     /// Test name filter passed to the Rust test harness (matches on generated proba_* names)
     #[arg(value_name = "FILTER")]

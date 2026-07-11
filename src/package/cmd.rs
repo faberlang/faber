@@ -4,6 +4,8 @@ use radix::tool::DiagnosticMode;
 use radix::{CompileResult, Output};
 use std::path::Path;
 
+use crate::input_shape::reader_locale_without_package_error;
+
 use super::cargo::{emit_generated_crate_with_runtime_plan, invoke_cargo_build};
 use super::go_build::{emit_go_module, invoke_go_build, GoBuildLayout};
 use super::manifest::manifest_build_target;
@@ -24,6 +26,15 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
     use std::fs;
     use std::path::PathBuf;
 
+    if let Some(message) = reader_locale_without_package_error(
+        command.reader_locale.as_deref(),
+        std::slice::from_ref(&command.input),
+        command.package,
+    ) {
+        eprintln!("error: {message}");
+        std::process::exit(1);
+    }
+
     let input_path = PathBuf::from(&command.input);
     let target = resolve_build_target(&command, &input_path);
     let is_package = use_package_compiler(target, &input_path, command.package);
@@ -36,10 +47,6 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
             }
         }
     } else {
-        if let Some(locale) = command.reader_locale.as_ref() {
-            eprintln!("error: --reader-locale {locale} requires a package path or .fab entry file");
-            std::process::exit(1);
-        }
         (Config::default().with_target(target), None)
     };
 

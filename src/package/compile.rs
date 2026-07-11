@@ -1,3 +1,4 @@
+use radix::cli::CliProgram;
 use radix::codegen::rust::{
     build_local_import_function_params, build_local_import_namespaces, local_import_module_key,
     ImportedFunctionParams, ImportedNamespaceInfo, RustFieldNamePolicy, SiblingModuleExports,
@@ -17,7 +18,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use super::codegen::{assemble_crate, ModuleNode};
-use super::file_interface::extract_file_interface;
+
 use super::frontmatter::{manifest_path_for_spec, merge_entry_test_selection};
 use super::import_graph::{
     build_mount_plan, library_import_binding, resolve_import, ImportResolution,
@@ -506,7 +507,7 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
         };
     }
 
-    // Namespace vars for local imports + narrow Norma host shims (entry + siblings).
+    // Namespace vars for local imports + explicit Norma host shims (entry + siblings).
     // WHY (79df18a): inject each binding name at most once — multi-unit packages
     // that all `importa … privata consolum` must not redeclare `var consolum`.
     let mut namespace_block = String::new();
@@ -519,7 +520,7 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
                 continue;
             };
             let import_path = unit.analysis.interner.resolve(import.path);
-            // G6 residual: narrow norma:consolum Go host (echo dic/scribe/mone).
+            // Package Go assembly owns an explicit `norma:consolum` host shim.
             if import_path == "norma:consolum" || import_path == "norma/consolum" {
                 for it in &import.items {
                     let binding = it
@@ -581,9 +582,20 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
     }
 
     let mut entry_code = super::go_build::inject_after_imports(&entry_code, &namespace_block);
+    if entry
+        .analysis
+        .cli_program
+        .as_ref()
+        .is_some_and(go_cli_accepts_dashed_rest_operands)
+    {
+        entry_code = allow_go_cli_dashed_rest_operands(&entry_code);
+    }
     if needs_os_for_shim {
+        entry_code = ensure_go_import(&entry_code, "bufio");
         entry_code = ensure_go_import(&entry_code, "os");
         entry_code = ensure_go_import(&entry_code, "fmt");
+        entry_code = ensure_go_import(&entry_code, "io");
+        entry_code = ensure_go_import(&entry_code, "strings");
     }
 
     // Side-channel: multi-file emit for build/run (Output is entry main.go only).
@@ -636,6 +648,24 @@ fn normalize_path_buf(path: &Path) -> PathBuf {
     std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
 }
 
+fn go_cli_accepts_dashed_rest_operands(program: &CliProgram) -> bool {
+    if !(program.global_options.is_empty() && program.options.is_empty()) {
+        return false;
+    }
+    program
+        .global_operands
+        .iter()
+        .chain(program.operands.iter())
+        .any(|operand| operand.rest)
+}
+
+fn allow_go_cli_dashed_rest_operands(code: &str) -> String {
+    code.replace(
+        "if strings.HasPrefix(arg, \"-\") {",
+        "if strings.HasPrefix(arg, \"-\") && false {",
+    )
+}
+
 /// Detect package-level Go function name collisions across flattened modules.
 ///
 /// WHY: multi-module assembly emits every unit into the same `package main`.
@@ -678,7 +708,7 @@ fn go_package_func_name_collision_diagnostic(
 
 /// Ensure a single-line or parenthesized Go import block includes `pkg`.
 fn ensure_go_import(code: &str, pkg: &str) -> String {
-    if code.contains(&format!("\"{pkg}\"")) {
+    if go_imports(code).iter().any(|existing| existing == pkg) {
         return code.to_owned();
     }
     // import (\n ... )
@@ -706,7 +736,7 @@ fn ensure_go_import(code: &str, pkg: &str) -> String {
         out.push_str("\n\t\"");
         out.push_str(pkg);
         out.push_str("\"\n)\n");
-        out.push_str(&code[line_end..].trim_start_matches('\n'));
+        out.push_str(code[line_end..].trim_start_matches('\n'));
         if !out.ends_with('\n') && code.ends_with('\n') {
             out.push('\n');
         }
@@ -718,11 +748,55 @@ fn ensure_go_import(code: &str, pkg: &str) -> String {
         let mut out = String::new();
         out.push_str(&code[..after]);
         out.push_str(&format!("\n\nimport \"{pkg}\"\n"));
-        out.push_str(&code[after..].trim_start_matches('\n'));
+        out.push_str(code[after..].trim_start_matches('\n'));
         return out;
     }
     code.to_owned()
 }
+
+fn go_imports(code: &str) -> Vec<String> {
+    let mut imports = Vec::new();
+    let mut in_block = false;
+
+    for line in code.lines() {
+        let trimmed = line.trim();
+        if in_block {
+            if trimmed == ")" {
+                in_block = false;
+                continue;
+            }
+            if let Some(path) = go_import_path(trimmed) {
+                imports.push(path.to_owned());
+            }
+            continue;
+        }
+
+        if trimmed == "import (" {
+            in_block = true;
+            continue;
+        }
+        if let Some(rest) = trimmed.strip_prefix("import ") {
+            if let Some(path) = go_import_path(rest.trim()) {
+                imports.push(path.to_owned());
+            }
+        }
+    }
+
+    imports
+}
+
+fn go_import_path(segment: &str) -> Option<&str> {
+    let quoted = if let Some((_, rest)) = segment.split_once(' ') {
+        rest.trim()
+    } else {
+        segment
+    };
+    quoted.strip_prefix('"')?.strip_suffix('"')
+}
+
+#[cfg(test)]
+#[path = "compile_test.rs"]
+mod tests;
 
 fn generate_package_rust(
     package: &mut AnalyzedPackage,
@@ -1067,10 +1141,19 @@ fn analyze_package_spec(
         }
 
         let export_names = program_export_names(&file.program, &file.interner);
-        let file_interface = match extract_file_interface(
+        let package_name = manifest_path_for_spec(&spec)
+            .and_then(|path| read_manifest(&path).ok())
+            .map(|manifest| manifest.package.name);
+        let export_identity = super::file_interface::ExportIdentityContext {
+            provider: "package".to_owned(),
+            package: package_name,
+            module_path: file.module_segments.clone(),
+        };
+        let file_interface = match super::file_interface::extract_file_interface_with_identity(
             &analysis,
             &export_names,
             &file.path.display().to_string(),
+            Some(&export_identity),
         ) {
             Ok(interface) => interface,
             Err(diag) => {

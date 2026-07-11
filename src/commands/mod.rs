@@ -21,6 +21,7 @@ mod script;
 mod test;
 
 use crate::cli::Command;
+use crate::input_shape::{reader_locale_without_package_error, verify_input_is_package_shaped};
 use crate::package;
 use clap::Parser;
 use radix::tool::{self, BuildCommand, CheckCommand, DiagnosticMode, EmitCommand, VerifyCommand};
@@ -70,6 +71,11 @@ pub fn run() {
 fn dispatch(command: Command) {
     match command {
         Command::Build(args) => {
+            reject_reader_locale_without_package(
+                args.reader_locale.as_deref(),
+                std::slice::from_ref(&args.input),
+                args.package,
+            );
             let target_explicit = args.target.is_some();
             package::cmd_build(BuildCommand {
                 input: args.input,
@@ -85,6 +91,11 @@ fn dispatch(command: Command) {
         }
         Command::Targets => tool::cmd_targets(),
         Command::Check(args) => {
+            reject_reader_locale_without_package(
+                args.reader_locale.as_deref(),
+                &args.input,
+                args.package,
+            );
             if args.package || package::should_treat_as_package_from_args(&args.input) {
                 package::cmd_check_package(CheckCommand {
                     input: args.input,
@@ -95,10 +106,6 @@ fn dispatch(command: Command) {
                     reader_locale: args.reader_locale,
                 });
             } else {
-                if let Some(locale) = args.reader_locale {
-                    eprintln!("error: --reader-locale {locale} requires a package path or .fab entry file");
-                    std::process::exit(1);
-                }
                 tool::cmd_check(CheckCommand {
                     input: args.input,
                     package: args.package,
@@ -154,12 +161,18 @@ fn dispatch(command: Command) {
                 &emit_command.input,
                 args.package,
             ) {
+                reject_reader_locale_without_package(
+                    emit_command.reader_locale.as_deref(),
+                    &emit_command.input,
+                    emit_command.package,
+                );
                 package::cmd_emit_package(emit_command);
             } else {
-                if let Some(locale) = emit_command.reader_locale.as_ref() {
-                    eprintln!("error: --reader-locale {locale} requires a package path or .fab entry file");
-                    std::process::exit(1);
-                }
+                reject_reader_locale_without_package(
+                    emit_command.reader_locale.as_deref(),
+                    &emit_command.input,
+                    emit_command.package,
+                );
                 tool::cmd_emit(emit_command);
             }
         }
@@ -202,16 +215,14 @@ fn cmd_verify_library(args: crate::cli::VerifyLibraryArgs) {
     }
 }
 
-fn verify_input_is_package_shaped(input: &[String], force_package: bool) -> bool {
-    if force_package {
-        return true;
+fn reject_reader_locale_without_package(
+    reader_locale: Option<&str>,
+    input: &[String],
+    force_package: bool,
+) {
+    if let Some(message) = reader_locale_without_package_error(reader_locale, input, force_package)
+    {
+        eprintln!("error: {message}");
+        std::process::exit(1);
     }
-    let Some(first) = input.first() else {
-        return false;
-    };
-    if first == "-" {
-        return false;
-    }
-    let path = std::path::Path::new(first);
-    path.is_dir() || path.file_name().is_some_and(|name| name == "faber.toml")
 }

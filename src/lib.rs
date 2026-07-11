@@ -12,6 +12,7 @@
 //! tool assumptions.
 
 mod explain_render;
+mod input_shape;
 mod io_buf;
 pub(crate) mod library;
 
@@ -26,6 +27,8 @@ pub mod reference;
 mod diagnostic_explain_test;
 #[cfg(test)]
 mod explain_test;
+#[cfg(test)]
+mod input_shape_test;
 #[cfg(test)]
 mod reference_pack_test_support;
 #[cfg(test)]

@@ -6,6 +6,7 @@
 
 mod cli;
 mod commands;
+mod input_shape;
 mod io_buf;
 mod library;
 mod package;
@@ -14,6 +15,10 @@ mod script;
 #[cfg(test)]
 #[path = "cli_test.rs"]
 mod cli_test;
+
+#[cfg(test)]
+#[path = "input_shape_test.rs"]
+mod input_shape_test;
 
 #[cfg(test)]
 #[path = "script_test.rs"]

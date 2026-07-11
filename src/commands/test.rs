@@ -1,6 +1,7 @@
 //! `faber test` — compile and run the package Cargo test harness.
 
 use crate::cli::TestArgs;
+use crate::input_shape::reader_locale_without_package_error;
 use crate::package;
 
 /// Builds the package test harness and maps Faber-level selectors to Cargo test flags.
@@ -8,6 +9,14 @@ pub(super) fn cmd_test(args: TestArgs) {
     use std::path::PathBuf;
 
     let input_path = PathBuf::from(&args.path);
+    if let Some(message) = reader_locale_without_package_error(
+        args.reader_locale.as_deref(),
+        &[args.path.display().to_string()],
+        false,
+    ) {
+        eprintln!("error: {message}");
+        std::process::exit(1);
+    }
     let test_selection = radix::codegen::rust::TestSelection {
         name: args.name.clone(),
         suite: args.suite.clone(),
@@ -24,7 +33,17 @@ pub(super) fn cmd_test(args: TestArgs) {
 
     // POLICY: tests are package-scoped so generated harness metadata and source
     // selection stay aligned.
-    let config = radix::driver::Config::default().with_target(radix::codegen::Target::Rust);
+    let (config, _reader_pack) = match package::config_with_reader_locale(
+        radix::codegen::Target::Rust,
+        &input_path,
+        args.reader_locale.as_deref(),
+    ) {
+        Ok(pair) => pair,
+        Err(diag) => {
+            eprintln!("error: {}", diag.message);
+            std::process::exit(1);
+        }
+    };
     let result =
         package::compile_package_with_test_selection(&config, &input_path, test_selection.as_ref());
 

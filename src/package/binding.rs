@@ -122,6 +122,7 @@ pub fn verify_library_bindings(
     let shim = validate_shim(package_root, &binding_path, &binding_manifest)?;
     prove_rust_bindings(
         target,
+        package_root,
         &binding_path,
         &target_config.dependencies,
         shim.as_deref(),
@@ -286,6 +287,7 @@ fn validate_shim(
 #[allow(clippy::too_many_arguments)]
 fn prove_rust_bindings(
     target: &str,
+    package_root: &Path,
     binding_path: &Path,
     dependencies: &BTreeMap<String, String>,
     shim: Option<&Path>,
@@ -343,17 +345,19 @@ fn prove_rust_bindings(
         return Err(diagnostics);
     }
 
-    run_rust_binding_probe(binding_path, dependencies, shim, &probes).map_err(|diagnostic| {
-        vec![diagnostic.with_arg(
-            "bindings",
-            manifest
-                .functions
-                .keys()
-                .cloned()
-                .collect::<Vec<_>>()
-                .join(","),
-        )]
-    })
+    run_rust_binding_probe(package_root, binding_path, dependencies, shim, &probes).map_err(
+        |diagnostic| {
+            vec![diagnostic.with_arg(
+                "bindings",
+                manifest
+                    .functions
+                    .keys()
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join(","),
+            )]
+        },
+    )
 }
 
 fn diagnostic(path: &Path, message: impl Into<String>, issue: &'static str) -> Diagnostic {

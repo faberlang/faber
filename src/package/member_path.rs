@@ -119,3 +119,7 @@ fn path_diagnostic(
         .with_arg("issue", issue)
         .with_arg("path", path.to_owned())
 }
+
+#[cfg(test)]
+#[path = "member_path_test.rs"]
+mod tests;

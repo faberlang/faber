@@ -63,10 +63,13 @@ fn cmd_host_manifest(args: ManifestArgs) {
     };
 
     if args.json {
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&manifest).expect("serialize host manifest")
-        );
+        match serde_json::to_string_pretty(&manifest) {
+            Ok(json) => println!("{json}"),
+            Err(error) => {
+                eprintln!("failed to serialize host manifest: {error}");
+                std::process::exit(70);
+            }
+        }
         return;
     }
 

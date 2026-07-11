@@ -43,6 +43,12 @@ fn corpus_root() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/corpus")
 }
 
+fn reader_locale_example_root(locale: &str) -> PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../examples/reader-locale")
+        .join(locale)
+}
+
 fn temp_dir(label: &str) -> PathBuf {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -51,6 +57,13 @@ fn temp_dir(label: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("faber-emit-integration-{label}-{nanos}"));
     fs::create_dir_all(&dir).expect("create temp dir");
     dir
+}
+
+fn write_plain_file(label: &str, contents: &str) -> PathBuf {
+    let dir = temp_dir(label);
+    let path = dir.join("plain.txt");
+    fs::write(&path, contents).expect("write plain file");
+    path
 }
 
 fn run_faber(args: &[&str]) -> (String, String, bool) {
@@ -243,5 +256,240 @@ incipit {
             && expanded_stderr.contains("\nphase:")
             && expanded_stderr.contains("\nspan:"),
         "expanded diagnostics should include phase and span records:\n{expanded_stderr}"
+    );
+}
+
+#[test]
+fn check_reader_locale_accepts_direct_entry_file_input() {
+    let example = reader_locale_example_root("th-TH");
+    let entry = example.join("src/main.fab");
+
+    let (stdout, stderr, ok) = run_faber(&[
+        "check",
+        "--reader-locale",
+        "th-TH",
+        entry.to_str().expect("entry path"),
+    ]);
+
+    assert!(ok, "reader-locale entry-file check failed:\n{stderr}");
+    assert!(stdout.is_empty(), "check should not write stdout: {stdout}");
+    assert!(
+        stderr.contains("ok:"),
+        "expected check success marker on stderr:\n{stderr}"
+    );
+}
+
+#[test]
+fn check_reader_locale_accepts_manifest_file_input() {
+    let example = reader_locale_example_root("th-TH");
+    let manifest = example.join("faber.toml");
+
+    let (stdout, stderr, ok) = run_faber(&[
+        "check",
+        "--reader-locale",
+        "th-TH",
+        manifest.to_str().expect("manifest path"),
+    ]);
+
+    assert!(ok, "reader-locale manifest check failed:\n{stderr}");
+    assert!(stdout.is_empty(), "check should not write stdout: {stdout}");
+    assert!(
+        stderr.contains("ok:"),
+        "expected check success marker on stderr:\n{stderr}"
+    );
+}
+
+#[test]
+fn emit_reader_locale_accepts_direct_entry_file_input() {
+    let example = reader_locale_example_root("th-TH");
+    let entry = example.join("src/main.fab");
+
+    let (stdout, stderr, ok) = run_faber_emit(&[
+        "emit",
+        "--reader-locale",
+        "th-TH",
+        entry.to_str().expect("entry path"),
+    ]);
+
+    assert!(ok, "reader-locale entry-file emit failed:\n{stderr}");
+    assert!(
+        stdout.contains("fn ทักทาย"),
+        "expected localized Rust emit output:\n{stdout}"
+    );
+}
+
+#[test]
+fn emit_reader_locale_accepts_manifest_file_input() {
+    let example = reader_locale_example_root("th-TH");
+    let manifest = example.join("faber.toml");
+
+    let (stdout, stderr, ok) = run_faber_emit(&[
+        "emit",
+        "--reader-locale",
+        "th-TH",
+        manifest.to_str().expect("manifest path"),
+    ]);
+
+    assert!(ok, "reader-locale manifest emit failed:\n{stderr}");
+    assert!(
+        stdout.contains("fn ทักทาย"),
+        "expected localized Rust emit output:\n{stdout}"
+    );
+}
+
+#[test]
+fn emit_reader_locale_rejects_stdin_input() {
+    let (stdout, stderr, ok) = run_faber_emit(&["emit", "--reader-locale", "th-TH", "-"]);
+
+    assert!(!ok, "reader-locale stdin emit should fail");
+    assert!(
+        stdout.is_empty(),
+        "rejected emit should not write stdout: {stdout}"
+    );
+    assert!(
+        stderr.contains("--reader-locale th-TH requires a package path or .fab entry file"),
+        "expected stdin shape rejection, got:\n{stderr}"
+    );
+}
+
+#[test]
+fn emit_reader_locale_rejects_forced_package_stdin_input() {
+    let (stdout, stderr, ok) =
+        run_faber_emit(&["emit", "--package", "--reader-locale", "th-TH", "-"]);
+
+    assert!(!ok, "emit should reject stdin reader-locale package input");
+    assert!(
+        stdout.is_empty(),
+        "rejected emit should not write stdout: {stdout}"
+    );
+    assert!(
+        stderr.contains("--reader-locale th-TH requires a package path or .fab entry file"),
+        "expected stdin shape rejection, got:\n{stderr}"
+    );
+}
+
+#[test]
+fn emit_reader_locale_rejects_existing_non_package_file() {
+    let plain = write_plain_file("emit-reader-locale-plain-file", "temp");
+
+    let (stdout, stderr, ok) = run_faber_emit(&[
+        "emit",
+        "--reader-locale",
+        "th-TH",
+        plain.to_str().expect("plain path"),
+    ]);
+
+    assert!(
+        !ok,
+        "emit should reject existing non-package files for reader-locale input"
+    );
+    assert!(
+        stdout.is_empty(),
+        "rejected emit should not write stdout: {stdout}"
+    );
+    assert!(
+        stderr.contains("--reader-locale th-TH requires a package path or .fab entry file"),
+        "expected reader-locale shape rejection, got:\n{stderr}"
+    );
+}
+
+#[test]
+fn emit_reader_locale_forced_package_rejects_existing_non_package_file() {
+    let plain = write_plain_file("emit-reader-locale-force-package", "temp");
+
+    let (stdout, stderr, ok) = run_faber_emit(&[
+        "emit",
+        "--package",
+        "--reader-locale",
+        "th-TH",
+        plain.to_str().expect("plain path"),
+    ]);
+
+    assert!(
+        !ok,
+        "forced package reader-locale should reject existing non-package files"
+    );
+    assert!(
+        stdout.is_empty(),
+        "rejected emit should not write stdout: {stdout}"
+    );
+    assert!(
+        stderr.contains("--reader-locale th-TH requires a package path or .fab entry file"),
+        "expected reader-locale shape rejection, got:\n{stderr}"
+    );
+}
+
+#[test]
+fn emit_reader_locale_missing_package_path_surfaces_missing_path_error() {
+    let (stdout, stderr, ok) =
+        run_faber_emit(&["emit", "--reader-locale", "th-TH", "missing-package"]);
+
+    assert!(!ok, "missing package path should fail");
+    assert!(
+        stdout.is_empty(),
+        "missing package path should not write stdout: {stdout}"
+    );
+    assert!(
+        !stderr.contains("--reader-locale th-TH requires a package path or .fab entry file"),
+        "missing package path should reach the underlying filesystem error, got:\n{stderr}"
+    );
+    assert!(
+        stderr.contains("cannot read 'missing-package': No such file or directory"),
+        "expected missing path error, got:\n{stderr}"
+    );
+}
+
+#[test]
+fn emit_reader_locale_rejects_multiple_direct_inputs() {
+    let example = reader_locale_example_root("th-TH");
+    let entry_a = example.join("src/main.fab");
+    let entry_b = example.join("src/lib.fab");
+
+    let (stdout, stderr, ok) = run_faber_emit(&[
+        "emit",
+        "--reader-locale",
+        "th-TH",
+        entry_a.to_str().expect("entry path"),
+        entry_b.to_str().expect("entry path"),
+    ]);
+
+    assert!(
+        !ok,
+        "emit should reject reader-locale when multiple direct inputs are supplied"
+    );
+    assert!(
+        stdout.is_empty(),
+        "rejected emit should not write stdout: {stdout}"
+    );
+    assert!(
+        stderr.contains("--reader-locale th-TH requires a package path or .fab entry file"),
+        "expected multiple-input reader-locale rejection, got:\n{stderr}"
+    );
+}
+
+#[test]
+fn emit_faber_target_rejects_reader_locale() {
+    let example = reader_locale_example_root("th-TH");
+    let entry = example.join("src/main.fab");
+
+    let (stdout, stderr, ok) = run_faber_emit(&[
+        "emit",
+        "-t",
+        "faber",
+        "--reader-locale",
+        "th-TH",
+        entry.to_str().expect("entry path"),
+    ]);
+
+    assert!(!ok, "faber emit should reject reader locale");
+    assert!(
+        stdout.is_empty(),
+        "rejected emit should not write stdout: {stdout}"
+    );
+    assert!(
+        stderr.contains(
+            "--reader-locale th-TH for Faber output is deferred to format reader-locale support"
+        ),
+        "expected faber emit reader-locale rejection, got:\n{stderr}"
     );
 }

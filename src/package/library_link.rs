@@ -53,6 +53,7 @@ pub(crate) fn emit_linked_library_crates(
         let crate_name = sanitize_crate_name(&provider);
         let crate_root = layout.generated_crate_root.join("deps").join(&crate_name);
         match emit_one_library_crate(
+            app_root,
             Path::new(&locked.package_root),
             &lib_manifest,
             &crate_name,
@@ -75,6 +76,7 @@ pub(crate) fn emit_linked_library_crates(
 }
 
 fn emit_one_library_crate(
+    app_root: &Path,
     package_root: &Path,
     lib_manifest: &super::FaberManifest,
     crate_name: &str,
@@ -153,7 +155,13 @@ fn emit_one_library_crate(
     let lib_path = src_dir.join("lib.rs");
     fs::write(&lib_path, lib_rs).map_err(|err| vec![Diagnostic::io_error(&lib_path, err)])?;
 
-    let cargo_toml = render_library_cargo_toml(crate_name, &lib_manifest.package.version, target);
+    let cargo_toml = render_library_cargo_toml(
+        crate_name,
+        &lib_manifest.package.version,
+        app_root,
+        package_root,
+        target,
+    );
     let cargo_path = crate_root.join("Cargo.toml");
     fs::write(&cargo_path, cargo_toml)
         .map_err(|err| vec![Diagnostic::io_error(&cargo_path, err)])?;
@@ -221,7 +229,10 @@ fn generate_linked_unit_rust(
                 .with_file(unit.path.display().to_string())
                 .with_args(err.args)
         })?;
-        code.push_str(&generated);
+        // Module-mode codegen uses `pub(crate)` for non-entry units. Linked
+        // library crates are path-deps for consumer packages, so promote
+        // package surface items to `pub` (G4/API2 pure-Faber + mixed libraries).
+        code.push_str(&promote_library_surface_visibility(&generated));
     }
     code.push_str(&binding_wrappers);
     if code.trim().is_empty() {
@@ -233,6 +244,8 @@ fn generate_linked_unit_rust(
 fn render_library_cargo_toml(
     crate_name: &str,
     version: &str,
+    app_root: &Path,
+    package_root: &Path,
     target: &super::manifest::ManifestTarget,
 ) -> String {
     let version = if version.trim().is_empty() {
@@ -240,14 +253,14 @@ fn render_library_cargo_toml(
     } else {
         version.trim()
     };
-    let faber_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../faber-runtime");
     let mut deps = format!(
         "faber = {{ package = \"faber-runtime\", path = \"{}\" }}\n",
-        faber_path.display()
+        super::cargo::runtime_cluster_path_from(app_root, "faber-runtime").display()
     );
     for (name, req) in &target.dependencies {
         if req.trim_start().starts_with('{') {
-            deps.push_str(&format!("{name} = {req}\n"));
+            let rendered = absolutize_inline_dependency_paths(package_root, req);
+            deps.push_str(&format!("{name} = {rendered}\n"));
         } else {
             deps.push_str(&format!("{name} = \"{req}\"\n"));
         }
@@ -270,6 +283,55 @@ path = "src/lib.rs"
 [dependencies]
 {deps}"#
     )
+}
+
+fn absolutize_inline_dependency_paths(package_root: &Path, requirement: &str) -> String {
+    let Ok(toml::Value::Table(mut table)) = requirement.trim().parse::<toml::Value>() else {
+        return requirement.to_owned();
+    };
+    if let Some(toml::Value::String(path)) = table.get_mut("path") {
+        *path = package_root.join(&*path).display().to_string();
+    }
+    toml::Value::Table(table).to_string()
+}
+
+/// Promote module-mode `pub(crate)` items to `pub` for path-dep consumers.
+fn promote_library_surface_visibility(source: &str) -> String {
+    source
+        .lines()
+        .map(promote_library_surface_visibility_line)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn promote_library_surface_visibility_line(line: &str) -> String {
+    let trimmed = line.trim_start();
+    let prefix_len = line.len() - trimmed.len();
+    let Some(rest) = trimmed.strip_prefix("pub(crate) ") else {
+        return line.to_owned();
+    };
+
+    const ITEM_PREFIXES: &[&str] = &[
+        "fn ",
+        "async fn ",
+        "struct ",
+        "enum ",
+        "type ",
+        "const ",
+        "static ",
+        "trait ",
+        "mod ",
+    ];
+
+    if ITEM_PREFIXES.iter().any(|prefix| rest.starts_with(prefix)) {
+        let mut out = String::with_capacity(line.len());
+        out.push_str(&line[..prefix_len]);
+        out.push_str("pub ");
+        out.push_str(rest);
+        out
+    } else {
+        line.to_owned()
+    }
 }
 
 fn format_rust(source: &str) -> String {
@@ -307,3 +369,7 @@ fn read_binding_manifest(path: &Path) -> Result<BindingManifest, Vec<Diagnostic>
         ]
     })
 }
+
+#[cfg(test)]
+#[path = "library_link_test.rs"]
+mod tests;

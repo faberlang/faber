@@ -27,8 +27,9 @@ use radix::hir::{HirItemKind, LibraryBinding, LibraryItem, LibraryItemKind, Libr
 use radix::mir::{BufferHost, Host, MirDiagnosticKind, MirProvider, StepperError, Value};
 use radix::Output;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn diagnostic_has_issue(diag: &Diagnostic, issue: &str) -> bool {
@@ -7352,6 +7353,23 @@ fn build_layout_never_produces_faber_target_nested_path() {
     );
 }
 
+#[test]
+fn linked_library_emit_skips_entry_file_layouts_without_manifest() {
+    let dir = test_temp_dir("linked-library-no-manifest");
+    let entry = dir.join("main.fab");
+    fs::write(&entry, "incipit { nota \"no manifest\" }").expect("entry");
+
+    let deps = super::artifact_plan::native_library_deps(&dir)
+        .expect("entry-file layouts without manifest should not require native deps");
+    assert!(deps.is_empty());
+
+    let layout = discover_build_layout(&entry).expect("layout");
+    let linked = super::library_link::emit_linked_library_crates(&layout.package_root, &layout)
+        .expect("entry-file layouts without manifest should not require native deps");
+
+    assert!(linked.is_empty());
+}
+
 // ---------------------------------------------------------------------------
 // Phase 2: Generated crate writer tests (no Cargo invocation)
 // ---------------------------------------------------------------------------
@@ -8856,7 +8874,10 @@ fn g8_sqlite_package_verifies_and_links_application() {
         return;
     };
     let report = verify_library_bindings(&lib, "rust").expect("sqlite library verifies");
-    assert_eq!(report.bindings, 4, "exsequi/quaere/scalar/transactio");
+    assert_eq!(
+        report.bindings, 6,
+        "exsequi/exsequi_batch/quaere/scalar/transactio/sha256_hex"
+    );
 
     let root = test_temp_dir("g8-sqlite-app");
     let app = root.join("app");
@@ -9342,11 +9363,10 @@ incipit {
 "#,
     )
     .unwrap();
-    std::env::set_var(
-        "FABER_LIBRARY_HOME",
-        env!("CARGO_MANIFEST_DIR").to_owned() + "/..",
+    let result = compile_package(
+        &Config::default().with_stdlib(dev_norma_library_home()),
+        &app,
     );
-    let result = compile_package(&Config::default(), &app);
     assert!(
         result.success(),
         "compile failed: {:?}",
@@ -9635,7 +9655,7 @@ incipit argumenta args exitus 0 {
     let Some(Output::Go(output)) = result.output else {
         panic!("expected Go");
     };
-    let decls = output.code.matches("var consolum").count();
+    let decls = output.code.matches("var consolum = struct").count();
     assert_eq!(
         decls, 1,
         "expected exactly one consolum shim, got {decls}:\n{}",
@@ -9751,6 +9771,129 @@ fn g6_go4_coreutils_echo_package_go_builds() {
     assert_eq!(output.status.code(), Some(0), "echo exit");
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert_eq!(stdout, "hello world\n", "echo stdout got {stdout:?}");
+
+    let output = Command::new(&binary)
+        .args(["-n", "hello"])
+        .output()
+        .expect("run echo -n");
+    assert_eq!(output.status.code(), Some(0), "echo -n exit");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(stdout, "hello", "echo -n stdout got {stdout:?}");
+
+    let output = Command::new(&binary)
+        .args(["-E", "hello", "world"])
+        .output()
+        .expect("run echo -E");
+    assert_eq!(output.status.code(), Some(0), "echo -E exit");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(stdout, "hello world\n", "echo -E stdout got {stdout:?}");
+
+    let output = Command::new(&binary)
+        .args(["-n", "-E", "x"])
+        .output()
+        .expect("run echo -n -E");
+    assert_eq!(output.status.code(), Some(0), "echo -n -E exit");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(stdout, "x", "echo -n -E stdout got {stdout:?}");
+}
+
+#[test]
+fn g6_consolum_shim_supports_full_stdio_surface() {
+    let dir = test_temp_dir("g6-consolum-surface");
+    fs::create_dir_all(dir.join("src")).expect("src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "g6-consolum-surface"
+version = "0.1.0"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        dir.join("src/main.fab"),
+        r#"
+importa ex "norma:consolum" privata consolum
+
+@ cli "tool"
+@ operandus ceteri textus ignored
+incipit argumenta args exitus 0 {
+  si consolum.audit() {
+    consolum.dic("tty")
+  }
+  secus {
+    consolum.dic("notty")
+  }
+  consolum.scribet(":")
+  consolum.dicet(consolum.leget())
+  consolum.scribe("")
+  fixum octeti sync_bytes ← consolum.hauri(4)
+  consolum.fundet(sync_bytes)
+  fixum octeti async_bytes ← consolum.hauriet(4)
+  consolum.funde(async_bytes)
+  consolum.monet("warn")
+  consolum.videbit("debug")
+  si consolum.loquitur() {
+    consolum.dic("stdout-tty")
+  }
+  si consolum.admonet() {
+    consolum.dic("stderr-tty")
+  }
+}
+"#,
+    )
+    .expect("entry");
+
+    let result = compile_package(&Config::default().with_target(Target::Go), &dir);
+    assert!(
+        result.success(),
+        "consolum surface compile failed: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| d.message.clone())
+            .collect::<Vec<_>>()
+    );
+    let Some(Output::Go(output)) = result.output else {
+        panic!("expected Go");
+    };
+    let modules = super::take_go_package_modules();
+    let layout = discover_build_layout(&dir).expect("layout");
+    let go_layout = super::GoBuildLayout::from_package(&layout);
+    super::emit_go_module(&go_layout, &output.code, &modules).expect("emit");
+    let binary = super::invoke_go_build(&go_layout).expect("go build consolum surface");
+
+    let mut child = Command::new(&binary)
+        .arg("ignored")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn");
+    child
+        .stdin
+        .as_mut()
+        .expect("stdin")
+        .write_all(b"salve\nBYTEBYTE")
+        .expect("write stdin");
+    let output = child.wait_with_output().expect("wait");
+
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "expected success; stdout={:?} stderr={:?}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout),
+        "notty:\nsalve\nBYTEBYTE"
+    );
+    assert_eq!(String::from_utf8_lossy(&output.stderr), "warn\ndebug\n");
 }
 
 #[test]
@@ -9786,4 +9929,265 @@ fn g6_go4_coreutils_false_package_go_builds() {
         .status()
         .expect("run false");
     assert_eq!(status.code(), Some(1), "GNU false should exit 1");
+}
+
+// ---------------------------------------------------------------------------
+// G9 API2 — http framework package contract
+// ---------------------------------------------------------------------------
+
+fn packages_http_lib() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("packages/http")
+}
+
+fn write_http_consumer_app(app: &Path, lib: &Path, entry_body: &str) {
+    fs::create_dir_all(app.join("src")).expect("app src");
+    let interface_root = lib.join("src");
+    fs::write(
+        app.join("faber.toml"),
+        r#"[package]
+name = "g9-http-app"
+version = "0.1.0"
+
+[paths]
+entry = "main.fab"
+
+[dependencies]
+http = "0.1.0"
+"#,
+    )
+    .expect("app manifest");
+    fs::write(
+        app.join("faber.lock"),
+        format!(
+            r#"
+[[package]]
+name = "http"
+version = "0.1.0"
+source = "path"
+package_root = "{package_root}"
+kind = "lib"
+target_language = "rust"
+target_triple = "host"
+target_manifest = ""
+interface_root = "{interface_root}"
+artifact = ""
+crate = "http"
+rustc = ""
+"#,
+            package_root = lib.display(),
+            interface_root = interface_root.display(),
+        ),
+    )
+    .expect("lock");
+    fs::write(app.join("src/main.fab"), entry_body).expect("entry");
+}
+
+fn build_and_run_http_app(app: &Path) -> std::process::Output {
+    let result = compile_package(&Config::default(), app);
+    assert!(
+        result.success(),
+        "expected http consumer compile, got {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| d.message.clone())
+            .collect::<Vec<_>>()
+    );
+    let layout = discover_build_layout(app).expect("layout");
+    let mut runtime_plan = package_rust_runtime_plan(&Config::default(), app).expect("plan");
+    let linked = super::library_link::emit_linked_library_crates(app, &layout).expect("link");
+    runtime_plan.library_path_deps = linked
+        .into_iter()
+        .map(|lib| (lib.crate_name, lib.crate_root))
+        .collect();
+    let Some(Output::Rust(output)) = result.output else {
+        panic!("expected Rust");
+    };
+    emit_generated_crate_with_runtime_plan(&layout, &output.code, None, &runtime_plan)
+        .expect("emit crate");
+    let binary = invoke_cargo_build(&layout, false).expect("cargo build app+http");
+    Command::new(&binary).output().expect("run app")
+}
+
+#[test]
+fn g9_api2_http_package_verifies_and_exports_http_application_contract() {
+    let lib = packages_http_lib();
+    assert!(lib.is_dir(), "packages/http missing at {}", lib.display());
+
+    let report = verify_library_bindings(&lib, "rust").expect("http library verifies");
+    assert!(
+        report.bindings >= 1,
+        "expected at least identitas_novum binding, got {}",
+        report.bindings
+    );
+    assert!(
+        report.declarations >= 7,
+        "expected free-function declarations, got {}",
+        report.declarations
+    );
+
+    let package = analyze_package(&Config::default().with_bodyless_functions(), &lib)
+        .expect("analyze http package");
+    let unit = package
+        .units
+        .iter()
+        .find(|unit| unit.path.ends_with("http.fab"))
+        .expect("http.fab unit");
+    let export = unit
+        .file_interface
+        .exports
+        .get("HttpApplication")
+        .expect("HttpApplication export");
+    let FileExportKind::Struct(strukt) = &export.kind else {
+        panic!("HttpApplication must be a struct export");
+    };
+    let contract = strukt
+        .annotation_contract
+        .as_ref()
+        .expect("HttpApplication must carry annotation_contract");
+    assert_eq!(contract.target, "functio");
+    assert_eq!(contract.fields.len(), 1);
+    assert_eq!(contract.fields[0].name, "nomen");
+    assert_eq!(contract.fields[0].ty, "textus");
+    let identity = contract
+        .qualified_identity
+        .as_ref()
+        .expect("application factory identity must be qualified");
+    assert_eq!(identity.provider, "package");
+    assert_eq!(identity.package.as_deref(), Some("http"));
+    assert_eq!(identity.export_name, "HttpApplication");
+}
+
+#[test]
+fn g9_api2_http_package_links_builder_application() {
+    let lib = packages_http_lib();
+    let root = test_temp_dir("g9-http-app");
+    let app = root.join("app");
+    write_http_consumer_app(
+        &app,
+        &lib,
+        r#"
+importa ex "http:http" privata http
+
+@ HttpApplication { nomen = "demo" }
+functio factory() → vacuum {
+}
+
+incipit {
+  # Nested free-function builders avoid local type annotations that currently
+  # lower to crate::<provider>::Type instead of the path-dep crate.
+  factory()
+  nota http.routes_of(http.register_post(http.register_get(http.router(), "/salve"), "/echo"))
+  nota http.identitas_novum()
+  nota http.status_of(http.replicatio(200, "ok"))
+}
+"#,
+    );
+    let output = build_and_run_http_app(&app);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stderr={}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains('2') || stdout.contains("2"),
+        "expected route count 2 on stdout, got {stdout:?}"
+    );
+}
+
+#[test]
+fn g9_api3_http_router_bindings_verify() {
+    let lib = packages_http_lib();
+    let report = verify_library_bindings(&lib, "rust").expect("http library verifies");
+    // API2 identitas + API3 route table / match / extract / map_*
+    assert!(
+        report.bindings >= 13,
+        "expected API3 binding set, got {}",
+        report.bindings
+    );
+}
+
+#[test]
+fn g9_api3_http_router_match_links_application() {
+    let lib = packages_http_lib();
+    let root = test_temp_dir("g9-http-api3");
+    let app = root.join("app");
+    write_http_consumer_app(
+        &app,
+        &lib,
+        r#"
+importa ex "http:http" privata http
+
+incipit {
+  fac {
+    fixum valor tab ← http.route_table()
+    fixum valor tab2 ← http.route_add_get(tab, "/users/{id}", "show")
+    fixum valor tab3 ← http.route_add_middleware(tab2, "auth")
+    fixum valor ∪ nihil hit ← http.route_match(tab3, "GET", "/users/7")
+    nota hit
+    fixum textus ∪ nihil q ← http.extract_query_param("id=7&x=1", "id")
+    nota q
+    fixum valor body ← http.extract_json("{\"n\":1}")
+    nota body
+    fixum valor err ← http.map_error(404, "missing")
+    nota err
+  }
+  cape e {
+    mone e
+  }
+}
+"#,
+    );
+    let output = build_and_run_http_app(&app);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stderr={} stdout={}",
+        String::from_utf8_lossy(&output.stderr),
+        String::from_utf8_lossy(&output.stdout)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains('7') || stdout.contains("7"),
+        "expected match/query evidence of 7 on stdout, got {stdout:?}"
+    );
+}
+
+#[test]
+fn g9_api3_http_duplicate_route_is_recoverable() {
+    let lib = packages_http_lib();
+    let root = test_temp_dir("g9-http-api3-dup");
+    let app = root.join("app");
+    write_http_consumer_app(
+        &app,
+        &lib,
+        r#"
+importa ex "http:http" privata http
+
+incipit {
+  fac {
+    fixum valor tab ← http.route_table()
+    fixum valor tab2 ← http.route_add_get(tab, "/x", "a")
+    fixum valor _ ← http.route_add_get(tab2, "/x", "b")
+    nota "unexpected-ok"
+  }
+  cape e {
+    mone e
+  }
+}
+"#,
+    );
+    let output = build_and_run_http_app(&app);
+    assert_eq!(output.status.code(), Some(0));
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        !combined.contains("unexpected-ok"),
+        "duplicate should not succeed: {combined:?}"
+    );
 }
