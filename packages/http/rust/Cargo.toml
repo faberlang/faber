@@ -8,5 +8,6 @@ path = "shim.rs"
 
 [dependencies]
 faber = { package = "faber-runtime", path = "../../../../faber-runtime" }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
 
 [workspace]

@@ -1,4 +1,4 @@
-//! Rust bindings for `packages/http` (G9 API2–API3).
+//! Rust bindings for `packages/http` (G9 API2–API4).
 //!
 //! - `identitas_novum` — frame substrate request ids (API2)
 //! - route table / match / extract — router engine (API3)
@@ -6,9 +6,14 @@
 use faber::frame;
 use faber::Valor;
 
+#[path = "concurrency.rs"]
+mod concurrency;
 #[path = "router.rs"]
 mod router;
 
+pub use concurrency::{
+    ApplicationState, HandlerWorkers, ResponseCompletion, ResponseTicket, StateError,
+};
 pub use router::{
     add_get, add_group, add_middleware, add_post, error_response, header_value, json_body,
     match_route, path_param, query_param, route_table, to_response,
