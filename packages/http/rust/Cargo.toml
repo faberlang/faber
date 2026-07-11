@@ -1,0 +1,12 @@
+[package]
+name = "faber-http-binding"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "shim.rs"
+
+[dependencies]
+faber = { package = "faber-runtime", path = "../../../../faber-runtime" }
+
+[workspace]

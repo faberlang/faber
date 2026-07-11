@@ -1,11 +1,10 @@
-# http framework package — G9 API2 source contract.
+# http framework package — G9 API2 contract + API3 router/middleware/extraction.
 #
 # Architecture:
 # - HttpApplication is the only annotation contract (application factory discovery).
-# - Routing, middleware, extractors, and responses are typed genera + builder APIs.
-# - No route annotation family; Radix owns no HTTP semantics.
-# - Transport lives in faber-http-transport (API1); this package is the framework seam.
-# - Cross-package surface is free functions (file interfaces do not yet port methods).
+# - Routing/middleware/extraction are free-function builders (no route annotations).
+# - Cross-package surface prefers free functions (file interfaces do not yet port methods).
+# - Route matching lives in rust/router.rs behind bodyless bindings.
 
 # ---------------------------------------------------------------------------
 # Annotation contract — application factory only
@@ -17,7 +16,7 @@ genus HttpApplication {
 }
 
 # ---------------------------------------------------------------------------
-# Request / response / error / state / builder carriers
+# Request / response / error / state / builder carriers (API2)
 # ---------------------------------------------------------------------------
 
 genus Rogatio {
@@ -50,7 +49,7 @@ genus Router {
 }
 
 # ---------------------------------------------------------------------------
-# Free constructors and builders
+# API2 free constructors (typed genus helpers)
 # ---------------------------------------------------------------------------
 
 functio router() → Router {
@@ -120,5 +119,38 @@ functio auge_state(AppState s) → AppState {
     }
 }
 
-# Native-backed request-id source (bridges API0 frame substrate for G4 bindings).
+# ---------------------------------------------------------------------------
+# API2 native binding
+# ---------------------------------------------------------------------------
+
 functio identitas_novum() → textus
+
+# ---------------------------------------------------------------------------
+# API3 route table (valor) — matching, groups, middleware, extraction
+# ---------------------------------------------------------------------------
+
+# Empty route table: { routes: [], middleware: [] }
+functio route_table() → valor
+
+# Register static or dynamic (`/users/{id}`) paths. Duplicate method+path → ⇥ textus.
+functio route_add_get(valor table, textus path, textus handler) → valor ⇥ textus
+functio route_add_post(valor table, textus path, textus handler) → valor ⇥ textus
+
+# Group: prefix + lista of { method, path, handler } tabulae.
+functio route_add_group(valor table, textus prefix, lista<valor> steps) → valor ⇥ textus
+
+# Ordered middleware names (unique).
+functio route_add_middleware(valor table, textus name) → valor ⇥ textus
+
+# Match method+path. nihil when none; ⇥ textus on ambiguous multi-match.
+functio route_match(valor table, textus method, textus path) → valor ∪ nihil ⇥ textus
+
+# Extractors
+functio extract_path_param(valor matched, textus name) → textus ∪ nihil
+functio extract_query_param(textus query, textus name) → textus ∪ nihil
+functio extract_header(valor headers, textus name) → textus ∪ nihil
+functio extract_json(textus corpus) → valor ⇥ textus
+
+# Response conversion / structured error mapping
+functio map_error(numerus status, textus nuntius) → valor
+functio map_response(numerus status, textus corpus) → valor

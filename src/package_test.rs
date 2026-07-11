@@ -9772,7 +9772,11 @@ fn g9_api2_http_package_verifies_and_exports_http_application_contract() {
     assert!(lib.is_dir(), "packages/http missing at {}", lib.display());
 
     let report = verify_library_bindings(&lib, "rust").expect("http library verifies");
-    assert_eq!(report.bindings, 1, "identitas_novum binding");
+    assert!(
+        report.bindings >= 1,
+        "expected at least identitas_novum binding, got {}",
+        report.bindings
+    );
     assert!(
         report.declarations >= 7,
         "expected free-function declarations, got {}",
@@ -9849,5 +9853,100 @@ incipit {
     assert!(
         stdout.contains('2') || stdout.contains("2"),
         "expected route count 2 on stdout, got {stdout:?}"
+    );
+}
+
+#[test]
+fn g9_api3_http_router_bindings_verify() {
+    let lib = packages_http_lib();
+    let report = verify_library_bindings(&lib, "rust").expect("http library verifies");
+    // API2 identitas + API3 route table / match / extract / map_*
+    assert!(
+        report.bindings >= 13,
+        "expected API3 binding set, got {}",
+        report.bindings
+    );
+}
+
+#[test]
+fn g9_api3_http_router_match_links_application() {
+    let lib = packages_http_lib();
+    let root = test_temp_dir("g9-http-api3");
+    let app = root.join("app");
+    write_http_consumer_app(
+        &app,
+        &lib,
+        r#"
+importa ex "http:http" privata http
+
+incipit {
+  fac {
+    fixum valor tab ← http.route_table()
+    fixum valor tab2 ← http.route_add_get(tab, "/users/{id}", "show")
+    fixum valor tab3 ← http.route_add_middleware(tab2, "auth")
+    fixum valor ∪ nihil hit ← http.route_match(tab3, "GET", "/users/7")
+    nota hit
+    fixum textus ∪ nihil q ← http.extract_query_param("id=7&x=1", "id")
+    nota q
+    fixum valor body ← http.extract_json("{\"n\":1}")
+    nota body
+    fixum valor err ← http.map_error(404, "missing")
+    nota err
+  }
+  cape e {
+    mone e
+  }
+}
+"#,
+    );
+    let output = build_and_run_http_app(&app);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stderr={} stdout={}",
+        String::from_utf8_lossy(&output.stderr),
+        String::from_utf8_lossy(&output.stdout)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains('7') || stdout.contains("7"),
+        "expected match/query evidence of 7 on stdout, got {stdout:?}"
+    );
+}
+
+#[test]
+fn g9_api3_http_duplicate_route_is_recoverable() {
+    let lib = packages_http_lib();
+    let root = test_temp_dir("g9-http-api3-dup");
+    let app = root.join("app");
+    write_http_consumer_app(
+        &app,
+        &lib,
+        r#"
+importa ex "http:http" privata http
+
+incipit {
+  fac {
+    fixum valor tab ← http.route_table()
+    fixum valor tab2 ← http.route_add_get(tab, "/x", "a")
+    fixum valor _ ← http.route_add_get(tab2, "/x", "b")
+    nota "unexpected-ok"
+  }
+  cape e {
+    mone e
+  }
+}
+"#,
+    );
+    let output = build_and_run_http_app(&app);
+    assert_eq!(output.status.code(), Some(0));
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        !combined.contains("unexpected-ok"),
+        "duplicate should not succeed: {combined:?}"
     );
 }

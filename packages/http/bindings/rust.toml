@@ -1,5 +1,41 @@
 [functions."http:http.identitas_novum"]
 symbol = "crate::shim::identitas_novum"
 
+[functions."http:http.route_table"]
+symbol = "crate::shim::route_table_empty"
+
+[functions."http:http.route_add_get"]
+symbol = "crate::shim::route_add_get"
+
+[functions."http:http.route_add_post"]
+symbol = "crate::shim::route_add_post"
+
+[functions."http:http.route_add_group"]
+symbol = "crate::shim::route_add_group"
+
+[functions."http:http.route_add_middleware"]
+symbol = "crate::shim::route_add_middleware"
+
+[functions."http:http.route_match"]
+symbol = "crate::shim::route_match"
+
+[functions."http:http.extract_path_param"]
+symbol = "crate::shim::extract_path_param"
+
+[functions."http:http.extract_query_param"]
+symbol = "crate::shim::extract_query_param"
+
+[functions."http:http.extract_header"]
+symbol = "crate::shim::extract_header"
+
+[functions."http:http.extract_json"]
+symbol = "crate::shim::extract_json"
+
+[functions."http:http.map_error"]
+symbol = "crate::shim::map_error"
+
+[functions."http:http.map_response"]
+symbol = "crate::shim::map_response"
+
 [shim]
 path = "rust/shim.rs"
