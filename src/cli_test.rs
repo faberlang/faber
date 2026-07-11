@@ -20,6 +20,14 @@ fn cli_parses_c_one_liner_without_subcommand() {
 }
 
 #[test]
+fn cli_parses_c_one_liner_forwarded_args_after_double_dash() {
+    let cli = Cli::try_parse_from(["faber", "-c", "incipit { nota 1 }", "--", "--flag", "value"])
+        .expect("parse -c forwarded args");
+    assert!(cli.command.is_none());
+    assert_eq!(cli.eval_args, vec!["--flag".to_owned(), "value".to_owned()]);
+}
+
+#[test]
 fn cli_parses_repl_subcommand() {
     let cli = Cli::try_parse_from(["faber", "repl"]).expect("parse repl");
     assert!(cli.eval_source.is_none());
@@ -93,7 +101,10 @@ fn cli_parses_hidden_fmir_run_with_forwarded_args() {
     let Some(crate::cli::Command::FmirRun(args)) = cli.command else {
         panic!("expected hidden fmir runner subcommand");
     };
-    assert_eq!(args.image, std::path::PathBuf::from("target/faber-mir/exe/run"));
+    assert_eq!(
+        args.image,
+        std::path::PathBuf::from("target/faber-mir/exe/run")
+    );
     assert_eq!(args.args, vec!["--flag".to_owned(), "value".to_owned()]);
 }
 
@@ -105,6 +116,33 @@ fn cli_parses_emit_wgsl_text_target() {
         panic!("expected emit subcommand");
     };
     assert_eq!(args.target, FaberCliTarget::WgslText);
+    assert_eq!(args.input, vec!["main.fab"]);
+}
+
+#[test]
+fn cli_parses_legacy_ir_alias_subcommands() {
+    let lex = Cli::try_parse_from(["faber", "lex", "main.fab"]).expect("parse lex");
+    let Some(crate::cli::Command::Lex(args)) = lex.command else {
+        panic!("expected lex subcommand");
+    };
+    assert_eq!(args.input, vec!["main.fab"]);
+
+    let parse = Cli::try_parse_from(["faber", "parse", "main.fab"]).expect("parse parse");
+    let Some(crate::cli::Command::Parse(args)) = parse.command else {
+        panic!("expected parse subcommand");
+    };
+    assert_eq!(args.input, vec!["main.fab"]);
+
+    let hir = Cli::try_parse_from(["faber", "hir", "main.fab"]).expect("parse hir");
+    let Some(crate::cli::Command::Hir(args)) = hir.command else {
+        panic!("expected hir subcommand");
+    };
+    assert_eq!(args.input, vec!["main.fab"]);
+
+    let cli_ir = Cli::try_parse_from(["faber", "cli-ir", "main.fab"]).expect("parse cli-ir");
+    let Some(crate::cli::Command::CliIr(args)) = cli_ir.command else {
+        panic!("expected cli-ir subcommand");
+    };
     assert_eq!(args.input, vec!["main.fab"]);
 }
 
@@ -309,6 +347,15 @@ fn cli_parses_install_subcommand() {
 }
 
 #[test]
+fn cli_init_defaults_to_current_directory() {
+    let cli = Cli::try_parse_from(["faber", "init"]).expect("parse init");
+    let Some(crate::cli::Command::Init(args)) = cli.command else {
+        panic!("expected init subcommand");
+    };
+    assert_eq!(args.path, std::path::PathBuf::from("."));
+}
+
+#[test]
 fn cli_verify_library_uses_default_rust_target() {
     let cli = Cli::try_parse_from(["faber", "verify-library", "sqlite"])
         .expect("parse verify-library defaults");
@@ -321,17 +368,26 @@ fn cli_verify_library_uses_default_rust_target() {
 
 #[test]
 fn cli_test_rejects_conflicting_ignored_modes() {
-    let error = Cli::try_parse_from([
-        "faber",
-        "test",
-        "pkg",
-        "--ignored",
-        "--include-ignored",
-    ])
-    .expect_err("test ignored mode conflict");
+    let error = Cli::try_parse_from(["faber", "test", "pkg", "--ignored", "--include-ignored"])
+        .expect_err("test ignored mode conflict");
     let rendered = error.to_string();
     assert!(rendered.contains("--ignored"));
     assert!(rendered.contains("--include-ignored"));
+}
+
+#[test]
+fn cli_parses_host_manifest_json_subcommand() {
+    let cli =
+        Cli::try_parse_from(["faber", "host", "manifest", "--json"]).expect("parse host manifest");
+    let Some(crate::cli::Command::Host(args)) = cli.command else {
+        panic!("expected host subcommand");
+    };
+    assert!(matches!(
+        args.command,
+        crate::commands::host::HostCommand::Manifest(crate::commands::host::ManifestArgs {
+            json: true
+        })
+    ));
 }
 
 #[test]
