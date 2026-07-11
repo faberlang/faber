@@ -294,15 +294,40 @@ fn absolutize_inline_dependency_paths(package_root: &Path, requirement: &str) ->
 /// Promote module-mode `pub(crate)` items to `pub` for path-dep consumers.
 fn promote_library_surface_visibility(source: &str) -> String {
     source
-        .replace("pub(crate) fn ", "pub fn ")
-        .replace("pub(crate) async fn ", "pub async fn ")
-        .replace("pub(crate) struct ", "pub struct ")
-        .replace("pub(crate) enum ", "pub enum ")
-        .replace("pub(crate) type ", "pub type ")
-        .replace("pub(crate) const ", "pub const ")
-        .replace("pub(crate) static ", "pub static ")
-        .replace("pub(crate) trait ", "pub trait ")
-        .replace("pub(crate) mod ", "pub mod ")
+        .lines()
+        .map(promote_library_surface_visibility_line)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn promote_library_surface_visibility_line(line: &str) -> String {
+    let trimmed = line.trim_start();
+    let prefix_len = line.len() - trimmed.len();
+    let Some(rest) = trimmed.strip_prefix("pub(crate) ") else {
+        return line.to_owned();
+    };
+
+    const ITEM_PREFIXES: &[&str] = &[
+        "fn ",
+        "async fn ",
+        "struct ",
+        "enum ",
+        "type ",
+        "const ",
+        "static ",
+        "trait ",
+        "mod ",
+    ];
+
+    if ITEM_PREFIXES.iter().any(|prefix| rest.starts_with(prefix)) {
+        let mut out = String::with_capacity(line.len());
+        out.push_str(&line[..prefix_len]);
+        out.push_str("pub ");
+        out.push_str(rest);
+        out
+    } else {
+        line.to_owned()
+    }
 }
 
 fn format_rust(source: &str) -> String {
@@ -339,4 +364,25 @@ fn read_binding_manifest(path: &Path) -> Result<BindingManifest, Vec<Diagnostic>
                 .with_arg("issue", "invalid_binding_manifest"),
         ]
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::promote_library_surface_visibility;
+
+    #[test]
+    fn visibility_promotion_ignores_string_literals() {
+        let source = r#"pub(crate) fn exported() {}
+let note = "pub(crate) fn hidden() {}";
+    pub(crate) struct Visible;
+// pub(crate) enum CommentOnly {}
+"#;
+
+        let promoted = promote_library_surface_visibility(source);
+
+        assert!(promoted.contains("pub fn exported() {}"));
+        assert!(promoted.contains("    pub struct Visible;"));
+        assert!(promoted.contains("\"pub(crate) fn hidden() {}\""));
+        assert!(promoted.contains("// pub(crate) enum CommentOnly {}"));
+    }
 }

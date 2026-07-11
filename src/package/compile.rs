@@ -708,7 +708,7 @@ fn go_package_func_name_collision_diagnostic(
 
 /// Ensure a single-line or parenthesized Go import block includes `pkg`.
 fn ensure_go_import(code: &str, pkg: &str) -> String {
-    if code.contains(&format!("\"{pkg}\"")) {
+    if go_imports(code).iter().any(|existing| existing == pkg) {
         return code.to_owned();
     }
     // import (\n ... )
@@ -752,6 +752,66 @@ fn ensure_go_import(code: &str, pkg: &str) -> String {
         return out;
     }
     code.to_owned()
+}
+
+fn go_imports(code: &str) -> Vec<String> {
+    let mut imports = Vec::new();
+    let mut in_block = false;
+
+    for line in code.lines() {
+        let trimmed = line.trim();
+        if in_block {
+            if trimmed == ")" {
+                in_block = false;
+                continue;
+            }
+            if let Some(path) = go_import_path(trimmed) {
+                imports.push(path.to_owned());
+            }
+            continue;
+        }
+
+        if trimmed == "import (" {
+            in_block = true;
+            continue;
+        }
+        if let Some(rest) = trimmed.strip_prefix("import ") {
+            if let Some(path) = go_import_path(rest.trim()) {
+                imports.push(path.to_owned());
+            }
+        }
+    }
+
+    imports
+}
+
+fn go_import_path(segment: &str) -> Option<&str> {
+    let quoted = if let Some((_, rest)) = segment.split_once(' ') {
+        rest.trim()
+    } else {
+        segment
+    };
+    quoted.strip_prefix('"')?.strip_suffix('"')
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ensure_go_import;
+
+    #[test]
+    fn ensure_go_import_ignores_matching_string_literals() {
+        let code = r#"package main
+
+func main() {
+	println("os")
+}
+"#;
+
+        let ensured = ensure_go_import(code, "os");
+
+        assert!(ensured.contains("import \"os\""));
+        assert!(ensured.contains("println(\"os\")"));
+    }
 }
 
 fn generate_package_rust(
