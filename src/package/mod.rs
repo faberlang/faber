@@ -51,7 +51,7 @@ mod source_files;
 
 pub use artifact_plan::ArtifactPlan;
 pub use binding::verify_library_bindings;
-#[cfg(test)]
+// used by `commands/run.rs` / tests for G4 library path-deps on package emit
 pub(crate) use cargo::emit_generated_crate_with_runtime_plan;
 #[allow(unused_imports)]
 // used by `commands/run.rs` and `commands/test.rs` in the binary crate
@@ -73,6 +73,8 @@ pub use discovery::{discover_build_layout, sanitize_crate_name, BuildLayout};
 pub(crate) use dispatch::{
     load_provider_manifests, provider_crate_path, selected_providers_for_routes, ProviderManifest,
 };
+#[allow(unused_imports)] // binary `commands/run` + `commands/test` G4 linkage
+pub(crate) use library_link::emit_linked_library_crates;
 pub(crate) use manifest::validate_manifest;
 #[allow(unused_imports)] // public package API; used by integration tests and external callers
 pub use manifest::{
@@ -201,7 +203,7 @@ pub(crate) fn library_resolver_for_package(
                 crate::library::LockedLibraryPackage {
                     name: package.name.clone(),
                     version: package.version.clone(),
-                    interface_root: package.interface_root_path(),
+                    interface_root: package.interface_root_path_for(package_root),
                 },
             );
         }

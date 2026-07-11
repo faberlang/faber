@@ -57,7 +57,42 @@ pub(super) fn cmd_test(args: TestArgs) {
         }
     };
 
-    if let Err(d) = package::emit_generated_crate(&layout, &code_string, meta.as_ref()) {
+    // Match `faber build` / `faber run`: G4 native library path deps via artifact plan.
+    let mut runtime_plan = match package::package_rust_runtime_plan(&config, &input_path) {
+        Ok(plan) => plan,
+        Err(diagnostics) => {
+            super::eprint_compile_diagnostics(&diagnostics);
+            eprintln!("runtime plan failed");
+            std::process::exit(1);
+        }
+    };
+    if let Some(diagnostic) =
+        package::package_host_selection_diagnostic(&runtime_plan, &layout.manifest_path)
+    {
+        super::eprint_compile_diagnostics(&[diagnostic]);
+        eprintln!("runtime plan failed");
+        std::process::exit(1);
+    }
+    match package::emit_linked_library_crates(&layout.package_root, &layout) {
+        Ok(linked) => {
+            runtime_plan.library_path_deps = linked
+                .into_iter()
+                .map(|lib| (lib.crate_name, lib.crate_root))
+                .collect();
+        }
+        Err(diagnostics) => {
+            super::eprint_compile_diagnostics(&diagnostics);
+            eprintln!("library dependency graph failed");
+            std::process::exit(1);
+        }
+    }
+
+    if let Err(d) = package::emit_generated_crate_with_runtime_plan(
+        &layout,
+        &code_string,
+        meta.as_ref(),
+        &runtime_plan,
+    ) {
         eprintln!("error emitting: {}", d.message);
         std::process::exit(1);
     }

@@ -8837,6 +8837,126 @@ incipit {
 }
 
 #[test]
+fn g4_relative_lock_paths_resolve_against_app_package_root() {
+    // Lock package_root/interface_root may be relative to the app that owns
+    // faber.lock — never to the process CWD.
+    let root = test_temp_dir("g4-rel-lock");
+    let lib = root.join("libmath");
+    let app = root.join("app");
+    fs::create_dir_all(lib.join("src")).expect("lib src");
+    fs::create_dir_all(lib.join("bindings")).expect("bindings");
+    fs::create_dir_all(lib.join("rust")).expect("rust");
+    fs::create_dir_all(app.join("src")).expect("app src");
+
+    fs::write(
+        lib.join("faber.toml"),
+        r#"[package]
+name = "libmath"
+version = "0.1.0"
+edition = "2026"
+
+[library]
+provider = "libmath"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["rust"]
+
+[target.rust]
+bindings = "bindings/rust.toml"
+"#,
+    )
+    .expect("lib manifest");
+    fs::write(
+        lib.join("src/math.fab"),
+        "functio double(numerus n) → numerus\n",
+    )
+    .expect("lib source");
+    fs::write(
+        lib.join("rust/shim.rs"),
+        "pub fn double(n: i64) -> i64 { n * 2 }\n",
+    )
+    .expect("shim");
+    fs::write(
+        lib.join("bindings/rust.toml"),
+        r#"[functions."libmath:math.double"]
+symbol = "crate::shim::double"
+
+[shim]
+path = "rust/shim.rs"
+"#,
+    )
+    .expect("bindings");
+
+    fs::write(
+        app.join("faber.toml"),
+        r#"[package]
+name = "g4-rel-app"
+version = "0.1.0"
+
+[paths]
+entry = "main.fab"
+
+[dependencies]
+libmath = "0.1.0"
+"#,
+    )
+    .expect("app manifest");
+    fs::write(
+        app.join("faber.lock"),
+        r#"
+[[package]]
+name = "libmath"
+version = "0.1.0"
+source = "path"
+package_root = "../libmath"
+kind = "lib"
+target_language = "rust"
+target_triple = "host"
+target_manifest = ""
+interface_root = "../libmath/src"
+artifact = ""
+crate = "libmath"
+rustc = ""
+"#,
+    )
+    .expect("lock");
+    fs::write(
+        app.join("src/main.fab"),
+        r#"
+importa ex "libmath:math" privata math
+
+incipit {
+  fixum numerus n ← math.double(21)
+  nota n
+}
+"#,
+    )
+    .expect("app entry");
+
+    // Call while CWD is not the app root — relative lock paths must still resolve.
+    let old = std::env::current_dir().expect("cwd");
+    std::env::set_current_dir(&root).expect("chdir root");
+    let deps = super::artifact_plan::native_library_deps(&app).expect("native deps");
+    assert_eq!(
+        deps.len(),
+        1,
+        "relative package_root should resolve vs app root"
+    );
+    assert!(
+        Path::new(&deps[0].1.package_root).is_absolute(),
+        "emit path should be absolute after resolve"
+    );
+    let layout = discover_build_layout(&app).expect("layout");
+    let linked = super::library_link::emit_linked_library_crates(&app, &layout).expect("emit");
+    assert_eq!(linked.len(), 1);
+    std::env::set_current_dir(old).expect("restore cwd");
+}
+
+#[test]
 fn g4_package_target_rejects_unsupported_after_analysis() {
     let dir = test_temp_dir("g4-reject");
     fs::create_dir_all(dir.join("src")).expect("src");

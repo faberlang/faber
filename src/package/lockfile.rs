@@ -39,16 +39,31 @@ pub(crate) struct LockedPackage {
 }
 
 impl LockedPackage {
-    pub(crate) fn interface_root_path(&self) -> PathBuf {
-        PathBuf::from(&self.interface_root)
-    }
-
     pub(crate) fn artifact_path(&self) -> PathBuf {
         PathBuf::from(&self.artifact)
     }
 
     pub(crate) fn target_manifest_path(&self) -> PathBuf {
         PathBuf::from(&self.target_manifest)
+    }
+
+    /// Resolve a lock path field relative to the **application** package root
+    /// (directory that contains `faber.lock`), not the process CWD.
+    pub(crate) fn resolve_path(app_package_root: &Path, locked_path: &str) -> PathBuf {
+        let path = PathBuf::from(locked_path);
+        if path.is_absolute() {
+            path
+        } else {
+            app_package_root.join(path)
+        }
+    }
+
+    pub(crate) fn package_root_path(&self, app_package_root: &Path) -> PathBuf {
+        Self::resolve_path(app_package_root, &self.package_root)
+    }
+
+    pub(crate) fn interface_root_path_for(&self, app_package_root: &Path) -> PathBuf {
+        Self::resolve_path(app_package_root, &self.interface_root)
     }
 }
 
@@ -126,13 +141,17 @@ pub(crate) fn validate_dependencies_against_lock(
                 .with_arg("package", name.clone()),
             );
         }
-        validate_locked_paths(locked, &mut diagnostics);
+        validate_locked_paths(package_root, locked, &mut diagnostics);
     }
     diagnostics
 }
 
-fn validate_locked_paths(locked: &LockedPackage, diagnostics: &mut Vec<Diagnostic>) {
-    let package_root = PathBuf::from(&locked.package_root);
+fn validate_locked_paths(
+    app_package_root: &Path,
+    locked: &LockedPackage,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    let package_root = locked.package_root_path(app_package_root);
     if !package_root.is_dir() {
         diagnostics.push(
             Diagnostic::error(format!(
@@ -144,7 +163,7 @@ fn validate_locked_paths(locked: &LockedPackage, diagnostics: &mut Vec<Diagnosti
             .with_arg("package", locked.name.clone()),
         );
     }
-    let interface_root = locked.interface_root_path();
+    let interface_root = locked.interface_root_path_for(app_package_root);
     if !interface_root.is_dir() {
         diagnostics.push(
             Diagnostic::error(format!(

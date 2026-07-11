@@ -212,7 +212,8 @@ pub(crate) fn plan_or_reject(
 /// Map provider names to Cargo crate names for native-binding library deps.
 pub(crate) fn linked_library_crate_map(package: &AnalyzedPackage) -> BTreeMap<String, String> {
     let mut map = BTreeMap::new();
-    let Some(lock) = read_lock(&package.spec.package_root).ok().flatten() else {
+    let app_root = &package.spec.package_root;
+    let Some(lock) = read_lock(app_root).ok().flatten() else {
         return map;
     };
     let Some(manifest) = package_manifest(package) else {
@@ -222,7 +223,7 @@ pub(crate) fn linked_library_crate_map(package: &AnalyzedPackage) -> BTreeMap<St
         let Some(locked) = lock.packages.iter().find(|p| &p.name == name) else {
             continue;
         };
-        if library_needs_native_crate(locked) {
+        if library_needs_native_crate(app_root, locked) {
             map.insert(name.clone(), sanitize_crate_name(name));
         }
     }
@@ -277,10 +278,10 @@ pub(crate) fn native_library_deps(
             );
             continue;
         }
-        if !library_needs_native_crate(locked) {
+        if !library_needs_native_crate(package_root, locked) {
             continue;
         }
-        let lib_root = PathBuf::from(&locked.package_root);
+        let lib_root = locked.package_root_path(package_root);
         let lib_manifest_path = lib_root.join(super::MANIFEST_FILE);
         match read_manifest(&lib_manifest_path) {
             Ok(lib_manifest) => {
@@ -307,7 +308,14 @@ pub(crate) fn native_library_deps(
                     );
                     continue;
                 }
-                out.push((name.clone(), locked.clone(), lib_manifest));
+                // Rewrite lock paths to absolute so emit/link consumers do not depend on CWD.
+                let mut locked = locked.clone();
+                locked.package_root = lib_root.display().to_string();
+                locked.interface_root = locked
+                    .interface_root_path_for(package_root)
+                    .display()
+                    .to_string();
+                out.push((name.clone(), locked, lib_manifest));
             }
             Err(diag) => diagnostics.push(*diag),
         }
@@ -319,8 +327,8 @@ pub(crate) fn native_library_deps(
     }
 }
 
-fn library_needs_native_crate(locked: &LockedPackage) -> bool {
-    let root = PathBuf::from(&locked.package_root);
+fn library_needs_native_crate(app_package_root: &Path, locked: &LockedPackage) -> bool {
+    let root = locked.package_root_path(app_package_root);
     if !root.is_dir() {
         return false;
     }
