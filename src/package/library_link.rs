@@ -153,7 +153,12 @@ fn emit_one_library_crate(
     let lib_path = src_dir.join("lib.rs");
     fs::write(&lib_path, lib_rs).map_err(|err| vec![Diagnostic::io_error(&lib_path, err)])?;
 
-    let cargo_toml = render_library_cargo_toml(crate_name, &lib_manifest.package.version, target);
+    let cargo_toml = render_library_cargo_toml(
+        crate_name,
+        &lib_manifest.package.version,
+        package_root,
+        target,
+    );
     let cargo_path = crate_root.join("Cargo.toml");
     fs::write(&cargo_path, cargo_toml)
         .map_err(|err| vec![Diagnostic::io_error(&cargo_path, err)])?;
@@ -236,6 +241,7 @@ fn generate_linked_unit_rust(
 fn render_library_cargo_toml(
     crate_name: &str,
     version: &str,
+    package_root: &Path,
     target: &super::manifest::ManifestTarget,
 ) -> String {
     let version = if version.trim().is_empty() {
@@ -250,7 +256,8 @@ fn render_library_cargo_toml(
     );
     for (name, req) in &target.dependencies {
         if req.trim_start().starts_with('{') {
-            deps.push_str(&format!("{name} = {req}\n"));
+            let rendered = absolutize_inline_dependency_paths(package_root, req);
+            deps.push_str(&format!("{name} = {rendered}\n"));
         } else {
             deps.push_str(&format!("{name} = \"{req}\"\n"));
         }
@@ -273,6 +280,16 @@ path = "src/lib.rs"
 [dependencies]
 {deps}"#
     )
+}
+
+fn absolutize_inline_dependency_paths(package_root: &Path, requirement: &str) -> String {
+    let Ok(toml::Value::Table(mut table)) = requirement.trim().parse::<toml::Value>() else {
+        return requirement.to_owned();
+    };
+    if let Some(toml::Value::String(path)) = table.get_mut("path") {
+        *path = package_root.join(&*path).display().to_string();
+    }
+    toml::Value::Table(table).to_string()
 }
 
 /// Promote module-mode `pub(crate)` items to `pub` for path-dep consumers.

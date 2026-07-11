@@ -42,13 +42,14 @@ impl Drop for ProbeChild {
 
 #[allow(clippy::result_large_err)]
 pub(crate) fn run_rust_binding_probe(
+    package_root: &Path,
     anchor: &Path,
     dependencies: &BTreeMap<String, String>,
     shim: Option<&Path>,
     probes: &[String],
 ) -> Result<(), Diagnostic> {
     let root = probe_root();
-    let result = run_probe_in(&root, anchor, dependencies, shim, probes);
+    let result = run_probe_in(&root, package_root, anchor, dependencies, shim, probes);
     match fs::remove_dir_all(&root) {
         Ok(()) => result,
         Err(cleanup_error) => match result {
@@ -68,6 +69,7 @@ pub(crate) fn run_rust_binding_probe(
 #[allow(clippy::result_large_err)]
 fn run_probe_in(
     root: &Path,
+    package_root: &Path,
     anchor: &Path,
     dependencies: &BTreeMap<String, String>,
     shim: Option<&Path>,
@@ -76,7 +78,7 @@ fn run_probe_in(
     let source_dir = root.join("src");
     fs::create_dir_all(&source_dir).map_err(|error| Diagnostic::io_error(&source_dir, error))?;
     let manifest_path = root.join("Cargo.toml");
-    let manifest = probe_manifest(dependencies).map_err(|error| {
+    let manifest = probe_manifest(package_root, dependencies).map_err(|error| {
         Diagnostic::error(format!(
             "failed to serialize Rust binding probe manifest: {error}"
         ))
@@ -159,7 +161,10 @@ fn run_probe_in(
     .with_arg("issue", "binding_rust_probe_failed"))
 }
 
-fn probe_manifest(dependencies: &BTreeMap<String, String>) -> Result<String, toml::ser::Error> {
+fn probe_manifest(
+    package_root: &Path,
+    dependencies: &BTreeMap<String, String>,
+) -> Result<String, toml::ser::Error> {
     let mut package = toml::map::Map::new();
     package.insert(
         "name".to_owned(),
@@ -174,10 +179,8 @@ fn probe_manifest(dependencies: &BTreeMap<String, String>) -> Result<String, tom
     let mut dependencies = dependencies
         .iter()
         .map(|(name, requirement)| {
-            let value = requirement
-                .trim()
-                .parse::<toml::Value>()
-                .unwrap_or_else(|_| toml::Value::String(requirement.clone()));
+            let value = parse_dependency_requirement(requirement);
+            let value = normalize_dependency_value(package_root, value);
             (name.clone(), value)
         })
         .collect::<toml::map::Map<_, _>>();
@@ -202,6 +205,30 @@ fn probe_manifest(dependencies: &BTreeMap<String, String>) -> Result<String, tom
     manifest.insert("package".to_owned(), toml::Value::Table(package));
     manifest.insert("dependencies".to_owned(), toml::Value::Table(dependencies));
     toml::to_string(&manifest)
+}
+
+fn normalize_dependency_value(package_root: &Path, value: toml::Value) -> toml::Value {
+    match value {
+        toml::Value::Table(mut table) => {
+            if let Some(toml::Value::String(path)) = table.get_mut("path") {
+                let absolute = package_root.join(&*path);
+                *path = absolute.display().to_string();
+            }
+            toml::Value::Table(table)
+        }
+        other => other,
+    }
+}
+
+fn parse_dependency_requirement(requirement: &str) -> toml::Value {
+    let trimmed = requirement.trim();
+    if trimmed.starts_with('{') {
+        trimmed
+            .parse::<toml::Value>()
+            .unwrap_or_else(|_| toml::Value::String(requirement.to_owned()))
+    } else {
+        toml::Value::String(requirement.to_owned())
+    }
 }
 
 fn probe_source(shim: Option<&Path>, probes: &[String]) -> String {

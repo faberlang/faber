@@ -3,7 +3,7 @@
 //! TARGET: API5 product proof for grouped routes, middleware, extraction,
 //! structured errors, shared state, and overlapping requests on real loopback.
 
-use crate::{
+use super::{
     add_group, add_middleware, header_value, json_body, match_route, path_param, query_param,
     ApplicationState,
 };
@@ -121,7 +121,7 @@ async fn slow(state: ApplicationState) -> HttpResponse {
 }
 
 fn fixture_routes() -> Result<Valor, String> {
-    let routes = add_middleware(crate::route_table(), "request-id".to_owned())?;
+    let routes = add_middleware(super::route_table(), "request-id".to_owned())?;
     add_group(
         routes,
         "/api".to_owned(),
@@ -212,7 +212,7 @@ fn json_error(status: u16, issue: &str) -> HttpResponse {
     json_response(status, format!(r#"{{"error":true,"issue":"{issue}"}}"#))
 }
 
-fn state_error(error: crate::StateError) -> String {
+fn state_error(error: super::StateError) -> String {
     format!("state error: {error:?}")
 }
 
