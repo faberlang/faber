@@ -8957,6 +8957,69 @@ incipit {
 }
 
 #[test]
+fn library_genus_record_call_arg_emits_correct_type() {
+    // Regression: package-path library Color {..} as call-arg must not emit as Euler.
+    let app = test_temp_dir("lib-color-call-arg");
+    fs::create_dir_all(app.join("src")).unwrap();
+    fs::write(
+        app.join("faber.toml"),
+        r#"[package]
+name = "color-call-arg"
+version = "0.1.0"
+[paths]
+entry = "main.fab"
+"#,
+    )
+    .unwrap();
+    fs::write(
+        app.join("src/main.fab"),
+        r#"
+importa ex "triga:triga" privata triga
+
+incipit {
+  fixum triga.Color midpoint ← triga.color_interpolata(
+    triga.Color { r = 0.0 ∷ f32, g = 0.0 ∷ f32, b = 0.0 ∷ f32 },
+    triga.Color { r = 1.0 ∷ f32, g = 0.5 ∷ f32, b = 0.25 ∷ f32 },
+    0.5 ∷ f32
+  )
+  adfirma midpoint.r ≡ (0.5 ∷ f32), "color call-arg"
+}
+"#,
+    )
+    .unwrap();
+    std::env::set_var(
+        "FABER_LIBRARY_HOME",
+        env!("CARGO_MANIFEST_DIR").to_owned() + "/..",
+    );
+    let result = compile_package(&Config::default(), &app);
+    assert!(
+        result.success(),
+        "compile failed: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| d.message.clone())
+            .collect::<Vec<_>>()
+    );
+    let Some(Output::Rust(output)) = result.output else {
+        panic!("expected rust");
+    };
+    assert!(
+        output.code.contains("crate::triga::Color {") || output.code.contains("triga::Color {"),
+        "expected Color construct in emit, got:\n{}",
+        output.code
+    );
+    assert!(
+        !output
+            .code
+            .contains("color_interpolata(&crate::triga::Euler")
+            && !output.code.contains("color_interpolata(&triga::Euler"),
+        "Color call-arg must not emit as Euler:\n{}",
+        output.code
+    );
+}
+
+#[test]
 fn g4_package_target_rejects_unsupported_after_analysis() {
     let dir = test_temp_dir("g4-reject");
     fs::create_dir_all(dir.join("src")).expect("src");
