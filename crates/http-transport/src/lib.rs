@@ -33,7 +33,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::sync::{Notify, Semaphore};
-use tokio::task::JoinHandle;
+use tokio::task::{JoinHandle, JoinSet};
 use tokio::time::timeout;
 
 const SHUTDOWN_DRAIN_TIMEOUT: Duration = Duration::from_millis(250);
@@ -169,8 +169,30 @@ pub struct HttpTransport {
     cancel_notify: Arc<Notify>,
     correlations: Arc<CorrelationTable>,
     in_flight: Arc<AtomicUsize>,
-    connections: Arc<Mutex<Vec<JoinHandle<()>>>>,
+    connections: Arc<Mutex<ConnectionTasks>>,
     join: Mutex<Option<JoinHandle<()>>>,
+}
+
+#[derive(Default)]
+struct ConnectionTasks {
+    set: JoinSet<()>,
+}
+
+impl ConnectionTasks {
+    fn spawn(&mut self, task: impl Future<Output = ()> + Send + 'static) {
+        self.reap_completed();
+        self.set.spawn(task);
+    }
+
+    fn reap_completed(&mut self) {
+        while self.set.try_join_next().is_some() {}
+    }
+
+    #[cfg(test)]
+    fn len(&mut self) -> usize {
+        self.reap_completed();
+        self.set.len()
+    }
 }
 
 impl HttpTransport {
@@ -196,7 +218,7 @@ impl HttpTransport {
         let correlations = Arc::new(CorrelationTable::new());
         let in_flight = Arc::new(AtomicUsize::new(0));
         let slots = Arc::new(Semaphore::new(config.max_in_flight.max(1)));
-        let connections = Arc::new(Mutex::new(Vec::new()));
+        let connections = Arc::new(Mutex::new(ConnectionTasks::default()));
 
         let handler: BoxHandler = Arc::new(move |req| Box::pin(handler(req)));
         let join = tokio::spawn(accept_loop(
@@ -241,6 +263,11 @@ impl HttpTransport {
 
     pub fn is_cancelled(&self) -> bool {
         self.cancel.load(Ordering::SeqCst)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn tracked_connections(&self) -> usize {
+        self.connections.lock().map(|mut tasks| tasks.len()).unwrap_or(0)
     }
 
     /// Signal accept loop to stop; in-flight handlers observe cancel mid-body when timed.
@@ -292,7 +319,7 @@ async fn accept_loop(
     cancel_notify: Arc<Notify>,
     correlations: Arc<CorrelationTable>,
     in_flight: Arc<AtomicUsize>,
-    connections: Arc<Mutex<Vec<JoinHandle<()>>>>,
+    connections: Arc<Mutex<ConnectionTasks>>,
     slots: Arc<Semaphore>,
 ) {
     loop {
@@ -341,42 +368,46 @@ async fn accept_loop(
         let request_timeout = config.request_timeout;
 
         in_flight.fetch_add(1, Ordering::SeqCst);
-        let connection = tokio::spawn(async move {
-            let _permit = permit;
-            let io = TokioIo::new(stream);
-            let service = service_fn(move |req| {
-                let handler = Arc::clone(&handler);
-                let config = config.clone();
-                let cancel = Arc::clone(&cancel);
-                let correlations = Arc::clone(&correlations);
-                async move {
-                    Ok::<_, Infallible>(
-                        handle_connection(req, handler, config, cancel, correlations).await,
-                    )
-                }
-            });
-
-            // One request per connection: disable keep-alive.
-            let conn = serve_http1(io, service, request_timeout);
-            let _ = conn.await;
-            in_flight.fetch_sub(1, Ordering::SeqCst);
-        });
         if let Ok(mut tasks) = connections.lock() {
-            tasks.push(connection);
+            tasks.spawn(async move {
+                let _permit = permit;
+                let io = TokioIo::new(stream);
+                let service = service_fn(move |req| {
+                    let handler = Arc::clone(&handler);
+                    let config = config.clone();
+                    let cancel = Arc::clone(&cancel);
+                    let correlations = Arc::clone(&correlations);
+                    async move {
+                        Ok::<_, Infallible>(
+                            handle_connection(req, handler, config, cancel, correlations).await,
+                        )
+                    }
+                });
+
+                // One request per connection: disable keep-alive.
+                let conn = serve_http1(io, service, request_timeout);
+                let _ = conn.await;
+                in_flight.fetch_sub(1, Ordering::SeqCst);
+            });
         }
     }
 }
 
-async fn drain_connection_tasks(connections: Arc<Mutex<Vec<JoinHandle<()>>>>) {
-    let tasks = connections
+async fn drain_connection_tasks(connections: Arc<Mutex<ConnectionTasks>>) {
+    let mut tasks = connections
         .lock()
         .ok()
-        .map(|mut tasks| std::mem::take(&mut *tasks))
+        .map(|mut tasks| std::mem::take(&mut tasks.set))
         .unwrap_or_default();
-    for mut task in tasks {
-        if timeout(SHUTDOWN_DRAIN_TIMEOUT, &mut task).await.is_err() {
-            task.abort();
-            let _ = task.await;
+    loop {
+        match timeout(SHUTDOWN_DRAIN_TIMEOUT, tasks.join_next()).await {
+            Ok(Some(_)) => {}
+            Ok(None) => break,
+            Err(_) => {
+                tasks.abort_all();
+                while tasks.join_next().await.is_some() {}
+                break;
+            }
         }
     }
 }

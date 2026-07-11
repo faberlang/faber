@@ -354,6 +354,30 @@ async fn completed_requests_do_not_accumulate_in_correlation_table() {
 }
 
 #[tokio::test]
+async fn completed_connections_do_not_accumulate_in_shutdown_tracking() {
+    let transport =
+        HttpTransport::serve(loopback(), TransportConfig::default(), |_req| async move {
+            HttpResponse::text(200, "ok")
+        })
+        .await
+        .expect("bind");
+
+    let uri = format!("http://{}/steady", transport.local_addr());
+    for _ in 0..128 {
+        let (status, body, _) = get_text(&uri, "").await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body, "ok");
+    }
+
+    assert!(
+        transport.tracked_connections() <= 1,
+        "completed connections should be reaped during normal operation"
+    );
+
+    transport.shutdown_and_join().await;
+}
+
+#[tokio::test]
 async fn slow_headers_and_saturation_are_time_bounded() {
     let transport = HttpTransport::serve(
         loopback(),
