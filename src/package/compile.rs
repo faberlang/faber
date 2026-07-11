@@ -474,7 +474,10 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
     }
 
     // Namespace vars for local imports + narrow Norma host shims (entry + siblings).
+    // WHY (79df18a): inject each binding name at most once — multi-unit packages
+    // that all `importa … privata consolum` must not redeclare `var consolum`.
     let mut namespace_block = String::new();
+    let mut injected_bindings: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     let mut needs_os_for_shim = false;
     for unit in &package.units {
         for item in &unit.analysis.hir.items {
@@ -488,8 +491,12 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
                     let binding = it
                         .alias
                         .map(|a| unit.analysis.interner.resolve(a))
-                        .unwrap_or_else(|| unit.analysis.interner.resolve(it.name));
-                    namespace_block.push_str(&super::go_build::render_norma_consolum_shim(binding));
+                        .unwrap_or_else(|| unit.analysis.interner.resolve(it.name))
+                        .to_owned();
+                    if !injected_bindings.insert(binding.clone()) {
+                        continue;
+                    }
+                    namespace_block.push_str(&super::go_build::render_norma_consolum_shim(&binding));
                     namespace_block.push('\n');
                     needs_os_for_shim = true;
                 }
@@ -526,8 +533,12 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
                 let binding = it
                     .alias
                     .map(|a| unit.analysis.interner.resolve(a))
-                    .unwrap_or_else(|| unit.analysis.interner.resolve(it.name));
-                namespace_block.push_str(&super::go_build::render_namespace_var(binding, funcs));
+                    .unwrap_or_else(|| unit.analysis.interner.resolve(it.name))
+                    .to_owned();
+                if !injected_bindings.insert(binding.clone()) {
+                    continue;
+                }
+                namespace_block.push_str(&super::go_build::render_namespace_var(&binding, funcs));
                 namespace_block.push('\n');
             }
         }
