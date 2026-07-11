@@ -223,8 +223,7 @@ fn snapshot_struct(
         })
         .collect::<Result<Vec<_>, Diagnostic>>()?;
 
-    let annotation_contract =
-        annotation_contract_export(analysis, def_id, name, export_identity);
+    let annotation_contract = annotation_contract_export(analysis, def_id, name, export_identity);
 
     Ok(InterfaceStructExport {
         name: analysis.interner.resolve(strukt.name).to_owned(),

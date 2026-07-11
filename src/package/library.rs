@@ -20,7 +20,6 @@ use radix::parser;
 use radix::semantic::TypeTable;
 use radix::syntax::{AnnotationKind, Program, StmtKind, Visibility};
 
-
 use super::import_graph::{
     inner_library_import_unresolved_diagnostic, library_import_binding,
     library_import_kind_diagnostic, library_resolve_diagnostic,

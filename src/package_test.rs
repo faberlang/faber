@@ -9883,11 +9883,8 @@ fn g9_api2_http_package_verifies_and_exports_http_application_contract() {
         report.declarations
     );
 
-    let package = analyze_package(
-        &Config::default().with_bodyless_functions(),
-        &lib,
-    )
-    .expect("analyze http package");
+    let package = analyze_package(&Config::default().with_bodyless_functions(), &lib)
+        .expect("analyze http package");
     let unit = package
         .units
         .iter()
