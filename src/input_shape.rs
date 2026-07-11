@@ -11,7 +11,7 @@ pub(crate) fn verify_input_is_package_shaped(input: &[String], force_package: bo
     let path = std::path::Path::new(first);
     path.is_dir()
         || path.file_name().is_some_and(|name| name == "faber.toml")
-        || path.extension().is_none()
+        || (!path.exists() && path.extension().is_none())
 }
 
 pub(crate) fn reader_locale_supports_input(input: &[String], force_package: bool) -> bool {
@@ -52,6 +52,35 @@ mod tests {
         reader_locale_supports_input, reader_locale_without_package_error,
         verify_input_is_package_shaped,
     };
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    struct TempPlainFile {
+        path: PathBuf,
+    }
+
+    impl TempPlainFile {
+        fn new() -> Self {
+            let mut path = std::env::temp_dir();
+            let nonce = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("clock before unix epoch")
+                .as_nanos();
+            path.push(format!("faber-input-shape-{nonce}"));
+            std::fs::write(&path, "temp").expect("write temp file");
+            Self { path }
+        }
+
+        fn input(&self) -> String {
+            self.path.to_string_lossy().into_owned()
+        }
+    }
+
+    impl Drop for TempPlainFile {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.path);
+        }
+    }
 
     #[test]
     fn verify_input_is_package_shaped_accepts_faber_manifest_and_dirs() {
@@ -81,6 +110,8 @@ mod tests {
             &["main.txt".to_owned()],
             false
         ));
+        let file = TempPlainFile::new();
+        assert!(!verify_input_is_package_shaped(&[file.input()], false));
     }
 
     #[test]
@@ -118,6 +149,8 @@ mod tests {
             &["main.txt".to_owned()],
             false
         ));
+        let file = TempPlainFile::new();
+        assert!(!reader_locale_supports_input(&[file.input()], false));
         assert!(!reader_locale_supports_input(
             &["main.fab".to_owned(), "other.fab".to_owned()],
             false
@@ -144,6 +177,11 @@ mod tests {
         );
         assert_eq!(
             reader_locale_without_package_error(Some("la"), &["main.txt".to_owned()], false),
+            Some("--reader-locale la requires a package path or .fab entry file".to_owned())
+        );
+        let file = TempPlainFile::new();
+        assert_eq!(
+            reader_locale_without_package_error(Some("la"), &[file.input()], false),
             Some("--reader-locale la requires a package path or .fab entry file".to_owned())
         );
         assert_eq!(
