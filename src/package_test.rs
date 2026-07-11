@@ -7765,8 +7765,8 @@ incipit {{
     assert!(cargo.contains("host-native"));
     assert!(cargo.contains("host_native"));
     assert!(cargo.contains("solum"));
-    assert!(!cargo.contains("faber-host-native"));
-    assert!(!cargo.contains("faber_host_native"));
+    // Live adapter is host-native-rs (`host_native`), not the deleted runtime
+    // workspace clone `faber-host-native` (purity Tier-1 / 4adf6ef).
     assert!(!cargo.contains("faber-host-macos-arm64"));
     assert!(!cargo.contains("../radix/hosts/macos-arm64"));
     let generated_main = fs::read_to_string(&layout.generated_rust_entry).expect("main");
@@ -9110,7 +9110,6 @@ incipit argumenta args exitus 0 {
 
 #[test]
 
-
 fn g6_go4_multi_module_namespace_package_builds() {
     let dir = test_temp_dir("g6-go4-multi");
     fs::create_dir_all(dir.join("src")).expect("src");
@@ -9160,8 +9159,7 @@ incipit argumenta args exitus 0 {
         panic!("expected Go output");
     };
     assert!(
-        output.code.contains("var helper = struct")
-            || output.code.contains("var helper ="),
+        output.code.contains("var helper = struct") || output.code.contains("var helper ="),
         "expected namespace var for helper:\n{}",
         output.code
     );
@@ -9172,12 +9170,11 @@ incipit argumenta args exitus 0 {
     );
 
     let modules = super::take_go_package_modules();
+    assert!(!modules.is_empty(), "expected non-entry module files");
     assert!(
-        !modules.is_empty(),
-        "expected non-entry module files"
-    );
-    assert!(
-        modules.iter().any(|(_, body)| body.contains("func identity")),
+        modules
+            .iter()
+            .any(|(_, body)| body.contains("func identity")),
         "expected identity func in module: {modules:?}"
     );
 
@@ -9267,17 +9264,17 @@ fn g6_go4_coreutils_echo_package_go_builds() {
         .expect("run echo");
     assert_eq!(output.status.code(), Some(0), "echo exit");
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert_eq!(
-        stdout, "hello world\n",
-        "echo stdout got {stdout:?}"
-    );
+    assert_eq!(stdout, "hello world\n", "echo stdout got {stdout:?}");
 }
 
 #[test]
 fn g6_go4_coreutils_false_package_go_builds() {
     let path = PathBuf::from("/Users/ianzepp/work/faberlang/examples/coreutils/packages/false");
     if !path.exists() {
-        eprintln!("skip: coreutils false package missing at {}", path.display());
+        eprintln!(
+            "skip: coreutils false package missing at {}",
+            path.display()
+        );
         return;
     }
     let result = compile_package(&Config::default().with_target(Target::Go), &path);
