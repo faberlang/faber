@@ -332,10 +332,28 @@ incipit {
     ]);
 
     assert!(!ok, "run --interpret should reject reader locale");
-    assert!(stdout.is_empty(), "rejected run should not write stdout: {stdout}");
+    assert!(
+        stdout.is_empty(),
+        "rejected run should not write stdout: {stdout}"
+    );
     assert!(
         stderr.contains("--reader-locale is not supported with `faber run --interpret`"),
         "expected interpret reader-locale rejection, got:\n{stderr}"
+    );
+}
+
+#[test]
+fn run_reader_locale_rejects_stdin_input() {
+    let (stdout, stderr, ok) = run_faber(&["run", "--reader-locale", "zh-Hans", "-"]);
+
+    assert!(!ok, "run should reject stdin reader-locale input");
+    assert!(
+        stdout.is_empty(),
+        "rejected run should not write stdout: {stdout}"
+    );
+    assert!(
+        stderr.contains("--reader-locale zh-Hans requires a package path or .fab entry file"),
+        "expected stdin reader-locale rejection, got:\n{stderr}"
     );
 }
 
@@ -387,6 +405,21 @@ incipit {
     assert!(
         stdout.contains("test result: ok."),
         "expected cargo test success output, got:\n{stdout}"
+    );
+}
+
+#[test]
+fn test_reader_locale_rejects_stdin_input() {
+    let (stdout, stderr, ok) = run_faber(&["test", "--reader-locale", "zh-Hans", "-"]);
+
+    assert!(!ok, "test should reject stdin reader-locale input");
+    assert!(
+        stdout.is_empty(),
+        "rejected test should not write stdout: {stdout}"
+    );
+    assert!(
+        stderr.contains("--reader-locale zh-Hans requires a package path or .fab entry file"),
+        "expected stdin reader-locale rejection, got:\n{stderr}"
     );
 }
 

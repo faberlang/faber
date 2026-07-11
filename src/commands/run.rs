@@ -9,6 +9,7 @@
 //! break (see `docs/factory/faber-script-runtime/stage0-baseline.md`).
 
 use crate::cli::{FmirRunArgs, RunArgs};
+use crate::input_shape::reader_locale_without_package_error;
 use crate::package;
 use radix::codegen::Target;
 use radix::diagnostics::Diagnostic;
@@ -35,6 +36,14 @@ fn should_interpret(args: &RunArgs, path: &Path) -> bool {
 /// Builds a package as Rust or interprets a single `.fab` file.
 pub(super) fn cmd_run(args: RunArgs) {
     let input_path = PathBuf::from(&args.path);
+    if let Some(message) = reader_locale_without_package_error(
+        args.reader_locale.as_deref(),
+        &[args.path.display().to_string()],
+        false,
+    ) {
+        eprintln!("error: {message}");
+        std::process::exit(1);
+    }
     if args.interpret && args.reader_locale.is_some() {
         eprintln!("error: --reader-locale is not supported with `faber run --interpret`");
         std::process::exit(1);
