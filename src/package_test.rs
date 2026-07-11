@@ -8856,7 +8856,10 @@ fn g8_sqlite_package_verifies_and_links_application() {
         return;
     };
     let report = verify_library_bindings(&lib, "rust").expect("sqlite library verifies");
-    assert_eq!(report.bindings, 4, "exsequi/quaere/scalar/transactio");
+    assert_eq!(
+        report.bindings, 6,
+        "exsequi/exsequi_batch/quaere/scalar/transactio/sha256_hex"
+    );
 
     let root = test_temp_dir("g8-sqlite-app");
     let app = root.join("app");
@@ -9342,11 +9345,10 @@ incipit {
 "#,
     )
     .unwrap();
-    std::env::set_var(
-        "FABER_LIBRARY_HOME",
-        env!("CARGO_MANIFEST_DIR").to_owned() + "/..",
+    let result = compile_package(
+        &Config::default().with_stdlib(dev_norma_library_home()),
+        &app,
     );
-    let result = compile_package(&Config::default(), &app);
     assert!(
         result.success(),
         "compile failed: {:?}",

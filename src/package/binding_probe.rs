@@ -193,8 +193,7 @@ fn probe_manifest(
         runtime.insert(
             "path".to_owned(),
             toml::Value::String(
-                Path::new(env!("CARGO_MANIFEST_DIR"))
-                    .join("../faber-runtime")
+                super::cargo::local_repo_path("faber-runtime")
                     .display()
                     .to_string(),
             ),

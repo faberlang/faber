@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use radix::codegen::Target;
@@ -107,11 +108,18 @@ fn generate_cargo_toml(meta: &FaberManifest, binary_name: &str, plan: &RustRunti
 }
 
 fn render_generated_cargo_toml(name: &str, version: &str, plan: &RustRuntimePlan) -> String {
+    let faber_path = if matches!(plan.host, Some(ManifestRustHost::Native))
+        || !plan.selected_providers.is_empty()
+    {
+        faber_runtime_path()
+    } else {
+        local_repo_path("faber-runtime")
+    };
     let mut deps = String::new();
     if plan.needs_faber {
         deps.push_str(&format!(
             "faber = {{ package = \"faber-runtime\", path = \"{}\" }}\n",
-            faber_runtime_path().display(),
+            faber_path.display(),
         ));
     }
     if matches!(plan.host, Some(ManifestRustHost::Native)) {
@@ -164,17 +172,108 @@ edition = "2021"
     )
 }
 
-fn faber_runtime_path() -> PathBuf {
+fn sibling_repo_path_from(manifest_dir: &Path, name: &str) -> PathBuf {
+    for candidate in manifest_dir.ancestors() {
+        let sibling = candidate.join(name);
+        if !sibling.is_dir() {
+            continue;
+        }
+        let has_core_runtime_repos = ["faber-runtime", "host-kernel-rs", "host-native-rs"]
+            .iter()
+            .all(|repo| candidate.join(repo).is_dir());
+        if has_core_runtime_repos {
+            return fs::canonicalize(&sibling).unwrap_or(sibling);
+        }
+    }
+    let fallback = manifest_dir.join("..").join(name);
+    fs::canonicalize(&fallback).unwrap_or(fallback)
+}
+
+fn local_repo_path_from(manifest_dir: &Path, name: &str) -> PathBuf {
+    for candidate in manifest_dir.ancestors() {
+        let sibling = candidate.join(name);
+        if sibling.is_dir() {
+            return sibling;
+        }
+    }
+    manifest_dir.join("..").join(name)
+}
+
+pub(crate) fn sibling_repo_path(name: &str) -> PathBuf {
+    sibling_repo_path_from(Path::new(env!("CARGO_MANIFEST_DIR")), name)
+}
+
+pub(crate) fn local_repo_path(name: &str) -> PathBuf {
+    local_repo_path_from(Path::new(env!("CARGO_MANIFEST_DIR")), name)
+}
+
+pub(crate) fn faber_runtime_path() -> PathBuf {
     // Public `faber` repo lives beside private `radix` under faberlang/.
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../faber-runtime")
+    sibling_repo_path("faber-runtime")
 }
 
-fn host_kernel_path() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../host-kernel-rs")
+pub(crate) fn host_kernel_path() -> PathBuf {
+    sibling_repo_path("host-kernel-rs")
 }
 
-fn host_native_path() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../host-native-rs")
+pub(crate) fn host_native_path() -> PathBuf {
+    sibling_repo_path("host-native-rs")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{local_repo_path_from, sibling_repo_path_from};
+    use std::fs;
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_dir(label: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("faber-{label}-{nonce}"));
+        fs::create_dir_all(&path).expect("temp dir");
+        path
+    }
+
+    #[test]
+    fn local_repo_path_prefers_nearest_worktree_sibling() {
+        let root = temp_dir("cargo-local-repo-path");
+        let worktree = root.join("worktrees").join("slice").join("faber-build");
+        fs::create_dir_all(&worktree).expect("worktree");
+        fs::create_dir_all(
+            worktree
+                .parent()
+                .expect("worktree parent")
+                .join("faber-runtime"),
+        )
+        .expect("worktree faber-runtime");
+        fs::create_dir_all(root.join("faber-runtime")).expect("repo faber-runtime");
+
+        assert_eq!(
+            local_repo_path_from(&worktree, "faber-runtime"),
+            worktree
+                .parent()
+                .expect("worktree parent")
+                .join("faber-runtime")
+        );
+    }
+
+    #[test]
+    fn sibling_repo_path_prefers_canonical_repo_cluster() {
+        let root = temp_dir("cargo-sibling-repo-path");
+        let worktree = root.join("worktrees").join("slice").join("faber-build");
+        fs::create_dir_all(&worktree).expect("worktree");
+        let cluster = worktree.parent().expect("worktree parent");
+        for repo in ["faber-runtime", "host-kernel-rs", "host-native-rs"] {
+            fs::create_dir_all(cluster.join(repo)).expect("cluster repo");
+        }
+        let direct = cluster.join("faber-runtime");
+        let expected = fs::canonicalize(&direct).unwrap_or_else(|_| direct.clone());
+
+        assert_eq!(sibling_repo_path_from(&worktree, "faber-runtime"), expected);
+    }
 }
 
 /// Write the generated Rust crate tree under the layout's `target/faber/` directory.

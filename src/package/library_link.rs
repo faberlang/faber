@@ -249,10 +249,9 @@ fn render_library_cargo_toml(
     } else {
         version.trim()
     };
-    let faber_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../faber-runtime");
     let mut deps = format!(
         "faber = {{ package = \"faber-runtime\", path = \"{}\" }}\n",
-        faber_path.display()
+        super::cargo::local_repo_path("faber-runtime").display()
     );
     for (name, req) in &target.dependencies {
         if req.trim_start().starts_with('{') {

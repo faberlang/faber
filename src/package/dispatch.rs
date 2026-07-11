@@ -207,9 +207,10 @@ pub(crate) fn provider_manifest_path(provider: &str) -> PathBuf {
 }
 
 pub(crate) fn provider_crate_path(provider: &str) -> PathBuf {
-    provider_manifest_path(provider)
+    let path = provider_manifest_path(provider)
         .parent()
         .and_then(Path::parent)
         .unwrap_or_else(|| Path::new("."))
-        .to_path_buf()
+        .to_path_buf();
+    fs::canonicalize(&path).unwrap_or(path)
 }
