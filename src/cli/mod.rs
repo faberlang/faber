@@ -267,31 +267,33 @@ pub struct ExplainArgs {
 
 impl ExplainArgs {
     fn validate(&self) -> Result<(), clap::Error> {
-        if self.reader_locale.is_some() {
-            if self.list {
-                return Err(explain_arg_error(
-                    ErrorKind::ArgumentConflict,
-                    "--reader-locale cannot be combined with --list",
-                ));
-            }
-            if self.search.is_some() {
-                return Err(explain_arg_error(
-                    ErrorKind::ArgumentConflict,
-                    "--reader-locale cannot be combined with --search",
-                ));
-            }
-            if self.category.is_some() {
-                return Err(explain_arg_error(
-                    ErrorKind::ArgumentConflict,
-                    "--reader-locale cannot be combined with --category",
-                ));
-            }
-            if self.term.is_none() {
-                return Err(explain_arg_error(
-                    ErrorKind::MissingRequiredArgument,
-                    "the following required arguments were not provided:\n  <TERM>",
-                ));
-            }
+        if self.reader_locale.is_none() {
+            return Ok(());
+        }
+
+        if self.list {
+            return Err(explain_arg_error(
+                ErrorKind::ArgumentConflict,
+                "--reader-locale cannot be combined with --list",
+            ));
+        }
+        if self.search.is_some() {
+            return Err(explain_arg_error(
+                ErrorKind::ArgumentConflict,
+                "--reader-locale cannot be combined with --search",
+            ));
+        }
+        if self.category.is_some() {
+            return Err(explain_arg_error(
+                ErrorKind::ArgumentConflict,
+                "--reader-locale cannot be combined with --category",
+            ));
+        }
+        if self.term.is_none() {
+            return Err(explain_arg_error(
+                ErrorKind::MissingRequiredArgument,
+                "the following required arguments were not provided:\n  <TERM>",
+            ));
         }
 
         Ok(())
