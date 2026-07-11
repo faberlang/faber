@@ -18,7 +18,9 @@ use radix::hir::{
 use radix::lexer::Interner;
 use radix::parser;
 use radix::semantic::TypeTable;
-use radix::syntax::{AnnotationKind, Program, StmtKind, Visibility};
+use radix::syntax::{
+    walk_expr, AnnotationKind, Expr, ExprKind, Program, StmtKind, Visibility, Visitor,
+};
 
 use super::file_interface::extract_file_interface;
 use super::import_graph::{
@@ -898,6 +900,32 @@ fn stmt_export_name(stmt: &radix::syntax::Stmt, interner: &Interner) -> Option<S
     Some(name.to_owned())
 }
 
+/// True when a function body opens a host stream (`ad`) so package codegen can
+/// mark the library item failable (Result + fac/cape) without requiring ⇥.
+fn function_body_contains_ad(body: Option<&radix::syntax::BlockStmt>) -> bool {
+    struct AdFinder {
+        found: bool,
+    }
+    impl Visitor for AdFinder {
+        fn visit_expr(&mut self, expr: &Expr) {
+            if self.found {
+                return;
+            }
+            if matches!(expr.kind, ExprKind::Ad(_)) {
+                self.found = true;
+                return;
+            }
+            walk_expr(self, expr);
+        }
+    }
+    let Some(body) = body else {
+        return false;
+    };
+    let mut finder = AdFinder { found: false };
+    finder.visit_block(body);
+    finder.found
+}
+
 fn library_interface_item(
     stmt: &radix::syntax::Stmt,
     interner: &Interner,
@@ -911,7 +939,8 @@ fn library_interface_item(
         StmtKind::Func(func) => (
             interner.resolve(func.name.name),
             LibraryItemKind::Function,
-            func.err.is_some(),
+            // Declared ⇥ or host `ad` materialize (codegen-failable for fac/cape).
+            func.err.is_some() || function_body_contains_ad(func.body.as_ref()),
         ),
         StmtKind::TypeAlias(alias) => (
             interner.resolve(alias.name.name),

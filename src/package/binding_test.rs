@@ -51,7 +51,7 @@ fn compiler_analysis_handles_annotations_multiline_signatures_and_next_line_bodi
     let root = test_package(
         "analyzed-layout",
         r#"@ futura
-functio externa(
+functio delegata(
     textus value
 ) → textus
 
@@ -62,13 +62,13 @@ functio localis(
     redde value
 }
 "#,
-        r#"[functions."fixture:api.externa"]
-symbol = "crate::shim::externa"
+        r#"[functions."fixture:api.delegata"]
+symbol = "crate::shim::delegata"
 
 [shim]
 path = "rust/shim.rs"
 "#,
-        "pub async fn externa(value: String) -> String { value }\n",
+        "pub async fn delegata(value: String) -> String { value }\n",
     );
 
     let result = verify_library_bindings(&root, "rust").expect("analyzed bindings verify");
@@ -103,9 +103,9 @@ path = "rust/shim.rs"
 fn rust_probe_rejects_a_missing_symbol() {
     let root = test_package(
         "missing-symbol",
-        "functio externa(textus value) → textus\n",
-        r#"[functions."fixture:api.externa"]
-symbol = "crate::shim::externa"
+        "functio delegata(textus value) → textus\n",
+        r#"[functions."fixture:api.delegata"]
+symbol = "crate::shim::delegata"
 
 [shim]
 path = "rust/shim.rs"
@@ -121,14 +121,14 @@ path = "rust/shim.rs"
 fn rust_probe_rejects_a_signature_mismatch() {
     let root = test_package(
         "wrong-signature",
-        "functio externa(textus value) → textus\n",
-        r#"[functions."fixture:api.externa"]
-symbol = "crate::shim::externa"
+        "functio delegata(textus value) → textus\n",
+        r#"[functions."fixture:api.delegata"]
+symbol = "crate::shim::delegata"
 
 [shim]
 path = "rust/shim.rs"
 "#,
-        "pub fn externa(value: i64) -> String { value.to_string() }\n",
+        "pub fn delegata(value: i64) -> String { value.to_string() }\n",
     );
 
     let diagnostics = verify_library_bindings(&root, "rust").expect_err("wrong signature rejected");
@@ -139,14 +139,14 @@ path = "rust/shim.rs"
 fn rust_probe_rejects_a_sync_symbol_for_an_async_contract() {
     let root = test_package(
         "wrong-async-signature",
-        "@ futura\nfunctio externa(textus value) → textus\n",
-        r#"[functions."fixture:api.externa"]
-symbol = "crate::shim::externa"
+        "@ futura\nfunctio delegata(textus value) → textus\n",
+        r#"[functions."fixture:api.delegata"]
+symbol = "crate::shim::delegata"
 
 [shim]
 path = "rust/shim.rs"
 "#,
-        "pub fn externa(value: String) -> String { value }\n",
+        "pub fn delegata(value: String) -> String { value }\n",
     );
 
     let diagnostics = verify_library_bindings(&root, "rust").expect_err("sync symbol rejected");
@@ -157,14 +157,14 @@ path = "rust/shim.rs"
 fn rust_probe_rejects_a_missing_error_channel() {
     let root = test_package(
         "wrong-error-signature",
-        "functio externa(textus value) → textus ⇥ textus\n",
-        r#"[functions."fixture:api.externa"]
-symbol = "crate::shim::externa"
+        "functio delegata(textus value) → textus ⇥ textus\n",
+        r#"[functions."fixture:api.delegata"]
+symbol = "crate::shim::delegata"
 
 [shim]
 path = "rust/shim.rs"
 "#,
-        "pub fn externa(value: String) -> String { value }\n",
+        "pub fn delegata(value: String) -> String { value }\n",
     );
 
     let diagnostics =
@@ -176,14 +176,14 @@ path = "rust/shim.rs"
 fn duplicate_binding_rows_are_rejected_by_manifest_parsing() {
     let root = test_package(
         "duplicate-row",
-        "functio externa(textus value) → textus\n",
-        r#"[functions."fixture:api.externa"]
-symbol = "crate::shim::externa"
+        "functio delegata(textus value) → textus\n",
+        r#"[functions."fixture:api.delegata"]
+symbol = "crate::shim::delegata"
 
-[functions."fixture:api.externa"]
+[functions."fixture:api.delegata"]
 symbol = "crate::shim::altera"
 "#,
-        "pub fn externa(value: String) -> String { value }\n",
+        "pub fn delegata(value: String) -> String { value }\n",
     );
 
     let diagnostics = verify_library_bindings(&root, "rust").expect_err("duplicate row rejected");
@@ -240,9 +240,9 @@ fn symlinked_shim_escape_is_rejected() {
 
     let root = test_package(
         "shim-symlink",
-        "functio externa(textus value) → textus\n",
-        r#"[functions."fixture:api.externa"]
-symbol = "crate::shim::externa"
+        "functio delegata(textus value) → textus\n",
+        r#"[functions."fixture:api.delegata"]
+symbol = "crate::shim::delegata"
 
 [shim]
 path = "rust/shim.rs"
@@ -252,7 +252,7 @@ path = "rust/shim.rs"
     let outside = root.with_extension("outside.rs");
     fs::write(
         &outside,
-        "pub fn externa(value: String) -> String { value }\n",
+        "pub fn delegata(value: String) -> String { value }\n",
     )
     .expect("write outside shim");
     fs::remove_file(root.join("rust/shim.rs")).expect("remove placeholder shim");
