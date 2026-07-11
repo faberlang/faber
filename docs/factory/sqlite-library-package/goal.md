@@ -211,6 +211,11 @@ After application linkage for verified target bindings is available:
 
 ### Stage 3 - ViviLite Read Consumer
 
+Status: first consumer proof complete in the SQLite packet (2026-07-10).
+ViviLite links the package through `d9dd406` and reads parameterized task, need,
+and want totals from a regular Vivi fixture. Output is explicitly labeled
+`sqlite-read`; item arrays and full status/list parity remain later units.
+
 Use the SQLite package from ViviLite to read a regular Vivi fixture mailspace
 and match selected `vivi` JSON outputs:
 
