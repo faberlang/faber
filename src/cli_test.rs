@@ -129,6 +129,29 @@ fn cli_parses_scena_target_for_build_and_run() {
 }
 
 #[test]
+fn cli_run_defaults_to_current_directory_and_rust_target() {
+    let run = Cli::try_parse_from(["faber", "run"]).expect("parse run defaults");
+    let Some(crate::cli::Command::Run(args)) = run.command else {
+        panic!("expected run subcommand");
+    };
+    assert_eq!(args.path, std::path::PathBuf::from("."));
+    assert_eq!(args.target, radix::tool::CliTarget::Rust);
+    assert!(!args.release);
+    assert!(!args.interpret);
+    assert!(!args.compile);
+    assert!(args.args.is_empty());
+}
+
+#[test]
+fn cli_rejects_conflicting_run_execution_modes() {
+    let error = Cli::try_parse_from(["faber", "run", "--interpret", "--compile", "pkg"])
+        .expect_err("run execution mode conflict");
+    let rendered = error.to_string();
+    assert!(rendered.contains("--interpret"));
+    assert!(rendered.contains("--compile"));
+}
+
+#[test]
 fn cli_leaves_build_target_unset_when_omitted() {
     let build = Cli::try_parse_from(["faber", "build", "pkg"]).expect("parse build");
     let Some(crate::cli::Command::Build(args)) = build.command else {
@@ -227,6 +250,15 @@ fn cli_parses_reader_locale_on_check_emit_build_and_format() {
 }
 
 #[test]
+fn cli_rejects_conflicting_format_output_modes() {
+    let error = Cli::try_parse_from(["faber", "format", "--check", "--stdout", "main.fab"])
+        .expect_err("format output mode conflict");
+    let rendered = error.to_string();
+    assert!(rendered.contains("--check"));
+    assert!(rendered.contains("--stdout"));
+}
+
+#[test]
 fn cli_parses_reader_locale_on_explain() {
     let explain = Cli::try_parse_from([
         "faber",
@@ -274,6 +306,32 @@ fn cli_parses_install_subcommand() {
         panic!("expected install subcommand");
     };
     assert_eq!(args.library, "norma");
+}
+
+#[test]
+fn cli_verify_library_uses_default_rust_target() {
+    let cli = Cli::try_parse_from(["faber", "verify-library", "sqlite"])
+        .expect("parse verify-library defaults");
+    let Some(crate::cli::Command::VerifyLibrary(args)) = cli.command else {
+        panic!("expected verify-library subcommand");
+    };
+    assert_eq!(args.target, "rust");
+    assert_eq!(args.input, std::path::PathBuf::from("sqlite"));
+}
+
+#[test]
+fn cli_test_rejects_conflicting_ignored_modes() {
+    let error = Cli::try_parse_from([
+        "faber",
+        "test",
+        "pkg",
+        "--ignored",
+        "--include-ignored",
+    ])
+    .expect_err("test ignored mode conflict");
+    let rendered = error.to_string();
+    assert!(rendered.contains("--ignored"));
+    assert!(rendered.contains("--include-ignored"));
 }
 
 #[test]
