@@ -440,6 +440,32 @@ fn cli_rejects_conflicting_explain_query_modes() {
     let list_reader_locale_rendered = list_reader_locale.to_string();
     assert!(list_reader_locale_rendered.contains("--list"));
     assert!(list_reader_locale_rendered.contains("--reader-locale"));
+
+    let search_reader_locale = Cli::try_parse_from_validated([
+        "faber",
+        "explain",
+        "--search",
+        "host",
+        "--reader-locale",
+        "la",
+    ])
+    .expect_err("search and reader locale should conflict");
+    let search_reader_locale_rendered = search_reader_locale.to_string();
+    assert!(search_reader_locale_rendered.contains("--search"));
+    assert!(search_reader_locale_rendered.contains("--reader-locale"));
+
+    let category_reader_locale = Cli::try_parse_from_validated([
+        "faber",
+        "explain",
+        "--category",
+        "diagnostics",
+        "--reader-locale",
+        "la",
+    ])
+    .expect_err("category and reader locale should conflict");
+    let category_reader_locale_rendered = category_reader_locale.to_string();
+    assert!(category_reader_locale_rendered.contains("--category"));
+    assert!(category_reader_locale_rendered.contains("--reader-locale"));
 }
 
 #[test]
