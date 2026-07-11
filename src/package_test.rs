@@ -8673,6 +8673,105 @@ entry = "main.fab"
 }
 
 #[test]
+/// G8 DB1 evidence: shipped `examples/sqlite` verifies and links into an app.
+fn g8_sqlite_package_verifies_and_links_application() {
+    let lib = PathBuf::from("/Users/ianzepp/work/faberlang/examples/sqlite");
+    if !lib.exists() {
+        eprintln!("skip: examples/sqlite missing at {}", lib.display());
+        return;
+    }
+    let report = verify_library_bindings(&lib, "rust").expect("sqlite library verifies");
+    assert_eq!(report.bindings, 3, "exsequi/quaere/scalar");
+
+    let root = test_temp_dir("g8-sqlite-app");
+    let app = root.join("app");
+    fs::create_dir_all(app.join("src")).expect("app src");
+    let interface_root = lib.join("src");
+    fs::write(
+        app.join("faber.toml"),
+        r#"[package]
+name = "g8-sqlite-app"
+version = "0.1.0"
+
+[paths]
+entry = "main.fab"
+
+[dependencies]
+sqlite = "0.1.0"
+"#,
+    )
+    .expect("app manifest");
+    fs::write(
+        app.join("faber.lock"),
+        format!(
+            r#"
+[[package]]
+name = "sqlite"
+version = "0.1.0"
+source = "path"
+package_root = "{package_root}"
+kind = "lib"
+target_language = "rust"
+target_triple = "host"
+target_manifest = ""
+interface_root = "{interface_root}"
+artifact = ""
+crate = "sqlite"
+rustc = ""
+"#,
+            package_root = lib.display(),
+            interface_root = interface_root.display(),
+        ),
+    )
+    .expect("lock");
+    // Scalar open of :memory: — exercises native library path-dep linkage only.
+    fs::write(
+        app.join("src/main.fab"),
+        r#"
+importa ex "sqlite:sqlite" privata sqlite
+
+incipit {
+  fac {
+    fixum valor ∪ nihil cell ← sqlite.scalar(":memory:", "SELECT 1", vacua)
+    nota cell
+  }
+  cape err {
+    mone err
+  }
+}
+"#,
+    )
+    .expect("entry");
+
+    let result = compile_package(&Config::default(), &app);
+    assert!(
+        result.success(),
+        "expected sqlite consumer compile, got {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| d.message.clone())
+            .collect::<Vec<_>>()
+    );
+    let layout = discover_build_layout(&app).expect("layout");
+    let mut runtime_plan = package_rust_runtime_plan(&Config::default(), &app).expect("plan");
+    let linked = super::library_link::emit_linked_library_crates(&app, &layout).expect("link");
+    runtime_plan.library_path_deps = linked
+        .into_iter()
+        .map(|lib| (lib.crate_name, lib.crate_root))
+        .collect();
+    let Some(Output::Rust(output)) = result.output else {
+        panic!("expected Rust");
+    };
+    emit_generated_crate_with_runtime_plan(&layout, &output.code, None, &runtime_plan)
+        .expect("emit crate");
+    let binary = invoke_cargo_build(&layout, false).expect("cargo build app+sqlite");
+    assert!(binary.exists(), "binary {}", binary.display());
+    let status = Command::new(&binary).status().expect("run");
+    assert_eq!(status.code(), Some(0), "sqlite consumer should exit 0");
+}
+
+#[test]
 fn g4_native_library_links_into_application_build() {
     let root = test_temp_dir("g4-lib-link");
     let lib = root.join("libmath");
