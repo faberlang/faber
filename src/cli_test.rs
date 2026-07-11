@@ -176,7 +176,7 @@ fn cli_parses_scena_target_for_build_and_run() {
         panic!("expected build subcommand");
     };
     assert_eq!(args.target, Some(radix::tool::CliTarget::Scena));
-    assert_eq!(args.input, vec!["pkg"]);
+    assert_eq!(args.input, "pkg");
 
     let run = Cli::try_parse_from(["faber", "run", "--target", "scena", "pkg", "--", "Ian"])
         .expect("parse run scena target");
@@ -218,7 +218,7 @@ fn cli_leaves_build_target_unset_when_omitted() {
         panic!("expected build subcommand");
     };
     assert_eq!(args.target, None);
-    assert_eq!(args.input, vec!["pkg"]);
+    assert_eq!(args.input, "pkg");
 }
 
 #[test]
@@ -243,7 +243,7 @@ fn cli_parses_build_output_and_mode_flags() {
     assert!(args.release);
     assert!(args.format);
     assert!(args.linter);
-    assert_eq!(args.input, vec!["pkg"]);
+    assert_eq!(args.input, "pkg");
 }
 
 #[test]
@@ -254,7 +254,7 @@ fn cli_parses_fmir_text_target_for_build() {
         panic!("expected build subcommand");
     };
     assert_eq!(args.target, Some(radix::tool::CliTarget::FmirText));
-    assert_eq!(args.input, vec!["pkg"]);
+    assert_eq!(args.input, "pkg");
 }
 
 #[test]
@@ -265,7 +265,7 @@ fn cli_parses_fmir_target_for_build() {
         panic!("expected build subcommand");
     };
     assert_eq!(args.target, Some(radix::tool::CliTarget::Fmir));
-    assert_eq!(args.input, vec!["pkg"]);
+    assert_eq!(args.input, "pkg");
 }
 
 #[test]
@@ -276,7 +276,7 @@ fn cli_parses_fmir_bin_target_for_build_and_run() {
         panic!("expected build subcommand");
     };
     assert_eq!(args.target, Some(radix::tool::CliTarget::FmirBin));
-    assert_eq!(args.input, vec!["pkg"]);
+    assert_eq!(args.input, "pkg");
 
     let run = Cli::try_parse_from(["faber", "run", "--target", "fmir-bin", "pkg", "--", "Ian"])
         .expect("parse run fmir-bin target");
@@ -367,6 +367,24 @@ fn cli_parses_check_flags_and_multiple_inputs() {
     assert!(args.permissive);
     assert!(args.package);
     assert_eq!(args.input, vec!["main.fab", "other.fab"]);
+}
+
+#[test]
+fn cli_build_rejects_extra_direct_inputs() {
+    let error = Cli::try_parse_from(["faber", "build", "main.fab", "other.fab"])
+        .expect_err("build extra direct inputs");
+    let rendered = error.to_string();
+    assert!(rendered.contains("unexpected argument 'other.fab'"));
+    assert!(rendered.contains("Usage: faber build [OPTIONS] <INPUT>"));
+}
+
+#[test]
+fn cli_run_rejects_extra_direct_inputs_without_double_dash() {
+    let error = Cli::try_parse_from(["faber", "run", "main.fab", "other.fab"])
+        .expect_err("run extra direct inputs without --");
+    let rendered = error.to_string();
+    assert!(rendered.contains("unexpected argument 'other.fab'"));
+    assert!(rendered.contains("Usage: faber run [OPTIONS] [PATH] [-- <ARGS>...]"));
 }
 
 #[test]

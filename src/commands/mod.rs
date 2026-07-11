@@ -71,15 +71,15 @@ pub fn run() {
 fn dispatch(command: Command) {
     match command {
         Command::Build(args) => {
+            let build_inputs = vec![args.input.clone()];
             reject_reader_locale_without_package(
                 args.reader_locale.as_deref(),
-                &args.input,
+                &build_inputs,
                 args.package,
             );
-            let input = expect_exactly_one_input("build", &args.input);
             let target_explicit = args.target.is_some();
             package::cmd_build(BuildCommand {
-                input,
+                input: args.input,
                 out_dir: args.out_dir,
                 package: args.package,
                 release: args.release,
@@ -230,21 +230,5 @@ fn reject_reader_locale_without_package(
     {
         eprintln!("error: {message}");
         std::process::exit(1);
-    }
-}
-
-fn expect_exactly_one_input(command: &str, input: &[String]) -> String {
-    match input {
-        [single] => single.clone(),
-        [] => {
-            eprintln!("error: faber {command} requires an input path");
-            std::process::exit(2);
-        }
-        [_, second, ..] => {
-            eprintln!("error: unexpected argument '{second}' found");
-            eprintln!();
-            eprintln!("Usage: faber {command} [OPTIONS] <INPUT>");
-            std::process::exit(2);
-        }
     }
 }

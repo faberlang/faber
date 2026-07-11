@@ -158,8 +158,8 @@ pub struct BuildArgs {
     pub reader_locale: Option<String>,
 
     /// Input file or package path
-    #[arg(value_name = "INPUT", required = true)]
-    pub input: Vec<String>,
+    #[arg(value_name = "INPUT")]
+    pub input: String,
 }
 
 /// Arguments for `faber check`.
