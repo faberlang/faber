@@ -53,6 +53,7 @@ pub(crate) fn emit_linked_library_crates(
         let crate_name = sanitize_crate_name(&provider);
         let crate_root = layout.generated_crate_root.join("deps").join(&crate_name);
         match emit_one_library_crate(
+            app_root,
             Path::new(&locked.package_root),
             &lib_manifest,
             &crate_name,
@@ -75,6 +76,7 @@ pub(crate) fn emit_linked_library_crates(
 }
 
 fn emit_one_library_crate(
+    app_root: &Path,
     package_root: &Path,
     lib_manifest: &super::FaberManifest,
     crate_name: &str,
@@ -156,6 +158,7 @@ fn emit_one_library_crate(
     let cargo_toml = render_library_cargo_toml(
         crate_name,
         &lib_manifest.package.version,
+        app_root,
         package_root,
         target,
     );
@@ -241,6 +244,7 @@ fn generate_linked_unit_rust(
 fn render_library_cargo_toml(
     crate_name: &str,
     version: &str,
+    app_root: &Path,
     package_root: &Path,
     target: &super::manifest::ManifestTarget,
 ) -> String {
@@ -251,7 +255,7 @@ fn render_library_cargo_toml(
     };
     let mut deps = format!(
         "faber = {{ package = \"faber-runtime\", path = \"{}\" }}\n",
-        super::cargo::runtime_cluster_path_from(package_root, "faber-runtime").display()
+        super::cargo::runtime_cluster_path_from(app_root, "faber-runtime").display()
     );
     for (name, req) in &target.dependencies {
         if req.trim_start().starts_with('{') {
@@ -367,22 +371,5 @@ fn read_binding_manifest(path: &Path) -> Result<BindingManifest, Vec<Diagnostic>
 }
 
 #[cfg(test)]
-mod tests {
-    use super::promote_library_surface_visibility;
-
-    #[test]
-    fn visibility_promotion_ignores_string_literals() {
-        let source = r#"pub(crate) fn exported() {}
-let note = "pub(crate) fn hidden() {}";
-    pub(crate) struct Visible;
-// pub(crate) enum CommentOnly {}
-"#;
-
-        let promoted = promote_library_surface_visibility(source);
-
-        assert!(promoted.contains("pub fn exported() {}"));
-        assert!(promoted.contains("    pub struct Visible;"));
-        assert!(promoted.contains("\"pub(crate) fn hidden() {}\""));
-        assert!(promoted.contains("// pub(crate) enum CommentOnly {}"));
-    }
-}
+#[path = "library_link_test.rs"]
+mod tests;

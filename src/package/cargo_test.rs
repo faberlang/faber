@@ -1,6 +1,6 @@
 use super::{
-    local_repo_path_from, render_generated_cargo_toml, runtime_cluster_path_from,
-    sibling_repo_path_from, RustRuntimePlan,
+    coherent_runtime_cluster_root_from, local_repo_path_from, render_generated_cargo_toml,
+    runtime_cluster_path_from, sibling_repo_path_from, RustRuntimePlan,
 };
 use crate::package::ManifestRustHost;
 use std::error::Error;
@@ -171,6 +171,60 @@ fn native_runtime_plan_uses_one_packet_local_repo_cluster() -> Result<(), Box<dy
 }
 
 #[test]
+fn native_runtime_plan_falls_back_to_one_canonical_cluster_when_packet_is_incomplete(
+) -> Result<(), Box<dyn Error>> {
+    let root = temp_dir("cargo-runtime-cluster-fallback")?;
+    let packet = root.join("worktrees").join("slice").join("pkg");
+    let packet_parent = packet
+        .parent()
+        .ok_or_else(|| std::io::Error::other("packet path should have parent"))?;
+    fs::create_dir_all(&packet)?;
+    fs::write(packet_parent.join("PACKET.md"), "# packet\n")?;
+    fs::create_dir_all(packet_parent.join("faber-runtime"))?;
+    fs::create_dir_all(packet_parent.join("host-native-rs"))?;
+
+    let mut plan = RustRuntimePlan {
+        needs_faber: true,
+        host: Some(ManifestRustHost::Native),
+        ..RustRuntimePlan::default()
+    };
+    plan.selected_providers.insert("sqlite".to_owned());
+
+    let rendered = render_generated_cargo_toml("demo", "0.1.0", &plan, &packet);
+    let expected_root = coherent_runtime_cluster_root_from(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).as_path(),
+        &[
+            "faber-runtime",
+            "host-kernel-rs",
+            "host-native-rs",
+            "host-providers-rs",
+        ],
+    )
+    .expect("repo runtime cluster root");
+
+    for expected in [
+        expected_root.join("faber-runtime"),
+        expected_root.join("host-kernel-rs"),
+        expected_root.join("host-native-rs"),
+        expected_root
+            .join("host-providers-rs")
+            .join("crates")
+            .join("sqlite"),
+    ] {
+        let needle = expected.display().to_string();
+        assert!(
+            rendered.contains(&needle),
+            "expected canonical-cluster path {needle} in:\n{rendered}"
+        );
+    }
+    assert!(
+        !rendered.contains(&packet_parent.display().to_string()),
+        "rendered cargo manifest should not mix incomplete packet-local cluster:\n{rendered}"
+    );
+    Ok(())
+}
+
+#[test]
 fn generated_http_cargo_manifest_keeps_packet_runtime_pin_without_host_native(
 ) -> Result<(), Box<dyn Error>> {
     let root = temp_dir("cargo-http-runtime-pin")?;
@@ -203,6 +257,49 @@ fn generated_http_cargo_manifest_keeps_packet_runtime_pin_without_host_native(
     assert!(
         !rendered.contains(&canonical_root.display().to_string()),
         "rendered cargo manifest should not pick canonical main runtime:\n{rendered}"
+    );
+    Ok(())
+}
+
+#[test]
+fn coherent_runtime_cluster_root_requires_all_requested_repos() -> Result<(), Box<dyn Error>> {
+    let root = temp_dir("cargo-cluster-root-selection")?;
+    let packet = root.join("worktrees").join("slice").join("pkg");
+    let packet_parent = packet
+        .parent()
+        .ok_or_else(|| std::io::Error::other("packet path should have parent"))?;
+    fs::create_dir_all(&packet)?;
+    fs::write(packet_parent.join("PACKET.md"), "# packet\n")?;
+    fs::create_dir_all(packet_parent.join("faber-runtime"))?;
+    fs::create_dir_all(packet_parent.join("host-native-rs"))?;
+
+    let canonical_root = root.join("canonical");
+    for repo in [
+        "faber-runtime",
+        "host-kernel-rs",
+        "host-native-rs",
+        "host-providers-rs",
+    ] {
+        fs::create_dir_all(canonical_root.join(repo))?;
+    }
+
+    assert_eq!(
+        coherent_runtime_cluster_root_from(&packet, &["faber-runtime", "host-native-rs"])
+            .expect("packet runtime root"),
+        fs::canonicalize(packet_parent).unwrap_or_else(|_| packet_parent.to_path_buf())
+    );
+    assert_eq!(
+        coherent_runtime_cluster_root_from(
+            &canonical_root,
+            &[
+                "faber-runtime",
+                "host-kernel-rs",
+                "host-native-rs",
+                "host-providers-rs"
+            ]
+        )
+        .expect("canonical complete root"),
+        fs::canonicalize(&canonical_root).unwrap_or_else(|_| canonical_root.clone())
     );
     Ok(())
 }

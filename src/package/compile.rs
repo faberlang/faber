@@ -795,25 +795,8 @@ fn go_import_path(segment: &str) -> Option<&str> {
 }
 
 #[cfg(test)]
-#[allow(clippy::items_after_test_module)]
-mod tests {
-    use super::ensure_go_import;
-
-    #[test]
-    fn ensure_go_import_ignores_matching_string_literals() {
-        let code = r#"package main
-
-func main() {
-	println("os")
-}
-"#;
-
-        let ensured = ensure_go_import(code, "os");
-
-        assert!(ensured.contains("import \"os\""));
-        assert!(ensured.contains("println(\"os\")"));
-    }
-}
+#[path = "compile_test.rs"]
+mod tests;
 
 fn generate_package_rust(
     package: &mut AnalyzedPackage,

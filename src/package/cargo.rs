@@ -118,7 +118,8 @@ fn render_generated_cargo_toml(
     plan: &RustRuntimePlan,
     package_root: &Path,
 ) -> String {
-    let faber_path = runtime_cluster_path_from(package_root, "faber-runtime");
+    let cluster_root = runtime_cluster_root_for_plan(package_root, plan);
+    let faber_path = cluster_root.join("faber-runtime");
     let mut deps = String::new();
     if plan.needs_faber {
         deps.push_str(&format!(
@@ -129,16 +130,20 @@ fn render_generated_cargo_toml(
     if matches!(plan.host, Some(ManifestRustHost::Native)) {
         deps.push_str(&format!(
             "host_kernel = {{ package = \"host-kernel\", path = \"{}\" }}\n",
-            runtime_cluster_path_from(package_root, "host-kernel-rs").display()
+            cluster_root.join("host-kernel-rs").display()
         ));
         deps.push_str(&format!(
             "host_native = {{ package = \"host-native\", path = \"{}\" }}\n",
-            runtime_cluster_path_from(package_root, "host-native-rs").display()
+            cluster_root.join("host-native-rs").display()
         ));
         for provider in &plan.selected_providers {
             deps.push_str(&format!(
                 "{provider} = {{ package = \"{provider}\", path = \"{}\" }}\n",
-                provider_crate_path_from(package_root, provider).display()
+                cluster_root
+                    .join("host-providers-rs")
+                    .join("crates")
+                    .join(provider)
+                    .display()
             ));
         }
     }
@@ -176,10 +181,49 @@ edition = "2021"
     )
 }
 
-fn provider_crate_path_from(package_root: &Path, provider: &str) -> PathBuf {
-    runtime_cluster_path_from(package_root, "host-providers-rs")
-        .join("crates")
-        .join(provider)
+fn runtime_cluster_root_for_plan(package_root: &Path, plan: &RustRuntimePlan) -> PathBuf {
+    let required = runtime_cluster_repo_names_for_plan(plan);
+    if let Some(root) = coherent_runtime_cluster_root_from(package_root, &required) {
+        return root;
+    }
+    if let Some(root) =
+        coherent_runtime_cluster_root_from(Path::new(env!("CARGO_MANIFEST_DIR")), &required)
+    {
+        return root;
+    }
+    runtime_cluster_path_from(package_root, "faber-runtime")
+        .parent()
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| package_root.to_path_buf())
+}
+
+fn runtime_cluster_repo_names_for_plan(plan: &RustRuntimePlan) -> Vec<&'static str> {
+    let mut repos = vec!["faber-runtime"];
+    if matches!(plan.host, Some(ManifestRustHost::Native)) {
+        repos.push("host-kernel-rs");
+        repos.push("host-native-rs");
+        if !plan.selected_providers.is_empty() {
+            repos.push("host-providers-rs");
+        }
+    }
+    repos
+}
+
+fn coherent_runtime_cluster_root_from(manifest_dir: &Path, required: &[&str]) -> Option<PathBuf> {
+    for candidate in manifest_dir.ancestors() {
+        if !required.iter().all(|repo| candidate.join(repo).is_dir()) {
+            continue;
+        }
+        if candidate.join("PACKET.md").is_file()
+            || candidate.join("MEMBERS.md").is_file()
+            || ["faber-runtime", "host-kernel-rs", "host-native-rs"]
+                .iter()
+                .all(|repo| candidate.join(repo).is_dir())
+        {
+            return Some(fs::canonicalize(candidate).unwrap_or_else(|_| candidate.to_path_buf()));
+        }
+    }
+    None
 }
 
 pub(crate) fn runtime_cluster_path_from(package_root: &Path, name: &str) -> PathBuf {
