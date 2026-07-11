@@ -4485,6 +4485,7 @@ incipit {
   fixum _ mono ← tempus.monotonicum()
   fixum _ active ← tempus.activum()
   fixum _ ms ← tempus.MILLISECUNDUM()
+  cede tempus.dormiet(0)
 }
 "#,
     )
@@ -4509,6 +4510,8 @@ incipit {
     assert!(output.code.contains("tempus:activum"));
     assert!(output.code.contains("faber::frame::sermo_open"));
     assert!(output.code.contains("fn nunc"));
+    assert!(output.code.contains("crate::tempus::dormiet(0).await"));
+    assert!(!output.code.contains("crate::tempus::dormiet(0).expect"));
     assert!(!output.code.contains("norma::tempus::nunc"));
     assert!(!output.code.contains("norma::tempus::monotonicum"));
     assert!(!output.code.contains("norma::tempus::millisecundum"));

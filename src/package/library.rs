@@ -32,6 +32,7 @@ struct LibraryInterfaceItem {
     local_name: String,
     kind: LibraryItemKind,
     is_failable: bool,
+    is_async: bool,
 }
 
 struct CachedLibraryInterface {
@@ -743,6 +744,7 @@ pub(crate) fn attach_library_provenance_with_links(
                     exported_name: interface_item.exported_name,
                     kind: interface_item.kind,
                     is_failable: interface_item.is_failable,
+                    is_async: interface_item.is_async,
                     rust_runtime_type,
                     elide_rust_decl,
                 },
@@ -840,7 +842,17 @@ fn library_interface_items(
         if has_private_visibility(&stmt.annotations, &cached.interner) {
             continue;
         }
-        if let Some(item) = library_interface_item(stmt, &cached.interner) {
+        if let Some(mut item) = library_interface_item(stmt, &cached.interner) {
+            item.is_async = cached
+                .file_interface
+                .as_ref()
+                .and_then(|interface| interface.exports.get(&item.exported_name))
+                .is_some_and(|export| {
+                    matches!(
+                        &export.kind,
+                        radix::file_interface::FileExportKind::Function(callable) if callable.is_async
+                    )
+                });
             items.push(item);
         }
     }
@@ -934,6 +946,7 @@ fn library_interface_item(
         local_name: name.to_owned(),
         kind,
         is_failable,
+        is_async: false,
     })
 }
 
