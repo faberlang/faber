@@ -442,6 +442,25 @@ fn run_reader_locale_rejects_multiple_direct_inputs() {
 }
 
 #[test]
+fn run_reader_locale_missing_package_path_surfaces_missing_path_error() {
+    let (stdout, stderr, ok) = run_faber(&["run", "--reader-locale", "th-TH", "missing-package"]);
+
+    assert!(!ok, "missing package path should fail");
+    assert!(
+        stdout.is_empty(),
+        "missing package path should not write stdout: {stdout}"
+    );
+    assert!(
+        !stderr.contains("--reader-locale th-TH requires a package path or .fab entry file"),
+        "missing package path should reach the underlying filesystem error, got:\n{stderr}"
+    );
+    assert!(
+        stderr.contains("cannot read 'missing-package': No such file or directory"),
+        "expected missing path error, got:\n{stderr}"
+    );
+}
+
+#[test]
 fn test_reader_locale_accepts_direct_entry_file_input() {
     let source = write_single_file(
         "test-reader-locale-single-file",
@@ -489,6 +508,26 @@ incipit {
     assert!(
         stdout.contains("test result: ok."),
         "expected cargo test success output, got:\n{stdout}"
+    );
+}
+
+#[test]
+fn test_reader_locale_missing_package_path_surfaces_missing_path_error() {
+    let (stdout, stderr, ok) =
+        run_faber(&["test", "--reader-locale", "th-TH", "missing-package"]);
+
+    assert!(!ok, "missing package path should fail");
+    assert!(
+        stdout.is_empty(),
+        "missing package path should not write stdout: {stdout}"
+    );
+    assert!(
+        !stderr.contains("--reader-locale th-TH requires a package path or .fab entry file"),
+        "missing package path should reach the underlying filesystem error, got:\n{stderr}"
+    );
+    assert!(
+        stderr.contains("cannot read 'missing-package': No such file or directory"),
+        "expected missing path error, got:\n{stderr}"
     );
 }
 

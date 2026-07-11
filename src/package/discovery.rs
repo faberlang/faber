@@ -141,11 +141,12 @@ pub(crate) fn is_manifest_backed_or_directory_package_input(input: &Path) -> boo
 }
 
 pub(crate) fn discover_package(input: &Path) -> PackageDiscoveryResult {
+    let display_path = input.to_path_buf();
     let input = absolutize_path(input);
     if !input.exists() {
         return Err(Box::new(Diagnostic::io_error(
-            &input,
-            std::io::Error::from(std::io::ErrorKind::NotFound),
+            &display_path,
+            std::io::Error::from_raw_os_error(2),
         )));
     }
 
@@ -230,11 +231,12 @@ fn parse_manifest_with_entry(path: &Path, entry: PathBuf) -> PackageDiscoveryRes
 /// name so old direct-file workflows still have deterministic output paths.
 #[allow(dead_code)]
 pub fn discover_build_layout(input: &Path) -> Result<BuildLayout, Box<Diagnostic>> {
+    let display_path = input.to_path_buf();
     let input = absolutize_path(input);
     if !input.exists() {
         return Err(Box::new(Diagnostic::io_error(
-            &input,
-            std::io::Error::from(std::io::ErrorKind::NotFound),
+            &display_path,
+            std::io::Error::from_raw_os_error(2),
         )));
     }
 
