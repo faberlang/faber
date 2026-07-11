@@ -40,6 +40,109 @@ pub(crate) fn selected_providers_for_routes(
     providers
 }
 
+/// Routes covered by `faber-runtime` `BuiltinRuntimeDispatch` / `builtin_route_frames`.
+///
+/// Dual-backend contract: these do **not** require `[target.rust] host = "native"`.
+/// Keep in sync with `faber-runtime/src/frame.rs` `builtin_route_frames` match arms.
+pub(crate) fn is_builtin_ad_route(route: &str) -> bool {
+    matches!(
+        route,
+        "runtime:echo"
+            | "tempus:nunc"
+            | "tempus:monotonicum"
+            | "tempus:activum"
+            | "tempus:dormiet"
+            | "tempus:expectet"
+            | "solum:scribe"
+            | "solum:scribet"
+            | "solum:appone"
+            | "solum:apponet"
+            | "solum:funde"
+            | "solum:dele"
+            | "solum:delet"
+            | "solum:parens"
+            | "solum:nomen"
+            | "solum:suffixum"
+            | "solum:iunge"
+            | "solum:absolve"
+            | "solum:temporarium"
+            | "solum:domus"
+            | "solum:partem"
+            | "processus:exsequi"
+            | "processus:exsequetur"
+            | "processus:captura"
+            | "processus:dimitte"
+            | "processus:lege"
+            | "processus:scribe"
+            | "processus:sedes"
+            | "processus:muta"
+            | "processus:identitas"
+            | "processus:argumenta"
+            | "processus:exi"
+            | "consolum:dic"
+            | "consolum:dicet"
+            | "consolum:scribe"
+            | "consolum:scribet"
+            | "consolum:mone"
+            | "consolum:monet"
+            | "consolum:vide"
+            | "consolum:videbit"
+            | "consolum:lege"
+            | "consolum:leget"
+            | "consolum:hauri"
+            | "consolum:hauriet"
+            | "consolum:funde"
+            | "consolum:audit"
+            | "consolum:loquitur"
+            | "consolum:admonet"
+            | "solum:lege"
+            | "solum:hauri"
+            | "solum:hauriet"
+            | "solum:carpe"
+            | "solum:carpiet"
+            | "solum:mensura"
+            | "solum:inveni"
+            | "solum:crea"
+            | "solum:creabit"
+            | "solum:enumera"
+            | "solum:enumerabit"
+            | "solum:amputa"
+            | "solum:amputabit"
+            | "solum:exscribe"
+            | "solum:exscribet"
+            | "solum:renomina"
+            | "solum:renominabit"
+            | "solum:tange"
+            | "solum:tanget"
+            | "solum:sequere"
+            | "solum:sequetur"
+            | "solum:vincula"
+            | "solum:modum"
+            | "solum:modus"
+            | "solum:exstat"
+            | "solum:exstabit"
+            | "solum:directoriumne"
+            | "solum:regularene"
+            | "solum:legibilene"
+            | "solum:vinculumne"
+            | "aleator:fractum"
+            | "aleator:sortire"
+            | "aleator:octetos"
+            | "aleator:uuid"
+            | "aleator:semina"
+    )
+}
+
+/// Non-`runtime:` routes that are **not** covered by builtin dispatch and therefore
+/// require `[target.rust] host` (or fail closed at plan time).
+pub(crate) fn host_required_routes(routes: &BTreeSet<String>) -> BTreeSet<String> {
+    routes
+        .iter()
+        .filter(|route| !is_builtin_ad_route(route))
+        .cloned()
+        .collect()
+}
+
 pub(crate) fn load_provider_manifests(
     providers: &BTreeSet<String>,
     routes: &BTreeSet<String>,

@@ -67,7 +67,10 @@ struct GeneratedPackageRust {
     diagnostics: Vec<Diagnostic>,
 }
 
-fn rust_runtime_plan_for_package(package: &AnalyzedPackage) -> RustRuntimePlan {
+fn rust_runtime_plan_for_package(
+    package: &AnalyzedPackage,
+    library_resolver: &crate::library::LibraryResolver,
+) -> RustRuntimePlan {
     let manifest = manifest_path_for_spec(&package.spec).and_then(|path| read_manifest(&path).ok());
     let host = manifest
         .as_ref()
@@ -107,20 +110,47 @@ fn rust_runtime_plan_for_package(package: &AnalyzedPackage) -> RustRuntimePlan {
         provider_error: None,
         library_path_deps,
     };
+    // Collect ad routes from package units **and** expanded library import
+    // bodies (norma is the primary product path — package-unit Ad alone is a
+    // false-negative for host-only devices).
+    let mut library_cache = LibraryInterfaceCache::default();
     for unit in &package.units {
         let mut collector = AdRouteCollector {
             interner: &unit.analysis.interner,
             routes: &mut plan.non_runtime_routes,
         };
         collector.visit_program(&unit.analysis.hir);
+        for import in &unit.expanded_library_imports {
+            let Ok(analysis) =
+                library_cached_analysis(import, library_resolver, &mut library_cache)
+            else {
+                continue;
+            };
+            let mut collector = AdRouteCollector {
+                interner: &analysis.interner,
+                routes: &mut plan.non_runtime_routes,
+            };
+            collector.visit_program(&analysis.hir);
+        }
     }
-    plan.selected_providers =
-        selected_providers_for_routes(&plan.non_runtime_routes, &explicit_providers);
+    // Dual-backend host gate:
+    // - host=native → select providers for all non-runtime routes (host path)
+    // - host unset → auto-select only host-only routes (builtin-covered are free)
+    // Explicit `[dispatch].providers` always participate.
+    let host_required = super::dispatch::host_required_routes(&plan.non_runtime_routes);
     if matches!(plan.host, Some(super::ManifestRustHost::Native)) {
-        match load_provider_manifests(&plan.selected_providers, &plan.non_runtime_routes) {
+        plan.selected_providers =
+            selected_providers_for_routes(&plan.non_runtime_routes, &explicit_providers);
+        // Validate host-provider coverage only for host-required routes so
+        // builtin-only dual-backend routes (e.g. tempus:expectet) do not fail
+        // closed against incomplete host manifests.
+        match load_provider_manifests(&plan.selected_providers, &host_required) {
             Ok(manifests) => plan.provider_manifests = manifests,
             Err(error) => plan.provider_error = Some(error.message),
         }
+    } else {
+        plan.selected_providers =
+            selected_providers_for_routes(&host_required, &explicit_providers);
     }
     plan
 }
@@ -178,7 +208,7 @@ pub(crate) fn package_rust_runtime_plan(
     let package_root = package_root_for_input(input);
     let library_resolver = library_resolver_for_package(&config, &package_root)?;
     let package = analyze_package_spec(&config, spec, &library_resolver)?;
-    Ok(rust_runtime_plan_for_package(&package))
+    Ok(rust_runtime_plan_for_package(&package, &library_resolver))
 }
 
 #[allow(clippy::result_large_err)]
