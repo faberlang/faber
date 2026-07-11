@@ -5,6 +5,7 @@ use radix::codegen::rust::{
 };
 use radix::codegen::Target;
 use radix::diagnostics::Diagnostic;
+use radix::cli::CliProgram;
 use radix::driver::{
     analyze_source_with_cli_program_and_import_contract, AnalyzedUnit, Config, Session,
 };
@@ -581,6 +582,14 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
     }
 
     let mut entry_code = super::go_build::inject_after_imports(&entry_code, &namespace_block);
+    if entry
+        .analysis
+        .cli_program
+        .as_ref()
+        .is_some_and(go_cli_accepts_dashed_rest_operands)
+    {
+        entry_code = allow_go_cli_dashed_rest_operands(&entry_code);
+    }
     if needs_os_for_shim {
         entry_code = ensure_go_import(&entry_code, "os");
         entry_code = ensure_go_import(&entry_code, "fmt");
@@ -634,6 +643,24 @@ fn resolve_local_import_path(
 
 fn normalize_path_buf(path: &Path) -> PathBuf {
     std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+}
+
+fn go_cli_accepts_dashed_rest_operands(program: &CliProgram) -> bool {
+    if !(program.global_options.is_empty() && program.options.is_empty()) {
+        return false;
+    }
+    program
+        .global_operands
+        .iter()
+        .chain(program.operands.iter())
+        .any(|operand| operand.rest)
+}
+
+fn allow_go_cli_dashed_rest_operands(code: &str) -> String {
+    code.replace(
+        "if strings.HasPrefix(arg, \"-\") {",
+        "if strings.HasPrefix(arg, \"-\") && false {",
+    )
 }
 
 /// Detect package-level Go function name collisions across flattened modules.

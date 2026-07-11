@@ -9753,6 +9753,30 @@ fn g6_go4_coreutils_echo_package_go_builds() {
     assert_eq!(output.status.code(), Some(0), "echo exit");
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert_eq!(stdout, "hello world\n", "echo stdout got {stdout:?}");
+
+    let output = Command::new(&binary)
+        .args(["-n", "hello"])
+        .output()
+        .expect("run echo -n");
+    assert_eq!(output.status.code(), Some(0), "echo -n exit");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(stdout, "hello", "echo -n stdout got {stdout:?}");
+
+    let output = Command::new(&binary)
+        .args(["-E", "hello", "world"])
+        .output()
+        .expect("run echo -E");
+    assert_eq!(output.status.code(), Some(0), "echo -E exit");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(stdout, "hello world\n", "echo -E stdout got {stdout:?}");
+
+    let output = Command::new(&binary)
+        .args(["-n", "-E", "x"])
+        .output()
+        .expect("run echo -n -E");
+    assert_eq!(output.status.code(), Some(0), "echo -n -E exit");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(stdout, "x", "echo -n -E stdout got {stdout:?}");
 }
 
 #[test]
