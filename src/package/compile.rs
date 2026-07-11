@@ -376,8 +376,15 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
                 let body = super::go_build::strip_go_preamble(&output.code);
                 let funcs = super::go_build::parse_go_func_sigs(&body);
                 unit_funcs.insert(unit.path.clone(), funcs);
+                // Restore std imports from structured GoNeeds (modules lose preamble).
+                let needs = radix::codegen::collect_go_needs(
+                    &unit.analysis.hir,
+                    &unit.analysis.types,
+                    &unit.analysis.interner,
+                );
+                let file_code = super::go_build::wrap_module_file(&body, &needs.imports);
                 let file = super::go_build::module_go_file_name(&unit.module_segments, &unit.path);
-                module_files.push((file, body));
+                module_files.push((file, file_code));
             }
             Ok(_) => {
                 diagnostics.push(

@@ -9225,3 +9225,35 @@ fn g6_go4_coreutils_true_package_go_builds() {
         .expect("run true");
     assert_eq!(status.code(), Some(0), "GNU true should exit 0");
 }
+
+#[test]
+fn g6_go4_coreutils_false_package_go_builds() {
+    let path = PathBuf::from("/Users/ianzepp/work/faberlang/examples/coreutils/packages/false");
+    if !path.exists() {
+        eprintln!("skip: coreutils false package missing at {}", path.display());
+        return;
+    }
+    let result = compile_package(&Config::default().with_target(Target::Go), &path);
+    assert!(
+        result.success(),
+        "false package go compile failed: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| d.message.clone())
+            .collect::<Vec<_>>()
+    );
+    let Some(Output::Go(output)) = result.output else {
+        panic!("expected Go");
+    };
+    let modules = super::take_go_package_modules();
+    let layout = discover_build_layout(&path).expect("layout");
+    let go_layout = super::GoBuildLayout::from_package(&layout);
+    super::emit_go_module(&go_layout, &output.code, &modules).expect("emit");
+    let binary = super::invoke_go_build(&go_layout).expect("go build false");
+    let status = Command::new(&binary)
+        .args(["ignored"])
+        .status()
+        .expect("run false");
+    assert_eq!(status.code(), Some(1), "GNU false should exit 1");
+}
