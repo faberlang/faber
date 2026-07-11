@@ -33,6 +33,10 @@ pub(super) fn cmd_run(args: RunArgs) {
     let input_path = PathBuf::from(&args.path);
     match Target::from(args.target) {
         Target::Rust => {}
+        Target::Go => {
+            cmd_run_go(args);
+            return;
+        }
         Target::Scena => {
             cmd_run_scena(args);
             return;
@@ -51,7 +55,7 @@ pub(super) fn cmd_run(args: RunArgs) {
         }
         target => {
             eprintln!(
-                "error: faber run does not support target `{}`; use `rust`, `scena`, `fmir-text`, `fmir`, or `fmir-bin`",
+                "error: faber run does not support target `{}`; use `rust`, `go`, `scena`, `fmir-text`, `fmir`, or `fmir-bin`",
                 run_target_name(target)
             );
             std::process::exit(1);
@@ -82,6 +86,51 @@ fn run_target_name(target: Target) -> &'static str {
         Target::FmirText => "fmir-text",
         Target::Fmir => "fmir",
         Target::FmirBin => "fmir-bin",
+    }
+}
+
+/// G6 GO3 — package compile → go build → exec with forwarded argv.
+fn cmd_run_go(args: RunArgs) {
+    let input_path = PathBuf::from(&args.path);
+    let config = radix::driver::Config::default().with_target(Target::Go);
+    let result = package::compile_package(&config, &input_path);
+    super::eprint_compile_diagnostics(&result.diagnostics);
+    let Some(output) = result.output else {
+        eprintln!("compilation failed");
+        std::process::exit(1);
+    };
+    let code = match output {
+        radix::Output::Go(go) => go.code,
+        _ => {
+            eprintln!("error: go run expected Go package output");
+            std::process::exit(1);
+        }
+    };
+    let layout = match package::discover_build_layout(&input_path) {
+        Ok(l) => l,
+        Err(d) => {
+            eprintln!("error: {}", d.message);
+            std::process::exit(1);
+        }
+    };
+    let go_layout = package::GoBuildLayout::from_package(&layout);
+    if let Err(d) = package::emit_go_module(&go_layout, &code, &[]) {
+        eprintln!("error: {}", d.message);
+        std::process::exit(1);
+    }
+    let binary = match package::invoke_go_build(&go_layout) {
+        Ok(path) => path,
+        Err(d) => {
+            eprintln!("error: {}", d.message);
+            std::process::exit(1);
+        }
+    };
+    match package::run_go_binary(&binary, &args.args) {
+        Ok(code) => std::process::exit(code),
+        Err(d) => {
+            eprintln!("error: {}", d.message);
+            std::process::exit(1);
+        }
     }
 }
 

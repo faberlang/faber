@@ -5,6 +5,7 @@ use radix::{CompileResult, Output};
 use std::path::Path;
 
 use super::cargo::{emit_generated_crate_with_runtime_plan, invoke_cargo_build};
+use super::go_build::{emit_go_module, invoke_go_build, GoBuildLayout};
 use super::manifest::manifest_build_target;
 use super::{
     build_package_fmir_binary_bundle, build_package_fmir_image, build_package_fmir_text_image,
@@ -128,6 +129,33 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
         eprintln!("compilation failed");
         std::process::exit(1);
     };
+
+    // G6 GO3: package Go builds write target/faber/go and invoke `go build`.
+    if is_package && target == radix::codegen::Target::Go {
+        let layout = match discover_build_layout(&input_path) {
+            Ok(l) => l,
+            Err(d) => {
+                eprintln!("error: {}", d.message);
+                std::process::exit(1);
+            }
+        };
+        let go_layout = GoBuildLayout::from_package(&layout);
+        let code = output_code(output);
+        if let Err(d) = emit_go_module(&go_layout, &code, &[]) {
+            eprintln!("error: {}", d.message);
+            std::process::exit(1);
+        }
+        match invoke_go_build(&go_layout) {
+            Ok(binary_path) => {
+                println!("{}", binary_path.display());
+                return;
+            }
+            Err(d) => {
+                eprintln!("error: {}", d.message);
+                std::process::exit(1);
+            }
+        }
+    }
 
     // Package Rust builds own a generated crate under target/faber/ and let
     // Cargo place artifacts in sibling debug/release directories.

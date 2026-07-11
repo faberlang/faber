@@ -34,6 +34,7 @@ mod cmd;
 mod codegen;
 mod compile;
 mod discovery;
+mod go_build;
 mod dispatch;
 mod file_interface;
 mod frontmatter;
@@ -57,6 +58,8 @@ pub(crate) use cargo::emit_generated_crate_with_runtime_plan;
 // used by `commands/run.rs` and `commands/test.rs` in the binary crate
 pub(crate) use cargo::invoke_cargo_build;
 pub use cargo::{emit_generated_crate, invoke_cargo_test};
+#[allow(unused_imports)] // binary `commands/run` consumes run_go_binary
+pub(crate) use go_build::{emit_go_module, invoke_go_build, run_go_binary, GoBuildLayout};
 pub(crate) use cargo::{package_host_selection_diagnostic, RustRuntimePlan};
 #[cfg(test)]
 pub use cmd::use_package_compiler;

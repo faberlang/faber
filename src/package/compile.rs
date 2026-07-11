@@ -12,7 +12,7 @@ use radix::hir::visit::{walk_expr, HirVisitor};
 use radix::hir::{HirExpressionKind, HirItemKind};
 use radix::lexer::Interner;
 use radix::syntax::{ImportDecl, ImportKind, StmtKind};
-use radix::{CompileResult, Output, RustOutput};
+use radix::{CompileResult, GoOutput, Output, RustOutput};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
@@ -265,6 +265,22 @@ fn compile_package_internal(
         }
     };
 
+    if config.target == Target::Go {
+        let plan = super::artifact_plan::plan_package(&package, Target::Go);
+        if !plan.supported {
+            return CompileResult {
+                output: None,
+                diagnostics: vec![Diagnostic::error(plan.rejection.unwrap_or_else(|| {
+                    "package compilation does not support this target".to_owned()
+                }))
+                .with_file(input.display().to_string())
+                .with_arg("issue", "package_target_unsupported")
+                .with_arg("target", plan.target)],
+            };
+        }
+        return generate_package_go_result(&package, input);
+    }
+
     if config.target != Target::Rust {
         let plan = super::artifact_plan::plan_package(&package, config.target);
         if !plan.supported {
@@ -278,7 +294,7 @@ fn compile_package_internal(
                 .with_arg("target", plan.target)],
             };
         }
-        // Planner seams exist; full product emit for Go/TS is later deliveries.
+        // Planner seams exist; full product emit for TS is later deliveries.
         return CompileResult {
             output: None,
             diagnostics: vec![Diagnostic::error(format!(
@@ -321,6 +337,97 @@ fn compile_package_internal(
     let crate_code = assemble_crate(&entry_code, &generated.module_tree.render(0));
     CompileResult {
         output: Some(Output::Rust(RustOutput { code: crate_code })),
+        diagnostics,
+    }
+}
+
+/// G6 GO3 — emit package Go entry (CLI SupportedNarrow or plain entry).
+///
+/// v1 assembly is **entry-unit only**: multi-module Go packages (sibling `.fab`
+/// imports) remain `package_go_multi_module_pending` until GO4 expands linking.
+fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> CompileResult {
+    let mut diagnostics = package.diagnostics.clone();
+    let Some(entry) = package.entry_unit() else {
+        return CompileResult {
+            output: None,
+            diagnostics: {
+                diagnostics.push(
+                    Diagnostic::error("package has no entry unit for Go assembly".to_owned())
+                        .with_file(input.display().to_string())
+                        .with_arg("issue", "package_go_entry_missing"),
+                );
+                diagnostics
+            },
+        };
+    };
+
+    if package.units.len() > 1 {
+        return CompileResult {
+            output: None,
+            diagnostics: {
+                diagnostics.push(
+                    Diagnostic::error(
+                        "Go package assembly supports a single entry unit in this slice; multi-module packages are deferred"
+                            .to_owned(),
+                    )
+                    .with_file(input.display().to_string())
+                    .with_arg("issue", "package_go_multi_module_pending")
+                    .with_arg("target", "go"),
+                );
+                diagnostics
+            },
+        };
+    }
+
+    let code = match entry.analysis.cli_program.as_ref() {
+        Some(cli) => match radix::codegen::generate_go_cli(
+            &entry.analysis.hir,
+            &entry.analysis.types,
+            &entry.analysis.interner,
+            cli,
+        ) {
+            Ok(output) => output.code,
+            Err(err) => {
+                let mut diag = Diagnostic::error(err.message).with_file(entry.path.display().to_string());
+                for arg in err.args {
+                    diag = diag.with_arg(arg.name, arg.value);
+                }
+                diagnostics.push(diag);
+                return CompileResult {
+                    output: None,
+                    diagnostics,
+                };
+            }
+        },
+        None => match radix::codegen::generate_from_analyzed(Target::Go, &entry.analysis) {
+            Ok(Output::Go(output)) => output.code,
+            Ok(_) => {
+                diagnostics.push(
+                    Diagnostic::error("Go package codegen returned a non-Go output".to_owned())
+                        .with_file(entry.path.display().to_string())
+                        .with_arg("issue", "package_go_codegen_failed"),
+                );
+                return CompileResult {
+                    output: None,
+                    diagnostics,
+                };
+            }
+            Err(err) => {
+                let mut diag = Diagnostic::error(err.message).with_file(entry.path.display().to_string());
+                for arg in err.args {
+                    diag = diag.with_arg(arg.name, arg.value);
+                }
+                diagnostics.push(diag);
+                return CompileResult {
+                    output: None,
+                    diagnostics,
+                };
+            }
+        },
+    };
+
+    CompileResult {
+        output: Some(Output::Go(GoOutput { code })),
         diagnostics,
     }
 }

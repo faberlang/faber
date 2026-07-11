@@ -9046,3 +9046,122 @@ entry = "main.fab"
         "package_target_assembly_pending"
     )));
 }
+
+#[test]
+fn g6_go3_single_entry_cli_package_compiles_and_go_builds() {
+    let dir = test_temp_dir("g6-go3-true");
+    fs::create_dir_all(dir.join("src")).expect("src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "g6-go3-true"
+version = "0.1.0"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("manifest");
+    // SupportedNarrow: fixed exit 0, rest textus only, no options.
+    fs::write(
+        dir.join("src/main.fab"),
+        r#"
+@ cli "true"
+@ operandus ceteri textus ignored
+incipit argumenta args exitus 0 {
+}
+"#,
+    )
+    .expect("entry");
+
+    let result = compile_package(&Config::default().with_target(Target::Go), &dir);
+    assert!(
+        result.success(),
+        "go package compile failed: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| d.message.clone())
+            .collect::<Vec<_>>()
+    );
+    let Some(Output::Go(output)) = result.output else {
+        panic!("expected Go output");
+    };
+    assert!(
+        output.code.contains("func main()") && output.code.contains("os.Exit(0)"),
+        "expected Go CLI main with fixed exit:\n{}",
+        output.code
+    );
+
+    let layout = discover_build_layout(&dir).expect("layout");
+    let go_layout = super::GoBuildLayout::from_package(&layout);
+    super::emit_go_module(&go_layout, &output.code, &[]).expect("emit go");
+    let binary = super::invoke_go_build(&go_layout).expect("go build");
+    assert!(binary.exists(), "binary missing at {}", binary.display());
+
+    let status = Command::new(&binary)
+        .args(["ignored", "args"])
+        .status()
+        .expect("run binary");
+    assert_eq!(status.code(), Some(0), "true-style binary should exit 0");
+}
+
+#[test]
+fn g6_go3_multi_module_package_is_deferred() {
+    let dir = test_temp_dir("g6-go3-multi");
+    fs::create_dir_all(dir.join("src")).expect("src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "g6-go3-multi"
+version = "0.1.0"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("manifest");
+    // Local import pulls a second package unit → multi-module assembly path.
+    fs::write(
+        dir.join("src/helper.fab"),
+        "functio identity(textus s) → textus {\n  redde s\n}\n",
+    )
+    .expect("helper");
+    fs::write(
+        dir.join("src/main.fab"),
+        r#"
+importa ex "./helper" privata identity
+
+@ cli "tool"
+@ operandus ceteri textus ignored
+incipit argumenta args exitus 0 {
+  fixum textus _ ← identity("x")
+}
+"#,
+    )
+    .expect("entry");
+
+    let result = compile_package(&Config::default().with_target(Target::Go), &dir);
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| diagnostic_has_issue(d, "package_go_multi_module_pending"))
+            || (result.success() == false
+                && result.diagnostics.iter().any(|d| {
+                    d.message.contains("multi-module") || diagnostic_has_issue(d, "package_go_multi_module_pending")
+                })),
+        "expected multi-module pending or related fail, got success={} diags={:?}",
+        result.success(),
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.message.clone(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    assert!(!result.success());
+}
