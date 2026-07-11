@@ -210,6 +210,31 @@ fn cli_leaves_build_target_unset_when_omitted() {
 }
 
 #[test]
+fn cli_parses_build_output_and_mode_flags() {
+    let build = Cli::try_parse_from([
+        "faber",
+        "build",
+        "--out-dir",
+        "dist",
+        "--package",
+        "--release",
+        "--format",
+        "--linter",
+        "pkg",
+    ])
+    .expect("parse build flags");
+    let Some(crate::cli::Command::Build(args)) = build.command else {
+        panic!("expected build subcommand");
+    };
+    assert_eq!(args.out_dir, std::path::PathBuf::from("dist"));
+    assert!(args.package);
+    assert!(args.release);
+    assert!(args.format);
+    assert!(args.linter);
+    assert_eq!(args.input, "pkg");
+}
+
+#[test]
 fn cli_parses_fmir_text_target_for_build() {
     let build = Cli::try_parse_from(["faber", "build", "--target", "fmir-text", "pkg"])
         .expect("parse build fmir-text target");
@@ -345,6 +370,40 @@ fn cli_parses_reader_locale_on_explain() {
         args.term.as_deref(),
         Some("SEM010.initializer_annotation_mismatch")
     );
+}
+
+#[test]
+fn cli_parses_explain_query_modes() {
+    let json =
+        Cli::try_parse_from(["faber", "explain", "--json", "nihil"]).expect("parse explain json");
+    let Some(crate::cli::Command::Explain(json_args)) = json.command else {
+        panic!("expected explain subcommand");
+    };
+    assert!(json_args.json);
+    assert_eq!(json_args.term.as_deref(), Some("nihil"));
+
+    let search = Cli::try_parse_from(["faber", "explain", "--search", "host"])
+        .expect("parse explain search");
+    let Some(crate::cli::Command::Explain(search_args)) = search.command else {
+        panic!("expected explain subcommand");
+    };
+    assert_eq!(search_args.search.as_deref(), Some("host"));
+    assert!(search_args.term.is_none());
+
+    let list = Cli::try_parse_from(["faber", "explain", "--list"]).expect("parse explain list");
+    let Some(crate::cli::Command::Explain(list_args)) = list.command else {
+        panic!("expected explain subcommand");
+    };
+    assert!(list_args.list);
+    assert!(list_args.term.is_none());
+
+    let category = Cli::try_parse_from(["faber", "explain", "--category", "diagnostics"])
+        .expect("parse explain category");
+    let Some(crate::cli::Command::Explain(category_args)) = category.command else {
+        panic!("expected explain subcommand");
+    };
+    assert_eq!(category_args.category.as_deref(), Some("diagnostics"));
+    assert!(category_args.term.is_none());
 }
 
 #[test]
