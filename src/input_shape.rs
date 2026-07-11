@@ -13,6 +13,9 @@ pub(crate) fn verify_input_is_package_shaped(input: &[String], force_package: bo
 }
 
 pub(crate) fn reader_locale_supports_input(input: &[String], force_package: bool) -> bool {
+    if input.len() != 1 {
+        return false;
+    }
     if verify_input_is_package_shaped(input, force_package) {
         return true;
     }
@@ -97,6 +100,10 @@ mod tests {
             &["main.txt".to_owned()],
             false
         ));
+        assert!(!reader_locale_supports_input(
+            &["main.fab".to_owned(), "other.fab".to_owned()],
+            false
+        ));
     }
 
     #[test]
@@ -119,6 +126,14 @@ mod tests {
         );
         assert_eq!(
             reader_locale_without_package_error(Some("la"), &["-".to_owned()], true),
+            Some("--reader-locale la requires a package path or .fab entry file".to_owned())
+        );
+        assert_eq!(
+            reader_locale_without_package_error(
+                Some("la"),
+                &["main.fab".to_owned(), "other.fab".to_owned()],
+                false
+            ),
             Some("--reader-locale la requires a package path or .fab entry file".to_owned())
         );
         assert_eq!(

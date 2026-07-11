@@ -456,6 +456,36 @@ fn check_reader_locale_rejects_forced_package_stdin_input() {
 }
 
 #[test]
+fn check_reader_locale_rejects_multiple_direct_inputs() {
+    let entry_a = write_single_file(
+        "check-reader-locale-multi-a",
+        "incipit { nota \"salve\" }\n",
+    );
+    let entry_b = write_single_file("check-reader-locale-multi-b", "incipit { nota \"vale\" }\n");
+
+    let (stdout, stderr, ok) = run_faber(&[
+        "check",
+        "--reader-locale",
+        "th-TH",
+        entry_a.to_str().expect("entry path"),
+        entry_b.to_str().expect("entry path"),
+    ]);
+
+    assert!(
+        !ok,
+        "check should reject reader-locale when multiple direct inputs are supplied"
+    );
+    assert!(
+        stdout.is_empty(),
+        "rejected check should not write stdout: {stdout}"
+    );
+    assert!(
+        stderr.contains("--reader-locale th-TH requires a package path or .fab entry file"),
+        "expected multiple-input reader-locale rejection, got:\n{stderr}"
+    );
+}
+
+#[test]
 fn fmir_bin_package_forwards_runtime_arg_after_source_is_removed() {
     let package = write_basic_package(
         "fmir-bin-cli",
