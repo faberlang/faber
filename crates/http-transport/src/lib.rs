@@ -36,6 +36,8 @@ use tokio::sync::{Notify, Semaphore};
 use tokio::task::JoinHandle;
 use tokio::time::timeout;
 
+const SHUTDOWN_DRAIN_TIMEOUT: Duration = Duration::from_millis(250);
+
 /// Default max body (1 MiB) for the first transport slice.
 pub const DEFAULT_MAX_BODY_BYTES: usize = 1024 * 1024;
 
@@ -167,6 +169,7 @@ pub struct HttpTransport {
     cancel_notify: Arc<Notify>,
     correlations: Arc<CorrelationTable>,
     in_flight: Arc<AtomicUsize>,
+    connections: Arc<Mutex<Vec<JoinHandle<()>>>>,
     join: Mutex<Option<JoinHandle<()>>>,
 }
 
@@ -193,6 +196,7 @@ impl HttpTransport {
         let correlations = Arc::new(CorrelationTable::new());
         let in_flight = Arc::new(AtomicUsize::new(0));
         let slots = Arc::new(Semaphore::new(config.max_in_flight.max(1)));
+        let connections = Arc::new(Mutex::new(Vec::new()));
 
         let handler: BoxHandler = Arc::new(move |req| Box::pin(handler(req)));
         let join = tokio::spawn(accept_loop(
@@ -203,6 +207,7 @@ impl HttpTransport {
             Arc::clone(&cancel_notify),
             Arc::clone(&correlations),
             Arc::clone(&in_flight),
+            Arc::clone(&connections),
             slots,
         ));
 
@@ -213,6 +218,7 @@ impl HttpTransport {
             cancel_notify,
             correlations,
             in_flight,
+            connections,
             join: Mutex::new(Some(join)),
         })
     }
@@ -250,6 +256,7 @@ impl HttpTransport {
         if let Some(handle) = handle {
             let _ = handle.await;
         }
+        drain_connection_tasks(self.connections).await;
     }
 }
 
@@ -285,6 +292,7 @@ async fn accept_loop(
     cancel_notify: Arc<Notify>,
     correlations: Arc<CorrelationTable>,
     in_flight: Arc<AtomicUsize>,
+    connections: Arc<Mutex<Vec<JoinHandle<()>>>>,
     slots: Arc<Semaphore>,
 ) {
     loop {
@@ -333,7 +341,7 @@ async fn accept_loop(
         let request_timeout = config.request_timeout;
 
         in_flight.fetch_add(1, Ordering::SeqCst);
-        tokio::spawn(async move {
+        let connection = tokio::spawn(async move {
             let _permit = permit;
             let io = TokioIo::new(stream);
             let service = service_fn(move |req| {
@@ -353,6 +361,23 @@ async fn accept_loop(
             let _ = conn.await;
             in_flight.fetch_sub(1, Ordering::SeqCst);
         });
+        if let Ok(mut tasks) = connections.lock() {
+            tasks.push(connection);
+        }
+    }
+}
+
+async fn drain_connection_tasks(connections: Arc<Mutex<Vec<JoinHandle<()>>>>) {
+    let tasks = connections
+        .lock()
+        .ok()
+        .map(|mut tasks| std::mem::take(&mut *tasks))
+        .unwrap_or_default();
+    for mut task in tasks {
+        if timeout(SHUTDOWN_DRAIN_TIMEOUT, &mut task).await.is_err() {
+            task.abort();
+            let _ = task.await;
+        }
     }
 }
 

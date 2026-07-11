@@ -401,3 +401,40 @@ async fn slow_headers_and_saturation_are_time_bounded() {
 
     transport.shutdown_and_join().await;
 }
+
+#[tokio::test]
+async fn shutdown_and_join_drains_or_aborts_stalled_body_connections() {
+    let transport =
+        HttpTransport::serve(loopback(), TransportConfig::default(), |_req| async move {
+            HttpResponse::text(200, "ok")
+        })
+        .await
+        .expect("bind");
+
+    let mut stream = TcpStream::connect(transport.local_addr())
+        .await
+        .expect("connect");
+    stream
+        .write_all(b"POST /hold HTTP/1.1\r\nHost: localhost\r\nContent-Length: 8\r\n\r\n")
+        .await
+        .expect("write partial body");
+
+    sleep(Duration::from_millis(40)).await;
+    assert_eq!(transport.in_flight(), 1, "partial body should hold one slot");
+
+    let started = Instant::now();
+    timeout(Duration::from_secs(2), transport.shutdown_and_join())
+        .await
+        .expect("shutdown join timeout");
+    assert!(
+        started.elapsed() < Duration::from_secs(2),
+        "shutdown should not wait indefinitely on stalled body"
+    );
+
+    let mut buf = [0u8; 1];
+    let read = timeout(Duration::from_secs(1), stream.read(&mut buf))
+        .await
+        .expect("read timeout")
+        .expect("read");
+    assert_eq!(read, 0, "connection should be closed after shutdown");
+}
