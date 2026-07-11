@@ -171,6 +171,13 @@ entry = "main.fab"
     package
 }
 
+fn write_single_file(label: &str, source: &str) -> PathBuf {
+    let dir = temp_dir(label);
+    let file = dir.join("main.fab");
+    fs::write(&file, source).expect("write single-file source");
+    file
+}
+
 fn assert_no_generated_rust(package: &Path) {
     assert!(
         !package.join("target/faber/Cargo.toml").exists(),
@@ -205,6 +212,32 @@ target = "fmir-text"
         package.join("target/faber-mir/image.fmir.txt")
     );
     assert_no_generated_rust(&package);
+}
+
+#[test]
+fn build_reader_locale_accepts_direct_entry_file_input() {
+    let source = write_single_file(
+        "build-reader-locale-single-file",
+        r#"
+incipit {
+  nota "salve"
+}
+"#,
+    );
+
+    let (stdout, stderr, ok) = run_faber(&[
+        "build",
+        "--reader-locale",
+        "zh-Hans",
+        source.to_str().expect("utf8 source path"),
+    ]);
+
+    assert!(ok, "single-file build with reader locale failed:\n{stderr}");
+    let binary = PathBuf::from(stdout.trim());
+    assert!(
+        binary.exists(),
+        "expected built binary path in stdout, got:\n{stdout}"
+    );
 }
 
 #[test]

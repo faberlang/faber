@@ -7353,6 +7353,19 @@ fn build_layout_never_produces_faber_target_nested_path() {
     );
 }
 
+#[test]
+fn linked_library_emit_skips_entry_file_layouts_without_manifest() {
+    let dir = test_temp_dir("linked-library-no-manifest");
+    let entry = dir.join("main.fab");
+    fs::write(&entry, "incipit { nota \"no manifest\" }").expect("entry");
+
+    let layout = discover_build_layout(&entry).expect("layout");
+    let linked = super::library_link::emit_linked_library_crates(&layout.package_root, &layout)
+        .expect("entry-file layouts without manifest should not require native deps");
+
+    assert!(linked.is_empty());
+}
+
 // ---------------------------------------------------------------------------
 // Phase 2: Generated crate writer tests (no Cargo invocation)
 // ---------------------------------------------------------------------------

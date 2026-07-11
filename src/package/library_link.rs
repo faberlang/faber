@@ -36,6 +36,9 @@ pub(crate) fn emit_linked_library_crates(
     app_root: &Path,
     layout: &BuildLayout,
 ) -> Result<Vec<LinkedLibraryCrate>, Vec<Diagnostic>> {
+    if !app_root.join(super::MANIFEST_FILE).is_file() {
+        return Ok(Vec::new());
+    }
     let deps = native_library_deps(app_root)?;
     if deps.is_empty() {
         return Ok(Vec::new());
