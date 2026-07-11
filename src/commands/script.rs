@@ -72,13 +72,13 @@ pub(super) fn interpret_path(path: &PathBuf, program_args: &[String]) {
 
 /// Whether `path` routes through the package-MIR runner rather than the
 /// single-source stepper: manifest-backed or directory packages, or a
-/// manifestless `.fab` file that declares a local import.
+/// manifestless `.fab` file that declares a non-kernel import.
 pub(super) fn is_package_interpret_input(path: &Path) -> bool {
     package::is_manifest_backed_or_directory_package_input(path)
-        || manifestless_file_declares_import(path)
+        || manifestless_file_declares_non_kernel_import(path)
 }
 
-fn manifestless_file_declares_import(path: &Path) -> bool {
+fn manifestless_file_declares_non_kernel_import(path: &Path) -> bool {
     if !is_single_fab_file(path) {
         return false;
     }
@@ -93,10 +93,12 @@ fn manifestless_file_declares_import(path: &Path) -> bool {
     let Some(program) = parse.program else {
         return false;
     };
-    program
-        .statements
-        .iter()
-        .any(|statement| matches!(statement.kind, radix::syntax::StmtKind::Import(_)))
+    program.statements.iter().any(|statement| {
+        let radix::syntax::StmtKind::Import(import) = &statement.kind else {
+            return false;
+        };
+        !radix::kernel::is_kernel_import_path(parse.interner.resolve(import.path))
+    })
 }
 
 /// Whether `path` is a single `.fab` file (the single-source stepper input).
