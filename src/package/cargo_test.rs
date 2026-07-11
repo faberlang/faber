@@ -55,8 +55,8 @@ fn sibling_repo_path_prefers_canonical_repo_cluster() -> Result<(), Box<dyn Erro
 }
 
 #[test]
-fn runtime_cluster_path_prefers_packet_root_layout_without_host_native() -> Result<(), Box<dyn Error>>
-{
+fn runtime_cluster_path_prefers_packet_root_layout_without_host_native(
+) -> Result<(), Box<dyn Error>> {
     let root = temp_dir("cargo-packet-runtime-cluster")?;
     let packet = root.join("worktrees").join("slice");
     let package_root = packet.join("faber-build");
@@ -65,13 +65,23 @@ fn runtime_cluster_path_prefers_packet_root_layout_without_host_native() -> Resu
     fs::write(packet.join("MEMBERS.md"), "# members\n")?;
     fs::create_dir_all(packet.join("faber-runtime"))?;
     fs::create_dir_all(packet.join("host-kernel-rs"))?;
-    fs::create_dir_all(packet.join("host-providers-rs").join("crates").join("sqlite"))?;
+    fs::create_dir_all(
+        packet
+            .join("host-providers-rs")
+            .join("crates")
+            .join("sqlite"),
+    )?;
 
     let canonical_root = root.join("canonical");
     fs::create_dir_all(canonical_root.join("faber-runtime"))?;
     fs::create_dir_all(canonical_root.join("host-kernel-rs"))?;
     fs::create_dir_all(canonical_root.join("host-native-rs"))?;
-    fs::create_dir_all(canonical_root.join("host-providers-rs").join("crates").join("sqlite"))?;
+    fs::create_dir_all(
+        canonical_root
+            .join("host-providers-rs")
+            .join("crates")
+            .join("sqlite"),
+    )?;
 
     let expected_runtime = fs::canonicalize(packet.join("faber-runtime"))
         .unwrap_or_else(|_| packet.join("faber-runtime"));
@@ -161,8 +171,8 @@ fn native_runtime_plan_uses_one_packet_local_repo_cluster() -> Result<(), Box<dy
 }
 
 #[test]
-fn generated_http_cargo_manifest_keeps_packet_runtime_pin_without_host_native() -> Result<(), Box<dyn Error>>
-{
+fn generated_http_cargo_manifest_keeps_packet_runtime_pin_without_host_native(
+) -> Result<(), Box<dyn Error>> {
     let root = temp_dir("cargo-http-runtime-pin")?;
     let packet = root.join("worktrees").join("slice");
     let package_root = packet.join("faber-build");
