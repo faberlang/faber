@@ -27,6 +27,77 @@ fn cli_parses_repl_subcommand() {
 }
 
 #[test]
+fn cli_parses_targets_subcommand() {
+    let cli = Cli::try_parse_from(["faber", "targets"]).expect("parse targets");
+    assert!(cli.eval_source.is_none());
+    assert!(matches!(cli.command, Some(crate::cli::Command::Targets)));
+}
+
+#[test]
+fn cli_parses_script_subcommand_with_forwarded_args() {
+    let cli = Cli::try_parse_from(["faber", "script", "pkg", "--", "--flag", "value"])
+        .expect("parse script");
+    let Some(crate::cli::Command::Script(args)) = cli.command else {
+        panic!("expected script subcommand");
+    };
+    assert_eq!(args.path, std::path::PathBuf::from("pkg"));
+    assert_eq!(args.args, vec!["--flag".to_owned(), "value".to_owned()]);
+}
+
+#[test]
+fn cli_parses_test_subcommand_selection_and_harness_flags() {
+    let cli = Cli::try_parse_from([
+        "faber",
+        "test",
+        "pkg",
+        "smoke",
+        "--name",
+        "suite_case",
+        "--suite",
+        "suite/path",
+        "--tag",
+        "slow",
+        "--exact",
+        "--nocapture",
+        "--test-threads",
+        "4",
+        "--include-ignored",
+    ])
+    .expect("parse test");
+    let Some(crate::cli::Command::Test(args)) = cli.command else {
+        panic!("expected test subcommand");
+    };
+    assert_eq!(args.path, std::path::PathBuf::from("pkg"));
+    assert_eq!(args.filter.as_deref(), Some("smoke"));
+    assert_eq!(args.name.as_deref(), Some("suite_case"));
+    assert_eq!(args.suite.as_deref(), Some("suite/path"));
+    assert_eq!(args.tag.as_deref(), Some("slow"));
+    assert!(args.exact);
+    assert!(args.nocapture);
+    assert_eq!(args.test_threads, Some(4));
+    assert!(!args.ignored);
+    assert!(args.include_ignored);
+}
+
+#[test]
+fn cli_parses_hidden_fmir_run_with_forwarded_args() {
+    let cli = Cli::try_parse_from([
+        "faber",
+        "__fmir-run",
+        "target/faber-mir/exe/run",
+        "--",
+        "--flag",
+        "value",
+    ])
+    .expect("parse hidden fmir runner");
+    let Some(crate::cli::Command::FmirRun(args)) = cli.command else {
+        panic!("expected hidden fmir runner subcommand");
+    };
+    assert_eq!(args.image, std::path::PathBuf::from("target/faber-mir/exe/run"));
+    assert_eq!(args.args, vec!["--flag".to_owned(), "value".to_owned()]);
+}
+
+#[test]
 fn cli_parses_emit_wgsl_text_target() {
     let cli =
         Cli::try_parse_from(["faber", "emit", "-t", "wgsl-text", "main.fab"]).expect("parse emit");
