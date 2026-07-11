@@ -8782,7 +8782,11 @@ incipit {
 "#,
     );
     let output = build_and_run_sqlite_app(&app);
-    assert_eq!(output.status.code(), Some(0), "sqlite consumer should exit 0");
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "sqlite consumer should exit 0"
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
         stdout.contains("Numerus(1)") || stdout.contains("1"),
@@ -8860,7 +8864,10 @@ incipit {
     assert_eq!(output.status.code(), Some(0));
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(!stdout.contains("unexpected-ok"), "path error must cape: {stdout:?}");
+    assert!(
+        !stdout.contains("unexpected-ok"),
+        "path error must cape: {stdout:?}"
+    );
     assert!(!stderr.trim().is_empty(), "expected path error on stderr");
 }
 

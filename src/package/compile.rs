@@ -398,7 +398,8 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
                 };
             }
             Err(err) => {
-                let mut diag = Diagnostic::error(err.message).with_file(unit.path.display().to_string());
+                let mut diag =
+                    Diagnostic::error(err.message).with_file(unit.path.display().to_string());
                 for arg in err.args {
                     diag = diag.with_arg(arg.name, arg.value);
                 }
@@ -420,7 +421,8 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
         ) {
             Ok(output) => output.code,
             Err(err) => {
-                let mut diag = Diagnostic::error(err.message).with_file(entry.path.display().to_string());
+                let mut diag =
+                    Diagnostic::error(err.message).with_file(entry.path.display().to_string());
                 for arg in err.args {
                     diag = diag.with_arg(arg.name, arg.value);
                 }
@@ -445,7 +447,8 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
                 };
             }
             Err(err) => {
-                let mut diag = Diagnostic::error(err.message).with_file(entry.path.display().to_string());
+                let mut diag =
+                    Diagnostic::error(err.message).with_file(entry.path.display().to_string());
                 for arg in err.args {
                     diag = diag.with_arg(arg.name, arg.value);
                 }
@@ -477,7 +480,8 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
     // WHY (79df18a): inject each binding name at most once — multi-unit packages
     // that all `importa … privata consolum` must not redeclare `var consolum`.
     let mut namespace_block = String::new();
-    let mut injected_bindings: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    let mut injected_bindings: std::collections::BTreeSet<String> =
+        std::collections::BTreeSet::new();
     let mut needs_os_for_shim = false;
     for unit in &package.units {
         for item in &unit.analysis.hir.items {
@@ -496,7 +500,8 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
                     if !injected_bindings.insert(binding.clone()) {
                         continue;
                     }
-                    namespace_block.push_str(&super::go_build::render_norma_consolum_shim(&binding));
+                    namespace_block
+                        .push_str(&super::go_build::render_norma_consolum_shim(&binding));
                     namespace_block.push('\n');
                     needs_os_for_shim = true;
                 }
@@ -506,7 +511,8 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
                 // Other Norma modules still fail closed at go build (no silent erase).
                 continue;
             }
-            let Some(target_path) = resolve_local_import_path(&package.spec, &unit.path, import_path)
+            let Some(target_path) =
+                resolve_local_import_path(&package.spec, &unit.path, import_path)
             else {
                 continue;
             };
@@ -656,13 +662,13 @@ fn ensure_go_import(code: &str, pkg: &str) -> String {
     }
     // import "fmt"\n → import (\n  "fmt"\n  "os"\n)
     if let Some(idx) = code.find("import \"") {
-        let line_end = code[idx..].find('\n').map(|n| idx + n).unwrap_or(code.len());
+        let line_end = code[idx..]
+            .find('\n')
+            .map(|n| idx + n)
+            .unwrap_or(code.len());
         let existing = code[idx..line_end].trim();
         // existing like `import "fmt"`
-        let existing_pkg = existing
-            .strip_prefix("import ")
-            .unwrap_or(existing)
-            .trim();
+        let existing_pkg = existing.strip_prefix("import ").unwrap_or(existing).trim();
         let mut out = String::new();
         out.push_str(&code[..idx]);
         out.push_str("import (\n\t");

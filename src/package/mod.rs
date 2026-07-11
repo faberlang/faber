@@ -34,10 +34,10 @@ mod cmd;
 mod codegen;
 mod compile;
 mod discovery;
-mod go_build;
 mod dispatch;
 mod file_interface;
 mod frontmatter;
+mod go_build;
 mod import_graph;
 mod library;
 mod library_link;
@@ -58,8 +58,6 @@ pub(crate) use cargo::emit_generated_crate_with_runtime_plan;
 // used by `commands/run.rs` and `commands/test.rs` in the binary crate
 pub(crate) use cargo::invoke_cargo_build;
 pub use cargo::{emit_generated_crate, invoke_cargo_test};
-#[allow(unused_imports)] // binary `commands/run` consumes run_go_binary
-pub(crate) use go_build::{emit_go_module, invoke_go_build, run_go_binary, GoBuildLayout};
 pub(crate) use cargo::{package_host_selection_diagnostic, RustRuntimePlan};
 #[cfg(test)]
 pub use cmd::use_package_compiler;
@@ -68,15 +66,17 @@ pub use cmd::{
     use_package_compiler_from_args,
 };
 pub(crate) use compile::package_rust_runtime_plan;
+pub(crate) use compile::take_go_package_modules;
 #[allow(unused_imports)] // package MIR stages consume this crate-visible analysis API.
 pub(crate) use compile::{analyze_package, AnalyzedPackage, AnalyzedPackageUnit};
 pub use compile::{check_package, compile_package, compile_package_with_test_selection};
-pub(crate) use compile::take_go_package_modules;
 #[allow(unused_imports)] // public package API; used by integration tests and external callers
 pub use discovery::{discover_build_layout, sanitize_crate_name, BuildLayout};
 pub(crate) use dispatch::{
     load_provider_manifests, provider_crate_path, selected_providers_for_routes, ProviderManifest,
 };
+#[allow(unused_imports)] // binary `commands/run` consumes run_go_binary
+pub(crate) use go_build::{emit_go_module, invoke_go_build, run_go_binary, GoBuildLayout};
 #[allow(unused_imports)] // binary `commands/run` + `commands/test` G4 linkage
 pub(crate) use library_link::emit_linked_library_crates;
 pub(crate) use manifest::validate_manifest;
