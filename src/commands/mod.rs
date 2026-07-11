@@ -106,11 +106,6 @@ fn dispatch(command: Command) {
                     reader_locale: args.reader_locale,
                 });
             } else {
-                reject_reader_locale_without_package(
-                    args.reader_locale.as_deref(),
-                    &args.input,
-                    args.package,
-                );
                 tool::cmd_check(CheckCommand {
                     input: args.input,
                     package: args.package,
