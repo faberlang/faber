@@ -8,6 +8,7 @@ use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use std::{future::pending, sync::Mutex};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::time::sleep;
@@ -461,4 +462,29 @@ async fn shutdown_and_join_drains_or_aborts_stalled_body_connections() {
         .expect("read timeout")
         .expect("read");
     assert_eq!(read, 0, "connection should be closed after shutdown");
+}
+
+#[tokio::test]
+async fn shutdown_drain_uses_one_global_deadline() {
+    let connections = Arc::new(Mutex::new(ConnectionTasks::default()));
+    {
+        let mut tasks = connections.lock().expect("lock tasks");
+        tasks.spawn(async {
+            sleep(Duration::from_millis(180)).await;
+        });
+        tasks.spawn(async {
+            sleep(Duration::from_millis(360)).await;
+        });
+        tasks.spawn(async {
+            pending::<()>().await;
+        });
+    }
+
+    let started = Instant::now();
+    drain_connection_tasks(Arc::clone(&connections)).await;
+    assert!(
+        started.elapsed() < Duration::from_millis(330),
+        "shutdown drain should use one absolute deadline, elapsed={:?}",
+        started.elapsed()
+    );
 }

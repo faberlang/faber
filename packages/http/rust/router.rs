@@ -416,8 +416,7 @@ fn percent_decode_bytes(input: &str) -> String {
     while i < bytes.len() {
         match bytes[i] {
             b'%' if i + 2 < bytes.len() => {
-                let hex = &input[i + 1..i + 3];
-                if let Ok(value) = u8::from_str_radix(hex, 16) {
+                if let Some(value) = percent_decode_hex_pair(bytes[i + 1], bytes[i + 2]) {
                     out.push(value);
                     i += 3;
                 } else {
@@ -432,6 +431,19 @@ fn percent_decode_bytes(input: &str) -> String {
         }
     }
     String::from_utf8(out).unwrap_or_else(|_| input.to_owned())
+}
+
+fn percent_decode_hex_pair(hi: u8, lo: u8) -> Option<u8> {
+    Some((hex_nibble(hi)? << 4) | hex_nibble(lo)?)
+}
+
+fn hex_nibble(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
 }
 
 #[cfg(test)]

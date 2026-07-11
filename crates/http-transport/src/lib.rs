@@ -34,7 +34,7 @@ use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::sync::{Notify, Semaphore};
 use tokio::task::{JoinHandle, JoinSet};
-use tokio::time::timeout;
+use tokio::time::{timeout, Instant};
 
 const SHUTDOWN_DRAIN_TIMEOUT: Duration = Duration::from_millis(250);
 
@@ -399,8 +399,15 @@ async fn drain_connection_tasks(connections: Arc<Mutex<ConnectionTasks>>) {
         .ok()
         .map(|mut tasks| std::mem::take(&mut tasks.set))
         .unwrap_or_default();
+    let deadline = Instant::now() + SHUTDOWN_DRAIN_TIMEOUT;
     loop {
-        match timeout(SHUTDOWN_DRAIN_TIMEOUT, tasks.join_next()).await {
+        let now = Instant::now();
+        let Some(remaining) = deadline.checked_duration_since(now) else {
+            tasks.abort_all();
+            while tasks.join_next().await.is_some() {}
+            break;
+        };
+        match timeout(remaining, tasks.join_next()).await {
             Ok(Some(_)) => {}
             Ok(None) => break,
             Err(_) => {
