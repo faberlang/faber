@@ -213,8 +213,12 @@ pub(crate) fn inject_after_imports(entry_code: &str, namespaces: &str) -> String
                 while let Some(n) = lines.peek().copied() {
                     let nt = n.trim_start();
                     if nt.starts_with("import ") || nt.is_empty() {
-                        out.push_str(lines.next().unwrap());
-                        out.push('\n');
+                        if let Some(import_line) = lines.next() {
+                            out.push_str(import_line);
+                            out.push('\n');
+                        } else {
+                            break;
+                        }
                     } else {
                         break;
                     }
@@ -236,8 +240,12 @@ pub(crate) fn inject_after_imports(entry_code: &str, namespaces: &str) -> String
                     // next non-empty is not import — inject after blank lines
                     while let Some(n) = lines.peek().copied() {
                         if n.trim().is_empty() {
-                            out.push_str(lines.next().unwrap());
-                            out.push('\n');
+                            if let Some(blank_line) = lines.next() {
+                                out.push_str(blank_line);
+                                out.push('\n');
+                            } else {
+                                break;
+                            }
                         } else {
                             break;
                         }
@@ -428,3 +436,7 @@ pub(crate) fn run_go_binary(binary: &Path, args: &[String]) -> Result<i32, Diagn
     })?;
     Ok(status.code().unwrap_or(1))
 }
+
+#[cfg(test)]
+#[path = "go_build_test.rs"]
+mod tests;

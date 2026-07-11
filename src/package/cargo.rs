@@ -221,60 +221,8 @@ pub(crate) fn host_native_path() -> PathBuf {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{local_repo_path_from, sibling_repo_path_from};
-    use std::fs;
-    use std::path::PathBuf;
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    fn temp_dir(label: &str) -> PathBuf {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock")
-            .as_nanos();
-        let path = std::env::temp_dir().join(format!("faber-{label}-{nonce}"));
-        fs::create_dir_all(&path).expect("temp dir");
-        path
-    }
-
-    #[test]
-    fn local_repo_path_prefers_nearest_worktree_sibling() {
-        let root = temp_dir("cargo-local-repo-path");
-        let worktree = root.join("worktrees").join("slice").join("faber-build");
-        fs::create_dir_all(&worktree).expect("worktree");
-        fs::create_dir_all(
-            worktree
-                .parent()
-                .expect("worktree parent")
-                .join("faber-runtime"),
-        )
-        .expect("worktree faber-runtime");
-        fs::create_dir_all(root.join("faber-runtime")).expect("repo faber-runtime");
-
-        assert_eq!(
-            local_repo_path_from(&worktree, "faber-runtime"),
-            worktree
-                .parent()
-                .expect("worktree parent")
-                .join("faber-runtime")
-        );
-    }
-
-    #[test]
-    fn sibling_repo_path_prefers_canonical_repo_cluster() {
-        let root = temp_dir("cargo-sibling-repo-path");
-        let worktree = root.join("worktrees").join("slice").join("faber-build");
-        fs::create_dir_all(&worktree).expect("worktree");
-        let cluster = worktree.parent().expect("worktree parent");
-        for repo in ["faber-runtime", "host-kernel-rs", "host-native-rs"] {
-            fs::create_dir_all(cluster.join(repo)).expect("cluster repo");
-        }
-        let direct = cluster.join("faber-runtime");
-        let expected = fs::canonicalize(&direct).unwrap_or_else(|_| direct.clone());
-
-        assert_eq!(sibling_repo_path_from(&worktree, "faber-runtime"), expected);
-    }
-}
+#[path = "cargo_test.rs"]
+mod tests;
 
 /// Write the generated Rust crate tree under the layout's `target/faber/` directory.
 ///
@@ -378,10 +326,9 @@ fn write_host_manifest(root: &Path, plan: &RustRuntimePlan) -> std::io::Result<(
         "providers": plan.provider_manifests,
         "required_routes": plan.non_runtime_routes,
     });
-    std::fs::write(
-        root.join("host-manifest.json"),
-        serde_json::to_vec_pretty(&value).expect("host manifest serialization is infallible"),
-    )
+    let bytes = serde_json::to_vec_pretty(&value)
+        .map_err(|err| std::io::Error::other(format!("serialize host manifest: {err}")))?;
+    std::fs::write(root.join("host-manifest.json"), bytes)
 }
 
 /// Invoke Cargo to build the generated crate and return the expected binary path.
