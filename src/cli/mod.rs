@@ -213,7 +213,7 @@ pub struct VerifyLibraryArgs {
 #[derive(clap::Args, Debug)]
 pub struct ExplainArgs {
     /// Emit a machine-readable JSON explanation
-    #[arg(long)]
+    #[arg(long, requires = "term")]
     pub json: bool,
 
     /// Reader locale used to select diagnostic explanation text
@@ -221,18 +221,19 @@ pub struct ExplainArgs {
     pub reader_locale: Option<String>,
 
     /// Search across explain entries and show ranked matches
-    #[arg(long)]
+    #[arg(long, conflicts_with_all = ["list", "category", "term", "json"])]
     pub search: Option<String>,
 
     /// List canonical explain terms
-    #[arg(long)]
+    #[arg(long, conflicts_with_all = ["search", "category", "term", "json"])]
     pub list: bool,
 
     /// List canonical and legacy entries in a category
-    #[arg(long)]
+    #[arg(long, conflicts_with_all = ["search", "list", "term", "json"])]
     pub category: Option<String>,
 
     /// Term, alias, or legacy spelling to explain
+    #[arg(conflicts_with_all = ["search", "list", "category"])]
     pub term: Option<String>,
 }
 

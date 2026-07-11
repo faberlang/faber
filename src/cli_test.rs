@@ -407,6 +407,42 @@ fn cli_parses_explain_query_modes() {
 }
 
 #[test]
+fn cli_rejects_conflicting_explain_query_modes() {
+    let mixed = Cli::try_parse_from(["faber", "explain", "--list", "nihil"])
+        .expect_err("list and term should conflict");
+    let mixed_rendered = mixed.to_string();
+    assert!(mixed_rendered.contains("--list"));
+
+    let search_json = Cli::try_parse_from(["faber", "explain", "--search", "host", "--json"])
+        .expect_err("search and json should conflict");
+    let search_json_rendered = search_json.to_string();
+    assert!(search_json_rendered.contains("--search"));
+    assert!(search_json_rendered.contains("--json"));
+
+    let search_category = Cli::try_parse_from([
+        "faber",
+        "explain",
+        "--search",
+        "host",
+        "--category",
+        "diagnostics",
+    ])
+    .expect_err("search and category should conflict");
+    let search_category_rendered = search_category.to_string();
+    assert!(search_category_rendered.contains("--search"));
+    assert!(search_category_rendered.contains("--category"));
+}
+
+#[test]
+fn cli_rejects_explain_json_without_term() {
+    let error =
+        Cli::try_parse_from(["faber", "explain", "--json"]).expect_err("json requires a term");
+    let rendered = error.to_string();
+    assert!(rendered.contains("--json"));
+    assert!(rendered.contains("<TERM>") || rendered.contains("<term>"));
+}
+
+#[test]
 fn cli_parses_verify_subcommand() {
     let cli = Cli::try_parse_from(["faber", "verify", "main.fab"]).expect("parse verify");
     let Some(crate::cli::Command::Verify(args)) = cli.command else {
