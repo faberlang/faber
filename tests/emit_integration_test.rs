@@ -43,6 +43,12 @@ fn corpus_root() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/corpus")
 }
 
+fn reader_locale_example_root(locale: &str) -> PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../examples/reader-locale")
+        .join(locale)
+}
+
 fn temp_dir(label: &str) -> PathBuf {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -243,5 +249,83 @@ incipit {
             && expanded_stderr.contains("\nphase:")
             && expanded_stderr.contains("\nspan:"),
         "expanded diagnostics should include phase and span records:\n{expanded_stderr}"
+    );
+}
+
+#[test]
+fn check_reader_locale_accepts_direct_entry_file_input() {
+    let example = reader_locale_example_root("th-TH");
+    let entry = example.join("src/main.fab");
+
+    let (stdout, stderr, ok) = run_faber(&[
+        "check",
+        "--reader-locale",
+        "th-TH",
+        entry.to_str().expect("entry path"),
+    ]);
+
+    assert!(ok, "reader-locale entry-file check failed:\n{stderr}");
+    assert!(stdout.is_empty(), "check should not write stdout: {stdout}");
+    assert!(
+        stderr.contains("ok:"),
+        "expected check success marker on stderr:\n{stderr}"
+    );
+}
+
+#[test]
+fn check_reader_locale_accepts_manifest_file_input() {
+    let example = reader_locale_example_root("th-TH");
+    let manifest = example.join("faber.toml");
+
+    let (stdout, stderr, ok) = run_faber(&[
+        "check",
+        "--reader-locale",
+        "th-TH",
+        manifest.to_str().expect("manifest path"),
+    ]);
+
+    assert!(ok, "reader-locale manifest check failed:\n{stderr}");
+    assert!(stdout.is_empty(), "check should not write stdout: {stdout}");
+    assert!(
+        stderr.contains("ok:"),
+        "expected check success marker on stderr:\n{stderr}"
+    );
+}
+
+#[test]
+fn emit_reader_locale_accepts_direct_entry_file_input() {
+    let example = reader_locale_example_root("th-TH");
+    let entry = example.join("src/main.fab");
+
+    let (stdout, stderr, ok) = run_faber_emit(&[
+        "emit",
+        "--reader-locale",
+        "th-TH",
+        entry.to_str().expect("entry path"),
+    ]);
+
+    assert!(ok, "reader-locale entry-file emit failed:\n{stderr}");
+    assert!(
+        stdout.contains("fn ทักทาย"),
+        "expected localized Rust emit output:\n{stdout}"
+    );
+}
+
+#[test]
+fn emit_reader_locale_accepts_manifest_file_input() {
+    let example = reader_locale_example_root("th-TH");
+    let manifest = example.join("faber.toml");
+
+    let (stdout, stderr, ok) = run_faber_emit(&[
+        "emit",
+        "--reader-locale",
+        "th-TH",
+        manifest.to_str().expect("manifest path"),
+    ]);
+
+    assert!(ok, "reader-locale manifest emit failed:\n{stderr}");
+    assert!(
+        stdout.contains("fn ทักทาย"),
+        "expected localized Rust emit output:\n{stdout}"
     );
 }
