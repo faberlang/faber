@@ -62,22 +62,89 @@ pub(crate) fn go_capitalize(name: &str) -> String {
     }
 }
 
-/// Narrow G6 residual: `norma:consolum` host surface for Go package assembly.
+/// `norma:consolum` host surface for Go package assembly.
 ///
-/// Echo needs `consolum.Dic` (no newline). Maps pure textus I/O verbs to `fmt`
-/// without a full Norma host. Unsupported verbs stay absent so go build fails
-/// closed if the package uses them.
+/// This mirrors the built-in package dispatch contract closely enough that Go
+/// package builds can use the public consolum API instead of a narrow echo-only
+/// slice. The generated shim stays local to package assembly; other Norma
+/// modules still fail closed until they grow explicit host support.
 pub(crate) fn render_norma_consolum_shim(binding: &str) -> String {
     // Field names match Go field-access capitalize (dic → Dic, scribe → Scribe).
     format!(
-        r#"var {binding} = struct {{
+        r#"var {binding}_reader = bufio.NewReader(os.Stdin)
+
+func {binding}_hauri(magnitudo int64) []byte {{
+	if magnitudo < 0 {{
+		magnitudo = 0
+	}}
+	data := make([]byte, magnitudo)
+	n, err := {binding}_reader.Read(data)
+	if err != nil && err != io.EOF {{
+		panic(err)
+	}}
+	return data[:n]
+}}
+
+func {binding}_lege() string {{
+	line, err := {binding}_reader.ReadString('\n')
+	if err != nil && err != io.EOF {{
+		panic(err)
+	}}
+	line = strings.TrimSuffix(line, "\n")
+	line = strings.TrimSuffix(line, "\r")
+	return line
+}}
+
+func {binding}_funde(data []byte) {{
+	if _, err := os.Stdout.Write(data); err != nil {{
+		panic(err)
+	}}
+}}
+
+func {binding}_isTerminal(file *os.File) bool {{
+	info, err := file.Stat()
+	if err != nil {{
+		return false
+	}}
+	return (info.Mode() & os.ModeCharDevice) != 0
+}}
+
+var {binding} = struct {{
+	Hauri func(int64) []byte
+	Hauriet func(int64) []byte
+	Lege func() string
+	Leget func() string
+	Funde func([]byte)
+	Fundet func([]byte)
 	Dic func(string)
+	Dicet func(string)
+	Scribet func(string)
 	Scribe func(string)
 	Mone func(string)
+	Monet func(string)
+	Vide func(string)
+	Videbit func(string)
+	Audit func() bool
+	Loquitur func() bool
+	Admonet func() bool
 }}{{
+	Hauri: {binding}_hauri,
+	Hauriet: {binding}_hauri,
+	Lege: {binding}_lege,
+	Leget: {binding}_lege,
+	Funde: {binding}_funde,
+	Fundet: {binding}_funde,
 	Dic: func(msg string) {{ fmt.Print(msg) }},
+	Dicet: func(msg string) {{ fmt.Print(msg) }},
+	Scribet: func(msg string) {{ fmt.Println(msg) }},
 	Scribe: func(msg string) {{ fmt.Println(msg) }},
 	Mone: func(msg string) {{ fmt.Fprintln(os.Stderr, msg) }},
+	Monet: func(msg string) {{ fmt.Fprintln(os.Stderr, msg) }},
+	Vide: func(msg string) {{ fmt.Fprintln(os.Stderr, msg) }},
+	Videbit: func(msg string) {{ fmt.Fprintln(os.Stderr, msg) }},
+	Audit: func() bool {{ return {binding}_isTerminal(os.Stdin) }},
+	Loquitur: func() bool {{ return {binding}_isTerminal(os.Stdout) }},
+	Admonet: func() bool {{ return {binding}_isTerminal(os.Stderr) }},
 }}
 "#
     )

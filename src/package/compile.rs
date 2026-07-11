@@ -1,3 +1,4 @@
+use radix::cli::CliProgram;
 use radix::codegen::rust::{
     build_local_import_function_params, build_local_import_namespaces, local_import_module_key,
     ImportedFunctionParams, ImportedNamespaceInfo, RustFieldNamePolicy, SiblingModuleExports,
@@ -5,7 +6,6 @@ use radix::codegen::rust::{
 };
 use radix::codegen::Target;
 use radix::diagnostics::Diagnostic;
-use radix::cli::CliProgram;
 use radix::driver::{
     analyze_source_with_cli_program_and_import_contract, AnalyzedUnit, Config, Session,
 };
@@ -507,7 +507,7 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
         };
     }
 
-    // Namespace vars for local imports + narrow Norma host shims (entry + siblings).
+    // Namespace vars for local imports + explicit Norma host shims (entry + siblings).
     // WHY (79df18a): inject each binding name at most once — multi-unit packages
     // that all `importa … privata consolum` must not redeclare `var consolum`.
     let mut namespace_block = String::new();
@@ -520,7 +520,7 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
                 continue;
             };
             let import_path = unit.analysis.interner.resolve(import.path);
-            // G6 residual: narrow norma:consolum Go host (echo dic/scribe/mone).
+            // Package Go assembly owns an explicit `norma:consolum` host shim.
             if import_path == "norma:consolum" || import_path == "norma/consolum" {
                 for it in &import.items {
                     let binding = it
@@ -591,8 +591,11 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
         entry_code = allow_go_cli_dashed_rest_operands(&entry_code);
     }
     if needs_os_for_shim {
+        entry_code = ensure_go_import(&entry_code, "bufio");
         entry_code = ensure_go_import(&entry_code, "os");
         entry_code = ensure_go_import(&entry_code, "fmt");
+        entry_code = ensure_go_import(&entry_code, "io");
+        entry_code = ensure_go_import(&entry_code, "strings");
     }
 
     // Side-channel: multi-file emit for build/run (Output is entry main.go only).

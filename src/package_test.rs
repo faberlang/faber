@@ -27,8 +27,9 @@ use radix::hir::{HirItemKind, LibraryBinding, LibraryItem, LibraryItemKind, Libr
 use radix::mir::{BufferHost, Host, MirDiagnosticKind, MirProvider, StepperError, Value};
 use radix::Output;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn diagnostic_has_issue(diag: &Diagnostic, issue: &str) -> bool {
@@ -9637,7 +9638,7 @@ incipit argumenta args exitus 0 {
     let Some(Output::Go(output)) = result.output else {
         panic!("expected Go");
     };
-    let decls = output.code.matches("var consolum").count();
+    let decls = output.code.matches("var consolum = struct").count();
     assert_eq!(
         decls, 1,
         "expected exactly one consolum shim, got {decls}:\n{}",
@@ -9777,6 +9778,105 @@ fn g6_go4_coreutils_echo_package_go_builds() {
     assert_eq!(output.status.code(), Some(0), "echo -n -E exit");
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert_eq!(stdout, "x", "echo -n -E stdout got {stdout:?}");
+}
+
+#[test]
+fn g6_consolum_shim_supports_full_stdio_surface() {
+    let dir = test_temp_dir("g6-consolum-surface");
+    fs::create_dir_all(dir.join("src")).expect("src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "g6-consolum-surface"
+version = "0.1.0"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        dir.join("src/main.fab"),
+        r#"
+importa ex "norma:consolum" privata consolum
+
+@ cli "tool"
+@ operandus ceteri textus ignored
+incipit argumenta args exitus 0 {
+  si consolum.audit() {
+    consolum.dic("tty")
+  }
+  secus {
+    consolum.dic("notty")
+  }
+  consolum.scribet(":")
+  consolum.dicet(consolum.leget())
+  consolum.scribe("")
+  fixum octeti sync_bytes ← consolum.hauri(4)
+  consolum.fundet(sync_bytes)
+  fixum octeti async_bytes ← consolum.hauriet(4)
+  consolum.funde(async_bytes)
+  consolum.monet("warn")
+  consolum.videbit("debug")
+  si consolum.loquitur() {
+    consolum.dic("stdout-tty")
+  }
+  si consolum.admonet() {
+    consolum.dic("stderr-tty")
+  }
+}
+"#,
+    )
+    .expect("entry");
+
+    let result = compile_package(&Config::default().with_target(Target::Go), &dir);
+    assert!(
+        result.success(),
+        "consolum surface compile failed: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| d.message.clone())
+            .collect::<Vec<_>>()
+    );
+    let Some(Output::Go(output)) = result.output else {
+        panic!("expected Go");
+    };
+    let modules = super::take_go_package_modules();
+    let layout = discover_build_layout(&dir).expect("layout");
+    let go_layout = super::GoBuildLayout::from_package(&layout);
+    super::emit_go_module(&go_layout, &output.code, &modules).expect("emit");
+    let binary = super::invoke_go_build(&go_layout).expect("go build consolum surface");
+
+    let mut child = Command::new(&binary)
+        .arg("ignored")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn");
+    child
+        .stdin
+        .as_mut()
+        .expect("stdin")
+        .write_all(b"salve\nBYTEBYTE")
+        .expect("write stdin");
+    let output = child.wait_with_output().expect("wait");
+
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "expected success; stdout={:?} stderr={:?}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout),
+        "notty:\nsalve\nBYTEBYTE"
+    );
+    assert_eq!(String::from_utf8_lossy(&output.stderr), "warn\ndebug\n");
 }
 
 #[test]
