@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use radix::codegen::Target;
 use radix::diagnostics::Diagnostic;
 
-use super::{provider_crate_path, BuildLayout, FaberManifest, ManifestRustHost, ProviderManifest};
+use super::{BuildLayout, FaberManifest, ManifestRustHost, ProviderManifest};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct RustRuntimePlan {
@@ -98,23 +98,27 @@ pub(crate) fn package_host_selection_diagnostic(
 /// The Rust edition is fixed at 2021 for backend output; Faber source edition
 /// is manifest metadata for the language frontend and does not imply a Rust
 /// edition. `binary_name` must already be sanitized for Cargo.
-fn generate_cargo_toml(meta: &FaberManifest, binary_name: &str, plan: &RustRuntimePlan) -> String {
+fn generate_cargo_toml(
+    meta: &FaberManifest,
+    package_root: &Path,
+    binary_name: &str,
+    plan: &RustRuntimePlan,
+) -> String {
     let version = if meta.package.version.trim().is_empty() {
         "0.1.0"
     } else {
         meta.package.version.trim()
     };
-    render_generated_cargo_toml(binary_name, version, plan)
+    render_generated_cargo_toml(binary_name, version, plan, package_root)
 }
 
-fn render_generated_cargo_toml(name: &str, version: &str, plan: &RustRuntimePlan) -> String {
-    let faber_path = if matches!(plan.host, Some(ManifestRustHost::Native))
-        || !plan.selected_providers.is_empty()
-    {
-        faber_runtime_path()
-    } else {
-        local_repo_path("faber-runtime")
-    };
+fn render_generated_cargo_toml(
+    name: &str,
+    version: &str,
+    plan: &RustRuntimePlan,
+    package_root: &Path,
+) -> String {
+    let faber_path = runtime_cluster_path_from(package_root, "faber-runtime");
     let mut deps = String::new();
     if plan.needs_faber {
         deps.push_str(&format!(
@@ -125,16 +129,16 @@ fn render_generated_cargo_toml(name: &str, version: &str, plan: &RustRuntimePlan
     if matches!(plan.host, Some(ManifestRustHost::Native)) {
         deps.push_str(&format!(
             "host_kernel = {{ package = \"host-kernel\", path = \"{}\" }}\n",
-            host_kernel_path().display()
+            runtime_cluster_path_from(package_root, "host-kernel-rs").display()
         ));
         deps.push_str(&format!(
             "host_native = {{ package = \"host-native\", path = \"{}\" }}\n",
-            host_native_path().display()
+            runtime_cluster_path_from(package_root, "host-native-rs").display()
         ));
         for provider in &plan.selected_providers {
             deps.push_str(&format!(
                 "{provider} = {{ package = \"{provider}\", path = \"{}\" }}\n",
-                provider_crate_path(provider).display()
+                provider_crate_path_from(package_root, provider).display()
             ));
         }
     }
@@ -172,6 +176,20 @@ edition = "2021"
     )
 }
 
+fn provider_crate_path_from(package_root: &Path, provider: &str) -> PathBuf {
+    runtime_cluster_path_from(package_root, "host-providers-rs")
+        .join("crates")
+        .join(provider)
+}
+
+pub(crate) fn runtime_cluster_path_from(package_root: &Path, name: &str) -> PathBuf {
+    let candidate = sibling_repo_path_from(package_root, name);
+    if candidate.is_dir() {
+        return candidate;
+    }
+    sibling_repo_path_from(Path::new(env!("CARGO_MANIFEST_DIR")), name)
+}
+
 fn sibling_repo_path_from(manifest_dir: &Path, name: &str) -> PathBuf {
     for candidate in manifest_dir.ancestors() {
         let sibling = candidate.join(name);
@@ -189,6 +207,7 @@ fn sibling_repo_path_from(manifest_dir: &Path, name: &str) -> PathBuf {
     fs::canonicalize(&fallback).unwrap_or(fallback)
 }
 
+#[cfg(test)]
 fn local_repo_path_from(manifest_dir: &Path, name: &str) -> PathBuf {
     for candidate in manifest_dir.ancestors() {
         let sibling = candidate.join(name);
@@ -199,25 +218,9 @@ fn local_repo_path_from(manifest_dir: &Path, name: &str) -> PathBuf {
     manifest_dir.join("..").join(name)
 }
 
-pub(crate) fn sibling_repo_path(name: &str) -> PathBuf {
-    sibling_repo_path_from(Path::new(env!("CARGO_MANIFEST_DIR")), name)
-}
-
+#[cfg(test)]
 pub(crate) fn local_repo_path(name: &str) -> PathBuf {
     local_repo_path_from(Path::new(env!("CARGO_MANIFEST_DIR")), name)
-}
-
-pub(crate) fn faber_runtime_path() -> PathBuf {
-    // Public `faber` repo lives beside private `radix` under faberlang/.
-    sibling_repo_path("faber-runtime")
-}
-
-pub(crate) fn host_kernel_path() -> PathBuf {
-    sibling_repo_path("host-kernel-rs")
-}
-
-pub(crate) fn host_native_path() -> PathBuf {
-    sibling_repo_path("host-native-rs")
 }
 
 #[cfg(test)]
@@ -257,9 +260,9 @@ pub(crate) fn emit_generated_crate_with_runtime_plan(
     }
 
     let cargo_src = if let Some(m) = meta {
-        generate_cargo_toml(m, layout.binary_name(), plan)
+        generate_cargo_toml(m, &layout.package_root, layout.binary_name(), plan)
     } else {
-        render_generated_cargo_toml(layout.binary_name(), "0.1.0", plan)
+        render_generated_cargo_toml(layout.binary_name(), "0.1.0", plan, &layout.package_root)
     };
     if let Err(err) = fs::write(&layout.generated_cargo_manifest, &cargo_src) {
         return Err(Box::new(Diagnostic::io_error(

@@ -1,4 +1,18 @@
-use super::{inject_after_imports, render_norma_consolum_shim};
+use super::{emit_go_module, inject_after_imports, render_norma_consolum_shim, GoBuildLayout};
+use std::error::Error;
+use std::fs;
+use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+fn temp_dir(label: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(Box::<dyn Error>::from)?
+        .as_nanos();
+    let path = std::env::temp_dir().join(format!("faber-{label}-{nonce}"));
+    fs::create_dir_all(&path)?;
+    Ok(path)
+}
 
 #[test]
 fn inject_after_single_line_imports_preserves_following_imports() {
@@ -52,4 +66,44 @@ fn render_norma_consolum_shim_covers_full_public_surface() {
             "expected shim snippet `{snippet}` in:\n{shim}"
         );
     }
+}
+
+#[test]
+fn emit_go_module_replaces_stale_owned_sources() -> Result<(), Box<dyn std::error::Error>> {
+    let root = temp_dir("go-build-stale-files")?;
+    let layout = GoBuildLayout {
+        module_root: root.join("target").join("faber").join("go"),
+        binary_path: root
+            .join("target")
+            .join("faber")
+            .join("go")
+            .join("bin")
+            .join("demo"),
+        package_name: "demo".to_owned(),
+    };
+
+    emit_go_module(
+        &layout,
+        "package main\n\nfunc main() {}\n",
+        &[(
+            "alpha.go".to_owned(),
+            "package main\n\nfunc alpha() {}\n".to_owned(),
+        )],
+    )
+    .expect("first emit");
+    fs::write(
+        layout.binary_path.parent().expect("bin dir").join("demo"),
+        b"keep",
+    )?;
+
+    emit_go_module(&layout, "package main\n\nfunc main() {}\n", &[]).expect("second emit");
+
+    assert!(!layout.module_root.join("alpha.go").exists());
+    assert!(layout.module_root.join("main.go").exists());
+    assert!(layout.module_root.join("go.mod").exists());
+    assert!(
+        layout.binary_path.exists(),
+        "binary output must be preserved"
+    );
+    Ok(())
 }

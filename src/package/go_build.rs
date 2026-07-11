@@ -8,6 +8,7 @@
 //! - binary at `<package>/target/faber/go/bin/<name>`
 
 use radix::diagnostics::Diagnostic;
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -402,6 +403,7 @@ pub(crate) fn emit_go_module(
         ))
         .with_arg("issue", "package_go_emit_failed")
     })?;
+    remove_stale_owned_go_files(layout, modules)?;
 
     let main_path = layout.module_root.join("main.go");
     fs::write(&main_path, entry_code).map_err(|err| {
@@ -437,6 +439,49 @@ pub(crate) fn emit_go_module(
         .with_arg("issue", "package_go_emit_failed")
     })?;
 
+    Ok(())
+}
+
+fn remove_stale_owned_go_files(
+    layout: &GoBuildLayout,
+    modules: &[(String, String)],
+) -> Result<(), Diagnostic> {
+    let owned: BTreeSet<String> = std::iter::once("main.go".to_owned())
+        .chain(modules.iter().map(|(file_name, _)| file_name.clone()))
+        .collect();
+    let entries = fs::read_dir(&layout.module_root).map_err(|err| {
+        Diagnostic::error(format!(
+            "failed to read Go module root '{}': {err}",
+            layout.module_root.display()
+        ))
+        .with_arg("issue", "package_go_emit_failed")
+    })?;
+    for entry in entries {
+        let entry = entry.map_err(|err| {
+            Diagnostic::error(format!(
+                "failed to inspect Go module root '{}': {err}",
+                layout.module_root.display()
+            ))
+            .with_arg("issue", "package_go_emit_failed")
+        })?;
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("go") {
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        if owned.contains(name) {
+            continue;
+        }
+        fs::remove_file(&path).map_err(|err| {
+            Diagnostic::error(format!(
+                "failed to remove stale '{}': {err}",
+                path.display()
+            ))
+            .with_arg("issue", "package_go_emit_failed")
+        })?;
+    }
     Ok(())
 }
 

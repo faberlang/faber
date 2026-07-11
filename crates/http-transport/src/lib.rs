@@ -21,7 +21,8 @@ use hyper::body::Incoming;
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Request, Response, StatusCode};
-use hyper_util::rt::TokioIo;
+use hyper_util::rt::{TokioIo, TokioTimer};
+use std::cmp::min;
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::future::Future;
@@ -135,7 +136,7 @@ impl CorrelationTable {
 
     pub fn complete(&self, id: &str, status: u16) {
         if let Ok(mut map) = self.inner.lock() {
-            if let Some(entry) = map.get_mut(id) {
+            if let Some(mut entry) = map.remove(id) {
                 entry.completed = true;
                 entry.status = Some(status);
             }
@@ -316,21 +317,10 @@ async fn accept_loop(
         let permit = match slots.clone().try_acquire_owned() {
             Ok(p) => p,
             Err(_) => {
-                let io = TokioIo::new(stream);
-                tokio::spawn(async move {
-                    let service = service_fn(|_req: Request<Incoming>| async move {
-                        let request_id = frame::next_frame_id();
-                        Ok::<_, Infallible>(error_response(
-                            StatusCode::SERVICE_UNAVAILABLE,
-                            &request_id,
-                            "server busy",
-                        ))
-                    });
-                    let conn = http1::Builder::new()
-                        .keep_alive(false)
-                        .serve_connection(io, service);
-                    let _ = conn.await;
-                });
+                tokio::spawn(reject_busy_connection(
+                    stream,
+                    busy_rejection_timeout(config.request_timeout),
+                ));
                 continue;
             }
         };
@@ -340,6 +330,7 @@ async fn accept_loop(
         let cancel = Arc::clone(&cancel);
         let correlations = Arc::clone(&correlations);
         let in_flight = Arc::clone(&in_flight);
+        let request_timeout = config.request_timeout;
 
         in_flight.fetch_add(1, Ordering::SeqCst);
         tokio::spawn(async move {
@@ -358,9 +349,7 @@ async fn accept_loop(
             });
 
             // One request per connection: disable keep-alive.
-            let conn = http1::Builder::new()
-                .keep_alive(false)
-                .serve_connection(io, service);
+            let conn = serve_http1(io, service, request_timeout);
             let _ = conn.await;
             in_flight.fetch_sub(1, Ordering::SeqCst);
         });
@@ -516,6 +505,44 @@ fn with_request_id(mut response: Response<Full<Bytes>>, request_id: &str) -> Res
         http::HeaderValue::from_static("close"),
     );
     response
+}
+
+fn serve_http1<S>(
+    io: TokioIo<S>,
+    service: impl hyper::service::Service<
+        Request<Incoming>,
+        Response = Response<Full<Bytes>>,
+        Error = Infallible,
+    >,
+    request_timeout: Duration,
+) -> impl Future<Output = Result<(), hyper::Error>>
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static,
+{
+    let mut builder = http1::Builder::new();
+    builder.keep_alive(false);
+    builder.timer(TokioTimer::new());
+    builder.header_read_timeout(Some(request_timeout));
+    builder.serve_connection(io, service)
+}
+
+fn busy_rejection_timeout(request_timeout: Duration) -> Duration {
+    min(request_timeout, Duration::from_millis(250))
+}
+
+async fn reject_busy_connection(stream: tokio::net::TcpStream, timeout_after: Duration) {
+    use tokio::io::AsyncWriteExt;
+
+    let request_id = frame::next_frame_id();
+    let response = format!(
+        "HTTP/1.1 503 Service Unavailable\r\ncontent-type: text/plain; charset=utf-8\r\nconnection: close\r\n{REQUEST_ID_HEADER}: {request_id}\r\ncontent-length: 11\r\n\r\nserver busy"
+    );
+    let _ = timeout(timeout_after, async {
+        let mut stream = stream;
+        let _ = stream.write_all(response.as_bytes()).await;
+        let _ = stream.shutdown().await;
+    })
+    .await;
 }
 
 #[cfg(test)]

@@ -736,7 +736,7 @@ fn ensure_go_import(code: &str, pkg: &str) -> String {
         out.push_str("\n\t\"");
         out.push_str(pkg);
         out.push_str("\"\n)\n");
-        out.push_str(&code[line_end..].trim_start_matches('\n'));
+        out.push_str(code[line_end..].trim_start_matches('\n'));
         if !out.ends_with('\n') && code.ends_with('\n') {
             out.push('\n');
         }
@@ -748,7 +748,7 @@ fn ensure_go_import(code: &str, pkg: &str) -> String {
         let mut out = String::new();
         out.push_str(&code[..after]);
         out.push_str(&format!("\n\nimport \"{pkg}\"\n"));
-        out.push_str(&code[after..].trim_start_matches('\n'));
+        out.push_str(code[after..].trim_start_matches('\n'));
         return out;
     }
     code.to_owned()
@@ -795,6 +795,7 @@ fn go_import_path(segment: &str) -> Option<&str> {
 }
 
 #[cfg(test)]
+#[allow(clippy::items_after_test_module)]
 mod tests {
     use super::ensure_go_import;
 

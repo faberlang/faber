@@ -86,12 +86,9 @@ async fn concurrent_correlation_two_slow_requests() {
         "expected overlap; elapsed={elapsed:?} delay={delay:?}"
     );
 
-    let ca = transport.correlations().get(&ida).expect("corr a");
-    let cb = transport.correlations().get(&idb).expect("corr b");
-    assert!(ca.completed);
-    assert!(cb.completed);
-    assert_eq!(ca.status, Some(200));
-    assert_eq!(cb.status, Some(200));
+    assert!(transport.correlations().get(&idb).is_none());
+    assert!(transport.correlations().get(&ida).is_none());
+    assert_eq!(transport.correlations().len(), 0);
 
     transport.shutdown_and_join().await;
 }
@@ -252,7 +249,7 @@ async fn cancel_during_inflight_handler_surfaces_unavailable_or_client_error() {
 
     // Let the request enter the handler.
     sleep(Duration::from_millis(40)).await;
-    assert!(transport.in_flight() >= 1 || transport.correlations().len() >= 1);
+    assert!(transport.in_flight() >= 1 || !transport.correlations().is_empty());
 
     transport.shutdown();
     // Unblock handler after cancel so connection can complete with cancel check.
@@ -334,4 +331,73 @@ async fn request_ids_come_from_frame_substrate() {
     let b = frame::next_frame_id();
     assert_ne!(a, b);
     assert!(!a.is_empty());
+}
+
+#[tokio::test]
+async fn completed_requests_do_not_accumulate_in_correlation_table() {
+    let transport =
+        HttpTransport::serve(loopback(), TransportConfig::default(), |_req| async move {
+            HttpResponse::text(200, "ok")
+        })
+        .await
+        .expect("bind");
+
+    let uri = format!("http://{}/steady", transport.local_addr());
+    for _ in 0..16 {
+        let (status, body, _) = get_text(&uri, "").await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body, "ok");
+        assert_eq!(transport.correlations().len(), 0);
+    }
+
+    transport.shutdown_and_join().await;
+}
+
+#[tokio::test]
+async fn slow_headers_and_saturation_are_time_bounded() {
+    let transport = HttpTransport::serve(
+        loopback(),
+        TransportConfig {
+            request_timeout: Duration::from_millis(100),
+            max_in_flight: 1,
+            ..TransportConfig::default()
+        },
+        |_req| async move { HttpResponse::text(200, "ok") },
+    )
+    .await
+    .expect("bind");
+
+    let mut first = TcpStream::connect(transport.local_addr())
+        .await
+        .expect("connect first");
+    first
+        .write_all(b"POST /hold HTTP/1.1\r\nHost: localhost\r\nContent-Length: 4\r\n")
+        .await
+        .expect("write partial headers");
+
+    sleep(Duration::from_millis(20)).await;
+
+    let started = Instant::now();
+    let mut second = TcpStream::connect(transport.local_addr())
+        .await
+        .expect("connect second");
+    let mut buf = vec![0u8; 512];
+    let n = timeout(Duration::from_secs(1), second.read(&mut buf))
+        .await
+        .expect("busy rejection timeout")
+        .expect("busy rejection read");
+    let busy_reply = String::from_utf8_lossy(&buf[..n]);
+    assert!(
+        busy_reply.contains("503 Service Unavailable") || n == 0,
+        "expected immediate 503 or close, got: {busy_reply:?}"
+    );
+    assert!(
+        started.elapsed() < Duration::from_millis(400),
+        "busy rejection should be bounded"
+    );
+
+    sleep(Duration::from_millis(160)).await;
+    assert_eq!(transport.in_flight(), 0, "slow header slot should time out");
+
+    transport.shutdown_and_join().await;
 }

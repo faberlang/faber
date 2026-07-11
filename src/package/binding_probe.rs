@@ -193,7 +193,7 @@ fn probe_manifest(
         runtime.insert(
             "path".to_owned(),
             toml::Value::String(
-                super::cargo::local_repo_path("faber-runtime")
+                super::cargo::runtime_cluster_path_from(package_root, "faber-runtime")
                     .display()
                     .to_string(),
             ),

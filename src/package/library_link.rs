@@ -251,7 +251,7 @@ fn render_library_cargo_toml(
     };
     let mut deps = format!(
         "faber = {{ package = \"faber-runtime\", path = \"{}\" }}\n",
-        super::cargo::local_repo_path("faber-runtime").display()
+        super::cargo::runtime_cluster_path_from(package_root, "faber-runtime").display()
     );
     for (name, req) in &target.dependencies {
         if req.trim_start().starts_with('{') {

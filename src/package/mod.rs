@@ -80,7 +80,7 @@ pub use compile::{check_package, compile_package, compile_package_with_test_sele
 #[allow(unused_imports)] // public package API; used by integration tests and external callers
 pub use discovery::{discover_build_layout, sanitize_crate_name, BuildLayout};
 pub(crate) use dispatch::{
-    load_provider_manifests, provider_crate_path, selected_providers_for_routes, ProviderManifest,
+    load_provider_manifests, selected_providers_for_routes, ProviderManifest,
 };
 #[allow(unused_imports)] // binary `commands/run` consumes run_go_binary
 pub(crate) use go_build::{emit_go_module, invoke_go_build, run_go_binary, GoBuildLayout};
