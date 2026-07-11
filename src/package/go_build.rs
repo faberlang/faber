@@ -164,7 +164,7 @@ pub(crate) fn render_namespace_var(binding: &str, funcs: &[GoFuncSig]) -> String
         let field = go_capitalize(&f.name);
         // after_func is `name(params) rets` — replace name with field for type only.
         let sig_tail = f.after_func.strip_prefix(&f.name).unwrap_or(&f.after_func);
-        w.push_str("\t");
+        w.push('\t');
         w.push_str(&field);
         w.push_str(" func");
         w.push_str(sig_tail);
@@ -173,7 +173,7 @@ pub(crate) fn render_namespace_var(binding: &str, funcs: &[GoFuncSig]) -> String
     w.push_str("}{\n");
     for f in funcs {
         let field = go_capitalize(&f.name);
-        w.push_str("\t");
+        w.push('\t');
         w.push_str(&field);
         w.push_str(": ");
         w.push_str(&f.name);
@@ -261,7 +261,7 @@ pub(crate) fn inject_after_imports(entry_code: &str, namespaces: &str) -> String
             if t.starts_with("import (") {
                 // consume until closing paren already in stream - we just wrote the open
                 // continue writing until )
-                while let Some(l) = lines.next() {
+                for l in lines.by_ref() {
                     out.push_str(l);
                     out.push('\n');
                     if l.trim_start().starts_with(')') {
@@ -384,6 +384,7 @@ impl GoBuildLayout {
 }
 
 /// Write Go sources + `go.mod` for a single-package product assembly.
+#[allow(clippy::result_large_err)]
 pub(crate) fn emit_go_module(
     layout: &GoBuildLayout,
     entry_code: &str,
@@ -442,6 +443,7 @@ pub(crate) fn emit_go_module(
     Ok(())
 }
 
+#[allow(clippy::result_large_err)]
 fn remove_stale_owned_go_files(
     layout: &GoBuildLayout,
     modules: &[(String, String)],
@@ -486,6 +488,7 @@ fn remove_stale_owned_go_files(
 }
 
 /// Invoke `go build` for an emitted module; returns the binary path.
+#[allow(clippy::result_large_err)]
 pub(crate) fn invoke_go_build(layout: &GoBuildLayout) -> Result<PathBuf, Diagnostic> {
     if let Some(parent) = layout.binary_path.parent() {
         fs::create_dir_all(parent).map_err(|err| {
@@ -541,6 +544,7 @@ fn sanitize_go_module_segment(name: &str) -> String {
 
 /// Run a built Go binary with forwarded argv.
 #[allow(dead_code)] // used by binary `commands/run` (not the lib test surface)
+#[allow(clippy::result_large_err)]
 pub(crate) fn run_go_binary(binary: &Path, args: &[String]) -> Result<i32, Diagnostic> {
     let status = Command::new(binary).args(args).status().map_err(|err| {
         Diagnostic::error(format!("failed to execute '{}': {err}", binary.display()))

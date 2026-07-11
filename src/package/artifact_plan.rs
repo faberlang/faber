@@ -193,6 +193,7 @@ pub(crate) fn plan_package(package: &AnalyzedPackage, target: Target) -> Artifac
 }
 
 /// Fail closed when the plan is unsupported for the selected target.
+#[allow(clippy::result_large_err)]
 pub(crate) fn plan_or_reject(
     package: &AnalyzedPackage,
     target: Target,

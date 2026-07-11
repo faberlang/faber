@@ -112,6 +112,7 @@ fn emit_one_library_crate(
     )
     .map_err(|d| vec![d])?;
     let binding_manifest = read_binding_manifest(&binding_path)?;
+    #[allow(clippy::result_large_err)]
     let shim_path = binding_manifest
         .shim
         .as_ref()
@@ -169,6 +170,7 @@ fn emit_one_library_crate(
     Ok(())
 }
 
+#[allow(clippy::result_large_err)]
 fn generate_linked_unit_rust(
     unit: &mut AnalyzedPackageUnit,
     bindings: &BTreeMap<String, FunctionBinding>,
@@ -220,7 +222,7 @@ fn generate_linked_unit_rust(
     unit.analysis
         .hir
         .items
-        .retain(|item| !wrapper_def_ids.iter().any(|id| *id == item.def_id));
+        .retain(|item| !wrapper_def_ids.contains(&item.def_id));
 
     let mut code = String::new();
     if !unit.analysis.hir.items.is_empty() {

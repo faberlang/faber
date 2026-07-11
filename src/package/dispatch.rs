@@ -143,6 +143,7 @@ pub(crate) fn host_required_routes(routes: &BTreeSet<String>) -> BTreeSet<String
         .collect()
 }
 
+#[allow(clippy::result_large_err)]
 pub(crate) fn load_provider_manifests(
     providers: &BTreeSet<String>,
     routes: &BTreeSet<String>,

@@ -335,7 +335,7 @@ fn single_file_rust_runtime_plan(
         .file_name()
         .and_then(|s| s.to_str())
         .unwrap_or("input.fab");
-    let analysis = analyze_source(&session, name, &source).map_err(|diagnostics| diagnostics)?;
+    let analysis = analyze_source(&session, name, &source)?;
     let needs =
         radix::codegen::collect_rust_needs(&analysis.hir, &analysis.types, BTreeSet::new(), None);
     let needs_tokio =
