@@ -196,6 +196,9 @@ fn sibling_repo_path_from(manifest_dir: &Path, name: &str) -> PathBuf {
         if !sibling.is_dir() {
             continue;
         }
+        if candidate.join("PACKET.md").is_file() || candidate.join("MEMBERS.md").is_file() {
+            return fs::canonicalize(&sibling).unwrap_or(sibling);
+        }
         let has_core_runtime_repos = ["faber-runtime", "host-kernel-rs", "host-native-rs"]
             .iter()
             .all(|repo| candidate.join(repo).is_dir());
@@ -219,6 +222,7 @@ fn local_repo_path_from(manifest_dir: &Path, name: &str) -> PathBuf {
 }
 
 #[cfg(test)]
+#[cfg_attr(test, allow(dead_code))]
 pub(crate) fn local_repo_path(name: &str) -> PathBuf {
     local_repo_path_from(Path::new(env!("CARGO_MANIFEST_DIR")), name)
 }

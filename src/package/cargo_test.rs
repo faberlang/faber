@@ -1,5 +1,6 @@
 use super::{
-    local_repo_path_from, render_generated_cargo_toml, sibling_repo_path_from, RustRuntimePlan,
+    local_repo_path_from, render_generated_cargo_toml, runtime_cluster_path_from,
+    sibling_repo_path_from, RustRuntimePlan,
 };
 use crate::package::ManifestRustHost;
 use std::error::Error;
@@ -50,6 +51,47 @@ fn sibling_repo_path_prefers_canonical_repo_cluster() -> Result<(), Box<dyn Erro
     let expected = fs::canonicalize(&direct).unwrap_or_else(|_| direct.clone());
 
     assert_eq!(sibling_repo_path_from(&worktree, "faber-runtime"), expected);
+    Ok(())
+}
+
+#[test]
+fn runtime_cluster_path_prefers_packet_root_layout_without_host_native() -> Result<(), Box<dyn Error>>
+{
+    let root = temp_dir("cargo-packet-runtime-cluster")?;
+    let packet = root.join("worktrees").join("slice");
+    let package_root = packet.join("faber-build");
+    fs::create_dir_all(&package_root)?;
+    fs::write(packet.join("PACKET.md"), "# packet\n")?;
+    fs::write(packet.join("MEMBERS.md"), "# members\n")?;
+    fs::create_dir_all(packet.join("faber-runtime"))?;
+    fs::create_dir_all(packet.join("host-kernel-rs"))?;
+    fs::create_dir_all(packet.join("host-providers-rs").join("crates").join("sqlite"))?;
+
+    let canonical_root = root.join("canonical");
+    fs::create_dir_all(canonical_root.join("faber-runtime"))?;
+    fs::create_dir_all(canonical_root.join("host-kernel-rs"))?;
+    fs::create_dir_all(canonical_root.join("host-native-rs"))?;
+    fs::create_dir_all(canonical_root.join("host-providers-rs").join("crates").join("sqlite"))?;
+
+    let expected_runtime = fs::canonicalize(packet.join("faber-runtime"))
+        .unwrap_or_else(|_| packet.join("faber-runtime"));
+    let expected_kernel = fs::canonicalize(packet.join("host-kernel-rs"))
+        .unwrap_or_else(|_| packet.join("host-kernel-rs"));
+    let expected_provider = fs::canonicalize(packet.join("host-providers-rs"))
+        .unwrap_or_else(|_| packet.join("host-providers-rs"));
+
+    assert_eq!(
+        runtime_cluster_path_from(&package_root, "faber-runtime"),
+        expected_runtime
+    );
+    assert_eq!(
+        runtime_cluster_path_from(&package_root, "host-kernel-rs"),
+        expected_kernel
+    );
+    assert_eq!(
+        runtime_cluster_path_from(&package_root, "host-providers-rs"),
+        expected_provider
+    );
     Ok(())
 }
 
@@ -114,6 +156,43 @@ fn native_runtime_plan_uses_one_packet_local_repo_cluster() -> Result<(), Box<dy
     assert!(
         !rendered.contains(&canonical_root.display().to_string()),
         "rendered cargo manifest should not pick the unrelated canonical cluster:\n{rendered}"
+    );
+    Ok(())
+}
+
+#[test]
+fn generated_http_cargo_manifest_keeps_packet_runtime_pin_without_host_native() -> Result<(), Box<dyn Error>>
+{
+    let root = temp_dir("cargo-http-runtime-pin")?;
+    let packet = root.join("worktrees").join("slice");
+    let package_root = packet.join("faber-build");
+    fs::create_dir_all(&package_root)?;
+    fs::write(packet.join("PACKET.md"), "# packet\n")?;
+    fs::create_dir_all(packet.join("faber-runtime"))?;
+
+    let canonical_root = root.join("canonical");
+    fs::create_dir_all(canonical_root.join("faber-runtime"))?;
+    fs::create_dir_all(canonical_root.join("host-kernel-rs"))?;
+    fs::create_dir_all(canonical_root.join("host-native-rs"))?;
+
+    let rendered = render_generated_cargo_toml(
+        "demo-http",
+        "0.1.0",
+        &RustRuntimePlan {
+            needs_faber: true,
+            ..RustRuntimePlan::default()
+        },
+        &package_root,
+    );
+
+    let needle = packet.join("faber-runtime").display().to_string();
+    assert!(
+        rendered.contains(&needle),
+        "expected packet-local runtime path {needle} in:\n{rendered}"
+    );
+    assert!(
+        !rendered.contains(&canonical_root.display().to_string()),
+        "rendered cargo manifest should not pick canonical main runtime:\n{rendered}"
     );
     Ok(())
 }
