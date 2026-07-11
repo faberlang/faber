@@ -93,6 +93,38 @@ fn reader_locale_forces_compiled_run_policy_for_single_fab_file() {
 }
 
 #[test]
+fn run_config_loads_reader_locale_pack_for_go_targets() {
+    let example = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale/th-TH");
+
+    let config = run_config(Target::Go, &example, Some("th-TH")).expect("run config");
+
+    assert_eq!(config.target, Target::Go);
+    assert_eq!(
+        config
+            .reader_pack
+            .as_ref()
+            .map(|pack| pack.metadata.id.as_str()),
+        Some("th-TH")
+    );
+}
+
+#[test]
+fn run_config_uses_manifest_reader_locale_for_non_rust_targets() {
+    let example = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale/th-TH");
+
+    let config = run_config(Target::FmirText, &example, None).expect("run config");
+
+    assert_eq!(config.target, Target::FmirText);
+    assert_eq!(
+        config
+            .reader_pack
+            .as_ref()
+            .map(|pack| pack.metadata.id.as_str()),
+        Some("th-TH")
+    );
+}
+
+#[test]
 fn run_scena_package_forwards_argv_through_artifact() {
     let dir = temp_dir("scena-package-run");
     let entry = dir.join("main.fab");
