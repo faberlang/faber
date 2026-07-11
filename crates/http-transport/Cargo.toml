@@ -1,0 +1,27 @@
+[package]
+name = "faber-http-transport"
+version = "0.1.0"
+edition = "2021"
+description = "G9 API1 Tokio/hyper HTTP accept transport with request-id correlation (packet staging; not the public http framework)"
+license = "MIT"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+bytes = "1"
+faber = { package = "faber-runtime", path = "../../../faber-runtime" }
+http = "1"
+http-body-util = "0.1"
+hyper = { version = "1", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync", "time", "io-util"] }
+
+[dev-dependencies]
+# Client side for integration tests.
+hyper = { version = "1", features = ["client", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio", "client-legacy", "http1"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync", "time", "io-util"] }
+
+[workspace]
