@@ -25,6 +25,7 @@ impl RustRuntimePlan {
     /// Plan for emit paths that only have generated source and no analysis
     /// context (tests / fallback). Always links faber-runtime; never sniffs
     /// emitted text for policy.
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn default_generated_crate_plan() -> Self {
         Self {
             needs_faber: true,
@@ -181,6 +182,7 @@ fn host_native_path() -> PathBuf {
 /// The generated crate owns exactly `target/faber/Cargo.toml` and
 /// `target/faber/src/main.rs`. Other files under `target/` are Cargo artifacts
 /// or user-adjacent build output and are intentionally left alone.
+#[cfg_attr(not(test), allow(dead_code))]
 pub fn emit_generated_crate(
     layout: &BuildLayout,
     rust_code: &str,

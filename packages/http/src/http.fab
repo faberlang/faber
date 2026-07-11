@@ -101,13 +101,13 @@ functio corpus_of(Replicatio r) → textus {
     redde r.corpus
 }
 
-functio register_get(Router r, textus via) → Router {
+functio register_get(Router r, textus _via) → Router {
     redde Router {
         route_count = r.route_count + 1
     }
 }
 
-functio register_post(Router r, textus via) → Router {
+functio register_post(Router r, textus _via) → Router {
     redde Router {
         route_count = r.route_count + 1
     }

@@ -9933,6 +9933,7 @@ functio factory() → vacuum {
 incipit {
   # Nested free-function builders avoid local type annotations that currently
   # lower to crate::<provider>::Type instead of the path-dep crate.
+  factory()
   nota http.routes_of(http.register_post(http.register_get(http.router(), "/salve"), "/echo"))
   nota http.identitas_novum()
   nota http.status_of(http.replicatio(200, "ok"))

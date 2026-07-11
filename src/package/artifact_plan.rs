@@ -7,6 +7,8 @@
 //! TARGET: Inspectable debug/test surface for artifact DAGs — not a public ABI.
 //! WHY: Product deliveries (Go CLI, browser, SQLite) share one analysis graph.
 
+#![allow(dead_code)]
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 

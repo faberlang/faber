@@ -4,6 +4,8 @@
 //! WHY: handlers share only `ApplicationState`; response tickets own correlated
 //! completion and cancellation, so late work cannot publish a success.
 
+#![allow(dead_code)] // API4 surface is shipped from the package before all product callers exist.
+
 use faber::Valor;
 use std::collections::BTreeMap;
 use std::future::Future;

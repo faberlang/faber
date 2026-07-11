@@ -3,6 +3,8 @@
 //! TARGET: API5 product proof for grouped routes, middleware, extraction,
 //! structured errors, shared state, and overlapping requests on real loopback.
 
+#![allow(dead_code)] // API5 fixture is a product proof surface used by targeted tests and later callers.
+
 use super::{
     add_group, add_middleware, header_value, json_body, match_route, path_param, query_param,
     ApplicationState,
