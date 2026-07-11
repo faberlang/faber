@@ -7,7 +7,12 @@ edition = "2021"
 path = "shim.rs"
 
 [dependencies]
+bytes = "1"
 faber = { package = "faber-runtime", path = "../../../../faber-runtime" }
+faber-http-transport = { path = "../../../crates/http-transport" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["io-util", "macros", "net", "rt-multi-thread", "sync", "time"] }
 
 [workspace]
