@@ -241,6 +241,33 @@ incipit {
 }
 
 #[test]
+fn build_reader_locale_accepts_manifest_file_input() {
+    let package = write_basic_package(
+        "build-reader-locale-manifest",
+        r#"
+incipit {
+  nota "salve"
+}
+"#,
+    );
+    let manifest = package.join("faber.toml");
+
+    let (stdout, stderr, ok) = run_faber(&[
+        "build",
+        "--reader-locale",
+        "zh-Hans",
+        manifest.to_str().expect("utf8 manifest path"),
+    ]);
+
+    assert!(ok, "manifest build with reader locale failed:\n{stderr}");
+    let binary = PathBuf::from(stdout.trim());
+    assert!(
+        binary.exists(),
+        "expected built binary path in stdout, got:\n{stdout}"
+    );
+}
+
+#[test]
 fn run_reader_locale_accepts_direct_entry_file_input() {
     let source = write_single_file(
         "run-reader-locale-single-file",
@@ -263,6 +290,29 @@ incipit {
 }
 
 #[test]
+fn run_reader_locale_accepts_manifest_file_input() {
+    let package = write_basic_package(
+        "run-reader-locale-manifest",
+        r#"
+incipit {
+  nota "salve"
+}
+"#,
+    );
+    let manifest = package.join("faber.toml");
+
+    let (stdout, stderr, ok) = run_faber(&[
+        "run",
+        "--reader-locale",
+        "zh-Hans",
+        manifest.to_str().expect("utf8 manifest path"),
+    ]);
+
+    assert!(ok, "manifest run with reader locale failed:\n{stderr}");
+    assert_eq!(stdout, "salve\n");
+}
+
+#[test]
 fn test_reader_locale_accepts_direct_entry_file_input() {
     let source = write_single_file(
         "test-reader-locale-single-file",
@@ -281,6 +331,32 @@ incipit {
     ]);
 
     assert!(ok, "single-file test with reader locale failed:\n{stderr}");
+    assert!(
+        stdout.contains("test result: ok."),
+        "expected cargo test success output, got:\n{stdout}"
+    );
+}
+
+#[test]
+fn test_reader_locale_accepts_manifest_file_input() {
+    let package = write_basic_package(
+        "test-reader-locale-manifest",
+        r#"
+incipit {
+  nota "salve"
+}
+"#,
+    );
+    let manifest = package.join("faber.toml");
+
+    let (stdout, stderr, ok) = run_faber(&[
+        "test",
+        "--reader-locale",
+        "zh-Hans",
+        manifest.to_str().expect("utf8 manifest path"),
+    ]);
+
+    assert!(ok, "manifest test with reader locale failed:\n{stderr}");
     assert!(
         stdout.contains("test result: ok."),
         "expected cargo test success output, got:\n{stdout}"

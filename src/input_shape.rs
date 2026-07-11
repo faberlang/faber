@@ -58,6 +58,10 @@ mod tests {
             &["faber.toml".to_owned()],
             false
         ));
+        assert!(verify_input_is_package_shaped(
+            &["pkg/faber.toml".to_owned()],
+            false
+        ));
     }
 
     #[test]
@@ -80,6 +84,10 @@ mod tests {
             false
         ));
         assert!(reader_locale_supports_input(
+            &["pkg/faber.toml".to_owned()],
+            false
+        ));
+        assert!(reader_locale_supports_input(
             &["main.fab".to_owned()],
             false
         ));
@@ -98,6 +106,10 @@ mod tests {
         );
         assert_eq!(
             reader_locale_without_package_error(Some("la"), &["faber.toml".to_owned()], false),
+            None
+        );
+        assert_eq!(
+            reader_locale_without_package_error(Some("la"), &["pkg/faber.toml".to_owned()], false),
             None
         );
         assert_eq!(
