@@ -71,10 +71,9 @@ pub fn run() {
 fn dispatch(command: Command) {
     match command {
         Command::Build(args) => {
-            let build_inputs = vec![args.input.clone()];
             reject_reader_locale_without_package(
                 args.reader_locale.as_deref(),
-                &build_inputs,
+                std::slice::from_ref(&args.input),
                 args.package,
             );
             let target_explicit = args.target.is_some();
