@@ -146,7 +146,7 @@ fn path_segments(path: &str) -> Vec<String> {
 fn decoded_request_segments(path: &str) -> Vec<String> {
     path_segments(path)
         .into_iter()
-        .map(|segment| percent_decode(&segment))
+        .map(|segment| percent_decode_bytes(&segment))
         .collect()
 }
 
@@ -356,7 +356,7 @@ pub fn query_param(query: String, name: String) -> Option<String> {
         let key = parts.next().unwrap_or("");
         let value = parts.next().unwrap_or("");
         if key == name {
-            return Some(percent_decode(value));
+            return Some(percent_decode_query_component(value));
         }
     }
     None
@@ -404,17 +404,17 @@ pub fn to_response(status: i64, corpus: String) -> Valor {
     ]))
 }
 
-fn percent_decode(input: &str) -> String {
+fn percent_decode_query_component(input: &str) -> String {
+    percent_decode_bytes(&input.replace('+', " "))
+}
+
+fn percent_decode_bytes(input: &str) -> String {
     // Decode on bytes so multi-byte UTF-8 survives; malformed escapes stay raw.
     let bytes = input.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;
     while i < bytes.len() {
         match bytes[i] {
-            b'+' => {
-                out.push(b' ');
-                i += 1;
-            }
             b'%' if i + 2 < bytes.len() => {
                 let hex = &input[i + 1..i + 3];
                 if let Ok(value) = u8::from_str_radix(hex, 16) {

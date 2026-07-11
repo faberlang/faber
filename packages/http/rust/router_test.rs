@@ -51,6 +51,24 @@ fn dynamic_path_params_decode_multibyte_utf8() {
 }
 
 #[test]
+fn dynamic_path_params_keep_literal_plus() {
+    let table = add_get(route_table(), "/users/{id}".into(), "show".into()).expect("route");
+    let hit = match_route(table, "GET".into(), "/users/A+B".into())
+        .expect("ok")
+        .expect("match");
+    assert_eq!(path_param(hit, "id".into()).as_deref(), Some("A+B"));
+}
+
+#[test]
+fn path_params_retain_malformed_escape_text() {
+    let table = add_get(route_table(), "/users/{id}".into(), "show".into()).expect("route");
+    let hit = match_route(table, "GET".into(), "/users/%ZZ".into())
+        .expect("ok")
+        .expect("match");
+    assert_eq!(path_param(hit, "id".into()).as_deref(), Some("%ZZ"));
+}
+
+#[test]
 fn duplicate_route_rejected() {
     let table = add_get(route_table(), "/x".into(), "a".into()).expect("first");
     let err = add_get(table, "/x".into(), "b".into()).expect_err("duplicate");
@@ -115,8 +133,16 @@ fn query_and_header_extraction() {
         Some("Ada Lovelace")
     );
     assert_eq!(
+        query_param("tag=A%2BB".into(), "tag".into()).as_deref(),
+        Some("A+B")
+    );
+    assert_eq!(
         query_param("mark=%E2%9C%93".into(), "mark".into()).as_deref(),
         Some("\u{2713}")
+    );
+    assert_eq!(
+        query_param("bad=%ZZ".into(), "bad".into()).as_deref(),
+        Some("%ZZ")
     );
     let headers = Valor::Tabula(BTreeMap::from([
         ("Content-Type".to_owned(), text("application/json")),
