@@ -278,6 +278,56 @@ async fn cancel_during_inflight_handler_surfaces_unavailable_or_client_error() {
 }
 
 #[tokio::test]
+async fn saturated_transport_returns_503_without_running_handler() {
+    let gate = Arc::new(tokio::sync::Notify::new());
+    let gate_h = Arc::clone(&gate);
+    let hits = Arc::new(AtomicUsize::new(0));
+    let hits_h = Arc::clone(&hits);
+    let transport = HttpTransport::serve(
+        loopback(),
+        TransportConfig {
+            request_timeout: Duration::from_secs(5),
+            max_in_flight: 1,
+            ..TransportConfig::default()
+        },
+        move |_req| {
+            let gate = Arc::clone(&gate_h);
+            hits_h.fetch_add(1, Ordering::SeqCst);
+            async move {
+                gate.notified().await;
+                HttpResponse::text(200, "ok")
+            }
+        },
+    )
+    .await
+    .expect("bind");
+
+    let base = format!("http://{}", transport.local_addr());
+    let first = tokio::spawn({
+        let base = base.clone();
+        async move { get_text(&format!("{base}/hold"), "").await }
+    });
+    sleep(Duration::from_millis(40)).await;
+
+    let (status, body, id) = get_text(&format!("{base}/busy"), "").await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(body, "server busy");
+    assert!(id.is_some());
+    assert_eq!(
+        hits.load(Ordering::SeqCst),
+        1,
+        "saturated request must not run handler"
+    );
+
+    gate.notify_waiters();
+    let (first_status, first_body, _) = first.await.expect("join first");
+    assert_eq!(first_status, StatusCode::OK);
+    assert_eq!(first_body, "ok");
+
+    transport.shutdown_and_join().await;
+}
+
+#[tokio::test]
 async fn request_ids_come_from_frame_substrate() {
     // next_frame_id is the shared runtime id source (API0 substrate continuity).
     let a = frame::next_frame_id();

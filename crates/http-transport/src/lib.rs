@@ -316,8 +316,21 @@ async fn accept_loop(
         let permit = match slots.clone().try_acquire_owned() {
             Ok(p) => p,
             Err(_) => {
-                // Saturated: drop connection without handler (fail closed).
-                drop(stream);
+                let io = TokioIo::new(stream);
+                tokio::spawn(async move {
+                    let service = service_fn(|_req: Request<Incoming>| async move {
+                        let request_id = frame::next_frame_id();
+                        Ok::<_, Infallible>(error_response(
+                            StatusCode::SERVICE_UNAVAILABLE,
+                            &request_id,
+                            "server busy",
+                        ))
+                    });
+                    let conn = http1::Builder::new()
+                        .keep_alive(false)
+                        .serve_connection(io, service);
+                    let _ = conn.await;
+                });
                 continue;
             }
         };
