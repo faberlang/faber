@@ -138,7 +138,8 @@ fn library_reexport_path_with_crate(
 }
 
 fn rust_ident(name: &str) -> String {
-    name.replace('-', "_")
+    // Shared with package module path emission so call paths match `pub mod` trees.
+    super::modules::sanitize_rust_module_ident(name)
 }
 
 struct TransitiveLibraryWalk {
