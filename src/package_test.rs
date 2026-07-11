@@ -9227,6 +9227,53 @@ fn g6_go4_coreutils_true_package_go_builds() {
 }
 
 #[test]
+fn g6_go4_coreutils_echo_package_go_builds() {
+    let path = PathBuf::from("/Users/ianzepp/work/faberlang/examples/coreutils/packages/echo");
+    if !path.exists() {
+        eprintln!("skip: coreutils echo package missing at {}", path.display());
+        return;
+    }
+    let result = compile_package(&Config::default().with_target(Target::Go), &path);
+    assert!(
+        result.success(),
+        "echo package go compile failed: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| d.message.clone())
+            .collect::<Vec<_>>()
+    );
+    let Some(Output::Go(output)) = result.output else {
+        panic!("expected Go");
+    };
+    assert!(
+        output.code.contains("var consolum") || output.code.contains("consolum ="),
+        "expected norma:consolum shim:\n{}",
+        output.code
+    );
+    assert!(
+        output.code.contains("fmt.Print"),
+        "expected Dic → fmt.Print in shim:\n{}",
+        output.code
+    );
+    let modules = super::take_go_package_modules();
+    let layout = discover_build_layout(&path).expect("layout");
+    let go_layout = super::GoBuildLayout::from_package(&layout);
+    super::emit_go_module(&go_layout, &output.code, &modules).expect("emit");
+    let binary = super::invoke_go_build(&go_layout).expect("go build echo");
+    let output = Command::new(&binary)
+        .args(["hello", "world"])
+        .output()
+        .expect("run echo");
+    assert_eq!(output.status.code(), Some(0), "echo exit");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(
+        stdout, "hello world\n",
+        "echo stdout got {stdout:?}"
+    );
+}
+
+#[test]
 fn g6_go4_coreutils_false_package_go_builds() {
     let path = PathBuf::from("/Users/ianzepp/work/faberlang/examples/coreutils/packages/false");
     if !path.exists() {

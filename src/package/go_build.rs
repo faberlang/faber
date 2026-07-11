@@ -62,6 +62,27 @@ pub(crate) fn go_capitalize(name: &str) -> String {
     }
 }
 
+/// Narrow G6 residual: `norma:consolum` host surface for Go package assembly.
+///
+/// Echo needs `consolum.Dic` (no newline). Maps pure textus I/O verbs to `fmt`
+/// without a full Norma host. Unsupported verbs stay absent so go build fails
+/// closed if the package uses them.
+pub(crate) fn render_norma_consolum_shim(binding: &str) -> String {
+    // Field names match Go field-access capitalize (dic → Dic, scribe → Scribe).
+    format!(
+        r#"var {binding} = struct {{
+	Dic func(string)
+	Scribe func(string)
+	Mone func(string)
+}}{{
+	Dic: func(msg string) {{ fmt.Print(msg) }},
+	Scribe: func(msg string) {{ fmt.Println(msg) }},
+	Mone: func(msg string) {{ fmt.Fprintln(os.Stderr, msg) }},
+}}
+"#
+    )
+}
+
 /// Build a namespace var so `binding.CapitalizedField(...)` resolves to package funcs.
 pub(crate) fn render_namespace_var(binding: &str, funcs: &[GoFuncSig]) -> String {
     if funcs.is_empty() {

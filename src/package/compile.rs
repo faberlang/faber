@@ -458,15 +458,30 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
         },
     };
 
-    // Namespace vars for local imports (entry and siblings).
+    // Namespace vars for local imports + narrow Norma host shims (entry + siblings).
     let mut namespace_block = String::new();
+    let mut needs_os_for_shim = false;
     for unit in &package.units {
         for item in &unit.analysis.hir.items {
             let HirItemKind::Import(import) = &item.kind else {
                 continue;
             };
             let import_path = unit.analysis.interner.resolve(import.path);
+            // G6 residual: narrow norma:consolum Go host (echo dic/scribe/mone).
+            if import_path == "norma:consolum" || import_path == "norma/consolum" {
+                for it in &import.items {
+                    let binding = it
+                        .alias
+                        .map(|a| unit.analysis.interner.resolve(a))
+                        .unwrap_or_else(|| unit.analysis.interner.resolve(it.name));
+                    namespace_block.push_str(&super::go_build::render_norma_consolum_shim(binding));
+                    namespace_block.push('\n');
+                    needs_os_for_shim = true;
+                }
+                continue;
+            }
             if import_path.starts_with("norma:") || import_path.starts_with("norma/") {
+                // Other Norma modules still fail closed at go build (no silent erase).
                 continue;
             }
             let Some(target_path) = resolve_local_import_path(&package.spec, &unit.path, import_path)
@@ -503,7 +518,11 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
         }
     }
 
-    let entry_code = super::go_build::inject_after_imports(&entry_code, &namespace_block);
+    let mut entry_code = super::go_build::inject_after_imports(&entry_code, &namespace_block);
+    if needs_os_for_shim {
+        entry_code = ensure_go_import(&entry_code, "os");
+        entry_code = ensure_go_import(&entry_code, "fmt");
+    }
 
     // Side-channel: multi-file emit for build/run (Output is entry main.go only).
     GO_PACKAGE_MODULES.with(|slot| {
@@ -553,6 +572,54 @@ fn resolve_local_import_path(
 
 fn normalize_path_buf(path: &Path) -> PathBuf {
     std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+}
+
+/// Ensure a single-line or parenthesized Go import block includes `pkg`.
+fn ensure_go_import(code: &str, pkg: &str) -> String {
+    if code.contains(&format!("\"{pkg}\"")) {
+        return code.to_owned();
+    }
+    // import (\n ... )
+    if let Some(idx) = code.find("import (") {
+        let insert_at = idx + "import (".len();
+        let mut out = String::with_capacity(code.len() + pkg.len() + 8);
+        out.push_str(&code[..insert_at]);
+        out.push_str(&format!("\n\t\"{pkg}\""));
+        out.push_str(&code[insert_at..]);
+        return out;
+    }
+    // import "fmt"\n → import (\n  "fmt"\n  "os"\n)
+    if let Some(idx) = code.find("import \"") {
+        let line_end = code[idx..].find('\n').map(|n| idx + n).unwrap_or(code.len());
+        let existing = code[idx..line_end].trim();
+        // existing like `import "fmt"`
+        let existing_pkg = existing
+            .strip_prefix("import ")
+            .unwrap_or(existing)
+            .trim();
+        let mut out = String::new();
+        out.push_str(&code[..idx]);
+        out.push_str("import (\n\t");
+        out.push_str(existing_pkg);
+        out.push_str("\n\t\"");
+        out.push_str(pkg);
+        out.push_str("\"\n)\n");
+        out.push_str(&code[line_end..].trim_start_matches('\n'));
+        if !out.ends_with('\n') && code.ends_with('\n') {
+            out.push('\n');
+        }
+        return out;
+    }
+    // No import block: insert after package main
+    if let Some(idx) = code.find("package main") {
+        let after = idx + "package main".len();
+        let mut out = String::new();
+        out.push_str(&code[..after]);
+        out.push_str(&format!("\n\nimport \"{pkg}\"\n"));
+        out.push_str(&code[after..].trim_start_matches('\n'));
+        return out;
+    }
+    code.to_owned()
 }
 
 fn generate_package_rust(
