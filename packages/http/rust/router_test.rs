@@ -42,6 +42,15 @@ fn dynamic_path_params() {
 }
 
 #[test]
+fn dynamic_path_params_decode_multibyte_utf8() {
+    let table = add_get(route_table(), "/users/{id}".into(), "show".into()).expect("route");
+    let hit = match_route(table, "GET".into(), "/users/%E2%9C%93".into())
+        .expect("ok")
+        .expect("match");
+    assert_eq!(path_param(hit, "id".into()).as_deref(), Some("\u{2713}"));
+}
+
+#[test]
 fn duplicate_route_rejected() {
     let table = add_get(route_table(), "/x".into(), "a".into()).expect("first");
     let err = add_get(table, "/x".into(), "b".into()).expect_err("duplicate");
@@ -104,6 +113,10 @@ fn query_and_header_extraction() {
     assert_eq!(
         query_param("a=1&name=Ada+Lovelace".into(), "name".into()).as_deref(),
         Some("Ada Lovelace")
+    );
+    assert_eq!(
+        query_param("mark=%E2%9C%93".into(), "mark".into()).as_deref(),
+        Some("\u{2713}")
     );
     let headers = Valor::Tabula(BTreeMap::from([
         ("Content-Type".to_owned(), text("application/json")),

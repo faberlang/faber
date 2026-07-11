@@ -143,6 +143,13 @@ fn path_segments(path: &str) -> Vec<String> {
         .collect()
 }
 
+fn decoded_request_segments(path: &str) -> Vec<String> {
+    path_segments(path)
+        .into_iter()
+        .map(|segment| percent_decode(&segment))
+        .collect()
+}
+
 fn is_param(segment: &str) -> bool {
     segment.starts_with('{') && segment.ends_with('}') && segment.len() > 2
 }
@@ -260,7 +267,7 @@ pub fn match_route(table: Valor, method: String, path: String) -> Result<Option<
     let tab = RouteTable::from_valor(&table)?;
     let method = method.to_ascii_uppercase();
     let path = normalize_path(&path);
-    let request_segments = path_segments(&path);
+    let request_segments = decoded_request_segments(&path);
 
     let mut matches: Vec<(Route, BTreeMap<String, String>)> = Vec::new();
     for route in &tab.routes {
@@ -398,33 +405,33 @@ pub fn to_response(status: i64, corpus: String) -> Valor {
 }
 
 fn percent_decode(input: &str) -> String {
-    // Minimal decoder: `+` → space, `%HH` hex; invalid sequences kept raw.
+    // Decode on bytes so multi-byte UTF-8 survives; malformed escapes stay raw.
     let bytes = input.as_bytes();
-    let mut out = String::new();
+    let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;
     while i < bytes.len() {
         match bytes[i] {
             b'+' => {
-                out.push(' ');
+                out.push(b' ');
                 i += 1;
             }
             b'%' if i + 2 < bytes.len() => {
                 let hex = &input[i + 1..i + 3];
                 if let Ok(value) = u8::from_str_radix(hex, 16) {
-                    out.push(value as char);
+                    out.push(value);
                     i += 3;
                 } else {
-                    out.push('%');
+                    out.push(b'%');
                     i += 1;
                 }
             }
             c => {
-                out.push(c as char);
+                out.push(c);
                 i += 1;
             }
         }
     }
-    out
+    String::from_utf8(out).unwrap_or_else(|_| input.to_owned())
 }
 
 #[cfg(test)]
