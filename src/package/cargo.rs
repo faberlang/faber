@@ -59,17 +59,16 @@ pub(crate) fn package_host_selection_diagnostic(
                 .with_arg("issue", "host_provider_selection_invalid"),
         );
     }
-    if (plan.non_runtime_routes.is_empty() && plan.selected_providers.is_empty())
-        || plan.host.is_some()
-    {
+    if plan.host.is_some() {
         return None;
     }
-    let routes = plan
-        .non_runtime_routes
-        .iter()
-        .cloned()
-        .collect::<Vec<_>>()
-        .join(", ");
+    // Dual-backend: builtin-covered ad routes do not require host selection.
+    // Only host-only routes (and explicit `[dispatch].providers`) gate host.
+    let host_routes = super::dispatch::host_required_routes(&plan.non_runtime_routes);
+    if host_routes.is_empty() && plan.selected_providers.is_empty() {
+        return None;
+    }
+    let routes = host_routes.iter().cloned().collect::<Vec<_>>().join(", ");
     let providers = plan
         .selected_providers
         .iter()

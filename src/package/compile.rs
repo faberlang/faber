@@ -67,7 +67,10 @@ struct GeneratedPackageRust {
     diagnostics: Vec<Diagnostic>,
 }
 
-fn rust_runtime_plan_for_package(package: &AnalyzedPackage) -> RustRuntimePlan {
+fn rust_runtime_plan_for_package(
+    package: &AnalyzedPackage,
+    library_resolver: &crate::library::LibraryResolver,
+) -> RustRuntimePlan {
     let manifest = manifest_path_for_spec(&package.spec).and_then(|path| read_manifest(&path).ok());
     let host = manifest
         .as_ref()
@@ -107,20 +110,47 @@ fn rust_runtime_plan_for_package(package: &AnalyzedPackage) -> RustRuntimePlan {
         provider_error: None,
         library_path_deps,
     };
+    // Collect ad routes from package units **and** expanded library import
+    // bodies (norma is the primary product path — package-unit Ad alone is a
+    // false-negative for host-only devices).
+    let mut library_cache = LibraryInterfaceCache::default();
     for unit in &package.units {
         let mut collector = AdRouteCollector {
             interner: &unit.analysis.interner,
             routes: &mut plan.non_runtime_routes,
         };
         collector.visit_program(&unit.analysis.hir);
+        for import in &unit.expanded_library_imports {
+            let Ok(analysis) =
+                library_cached_analysis(import, library_resolver, &mut library_cache)
+            else {
+                continue;
+            };
+            let mut collector = AdRouteCollector {
+                interner: &analysis.interner,
+                routes: &mut plan.non_runtime_routes,
+            };
+            collector.visit_program(&analysis.hir);
+        }
     }
-    plan.selected_providers =
-        selected_providers_for_routes(&plan.non_runtime_routes, &explicit_providers);
+    // Dual-backend host gate:
+    // - host=native → select providers for all non-runtime routes (host path)
+    // - host unset → auto-select only host-only routes (builtin-covered are free)
+    // Explicit `[dispatch].providers` always participate.
+    let host_required = super::dispatch::host_required_routes(&plan.non_runtime_routes);
     if matches!(plan.host, Some(super::ManifestRustHost::Native)) {
-        match load_provider_manifests(&plan.selected_providers, &plan.non_runtime_routes) {
+        plan.selected_providers =
+            selected_providers_for_routes(&plan.non_runtime_routes, &explicit_providers);
+        // Validate host-provider coverage only for host-required routes so
+        // builtin-only dual-backend routes (e.g. tempus:expectet) do not fail
+        // closed against incomplete host manifests.
+        match load_provider_manifests(&plan.selected_providers, &host_required) {
             Ok(manifests) => plan.provider_manifests = manifests,
             Err(error) => plan.provider_error = Some(error.message),
         }
+    } else {
+        plan.selected_providers =
+            selected_providers_for_routes(&host_required, &explicit_providers);
     }
     plan
 }
@@ -178,7 +208,7 @@ pub(crate) fn package_rust_runtime_plan(
     let package_root = package_root_for_input(input);
     let library_resolver = library_resolver_for_package(&config, &package_root)?;
     let package = analyze_package_spec(&config, spec, &library_resolver)?;
-    Ok(rust_runtime_plan_for_package(&package))
+    Ok(rust_runtime_plan_for_package(&package, &library_resolver))
 }
 
 #[allow(clippy::result_large_err)]
@@ -398,7 +428,8 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
                 };
             }
             Err(err) => {
-                let mut diag = Diagnostic::error(err.message).with_file(unit.path.display().to_string());
+                let mut diag =
+                    Diagnostic::error(err.message).with_file(unit.path.display().to_string());
                 for arg in err.args {
                     diag = diag.with_arg(arg.name, arg.value);
                 }
@@ -420,7 +451,8 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
         ) {
             Ok(output) => output.code,
             Err(err) => {
-                let mut diag = Diagnostic::error(err.message).with_file(entry.path.display().to_string());
+                let mut diag =
+                    Diagnostic::error(err.message).with_file(entry.path.display().to_string());
                 for arg in err.args {
                     diag = diag.with_arg(arg.name, arg.value);
                 }
@@ -445,7 +477,8 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
                 };
             }
             Err(err) => {
-                let mut diag = Diagnostic::error(err.message).with_file(entry.path.display().to_string());
+                let mut diag =
+                    Diagnostic::error(err.message).with_file(entry.path.display().to_string());
                 for arg in err.args {
                     diag = diag.with_arg(arg.name, arg.value);
                 }
@@ -477,7 +510,8 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
     // WHY (79df18a): inject each binding name at most once — multi-unit packages
     // that all `importa … privata consolum` must not redeclare `var consolum`.
     let mut namespace_block = String::new();
-    let mut injected_bindings: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    let mut injected_bindings: std::collections::BTreeSet<String> =
+        std::collections::BTreeSet::new();
     let mut needs_os_for_shim = false;
     for unit in &package.units {
         for item in &unit.analysis.hir.items {
@@ -496,7 +530,8 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
                     if !injected_bindings.insert(binding.clone()) {
                         continue;
                     }
-                    namespace_block.push_str(&super::go_build::render_norma_consolum_shim(&binding));
+                    namespace_block
+                        .push_str(&super::go_build::render_norma_consolum_shim(&binding));
                     namespace_block.push('\n');
                     needs_os_for_shim = true;
                 }
@@ -506,7 +541,8 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
                 // Other Norma modules still fail closed at go build (no silent erase).
                 continue;
             }
-            let Some(target_path) = resolve_local_import_path(&package.spec, &unit.path, import_path)
+            let Some(target_path) =
+                resolve_local_import_path(&package.spec, &unit.path, import_path)
             else {
                 continue;
             };
@@ -656,13 +692,13 @@ fn ensure_go_import(code: &str, pkg: &str) -> String {
     }
     // import "fmt"\n → import (\n  "fmt"\n  "os"\n)
     if let Some(idx) = code.find("import \"") {
-        let line_end = code[idx..].find('\n').map(|n| idx + n).unwrap_or(code.len());
+        let line_end = code[idx..]
+            .find('\n')
+            .map(|n| idx + n)
+            .unwrap_or(code.len());
         let existing = code[idx..line_end].trim();
         // existing like `import "fmt"`
-        let existing_pkg = existing
-            .strip_prefix("import ")
-            .unwrap_or(existing)
-            .trim();
+        let existing_pkg = existing.strip_prefix("import ").unwrap_or(existing).trim();
         let mut out = String::new();
         out.push_str(&code[..idx]);
         out.push_str("import (\n\t");

@@ -68,6 +68,23 @@ incipit { nota thing.label() }
 }
 
 #[test]
+fn interpret_package_input_leaves_kernel_imports_as_single_source() {
+    let dir = temp_dir("kernel-script-input");
+    for (name, import) in [
+        (
+            "module.fab",
+            r#"importa ex "faber:processus" privata processus"#,
+        ),
+        ("glob.fab", r#"importa ex "faber:*" privata faber"#),
+    ] {
+        let entry = dir.join(name);
+        std::fs::write(&entry, format!("{import}\n\nincipit {{ nota 1 }}\n")).expect("write entry");
+
+        assert!(!is_package_interpret_input(&entry));
+    }
+}
+
+#[test]
 fn interpret_package_input_leaves_manifestless_file_as_single_source() {
     let dir = temp_dir("single-file-input");
     let entry = dir.join("script.fab");

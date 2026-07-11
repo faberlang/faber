@@ -4485,6 +4485,7 @@ incipit {
   fixum _ mono ← tempus.monotonicum()
   fixum _ active ← tempus.activum()
   fixum _ ms ← tempus.MILLISECUNDUM()
+  cede tempus.dormiet(0)
 }
 "#,
     )
@@ -4509,6 +4510,8 @@ incipit {
     assert!(output.code.contains("tempus:activum"));
     assert!(output.code.contains("faber::frame::sermo_open"));
     assert!(output.code.contains("fn nunc"));
+    assert!(output.code.contains("crate::tempus::dormiet(0).await"));
+    assert!(!output.code.contains("crate::tempus::dormiet(0).expect"));
     assert!(!output.code.contains("norma::tempus::nunc"));
     assert!(!output.code.contains("norma::tempus::monotonicum"));
     assert!(!output.code.contains("norma::tempus::millisecundum"));
@@ -7442,14 +7445,16 @@ entry = "main.fab"
 }
 
 #[test]
-fn package_runtime_plan_requires_host_for_non_runtime_routes() {
-    let pkg = test_temp_dir("runtime-plan-host-required");
+fn package_runtime_plan_builtin_inline_ad_does_not_require_host() {
+    // Dual-backend honesty (correctness 9e1bae1 false+): solum:lege is builtin —
+    // inline ad without [target.rust] host must not fail closed at plan time.
+    let pkg = test_temp_dir("runtime-plan-builtin-hostless");
     fs::create_dir_all(pkg.join("src")).expect("src");
     fs::write(
         pkg.join("faber.toml"),
         r#"
 [package]
-name = "runtime-plan-host-required"
+name = "runtime-plan-builtin-hostless"
 
 [paths]
 source = "src"
@@ -7469,9 +7474,50 @@ entry = "main.fab"
         plan.non_runtime_routes.iter().cloned().collect::<Vec<_>>(),
         vec!["solum:lege".to_owned()]
     );
+    assert!(
+        plan.selected_providers.is_empty(),
+        "builtin-covered routes must not auto-select host providers without host=native: {:?}",
+        plan.selected_providers
+    );
+    assert!(plan.host.is_none());
+    assert!(
+        package_host_selection_diagnostic(&plan, &pkg.join("faber.toml")).is_none(),
+        "builtin ad must not require host selection"
+    );
+}
+
+#[test]
+fn package_runtime_plan_requires_host_for_host_only_routes() {
+    // Host-only (not builtin) routes still require [target.rust] host.
+    let pkg = test_temp_dir("runtime-plan-host-required");
+    fs::create_dir_all(pkg.join("src")).expect("src");
+    fs::write(
+        pkg.join("faber.toml"),
+        r#"
+[package]
+name = "runtime-plan-host-required"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        pkg.join("src/main.fab"),
+        r#"incipit { fixum textus body ← ad 'ignotum:route' ("x") ↦ textus nota body }"#,
+    )
+    .expect("entry");
+
+    let plan = package_rust_runtime_plan(&Config::default(), &pkg).expect("runtime plan");
+
+    assert_eq!(
+        plan.non_runtime_routes.iter().cloned().collect::<Vec<_>>(),
+        vec!["ignotum:route".to_owned()]
+    );
     assert_eq!(
         plan.selected_providers.iter().cloned().collect::<Vec<_>>(),
-        vec!["solum".to_owned()]
+        vec!["ignotum".to_owned()]
     );
     assert!(plan.host.is_none());
     let diagnostic = package_host_selection_diagnostic(&plan, &pkg.join("faber.toml"))
@@ -7480,6 +7526,56 @@ entry = "main.fab"
         &diagnostic,
         "package_host_selection_required"
     ));
+}
+
+#[test]
+fn package_runtime_plan_collects_library_ad_routes_without_host_for_builtin() {
+    // Dual-backend honesty (correctness 9e1bae1 false−): norma-wrapped ad must
+    // appear in non_runtime_routes. Builtin-covered library routes stay hostless.
+    let pkg = test_temp_dir("runtime-plan-library-aleator");
+    fs::create_dir_all(pkg.join("src")).expect("src");
+    fs::write(
+        pkg.join("faber.toml"),
+        r#"
+[package]
+name = "runtime-plan-library-aleator"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        pkg.join("src/main.fab"),
+        r#"
+importa ex "norma:aleator" privata aleator
+
+incipit {
+  fixum _ id ← aleator.uuid()
+  nota id
+}
+"#,
+    )
+    .expect("entry");
+
+    let plan = package_rust_runtime_plan(&Config::default(), &pkg).expect("runtime plan");
+
+    assert!(
+        plan.non_runtime_routes.contains("aleator:uuid"),
+        "library-expanded ad must be collected (got {:?})",
+        plan.non_runtime_routes
+    );
+    assert!(
+        plan.selected_providers.is_empty(),
+        "builtin aleator routes must not force host providers: {:?}",
+        plan.selected_providers
+    );
+    assert!(plan.host.is_none());
+    assert!(
+        package_host_selection_diagnostic(&plan, &pkg.join("faber.toml")).is_none(),
+        "norma:aleator builtin surface must not require host"
+    );
 }
 
 #[test]
@@ -7765,8 +7861,8 @@ incipit {{
     assert!(cargo.contains("host-native"));
     assert!(cargo.contains("host_native"));
     assert!(cargo.contains("solum"));
-    assert!(!cargo.contains("faber-host-native"));
-    assert!(!cargo.contains("faber_host_native"));
+    // Live adapter is host-native-rs (`host_native`), not the deleted runtime
+    // workspace clone `faber-host-native` (purity Tier-1 / 4adf6ef).
     assert!(!cargo.contains("faber-host-macos-arm64"));
     assert!(!cargo.contains("../radix/hosts/macos-arm64"));
     let generated_main = fs::read_to_string(&layout.generated_rust_entry).expect("main");
@@ -8782,7 +8878,11 @@ incipit {
 "#,
     );
     let output = build_and_run_sqlite_app(&app);
-    assert_eq!(output.status.code(), Some(0), "sqlite consumer should exit 0");
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "sqlite consumer should exit 0"
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
         stdout.contains("Numerus(1)") || stdout.contains("1"),
@@ -8860,7 +8960,10 @@ incipit {
     assert_eq!(output.status.code(), Some(0));
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(!stdout.contains("unexpected-ok"), "path error must cape: {stdout:?}");
+    assert!(
+        !stdout.contains("unexpected-ok"),
+        "path error must cape: {stdout:?}"
+    );
     assert!(!stderr.trim().is_empty(), "expected path error on stderr");
 }
 
@@ -9362,7 +9465,6 @@ incipit argumenta args exitus 0 {
 
 #[test]
 
-
 fn g6_go4_multi_module_namespace_package_builds() {
     let dir = test_temp_dir("g6-go4-multi");
     fs::create_dir_all(dir.join("src")).expect("src");
@@ -9412,8 +9514,7 @@ incipit argumenta args exitus 0 {
         panic!("expected Go output");
     };
     assert!(
-        output.code.contains("var helper = struct")
-            || output.code.contains("var helper ="),
+        output.code.contains("var helper = struct") || output.code.contains("var helper ="),
         "expected namespace var for helper:\n{}",
         output.code
     );
@@ -9424,12 +9525,11 @@ incipit argumenta args exitus 0 {
     );
 
     let modules = super::take_go_package_modules();
+    assert!(!modules.is_empty(), "expected non-entry module files");
     assert!(
-        !modules.is_empty(),
-        "expected non-entry module files"
-    );
-    assert!(
-        modules.iter().any(|(_, body)| body.contains("func identity")),
+        modules
+            .iter()
+            .any(|(_, body)| body.contains("func identity")),
         "expected identity func in module: {modules:?}"
     );
 
@@ -9650,17 +9750,17 @@ fn g6_go4_coreutils_echo_package_go_builds() {
         .expect("run echo");
     assert_eq!(output.status.code(), Some(0), "echo exit");
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert_eq!(
-        stdout, "hello world\n",
-        "echo stdout got {stdout:?}"
-    );
+    assert_eq!(stdout, "hello world\n", "echo stdout got {stdout:?}");
 }
 
 #[test]
 fn g6_go4_coreutils_false_package_go_builds() {
     let path = PathBuf::from("/Users/ianzepp/work/faberlang/examples/coreutils/packages/false");
     if !path.exists() {
-        eprintln!("skip: coreutils false package missing at {}", path.display());
+        eprintln!(
+            "skip: coreutils false package missing at {}",
+            path.display()
+        );
         return;
     }
     let result = compile_package(&Config::default().with_target(Target::Go), &path);
