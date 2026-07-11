@@ -9227,6 +9227,65 @@ fn g6_go4_coreutils_true_package_go_builds() {
 }
 
 #[test]
+fn g6_go4_func_name_collision_fails_closed() {
+    let dir = test_temp_dir("g6-go4-collision");
+    fs::create_dir_all(dir.join("src")).expect("src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "g6-go4-collision"
+version = "0.1.0"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("manifest");
+    // Two non-entry modules export the same function name.
+    fs::write(
+        dir.join("src/a.fab"),
+        "functio identity(textus s) → textus {\n  redde s\n}\n",
+    )
+    .expect("a");
+    fs::write(
+        dir.join("src/b.fab"),
+        "functio identity(textus s) → textus {\n  redde s + \"!\"\n}\n",
+    )
+    .expect("b");
+    fs::write(
+        dir.join("src/main.fab"),
+        r#"
+importa ex "./a" privata a
+importa ex "./b" privata b
+@ cli "tool"
+@ operandus ceteri textus ignored
+incipit argumenta args exitus 0 {
+  fixum textus _ ← a.identity("x")
+  fixum textus __ ← b.identity("y")
+}
+"#,
+    )
+    .expect("entry");
+
+    let result = compile_package(&Config::default().with_target(Target::Go), &dir);
+    assert!(!result.success(), "expected compile failure on collision");
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| diagnostic_has_issue(d, "package_go_func_name_collision")),
+        "expected package_go_func_name_collision: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.message.clone(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn g6_go4_coreutils_echo_package_go_builds() {
     let path = PathBuf::from("/Users/ianzepp/work/faberlang/examples/coreutils/packages/echo");
     if !path.exists() {
