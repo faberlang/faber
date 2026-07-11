@@ -20,7 +20,7 @@ use radix::parser;
 use radix::semantic::TypeTable;
 use radix::syntax::{AnnotationKind, Program, StmtKind, Visibility};
 
-use super::file_interface::extract_file_interface;
+
 use super::import_graph::{
     inner_library_import_unresolved_diagnostic, library_import_binding,
     library_import_kind_diagnostic, library_resolve_diagnostic,
@@ -515,10 +515,16 @@ fn analyze_cached_library_interface(
         let cached = load_cached_library_interface(&import.module, library_cache)?;
         program_export_names(&cached.program, &cached.interner)
     };
-    let file_interface = extract_file_interface(
+    let export_identity = super::file_interface::ExportIdentityContext {
+        provider: "package".to_owned(),
+        package: Some(import.module.package.clone()),
+        module_path: import.module.module_path.clone(),
+    };
+    let file_interface = super::file_interface::extract_file_interface_with_identity(
         &analysis,
         &export_names,
         &import.module.interface_path.display().to_string(),
+        Some(&export_identity),
     )?;
 
     let cached = library_cache.entries.get_mut(&key).ok_or_else(|| {

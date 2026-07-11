@@ -1,0 +1,124 @@
+# http framework package — G9 API2 source contract.
+#
+# Architecture:
+# - HttpApplication is the only annotation contract (application factory discovery).
+# - Routing, middleware, extractors, and responses are typed genera + builder APIs.
+# - No route annotation family; Radix owns no HTTP semantics.
+# - Transport lives in faber-http-transport (API1); this package is the framework seam.
+# - Cross-package surface is free functions (file interfaces do not yet port methods).
+
+# ---------------------------------------------------------------------------
+# Annotation contract — application factory only
+# ---------------------------------------------------------------------------
+
+@ annotatio { target = functio }
+genus HttpApplication {
+    textus nomen
+}
+
+# ---------------------------------------------------------------------------
+# Request / response / error / state / builder carriers
+# ---------------------------------------------------------------------------
+
+genus Rogatio {
+    textus id = ""
+    textus modus = "GET"
+    textus via = "/"
+    textus corpus = ""
+}
+
+genus Replicatio {
+    numerus status = 200
+    textus corpus = ""
+}
+
+genus HttpError {
+    numerus status = 500
+    textus nuntius = ""
+}
+
+genus AppState {
+    numerus contator = 0
+}
+
+genus Middleware {
+    textus nomen = ""
+}
+
+genus Router {
+    numerus route_count = 0
+}
+
+# ---------------------------------------------------------------------------
+# Free constructors and builders
+# ---------------------------------------------------------------------------
+
+functio router() → Router {
+    redde Router {}
+}
+
+functio middleware(textus nomen) → Middleware {
+    redde Middleware {
+        nomen = nomen
+    }
+}
+
+functio rogatio(textus id, textus modus, textus via, textus corpus) → Rogatio {
+    redde Rogatio {
+        id = id,
+        modus = modus,
+        via = via,
+        corpus = corpus
+    }
+}
+
+functio replicatio(numerus status, textus corpus) → Replicatio {
+    redde Replicatio {
+        status = status,
+        corpus = corpus
+    }
+}
+
+functio http_error(numerus status, textus nuntius) → HttpError {
+    redde HttpError {
+        status = status,
+        nuntius = nuntius
+    }
+}
+
+functio app_state() → AppState {
+    redde AppState {}
+}
+
+functio routes_of(Router r) → numerus {
+    redde r.route_count
+}
+
+functio status_of(Replicatio r) → numerus {
+    redde r.status
+}
+
+functio corpus_of(Replicatio r) → textus {
+    redde r.corpus
+}
+
+functio register_get(Router r, textus via) → Router {
+    redde Router {
+        route_count = r.route_count + 1
+    }
+}
+
+functio register_post(Router r, textus via) → Router {
+    redde Router {
+        route_count = r.route_count + 1
+    }
+}
+
+functio auge_state(AppState s) → AppState {
+    redde AppState {
+        contator = s.contator + 1
+    }
+}
+
+# Native-backed request-id source (bridges API0 frame substrate for G4 bindings).
+functio identitas_novum() → textus

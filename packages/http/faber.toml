@@ -1,0 +1,20 @@
+[package]
+name = "http"
+version = "0.1.0"
+edition = "2026"
+
+[library]
+provider = "http"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["rust"]
+
+[target.rust]
+bindings = "bindings/rust.toml"
+
+# Binding probe injects `faber-runtime` automatically when absent (see binding_probe.rs).
+# App link path-deps come from G4 library_link, not this table.

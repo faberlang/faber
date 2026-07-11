@@ -221,7 +221,10 @@ fn generate_linked_unit_rust(
                 .with_file(unit.path.display().to_string())
                 .with_args(err.args)
         })?;
-        code.push_str(&generated);
+        // Module-mode codegen uses `pub(crate)` for non-entry units. Linked
+        // library crates are path-deps for consumer packages, so promote
+        // package surface items to `pub` (G4/API2 pure-Faber + mixed libraries).
+        code.push_str(&promote_library_surface_visibility(&generated));
     }
     code.push_str(&binding_wrappers);
     if code.trim().is_empty() {
@@ -270,6 +273,20 @@ path = "src/lib.rs"
 [dependencies]
 {deps}"#
     )
+}
+
+/// Promote module-mode `pub(crate)` items to `pub` for path-dep consumers.
+fn promote_library_surface_visibility(source: &str) -> String {
+    source
+        .replace("pub(crate) fn ", "pub fn ")
+        .replace("pub(crate) async fn ", "pub async fn ")
+        .replace("pub(crate) struct ", "pub struct ")
+        .replace("pub(crate) enum ", "pub enum ")
+        .replace("pub(crate) type ", "pub type ")
+        .replace("pub(crate) const ", "pub const ")
+        .replace("pub(crate) static ", "pub static ")
+        .replace("pub(crate) trait ", "pub trait ")
+        .replace("pub(crate) mod ", "pub mod ")
 }
 
 fn format_rust(source: &str) -> String {

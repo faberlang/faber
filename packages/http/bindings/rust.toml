@@ -1,0 +1,5 @@
+[functions."http:http.identitas_novum"]
+symbol = "crate::shim::identitas_novum"
+
+[shim]
+path = "rust/shim.rs"

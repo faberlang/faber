@@ -9687,3 +9687,167 @@ fn g6_go4_coreutils_false_package_go_builds() {
         .expect("run false");
     assert_eq!(status.code(), Some(1), "GNU false should exit 1");
 }
+
+// ---------------------------------------------------------------------------
+// G9 API2 — http framework package contract
+// ---------------------------------------------------------------------------
+
+fn packages_http_lib() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("packages/http")
+}
+
+fn write_http_consumer_app(app: &Path, lib: &Path, entry_body: &str) {
+    fs::create_dir_all(app.join("src")).expect("app src");
+    let interface_root = lib.join("src");
+    fs::write(
+        app.join("faber.toml"),
+        r#"[package]
+name = "g9-http-app"
+version = "0.1.0"
+
+[paths]
+entry = "main.fab"
+
+[dependencies]
+http = "0.1.0"
+"#,
+    )
+    .expect("app manifest");
+    fs::write(
+        app.join("faber.lock"),
+        format!(
+            r#"
+[[package]]
+name = "http"
+version = "0.1.0"
+source = "path"
+package_root = "{package_root}"
+kind = "lib"
+target_language = "rust"
+target_triple = "host"
+target_manifest = ""
+interface_root = "{interface_root}"
+artifact = ""
+crate = "http"
+rustc = ""
+"#,
+            package_root = lib.display(),
+            interface_root = interface_root.display(),
+        ),
+    )
+    .expect("lock");
+    fs::write(app.join("src/main.fab"), entry_body).expect("entry");
+}
+
+fn build_and_run_http_app(app: &Path) -> std::process::Output {
+    let result = compile_package(&Config::default(), app);
+    assert!(
+        result.success(),
+        "expected http consumer compile, got {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| d.message.clone())
+            .collect::<Vec<_>>()
+    );
+    let layout = discover_build_layout(app).expect("layout");
+    let mut runtime_plan = package_rust_runtime_plan(&Config::default(), app).expect("plan");
+    let linked = super::library_link::emit_linked_library_crates(app, &layout).expect("link");
+    runtime_plan.library_path_deps = linked
+        .into_iter()
+        .map(|lib| (lib.crate_name, lib.crate_root))
+        .collect();
+    let Some(Output::Rust(output)) = result.output else {
+        panic!("expected Rust");
+    };
+    emit_generated_crate_with_runtime_plan(&layout, &output.code, None, &runtime_plan)
+        .expect("emit crate");
+    let binary = invoke_cargo_build(&layout, false).expect("cargo build app+http");
+    Command::new(&binary).output().expect("run app")
+}
+
+#[test]
+fn g9_api2_http_package_verifies_and_exports_http_application_contract() {
+    let lib = packages_http_lib();
+    assert!(lib.is_dir(), "packages/http missing at {}", lib.display());
+
+    let report = verify_library_bindings(&lib, "rust").expect("http library verifies");
+    assert_eq!(report.bindings, 1, "identitas_novum binding");
+    assert!(
+        report.declarations >= 7,
+        "expected free-function declarations, got {}",
+        report.declarations
+    );
+
+    let package = analyze_package(
+        &Config::default().with_bodyless_functions(),
+        &lib,
+    )
+    .expect("analyze http package");
+    let unit = package
+        .units
+        .iter()
+        .find(|unit| unit.path.ends_with("http.fab"))
+        .expect("http.fab unit");
+    let export = unit
+        .file_interface
+        .exports
+        .get("HttpApplication")
+        .expect("HttpApplication export");
+    let FileExportKind::Struct(strukt) = &export.kind else {
+        panic!("HttpApplication must be a struct export");
+    };
+    let contract = strukt
+        .annotation_contract
+        .as_ref()
+        .expect("HttpApplication must carry annotation_contract");
+    assert_eq!(contract.target, "functio");
+    assert_eq!(contract.fields.len(), 1);
+    assert_eq!(contract.fields[0].name, "nomen");
+    assert_eq!(contract.fields[0].ty, "textus");
+    let identity = contract
+        .qualified_identity
+        .as_ref()
+        .expect("application factory identity must be qualified");
+    assert_eq!(identity.provider, "package");
+    assert_eq!(identity.package.as_deref(), Some("http"));
+    assert_eq!(identity.export_name, "HttpApplication");
+}
+
+#[test]
+fn g9_api2_http_package_links_builder_application() {
+    let lib = packages_http_lib();
+    let root = test_temp_dir("g9-http-app");
+    let app = root.join("app");
+    write_http_consumer_app(
+        &app,
+        &lib,
+        r#"
+importa ex "http:http" privata http
+
+@ HttpApplication { nomen = "demo" }
+functio factory() → vacuum {
+}
+
+incipit {
+  # Nested free-function builders avoid local type annotations that currently
+  # lower to crate::<provider>::Type instead of the path-dep crate.
+  nota http.routes_of(http.register_post(http.register_get(http.router(), "/salve"), "/echo"))
+  nota http.identitas_novum()
+  nota http.status_of(http.replicatio(200, "ok"))
+}
+"#,
+    );
+    let output = build_and_run_http_app(&app);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stderr={}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains('2') || stdout.contains("2"),
+        "expected route count 2 on stdout, got {stdout:?}"
+    );
+}

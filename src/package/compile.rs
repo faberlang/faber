@@ -17,7 +17,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use super::codegen::{assemble_crate, ModuleNode};
-use super::file_interface::extract_file_interface;
+
 use super::frontmatter::{manifest_path_for_spec, merge_entry_test_selection};
 use super::import_graph::{
     build_mount_plan, library_import_binding, resolve_import, ImportResolution,
@@ -1031,10 +1031,19 @@ fn analyze_package_spec(
         }
 
         let export_names = program_export_names(&file.program, &file.interner);
-        let file_interface = match extract_file_interface(
+        let package_name = manifest_path_for_spec(&spec)
+            .and_then(|path| read_manifest(&path).ok())
+            .map(|manifest| manifest.package.name);
+        let export_identity = super::file_interface::ExportIdentityContext {
+            provider: "package".to_owned(),
+            package: package_name,
+            module_path: file.module_segments.clone(),
+        };
+        let file_interface = match super::file_interface::extract_file_interface_with_identity(
             &analysis,
             &export_names,
             &file.path.display().to_string(),
+            Some(&export_identity),
         ) {
             Ok(interface) => interface,
             Err(diag) => {
