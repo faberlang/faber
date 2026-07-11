@@ -35,6 +35,7 @@ pub struct Cli {
 #[derive(Subcommand, Debug)]
 pub enum Command {
     /// Compile a file or package and write output to disk
+    #[command(override_usage = "faber build [OPTIONS] <INPUT>")]
     Build(BuildArgs),
 
     /// Show supported targets and current capability notes

@@ -28,6 +28,18 @@ fn cli_parses_c_one_liner_forwarded_args_after_double_dash() {
 }
 
 #[test]
+fn cli_build_help_preserves_single_input_usage() {
+    let mut command = Cli::command();
+    let build = command
+        .find_subcommand_mut("build")
+        .expect("build subcommand");
+    let help = build.render_long_help().to_string();
+
+    assert!(help.contains("Usage: faber build [OPTIONS] <INPUT>"));
+    assert!(!help.contains("Usage: faber build [OPTIONS] <INPUT>..."));
+}
+
+#[test]
 fn cli_parses_repl_subcommand() {
     let cli = Cli::try_parse_from(["faber", "repl"]).expect("parse repl");
     assert!(cli.eval_source.is_none());
