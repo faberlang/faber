@@ -26,6 +26,15 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
     use std::fs;
     use std::path::PathBuf;
 
+    if let Some(message) = reader_locale_without_package_error(
+        command.reader_locale.as_deref(),
+        std::slice::from_ref(&command.input),
+        command.package,
+    ) {
+        eprintln!("error: {message}");
+        std::process::exit(1);
+    }
+
     let input_path = PathBuf::from(&command.input);
     let target = resolve_build_target(&command, &input_path);
     let is_package = use_package_compiler(target, &input_path, command.package);
@@ -38,14 +47,6 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
             }
         }
     } else {
-        if let Some(message) = reader_locale_without_package_error(
-            command.reader_locale.as_deref(),
-            std::slice::from_ref(&command.input),
-            command.package,
-        ) {
-            eprintln!("error: {message}");
-            std::process::exit(1);
-        }
         (Config::default().with_target(target), None)
     };
 

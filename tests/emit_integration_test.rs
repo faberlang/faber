@@ -346,6 +346,22 @@ fn emit_reader_locale_rejects_stdin_input() {
 }
 
 #[test]
+fn emit_reader_locale_rejects_forced_package_stdin_input() {
+    let (stdout, stderr, ok) =
+        run_faber_emit(&["emit", "--package", "--reader-locale", "th-TH", "-"]);
+
+    assert!(!ok, "emit should reject stdin reader-locale package input");
+    assert!(
+        stdout.is_empty(),
+        "rejected emit should not write stdout: {stdout}"
+    );
+    assert!(
+        stderr.contains("--reader-locale th-TH requires a package path or .fab entry file"),
+        "expected stdin shape rejection, got:\n{stderr}"
+    );
+}
+
+#[test]
 fn emit_faber_target_rejects_reader_locale() {
     let example = reader_locale_example_root("th-TH");
     let entry = example.join("src/main.fab");

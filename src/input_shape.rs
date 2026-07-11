@@ -1,12 +1,12 @@
 pub(crate) fn verify_input_is_package_shaped(input: &[String], force_package: bool) -> bool {
-    if force_package {
-        return true;
-    }
     let Some(first) = input.first() else {
         return false;
     };
     if first == "-" {
         return false;
+    }
+    if force_package {
+        return true;
     }
     let path = std::path::Path::new(first);
     path.is_dir() || path.file_name().is_some_and(|name| name == "faber.toml")
@@ -67,6 +67,7 @@ mod tests {
     #[test]
     fn verify_input_is_package_shaped_rejects_stdin_and_single_source_files() {
         assert!(!verify_input_is_package_shaped(&["-".to_owned()], false));
+        assert!(!verify_input_is_package_shaped(&["-".to_owned()], true));
         assert!(!verify_input_is_package_shaped(
             &["main.fab".to_owned()],
             false
@@ -118,7 +119,7 @@ mod tests {
         );
         assert_eq!(
             reader_locale_without_package_error(Some("la"), &["-".to_owned()], true),
-            None
+            Some("--reader-locale la requires a package path or .fab entry file".to_owned())
         );
         assert_eq!(
             reader_locale_without_package_error(None, &["main.fab".to_owned()], false),

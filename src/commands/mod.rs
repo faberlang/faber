@@ -86,6 +86,11 @@ fn dispatch(command: Command) {
         }
         Command::Targets => tool::cmd_targets(),
         Command::Check(args) => {
+            reject_reader_locale_without_package(
+                args.reader_locale.as_deref(),
+                &args.input,
+                args.package,
+            );
             if args.package || package::should_treat_as_package_from_args(&args.input) {
                 package::cmd_check_package(CheckCommand {
                     input: args.input,
@@ -156,6 +161,11 @@ fn dispatch(command: Command) {
                 &emit_command.input,
                 args.package,
             ) {
+                reject_reader_locale_without_package(
+                    emit_command.reader_locale.as_deref(),
+                    &emit_command.input,
+                    emit_command.package,
+                );
                 package::cmd_emit_package(emit_command);
             } else {
                 reject_reader_locale_without_package(

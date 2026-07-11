@@ -241,6 +241,22 @@ incipit {
 }
 
 #[test]
+fn build_reader_locale_rejects_forced_package_stdin_input() {
+    let (stdout, stderr, ok) =
+        run_faber(&["build", "--package", "--reader-locale", "zh-Hans", "-"]);
+
+    assert!(!ok, "build should reject stdin reader-locale package input");
+    assert!(
+        stdout.is_empty(),
+        "rejected build should not write stdout: {stdout}"
+    );
+    assert!(
+        stderr.contains("--reader-locale zh-Hans requires a package path or .fab entry file"),
+        "expected stdin shape rejection, got:\n{stderr}"
+    );
+}
+
+#[test]
 fn build_reader_locale_accepts_manifest_file_input() {
     let package = write_basic_package(
         "build-reader-locale-manifest",
@@ -420,6 +436,22 @@ fn test_reader_locale_rejects_stdin_input() {
     assert!(
         stderr.contains("--reader-locale zh-Hans requires a package path or .fab entry file"),
         "expected stdin reader-locale rejection, got:\n{stderr}"
+    );
+}
+
+#[test]
+fn check_reader_locale_rejects_forced_package_stdin_input() {
+    let (stdout, stderr, ok) =
+        run_faber(&["check", "--package", "--reader-locale", "zh-Hans", "-"]);
+
+    assert!(!ok, "check should reject stdin reader-locale package input");
+    assert!(
+        stdout.is_empty(),
+        "rejected check should not write stdout: {stdout}"
+    );
+    assert!(
+        stderr.contains("--reader-locale zh-Hans requires a package path or .fab entry file"),
+        "expected stdin shape rejection, got:\n{stderr}"
     );
 }
 
