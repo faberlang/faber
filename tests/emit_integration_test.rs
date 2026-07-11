@@ -329,3 +329,37 @@ fn emit_reader_locale_accepts_manifest_file_input() {
         "expected localized Rust emit output:\n{stdout}"
     );
 }
+
+#[test]
+fn emit_reader_locale_rejects_stdin_input() {
+    let (stdout, stderr, ok) = run_faber_emit(&["emit", "--reader-locale", "th-TH", "-"]);
+
+    assert!(!ok, "reader-locale stdin emit should fail");
+    assert!(stdout.is_empty(), "rejected emit should not write stdout: {stdout}");
+    assert!(
+        stderr.contains("--reader-locale th-TH requires a package path or .fab entry file"),
+        "expected stdin shape rejection, got:\n{stderr}"
+    );
+}
+
+#[test]
+fn emit_faber_target_rejects_reader_locale() {
+    let example = reader_locale_example_root("th-TH");
+    let entry = example.join("src/main.fab");
+
+    let (stdout, stderr, ok) = run_faber_emit(&[
+        "emit",
+        "-t",
+        "faber",
+        "--reader-locale",
+        "th-TH",
+        entry.to_str().expect("entry path"),
+    ]);
+
+    assert!(!ok, "faber emit should reject reader locale");
+    assert!(stdout.is_empty(), "rejected emit should not write stdout: {stdout}");
+    assert!(
+        stderr.contains("--reader-locale th-TH for Faber output is deferred to format reader-locale support"),
+        "expected faber emit reader-locale rejection, got:\n{stderr}"
+    );
+}

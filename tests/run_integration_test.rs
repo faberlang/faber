@@ -313,6 +313,33 @@ incipit {
 }
 
 #[test]
+fn run_interpret_rejects_reader_locale() {
+    let source = write_single_file(
+        "run-reader-locale-interpret-reject",
+        r#"
+incipit {
+  nota "salve"
+}
+"#,
+    );
+
+    let (stdout, stderr, ok) = run_faber(&[
+        "run",
+        "--interpret",
+        "--reader-locale",
+        "zh-Hans",
+        source.to_str().expect("utf8 source path"),
+    ]);
+
+    assert!(!ok, "run --interpret should reject reader locale");
+    assert!(stdout.is_empty(), "rejected run should not write stdout: {stdout}");
+    assert!(
+        stderr.contains("--reader-locale is not supported with `faber run --interpret`"),
+        "expected interpret reader-locale rejection, got:\n{stderr}"
+    );
+}
+
+#[test]
 fn test_reader_locale_accepts_direct_entry_file_input() {
     let source = write_single_file(
         "test-reader-locale-single-file",
