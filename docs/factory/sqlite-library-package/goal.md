@@ -1,9 +1,9 @@
 # Goal: SQLite Library Package
 
-**Status**: Stage 2 Rust binding prototype complete in the SQLite packet;
-generated application linkage and parameterized rusqlite operations proven
+**Status**: Stage 2 Rust binding prototype and Stage 3 read consumer complete;
+Stage 4 write prerequisites now include atomic batches and SHA-256 hashing
 **Created**: 2026-07-09
-**Refreshed**: 2026-07-10
+**Refreshed**: 2026-07-11
 **Target workspace**: `/Users/ianzepp/work/faberlang`
 **Factory artifact dir**: `faber/docs/factory/sqlite-library-package/`
 **Primary surfaces**: unified `faber.toml` library packages, target binding
@@ -226,6 +226,10 @@ and match selected `vivi` JSON outputs:
 - `board --json`.
 
 ### Stage 4 - Write Compatibility
+
+Status: atomic parameterized batches and the Faber-visible
+`sqlite:sqlite.sha256_hex` content-ID helper are complete in the packet. Exact
+message composition plus atomic blob/catalog/event persistence remain open.
 
 Add mutation surfaces only after read parity:
 
