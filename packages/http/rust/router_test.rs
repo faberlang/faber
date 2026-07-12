@@ -60,6 +60,56 @@ fn dynamic_path_params_keep_literal_plus() {
 }
 
 #[test]
+fn static_paths_decode_request_segments_before_matching() {
+    let table = add_get(route_table(), "/hello%20world".into(), "hello".into()).expect("route");
+    assert!(
+        match_route(table.clone(), "GET".into(), "/hello%20world".into())
+            .expect("encoded match")
+            .is_some()
+    );
+    assert!(match_route(table, "GET".into(), "/hello world".into())
+        .expect("decoded match")
+        .is_some());
+}
+
+#[test]
+fn encoded_slashes_stay_inside_dynamic_segments() {
+    let table = add_get(route_table(), "/files/{path}".into(), "file".into()).expect("route");
+    let hit = match_route(table, "GET".into(), "/files/a%2Fb".into())
+        .expect("ok")
+        .expect("match");
+    assert_eq!(path_param(hit, "path".into()).as_deref(), Some("a/b"));
+}
+
+#[test]
+fn traversal_segments_are_rejected_before_matching_or_registration() {
+    let table = add_get(route_table(), "/files/{path}".into(), "file".into()).expect("route");
+    for path in ["/files/../secret", "/files/%2e%2e/secret"] {
+        assert!(
+            match_route(table.clone(), "GET".into(), path.into())
+                .expect("malformed traversal request should be a miss")
+                .is_none(),
+            "traversal path must not match: {path}"
+        );
+    }
+
+    for path in ["/files/../secret", "/files/%2e%2e/secret"] {
+        let error = add_get(route_table(), path.into(), "file".into())
+            .expect_err("traversal route must be rejected");
+        assert!(error.contains("traversal"), "{error}");
+    }
+}
+
+#[test]
+fn malformed_percent_decoded_utf8_fails_closed() {
+    let table = add_get(route_table(), "/users/{id}".into(), "show".into()).expect("route");
+    assert!(match_route(table, "GET".into(), "/users/%C3%28".into())
+        .expect("malformed UTF-8 request should be a miss")
+        .is_none());
+    assert_eq!(query_param("q=%C3%28".into(), "q".into()), None);
+}
+
+#[test]
 fn path_params_retain_malformed_escape_text() {
     let table = add_get(route_table(), "/users/{id}".into(), "show".into()).expect("route");
     let hit = match_route(table, "GET".into(), "/users/%ZZ".into())
@@ -144,6 +194,10 @@ fn query_and_header_extraction() {
     assert_eq!(
         query_param("tag=A%2BB".into(), "tag".into()).as_deref(),
         Some("A+B")
+    );
+    assert_eq!(
+        query_param("na%6De=Ada".into(), "name".into()).as_deref(),
+        Some("Ada")
     );
     assert_eq!(
         query_param("mark=%E2%9C%93".into(), "mark".into()).as_deref(),

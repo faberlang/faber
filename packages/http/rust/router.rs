@@ -91,9 +91,11 @@ fn route_from_valor(value: &Valor) -> Result<Route, String> {
     let Valor::Tabula(fields) = value else {
         return Err("route must be a tabula".to_owned());
     };
+    let path = text_field(fields, KEY_PATH)?;
+    validate_route_path(path)?;
     Ok(Route {
         method: text_field(fields, KEY_METHOD)?.to_ascii_uppercase(),
-        path: normalize_path(text_field(fields, KEY_PATH)?),
+        path: normalize_path(path),
         handler: text_field(fields, KEY_HANDLER)?.to_owned(),
         group: fields
             .get(KEY_GROUP)
@@ -135,6 +137,19 @@ pub fn normalize_path(path: &str) -> String {
     }
 }
 
+fn validate_route_path(path: &str) -> Result<(), String> {
+    for segment in path_segments(path) {
+        let decoded = percent_decode_bytes(&segment)
+            .ok_or_else(|| format!("route path contains invalid UTF-8 escape: {path}"))?;
+        if decoded == "." || decoded == ".." {
+            return Err(format!(
+                "route path must not contain traversal segment `{decoded}`: {path}"
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn path_segments(path: &str) -> Vec<String> {
     normalize_path(path)
         .split('/')
@@ -143,11 +158,18 @@ fn path_segments(path: &str) -> Vec<String> {
         .collect()
 }
 
-fn decoded_request_segments(path: &str) -> Vec<String> {
-    path_segments(path)
+fn decoded_request_segments(path: &str) -> Option<Vec<String>> {
+    let segments = path_segments(path)
         .into_iter()
         .map(|segment| percent_decode_bytes(&segment))
-        .collect()
+        .collect::<Option<Vec<_>>>()?;
+    if segments
+        .iter()
+        .any(|segment| segment == "." || segment == "..")
+    {
+        return None;
+    }
+    Some(segments)
 }
 
 fn is_param(segment: &str) -> bool {
@@ -187,6 +209,7 @@ fn add_route(
     if handler.trim().is_empty() {
         return Err("handler id must not be empty".to_owned());
     }
+    validate_route_path(&path)?;
     let mut tab = RouteTable::from_valor(&table)?;
     let route = Route {
         method: method.to_ascii_uppercase(),
@@ -212,6 +235,7 @@ fn add_route(
 /// Each step is a tabula `{ method, path, handler }`. Paths are joined with the prefix.
 pub fn add_group(table: Valor, prefix: String, steps: Vec<Valor>) -> Result<Valor, String> {
     let mut tab = RouteTable::from_valor(&table)?;
+    validate_route_path(&prefix)?;
     let prefix = normalize_path(&prefix);
     for (index, step) in steps.into_iter().enumerate() {
         let route = route_from_valor(&step).map_err(|err| format!("group step {index}: {err}"))?;
@@ -267,7 +291,9 @@ pub fn match_route(table: Valor, method: String, path: String) -> Result<Option<
     let tab = RouteTable::from_valor(&table)?;
     let method = method.to_ascii_uppercase();
     let path = normalize_path(&path);
-    let request_segments = decoded_request_segments(&path);
+    let Some(request_segments) = decoded_request_segments(&path) else {
+        return Ok(None);
+    };
 
     let mut matches: Vec<(Route, BTreeMap<String, String>)> = Vec::new();
     for route in &tab.routes {
@@ -324,7 +350,7 @@ fn match_path(template: &str, request: &[String]) -> Option<BTreeMap<String, Str
                 return None;
             }
             params.insert(name.to_owned(), req.clone());
-        } else if templ != req {
+        } else if percent_decode_bytes(templ)? != *req {
             return None;
         }
     }
@@ -355,8 +381,8 @@ pub fn query_param(query: String, name: String) -> Option<String> {
         let mut parts = pair.splitn(2, '=');
         let key = parts.next().unwrap_or("");
         let value = parts.next().unwrap_or("");
-        if key == name {
-            return Some(percent_decode_query_component(value));
+        if percent_decode_query_component(key).as_deref() == Some(name.as_str()) {
+            return percent_decode_query_component(value);
         }
     }
     None
@@ -404,11 +430,11 @@ pub fn to_response(status: i64, corpus: String) -> Valor {
     ]))
 }
 
-fn percent_decode_query_component(input: &str) -> String {
+fn percent_decode_query_component(input: &str) -> Option<String> {
     percent_decode_bytes(&input.replace('+', " "))
 }
 
-fn percent_decode_bytes(input: &str) -> String {
+fn percent_decode_bytes(input: &str) -> Option<String> {
     // Decode on bytes so multi-byte UTF-8 survives; malformed escapes stay raw.
     let bytes = input.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
@@ -430,7 +456,7 @@ fn percent_decode_bytes(input: &str) -> String {
             }
         }
     }
-    String::from_utf8(out).unwrap_or_else(|_| input.to_owned())
+    String::from_utf8(out).ok()
 }
 
 fn percent_decode_hex_pair(hi: u8, lo: u8) -> Option<u8> {
