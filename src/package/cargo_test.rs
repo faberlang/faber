@@ -303,3 +303,38 @@ fn coherent_runtime_cluster_root_requires_all_requested_repos() -> Result<(), Bo
     );
     Ok(())
 }
+
+#[test]
+fn generated_cargo_manifest_escapes_metadata_paths_and_dependency_keys(
+) -> Result<(), Box<dyn Error>> {
+    let version = "0.1.0\"\n# injected";
+    let library_path = PathBuf::from("/tmp/library-\"-\\-path");
+    let mut plan = RustRuntimePlan::default();
+    plan.library_path_deps
+        .push(("library\"key".to_owned(), library_path.clone()));
+
+    let rendered =
+        render_generated_cargo_toml("demo", version, &plan, PathBuf::from("/tmp").as_path());
+    let manifest = toml::from_str::<toml::Value>(&rendered)?;
+    let package = manifest
+        .get("package")
+        .and_then(toml::Value::as_table)
+        .ok_or("missing package table")?;
+    assert_eq!(
+        package.get("version").and_then(toml::Value::as_str),
+        Some(version)
+    );
+    let dependencies = manifest
+        .get("dependencies")
+        .and_then(toml::Value::as_table)
+        .ok_or("missing dependency table")?;
+    let dependency = dependencies
+        .get("library\"key")
+        .and_then(toml::Value::as_table)
+        .ok_or("missing quoted dependency key")?;
+    assert_eq!(
+        dependency.get("path").and_then(toml::Value::as_str),
+        Some(library_path.to_string_lossy().as_ref())
+    );
+    Ok(())
+}
