@@ -202,13 +202,10 @@ fn generate_linked_unit_rust(
                 .with_args(err.args)
                 .with_arg("issue", "library_binding_wrapper_failed")
         })?;
-        // Public API for application path-dep consumers.
-        // render_binding_probe emits `fn name`; promote exactly once.
-        let pub_probe = if probe.contains("\nfn ") {
-            probe.replacen("\nfn ", "\npub fn ", 1)
-        } else {
-            probe.replacen("fn ", "pub fn ", 1)
-        };
+        // Public API for application path-dep consumers. Binding probes emit
+        // either `fn name` or `async fn name`; promote the generated wrapper
+        // without rewriting its body or attributes.
+        let pub_probe = promote_binding_function_visibility(&probe);
         binding_wrappers.push_str(&pub_probe);
         if !binding_wrappers.ends_with('\n') {
             binding_wrappers.push('\n');
@@ -250,6 +247,37 @@ fn binding_for_function<'a>(
         .iter()
         .find(|(key, _)| key.ends_with(&suffix))
         .map(|(_, binding)| binding)
+}
+
+fn promote_binding_function_visibility(source: &str) -> String {
+    let mut promoted = source
+        .lines()
+        .map(|line| {
+            let trimmed = line.trim_start();
+            let prefix_len = line.len() - trimmed.len();
+            let Some(rest) = trimmed
+                .strip_prefix("async fn ")
+                .or_else(|| trimmed.strip_prefix("fn "))
+            else {
+                return line.to_owned();
+            };
+            let mut promoted = String::with_capacity(line.len() + 4);
+            promoted.push_str(&line[..prefix_len]);
+            promoted.push_str("pub ");
+            if trimmed.starts_with("async fn ") {
+                promoted.push_str("async fn ");
+            } else {
+                promoted.push_str("fn ");
+            }
+            promoted.push_str(rest);
+            promoted
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    if source.ends_with('\n') {
+        promoted.push('\n');
+    }
+    promoted
 }
 
 fn render_library_cargo_toml(

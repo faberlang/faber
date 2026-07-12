@@ -1,4 +1,7 @@
-use super::{binding_for_function, promote_library_surface_visibility, render_library_cargo_toml};
+use super::{
+    binding_for_function, promote_binding_function_visibility, promote_library_surface_visibility,
+    render_library_cargo_toml,
+};
 use crate::package::manifest::ManifestTarget;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -30,6 +33,16 @@ fn binding_lookup_requires_the_exact_module_suffix() {
 
     assert!(binding_for_function(&bindings, "", "value").is_none());
     assert!(binding_for_function(&bindings, "nested", "value").is_none());
+}
+
+#[test]
+fn async_binding_wrappers_are_public_to_consumers() {
+    let source = "#[allow(dead_code)]\nasync fn invoke() {\n    ready().await;\n}\n";
+    let promoted = promote_binding_function_visibility(source);
+
+    assert!(promoted.contains("async fn invoke"));
+    assert!(promoted.contains("pub async fn invoke"));
+    assert!(promoted.contains("    ready().await;"));
 }
 
 #[test]
