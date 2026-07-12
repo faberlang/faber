@@ -188,7 +188,7 @@ edition = "2021"
     )
 }
 
-fn toml_key(value: &str) -> String {
+pub(super) fn toml_key(value: &str) -> String {
     if !value.is_empty()
         && value
             .chars()
@@ -200,11 +200,11 @@ fn toml_key(value: &str) -> String {
     }
 }
 
-fn toml_path(path: &Path) -> String {
+pub(super) fn toml_path(path: &Path) -> String {
     toml_string(&path.display().to_string())
 }
 
-fn toml_string(value: &str) -> String {
+pub(super) fn toml_string(value: &str) -> String {
     let mut quoted = String::with_capacity(value.len() + 2);
     quoted.push('"');
     for character in value.chars() {
