@@ -145,6 +145,12 @@ impl CorrelationTable {
         }
     }
 
+    fn remove(&self, id: &str) {
+        if let Ok(mut map) = self.inner.lock() {
+            map.remove(id);
+        }
+    }
+
     pub fn get(&self, id: &str) -> Option<CorrelationEntry> {
         self.inner.lock().ok().and_then(|map| map.get(id).cloned())
     }
@@ -155,6 +161,35 @@ impl CorrelationTable {
 
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+}
+
+struct CorrelationGuard {
+    table: Arc<CorrelationTable>,
+    id: String,
+}
+
+impl CorrelationGuard {
+    fn new(table: Arc<CorrelationTable>, id: String) -> Self {
+        Self { table, id }
+    }
+
+    fn complete(&self, status: u16) {
+        self.table.complete(&self.id, status);
+    }
+}
+
+impl Drop for CorrelationGuard {
+    fn drop(&mut self) {
+        self.table.remove(&self.id);
+    }
+}
+
+struct InFlightGuard(Arc<AtomicUsize>);
+
+impl Drop for InFlightGuard {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
     }
 }
 
@@ -267,7 +302,10 @@ impl HttpTransport {
 
     #[cfg(test)]
     pub(crate) fn tracked_connections(&self) -> usize {
-        self.connections.lock().map(|mut tasks| tasks.len()).unwrap_or(0)
+        self.connections
+            .lock()
+            .map(|mut tasks| tasks.len())
+            .unwrap_or(0)
     }
 
     /// Signal accept loop to stop; in-flight handlers observe cancel mid-body when timed.
@@ -368,27 +406,31 @@ async fn accept_loop(
         let request_timeout = config.request_timeout;
 
         in_flight.fetch_add(1, Ordering::SeqCst);
-        if let Ok(mut tasks) = connections.lock() {
-            tasks.spawn(async move {
-                let _permit = permit;
-                let io = TokioIo::new(stream);
-                let service = service_fn(move |req| {
-                    let handler = Arc::clone(&handler);
-                    let config = config.clone();
-                    let cancel = Arc::clone(&cancel);
-                    let correlations = Arc::clone(&correlations);
-                    async move {
-                        Ok::<_, Infallible>(
-                            handle_connection(req, handler, config, cancel, correlations).await,
-                        )
-                    }
-                });
+        let in_flight_guard = InFlightGuard(Arc::clone(&in_flight));
+        match connections.lock() {
+            Ok(mut tasks) => {
+                tasks.spawn(async move {
+                    let _in_flight_guard = in_flight_guard;
+                    let _permit = permit;
+                    let io = TokioIo::new(stream);
+                    let service = service_fn(move |req| {
+                        let handler = Arc::clone(&handler);
+                        let config = config.clone();
+                        let cancel = Arc::clone(&cancel);
+                        let correlations = Arc::clone(&correlations);
+                        async move {
+                            Ok::<_, Infallible>(
+                                handle_connection(req, handler, config, cancel, correlations).await,
+                            )
+                        }
+                    });
 
-                // One request per connection: disable keep-alive.
-                let conn = serve_http1(io, service, request_timeout);
-                let _ = conn.await;
-                in_flight.fetch_sub(1, Ordering::SeqCst);
-            });
+                    // One request per connection: disable keep-alive.
+                    let conn = serve_http1(io, service, request_timeout);
+                    let _ = conn.await;
+                });
+            }
+            Err(_) => drop(in_flight_guard),
         }
     }
 }
@@ -444,6 +486,7 @@ async fn handle_connection(
     let headers = collect_headers(req.headers());
 
     correlations.begin(&request_id, method.as_str(), &path);
+    let correlation = CorrelationGuard::new(Arc::clone(&correlations), request_id.clone());
 
     let body_result = timeout(
         config.request_timeout,
@@ -454,7 +497,7 @@ async fn handle_connection(
     let body = match body_result {
         Ok(Ok(collected)) => collected.to_bytes(),
         Ok(Err(_)) => {
-            correlations.complete(&request_id, StatusCode::PAYLOAD_TOO_LARGE.as_u16());
+            correlation.complete(StatusCode::PAYLOAD_TOO_LARGE.as_u16());
             return error_response(
                 StatusCode::PAYLOAD_TOO_LARGE,
                 &request_id,
@@ -462,7 +505,7 @@ async fn handle_connection(
             );
         }
         Err(_) => {
-            correlations.complete(&request_id, StatusCode::REQUEST_TIMEOUT.as_u16());
+            correlation.complete(StatusCode::REQUEST_TIMEOUT.as_u16());
             return error_response(
                 StatusCode::REQUEST_TIMEOUT,
                 &request_id,
@@ -472,7 +515,7 @@ async fn handle_connection(
     };
 
     if cancel.load(Ordering::SeqCst) {
-        correlations.complete(&request_id, StatusCode::SERVICE_UNAVAILABLE.as_u16());
+        correlation.complete(StatusCode::SERVICE_UNAVAILABLE.as_u16());
         return error_response(
             StatusCode::SERVICE_UNAVAILABLE,
             &request_id,
@@ -492,13 +535,13 @@ async fn handle_connection(
     let response = match timeout(config.request_timeout, handler(carrier)).await {
         Ok(resp) => resp,
         Err(_) => {
-            correlations.complete(&request_id, StatusCode::GATEWAY_TIMEOUT.as_u16());
+            correlation.complete(StatusCode::GATEWAY_TIMEOUT.as_u16());
             return error_response(StatusCode::GATEWAY_TIMEOUT, &request_id, "handler timeout");
         }
     };
 
     if cancel.load(Ordering::SeqCst) {
-        correlations.complete(&request_id, StatusCode::SERVICE_UNAVAILABLE.as_u16());
+        correlation.complete(StatusCode::SERVICE_UNAVAILABLE.as_u16());
         return error_response(
             StatusCode::SERVICE_UNAVAILABLE,
             &request_id,
@@ -506,7 +549,7 @@ async fn handle_connection(
         );
     }
 
-    correlations.complete(&request_id, response.status);
+    correlation.complete(response.status);
     build_response(response, &request_id)
 }
 

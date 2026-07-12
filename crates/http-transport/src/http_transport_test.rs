@@ -445,7 +445,13 @@ async fn shutdown_and_join_drains_or_aborts_stalled_body_connections() {
         .expect("write partial body");
 
     sleep(Duration::from_millis(40)).await;
-    assert_eq!(transport.in_flight(), 1, "partial body should hold one slot");
+    assert_eq!(
+        transport.in_flight(),
+        1,
+        "partial body should hold one slot"
+    );
+    let in_flight = Arc::clone(&transport.in_flight);
+    let correlations = Arc::clone(&transport.correlations);
 
     let started = Instant::now();
     timeout(Duration::from_secs(2), transport.shutdown_and_join())
@@ -462,6 +468,15 @@ async fn shutdown_and_join_drains_or_aborts_stalled_body_connections() {
         .expect("read timeout")
         .expect("read");
     assert_eq!(read, 0, "connection should be closed after shutdown");
+    assert_eq!(
+        in_flight.load(Ordering::SeqCst),
+        0,
+        "aborted connection must release its in-flight count"
+    );
+    assert!(
+        correlations.is_empty(),
+        "aborted connection must remove its correlation entry"
+    );
 }
 
 #[tokio::test]
