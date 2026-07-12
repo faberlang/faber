@@ -14,6 +14,7 @@ faberlang/
   faber-runtime/   public Rust runtime types (`use faber::…`)
   radix/           private compiler (formatter is `radix::forma`)
   norma/           public standard library source
+  triga/           optional graphics and geometry library
   examples/        public application examples
   cista/           public package-store CLI/lib
 ```
