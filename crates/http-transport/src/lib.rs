@@ -34,7 +34,7 @@ use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::sync::{Notify, Semaphore};
 use tokio::task::{JoinHandle, JoinSet};
-use tokio::time::{timeout, Instant};
+use tokio::time::{timeout, timeout_at, Instant};
 
 const SHUTDOWN_DRAIN_TIMEOUT: Duration = Duration::from_millis(250);
 
@@ -484,12 +484,13 @@ async fn handle_connection(
     let path = uri.path().to_owned();
     let query = uri.query().map(str::to_owned);
     let headers = collect_headers(req.headers());
+    let deadline = Instant::now() + config.request_timeout;
 
     correlations.begin(&request_id, method.as_str(), &path);
     let correlation = CorrelationGuard::new(Arc::clone(&correlations), request_id.clone());
 
-    let body_result = timeout(
-        config.request_timeout,
+    let body_result = timeout_at(
+        deadline,
         Limited::new(req.into_body(), config.max_body_bytes).collect(),
     )
     .await;
@@ -532,7 +533,7 @@ async fn handle_connection(
         body,
     };
 
-    let response = match timeout(config.request_timeout, handler(carrier)).await {
+    let response = match timeout_at(deadline, handler(carrier)).await {
         Ok(resp) => resp,
         Err(_) => {
             correlation.complete(StatusCode::GATEWAY_TIMEOUT.as_u16());

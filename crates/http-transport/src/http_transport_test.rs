@@ -171,6 +171,46 @@ async fn handler_timeout_returns_504() {
 }
 
 #[tokio::test]
+async fn request_timeout_covers_body_and_handler_together() {
+    let transport = HttpTransport::serve(
+        loopback(),
+        TransportConfig {
+            request_timeout: Duration::from_millis(150),
+            ..TransportConfig::default()
+        },
+        |_req| async move {
+            sleep(Duration::from_millis(100)).await;
+            HttpResponse::text(200, "too late")
+        },
+    )
+    .await
+    .expect("bind");
+
+    let mut stream = TcpStream::connect(transport.local_addr())
+        .await
+        .expect("connect");
+    stream
+        .write_all(b"POST /budget HTTP/1.1\r\nHost: localhost\r\nContent-Length: 1\r\n\r\n")
+        .await
+        .expect("write headers");
+    sleep(Duration::from_millis(75)).await;
+    stream.write_all(b"x").await.expect("write body");
+
+    let mut response = Vec::new();
+    timeout(Duration::from_secs(1), stream.read_to_end(&mut response))
+        .await
+        .expect("response timeout")
+        .expect("read response");
+    let response = String::from_utf8_lossy(&response);
+    assert!(
+        response.contains("HTTP/1.1 504 Gateway Timeout"),
+        "shared request deadline should time out handler after body delay: {response}"
+    );
+
+    transport.shutdown_and_join().await;
+}
+
+#[tokio::test]
 async fn shutdown_stops_accept_and_drains() {
     let hits = Arc::new(AtomicUsize::new(0));
     let hits_h = Arc::clone(&hits);
