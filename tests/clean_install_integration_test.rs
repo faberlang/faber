@@ -31,6 +31,7 @@ fn command(executable: &Path, package: &Path, home: &Path) -> Output {
         .arg(package)
         .current_dir(package)
         .env("HOME", home)
+        .envs(platform_cache_env(home))
         // Cargo remains available from the test toolchain while Faber's
         // platform cache is isolated beneath this fresh HOME.
         .env(
@@ -50,6 +51,36 @@ fn command(executable: &Path, package: &Path, home: &Path) -> Output {
             }),
         );
     command.output().expect("run installed Faber")
+}
+
+#[cfg(target_os = "macos")]
+fn platform_cache_env(_home: &Path) -> Vec<(&'static str, PathBuf)> {
+    Vec::new()
+}
+
+#[cfg(target_os = "windows")]
+fn platform_cache_env(home: &Path) -> Vec<(&'static str, PathBuf)> {
+    vec![("LOCALAPPDATA", home.join("AppData/Local"))]
+}
+
+#[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+fn platform_cache_env(home: &Path) -> Vec<(&'static str, PathBuf)> {
+    vec![("XDG_CACHE_HOME", home.join(".cache"))]
+}
+
+#[cfg(target_os = "macos")]
+fn expected_cache_root(home: &Path) -> PathBuf {
+    home.join("Library/Caches/faber/core-support")
+}
+
+#[cfg(target_os = "windows")]
+fn expected_cache_root(home: &Path) -> PathBuf {
+    home.join("AppData/Local/faber/core-support")
+}
+
+#[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+fn expected_cache_root(home: &Path) -> PathBuf {
+    home.join(".cache/faber/core-support")
 }
 
 fn write_package(root: &Path, native: bool) -> PathBuf {
@@ -75,7 +106,7 @@ fn generated_manifest(package: &Path) -> String {
 }
 
 fn assert_only_materialized_paths(manifest: &str, home: &Path) {
-    let cache = home.join("Library/Caches/faber/core-support");
+    let cache = expected_cache_root(home);
     assert!(
         manifest.contains(cache.to_string_lossy().as_ref()),
         "missing materialized cache path:\n{manifest}"

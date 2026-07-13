@@ -1,6 +1,20 @@
 use super::probe_manifest;
 use std::collections::BTreeMap;
+use std::fs;
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+
+fn temp_root(label: &str) -> std::path::PathBuf {
+    let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+    let root = std::env::temp_dir().join(format!(
+        "faber-binding-probe-{label}-{}-{id}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&root).expect("create temp root");
+    root
+}
 
 #[test]
 fn probe_manifest_preserves_inline_dependency_tables() {
@@ -61,4 +75,39 @@ fn probe_manifest_uses_verified_materialized_runtime() {
         support.faber_runtime().unwrap().to_string_lossy()
     );
     assert!(!runtime_path.contains("worktrees"));
+}
+
+#[test]
+fn probe_manifest_reuses_runtime_path_from_target_path_dependencies() {
+    let root = temp_root("runtime-path-dep");
+    let package = root.join("packages/http");
+    let transport = root.join("crates/http-transport");
+    let runtime = root.join("faber-runtime");
+    fs::create_dir_all(&package).expect("create package");
+    fs::create_dir_all(&transport).expect("create transport");
+    fs::create_dir_all(&runtime).expect("create runtime");
+    fs::write(
+        transport.join("Cargo.toml"),
+        r#"[package]
+name = "faber-http-transport"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+faber = { package = "faber-runtime", path = "../../faber-runtime" }
+"#,
+    )
+    .expect("write transport manifest");
+    let dependencies = BTreeMap::from([(
+        "faber_http_transport".to_owned(),
+        r#"{ package = "faber-http-transport", path = "../../crates/http-transport" }"#.to_owned(),
+    )]);
+
+    let manifest = probe_manifest(&package, &dependencies).expect("probe manifest");
+    let parsed = toml::from_str::<toml::Value>(&manifest).expect("valid TOML");
+
+    assert_eq!(
+        parsed["dependencies"]["faber"]["path"].as_str(),
+        Some(runtime.to_string_lossy().as_ref())
+    );
 }

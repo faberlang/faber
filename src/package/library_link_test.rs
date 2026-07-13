@@ -4,7 +4,21 @@ use super::{
 };
 use crate::package::manifest::ManifestTarget;
 use std::collections::BTreeMap;
+use std::fs;
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+
+fn temp_root(label: &str) -> std::path::PathBuf {
+    let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+    let root = std::env::temp_dir().join(format!(
+        "faber-library-link-{label}-{}-{id}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&root).expect("create temp root");
+    root
+}
 
 #[test]
 fn visibility_promotion_ignores_string_literals() {
@@ -88,5 +102,45 @@ fn linked_library_cargo_manifest_escapes_values_and_inline_paths() {
     assert_eq!(
         inline.get("path").and_then(toml::Value::as_str),
         Some("/tmp/package/native\"shim")
+    );
+}
+
+#[test]
+fn linked_library_manifest_reuses_runtime_path_from_target_path_dependencies() {
+    let root = temp_root("runtime-path-dep");
+    let package = root.join("packages/http");
+    let transport = root.join("crates/http-transport");
+    let runtime = root.join("faber-runtime");
+    fs::create_dir_all(&package).expect("create package");
+    fs::create_dir_all(&transport).expect("create transport");
+    fs::create_dir_all(&runtime).expect("create runtime");
+    fs::write(
+        transport.join("Cargo.toml"),
+        r#"[package]
+name = "faber-http-transport"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+faber = { package = "faber-runtime", path = "../../faber-runtime" }
+"#,
+    )
+    .expect("write transport manifest");
+    let target = ManifestTarget {
+        dependencies: BTreeMap::from([(
+            "faber_http_transport".to_owned(),
+            r#"{ package = "faber-http-transport", path = "../../crates/http-transport" }"#
+                .to_owned(),
+        )]),
+        ..ManifestTarget::default()
+    };
+
+    let rendered =
+        render_library_cargo_toml("library", "0.1.0", &package, &target).expect("manifest");
+    let manifest = toml::from_str::<toml::Value>(&rendered).expect("valid Cargo TOML");
+
+    assert_eq!(
+        manifest["dependencies"]["faber"]["path"].as_str(),
+        Some(runtime.to_string_lossy().as_ref())
     );
 }

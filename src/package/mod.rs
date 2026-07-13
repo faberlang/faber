@@ -48,6 +48,7 @@ mod mir;
 mod modules;
 mod paths;
 mod reader;
+mod runtime_dependency;
 mod source_files;
 
 #[allow(unused_imports)]

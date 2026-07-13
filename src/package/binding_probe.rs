@@ -13,6 +13,10 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use radix::diagnostics::Diagnostic;
 
+use super::runtime_dependency::{
+    normalize_dependency_value, parse_dependency_requirement, runtime_path_for_target_dependencies,
+};
+
 const PROBE_TIMEOUT: Duration = Duration::from_secs(60);
 static NEXT_PROBE_ID: AtomicU64 = AtomicU64::new(0);
 
@@ -163,6 +167,7 @@ fn probe_manifest(
     package_root: &Path,
     dependencies: &BTreeMap<String, String>,
 ) -> Result<String, Diagnostic> {
+    let runtime_path = runtime_path_for_target_dependencies(package_root, dependencies)?;
     let mut package = toml::map::Map::new();
     package.insert(
         "name".to_owned(),
@@ -182,12 +187,6 @@ fn probe_manifest(
             (name.clone(), value)
         })
         .collect::<toml::map::Map<_, _>>();
-    let runtime_path = crate::core_support::materialize::materialize()
-        .and_then(|support| support.faber_runtime())
-        .map_err(|error| {
-            Diagnostic::error(format!("verified core support is unavailable: {error}"))
-                .with_arg("issue", "core_support_materialization_failed")
-        })?;
     let mut runtime = toml::map::Map::new();
     runtime.insert(
         "package".to_owned(),
@@ -219,30 +218,6 @@ fn probe_manifest(
         ))
         .with_arg("issue", "binding_probe_manifest_serialize_failed")
     })
-}
-
-fn normalize_dependency_value(package_root: &Path, value: toml::Value) -> toml::Value {
-    match value {
-        toml::Value::Table(mut table) => {
-            if let Some(toml::Value::String(path)) = table.get_mut("path") {
-                let absolute = package_root.join(&*path);
-                *path = absolute.display().to_string();
-            }
-            toml::Value::Table(table)
-        }
-        other => other,
-    }
-}
-
-fn parse_dependency_requirement(requirement: &str) -> toml::Value {
-    let trimmed = requirement.trim();
-    if trimmed.starts_with('{') {
-        trimmed
-            .parse::<toml::Value>()
-            .unwrap_or_else(|_| toml::Value::String(requirement.to_owned()))
-    } else {
-        toml::Value::String(requirement.to_owned())
-    }
 }
 
 fn probe_source(shim: Option<&Path>, probes: &[String]) -> String {

@@ -2,7 +2,21 @@ use super::{render_generated_cargo_toml, RustRuntimePlan};
 use crate::core_support::materialize::materialize;
 use crate::package::ManifestRustHost;
 use std::error::Error;
+use std::fs;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+
+fn temp_root(label: &str) -> PathBuf {
+    let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+    let root = std::env::temp_dir().join(format!(
+        "faber-cargo-test-{label}-{}-{id}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&root).expect("create temp root");
+    root
+}
 
 #[test]
 fn minimal_generated_cargo_manifest_links_only_materialized_runtime() -> Result<(), Box<dyn Error>>
@@ -115,6 +129,45 @@ fn generated_cargo_manifest_escapes_metadata_paths_and_dependency_keys(
     assert_eq!(
         manifest["dependencies"]["library\"key"]["path"].as_str(),
         Some(library_path.to_string_lossy().as_ref())
+    );
+    Ok(())
+}
+
+#[test]
+fn generated_cargo_manifest_reuses_runtime_path_from_linked_library_deps(
+) -> Result<(), Box<dyn Error>> {
+    let root = temp_root("linked-runtime");
+    let library = root.join("target/faber/deps/http");
+    let runtime = root.join("faber-runtime");
+    fs::create_dir_all(&library)?;
+    fs::create_dir_all(&runtime)?;
+    fs::write(
+        library.join("Cargo.toml"),
+        format!(
+            r#"[package]
+name = "http"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+faber = {{ package = "faber-runtime", path = "{}" }}
+"#,
+            runtime.display()
+        ),
+    )?;
+    let mut plan = RustRuntimePlan {
+        needs_faber: true,
+        ..RustRuntimePlan::default()
+    };
+    plan.library_path_deps
+        .push(("http".to_owned(), library.clone()));
+
+    let rendered = render_generated_cargo_toml("demo", "0.1.0", &plan, &root);
+    let manifest = toml::from_str::<toml::Value>(&rendered)?;
+
+    assert_eq!(
+        manifest["dependencies"]["faber"]["path"].as_str(),
+        Some(runtime.to_string_lossy().as_ref())
     );
     Ok(())
 }

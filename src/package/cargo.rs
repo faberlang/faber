@@ -6,6 +6,7 @@ use radix::diagnostics::Diagnostic;
 
 use crate::core_support::materialize::{materialize, MaterializedCoreSupport};
 
+use super::runtime_dependency::runtime_path_from_crate_roots;
 use super::{BuildLayout, FaberManifest, ManifestRustHost, ProviderManifest};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -119,7 +120,13 @@ fn render_generated_cargo_toml_with_support(
     plan: &RustRuntimePlan,
     support: &MaterializedCoreSupport,
 ) -> Result<String, Box<Diagnostic>> {
-    let faber_path = support.faber_runtime().map_err(core_support_diagnostic)?;
+    let materialized_faber_path = support.faber_runtime().map_err(core_support_diagnostic)?;
+    let linked_runtime_path = runtime_path_from_crate_roots(
+        plan.library_path_deps
+            .iter()
+            .map(|(_, crate_path)| crate_path.as_path()),
+    );
+    let faber_path = linked_runtime_path.unwrap_or(materialized_faber_path);
     let mut deps = String::new();
     if plan.needs_faber {
         deps.push_str(&format!(
@@ -194,9 +201,14 @@ fn render_generated_cargo_toml(
     plan: &RustRuntimePlan,
     _: &Path,
 ) -> String {
-    let support = materialize().expect("embedded core support materializes for Cargo tests");
-    render_generated_cargo_toml_with_support(name, version, plan, &support)
-        .expect("materialized core support is valid for Cargo tests")
+    let support = match materialize() {
+        Ok(support) => support,
+        Err(error) => return format!("core support materialization failed: {error}"),
+    };
+    match render_generated_cargo_toml_with_support(name, version, plan, &support) {
+        Ok(rendered) => rendered,
+        Err(error) => format!("generated Cargo.toml rendering failed: {}", error.message),
+    }
 }
 
 fn core_support_diagnostic(

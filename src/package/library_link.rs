@@ -21,6 +21,9 @@ use super::codegen::ModuleNode;
 use super::compile::{generate_library_unit_rust, AnalyzedPackageUnit};
 use super::discovery::sanitize_crate_name;
 use super::member_path::resolve_package_member;
+use super::runtime_dependency::{
+    parse_dependency_requirement, runtime_path_for_target_dependencies,
+};
 use super::{analyze_package, BuildLayout};
 
 /// One generated library crate ready for a path dependency.
@@ -292,17 +295,11 @@ fn render_library_cargo_toml(
     } else {
         version.trim()
     };
-    let support = crate::core_support::materialize::materialize().map_err(|error| {
-        Diagnostic::error(format!("verified core support is unavailable: {error}"))
-            .with_arg("issue", "core_support_materialization_failed")
-    })?;
+    let runtime_path = runtime_path_for_target_dependencies(package_root, &target.dependencies)?;
     let mut deps = format!(
         "faber = {{ package = {}, path = {} }}\n",
         super::cargo::toml_string("faber-runtime"),
-        super::cargo::toml_path(&support.faber_runtime().map_err(|error| {
-            Diagnostic::error(format!("verified core support is unavailable: {error}"))
-                .with_arg("issue", "core_support_materialization_failed")
-        })?),
+        super::cargo::toml_path(&runtime_path),
     );
     for (name, req) in &target.dependencies {
         if name == "faber" {
@@ -342,7 +339,7 @@ fn render_dependency_requirement(package_root: &Path, requirement: &str) -> Stri
 }
 
 fn absolutize_inline_dependency_paths(package_root: &Path, requirement: &str) -> String {
-    let Ok(toml::Value::Table(mut table)) = requirement.trim().parse::<toml::Value>() else {
+    let toml::Value::Table(mut table) = parse_dependency_requirement(requirement) else {
         return super::cargo::toml_string(requirement);
     };
     if let Some(toml::Value::String(path)) = table.get_mut("path") {
