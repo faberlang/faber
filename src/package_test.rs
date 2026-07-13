@@ -10059,6 +10059,57 @@ fn g9_api2_http_package_verifies_and_exports_http_application_contract() {
 }
 
 #[test]
+fn g1_c4_imported_annotation_contract_survives_package_graph_extract() {
+    let lib = packages_http_lib();
+    let root = test_temp_dir("g1-c4-imported-annotation-contract");
+    let app = root.join("app");
+    write_http_consumer_app(
+        &app,
+        &lib,
+        r#"
+importa ex "http:http" privata http
+
+@ HttpApplication { nomen = "demo" }
+functio factory() → vacuum {
+}
+
+incipit {
+  factory()
+}
+"#,
+    );
+
+    let package = analyze_package(&Config::default(), &app).expect("analyze package graph");
+    let entry = package.entry_unit().expect("entry unit");
+    let application = entry
+        .analysis
+        .annotation_contracts
+        .applications()
+        .next()
+        .expect("imported HttpApplication contract application");
+    assert_eq!(
+        entry.analysis.interner.resolve(application.family),
+        "HttpApplication"
+    );
+
+    let contract = entry
+        .analysis
+        .annotation_contracts
+        .registry
+        .get(application.contract_id)
+        .expect("imported HttpApplication contract");
+    assert_eq!(
+        entry.analysis.interner.resolve(contract.name),
+        "HttpApplication"
+    );
+    assert_eq!(contract.fields.len(), 1);
+    assert_eq!(
+        entry.analysis.interner.resolve(contract.fields[0].name),
+        "nomen"
+    );
+}
+
+#[test]
 fn g9_api2_http_package_links_builder_application() {
     let lib = packages_http_lib();
     let root = test_temp_dir("g9-http-app");
