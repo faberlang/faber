@@ -22,6 +22,10 @@ serde_json = "1"
 toml = "1.1.2"
 postcard = { version = "1.1.3", default-features = false, features = ["alloc"] }
 zip = { version = "2", default-features = false, features = ["deflate"] }
+fs2 = "0.4"
+sha2 = "0.10"
+tar = "0.4"
+zstd = "0.13"
 
 [build-dependencies]
 sha2 = "0.10"
@@ -30,6 +34,3 @@ zstd = "0.13"
 
 [dev-dependencies]
 hygiene-ratchet = { path = "../radix/crates/hygiene-ratchet" }
-sha2 = "0.10"
-tar = "0.4"
-zstd = "0.13"
