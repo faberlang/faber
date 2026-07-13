@@ -1,0 +1,10 @@
+# Logical roots embedded by the Faber RC core-support payload.
+faber-runtime
+host-kernel-rs
+host-native-rs
+host-providers-rs/Cargo.toml
+host-providers-rs/crates/aleator
+host-providers-rs/crates/consolum
+host-providers-rs/crates/processus
+host-providers-rs/crates/solum
+host-providers-rs/crates/tempus

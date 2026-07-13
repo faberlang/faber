@@ -11,6 +11,8 @@
 //! helpers stay crate-local so lower-level compiler APIs do not inherit package
 //! tool assumptions.
 
+pub mod core_support;
+
 mod explain_render;
 mod input_shape;
 mod io_buf;
@@ -23,6 +25,8 @@ pub mod explain;
 pub mod package;
 pub mod reference;
 
+#[cfg(test)]
+mod core_support_test;
 #[cfg(test)]
 mod diagnostic_explain_test;
 #[cfg(test)]
