@@ -1,8 +1,8 @@
+use crate::core_support::materialize::materialize;
 use radix::diagnostics::Diagnostic;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::fs;
-use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -148,9 +148,20 @@ pub(crate) fn load_provider_manifests(
     providers: &BTreeSet<String>,
     routes: &BTreeSet<String>,
 ) -> Result<Vec<ProviderManifest>, Diagnostic> {
+    let support = materialize().map_err(|error| {
+        Diagnostic::error(format!("verified core support is unavailable: {error}"))
+            .with_arg("issue", "core_support_materialization_failed")
+    })?;
     let mut manifests = Vec::new();
     for provider in providers {
-        let path = provider_manifest_path(provider);
+        let path = support
+            .provider(provider)
+            .map_err(|error| {
+                Diagnostic::error(format!("unsupported host provider `{provider}`: {error}"))
+                    .with_arg("issue", "host_provider_unsupported")
+                    .with_arg("provider", provider.clone())
+            })?
+            .join("src/manifest.json");
         let source = fs::read_to_string(&path).map_err(|error| {
             Diagnostic::error(format!(
                 "selected host provider `{provider}` has no readable manifest: {error}"
@@ -198,11 +209,4 @@ pub(crate) fn load_provider_manifests(
         .with_arg("route", route.clone()));
     }
     Ok(manifests)
-}
-
-pub(crate) fn provider_manifest_path(provider: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../host-providers-rs/crates")
-        .join(provider)
-        .join("src/manifest.json")
 }

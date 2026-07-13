@@ -60,10 +60,10 @@ fn linked_library_cargo_manifest_escapes_values_and_inline_paths() {
     let rendered = render_library_cargo_toml(
         "library",
         "0.1.0\"\n# injected",
-        Path::new("/tmp/app"),
         Path::new("/tmp/package"),
         &target,
-    );
+    )
+    .expect("materialized core support");
     let manifest = toml::from_str::<toml::Value>(&rendered).expect("valid Cargo TOML");
     let package = manifest
         .get("package")

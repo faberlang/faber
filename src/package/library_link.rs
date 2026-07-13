@@ -76,7 +76,7 @@ pub(crate) fn emit_linked_library_crates(
 }
 
 fn emit_one_library_crate(
-    app_root: &Path,
+    _app_root: &Path,
     package_root: &Path,
     lib_manifest: &super::FaberManifest,
     crate_name: &str,
@@ -159,10 +159,10 @@ fn emit_one_library_crate(
     let cargo_toml = render_library_cargo_toml(
         crate_name,
         &lib_manifest.package.version,
-        app_root,
         package_root,
         target,
-    );
+    )
+    .map_err(|error| vec![error])?;
     let cargo_path = crate_root.join("Cargo.toml");
     fs::write(&cargo_path, cargo_toml)
         .map_err(|err| vec![Diagnostic::io_error(&cargo_path, err)])?;
@@ -280,34 +280,41 @@ fn promote_binding_function_visibility(source: &str) -> String {
     promoted
 }
 
+#[allow(clippy::result_large_err)]
 fn render_library_cargo_toml(
     crate_name: &str,
     version: &str,
-    app_root: &Path,
     package_root: &Path,
     target: &super::manifest::ManifestTarget,
-) -> String {
+) -> Result<String, Diagnostic> {
     let version = if version.trim().is_empty() {
         "0.1.0"
     } else {
         version.trim()
     };
+    let support = crate::core_support::materialize::materialize().map_err(|error| {
+        Diagnostic::error(format!("verified core support is unavailable: {error}"))
+            .with_arg("issue", "core_support_materialization_failed")
+    })?;
     let mut deps = format!(
         "faber = {{ package = {}, path = {} }}\n",
         super::cargo::toml_string("faber-runtime"),
-        super::cargo::toml_path(&super::cargo::runtime_cluster_path_from(
-            app_root,
-            "faber-runtime",
-        )),
+        super::cargo::toml_path(&support.faber_runtime().map_err(|error| {
+            Diagnostic::error(format!("verified core support is unavailable: {error}"))
+                .with_arg("issue", "core_support_materialization_failed")
+        })?),
     );
     for (name, req) in &target.dependencies {
+        if name == "faber" {
+            continue;
+        }
         let rendered = render_dependency_requirement(package_root, req);
         deps.push_str(&format!("{} = {rendered}\n", super::cargo::toml_key(name)));
     }
     // No [workspace] table: this crate is a path dependency under the application
     // generated workspace root (`target/faber/`). Nested empty workspaces make Cargo
     // reject the tree as multiple workspace roots.
-    format!(
+    Ok(format!(
         r#"[package]
 name = {crate_name}
 version = {version}
@@ -323,7 +330,7 @@ path = "src/lib.rs"
 {deps}"#,
         crate_name = super::cargo::toml_string(crate_name),
         version = super::cargo::toml_string(version),
-    )
+    ))
 }
 
 fn render_dependency_requirement(package_root: &Path, requirement: &str) -> String {

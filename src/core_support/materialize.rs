@@ -23,8 +23,48 @@ pub struct MaterializedCoreSupport {
 
 impl MaterializedCoreSupport {
     /// The content-addressed root suitable for later generated-Cargo routing.
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn root(&self) -> &Path {
         &self.root
+    }
+
+    /// Verified source root for the core runtime crate.
+    pub fn faber_runtime(&self) -> Result<PathBuf, MaterializeError> {
+        self.required_directory("faber-runtime")
+    }
+
+    /// Verified source root for the native kernel crate.
+    pub fn host_kernel(&self) -> Result<PathBuf, MaterializeError> {
+        self.required_directory("host-kernel-rs")
+    }
+
+    /// Verified source root for the native host crate.
+    pub fn host_native(&self) -> Result<PathBuf, MaterializeError> {
+        self.required_directory("host-native-rs")
+    }
+
+    /// Verified source root for one explicit embedded provider crate.
+    pub fn provider(&self, provider: &str) -> Result<PathBuf, MaterializeError> {
+        if !matches!(
+            provider,
+            "aleator" | "consolum" | "processus" | "solum" | "tempus"
+        ) {
+            return Err(MaterializeError::InvalidPayload(
+                "unsupported core-support provider",
+            ));
+        }
+        self.required_directory(&format!("host-providers-rs/crates/{provider}"))
+    }
+
+    fn required_directory(&self, relative: &str) -> Result<PathBuf, MaterializeError> {
+        let path = self.root.join(relative);
+        let metadata = fs::symlink_metadata(&path).map_err(MaterializeError::io)?;
+        if metadata.file_type().is_symlink() || !metadata.is_dir() {
+            return Err(MaterializeError::InvalidPayload(
+                "verified core-support path is unavailable",
+            ));
+        }
+        Ok(path)
     }
 }
 

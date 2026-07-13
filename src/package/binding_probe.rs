@@ -78,12 +78,9 @@ fn run_probe_in(
     let source_dir = root.join("src");
     fs::create_dir_all(&source_dir).map_err(|error| Diagnostic::io_error(&source_dir, error))?;
     let manifest_path = root.join("Cargo.toml");
-    let manifest = probe_manifest(package_root, dependencies).map_err(|error| {
-        Diagnostic::error(format!(
-            "failed to serialize Rust binding probe manifest: {error}"
-        ))
-        .with_file(anchor.display().to_string())
-        .with_arg("issue", "binding_probe_manifest_serialize_failed")
+    let manifest = probe_manifest(package_root, dependencies).map_err(|mut error| {
+        error.file = anchor.display().to_string();
+        error
     })?;
     fs::write(&manifest_path, manifest)
         .map_err(|error| Diagnostic::io_error(&manifest_path, error))?;
@@ -161,10 +158,11 @@ fn run_probe_in(
     .with_arg("issue", "binding_rust_probe_failed"))
 }
 
+#[allow(clippy::result_large_err)]
 fn probe_manifest(
     package_root: &Path,
     dependencies: &BTreeMap<String, String>,
-) -> Result<String, toml::ser::Error> {
+) -> Result<String, Diagnostic> {
     let mut package = toml::map::Map::new();
     package.insert(
         "name".to_owned(),
@@ -184,26 +182,43 @@ fn probe_manifest(
             (name.clone(), value)
         })
         .collect::<toml::map::Map<_, _>>();
-    dependencies.entry("faber".to_owned()).or_insert_with(|| {
-        let mut runtime = toml::map::Map::new();
-        runtime.insert(
-            "package".to_owned(),
-            toml::Value::String("faber-runtime".to_owned()),
-        );
-        runtime.insert(
-            "path".to_owned(),
-            toml::Value::String(
-                super::cargo::runtime_cluster_path_from(package_root, "faber-runtime")
-                    .display()
-                    .to_string(),
-            ),
-        );
-        toml::Value::Table(runtime)
-    });
+    let runtime_path = crate::core_support::materialize::materialize()
+        .and_then(|support| support.faber_runtime())
+        .map_err(|error| {
+            Diagnostic::error(format!("verified core support is unavailable: {error}"))
+                .with_arg("issue", "core_support_materialization_failed")
+        })?;
+    let mut runtime = toml::map::Map::new();
+    runtime.insert(
+        "package".to_owned(),
+        toml::Value::String("faber-runtime".to_owned()),
+    );
+    runtime.insert(
+        "path".to_owned(),
+        toml::Value::String(runtime_path.display().to_string()),
+    );
+    let runtime = toml::Value::Table(runtime);
+    for (name, value) in &mut dependencies {
+        let is_runtime = name == "faber"
+            || value
+                .as_table()
+                .and_then(|table| table.get("package"))
+                .and_then(toml::Value::as_str)
+                == Some("faber-runtime");
+        if is_runtime {
+            *value = runtime.clone();
+        }
+    }
+    dependencies.entry("faber".to_owned()).or_insert(runtime);
     let mut manifest = toml::map::Map::new();
     manifest.insert("package".to_owned(), toml::Value::Table(package));
     manifest.insert("dependencies".to_owned(), toml::Value::Table(dependencies));
-    toml::to_string(&manifest)
+    toml::to_string(&manifest).map_err(|error| {
+        Diagnostic::error(format!(
+            "failed to serialize Rust binding probe manifest: {error}"
+        ))
+        .with_arg("issue", "binding_probe_manifest_serialize_failed")
+    })
 }
 
 fn normalize_dependency_value(package_root: &Path, value: toml::Value) -> toml::Value {

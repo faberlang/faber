@@ -1,9 +1,10 @@
 use std::collections::BTreeSet;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use radix::codegen::Target;
 use radix::diagnostics::Diagnostic;
+
+use crate::core_support::materialize::{materialize, MaterializedCoreSupport};
 
 use super::{BuildLayout, FaberManifest, ManifestRustHost, ProviderManifest};
 
@@ -100,26 +101,25 @@ pub(crate) fn package_host_selection_diagnostic(
 /// edition. `binary_name` must already be sanitized for Cargo.
 fn generate_cargo_toml(
     meta: &FaberManifest,
-    package_root: &Path,
     binary_name: &str,
     plan: &RustRuntimePlan,
-) -> String {
+    support: &MaterializedCoreSupport,
+) -> Result<String, Box<Diagnostic>> {
     let version = if meta.package.version.trim().is_empty() {
         "0.1.0"
     } else {
         meta.package.version.trim()
     };
-    render_generated_cargo_toml(binary_name, version, plan, package_root)
+    render_generated_cargo_toml_with_support(binary_name, version, plan, support)
 }
 
-fn render_generated_cargo_toml(
+fn render_generated_cargo_toml_with_support(
     name: &str,
     version: &str,
     plan: &RustRuntimePlan,
-    package_root: &Path,
-) -> String {
-    let cluster_root = runtime_cluster_root_for_plan(package_root, plan);
-    let faber_path = cluster_root.join("faber-runtime");
+    support: &MaterializedCoreSupport,
+) -> Result<String, Box<Diagnostic>> {
+    let faber_path = support.faber_runtime().map_err(core_support_diagnostic)?;
     let mut deps = String::new();
     if plan.needs_faber {
         deps.push_str(&format!(
@@ -132,12 +132,12 @@ fn render_generated_cargo_toml(
         deps.push_str(&format!(
             "host_kernel = {{ package = {}, path = {} }}\n",
             toml_string("host-kernel"),
-            toml_path(&cluster_root.join("host-kernel-rs")),
+            toml_path(&support.host_kernel().map_err(core_support_diagnostic)?),
         ));
         deps.push_str(&format!(
             "host_native = {{ package = {}, path = {} }}\n",
             toml_string("host-native"),
-            toml_path(&cluster_root.join("host-native-rs")),
+            toml_path(&support.host_native().map_err(core_support_diagnostic)?),
         ));
         for provider in &plan.selected_providers {
             deps.push_str(&format!(
@@ -145,10 +145,9 @@ fn render_generated_cargo_toml(
                 toml_key(provider),
                 toml_string(provider),
                 toml_path(
-                    &cluster_root
-                        .join("host-providers-rs")
-                        .join("crates")
-                        .join(provider),
+                    &support
+                        .provider(provider)
+                        .map_err(core_support_diagnostic)?
                 ),
             ));
         }
@@ -164,7 +163,7 @@ fn render_generated_cargo_toml(
         ));
     }
 
-    format!(
+    Ok(format!(
         r#"[package]
 name = {name}
 version = {version}
@@ -185,6 +184,27 @@ edition = "2021"
         name = toml_string(name),
         version = toml_string(version),
         deps = deps
+    ))
+}
+
+#[cfg(test)]
+fn render_generated_cargo_toml(
+    name: &str,
+    version: &str,
+    plan: &RustRuntimePlan,
+    _: &Path,
+) -> String {
+    let support = materialize().expect("embedded core support materializes for Cargo tests");
+    render_generated_cargo_toml_with_support(name, version, plan, &support)
+        .expect("materialized core support is valid for Cargo tests")
+}
+
+fn core_support_diagnostic(
+    error: crate::core_support::materialize::MaterializeError,
+) -> Box<Diagnostic> {
+    Box::new(
+        Diagnostic::error(format!("verified core support is unavailable: {error}"))
+            .with_arg("issue", "core_support_materialization_failed"),
     )
 }
 
@@ -228,96 +248,6 @@ pub(super) fn toml_string(value: &str) -> String {
     quoted
 }
 
-fn runtime_cluster_root_for_plan(package_root: &Path, plan: &RustRuntimePlan) -> PathBuf {
-    let required = runtime_cluster_repo_names_for_plan(plan);
-    if let Some(root) = coherent_runtime_cluster_root_from(package_root, &required) {
-        return root;
-    }
-    if let Some(root) =
-        coherent_runtime_cluster_root_from(Path::new(env!("CARGO_MANIFEST_DIR")), &required)
-    {
-        return root;
-    }
-    runtime_cluster_path_from(package_root, "faber-runtime")
-        .parent()
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| package_root.to_path_buf())
-}
-
-fn runtime_cluster_repo_names_for_plan(plan: &RustRuntimePlan) -> Vec<&'static str> {
-    let mut repos = vec!["faber-runtime"];
-    if matches!(plan.host, Some(ManifestRustHost::Native)) {
-        repos.push("host-kernel-rs");
-        repos.push("host-native-rs");
-        if !plan.selected_providers.is_empty() {
-            repos.push("host-providers-rs");
-        }
-    }
-    repos
-}
-
-fn coherent_runtime_cluster_root_from(manifest_dir: &Path, required: &[&str]) -> Option<PathBuf> {
-    for candidate in manifest_dir.ancestors() {
-        if !required.iter().all(|repo| candidate.join(repo).is_dir()) {
-            continue;
-        }
-        if candidate.join("PACKET.md").is_file()
-            || candidate.join("MEMBERS.md").is_file()
-            || ["faber-runtime", "host-kernel-rs", "host-native-rs"]
-                .iter()
-                .all(|repo| candidate.join(repo).is_dir())
-        {
-            return Some(fs::canonicalize(candidate).unwrap_or_else(|_| candidate.to_path_buf()));
-        }
-    }
-    None
-}
-
-pub(crate) fn runtime_cluster_path_from(package_root: &Path, name: &str) -> PathBuf {
-    let candidate = sibling_repo_path_from(package_root, name);
-    if candidate.is_dir() {
-        return candidate;
-    }
-    sibling_repo_path_from(Path::new(env!("CARGO_MANIFEST_DIR")), name)
-}
-
-fn sibling_repo_path_from(manifest_dir: &Path, name: &str) -> PathBuf {
-    for candidate in manifest_dir.ancestors() {
-        let sibling = candidate.join(name);
-        if !sibling.is_dir() {
-            continue;
-        }
-        if candidate.join("PACKET.md").is_file() || candidate.join("MEMBERS.md").is_file() {
-            return fs::canonicalize(&sibling).unwrap_or(sibling);
-        }
-        let has_core_runtime_repos = ["faber-runtime", "host-kernel-rs", "host-native-rs"]
-            .iter()
-            .all(|repo| candidate.join(repo).is_dir());
-        if has_core_runtime_repos {
-            return fs::canonicalize(&sibling).unwrap_or(sibling);
-        }
-    }
-    let fallback = manifest_dir.join("..").join(name);
-    fs::canonicalize(&fallback).unwrap_or(fallback)
-}
-
-#[cfg(test)]
-fn local_repo_path_from(manifest_dir: &Path, name: &str) -> PathBuf {
-    for candidate in manifest_dir.ancestors() {
-        let sibling = candidate.join(name);
-        if sibling.is_dir() {
-            return sibling;
-        }
-    }
-    manifest_dir.join("..").join(name)
-}
-
-#[cfg(test)]
-#[cfg_attr(test, allow(dead_code))]
-pub(crate) fn local_repo_path(name: &str) -> PathBuf {
-    local_repo_path_from(Path::new(env!("CARGO_MANIFEST_DIR")), name)
-}
-
 #[cfg(test)]
 #[path = "cargo_test.rs"]
 mod tests;
@@ -354,10 +284,11 @@ pub(crate) fn emit_generated_crate_with_runtime_plan(
         return Err(Box::new(Diagnostic::io_error(&src_dir, err)));
     }
 
+    let support = materialize().map_err(core_support_diagnostic)?;
     let cargo_src = if let Some(m) = meta {
-        generate_cargo_toml(m, &layout.package_root, layout.binary_name(), plan)
+        generate_cargo_toml(m, layout.binary_name(), plan, &support)?
     } else {
-        render_generated_cargo_toml(layout.binary_name(), "0.1.0", plan, &layout.package_root)
+        render_generated_cargo_toml_with_support(layout.binary_name(), "0.1.0", plan, &support)?
     };
     if let Err(err) = fs::write(&layout.generated_cargo_manifest, &cargo_src) {
         return Err(Box::new(Diagnostic::io_error(
