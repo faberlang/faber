@@ -7,9 +7,11 @@ import contextlib
 import copy
 import importlib.util
 import io
+import os
 import pathlib
 import subprocess
 import sys
+import tempfile
 import tomllib
 
 
@@ -82,9 +84,17 @@ def check_allowed_target_edges(root: pathlib.Path) -> None:
             raise AssertionError(f"{name}: {error}") from error
 
 
+UNSUPPORTED_TARGET_FIXTURE_ENV = "FABER_SESSION_CLI_NEGATIVE_UNSUPPORTED_TARGET_FIXTURE"
+
+
 def check_unsupported_target_fixture(root: pathlib.Path) -> None:
     checker = root / "check-session-cli-contract.py"
-    fixture = root / "session-cli-contract-unsupported-target.toml"
+    fixture = pathlib.Path(
+        os.environ.get(
+            UNSUPPORTED_TARGET_FIXTURE_ENV,
+            root / "session-cli-contract-unsupported-target.toml",
+        )
+    )
     result = subprocess.run(
         ["python3", str(checker), str(fixture)],
         text=True,
@@ -95,15 +105,44 @@ def check_unsupported_target_fixture(root: pathlib.Path) -> None:
     if result.returncode == 0:
         print("FAIL unsupported target fixture unexpectedly passed", file=sys.stderr)
         print(result.stdout, file=sys.stderr)
-        return 1
+        raise AssertionError("unsupported target fixture unexpectedly passed")
     if "admission.allowed_targets contains unknown targets ['unsupported-target']" not in result.stderr:
         print("FAIL unsupported target fixture failed for the wrong reason", file=sys.stderr)
         print(result.stderr, file=sys.stderr)
         raise AssertionError("unsupported target fixture failed for the wrong reason")
 
 
+def check_unexpected_pass_regression(root: pathlib.Path) -> None:
+    with tempfile.TemporaryDirectory(prefix="faber-session-negative-") as temporary:
+        passing_fixture = pathlib.Path(temporary) / "passing-session-cli-contract.toml"
+        passing_fixture.write_bytes((root / "session-cli-contract.toml").read_bytes())
+        env = os.environ.copy()
+        env[UNSUPPORTED_TARGET_FIXTURE_ENV] = str(passing_fixture)
+        result = subprocess.run(
+            ["python3", str(root / "check-session-cli-contract-negative.py")],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=30,
+            env=env,
+        )
+    if result.returncode == 0:
+        raise AssertionError("negative checker process passed when unsupported-target fixture passed")
+    if "unsupported target fixture unexpectedly passed" not in result.stderr:
+        raise AssertionError(
+            "negative checker process failed without the unsupported-target false-pass diagnostic"
+        )
+
+
 def main() -> int:
     root = pathlib.Path(__file__).resolve().parent
+    if len(sys.argv) > 2 or (len(sys.argv) == 2 and sys.argv[1] != "--self-test"):
+        print("usage: check-session-cli-contract-negative.py [--self-test]", file=sys.stderr)
+        return 1
+    if len(sys.argv) == 2:
+        check_unexpected_pass_regression(root)
+        print("ok: session CLI contract negative checker self-test")
+        return 0
     check_allowed_target_edges(root)
     check_unsupported_target_fixture(root)
     print("ok: session CLI contract negative fixtures")
