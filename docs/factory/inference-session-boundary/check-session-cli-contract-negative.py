@@ -47,6 +47,15 @@ def with_allowed_targets(document: dict[str, object], allowed_targets: list[str]
     return mutated
 
 
+def with_field(document: dict[str, object], table: str, field: str, value: object) -> dict[str, object]:
+    mutated = copy.deepcopy(document)
+    table_value = mutated[table]
+    if not isinstance(table_value, dict):
+        raise AssertionError(f"fixture table {table} is not a table")
+    table_value[field] = value
+    return mutated
+
+
 def check_allowed_target_edges(root: pathlib.Path) -> None:
     checker = load_checker(root)
     with open(root / "session-cli-contract.toml", "rb") as handle:
@@ -80,6 +89,58 @@ def check_allowed_target_edges(root: pathlib.Path) -> None:
     for name, allowed_targets, expected_error in cases:
         try:
             assert_rejects(checker, with_allowed_targets(baseline, allowed_targets), expected_error)
+        except AssertionError as error:
+            raise AssertionError(f"{name}: {error}") from error
+
+
+def check_exact_contract_fields(root: pathlib.Path) -> None:
+    checker = load_checker(root)
+    with open(root / "session-cli-contract.toml", "rb") as handle:
+        baseline = tomllib.load(handle)
+
+    checker.validate(baseline)
+
+    cases = [
+        (
+            "package root argument",
+            with_field(baseline, "command", "package_root_arg", "<pkg>"),
+            "command.package_root_arg must be <package-root>",
+        ),
+        (
+            "separator",
+            with_field(baseline, "command", "separator", "---"),
+            "command.separator must be --",
+        ),
+        (
+            "package root input contract",
+            with_field(baseline, "inputs", "package_root", "optional"),
+            "inputs.package_root must be required-relative-or-absolute-path",
+        ),
+        (
+            "existing package root requirement",
+            with_field(baseline, "admission", "requires_existing_package_root", False),
+            "admission.requires_existing_package_root must be true",
+        ),
+        (
+            "stdout contract",
+            with_field(baseline, "stdout", "contract", "free-form session text"),
+            "stdout.contract must be line-delimited session events",
+        ),
+        (
+            "stderr contract",
+            with_field(baseline, "stderr", "contract", "warnings and diagnostics"),
+            "stderr.contract must be diagnostics only",
+        ),
+        (
+            "stderr required prefix",
+            with_field(baseline, "stderr", "required_failure_prefix", "session:"),
+            "stderr.required_failure_prefix must be faber session:",
+        ),
+    ]
+
+    for name, document, expected_error in cases:
+        try:
+            assert_rejects(checker, document, expected_error)
         except AssertionError as error:
             raise AssertionError(f"{name}: {error}") from error
 
@@ -144,6 +205,7 @@ def main() -> int:
         print("ok: session CLI contract negative checker self-test")
         return 0
     check_allowed_target_edges(root)
+    check_exact_contract_fields(root)
     check_unsupported_target_fixture(root)
     print("ok: session CLI contract negative fixtures")
     return 0

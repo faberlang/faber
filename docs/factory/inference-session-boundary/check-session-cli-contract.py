@@ -42,6 +42,12 @@ REQUIRED_FAILURES = {
 }
 
 EXPECTED_ALLOWED_TARGETS = ("fmir-text", "fmir", "fmir-bin", "scena", "rust")
+EXPECTED_PACKAGE_ROOT_ARG = "<package-root>"
+EXPECTED_PACKAGE_ROOT_CONTRACT = "required-relative-or-absolute-path"
+EXPECTED_SEPARATOR = "--"
+EXPECTED_STDOUT_CONTRACT = "line-delimited session events"
+EXPECTED_STDERR_CONTRACT = "diagnostics only"
+EXPECTED_FAILURE_PREFIX = "faber session:"
 
 
 def fail(message: str) -> None:
@@ -88,12 +94,25 @@ def validate(document: dict[str, object]) -> None:
     if string(command.get("status"), "command.status") != "contract-only":
         fail("command.status must remain contract-only")
     shape = string(command.get("shape"), "command.shape")
-    for required in ("faber session", "--model-manifest", "--"):
+    for required in (
+        "faber session",
+        EXPECTED_PACKAGE_ROOT_ARG,
+        "--model-manifest",
+        "<manifest>",
+        EXPECTED_SEPARATOR,
+        "<session-args>",
+    ):
         if required not in shape:
             fail(f"command.shape must include {required}")
+    if string(command.get("package_root_arg"), "command.package_root_arg") != EXPECTED_PACKAGE_ROOT_ARG:
+        fail(f"command.package_root_arg must be {EXPECTED_PACKAGE_ROOT_ARG}")
     if string(command.get("model_manifest_flag"), "command.model_manifest_flag") != "--model-manifest":
         fail("command.model_manifest_flag must be --model-manifest")
+    if string(command.get("separator"), "command.separator") != EXPECTED_SEPARATOR:
+        fail(f"command.separator must be {EXPECTED_SEPARATOR}")
 
+    if string(inputs.get("package_root"), "inputs.package_root") != EXPECTED_PACKAGE_ROOT_CONTRACT:
+        fail(f"inputs.package_root must be {EXPECTED_PACKAGE_ROOT_CONTRACT}")
     accepted = set(string_list(inputs.get("accepted_manifest_formats"), "inputs.accepted_manifest_formats"))
     if accepted != {"oracle"}:
         fail("inputs.accepted_manifest_formats must be exactly ['oracle']")
@@ -130,18 +149,24 @@ def validate(document: dict[str, object]) -> None:
         fail(f"admission.allowed_targets must be exactly {list(EXPECTED_ALLOWED_TARGETS)}")
     if not bool_value(admission.get("requires_manifest_static_validation"), "admission.requires_manifest_static_validation"):
         fail("manifest static validation must be required")
+    if not bool_value(admission.get("requires_existing_package_root"), "admission.requires_existing_package_root"):
+        fail("admission.requires_existing_package_root must be true")
     for field in ("loads_model_bytes", "loads_tokenizer", "executes_runtime", "downloads_models"):
         if bool_value(admission.get(field), f"admission.{field}"):
             fail(f"admission.{field} must stay false")
 
+    if string(stdout.get("contract"), "stdout.contract") != EXPECTED_STDOUT_CONTRACT:
+        fail(f"stdout.contract must be {EXPECTED_STDOUT_CONTRACT}")
     allowed_events = set(string_list(stdout.get("allowed_event_kinds"), "stdout.allowed_event_kinds"))
     if not {"artifact", "diagnostic", "oracle-request", "oracle-result"}.issubset(allowed_events):
         fail("stdout.allowed_event_kinds missing contract events")
     forbidden_events = set(string_list(stdout.get("forbidden_event_kinds"), "stdout.forbidden_event_kinds"))
     if not {"token", "logit", "gpu-kernel", "model-loaded"}.issubset(forbidden_events):
         fail("stdout.forbidden_event_kinds missing runtime event exclusions")
-    if "diagnostics" not in string(stderr.get("contract"), "stderr.contract"):
-        fail("stderr.contract must be diagnostics-only")
+    if string(stderr.get("contract"), "stderr.contract") != EXPECTED_STDERR_CONTRACT:
+        fail(f"stderr.contract must be {EXPECTED_STDERR_CONTRACT}")
+    if string(stderr.get("required_failure_prefix"), "stderr.required_failure_prefix") != EXPECTED_FAILURE_PREFIX:
+        fail(f"stderr.required_failure_prefix must be {EXPECTED_FAILURE_PREFIX}")
 
     missing_failures = sorted(REQUIRED_FAILURES - set(failures.keys()))
     if missing_failures:

@@ -105,9 +105,10 @@ future `faber session <package-root> --model-manifest <manifest> --
 <session-args>` shape, oracle-only manifest admission, package target
 allow-lists, stdout/stderr contracts, fail-before-execution behavior, and
 explicit non-claims. The checker validates only the contract metadata,
-including the exact allowed package target set, and has a negative
-unsupported-target fixture. It does not run `faber`, load model or tokenizer
-artifacts, or execute an inference runtime.
+including the exact package-root, separator, stdout/stderr, required failure
+prefix, and allowed package target set. Its negative fixture covers these
+exact-contract fields plus unsupported target drift. It does not run `faber`,
+load model or tokenizer artifacts, or execute an inference runtime.
 
 ## Package And Runtime Boundary
 
