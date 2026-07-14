@@ -51,7 +51,7 @@ pub(super) fn package_source_files(source_root: &Path) -> Result<Vec<PathBuf>, V
             };
             if !canonical_path.starts_with(&canonical_root) {
                 diagnostics.push(
-                    Diagnostic::error(format!(
+                    crate::package_diagnostic_error(format!(
                         "package source resolves outside the source root: {}",
                         path.display()
                     ))
@@ -153,7 +153,7 @@ pub(super) fn load_package_source(
     } = parse;
     let Some(program) = program else {
         diagnostics.push(
-            Diagnostic::error("successful package parse result missing program")
+            crate::package_diagnostic_error("successful package parse result missing program")
                 .with_file(path.display().to_string()),
         );
         return None;

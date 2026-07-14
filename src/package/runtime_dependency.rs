@@ -17,8 +17,10 @@ pub(crate) fn runtime_path_for_target_dependencies(
     crate::core_support::materialize::materialize()
         .and_then(|support| support.faber_runtime())
         .map_err(|error| {
-            Diagnostic::error(format!("verified core support is unavailable: {error}"))
-                .with_arg("issue", "core_support_materialization_failed")
+            crate::package_diagnostic_error(format!(
+                "verified core support is unavailable: {error}"
+            ))
+            .with_arg("issue", "core_support_materialization_failed")
         })
 }
 

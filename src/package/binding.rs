@@ -142,7 +142,7 @@ fn read_binding_manifest(path: &Path) -> Result<BindingManifest, Vec<Diagnostic>
     let source = fs::read_to_string(path).map_err(|err| vec![Diagnostic::io_error(path, err)])?;
     toml::from_str::<BindingManifest>(&source).map_err(|err| {
         vec![
-            Diagnostic::error(format!("invalid binding manifest: {err}"))
+            crate::package_diagnostic_error(format!("invalid binding manifest: {err}"))
                 .with_file(path.display().to_string())
                 .with_arg("issue", "invalid_binding_manifest"),
         ]
@@ -174,12 +174,14 @@ fn collect_binding_contracts(
             let key = format!("{provider}:{module}.{}", contract.name);
             if !keys.insert(key.clone()) {
                 diagnostics.push(
-                    Diagnostic::error(format!("duplicate Faber binding contract `{key}`"))
-                        .with_phase(DiagnosticPhase::Analysis)
-                        .with_file(unit.path.display().to_string())
-                        .with_span(contract.span)
-                        .with_arg("issue", "binding_duplicate_contract")
-                        .with_arg("binding", key),
+                    crate::package_diagnostic_error(format!(
+                        "duplicate Faber binding contract `{key}`"
+                    ))
+                    .with_phase(DiagnosticPhase::Analysis)
+                    .with_file(unit.path.display().to_string())
+                    .with_span(contract.span)
+                    .with_arg("issue", "binding_duplicate_contract")
+                    .with_arg("binding", key),
                 );
                 continue;
             }
@@ -237,7 +239,7 @@ fn validate_bindings(
     for declaration in declarations {
         if !declaration.has_body && !binding_keys.contains(declaration.key.as_str()) {
             diagnostics.push(
-                Diagnostic::error(format!(
+                crate::package_diagnostic_error(format!(
                     "declaration `{}` has no Faber body and no binding",
                     declaration.key
                 ))
@@ -328,7 +330,7 @@ fn prove_rust_bindings(
                 declaration.callable
             )),
             Err(error) => diagnostics.push(
-                Diagnostic::error(format!(
+                crate::package_diagnostic_error(format!(
                     "binding `{key}` cannot be represented as a Rust ABI probe: {}",
                     error.message
                 ))
@@ -361,7 +363,7 @@ fn prove_rust_bindings(
 }
 
 fn diagnostic(path: &Path, message: impl Into<String>, issue: &'static str) -> Diagnostic {
-    Diagnostic::error(message.into())
+    crate::package_diagnostic_error(message.into())
         .with_file(path.display().to_string())
         .with_arg("issue", issue)
 }

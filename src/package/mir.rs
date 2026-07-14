@@ -1371,11 +1371,11 @@ fn select_entry_unit(package: &AnalyzedPackage) -> Result<usize, Vec<Diagnostic>
         .collect::<Vec<_>>();
     match entries.as_slice() {
         [index] => Ok(*index),
-        [] => Err(vec![Diagnostic::error(
+        [] => Err(vec![crate::package_diagnostic_error(
             "package MIR run requires exactly one entry unit",
         )
         .with_file(package.spec.entry.display().to_string())]),
-        _ => Err(vec![Diagnostic::error(
+        _ => Err(vec![crate::package_diagnostic_error(
             "package MIR run found multiple entry units",
         )
         .with_file(package.spec.entry.display().to_string())]),
@@ -1398,7 +1398,7 @@ fn library_import_diagnostics(package: &AnalyzedPackage) -> Option<Vec<Diagnosti
             .map(library_identity_label)
             .collect::<BTreeSet<_>>();
         diagnostics.extend(imports.pop_first().map(|first| {
-            Diagnostic::error(format!(
+            crate::package_diagnostic_error(format!(
                 "package MIR does not yet support library imports such as `{first}`; use compiled package execution for this surface"
             ))
             .with_file(unit.path.display().to_string())
@@ -1968,7 +1968,7 @@ fn push_cli_option_match_diagnostic(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     diagnostics.push(
-        Diagnostic::error(format!(
+        crate::package_diagnostic_error(format!(
             "package MIR could not match CLI option `{option}`; use compiled package execution for this surface"
         ))
         .with_file(unit.path.display().to_string()),
@@ -1981,7 +1981,7 @@ fn push_cli_option_missing_value_diagnostic(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     diagnostics.push(
-        Diagnostic::error(format!(
+        crate::package_diagnostic_error(format!(
             "package MIR expected a value for CLI option `{option}`; use compiled package execution for this surface"
         ))
         .with_file(unit.path.display().to_string()),
@@ -2072,7 +2072,7 @@ fn plan_cli_subcommand(
     let Some(command_match) = matching_cli_command(&cli_program.commands, &command_argumenta)
     else {
         diagnostics.push(
-            Diagnostic::error(format!(
+            crate::package_diagnostic_error(format!(
                 "package MIR could not match CLI command `{}`; use compiled package execution for this surface",
                 command_argumenta.join(" ")
             ))
@@ -2100,7 +2100,7 @@ fn plan_cli_subcommand(
     let command = command_match.command;
     let Some(unit_index) = command_unit_index(package, command) else {
         diagnostics.push(
-            Diagnostic::error(format!(
+            crate::package_diagnostic_error(format!(
                 "package MIR could not resolve CLI command module for `{}`",
                 command.path.join(" ")
             ))
@@ -2702,7 +2702,7 @@ fn push_cli_operand_parse_diagnostic(
 ) {
     let name = operand.binding_name.as_str();
     diagnostics.push(
-        Diagnostic::error(format!(
+        crate::package_diagnostic_error(format!(
             "package MIR could not parse CLI operand `{name}` value `{value}` as {ty}; use compiled package execution for this surface"
         ))
         .with_file(unit.path.display().to_string()),
@@ -2718,7 +2718,7 @@ fn push_cli_option_parse_diagnostic(
 ) {
     let name = option.binding_name.as_str();
     diagnostics.push(
-        Diagnostic::error(format!(
+        crate::package_diagnostic_error(format!(
             "package MIR could not parse CLI option `{name}` value `{value}` as {ty}; use compiled package execution for this surface"
         ))
         .with_file(unit.path.display().to_string()),
@@ -2732,7 +2732,7 @@ fn push_cli_option_default_diagnostic(
 ) {
     let name = option.binding_name.as_str();
     diagnostics.push(
-        Diagnostic::error(format!(
+        crate::package_diagnostic_error(format!(
             "package MIR does not yet support CLI option `{name}` default value; use compiled package execution for this surface"
         ))
         .with_file(unit.path.display().to_string())
@@ -2748,7 +2748,7 @@ fn push_cli_operand_default_diagnostic(
 ) {
     let name = operand.binding_name.as_str();
     diagnostics.push(
-        Diagnostic::error(format!(
+        crate::package_diagnostic_error(format!(
             "package MIR does not yet support CLI operand `{name}` default value; use compiled package execution for this surface"
         ))
         .with_file(unit.path.display().to_string())
@@ -2764,7 +2764,7 @@ fn push_cli_operand_missing_diagnostic(
 ) {
     let name = operand.binding_name.as_str();
     diagnostics.push(
-        Diagnostic::error(format!(
+        crate::package_diagnostic_error(format!(
             "package MIR expected CLI operand `{name}` but no value was provided; use compiled package execution for this surface"
         ))
         .with_file(unit.path.display().to_string()),
@@ -2968,7 +2968,7 @@ fn textus_literal_payload(text: &str) -> String {
 }
 
 fn unsupported_cli_diagnostic(path: &Path, surface: &str) -> Diagnostic {
-    Diagnostic::error(format!(
+    crate::package_diagnostic_error(format!(
         "package MIR does not yet support {surface}; use compiled package execution for this surface"
     ))
     .with_file(path.display().to_string())
@@ -3072,7 +3072,7 @@ fn local_namespace_call_targets(
                     && consumer == PackageMirConsumer::Interpreted
                 {
                     diagnostics.push(
-                        Diagnostic::error(format!(
+                        crate::package_diagnostic_error(format!(
                             "package MIR does not yet support library imports such as `{import_path}`; use compiled package execution for this surface"
                         ))
                         .with_file(unit.path.display().to_string())
@@ -3187,7 +3187,9 @@ fn rewrite_unit_namespace_calls(
     } else {
         Err(diagnostics
             .into_iter()
-            .map(|message| Diagnostic::error(message).with_file(unit.path.display().to_string()))
+            .map(|message| {
+                crate::package_diagnostic_error(message).with_file(unit.path.display().to_string())
+            })
             .collect())
     }
 }
@@ -4793,7 +4795,7 @@ fn shift_environment_id(id: &mut MirClosureEnvironmentId, offset: u32) {
 }
 
 fn mir_diag(path: &Path, message: impl Into<String>) -> Diagnostic {
-    Diagnostic::error(message).with_file(path.display().to_string())
+    crate::package_diagnostic_error(message).with_file(path.display().to_string())
 }
 
 fn mir_lowering_diag(path: &Path, message: impl Into<String>) -> Diagnostic {

@@ -302,12 +302,14 @@ fn compile_package_internal(
         if !plan.supported {
             return CompileResult {
                 output: None,
-                diagnostics: vec![Diagnostic::error(plan.rejection.unwrap_or_else(|| {
-                    "package compilation does not support this target".to_owned()
-                }))
-                .with_file(input.display().to_string())
-                .with_arg("issue", "package_target_unsupported")
-                .with_arg("target", plan.target)],
+                diagnostics: vec![
+                    crate::package_diagnostic_error(plan.rejection.unwrap_or_else(|| {
+                        "package compilation does not support this target".to_owned()
+                    }))
+                    .with_file(input.display().to_string())
+                    .with_arg("issue", "package_target_unsupported")
+                    .with_arg("target", plan.target),
+                ],
             };
         }
         return generate_package_go_result(&package, input);
@@ -318,18 +320,20 @@ fn compile_package_internal(
         if !plan.supported {
             return CompileResult {
                 output: None,
-                diagnostics: vec![Diagnostic::error(plan.rejection.unwrap_or_else(|| {
-                    "package compilation does not support this target".to_owned()
-                }))
-                .with_file(input.display().to_string())
-                .with_arg("issue", "package_target_unsupported")
-                .with_arg("target", plan.target)],
+                diagnostics: vec![
+                    crate::package_diagnostic_error(plan.rejection.unwrap_or_else(|| {
+                        "package compilation does not support this target".to_owned()
+                    }))
+                    .with_file(input.display().to_string())
+                    .with_arg("issue", "package_target_unsupported")
+                    .with_arg("target", plan.target),
+                ],
             };
         }
         // Planner seams exist; full product emit for TS is later deliveries.
         return CompileResult {
             output: None,
-            diagnostics: vec![Diagnostic::error(format!(
+            diagnostics: vec![crate::package_diagnostic_error(format!(
                 "package compilation has a {} artifact plan but full product assembly is not implemented yet",
                 plan.target
             ))
@@ -359,7 +363,7 @@ fn compile_package_internal(
     let Some(entry_code) = generated.entry_code else {
         return CompileResult {
             output: None,
-            diagnostics: vec![Diagnostic::error(
+            diagnostics: vec![crate::package_diagnostic_error(
                 "package compilation did not produce an entry module",
             )
             .with_file(package.spec.entry.display().to_string())],
@@ -385,9 +389,11 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
             output: None,
             diagnostics: {
                 diagnostics.push(
-                    Diagnostic::error("package has no entry unit for Go assembly".to_owned())
-                        .with_file(input.display().to_string())
-                        .with_arg("issue", "package_go_entry_missing"),
+                    crate::package_diagnostic_error(
+                        "package has no entry unit for Go assembly".to_owned(),
+                    )
+                    .with_file(input.display().to_string())
+                    .with_arg("issue", "package_go_entry_missing"),
                 );
                 diagnostics
             },
@@ -420,9 +426,11 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
             }
             Ok(_) => {
                 diagnostics.push(
-                    Diagnostic::error("Go module codegen returned a non-Go output".to_owned())
-                        .with_file(unit.path.display().to_string())
-                        .with_arg("issue", "package_go_codegen_failed"),
+                    crate::package_diagnostic_error(
+                        "Go module codegen returned a non-Go output".to_owned(),
+                    )
+                    .with_file(unit.path.display().to_string())
+                    .with_arg("issue", "package_go_codegen_failed"),
                 );
                 return CompileResult {
                     output: None,
@@ -430,8 +438,8 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
                 };
             }
             Err(err) => {
-                let mut diag =
-                    Diagnostic::error(err.message).with_file(unit.path.display().to_string());
+                let mut diag = crate::package_diagnostic_error(err.message)
+                    .with_file(unit.path.display().to_string());
                 for arg in err.args {
                     diag = diag.with_arg(arg.name, arg.value);
                 }
@@ -453,8 +461,8 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
         ) {
             Ok(output) => output.code,
             Err(err) => {
-                let mut diag =
-                    Diagnostic::error(err.message).with_file(entry.path.display().to_string());
+                let mut diag = crate::package_diagnostic_error(err.message)
+                    .with_file(entry.path.display().to_string());
                 for arg in err.args {
                     diag = diag.with_arg(arg.name, arg.value);
                 }
@@ -469,9 +477,11 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
             Ok(Output::Go(output)) => output.code,
             Ok(_) => {
                 diagnostics.push(
-                    Diagnostic::error("Go package codegen returned a non-Go output".to_owned())
-                        .with_file(entry.path.display().to_string())
-                        .with_arg("issue", "package_go_codegen_failed"),
+                    crate::package_diagnostic_error(
+                        "Go package codegen returned a non-Go output".to_owned(),
+                    )
+                    .with_file(entry.path.display().to_string())
+                    .with_arg("issue", "package_go_codegen_failed"),
                 );
                 return CompileResult {
                     output: None,
@@ -479,8 +489,8 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
                 };
             }
             Err(err) => {
-                let mut diag =
-                    Diagnostic::error(err.message).with_file(entry.path.display().to_string());
+                let mut diag = crate::package_diagnostic_error(err.message)
+                    .with_file(entry.path.display().to_string());
                 for arg in err.args {
                     diag = diag.with_arg(arg.name, arg.value);
                 }
@@ -555,7 +565,7 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
                 .map(|(_, f)| f.as_slice())
             else {
                 diagnostics.push(
-                    Diagnostic::error(format!(
+                    crate::package_diagnostic_error(format!(
                         "Go multi-module assembly could not find unit for import `{import_path}`"
                     ))
                     .with_file(unit.path.display().to_string())
@@ -689,7 +699,7 @@ fn go_package_func_name_collision_diagnostic(
         for f in funcs {
             if let Some(prior) = owners.get(&f.name) {
                 return Some(
-                    Diagnostic::error(format!(
+                    crate::package_diagnostic_error(format!(
                         "Go package assembly: function `{}` is declared in both {prior} and {owner}; \
                          flattened `package main` cannot host colliding names",
                         f.name
@@ -851,8 +861,10 @@ fn generate_package_rust(
 
         if rust.contains("unresolved_def") {
             diagnostics.push(
-                Diagnostic::error("project compilation produced unresolved Rust backend names")
-                    .with_file(unit.path.display().to_string()),
+                crate::package_diagnostic_error(
+                    "project compilation produced unresolved Rust backend names",
+                )
+                .with_file(unit.path.display().to_string()),
             );
             continue;
         }
@@ -1454,7 +1466,7 @@ fn file_interfaces_for_file(
         match resolve_import(spec, library_resolver, &file.path, import_path) {
             ImportResolution::Local(target) => {
                 let Some(interface) = analyzed_interfaces_by_path.get(&target).cloned() else {
-                    return Err(Diagnostic::error(format!(
+                    return Err(crate::package_diagnostic_error(format!(
                         "local import `{import_path}` interface was not analyzed before importer"
                     ))
                     .with_file(file.path.display().to_string())

@@ -149,7 +149,7 @@ pub(crate) fn load_provider_manifests(
     routes: &BTreeSet<String>,
 ) -> Result<Vec<ProviderManifest>, Diagnostic> {
     let support = materialize().map_err(|error| {
-        Diagnostic::error(format!("verified core support is unavailable: {error}"))
+        crate::package_diagnostic_error(format!("verified core support is unavailable: {error}"))
             .with_arg("issue", "core_support_materialization_failed")
     })?;
     let mut manifests = Vec::new();
@@ -157,27 +157,29 @@ pub(crate) fn load_provider_manifests(
         let path = support
             .provider(provider)
             .map_err(|error| {
-                Diagnostic::error(format!("unsupported host provider `{provider}`: {error}"))
-                    .with_arg("issue", "host_provider_unsupported")
-                    .with_arg("provider", provider.clone())
+                crate::package_diagnostic_error(format!(
+                    "unsupported host provider `{provider}`: {error}"
+                ))
+                .with_arg("issue", "host_provider_unsupported")
+                .with_arg("provider", provider.clone())
             })?
             .join("src/manifest.json");
         let source = fs::read_to_string(&path).map_err(|error| {
-            Diagnostic::error(format!(
+            crate::package_diagnostic_error(format!(
                 "selected host provider `{provider}` has no readable manifest: {error}"
             ))
             .with_file(path.display().to_string())
             .with_arg("issue", "host_provider_manifest_missing")
         })?;
         let manifest = serde_json::from_str::<ProviderManifest>(&source).map_err(|error| {
-            Diagnostic::error(format!(
+            crate::package_diagnostic_error(format!(
                 "invalid host provider manifest `{provider}`: {error}"
             ))
             .with_file(path.display().to_string())
             .with_arg("issue", "host_provider_manifest_invalid")
         })?;
         if manifest.manifest_version != 1 || manifest.provider != *provider {
-            return Err(Diagnostic::error(format!(
+            return Err(crate::package_diagnostic_error(format!(
                 "host provider manifest `{provider}` has mismatched identity or version"
             ))
             .with_file(path.display().to_string())
@@ -189,7 +191,7 @@ pub(crate) fn load_provider_manifests(
     for manifest in &manifests {
         for call in &manifest.calls {
             if !exported.insert(call.route.as_str()) {
-                return Err(Diagnostic::error(format!(
+                return Err(crate::package_diagnostic_error(format!(
                     "selected host providers export duplicate route `{}`",
                     call.route
                 ))
@@ -202,7 +204,7 @@ pub(crate) fn load_provider_manifests(
         .iter()
         .find(|route| !exported.contains(route.as_str()))
     {
-        return Err(Diagnostic::error(format!(
+        return Err(crate::package_diagnostic_error(format!(
             "selected host providers do not export required route `{route}`"
         ))
         .with_arg("issue", "host_provider_route_missing")

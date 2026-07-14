@@ -25,6 +25,14 @@ pub mod explain;
 pub mod package;
 pub mod reference;
 
+pub(crate) const PACKAGE_DIAGNOSTIC_CODE: &str = "PKG001";
+
+pub(crate) fn package_diagnostic_error(
+    message: impl Into<String>,
+) -> radix::diagnostics::Diagnostic {
+    radix::diagnostics::Diagnostic::error(message).with_code(PACKAGE_DIAGNOSTIC_CODE)
+}
+
 #[cfg(test)]
 mod core_support_test;
 #[cfg(test)]

@@ -204,7 +204,7 @@ pub(super) fn manifest_build_target(target: &str, path: &Path) -> Result<Target,
         "fmir" => Ok(Target::Fmir),
         "fmir-bin" => Ok(Target::FmirBin),
         unsupported => Err(Box::new(
-            Diagnostic::error(format!(
+            crate::package_diagnostic_error(format!(
                 "faber.toml build.target '{unsupported}' is not supported for package builds"
             ))
             .with_file(path.display().to_string())
@@ -223,7 +223,7 @@ pub fn read_manifest(path: &Path) -> Result<FaberManifest, Box<Diagnostic>> {
         fs::read_to_string(path).map_err(|err| Box::new(Diagnostic::io_error(path, err)))?;
     toml::from_str::<FaberManifest>(&source).map_err(|err| {
         Box::new(
-            Diagnostic::error(format!("invalid faber.toml manifest: {err}"))
+            crate::package_diagnostic_error(format!("invalid faber.toml manifest: {err}"))
                 .with_file(path.display().to_string())
                 .with_arg("issue", "invalid_package_manifest"),
         )
@@ -236,13 +236,13 @@ pub(crate) fn validate_manifest(
 ) -> Result<(), Box<Diagnostic>> {
     if manifest.package.name.trim().is_empty() {
         return Err(Box::new(
-            Diagnostic::error("faber.toml package.name must not be empty")
+            crate::package_diagnostic_error("faber.toml package.name must not be empty")
                 .with_file(path.display().to_string()),
         ));
     }
     if !crate::library::is_valid_provider_segment(&manifest.package.name) {
         return Err(Box::new(
-            Diagnostic::error(
+            crate::package_diagnostic_error(
                 "faber.toml package.name must contain only ASCII letters, numbers, underscore, or hyphen",
             )
             .with_file(path.display().to_string())
@@ -252,21 +252,21 @@ pub(crate) fn validate_manifest(
 
     if manifest.package.version.trim().is_empty() {
         return Err(Box::new(
-            Diagnostic::error("faber.toml package.version must not be empty")
+            crate::package_diagnostic_error("faber.toml package.version must not be empty")
                 .with_file(path.display().to_string()),
         ));
     }
 
     if manifest.package.edition.trim().is_empty() {
         return Err(Box::new(
-            Diagnostic::error("faber.toml package.edition must not be empty")
+            crate::package_diagnostic_error("faber.toml package.edition must not be empty")
                 .with_file(path.display().to_string()),
         ));
     }
 
     if manifest.paths.source.trim().is_empty() {
         return Err(Box::new(
-            Diagnostic::error("faber.toml paths.source must not be empty")
+            crate::package_diagnostic_error("faber.toml paths.source must not be empty")
                 .with_file(path.display().to_string()),
         ));
     }
@@ -274,7 +274,7 @@ pub(crate) fn validate_manifest(
     if let Some(entry) = manifest.paths.entry.as_deref() {
         if entry.trim().is_empty() {
             return Err(Box::new(
-                Diagnostic::error("faber.toml paths.entry must not be empty")
+                crate::package_diagnostic_error("faber.toml paths.entry must not be empty")
                     .with_file(path.display().to_string()),
             ));
         }
@@ -283,7 +283,7 @@ pub(crate) fn validate_manifest(
     if let Some(library) = &manifest.library {
         if !crate::library::is_valid_provider_segment(&library.provider) {
             return Err(Box::new(
-                Diagnostic::error(
+                crate::package_diagnostic_error(
                     "faber.toml library.provider must contain only ASCII letters, numbers, underscore, or hyphen",
                 )
                 .with_file(path.display().to_string())
@@ -297,10 +297,12 @@ pub(crate) fn validate_manifest(
         "lib" => validate_library_build(manifest, path)?,
         kind => {
             return Err(Box::new(
-                Diagnostic::error(format!("faber.toml build.kind '{kind}' is not supported"))
-                    .with_file(path.display().to_string())
-                    .with_arg("issue", "package_build_kind_unsupported")
-                    .with_arg("kind", kind.to_owned()),
+                crate::package_diagnostic_error(format!(
+                    "faber.toml build.kind '{kind}' is not supported"
+                ))
+                .with_file(path.display().to_string())
+                .with_arg("issue", "package_build_kind_unsupported")
+                .with_arg("kind", kind.to_owned()),
             ));
         }
     }
@@ -308,7 +310,7 @@ pub(crate) fn validate_manifest(
     if let Some(locale) = manifest.reader.locale.as_deref() {
         if locale.trim().is_empty() {
             return Err(Box::new(
-                Diagnostic::error("faber.toml reader.locale must not be empty")
+                crate::package_diagnostic_error("faber.toml reader.locale must not be empty")
                     .with_file(path.display().to_string()),
             ));
         }
@@ -317,13 +319,13 @@ pub(crate) fn validate_manifest(
     if let Some(pack) = manifest.reader.pack.as_deref() {
         if pack.trim().is_empty() {
             return Err(Box::new(
-                Diagnostic::error("faber.toml reader.pack must not be empty")
+                crate::package_diagnostic_error("faber.toml reader.pack must not be empty")
                     .with_file(path.display().to_string()),
             ));
         }
         if manifest.reader.locale.is_none() {
             return Err(Box::new(
-                Diagnostic::error("faber.toml reader.pack requires reader.locale")
+                crate::package_diagnostic_error("faber.toml reader.pack requires reader.locale")
                     .with_file(path.display().to_string()),
             ));
         }
@@ -332,13 +334,13 @@ pub(crate) fn validate_manifest(
     for (name, version) in &manifest.dependencies {
         if name.trim().is_empty() {
             return Err(Box::new(
-                Diagnostic::error("faber.toml [dependencies] key must not be empty")
+                crate::package_diagnostic_error("faber.toml [dependencies] key must not be empty")
                     .with_file(path.display().to_string()),
             ));
         }
         if version.trim().is_empty() {
             return Err(Box::new(
-                Diagnostic::error(format!(
+                crate::package_diagnostic_error(format!(
                     "faber.toml dependency `{name}` version must be a non-empty exact string"
                 ))
                 .with_file(path.display().to_string()),
@@ -349,7 +351,7 @@ pub(crate) fn validate_manifest(
     for provider in &manifest.dispatch.providers {
         if provider.trim().is_empty() || !crate::library::is_valid_provider_segment(provider) {
             return Err(Box::new(
-                Diagnostic::error(format!(
+                crate::package_diagnostic_error(format!(
                     "faber.toml [dispatch].providers entry `{provider}` is invalid"
                 ))
                 .with_file(path.display().to_string())
@@ -360,7 +362,7 @@ pub(crate) fn validate_manifest(
 
     if !manifest.dispatch.providers.is_empty() && manifest.build.target != "rust" {
         return Err(Box::new(
-            Diagnostic::error(
+            crate::package_diagnostic_error(
                 "faber.toml [dispatch] is only supported for the Rust package target",
             )
             .with_file(path.display().to_string())
@@ -371,7 +373,7 @@ pub(crate) fn validate_manifest(
     for (target, config) in &manifest.target {
         if target.trim().is_empty() {
             return Err(Box::new(
-                Diagnostic::error("faber.toml [target] key must not be empty")
+                crate::package_diagnostic_error("faber.toml [target] key must not be empty")
                     .with_file(path.display().to_string())
                     .with_arg("issue", "invalid_target_table"),
             ));
@@ -379,15 +381,17 @@ pub(crate) fn validate_manifest(
         if let Some(bindings) = config.bindings.as_deref() {
             if bindings.trim().is_empty() {
                 return Err(Box::new(
-                    Diagnostic::error("faber.toml target bindings path must not be empty")
-                        .with_file(path.display().to_string())
-                        .with_arg("issue", "invalid_target_bindings"),
+                    crate::package_diagnostic_error(
+                        "faber.toml target bindings path must not be empty",
+                    )
+                    .with_file(path.display().to_string())
+                    .with_arg("issue", "invalid_target_bindings"),
                 ));
             }
         }
         if config.host.is_some() && target != "rust" {
             return Err(Box::new(
-                Diagnostic::error(
+                crate::package_diagnostic_error(
                     "faber.toml target host policy is only supported for target.rust",
                 )
                 .with_file(path.display().to_string())
@@ -398,7 +402,7 @@ pub(crate) fn validate_manifest(
         for (name, version) in &config.dependencies {
             if name.trim().is_empty() || version.trim().is_empty() {
                 return Err(Box::new(
-                    Diagnostic::error(
+                    crate::package_diagnostic_error(
                         "faber.toml target dependency names and versions must be non-empty",
                     )
                     .with_file(path.display().to_string())
@@ -414,17 +418,21 @@ pub(crate) fn validate_manifest(
 fn validate_binary_build(manifest: &FaberManifest, path: &Path) -> Result<(), Box<Diagnostic>> {
     if manifest.paths.entry.is_none() {
         return Err(Box::new(
-            Diagnostic::error("faber.toml paths.entry is required when build.kind = \"bin\"")
-                .with_file(path.display().to_string())
-                .with_arg("issue", "missing_binary_entry"),
+            crate::package_diagnostic_error(
+                "faber.toml paths.entry is required when build.kind = \"bin\"",
+            )
+            .with_file(path.display().to_string())
+            .with_arg("issue", "missing_binary_entry"),
         ));
     }
     manifest_build_target(&manifest.build.target, path)?;
     if !manifest.build.targets.is_empty() {
         return Err(Box::new(
-            Diagnostic::error("faber.toml build.targets is only valid when build.kind = \"lib\"")
-                .with_file(path.display().to_string())
-                .with_arg("issue", "binary_targets_unsupported"),
+            crate::package_diagnostic_error(
+                "faber.toml build.targets is only valid when build.kind = \"lib\"",
+            )
+            .with_file(path.display().to_string())
+            .with_arg("issue", "binary_targets_unsupported"),
         ));
     }
     Ok(())
@@ -433,14 +441,16 @@ fn validate_binary_build(manifest: &FaberManifest, path: &Path) -> Result<(), Bo
 fn validate_library_build(manifest: &FaberManifest, path: &Path) -> Result<(), Box<Diagnostic>> {
     if manifest.library.is_none() {
         return Err(Box::new(
-            Diagnostic::error("faber.toml [library] is required when build.kind = \"lib\"")
-                .with_file(path.display().to_string())
-                .with_arg("issue", "missing_library_table"),
+            crate::package_diagnostic_error(
+                "faber.toml [library] is required when build.kind = \"lib\"",
+            )
+            .with_file(path.display().to_string())
+            .with_arg("issue", "missing_library_table"),
         ));
     }
     if manifest.build.targets.is_empty() {
         return Err(Box::new(
-            Diagnostic::error(
+            crate::package_diagnostic_error(
                 "faber.toml build.targets must not be empty when build.kind = \"lib\"",
             )
             .with_file(path.display().to_string())
@@ -450,9 +460,11 @@ fn validate_library_build(manifest: &FaberManifest, path: &Path) -> Result<(), B
     for target in &manifest.build.targets {
         if target.trim().is_empty() {
             return Err(Box::new(
-                Diagnostic::error("faber.toml build.targets entries must not be empty")
-                    .with_file(path.display().to_string())
-                    .with_arg("issue", "empty_library_target"),
+                crate::package_diagnostic_error(
+                    "faber.toml build.targets entries must not be empty",
+                )
+                .with_file(path.display().to_string())
+                .with_arg("issue", "empty_library_target"),
             ));
         }
         manifest_build_target(target, path)?;

@@ -325,7 +325,7 @@ fn single_file_rust_runtime_plan(
     use std::fs;
 
     let source = fs::read_to_string(input_path).map_err(|err| {
-        vec![radix::Diagnostic::error(format!(
+        vec![crate::package_diagnostic_error(format!(
             "failed to read '{}': {err}",
             input_path.display()
         ))]

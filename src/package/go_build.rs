@@ -391,14 +391,14 @@ pub(crate) fn emit_go_module(
     modules: &[(String, String)],
 ) -> Result<(), Diagnostic> {
     fs::create_dir_all(&layout.module_root).map_err(|err| {
-        Diagnostic::error(format!(
+        crate::package_diagnostic_error(format!(
             "failed to create Go module root '{}': {err}",
             layout.module_root.display()
         ))
         .with_arg("issue", "package_go_emit_failed")
     })?;
     fs::create_dir_all(layout.module_root.join("bin")).map_err(|err| {
-        Diagnostic::error(format!(
+        crate::package_diagnostic_error(format!(
             "failed to create Go binary dir '{}': {err}",
             layout.module_root.join("bin").display()
         ))
@@ -408,7 +408,7 @@ pub(crate) fn emit_go_module(
 
     let main_path = layout.module_root.join("main.go");
     fs::write(&main_path, entry_code).map_err(|err| {
-        Diagnostic::error(format!("failed to write '{}': {err}", main_path.display()))
+        crate::package_diagnostic_error(format!("failed to write '{}': {err}", main_path.display()))
             .with_arg("issue", "package_go_emit_failed")
     })?;
 
@@ -422,7 +422,7 @@ pub(crate) fn emit_go_module(
             wrap_module_file(code, &std::collections::BTreeSet::new())
         };
         fs::write(&path, file_code).map_err(|err| {
-            Diagnostic::error(format!("failed to write '{}': {err}", path.display()))
+            crate::package_diagnostic_error(format!("failed to write '{}': {err}", path.display()))
                 .with_arg("issue", "package_go_emit_failed")
         })?;
     }
@@ -433,7 +433,7 @@ pub(crate) fn emit_go_module(
     );
     let go_mod_path = layout.module_root.join("go.mod");
     fs::write(&go_mod_path, go_mod).map_err(|err| {
-        Diagnostic::error(format!(
+        crate::package_diagnostic_error(format!(
             "failed to write '{}': {err}",
             go_mod_path.display()
         ))
@@ -452,7 +452,7 @@ fn remove_stale_owned_go_files(
         .chain(modules.iter().map(|(file_name, _)| file_name.clone()))
         .collect();
     let entries = fs::read_dir(&layout.module_root).map_err(|err| {
-        Diagnostic::error(format!(
+        crate::package_diagnostic_error(format!(
             "failed to read Go module root '{}': {err}",
             layout.module_root.display()
         ))
@@ -460,7 +460,7 @@ fn remove_stale_owned_go_files(
     })?;
     for entry in entries {
         let entry = entry.map_err(|err| {
-            Diagnostic::error(format!(
+            crate::package_diagnostic_error(format!(
                 "failed to inspect Go module root '{}': {err}",
                 layout.module_root.display()
             ))
@@ -477,7 +477,7 @@ fn remove_stale_owned_go_files(
             continue;
         }
         fs::remove_file(&path).map_err(|err| {
-            Diagnostic::error(format!(
+            crate::package_diagnostic_error(format!(
                 "failed to remove stale '{}': {err}",
                 path.display()
             ))
@@ -492,8 +492,11 @@ fn remove_stale_owned_go_files(
 pub(crate) fn invoke_go_build(layout: &GoBuildLayout) -> Result<PathBuf, Diagnostic> {
     if let Some(parent) = layout.binary_path.parent() {
         fs::create_dir_all(parent).map_err(|err| {
-            Diagnostic::error(format!("failed to create '{}': {err}", parent.display()))
-                .with_arg("issue", "package_go_build_failed")
+            crate::package_diagnostic_error(format!(
+                "failed to create '{}': {err}",
+                parent.display()
+            ))
+            .with_arg("issue", "package_go_build_failed")
         })?;
     }
 
@@ -505,14 +508,14 @@ pub(crate) fn invoke_go_build(layout: &GoBuildLayout) -> Result<PathBuf, Diagnos
         .current_dir(&layout.module_root)
         .output()
         .map_err(|err| {
-            Diagnostic::error(format!("failed to execute `go build`: {err}"))
+            crate::package_diagnostic_error(format!("failed to execute `go build`: {err}"))
                 .with_arg("issue", "package_go_build_failed")
         })?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         let stdout = String::from_utf8_lossy(&output.stdout);
-        return Err(Diagnostic::error(format!(
+        return Err(crate::package_diagnostic_error(format!(
             "go build failed for '{}':\n{stderr}{stdout}",
             layout.module_root.display()
         ))
@@ -520,7 +523,7 @@ pub(crate) fn invoke_go_build(layout: &GoBuildLayout) -> Result<PathBuf, Diagnos
     }
 
     if !layout.binary_path.exists() {
-        return Err(Diagnostic::error(format!(
+        return Err(crate::package_diagnostic_error(format!(
             "go build reported success but binary missing at '{}'",
             layout.binary_path.display()
         ))
@@ -547,7 +550,7 @@ fn sanitize_go_module_segment(name: &str) -> String {
 #[allow(clippy::result_large_err)]
 pub(crate) fn run_go_binary(binary: &Path, args: &[String]) -> Result<i32, Diagnostic> {
     let status = Command::new(binary).args(args).status().map_err(|err| {
-        Diagnostic::error(format!("failed to execute '{}': {err}", binary.display()))
+        crate::package_diagnostic_error(format!("failed to execute '{}': {err}", binary.display()))
             .with_arg("issue", "package_go_run_failed")
     })?;
     Ok(status.code().unwrap_or(1))

@@ -200,7 +200,7 @@ pub(crate) fn plan_or_reject(
 ) -> Result<ArtifactPlan, Diagnostic> {
     let plan = plan_package(package, target);
     if !plan.supported {
-        return Err(Diagnostic::error(
+        return Err(crate::package_diagnostic_error(
             plan.rejection
                 .clone()
                 .unwrap_or_else(|| "package target is unsupported".to_owned()),
@@ -254,7 +254,7 @@ pub(crate) fn native_library_deps(
     let lock = match read_lock(package_root) {
         Ok(Some(lock)) => lock,
         Ok(None) => {
-            return Err(vec![Diagnostic::error(format!(
+            return Err(vec![crate::package_diagnostic_error(format!(
                 "faber.toml declares dependencies but {} is missing",
                 package_root.join(super::lockfile::LOCK_FILE).display()
             ))
@@ -268,7 +268,7 @@ pub(crate) fn native_library_deps(
     for (name, version) in &manifest.dependencies {
         let Some(locked) = lock_index.get(name) else {
             diagnostics.push(
-                Diagnostic::error(format!(
+                crate::package_diagnostic_error(format!(
                     "dependency `{name}` is missing from {}",
                     super::lockfile::LOCK_FILE
                 ))
@@ -279,7 +279,7 @@ pub(crate) fn native_library_deps(
         };
         if &locked.version != version {
             diagnostics.push(
-                Diagnostic::error(format!(
+                crate::package_diagnostic_error(format!(
                     "dependency `{name}` version mismatch: faber.toml has `{version}`, lock has `{}`",
                     locked.version
                 ))
@@ -297,7 +297,7 @@ pub(crate) fn native_library_deps(
             Ok(lib_manifest) => {
                 if lib_manifest.build.kind != "lib" {
                     diagnostics.push(
-                        Diagnostic::error(format!(
+                        crate::package_diagnostic_error(format!(
                             "dependency `{name}` package_root is not a library package"
                         ))
                         .with_file(lib_manifest_path.display().to_string())
@@ -308,7 +308,7 @@ pub(crate) fn native_library_deps(
                 }
                 if !lib_manifest.build.targets.iter().any(|t| t == "rust") {
                     diagnostics.push(
-                        Diagnostic::error(format!(
+                        crate::package_diagnostic_error(format!(
                             "dependency `{name}` does not support target `rust`"
                         ))
                         .with_file(lib_manifest_path.display().to_string())

@@ -64,7 +64,7 @@ pub(super) fn build_mount_plan(
     for mount in mounts {
         if imports.named_aliases.contains(&mount.alias) {
             diagnostics.push(
-                Diagnostic::error(format!(
+                crate::package_diagnostic_error(format!(
                     "@ imperia target '{}' must be a wildcard import alias, not a named import",
                     mount.alias
                 ))
@@ -78,7 +78,7 @@ pub(super) fn build_mount_plan(
 
         let Some(module_path) = imports.wildcard_aliases.get(&mount.alias) else {
             diagnostics.push(
-                Diagnostic::error(format!(
+                crate::package_diagnostic_error(format!(
                     "@ imperia target '{}' does not name a package-local wildcard import alias",
                     mount.alias
                 ))
@@ -91,7 +91,7 @@ pub(super) fn build_mount_plan(
         };
         let Some(module_file) = files_by_path.get(module_path) else {
             diagnostics.push(
-                Diagnostic::error(format!(
+                crate::package_diagnostic_error(format!(
                     "@ imperia target '{}' resolved to a module that was not loaded",
                     mount.alias
                 ))
@@ -197,7 +197,7 @@ fn collect_root_mounts(file: &PackageFile, diagnostics: &mut Vec<Diagnostic>) ->
             }
             if !is_cli_entry {
                 diagnostics.push(
-                    Diagnostic::error(
+                    crate::package_diagnostic_error(
                         "@ imperia module mounts must annotate the root @ cli entry point",
                     )
                     .with_file(file.path.display().to_string())
@@ -208,7 +208,7 @@ fn collect_root_mounts(file: &PackageFile, diagnostics: &mut Vec<Diagnostic>) ->
             match parse_mount_annotation(file, annotation_stmt, annotation.span) {
                 Some(mount) => mounts.push(mount),
                 None => diagnostics.push(
-                    Diagnostic::error(
+                    crate::package_diagnostic_error(
                         "@ imperia must use '@ imperia \"path\" ex <wildcard_alias>'",
                     )
                     .with_file(file.path.display().to_string())
@@ -273,7 +273,7 @@ fn validate_mounted_command_collisions(
         let path = command.path.join("/");
         if paths.insert(path.clone(), command.span).is_some() {
             diagnostics.push(
-                Diagnostic::error(format!("duplicate command path '{path}'"))
+                crate::package_diagnostic_error(format!("duplicate command path '{path}'"))
                     .with_file(file.display().to_string())
                     .with_arg("issue", "duplicate_command_path")
                     .with_arg("path", path)
@@ -286,7 +286,7 @@ fn validate_mounted_command_collisions(
         for alias in &command.aliases {
             if aliases.insert(alias.clone(), command.span).is_some() {
                 diagnostics.push(
-                    Diagnostic::error(format!("duplicate command alias '{alias}'"))
+                    crate::package_diagnostic_error(format!("duplicate command alias '{alias}'"))
                         .with_file(file.display().to_string())
                         .with_arg("issue", "duplicate_command_alias")
                         .with_arg("alias", alias.clone())
@@ -295,7 +295,7 @@ fn validate_mounted_command_collisions(
             }
             if paths.contains_key(alias) {
                 diagnostics.push(
-                    Diagnostic::error(format!(
+                    crate::package_diagnostic_error(format!(
                         "command alias '{alias}' collides with a command path"
                     ))
                     .with_file(file.display().to_string())
@@ -327,7 +327,7 @@ fn validate_mounted_global_collisions(
         for option in &command.options {
             if globals.contains(option.binding.as_str()) {
                 diagnostics.push(
-                    Diagnostic::error(format!(
+                    crate::package_diagnostic_error(format!(
                         "command '{label}' option '{}' collides with a global CLI binding",
                         option.binding
                     ))
@@ -342,7 +342,7 @@ fn validate_mounted_global_collisions(
         for operand in &command.operands {
             if globals.contains(operand.binding.as_str()) {
                 diagnostics.push(
-                    Diagnostic::error(format!(
+                    crate::package_diagnostic_error(format!(
                         "command '{label}' operand '{}' collides with a global CLI binding",
                         operand.binding
                     ))
@@ -456,10 +456,13 @@ fn detect_import_cycles_from(
                 .collect::<Vec<_>>();
             cycle.push(next.display().to_string());
             diagnostics.push(
-                Diagnostic::error(format!("import cycle detected: {}", cycle.join(" -> ")))
-                    .with_file(path.display().to_string())
-                    .with_arg("issue", "package_import_cycle")
-                    .with_span(*span),
+                crate::package_diagnostic_error(format!(
+                    "import cycle detected: {}",
+                    cycle.join(" -> ")
+                ))
+                .with_file(path.display().to_string())
+                .with_arg("issue", "package_import_cycle")
+                .with_span(*span),
             );
             continue;
         }
@@ -532,13 +535,13 @@ pub(super) fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) 
         LibraryResolveError::OldBuiltinNormaSpecifier {
             specifier: _,
             replacement,
-        } => Diagnostic::error(format!(
+        } => crate::package_diagnostic_error(format!(
             "built-in Norma imports use provider syntax; write \"{replacement}\""
         ))
         .with_file(file.display().to_string())
         .with_arg("issue", "old_builtin_norma_specifier")
         .with_arg("replacement", replacement),
-        LibraryResolveError::InvalidProviderSpecifier { specifier, reason } => Diagnostic::error(format!(
+        LibraryResolveError::InvalidProviderSpecifier { specifier, reason } => crate::package_diagnostic_error(format!(
             "invalid library import specifier `{specifier}`: {reason}"
         ))
         .with_file(file.display().to_string()),
@@ -546,7 +549,7 @@ pub(super) fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) 
             specifier,
             provider,
             library_home,
-        } => Diagnostic::error(format!(
+        } => crate::package_diagnostic_error(format!(
             "unknown library provider `{provider}` in import `{specifier}`; expected provider repo at {}",
             library_home.join(&provider).display()
         ))
@@ -560,7 +563,7 @@ pub(super) fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) 
             provider,
             manifest_path,
             reason,
-        } => Diagnostic::error(format!(
+        } => crate::package_diagnostic_error(format!(
             "installed library provider `{provider}` for import `{specifier}` has an invalid manifest at {}: {reason}",
             manifest_path.display()
         ))
@@ -573,7 +576,7 @@ pub(super) fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) 
             specifier,
             provider,
             source_root,
-        } => Diagnostic::error(format!(
+        } => crate::package_diagnostic_error(format!(
             "installed library provider `{provider}` for import `{specifier}` is missing source root {}",
             source_root.display()
         ))
@@ -587,7 +590,7 @@ pub(super) fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) 
             package,
             expected_path,
             known_modules,
-        } => Diagnostic::error(format!(
+        } => crate::package_diagnostic_error(format!(
             "unknown library module `{specifier}` for provider `{package}`; expected {}; known modules: {}",
             expected_path.display(),
             known_modules.join(", ")
@@ -598,7 +601,7 @@ pub(super) fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) 
         .with_arg("provider", package)
         .with_arg("expected_path", expected_path.display().to_string())
         .with_arg("known_modules", known_modules.join(",")),
-        LibraryResolveError::MissingLibraryHome { specifier, hint } => Diagnostic::error(format!(
+        LibraryResolveError::MissingLibraryHome { specifier, hint } => crate::package_diagnostic_error(format!(
             "library import `{specifier}` needs a public library home; {hint}"
         ))
         .with_file(file.display().to_string())
@@ -613,7 +616,7 @@ pub(super) fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) 
                 .as_deref()
                 .map(|v| format!(" (`{provider} = \"{v}\"`)"))
                 .unwrap_or_default();
-            Diagnostic::error(format!(
+            crate::package_diagnostic_error(format!(
                 "library import `{specifier}` is declared in faber.toml{version_hint} but missing from faber.lock; install the package with the package manager"
             ))
             .with_file(file.display().to_string())
@@ -624,7 +627,7 @@ pub(super) fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) 
         LibraryResolveError::UndeclaredProvider {
             specifier,
             provider,
-        } => Diagnostic::error(format!(
+        } => crate::package_diagnostic_error(format!(
             "library import `{specifier}` uses undeclared provider `{provider}`; add it to faber.toml [dependencies] and install it"
         ))
         .with_file(file.display().to_string())
@@ -639,7 +642,7 @@ pub(super) fn inner_library_import_unresolved_diagnostic(
     decl: &ImportDecl,
     import_path: &str,
 ) -> Diagnostic {
-    Diagnostic::error(format!(
+    crate::package_diagnostic_error(format!(
         "library interface import `{import_path}` must resolve to a built-in library module (provider syntax `norma:…`)"
     ))
     .with_file(file.display().to_string())
@@ -651,7 +654,7 @@ pub(super) fn library_import_kind_diagnostic(
     decl: &ImportDecl,
     import_path: &str,
 ) -> Diagnostic {
-    Diagnostic::error(format!(
+    crate::package_diagnostic_error(format!(
         "library import `{import_path}` must import its module name as a module alias"
     ))
     .with_file(file.display().to_string())
@@ -659,7 +662,7 @@ pub(super) fn library_import_kind_diagnostic(
 }
 
 fn kernel_import_script_only_diagnostic(file: &Path, import_path: &str) -> Diagnostic {
-    Diagnostic::error(format!(
+    crate::package_diagnostic_error(format!(
         "{} (`{import_path}`)",
         radix::kernel::kernel_script_mode_only_message()
     ))
@@ -677,7 +680,7 @@ pub(super) fn import_unsupported_diagnostic(
         ImportKind::Named { .. } => "import",
         ImportKind::Wildcard { .. } => "wildcard import",
     };
-    Diagnostic::error(format!(
+    crate::package_diagnostic_error(format!(
         "package compilation only supports local intra-package imports; unsupported {kind} path `{import_path}`"
     ))
     .with_file(file.display().to_string())

@@ -114,7 +114,7 @@ fn path_diagnostic(
     message: &'static str,
     issue: &'static str,
 ) -> Diagnostic {
-    Diagnostic::error(format!("{message}: {path}"))
+    crate::package_diagnostic_error(format!("{message}: {path}"))
         .with_file(anchor.display().to_string())
         .with_arg("issue", issue)
         .with_arg("path", path.to_owned())

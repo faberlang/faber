@@ -98,7 +98,7 @@ fn unknown_provider_is_a_structured_materialized_root_failure() {
     let support = materialize().expect("embedded core support materializes");
     let error = super::render_generated_cargo_toml_with_support("demo", "0.1.0", &plan, &support)
         .expect_err("unknown provider must fail closed");
-    assert!(error.message.contains("unsupported core-support provider"));
+    assert_eq!(error.code, Some(crate::PACKAGE_DIAGNOSTIC_CODE));
     assert_eq!(
         error
             .args

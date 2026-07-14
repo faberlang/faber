@@ -77,7 +77,7 @@ pub(crate) fn read_lock(package_root: &Path) -> Result<Option<FaberLock>, Box<Di
         fs::read_to_string(&path).map_err(|err| Box::new(Diagnostic::io_error(&path, err)))?;
     let lock = toml::from_str::<FaberLock>(&source).map_err(|err| {
         Box::new(
-            Diagnostic::error(format!("invalid {LOCK_FILE}: {err}"))
+            crate::package_diagnostic_error(format!("invalid {LOCK_FILE}: {err}"))
                 .with_file(path.display().to_string())
                 .with_arg("issue", "invalid_faber_lock"),
         )
@@ -101,7 +101,7 @@ pub(crate) fn lock_index(
     for package in &lock.packages {
         if map.insert(package.name.clone(), package.clone()).is_some() {
             diagnostics.push(
-                Diagnostic::error(format!(
+                crate::package_diagnostic_error(format!(
                     "{LOCK_FILE} contains duplicate package name `{}`",
                     package.name
                 ))
@@ -131,7 +131,7 @@ pub(crate) fn validate_dependencies_against_lock(
     }
     let Some(lock) = lock else {
         diagnostics.push(
-            Diagnostic::error(format!(
+            crate::package_diagnostic_error(format!(
                 "faber.toml declares dependencies but {} is missing; install packages with the package manager first",
                 package_root.join(LOCK_FILE).display()
             ))
@@ -147,7 +147,7 @@ pub(crate) fn validate_dependencies_against_lock(
     for (name, version) in dependencies {
         let Some(locked) = index.get(name) else {
             diagnostics.push(
-                Diagnostic::error(format!(
+                crate::package_diagnostic_error(format!(
                     "dependency `{name} = \"{version}\"` is declared in faber.toml but missing from {LOCK_FILE}"
                 ))
                 .with_file(package_root.join(LOCK_FILE).display().to_string())
@@ -159,7 +159,7 @@ pub(crate) fn validate_dependencies_against_lock(
         };
         if &locked.version != version {
             diagnostics.push(
-                Diagnostic::error(format!(
+                crate::package_diagnostic_error(format!(
                     "dependency `{name}` version mismatch: faber.toml has `{version}`, {LOCK_FILE} has `{}`",
                     locked.version
                 ))
@@ -181,7 +181,7 @@ fn validate_locked_paths(
     let package_root = locked.package_root_path(app_package_root);
     if !package_root.is_dir() {
         diagnostics.push(
-            Diagnostic::error(format!(
+            crate::package_diagnostic_error(format!(
                 "locked package_root for `{}` is missing or not a directory: {}",
                 locked.name,
                 package_root.display()
@@ -193,7 +193,7 @@ fn validate_locked_paths(
     let interface_root = locked.interface_root_path_for(app_package_root);
     if !interface_root.is_dir() {
         diagnostics.push(
-            Diagnostic::error(format!(
+            crate::package_diagnostic_error(format!(
                 "locked interface_root for `{}` is missing or not a directory: {}",
                 locked.name,
                 interface_root.display()
@@ -212,7 +212,7 @@ fn validate_locked_paths(
     let artifact = locked.artifact_path();
     if !artifact.is_file() {
         diagnostics.push(
-            Diagnostic::error(format!(
+            crate::package_diagnostic_error(format!(
                 "locked artifact for `{}` is missing: {}",
                 locked.name,
                 artifact.display()
@@ -224,7 +224,7 @@ fn validate_locked_paths(
     let target_manifest = locked.target_manifest_path();
     if !target_manifest.is_file() {
         diagnostics.push(
-            Diagnostic::error(format!(
+            crate::package_diagnostic_error(format!(
                 "locked target_manifest for `{}` is missing: {}",
                 locked.name,
                 target_manifest.display()

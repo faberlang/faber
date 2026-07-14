@@ -58,7 +58,7 @@ pub(crate) fn package_host_selection_diagnostic(
 ) -> Option<Diagnostic> {
     if let Some(error) = &plan.provider_error {
         return Some(
-            Diagnostic::error(error.clone())
+            crate::package_diagnostic_error(error.clone())
                 .with_file(manifest_path.display().to_string())
                 .with_arg("issue", "host_provider_selection_invalid"),
         );
@@ -85,7 +85,7 @@ pub(crate) fn package_host_selection_diagnostic(
         format!("routes [{routes}]")
     };
     Some(
-        Diagnostic::error(format!(
+        crate::package_diagnostic_error(format!(
             "package uses host providers without [target.rust] host selection: {detail}"
         ))
         .with_file(manifest_path.display().to_string())
@@ -215,7 +215,7 @@ fn core_support_diagnostic(
     error: crate::core_support::materialize::MaterializeError,
 ) -> Box<Diagnostic> {
     Box::new(
-        Diagnostic::error(format!("verified core support is unavailable: {error}"))
+        crate::package_diagnostic_error(format!("verified core support is unavailable: {error}"))
             .with_arg("issue", "core_support_materialization_failed"),
     )
 }
@@ -398,13 +398,13 @@ pub(crate) fn invoke_cargo_build(
     }
 
     let status = cmd.status().map_err(|e| {
-        Box::new(Diagnostic::error(format!(
+        Box::new(crate::package_diagnostic_error(format!(
             "failed to spawn cargo (ensure cargo is installed and on PATH): {e}"
         )))
     })?;
 
     if !status.success() {
-        return Err(Box::new(Diagnostic::error(format!(
+        return Err(Box::new(crate::package_diagnostic_error(format!(
             "cargo build exited with status {status}"
         ))));
     }
@@ -454,7 +454,7 @@ pub fn invoke_cargo_test(
     }
 
     let status = cmd.status().map_err(|e| {
-        Box::new(Diagnostic::error(format!(
+        Box::new(crate::package_diagnostic_error(format!(
             "failed to spawn cargo (ensure cargo is installed and on PATH): {e}"
         )))
     })?;

@@ -210,7 +210,7 @@ fn visit_transitive_library_import(
         if let Some(existing) = walk.seen_bindings.get(&key) {
             if existing != &import.binding {
                 diagnostics.push(
-                    Diagnostic::error(format!(
+                    crate::package_diagnostic_error(format!(
                         "library module `{module_label}` is imported under conflicting aliases `{existing}` and `{}`",
                         import.binding
                     ))
@@ -230,7 +230,7 @@ fn visit_transitive_library_import(
         let mut cycle = walk.stack.clone();
         cycle.push(module_label);
         diagnostics.push(
-            Diagnostic::error(format!(
+            crate::package_diagnostic_error(format!(
                 "library import cycle detected: {}",
                 cycle.join(" -> ")
             ))
@@ -299,16 +299,15 @@ fn read_and_parse_library_interface(
             let diagnostic = Diagnostic::from_parse_error(&display_name, peeled.body, err);
             message.push_str(&format!(": {}", diagnostic.message));
         }
-        return Err(
-            Diagnostic::error(message).with_file(module.interface_path.display().to_string())
-        );
+        return Err(crate::package_diagnostic_error(message)
+            .with_file(module.interface_path.display().to_string()));
     }
 
     let Some(program) = parse.program else {
-        return Err(
-            Diagnostic::error("successful library interface parse result missing program")
-                .with_file(module.interface_path.display().to_string()),
-        );
+        return Err(crate::package_diagnostic_error(
+            "successful library interface parse result missing program",
+        )
+        .with_file(module.interface_path.display().to_string()));
     };
 
     Ok(CachedLibraryInterface {
@@ -332,7 +331,7 @@ fn load_cached_library_interface<'a>(
         library_cache.entries.insert(key.clone(), cached);
     }
     library_cache.entries.get(&key).ok_or_else(|| {
-        Diagnostic::error("library interface cache missing entry after insert")
+        crate::package_diagnostic_error("library interface cache missing entry after insert")
             .with_file(module.interface_path.display().to_string())
     })
 }
@@ -358,8 +357,10 @@ pub(crate) fn library_cached_file_interface(
         .get(&key)
         .and_then(|cached| cached.file_interface.clone())
         .ok_or_else(|| {
-            Diagnostic::error("library interface cache missing extracted file interface")
-                .with_file(import.module.interface_path.display().to_string())
+            crate::package_diagnostic_error(
+                "library interface cache missing extracted file interface",
+            )
+            .with_file(import.module.interface_path.display().to_string())
         })
 }
 
@@ -382,7 +383,7 @@ pub(crate) fn library_cached_analysis<'a>(
         .get(&key)
         .and_then(|cached| cached.analysis.as_ref())
         .ok_or_else(|| {
-            Diagnostic::error("library interface cache missing analyzed unit")
+            crate::package_diagnostic_error("library interface cache missing analyzed unit")
                 .with_file(import.module.interface_path.display().to_string())
         })
 }
@@ -406,7 +407,7 @@ pub(crate) fn library_cached_expanded_imports(
         .get(&key)
         .map(|cached| cached.expanded_imports.clone())
         .ok_or_else(|| {
-            Diagnostic::error("library interface cache missing expanded imports")
+            crate::package_diagnostic_error("library interface cache missing expanded imports")
                 .with_file(import.module.interface_path.display().to_string())
         })
 }
@@ -430,7 +431,7 @@ pub(crate) fn with_library_cached_analysis_mut<T>(
         analyze_cached_library_interface(import, library_resolver, library_cache)?;
     }
     let mut cached = library_cache.entries.remove(&key).ok_or_else(|| {
-        Diagnostic::error("library interface cache missing entry after insert")
+        crate::package_diagnostic_error("library interface cache missing entry after insert")
             .with_file(import.module.interface_path.display().to_string())
     })?;
     let result = match cached.analysis.as_mut() {
@@ -439,10 +440,10 @@ pub(crate) fn with_library_cached_analysis_mut<T>(
                 .with_file(import.module.interface_path.display().to_string())
                 .with_args(err.args)
         }),
-        None => Err(
-            Diagnostic::error("library interface cache missing analyzed unit")
-                .with_file(import.module.interface_path.display().to_string()),
-        ),
+        None => Err(crate::package_diagnostic_error(
+            "library interface cache missing analyzed unit",
+        )
+        .with_file(import.module.interface_path.display().to_string())),
     };
     library_cache.entries.insert(key, cached);
     result
@@ -565,8 +566,10 @@ fn analyze_cached_library_interface(
         Ok(analysis) => analysis,
         Err(diagnostics) => {
             return Err(diagnostics.into_iter().next().unwrap_or_else(|| {
-                Diagnostic::error("library interface analysis failed without diagnostics")
-                    .with_file(import.module.interface_path.display().to_string())
+                crate::package_diagnostic_error(
+                    "library interface analysis failed without diagnostics",
+                )
+                .with_file(import.module.interface_path.display().to_string())
             }))
         }
     };
@@ -593,7 +596,7 @@ fn analyze_cached_library_interface(
     )?;
 
     let cached = library_cache.entries.get_mut(&key).ok_or_else(|| {
-        Diagnostic::error("library interface cache missing entry after analysis")
+        crate::package_diagnostic_error("library interface cache missing entry after analysis")
             .with_file(import.module.interface_path.display().to_string())
     })?;
     cached.analysis = Some(analysis);
@@ -762,7 +765,7 @@ pub(crate) fn attach_library_provenance_with_links(
                 );
             }
         } else if has_namespace_binding {
-            return Err(Diagnostic::error(format!(
+            return Err(crate::package_diagnostic_error(format!(
                 "library import `{}` did not produce binding `{}` in analyzed HIR",
                 import.module.package, import.binding
             ))
@@ -773,7 +776,7 @@ pub(crate) fn attach_library_provenance_with_links(
                     .iter()
                     .all(|item| item.exported_name != exported_member)
                 {
-                    return Err(Diagnostic::error(format!(
+                    return Err(crate::package_diagnostic_error(format!(
                         "library import `{}` did not produce binding `{}` in analyzed HIR",
                         import.module.package, import.binding
                     ))

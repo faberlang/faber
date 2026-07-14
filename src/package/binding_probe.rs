@@ -67,7 +67,7 @@ pub(crate) fn run_rust_binding_probe(
     }
 
     let _gate = PROBE_GATE.lock().map_err(|_| {
-        Diagnostic::error("Rust binding probe gate is poisoned")
+        crate::package_diagnostic_error("Rust binding probe gate is poisoned")
             .with_file(anchor.display().to_string())
             .with_arg("issue", "binding_probe_gate_poisoned")
     })?;
@@ -181,7 +181,7 @@ fn run_probe_in(
         .stderr(Stdio::from(stderr))
         .spawn()
         .map_err(|error| {
-            Diagnostic::error(format!("failed to spawn Rust binding probe: {error}"))
+            crate::package_diagnostic_error(format!("failed to spawn Rust binding probe: {error}"))
                 .with_file(anchor.display().to_string())
                 .with_arg("issue", "binding_probe_spawn_failed")
         })?;
@@ -190,32 +190,34 @@ fn run_probe_in(
     let deadline = Instant::now() + PROBE_TIMEOUT;
     let status = loop {
         if let Some(status) = child.child.try_wait().map_err(|error| {
-            Diagnostic::error(format!("failed to inspect Rust binding probe: {error}"))
-                .with_file(anchor.display().to_string())
-                .with_arg("issue", "binding_probe_wait_failed")
+            crate::package_diagnostic_error(format!(
+                "failed to inspect Rust binding probe: {error}"
+            ))
+            .with_file(anchor.display().to_string())
+            .with_arg("issue", "binding_probe_wait_failed")
         })? {
             break status;
         }
         if Instant::now() >= deadline {
             child.child.kill().map_err(|error| {
-                Diagnostic::error(format!(
+                crate::package_diagnostic_error(format!(
                     "failed to terminate timed-out Rust binding probe: {error}"
                 ))
                 .with_file(anchor.display().to_string())
                 .with_arg("issue", "binding_probe_kill_failed")
             })?;
             child.child.wait().map_err(|error| {
-                Diagnostic::error(format!(
+                crate::package_diagnostic_error(format!(
                     "failed to reap timed-out Rust binding probe: {error}"
                 ))
                 .with_file(anchor.display().to_string())
                 .with_arg("issue", "binding_probe_wait_failed")
             })?;
-            return Err(
-                Diagnostic::error("Rust binding probe timed out after 60 seconds")
-                    .with_file(anchor.display().to_string())
-                    .with_arg("issue", "binding_probe_timeout"),
-            );
+            return Err(crate::package_diagnostic_error(
+                "Rust binding probe timed out after 60 seconds",
+            )
+            .with_file(anchor.display().to_string())
+            .with_arg("issue", "binding_probe_timeout"));
         }
         std::thread::sleep(Duration::from_millis(10));
     };
@@ -225,7 +227,7 @@ fn run_probe_in(
     }
     let stderr = read_output(&stderr_path)?;
     let stdout = read_output(&stdout_path)?;
-    Err(Diagnostic::error(format!(
+    Err(crate::package_diagnostic_error(format!(
         "Rust binding contract probe failed\n{}{}",
         truncate_output(&stderr),
         truncate_output(&stdout)
@@ -285,7 +287,7 @@ fn probe_manifest(
     manifest.insert("package".to_owned(), toml::Value::Table(package));
     manifest.insert("dependencies".to_owned(), toml::Value::Table(dependencies));
     toml::to_string(&manifest).map_err(|error| {
-        Diagnostic::error(format!(
+        crate::package_diagnostic_error(format!(
             "failed to serialize Rust binding probe manifest: {error}"
         ))
         .with_arg("issue", "binding_probe_manifest_serialize_failed")

@@ -29,7 +29,7 @@ fn frontmatter_manifest_conflict(
         return None;
     }
     Some(
-        Diagnostic::error(format!(
+        crate::package_diagnostic_error(format!(
             "frontmatter {frontmatter_label} `{frontmatter_value}` cannot override faber.toml {manifest_label} `{manifest_value}`"
         ))
         .with_file(file.to_owned())

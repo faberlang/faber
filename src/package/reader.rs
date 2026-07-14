@@ -50,7 +50,7 @@ pub(crate) fn load_reader_pack_for_input(
     let pack_path = reader_pack_path(&package_root, &locale, cli_locale, manifest.as_ref());
     let pack = ReaderLocalePack::from_toml_path(&pack_path).map_err(|err| {
         Box::new(
-            Diagnostic::error(format!(
+            crate::package_diagnostic_error(format!(
                 "failed to load reader locale '{locale}' pack '{}': {err}",
                 pack_path.display()
             ))
@@ -60,7 +60,7 @@ pub(crate) fn load_reader_pack_for_input(
 
     if pack.metadata.id != locale {
         return Err(Box::new(
-            Diagnostic::error(format!(
+            crate::package_diagnostic_error(format!(
                 "reader locale '{locale}' selected pack '{}' with id '{}'",
                 pack_path.display(),
                 pack.metadata.id
@@ -79,7 +79,7 @@ fn selected_locale<'a>(
     if let Some(locale) = cli_locale {
         let trimmed = locale.trim();
         if trimmed.is_empty() {
-            return Err(Box::new(Diagnostic::error(
+            return Err(Box::new(crate::package_diagnostic_error(
                 "--reader-locale must not be empty",
             )));
         }

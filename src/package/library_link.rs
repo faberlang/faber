@@ -89,24 +89,28 @@ fn emit_one_library_crate(
     let mut package = analyze_package(&config, package_root)?;
 
     let target = lib_manifest.target.get("rust").ok_or_else(|| {
-        vec![Diagnostic::error("library missing [target.rust]")
-            .with_file(
-                package_root
-                    .join(super::MANIFEST_FILE)
-                    .display()
-                    .to_string(),
-            )
-            .with_arg("issue", "library_target_rust_missing")]
+        vec![
+            crate::package_diagnostic_error("library missing [target.rust]")
+                .with_file(
+                    package_root
+                        .join(super::MANIFEST_FILE)
+                        .display()
+                        .to_string(),
+                )
+                .with_arg("issue", "library_target_rust_missing"),
+        ]
     })?;
     let bindings_rel = target.bindings.as_deref().ok_or_else(|| {
-        vec![Diagnostic::error("library missing [target.rust].bindings")
-            .with_file(
-                package_root
-                    .join(super::MANIFEST_FILE)
-                    .display()
-                    .to_string(),
-            )
-            .with_arg("issue", "library_bindings_missing")]
+        vec![
+            crate::package_diagnostic_error("library missing [target.rust].bindings")
+                .with_file(
+                    package_root
+                        .join(super::MANIFEST_FILE)
+                        .display()
+                        .to_string(),
+                )
+                .with_arg("issue", "library_bindings_missing"),
+        ]
     })?;
     let binding_path = resolve_package_member(
         package_root,
@@ -416,7 +420,7 @@ fn read_binding_manifest(path: &Path) -> Result<BindingManifest, Vec<Diagnostic>
     let source = fs::read_to_string(path).map_err(|err| vec![Diagnostic::io_error(path, err)])?;
     toml::from_str::<BindingManifest>(&source).map_err(|err| {
         vec![
-            Diagnostic::error(format!("invalid binding manifest: {err}"))
+            crate::package_diagnostic_error(format!("invalid binding manifest: {err}"))
                 .with_file(path.display().to_string())
                 .with_arg("issue", "invalid_binding_manifest"),
         ]

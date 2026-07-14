@@ -282,7 +282,7 @@ fn snapshot_function(
 ) -> Result<radix::file_interface::InterfaceCallable, Diagnostic> {
     let name = analysis.interner.resolve(func.name);
     let ret = func.ret_ty.ok_or_else(|| {
-        Diagnostic::error(format!(
+        crate::package_diagnostic_error(format!(
             "public export `{name}` in `{file_label}` does not have a resolved return type"
         ))
         .with_phase(DiagnosticPhase::Analysis)
@@ -326,7 +326,7 @@ fn snapshot_const(
     name: &str,
 ) -> Result<radix::file_interface::InterfaceTypeSnapshot, Diagnostic> {
     let ty = konst.ty.or(konst.value.ty).ok_or_else(|| {
-        Diagnostic::error(format!(
+        crate::package_diagnostic_error(format!(
             "public export `{name}` in `{file_label}` does not have a resolved constant type"
         ))
         .with_phase(DiagnosticPhase::Analysis)
@@ -371,7 +371,7 @@ fn hir_item_name(item: &HirItemKind, analysis: &AnalyzedUnit) -> Option<String> 
 }
 
 fn interface_error(file_label: &str, export_name: &str, err: FileInterfaceError) -> Diagnostic {
-    Diagnostic::error(format!(
+    crate::package_diagnostic_error(format!(
         "public export `{export_name}` in `{file_label}` cannot be represented in a file interface: {err:?}"
     ))
     .with_phase(DiagnosticPhase::Analysis)
