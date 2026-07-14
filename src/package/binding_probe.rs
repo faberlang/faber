@@ -3,12 +3,13 @@
 //! Radix renders exact ABI wrappers. This module owns the temporary Cargo
 //! crate, target dependencies, shim attachment, timeout, and diagnostics.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use radix::diagnostics::Diagnostic;
@@ -19,6 +20,10 @@ use super::runtime_dependency::{
 
 const PROBE_TIMEOUT: Duration = Duration::from_secs(60);
 static NEXT_PROBE_ID: AtomicU64 = AtomicU64::new(0);
+// Cargo probes share registry and build locks across test threads. Gate probe
+// children so the timeout measures compile time, not waiting behind siblings.
+static PROBE_GATE: Mutex<()> = Mutex::new(());
+static SUCCESSFUL_PROBES: OnceLock<Mutex<BTreeSet<String>>> = OnceLock::new();
 
 struct ProbeChild {
     child: Child,
@@ -52,8 +57,35 @@ pub(crate) fn run_rust_binding_probe(
     shim: Option<&Path>,
     probes: &[String],
 ) -> Result<(), Diagnostic> {
+    let key = probe_key(package_root, anchor, dependencies, shim, probes);
+    if successful_probes()
+        .lock()
+        .map(|cache| cache.contains(&key))
+        .unwrap_or(false)
+    {
+        return Ok(());
+    }
+
+    let _gate = PROBE_GATE.lock().map_err(|_| {
+        Diagnostic::error("Rust binding probe gate is poisoned")
+            .with_file(anchor.display().to_string())
+            .with_arg("issue", "binding_probe_gate_poisoned")
+    })?;
+    if successful_probes()
+        .lock()
+        .map(|cache| cache.contains(&key))
+        .unwrap_or(false)
+    {
+        return Ok(());
+    }
+
     let root = probe_root();
     let result = run_probe_in(&root, package_root, anchor, dependencies, shim, probes);
+    if result.is_ok() {
+        if let Ok(mut cache) = successful_probes().lock() {
+            cache.insert(key);
+        }
+    }
     match fs::remove_dir_all(&root) {
         Ok(()) => result,
         Err(cleanup_error) => match result {
@@ -68,6 +100,46 @@ pub(crate) fn run_rust_binding_probe(
             }
         },
     }
+}
+
+fn successful_probes() -> &'static Mutex<BTreeSet<String>> {
+    SUCCESSFUL_PROBES.get_or_init(|| Mutex::new(BTreeSet::new()))
+}
+
+fn probe_key(
+    package_root: &Path,
+    anchor: &Path,
+    dependencies: &BTreeMap<String, String>,
+    shim: Option<&Path>,
+    probes: &[String],
+) -> String {
+    let mut key = String::new();
+    key.push_str(&canonical_probe_path(package_root));
+    key.push('\n');
+    key.push_str(&canonical_probe_path(anchor));
+    key.push('\n');
+    if let Some(shim) = shim {
+        key.push_str(&canonical_probe_path(shim));
+    }
+    key.push('\n');
+    for (name, requirement) in dependencies {
+        key.push_str(name);
+        key.push('=');
+        key.push_str(requirement);
+        key.push('\n');
+    }
+    for probe in probes {
+        key.push_str(probe);
+        key.push('\n');
+    }
+    key
+}
+
+fn canonical_probe_path(path: &Path) -> String {
+    fs::canonicalize(path)
+        .unwrap_or_else(|_| path.to_path_buf())
+        .display()
+        .to_string()
 }
 
 #[allow(clippy::result_large_err)]
