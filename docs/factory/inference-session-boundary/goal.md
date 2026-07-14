@@ -1,6 +1,6 @@
 # Goal: Inference Session Boundary
 
-**Status**: proposed — Faber-owned inference/session boundary defined; no runtime implementation or capability claim
+**Status**: proposed — Faber-owned inference/session boundary and static model artifact oracle check defined; no runtime implementation or capability claim
 **Created**: 2026-07-14
 **Refreshed**: 2026-07-14
 **Target workspace**: `/home/ianzepp/work/faberlang`
@@ -86,6 +86,14 @@ For the first packet, `model.format = "oracle"` is enough. Real GGUF,
 safetensors, tokenizer, and quantized kernel formats should remain rejected
 until their owners provide verifiable loaders and runtime facts.
 
+The first static oracle lives in
+[`model-artifact-oracle.toml`](model-artifact-oracle.toml) and is checked by
+[`check-model-artifact-oracle.py`](check-model-artifact-oracle.py). It validates
+only handoff metadata, relative contained paths, checksum syntax, allowed and
+rejected format policy, and explicit non-claims. The checker deliberately does
+not open model or tokenizer artifacts, load model bytes, run tokenizers, or
+execute an inference runtime.
+
 ## Package And Runtime Boundary
 
 Faber should treat inference as package execution with extra declared artifacts,
@@ -120,7 +128,7 @@ the named owner lands evidence:
 
 ## Smallest Follow-Up Packets
 
-1. **Model artifact manifest oracle check**
+1. **Model artifact manifest oracle check** — complete for static metadata
    - Add a Faber-local docs/test fixture for an `oracle` model manifest.
    - Validate required fields, path containment, checksum shape, and non-claims.
    - Do not load model bytes or run inference.

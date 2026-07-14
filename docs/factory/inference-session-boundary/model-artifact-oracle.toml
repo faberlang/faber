@@ -1,0 +1,52 @@
+[model]
+id = "tiny-token-logits-oracle"
+format = "oracle"
+path = "fixtures/tiny-token-logits/model.oracle.json"
+sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+
+[tokenizer]
+path = "fixtures/tiny-token-logits/tokenizer.oracle.json"
+sha256 = "1111111111111111111111111111111111111111111111111111111111111111"
+
+[session]
+entry = "ai-workbench.generate"
+target = "fmir-bin"
+argv_contract = ["prompt"]
+
+[runtime]
+requirements = ["fmir-cli-args", "oracle-fixture"]
+
+[policy]
+allowed_formats = ["oracle"]
+rejected_formats = [
+  "gguf",
+  "safetensors",
+  "transformer",
+  "quantized-kernel",
+  "gpu-runtime",
+]
+model_loading = "disabled"
+tokenizer_loading = "disabled"
+runtime_execution = "disabled"
+
+[evidence]
+checks = [
+  "static metadata only",
+  "relative contained artifact paths",
+  "checksum syntax only",
+  "oracle format only",
+  "explicit non-claims",
+]
+non_claims = [
+  "no public inference support",
+  "no llama.cpp equivalence",
+  "no GGUF runtime",
+  "no safetensors runtime",
+  "no transformer runtime",
+  "no tokenizer runtime",
+  "no quantized-kernel runtime",
+  "no GPU runtime",
+  "no model download",
+  "no model loading",
+  "no runtime execution",
+]

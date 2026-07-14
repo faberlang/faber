@@ -37,3 +37,6 @@ check_goal_status \
 check_goal_status \
     "SQLite library package" \
     "$root/docs/factory/sqlite-library-package/goal.md"
+
+python3 "$root/docs/factory/inference-session-boundary/check-model-artifact-oracle.py" \
+    "$root/docs/factory/inference-session-boundary/model-artifact-oracle.toml"
