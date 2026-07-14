@@ -41,6 +41,8 @@ REQUIRED_FAILURES = {
     "runtime_execution_requested",
 }
 
+EXPECTED_ALLOWED_TARGETS = ("fmir-text", "fmir", "fmir-bin", "scena", "rust")
+
 
 def fail(message: str) -> None:
     print(f"session CLI contract check failed: {message}", file=sys.stderr)
@@ -107,6 +109,25 @@ def validate(document: dict[str, object]) -> None:
     requirements = set(string_list(admission.get("required_runtime_requirements"), "admission.required_runtime_requirements"))
     if requirements != {"oracle-fixture"}:
         fail("admission.required_runtime_requirements must be exactly ['oracle-fixture']")
+    allowed_targets = string_list(admission.get("allowed_targets"), "admission.allowed_targets")
+    if not allowed_targets:
+        fail("admission.allowed_targets must not be empty")
+    for target in allowed_targets:
+        if not target:
+            fail("admission.allowed_targets entries must be non-empty")
+    duplicates = sorted({target for target in allowed_targets if allowed_targets.count(target) > 1})
+    if duplicates:
+        fail(f"admission.allowed_targets contains duplicates {duplicates}")
+    expected_targets = set(EXPECTED_ALLOWED_TARGETS)
+    actual_targets = set(allowed_targets)
+    unknown_targets = sorted(actual_targets - expected_targets)
+    if unknown_targets:
+        fail(f"admission.allowed_targets contains unknown targets {unknown_targets}")
+    missing_targets = [target for target in EXPECTED_ALLOWED_TARGETS if target not in actual_targets]
+    if missing_targets:
+        fail(f"admission.allowed_targets missing {missing_targets}")
+    if allowed_targets != list(EXPECTED_ALLOWED_TARGETS):
+        fail(f"admission.allowed_targets must be exactly {list(EXPECTED_ALLOWED_TARGETS)}")
     if not bool_value(admission.get("requires_manifest_static_validation"), "admission.requires_manifest_static_validation"):
         fail("manifest static validation must be required")
     for field in ("loads_model_bytes", "loads_tokenizer", "executes_runtime", "downloads_models"):

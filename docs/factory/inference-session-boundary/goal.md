@@ -102,9 +102,10 @@ The first command-shape contract lives in
 future `faber session <package-root> --model-manifest <manifest> --
 <session-args>` shape, oracle-only manifest admission, package target
 allow-lists, stdout/stderr contracts, fail-before-execution behavior, and
-explicit non-claims. The checker validates only the contract metadata; it does
-not run `faber`, load model or tokenizer artifacts, or execute an inference
-runtime.
+explicit non-claims. The checker validates only the contract metadata,
+including the exact allowed package target set, and has a negative
+unsupported-target fixture. It does not run `faber`, load model or tokenizer
+artifacts, or execute an inference runtime.
 
 ## Package And Runtime Boundary
 
