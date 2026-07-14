@@ -93,7 +93,16 @@ fn materialize_payload(
         .join("faber")
         .join("core-support")
         .join(PAYLOAD_FORMAT);
+    let created_cache_root = match fs::symlink_metadata(cache_root) {
+        Ok(_) => false,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => true,
+        Err(error) => return Err(MaterializeError::io(error)),
+    };
     fs::create_dir_all(&parent).map_err(MaterializeError::io)?;
+    if created_cache_root {
+        secure_created_cache_root(cache_root)?;
+    }
+    secure_managed_cache_directories(cache_root)?;
     ensure_real_cache_directories(cache_root, &parent)?;
 
     let target = parent.join(expected_archive_hash);
@@ -158,6 +167,55 @@ fn materialize_locked(
             Err(error)
         }
     }
+}
+
+#[cfg(unix)]
+fn secure_created_cache_root(cache_root: &Path) -> Result<(), MaterializeError> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let metadata = fs::symlink_metadata(cache_root).map_err(MaterializeError::io)?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err(MaterializeError::InvalidPayload("cache root is unsafe"));
+    }
+    fs::set_permissions(cache_root, fs::Permissions::from_mode(0o700)).map_err(MaterializeError::io)
+}
+
+#[cfg(not(unix))]
+fn secure_created_cache_root(_: &Path) -> Result<(), MaterializeError> {
+    Ok(())
+}
+
+#[cfg(unix)]
+fn secure_managed_cache_directories(cache_root: &Path) -> Result<(), MaterializeError> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let mut current = cache_root.to_path_buf();
+    for component in Path::new("faber/core-support").components() {
+        current.push(component.as_os_str());
+        let metadata = fs::symlink_metadata(&current).map_err(MaterializeError::io)?;
+        if metadata.file_type().is_symlink() || !metadata.is_dir() {
+            return Err(MaterializeError::InvalidPayload(
+                "cache directory is unsafe",
+            ));
+        }
+        fs::set_permissions(&current, fs::Permissions::from_mode(0o700))
+            .map_err(MaterializeError::io)?;
+    }
+    let payload = current.join(PAYLOAD_FORMAT);
+    let metadata = fs::symlink_metadata(&payload).map_err(MaterializeError::io)?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err(MaterializeError::InvalidPayload(
+            "cache directory is unsafe",
+        ));
+    }
+    fs::set_permissions(payload, fs::Permissions::from_mode(0o700))
+        .map_err(MaterializeError::io)?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn secure_managed_cache_directories(_: &Path) -> Result<(), MaterializeError> {
+    Ok(())
 }
 
 fn ensure_real_cache_directories(cache_root: &Path, parent: &Path) -> Result<(), MaterializeError> {

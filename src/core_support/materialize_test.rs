@@ -12,6 +12,11 @@ fn test_root(label: &str) -> PathBuf {
         std::process::id()
     ));
     fs::create_dir(&root).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
+    }
     root
 }
 
@@ -143,6 +148,22 @@ fn concurrent_materializations_converge_on_one_completed_entry() {
         .collect::<BTreeSet<_>>();
     assert_eq!(paths.len(), 1);
     cleanup(root.as_ref());
+}
+
+#[cfg(unix)]
+#[test]
+fn rejects_group_writable_cache_root() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let root = test_root("group-writable");
+    fs::set_permissions(&root, fs::Permissions::from_mode(0o775)).unwrap();
+    let (archive, hash, manifest) = payload(&[("faber-runtime/src/lib.rs", b"ok")]);
+    let err = materialize_payload(&root, &archive, &hash, &manifest).unwrap_err();
+    assert!(matches!(
+        err,
+        MaterializeError::InvalidPayload("cache directory is writable by another user")
+    ));
+    cleanup(&root);
 }
 
 #[cfg(unix)]
