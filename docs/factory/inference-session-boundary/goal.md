@@ -1,6 +1,6 @@
 # Goal: Inference Session Boundary
 
-**Status**: proposed — Faber-owned inference/session boundary and static model artifact oracle check defined; no runtime implementation or capability claim
+**Status**: proposed — Faber-owned inference/session boundary, static model artifact oracle check, and session CLI contract defined; no runtime implementation or capability claim
 **Created**: 2026-07-14
 **Refreshed**: 2026-07-14
 **Target workspace**: `/home/ianzepp/work/faberlang`
@@ -94,6 +94,18 @@ rejected format policy, and explicit non-claims. The checker deliberately does
 not open model or tokenizer artifacts, load model bytes, run tokenizers, or
 execute an inference runtime.
 
+## Session CLI Contract
+
+The first command-shape contract lives in
+[`session-cli-contract.toml`](session-cli-contract.toml) and is checked by
+[`check-session-cli-contract.py`](check-session-cli-contract.py). It defines a
+future `faber session <package-root> --model-manifest <manifest> --
+<session-args>` shape, oracle-only manifest admission, package target
+allow-lists, stdout/stderr contracts, fail-before-execution behavior, and
+explicit non-claims. The checker validates only the contract metadata; it does
+not run `faber`, load model or tokenizer artifacts, or execute an inference
+runtime.
+
 ## Package And Runtime Boundary
 
 Faber should treat inference as package execution with extra declared artifacts,
@@ -133,7 +145,7 @@ the named owner lands evidence:
    - Validate required fields, path containment, checksum shape, and non-claims.
    - Do not load model bytes or run inference.
 
-2. **Session CLI contract spike**
+2. **Session CLI contract spike** — complete for static metadata
    - Define a narrow command contract for a package/session invocation that
      forwards prompt/session arguments and reports artifact paths/diagnostics.
    - Acceptance can be help text plus parser tests or a docs checker.

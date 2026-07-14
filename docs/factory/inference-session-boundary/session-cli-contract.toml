@@ -1,0 +1,80 @@
+[command]
+name = "faber session"
+status = "contract-only"
+shape = "faber session <package-root> --model-manifest <manifest> -- <session-args>"
+package_root_arg = "<package-root>"
+model_manifest_flag = "--model-manifest"
+separator = "--"
+
+[inputs]
+package_root = "required-relative-or-absolute-path"
+model_manifest = "oracle-only-model-artifact-manifest"
+session_args = ["prompt"]
+accepted_manifest_formats = ["oracle"]
+rejected_manifest_formats = [
+  "gguf",
+  "safetensors",
+  "transformer",
+  "quantized-kernel",
+  "gpu-runtime",
+]
+
+[admission]
+manifest_checker = "docs/factory/inference-session-boundary/check-model-artifact-oracle.py"
+required_runtime_requirements = ["oracle-fixture"]
+allowed_targets = ["fmir-text", "fmir", "fmir-bin", "scena", "rust"]
+requires_existing_package_root = true
+requires_manifest_static_validation = true
+loads_model_bytes = false
+loads_tokenizer = false
+executes_runtime = false
+downloads_models = false
+
+[stdout]
+contract = "line-delimited session events"
+allowed_event_kinds = [
+  "artifact",
+  "diagnostic",
+  "oracle-request",
+  "oracle-result",
+]
+forbidden_event_kinds = [
+  "token",
+  "logit",
+  "gpu-kernel",
+  "model-loaded",
+]
+
+[stderr]
+contract = "diagnostics only"
+required_failure_prefix = "faber session:"
+
+[failures]
+unsupported_format = "reject before package execution"
+missing_non_claim = "reject before package execution"
+unchecked_path = "reject before package execution"
+unknown_runtime_requirement = "reject before package execution"
+runtime_execution_requested = "reject before package execution"
+
+[evidence]
+checks = [
+  "contract metadata only",
+  "oracle manifest admission only",
+  "session argument forwarding contract",
+  "stdout and stderr contract",
+  "failure behavior",
+  "explicit non-claims",
+]
+non_claims = [
+  "no public inference support",
+  "no llama.cpp equivalence",
+  "no GGUF runtime",
+  "no safetensors runtime",
+  "no transformer runtime",
+  "no tokenizer runtime",
+  "no quantized-kernel runtime",
+  "no GPU runtime",
+  "no model loading",
+  "no runtime execution",
+  "no implemented faber session command",
+]

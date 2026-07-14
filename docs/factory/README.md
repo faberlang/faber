@@ -51,6 +51,6 @@ docs/factory/check-state-consistency.sh
 
 | Goal | Status | Entry |
 | ---- | ------ | ----- |
-| Inference session boundary | proposed — Faber-owned inference/session boundary and static model artifact oracle check defined; no runtime implementation or capability claim | [`inference-session-boundary/goal.md`](inference-session-boundary/goal.md) |
+| Inference session boundary | proposed — Faber-owned inference/session boundary, static model artifact oracle check, and session CLI contract defined; no runtime implementation or capability claim | [`inference-session-boundary/goal.md`](inference-session-boundary/goal.md) |
 | SQLite library package | active — Stage 1 API contract, Stage 2 Rust binding prototype, and Stage 3 ViviLite read consumer complete; Stage 4 write compatibility partially complete | [`sqlite-library-package/goal.md`](sqlite-library-package/goal.md) |
 | Unified package manifest | active — Phases 1–4 Rust native-binding path complete (G4); Go/TS product assembly later | [`unified-package-manifest/goal.md`](unified-package-manifest/goal.md) |
