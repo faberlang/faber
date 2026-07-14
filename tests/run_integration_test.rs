@@ -58,6 +58,41 @@ fn run_faber(args: &[&str]) -> (String, String, bool) {
     (stdout, stderr, status.success())
 }
 
+#[test]
+fn targets_reports_faber_package_capability_for_fmir_targets() {
+    let (stdout, stderr, ok) = run_faber(&["targets"]);
+    assert!(ok, "faber targets failed:\n{stderr}");
+
+    for target in ["fmir-text", "fmir", "fmir-bin"] {
+        let prefix = format!("{target} ");
+        let row = stdout
+            .lines()
+            .find(|line| line.starts_with(&prefix))
+            .unwrap_or_else(|| panic!("missing {target} row:\n{stdout}"));
+        assert!(
+            row.contains("check=yes build=yes run=yes package=yes"),
+            "Faber package FMIR target row must show package build/run truth:\n{row}"
+        );
+        assert!(
+            row.contains("faber build --target"),
+            "Faber FMIR target note must point at Faber package build surface:\n{row}"
+        );
+        assert!(
+            !row.contains("radix emit rejects"),
+            "Faber target row must not present Radix emit truth as Faber command truth:\n{row}"
+        );
+    }
+
+    let wgsl = stdout
+        .lines()
+        .find(|line| line.starts_with("wgsl-text "))
+        .expect("missing wgsl-text row");
+    assert!(
+        wgsl.contains("run=no package=no") && wgsl.contains("not GPU launch or package runtime"),
+        "systems emit targets must remain non-package/non-runtime claims:\n{wgsl}"
+    );
+}
+
 fn run_faber_status(args: &[&str]) -> (String, String, std::process::ExitStatus) {
     run_faber_status_with_env(args, &[])
 }

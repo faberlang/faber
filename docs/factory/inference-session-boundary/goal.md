@@ -28,7 +28,7 @@ lifecycle, tokenizer execution, and GPU/CPU kernels.
 
 | Surface | Current Faber fact | Boundary implication |
 | --- | --- | --- |
-| `faber targets` | Faber exposes capability rows through the Radix command surface. | Faber may display delegated package targets, but target capability truth remains Radix-owned. |
+| `faber targets` | Faber exposes Faber command-surface capability rows. FMIR package targets report `build/run/package=yes` because Faber owns those package artifact commands, while Radix keeps its emit rows delegated/non-runnable. | Faber target rows must distinguish Faber package command truth from Radix emit truth. |
 | `build --target fmir-text` / `fmir` / `fmir-bin` | Package FMIR image targets are produced by Faber package commands and print artifact paths on stdout. | Faber owns package artifact UX and runner bundling for FMIR package images. |
 | `run --target fmir-text\|fmir\|fmir-bin` | Builds the package artifact and forwards runtime arguments after `--`. | Faber owns CLI/session argument forwarding and fail-closed runtime requirement checks for package images. |
 | `run --target scena` | Builds/loads the MIR package artifact and forwards runtime args after `--`. | Faber owns package-scoped MIR runner UX; Radix owns MIR semantics. |

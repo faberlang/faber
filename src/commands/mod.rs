@@ -18,6 +18,7 @@ mod install;
 mod install_test;
 mod run;
 mod script;
+mod targets;
 mod test;
 
 use crate::cli::Command;
@@ -33,6 +34,7 @@ use init::cmd_init;
 use install::cmd_install;
 use run::{cmd_fmir_run_image, cmd_run};
 use script::{cmd_eval, cmd_repl, cmd_script};
+use targets::cmd_targets;
 use test::cmd_test;
 
 fn diagnostic_mode(enabled: bool) -> DiagnosticMode {
@@ -89,7 +91,7 @@ fn dispatch(command: Command) {
                 reader_locale: args.reader_locale,
             })
         }
-        Command::Targets => tool::cmd_targets(),
+        Command::Targets => cmd_targets(),
         Command::Check(args) => {
             reject_reader_locale_without_package(
                 args.reader_locale.as_deref(),
