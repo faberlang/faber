@@ -82,16 +82,40 @@ pub(crate) fn read_lock(package_root: &Path) -> Result<Option<FaberLock>, Box<Di
                 .with_arg("issue", "invalid_faber_lock"),
         )
     })?;
+    if let Err(mut diagnostics) = lock_index(&path, &lock) {
+        let diagnostic = diagnostics
+            .pop()
+            .expect("duplicate lock diagnostics must be non-empty");
+        return Err(Box::new(diagnostic));
+    }
     Ok(Some(lock))
 }
 
 /// Index locked packages by name.
-pub(crate) fn lock_index(lock: &FaberLock) -> BTreeMap<String, LockedPackage> {
+pub(crate) fn lock_index(
+    lock_path: &Path,
+    lock: &FaberLock,
+) -> Result<BTreeMap<String, LockedPackage>, Vec<Diagnostic>> {
     let mut map = BTreeMap::new();
+    let mut diagnostics = Vec::new();
     for package in &lock.packages {
-        map.insert(package.name.clone(), package.clone());
+        if map.insert(package.name.clone(), package.clone()).is_some() {
+            diagnostics.push(
+                Diagnostic::error(format!(
+                    "{LOCK_FILE} contains duplicate package name `{}`",
+                    package.name
+                ))
+                .with_file(lock_path.display().to_string())
+                .with_arg("issue", "duplicate_locked_package")
+                .with_arg("package", package.name.clone()),
+            );
+        }
     }
-    map
+    if diagnostics.is_empty() {
+        Ok(map)
+    } else {
+        Err(diagnostics)
+    }
 }
 
 /// Validate that declared exact dependencies are present in the lock with matching versions
@@ -116,7 +140,10 @@ pub(crate) fn validate_dependencies_against_lock(
         );
         return diagnostics;
     };
-    let index = lock_index(lock);
+    let index = match lock_index(&package_root.join(LOCK_FILE), lock) {
+        Ok(index) => index,
+        Err(diagnostics) => return diagnostics,
+    };
     for (name, version) in dependencies {
         let Some(locked) = index.get(name) else {
             diagnostics.push(
@@ -207,3 +234,7 @@ fn validate_locked_paths(
         );
     }
 }
+
+#[cfg(test)]
+#[path = "lockfile_test.rs"]
+mod tests;

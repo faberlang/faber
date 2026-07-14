@@ -18,7 +18,7 @@ use serde::Serialize;
 
 use super::compile::AnalyzedPackage;
 use super::discovery::sanitize_crate_name;
-use super::lockfile::{read_lock, LockedPackage};
+use super::lockfile::{lock_index, read_lock, LockedPackage};
 use super::manifest::{read_manifest, FaberManifest};
 use super::PackageSpec;
 
@@ -219,11 +219,14 @@ pub(crate) fn linked_library_crate_map(package: &AnalyzedPackage) -> BTreeMap<St
     let Some(lock) = read_lock(app_root).ok().flatten() else {
         return map;
     };
+    let Ok(lock_index) = lock_index(&app_root.join(super::lockfile::LOCK_FILE), &lock) else {
+        return map;
+    };
     let Some(manifest) = package_manifest(package) else {
         return map;
     };
     for name in manifest.dependencies.keys() {
-        let Some(locked) = lock.packages.iter().find(|p| &p.name == name) else {
+        let Some(locked) = lock_index.get(name) else {
             continue;
         };
         if library_needs_native_crate(app_root, locked) {
@@ -259,10 +262,14 @@ pub(crate) fn native_library_deps(
         }
         Err(diag) => return Err(vec![*diag]),
     };
+    let lock_index = match lock_index(&package_root.join(super::lockfile::LOCK_FILE), &lock) {
+        Ok(lock_index) => lock_index,
+        Err(diagnostics) => return Err(diagnostics),
+    };
     let mut out = Vec::new();
     let mut diagnostics = Vec::new();
     for (name, version) in &manifest.dependencies {
-        let Some(locked) = lock.packages.iter().find(|p| &p.name == name) else {
+        let Some(locked) = lock_index.get(name) else {
             diagnostics.push(
                 Diagnostic::error(format!(
                     "dependency `{name}` is missing from {}",

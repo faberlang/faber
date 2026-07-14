@@ -209,7 +209,11 @@ pub(crate) fn library_resolver_for_package(
 
     let mut locked = std::collections::BTreeMap::new();
     if let Some(lock) = lock.as_ref() {
-        for package in &lock.packages {
+        let lock_index = match lockfile::lock_index(&package_root.join(lockfile::LOCK_FILE), lock) {
+            Ok(lock_index) => lock_index,
+            Err(diagnostics) => return Err(diagnostics),
+        };
+        for package in lock_index.values() {
             locked.insert(
                 package.name.clone(),
                 crate::library::LockedLibraryPackage {
