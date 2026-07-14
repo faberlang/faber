@@ -56,3 +56,21 @@ faber = { package = "faber-runtime", path = "../../faber-runtime" }
         Some(runtime)
     );
 }
+
+#[test]
+fn detects_runtime_path_from_direct_target_dependency() {
+    let root = temp_root("direct-dep");
+    let package = root.join("packages/app");
+    let runtime = root.join("faber-runtime");
+    fs::create_dir_all(&package).expect("create package");
+    fs::create_dir_all(&runtime).expect("create runtime");
+    let dependencies = BTreeMap::from([(
+        "faber".to_owned(),
+        r#"{ package = "faber-runtime", path = "../../faber-runtime" }"#.to_owned(),
+    )]);
+
+    assert_eq!(
+        runtime_path_from_target_dependencies(&package, &dependencies),
+        Some(runtime)
+    );
+}
