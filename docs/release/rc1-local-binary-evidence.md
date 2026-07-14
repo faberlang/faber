@@ -4,11 +4,46 @@ Date: 2026-07-14
 Status: local evidence only; not a public release record
 Owning repo: `faber`
 
-This note records the local evidence created after commit `cd24854`
-(`Align Faber CLI version with RC1`). It is intended for release control-plane
-and `faberlang.dev` claim review. It does not authorize tagging, pushing,
-publishing, public downloads, installation instructions, Homebrew, curl, DNS,
-or a production/stable 1.0 claim.
+This note records local evidence for release control-plane and `faberlang.dev`
+claim review. It does not authorize tagging, pushing, publishing, public
+downloads, installation instructions, Homebrew, curl, DNS, or a
+production/stable 1.0 claim.
+
+## Current Evidence Refresh
+
+Captured on 2026-07-14 after the Radix generated-Rust producer fix that cleared
+the Triga Stage 2 compile errors.
+
+Source provenance:
+
+| Repo | Commit |
+| --- | --- |
+| `radix` | `7d32673f8136` |
+| `faber` | `5d508d737e87` |
+
+Both `radix` and `faber` were clean before the release-profile build.
+
+Build and validation commands run in `/home/ianzepp/work/faberlang/faber`:
+
+```sh
+cargo fmt --check
+timeout 180 cargo test reference_test --lib
+timeout 240 cargo test --test clean_install_integration_test
+timeout 600 cargo build --release
+./target/release/faber --version
+sha256sum target/release/faber
+```
+
+Observed results:
+
+```text
+cargo fmt --check: passed
+cargo test reference_test --lib: 14 passed
+cargo test --test clean_install_integration_test: 2 passed
+cargo build --release: passed
+./target/release/faber --version: faber 1.0.0-rc.1
+sha256sum target/release/faber: 666e0563532ff48659051b2210db09e11aad52690bf6e6e043153a5664170345  target/release/faber
+```
 
 ## Proven Locally
 
@@ -22,7 +57,7 @@ or a production/stable 1.0 claim.
 - The observed local SHA-256 for that release-profile binary was:
 
   ```text
-  e9eac740721917790ee2215c175aa4f6f407a8730f0ca61b9aa8e47a2fdfcc43  target/release/faber
+  666e0563532ff48659051b2210db09e11aad52690bf6e6e043153a5664170345  target/release/faber
   ```
 
 - Reference-pack version compatibility handles prerelease/build metadata for
@@ -37,8 +72,8 @@ The following commands passed in `/home/ianzepp/work/faberlang/faber`:
 ```sh
 cargo fmt --check
 timeout 180 cargo test reference_test --lib
-timeout 180 cargo test --test clean_install_integration_test
-timeout 300 cargo build --release
+timeout 240 cargo test --test clean_install_integration_test
+timeout 600 cargo build --release
 ./target/release/faber --version
 sha256sum target/release/faber
 ```
@@ -50,7 +85,7 @@ cargo test reference_test --lib: 14 passed
 cargo test --test clean_install_integration_test: 2 passed
 cargo build --release: passed
 ./target/release/faber --version: faber 1.0.0-rc.1
-sha256sum target/release/faber: e9eac740721917790ee2215c175aa4f6f407a8730f0ca61b9aa8e47a2fdfcc43
+sha256sum target/release/faber: 666e0563532ff48659051b2210db09e11aad52690bf6e6e043153a5664170345
 ```
 
 ## Allowed Claim Wording
