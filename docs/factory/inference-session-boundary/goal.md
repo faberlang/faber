@@ -90,9 +90,11 @@ The first static oracle lives in
 [`model-artifact-oracle.toml`](model-artifact-oracle.toml) and is checked by
 [`check-model-artifact-oracle.py`](check-model-artifact-oracle.py). It validates
 only handoff metadata, relative contained paths, checksum syntax, allowed and
-rejected format policy, and explicit non-claims. The checker deliberately does
-not open model or tokenizer artifacts, load model bytes, run tokenizers, or
-execute an inference runtime.
+rejected format policy, exact oracle runtime requirements, exact prompt argv
+contract, and explicit non-claims. Its self-test rejects unknown runtime
+requirements and argv-contract drift. The checker deliberately does not open
+model or tokenizer artifacts, load model bytes, run tokenizers, or execute an
+inference runtime.
 
 ## Session CLI Contract
 

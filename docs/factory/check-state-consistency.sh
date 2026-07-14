@@ -45,6 +45,8 @@ python3 "$root/docs/factory/autograd-equivalent-roadmap/check-autograd-roadmap.p
     "$root/docs/factory/autograd-equivalent-roadmap/deck.md"
 python3 "$root/docs/factory/inference-session-boundary/check-model-artifact-oracle.py" \
     "$root/docs/factory/inference-session-boundary/model-artifact-oracle.toml"
+python3 "$root/docs/factory/inference-session-boundary/check-model-artifact-oracle.py" \
+    --self-test
 python3 "$root/docs/factory/inference-session-boundary/check-session-cli-contract.py" \
     "$root/docs/factory/inference-session-boundary/session-cli-contract.toml"
 python3 "$root/docs/factory/inference-session-boundary/check-session-cli-contract-negative.py"

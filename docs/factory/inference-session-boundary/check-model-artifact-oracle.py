@@ -8,10 +8,13 @@ an inference runtime.
 
 from __future__ import annotations
 
+import contextlib
+import copy
+import io
 import re
 import sys
 import tomllib
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 
 
 REQUIRED_NON_CLAIMS = {
@@ -34,6 +37,21 @@ REJECTED_FORMATS = {
     "transformer",
     "quantized-kernel",
     "gpu-runtime",
+}
+
+EXPECTED_ARGV_CONTRACT = ("prompt",)
+
+ALLOWED_RUNTIME_REQUIREMENTS = {
+    "fmir-cli-args",
+    "oracle-fixture",
+}
+
+REQUIRED_EVIDENCE_CHECKS = {
+    "static metadata only",
+    "relative contained artifact paths",
+    "checksum syntax only",
+    "oracle format only",
+    "explicit non-claims",
 }
 
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -102,11 +120,27 @@ def validate(document: dict[str, object]) -> None:
     target = string(session.get("target"), "session.target")
     if target not in {"fmir-text", "fmir", "fmir-bin", "scena", "rust"}:
         fail(f"session.target is not a Faber package target: {target}")
-    string_list(session.get("argv_contract"), "session.argv_contract")
+    argv_contract = string_list(session.get("argv_contract"), "session.argv_contract")
+    if argv_contract != list(EXPECTED_ARGV_CONTRACT):
+        fail(f"session.argv_contract must be exactly {list(EXPECTED_ARGV_CONTRACT)}")
 
-    requirements = set(string_list(runtime.get("requirements"), "runtime.requirements"))
-    if "oracle-fixture" not in requirements:
-        fail("runtime.requirements must include oracle-fixture")
+    requirement_list = string_list(runtime.get("requirements"), "runtime.requirements")
+    duplicates = sorted(
+        {
+            requirement
+            for requirement in requirement_list
+            if requirement_list.count(requirement) > 1
+        }
+    )
+    if duplicates:
+        fail(f"runtime.requirements contains duplicates {duplicates}")
+    requirements = set(requirement_list)
+    unknown_requirements = sorted(requirements - ALLOWED_RUNTIME_REQUIREMENTS)
+    if unknown_requirements:
+        fail(f"runtime.requirements contains unknown entries {unknown_requirements}")
+    missing_requirements = sorted(ALLOWED_RUNTIME_REQUIREMENTS - requirements)
+    if missing_requirements:
+        fail(f"runtime.requirements missing {missing_requirements}")
     if requirements & REJECTED_FORMATS:
         fail("runtime.requirements must not name real model/runtime formats")
 
@@ -122,15 +156,98 @@ def validate(document: dict[str, object]) -> None:
             fail(f"policy.{field} must be disabled")
 
     checks = set(string_list(evidence.get("checks"), "evidence.checks"))
-    if "static metadata only" not in checks:
-        fail("evidence.checks must include static metadata only")
+    missing_checks = sorted(REQUIRED_EVIDENCE_CHECKS - checks)
+    if missing_checks:
+        fail(f"evidence.checks missing {missing_checks}")
+    unknown_checks = sorted(checks - REQUIRED_EVIDENCE_CHECKS)
+    if unknown_checks:
+        fail(f"evidence.checks contains unknown entries {unknown_checks}")
     non_claims = set(string_list(evidence.get("non_claims"), "evidence.non_claims"))
     missing_non_claims = sorted(REQUIRED_NON_CLAIMS - non_claims)
     if missing_non_claims:
         fail(f"evidence.non_claims missing {missing_non_claims}")
 
 
+def assert_rejects(document: dict[str, object], expected_error: str) -> None:
+    stderr = io.StringIO()
+    try:
+        with contextlib.redirect_stderr(stderr):
+            validate(document)
+    except SystemExit as error:
+        if error.code != 1:
+            raise AssertionError(f"expected exit 1, got {error.code}")
+    else:
+        raise AssertionError(f"expected rejection containing {expected_error!r}")
+    error_text = stderr.getvalue()
+    if expected_error not in error_text:
+        raise AssertionError(f"expected {expected_error!r} in {error_text!r}")
+
+
+def with_mutation(
+    document: dict[str, object],
+    table_name: str,
+    key: str,
+    value: object,
+) -> dict[str, object]:
+    mutated = copy.deepcopy(document)
+    table_value = mutated[table_name]
+    if not isinstance(table_value, dict):
+        raise AssertionError(f"fixture table {table_name} is not a table")
+    table_value[key] = value
+    return mutated
+
+
+def self_test() -> None:
+    root = Path(__file__).resolve().parent
+    with open(root / "model-artifact-oracle.toml", "rb") as handle:
+        baseline = tomllib.load(handle)
+
+    validate(baseline)
+    cases = [
+        (
+            "unknown runtime requirement",
+            with_mutation(
+                baseline,
+                "runtime",
+                "requirements",
+                ["fmir-cli-args", "oracle-fixture", "external-provider"],
+            ),
+            "runtime.requirements contains unknown entries ['external-provider']",
+        ),
+        (
+            "missing runtime requirement",
+            with_mutation(baseline, "runtime", "requirements", ["oracle-fixture"]),
+            "runtime.requirements missing ['fmir-cli-args']",
+        ),
+        (
+            "empty argv contract",
+            with_mutation(baseline, "session", "argv_contract", []),
+            "session.argv_contract must be exactly ['prompt']",
+        ),
+        (
+            "extra argv contract",
+            with_mutation(baseline, "session", "argv_contract", ["prompt", "temperature"]),
+            "session.argv_contract must be exactly ['prompt']",
+        ),
+        (
+            "weakened evidence checks",
+            with_mutation(baseline, "evidence", "checks", ["static metadata only"]),
+            "evidence.checks missing",
+        ),
+    ]
+
+    for name, document, expected_error in cases:
+        try:
+            assert_rejects(document, expected_error)
+        except AssertionError as error:
+            raise AssertionError(f"{name}: {error}") from error
+
+
 def main() -> None:
+    if len(sys.argv) == 2 and sys.argv[1] == "--self-test":
+        self_test()
+        print("ok: model artifact oracle negative self-test")
+        return
     manifest = (
         sys.argv[1]
         if len(sys.argv) > 1
