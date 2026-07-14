@@ -122,6 +122,42 @@ def check_exact_contract_fields(root: pathlib.Path) -> None:
             "inputs.model_manifest must be oracle-only-model-artifact-manifest",
         ),
         (
+            "duplicate prompt session argument",
+            with_field(baseline, "inputs", "session_args", ["prompt", "prompt"]),
+            "inputs.session_args must be exactly ['prompt']",
+        ),
+        (
+            "extra session argument",
+            with_field(baseline, "inputs", "session_args", ["prompt", "temperature"]),
+            "inputs.session_args must be exactly ['prompt']",
+        ),
+        (
+            "accepted manifest drift",
+            with_field(baseline, "inputs", "accepted_manifest_formats", ["oracle", "gguf"]),
+            "inputs.accepted_manifest_formats must be exactly ['oracle']",
+        ),
+        (
+            "oracle rejected while accepted",
+            with_field(
+                baseline,
+                "inputs",
+                "rejected_manifest_formats",
+                ["oracle", "gguf", "safetensors", "transformer", "quantized-kernel", "gpu-runtime"],
+            ),
+            "inputs accepted/rejected manifest formats overlap ['oracle']",
+        ),
+        (
+            "rejected manifest order",
+            with_field(
+                baseline,
+                "inputs",
+                "rejected_manifest_formats",
+                ["safetensors", "gguf", "transformer", "quantized-kernel", "gpu-runtime"],
+            ),
+            "inputs.rejected_manifest_formats must be exactly "
+            "['gguf', 'safetensors', 'transformer', 'quantized-kernel', 'gpu-runtime']",
+        ),
+        (
             "existing package root requirement",
             with_field(baseline, "admission", "requires_existing_package_root", False),
             "admission.requires_existing_package_root must be true",
@@ -130,6 +166,58 @@ def check_exact_contract_fields(root: pathlib.Path) -> None:
             "stdout contract",
             with_field(baseline, "stdout", "contract", "free-form session text"),
             "stdout.contract must be line-delimited session events",
+        ),
+        (
+            "token stdout event allowed",
+            with_field(
+                baseline,
+                "stdout",
+                "allowed_event_kinds",
+                ["artifact", "diagnostic", "oracle-request", "oracle-result", "token"],
+            ),
+            "stdout allowed/forbidden event kinds overlap ['token']",
+        ),
+        (
+            "logit stdout event allowed",
+            with_field(
+                baseline,
+                "stdout",
+                "allowed_event_kinds",
+                ["artifact", "diagnostic", "oracle-request", "oracle-result", "logit"],
+            ),
+            "stdout allowed/forbidden event kinds overlap ['logit']",
+        ),
+        (
+            "model-loaded stdout event allowed",
+            with_field(
+                baseline,
+                "stdout",
+                "allowed_event_kinds",
+                ["artifact", "diagnostic", "oracle-request", "oracle-result", "model-loaded"],
+            ),
+            "stdout allowed/forbidden event kinds overlap ['model-loaded']",
+        ),
+        (
+            "allowed stdout event order",
+            with_field(
+                baseline,
+                "stdout",
+                "allowed_event_kinds",
+                ["diagnostic", "artifact", "oracle-request", "oracle-result"],
+            ),
+            "stdout.allowed_event_kinds must be exactly "
+            "['artifact', 'diagnostic', 'oracle-request', 'oracle-result']",
+        ),
+        (
+            "forbidden stdout event order",
+            with_field(
+                baseline,
+                "stdout",
+                "forbidden_event_kinds",
+                ["logit", "token", "gpu-kernel", "model-loaded"],
+            ),
+            "stdout.forbidden_event_kinds must be exactly "
+            "['token', 'logit', 'gpu-kernel', 'model-loaded']",
         ),
         (
             "stderr contract",

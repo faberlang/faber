@@ -25,14 +25,6 @@ REQUIRED_NON_CLAIMS = {
     "no implemented faber session command",
 }
 
-REJECTED_FORMATS = {
-    "gguf",
-    "safetensors",
-    "transformer",
-    "quantized-kernel",
-    "gpu-runtime",
-}
-
 REQUIRED_FAILURES = {
     "unsupported_format",
     "missing_non_claim",
@@ -50,6 +42,27 @@ EXPECTED_STDERR_CONTRACT = "diagnostics only"
 EXPECTED_FAILURE_PREFIX = "faber session:"
 EXPECTED_MODEL_MANIFEST = "oracle-only-model-artifact-manifest"
 EXPECTED_ORACLE_RUNTIME_REQUIREMENTS = ("fmir-cli-args", "oracle-fixture")
+EXPECTED_SESSION_ARGS = ("prompt",)
+EXPECTED_ACCEPTED_MANIFEST_FORMATS = ("oracle",)
+EXPECTED_REJECTED_MANIFEST_FORMATS = (
+    "gguf",
+    "safetensors",
+    "transformer",
+    "quantized-kernel",
+    "gpu-runtime",
+)
+EXPECTED_ALLOWED_STDOUT_EVENTS = (
+    "artifact",
+    "diagnostic",
+    "oracle-request",
+    "oracle-result",
+)
+EXPECTED_FORBIDDEN_STDOUT_EVENTS = (
+    "token",
+    "logit",
+    "gpu-kernel",
+    "model-loaded",
+)
 
 
 def fail(message: str) -> None:
@@ -80,6 +93,13 @@ def string_list(value: object, field: str) -> list[str]:
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         fail(f"{field} must be a string array")
     return value
+
+
+def exact_string_list(value: object, field: str, expected: tuple[str, ...]) -> list[str]:
+    items = string_list(value, field)
+    if items != list(expected):
+        fail(f"{field} must be exactly {list(expected)}")
+    return items
 
 
 def validate(document: dict[str, object]) -> None:
@@ -117,15 +137,33 @@ def validate(document: dict[str, object]) -> None:
         fail(f"inputs.package_root must be {EXPECTED_PACKAGE_ROOT_CONTRACT}")
     if string(inputs.get("model_manifest"), "inputs.model_manifest") != EXPECTED_MODEL_MANIFEST:
         fail(f"inputs.model_manifest must be {EXPECTED_MODEL_MANIFEST}")
-    accepted = set(string_list(inputs.get("accepted_manifest_formats"), "inputs.accepted_manifest_formats"))
-    if accepted != {"oracle"}:
-        fail("inputs.accepted_manifest_formats must be exactly ['oracle']")
-    rejected = set(string_list(inputs.get("rejected_manifest_formats"), "inputs.rejected_manifest_formats"))
-    missing_rejections = sorted(REJECTED_FORMATS - rejected)
-    if missing_rejections:
-        fail(f"inputs.rejected_manifest_formats missing {missing_rejections}")
-    if set(string_list(inputs.get("session_args"), "inputs.session_args")) != {"prompt"}:
-        fail("inputs.session_args must describe only prompt forwarding")
+    session_args = exact_string_list(
+        inputs.get("session_args"),
+        "inputs.session_args",
+        EXPECTED_SESSION_ARGS,
+    )
+    accepted_manifest_formats = exact_string_list(
+        inputs.get("accepted_manifest_formats"),
+        "inputs.accepted_manifest_formats",
+        EXPECTED_ACCEPTED_MANIFEST_FORMATS,
+    )
+    rejected_manifest_formats = string_list(
+        inputs.get("rejected_manifest_formats"),
+        "inputs.rejected_manifest_formats",
+    )
+    manifest_overlap = sorted(set(accepted_manifest_formats) & set(rejected_manifest_formats))
+    if manifest_overlap:
+        fail(f"inputs accepted/rejected manifest formats overlap {manifest_overlap}")
+    if set(rejected_manifest_formats) != set(EXPECTED_REJECTED_MANIFEST_FORMATS):
+        fail(
+            f"inputs.rejected_manifest_formats must be exactly "
+            f"{list(EXPECTED_REJECTED_MANIFEST_FORMATS)}"
+        )
+    if rejected_manifest_formats != list(EXPECTED_REJECTED_MANIFEST_FORMATS):
+        fail(
+            f"inputs.rejected_manifest_formats must be exactly "
+            f"{list(EXPECTED_REJECTED_MANIFEST_FORMATS)}"
+        )
 
     if "check-model-artifact-oracle.py" not in string(admission.get("manifest_checker"), "admission.manifest_checker"):
         fail("admission.manifest_checker must use the oracle manifest checker")
@@ -177,12 +215,21 @@ def validate(document: dict[str, object]) -> None:
 
     if string(stdout.get("contract"), "stdout.contract") != EXPECTED_STDOUT_CONTRACT:
         fail(f"stdout.contract must be {EXPECTED_STDOUT_CONTRACT}")
-    allowed_events = set(string_list(stdout.get("allowed_event_kinds"), "stdout.allowed_event_kinds"))
-    if not {"artifact", "diagnostic", "oracle-request", "oracle-result"}.issubset(allowed_events):
-        fail("stdout.allowed_event_kinds missing contract events")
-    forbidden_events = set(string_list(stdout.get("forbidden_event_kinds"), "stdout.forbidden_event_kinds"))
-    if not {"token", "logit", "gpu-kernel", "model-loaded"}.issubset(forbidden_events):
-        fail("stdout.forbidden_event_kinds missing runtime event exclusions")
+    allowed_events = string_list(stdout.get("allowed_event_kinds"), "stdout.allowed_event_kinds")
+    forbidden_events = string_list(stdout.get("forbidden_event_kinds"), "stdout.forbidden_event_kinds")
+    stdout_overlap = sorted(set(allowed_events) & set(forbidden_events))
+    if stdout_overlap:
+        fail(f"stdout allowed/forbidden event kinds overlap {stdout_overlap}")
+    if allowed_events != list(EXPECTED_ALLOWED_STDOUT_EVENTS):
+        fail(
+            f"stdout.allowed_event_kinds must be exactly "
+            f"{list(EXPECTED_ALLOWED_STDOUT_EVENTS)}"
+        )
+    if forbidden_events != list(EXPECTED_FORBIDDEN_STDOUT_EVENTS):
+        fail(
+            f"stdout.forbidden_event_kinds must be exactly "
+            f"{list(EXPECTED_FORBIDDEN_STDOUT_EVENTS)}"
+        )
     if string(stderr.get("contract"), "stderr.contract") != EXPECTED_STDERR_CONTRACT:
         fail(f"stderr.contract must be {EXPECTED_STDERR_CONTRACT}")
     if string(stderr.get("required_failure_prefix"), "stderr.required_failure_prefix") != EXPECTED_FAILURE_PREFIX:
