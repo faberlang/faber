@@ -184,6 +184,104 @@ entry = "main.fab"
     package
 }
 
+fn write_package_manifest(package: &Path, source: &str, entry: &str) {
+    fs::write(
+        package.join("faber.toml"),
+        format!(
+            r#"
+[package]
+name = "containment-check"
+
+[paths]
+source = "{source}"
+entry = "{entry}"
+"#
+        ),
+    )
+    .expect("write manifest");
+}
+
+fn assert_package_path_rejected(stderr: &str, expected: &str) {
+    assert!(
+        stderr.contains(expected),
+        "expected package path rejection containing `{expected}`, got:\n{stderr}"
+    );
+}
+
+#[test]
+fn check_manifest_rejects_source_parent_escape() {
+    let workspace = temp_dir("package-source-parent-escape");
+    let package = workspace.join("pkg");
+    let outside = workspace.join("outside");
+    fs::create_dir_all(&package).expect("create package");
+    fs::create_dir_all(&outside).expect("create outside");
+    fs::write(outside.join("main.fab"), "incipit { nota 1 }\n").expect("write outside entry");
+    write_package_manifest(&package, "../outside", "main.fab");
+
+    let (_stdout, stderr, ok) = run_faber(&["check", package.to_str().expect("utf8 package path")]);
+
+    assert!(!ok, "source parent escape must fail");
+    assert_package_path_rejected(&stderr, "package member path escapes through its parent");
+}
+
+#[test]
+fn check_manifest_rejects_entry_parent_escape() {
+    let workspace = temp_dir("package-entry-parent-escape");
+    let package = workspace.join("pkg");
+    let outside = workspace.join("outside");
+    fs::create_dir_all(package.join("src")).expect("create source");
+    fs::create_dir_all(&outside).expect("create outside");
+    fs::write(outside.join("main.fab"), "incipit { nota 1 }\n").expect("write outside entry");
+    write_package_manifest(&package, "src", "../../outside/main.fab");
+
+    let (_stdout, stderr, ok) = run_faber(&["check", package.to_str().expect("utf8 package path")]);
+
+    assert!(!ok, "entry parent escape must fail");
+    assert_package_path_rejected(&stderr, "package member path escapes through its parent");
+}
+
+#[test]
+fn check_manifest_rejects_absolute_package_path() {
+    let workspace = temp_dir("package-absolute-path");
+    let package = workspace.join("pkg");
+    let outside = workspace.join("outside");
+    fs::create_dir_all(package.join("src")).expect("create source");
+    fs::create_dir_all(&outside).expect("create outside");
+    let outside_entry = outside.join("main.fab");
+    fs::write(&outside_entry, "incipit { nota 1 }\n").expect("write outside entry");
+    write_package_manifest(
+        &package,
+        "src",
+        outside_entry.to_str().expect("utf8 outside entry"),
+    );
+
+    let (_stdout, stderr, ok) = run_faber(&["check", package.to_str().expect("utf8 package path")]);
+
+    assert!(!ok, "absolute entry path must fail");
+    assert_package_path_rejected(&stderr, "package member path must be relative");
+}
+
+#[cfg(unix)]
+#[test]
+fn check_manifest_rejects_entry_symlink_escape() {
+    use std::os::unix::fs::symlink;
+
+    let workspace = temp_dir("package-entry-symlink-escape");
+    let package = workspace.join("pkg");
+    let source = package.join("src");
+    let outside = workspace.join("outside");
+    fs::create_dir_all(&source).expect("create source");
+    fs::create_dir_all(&outside).expect("create outside");
+    fs::write(outside.join("main.fab"), "incipit { nota 1 }\n").expect("write outside entry");
+    symlink(&outside, source.join("linked")).expect("link outside source");
+    write_package_manifest(&package, "src", "linked/main.fab");
+
+    let (_stdout, stderr, ok) = run_faber(&["check", package.to_str().expect("utf8 package path")]);
+
+    assert!(!ok, "entry symlink escape must fail");
+    assert_package_path_rejected(&stderr, "package member resolves outside the package root");
+}
+
 fn write_single_file(label: &str, source: &str) -> PathBuf {
     let dir = temp_dir(label);
     let file = dir.join("main.fab");

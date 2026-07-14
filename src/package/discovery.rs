@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use radix::diagnostics::Diagnostic;
 
 use super::manifest::{read_manifest, validate_manifest};
+use super::member_path::resolve_package_member;
 use super::paths::{absolutize_path, normalize_path};
 use super::MANIFEST_FILE;
 
@@ -192,12 +193,14 @@ fn parse_manifest(path: &Path) -> PackageDiscoveryResult {
 
     validate_manifest(&manifest, path)?;
 
-    let source_root = package_root.join(&manifest.paths.source);
+    let source_root = resolve_package_member(&package_root, &manifest.paths.source, path)
+        .map_err(|diagnostic| Box::new(diagnostic))?;
     let entry = manifest
         .paths
         .entry
         .as_deref()
-        .map(|entry| source_root.join(entry))
+        .map(|entry| manifest_entry_path(&package_root, &manifest.paths.source, entry, path))
+        .transpose()?
         .unwrap_or_else(|| source_root.clone());
     Ok(PackageSpec {
         package_root,
@@ -215,12 +218,29 @@ fn parse_manifest_with_entry(path: &Path, entry: PathBuf) -> PackageDiscoveryRes
 
     validate_manifest(&manifest, path)?;
 
-    let source_root = package_root.join(&manifest.paths.source);
+    let source_root = resolve_package_member(&package_root, &manifest.paths.source, path)
+        .map_err(|diagnostic| Box::new(diagnostic))?;
     Ok(PackageSpec {
         package_root,
         source_root,
         entry,
     })
+}
+
+fn manifest_entry_path(
+    package_root: &Path,
+    source: &str,
+    entry: &str,
+    manifest_path: &Path,
+) -> Result<PathBuf, Box<Diagnostic>> {
+    if Path::new(entry).is_absolute() {
+        return resolve_package_member(package_root, entry, manifest_path)
+            .map_err(|diagnostic| Box::new(diagnostic));
+    }
+    let relative = Path::new(source).join(entry);
+    let relative = relative.to_string_lossy();
+    resolve_package_member(package_root, &relative, manifest_path)
+        .map_err(|diagnostic| Box::new(diagnostic))
 }
 
 /// Discover a `BuildLayout` for the given input (directory, manifest file, or entry file).
