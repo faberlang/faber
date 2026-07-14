@@ -42,6 +42,7 @@ struct CachedLibraryInterface {
     interner: Interner,
     analysis: Option<AnalyzedUnit>,
     file_interface: Option<FileInterface>,
+    expanded_imports: Vec<LibraryImportBinding>,
 }
 
 type LibraryIdentityKey = (u8, String, Vec<String>);
@@ -316,6 +317,7 @@ fn read_and_parse_library_interface(
         interner: parse.interner,
         analysis: None,
         file_interface: None,
+        expanded_imports: Vec::new(),
     })
 }
 
@@ -383,6 +385,67 @@ pub(crate) fn library_cached_analysis<'a>(
             Diagnostic::error("library interface cache missing analyzed unit")
                 .with_file(import.module.interface_path.display().to_string())
         })
+}
+
+#[allow(clippy::result_large_err)]
+pub(crate) fn library_cached_expanded_imports(
+    import: &LibraryImportBinding,
+    library_resolver: &LibraryResolver,
+    library_cache: &mut LibraryInterfaceCache,
+) -> Result<Vec<LibraryImportBinding>, Diagnostic> {
+    let key = library_identity_key(&library_identity(&import.module));
+    if library_cache
+        .entries
+        .get(&key)
+        .is_none_or(|cached| cached.analysis.is_none())
+    {
+        analyze_cached_library_interface(import, library_resolver, library_cache)?;
+    }
+    library_cache
+        .entries
+        .get(&key)
+        .map(|cached| cached.expanded_imports.clone())
+        .ok_or_else(|| {
+            Diagnostic::error("library interface cache missing expanded imports")
+                .with_file(import.module.interface_path.display().to_string())
+        })
+}
+
+#[allow(clippy::result_large_err)]
+pub(crate) fn with_library_cached_analysis_mut<T>(
+    import: &LibraryImportBinding,
+    library_resolver: &LibraryResolver,
+    library_cache: &mut LibraryInterfaceCache,
+    f: impl FnOnce(
+        &mut AnalyzedUnit,
+        &mut LibraryInterfaceCache,
+    ) -> Result<T, radix::codegen::CodegenError>,
+) -> Result<T, Diagnostic> {
+    let key = library_identity_key(&library_identity(&import.module));
+    if library_cache
+        .entries
+        .get(&key)
+        .is_none_or(|cached| cached.analysis.is_none())
+    {
+        analyze_cached_library_interface(import, library_resolver, library_cache)?;
+    }
+    let mut cached = library_cache.entries.remove(&key).ok_or_else(|| {
+        Diagnostic::error("library interface cache missing entry after insert")
+            .with_file(import.module.interface_path.display().to_string())
+    })?;
+    let result = match cached.analysis.as_mut() {
+        Some(analysis) => f(analysis, library_cache).map_err(|err| {
+            Diagnostic::codegen_error(&err.message)
+                .with_file(import.module.interface_path.display().to_string())
+                .with_args(err.args)
+        }),
+        None => Err(
+            Diagnostic::error("library interface cache missing analyzed unit")
+                .with_file(import.module.interface_path.display().to_string()),
+        ),
+    };
+    library_cache.entries.insert(key, cached);
+    result
 }
 
 pub(crate) fn library_module_segments(import: &LibraryImportBinding) -> Vec<String> {
@@ -535,6 +598,7 @@ fn analyze_cached_library_interface(
     })?;
     cached.analysis = Some(analysis);
     cached.file_interface = Some(file_interface);
+    cached.expanded_imports = expanded;
     Ok(())
 }
 

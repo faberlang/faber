@@ -133,10 +133,10 @@ use paths::normalize_path;
 use source_files::{load_package_source, package_source_files};
 
 pub(crate) use library::{
-    analysis_source_for_file, library_cached_analysis, library_cached_file_interface,
-    library_generates_rust_module, library_imported_function_params,
+    analysis_source_for_file, library_cached_analysis, library_cached_expanded_imports,
+    library_cached_file_interface, library_generates_rust_module, library_imported_function_params,
     library_interface_export_names, library_interface_has_module, library_module_segments,
-    program_export_names, LibraryInterfaceCache,
+    program_export_names, with_library_cached_analysis_mut, LibraryInterfaceCache,
 };
 pub(crate) use reader::{config_with_reader_locale, load_reader_pack_for_input};
 

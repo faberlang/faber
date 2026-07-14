@@ -25,11 +25,12 @@ use super::import_graph::{
 };
 use super::{
     analysis_source_for_file, discover_build_layout, discover_package, library_cached_analysis,
-    library_cached_file_interface, library_generates_rust_module, library_imported_function_params,
-    library_interface_export_names, library_interface_has_module, library_module_segments,
-    library_resolver_for_package, load_package, load_package_with_reader_pack,
-    load_provider_manifests, load_reader_pack_for_input, program_export_names, read_manifest,
-    selected_providers_for_routes, LibraryImportBinding, LibraryInterfaceCache, PackageFile,
+    library_cached_expanded_imports, library_cached_file_interface, library_generates_rust_module,
+    library_imported_function_params, library_interface_export_names, library_interface_has_module,
+    library_module_segments, library_resolver_for_package, load_package,
+    load_package_with_reader_pack, load_provider_manifests, load_reader_pack_for_input,
+    program_export_names, read_manifest, selected_providers_for_routes,
+    with_library_cached_analysis_mut, LibraryImportBinding, LibraryInterfaceCache, PackageFile,
     RustRuntimePlan,
 };
 
@@ -1053,21 +1054,40 @@ fn insert_generated_library_modules(
         if !library_generates_rust_module(import, library_cache)? {
             continue;
         }
-        let analysis = library_cached_analysis(import, library_resolver, library_cache)?;
-        let rust = generate_rust_code_for_analysis(
-            analysis,
-            false,
-            test_selection,
-            field_name_policy,
-            false,
-            None,
-            None,
-        )
-        .map_err(|err| {
-            Diagnostic::codegen_error(&err.message)
-                .with_file(import.module.interface_path.display().to_string())
-                .with_args(err.args)
-        })?;
+        let imports = library_cached_expanded_imports(import, library_resolver, library_cache)?;
+        let rust = with_library_cached_analysis_mut(
+            import,
+            library_resolver,
+            library_cache,
+            |analysis, library_cache| {
+                let mut imported_namespace_info = build_local_import_namespaces(
+                    &analysis.hir,
+                    &analysis.interner,
+                    &mut analysis.types,
+                    &analysis.resolver,
+                    &[],
+                );
+                extend_library_namespace_type_paths(
+                    &imports,
+                    &analysis.hir,
+                    &analysis.interner,
+                    &mut analysis.types,
+                    &analysis.resolver,
+                    library_resolver,
+                    library_cache,
+                    &mut imported_namespace_info,
+                )?;
+                generate_rust_code_for_analysis(
+                    analysis,
+                    false,
+                    test_selection,
+                    field_name_policy,
+                    false,
+                    None,
+                    Some(imported_namespace_info),
+                )
+            },
+        )?;
         module_tree.insert(&key, rust);
     }
     Ok(())
