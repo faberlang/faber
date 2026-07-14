@@ -106,9 +106,10 @@ future `faber session <package-root> --model-manifest <manifest> --
 allow-lists, stdout/stderr contracts, fail-before-execution behavior, and
 explicit non-claims. The checker validates only the contract metadata,
 including the exact package-root, separator, stdout/stderr, required failure
-prefix, and allowed package target set. Its negative fixture covers these
-exact-contract fields plus unsupported target drift. It does not run `faber`,
-load model or tokenizer artifacts, or execute an inference runtime.
+prefix, required failure rows, and allowed package target set. Its negative
+fixture covers these exact-contract fields, every required failure row, and
+unsupported target drift. It does not run `faber`, load model or tokenizer
+artifacts, or execute an inference runtime.
 
 ## Package And Runtime Boundary
 

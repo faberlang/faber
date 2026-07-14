@@ -145,6 +145,48 @@ def check_exact_contract_fields(root: pathlib.Path) -> None:
             raise AssertionError(f"{name}: {error}") from error
 
 
+def check_required_failure_rows(root: pathlib.Path) -> None:
+    checker = load_checker(root)
+    with open(root / "session-cli-contract.toml", "rb") as handle:
+        baseline = tomllib.load(handle)
+
+    checker.validate(baseline)
+
+    cases = [
+        (
+            "unsupported format",
+            with_field(baseline, "failures", "unsupported_format", "may continue"),
+            "failures.unsupported_format must reject before package execution",
+        ),
+        (
+            "missing non-claim",
+            with_field(baseline, "failures", "missing_non_claim", "may continue"),
+            "failures.missing_non_claim must reject before package execution",
+        ),
+        (
+            "unchecked path",
+            with_field(baseline, "failures", "unchecked_path", "may continue"),
+            "failures.unchecked_path must reject before package execution",
+        ),
+        (
+            "unknown runtime requirement",
+            with_field(baseline, "failures", "unknown_runtime_requirement", "may continue"),
+            "failures.unknown_runtime_requirement must reject before package execution",
+        ),
+        (
+            "runtime execution requested",
+            with_field(baseline, "failures", "runtime_execution_requested", "may continue"),
+            "failures.runtime_execution_requested must reject before package execution",
+        ),
+    ]
+
+    for name, document, expected_error in cases:
+        try:
+            assert_rejects(checker, document, expected_error)
+        except AssertionError as error:
+            raise AssertionError(f"{name}: {error}") from error
+
+
 UNSUPPORTED_TARGET_FIXTURE_ENV = "FABER_SESSION_CLI_NEGATIVE_UNSUPPORTED_TARGET_FIXTURE"
 
 
@@ -173,6 +215,27 @@ def check_unsupported_target_fixture(root: pathlib.Path) -> None:
         raise AssertionError("unsupported target fixture failed for the wrong reason")
 
 
+def check_required_failure_fixture(root: pathlib.Path) -> None:
+    checker = load_checker(root)
+    with open(root / "session-cli-contract.toml", "rb") as handle:
+        baseline = tomllib.load(handle)
+
+    mutated = with_field(
+        baseline,
+        "failures",
+        "runtime_execution_requested",
+        "may continue into package execution",
+    )
+    try:
+        assert_rejects(
+            checker,
+            mutated,
+            "failures.runtime_execution_requested must reject before package execution",
+        )
+    except AssertionError as error:
+        raise AssertionError(f"required failure fixture: {error}") from error
+
+
 def check_unexpected_pass_regression(root: pathlib.Path) -> None:
     with tempfile.TemporaryDirectory(prefix="faber-session-negative-") as temporary:
         passing_fixture = pathlib.Path(temporary) / "passing-session-cli-contract.toml"
@@ -195,17 +258,34 @@ def check_unexpected_pass_regression(root: pathlib.Path) -> None:
         )
 
 
+def check_required_failure_self_test(root: pathlib.Path) -> None:
+    check_required_failure_fixture(root)
+
+
 def main() -> int:
     root = pathlib.Path(__file__).resolve().parent
-    if len(sys.argv) > 2 or (len(sys.argv) == 2 and sys.argv[1] != "--self-test"):
-        print("usage: check-session-cli-contract-negative.py [--self-test]", file=sys.stderr)
+    if len(sys.argv) > 2 or (
+        len(sys.argv) == 2
+        and sys.argv[1] not in {"--self-test", "--self-test-required-failure"}
+    ):
+        print(
+            "usage: check-session-cli-contract-negative.py [--self-test|--self-test-required-failure]",
+            file=sys.stderr,
+        )
         return 1
-    if len(sys.argv) == 2:
+    if len(sys.argv) == 2 and sys.argv[1] == "--self-test":
         check_unexpected_pass_regression(root)
+        check_required_failure_self_test(root)
         print("ok: session CLI contract negative checker self-test")
+        return 0
+    if len(sys.argv) == 2:
+        check_required_failure_self_test(root)
+        print("ok: session CLI contract required-failure self-test")
         return 0
     check_allowed_target_edges(root)
     check_exact_contract_fields(root)
+    check_required_failure_rows(root)
+    check_required_failure_fixture(root)
     check_unsupported_target_fixture(root)
     print("ok: session CLI contract negative fixtures")
     return 0
