@@ -1,6 +1,6 @@
 [package]
 name = "faber"
-version = "1.0.0-rc.1"
+version = "1.0.0-rc.2"
 edition = "2021"
 description = "Faber project and package tool"
 license = "MIT"
