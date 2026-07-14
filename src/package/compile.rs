@@ -961,15 +961,6 @@ fn extend_library_namespace_type_paths(
             continue;
         };
         let module_segments = library_module_segments(import);
-        info.modules
-            .insert(namespace_def_id, module_segments.clone());
-        let export_names = library_interface_export_names(import, library_resolver, library_cache)
-            .map_err(|diag| radix::codegen::CodegenError {
-                message: diag.message,
-                args: diag.args,
-            })?;
-        info.exports
-            .insert(namespace_def_id, export_names.into_iter().collect());
         let analysis =
             library_cached_analysis(import, library_resolver, library_cache).map_err(|diag| {
                 radix::codegen::CodegenError {
