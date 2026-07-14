@@ -1,7 +1,7 @@
 use crate::explain::{render_list, render_plain, Lookup, Registry};
 use crate::reference::{
-    pack_version_skew, resolve_reference_root, PackMetadata, ReferenceLayout, ReferencePack,
-    ResolvedTerm, REFERENCE_ROOT_ENV,
+    pack_version_skew, parse_release_version, resolve_reference_root, PackMetadata,
+    ReferenceLayout, ReferencePack, ResolvedTerm, REFERENCE_ROOT_ENV,
 };
 use crate::reference_pack_test_support::{env_lock, repo_exempla_root};
 use crate::reference_parse::entry_from_exempla;
@@ -154,8 +154,11 @@ fn disk_render_plain_includes_short_contract_for_functio() {
 
 #[test]
 fn pack_version_skew_errors_on_major_mismatch() {
+    let (major, _minor, _patch) =
+        parse_release_version(env!("CARGO_PKG_VERSION")).expect("release version");
+    let pack_version = format!("{}.0.0", major + 1);
     let metadata = PackMetadata {
-        faber_version: Some("1.0.0".to_owned()),
+        faber_version: Some(pack_version),
         generated_on: None,
         fab_count: 0,
         registry_terms: 0,
@@ -168,8 +171,11 @@ fn pack_version_skew_errors_on_major_mismatch() {
 
 #[test]
 fn pack_version_skew_warns_on_minor_patch_drift() {
+    let (major, minor, _patch) =
+        parse_release_version(env!("CARGO_PKG_VERSION")).expect("release version");
+    let pack_version = format!("{major}.{}.0", minor + 1);
     let metadata = PackMetadata {
-        faber_version: Some("0.35.0".to_owned()),
+        faber_version: Some(pack_version.clone()),
         generated_on: None,
         fab_count: 0,
         registry_terms: 0,
@@ -179,7 +185,7 @@ fn pack_version_skew_warns_on_minor_patch_drift() {
     let warning = pack_version_skew(&metadata)
         .expect("minor drift warns")
         .expect("warning message");
-    assert!(warning.contains("0.35.0"));
+    assert!(warning.contains(&pack_version));
     assert!(warning.contains("differs"));
 }
 
@@ -209,6 +215,14 @@ fn pack_version_skew_accepts_matching_release_version() {
     assert!(pack_version_skew(&metadata)
         .expect("matching version")
         .is_none());
+}
+
+#[test]
+fn release_version_parser_accepts_prerelease_and_build_metadata() {
+    assert_eq!(parse_release_version("1.0.0-rc.1"), Some((1, 0, 0)));
+    assert_eq!(parse_release_version("1.0.0+local"), Some((1, 0, 0)));
+    assert_eq!(parse_release_version("1.0.0-rc.1+local"), Some((1, 0, 0)));
+    assert_eq!(parse_release_version("ci"), None);
 }
 
 #[test]

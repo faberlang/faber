@@ -530,8 +530,11 @@ pub fn pack_version_skew(metadata: &PackMetadata) -> Result<Option<String>, Refe
     )))
 }
 
-fn parse_release_version(value: &str) -> Option<(u32, u32, u32)> {
-    let mut parts = value.split('.');
+pub(crate) fn parse_release_version(value: &str) -> Option<(u32, u32, u32)> {
+    let core = value
+        .split_once(['-', '+'])
+        .map_or(value, |(core, _metadata)| core);
+    let mut parts = core.split('.');
     let major: u32 = parts.next()?.parse().ok()?;
     let minor: u32 = parts.next()?.parse().ok()?;
     let patch: u32 = parts.next().unwrap_or("0").parse().ok()?;
