@@ -21,7 +21,7 @@ rejected_manifest_formats = [
 
 [admission]
 manifest_checker = "docs/factory/inference-session-boundary/check-model-artifact-oracle.py"
-required_runtime_requirements = ["oracle-fixture"]
+required_runtime_requirements = ["fmir-cli-args", "oracle-fixture"]
 allowed_targets = ["fmir-text", "fmir", "fmir-bin", "scena", "rust"]
 requires_existing_package_root = true
 requires_manifest_static_validation = true

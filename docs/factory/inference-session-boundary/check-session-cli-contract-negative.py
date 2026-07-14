@@ -117,6 +117,11 @@ def check_exact_contract_fields(root: pathlib.Path) -> None:
             "inputs.package_root must be required-relative-or-absolute-path",
         ),
         (
+            "model manifest identity",
+            with_field(baseline, "inputs", "model_manifest", "unchecked-any-file"),
+            "inputs.model_manifest must be oracle-only-model-artifact-manifest",
+        ),
+        (
             "existing package root requirement",
             with_field(baseline, "admission", "requires_existing_package_root", False),
             "admission.requires_existing_package_root must be true",
@@ -141,6 +146,47 @@ def check_exact_contract_fields(root: pathlib.Path) -> None:
     for name, document, expected_error in cases:
         try:
             assert_rejects(checker, document, expected_error)
+        except AssertionError as error:
+            raise AssertionError(f"{name}: {error}") from error
+
+
+def check_runtime_requirement_edges(root: pathlib.Path) -> None:
+    checker = load_checker(root)
+    with open(root / "session-cli-contract.toml", "rb") as handle:
+        baseline = tomllib.load(handle)
+
+    checker.validate(baseline)
+
+    cases = [
+        (
+            "missing runtime requirement",
+            ["oracle-fixture"],
+            "admission.required_runtime_requirements missing ['fmir-cli-args']",
+        ),
+        (
+            "duplicate runtime requirement",
+            ["fmir-cli-args", "oracle-fixture", "oracle-fixture"],
+            "admission.required_runtime_requirements contains duplicates ['oracle-fixture']",
+        ),
+        (
+            "unknown runtime requirement",
+            ["fmir-cli-args", "oracle-fixture", "external-provider"],
+            "admission.required_runtime_requirements contains unknown entries ['external-provider']",
+        ),
+        (
+            "non-canonical runtime requirement order",
+            ["oracle-fixture", "fmir-cli-args"],
+            "admission.required_runtime_requirements must be exactly ['fmir-cli-args', 'oracle-fixture']",
+        ),
+    ]
+
+    for name, requirements, expected_error in cases:
+        try:
+            assert_rejects(
+                checker,
+                with_field(baseline, "admission", "required_runtime_requirements", requirements),
+                expected_error,
+            )
         except AssertionError as error:
             raise AssertionError(f"{name}: {error}") from error
 
@@ -274,6 +320,8 @@ def main() -> int:
         )
         return 1
     if len(sys.argv) == 2 and sys.argv[1] == "--self-test":
+        check_exact_contract_fields(root)
+        check_runtime_requirement_edges(root)
         check_unexpected_pass_regression(root)
         check_required_failure_self_test(root)
         print("ok: session CLI contract negative checker self-test")
@@ -284,6 +332,7 @@ def main() -> int:
         return 0
     check_allowed_target_edges(root)
     check_exact_contract_fields(root)
+    check_runtime_requirement_edges(root)
     check_required_failure_rows(root)
     check_required_failure_fixture(root)
     check_unsupported_target_fixture(root)

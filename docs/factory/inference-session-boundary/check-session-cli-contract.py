@@ -48,6 +48,8 @@ EXPECTED_SEPARATOR = "--"
 EXPECTED_STDOUT_CONTRACT = "line-delimited session events"
 EXPECTED_STDERR_CONTRACT = "diagnostics only"
 EXPECTED_FAILURE_PREFIX = "faber session:"
+EXPECTED_MODEL_MANIFEST = "oracle-only-model-artifact-manifest"
+EXPECTED_ORACLE_RUNTIME_REQUIREMENTS = ("fmir-cli-args", "oracle-fixture")
 
 
 def fail(message: str) -> None:
@@ -113,6 +115,8 @@ def validate(document: dict[str, object]) -> None:
 
     if string(inputs.get("package_root"), "inputs.package_root") != EXPECTED_PACKAGE_ROOT_CONTRACT:
         fail(f"inputs.package_root must be {EXPECTED_PACKAGE_ROOT_CONTRACT}")
+    if string(inputs.get("model_manifest"), "inputs.model_manifest") != EXPECTED_MODEL_MANIFEST:
+        fail(f"inputs.model_manifest must be {EXPECTED_MODEL_MANIFEST}")
     accepted = set(string_list(inputs.get("accepted_manifest_formats"), "inputs.accepted_manifest_formats"))
     if accepted != {"oracle"}:
         fail("inputs.accepted_manifest_formats must be exactly ['oracle']")
@@ -125,9 +129,25 @@ def validate(document: dict[str, object]) -> None:
 
     if "check-model-artifact-oracle.py" not in string(admission.get("manifest_checker"), "admission.manifest_checker"):
         fail("admission.manifest_checker must use the oracle manifest checker")
-    requirements = set(string_list(admission.get("required_runtime_requirements"), "admission.required_runtime_requirements"))
-    if requirements != {"oracle-fixture"}:
-        fail("admission.required_runtime_requirements must be exactly ['oracle-fixture']")
+    requirement_list = string_list(
+        admission.get("required_runtime_requirements"),
+        "admission.required_runtime_requirements",
+    )
+    duplicates = sorted(
+        {requirement for requirement in requirement_list if requirement_list.count(requirement) > 1}
+    )
+    if duplicates:
+        fail(f"admission.required_runtime_requirements contains duplicates {duplicates}")
+    requirements = set(requirement_list)
+    expected_requirements = set(EXPECTED_ORACLE_RUNTIME_REQUIREMENTS)
+    unknown_requirements = sorted(requirements - expected_requirements)
+    if unknown_requirements:
+        fail(f"admission.required_runtime_requirements contains unknown entries {unknown_requirements}")
+    missing_requirements = [requirement for requirement in EXPECTED_ORACLE_RUNTIME_REQUIREMENTS if requirement not in requirements]
+    if missing_requirements:
+        fail(f"admission.required_runtime_requirements missing {missing_requirements}")
+    if requirement_list != list(EXPECTED_ORACLE_RUNTIME_REQUIREMENTS):
+        fail(f"admission.required_runtime_requirements must be exactly {list(EXPECTED_ORACLE_RUNTIME_REQUIREMENTS)}")
     allowed_targets = string_list(admission.get("allowed_targets"), "admission.allowed_targets")
     if not allowed_targets:
         fail("admission.allowed_targets must not be empty")
