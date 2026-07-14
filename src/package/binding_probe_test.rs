@@ -1,4 +1,5 @@
 use super::probe_manifest;
+use crate::package::paths::paths_equivalent;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
@@ -106,8 +107,8 @@ faber = { package = "faber-runtime", path = "../../faber-runtime" }
     let manifest = probe_manifest(&package, &dependencies).expect("probe manifest");
     let parsed = toml::from_str::<toml::Value>(&manifest).expect("valid TOML");
 
-    assert_eq!(
-        parsed["dependencies"]["faber"]["path"].as_str(),
-        Some(runtime.to_string_lossy().as_ref())
-    );
+    let runtime_path = parsed["dependencies"]["faber"]["path"]
+        .as_str()
+        .expect("runtime path");
+    assert!(paths_equivalent(Path::new(runtime_path), &runtime));
 }

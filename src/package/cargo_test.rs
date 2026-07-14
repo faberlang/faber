@@ -1,9 +1,10 @@
 use super::{render_generated_cargo_toml, RustRuntimePlan};
 use crate::core_support::materialize::materialize;
+use crate::package::paths::paths_equivalent;
 use crate::package::ManifestRustHost;
 use std::error::Error;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
@@ -165,9 +166,9 @@ faber = {{ package = "faber-runtime", path = "{}" }}
     let rendered = render_generated_cargo_toml("demo", "0.1.0", &plan, &root);
     let manifest = toml::from_str::<toml::Value>(&rendered)?;
 
-    assert_eq!(
-        manifest["dependencies"]["faber"]["path"].as_str(),
-        Some(runtime.to_string_lossy().as_ref())
-    );
+    let runtime_path = manifest["dependencies"]["faber"]["path"]
+        .as_str()
+        .expect("runtime path");
+    assert!(paths_equivalent(Path::new(runtime_path), &runtime));
     Ok(())
 }

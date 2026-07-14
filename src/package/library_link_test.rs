@@ -3,6 +3,7 @@ use super::{
     render_library_cargo_toml,
 };
 use crate::package::manifest::ManifestTarget;
+use crate::package::paths::paths_equivalent;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
@@ -139,8 +140,8 @@ faber = { package = "faber-runtime", path = "../../faber-runtime" }
         render_library_cargo_toml("library", "0.1.0", &package, &target).expect("manifest");
     let manifest = toml::from_str::<toml::Value>(&rendered).expect("valid Cargo TOML");
 
-    assert_eq!(
-        manifest["dependencies"]["faber"]["path"].as_str(),
-        Some(runtime.to_string_lossy().as_ref())
-    );
+    let runtime_path = manifest["dependencies"]["faber"]["path"]
+        .as_str()
+        .expect("runtime path");
+    assert!(paths_equivalent(Path::new(runtime_path), &runtime));
 }

@@ -1,3 +1,5 @@
+#[cfg(test)]
+use std::fs;
 use std::path::{Component, Path, PathBuf};
 
 /// Normalize lexical path components without consulting the filesystem.
@@ -32,4 +34,16 @@ pub(crate) fn absolutize_path(path: &Path) -> PathBuf {
 
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     normalize_path(&cwd.join(path))
+}
+
+/// Compare paths after resolving filesystem aliases such as macOS `/var` →
+/// `/private/var`, while retaining lexical normalization for missing paths.
+#[cfg(test)]
+pub(crate) fn paths_equivalent(left: &Path, right: &Path) -> bool {
+    comparison_path(left) == comparison_path(right)
+}
+
+#[cfg(test)]
+fn comparison_path(path: &Path) -> PathBuf {
+    fs::canonicalize(path).unwrap_or_else(|_| normalize_path(path))
 }

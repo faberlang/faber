@@ -2,6 +2,7 @@ use super::{
     dependency_path, parse_dependency_requirement, runtime_path_from_cargo_manifest,
     runtime_path_from_target_dependencies,
 };
+use crate::package::paths::paths_equivalent;
 use std::collections::BTreeMap;
 use std::fs;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -45,15 +46,17 @@ faber = { package = "faber-runtime", path = "../../faber-runtime" }
     )]);
     let parsed = parse_dependency_requirement(dependencies["faber_http_transport"].as_str());
     let table = parsed.as_table().expect("inline dependency table");
-    assert_eq!(dependency_path(&package, table), Some(transport.clone()));
-    assert_eq!(
-        runtime_path_from_cargo_manifest(&transport),
-        Some(runtime.clone())
-    );
+    assert!(dependency_path(&package, table)
+        .as_deref()
+        .is_some_and(|path| paths_equivalent(path, &transport)));
+    assert!(runtime_path_from_cargo_manifest(&transport)
+        .as_deref()
+        .is_some_and(|path| paths_equivalent(path, &runtime)));
 
-    assert_eq!(
-        runtime_path_from_target_dependencies(&package, &dependencies),
-        Some(runtime)
+    assert!(
+        runtime_path_from_target_dependencies(&package, &dependencies)
+            .as_deref()
+            .is_some_and(|path| paths_equivalent(path, &runtime))
     );
 }
 
@@ -69,8 +72,9 @@ fn detects_runtime_path_from_direct_target_dependency() {
         r#"{ package = "faber-runtime", path = "../../faber-runtime" }"#.to_owned(),
     )]);
 
-    assert_eq!(
-        runtime_path_from_target_dependencies(&package, &dependencies),
-        Some(runtime)
+    assert!(
+        runtime_path_from_target_dependencies(&package, &dependencies)
+            .as_deref()
+            .is_some_and(|path| paths_equivalent(path, &runtime))
     );
 }
