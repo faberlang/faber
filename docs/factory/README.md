@@ -29,6 +29,12 @@ cargo test --manifest-path ../radix/Cargo.toml -p radix -- <filter>
 
 Each `goal.md` / `CAMPAIGN.md` owns its **Status** line.
 
+Factory index consistency:
+
+```bash
+docs/factory/check-state-consistency.sh
+```
+
 ## Open campaigns
 
 | Campaign | Status | Entry |
@@ -45,5 +51,5 @@ Each `goal.md` / `CAMPAIGN.md` owns its **Status** line.
 
 | Goal | Status | Entry |
 | ---- | ------ | ----- |
-| SQLite library package | Stage 1 contract complete — Phase 4 verification + G4 Rust linkage path available; Stage 2 product open | [`sqlite-library-package/goal.md`](sqlite-library-package/goal.md) |
+| SQLite library package | active — Stage 1 API contract, Stage 2 Rust binding prototype, and Stage 3 ViviLite read consumer complete; Stage 4 write compatibility partially complete | [`sqlite-library-package/goal.md`](sqlite-library-package/goal.md) |
 | Unified package manifest | active — Phases 1–4 Rust native-binding path complete (G4); Go/TS product assembly later | [`unified-package-manifest/goal.md`](unified-package-manifest/goal.md) |

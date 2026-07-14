@@ -91,14 +91,14 @@ regular Vivi storage compatibility and shared developer types belong here.
 | Goal | State | Factory entry | Next action |
 | --- | --- | --- | --- |
 | 1 — Census types (`schema`, `series<S>`, `census<S>`) | proposed — parked | [`radix/docs/factory/census-types/goal.md`](../../../../radix/docs/factory/census-types/goal.md) | Flesh delivery spec when campaign opens; implement compiler/runtime per census plan |
-| 2 — SQLite library shim (`sqlite:sqlite`) | Stage 1 contract complete; Phase 4 binding verification available; Stage 2 not landed | [`sqlite-library-package/goal.md`](../sqlite-library-package/goal.md) | Research/delivery must route the open Phase 3 backend build graph (or prove an equivalent build path) before application linkage |
-| 3 — ViviLite SQL integration | Stage 0–1 file-backed complete; Stage 2+ deferred | [`examples/docs/factory/vivilite/goal.md`](../../../../examples/docs/factory/vivilite/goal.md) | Read oracle via shim; typed board/status; keep `.vivilite/` lane |
+| 2 — SQLite library shim (`sqlite:sqlite`) | Stages 1–3 complete; Stage 4 write compatibility partially complete | [`sqlite-library-package/goal.md`](../sqlite-library-package/goal.md) | Continue only the remaining Stage 4 sent-copy parity and mutation-command scope when selected |
+| 3 — ViviLite SQL integration | Stage 0–1 file-backed complete; SQLite read lane present; write lane partially complete | [`examples/docs/factory/vivilite/goal.md`](../../../../examples/docs/factory/vivilite/goal.md) | Finish sent-copy parity and remaining mutation commands through fixture-first gates |
 
 Delivery specs for Goals 1–3 are **not authored yet**. Link existing factory
 goals above; lower to `goal-*-delivery.md` files in this directory when the
 campaign is selected.
 
-## Prerequisite And Status Check — 2026-07-10
+## Prerequisite And Status Check — 2026-07-14
 
 | Surface | Verified state | Campaign implication |
 | --- | --- | --- |
@@ -106,9 +106,9 @@ campaign is selected.
 | Census types | Proposed/parked; no `schema`, typed `series<S>`, or `census<S>` implementation landed | Goal 1 still begins with delivery/spec lock work |
 | Unified manifest Phases 1–2 | Complete | Library manifests, install, and provider-root resolution are available |
 | Unified manifest Phase 4 | Binding-manifest verification complete | Bodyless Faber declarations, binding keys, shim presence, target dependencies, and Rust ABI probes can be verified |
-| Unified manifest Phase 3 | Backend library build graph open | Current hard gate for linking a verified native-binding library into a built application, unless research proves an equivalent path |
-| SQLite package | Stage 1 API/fixture contract complete; no package or Rust binding prototype landed | Goal 2 is not implementation-ready from the contract alone |
-| ViviLite | Stage 0–1 file-backed package and tests landed; SQLite lane absent | Goal 3 remains deferred behind a usable SQLite read path |
+| Unified manifest Phase 3 | Complete for the Rust native-binding path used by the SQLite packet | The old application-linkage gate is historical evidence, not a current blocker for the shipped SQLite packet |
+| SQLite package | Stage 1 API contract, Stage 2 Rust binding prototype, and Stage 3 ViviLite read consumer complete; Stage 4 write compatibility partially complete | Goal 2 remains active only for sent-copy parity and remaining mutation commands |
+| ViviLite | Stage 0–1 file-backed package and tests landed; SQLite read lane present; write lane partially complete | Goal 3 remains fixture-gated for write parity and remaining mutation commands |
 | Vivi want `688cd65` | Open; stated done-when is satisfied by this campaign artifact | Preserve as sequencing evidence; operator may close/promote separately |
 
 ## Dependency Order
@@ -124,9 +124,10 @@ Goal 3 (ViviLite tie-in — read oracle, then write compatibility)
 ```
 
 Unified package manifest Phase 4 verification is complete and is no longer a
-blocker. Phase 3's backend library build graph, or an explicitly proven
-equivalent path that links the verified shim and target dependencies into an
-application build, remains the Goal 2 linkage gate.
+blocker. The Rust native-binding application linkage path is also proven for
+the SQLite packet, so the former Phase 3 build-graph gate is no longer the Goal
+2 blocker. Remaining work is the Stage 4 write-compatibility scope recorded in
+[`sqlite-library-package/goal.md`](../sqlite-library-package/goal.md).
 
 ## Related Artifacts
 

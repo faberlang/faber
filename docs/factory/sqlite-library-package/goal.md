@@ -1,9 +1,8 @@
 # Goal: SQLite Library Package
 
-**Status**: Stage 2 Rust binding prototype, Stage 3 read consumer, and first
-Stage 4 Vivi-compatible work-item creation path complete
+**Status**: active — Stage 1 API contract, Stage 2 Rust binding prototype, and Stage 3 ViviLite read consumer complete; Stage 4 write compatibility partially complete
 **Created**: 2026-07-09
-**Refreshed**: 2026-07-11
+**Refreshed**: 2026-07-14
 **Target workspace**: `/Users/ianzepp/work/faberlang`
 **Factory artifact dir**: `faber/docs/factory/sqlite-library-package/`
 **Primary surfaces**: unified `faber.toml` library packages, target binding
@@ -35,8 +34,8 @@ main API, or make SQLite a hidden compiler/runtime feature.
 The current package direction is the sibling
 [`unified-package-manifest`](../unified-package-manifest/goal.md) goal:
 `faber.toml` becomes the package authority for applications, source libraries,
-backend-compiled libraries, and native-binding facades. A SQLite package must
-follow that direction instead of reviving a separate long-term `cista.toml`
+backend-compiled libraries, and native-binding facades. The SQLite package
+follows that direction instead of reviving a separate long-term `cista.toml`
 facade design.
 
 ## Goals
@@ -72,7 +71,7 @@ facade design.
 
 | Source | Evidence |
 | --- | --- |
-| [`unified-package-manifest/goal.md`](../unified-package-manifest/goal.md) | `faber.toml` is the package authority; Phases 1–2 and Phase 4 verification are complete, while Phase 3 backend library linkage remains open. |
+| [`unified-package-manifest/goal.md`](../unified-package-manifest/goal.md) | `faber.toml` is the package authority; Phases 1–4 cover the Rust native-binding path used by the SQLite packet. |
 | [`../README.md`](../README.md) | Public `faber` repo owns package product surface. |
 | `../../../../cista/docs/factory/cista-package-store/goal.md` | Current Cista work separates store concerns from Faber package authority and warns against conflating with unified manifest. |
 | `../../../../examples/cista-lab/` | Existing lab proves interface/source plus target binding ideas but uses the old split-manifest staging shape. |
@@ -157,24 +156,40 @@ Rust target:
 | Unified package manifest Phase 1 | Record SQLite as a library package | Complete. |
 | Unified package manifest Phase 2 | Install/resolve provider roots by manifest | Complete. |
 | Unified package manifest Phase 4 | Verify bodyless declarations, binding rows, shim source, dependencies, and Rust ABI | Complete for `faber verify-library`; it does not provide application linkage. |
-| Unified package manifest Phase 3 | Link generated/backend library artifacts into application Cargo graphs | Open; current implementation gate for a usable SQLite consumer. |
+| Unified package manifest Phase 3 | Link generated/backend library artifacts into application Cargo graphs | Complete for the Rust native-binding path used by the SQLite packet. |
 | SQLite read API | ViviLite regular-Vivi read parity | Allows `board --json` and list/show validation against `.vivi/mail.sqlite`. |
 | SQLite write API | ViviLite write compatibility | Only after read parity and storage semantics are understood. |
 
 Phase 4 verifies the native binding contract in an isolated Rust probe. The
-current application Cargo generator does not consume a library package's shim
-and target dependencies, so Phase 3 or an explicitly proven equivalent path is
-the remaining build/linkage prerequisite.
+SQLite packet also has a generated application build/linkage proof for the Rust
+native-binding path, so the former Phase 3 linkage gate is historical evidence,
+not a current blocker for the shipped packet.
+
+## Current State
+
+| Stage | State | Evidence | Remaining scope |
+| --- | --- | --- | --- |
+| Stage 0 - Backend linkage gate | complete | G4 Rust native-binding package linkage path is available and used by the SQLite packet. | None for the Rust path; other backend product assembly remains outside this goal. |
+| Stage 1 - API and fixture contract | complete | [`stage-1-api-fixture-contract.md`](stage-1-api-fixture-contract.md) records `sqlite:sqlite`, `valor` row shape, parameters, and ViviLite oracle contract. | None. |
+| Stage 2 - Rust binding prototype | complete | The packet binds `exsequi`, `exsequi_batch`, `quaere`, `scalar`, `transactio`, and `sha256_hex` through bundled `rusqlite`; shim and generated build proofs are complete. | Restore a Faber-defined `SQLiteEffect` return type when the binding ABI can carry it directly; current effect values are returned as `valor`. |
+| Stage 3 - ViviLite read consumer | complete for first read path | ViviLite links `sqlite:sqlite`, reports `lane = "sqlite-read"`, and reads regular Vivi task, need, and want totals plus item arrays from a fixture. | Broader status/list parity can continue as follow-up consumer polish. |
+| Stage 4 - Write compatibility | partially complete and active | Atomic parameterized batches, `sha256_hex`, exact work-item message composition, content-addressed blob storage, and atomic blob/catalog/event persistence are complete. | Sent-copy parity and remaining mutation commands remain open. |
+
+The goal is **active** only for the remaining Stage 4 write-compatibility
+scope above. It is not parked on the old Phase 3 linkage prerequisite, and it is
+not complete as a whole until sent-copy parity and the remaining mutation
+commands are delivered.
 
 ## Implementation Shape
 
-### Stage 0 - Hold Until Backend Library Linkage Is Ready
+### Stage 0 - Backend Library Linkage Gate
 
-Status: Phase 1–2 and Phase 4 gates satisfied; Phase 3 linkage gate open.
+Status: complete for the Rust native-binding path used by the SQLite packet.
 
-Do not implement SQLite through the old split `cista.toml` staging shape. Keep
-this goal parked for implementation until the Phase 3 build graph is delivered
-or detailed research proves and records an equivalent application linkage path.
+Do not implement SQLite through the old split `cista.toml` staging shape. The
+historical blocker was backend library linkage for verified target bindings;
+the packet now has a generated Rust application build proof, so this stage is
+no longer parked.
 
 ### Stage 1 - API And Fixture Contract
 
@@ -202,7 +217,7 @@ Faber-defined genus. Restoring the Stage 1 `SQLiteEffect` return type is a
 bounded ABI follow-up, not something this prototype hides behind an unverified
 Rust struct.
 
-After application linkage for verified target bindings is available:
+Delivered packet shape:
 
 - add Rust shim over `rusqlite`;
 - bind `exsequi`, `quaere`, and `scalar`;
@@ -216,8 +231,8 @@ ViviLite links the package through `d9dd406` and reads parameterized task, need,
 and want totals from a regular Vivi fixture. Output is explicitly labeled
 `sqlite-read`; item arrays and full status/list parity remain later units.
 
-Use the SQLite package from ViviLite to read a regular Vivi fixture mailspace
-and match selected `vivi` JSON outputs:
+The first read consumer path uses the SQLite package from ViviLite to read a
+regular Vivi fixture mailspace and match selected `vivi` JSON outputs:
 
 - `mailspace status --json`;
 - `task list --json`;
