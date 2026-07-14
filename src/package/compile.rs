@@ -1,8 +1,8 @@
 use radix::cli::CliProgram;
 use radix::codegen::rust::{
     build_local_import_function_params, build_local_import_namespaces, local_import_module_key,
-    ImportedFunctionParams, ImportedNamespaceInfo, RustFieldNamePolicy, SiblingModuleExports,
-    TestSelection as RustTestSelection,
+    remap_function_param_info, ImportedFunctionParams, ImportedNamespaceInfo, RustFieldNamePolicy,
+    SiblingModuleExports, TestSelection as RustTestSelection,
 };
 use radix::codegen::Target;
 use radix::diagnostics::Diagnostic;
@@ -926,9 +926,12 @@ fn generate_package_unit_rust(
         &unit.expanded_library_imports,
         &unit.analysis.hir,
         &unit.analysis.interner,
+        &mut unit.analysis.types,
         &unit.analysis.resolver,
+        library_resolver,
+        library_cache,
         &mut imported_namespace_info,
-    );
+    )?;
 
     generate_rust_code_for_analysis(
         &unit.analysis,
@@ -945,38 +948,71 @@ fn extend_library_namespace_type_paths(
     imports: &[LibraryImportBinding],
     hir: &radix::hir::HirProgram,
     interner: &Interner,
+    entry_types: &mut radix::semantic::TypeTable,
     resolver: &radix::semantic::Resolver,
+    library_resolver: &crate::library::LibraryResolver,
+    library_cache: &mut LibraryInterfaceCache,
     info: &mut ImportedNamespaceInfo<'_>,
-) {
+) -> Result<(), radix::codegen::CodegenError> {
     for import in imports {
-        let Some(binding) = import_binding_symbol(hir, interner, &import.binding) else {
+        let Some((binding, namespace_def_id)) =
+            import_binding_symbol_and_def_id(hir, interner, &import.binding)
+        else {
             continue;
         };
+        let module_segments = library_module_segments(import);
+        info.modules
+            .insert(namespace_def_id, module_segments.clone());
+        let export_names = library_interface_export_names(import, library_resolver, library_cache)
+            .map_err(|diag| radix::codegen::CodegenError {
+                message: diag.message,
+                args: diag.args,
+            })?;
+        info.exports
+            .insert(namespace_def_id, export_names.into_iter().collect());
+        let analysis =
+            library_cached_analysis(import, library_resolver, library_cache).map_err(|diag| {
+                radix::codegen::CodegenError {
+                    message: diag.message,
+                    args: diag.args,
+                }
+            })?;
+        for item in &analysis.hir.items {
+            let HirItemKind::Function(func) = &item.kind else {
+                continue;
+            };
+            let name = analysis.interner.resolve(func.name).to_owned();
+            info.function_params.insert(
+                (namespace_def_id, name),
+                remap_function_param_info(func, entry_types, &analysis.types),
+            );
+        }
         for export in resolver.imported_file_type_exports(binding) {
             let mut path = String::from("crate");
-            for segment in library_module_segments(import) {
+            for segment in &module_segments {
                 path.push_str("::");
-                path.push_str(&segment);
+                path.push_str(segment);
             }
             path.push_str("::");
             path.push_str(interner.resolve(export.member));
             info.type_paths.insert(export.def_id, path);
         }
     }
+    Ok(())
 }
 
-fn import_binding_symbol(
+fn import_binding_symbol_and_def_id(
     hir: &radix::hir::HirProgram,
     interner: &Interner,
     binding_name: &str,
-) -> Option<radix::lexer::Symbol> {
+) -> Option<(radix::lexer::Symbol, radix::hir::DefId)> {
     hir.items.iter().find_map(|item| {
         let HirItemKind::Import(import) = &item.kind else {
             return None;
         };
         import.items.iter().find_map(|import_item| {
             let binding = import_item.alias.unwrap_or(import_item.name);
-            (interner.resolve(binding) == binding_name).then_some(binding)
+            (interner.resolve(binding) == binding_name).then_some((binding, import_item.def_id))
         })
     })
 }
