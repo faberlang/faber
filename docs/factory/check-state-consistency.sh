@@ -32,12 +32,17 @@ check_goal_status() {
 }
 
 check_goal_status \
+    "Autograd-equivalent roadmap" \
+    "$root/docs/factory/autograd-equivalent-roadmap/deck.md"
+check_goal_status \
     "Inference session boundary" \
     "$root/docs/factory/inference-session-boundary/goal.md"
 check_goal_status \
     "SQLite library package" \
     "$root/docs/factory/sqlite-library-package/goal.md"
 
+python3 "$root/docs/factory/autograd-equivalent-roadmap/check-autograd-roadmap.py" \
+    "$root/docs/factory/autograd-equivalent-roadmap/deck.md"
 python3 "$root/docs/factory/inference-session-boundary/check-model-artifact-oracle.py" \
     "$root/docs/factory/inference-session-boundary/model-artifact-oracle.toml"
 python3 "$root/docs/factory/inference-session-boundary/check-session-cli-contract.py" \
