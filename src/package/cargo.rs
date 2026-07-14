@@ -356,7 +356,7 @@ fn write_host_registration(src_dir: &Path, plan: &RustRuntimePlan) -> std::io::R
         ));
     }
     source.push_str(
-        "    let host = host_native::NativeHost::new(kernel);\n    if let Err(error) = faber::install_host_dispatch(std::sync::Arc::new(host)) {\n        eprintln!(\"host dispatch initialization failed: {error}\");\n        std::process::exit(70);\n    }\n}\n",
+        "    let host = match host_native::NativeHost::try_new(kernel) {\n        Ok(host) => host,\n        Err(error) => {\n            eprintln!(\"host native initialization failed: {error}\");\n            std::process::exit(70);\n        }\n    };\n    if let Err(error) = faber::install_host_dispatch(std::sync::Arc::new(host)) {\n        eprintln!(\"host dispatch initialization failed: {error}\");\n        std::process::exit(70);\n    }\n}\n",
     );
     std::fs::write(path, source)
 }

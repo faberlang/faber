@@ -7894,8 +7894,13 @@ incipit {{
     )
     .expect("host_register");
     assert!(host_register.contains("solum::register(&mut kernel)"));
-    assert!(host_register.contains("host_native::NativeHost::new(kernel)"));
+    assert!(host_register.contains("host_native::NativeHost::try_new(kernel)"));
+    assert!(host_register.contains("host native initialization failed"));
     assert!(host_register.contains("faber::install_host_dispatch"));
+    assert!(
+        host_register.find("try_new(kernel)") < host_register.find("install_host_dispatch"),
+        "host native construction must happen before host dispatch installation"
+    );
     let host_manifest = fs::read_to_string(layout.generated_crate_root.join("host-manifest.json"))
         .expect("host-manifest.json");
     assert!(host_manifest.contains("solum:lege"));
