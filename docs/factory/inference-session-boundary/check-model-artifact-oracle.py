@@ -39,6 +39,15 @@ REJECTED_FORMATS = {
     "gpu-runtime",
 }
 
+EXPECTED_ALLOWED_FORMATS = ("oracle",)
+EXPECTED_REJECTED_FORMATS = (
+    "gguf",
+    "safetensors",
+    "transformer",
+    "quantized-kernel",
+    "gpu-runtime",
+)
+
 EXPECTED_ARGV_CONTRACT = ("prompt",)
 
 ALLOWED_RUNTIME_REQUIREMENTS = {
@@ -79,6 +88,13 @@ def string_list(value: object, field: str) -> list[str]:
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         fail(f"{field} must be a string array")
     return value
+
+
+def exact_string_list(value: object, field: str, expected: tuple[str, ...]) -> list[str]:
+    items = string_list(value, field)
+    if items != list(expected):
+        fail(f"{field} must be exactly {list(expected)}")
+    return items
 
 
 def contained_relative_path(value: object, field: str) -> None:
@@ -144,13 +160,27 @@ def validate(document: dict[str, object]) -> None:
     if requirements & REJECTED_FORMATS:
         fail("runtime.requirements must not name real model/runtime formats")
 
-    allowed = set(string_list(policy.get("allowed_formats"), "policy.allowed_formats"))
-    if allowed != {"oracle"}:
-        fail("policy.allowed_formats must be exactly ['oracle']")
-    rejected = set(string_list(policy.get("rejected_formats"), "policy.rejected_formats"))
-    missing_rejections = sorted(REJECTED_FORMATS - rejected)
+    allowed = exact_string_list(policy.get("allowed_formats"), "policy.allowed_formats", EXPECTED_ALLOWED_FORMATS)
+    rejected = string_list(policy.get("rejected_formats"), "policy.rejected_formats")
+    duplicate_rejections = sorted(
+        {
+            format_name
+            for format_name in rejected
+            if rejected.count(format_name) > 1
+        }
+    )
+    if duplicate_rejections:
+        fail(f"policy.rejected_formats contains duplicates {duplicate_rejections}")
+    if set(allowed) & set(rejected):
+        fail("policy.allowed_formats and policy.rejected_formats overlap")
+    unknown_rejections = sorted(set(rejected) - set(EXPECTED_REJECTED_FORMATS))
+    if unknown_rejections:
+        fail(f"policy.rejected_formats contains unknown entries {unknown_rejections}")
+    missing_rejections = [format_name for format_name in EXPECTED_REJECTED_FORMATS if format_name not in rejected]
     if missing_rejections:
         fail(f"policy.rejected_formats missing {missing_rejections}")
+    if rejected != list(EXPECTED_REJECTED_FORMATS):
+        fail(f"policy.rejected_formats must be exactly {list(EXPECTED_REJECTED_FORMATS)}")
     for field in ("model_loading", "tokenizer_loading", "runtime_execution"):
         if string(policy.get(field), f"policy.{field}") != "disabled":
             fail(f"policy.{field} must be disabled")
@@ -218,6 +248,56 @@ def self_test() -> None:
             "missing runtime requirement",
             with_mutation(baseline, "runtime", "requirements", ["oracle-fixture"]),
             "runtime.requirements missing ['fmir-cli-args']",
+        ),
+        (
+            "oracle overlap in rejected formats",
+            with_mutation(
+                baseline,
+                "policy",
+                "rejected_formats",
+                ["oracle", "gguf", "safetensors", "transformer", "quantized-kernel", "gpu-runtime"],
+            ),
+            "policy.allowed_formats and policy.rejected_formats overlap",
+        ),
+        (
+            "unknown rejected format",
+            with_mutation(
+                baseline,
+                "policy",
+                "rejected_formats",
+                ["gguf", "safetensors", "transformer", "quantized-kernel", "gpu-runtime", "image"],
+            ),
+            "policy.rejected_formats contains unknown entries ['image']",
+        ),
+        (
+            "duplicate rejected format",
+            with_mutation(
+                baseline,
+                "policy",
+                "rejected_formats",
+                ["gguf", "gguf", "transformer", "quantized-kernel", "gpu-runtime"],
+            ),
+            "policy.rejected_formats contains duplicates ['gguf']",
+        ),
+        (
+            "missing rejected format",
+            with_mutation(
+                baseline,
+                "policy",
+                "rejected_formats",
+                ["gguf", "safetensors", "transformer", "quantized-kernel"],
+            ),
+            "policy.rejected_formats missing ['gpu-runtime']",
+        ),
+        (
+            "order drift in rejected formats",
+            with_mutation(
+                baseline,
+                "policy",
+                "rejected_formats",
+                ["gpu-runtime", "quantized-kernel", "transformer", "safetensors", "gguf"],
+            ),
+            "policy.rejected_formats must be exactly ['gguf', 'safetensors', 'transformer', 'quantized-kernel', 'gpu-runtime']",
         ),
         (
             "empty argv contract",
