@@ -13,14 +13,15 @@ production/stable 1.0 claim.
 
 Captured on 2026-07-14 after the Radix generated-Rust producer fix that cleared
 the Triga Stage 2 compile errors and the Faber package namespace regression fix
-at `de403e850959`.
+at `de403e850959`. Refreshed after the Radix direct provider-interface
+residual fix at `82d6230ec`.
 
 Source provenance:
 
 | Repo | Commit |
 | --- | --- |
-| `radix` | `7d32673f8136` |
-| `faber` | `de403e850959` |
+| `radix` | `82d6230ec` |
+| `faber` | `edbb54f496e5` |
 
 Both `radix` and `faber` were clean before the release-profile build.
 
@@ -45,7 +46,7 @@ cargo test reference_test --lib: 14 passed
 cargo test --test clean_install_integration_test: 2 passed
 cargo build --release: passed
 target/release/faber --version: faber 1.0.0-rc.1
-sha256sum target/release/faber: 05239e9901d2a6e7a390b9882fc8a52a6d2aed01eafcd4e8ae309235ae9c2202  target/release/faber
+sha256sum target/release/faber: 77203c7302eb025bbf3ddd01aae798a96f0ca97cc0219066a6a64a991405700b  target/release/faber
 ```
 
 ## Proven Locally
@@ -60,7 +61,7 @@ sha256sum target/release/faber: 05239e9901d2a6e7a390b9882fc8a52a6d2aed01eafcd4e8
 - The observed local SHA-256 for that release-profile binary was:
 
   ```text
-  05239e9901d2a6e7a390b9882fc8a52a6d2aed01eafcd4e8ae309235ae9c2202  target/release/faber
+  77203c7302eb025bbf3ddd01aae798a96f0ca97cc0219066a6a64a991405700b  target/release/faber
   ```
 
 - Reference-pack version compatibility handles prerelease/build metadata for
@@ -91,7 +92,7 @@ cargo test reference_test --lib: 14 passed
 cargo test --test clean_install_integration_test: 2 passed
 cargo build --release: passed
 target/release/faber --version: faber 1.0.0-rc.1
-sha256sum target/release/faber: 05239e9901d2a6e7a390b9882fc8a52a6d2aed01eafcd4e8ae309235ae9c2202
+sha256sum target/release/faber: 77203c7302eb025bbf3ddd01aae798a96f0ca97cc0219066a6a64a991405700b
 ```
 
 ## Allowed Claim Wording
