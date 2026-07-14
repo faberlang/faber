@@ -12,14 +12,15 @@ production/stable 1.0 claim.
 ## Current Evidence Refresh
 
 Captured on 2026-07-14 after the Radix generated-Rust producer fix that cleared
-the Triga Stage 2 compile errors.
+the Triga Stage 2 compile errors and the Faber package namespace regression fix
+at `de403e850959`.
 
 Source provenance:
 
 | Repo | Commit |
 | --- | --- |
 | `radix` | `7d32673f8136` |
-| `faber` | `5d508d737e87` |
+| `faber` | `de403e850959` |
 
 Both `radix` and `faber` were clean before the release-profile build.
 
@@ -27,10 +28,11 @@ Build and validation commands run in `/home/ianzepp/work/faberlang/faber`:
 
 ```sh
 cargo fmt --check
-timeout 180 cargo test reference_test --lib
-timeout 240 cargo test --test clean_install_integration_test
-timeout 600 cargo build --release
-./target/release/faber --version
+cargo test namespace
+cargo test reference_test --lib
+cargo test --test clean_install_integration_test
+cargo build --release
+target/release/faber --version
 sha256sum target/release/faber
 ```
 
@@ -38,11 +40,12 @@ Observed results:
 
 ```text
 cargo fmt --check: passed
+cargo test namespace: passed
 cargo test reference_test --lib: 14 passed
 cargo test --test clean_install_integration_test: 2 passed
 cargo build --release: passed
-./target/release/faber --version: faber 1.0.0-rc.1
-sha256sum target/release/faber: 666e0563532ff48659051b2210db09e11aad52690bf6e6e043153a5664170345  target/release/faber
+target/release/faber --version: faber 1.0.0-rc.1
+sha256sum target/release/faber: 05239e9901d2a6e7a390b9882fc8a52a6d2aed01eafcd4e8ae309235ae9c2202  target/release/faber
 ```
 
 ## Proven Locally
@@ -57,7 +60,7 @@ sha256sum target/release/faber: 666e0563532ff48659051b2210db09e11aad52690bf6e6e0
 - The observed local SHA-256 for that release-profile binary was:
 
   ```text
-  666e0563532ff48659051b2210db09e11aad52690bf6e6e043153a5664170345  target/release/faber
+  05239e9901d2a6e7a390b9882fc8a52a6d2aed01eafcd4e8ae309235ae9c2202  target/release/faber
   ```
 
 - Reference-pack version compatibility handles prerelease/build metadata for
@@ -71,21 +74,24 @@ The following commands passed in `/home/ianzepp/work/faberlang/faber`:
 
 ```sh
 cargo fmt --check
-timeout 180 cargo test reference_test --lib
-timeout 240 cargo test --test clean_install_integration_test
-timeout 600 cargo build --release
-./target/release/faber --version
+cargo test namespace
+cargo test reference_test --lib
+cargo test --test clean_install_integration_test
+cargo build --release
+target/release/faber --version
 sha256sum target/release/faber
 ```
 
 Observed results:
 
 ```text
+cargo fmt --check: passed
+cargo test namespace: passed
 cargo test reference_test --lib: 14 passed
 cargo test --test clean_install_integration_test: 2 passed
 cargo build --release: passed
-./target/release/faber --version: faber 1.0.0-rc.1
-sha256sum target/release/faber: 666e0563532ff48659051b2210db09e11aad52690bf6e6e043153a5664170345
+target/release/faber --version: faber 1.0.0-rc.1
+sha256sum target/release/faber: 05239e9901d2a6e7a390b9882fc8a52a6d2aed01eafcd4e8ae309235ae9c2202
 ```
 
 ## Allowed Claim Wording
