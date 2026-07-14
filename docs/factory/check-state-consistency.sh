@@ -48,3 +48,5 @@ python3 "$root/docs/factory/inference-session-boundary/check-model-artifact-orac
 python3 "$root/docs/factory/inference-session-boundary/check-session-cli-contract.py" \
     "$root/docs/factory/inference-session-boundary/session-cli-contract.toml"
 python3 "$root/docs/factory/inference-session-boundary/check-session-cli-contract-negative.py"
+python3 "$root/docs/factory/inference-session-boundary/check-session-cli-contract-negative.py" \
+    --self-test
