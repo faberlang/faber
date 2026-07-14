@@ -193,8 +193,8 @@ fn parse_manifest(path: &Path) -> PackageDiscoveryResult {
 
     validate_manifest(&manifest, path)?;
 
-    let source_root = resolve_package_member(&package_root, &manifest.paths.source, path)
-        .map_err(|diagnostic| Box::new(diagnostic))?;
+    let source_root =
+        resolve_package_member(&package_root, &manifest.paths.source, path).map_err(Box::new)?;
     let entry = manifest
         .paths
         .entry
@@ -218,8 +218,8 @@ fn parse_manifest_with_entry(path: &Path, entry: PathBuf) -> PackageDiscoveryRes
 
     validate_manifest(&manifest, path)?;
 
-    let source_root = resolve_package_member(&package_root, &manifest.paths.source, path)
-        .map_err(|diagnostic| Box::new(diagnostic))?;
+    let source_root =
+        resolve_package_member(&package_root, &manifest.paths.source, path).map_err(Box::new)?;
     Ok(PackageSpec {
         package_root,
         source_root,
@@ -234,13 +234,11 @@ fn manifest_entry_path(
     manifest_path: &Path,
 ) -> Result<PathBuf, Box<Diagnostic>> {
     if Path::new(entry).is_absolute() {
-        return resolve_package_member(package_root, entry, manifest_path)
-            .map_err(|diagnostic| Box::new(diagnostic));
+        return resolve_package_member(package_root, entry, manifest_path).map_err(Box::new);
     }
     let relative = Path::new(source).join(entry);
     let relative = relative.to_string_lossy();
-    resolve_package_member(package_root, &relative, manifest_path)
-        .map_err(|diagnostic| Box::new(diagnostic))
+    resolve_package_member(package_root, &relative, manifest_path).map_err(Box::new)
 }
 
 /// Discover a `BuildLayout` for the given input (directory, manifest file, or entry file).

@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use radix::diagnostics::Diagnostic;
 
+#[allow(clippy::result_large_err)]
 pub(crate) fn runtime_path_for_target_dependencies(
     package_root: &Path,
     dependencies: &BTreeMap<String, String>,

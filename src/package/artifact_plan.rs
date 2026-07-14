@@ -262,10 +262,7 @@ pub(crate) fn native_library_deps(
         }
         Err(diag) => return Err(vec![*diag]),
     };
-    let lock_index = match lock_index(&package_root.join(super::lockfile::LOCK_FILE), &lock) {
-        Ok(lock_index) => lock_index,
-        Err(diagnostics) => return Err(diagnostics),
-    };
+    let lock_index = lock_index(&package_root.join(super::lockfile::LOCK_FILE), &lock)?;
     let mut out = Vec::new();
     let mut diagnostics = Vec::new();
     for (name, version) in &manifest.dependencies {

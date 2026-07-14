@@ -925,13 +925,15 @@ fn generate_package_unit_rust(
     );
     extend_library_namespace_type_paths(
         &unit.expanded_library_imports,
-        &unit.analysis.hir,
-        &unit.analysis.interner,
-        &mut unit.analysis.types,
-        &unit.analysis.resolver,
-        library_resolver,
-        library_cache,
-        &mut imported_namespace_info,
+        &mut LibraryNamespaceExtension {
+            hir: &unit.analysis.hir,
+            interner: &unit.analysis.interner,
+            entry_types: &mut unit.analysis.types,
+            resolver: &unit.analysis.resolver,
+            library_resolver,
+            library_cache,
+            info: &mut imported_namespace_info,
+        },
     )?;
 
     generate_rust_code_for_analysis(
@@ -945,49 +947,52 @@ fn generate_package_unit_rust(
     )
 }
 
+struct LibraryNamespaceExtension<'entry, 'state> {
+    hir: &'entry radix::hir::HirProgram,
+    interner: &'entry Interner,
+    entry_types: &'state mut radix::semantic::TypeTable,
+    resolver: &'entry radix::semantic::Resolver,
+    library_resolver: &'state crate::library::LibraryResolver,
+    library_cache: &'state mut LibraryInterfaceCache,
+    info: &'state mut ImportedNamespaceInfo<'entry>,
+}
+
 fn extend_library_namespace_type_paths(
     imports: &[LibraryImportBinding],
-    hir: &radix::hir::HirProgram,
-    interner: &Interner,
-    entry_types: &mut radix::semantic::TypeTable,
-    resolver: &radix::semantic::Resolver,
-    library_resolver: &crate::library::LibraryResolver,
-    library_cache: &mut LibraryInterfaceCache,
-    info: &mut ImportedNamespaceInfo<'_>,
+    context: &mut LibraryNamespaceExtension<'_, '_>,
 ) -> Result<(), radix::codegen::CodegenError> {
     for import in imports {
         let Some((binding, namespace_def_id)) =
-            import_binding_symbol_and_def_id(hir, interner, &import.binding)
+            import_binding_symbol_and_def_id(context.hir, context.interner, &import.binding)
         else {
             continue;
         };
         let module_segments = library_module_segments(import);
         let analysis =
-            library_cached_analysis(import, library_resolver, library_cache).map_err(|diag| {
-                radix::codegen::CodegenError {
+            library_cached_analysis(import, context.library_resolver, context.library_cache)
+                .map_err(|diag| radix::codegen::CodegenError {
                     message: diag.message,
                     args: diag.args,
-                }
-            })?;
+                })?;
         for item in &analysis.hir.items {
             let HirItemKind::Function(func) = &item.kind else {
                 continue;
             };
             let name = analysis.interner.resolve(func.name).to_owned();
-            info.function_params.insert(
+            context.info.function_params.insert(
                 (namespace_def_id, name),
-                remap_function_param_info(func, entry_types, &analysis.types),
+                remap_function_param_info(func, context.entry_types, &analysis.types),
             );
         }
-        for export in resolver.imported_file_type_exports(binding) {
+        for export in context.resolver.imported_file_type_exports(binding) {
             let mut path = String::from("crate");
             for segment in &module_segments {
                 path.push_str("::");
                 path.push_str(segment);
             }
             path.push_str("::");
-            path.push_str(interner.resolve(export.member));
-            info.type_paths.insert(export.def_id, path);
+            path.push_str(context.interner.resolve(export.member));
+            context.info.type_paths.insert(export.def_id, path);
         }
     }
     Ok(())
@@ -1069,13 +1074,15 @@ fn insert_generated_library_modules(
                 );
                 extend_library_namespace_type_paths(
                     &imports,
-                    &analysis.hir,
-                    &analysis.interner,
-                    &mut analysis.types,
-                    &analysis.resolver,
-                    library_resolver,
-                    library_cache,
-                    &mut imported_namespace_info,
+                    &mut LibraryNamespaceExtension {
+                        hir: &analysis.hir,
+                        interner: &analysis.interner,
+                        entry_types: &mut analysis.types,
+                        resolver: &analysis.resolver,
+                        library_resolver,
+                        library_cache,
+                        info: &mut imported_namespace_info,
+                    },
                 )?;
                 generate_rust_code_for_analysis(
                     analysis,
