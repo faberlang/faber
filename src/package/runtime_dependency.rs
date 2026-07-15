@@ -42,7 +42,7 @@ fn runtime_path_from_target_dependencies(
             continue;
         };
         if is_runtime_dependency(name, table) {
-            if let Some(path) = dependency_path(package_root, table) {
+            if let Some(path) = dependency_path(package_root, table).filter(|path| path.is_dir()) {
                 return Some(path);
             }
         }
