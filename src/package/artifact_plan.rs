@@ -121,7 +121,7 @@ impl ArtifactPlan {
 /// Build an artifact plan from a shared analyzed package for one target.
 pub(crate) fn plan_package(package: &AnalyzedPackage, target: Target) -> ArtifactPlan {
     let package_id = package_id_from_spec(&package.spec);
-    let target_name = target_name(target);
+    let target_label = target_name(target);
     let mut nodes = Vec::new();
     let mut edges = Vec::new();
     let mut seen_ids = BTreeSet::new();
@@ -171,7 +171,7 @@ pub(crate) fn plan_package(package: &AnalyzedPackage, target: Target) -> Artifac
             false,
             Some(format!(
                 "package artifact planning does not support target `{}`",
-                super::artifact_plan::target_name(other)
+                target_name(other)
             )),
             None,
         ),
@@ -182,7 +182,7 @@ pub(crate) fn plan_package(package: &AnalyzedPackage, target: Target) -> Artifac
 
     ArtifactPlan {
         package: package_id,
-        target: target_name,
+        target: target_label,
         supported,
         rejection,
         nodes,
@@ -356,9 +356,10 @@ fn library_needs_native_crate(app_package_root: &Path, locked: &LockedPackage) -
 }
 
 fn package_id_from_spec(spec: &PackageSpec) -> PackageId {
-    let name = read_manifest(&spec.package_root.join(super::MANIFEST_FILE))
-        .ok()
-        .map(|m| m.package.name)
+    let manifest = read_manifest(&spec.package_root.join(super::MANIFEST_FILE)).ok();
+    let name = manifest
+        .as_ref()
+        .map(|manifest| manifest.package.name.clone())
         .unwrap_or_else(|| {
             spec.package_root
                 .file_name()
@@ -366,9 +367,7 @@ fn package_id_from_spec(spec: &PackageSpec) -> PackageId {
                 .unwrap_or("package")
                 .to_owned()
         });
-    let version = read_manifest(&spec.package_root.join(super::MANIFEST_FILE))
-        .ok()
-        .map(|m| m.package.version);
+    let version = manifest.map(|manifest| manifest.package.version);
     PackageId { name, version }
 }
 
@@ -437,13 +436,6 @@ fn push_source_units(
                 depends_on: Vec::new(),
             },
         );
-
-        for export in &unit.export_names {
-            let _export = ExportId {
-                module: module.clone(),
-                name: export.clone(),
-            };
-        }
 
         for import in &unit.expanded_library_imports {
             edges.push(DependencyEdge {
