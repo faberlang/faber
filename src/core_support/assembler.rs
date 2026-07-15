@@ -10,6 +10,7 @@ pub const EXPECTED_ROOTS: &[&str] = &[
     "host-native-rs",
     "host-providers-rs/Cargo.toml",
     "host-providers-rs/crates/aleator",
+    "host-providers-rs/crates/http",
     "host-providers-rs/crates/consolum",
     "host-providers-rs/crates/processus",
     "host-providers-rs/crates/solum",

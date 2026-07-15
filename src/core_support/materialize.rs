@@ -47,7 +47,7 @@ impl MaterializedCoreSupport {
     pub fn provider(&self, provider: &str) -> Result<PathBuf, MaterializeError> {
         if !matches!(
             provider,
-            "aleator" | "consolum" | "processus" | "solum" | "tempus"
+            "aleator" | "consolum" | "http" | "processus" | "solum" | "tempus"
         ) {
             return Err(MaterializeError::InvalidPayload(
                 "unsupported core-support provider",

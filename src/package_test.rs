@@ -27,10 +27,12 @@ use radix::hir::{HirItemKind, LibraryBinding, LibraryItem, LibraryItemKind, Libr
 use radix::mir::{BufferHost, Host, MirDiagnosticKind, MirProvider, StepperError, Value};
 use radix::Output;
 use std::fs;
-use std::io::Write;
+use std::io::{Read, Write};
+use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::thread;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 fn diagnostic_has_issue(diag: &Diagnostic, issue: &str) -> bool {
     diag.args.contains(&DiagnosticArg::new("issue", issue))
@@ -10245,5 +10247,144 @@ incipit {
     assert!(
         !combined.contains("unexpected-ok"),
         "duplicate should not succeed: {combined:?}"
+    );
+}
+
+#[test]
+fn generated_package_http_provider_serves_one_localhost_request() {
+    let pkg = test_temp_dir("package-http-provider-hello");
+    fs::create_dir_all(pkg.join("src")).expect("create src");
+    fs::write(
+        pkg.join("faber.toml"),
+        r#"
+[package]
+name = "http-provider-hello"
+version = "0.1.0"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[target.rust]
+host = "native"
+"#,
+    )
+    .expect("write manifest");
+    let probe = TcpListener::bind(("127.0.0.1", 0)).expect("reserve localhost port");
+    let port = probe.local_addr().expect("port").port();
+    drop(probe);
+    fs::write(
+        pkg.join("src/main.fab"),
+        format!(
+            r#"
+incipit {{
+    fixum lista<valor> options ← [{port} ↦ valor]
+    fixum numerus listener ← ad 'http:listen' (options) ↦ numerus
+    fixum valor request ← ad 'http:accept' (listener) ↦ valor
+    fixum tabula<textus, valor> fields ← request ↦ tabula<textus, valor>
+    fixum valor request_id_value ← fields.accipe("id")
+    fixum textus request_id ← request_id_value ↦ textus
+    fixum lista<valor> headers ← []
+    fixum vacuum _ ← ad 'http:respond' ([request_id ↦ valor, 200 ↦ valor, headers ↦ valor, "salve mundus" ↦ valor]) ↦ vacuum
+    fixum vacuum _ ← ad 'http:stop' (listener) ↦ vacuum
+}}
+"#
+        ),
+    )
+    .expect("write entry");
+
+    let layout = discover_build_layout(&pkg).expect("layout");
+    let compile_result = compile_package(&Config::default(), &pkg);
+    assert!(
+        compile_result.success(),
+        "expected HTTP hello compile success, got {:?}",
+        compile_result
+            .diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+    let Some(Output::Rust(output)) = compile_result.output else {
+        panic!("expected Rust output");
+    };
+    let plan = package_rust_runtime_plan(&Config::default(), &pkg).expect("runtime plan");
+    assert_eq!(
+        plan.selected_providers.iter().cloned().collect::<Vec<_>>(),
+        vec!["http".to_owned()]
+    );
+    assert!(plan.provider_error.is_none(), "{:?}", plan.provider_error);
+    let http_manifest = plan
+        .provider_manifests
+        .iter()
+        .find(|manifest| manifest.provider == "http")
+        .expect("generated plan must register http provider");
+    assert_eq!(http_manifest.prefixes, ["http"]);
+    assert_eq!(
+        http_manifest
+            .calls
+            .iter()
+            .map(|call| call.route.as_str())
+            .collect::<Vec<_>>(),
+        vec!["http:listen", "http:accept", "http:respond", "http:stop"]
+    );
+
+    emit_generated_crate_with_runtime_plan(
+        &layout,
+        &output.code,
+        Some(&read_manifest(&layout.manifest_path).expect("manifest")),
+        &plan,
+    )
+    .expect("emit generated crate");
+    let cargo = fs::read_to_string(&layout.generated_cargo_manifest).expect("generated cargo");
+    assert!(cargo.contains("http = { package = \"http\""), "{cargo}");
+    let generated_main = fs::read_to_string(&layout.generated_rust_entry).expect("generated main");
+    assert!(generated_main.contains("host_register::install_or_exit();"));
+    let host_register = fs::read_to_string(
+        layout
+            .generated_crate_root
+            .join("src")
+            .join("host_register.rs"),
+    )
+    .expect("host registration");
+    assert!(host_register.contains("http::register(&mut kernel)"));
+    let host_manifest = fs::read_to_string(layout.generated_crate_root.join("host-manifest.json"))
+        .expect("host manifest");
+    assert!(host_manifest.contains("\"provider\": \"http\""));
+    assert!(host_manifest.contains("http:listen"));
+
+    let binary = invoke_cargo_build(&layout, false).expect("cargo build");
+    let mut child = Command::new(binary)
+        .spawn()
+        .expect("spawn generated server");
+    let mut client = None;
+    for _ in 0..100 {
+        match TcpStream::connect(("127.0.0.1", port)) {
+            Ok(stream) => {
+                client = Some(stream);
+                break;
+            }
+            Err(_) => thread::sleep(Duration::from_millis(20)),
+        }
+    }
+    let Some(mut client) = client else {
+        let _ = child.kill();
+        let _ = child.wait();
+        panic!("generated server did not accept localhost connection");
+    };
+    client
+        .write_all(b"GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+        .expect("write GET");
+    client
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .expect("read timeout");
+    let mut response = String::new();
+    client.read_to_string(&mut response).expect("read response");
+    let status = child.wait().expect("wait generated server");
+    assert!(status.success(), "generated server failed: {status:?}");
+    assert!(response.starts_with("HTTP/1.1 200 OK\r\n"), "{response:?}");
+    assert!(response.contains("\r\n\r\nsalve mundus"), "{response:?}");
+    assert!(
+        response.contains("x-faber-request-id: http-"),
+        "{response:?}"
     );
 }
