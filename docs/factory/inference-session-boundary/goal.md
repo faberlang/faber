@@ -3,7 +3,7 @@
 **Status**: proposed — Faber-owned inference/session boundary, static model artifact oracle check, and session CLI contract defined; no runtime implementation or capability claim
 **Created**: 2026-07-14
 **Refreshed**: 2026-07-14
-**Target workspace**: `/home/ianzepp/work/faberlang`
+**Target workspace**: `/Users/ianzepp/work/faberlang`
 **Factory artifact dir**: `faber/docs/factory/inference-session-boundary/`
 **Primary surfaces**: `faber` CLI package build/run UX, FMIR package artifacts,
 generated Rust package/runtime wiring, future model artifact manifests, and

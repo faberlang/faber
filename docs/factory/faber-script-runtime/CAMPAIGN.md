@@ -1,6 +1,6 @@
 # Campaign: Faber Script Runtime
 
-**Status**: proposed (2026-07-06)
+**Status**: partial — Stages 1 and 1b shipped; Stages 2+ remain planned (verified 2026-07-15)
 **Mode**: draft/maintain -- routing artifact; do not implement directly from
 this file.
 **Target repo**: `/Users/ianzepp/work/faberlang/faber`
@@ -15,6 +15,11 @@ Create a first-class source-execution lane for Faber scripts and packages. The
 user-facing entry point is `faber script`, backed by the MIR stepper and package
 MIR runner. Interpreted execution lives in this repo (former `scena` embed API absorbed into
 `src/script/`). Sibling radix owns the MIR stepper engine.
+
+Stage 1 (`faber script`) and Stage 1b package-host bridging are shipped and
+covered by current CLI/package tests. This campaign remains open only for the
+explicitly planned Stage 2+ runner/timing work below; the command itself is not
+proposed or missing.
 
 This campaign is about interpreted execution only. The generated Rust/Cargo
 package path stays owned by `faber run`, `faber build`, and `faber test`.

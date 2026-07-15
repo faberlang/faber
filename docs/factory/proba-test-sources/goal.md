@@ -1,6 +1,6 @@
 # Goal: `.proba` Test Source Files
 
-**Status**: proposed
+**Status**: partial — inline `proba`/`probandum` is shipped; separate `.proba` discovery remains proposed (verified 2026-07-15)
 **Created**: 2026-07-01
 **Target repo**: `/Users/ianzepp/work/faberlang/faber`
 **Factory artifact dir**: `docs/factory/proba-test-sources/`
@@ -9,7 +9,14 @@ resolution, stdlib test layout, source extension handling.
 
 ---
 
-## Summary
+## Current implementation boundary
+
+Inline `proba`/`probandum` support and CLI selection are shipped in the current
+Faber package/test path. No live source-extension discovery for separate
+`.proba` files was found; the remaining proposal is specifically the separate
+file boundary described below. Keep this goal open for that boundary only.
+
+## Historical summary
 
 Introduce `.proba` as a first-class Faber test-source extension. A `.proba`
 file is a complete Faber source file: it may contain helper functions, genera,
