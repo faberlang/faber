@@ -1,6 +1,6 @@
 use super::{
-    dependency_path, parse_dependency_requirement, runtime_path_from_cargo_manifest,
-    runtime_path_from_target_dependencies,
+    dependency_path, parse_dependency_requirement, runtime_path_for_target_dependencies,
+    runtime_path_from_cargo_manifest, runtime_path_from_target_dependencies,
 };
 use crate::package::paths::paths_equivalent;
 use std::collections::BTreeMap;
@@ -76,5 +76,29 @@ fn detects_runtime_path_from_direct_target_dependency() {
         runtime_path_from_target_dependencies(&package, &dependencies)
             .as_deref()
             .is_some_and(|path| paths_equivalent(path, &runtime))
+    );
+}
+
+#[test]
+fn missing_direct_runtime_dependency_falls_back_to_materialized_runtime() {
+    let root = temp_root("missing-direct-dep");
+    let package = root.join("packages/app");
+    fs::create_dir_all(&package).expect("create package");
+    let dependencies = BTreeMap::from([(
+        "faber".to_owned(),
+        r#"{ package = "faber-runtime", path = "missing-runtime" }"#.to_owned(),
+    )]);
+    let expected = crate::core_support::materialize::materialize()
+        .expect("embedded core support materializes")
+        .faber_runtime()
+        .expect("materialized runtime path");
+
+    let actual = runtime_path_for_target_dependencies(&package, &dependencies)
+        .expect("missing direct path should fall back to materialized runtime");
+    assert!(
+        paths_equivalent(&actual, &expected),
+        "expected materialized runtime {}, got {}",
+        expected.display(),
+        actual.display()
     );
 }
