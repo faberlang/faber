@@ -7,7 +7,8 @@ Owning repo: `faber`
 This note records local evidence for release control-plane and `faberlang.dev`
 claim review. It does not authorize tagging, pushing, publishing, public
 downloads, installation instructions, Homebrew, curl, DNS, or a
-production/stable 1.0 claim.
+production/stable 1.0 claim. RC1 is evidence for the odd-major development
+line, not a language-lock or LTS decision; see [`policy.md`](policy.md).
 
 ## Current Evidence Refresh
 
