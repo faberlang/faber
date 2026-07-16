@@ -468,7 +468,10 @@ fn emit_reader_locale_rejects_multiple_direct_inputs() {
 }
 
 #[test]
-fn emit_faber_target_rejects_reader_locale() {
+fn emit_faber_target_localizes_reader_locale() {
+    // Phase 2: `faber emit -t faber --reader-locale=<X>` emits localized Faber
+    // (the old "deferred" rejection is gone). Thai source re-emits in the Thai
+    // surface.
     let example = reader_locale_example_root("th-TH");
     let entry = example.join("src/main.fab");
 
@@ -481,15 +484,13 @@ fn emit_faber_target_rejects_reader_locale() {
         entry.to_str().expect("entry path"),
     ]);
 
-    assert!(!ok, "faber emit should reject reader locale");
+    assert!(ok, "faber emit should succeed with reader locale: {stderr}");
     assert!(
-        stdout.is_empty(),
-        "rejected emit should not write stdout: {stdout}"
+        stdout.contains("ฟังก์ชัน"),
+        "localized emit should produce the Thai surface: {stdout}"
     );
     assert!(
-        stderr.contains(
-            "--reader-locale th-TH for Faber output is deferred to format reader-locale support"
-        ),
-        "expected faber emit reader-locale rejection, got:\n{stderr}"
+        !stdout.contains("functio"),
+        "localized emit should not emit the Latin keyword: {stdout}"
     );
 }

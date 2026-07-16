@@ -134,7 +134,7 @@ fn format_cli_comment_fixture_reparses() {
 }
 
 #[test]
-fn format_canonical_reader_locale_thai_matches_latin_twin() {
+fn format_canonical_reader_locale_thai_localizes_surface() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale/th-TH");
     let thai = root.join("src/main.fab");
     let latin = root.join("twins/main.la.fab");
@@ -147,48 +147,49 @@ fn format_canonical_reader_locale_thai_matches_latin_twin() {
         "--stdout",
         thai.to_str().expect("utf8 thai path"),
     ]);
-    let latin_output = run_faber_format_stdout_with_args(&[
-        "format",
-        "--canonical",
-        "--stdout",
-        latin.to_str().expect("utf8 latin path"),
-    ]);
 
-    assert_eq!(thai_output, latin_output);
-    assert!(thai_output.contains("functio ทักทาย(textus name) → textus"));
-    assert!(thai_output.contains("fixum textus greeting ← scriptum(\"สวัสดี, §!\", name)"));
-    assert!(thai_output.contains("functio ผ่าน(numerus score) → bivalens"));
-    assert!(thai_output.contains("score ≥ 80 sic verum secus score ≥ 50 sic verum secus falsum"));
-    assert!(thai_output.contains("functio นับผ่าน(lista<numerus> scores) → numerus"));
-    assert!(thai_output.contains("itera ex scores fixum score"));
-    assert!(thai_output.contains("perge"));
-    assert!(thai_output.contains("rumpe"));
-    assert!(thai_output.contains("functio นับถอยหลัง(numerus start) → numerus"));
-    assert!(thai_output.contains("dum current > 0"));
-    assert!(thai_output.contains("incipit {"));
-    assert!(thai_output.contains("fixum numerus score ← 82"));
-    assert!(thai_output.contains("fixum lista<numerus> scores ← [-1, 82, 41, 60]"));
-    assert!(thai_output.contains("nota ผ่าน(score)"));
-    assert!(thai_output.contains("nota นับผ่าน(scores)"));
-    assert!(!thai_output.contains("ฟังก์ชัน"));
-    assert!(!thai_output.contains("คงที่"));
-    assert!(!thai_output.contains("แปร"));
-    assert!(!thai_output.contains("ข้อความ"));
-    assert!(!thai_output.contains("รายการ"));
-    assert!(!thai_output.contains("จำนวน"));
-    assert!(!thai_output.contains("ตรรกะ"));
-    assert!(!thai_output.contains("ถ้า"));
-    assert!(!thai_output.contains("มิฉะนั้น"));
-    assert!(!thai_output.contains("วน"));
-    assert!(!thai_output.contains("จาก"));
-    assert!(!thai_output.contains("ข้าม"));
-    assert!(!thai_output.contains("หยุด"));
-    assert!(!thai_output.contains("ขณะ"));
-    assert!(!thai_output.contains("เริ่ม"));
-    assert!(!thai_output.contains("แสดง"));
-    assert!(!thai_output.contains("คืน"));
-    assert!(!thai_output.contains("จริง"));
-    assert!(!thai_output.contains("เท็จ"));
+    // Phase 2: --reader-locale drives the emitter surface, so the canonical
+    // re-emit localizes reader-locale keywords and types into Thai and no longer
+    // matches the Latin twin.
+    assert_ne!(
+        thai_output,
+        run_faber_format_stdout_with_args(&[
+            "format",
+            "--canonical",
+            "--stdout",
+            latin.to_str().expect("utf8 latin path"),
+        ]),
+        "localized Thai emit must differ from the Latin twin"
+    );
+
+    assert!(thai_output.contains("ฟังก์ชัน ทักทาย(ข้อความ name) → ข้อความ"));
+    assert!(thai_output.contains("คงที่ ข้อความ greeting ← scriptum"));
+    assert!(thai_output.contains("คืน greeting"));
+    assert!(thai_output.contains("ฟังก์ชัน ผ่าน(จำนวน score) → ตรรกะ"));
+    assert!(thai_output.contains("sic จริง มิฉะนั้น score ≥ 50 sic จริง มิฉะนั้น เท็จ"));
+    assert!(thai_output.contains("ฟังก์ชัน นับผ่าน(รายการ<จำนวน> scores) → จำนวน"));
+    assert!(thai_output.contains("แปร จำนวน total ← 0"));
+    assert!(thai_output.contains("วน จาก scores คงที่ score"));
+    assert!(thai_output.contains("ถ้า score < 0 {"));
+    assert!(thai_output.contains("ข้าม"));
+    assert!(thai_output.contains("หยุด"));
+    assert!(thai_output.contains("ฟังก์ชัน นับถอยหลัง(จำนวน start) → จำนวน"));
+    assert!(thai_output.contains("ขณะ current > 0"));
+    assert!(thai_output.contains("เริ่ม {"));
+    assert!(thai_output.contains("คงที่ จำนวน score ← 82"));
+    assert!(thai_output.contains("คงที่ รายการ<จำนวน> scores ← [-1, 82, 41, 60]"));
+    assert!(thai_output.contains("แสดง ผ่าน(score)"));
+    assert!(thai_output.contains("แสดง นับผ่าน(scores)"));
+    // The Latin keyword surface must not survive localized re-emit. `scriptum`
+    // (a builtin name) and `sic` (not a localized keyword token) stay Latin.
+    assert!(!thai_output.contains("functio"));
+    assert!(!thai_output.contains("fixum"));
+    assert!(!thai_output.contains("textus"));
+    assert!(!thai_output.contains("numerus"));
+    assert!(!thai_output.contains("bivalens"));
+    assert!(!thai_output.contains("lista<"));
+    assert!(!thai_output.contains("itera"));
+    assert!(!thai_output.contains("incipit"));
 }
 
 #[test]
@@ -217,7 +218,10 @@ fn format_reader_locale_la_without_canonical_matches_canonical_latin() {
 }
 
 #[test]
-fn format_reader_locale_without_canonical_errors() {
+fn format_reader_locale_without_canonical_localizes() {
+    // Phase 2 removed the "--reader-locale requires --canonical" gate. A bare
+    // --reader-locale=<X> now selects the canonical re-emit path with the
+    // localized surface (Latin default when --reader-locale is absent).
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale/th-TH");
     let thai = root.join("src/main.fab");
 
@@ -233,13 +237,18 @@ fn format_reader_locale_without_canonical_errors() {
         .expect("run faber format");
 
     assert!(
-        !output.status.success(),
-        "reader-locale author formatting should fail until localized output exists"
+        output.status.success(),
+        "reader-locale formatting must succeed without --canonical: {}",
+        String::from_utf8_lossy(&output.stderr)
     );
-    let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
     assert!(
-        stderr.contains("format --reader-locale currently requires --canonical"),
-        "unexpected stderr: {stderr}"
+        stdout.contains("ฟังก์ชัน"),
+        "bare --reader-locale=th-TH must emit the Thai surface: {stdout}"
+    );
+    assert!(
+        !stdout.contains("functio"),
+        "bare --reader-locale=th-TH must not emit the Latin keyword: {stdout}"
     );
 }
 

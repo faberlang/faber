@@ -138,6 +138,7 @@ pub(crate) use library::{
     library_interface_export_names, library_interface_has_module, library_module_segments,
     program_export_names, with_library_cached_analysis_mut, LibraryInterfaceCache,
 };
+pub use reader::reader_pack_for_emit;
 pub(crate) use reader::{config_with_reader_locale, load_reader_pack_for_input};
 
 pub(super) const MANIFEST_FILE: &str = "faber.toml";

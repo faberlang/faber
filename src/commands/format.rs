@@ -22,16 +22,10 @@ pub fn cmd_format(command: FormatCommand) {
         eprintln!("warning: --config is not implemented yet (forma.toml deferred)");
     }
 
-    let reader_locale_selects_canonical = command
-        .reader_locale
-        .as_deref()
-        .is_some_and(reader_locale_is_canonical);
-    let canonical = command.canonical || reader_locale_selects_canonical;
-
-    if command.reader_locale.is_some() && !canonical {
-        eprintln!("error: format --reader-locale currently requires --canonical");
-        std::process::exit(1);
-    }
+    // --canonical is the la alias; --reader-locale=<X> drives the emitter
+    // surface. Either selects the canonical re-emit path (localizing via the
+    // reader pack); no flags keeps author mode.
+    let use_canonical = command.canonical || command.reader_locale.is_some();
 
     let files = match resolve_format_paths(&command.paths) {
         Ok(files) => files,
@@ -60,7 +54,7 @@ pub fn cmd_format(command: FormatCommand) {
         };
 
         let name = path.display().to_string();
-        let result = if canonical {
+        let result = if use_canonical {
             let session = match format_session(path, command.reader_locale.as_deref()) {
                 Ok(session) => session,
                 Err(message) => {
@@ -150,10 +144,6 @@ fn format_session(path: &Path, reader_locale: Option<&str>) -> Result<Session, S
     crate::package::config_with_reader_locale(Target::Faber, path, reader_locale)
         .map(|(config, _)| Session::new(config))
         .map_err(|diag| diag.message)
-}
-
-fn reader_locale_is_canonical(locale: &str) -> bool {
-    locale.trim() == "la"
 }
 
 pub(super) fn formatted_source_for_write(

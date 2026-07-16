@@ -126,6 +126,39 @@ fn package_root_for_selection(spec: &PackageSpec, manifest_path: Option<&Path>) 
         .unwrap_or_else(|| spec.source_root.clone())
 }
 
+/// Resolve a CLI reader locale to a pack for single-file emit.
+///
+/// File input uses the package-aware resolver (package-local pack, else the
+/// installed pack); stdin falls back to the installed pack directly, since
+/// there is no package context to consult. `None` locale yields `None`.
+pub fn reader_pack_for_emit(
+    input: &[String],
+    cli_locale: Option<&str>,
+) -> Result<Option<ReaderLocalePack>, String> {
+    let Some(locale) = cli_locale
+        .map(str::trim)
+        .filter(|locale| !locale.is_empty())
+    else {
+        return Ok(None);
+    };
+
+    if let Some(path) = input.iter().find(|s| !s.is_empty() && s.as_str() != "-") {
+        return load_reader_pack_for_input(Path::new(path), Some(locale))
+            .map_err(|diag| diag.message.clone());
+    }
+
+    // Stdin: no package context, use the installed pack for the locale.
+    let pack_path = installed_reader_pack_path(locale);
+    ReaderLocalePack::from_toml_path(&pack_path)
+        .map(Some)
+        .map_err(|err| {
+            format!(
+                "failed to load reader locale '{locale}' pack '{}': {err}",
+                pack_path.display()
+            )
+        })
+}
+
 fn installed_reader_pack_path(locale: &str) -> PathBuf {
     normalize_path(
         &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
