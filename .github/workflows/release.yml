@@ -1,0 +1,237 @@
+name: Release Faber
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing Faber source tag to release, for example v1.1.0"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  RELEASE_REPO: faberlang/releases
+  COMPONENT: faber
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            binary: faber
+          - os: macos-13
+            target: x86_64-apple-darwin
+            binary: faber
+          - os: macos-14
+            target: aarch64-apple-darwin
+            binary: faber
+
+    steps:
+      - name: Resolve source tag
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            tag="${{ inputs.tag }}"
+          else
+            tag="${GITHUB_REF_NAME}"
+          fi
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Faber releases require a stable SemVer source tag like v1.1.0; got $tag" >&2
+            exit 1
+          fi
+          version="${tag#v}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "release_tag=${COMPONENT}-${tag}" >> "$GITHUB_OUTPUT"
+
+      # Faber's Cargo.toml has `radix = { path = "../radix/crates/radix" }` and
+      # build.rs assembles core-support from sibling repos via
+      # core-support-manifest.txt. The CI workspace must mirror the local
+      # faberlang/ layout with all repos as siblings under one parent.
+
+      - name: Check out Faber source
+        uses: actions/checkout@v4
+        with:
+          path: faber
+          ref: ${{ steps.source.outputs.tag }}
+
+      - name: Check out Radix (private)
+        uses: actions/checkout@v4
+        with:
+          repository: faberlang/radix
+          path: radix
+          token: ${{ secrets.FABERLANG_RELEASES_TOKEN }}
+
+      - name: Check out Cista
+        uses: actions/checkout@v4
+        with:
+          repository: faberlang/cista
+          path: cista
+
+      - name: Check out Faber runtime
+        uses: actions/checkout@v4
+        with:
+          repository: faberlang/faber-runtime
+          path: faber-runtime
+
+      - name: Check out host-kernel-rs
+        uses: actions/checkout@v4
+        with:
+          repository: faberlang/host-kernel-rs
+          path: host-kernel-rs
+
+      - name: Check out host-native-rs
+        uses: actions/checkout@v4
+        with:
+          repository: faberlang/host-native-rs
+          path: host-native-rs
+
+      - name: Check out host-providers-rs
+        uses: actions/checkout@v4
+        with:
+          repository: faberlang/host-providers-rs
+          path: host-providers-rs
+
+      - name: Validate crate version
+        shell: bash
+        working-directory: faber
+        run: |
+          set -euo pipefail
+          crate_version="$(
+            awk '
+              /^\[package\]/ { in_package=1; next }
+              /^\[/ && in_package { exit }
+              in_package && /^version[[:space:]]*=/ {
+                gsub(/"/, "", $3)
+                print $3
+                exit
+              }
+            ' Cargo.toml
+          )"
+          if [[ "$crate_version" != "${{ steps.source.outputs.version }}" ]]; then
+            echo "tag ${{ steps.source.outputs.tag }} does not match Cargo.toml version $crate_version" >&2
+            exit 1
+          fi
+
+      - name: Install Rust target
+        shell: bash
+        run: rustup target add "${{ matrix.target }}"
+
+      - name: Build Faber CLI
+        shell: bash
+        working-directory: faber
+        run: |
+          set -euo pipefail
+          cargo build --locked --release --bin faber --target "${{ matrix.target }}"
+          "target/${{ matrix.target }}/release/${{ matrix.binary }}" --version
+
+      - name: Package artifact
+        id: package
+        shell: bash
+        working-directory: faber
+        run: |
+          set -euo pipefail
+          version="${{ steps.source.outputs.version }}"
+          target="${{ matrix.target }}"
+          staging="dist/${COMPONENT}-v${version}-${target}"
+          mkdir -p "$staging"
+          cp "target/${target}/release/${{ matrix.binary }}" "$staging/${COMPONENT}"
+          chmod +x "$staging/${COMPONENT}"
+          cat > "$staging/README.txt" <<EOF
+          ${COMPONENT} v${version}
+          target: ${target}
+          source: https://github.com/faberlang/faber/tree/${{ steps.source.outputs.tag }}
+          EOF
+          archive="${COMPONENT}-v${version}-${target}.tar.gz"
+          tar -C dist -czf "dist/${archive}" "${COMPONENT}-v${version}-${target}"
+          if command -v shasum >/dev/null 2>&1; then
+            shasum -a 256 "dist/${archive}" > "dist/${archive}.sha256"
+          else
+            sha256sum "dist/${archive}" > "dist/${archive}.sha256"
+          fi
+          echo "archive=dist/${archive}" >> "$GITHUB_OUTPUT"
+          echo "checksum=dist/${archive}.sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.COMPONENT }}-${{ steps.source.outputs.version }}-${{ matrix.target }}
+          path: |
+            faber/${{ steps.package.outputs.archive }}
+            faber/${{ steps.package.outputs.checksum }}
+          if-no-files-found: error
+
+  publish:
+    name: Publish public release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Resolve source tag
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            tag="${{ inputs.tag }}"
+          else
+            tag="${GITHUB_REF_NAME}"
+          fi
+          version="${tag#v}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "release_tag=${COMPONENT}-${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish to shared public release repo
+        env:
+          GH_TOKEN: ${{ secrets.FABERLANG_RELEASES_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_TOKEN}" ]]; then
+            echo "FABERLANG_RELEASES_TOKEN must allow writes to ${RELEASE_REPO}" >&2
+            exit 1
+          fi
+          release_tag="${{ steps.source.outputs.release_tag }}"
+          source_tag="${{ steps.source.outputs.tag }}"
+          version="${{ steps.source.outputs.version }}"
+          notes="$(mktemp)"
+          cat > "$notes" <<EOF
+          Faber ${version}
+
+          Source tag: faberlang/faber ${source_tag}
+
+          This release contains the Faber project and package tool CLI. It is
+          built from the public Faber source repository with the private Radix
+          compiler and public runtime/host repos assembled as build-time
+          siblings. Public artifacts are collected in ${RELEASE_REPO} with
+          component-prefixed tags.
+          EOF
+          if gh release view "$release_tag" --repo "$RELEASE_REPO" >/dev/null 2>&1; then
+            gh release upload "$release_tag" dist/* --repo "$RELEASE_REPO" --clobber
+          else
+            gh release create "$release_tag" dist/* \
+              --repo "$RELEASE_REPO" \
+              --title "Faber ${version}" \
+              --notes-file "$notes"
+          fi

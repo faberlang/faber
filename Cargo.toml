@@ -33,4 +33,4 @@ tar = "0.4"
 zstd = "0.13"
 
 [dev-dependencies]
-hygiene-ratchet = { path = "../radix/crates/hygiene-ratchet" }
+hygiene-ratchet = { path = "crates/hygiene-ratchet" }
