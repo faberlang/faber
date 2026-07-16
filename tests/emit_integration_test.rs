@@ -494,3 +494,47 @@ fn emit_faber_target_localizes_reader_locale() {
         "localized emit should not emit the Latin keyword: {stdout}"
     );
 }
+
+#[test]
+fn emit_faber_reader_locale_arabic_preserves_logical_order() {
+    // Phase 3 (req. #9): Arabic emit preserves logical (codepoint) order. The
+    // emitted bytes decode to Arabic keyword codepoints in canonical logical
+    // sequence; no Bidi isolates / embedding controls are inserted (logical
+    // order is invariant; visual reordering would be a correctness bug).
+    let example = reader_locale_example_root("ar");
+    let entry = example.join("src/main.fab");
+
+    let (stdout, stderr, ok) = run_faber_emit(&[
+        "emit",
+        "-t",
+        "faber",
+        "--reader-locale",
+        "ar",
+        entry.to_str().expect("entry path"),
+    ]);
+
+    assert!(ok, "arabic emit should succeed: {stderr}");
+    // functio -> دالة, incipit -> بداية, in logical order.
+    assert!(
+        stdout.contains("دالة"),
+        "arabic emit should localize functio: {stdout}"
+    );
+    assert!(
+        stdout.contains("بداية"),
+        "arabic emit should localize incipit: {stdout}"
+    );
+    assert!(
+        !stdout.contains("functio"),
+        "arabic emit should not emit the Latin keyword: {stdout}"
+    );
+    // No Bidi / directional embedding controls. Logical order means scalar
+    // values stream in source order; any directional control is a visual bug.
+    const BIDI_CONTROLS: &[char] = &[
+        '\u{202A}', '\u{202B}', '\u{202C}', '\u{202D}', '\u{202E}', // LRE/RLE/PDF/LRO/RLO
+        '\u{2066}', '\u{2067}', '\u{2068}', '\u{2069}', // LRI/RLI/FSI/PDI
+    ];
+    assert!(
+        !stdout.chars().any(|c| BIDI_CONTROLS.contains(&c)),
+        "arabic emit must not inject Bidi controls (logical order invariant): {stdout}"
+    );
+}
