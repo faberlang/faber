@@ -405,11 +405,15 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
     let mut unit_funcs: std::collections::BTreeMap<PathBuf, Vec<super::go_build::GoFuncSig>> =
         std::collections::BTreeMap::new();
 
+    // Go is not a localized target; the surface is unused but required by the
+    // shared dispatch seam after reader-locale emit threading.
+    let go_surface_latin = radix::reader_locale::latin_reader_pack();
+    let go_surface = radix::reader_locale::KeywordSurface::new(&go_surface_latin);
     for unit in &package.units {
         if unit.is_entry {
             continue;
         }
-        match radix::codegen::generate_from_analyzed(Target::Go, &unit.analysis) {
+        match radix::codegen::generate_from_analyzed(Target::Go, &unit.analysis, &go_surface) {
             Ok(Output::Go(output)) => {
                 let body = super::go_build::strip_go_preamble(&output.code);
                 let funcs = super::go_build::parse_go_func_sigs(&body);
@@ -473,34 +477,36 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
                 };
             }
         },
-        None => match radix::codegen::generate_from_analyzed(Target::Go, &entry.analysis) {
-            Ok(Output::Go(output)) => output.code,
-            Ok(_) => {
-                diagnostics.push(
-                    crate::package_diagnostic_error(
-                        "Go package codegen returned a non-Go output".to_owned(),
-                    )
-                    .with_file(entry.path.display().to_string())
-                    .with_arg("issue", "package_go_codegen_failed"),
-                );
-                return CompileResult {
-                    output: None,
-                    diagnostics,
-                };
-            }
-            Err(err) => {
-                let mut diag = crate::package_diagnostic_error(err.message)
-                    .with_file(entry.path.display().to_string());
-                for arg in err.args {
-                    diag = diag.with_arg(arg.name, arg.value);
+        None => {
+            match radix::codegen::generate_from_analyzed(Target::Go, &entry.analysis, &go_surface) {
+                Ok(Output::Go(output)) => output.code,
+                Ok(_) => {
+                    diagnostics.push(
+                        crate::package_diagnostic_error(
+                            "Go package codegen returned a non-Go output".to_owned(),
+                        )
+                        .with_file(entry.path.display().to_string())
+                        .with_arg("issue", "package_go_codegen_failed"),
+                    );
+                    return CompileResult {
+                        output: None,
+                        diagnostics,
+                    };
                 }
-                diagnostics.push(diag);
-                return CompileResult {
-                    output: None,
-                    diagnostics,
-                };
+                Err(err) => {
+                    let mut diag = crate::package_diagnostic_error(err.message)
+                        .with_file(entry.path.display().to_string());
+                    for arg in err.args {
+                        diag = diag.with_arg(arg.name, arg.value);
+                    }
+                    diagnostics.push(diag);
+                    return CompileResult {
+                        output: None,
+                        diagnostics,
+                    };
+                }
             }
-        },
+        }
     };
 
     // P1 (53ff0a7): flatten to package main fails open if two units emit the same
