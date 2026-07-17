@@ -91,7 +91,8 @@ pub(crate) use manifest::validate_manifest;
 #[allow(unused_imports)] // public package API; used by integration tests and external callers
 pub use manifest::{
     read_manifest, FaberManifest, ManifestBuild, ManifestDispatch, ManifestLibrary,
-    ManifestPackage, ManifestPaths, ManifestRustFieldNames, ManifestRustHost,
+    ManifestPackage, ManifestPaths, ManifestProduct, ManifestProductEmit, ManifestProductKind,
+    ManifestRustFieldNames, ManifestRustHost,
 };
 // binary-only package interpretation route consumes this through `commands`.
 #[allow(unused_imports)] // generated fmir-bin runner crates consume this public API.

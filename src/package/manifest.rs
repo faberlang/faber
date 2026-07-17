@@ -25,6 +25,10 @@ pub struct FaberManifest {
     #[serde(default)]
     pub build: ManifestBuild,
 
+    /// Product packaging recipe owned by faber, not by Radix codegen targets.
+    #[serde(default)]
+    pub product: Option<ManifestProduct>,
+
     /// Reader-locale settings used to select a source and diagnostic surface.
     #[serde(default)]
     pub reader: ManifestReader,
@@ -97,6 +101,40 @@ pub struct ManifestBuild {
     /// Generated Rust struct-field spelling policy.
     #[serde(default)]
     pub rust_field_names: ManifestRustFieldNames,
+}
+
+/// `[product]` browser application packaging metadata.
+///
+/// This selects a faber-owned product recipe. It deliberately does not add a
+/// Radix `web` backend: browser controllers emit TypeScript and packaging owns
+/// assets plus product manifests.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ManifestProduct {
+    pub kind: ManifestProductKind,
+    pub emit: ManifestProductEmit,
+    #[serde(default = "default_product_out")]
+    pub out: String,
+    #[serde(default = "default_product_templates")]
+    pub templates: String,
+    #[serde(default = "default_product_styles")]
+    pub styles: String,
+    #[serde(default = "default_product_public")]
+    pub public: String,
+    #[serde(default = "default_product_controllers_json")]
+    pub controllers_json: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ManifestProductKind {
+    BrowserApp,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+pub enum ManifestProductEmit {
+    #[serde(rename = "typescript")]
+    TypeScript,
 }
 
 /// `[reader]` metadata used to select a package-local reader pack.
@@ -196,9 +234,30 @@ fn default_build_kind() -> String {
     "bin".to_owned()
 }
 
+fn default_product_out() -> String {
+    "dist".to_owned()
+}
+
+fn default_product_templates() -> String {
+    "pages".to_owned()
+}
+
+fn default_product_styles() -> String {
+    "styles".to_owned()
+}
+
+fn default_product_public() -> String {
+    "public".to_owned()
+}
+
+fn default_product_controllers_json() -> String {
+    "controllers.json".to_owned()
+}
+
 pub(super) fn manifest_build_target(target: &str, path: &Path) -> Result<Target, Box<Diagnostic>> {
     match target.trim() {
         "rust" => Ok(Target::Rust),
+        "ts" | "typescript" => Ok(Target::TypeScript),
         "scena" => Ok(Target::Scena),
         "fmir-text" => Ok(Target::FmirText),
         "fmir" => Ok(Target::Fmir),
@@ -307,6 +366,10 @@ pub(crate) fn validate_manifest(
         }
     }
 
+    if let Some(product) = &manifest.product {
+        validate_product(product, path)?;
+    }
+
     if let Some(locale) = manifest.reader.locale.as_deref() {
         if locale.trim().is_empty() {
             return Err(Box::new(
@@ -412,6 +475,44 @@ pub(crate) fn validate_manifest(
         }
     }
 
+    Ok(())
+}
+
+fn validate_product(product: &ManifestProduct, path: &Path) -> Result<(), Box<Diagnostic>> {
+    match product.kind {
+        ManifestProductKind::BrowserApp => {}
+    }
+    match product.emit {
+        ManifestProductEmit::TypeScript => {}
+    }
+
+    validate_product_path("out", &product.out, path)?;
+    validate_product_path("templates", &product.templates, path)?;
+    validate_product_path("styles", &product.styles, path)?;
+    validate_product_path("public", &product.public, path)?;
+    validate_product_path("controllers_json", &product.controllers_json, path)?;
+    Ok(())
+}
+
+fn validate_product_path(field: &str, value: &str, path: &Path) -> Result<(), Box<Diagnostic>> {
+    let trimmed = value.trim();
+    if trimmed.is_empty()
+        || trimmed.starts_with('/')
+        || trimmed == "."
+        || trimmed == ".."
+        || trimmed
+            .split('/')
+            .any(|segment| segment.is_empty() || segment == "." || segment == "..")
+    {
+        return Err(Box::new(
+            crate::package_diagnostic_error(format!(
+                "faber.toml product.{field} must be a non-empty relative path without traversal"
+            ))
+            .with_file(path.display().to_string())
+            .with_arg("issue", "invalid_product_path")
+            .with_arg("field", field.to_owned()),
+        ));
+    }
     Ok(())
 }
 

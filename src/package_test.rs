@@ -14,7 +14,7 @@ use super::{
     run_package_fmir_image, run_package_fmir_text_image, run_package_mir, run_package_mir_artifact,
     sanitize_crate_name, use_package_compiler, use_package_compiler_from_args, validate_manifest,
     verify_library_bindings, with_lowered_package_mir, BuildLayout, LibraryInterfaceCache,
-    ManifestRustHost,
+    ManifestProductEmit, ManifestProductKind, ManifestRustHost,
 };
 use super::{fmir_image_test_summary, fmir_text_image_test_summary};
 use crate::library::{LibraryProviderKind, LibraryResolver, ResolvedLibraryModule};
@@ -5863,8 +5863,98 @@ name = "defaults"
     assert_eq!(manifest.build.target, "rust");
     assert!(manifest.build.targets.is_empty());
     assert_eq!(manifest.build.kind, "bin");
+    assert!(manifest.product.is_none());
     assert!(manifest.reader.locale.is_none());
     assert!(manifest.reader.pack.is_none());
+}
+
+#[test]
+fn g10_web_product_manifest_accepts_browser_app_recipe_without_web_target() {
+    let dir = test_temp_dir("g10-web-product-manifest");
+    let manifest = dir.join("faber.toml");
+    fs::write(
+        &manifest,
+        r#"
+[package]
+name = "browser-product"
+
+[paths]
+entry = "main.fab"
+
+[build]
+target = "ts"
+kind = "bin"
+
+[product]
+kind = "browser-app"
+emit = "typescript"
+out = "dist"
+templates = "pages"
+styles = "styles"
+public = "public"
+controllers_json = "controllers.json"
+"#,
+    )
+    .expect("write manifest");
+
+    let manifest = read_manifest(&manifest).expect("read manifest");
+    validate_manifest(&manifest, &dir.join("faber.toml")).expect("product recipe validates");
+    assert_eq!(manifest.build.target, "ts");
+    let product = manifest.product.expect("product table");
+    assert_eq!(product.kind, ManifestProductKind::BrowserApp);
+    assert_eq!(product.emit, ManifestProductEmit::TypeScript);
+    assert_eq!(product.out, "dist");
+}
+
+#[test]
+fn g10_web_product_manifest_rejects_unknown_and_unsafe_packaging_fields() {
+    let dir = test_temp_dir("g10-web-product-bad-manifest");
+    let unknown = dir.join("unknown.toml");
+    fs::write(
+        &unknown,
+        r#"
+[package]
+name = "bad-product"
+
+[paths]
+entry = "main.fab"
+
+[build]
+target = "ts"
+
+[product]
+kind = "browser-app"
+emit = "typescript"
+bundler = "vite"
+"#,
+    )
+    .expect("write unknown manifest");
+    let err = read_manifest(&unknown).expect_err("unknown product fields fail closed");
+    assert!(diagnostic_has_issue(&err, "invalid_package_manifest"));
+
+    let traversal = dir.join("traversal.toml");
+    fs::write(
+        &traversal,
+        r#"
+[package]
+name = "bad-path"
+
+[paths]
+entry = "main.fab"
+
+[build]
+target = "ts"
+
+[product]
+kind = "browser-app"
+emit = "typescript"
+out = "../dist"
+"#,
+    )
+    .expect("write traversal manifest");
+    let manifest = read_manifest(&traversal).expect("read traversal manifest");
+    let err = validate_manifest(&manifest, &traversal).expect_err("unsafe product path rejects");
+    assert!(diagnostic_has_issue(&err, "invalid_product_path"));
 }
 
 #[test]
@@ -10031,6 +10121,154 @@ fn g6_go4_coreutils_false_package_go_builds() {
         .status()
         .expect("run false");
     assert_eq!(status.code(), Some(1), "GNU false should exit 1");
+}
+
+// ---------------------------------------------------------------------------
+// G10 WEB1 — faber-web framework package contract
+// ---------------------------------------------------------------------------
+
+fn sibling_faber_web_lib() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../faber-web")
+}
+
+fn write_web_consumer_app(app: &Path, lib: &Path, entry_body: &str) {
+    fs::create_dir_all(app.join("src")).expect("app src");
+    let interface_root = lib.join("src");
+    fs::write(
+        app.join("faber.toml"),
+        r#"[package]
+name = "g10-web-app"
+version = "0.1.0"
+
+[paths]
+entry = "main.fab"
+
+[build]
+target = "ts"
+kind = "bin"
+
+[product]
+kind = "browser-app"
+emit = "typescript"
+
+[dependencies]
+web = "0.1.0"
+"#,
+    )
+    .expect("app manifest");
+    fs::write(
+        app.join("faber.lock"),
+        format!(
+            r#"
+[[package]]
+name = "web"
+version = "0.1.0"
+source = "path"
+package_root = "{package_root}"
+kind = "lib"
+target_language = "ts"
+target_triple = "browser"
+target_manifest = ""
+interface_root = "{interface_root}"
+artifact = ""
+crate = "web"
+rustc = ""
+"#,
+            package_root = lib.display(),
+            interface_root = interface_root.display(),
+        ),
+    )
+    .expect("lock");
+    fs::write(app.join("src/main.fab"), entry_body).expect("entry");
+}
+
+#[test]
+fn g10_web1_faber_web_package_exports_controller_contract() {
+    let lib = sibling_faber_web_lib();
+    assert!(lib.is_dir(), "faber-web missing at {}", lib.display());
+
+    let package = analyze_package(&Config::default(), &lib).expect("analyze faber-web package");
+    let unit = package
+        .units
+        .iter()
+        .find(|unit| unit.path.ends_with("web.fab"))
+        .expect("web.fab unit");
+    let export = unit
+        .file_interface
+        .exports
+        .get("WebController")
+        .expect("WebController export");
+    let FileExportKind::Struct(strukt) = &export.kind else {
+        panic!("WebController must be a struct export");
+    };
+    let contract = strukt
+        .annotation_contract
+        .as_ref()
+        .expect("WebController must carry annotation_contract");
+    assert_eq!(contract.target, "functio");
+    assert_eq!(contract.fields.len(), 1);
+    assert_eq!(contract.fields[0].name, "selector");
+    assert_eq!(contract.fields[0].ty, "textus");
+    let identity = contract
+        .qualified_identity
+        .as_ref()
+        .expect("WebController identity must be qualified");
+    assert_eq!(identity.provider, "package");
+    assert_eq!(identity.package.as_deref(), Some("faber-web"));
+    assert_eq!(identity.export_name, "WebController");
+}
+
+#[test]
+fn g10_web1_imported_web_controller_survives_package_graph_extract() {
+    let lib = sibling_faber_web_lib();
+    let root = test_temp_dir("g10-web-imported-controller");
+    let app = root.join("app");
+    write_web_consumer_app(
+        &app,
+        &lib,
+        r#"
+importa ex "web:web" privata web
+importa ex "web:dom" privata dom
+
+@ WebController { selector = "[data-faber=shell]" }
+functio shell(dom.Scope scope) → vacuum {
+  nota web.mount("[data-faber=shell]")
+  nota dom.require(scope, "button")
+}
+
+incipit {
+  shell(dom.scope("[data-faber=shell]"))
+}
+"#,
+    );
+
+    let package = analyze_package(&Config::default(), &app).expect("analyze web app package graph");
+    let entry = package.entry_unit().expect("entry unit");
+    let application = entry
+        .analysis
+        .annotation_contracts
+        .applications()
+        .next()
+        .expect("imported WebController contract application");
+    assert_eq!(
+        entry.analysis.interner.resolve(application.family),
+        "WebController"
+    );
+    let contract = entry
+        .analysis
+        .annotation_contracts
+        .registry
+        .get(application.contract_id)
+        .expect("imported WebController contract");
+    assert_eq!(
+        entry.analysis.interner.resolve(contract.name),
+        "WebController"
+    );
+    assert_eq!(contract.fields.len(), 1);
+    assert_eq!(
+        entry.analysis.interner.resolve(contract.fields[0].name),
+        "selector"
+    );
 }
 
 // ---------------------------------------------------------------------------
