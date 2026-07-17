@@ -422,9 +422,11 @@ are all manual, undocumented steps.
    → tag push triggers release.yml automatically
 
 3. VERIFY (after CI completes)
-   a. Check faberlang/releases has faber-vX.Y.Z with all 3 platform archives
-   b. Download one archive, verify SHA-256, run binary --version
-   c. If Homebrew: update tap formula with checksums
+   a. Check faberlang/releases has faber-vX.Y.Z with all expected platform archives
+   b. Download one archive plus its `.sha256` into one directory, run `(cd <download-dir> && shasum -a 256 -c <file>.sha256)`, and run binary `--version`
+   c. The `.sha256` line must name only the archive basename (for example: `<64 hex>  faber-vX.Y.Z-aarch64-apple-darwin.tar.gz`), not a CI path like `dist/<archive>`
+   d. Faber 1.1.1 checksums were published before this basename-only workflow fix; do not re-tag 1.1.1 without Mind/operator direction.
+   e. If Homebrew: update tap formula with checksums
 
 4. DOCUMENT
    a. Write docs/release/vX.Y.Z.md with companion heads and evidence
