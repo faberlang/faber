@@ -72,7 +72,14 @@ parallel user paths.
 - **M1.1 — Git/URL install:** landed default `faber install <git-url>` as a
   temporary clone plus required `cista.toml` install into the Cista store with
   project lock rewrite; Faber keeps the old FABER_LIBRARY_HOME clone path only
-  behind explicit `--legacy-library-home` for local development.
+  behind explicit `--legacy-library-home` for local development. Faber SHA:
+  `16bb59c`.
+- **M1.2 — Registry pin + Triga dogfood:** landed `faber install name@version`
+  as the product facade over Cista registry/cache install with `--registry` /
+  `CISTA_REGISTRY` selection and no fallback from bare names to GitHub clones.
+  Dogfood proof installed `../triga` into a temp Cista store, rewrote a consumer
+  `faber.lock` with the Triga interface root, and checked `importa ex
+  "triga:triga"` green from the lock path.
 - **M1 — Product install:** continue migrating `faber install` to front the Cista
   store for remaining non-path package sources.
 - **M2 — Cold agent:** prove a fresh agent can install Faber, install a library

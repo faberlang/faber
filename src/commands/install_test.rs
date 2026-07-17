@@ -157,6 +157,60 @@ fn git(cwd: &Path, args: &[&str]) {
 }
 
 #[test]
+fn install_registry_pin_updates_store_and_project_lock() {
+    let fixture = test_temp_dir("registry-store");
+    let registry = fixture.join("registry");
+    write_cista_repo(&registry.join("regmath/0.1.0"), "regmath");
+    let store = fixture.join("store");
+    let project = fixture.join("consumer");
+    write_project_with_dependency(&project, "regmath");
+
+    install_store_source(
+        "regmath@0.1.0",
+        Some(&store),
+        Some(&registry),
+        Some(&project),
+        "rust",
+    )
+    .expect("install from registry pin");
+
+    let installed_root = store.join("regmath/0.1.0");
+    assert!(installed_root.join("interfaces/math/add.fab").is_file());
+    let lock = cista::faber_lock::read_lock(&project.join("faber.lock")).expect("read lock");
+    let regmath = lock
+        .packages
+        .iter()
+        .find(|package| package.name == "regmath")
+        .expect("regmath lock entry");
+    assert_eq!(regmath.version, "0.1.0");
+    assert_eq!(
+        PathBuf::from(&regmath.package_root),
+        installed_root.canonicalize().unwrap()
+    );
+
+    fs::remove_dir_all(fixture).expect("cleanup temp root");
+}
+
+#[test]
+fn install_bare_name_fails_closed_instead_of_github_clone() {
+    let fixture = test_temp_dir("bare-name");
+    let store = fixture.join("store");
+
+    let errors = install_store_source("regmath", Some(&store), None, None, "rust")
+        .expect_err("bare registry names must require an exact pin");
+
+    assert!(errors
+        .iter()
+        .any(|error| error.contains("requires an exact name@version pin")));
+    assert!(
+        !store.exists(),
+        "rejected bare name must not create a store"
+    );
+
+    fs::remove_dir_all(fixture).expect("cleanup temp root");
+}
+
+#[test]
 fn install_git_url_cista_package_updates_store_and_project_lock() {
     let fixture = test_temp_dir("git-store");
     let source_repo = write_cista_repo(&fixture.join("gitmath-repo"), "gitmath");
@@ -165,7 +219,8 @@ fn install_git_url_cista_package_updates_store_and_project_lock() {
     write_project_with_dependency(&project, "gitmath");
     let url = format!("file://{}", source_repo.display());
 
-    install_store_source(&url, Some(&store), Some(&project), "rust").expect("install from git URL");
+    install_store_source(&url, Some(&store), None, Some(&project), "rust")
+        .expect("install from git URL");
 
     let installed_root = store.join("gitmath/0.1.0");
     assert!(installed_root.join("interfaces/math/add.fab").is_file());
@@ -191,7 +246,7 @@ fn install_git_url_without_cista_manifest_fails_closed() {
     let store = fixture.join("store");
     let url = format!("file://{}", source_repo.display());
 
-    let errors = install_store_source(&url, Some(&store), None, "rust")
+    let errors = install_store_source(&url, Some(&store), None, None, "rust")
         .expect_err("faber.toml-only git installs must not use Cista store");
 
     assert!(errors

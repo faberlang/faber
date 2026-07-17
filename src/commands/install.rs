@@ -66,6 +66,7 @@ pub(super) fn cmd_install(args: InstallArgs) {
     match install_store_source(
         library,
         args.store.as_deref(),
+        args.registry.as_deref(),
         args.project.as_deref(),
         &args.target_language,
     ) {
@@ -92,15 +93,26 @@ fn install_store_path(
     install_store_cista_path(path, store, project, target_language)
 }
 
-/// Product composition path: clone a git/name source, require cista.toml, then install it.
+/// Product composition path: install an exact registry pin or git URL through the Cista store.
 pub(super) fn install_store_source(
     library_or_url: &str,
     store: Option<&Path>,
+    registry: Option<&Path>,
     project: Option<&Path>,
     target_language: &str,
 ) -> Result<(), Vec<String>> {
-    if looks_like_library_name(library_or_url) && !valid_library_name(library_or_url) {
-        return Err(vec![InstallError::InvalidLibraryName(
+    if looks_like_registry_pin(library_or_url) {
+        return install_store_registry_package(
+            library_or_url,
+            store,
+            registry,
+            project,
+            target_language,
+        );
+    }
+
+    if looks_like_library_name(library_or_url) {
+        return Err(vec![InstallError::UnpinnedRegistryPackage(
             library_or_url.to_owned(),
         )
         .to_string()]);
@@ -145,6 +157,25 @@ pub(super) fn install_store_source(
     }
 }
 
+fn install_store_registry_package(
+    package: &str,
+    store: Option<&Path>,
+    registry: Option<&Path>,
+    project: Option<&Path>,
+    target_language: &str,
+) -> Result<(), Vec<String>> {
+    cista::install(cista::cli::InstallArgs {
+        path: None,
+        package: Some(package.to_owned()),
+        manifest: PathBuf::from("cista.toml"),
+        target_language: target_language.to_owned(),
+        store: store.map(Path::to_path_buf),
+        registry: registry.map(Path::to_path_buf),
+        project: project.map(Path::to_path_buf),
+        verify_target_build: false,
+    })
+}
+
 fn install_store_cista_path(
     path: PathBuf,
     store: Option<&Path>,
@@ -184,6 +215,7 @@ pub(super) enum InstallError {
         path: PathBuf,
         message: String,
     },
+    UnpinnedRegistryPackage(String),
     NotLibraryPackage {
         path: PathBuf,
         kind: String,
@@ -216,6 +248,10 @@ impl fmt::Display for InstallError {
             InstallError::InvalidManifest { path, message } => {
                 write!(f, "invalid library manifest at {}: {message}", path.display())
             }
+            InstallError::UnpinnedRegistryPackage(name) => write!(
+                f,
+                "registry install requires an exact name@version pin, got `{name}`; pass --registry or set CISTA_REGISTRY when installing a registry package"
+            ),
             InstallError::NotLibraryPackage { path, kind } => write!(
                 f,
                 "{} is not an installable Faber source library: build.kind is `{kind}`, expected `lib`",
@@ -355,6 +391,10 @@ fn install_source(input: &str) -> Result<String, InstallError> {
         return Err(InstallError::InvalidLibraryName(input.to_owned()));
     }
     Ok(format!("https://github.com/faberlang/{input}.git"))
+}
+
+fn looks_like_registry_pin(input: &str) -> bool {
+    looks_like_library_name(input) && input.split_once('@').is_some()
 }
 
 fn looks_like_library_name(input: &str) -> bool {
