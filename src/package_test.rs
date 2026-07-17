@@ -312,6 +312,50 @@ incipit {
 }
 
 #[test]
+fn build_package_resolves_norma_json_facade_roundtrip() {
+    let dir = test_temp_dir("norma-json-build-roundtrip");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+importa ex "norma:json" privata json
+
+incipit {
+  fac {
+    fixum json arr ← json.solve("[1]")
+    fixum textus arr_wire ← json.pange(arr)
+    fixum json obj ← json.solve("{\"a\":1}")
+    fixum textus obj_wire ← json.pange(obj)
+    nota arr_wire
+    nota obj_wire
+  }
+  cape err {
+    nota err
+  }
+}
+"#,
+    )
+    .expect("write entry");
+
+    let result = compile_package(&Config::default(), &entry);
+    assert!(
+        result.success(),
+        "expected norma:json package compile success, got {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+    let Some(Output::Rust(output)) = result.output else {
+        panic!("expected rust output");
+    };
+    let layout = discover_build_layout(&entry).expect("layout");
+    emit_generated_crate(&layout, &output.code, None).expect("emit generated crate");
+    invoke_cargo_build(&layout, false).expect("cargo build");
+}
+
+#[test]
 fn compile_package_prefers_locked_norma_interfaces_over_library_home_without_dependency() {
     let dir = test_temp_dir("locked-norma-platform-default");
     let src = dir.join("src");
