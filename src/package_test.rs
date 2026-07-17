@@ -10356,7 +10356,84 @@ assets_manifest = "pages/index.html"
         manifest.product.as_ref().unwrap(),
     )
     .expect_err("manifest/asset collision fails closed");
-    assert!(diagnostic_has_issue(&err, "product_manifest_collision"));
+    assert!(diagnostic_has_issue(&err, "product_output_collision"));
+
+    // Controllers-json path collides with a planned asset output → fail closed.
+    // Regression for auditor-1 block_ship on b0c0e3d: the manifest collision
+    // guard existed, but controllers_json was unchecked.
+    let controllers_collision = test_temp_dir("g10-web2-controllers-collision");
+    fs::write(
+        controllers_collision.join("faber.toml"),
+        r#"[package]
+name = "web2-controllers-collision"
+
+[paths]
+entry = "main.fab"
+
+[build]
+target = "ts"
+kind = "bin"
+
+[product]
+kind = "browser-app"
+emit = "typescript"
+out = "dist"
+templates = "pages"
+styles = "styles"
+public = "public"
+controllers_json = "pages/index.html"
+"#,
+    )
+    .expect("manifest");
+    write_static_asset_roots(&controllers_collision);
+    fs::write(
+        controllers_collision.join("pages/index.html"),
+        "controllers will overwrite me\n",
+    )
+    .expect("colliding asset");
+    let manifest =
+        read_manifest(&controllers_collision.join("faber.toml")).expect("manifest");
+    let err = build_browser_product_static_assets(
+        &controllers_collision,
+        manifest.product.as_ref().unwrap(),
+    )
+    .expect_err("controllers_json/asset collision fails closed");
+    assert!(diagnostic_has_issue(&err, "product_output_collision"));
+
+    // Controllers-json path equals assets-manifest path → fail closed.
+    let self_collision = test_temp_dir("g10-web2-output-self-collision");
+    fs::write(
+        self_collision.join("faber.toml"),
+        r#"[package]
+name = "web2-output-self-collision"
+
+[paths]
+entry = "main.fab"
+
+[build]
+target = "ts"
+kind = "bin"
+
+[product]
+kind = "browser-app"
+emit = "typescript"
+out = "dist"
+templates = "pages"
+styles = "styles"
+public = "public"
+assets_manifest = "shared.json"
+controllers_json = "shared.json"
+"#,
+    )
+    .expect("manifest");
+    write_static_asset_roots(&self_collision);
+    let manifest = read_manifest(&self_collision.join("faber.toml")).expect("manifest");
+    let err = build_browser_product_static_assets(
+        &self_collision,
+        manifest.product.as_ref().unwrap(),
+    )
+    .expect_err("generated output self-collision fails closed");
+    assert!(diagnostic_has_issue(&err, "product_output_collision"));
 }
 
 fn write_browser_product_manifest(root: &Path, product_overrides: &str) {

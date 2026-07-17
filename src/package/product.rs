@@ -71,8 +71,9 @@ pub(crate) fn build_browser_product_static_assets(
         collect_root(&package_root, &out_dir, root, &mut planned)?;
     }
 
-    reject_stale_outputs(&out_dir, &planned, &manifest_path)?;
-    reject_manifest_collision(&planned, &manifest_path)?;
+    let generated = product_generated_output_paths(&out_dir, product);
+    reject_stale_outputs(&out_dir, &planned, &generated)?;
+    reject_output_collisions(&planned, &generated)?;
 
     for (output, asset) in &planned {
         if let Some(parent) = output.parent() {
@@ -250,7 +251,7 @@ fn reject_relative_escape(path: &Path) -> Result<(), Box<Diagnostic>> {
 fn reject_stale_outputs(
     out_dir: &Path,
     planned: &BTreeMap<PathBuf, PlannedAsset>,
-    manifest_path: &Path,
+    generated: &[(&'static str, PathBuf)],
 ) -> Result<(), Box<Diagnostic>> {
     let Ok(metadata) = fs::symlink_metadata(out_dir) else {
         return Ok(());
@@ -267,28 +268,58 @@ fn reject_stale_outputs(
     let allowed = planned
         .keys()
         .cloned()
-        .chain(std::iter::once(normalize_path(manifest_path)))
+        .chain(generated.iter().map(|(_, path)| path.clone()))
         .collect::<BTreeSet<_>>();
     reject_stale_dir(out_dir, &allowed)
 }
 
-/// Fail closed when the asset manifest path collides with a planned asset
-/// output. Without this guard the manifest write silently overwrites the
+/// Collect all generated product output paths — files and directories the
+/// product build writes into `out_dir` beyond copied static assets.
+fn product_generated_output_paths(
+    out_dir: &Path,
+    product: &ManifestProduct,
+) -> Vec<(&'static str, PathBuf)> {
+    vec![
+        ("assets manifest", normalize_path(&out_dir.join(&product.assets_manifest))),
+        ("controllers json", normalize_path(&out_dir.join(&product.controllers_json))),
+        ("faber-ts directory", normalize_path(&out_dir.join("faber-ts"))),
+        ("faber-esm directory", normalize_path(&out_dir.join("faber-esm"))),
+        ("tsconfig", normalize_path(&out_dir.join("tsconfig.faber-browser.json"))),
+    ]
+}
+
+/// Fail closed when any generated product output path collides with a planned
+/// static asset or with another generated output. Without this guard a
+/// configurable path like `controllers_json` can silently overwrite a copied
 /// asset (or vice versa), producing non-deterministic dist content.
-fn reject_manifest_collision(
+fn reject_output_collisions(
     planned: &BTreeMap<PathBuf, PlannedAsset>,
-    manifest_path: &Path,
+    generated: &[(&'static str, PathBuf)],
 ) -> Result<(), Box<Diagnostic>> {
-    let normalized = normalize_path(manifest_path);
-    if let Some(asset) = planned.get(&normalized) {
-        return Err(Box::new(
-            product_diag(format!(
-                "browser product manifest path `{}` collides with asset output from `{}`",
-                manifest_path.display(),
-                asset.source.display()
-            ))
-            .with_arg("issue", "product_manifest_collision"),
-        ));
+    for (label, path) in generated {
+        if let Some(asset) = planned.get(path) {
+            return Err(Box::new(
+                product_diag(format!(
+                    "browser product {label} path `{}` collides with static asset from `{}`",
+                    path.display(),
+                    asset.source.display()
+                ))
+                .with_arg("issue", "product_output_collision"),
+            ));
+        }
+    }
+    for (i, (label_a, path_a)) in generated.iter().enumerate() {
+        for (label_b, path_b) in generated.iter().skip(i + 1) {
+            if path_a == path_b {
+                return Err(Box::new(
+                    product_diag(format!(
+                        "browser product {label_a} path `{}` collides with {label_b} path",
+                        path_a.display(),
+                    ))
+                    .with_arg("issue", "product_output_collision"),
+                ));
+            }
+        }
     }
     Ok(())
 }
