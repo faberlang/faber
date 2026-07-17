@@ -54,6 +54,9 @@ pub enum Command {
     Init(InitArgs),
 
     /// Install or update a public Faber source library under FABER_LIBRARY_HOME
+    #[command(
+        long_about = "Install or update a public Faber source library from git under FABER_LIBRARY_HOME.\n\nThis command manages source libraries only. For cista package-store installs, use `cista install`."
+    )]
     Install(InstallArgs),
 
     /// Explain a Faber glyph, keyword, or grammar term
@@ -83,6 +86,9 @@ pub enum Command {
 
     /// Lower AST to HIR and output as JSON (compatibility alias for `radix hir`)
     Hir(radix::tool::InputArgs),
+
+    /// Lower checked HIR to MIR and output a deterministic text dump (compatibility alias for `radix mir`)
+    Mir(radix::tool::InputArgs),
 
     /// Validate and output normalized CLI IR as JSON (compatibility alias for `radix cli-ir`)
     CliIr(radix::tool::InputArgs),
@@ -196,7 +202,7 @@ pub struct InitArgs {
 /// Arguments for `faber install`.
 #[derive(clap::Args, Debug)]
 pub struct InstallArgs {
-    /// Public Faber source library name, such as `norma`
+    /// Public Faber source library name or git URL, such as `norma`
     pub library: String,
 }
 

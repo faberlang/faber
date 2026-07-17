@@ -40,6 +40,19 @@ fn cli_build_help_preserves_single_input_usage() {
 }
 
 #[test]
+fn cli_install_help_names_source_library_and_cista_boundaries() {
+    let mut command = Cli::command();
+    let install = command
+        .find_subcommand_mut("install")
+        .expect("install subcommand");
+    let help = install.render_long_help().to_string();
+
+    assert!(help.contains("source library from git"));
+    assert!(help.contains("FABER_LIBRARY_HOME"));
+    assert!(help.contains("cista install"));
+}
+
+#[test]
 fn cli_parses_repl_subcommand() {
     let cli = Cli::try_parse_from(["faber", "repl"]).expect("parse repl");
     assert!(cli.eval_source.is_none());
@@ -158,6 +171,12 @@ fn cli_parses_legacy_ir_alias_subcommands() {
     let hir = Cli::try_parse_from(["faber", "hir", "main.fab"]).expect("parse hir");
     let Some(crate::cli::Command::Hir(args)) = hir.command else {
         panic!("expected hir subcommand");
+    };
+    assert_eq!(args.input, vec!["main.fab"]);
+
+    let mir = Cli::try_parse_from(["faber", "mir", "main.fab"]).expect("parse mir");
+    let Some(crate::cli::Command::Mir(args)) = mir.command else {
+        panic!("expected mir subcommand");
     };
     assert_eq!(args.input, vec!["main.fab"]);
 

@@ -142,6 +142,7 @@ fn dispatch(command: Command) {
         Command::Lex(args) => tool::cmd_lex(&args.input),
         Command::Parse(args) => tool::cmd_parse(&args.input),
         Command::Hir(args) => tool::cmd_hir(&args.input),
+        Command::Mir(args) => tool::cmd_mir(&args.input),
         Command::CliIr(args) => tool::cmd_cli_ir(&args.input),
         Command::Emit(args) => {
             let emit_command = EmitCommand {
