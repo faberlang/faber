@@ -458,6 +458,9 @@ pub(crate) fn library_generates_rust_module(
     import: &LibraryImportBinding,
     library_cache: &mut LibraryInterfaceCache,
 ) -> Result<bool, Diagnostic> {
+    if is_builtin_norma_http_module(&import.module) {
+        return Ok(false);
+    }
     let cached = load_cached_library_interface(&import.module, library_cache)?;
     Ok(cached.program.statements.iter().any(|stmt| {
         !has_private_visibility(&stmt.annotations, &cached.interner)
@@ -786,12 +789,13 @@ pub(crate) fn attach_library_provenance_with_links(
         }
 
         for interface_item in interface_items {
-            let rust_runtime_type = library_item_call_path_with_crate(
+            let rust_runtime_type = library_item_runtime_path_with_crate(
                 &import.module,
                 &interface_item,
                 linked_crate.map(String::as_str),
             );
-            let elide_rust_decl = false;
+            let elide_rust_decl =
+                library_item_elides_generated_rust_decl(&import.module, &interface_item);
             let def_id = lookup_library_item_def_id(
                 &hir_items,
                 &interface_item.local_name,
@@ -861,11 +865,14 @@ fn public_library_imports(
     Ok(imports)
 }
 
-fn library_item_call_path_with_crate(
+fn library_item_runtime_path_with_crate(
     module: &ResolvedLibraryModule,
     item: &LibraryInterfaceItem,
     linked_crate: Option<&str>,
 ) -> Option<String> {
+    if is_builtin_norma_http(module) {
+        return norma_http_runtime_path(item);
+    }
     if item.kind == LibraryItemKind::Function {
         return Some(library_generated_call_path_with_crate(
             module,
@@ -874,6 +881,36 @@ fn library_item_call_path_with_crate(
         ));
     }
     None
+}
+
+fn library_item_elides_generated_rust_decl(
+    module: &ResolvedLibraryModule,
+    item: &LibraryInterfaceItem,
+) -> bool {
+    is_builtin_norma_http(module) && item.kind == LibraryItemKind::Interface
+}
+
+pub(crate) fn is_builtin_norma_http_module(module: &ResolvedLibraryModule) -> bool {
+    module.package == "norma" && module.module_path.len() == 1 && module.module_path[0] == "http"
+}
+
+fn is_builtin_norma_http(module: &ResolvedLibraryModule) -> bool {
+    is_builtin_norma_http_module(module)
+}
+
+fn norma_http_runtime_path(item: &LibraryInterfaceItem) -> Option<String> {
+    match item.kind {
+        LibraryItemKind::Function => match item.exported_name.as_str() {
+            "petet" | "mittet" | "ponet" | "delet" | "mutabit" | "rogabit" => {
+                Some(format!("faber::http::{}", item.exported_name))
+            }
+            _ => None,
+        },
+        LibraryItemKind::Interface if item.exported_name == "Replicatio" => {
+            Some("faber::http::Replicatio".to_owned())
+        }
+        _ => None,
+    }
 }
 
 fn lookup_library_item_def_id(

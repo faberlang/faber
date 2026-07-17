@@ -123,6 +123,9 @@ fn rust_runtime_plan_for_package(
         };
         collector.visit_program(&unit.analysis.hir);
         for import in &unit.expanded_library_imports {
+            if super::library::is_builtin_norma_http_module(&import.module) {
+                continue;
+            }
             let Ok(analysis) =
                 library_cached_analysis(import, library_resolver, &mut library_cache)
             else {

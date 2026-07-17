@@ -4729,7 +4729,7 @@ incipiet {
     let Some(Output::Rust(output)) = compile_result.output else {
         panic!("expected rust output");
     };
-    assert!(output.code.contains("crate::http::petet"));
+    assert!(output.code.contains("faber::http::petet"));
     assert!(output
         .code
         .contains("tokio::runtime::Builder::new_current_thread"));
@@ -4748,10 +4748,8 @@ incipiet {
         output.code
     );
     assert!(
-        output
-            .code
-            .contains("norma:http.petet is deferred pending Stage 2 dispatch"),
-        "expected deferred native http wire floor, got:\n{}",
+        output.code.contains("faber::http::Replicatio"),
+        "expected runtime HTTP response carrier, got:\n{}",
         output.code
     );
 
@@ -5134,8 +5132,11 @@ incipit {
     assert_eq!(item.identity.module_path, vec!["http"]);
     assert_eq!(item.exported_name, "Replicatio");
     assert_eq!(item.kind, LibraryItemKind::Interface);
-    assert!(item.rust_runtime_type.is_none());
-    assert!(!item.elide_rust_decl);
+    assert_eq!(
+        item.rust_runtime_type.as_deref(),
+        Some("faber::http::Replicatio")
+    );
+    assert!(item.elide_rust_decl);
 }
 
 #[test]
@@ -5170,12 +5171,12 @@ incipiet {
 
     assert!(output
         .code
-        .contains("crate::http::petet(\"http://127.0.0.1:9\".to_string()).await"));
+        .contains("faber::http::petet(\"http://127.0.0.1:9\".to_string()).await"));
     assert!(output
         .code
-        .contains("let responsum: dyn crate::http::Replicatio ="));
+        .contains("let responsum: faber::http::Replicatio ="));
     assert!(!output.code.contains("rete.petet"));
-    assert!(output.code.contains("pub trait Replicatio"));
+    assert!(!output.code.contains("pub trait Replicatio"));
 }
 
 #[test]
