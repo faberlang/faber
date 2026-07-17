@@ -63,9 +63,9 @@ parallel user paths.
 
 ## Milestones
 
-- **M0 — Store loop:** keep Cista's shared store, lockfile, registry/cache, and
-  package validation loop reliable enough to serve as the source of package
-  truth.
+- **M0 — Store loop:** landed the Cista shared store, lockfile, registry/cache,
+  package validation loop, and product-facing install API as the source of
+  package truth. Cista API export SHA: `693dc7a`.
 - **M1.0 — Path install:** landed `faber install --path` as an in-process Cista
   store install with project lock rewrite; Cista API export `693dc7a`, Faber
   facade/test `09f3443`.
@@ -78,17 +78,20 @@ parallel user paths.
   Dogfood proof installed `../triga` into a temp Cista store, rewrote a consumer
   `faber.lock` with the Triga interface root, and checked `importa ex
   "triga:triga"` green from the lock path. Faber SHA: `7329a80`.
-- **M1 — Product install:** continue migrating `faber install` to front the Cista
-  store for remaining non-path package sources.
-- **M2 — Cold agent + legacy install removal:** store-only resolve proof is now
-  covered by `scripta/check-store-only-resolve.sh`: a temp consumer declares
+- **M1 — Product install:** landed for path, Git/URL, and registry pins: the
+  Faber product facade now routes package installs through the Cista store and
+  rewrites the project lock instead of maintaining a parallel installer. Faber
+  SHAs: `09f3443`, `16bb59c`, `7329a80`.
+- **M2 — Cold agent + legacy install removal:** landed. Store-only resolve proof
+  is covered by `scripta/check-store-only-resolve.sh`: a temp consumer declares
   `norma` and `triga`, installs both via `faber install --path` into a temp
   Cista store, then runs `faber check --package` with `FABER_LIBRARY_HOME` and
   `FABER_ENABLE_WORKSPACE_LIBRARY_PROBE` unset. Since the monorepo sibling probe
   is opt-in, this proves lock/interface roots carry dependency resolution for
   the slice. The old `--legacy-library-home` / `FABER_LIBRARY_HOME` install path
   is removed; `FABER_LIBRARY_HOME` survives only as an explicit resolver
-  override when set by local development workflows.
+  override when set by local development workflows. Faber SHAs: `48ff510`,
+  `bf4cf44`, `11ee45f`.
 
 Browser-game and web-hosting flows are later work after MIR/host foundations;
 they are not part of this composition decision.
