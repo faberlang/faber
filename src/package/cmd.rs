@@ -120,6 +120,34 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
         return;
     }
 
+    if is_package && target == Target::TypeScript {
+        let layout = match discover_build_layout(&input_path) {
+            Ok(l) => l,
+            Err(d) => {
+                eprintln!("error: {}", d.message);
+                std::process::exit(1);
+            }
+        };
+        if layout.manifest_path.exists() {
+            let manifest = read_manifest(&layout.manifest_path).unwrap_or_else(|diag| {
+                eprintln!("error: {}", diag.message);
+                std::process::exit(1);
+            });
+            if let Some(product) = manifest.product.as_ref() {
+                match super::build_browser_product(&config, &input_path, product) {
+                    Ok(build) => {
+                        println!("{}", build.esm_entry.display());
+                        return;
+                    }
+                    Err(diag) => {
+                        eprintln!("error: {}", diag.message);
+                        std::process::exit(1);
+                    }
+                }
+            }
+        }
+    }
+
     let result = if is_package {
         compile_package(&config, &input_path)
     } else {

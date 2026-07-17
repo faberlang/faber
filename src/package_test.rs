@@ -5,16 +5,17 @@
 //! needs them.
 
 use super::{
-    analyze_package, build_browser_product_static_assets, build_package_fmir_image,
-    build_package_fmir_text_image, build_package_mir_artifact, check_package, compile_package,
-    compile_package_with_test_selection, config_with_reader_locale, discover_build_layout,
-    discover_package, emit_generated_crate, emit_generated_crate_with_runtime_plan,
-    invoke_cargo_build, library_cached_file_interface, library_resolver_from_config, load_package,
-    package_host_selection_diagnostic, package_rust_runtime_plan, read_manifest,
-    run_package_fmir_image, run_package_fmir_text_image, run_package_mir, run_package_mir_artifact,
-    sanitize_crate_name, use_package_compiler, use_package_compiler_from_args, validate_manifest,
-    verify_library_bindings, with_lowered_package_mir, BuildLayout, LibraryInterfaceCache,
-    ManifestProductEmit, ManifestProductKind, ManifestRustHost,
+    analyze_package, build_browser_product, build_browser_product_static_assets,
+    build_package_fmir_image, build_package_fmir_text_image, build_package_mir_artifact,
+    check_package, compile_package, compile_package_with_test_selection, config_with_reader_locale,
+    discover_build_layout, discover_package, emit_generated_crate,
+    emit_generated_crate_with_runtime_plan, invoke_cargo_build, library_cached_file_interface,
+    library_resolver_from_config, load_package, package_host_selection_diagnostic,
+    package_rust_runtime_plan, read_manifest, run_package_fmir_image, run_package_fmir_text_image,
+    run_package_mir, run_package_mir_artifact, sanitize_crate_name, use_package_compiler,
+    use_package_compiler_from_args, validate_manifest, verify_library_bindings,
+    with_lowered_package_mir, BuildLayout, LibraryInterfaceCache, ManifestProductEmit,
+    ManifestProductKind, ManifestRustHost,
 };
 use super::{fmir_image_test_summary, fmir_text_image_test_summary};
 use crate::library::{LibraryProviderKind, LibraryResolver, ResolvedLibraryModule};
@@ -10349,6 +10350,118 @@ fn write_static_asset_roots(root: &Path) {
     fs::create_dir_all(root.join("pages")).expect("pages");
     fs::create_dir_all(root.join("styles")).expect("styles");
     fs::create_dir_all(root.join("public")).expect("public");
+}
+
+#[test]
+fn g10_web3_builds_controllers_json_and_browser_esm() {
+    if Command::new("tsc").arg("--version").output().is_err() {
+        eprintln!("tsc not found on PATH; skipping WEB3 browser ESM test");
+        return;
+    }
+    let lib = sibling_faber_web_lib();
+    let root = test_temp_dir("g10-web3-browser-esm");
+    let app = root.join("app");
+    write_web_consumer_app(
+        &app,
+        &lib,
+        r#"
+importa ex "web:web" privata web
+importa ex "web:dom" privata dom
+
+@ WebController { selector = "[data-faber=shell]" }
+functio shell(dom.Scope scope) → vacuum {
+  nota dom.require(scope, "button")
+}
+"#,
+    );
+    write_static_asset_roots(&app);
+    fs::write(
+        app.join("pages/index.html"),
+        "<main data-faber=shell></main>\n",
+    )
+    .expect("page");
+
+    let manifest = read_manifest(&app.join("faber.toml")).expect("manifest");
+    let build = build_browser_product(
+        &Config::default().with_target(Target::TypeScript),
+        &app,
+        manifest.product.as_ref().unwrap(),
+    )
+    .expect("browser product build");
+
+    let controllers = fs::read_to_string(&build.controllers_json).expect("controllers.json");
+    assert!(controllers.contains("\"selector\": \"[data-faber=shell]\""));
+    assert!(controllers.contains("\"module\": \"./main.js\""));
+    assert!(build.esm_entry.is_file());
+    let esm = fs::read_to_string(&build.esm_entry).expect("esm entry");
+    assert!(esm.contains("./main.js"));
+    assert_eq!(build.controllers.len(), 1);
+
+    let second = build_browser_product(
+        &Config::default().with_target(Target::TypeScript),
+        &app,
+        manifest.product.as_ref().unwrap(),
+    )
+    .expect("browser product rebuild");
+    assert_eq!(
+        fs::read_to_string(&second.controllers_json).unwrap(),
+        controllers
+    );
+}
+
+#[test]
+fn g10_web3_rejects_duplicate_mount_and_invalid_selector() {
+    let lib = sibling_faber_web_lib();
+    let root = test_temp_dir("g10-web3-controller-rejects");
+    let dup = root.join("dup");
+    write_web_consumer_app(
+        &dup,
+        &lib,
+        r##"
+importa ex "web:web" privata web
+importa ex "web:dom" privata dom
+
+@ WebController { selector = "#shell" }
+functio one(dom.Scope scope) → vacuum {}
+
+@ WebController { selector = "#shell" }
+functio two(dom.Scope scope) → vacuum {}
+"##,
+    );
+    write_static_asset_roots(&dup);
+    let manifest = read_manifest(&dup.join("faber.toml")).expect("manifest");
+    let err = build_browser_product(
+        &Config::default().with_target(Target::TypeScript),
+        &dup,
+        manifest.product.as_ref().unwrap(),
+    )
+    .expect_err("duplicate mount fails closed");
+    assert!(diagnostic_has_issue(&err, "product_duplicate_mount"));
+
+    let invalid = root.join("invalid");
+    write_web_consumer_app(
+        &invalid,
+        &lib,
+        r#"
+importa ex "web:web" privata web
+importa ex "web:dom" privata dom
+
+@ WebController { selector = "main shell" }
+functio shell(dom.Scope scope) → vacuum {}
+"#,
+    );
+    write_static_asset_roots(&invalid);
+    let manifest = read_manifest(&invalid.join("faber.toml")).expect("manifest");
+    let err = build_browser_product(
+        &Config::default().with_target(Target::TypeScript),
+        &invalid,
+        manifest.product.as_ref().unwrap(),
+    )
+    .expect_err("invalid static selector fails closed");
+    assert!(diagnostic_has_issue(
+        &err,
+        "product_invalid_static_selector"
+    ));
 }
 
 #[test]
