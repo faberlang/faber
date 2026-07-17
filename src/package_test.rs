@@ -4491,6 +4491,7 @@ importa ex "norma:solum" privata solum ut terra
 incipit {
   fixum _ exists ← terra.exstat(".")
   fixum _ parent ← terra.parens("a/b")
+  cede terra.fundet("fundet.bin", |41 42 43|)
 }
 "#,
     )
@@ -4512,8 +4513,12 @@ incipit {
 
     assert!(output.code.contains("solum:exstat"));
     assert!(output.code.contains("solum:parens"));
+    assert!(output.code.contains("solum:funde"));
     assert!(output.code.contains("faber::frame::sermo_open"));
     assert!(output.code.contains("fn exstat"));
+    assert!(output.code.contains("crate::solum::fundet"));
+    assert!(output.code.contains(".await"));
+    assert!(!output.code.contains("solum:fundet"));
     assert!(!output.code.contains("norma::solum::exstat"));
     assert!(!output.code.contains("norma::solum::parens"));
     assert!(!output.code.contains("crate::norma::hal::solum"));
