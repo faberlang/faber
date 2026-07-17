@@ -5,8 +5,8 @@
 //! needs them.
 
 use super::{
-    analyze_package, build_package_fmir_image, build_package_fmir_text_image,
-    build_package_mir_artifact, check_package, compile_package,
+    analyze_package, build_browser_product_static_assets, build_package_fmir_image,
+    build_package_fmir_text_image, build_package_mir_artifact, check_package, compile_package,
     compile_package_with_test_selection, config_with_reader_locale, discover_build_layout,
     discover_package, emit_generated_crate, emit_generated_crate_with_runtime_plan,
     invoke_cargo_build, library_cached_file_interface, library_resolver_from_config, load_package,
@@ -10216,6 +10216,139 @@ fn g10_web1_faber_web_package_exports_controller_contract() {
     assert_eq!(identity.provider, "package");
     assert_eq!(identity.package.as_deref(), Some("faber-web"));
     assert_eq!(identity.export_name, "WebController");
+}
+
+#[test]
+fn g10_web2_product_static_assets_are_deterministic_and_manifested() {
+    let dir = test_temp_dir("g10-web2-static-assets");
+    write_browser_product_manifest(&dir, r#""#);
+    write_static_asset_roots(&dir);
+    fs::write(dir.join("pages/index.html"), "<main>Hello</main>\n").expect("page");
+    fs::write(dir.join("styles/site.css"), "main { color: red; }\n").expect("style");
+    fs::write(dir.join("public/logo.svg"), "<svg/>\n").expect("public");
+
+    let manifest = read_manifest(&dir.join("faber.toml")).expect("manifest");
+    let first = build_browser_product_static_assets(&dir, manifest.product.as_ref().unwrap())
+        .expect("first static build");
+    let first_manifest = fs::read_to_string(&first.manifest_path).expect("first manifest");
+    let first_assets = first
+        .assets
+        .iter()
+        .map(|asset| {
+            (
+                asset.kind,
+                asset
+                    .output
+                    .strip_prefix(&first.out_dir)
+                    .unwrap()
+                    .to_path_buf(),
+                asset.sha256.clone(),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let second = build_browser_product_static_assets(&dir, manifest.product.as_ref().unwrap())
+        .expect("second static build");
+    let second_manifest = fs::read_to_string(&second.manifest_path).expect("second manifest");
+    let second_assets = second
+        .assets
+        .iter()
+        .map(|asset| {
+            (
+                asset.kind,
+                asset
+                    .output
+                    .strip_prefix(&second.out_dir)
+                    .unwrap()
+                    .to_path_buf(),
+                asset.sha256.clone(),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    assert_eq!(first_manifest, second_manifest);
+    assert_eq!(first_assets, second_assets);
+    assert!(first.out_dir.join("pages/index.html").is_file());
+    assert!(first.out_dir.join("styles/site.css").is_file());
+    assert!(first.out_dir.join("public/logo.svg").is_file());
+    assert!(first_manifest.contains("pages/index.html"));
+    assert!(first_manifest.contains("styles/site.css"));
+    assert!(first_manifest.contains("public/logo.svg"));
+}
+
+#[test]
+fn g10_web2_product_static_assets_fail_closed_on_missing_root_collision_and_stale_output() {
+    let missing = test_temp_dir("g10-web2-missing-root");
+    write_browser_product_manifest(&missing, r#""#);
+    fs::create_dir_all(missing.join("pages")).expect("pages");
+    fs::create_dir_all(missing.join("styles")).expect("styles");
+    let manifest = read_manifest(&missing.join("faber.toml")).expect("manifest");
+    let err = build_browser_product_static_assets(&missing, manifest.product.as_ref().unwrap())
+        .expect_err("missing public root fails closed");
+    assert!(diagnostic_has_issue(&err, "product_asset_root_missing"));
+
+    let collision = test_temp_dir("g10-web2-collision");
+    write_browser_product_manifest(
+        &collision,
+        r#"
+templates = "pages"
+styles = "pages"
+public = "public"
+"#,
+    );
+    write_static_asset_roots(&collision);
+    fs::write(
+        collision.join("pages/shared.txt"),
+        "same source, same output\n",
+    )
+    .expect("shared");
+    let manifest = read_manifest(&collision.join("faber.toml")).expect("manifest");
+    let err = build_browser_product_static_assets(&collision, manifest.product.as_ref().unwrap())
+        .expect_err("duplicate output fails closed");
+    assert!(diagnostic_has_issue(&err, "product_asset_collision"));
+
+    let stale = test_temp_dir("g10-web2-stale-output");
+    write_browser_product_manifest(&stale, r#""#);
+    write_static_asset_roots(&stale);
+    fs::write(stale.join("pages/index.html"), "ok\n").expect("page");
+    fs::create_dir_all(stale.join("dist/pages")).expect("dist pages");
+    fs::write(stale.join("dist/pages/old.html"), "stale\n").expect("stale");
+    let manifest = read_manifest(&stale.join("faber.toml")).expect("manifest");
+    let err = build_browser_product_static_assets(&stale, manifest.product.as_ref().unwrap())
+        .expect_err("stale output fails closed");
+    assert!(diagnostic_has_issue(&err, "product_stale_output"));
+}
+
+fn write_browser_product_manifest(root: &Path, product_overrides: &str) {
+    fs::write(
+        root.join("faber.toml"),
+        format!(
+            r#"[package]
+name = "web2-static"
+
+[paths]
+entry = "main.fab"
+
+[build]
+target = "ts"
+kind = "bin"
+
+[product]
+kind = "browser-app"
+emit = "typescript"
+out = "dist"
+assets_manifest = "faber-assets.json"
+{product_overrides}
+"#
+        ),
+    )
+    .expect("manifest");
+}
+
+fn write_static_asset_roots(root: &Path) {
+    fs::create_dir_all(root.join("pages")).expect("pages");
+    fs::create_dir_all(root.join("styles")).expect("styles");
+    fs::create_dir_all(root.join("public")).expect("public");
 }
 
 #[test]

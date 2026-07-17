@@ -10,10 +10,11 @@ use super::cargo::{emit_generated_crate_with_runtime_plan, invoke_cargo_build};
 use super::go_build::{emit_go_module, invoke_go_build, GoBuildLayout};
 use super::manifest::manifest_build_target;
 use super::{
-    build_package_fmir_binary_bundle, build_package_fmir_image, build_package_fmir_text_image,
-    build_package_mir_artifact, check_package, compile_package, config_with_reader_locale,
-    discover_build_layout, package_host_selection_diagnostic, package_rust_runtime_plan,
-    read_manifest, BuildLayout, MANIFEST_FILE,
+    build_browser_product_static_assets, build_package_fmir_binary_bundle,
+    build_package_fmir_image, build_package_fmir_text_image, build_package_mir_artifact,
+    check_package, compile_package, config_with_reader_locale, discover_build_layout,
+    package_host_selection_diagnostic, package_rust_runtime_plan, read_manifest, BuildLayout,
+    MANIFEST_FILE,
 };
 
 /// Execute the user-facing `faber build` command.
@@ -241,6 +242,30 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
             Err(d) => {
                 eprintln!("error: {}", d.message);
                 std::process::exit(1);
+            }
+        }
+    }
+
+    if is_package && target == radix::codegen::Target::TypeScript {
+        let layout = match discover_build_layout(&input_path) {
+            Ok(l) => l,
+            Err(d) => {
+                eprintln!("error: {}", d.message);
+                std::process::exit(1);
+            }
+        };
+        if layout.manifest_path.exists() {
+            let manifest = read_manifest(&layout.manifest_path).unwrap_or_else(|diag| {
+                eprintln!("error: {}", diag.message);
+                std::process::exit(1);
+            });
+            if let Some(product) = manifest.product.as_ref() {
+                if let Err(diag) =
+                    build_browser_product_static_assets(&layout.package_root, product)
+                {
+                    eprintln!("error: {}", diag.message);
+                    std::process::exit(1);
+                }
             }
         }
     }

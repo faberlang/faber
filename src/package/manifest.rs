@@ -121,6 +121,8 @@ pub struct ManifestProduct {
     pub styles: String,
     #[serde(default = "default_product_public")]
     pub public: String,
+    #[serde(default = "default_product_assets_manifest")]
+    pub assets_manifest: String,
     #[serde(default = "default_product_controllers_json")]
     pub controllers_json: String,
 }
@@ -248,6 +250,10 @@ fn default_product_styles() -> String {
 
 fn default_product_public() -> String {
     "public".to_owned()
+}
+
+fn default_product_assets_manifest() -> String {
+    "assets.json".to_owned()
 }
 
 fn default_product_controllers_json() -> String {
@@ -490,6 +496,7 @@ fn validate_product(product: &ManifestProduct, path: &Path) -> Result<(), Box<Di
     validate_product_path("templates", &product.templates, path)?;
     validate_product_path("styles", &product.styles, path)?;
     validate_product_path("public", &product.public, path)?;
+    validate_product_path("assets_manifest", &product.assets_manifest, path)?;
     validate_product_path("controllers_json", &product.controllers_json, path)?;
     Ok(())
 }
