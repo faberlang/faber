@@ -29,9 +29,8 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             binary: faber
-          - os: macos-13
-            target: x86_64-apple-darwin
-            binary: faber
+          # macos-13 (Intel) removed: GitHub-hosted queue is often unbounded.
+          # Ship Linux x64 + Apple silicon; re-add Intel only with a reliable runner.
           - os: macos-14
             target: aarch64-apple-darwin
             binary: faber
