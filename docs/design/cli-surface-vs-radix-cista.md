@@ -149,16 +149,15 @@ A user who reads "install a package" faces two incompatible commands with
 different stores, different semantics, and no documentation in `faber --help`
 that mentions `cista` at all.
 
-**Architecture invariant (by design):** The Cista goal doc
-(`cista/docs/factory/cista-package-store/goal.md`) explicitly mandates that
-`faber` must not know `cista` exists — no crate dependency, no process
-dependency, no store discovery. Cross-repo integration uses file contracts
-(`faber.toml`, `faber.lock`, documented store layout). This is a deliberate
-clean-architecture boundary, not an oversight.
+**Decision update (2026-07-17):**
+[`product-composition-radix-cista.md`](product-composition-radix-cista.md)
+supersedes the earlier repo-separation reading. `faber` may crate-depend on
+`cista` the same way it may depend on `radix`; no crate dependency / spawn-only
+integration is retired as long-term product law.
 
-The goal doc also states the intended direction: *"faber is a thin install
-facade later"* — meaning `faber install` would eventually delegate to cista
-via process spawn. This has not been implemented.
+The intended direction remains that `faber install` becomes the product facade
+over the Cista store, but process spawning is no longer the only permitted
+implementation shape. This has not been implemented.
 
 ### 4.2 Capability gaps for "install Faber and do real work"
 
@@ -196,18 +195,16 @@ under `faber`, but rather:
    aliases. One struct delegation. Unblocks MIR debugging without leaving the
    `faber` tool. *(effort: S)*
 
-2. **Package management discoverability** — at minimum, `faber install` should
-   document or detect the cista store path and guide users to `cista install`
-   when they are trying to install a store package rather than a git library.
-   Today `faber install` silently uses a git-clone mechanism that is
-   disconnected from the package store. *(effort: M — design decision required;
-   see §4.1 invariant)*
+2. **Package management composition** — migrate `faber install` toward the
+   product facade over the Cista store, with `FABER_LIBRARY_HOME` documented as
+   a local-development override. Today `faber install` silently uses a git-clone
+   mechanism that is disconnected from the package store. *(effort: M — design
+   decided; see §4.1 and `product-composition-radix-cista.md`)*
 
-3. **`faber add <dep>`** (or `faber deps add`) — a thin facade that writes
-   `faber.toml [dependencies]` and shells out to `cista install --project`.
-   This closes the "add a dependency" loop into one command. Violates no
-   invariant: faber already reads `faber.toml` and `faber.lock`; it would
-   spawn `cista` as an external tool. *(effort: M)*
+3. **`faber add <dep>`** (or `faber deps add`) — a facade that writes
+   `faber.toml [dependencies]` and resolves through Cista. Direct crate calls,
+   process calls, or file contracts are all permitted implementation choices for
+   the migration unit. *(effort: M)*
 
 ---
 
@@ -216,9 +213,9 @@ under `faber`, but rather:
 | # | Gap | Severity | Effort | Recommendation |
 | --- | --- | --- | --- | --- |
 | 1 | **`faber mir` alias missing** | Low (power-user) | S | Add `mir` as a compatibility alias matching `radix mir`, same as `lex`/`parse`/`hir`. One clap variant + delegation. Quick win. |
-| 2 | **Package management dual-entry** | Medium (usability) | M (design) | File a **need** for operator decision: should `faber install` detect cista store packages and delegate, or should docs clarify the two-store model? The repo-separation invariant means delegation = process spawn, not crate dependency. |
-| 3 | **No `faber add`/dependency management front** | Medium (usability) | M | After #2 is decided, implement a thin `faber add <name>@<ver>` that writes `faber.toml` and spawns `cista install --project`. Closes the most common package loop. |
-| 4 | **`faber install` silently uses git-clone, not store** | Low-medium | S (docs) | At minimum, `faber install --help` should note that this installs source libraries via git into `FABER_LIBRARY_HOME`, and that `cista install` is the package-store mechanism. Prevents user confusion. |
+| 2 | **Package management dual-entry** | Medium (usability) | M | Implement the decided product composition: `faber install` becomes the facade over the Cista store; `FABER_LIBRARY_HOME` is a dev override. |
+| 3 | **No `faber add`/dependency management front** | Medium (usability) | M | After install composition starts, implement `faber add <name>@<ver>` or equivalent dependency facade that writes `faber.toml` and resolves through Cista. |
+| 4 | **`faber install` silently uses git-clone, not store** | Low-medium | S (docs) | Interim help/docs should say this is legacy source-library installation and point at the composition decision. Prevents user confusion before migration lands. |
 | 5 | **`radix abi` not fronted** | None (correctly radix-only) | — | No action. ABI contract is compiler-runtime integration, not application developer surface. |
 | 6 | **No `faber package list/show`** | Low | M | Optional: thin facade over `cista package list/show`. Lower priority than #2/#3. Can defer until package management UX is decided. |
 
@@ -232,10 +229,10 @@ under `faber`, but rather:
   fully covered by Faber with broad target support.
 - The **`mir` alias** gap is a convenience issue for power users who already
   have `radix` installed alongside `faber`.
-- The **package management** dual-entry is a known architectural decision
-  (repo-separation invariant) with a documented roadmap (Cista Phase A shipped,
-  Phase B next). It is not a regression or an oversight — it is staged
-  delivery.
+- The **package management** dual-entry is a known staged delivery gap with a
+  decided composition path: `faber install` becomes the product facade over the
+  Cista store. It is not a regression or an oversight, but the old
+  repo-separation invariant no longer blocks direct composition.
 - **Cista** is at v0.1.0 with local/dev registry working; remote `cista.dev` is
   environment-gated. Package management is explicitly early-stage in the
   release docs.
