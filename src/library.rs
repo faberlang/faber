@@ -21,8 +21,8 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 pub(crate) const FABER_LIBRARY_HOME_ENV: &str = "FABER_LIBRARY_HOME";
-pub(crate) const FABER_DISABLE_WORKSPACE_LIBRARY_PROBE_ENV: &str =
-    "FABER_DISABLE_WORKSPACE_LIBRARY_PROBE";
+pub(crate) const FABER_ENABLE_WORKSPACE_LIBRARY_PROBE_ENV: &str =
+    "FABER_ENABLE_WORKSPACE_LIBRARY_PROBE";
 
 /// Locked package interface root used for build-time resolution.
 ///
@@ -220,7 +220,7 @@ impl LibraryResolver {
         }
     }
 
-    /// Build a resolver from `FABER_LIBRARY_HOME` or, unless disabled, the sibling dev layout.
+    /// Build a resolver from an explicit `FABER_LIBRARY_HOME`, or from the sibling dev layout only when explicitly enabled.
     pub(crate) fn default() -> Self {
         Self {
             library_home: default_library_home(),
@@ -521,11 +521,13 @@ fn default_library_home() -> Option<PathBuf> {
     if let Some(value) = std::env::var_os(FABER_LIBRARY_HOME_ENV) {
         return Some(PathBuf::from(value));
     }
-    if std::env::var_os(FABER_DISABLE_WORKSPACE_LIBRARY_PROBE_ENV).is_some() {
+    if std::env::var_os(FABER_ENABLE_WORKSPACE_LIBRARY_PROBE_ENV).is_none() {
         return None;
     }
 
-    // Public faber repo is a sibling of norma under faberlang/.
+    // Public faber repo is a sibling of norma under faberlang/. This dev-only
+    // probe is opt-in so package consumers do not silently resolve from a
+    // nearby checkout instead of the Cista lock/store path.
     let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap_or_else(|| Path::new("."));
@@ -554,14 +556,14 @@ mod tests {
 
     struct EnvRestore {
         home: Option<std::ffi::OsString>,
-        disable: Option<std::ffi::OsString>,
+        enable: Option<std::ffi::OsString>,
     }
 
     impl EnvRestore {
         fn capture() -> Self {
             Self {
                 home: std::env::var_os(FABER_LIBRARY_HOME_ENV),
-                disable: std::env::var_os(FABER_DISABLE_WORKSPACE_LIBRARY_PROBE_ENV),
+                enable: std::env::var_os(FABER_ENABLE_WORKSPACE_LIBRARY_PROBE_ENV),
             }
         }
     }
@@ -569,10 +571,7 @@ mod tests {
     impl Drop for EnvRestore {
         fn drop(&mut self) {
             restore_env(FABER_LIBRARY_HOME_ENV, self.home.take());
-            restore_env(
-                FABER_DISABLE_WORKSPACE_LIBRARY_PROBE_ENV,
-                self.disable.take(),
-            );
+            restore_env(FABER_ENABLE_WORKSPACE_LIBRARY_PROBE_ENV, self.enable.take());
         }
     }
 
@@ -584,22 +583,35 @@ mod tests {
     }
 
     #[test]
-    fn workspace_library_probe_can_be_disabled_for_store_only_resolution() {
+    fn workspace_library_probe_is_off_by_default_for_store_only_resolution() {
         let _guard = env_guard();
         let _env = EnvRestore::capture();
         std::env::remove_var(FABER_LIBRARY_HOME_ENV);
-        std::env::set_var(FABER_DISABLE_WORKSPACE_LIBRARY_PROBE_ENV, "1");
+        std::env::remove_var(FABER_ENABLE_WORKSPACE_LIBRARY_PROBE_ENV);
 
         assert_eq!(default_library_home(), None);
     }
 
     #[test]
-    fn explicit_library_home_wins_over_probe_disable() {
+    fn workspace_library_probe_requires_explicit_enable() {
+        let _guard = env_guard();
+        let _env = EnvRestore::capture();
+        std::env::remove_var(FABER_LIBRARY_HOME_ENV);
+        std::env::set_var(FABER_ENABLE_WORKSPACE_LIBRARY_PROBE_ENV, "1");
+
+        let Some(home) = default_library_home() else {
+            return;
+        };
+        assert!(home.join("norma/src/solum.fab").is_file());
+    }
+
+    #[test]
+    fn explicit_library_home_wins_over_probe_enable() {
         let _guard = env_guard();
         let _env = EnvRestore::capture();
         let explicit = PathBuf::from("/tmp/faber-explicit-library-home-test");
         std::env::set_var(FABER_LIBRARY_HOME_ENV, &explicit);
-        std::env::set_var(FABER_DISABLE_WORKSPACE_LIBRARY_PROBE_ENV, "1");
+        std::env::set_var(FABER_ENABLE_WORKSPACE_LIBRARY_PROBE_ENV, "1");
 
         assert_eq!(default_library_home(), Some(explicit));
     }

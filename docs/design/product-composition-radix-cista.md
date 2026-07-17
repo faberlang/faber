@@ -85,9 +85,10 @@ parallel user paths.
 - **M2 — Cold agent:** store-only resolve proof is now covered by
   `scripta/check-store-only-resolve.sh`: a temp consumer declares `norma` and
   `triga`, installs both via `faber install --path` into a temp Cista store,
-  then runs `faber check --package` with `FABER_LIBRARY_HOME` unset and
-  `FABER_DISABLE_WORKSPACE_LIBRARY_PROBE=1`. This proves lock/interface roots,
-  not the monorepo sibling probe, carry dependency resolution for the slice.
+  then runs `faber check --package` with `FABER_LIBRARY_HOME` and
+  `FABER_ENABLE_WORKSPACE_LIBRARY_PROBE` unset. Since the monorepo sibling probe
+  is opt-in, this proves lock/interface roots carry dependency resolution for
+  the slice.
 
 Browser-game and web-hosting flows are later work after MIR/host foundations;
 they are not part of this composition decision.

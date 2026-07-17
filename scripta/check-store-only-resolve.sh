@@ -48,8 +48,8 @@ cargo run --quiet -- install --path "$WORKSPACE_ROOT/norma" --store "$STORE" --p
 cargo run --quiet -- install --path "$WORKSPACE_ROOT/triga" --store "$STORE" --project "$CONSUMER"
 
 env -u FABER_LIBRARY_HOME \
+  -u FABER_ENABLE_WORKSPACE_LIBRARY_PROBE \
   CISTAE_HOME="$STORE" \
-  FABER_DISABLE_WORKSPACE_LIBRARY_PROBE=1 \
   cargo run --quiet -- check --package "$CONSUMER"
 
 echo "store-only resolve proof passed: $CONSUMER"
