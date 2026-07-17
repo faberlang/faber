@@ -356,6 +356,51 @@ incipit {
 }
 
 #[test]
+fn run_package_validates_norma_json_object_array_roundtrip() {
+    let dir = test_temp_dir("norma-json-run-roundtrip");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+importa ex "norma:json" privata json
+
+@ json
+genus Payload {
+  textus name
+  lista<numerus> counts
+}
+
+incipit {
+  fac {
+    fixum textus original ← "{\"counts\":[1,2],\"name\":\"Ada\"}"
+    fixum json parsed ← json.solve(original)
+    fixum Payload payload ← parsed ↦ Payload
+    fixum json encoded ← json.solve(original)
+    fixum textus wire ← json.pange(encoded)
+    fixum json reparsed ← json.solve(wire)
+    fixum Payload roundtrip ← reparsed ↦ Payload
+    nota payload.name
+    nota payload.counts.longitudo()
+    nota wire
+    nota roundtrip.name
+    nota roundtrip.counts.longitudo()
+  }
+  cape err {
+    nota err
+  }
+}
+"#,
+    )
+    .expect("write entry");
+
+    let stdout = compile_emit_build_run(&entry);
+    assert_eq!(
+        stdout.lines().collect::<Vec<_>>(),
+        vec!["Ada", "2", r#"{"counts":[1,2],"name":"Ada"}"#, "Ada", "2"]
+    );
+}
+
+#[test]
 fn compile_package_prefers_locked_norma_interfaces_over_library_home_without_dependency() {
     let dir = test_temp_dir("locked-norma-platform-default");
     let src = dir.join("src");
