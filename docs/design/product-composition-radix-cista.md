@@ -60,13 +60,17 @@ per migration unit. The forbidden shape is preserving two competing product laws
 "Faber installs git libraries" versus "Cista installs packages" as permanent
 parallel user paths.
 
-## Planned milestones, not yet implemented
+## Milestones
 
 - **M0 — Store loop:** keep Cista's shared store, lockfile, registry/cache, and
   package validation loop reliable enough to serve as the source of package
   truth.
-- **M1 — Product install:** migrate `faber install` to front the Cista store and
-  make `FABER_LIBRARY_HOME` explicitly a development escape hatch.
+- **M1.0 — Path install:** landed `faber install --path` as an in-process Cista
+  store install with project lock rewrite; Cista API export `693dc7a`, Faber
+  facade/test `09f3443`. `FABER_LIBRARY_HOME` remains an explicit legacy/dev
+  escape hatch.
+- **M1 — Product install:** continue migrating `faber install` to front the Cista
+  store for non-path package sources.
 - **M2 — Cold agent:** prove a fresh agent can install Faber, install a library
   package, resolve dependencies, and build without private sibling-checkout
   assumptions.
