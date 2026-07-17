@@ -1,6 +1,4 @@
-use super::install::{install_library, install_store_source, InstallError};
-use crate::package::compile_package;
-use radix::driver::Config;
+use super::install::install_store_source;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -52,35 +50,6 @@ functio addit(numerus left, numerus right) → numerus {
     git(root, &["add", "."]);
     git(root, &["commit", "-m", "seed library"]);
     root.to_path_buf()
-}
-
-fn write_app(root: &Path, provider: &str) {
-    fs::create_dir_all(root.join("src")).expect("create app src");
-    fs::write(
-        root.join("faber.toml"),
-        r#"
-[package]
-name = "consumer"
-
-[paths]
-source = "src"
-entry = "main.fab"
-"#,
-    )
-    .expect("write app manifest");
-    fs::write(
-        root.join("src/main.fab"),
-        format!(
-            r#"
-importa ex "{provider}:math/add" privata add
-
-incipit {{
-    nota add.addit(1, 2)
-}}
-"#
-        ),
-    )
-    .expect("write app entry");
 }
 
 fn write_cista_repo(root: &Path, package: &str) -> PathBuf {
@@ -258,65 +227,4 @@ fn install_git_url_without_cista_manifest_fails_closed() {
     );
 
     fs::remove_dir_all(fixture).expect("cleanup temp root");
-}
-
-#[test]
-fn install_git_path_library_and_consume_non_default_source_root() {
-    let fixture = test_temp_dir("consumer-proof");
-    let source_repo = write_library_repo(
-        &fixture.join("source-lib"),
-        "altmath-package",
-        "altmath",
-        "interfaces",
-    );
-    let library_home = fixture.join("library-home");
-
-    let report = install_library(
-        source_repo.to_str().expect("source path"),
-        library_home.clone(),
-    )
-    .expect("install library");
-    assert_eq!(report.provider, "altmath");
-    assert!(report.target.join("interfaces/math/add.fab").is_file());
-    assert!(!report.target.join("src/math/add.fab").exists());
-
-    let app = fixture.join("app");
-    write_app(&app, "altmath");
-    let result = compile_package(&Config::default().with_stdlib(library_home), &app);
-    assert!(
-        result.success(),
-        "expected app to import installed non-default source root, got {:?}",
-        result
-            .diagnostics
-            .iter()
-            .map(|diag| (diag.code, diag.issue()))
-            .collect::<Vec<_>>()
-    );
-}
-
-#[test]
-fn install_rejects_existing_provider_with_different_remote_or_identity() {
-    let fixture = test_temp_dir("conflict");
-    let first = write_library_repo(
-        &fixture.join("first-lib"),
-        "altmath-package",
-        "altmath",
-        "interfaces",
-    );
-    let second = write_library_repo(
-        &fixture.join("second-lib"),
-        "different-package",
-        "altmath",
-        "interfaces",
-    );
-    let library_home = fixture.join("library-home");
-
-    install_library(first.to_str().expect("first path"), library_home.clone())
-        .expect("first install");
-    let err = install_library(second.to_str().expect("second path"), library_home)
-        .expect_err("conflicting install should fail");
-    assert!(
-        matches!(err, InstallError::ConflictingInstall { .. }),
-        "expected conflicting install error, got {err:?}"
-    );
 }

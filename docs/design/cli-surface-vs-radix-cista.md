@@ -23,7 +23,7 @@ implementation/docs after M1/M2. No stale docs cited without live confirmation.
 | `verify` | HIR aspect verification (single file) | inherits `radix::tool::VerifyArgs` |
 | `verify-library` | Verify library package target binding manifest | `--target`, `<input>` |
 | `init` | Create new Faber package | `<path>` |
-| `install` | Install Faber packages into the Cista store by default; legacy `FABER_LIBRARY_HOME` clone path is explicit | `--path`, `<git-url>`, `<name>@<version>`, `--legacy-library-home` |
+| `install` | Install Faber packages into the Cista store | `--path`, `<git-url>`, `<name>@<version>` |
 | `explain` | Language reference (glyphs, keywords, grammar) | `--json`, `--search`, `--list`, `--category`, `--reader-locale` |
 | `run` | Build (if needed) + run compiled package | `-t`, `--release`, `--interpret`, `--compile`, `--reader-locale` |
 | `script` | Interpret source via MIR stepper (file/pkg/archive) | trailing args after `--` |
@@ -137,19 +137,20 @@ This remains the most significant usability area, but the original hard split
 is superseded. Faber now fronts the Cista store for package installation while
 Cista keeps lower-level package-manager operations.
 
-### 4.1 Dual-entry confusion: `faber install` vs `cista install`
+### 4.1 Product entry: `faber install` over the Cista store
 
-| Mechanism | `faber install <git-url>` / `--path <dir>` | `faber install --legacy-library-home <library>` | `cista install --path <dir>` |
-| --- | --- | --- | --- |
-| **What it does** | Requires `cista.toml` and installs into the Cista store | Git-clones an old source library into `FABER_LIBRARY_HOME` | Snapshots a local package into `$CISTAE_HOME` store with interface/target/binding metadata |
-| **Store** | `$CISTAE_HOME` / `~/.faber/cistae` (structured `interfaces/` + `targets/`) | `FABER_LIBRARY_HOME` (flat `.fab` files) | `$CISTAE_HOME` / `~/.faber/cistae` (structured `interfaces/` + `targets/`) |
-| **Lockfile** | rewrites project `faber.lock` when a project is present | none | rewrites project `faber.lock` |
-| **Binary deps** | store-backed package role | no | yes (bin role, `cista run`) |
-| **Registry** | git remote / local path today; registry later | git remote | local/dev filesystem registry + remote HTTP (`cista.dev`) |
+| Mechanism | `faber install <git-url>` / `--path <dir>` / `<name>@<version>` | `cista install --path <dir>` |
+| --- | --- | --- |
+| **What it does** | Requires `cista.toml` and installs into the Cista store | Snapshots a local package into `$CISTAE_HOME` store with interface/target/binding metadata |
+| **Store** | `$CISTAE_HOME` / `~/.faber/cistae` (structured `interfaces/` + `targets/`) | `$CISTAE_HOME` / `~/.faber/cistae` (structured `interfaces/` + `targets/`) |
+| **Lockfile** | rewrites project `faber.lock` when a project is present | rewrites project `faber.lock` |
+| **Binary deps** | store-backed package role | yes (bin role, `cista run`) |
+| **Registry** | exact local/dev registry pins via `--registry` / `CISTA_REGISTRY`; broader registry discovery later | local/dev filesystem registry + remote HTTP (`cista.dev`) |
 
-A user who reads "install a package" now gets the Cista store by default for
-`--path` and git/URL sources. The old source-library clone behavior is explicit
-only through `--legacy-library-home`.
+A user who reads "install a package" now gets the Cista store for `--path`,
+git/URL sources, and exact registry pins. The old `FABER_LIBRARY_HOME` source
+library clone path has been removed from `faber install`; `FABER_LIBRARY_HOME`
+may remain only as an explicit resolver override for local development.
 
 **Decision update (2026-07-17):**
 [`product-composition-radix-cista.md`](product-composition-radix-cista.md)
@@ -196,9 +197,9 @@ under `faber`, but rather:
 2. **Package management composition** — `faber install` now covers `--path`,
    git/URL, and exact registry pins through the Cista store. Remaining UX work
    is dependency editing, listing, update/remove, publish, and optional broader
-   registry discovery. `FABER_LIBRARY_HOME` is only an explicit local-development
-   override. *(effort: M — design decided; see §4.1 and
-   `product-composition-radix-cista.md`)*
+   registry discovery. `FABER_LIBRARY_HOME` is not an install destination; it may
+   remain only as an explicit resolver override. *(effort: M — design decided;
+   see §4.1 and `product-composition-radix-cista.md`)*
 
 3. **`faber add <dep>`** (or `faber deps add`) — a facade that writes
    `faber.toml [dependencies]` and resolves through Cista. Direct crate calls,
@@ -214,7 +215,7 @@ under `faber`, but rather:
 | 1 | **`faber mir` alias missing** | Low (power-user) | S | Add `mir` as a compatibility alias matching `radix mir`, same as `lex`/`parse`/`hir`. One clap variant + delegation. Quick win. |
 | 2 | **Package management follow-through** | Medium (usability) | M | Keep extending the decided composition after install: dependency edit/add UX, list/show/update/remove, and publish remain outside the Faber product surface. |
 | 3 | **No `faber add`/dependency management front** | Medium (usability) | M | After install composition starts, implement `faber add <name>@<ver>` or equivalent dependency facade that writes `faber.toml` and resolves through Cista. |
-| 4 | **Legacy source-library clone path still exists** | Low | S (cleanup) | Keep it explicit with `--legacy-library-home`; remove when no local-development user still needs old `faber.toml` source-library clones. |
+| 4 | **Legacy source-library clone path removed** | Done | — | `--legacy-library-home` no longer exists; git/path/registry installs all route to Cista. |
 | 5 | **`radix abi` not fronted** | None (correctly radix-only) | — | No action. ABI contract is compiler-runtime integration, not application developer surface. |
 | 6 | **No `faber package list/show`** | Low | M | Optional: thin facade over `cista package list/show`. Lower priority than #2/#3. Can defer until package management UX is decided. |
 
@@ -252,7 +253,7 @@ cista-only or later work.
   `cista/src/cli.rs`.
 - Package architecture from `cista/docs/factory/cista-package-store/goal.md`
   (1145 lines, comprehensive — read in full).
-- `faber` has zero code dependency on `cista` (confirmed: `grep -rn cista
-  faber/src/` returns only a test fixture path).
+- `faber` now depends on `cista` for product-level install composition; this is
+  intentional under `product-composition-radix-cista.md`.
 - Release interdependency analysis from
   `faber/docs/release/process-versioning-and-deps.md`.

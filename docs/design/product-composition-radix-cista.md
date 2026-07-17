@@ -51,8 +51,9 @@ behavior; Faber is where agents and humans meet a single product.
 - treats Norma as the platform default package available to every Faber project;
 - leaves Triga as an optional third-party package rather than a platform
   default;
-- uses `FABER_LIBRARY_HOME` only as a local-development override, not the
-  production package-store model.
+- keeps `FABER_LIBRARY_HOME` out of install; it may remain only as an explicit
+  resolve override for local monorepo development, not as a package-store model
+  or install destination.
 
 This decision does not require one implementation shape. Direct crate calls,
 small shared modules, process calls, or file contracts are choices to evaluate
@@ -67,13 +68,10 @@ parallel user paths.
   truth.
 - **M1.0 — Path install:** landed `faber install --path` as an in-process Cista
   store install with project lock rewrite; Cista API export `693dc7a`, Faber
-  facade/test `09f3443`. `FABER_LIBRARY_HOME` remains an explicit legacy/dev
-  escape hatch.
+  facade/test `09f3443`.
 - **M1.1 — Git/URL install:** landed default `faber install <git-url>` as a
   temporary clone plus required `cista.toml` install into the Cista store with
-  project lock rewrite; Faber keeps the old FABER_LIBRARY_HOME clone path only
-  behind explicit `--legacy-library-home` for local development. Faber SHA:
-  `16bb59c`.
+  project lock rewrite. Faber SHA: `16bb59c`.
 - **M1.2 — Registry pin + Triga dogfood:** landed `faber install name@version`
   as the product facade over Cista registry/cache install with `--registry` /
   `CISTA_REGISTRY` selection and no fallback from bare names to GitHub clones.
@@ -82,13 +80,15 @@ parallel user paths.
   "triga:triga"` green from the lock path. Faber SHA: `7329a80`.
 - **M1 — Product install:** continue migrating `faber install` to front the Cista
   store for remaining non-path package sources.
-- **M2 — Cold agent:** store-only resolve proof is now covered by
-  `scripta/check-store-only-resolve.sh`: a temp consumer declares `norma` and
-  `triga`, installs both via `faber install --path` into a temp Cista store,
-  then runs `faber check --package` with `FABER_LIBRARY_HOME` and
+- **M2 — Cold agent + legacy install removal:** store-only resolve proof is now
+  covered by `scripta/check-store-only-resolve.sh`: a temp consumer declares
+  `norma` and `triga`, installs both via `faber install --path` into a temp
+  Cista store, then runs `faber check --package` with `FABER_LIBRARY_HOME` and
   `FABER_ENABLE_WORKSPACE_LIBRARY_PROBE` unset. Since the monorepo sibling probe
   is opt-in, this proves lock/interface roots carry dependency resolution for
-  the slice.
+  the slice. The old `--legacy-library-home` / `FABER_LIBRARY_HOME` install path
+  is removed; `FABER_LIBRARY_HOME` survives only as an explicit resolver
+  override when set by local development workflows.
 
 Browser-game and web-hosting flows are later work after MIR/host foundations;
 they are not part of this composition decision.

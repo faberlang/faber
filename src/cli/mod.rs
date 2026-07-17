@@ -55,7 +55,7 @@ pub enum Command {
 
     /// Install a Faber library package into the Cista store
     #[command(
-        long_about = "Install a Faber library package into the Cista package store ($CISTAE_HOME / ~/.faber/cistae) and rewrite faber.lock when a project is present.\n\n`faber install --path <package-root>` installs a local package containing cista.toml. `faber install <git-url>` clones to a temporary checkout, requires cista.toml, and installs the same store path. `faber install <name>@<version>` installs an exact registry pin via Cista using --registry or CISTA_REGISTRY; bare names fail closed.\n\nThe old FABER_LIBRARY_HOME source-library clone path is available only with --legacy-library-home for local development."
+        long_about = "Install a Faber library package into the Cista package store ($CISTAE_HOME / ~/.faber/cistae) and rewrite faber.lock when a project is present.\n\n`faber install --path <package-root>` installs a local package containing cista.toml. `faber install <git-url>` clones to a temporary checkout, requires cista.toml, and installs the same store path. `faber install <name>@<version>` installs an exact registry pin via Cista using --registry or CISTA_REGISTRY; bare names fail closed."
     )]
     Install(InstallArgs),
 
@@ -221,10 +221,6 @@ pub struct InstallArgs {
     /// Local/dev Cista registry root for exact name@version installs; falls back to CISTA_REGISTRY
     #[arg(long)]
     pub registry: Option<PathBuf>,
-
-    /// Use the old FABER_LIBRARY_HOME source-library clone path instead of the Cista store
-    #[arg(long, conflicts_with = "path")]
-    pub legacy_library_home: bool,
 
     /// Exact registry package pin (name@version) or git URL; default installs into the Cista store
     #[arg(required_unless_present = "path")]

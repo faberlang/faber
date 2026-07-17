@@ -40,7 +40,7 @@ fn cli_build_help_preserves_single_input_usage() {
 }
 
 #[test]
-fn cli_install_help_names_cista_store_and_legacy_escape_hatch() {
+fn cli_install_help_names_cista_store_only() {
     let mut command = Cli::command();
     let install = command
         .find_subcommand_mut("install")
@@ -49,9 +49,16 @@ fn cli_install_help_names_cista_store_and_legacy_escape_hatch() {
 
     assert!(help.contains("Cista package store"));
     assert!(help.contains("requires cista.toml"));
-    assert!(help.contains("FABER_LIBRARY_HOME"));
-    assert!(help.contains("--legacy-library-home"));
+    assert!(!help.contains("FABER_LIBRARY_HOME"));
+    assert!(!help.contains("--legacy-library-home"));
     assert!(help.contains("--path <PATH>"));
+}
+
+#[test]
+fn cli_rejects_legacy_library_home_install_flag() {
+    let err = Cli::try_parse_from(["faber", "install", "--legacy-library-home", "norma"])
+        .expect_err("legacy install flag must be removed");
+    assert_eq!(err.kind(), clap::error::ErrorKind::UnknownArgument);
 }
 
 #[test]
