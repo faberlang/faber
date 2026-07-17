@@ -2,13 +2,39 @@ use crate::cli::InstallArgs;
 use crate::library::FABER_LIBRARY_HOME_ENV;
 use crate::package::read_manifest;
 use std::fmt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub(super) fn cmd_install(args: InstallArgs) {
+    if let Some(path) = args.path.as_ref() {
+        match install_store_path(
+            path,
+            args.store.as_deref(),
+            args.project.as_deref(),
+            &args.target_language,
+        ) {
+            Ok(()) => {}
+            Err(errors) => {
+                for err in errors {
+                    eprintln!("error: {err}");
+                }
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
+
+    let Some(library) = args.library.as_ref() else {
+        eprintln!("error: `faber install` requires a library name/URL or --path");
+        std::process::exit(1);
+    };
+
     let Some(home) = std::env::var_os(FABER_LIBRARY_HOME_ENV).map(PathBuf::from) else {
-        eprintln!("error: FABER_LIBRARY_HOME is required for `faber install`");
+        eprintln!(
+            "error: FABER_LIBRARY_HOME is required for legacy `faber install <name|url>`\n\
+             hint: use `faber install --path <package>` for the Cista package store"
+        );
         std::process::exit(1);
     };
 
@@ -20,10 +46,10 @@ pub(super) fn cmd_install(args: InstallArgs) {
         std::process::exit(1);
     }
 
-    match install_library(&args.library, home) {
+    match install_library(library, home) {
         Ok(report) => {
             println!(
-                "installed {} at {}",
+                "installed {} at {} (legacy FABER_LIBRARY_HOME source-library path)",
                 report.provider,
                 report.target.display()
             );
@@ -33,6 +59,28 @@ pub(super) fn cmd_install(args: InstallArgs) {
             std::process::exit(1);
         }
     }
+}
+
+/// Product composition path: install a local `cista.toml` package into the store.
+fn install_store_path(
+    path: &Path,
+    store: Option<&Path>,
+    project: Option<&Path>,
+    target_language: &str,
+) -> Result<(), Vec<String>> {
+    let path = path
+        .canonicalize()
+        .map_err(|err| vec![format!("{}: {err}", path.display())])?;
+    cista::install(cista::cli::InstallArgs {
+        path: Some(path),
+        package: None,
+        manifest: PathBuf::from("cista.toml"),
+        target_language: target_language.to_owned(),
+        store: store.map(Path::to_path_buf),
+        registry: None,
+        project: project.map(Path::to_path_buf),
+        verify_target_build: false,
+    })
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

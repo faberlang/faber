@@ -53,9 +53,9 @@ pub enum Command {
     /// Create a new Faber package
     Init(InitArgs),
 
-    /// Install or update a public Faber source library under FABER_LIBRARY_HOME
+    /// Install a Faber library package (Cista store path, or legacy git source-library)
     #[command(
-        long_about = "Install or update a public Faber source library from git under FABER_LIBRARY_HOME.\n\nThis command manages source libraries only. For cista package-store installs, use `cista install`."
+        long_about = "Install a Faber library package.\n\nPreferred (product composition): `faber install --path <package-root>` installs into the Cista package store ($CISTAE_HOME / ~/.faber/cistae) and rewrites faber.lock when a project is present.\n\nLegacy: a bare library name or git URL clones a source library under FABER_LIBRARY_HOME (dev override). Prefer --path / store installs for the canonical package path."
     )]
     Install(InstallArgs),
 
@@ -202,8 +202,25 @@ pub struct InitArgs {
 /// Arguments for `faber install`.
 #[derive(clap::Args, Debug)]
 pub struct InstallArgs {
-    /// Public Faber source library name or git URL, such as `norma`
-    pub library: String,
+    /// Local package root containing `cista.toml` (product path → Cista store)
+    #[arg(long, conflicts_with = "library")]
+    pub path: Option<PathBuf>,
+
+    /// Shared cista package store; falls back to CISTAE_HOME, then ~/.faber/cistae
+    #[arg(long, requires = "path")]
+    pub store: Option<PathBuf>,
+
+    /// Project root for faber.lock rewrite; defaults to cwd when faber.toml exists
+    #[arg(long, requires = "path")]
+    pub project: Option<PathBuf>,
+
+    /// Target language for store install (default: rust)
+    #[arg(long, default_value = "rust", requires = "path")]
+    pub target_language: String,
+
+    /// Legacy: public Faber source library name or git URL under FABER_LIBRARY_HOME
+    #[arg(required_unless_present = "path")]
+    pub library: Option<String>,
 }
 
 /// Arguments for `faber verify-library`.

@@ -47,9 +47,9 @@ fn cli_install_help_names_source_library_and_cista_boundaries() {
         .expect("install subcommand");
     let help = install.render_long_help().to_string();
 
-    assert!(help.contains("source library from git"));
+    assert!(help.contains("Cista package store"));
     assert!(help.contains("FABER_LIBRARY_HOME"));
-    assert!(help.contains("cista install"));
+    assert!(help.contains("--path <PATH>"));
 }
 
 #[test]
@@ -574,7 +574,8 @@ fn cli_parses_install_subcommand() {
     let Some(crate::cli::Command::Install(args)) = cli.command else {
         panic!("expected install subcommand");
     };
-    assert_eq!(args.library, "norma");
+    assert_eq!(args.library.as_deref(), Some("norma"));
+    assert!(args.path.is_none());
 }
 
 #[test]
