@@ -79,12 +79,15 @@ parallel user paths.
   `CISTA_REGISTRY` selection and no fallback from bare names to GitHub clones.
   Dogfood proof installed `../triga` into a temp Cista store, rewrote a consumer
   `faber.lock` with the Triga interface root, and checked `importa ex
-  "triga:triga"` green from the lock path.
+  "triga:triga"` green from the lock path. Faber SHA: `7329a80`.
 - **M1 — Product install:** continue migrating `faber install` to front the Cista
   store for remaining non-path package sources.
-- **M2 — Cold agent:** prove a fresh agent can install Faber, install a library
-  package, resolve dependencies, and build without private sibling-checkout
-  assumptions.
+- **M2 — Cold agent:** store-only resolve proof is now covered by
+  `scripta/check-store-only-resolve.sh`: a temp consumer declares `norma` and
+  `triga`, installs both via `faber install --path` into a temp Cista store,
+  then runs `faber check --package` with `FABER_LIBRARY_HOME` unset and
+  `FABER_DISABLE_WORKSPACE_LIBRARY_PROBE=1`. This proves lock/interface roots,
+  not the monorepo sibling probe, carry dependency resolution for the slice.
 
 Browser-game and web-hosting flows are later work after MIR/host foundations;
 they are not part of this composition decision.
