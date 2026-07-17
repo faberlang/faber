@@ -30,32 +30,50 @@ pub(super) fn cmd_install(args: InstallArgs) {
         std::process::exit(1);
     };
 
-    let Some(home) = std::env::var_os(FABER_LIBRARY_HOME_ENV).map(PathBuf::from) else {
-        eprintln!(
-            "error: FABER_LIBRARY_HOME is required for legacy `faber install <name|url>`\n\
-             hint: use `faber install --path <package>` for the Cista package store"
-        );
-        std::process::exit(1);
-    };
+    if args.legacy_library_home {
+        let Some(home) = std::env::var_os(FABER_LIBRARY_HOME_ENV).map(PathBuf::from) else {
+            eprintln!(
+                "error: FABER_LIBRARY_HOME is required for `faber install --legacy-library-home <name|url>`\n\
+                 hint: omit --legacy-library-home to install cista.toml packages into the Cista store"
+            );
+            std::process::exit(1);
+        };
 
-    if let Err(err) = std::fs::create_dir_all(&home) {
-        eprintln!(
-            "error: failed to create FABER_LIBRARY_HOME at {}: {err}",
-            home.display()
-        );
-        std::process::exit(1);
+        if let Err(err) = std::fs::create_dir_all(&home) {
+            eprintln!(
+                "error: failed to create FABER_LIBRARY_HOME at {}: {err}",
+                home.display()
+            );
+            std::process::exit(1);
+        }
+
+        match install_library(library, home) {
+            Ok(report) => {
+                println!(
+                    "installed {} at {} (legacy FABER_LIBRARY_HOME source-library path)",
+                    report.provider,
+                    report.target.display()
+                );
+            }
+            Err(err) => {
+                eprintln!("error: {err}");
+                std::process::exit(1);
+            }
+        }
+        return;
     }
 
-    match install_library(library, home) {
-        Ok(report) => {
-            println!(
-                "installed {} at {} (legacy FABER_LIBRARY_HOME source-library path)",
-                report.provider,
-                report.target.display()
-            );
-        }
-        Err(err) => {
-            eprintln!("error: {err}");
+    match install_store_source(
+        library,
+        args.store.as_deref(),
+        args.project.as_deref(),
+        &args.target_language,
+    ) {
+        Ok(()) => {}
+        Err(errors) => {
+            for err in errors {
+                eprintln!("error: {err}");
+            }
             std::process::exit(1);
         }
     }
@@ -71,6 +89,68 @@ fn install_store_path(
     let path = path
         .canonicalize()
         .map_err(|err| vec![format!("{}: {err}", path.display())])?;
+    install_store_cista_path(path, store, project, target_language)
+}
+
+/// Product composition path: clone a git/name source, require cista.toml, then install it.
+pub(super) fn install_store_source(
+    library_or_url: &str,
+    store: Option<&Path>,
+    project: Option<&Path>,
+    target_language: &str,
+) -> Result<(), Vec<String>> {
+    if looks_like_library_name(library_or_url) && !valid_library_name(library_or_url) {
+        return Err(vec![InstallError::InvalidLibraryName(
+            library_or_url.to_owned(),
+        )
+        .to_string()]);
+    }
+
+    let source = install_source(library_or_url).map_err(|err| vec![err.to_string()])?;
+    let checkout_parent = std::env::temp_dir().join("faber-install-checkouts");
+    std::fs::create_dir_all(&checkout_parent).map_err(|err| {
+        vec![format!(
+            "failed to create temporary install checkout directory {}: {err}",
+            checkout_parent.display()
+        )]
+    })?;
+    let checkout =
+        temp_checkout_dir(&checkout_parent, library_or_url).map_err(|err| vec![err.to_string()])?;
+    git_clone(&source, &checkout).map_err(|err| vec![err.to_string()])?;
+
+    let result = if checkout.join("cista.toml").is_file() {
+        install_store_cista_path(checkout.clone(), store, project, target_language)
+    } else {
+        Err(vec![format!(
+            "{} has no cista.toml; `faber install <git-url>` installs Cista packages only (use --legacy-library-home for old faber.toml source-library clones)",
+            checkout.display()
+        )])
+    };
+
+    match std::fs::remove_dir_all(&checkout) {
+        Ok(()) => result,
+        Err(cleanup_error) => match result {
+            Ok(()) => Err(vec![format!(
+                "installed package but failed to remove temporary checkout {}: {cleanup_error}",
+                checkout.display()
+            )]),
+            Err(mut errors) => {
+                errors.push(format!(
+                    "failed to remove temporary checkout {}: {cleanup_error}",
+                    checkout.display()
+                ));
+                Err(errors)
+            }
+        },
+    }
+}
+
+fn install_store_cista_path(
+    path: PathBuf,
+    store: Option<&Path>,
+    project: Option<&Path>,
+    target_language: &str,
+) -> Result<(), Vec<String>> {
     cista::install(cista::cli::InstallArgs {
         path: Some(path),
         package: None,

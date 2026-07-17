@@ -53,9 +53,9 @@ pub enum Command {
     /// Create a new Faber package
     Init(InitArgs),
 
-    /// Install a Faber library package (Cista store path, or legacy git source-library)
+    /// Install a Faber library package into the Cista store
     #[command(
-        long_about = "Install a Faber library package.\n\nPreferred (product composition): `faber install --path <package-root>` installs into the Cista package store ($CISTAE_HOME / ~/.faber/cistae) and rewrites faber.lock when a project is present.\n\nLegacy: a bare library name or git URL clones a source library under FABER_LIBRARY_HOME (dev override). Prefer --path / store installs for the canonical package path."
+        long_about = "Install a Faber library package into the Cista package store ($CISTAE_HOME / ~/.faber/cistae) and rewrite faber.lock when a project is present.\n\n`faber install --path <package-root>` installs a local package containing cista.toml. `faber install <git-url>` clones to a temporary checkout, requires cista.toml, and installs the same store path. Bare library names resolve to https://github.com/faberlang/<name>.git.\n\nThe old FABER_LIBRARY_HOME source-library clone path is available only with --legacy-library-home for local development."
     )]
     Install(InstallArgs),
 
@@ -207,18 +207,22 @@ pub struct InstallArgs {
     pub path: Option<PathBuf>,
 
     /// Shared cista package store; falls back to CISTAE_HOME, then ~/.faber/cistae
-    #[arg(long, requires = "path")]
+    #[arg(long)]
     pub store: Option<PathBuf>,
 
     /// Project root for faber.lock rewrite; defaults to cwd when faber.toml exists
-    #[arg(long, requires = "path")]
+    #[arg(long)]
     pub project: Option<PathBuf>,
 
     /// Target language for store install (default: rust)
-    #[arg(long, default_value = "rust", requires = "path")]
+    #[arg(long, default_value = "rust")]
     pub target_language: String,
 
-    /// Legacy: public Faber source library name or git URL under FABER_LIBRARY_HOME
+    /// Use the old FABER_LIBRARY_HOME source-library clone path instead of the Cista store
+    #[arg(long, conflicts_with = "path")]
+    pub legacy_library_home: bool,
+
+    /// Public Faber package name or git URL; default installs into the Cista store
     #[arg(required_unless_present = "path")]
     pub library: Option<String>,
 }

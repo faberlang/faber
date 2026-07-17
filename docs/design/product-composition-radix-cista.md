@@ -69,8 +69,12 @@ parallel user paths.
   store install with project lock rewrite; Cista API export `693dc7a`, Faber
   facade/test `09f3443`. `FABER_LIBRARY_HOME` remains an explicit legacy/dev
   escape hatch.
+- **M1.1 — Git/URL install:** landed default `faber install <git-url>` as a
+  temporary clone plus required `cista.toml` install into the Cista store with
+  project lock rewrite; Faber keeps the old FABER_LIBRARY_HOME clone path only
+  behind explicit `--legacy-library-home` for local development.
 - **M1 — Product install:** continue migrating `faber install` to front the Cista
-  store for non-path package sources.
+  store for remaining non-path package sources.
 - **M2 — Cold agent:** prove a fresh agent can install Faber, install a library
   package, resolve dependencies, and build without private sibling-checkout
   assumptions.
