@@ -95,7 +95,9 @@ pub use manifest::{
     ManifestPackage, ManifestPaths, ManifestProduct, ManifestProductEmit, ManifestProductKind,
     ManifestRustFieldNames, ManifestRustHost,
 };
-pub(crate) use product::{build_browser_product, build_browser_product_static_assets};
+pub(crate) use product::build_browser_product;
+#[cfg(test)]
+pub(crate) use product::build_browser_product_static_assets;
 // binary-only package interpretation route consumes this through `commands`.
 #[allow(unused_imports)] // generated fmir-bin runner crates consume this public API.
 pub use mir::run_fmir_image_bytes_with_stdio;

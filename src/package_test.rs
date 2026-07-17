@@ -10318,6 +10318,45 @@ public = "public"
     let err = build_browser_product_static_assets(&stale, manifest.product.as_ref().unwrap())
         .expect_err("stale output fails closed");
     assert!(diagnostic_has_issue(&err, "product_stale_output"));
+
+    // Manifest path collides with a planned asset output → fail closed.
+    let manifest_collision = test_temp_dir("g10-web2-manifest-collision");
+    fs::write(
+        manifest_collision.join("faber.toml"),
+        r#"[package]
+name = "web2-manifest-collision"
+
+[paths]
+entry = "main.fab"
+
+[build]
+target = "ts"
+kind = "bin"
+
+[product]
+kind = "browser-app"
+emit = "typescript"
+out = "dist"
+templates = "pages"
+styles = "styles"
+public = "public"
+assets_manifest = "pages/index.html"
+"#,
+    )
+    .expect("manifest");
+    write_static_asset_roots(&manifest_collision);
+    fs::write(
+        manifest_collision.join("pages/index.html"),
+        "manifest will overwrite me\n",
+    )
+    .expect("colliding asset");
+    let manifest = read_manifest(&manifest_collision.join("faber.toml")).expect("manifest");
+    let err = build_browser_product_static_assets(
+        &manifest_collision,
+        manifest.product.as_ref().unwrap(),
+    )
+    .expect_err("manifest/asset collision fails closed");
+    assert!(diagnostic_has_issue(&err, "product_manifest_collision"));
 }
 
 fn write_browser_product_manifest(root: &Path, product_overrides: &str) {

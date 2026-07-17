@@ -72,6 +72,7 @@ pub(crate) fn build_browser_product_static_assets(
     }
 
     reject_stale_outputs(&out_dir, &planned, &manifest_path)?;
+    reject_manifest_collision(&planned, &manifest_path)?;
 
     for (output, asset) in &planned {
         if let Some(parent) = output.parent() {
@@ -269,6 +270,27 @@ fn reject_stale_outputs(
         .chain(std::iter::once(normalize_path(manifest_path)))
         .collect::<BTreeSet<_>>();
     reject_stale_dir(out_dir, &allowed)
+}
+
+/// Fail closed when the asset manifest path collides with a planned asset
+/// output. Without this guard the manifest write silently overwrites the
+/// asset (or vice versa), producing non-deterministic dist content.
+fn reject_manifest_collision(
+    planned: &BTreeMap<PathBuf, PlannedAsset>,
+    manifest_path: &Path,
+) -> Result<(), Box<Diagnostic>> {
+    let normalized = normalize_path(manifest_path);
+    if let Some(asset) = planned.get(&normalized) {
+        return Err(Box::new(
+            product_diag(format!(
+                "browser product manifest path `{}` collides with asset output from `{}`",
+                manifest_path.display(),
+                asset.source.display()
+            ))
+            .with_arg("issue", "product_manifest_collision"),
+        ));
+    }
+    Ok(())
 }
 
 fn reject_stale_dir(dir: &Path, allowed: &BTreeSet<PathBuf>) -> Result<(), Box<Diagnostic>> {
