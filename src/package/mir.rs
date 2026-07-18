@@ -2368,6 +2368,7 @@ fn import_semantic_type(
             target.intern(Type::Intervallum(inner))
         }
         Type::SizedNumeric(primitive, width) => target.sized_numeric(primitive, width),
+        Type::ModularWord(width) => target.intern(Type::ModularWord(width)),
         Type::SizedInstans(precision) => target.intern(Type::SizedInstans(precision)),
         Type::Option(inner) => {
             let inner = import_semantic_type(source, target, inner, imported);
