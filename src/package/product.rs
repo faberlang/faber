@@ -472,22 +472,21 @@ pub(crate) fn build_browser_product(
     })
 }
 
+/// Remove all generated product outputs from a previous build.
+///
+/// Uses [`product_generated_output_paths`] as the single source of truth so
+/// that collision guards and cleanup stay in sync. Previously this function
+/// had its own hardcoded list that diverged (omitted `assets_manifest`).
 fn remove_previous_product_generated_outputs(
     package_root: &Path,
     product: &ManifestProduct,
 ) -> Result<(), Box<Diagnostic>> {
     let out_dir = normalize_path(&package_root.join(&product.out));
-    for dir in [out_dir.join("faber-ts"), out_dir.join("faber-esm")] {
-        if dir.exists() {
-            fs::remove_dir_all(&dir).map_err(|err| io_diag(&dir, err))?;
-        }
-    }
-    for file in [
-        out_dir.join(&product.controllers_json),
-        out_dir.join("tsconfig.faber-browser.json"),
-    ] {
-        if file.exists() {
-            fs::remove_file(&file).map_err(|err| io_diag(&file, err))?;
+    for (_, path) in product_generated_output_paths(&out_dir, product) {
+        if path.is_dir() {
+            fs::remove_dir_all(&path).map_err(|err| io_diag(&path, err))?;
+        } else if path.exists() {
+            fs::remove_file(&path).map_err(|err| io_diag(&path, err))?;
         }
     }
     Ok(())
