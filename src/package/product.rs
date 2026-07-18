@@ -8,6 +8,14 @@ use sha2::{Digest, Sha256};
 use super::manifest::{ManifestProduct, ManifestProductKind};
 use super::paths::normalize_path;
 
+/// Generated product output path components — the single source of truth for
+/// directory and file names written by the browser product build. Both
+/// [`product_generated_output_paths`] and the build function consume these
+/// constants so the registry and the writer never diverge.
+const FABER_TS_DIR: &str = "faber-ts";
+const FABER_ESM_DIR: &str = "faber-esm";
+const TSCONFIG_FILE: &str = "tsconfig.faber-browser.json";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BrowserProductAssetBuild {
     pub out_dir: PathBuf,
@@ -347,17 +355,17 @@ fn product_generated_output_paths(
         },
         GeneratedOutput {
             label: "faber-ts directory",
-            path: normalize_path(&out_dir.join("faber-ts")),
+            path: normalize_path(&out_dir.join(FABER_TS_DIR)),
             is_dir: true,
         },
         GeneratedOutput {
             label: "faber-esm directory",
-            path: normalize_path(&out_dir.join("faber-esm")),
+            path: normalize_path(&out_dir.join(FABER_ESM_DIR)),
             is_dir: true,
         },
         GeneratedOutput {
             label: "tsconfig",
-            path: normalize_path(&out_dir.join("tsconfig.faber-browser.json")),
+            path: normalize_path(&out_dir.join(TSCONFIG_FILE)),
             is_dir: false,
         },
     ]
@@ -519,8 +527,8 @@ pub(crate) fn build_browser_product(
         }))
     })?;
     let controllers = discover_controllers(&package)?;
-    let ts_root = static_build.out_dir.join("faber-ts");
-    let esm_root = static_build.out_dir.join("faber-esm");
+    let ts_root = static_build.out_dir.join(FABER_TS_DIR);
+    let esm_root = static_build.out_dir.join(FABER_ESM_DIR);
     fs::create_dir_all(&ts_root).map_err(|err| io_diag(&ts_root, err))?;
     fs::create_dir_all(&esm_root).map_err(|err| io_diag(&esm_root, err))?;
 
@@ -531,7 +539,7 @@ pub(crate) fn build_browser_product(
     let declarations = ts_root.join("faber-web.d.ts");
     fs::write(&declarations, web_ambient_declarations())
         .map_err(|err| io_diag(&declarations, err))?;
-    let tsconfig = static_build.out_dir.join("tsconfig.faber-browser.json");
+    let tsconfig = static_build.out_dir.join(TSCONFIG_FILE);
     fs::write(&tsconfig, render_tsconfig(&ts_root, &esm_root))
         .map_err(|err| io_diag(&tsconfig, err))?;
     invoke_tsc(&tsconfig)?;
