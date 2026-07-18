@@ -280,11 +280,26 @@ fn product_generated_output_paths(
     product: &ManifestProduct,
 ) -> Vec<(&'static str, PathBuf)> {
     vec![
-        ("assets manifest", normalize_path(&out_dir.join(&product.assets_manifest))),
-        ("controllers json", normalize_path(&out_dir.join(&product.controllers_json))),
-        ("faber-ts directory", normalize_path(&out_dir.join("faber-ts"))),
-        ("faber-esm directory", normalize_path(&out_dir.join("faber-esm"))),
-        ("tsconfig", normalize_path(&out_dir.join("tsconfig.faber-browser.json"))),
+        (
+            "assets manifest",
+            normalize_path(&out_dir.join(&product.assets_manifest)),
+        ),
+        (
+            "controllers json",
+            normalize_path(&out_dir.join(&product.controllers_json)),
+        ),
+        (
+            "faber-ts directory",
+            normalize_path(&out_dir.join("faber-ts")),
+        ),
+        (
+            "faber-esm directory",
+            normalize_path(&out_dir.join("faber-esm")),
+        ),
+        (
+            "tsconfig",
+            normalize_path(&out_dir.join("tsconfig.faber-browser.json")),
+        ),
     ]
 }
 
@@ -493,6 +508,7 @@ fn discover_controllers(
                 continue;
             };
             validate_selector(&selector, &unit.path)?;
+            validate_controller_origin(unit, function)?;
             validate_controller_signature(unit, function)?;
             let name = unit.analysis.interner.resolve(function.name).to_owned();
             if let Some(existing) = selectors.insert(selector.clone(), name.clone()) {
@@ -552,6 +568,57 @@ fn web_controller_selector(
     })
 }
 
+/// Verify the WebController annotation contract originates from the `web`
+/// package's `web` module — not a local shadowing definition.
+fn validate_controller_origin(
+    unit: &super::AnalyzedPackageUnit,
+    function: &radix::hir::HirFunction,
+) -> Result<(), Box<Diagnostic>> {
+    for annotation in &function.annotations {
+        let Some(contract_id) = annotation.contract_id else {
+            continue;
+        };
+        let Some(contract) = unit.analysis.annotation_contracts.registry.get(contract_id) else {
+            continue;
+        };
+        if unit.analysis.interner.resolve(contract.name) != "WebController" {
+            continue;
+        }
+        let controller_name = unit.analysis.interner.resolve(function.name);
+        match unit.analysis.libraries.items.get(&contract.def_id) {
+            Some(item)
+                if matches!(&item.identity.provider, radix::hir::LibraryProvider::Package(name) if name == "web")
+                    && item.identity.module_path == ["web".to_owned()]
+                    && item.exported_name == "WebController" =>
+            {
+                return Ok(());
+            }
+            Some(item) => {
+                return Err(Box::new(
+                    product_diag(format!(
+                        "browser controller `{controller_name}` annotation `WebController` must originate from web:web; found `{}`",
+                        library_item_display_key(item)
+                    ))
+                    .with_file(unit.path.display().to_string())
+                    .with_arg("issue", "product_controller_unqualified_origin")
+                    .with_arg("controller", controller_name.to_owned()),
+                ));
+            }
+            None => {
+                return Err(Box::new(
+                    product_diag(format!(
+                        "browser controller `{controller_name}` annotation `WebController` must be imported from web:web; local definitions are rejected"
+                    ))
+                    .with_file(unit.path.display().to_string())
+                    .with_arg("issue", "product_controller_unqualified_origin")
+                    .with_arg("controller", controller_name.to_owned()),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn validate_selector(selector: &str, file: &Path) -> Result<(), Box<Diagnostic>> {
     let valid = !selector.is_empty()
         && !selector
@@ -603,11 +670,21 @@ fn param_is_dom_scope(unit: &super::AnalyzedPackageUnit, param: &radix::hir::Hir
     let radix::semantic::Type::Struct(def_id) = unit.analysis.types.get(param.ty) else {
         return false;
     };
-    unit.analysis
-        .resolver
-        .get_symbol(*def_id)
-        .map(|symbol| unit.analysis.interner.resolve(symbol.name) == "Scope")
-        .unwrap_or(false)
+    let symbol = match unit.analysis.resolver.get_symbol(*def_id) {
+        Some(symbol) => symbol,
+        None => return false,
+    };
+    if unit.analysis.interner.resolve(symbol.name) != "Scope" {
+        return false;
+    }
+    // Provenance must originate from web:dom — reject local shadowing.
+    matches!(
+        unit.analysis.libraries.items.get(def_id),
+        Some(item)
+            if matches!(&item.identity.provider, radix::hir::LibraryProvider::Package(name) if name == "web")
+                && item.identity.module_path == ["dom".to_owned()]
+                && item.exported_name == "Scope"
+    )
 }
 
 fn emit_typescript_modules(
@@ -833,6 +910,16 @@ fn render_controllers_json(controllers: &[BrowserController]) -> Result<String, 
 
 fn product_diag(message: impl Into<String>) -> Diagnostic {
     crate::package_diagnostic_error(message.into())
+}
+
+/// Human-readable display key for a library item's provenance.
+fn library_item_display_key(item: &radix::hir::LibraryItem) -> String {
+    let provider = match &item.identity.provider {
+        radix::hir::LibraryProvider::Builtin(name) => format!("builtin:{name}"),
+        radix::hir::LibraryProvider::Package(name) => format!("package:{name}"),
+    };
+    let module = item.identity.module_path.join(":");
+    format!("{provider}:{module}:{}", item.exported_name)
 }
 
 fn io_diag(path: &Path, err: std::io::Error) -> Box<Diagnostic> {

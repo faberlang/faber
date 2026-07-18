@@ -10183,6 +10183,72 @@ rustc = ""
     fs::write(app.join("src/main.fab"), entry_body).expect("entry");
 }
 
+/// Like write_web_consumer_app but imports only web:web (not web:dom) and
+/// defines a local Scope genus for shadowing tests.
+fn write_web_consumer_app_with_only_web_import(app: &Path, lib: &Path) {
+    fs::create_dir_all(app.join("src")).expect("app src");
+    let interface_root = lib.join("src");
+    fs::write(
+        app.join("faber.toml"),
+        r#"[package]
+name = "g10-web-local-scope"
+version = "0.1.0"
+
+[paths]
+entry = "main.fab"
+
+[build]
+target = "ts"
+kind = "bin"
+
+[product]
+kind = "browser-app"
+emit = "typescript"
+
+[dependencies]
+web = "0.1.0"
+"#,
+    )
+    .expect("app manifest");
+    fs::write(
+        app.join("faber.lock"),
+        format!(
+            r#"
+[[package]]
+name = "web"
+version = "0.1.0"
+source = "path"
+package_root = "{package_root}"
+kind = "lib"
+target_language = "ts"
+target_triple = "browser"
+target_manifest = ""
+interface_root = "{interface_root}"
+artifact = ""
+crate = "web"
+rustc = ""
+"#,
+            package_root = lib.display(),
+            interface_root = interface_root.display(),
+        ),
+    )
+    .expect("lock");
+    fs::write(
+        app.join("src/main.fab"),
+        r##"
+importa ex "web:web" privata web
+
+genus Scope {
+    textus selector = ""
+}
+
+@ WebController { selector = "#shell" }
+functio shell(Scope scope) → vacuum {}
+"##,
+    )
+    .expect("entry");
+}
+
 #[test]
 fn g10_web1_faber_web_package_exports_controller_contract() {
     let lib = sibling_faber_web_lib();
@@ -10391,8 +10457,7 @@ controllers_json = "pages/index.html"
         "controllers will overwrite me\n",
     )
     .expect("colliding asset");
-    let manifest =
-        read_manifest(&controllers_collision.join("faber.toml")).expect("manifest");
+    let manifest = read_manifest(&controllers_collision.join("faber.toml")).expect("manifest");
     let err = build_browser_product_static_assets(
         &controllers_collision,
         manifest.product.as_ref().unwrap(),
@@ -10428,11 +10493,9 @@ controllers_json = "shared.json"
     .expect("manifest");
     write_static_asset_roots(&self_collision);
     let manifest = read_manifest(&self_collision.join("faber.toml")).expect("manifest");
-    let err = build_browser_product_static_assets(
-        &self_collision,
-        manifest.product.as_ref().unwrap(),
-    )
-    .expect_err("generated output self-collision fails closed");
+    let err =
+        build_browser_product_static_assets(&self_collision, manifest.product.as_ref().unwrap())
+            .expect_err("generated output self-collision fails closed");
     assert!(diagnostic_has_issue(&err, "product_output_collision"));
 }
 
@@ -10577,6 +10640,84 @@ functio shell(dom.Scope scope) → vacuum {}
     assert!(diagnostic_has_issue(
         &err,
         "product_invalid_static_selector"
+    ));
+}
+
+#[test]
+fn g10_web3_rejects_local_web_controller_shadowing() {
+    // Package defines its own @annotatio WebController locally — no web:web import.
+    // Controller discovery must reject the unqualified origin.
+    let root = test_temp_dir("g10-web3-local-controller");
+    fs::create_dir_all(root.join("src")).expect("src");
+    write_static_asset_roots(&root);
+    fs::write(
+        root.join("faber.toml"),
+        r#"[package]
+name = "local-controller"
+version = "0.1.0"
+
+[paths]
+entry = "main.fab"
+
+[build]
+target = "ts"
+kind = "bin"
+
+[product]
+kind = "browser-app"
+emit = "typescript"
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        root.join("src/main.fab"),
+        r##"
+@ annotatio
+genus WebController {
+    textus selector
+}
+
+genus Scope {
+    textus selector = ""
+}
+
+@ WebController { selector = "#shell" }
+functio shell(Scope scope) → vacuum {}
+"##,
+    )
+    .expect("entry");
+    let manifest = read_manifest(&root.join("faber.toml")).expect("manifest");
+    let err = build_browser_product(
+        &Config::default().with_target(Target::TypeScript),
+        &root,
+        manifest.product.as_ref().unwrap(),
+    )
+    .expect_err("local WebController must fail closed");
+    assert!(diagnostic_has_issue(
+        &err,
+        "product_controller_unqualified_origin"
+    ));
+}
+
+#[test]
+fn g10_web3_rejects_local_scope_shadowing() {
+    // Package imports web:web legitimately for WebController, but defines its
+    // own Scope genus locally instead of importing web:dom Scope.
+    let lib = sibling_faber_web_lib();
+    let root = test_temp_dir("g10-web3-local-scope");
+    let app = root.join("app");
+    write_web_consumer_app_with_only_web_import(&app, &lib);
+    write_static_asset_roots(&app);
+    let manifest = read_manifest(&app.join("faber.toml")).expect("manifest");
+    let err = build_browser_product(
+        &Config::default().with_target(Target::TypeScript),
+        &app,
+        manifest.product.as_ref().unwrap(),
+    )
+    .expect_err("local Scope must fail closed");
+    assert!(diagnostic_has_issue(
+        &err,
+        "product_invalid_controller_signature"
     ));
 }
 
