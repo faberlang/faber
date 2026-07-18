@@ -139,6 +139,7 @@ fn write_browser_product_static_assets(
 /// Convenience wrapper: plan (preflight) + write in one call. For callers that
 /// need cleanup between preflight and write (e.g. [`build_browser_product`]),
 /// call the two phases directly.
+#[cfg(test)]
 pub(crate) fn build_browser_product_static_assets(
     package_root: &Path,
     product: &ManifestProduct,
