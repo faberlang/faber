@@ -15,6 +15,9 @@ use super::paths::normalize_path;
 const FABER_TS_DIR: &str = "faber-ts";
 const FABER_ESM_DIR: &str = "faber-esm";
 const TSCONFIG_FILE: &str = "tsconfig.faber-browser.json";
+const BROWSER_ENTRY_TS: &str = "faber-browser.ts";
+const WEB_AMBIENT_DTS: &str = "faber-web.d.ts";
+const BROWSER_ENTRY_JS: &str = "faber-browser.js";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BrowserProductAssetBuild {
@@ -533,10 +536,10 @@ pub(crate) fn build_browser_product(
     fs::create_dir_all(&esm_root).map_err(|err| io_diag(&esm_root, err))?;
 
     emit_typescript_modules(&package, &ts_root, &controllers)?;
-    let browser_entry = ts_root.join("faber-browser.ts");
+    let browser_entry = ts_root.join(BROWSER_ENTRY_TS);
     fs::write(&browser_entry, render_browser_entry(&controllers))
         .map_err(|err| io_diag(&browser_entry, err))?;
-    let declarations = ts_root.join("faber-web.d.ts");
+    let declarations = ts_root.join(WEB_AMBIENT_DTS);
     fs::write(&declarations, web_ambient_declarations())
         .map_err(|err| io_diag(&declarations, err))?;
     let tsconfig = static_build.out_dir.join(TSCONFIG_FILE);
@@ -547,7 +550,7 @@ pub(crate) fn build_browser_product(
     let controllers_json = static_build.out_dir.join(&product.controllers_json);
     fs::write(&controllers_json, render_controllers_json(&controllers)?)
         .map_err(|err| io_diag(&controllers_json, err))?;
-    let esm_entry = esm_root.join("faber-browser.js");
+    let esm_entry = esm_root.join(BROWSER_ENTRY_JS);
     if !esm_entry.is_file() {
         return Err(Box::new(
             product_diag(format!(
