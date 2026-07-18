@@ -31,16 +31,21 @@ struct AssetRoot<'a> {
     output_prefix: &'a str,
 }
 
-/// Build the static-asset portion of a browser-app product recipe.
-///
-/// WEB2 owns only deterministic HTML/CSS/public asset copying. Controller TS,
-/// `tsc`, and `controllers.json` are later WEB3 work; the asset manifest written
-/// here gives those stages deterministic static paths without inventing a Radix
-/// `web` target.
-pub(crate) fn build_browser_product_static_assets(
+/// Planned static-asset set after preflight checks pass.
+struct StaticAssetPlan {
+    out_dir: PathBuf,
+    manifest_path: PathBuf,
+    planned: BTreeMap<PathBuf, PlannedAsset>,
+}
+
+/// Collect planned static assets and run preflight checks (stale outputs,
+/// collision containment). This is the fail-closed gate: it must run before
+/// any cleanup or copy/write so that a collision error does not leave the
+/// output directory in a partially destroyed state.
+fn plan_browser_product_static_assets(
     package_root: &Path,
     product: &ManifestProduct,
-) -> Result<BrowserProductAssetBuild, Box<Diagnostic>> {
+) -> Result<StaticAssetPlan, Box<Diagnostic>> {
     match product.kind {
         ManifestProductKind::BrowserApp => {}
     }
@@ -75,6 +80,24 @@ pub(crate) fn build_browser_product_static_assets(
     reject_stale_outputs(&out_dir, &planned, &generated)?;
     reject_output_collisions(&planned, &generated)?;
 
+    Ok(StaticAssetPlan {
+        out_dir,
+        manifest_path,
+        planned,
+    })
+}
+
+/// Write planned static assets and the asset manifest to disk. Called only
+/// after preflight ([`plan_browser_product_static_assets`]) and cleanup.
+fn write_browser_product_static_assets(
+    plan: StaticAssetPlan,
+) -> Result<BrowserProductAssetBuild, Box<Diagnostic>> {
+    let StaticAssetPlan {
+        out_dir,
+        manifest_path,
+        planned,
+    } = plan;
+
     for (output, asset) in &planned {
         if let Some(parent) = output.parent() {
             fs::create_dir_all(parent).map_err(|err| io_diag(parent, err))?;
@@ -106,12 +129,40 @@ pub(crate) fn build_browser_product_static_assets(
     })
 }
 
+/// Build the static-asset portion of a browser-app product recipe.
+///
+/// WEB2 owns only deterministic HTML/CSS/public asset copying. Controller TS,
+/// `tsc`, and `controllers.json` are later WEB3 work; the asset manifest written
+/// here gives those stages deterministic static paths without inventing a Radix
+/// `web` target.
+///
+/// Convenience wrapper: plan (preflight) + write in one call. For callers that
+/// need cleanup between preflight and write (e.g. [`build_browser_product`]),
+/// call the two phases directly.
+pub(crate) fn build_browser_product_static_assets(
+    package_root: &Path,
+    product: &ManifestProduct,
+) -> Result<BrowserProductAssetBuild, Box<Diagnostic>> {
+    let plan = plan_browser_product_static_assets(package_root, product)?;
+    write_browser_product_static_assets(plan)
+}
+
 #[derive(Debug)]
 struct PlannedAsset {
     kind: &'static str,
     source: PathBuf,
     size: u64,
     sha256: String,
+}
+
+/// A generated product output path — written by the build into `out_dir`
+/// beyond copied static assets. `is_dir` marks directory outputs that own
+/// their entire subtree (e.g. `faber-ts/`, `faber-esm/`).
+#[derive(Debug)]
+struct GeneratedOutput {
+    label: &'static str,
+    path: PathBuf,
+    is_dir: bool,
 }
 
 fn collect_root(
@@ -251,7 +302,7 @@ fn reject_relative_escape(path: &Path) -> Result<(), Box<Diagnostic>> {
 fn reject_stale_outputs(
     out_dir: &Path,
     planned: &BTreeMap<PathBuf, PlannedAsset>,
-    generated: &[(&'static str, PathBuf)],
+    generated: &[GeneratedOutput],
 ) -> Result<(), Box<Diagnostic>> {
     let Ok(metadata) = fs::symlink_metadata(out_dir) else {
         return Ok(());
@@ -268,68 +319,94 @@ fn reject_stale_outputs(
     let allowed = planned
         .keys()
         .cloned()
-        .chain(generated.iter().map(|(_, path)| path.clone()))
+        .chain(generated.iter().map(|gen| gen.path.clone()))
         .collect::<BTreeSet<_>>();
     reject_stale_dir(out_dir, &allowed)
 }
 
 /// Collect all generated product output paths — files and directories the
 /// product build writes into `out_dir` beyond copied static assets.
+///
+/// This is the single source of truth for collision guards, stale-output
+/// checking, and cleanup.
 fn product_generated_output_paths(
     out_dir: &Path,
     product: &ManifestProduct,
-) -> Vec<(&'static str, PathBuf)> {
+) -> Vec<GeneratedOutput> {
     vec![
-        (
-            "assets manifest",
-            normalize_path(&out_dir.join(&product.assets_manifest)),
-        ),
-        (
-            "controllers json",
-            normalize_path(&out_dir.join(&product.controllers_json)),
-        ),
-        (
-            "faber-ts directory",
-            normalize_path(&out_dir.join("faber-ts")),
-        ),
-        (
-            "faber-esm directory",
-            normalize_path(&out_dir.join("faber-esm")),
-        ),
-        (
-            "tsconfig",
-            normalize_path(&out_dir.join("tsconfig.faber-browser.json")),
-        ),
+        GeneratedOutput {
+            label: "assets manifest",
+            path: normalize_path(&out_dir.join(&product.assets_manifest)),
+            is_dir: false,
+        },
+        GeneratedOutput {
+            label: "controllers json",
+            path: normalize_path(&out_dir.join(&product.controllers_json)),
+            is_dir: false,
+        },
+        GeneratedOutput {
+            label: "faber-ts directory",
+            path: normalize_path(&out_dir.join("faber-ts")),
+            is_dir: true,
+        },
+        GeneratedOutput {
+            label: "faber-esm directory",
+            path: normalize_path(&out_dir.join("faber-esm")),
+            is_dir: true,
+        },
+        GeneratedOutput {
+            label: "tsconfig",
+            path: normalize_path(&out_dir.join("tsconfig.faber-browser.json")),
+            is_dir: false,
+        },
     ]
 }
 
 /// Fail closed when any generated product output path collides with a planned
-/// static asset or with another generated output. Without this guard a
-/// configurable path like `controllers_json` can silently overwrite a copied
-/// asset (or vice versa), producing non-deterministic dist content.
+/// static asset or with another generated output. The check is symmetric and
+/// component-aware: it rejects equal paths OR either path being an ancestor of
+/// the other. This does not depend on `is_dir` — a configurable generated file
+/// can still land inside a static directory subtree or vice versa. Without this
+/// guard a static asset under a generated directory can be silently overwritten
+/// while the asset manifest still records the original file's hash.
 fn reject_output_collisions(
     planned: &BTreeMap<PathBuf, PlannedAsset>,
-    generated: &[(&'static str, PathBuf)],
+    generated: &[GeneratedOutput],
 ) -> Result<(), Box<Diagnostic>> {
-    for (label, path) in generated {
-        if let Some(asset) = planned.get(path) {
-            return Err(Box::new(
-                product_diag(format!(
-                    "browser product {label} path `{}` collides with static asset from `{}`",
-                    path.display(),
-                    asset.source.display()
-                ))
-                .with_arg("issue", "product_output_collision"),
-            ));
-        }
-    }
-    for (i, (label_a, path_a)) in generated.iter().enumerate() {
-        for (label_b, path_b) in generated.iter().skip(i + 1) {
-            if path_a == path_b {
+    // Generated outputs vs planned static assets — symmetric component-aware
+    // overlap: equal paths OR either path an ancestor of the other.
+    for gen in generated {
+        for (planned_path, asset) in planned {
+            if planned_path == &gen.path
+                || path_is_inside(planned_path, &gen.path)
+                || path_is_inside(&gen.path, planned_path)
+            {
                 return Err(Box::new(
                     product_diag(format!(
-                        "browser product {label_a} path `{}` collides with {label_b} path",
-                        path_a.display(),
+                        "browser product {} path `{}` collides with static asset from `{}`",
+                        gen.label,
+                        gen.path.display(),
+                        asset.source.display()
+                    ))
+                    .with_arg("issue", "product_output_collision"),
+                ));
+            }
+        }
+    }
+
+    // Generated outputs vs each other.
+    for (i, gen_a) in generated.iter().enumerate() {
+        for gen_b in generated.iter().skip(i + 1) {
+            let collides = path_is_inside(&gen_b.path, &gen_a.path)
+                || path_is_inside(&gen_a.path, &gen_b.path);
+            if collides {
+                return Err(Box::new(
+                    product_diag(format!(
+                        "browser product {} path `{}` collides with {} path `{}`",
+                        gen_a.label,
+                        gen_a.path.display(),
+                        gen_b.label,
+                        gen_b.path.display(),
                     ))
                     .with_arg("issue", "product_output_collision"),
                 ));
@@ -345,6 +422,11 @@ fn reject_stale_dir(dir: &Path, allowed: &BTreeSet<PathBuf>) -> Result<(), Box<D
         let path = normalize_path(&entry.path());
         let metadata = fs::symlink_metadata(&path).map_err(|err| io_diag(&path, err))?;
         if metadata.is_dir() && !metadata.file_type().is_symlink() {
+            // Generated directories own their subtrees — stale checking does
+            // not recurse into them.
+            if allowed.contains(&path) {
+                continue;
+            }
             reject_stale_dir(&path, allowed)?;
             continue;
         }
@@ -423,8 +505,11 @@ pub(crate) fn build_browser_product(
     product: &ManifestProduct,
 ) -> Result<BrowserProductBuild, Box<Diagnostic>> {
     let layout = super::discover_build_layout(input)?;
+    // Preflight (collision containment) BEFORE cleanup so a collision error
+    // does not destroy previous generated outputs.
+    let plan = plan_browser_product_static_assets(&layout.package_root, product)?;
     remove_previous_product_generated_outputs(&layout.package_root, product)?;
-    let static_build = build_browser_product_static_assets(&layout.package_root, product)?;
+    let static_build = write_browser_product_static_assets(plan)?;
     let package = super::analyze_package(config, input).map_err(|diagnostics| {
         Box::new(diagnostics.into_iter().next().unwrap_or_else(|| {
             product_diag("browser product package analysis failed")
@@ -482,11 +567,37 @@ fn remove_previous_product_generated_outputs(
     product: &ManifestProduct,
 ) -> Result<(), Box<Diagnostic>> {
     let out_dir = normalize_path(&package_root.join(&product.out));
-    for (_, path) in product_generated_output_paths(&out_dir, product) {
-        if path.is_dir() {
-            fs::remove_dir_all(&path).map_err(|err| io_diag(&path, err))?;
-        } else if path.exists() {
-            fs::remove_file(&path).map_err(|err| io_diag(&path, err))?;
+    for gen in product_generated_output_paths(&out_dir, product) {
+        // Use the declared output kind, not the live path shape. A shape
+        // mismatch is corrupted state — fail closed rather than guessing.
+        if gen.is_dir {
+            if gen.path.exists() && !gen.path.is_dir() {
+                return Err(Box::new(
+                    product_diag(format!(
+                        "browser product {} path `{}` is declared as a directory but exists as a non-directory",
+                        gen.label,
+                        gen.path.display()
+                    ))
+                    .with_arg("issue", "product_output_shape_mismatch"),
+                ));
+            }
+            if gen.path.exists() {
+                fs::remove_dir_all(&gen.path).map_err(|err| io_diag(&gen.path, err))?;
+            }
+        } else {
+            if gen.path.exists() && gen.path.is_dir() {
+                return Err(Box::new(
+                    product_diag(format!(
+                        "browser product {} path `{}` is declared as a file but exists as a directory",
+                        gen.label,
+                        gen.path.display()
+                    ))
+                    .with_arg("issue", "product_output_shape_mismatch"),
+                ));
+            }
+            if gen.path.exists() {
+                fs::remove_file(&gen.path).map_err(|err| io_diag(&gen.path, err))?;
+            }
         }
     }
     Ok(())

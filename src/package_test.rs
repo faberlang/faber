@@ -10497,6 +10497,86 @@ controllers_json = "shared.json"
         build_browser_product_static_assets(&self_collision, manifest.product.as_ref().unwrap())
             .expect_err("generated output self-collision fails closed");
     assert!(diagnostic_has_issue(&err, "product_output_collision"));
+
+    // Static asset inside generated directory (faber-ts) → fail closed.
+    // Regression for auditor-1 block_ship 272ca15: equality-only collision
+    // check did not reject static assets whose output lands inside a
+    // generated directory. The generated `faber-ts/` owns its subtree, so any
+    // planned static asset at `dist/faber-ts/**` must collide.
+    let generated_dir_collision = test_temp_dir("g10-web2-generated-dir-collision");
+    fs::write(
+        generated_dir_collision.join("faber.toml"),
+        r#"[package]
+name = "web2-generated-dir-collision"
+
+[paths]
+entry = "main.fab"
+
+[build]
+target = "ts"
+kind = "bin"
+
+[product]
+kind = "browser-app"
+emit = "typescript"
+out = "dist"
+templates = "faber-ts"
+styles = "styles"
+public = "public"
+"#,
+    )
+    .expect("manifest");
+    fs::create_dir_all(generated_dir_collision.join("faber-ts")).expect("faber-ts source");
+    fs::create_dir_all(generated_dir_collision.join("styles")).expect("styles");
+    fs::create_dir_all(generated_dir_collision.join("public")).expect("public");
+    fs::write(
+        generated_dir_collision.join("faber-ts/main.ts"),
+        "STATIC MAIN TS SENTINEL\n",
+    )
+    .expect("static inside generated dir");
+    let manifest =
+        read_manifest(&generated_dir_collision.join("faber.toml")).expect("manifest");
+    let err = build_browser_product_static_assets(
+        &generated_dir_collision,
+        manifest.product.as_ref().unwrap(),
+    )
+    .expect_err("static asset inside generated directory fails closed");
+    assert!(diagnostic_has_issue(&err, "product_output_collision"));
+
+    // Static asset inside generated directory (faber-esm) → fail closed.
+    let esm_collision = test_temp_dir("g10-web2-esm-dir-collision");
+    fs::write(
+        esm_collision.join("faber.toml"),
+        r#"[package]
+name = "web2-esm-dir-collision"
+
+[paths]
+entry = "main.fab"
+
+[build]
+target = "ts"
+kind = "bin"
+
+[product]
+kind = "browser-app"
+emit = "typescript"
+out = "dist"
+templates = "pages"
+styles = "styles"
+public = "faber-esm"
+"#,
+    )
+    .expect("manifest");
+    fs::create_dir_all(esm_collision.join("pages")).expect("pages");
+    fs::create_dir_all(esm_collision.join("styles")).expect("styles");
+    fs::create_dir_all(esm_collision.join("faber-esm")).expect("faber-esm source");
+    fs::write(esm_collision.join("faber-esm/polyfill.js"), "export {}\n")
+        .expect("static inside generated dir");
+    let manifest = read_manifest(&esm_collision.join("faber.toml")).expect("manifest");
+    let err =
+        build_browser_product_static_assets(&esm_collision, manifest.product.as_ref().unwrap())
+            .expect_err("static asset inside generated esm directory fails closed");
+    assert!(diagnostic_has_issue(&err, "product_output_collision"));
 }
 
 fn write_browser_product_manifest(root: &Path, product_overrides: &str) {
