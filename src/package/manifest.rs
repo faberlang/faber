@@ -486,9 +486,13 @@ pub(crate) fn validate_manifest(
 
 fn validate_product(product: &ManifestProduct, path: &Path) -> Result<(), Box<Diagnostic>> {
     match product.kind {
+        // Only BrowserApp exists today; future kind variants will need their
+        // own dispatch here rather than falling through silently.
         ManifestProductKind::BrowserApp => {}
     }
     match product.emit {
+        // Only TypeScript exists today; future emit variants will need their
+        // own dispatch here rather than falling through silently.
         ManifestProductEmit::TypeScript => {}
     }
 
