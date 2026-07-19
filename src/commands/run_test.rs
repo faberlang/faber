@@ -1,7 +1,122 @@
 use super::*;
+use radix::codegen::Target;
 use radix::mir::BufferHost;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+// ── run_target_name ───────────────────────────────────────────────────────
+
+#[test]
+fn run_target_name_maps_rust() {
+    assert_eq!(run_target_name(Target::Rust), "rust");
+}
+
+#[test]
+fn run_target_name_maps_typescript() {
+    assert_eq!(run_target_name(Target::TypeScript), "ts");
+}
+
+#[test]
+fn run_target_name_maps_go() {
+    assert_eq!(run_target_name(Target::Go), "go");
+}
+
+#[test]
+fn run_target_name_maps_faber() {
+    assert_eq!(run_target_name(Target::Faber), "faber");
+}
+
+#[test]
+fn run_target_name_maps_wasm_variants() {
+    assert_eq!(run_target_name(Target::WasmText), "wasm-text");
+    assert_eq!(run_target_name(Target::Wasm), "wasm");
+}
+
+#[test]
+fn run_target_name_maps_text_based_targets() {
+    assert_eq!(run_target_name(Target::LlvmText), "llvm-text");
+    assert_eq!(run_target_name(Target::MetalText), "metal-text");
+    assert_eq!(run_target_name(Target::WgslText), "wgsl-text");
+}
+
+#[test]
+fn run_target_name_maps_sexp() {
+    assert_eq!(run_target_name(Target::Sexp), "sexp");
+}
+
+#[test]
+fn run_target_name_maps_scena_and_fmir_variants() {
+    assert_eq!(run_target_name(Target::Scena), "scena");
+    assert_eq!(run_target_name(Target::FmirText), "fmir-text");
+    assert_eq!(run_target_name(Target::Fmir), "fmir");
+    assert_eq!(run_target_name(Target::FmirBin), "fmir-bin");
+}
+
+// ── should_interpret — interpret flag override ────────────────────────────
+
+#[test]
+fn interpret_flag_overrides_package_directory() {
+    let dir = temp_dir("interpret-flag-override");
+    let args = RunArgs {
+        path: dir.clone(),
+        reader_locale: None,
+        target: radix::tool::CliTarget::Rust,
+        release: false,
+        interpret: true,
+        compile: false,
+        args: Vec::new(),
+    };
+    // Even though `dir` is a directory, `--interpret` forces interpreted mode.
+    assert!(should_interpret(&args, &dir));
+}
+
+#[test]
+fn compile_flag_takes_precedence_over_interpret_flag() {
+    let fab = PathBuf::from("script.fab");
+    let args = RunArgs {
+        path: fab.clone(),
+        reader_locale: None,
+        target: radix::tool::CliTarget::Rust,
+        release: false,
+        interpret: true,
+        compile: true,
+        args: Vec::new(),
+    };
+    // `--compile` gates at line 28 return false before `--interpret` is checked.
+    assert!(!should_interpret(&args, &fab));
+}
+
+#[test]
+fn reader_locale_takes_precedence_over_interpret_flag() {
+    let fab = PathBuf::from("script.fab");
+    let args = RunArgs {
+        path: fab.clone(),
+        reader_locale: Some("zh-Hans".to_owned()),
+        target: radix::tool::CliTarget::Rust,
+        release: false,
+        interpret: true,
+        compile: false,
+        args: Vec::new(),
+    };
+    // reader_locale gate at line 23 returns false before `--interpret` is checked.
+    assert!(!should_interpret(&args, &fab));
+}
+
+#[test]
+fn non_rust_target_takes_precedence_over_interpret_flag() {
+    let fab = PathBuf::from("script.fab");
+    let args = RunArgs {
+        path: fab.clone(),
+        reader_locale: None,
+        target: radix::tool::CliTarget::Scena,
+        release: false,
+        interpret: true,
+        compile: false,
+        args: Vec::new(),
+    };
+    // Target gate at line 25 returns false before `--interpret` is checked.
+    assert!(!should_interpret(&args, &fab));
+}
 
 fn temp_dir(label: &str) -> PathBuf {
     let nanos = SystemTime::now()
