@@ -183,8 +183,9 @@ fn is_known_fmir_runtime_requirement_accepts_host_fs_and_env() {
 }
 
 #[test]
-fn is_known_fmir_runtime_requirement_accepts_host_stdin_too() {
+fn is_known_fmir_runtime_requirement_accepts_host_stdin_and_stderr() {
     assert!(is_known_fmir_runtime_requirement("host:stdin"));
+    assert!(is_known_fmir_runtime_requirement("host:stderr"));
 }
 
 #[test]

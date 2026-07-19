@@ -199,7 +199,7 @@ fn merge_entry_test_selection_cli_overrides_frontmatter() {
 }
 
 #[test]
-fn merge_entry_test_selection_merges_cli_suite_with_frontmatter_tag() {
+fn merge_entry_test_selection_cli_suite_overrides_frontmatter_tag() {
     let cli = TestSelection {
         name: None,
         suite: Some("math".to_owned()),
