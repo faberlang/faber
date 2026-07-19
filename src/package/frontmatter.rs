@@ -137,3 +137,7 @@ pub(super) fn merge_entry_test_selection(
     (selection.name.is_some() || selection.suite.is_some() || selection.tag.is_some())
         .then_some(selection)
 }
+
+#[cfg(test)]
+#[path = "frontmatter_test.rs"]
+mod tests;
