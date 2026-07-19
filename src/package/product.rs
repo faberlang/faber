@@ -893,7 +893,82 @@ fn render_browser_entry(controllers: &[BrowserController]) -> String {
             controller.name, controller.selector, controller.name
         ));
     }
-    out.push_str("] as const;\n");
+    out.push_str(
+        r#"] as const;
+
+export type ControllerMount = {
+  name: string;
+  selector: string;
+  root: Element;
+  cleanup: unknown;
+};
+
+export type ControllerFailure = {
+  name: string;
+  selector: string;
+  error: unknown;
+};
+
+export type ControllerRuntime = {
+  mounts: ControllerMount[];
+  failures: ControllerFailure[];
+  dispose(): void;
+};
+
+function disposeCleanup(cleanup: unknown): void {
+  if (Array.isArray(cleanup)) {
+    for (const item of cleanup) {
+      disposeCleanup(item);
+    }
+    return;
+  }
+  if (
+    cleanup !== null &&
+    typeof cleanup === "object" &&
+    "dispose" in cleanup &&
+    typeof cleanup.dispose === "function"
+  ) {
+    (cleanup as { dispose: () => void }).dispose();
+  }
+}
+
+export function mountControllers(root: ParentNode = globalThis.document): ControllerRuntime {
+  const mounts: ControllerMount[] = [];
+  const failures: ControllerFailure[] = [];
+  for (const controller of controllers) {
+    const element = root.querySelector(controller.selector);
+    if (element === null) {
+      failures.push({
+        name: controller.name,
+        selector: controller.selector,
+        error: new Error(`browser controller mount root not found: ${controller.selector}`),
+      });
+      continue;
+    }
+    try {
+      const cleanup = controller.mount({ root: element, selector: controller.selector });
+      mounts.push({
+        name: controller.name,
+        selector: controller.selector,
+        root: element,
+        cleanup,
+      });
+    } catch (error) {
+      failures.push({ name: controller.name, selector: controller.selector, error });
+    }
+  }
+  return {
+    mounts,
+    failures,
+    dispose() {
+      for (let index = mounts.length - 1; index >= 0; index -= 1) {
+        disposeCleanup(mounts[index].cleanup);
+      }
+    },
+  };
+}
+"#,
+    );
     out
 }
 

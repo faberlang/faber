@@ -10534,8 +10534,7 @@ public = "public"
         "STATIC MAIN TS SENTINEL\n",
     )
     .expect("static inside generated dir");
-    let manifest =
-        read_manifest(&generated_dir_collision.join("faber.toml")).expect("manifest");
+    let manifest = read_manifest(&generated_dir_collision.join("faber.toml")).expect("manifest");
     let err = build_browser_product_static_assets(
         &generated_dir_collision,
         manifest.product.as_ref().unwrap(),
@@ -10654,6 +10653,9 @@ functio shell(dom.Scope scope) → vacuum {
     assert!(build.esm_entry.is_file());
     let esm = fs::read_to_string(&build.esm_entry).expect("esm entry");
     assert!(esm.contains("./main.js"));
+    assert!(esm.contains("export function mountControllers"));
+    assert!(esm.contains("failures.push"));
+    assert!(esm.contains("disposeCleanup"));
     assert_eq!(build.controllers.len(), 1);
 
     let second = build_browser_product(
@@ -11364,7 +11366,10 @@ fn package_fmir_image_is_artifact_version_3() {
     let bytes = fs::read(&image.image_path).expect("read image");
     let summary = fmir_image_test_summary(&bytes, &image.image_path).expect("summarize fmir image");
 
-    assert_eq!(summary.version, 3, "fmir image must declare artifact version 3");
+    assert_eq!(
+        summary.version, 3,
+        "fmir image must declare artifact version 3"
+    );
 }
 
 #[test]
@@ -11380,8 +11385,11 @@ fn package_fmir_text_image_rejects_version_2_images() {
     )
     .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
-    fs::write(&image.image_path, rewrite_text_image_version(&image_text, 2))
-        .expect("write version-2 image");
+    fs::write(
+        &image.image_path,
+        rewrite_text_image_version(&image_text, 2),
+    )
+    .expect("write version-2 image");
     fs::remove_file(&entry).expect("remove source after rewriting image");
 
     let mut host = BufferHost::default();
@@ -11409,8 +11417,11 @@ fn package_fmir_text_image_rejects_future_versions() {
     )
     .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
-    fs::write(&image.image_path, rewrite_text_image_version(&image_text, 999))
-        .expect("write future-version image");
+    fs::write(
+        &image.image_path,
+        rewrite_text_image_version(&image_text, 999),
+    )
+    .expect("write future-version image");
     fs::remove_file(&entry).expect("remove source after rewriting image");
 
     let mut host = BufferHost::default();
@@ -11509,7 +11520,10 @@ incipit {
 
     assert_eq!(
         host.stdout_lines,
-        vec!["18446744073709551615".to_owned(), "9223372036854775808".to_owned()]
+        vec![
+            "18446744073709551615".to_owned(),
+            "9223372036854775808".to_owned()
+        ]
     );
 }
 
@@ -11539,6 +11553,9 @@ incipit {
 
     assert_eq!(
         host.stdout_lines,
-        vec!["18446744073709551615".to_owned(), "9223372036854775808".to_owned()]
+        vec![
+            "18446744073709551615".to_owned(),
+            "9223372036854775808".to_owned()
+        ]
     );
 }
