@@ -309,3 +309,7 @@ fn nearest_manifest_for_file(entry: &Path) -> Option<PathBuf> {
     }
     None
 }
+
+#[cfg(test)]
+#[path = "discovery_test.rs"]
+mod tests;
