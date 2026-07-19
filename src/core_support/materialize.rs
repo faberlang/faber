@@ -115,9 +115,9 @@ fn materialize_payload(
         expected_archive_hash,
         &expected_files,
     );
-    if FileExt::unlock(&lock).is_err() {
-        // Return the materialization result; the file descriptor closes next.
-    }
+    // Unlock errors are non-fatal: the file descriptor closes after return,
+    // which releases the OS-level lock.  Prefer the materialization result.
+    let _ = FileExt::unlock(&lock);
     result
 }
 
