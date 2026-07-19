@@ -9,9 +9,13 @@ use super::manifest::{ManifestProduct, ManifestProductKind};
 use super::paths::normalize_path;
 
 /// Generated product output path components — the single source of truth for
-/// directory and file names written by the browser product build. Both
-/// [`product_generated_output_paths`] and the build function consume these
-/// constants so the registry and the writer never diverge.
+/// directory and file names written by the browser product build.
+///
+/// [`product_generated_output_paths`] consumes `FABER_TS_DIR`, `FABER_ESM_DIR`,
+/// and `TSCONFIG_FILE` for collision guards, stale-output checking, and cleanup
+/// registration. The build function consumes all constants. Files inside
+/// directory outputs (`BROWSER_ENTRY_TS`, `WEB_AMBIENT_DTS`, `BROWSER_ENTRY_JS`)
+/// are covered indirectly through their owning directory entries.
 const FABER_TS_DIR: &str = "faber-ts";
 const FABER_ESM_DIR: &str = "faber-esm";
 const TSCONFIG_FILE: &str = "tsconfig.faber-browser.json";
@@ -58,6 +62,8 @@ fn plan_browser_product_static_assets(
     product: &ManifestProduct,
 ) -> Result<StaticAssetPlan, Box<Diagnostic>> {
     match product.kind {
+        // Only BrowserApp exists today; future kind variants will need their
+        // own dispatch here rather than falling through silently.
         ManifestProductKind::BrowserApp => {}
     }
 
@@ -868,7 +874,8 @@ fn adapt_controller_typescript(mut code: String, controllers: &[BrowserControlle
     // TypeScript infers the return type; assignment to a `void`-typed handler
     // parameter still accepts any return value.
     code = code.replace("): void =>", ") =>");
-    code.replace("unresolved_def", "any")
+    code = code.replace("unresolved_def", "any");
+    code
 }
 
 fn ts_module_file_name(unit: &super::AnalyzedPackageUnit) -> String {
@@ -946,7 +953,7 @@ export function mountControllers(root: ParentNode = globalThis.document): Contro
       continue;
     }
     try {
-      const cleanup = controller.mount({ root: element, selector: controller.selector });
+      const cleanup = controller.mount({ selector: controller.selector });
       mounts.push({
         name: controller.name,
         selector: controller.selector,
