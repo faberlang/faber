@@ -10656,6 +10656,10 @@ functio shell(dom.Scope scope) → vacuum {
     assert!(esm.contains("export function mountControllers"));
     assert!(esm.contains("failures.push"));
     assert!(esm.contains("disposeCleanup"));
+    let ambient = fs::read_to_string(build.out_dir.join("faber-ts/faber-web.d.ts"))
+        .expect("ambient web declarations");
+    assert!(ambient.contains("export class FrameState"));
+    assert!(ambient.contains("on_frame(handler: FrameHandler): Subscription"));
     assert_eq!(build.controllers.len(), 1);
 
     let second = build_browser_product(
