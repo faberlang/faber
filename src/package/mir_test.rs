@@ -135,3 +135,14 @@ fn record_field_string(
         }
     })
 }
+
+// R0 red artifact contract: adding `MirConstant::UInt(u64)` to the serialized
+// MIR schema is an approved clean break, so the package MIR artifact version
+// moves 2 → 3 (no dual-format reader). Fails until R2 lands the bump.
+#[test]
+fn package_mir_artifact_version_is_3_for_unsigned_constant_schema() {
+    assert_eq!(
+        PACKAGE_MIR_ARTIFACT_VERSION, 3,
+        "MirConstant::UInt requires the FMIR artifact version 3 clean break"
+    );
+}

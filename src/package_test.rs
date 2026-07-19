@@ -11304,3 +11304,241 @@ incipit {{
         "{response:?}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// R0 red artifact contract: FMIR text/binary artifact version 3
+//
+// The modular-word width family adds `MirConstant::UInt(u64)` to the
+// serialized MIR schema, which is an approved clean artifact version break:
+// `PACKAGE_MIR_ARTIFACT_VERSION` moves 2 → 3, version-3 images round-trip,
+// and version-2 or future images keep failing closed through the existing
+// exact-version gate. These tests compile against the current public crate
+// API and fail until R2 lands the version bump.
+// ---------------------------------------------------------------------------
+
+fn rewrite_text_image_version(text: &str, version: u32) -> String {
+    for current in ["version = 2", "version = 3"] {
+        if text.contains(current) {
+            return text.replacen(current, &format!("version = {version}"), 1);
+        }
+    }
+    panic!("image text has no recognizable version line:\n{text}")
+}
+
+fn rewrite_binary_image_version(bytes: &mut [u8], version: u8) {
+    assert!(
+        matches!(bytes.first(), Some(2) | Some(3)),
+        "binary image must start with a recognizable artifact version varint"
+    );
+    bytes[0] = version;
+}
+
+#[test]
+fn package_fmir_text_image_is_artifact_version_3() {
+    let dir = test_temp_dir("package-fmir-text-v3");
+    let entry = dir.join("main.fab");
+    fs::write(&entry, "incipit { nota \"v3\" }").expect("write entry");
+
+    let image = build_package_fmir_text_image(
+        &Config::default().with_target(Target::FmirText),
+        &entry,
+        &[],
+    )
+    .expect("build fmir-text image");
+    let image_text = fs::read_to_string(&image.image_path).expect("read image");
+
+    assert!(
+        image_text.contains("version = 3"),
+        "fmir-text image must declare artifact version 3:\n{image_text}"
+    );
+}
+
+#[test]
+fn package_fmir_image_is_artifact_version_3() {
+    let dir = test_temp_dir("package-fmir-v3");
+    let entry = dir.join("main.fab");
+    fs::write(&entry, "incipit { nota \"v3\" }").expect("write entry");
+
+    let image = build_package_fmir_image(&Config::default().with_target(Target::Fmir), &entry, &[])
+        .expect("build fmir image");
+    let bytes = fs::read(&image.image_path).expect("read image");
+    let summary = fmir_image_test_summary(&bytes, &image.image_path).expect("summarize fmir image");
+
+    assert_eq!(summary.version, 3, "fmir image must declare artifact version 3");
+}
+
+#[test]
+fn package_fmir_text_image_rejects_version_2_images() {
+    let dir = test_temp_dir("package-fmir-text-v2-reject");
+    let entry = dir.join("main.fab");
+    fs::write(&entry, "incipit { nota \"must not run\" }").expect("write entry");
+
+    let image = build_package_fmir_text_image(
+        &Config::default().with_target(Target::FmirText),
+        &entry,
+        &[],
+    )
+    .expect("build fmir-text image");
+    let image_text = fs::read_to_string(&image.image_path).expect("read image");
+    fs::write(&image.image_path, rewrite_text_image_version(&image_text, 2))
+        .expect("write version-2 image");
+    fs::remove_file(&entry).expect("remove source after rewriting image");
+
+    let mut host = BufferHost::default();
+    let diagnostics = run_package_fmir_text_image(&image, &mut host)
+        .expect_err("version-2 fmir-text images must fail closed under the version-3 schema");
+
+    assert!(diagnostics.iter().any(|diag| {
+        diagnostic_has_issue(diag, "fmir_text_image_version_unsupported")
+            && diagnostic_has_arg(diag, "actual", "2")
+            && diagnostic_has_arg(diag, "expected", "3")
+    }));
+    assert!(host.stdout_lines.is_empty());
+}
+
+#[test]
+fn package_fmir_text_image_rejects_future_versions() {
+    let dir = test_temp_dir("package-fmir-text-future-reject");
+    let entry = dir.join("main.fab");
+    fs::write(&entry, "incipit { nota \"must not run\" }").expect("write entry");
+
+    let image = build_package_fmir_text_image(
+        &Config::default().with_target(Target::FmirText),
+        &entry,
+        &[],
+    )
+    .expect("build fmir-text image");
+    let image_text = fs::read_to_string(&image.image_path).expect("read image");
+    fs::write(&image.image_path, rewrite_text_image_version(&image_text, 999))
+        .expect("write future-version image");
+    fs::remove_file(&entry).expect("remove source after rewriting image");
+
+    let mut host = BufferHost::default();
+    let diagnostics = run_package_fmir_text_image(&image, &mut host)
+        .expect_err("future fmir-text versions must fail closed");
+
+    assert!(diagnostics.iter().any(|diag| {
+        diagnostic_has_issue(diag, "fmir_text_image_version_unsupported")
+            && diagnostic_has_arg(diag, "actual", "999")
+            && diagnostic_has_arg(diag, "expected", "3")
+    }));
+    assert!(host.stdout_lines.is_empty());
+}
+
+#[test]
+fn package_fmir_image_rejects_version_2_images() {
+    let dir = test_temp_dir("package-fmir-v2-reject");
+    let entry = dir.join("main.fab");
+    fs::write(&entry, "incipit { nota \"must not run\" }").expect("write entry");
+
+    let image = build_package_fmir_image(&Config::default().with_target(Target::Fmir), &entry, &[])
+        .expect("build fmir image");
+    let mut image_bytes = fs::read(&image.image_path).expect("read image");
+    rewrite_binary_image_version(&mut image_bytes, 2);
+    fs::write(&image.image_path, image_bytes).expect("write version-2 image");
+    fs::remove_file(&entry).expect("remove source after rewriting image");
+
+    let mut host = BufferHost::default();
+    let diagnostics = run_package_fmir_image(&image, &mut host)
+        .expect_err("version-2 fmir images must fail closed under the version-3 schema");
+
+    assert!(diagnostics.iter().any(|diag| {
+        diagnostic_has_issue(diag, "fmir_image_version_unsupported")
+            && diagnostic_has_arg(diag, "actual", "2")
+            && diagnostic_has_arg(diag, "expected", "3")
+    }));
+    assert!(host.stdout_lines.is_empty());
+}
+
+#[test]
+fn package_fmir_image_rejects_future_versions() {
+    let dir = test_temp_dir("package-fmir-future-reject");
+    let entry = dir.join("main.fab");
+    fs::write(&entry, "incipit { nota \"must not run\" }").expect("write entry");
+
+    let image = build_package_fmir_image(&Config::default().with_target(Target::Fmir), &entry, &[])
+        .expect("build fmir image");
+    let mut image_bytes = fs::read(&image.image_path).expect("read image");
+    rewrite_binary_image_version(&mut image_bytes, 99);
+    fs::write(&image.image_path, image_bytes).expect("write future-version image");
+    fs::remove_file(&entry).expect("remove source after rewriting image");
+
+    let mut host = BufferHost::default();
+    let diagnostics = run_package_fmir_image(&image, &mut host)
+        .expect_err("future fmir versions must fail closed");
+
+    assert!(diagnostics.iter().any(|diag| {
+        diagnostic_has_issue(diag, "fmir_image_version_unsupported")
+            && diagnostic_has_arg(diag, "actual", "99")
+            && diagnostic_has_arg(diag, "expected", "3")
+    }));
+    assert!(host.stdout_lines.is_empty());
+}
+
+#[test]
+fn package_fmir_text_image_round_trips_upper_half_u64_constants() {
+    // R0 red carrier proof at the artifact boundary: an unsigned 64-bit
+    // constant above i64::MAX must survive image build, source removal, and
+    // image execution with its exact value. Fails until R1 (literal carrier)
+    // and R2 (`MirConstant::UInt` + version 3) land.
+    let dir = test_temp_dir("package-fmir-text-u64-constants");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+incipit {
+  fixum numerus<u64> max ← 18446744073709551615
+  fixum numerus<u64> sha ← 9223372036854775808
+  nota max
+  nota sha
+}
+"#,
+    )
+    .expect("write entry");
+
+    let image = build_package_fmir_text_image(
+        &Config::default().with_target(Target::FmirText),
+        &entry,
+        &[],
+    )
+    .expect("build fmir-text image with upper-half u64 constants");
+    fs::remove_file(&entry).expect("remove source after image build");
+
+    let mut host = BufferHost::default();
+    run_package_fmir_text_image(&image, &mut host).expect("run fmir-text image without source");
+
+    assert_eq!(
+        host.stdout_lines,
+        vec!["18446744073709551615".to_owned(), "9223372036854775808".to_owned()]
+    );
+}
+
+#[test]
+fn package_fmir_image_round_trips_upper_half_u64_constants() {
+    let dir = test_temp_dir("package-fmir-u64-constants");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+incipit {
+  fixum numerus<u64> max ← 18446744073709551615
+  fixum numerus<u64> sha ← 9223372036854775808
+  nota max
+  nota sha
+}
+"#,
+    )
+    .expect("write entry");
+
+    let image = build_package_fmir_image(&Config::default().with_target(Target::Fmir), &entry, &[])
+        .expect("build fmir image with upper-half u64 constants");
+    fs::remove_file(&entry).expect("remove source after image build");
+
+    let mut host = BufferHost::default();
+    run_package_fmir_image(&image, &mut host).expect("run fmir image without source");
+
+    assert_eq!(
+        host.stdout_lines,
+        vec!["18446744073709551615".to_owned(), "9223372036854775808".to_owned()]
+    );
+}
