@@ -67,7 +67,7 @@ fn index_manifest_matches_registry() {
 #[test]
 fn all_entries_validate() {
     let registry = disk_registry();
-    assert_eq!(registry.entries().len(), 190);
+    assert_eq!(registry.entries().len(), 194);
 
     for entry in registry.entries() {
         assert!(!entry.term.is_empty());
@@ -139,7 +139,7 @@ fn load_aliases_disk_registry_entry_point() {
     std::env::remove_var(crate::reference::REFERENCE_ROOT_ENV);
 
     let registry = Registry::load().expect("load via disk entry point");
-    assert_eq!(registry.entries().len(), 190);
+    assert_eq!(registry.entries().len(), 194);
 
     if let Some(value) = previous {
         std::env::set_var(crate::reference::REFERENCE_ROOT_ENV, value);
