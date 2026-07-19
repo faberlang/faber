@@ -839,7 +839,7 @@ functio text() → textus {
     assert_eq!(first_manifest, second_manifest);
     assert_eq!(
         first_manifest,
-        r#"version = 2
+        r#"version = 3
 target = "scena"
 entry = "main.fab"
 entry_function = "run_entry"
@@ -1303,7 +1303,7 @@ fn package_fmir_text_image_rejects_bad_version_without_source_fallback() {
     )
     .expect("build fmir-text image");
     let mut image_text = fs::read_to_string(&image.image_path).expect("read image");
-    image_text = image_text.replacen("version = 2", "version = 999", 1);
+    image_text = rewrite_text_image_version(&image_text, 999);
     fs::write(&image.image_path, image_text).expect("write corrupt image");
     fs::remove_file(&entry).expect("remove source after corrupting image");
 
@@ -1314,7 +1314,7 @@ fn package_fmir_text_image_rejects_bad_version_without_source_fallback() {
     assert!(diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "fmir_text_image_version_unsupported")
             && diagnostic_has_arg(diag, "actual", "999")
-            && diagnostic_has_arg(diag, "expected", "2")
+            && diagnostic_has_arg(diag, "expected", "3")
     }));
     assert!(host.stdout_lines.is_empty());
 }
@@ -1620,7 +1620,7 @@ fn package_fmir_image_rejects_bad_version_without_source_fallback() {
     let image = build_package_fmir_image(&Config::default().with_target(Target::Fmir), &entry, &[])
         .expect("build fmir image");
     let mut image_bytes = fs::read(&image.image_path).expect("read image");
-    image_bytes[0] = 3;
+    rewrite_binary_image_version(&mut image_bytes, 99);
     fs::write(&image.image_path, image_bytes).expect("write corrupt image");
     fs::remove_file(&entry).expect("remove source after corrupting image");
 
@@ -1630,8 +1630,8 @@ fn package_fmir_image_rejects_bad_version_without_source_fallback() {
 
     assert!(diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "fmir_image_version_unsupported")
-            && diagnostic_has_arg(diag, "actual", "3")
-            && diagnostic_has_arg(diag, "expected", "2")
+            && diagnostic_has_arg(diag, "actual", "99")
+            && diagnostic_has_arg(diag, "expected", "3")
     }));
     assert!(host.stdout_lines.is_empty());
 }

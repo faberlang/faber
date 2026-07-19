@@ -65,7 +65,7 @@ pub fn with_lowered_package_mir<R>(
 // linked function-source ids must live above that range or rewritten namespace
 // calls can collide with import/local bindings and lower as indirect calls.
 const PACKAGE_MIR_SYNTHETIC_DEF_BASE: u32 = 2_000_000_000;
-const PACKAGE_MIR_ARTIFACT_VERSION: u32 = 2;
+const PACKAGE_MIR_ARTIFACT_VERSION: u32 = 3;
 const PACKAGE_MIR_TOOLCHAIN_VERSION: &str = env!("CARGO_PKG_VERSION");
 const PACKAGE_MIR_TARGET_NAME: &str = "scena";
 const FMIR_TEXT_TARGET_NAME: &str = "fmir-text";
@@ -4241,6 +4241,7 @@ fn remap_constant_text_symbols(
             }
         }
         MirConstant::Int(_)
+        | MirConstant::UInt(_)
         | MirConstant::Float(_)
         | MirConstant::Bool(_)
         | MirConstant::Nil
