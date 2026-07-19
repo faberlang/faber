@@ -521,9 +521,7 @@ fn default_library_home() -> Option<PathBuf> {
     if let Some(value) = std::env::var_os(FABER_LIBRARY_HOME_ENV) {
         return Some(PathBuf::from(value));
     }
-    if std::env::var_os(FABER_ENABLE_WORKSPACE_LIBRARY_PROBE_ENV).is_none() {
-        return None;
-    }
+    std::env::var_os(FABER_ENABLE_WORKSPACE_LIBRARY_PROBE_ENV)?;
 
     // Public faber repo is a sibling of norma under faberlang/. This dev-only
     // probe is opt-in so package consumers do not silently resolve from a
