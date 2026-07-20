@@ -71,7 +71,10 @@ fn panic_trap(trap: HostTrap) -> ! {
 
 pub(crate) fn exit_code_from_i32(code: i32) -> ExitCode {
     // WHY: Unix wait status uses the low eight bits of the exit code.
-    ExitCode::from((code & 0xff) as u8)
+    // SAFETY: `& 0xff` confines the value to `u8` range before the cast.
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let low = (code & 0xff) as u8;
+    ExitCode::from(low)
 }
 
 /// Inverse of [`exit_code_from_i32`] for [`std::process::exit`].
@@ -84,7 +87,7 @@ pub fn raw_exit_code(code: ExitCode) -> i32 {
     }
     for value in 2..=255 {
         if code == ExitCode::from(value) {
-            return value as i32;
+            return i32::from(value);
         }
     }
     1
