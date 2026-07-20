@@ -36,7 +36,7 @@ fn truncate_output_truncates_at_8000_chars() {
 #[test]
 fn truncate_output_handles_unicode_character_boundary() {
     // 4-byte unicode characters at the boundary
-    let long: String = std::iter::repeat("🔥").take(5_000).collect();
+    let long: String = std::iter::repeat_n("🔥", 5_000).collect();
     let truncated = truncate_output(&long);
     // Should not panic and should be <= 8000 chars
     assert!(truncated.chars().count() <= 8_000);
