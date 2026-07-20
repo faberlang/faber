@@ -59,8 +59,7 @@ fn probe_root_lives_in_temp_dir() {
     let root = probe_root();
     assert!(
         root.starts_with(std::env::temp_dir()),
-        "probe_root must be under temp dir: {:?}",
-        root
+        "probe_root must be under temp dir: {root:?}"
     );
 }
 

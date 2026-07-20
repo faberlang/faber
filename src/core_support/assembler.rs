@@ -88,10 +88,12 @@ pub fn assemble(workspace: &Path, roots: &[String]) -> io::Result<Assembly> {
 }
 
 pub fn file_manifest(files: &[FileRecord]) -> String {
-    files
-        .iter()
-        .map(|file| format!("{}  {}\n", file.sha256, file.path))
-        .collect()
+    let mut output = String::new();
+    for file in files {
+        use std::fmt::Write;
+        let _ = writeln!(output, "{}  {}", file.sha256, file.path);
+    }
+    output
 }
 
 fn checked_root(workspace: &Path, entry: &str) -> io::Result<PathBuf> {
@@ -196,7 +198,13 @@ fn invalid(message: &str) -> io::Error {
 }
 
 fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+    bytes
+        .iter()
+        .fold(String::with_capacity(bytes.len() * 2), |mut acc, byte| {
+            use std::fmt::Write;
+            let _ = write!(acc, "{byte:02x}");
+            acc
+        })
 }
 
 #[cfg(unix)]

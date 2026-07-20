@@ -20,7 +20,7 @@ pub(crate) struct RustRuntimePlan {
     pub(crate) selected_providers: BTreeSet<String>,
     pub(crate) provider_manifests: Vec<ProviderManifest>,
     pub(crate) provider_error: Option<String>,
-    /// Faber library path dependencies: (crate_name, absolute crate root).
+    /// Faber library path dependencies: (`crate_name`, absolute crate root).
     pub(crate) library_path_deps: Vec<(String, PathBuf)>,
 }
 

@@ -51,7 +51,7 @@ pub(super) fn cmd_run(args: RunArgs) {
     match Target::from(args.target) {
         Target::Rust => {}
         Target::Go => {
-            cmd_run_go(args);
+            cmd_run_go(&args);
             return;
         }
         Target::Scena => {
@@ -130,7 +130,7 @@ fn run_config_or_exit(
 }
 
 /// G6 GO3 — package compile → go build → exec with forwarded argv.
-fn cmd_run_go(args: RunArgs) {
+fn cmd_run_go(args: &RunArgs) {
     let input_path = PathBuf::from(&args.path);
     let config = run_config_or_exit(Target::Go, &input_path, args.reader_locale.as_deref());
     let result = package::compile_package(&config, &input_path);
@@ -139,12 +139,11 @@ fn cmd_run_go(args: RunArgs) {
         eprintln!("compilation failed");
         std::process::exit(1);
     };
-    let code = match output {
-        radix::Output::Go(go) => go.code,
-        _ => {
-            eprintln!("error: go run expected Go package output");
-            std::process::exit(1);
-        }
+    let code = if let radix::Output::Go(go) = output {
+        go.code
+    } else {
+        eprintln!("error: go run expected Go package output");
+        std::process::exit(1);
     };
     let layout = match package::discover_build_layout(&input_path) {
         Ok(l) => l,
@@ -299,12 +298,11 @@ fn cmd_run_compiled(args: &RunArgs) {
         None
     };
 
-    let code_string = match output {
-        radix::Output::Rust(r) => r.code,
-        _ => {
-            eprintln!("error: run only supports Rust backend packages");
-            std::process::exit(1);
-        }
+    let code_string = if let radix::Output::Rust(r) = output {
+        r.code
+    } else {
+        eprintln!("error: run only supports Rust backend packages");
+        std::process::exit(1);
     };
 
     // Match `faber build`: runtime plan + G4 native library path deps (no text-sniff).

@@ -236,7 +236,7 @@ fn compile_emit_build_run(entry: &Path) -> String {
     emit_generated_crate(&layout, &output.code, None).expect("emit generated crate");
     let binary = invoke_cargo_build(&layout, false).expect("cargo build");
     let run = Command::new(binary).output().expect("run generated binary");
-    assert!(run.status.success(), "generated binary failed: {:?}", run);
+    assert!(run.status.success(), "generated binary failed: {run:?}");
     String::from_utf8(run.stdout).expect("stdout utf8")
 }
 
@@ -578,7 +578,7 @@ functio label() → textus {
     let package = analyze_package(&Config::default(), &entry).expect("analyze package");
 
     assert!(
-        !package.diagnostics.iter().any(|diag| diag.is_error()),
+        !package.diagnostics.iter().any(radix::Diagnostic::is_error),
         "expected no analysis errors, got {:?}",
         package
             .diagnostics
@@ -4200,7 +4200,7 @@ incipit {
     let binary = invoke_cargo_build(&layout, false).expect("cargo build");
     let run = Command::new(binary).output().expect("run generated binary");
 
-    assert!(run.status.success(), "chorda binary failed: {:?}", run);
+    assert!(run.status.success(), "chorda binary failed: {run:?}");
     let stdout = String::from_utf8(run.stdout).expect("stdout utf8");
     assert_eq!(
         stdout.lines().collect::<Vec<_>>(),
@@ -7991,7 +7991,7 @@ incipit {{
 
     let binary = invoke_cargo_build(&layout, false).expect("cargo build");
     let run = Command::new(binary).output().expect("run generated binary");
-    assert!(run.status.success(), "generated binary failed: {:?}", run);
+    assert!(run.status.success(), "generated binary failed: {run:?}");
     assert_eq!(
         String::from_utf8(run.stdout).expect("stdout utf8"),
         "salve host\n"
@@ -9099,7 +9099,7 @@ incipit {
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stdout.contains("Numerus(1)") || stdout.contains("1"),
+        stdout.contains("Numerus(1)") || stdout.contains('1'),
         "expected scalar 1 on stdout, got {stdout:?}"
     );
 }
@@ -10183,7 +10183,7 @@ rustc = ""
     fs::write(app.join("src/main.fab"), entry_body).expect("entry");
 }
 
-/// Like write_web_consumer_app but imports only web:web (not web:dom) and
+/// Like `write_web_consumer_app` but imports only web:web (not web:dom) and
 /// defines a local Scope genus for shadowing tests.
 fn write_web_consumer_app_with_only_web_import(app: &Path, lib: &Path) {
     fs::create_dir_all(app.join("src")).expect("app src");
@@ -11161,7 +11161,7 @@ incipit {
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stdout.contains('2') || stdout.contains("2"),
+        stdout.contains('2') || stdout.contains('2'),
         "expected route count 2 on stdout, got {stdout:?}"
     );
 }
@@ -11219,7 +11219,7 @@ incipit {
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stdout.contains('7') || stdout.contains("7"),
+        stdout.contains('7') || stdout.contains('7'),
         "expected match/query evidence of 7 on stdout, got {stdout:?}"
     );
 }

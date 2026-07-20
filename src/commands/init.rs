@@ -28,8 +28,7 @@ pub(super) fn cmd_init(args: InitArgs) {
     }
 
     let manifest_source = format!(
-        "[package]\nname = \"{}\"\nversion = \"0.1.0\"\nedition = \"2026\"\n\n[paths]\nsource = \"src\"\nentry = \"main.fab\"\n\n[build]\ntarget = \"rust\"\nkind = \"bin\"\n",
-        package_name
+        "[package]\nname = \"{package_name}\"\nversion = \"0.1.0\"\nedition = \"2026\"\n\n[paths]\nsource = \"src\"\nentry = \"main.fab\"\n\n[build]\ntarget = \"rust\"\nkind = \"bin\"\n"
     );
     if let Err(err) = std::fs::write(&manifest, manifest_source) {
         eprintln!("error: failed to write '{}': {}", manifest.display(), err);

@@ -43,11 +43,11 @@ struct HostManifest {
 
 pub(super) fn cmd_host(command: HostCommand) {
     match command {
-        HostCommand::Manifest(args) => cmd_host_manifest(args),
+        HostCommand::Manifest(args) => cmd_host_manifest(&args),
     }
 }
 
-fn cmd_host_manifest(args: ManifestArgs) {
+fn cmd_host_manifest(args: &ManifestArgs) {
     let manifest = HostManifest {
         version: KERNEL_MANIFEST_VERSION,
         modules: kernel_manifest_entries()

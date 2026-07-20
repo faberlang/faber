@@ -17,7 +17,7 @@ pub struct FormatCommand {
     pub config: Option<PathBuf>,
 }
 
-pub fn cmd_format(command: FormatCommand) {
+pub fn cmd_format(command: &FormatCommand) {
     if command.config.is_some() {
         eprintln!("warning: --config is not implemented yet (forma.toml deferred)");
     }

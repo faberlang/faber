@@ -37,14 +37,12 @@ impl ProbeChild {
 
 impl Drop for ProbeChild {
     fn drop(&mut self) {
-        match self.child.try_wait() {
-            Ok(Some(_)) => {}
-            Ok(None) | Err(_) => {
-                // WHY: Drop is the last-resort cleanup for early diagnostic
-                // returns; the normal timeout path reports kill/wait failures.
-                drop(self.child.kill());
-                drop(self.child.wait());
-            }
+        if let Ok(Some(_)) = self.child.try_wait() {
+            // WHY: Drop is the last-resort cleanup for early diagnostic
+            // returns; the normal timeout path reports kill/wait failures.
+        } else {
+            drop(self.child.kill());
+            drop(self.child.wait());
         }
     }
 }

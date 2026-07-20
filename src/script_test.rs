@@ -50,11 +50,11 @@ fn run_named_uses_diagnostic_identity() {
     let mut host = BufferHost::default();
     let status = run_named(
         "embed.fab",
-        r#"
+        r"
 incipit {
     nota 1
 }
-"#,
+",
         &mut host,
     )
     .expect("named embed run succeeds");

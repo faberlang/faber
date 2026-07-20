@@ -206,7 +206,7 @@ pub struct InstallArgs {
     #[arg(long, conflicts_with = "library")]
     pub path: Option<PathBuf>,
 
-    /// Shared cista package store; falls back to CISTAE_HOME, then ~/.faber/cistae
+    /// Shared cista package store; falls back to `CISTAE_HOME`, then `~/.faber/cistae`
     #[arg(long)]
     pub store: Option<PathBuf>,
 
@@ -218,7 +218,7 @@ pub struct InstallArgs {
     #[arg(long, default_value = "rust")]
     pub target_language: String,
 
-    /// Local/dev Cista registry root for exact name@version installs; falls back to CISTA_REGISTRY
+    /// Local/dev Cista registry root for exact name@version installs; falls back to `CISTA_REGISTRY`
     #[arg(long)]
     pub registry: Option<PathBuf>,
 

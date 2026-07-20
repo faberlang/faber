@@ -24,26 +24,43 @@ pub struct MaterializedCoreSupport {
 impl MaterializedCoreSupport {
     /// The content-addressed root suitable for later generated-Cargo routing.
     #[cfg_attr(not(test), allow(dead_code))]
+    #[must_use]
     pub fn root(&self) -> &Path {
         &self.root
     }
 
     /// Verified source root for the core runtime crate.
+    ///
+    /// # Errors
+    /// Returns [`MaterializeError`] when the core runtime directory is missing
+    /// or is a symlink.
     pub fn faber_runtime(&self) -> Result<PathBuf, MaterializeError> {
         self.required_directory("faber-runtime")
     }
 
     /// Verified source root for the native kernel crate.
+    ///
+    /// # Errors
+    /// Returns [`MaterializeError`] when the kernel directory is missing or is
+    /// a symlink.
     pub fn host_kernel(&self) -> Result<PathBuf, MaterializeError> {
         self.required_directory("host-kernel-rs")
     }
 
     /// Verified source root for the native host crate.
+    ///
+    /// # Errors
+    /// Returns [`MaterializeError`] when the host directory is missing or is a
+    /// symlink.
     pub fn host_native(&self) -> Result<PathBuf, MaterializeError> {
         self.required_directory("host-native-rs")
     }
 
     /// Verified source root for one explicit embedded provider crate.
+    ///
+    /// # Errors
+    /// Returns [`MaterializeError`] when the provider is unsupported or the
+    /// provider directory is missing or a symlink.
     pub fn provider(&self, provider: &str) -> Result<PathBuf, MaterializeError> {
         if !matches!(
             provider,
@@ -69,6 +86,10 @@ impl MaterializedCoreSupport {
 }
 
 /// Materializes the embedded payload beneath the platform cache directory.
+///
+/// # Errors
+/// Returns [`MaterializeError`] when the platform cache directory cannot be
+/// determined or any extraction step fails.
 pub fn materialize() -> Result<MaterializedCoreSupport, MaterializeError> {
     materialize_into(&platform_cache_dir()?)
 }
@@ -77,6 +98,9 @@ pub fn materialize() -> Result<MaterializedCoreSupport, MaterializeError> {
 ///
 /// This explicit seam exists for callers that own an application cache root and
 /// for tests; it never derives a path from a workspace or checkout location.
+///
+/// # Errors
+/// Returns [`MaterializeError`] when any extraction or verification step fails.
 pub fn materialize_into(cache_root: &Path) -> Result<MaterializedCoreSupport, MaterializeError> {
     materialize_payload(cache_root, ARCHIVE, SHA256, FILE_MANIFEST)
 }
@@ -335,8 +359,8 @@ fn extract(
         if size > MAX_FILE_BYTES
             || total
                 .checked_add(size)
-                .filter(|size| *size <= MAX_PAYLOAD_BYTES)
-                .is_none()
+                .as_ref()
+                .is_none_or(|size| *size > MAX_PAYLOAD_BYTES)
         {
             return Err(MaterializeError::InvalidPayload(
                 "archive exceeds extraction size limits",
@@ -516,10 +540,12 @@ fn completion_contents(archive_hash: &str, files: &BTreeMap<String, String>) -> 
 }
 
 fn file_manifest_contents(files: &BTreeMap<String, String>) -> String {
-    files
-        .iter()
-        .map(|(path, hash)| format!("{hash}  {path}\n"))
-        .collect()
+    let mut output = String::new();
+    for (path, hash) in files {
+        use std::fmt::Write;
+        let _ = writeln!(output, "{hash}  {path}");
+    }
+    output
 }
 
 fn open_lock(parent: &Path, hash: &str) -> Result<File, MaterializeError> {
@@ -746,7 +772,13 @@ fn fsync_dir(_: &Path) -> Result<(), MaterializeError> {
 }
 
 fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+    bytes
+        .iter()
+        .fold(String::with_capacity(bytes.len() * 2), |mut acc, byte| {
+            use std::fmt::Write;
+            let _ = write!(acc, "{byte:02x}");
+            acc
+        })
 }
 
 /// A closed set of materialization failures. No failure falls back to a source checkout.

@@ -132,7 +132,7 @@ fn dispatch(command: Command) {
         }
         Command::VerifyLibrary(args) => cmd_verify_library(args),
         Command::Init(args) => cmd_init(args),
-        Command::Install(args) => cmd_install(args),
+        Command::Install(args) => cmd_install(&args),
         Command::Explain(args) => cmd_explain(args),
         Command::Run(args) => cmd_run(args),
         Command::FmirRun(args) => cmd_fmir_run_image(args),
@@ -179,7 +179,7 @@ fn dispatch(command: Command) {
                 tool::cmd_emit(emit_command);
             }
         }
-        Command::Format(args) => cmd_format(format::FormatCommand {
+        Command::Format(args) => cmd_format(&format::FormatCommand {
             paths: args.paths,
             canonical: args.canonical,
             reader_locale: args.reader_locale,

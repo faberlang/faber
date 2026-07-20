@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub(super) fn cmd_install(args: InstallArgs) {
+pub(super) fn cmd_install(args: &InstallArgs) {
     if let Some(path) = args.path.as_ref() {
         match install_store_path(
             path,

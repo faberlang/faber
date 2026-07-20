@@ -50,7 +50,7 @@ fn has_issue(diagnostics: &[radix::diagnostics::Diagnostic], issue: &str) -> boo
 fn compiler_analysis_handles_annotations_multiline_signatures_and_next_line_bodies() {
     let root = test_package(
         "analyzed-layout",
-        r#"@ futura
+        r"@ futura
 functio delegata(
     textus value
 ) → textus
@@ -61,7 +61,7 @@ functio localis(
 {
     redde value
 }
-"#,
+",
         r#"[functions."fixture:api.delegata"]
 symbol = "crate::shim::delegata"
 
@@ -80,12 +80,12 @@ path = "rust/shim.rs"
 fn nested_method_cannot_satisfy_a_top_level_binding() {
     let root = test_package(
         "nested-method",
-        r#"genus Capsa {
+        r"genus Capsa {
     functio abscondita(textus value) → textus {
         redde value
     }
 }
-"#,
+",
         r#"[functions."fixture:api.abscondita"]
 symbol = "crate::shim::abscondita"
 

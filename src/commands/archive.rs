@@ -90,7 +90,7 @@ fn create_temp_root(archive: &Path) -> ArchiveResult<PathBuf> {
         };
         match fs::create_dir(&candidate) {
             Ok(()) => return Ok(candidate),
-            Err(err) if err.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {}
             Err(err) => {
                 return Err(Box::new(Diagnostic::io_error(&candidate, err)));
             }

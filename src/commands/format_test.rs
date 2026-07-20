@@ -82,9 +82,10 @@ fn format_test_gate_matches_compile_author_pipeline_for_salve() {
 }
 
 fn faber_binary() -> PathBuf {
-    std::env::var("CARGO_BIN_EXE_faber")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/debug/faber"))
+    std::env::var("CARGO_BIN_EXE_faber").map_or_else(
+        |_| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/debug/faber"),
+        PathBuf::from,
+    )
 }
 
 fn run_faber_format_stdout(path: &Path) -> String {

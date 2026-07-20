@@ -14,18 +14,17 @@ pub(super) fn cmd_explain(args: ExplainArgs) {
 
     if let Some(category) = args.category {
         let registry = load_registry();
-        match explain::render_category(&registry, &category) {
-            Some(output) => print!("{output}"),
-            None => {
-                eprintln!("error: no explanations found in category '{category}'");
-                let categories = registry
-                    .categories()
-                    .into_iter()
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                eprintln!("hint: available categories: {categories}");
-                std::process::exit(1);
-            }
+        if let Some(output) = explain::render_category(&registry, &category) {
+            print!("{output}");
+        } else {
+            eprintln!("error: no explanations found in category '{category}'");
+            let categories = registry
+                .categories()
+                .into_iter()
+                .collect::<Vec<_>>()
+                .join(", ");
+            eprintln!("hint: available categories: {categories}");
+            std::process::exit(1);
         }
         return;
     }

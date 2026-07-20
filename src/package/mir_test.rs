@@ -42,8 +42,8 @@ fn fmir_bin_entrypoint_and_runner_names_are_configured() {
 #[test]
 fn fnv1a64_constants_are_standard() {
     // Standard FNV-1a 64-bit offset and prime values.
-    assert_eq!(FNV1A64_OFFSET, 0xcbf29ce484222325);
-    assert_eq!(FNV1A64_PRIME, 0x100000001b3);
+    assert_eq!(FNV1A64_OFFSET, 0xcbf2_9ce4_8422_2325);
+    assert_eq!(FNV1A64_PRIME, 0x0100_0000_01b3);
 }
 
 #[test]
@@ -336,8 +336,8 @@ fn is_bridged_norma_module_returns_false_for_package_provider() {
 #[test]
 fn validate_package_mir_manifest_accepts_valid_manifest() {
     let manifest = format!(
-        r#"version = {version}
-target = "{target}"
+        r#"version = {PACKAGE_MIR_ARTIFACT_VERSION}
+target = "{PACKAGE_MIR_TARGET_NAME}"
 
 [package]
 name = "test-package"
@@ -345,9 +345,7 @@ name = "test-package"
 entry = "main.fab"
 
 [runtime]
-"#,
-        version = PACKAGE_MIR_ARTIFACT_VERSION,
-        target = PACKAGE_MIR_TARGET_NAME
+"#
     );
     let result = validate_package_mir_manifest(&manifest, Path::new("/fake/path"));
     assert!(result.is_ok());
@@ -368,12 +366,11 @@ entry = "main.fab"
 #[test]
 fn validate_package_mir_manifest_rejects_missing_target() {
     let manifest = format!(
-        r#"version = {version}
+        r#"version = {PACKAGE_MIR_ARTIFACT_VERSION}
 entry = "main.fab"
 
 [runtime]
-"#,
-        version = PACKAGE_MIR_ARTIFACT_VERSION
+"#
     );
     let result = validate_package_mir_manifest(&manifest, Path::new("/fake/path"));
     assert!(result.is_err());
@@ -382,13 +379,11 @@ entry = "main.fab"
 #[test]
 fn validate_package_mir_manifest_rejects_missing_entry() {
     let manifest = format!(
-        r#"version = {version}
-target = "{target}"
+        r#"version = {PACKAGE_MIR_ARTIFACT_VERSION}
+target = "{PACKAGE_MIR_TARGET_NAME}"
 
 [runtime]
 "#,
-        version = PACKAGE_MIR_ARTIFACT_VERSION,
-        target = PACKAGE_MIR_TARGET_NAME
     );
     let result = validate_package_mir_manifest(&manifest, Path::new("/fake/path"));
     assert!(result.is_err());
@@ -397,12 +392,10 @@ target = "{target}"
 #[test]
 fn validate_package_mir_manifest_rejects_missing_runtime_section() {
     let manifest = format!(
-        r#"version = {version}
-target = "{target}"
+        r#"version = {PACKAGE_MIR_ARTIFACT_VERSION}
+target = "{PACKAGE_MIR_TARGET_NAME}"
 entry = "main.fab"
 "#,
-        version = PACKAGE_MIR_ARTIFACT_VERSION,
-        target = PACKAGE_MIR_TARGET_NAME,
     );
     let result = validate_package_mir_manifest(&manifest, Path::new("/fake/path"));
     assert!(result.is_err());
@@ -424,13 +417,12 @@ entry = "main.fab"
 #[test]
 fn validate_package_mir_manifest_rejects_wrong_target() {
     let manifest = format!(
-        r#"version = {version}
+        r#"version = {PACKAGE_MIR_ARTIFACT_VERSION}
 target = "fmir"
 entry = "main.fab"
 
 [runtime]
 "#,
-        version = PACKAGE_MIR_ARTIFACT_VERSION,
     );
     let result = validate_package_mir_manifest(&manifest, Path::new("/fake/path"));
     assert!(result.is_err());

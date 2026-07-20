@@ -39,11 +39,11 @@ targets = ["rust"]
     .expect("write manifest");
     fs::write(
         root.join(source).join("math").join("add.fab"),
-        r#"
+        r"
 functio addit(numerus left, numerus right) → numerus {
     redde left + right
 }
-"#,
+",
     )
     .expect("write module");
     git(root, &["init"]);

@@ -68,12 +68,11 @@ pub(super) fn cmd_test(args: &TestArgs) {
         None
     };
 
-    let code_string = match output {
-        radix::Output::Rust(r) => r.code,
-        _ => {
-            eprintln!("error: test only supports Rust backend packages");
-            std::process::exit(1);
-        }
+    let code_string = if let radix::Output::Rust(r) = output {
+        r.code
+    } else {
+        eprintln!("error: test only supports Rust backend packages");
+        std::process::exit(1);
     };
 
     // Match `faber build` / `faber run`: G4 native library path deps via artifact plan.

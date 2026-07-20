@@ -54,10 +54,10 @@ func main() {
 
 #[test]
 fn ensure_go_import_inserts_after_package_main_when_no_imports() {
-    let code = r#"package main
+    let code = r"package main
 
 func main() {}
-"#;
+";
     let ensured = ensure_go_import(code, "fmt");
     assert!(ensured.starts_with("package main"));
     assert!(ensured.contains("import \"fmt\""));
@@ -79,7 +79,7 @@ func main() {}
 
 #[test]
 fn ensure_go_import_handles_no_package_main() {
-    let code = r#"func main() {}"#;
+    let code = r"func main() {}";
     let ensured = ensure_go_import(code, "fmt");
     assert_eq!(ensured, code);
 }

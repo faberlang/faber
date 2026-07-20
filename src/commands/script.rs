@@ -124,7 +124,7 @@ fn eprint_archive_diagnostics(diagnostics: &[Diagnostic]) {
 /// Execute `-c` / `--command` source via the MIR stepper.
 pub(super) fn cmd_eval(source: &str, args: Vec<String>) {
     let mut host = StdioHost::with_argumenta(args);
-    if let Err(error) = interpret_source("command-line", &source, &mut host) {
+    if let Err(error) = interpret_source("command-line", source, &mut host) {
         print_run_source_error(&error);
         std::process::exit(1);
     }

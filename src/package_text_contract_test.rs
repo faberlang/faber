@@ -266,7 +266,7 @@ fn package_render_emits_sem001_suggestion_for_vietnamese_name() {
         "expected SEM001 diagnostics: {diagnostics:?}"
     );
     assert!(
-        diagnostics.iter().any(|diag| diag.is_error()),
+        diagnostics.iter().any(radix::Diagnostic::is_error),
         "misspelled identifier must not be accepted as valid source: {diagnostics:?}"
     );
 
@@ -307,7 +307,7 @@ fn package_render_emits_reader002_accented_keyword_suggestion() {
         "expected READER002 diagnostics: {diagnostics:?}"
     );
     assert!(
-        diagnostics.iter().any(|diag| diag.is_error()),
+        diagnostics.iter().any(radix::Diagnostic::is_error),
         "misspelled keyword must not be accepted as valid source: {diagnostics:?}"
     );
 
@@ -343,7 +343,7 @@ fn package_render_emits_reader002_typo_keyword_suggestion() {
         "expected READER002 diagnostics: {diagnostics:?}"
     );
     assert!(
-        diagnostics.iter().any(|diag| diag.is_error()),
+        diagnostics.iter().any(radix::Diagnostic::is_error),
         "misspelled keyword must not be accepted as valid source: {diagnostics:?}"
     );
 
