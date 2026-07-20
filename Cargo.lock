@@ -597,6 +597,8 @@ dependencies = [
  "ariadne",
  "clap",
  "getrandom 0.2.17",
+ "radix-codegen-go",
+ "radix-codegen-rust",
  "radix-codegen-shared",
  "radix-codegen-ts",
  "radix-diagnostics",
@@ -616,6 +618,32 @@ dependencies = [
  "wait-timeout",
  "wasm-encoder 0.250.0",
  "wat",
+]
+
+[[package]]
+name = "radix-codegen-go"
+version = "0.38.0"
+dependencies = [
+ "radix-codegen-shared",
+ "radix-diagnostics",
+ "radix-hir",
+ "radix-lexer",
+ "radix-syntax",
+ "radix-types",
+ "rustc-hash",
+]
+
+[[package]]
+name = "radix-codegen-rust"
+version = "0.38.0"
+dependencies = [
+ "radix-codegen-shared",
+ "radix-diagnostics",
+ "radix-hir",
+ "radix-lexer",
+ "radix-syntax",
+ "radix-types",
+ "rustc-hash",
 ]
 
 [[package]]

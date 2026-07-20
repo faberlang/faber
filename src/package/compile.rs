@@ -1417,15 +1417,25 @@ fn generate_rust_code_for_analysis(
             if let Some(info) = imported_namespace_info {
                 codegen.set_imported_namespace_info(info);
             }
-            codegen.set_gpu_builtins(&analysis.gpu_builtins);
+            let gpu_builtins = radix::codegen::rust::rust_gpu_builtins(&analysis.gpu_builtins);
+            codegen.set_gpu_builtins(&gpu_builtins);
             codegen.set_field_name_policy(field_name_policy);
             codegen.set_native_host_bootstrap(native_host_bootstrap);
+            let cli_ir = radix::codegen::rust::to_cli_ir(cli_program);
             return codegen
-                .generate_cli(&analysis.hir, &analysis.types, cli_program)
+                .generate_cli(&analysis.hir, &analysis.types, &cli_ir)
                 .map(|output| output.code);
         }
     }
 
+    let gpu_builtins = radix::codegen::rust::rust_gpu_builtins(&analysis.gpu_builtins);
+    let cli_ir = if module_mode {
+        None
+    } else {
+        analysis.cli_program.as_ref().map(radix::codegen::rust::to_cli_ir)
+    };
+    // Leaf ModuleGenerationRequest borrows CLI IR; keep owned ir alive for the call.
+    let cli_ir_ref = cli_ir.as_ref();
     radix::codegen::rust::generate_with_library_registry_test_selection_and_imports(
         radix::codegen::rust::ModuleGenerationRequest {
             hir: &analysis.hir,
@@ -1434,10 +1444,10 @@ fn generate_rust_code_for_analysis(
             libraries: &analysis.libraries,
             test_selection: test_selection.cloned(),
             module_mode,
-            cli_program: if module_mode { cli_program } else { None },
+            cli_program: cli_ir_ref,
             imported_function_params,
             imported_namespace_info,
-            gpu_builtins: &analysis.gpu_builtins,
+            gpu_builtins: &gpu_builtins,
             field_name_policy,
             native_host_bootstrap,
         },
