@@ -1,9 +1,9 @@
 use super::*;
 use radix::lexer::Span;
 use radix::mir::MirTempId;
-use std::path::Path;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
 
 // ── Constant / configuration tests ──────────────────────────────────────────
 
@@ -62,7 +62,10 @@ fn fnv1a64_empty_input_produces_offset() {
 fn fnv1a64_single_byte_produces_deterministic_hash() {
     let hash_a = fnv1a64(b"a");
     let hash_b = fnv1a64(b"b");
-    assert_ne!(hash_a, hash_b, "different bytes must produce different hashes");
+    assert_ne!(
+        hash_a, hash_b,
+        "different bytes must produce different hashes"
+    );
     // Re-run to verify determinism.
     assert_eq!(fnv1a64(b"a"), hash_a);
 }
@@ -198,7 +201,9 @@ fn is_known_fmir_runtime_requirement_rejects_unknown_host_prefix() {
 fn is_known_fmir_runtime_requirement_rejects_empty_and_garbage() {
     assert!(!is_known_fmir_runtime_requirement(""));
     assert!(!is_known_fmir_runtime_requirement("not-a-requirement"));
-    assert!(!is_known_fmir_runtime_requirement("kernel:unknown_module.verb"));
+    assert!(!is_known_fmir_runtime_requirement(
+        "kernel:unknown_module.verb"
+    ));
 }
 
 // ── is_known_fmir_kernel_requirement ────────────────────────────────────────
@@ -291,10 +296,7 @@ fn library_identity_label_formats_package_provider() {
         provider: LibraryProvider::Package("my-lib".to_owned()),
         module_path: vec!["foo".to_string(), "bar".to_string()],
     };
-    assert_eq!(
-        library_identity_label(&identity),
-        "my-lib:foo/bar"
-    );
+    assert_eq!(library_identity_label(&identity), "my-lib:foo/bar");
 }
 
 #[test]
@@ -304,10 +306,7 @@ fn library_identity_label_handles_multi_segment_module_path() {
         provider: LibraryProvider::Builtin("norma".to_owned()),
         module_path: vec!["http".to_string(), "v1".to_string(), "client".to_string()],
     };
-    assert_eq!(
-        library_identity_label(&identity),
-        "norma:http/v1/client"
-    );
+    assert_eq!(library_identity_label(&identity), "norma:http/v1/client");
 }
 
 // ── is_bridged_norma_module ────────────────────────────────────────────────
@@ -454,7 +453,10 @@ fn make_fmir_bin_entrypoint_executable_sets_755_permissions() {
     std::fs::write(&entrypoint, "#!/bin/sh\necho hello").expect("write entrypoint");
 
     let result = make_fmir_bin_entrypoint_executable(&entrypoint, &dir);
-    assert!(result.is_ok(), "make_fmir_bin_entrypoint_executable should succeed");
+    assert!(
+        result.is_ok(),
+        "make_fmir_bin_entrypoint_executable should succeed"
+    );
 
     let metadata = std::fs::metadata(&entrypoint).expect("read metadata");
     let mode = metadata.permissions().mode();

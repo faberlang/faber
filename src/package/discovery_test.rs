@@ -89,7 +89,10 @@ fn build_layout_from_package_root_sets_release_binary() {
 #[test]
 fn build_layout_from_package_root_sets_generated_crate_paths() {
     let layout = BuildLayout::from_package_root("/tmp/my-pkg", "my-package");
-    assert_eq!(layout.generated_crate_root, Path::new("/tmp/my-pkg/target/faber"));
+    assert_eq!(
+        layout.generated_crate_root,
+        Path::new("/tmp/my-pkg/target/faber")
+    );
     assert_eq!(
         layout.generated_cargo_manifest,
         Path::new("/tmp/my-pkg/target/faber/Cargo.toml")

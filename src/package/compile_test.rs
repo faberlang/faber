@@ -174,7 +174,12 @@ fn go_import_path_handles_path_with_slashes() {
 
 #[test]
 fn sorted_export_names_returns_sorted_deduped_list() {
-    let names = vec!["z".to_owned(), "a".to_owned(), "b".to_owned(), "a".to_owned()];
+    let names = vec![
+        "z".to_owned(),
+        "a".to_owned(),
+        "b".to_owned(),
+        "a".to_owned(),
+    ];
     let result = sorted_export_names(names);
     assert_eq!(result, vec!["a", "b", "z"]);
 }
@@ -214,10 +219,7 @@ fn normalize_path_buf_returns_path_as_is_when_canonicalize_fails() {
 fn allow_go_cli_dashed_rest_operands_injects_false_guard() {
     let code = r#"if strings.HasPrefix(arg, "-") {"#;
     let result = allow_go_cli_dashed_rest_operands(code);
-    assert_eq!(
-        result,
-        r#"if strings.HasPrefix(arg, "-") && false {"#
-    );
+    assert_eq!(result, r#"if strings.HasPrefix(arg, "-") && false {"#);
 }
 
 #[test]

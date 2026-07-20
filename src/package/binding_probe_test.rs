@@ -48,7 +48,10 @@ fn truncate_output_handles_unicode_character_boundary() {
 fn probe_root_returns_unique_path_per_call() {
     let root1 = probe_root();
     let root2 = probe_root();
-    assert_ne!(root1, root2, "each probe_root call must produce a unique path");
+    assert_ne!(
+        root1, root2,
+        "each probe_root call must produce a unique path"
+    );
 }
 
 #[test]
@@ -115,7 +118,10 @@ fn probe_key_changes_with_different_probes() {
 
     let key_a = probe_key(package_root, anchor, &deps, None, &["fn a() {}".to_owned()]);
     let key_b = probe_key(package_root, anchor, &deps, None, &["fn b() {}".to_owned()]);
-    assert_ne!(key_a, key_b, "different probes should produce different keys");
+    assert_ne!(
+        key_a, key_b,
+        "different probes should produce different keys"
+    );
 }
 
 #[test]
@@ -126,7 +132,13 @@ fn probe_key_includes_shim_path_when_present() {
     let probes = vec!["fn test() {}".to_owned()];
 
     let key_without = probe_key(package_root, anchor, &deps, None, &probes);
-    let key_with = probe_key(package_root, anchor, &deps, Some(Path::new("/shim.rs")), &probes);
+    let key_with = probe_key(
+        package_root,
+        anchor,
+        &deps,
+        Some(Path::new("/shim.rs")),
+        &probes,
+    );
     assert_ne!(
         key_without, key_with,
         "shim presence should change probe key"
@@ -166,10 +178,10 @@ fn probe_source_with_shim_includes_path_attribute() {
 
 #[test]
 fn probe_source_handles_multiple_probes() {
-    let source = probe_source(None, &[
-        "fn test_a() {}".to_owned(),
-        "fn test_b() {}".to_owned(),
-    ]);
+    let source = probe_source(
+        None,
+        &["fn test_a() {}".to_owned(), "fn test_b() {}".to_owned()],
+    );
     assert!(source.contains("fn test_a() {}"));
     assert!(source.contains("fn test_b() {}"));
     assert!(source.contains("fn main() {}"));

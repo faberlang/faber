@@ -338,7 +338,10 @@ fn normalize_trailing_newline_handles_only_newlines() {
 
 #[test]
 fn normalize_trailing_newline_preserves_internal_newlines() {
-    assert_eq!(normalize_trailing_newline("line1\nline2\n"), "line1\nline2\n");
+    assert_eq!(
+        normalize_trailing_newline("line1\nline2\n"),
+        "line1\nline2\n"
+    );
 }
 
 #[test]

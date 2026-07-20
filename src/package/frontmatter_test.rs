@@ -25,11 +25,14 @@ entry = "main.fab"
 #[test]
 fn validate_frontmatter_no_conflict_when_values_match() {
     let path = Path::new("main.fab");
-    let frontmatter =
-        parse_file_frontmatter(r#"build = { target = "rust", kind = "bin" }"#).expect("frontmatter");
+    let frontmatter = parse_file_frontmatter(r#"build = { target = "rust", kind = "bin" }"#)
+        .expect("frontmatter");
     let manifest = test_manifest();
     let result = validate_frontmatter_against_manifest(path, Some(&frontmatter), &manifest);
-    assert!(result.is_none(), "matching values should not produce a conflict");
+    assert!(
+        result.is_none(),
+        "matching values should not produce a conflict"
+    );
 }
 
 #[test]
@@ -37,7 +40,10 @@ fn validate_frontmatter_no_conflict_when_no_frontmatter() {
     let path = Path::new("main.fab");
     let manifest = test_manifest();
     let result = validate_frontmatter_against_manifest(path, None, &manifest);
-    assert!(result.is_none(), "no frontmatter should not produce a conflict");
+    assert!(
+        result.is_none(),
+        "no frontmatter should not produce a conflict"
+    );
 }
 
 #[test]
@@ -47,7 +53,10 @@ fn validate_frontmatter_rejects_target_conflict() {
         parse_file_frontmatter(r#"build = { target = "scena" }"#).expect("frontmatter");
     let manifest = test_manifest();
     let result = validate_frontmatter_against_manifest(path, Some(&frontmatter), &manifest);
-    assert!(result.is_some(), "target conflict should produce a diagnostic");
+    assert!(
+        result.is_some(),
+        "target conflict should produce a diagnostic"
+    );
     let diag = result.unwrap();
     assert!(diag.message.contains("[build].target"));
     assert!(diag.message.contains("scena"));
@@ -56,11 +65,13 @@ fn validate_frontmatter_rejects_target_conflict() {
 #[test]
 fn validate_frontmatter_rejects_kind_conflict() {
     let path = Path::new("main.fab");
-    let frontmatter =
-        parse_file_frontmatter(r#"build = { kind = "lib" }"#).expect("frontmatter");
+    let frontmatter = parse_file_frontmatter(r#"build = { kind = "lib" }"#).expect("frontmatter");
     let manifest = test_manifest();
     let result = validate_frontmatter_against_manifest(path, Some(&frontmatter), &manifest);
-    assert!(result.is_some(), "kind conflict should produce a diagnostic");
+    assert!(
+        result.is_some(),
+        "kind conflict should produce a diagnostic"
+    );
     let diag = result.unwrap();
     assert!(diag.message.contains("[build].kind"));
     assert!(diag.message.contains("lib"));
@@ -69,13 +80,13 @@ fn validate_frontmatter_rejects_kind_conflict() {
 #[test]
 fn validate_frontmatter_rejects_package_name_conflict() {
     let path = Path::new("main.fab");
-    let frontmatter = parse_file_frontmatter(
-        "[package]\nname = \"other\"",
-    )
-    .expect("frontmatter");
+    let frontmatter = parse_file_frontmatter("[package]\nname = \"other\"").expect("frontmatter");
     let manifest = test_manifest();
     let result = validate_frontmatter_against_manifest(path, Some(&frontmatter), &manifest);
-    assert!(result.is_some(), "name conflict should produce a diagnostic");
+    assert!(
+        result.is_some(),
+        "name conflict should produce a diagnostic"
+    );
     let diag = result.unwrap();
     assert!(diag.message.contains("[package].name"));
 }
@@ -83,13 +94,14 @@ fn validate_frontmatter_rejects_package_name_conflict() {
 #[test]
 fn validate_frontmatter_rejects_package_version_conflict() {
     let path = Path::new("main.fab");
-    let frontmatter = parse_file_frontmatter(
-        "[package]\nversion = \"2.0.0\"",
-    )
-    .expect("frontmatter");
+    let frontmatter =
+        parse_file_frontmatter("[package]\nversion = \"2.0.0\"").expect("frontmatter");
     let manifest = test_manifest();
     let result = validate_frontmatter_against_manifest(path, Some(&frontmatter), &manifest);
-    assert!(result.is_some(), "version conflict should produce a diagnostic");
+    assert!(
+        result.is_some(),
+        "version conflict should produce a diagnostic"
+    );
     let diag = result.unwrap();
     assert!(diag.message.contains("[package].version"));
 }
@@ -97,13 +109,13 @@ fn validate_frontmatter_rejects_package_version_conflict() {
 #[test]
 fn validate_frontmatter_rejects_paths_source_conflict() {
     let path = Path::new("main.fab");
-    let frontmatter = parse_file_frontmatter(
-        "[paths]\nsource = \"lib\"",
-    )
-    .expect("frontmatter");
+    let frontmatter = parse_file_frontmatter("[paths]\nsource = \"lib\"").expect("frontmatter");
     let manifest = test_manifest();
     let result = validate_frontmatter_against_manifest(path, Some(&frontmatter), &manifest);
-    assert!(result.is_some(), "paths.source conflict should produce a diagnostic");
+    assert!(
+        result.is_some(),
+        "paths.source conflict should produce a diagnostic"
+    );
     let diag = result.unwrap();
     assert!(diag.message.contains("[paths].source"));
 }
@@ -111,13 +123,14 @@ fn validate_frontmatter_rejects_paths_source_conflict() {
 #[test]
 fn validate_frontmatter_rejects_paths_entry_conflict() {
     let path = Path::new("main.fab");
-    let frontmatter = parse_file_frontmatter(
-        "[paths]\nentry = \"other.fab\"",
-    )
-    .expect("frontmatter");
+    let frontmatter =
+        parse_file_frontmatter("[paths]\nentry = \"other.fab\"").expect("frontmatter");
     let manifest = test_manifest();
     let result = validate_frontmatter_against_manifest(path, Some(&frontmatter), &manifest);
-    assert!(result.is_some(), "paths.entry conflict should produce a diagnostic");
+    assert!(
+        result.is_some(),
+        "paths.entry conflict should produce a diagnostic"
+    );
     let diag = result.unwrap();
     assert!(diag.message.contains("[paths].entry"));
 }
@@ -139,10 +152,8 @@ source = "src"
 "#;
     let manifest: FaberManifest = toml::from_str(toml_str).expect("valid manifest");
     let path = Path::new("main.fab");
-    let frontmatter = parse_file_frontmatter(
-        "[paths]\nentry = \"custom.fab\"",
-    )
-    .expect("frontmatter");
+    let frontmatter =
+        parse_file_frontmatter("[paths]\nentry = \"custom.fab\"").expect("frontmatter");
     let result = validate_frontmatter_against_manifest(path, Some(&frontmatter), &manifest);
     assert!(result.is_none(), "no conflict when manifest has no entry");
 }
@@ -157,18 +168,22 @@ fn merge_entry_test_selection_uses_cli_when_provided() {
         tag: None,
     };
     let result = merge_entry_test_selection(Some(&cli), None);
-    assert_eq!(result.as_ref().and_then(|s| s.name.as_deref()), Some("test_foo"));
+    assert_eq!(
+        result.as_ref().and_then(|s| s.name.as_deref()),
+        Some("test_foo")
+    );
 }
 
 #[test]
 fn merge_entry_test_selection_uses_frontmatter_when_no_cli() {
-    let frontmatter = parse_file_frontmatter(
-        "[probanda]\ntags = [\"integration\"]",
-    )
-    .expect("frontmatter");
+    let frontmatter =
+        parse_file_frontmatter("[probanda]\ntags = [\"integration\"]").expect("frontmatter");
     let result = merge_entry_test_selection(None, Some(&frontmatter));
     assert!(result.is_some());
-    assert_eq!(result.as_ref().and_then(|s| s.tag.as_deref()), Some("integration"));
+    assert_eq!(
+        result.as_ref().and_then(|s| s.tag.as_deref()),
+        Some("integration")
+    );
 }
 
 #[test]
@@ -176,7 +191,10 @@ fn merge_entry_test_selection_uses_frontmatter_sectio() {
     let frontmatter = parse_file_frontmatter("sectio = \"math\"").expect("frontmatter");
     let result = merge_entry_test_selection(None, Some(&frontmatter));
     assert!(result.is_some());
-    assert_eq!(result.as_ref().and_then(|s| s.suite.as_deref()), Some("math"));
+    assert_eq!(
+        result.as_ref().and_then(|s| s.suite.as_deref()),
+        Some("math")
+    );
 }
 
 #[test]
@@ -186,10 +204,8 @@ fn merge_entry_test_selection_cli_overrides_frontmatter() {
         suite: None,
         tag: None,
     };
-    let frontmatter = parse_file_frontmatter(
-        "[probanda]\ntags = [\"frontmatter-tag\"]",
-    )
-    .expect("frontmatter");
+    let frontmatter =
+        parse_file_frontmatter("[probanda]\ntags = [\"frontmatter-tag\"]").expect("frontmatter");
     let result = merge_entry_test_selection(Some(&cli), Some(&frontmatter));
     assert_eq!(
         result.as_ref().and_then(|s| s.name.as_deref()),
@@ -205,10 +221,8 @@ fn merge_entry_test_selection_cli_suite_overrides_frontmatter_tag() {
         suite: Some("math".to_owned()),
         tag: None,
     };
-    let frontmatter = parse_file_frontmatter(
-        "[probanda]\ntags = [\"integration\"]",
-    )
-    .expect("frontmatter");
+    let frontmatter =
+        parse_file_frontmatter("[probanda]\ntags = [\"integration\"]").expect("frontmatter");
     let result = merge_entry_test_selection(Some(&cli), Some(&frontmatter));
     assert_eq!(
         result.as_ref().and_then(|s| s.suite.as_deref()),
@@ -244,8 +258,7 @@ fn frontmatter_manifest_conflict_returns_none_when_values_match() {
 
 #[test]
 fn frontmatter_manifest_conflict_returns_diagnostic_on_mismatch() {
-    let result =
-        frontmatter_manifest_conflict("file.fab", "target", "scena", "target", "rust");
+    let result = frontmatter_manifest_conflict("file.fab", "target", "scena", "target", "rust");
     assert!(result.is_some());
     let diag = result.unwrap();
     assert!(diag.message.contains("frontmatter target"));
