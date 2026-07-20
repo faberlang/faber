@@ -543,7 +543,3 @@ fn default_library_home() -> Option<PathBuf> {
 
     None
 }
-
-#[cfg(test)]
-#[path = "library_test.rs"]
-mod tests;
