@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 
 /// Run `faber script`: interpret a file, package directory, manifest, or
 /// archive without compiling to Rust or invoking Cargo.
-pub(super) fn cmd_script(args: ScriptArgs) {
+pub(super) fn cmd_script(args: &ScriptArgs) {
     let path = PathBuf::from(&args.path);
     interpret_path(&path, &args.args);
 }
@@ -122,7 +122,7 @@ fn eprint_archive_diagnostics(diagnostics: &[Diagnostic]) {
 }
 
 /// Execute `-c` / `--command` source via the MIR stepper.
-pub(super) fn cmd_eval(source: String, args: Vec<String>) {
+pub(super) fn cmd_eval(source: &str, args: Vec<String>) {
     let mut host = StdioHost::with_argumenta(args);
     if let Err(error) = interpret_source("command-line", &source, &mut host) {
         print_run_source_error(&error);

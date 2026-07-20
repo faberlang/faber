@@ -67,7 +67,7 @@ pub(super) fn cmd_run(args: RunArgs) {
             return;
         }
         Target::FmirBin => {
-            cmd_run_fmir_bin(args);
+            cmd_run_fmir_bin(&args);
             return;
         }
         target => {
@@ -84,7 +84,7 @@ pub(super) fn cmd_run(args: RunArgs) {
         return;
     }
 
-    cmd_run_compiled(args);
+    cmd_run_compiled(&args);
 }
 
 fn run_target_name(target: Target) -> &'static str {
@@ -233,7 +233,7 @@ fn cmd_run_fmir(args: RunArgs) {
     }
 }
 
-fn cmd_run_fmir_bin(args: RunArgs) {
+fn cmd_run_fmir_bin(args: &RunArgs) {
     let input_path = PathBuf::from(&args.path);
     let config = run_config_or_exit(Target::FmirBin, &input_path, args.reader_locale.as_deref());
     let bundle =
@@ -268,7 +268,7 @@ fn run_scena_package_with_host<H: radix::mir::Host + ?Sized>(
     package::run_package_mir_artifact(&config, &artifact, host)
 }
 
-fn cmd_run_compiled(args: RunArgs) {
+fn cmd_run_compiled(args: &RunArgs) {
     let input_path = PathBuf::from(&args.path);
 
     // POLICY: `run` is package-scoped, so stale generated crates are never

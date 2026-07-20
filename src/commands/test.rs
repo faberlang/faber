@@ -5,7 +5,7 @@ use crate::input_shape::reader_locale_without_package_error;
 use crate::package;
 
 /// Builds the package test harness and maps Faber-level selectors to Cargo test flags.
-pub(super) fn cmd_test(args: TestArgs) {
+pub(super) fn cmd_test(args: &TestArgs) {
     use std::path::PathBuf;
 
     let input_path = PathBuf::from(&args.path);

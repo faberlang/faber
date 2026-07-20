@@ -128,7 +128,7 @@ fn install_store_registry_package(
     project: Option<&Path>,
     target_language: &str,
 ) -> Result<(), Vec<String>> {
-    cista::install(cista::cli::InstallArgs {
+    cista::install(&cista::cli::InstallArgs {
         path: None,
         package: Some(package.to_owned()),
         manifest: PathBuf::from("cista.toml"),
@@ -146,7 +146,7 @@ fn install_store_cista_path(
     project: Option<&Path>,
     target_language: &str,
 ) -> Result<(), Vec<String>> {
-    cista::install(cista::cli::InstallArgs {
+    cista::install(&cista::cli::InstallArgs {
         path: Some(path),
         package: None,
         manifest: PathBuf::from("cista.toml"),

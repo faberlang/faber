@@ -60,7 +60,7 @@ pub(super) fn eprint_compile_diagnostics(diagnostics: &[radix::diagnostics::Diag
 pub fn run() {
     let cli = crate::cli::Cli::parse();
     if let Some(source) = cli.eval_source {
-        cmd_eval(source, cli.eval_args);
+        cmd_eval(&source, cli.eval_args);
         return;
     }
     let Some(command) = cli.command else {
@@ -89,7 +89,7 @@ fn dispatch(command: Command) {
                 format: args.format,
                 linter: args.linter,
                 reader_locale: args.reader_locale,
-            })
+            });
         }
         Command::Targets => cmd_targets(),
         Command::Check(args) => {
@@ -136,9 +136,9 @@ fn dispatch(command: Command) {
         Command::Explain(args) => cmd_explain(args),
         Command::Run(args) => cmd_run(args),
         Command::FmirRun(args) => cmd_fmir_run_image(args),
-        Command::Script(args) => cmd_script(args),
+        Command::Script(args) => cmd_script(&args),
         Command::Repl(args) => cmd_repl(args),
-        Command::Test(args) => cmd_test(args),
+        Command::Test(args) => cmd_test(&args),
         Command::Lex(args) => tool::cmd_lex(&args.input),
         Command::Parse(args) => tool::cmd_parse(&args.input),
         Command::Hir(args) => tool::cmd_hir(&args.input),
@@ -197,10 +197,10 @@ fn cmd_verify_library(args: crate::cli::VerifyLibraryArgs) {
         .file_name()
         .is_some_and(|name| name == "faber.toml")
     {
-        args.input
-            .parent()
-            .map(std::path::Path::to_path_buf)
-            .unwrap_or_else(|| std::path::PathBuf::from("."))
+        args.input.parent().map_or_else(
+            || std::path::PathBuf::from("."),
+            std::path::Path::to_path_buf,
+        )
     } else {
         args.input
     };

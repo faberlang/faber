@@ -169,7 +169,7 @@ fn extract_zip(archive: &Path, temp_root: &Path) -> ArchiveResult<()> {
 fn is_zip_symlink(entry: &zip::read::ZipFile<'_>) -> bool {
     entry
         .unix_mode()
-        .is_some_and(|mode| (mode & 0o170000) == 0o120000)
+        .is_some_and(|mode| (mode & 0o170_000) == 0o120_000)
 }
 
 fn safe_archive_path(name: &str) -> Result<PathBuf, ()> {

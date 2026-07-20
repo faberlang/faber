@@ -79,8 +79,8 @@ const FMIR_BIN_ENTRYPOINT_FILE: &str = "run";
 const FMIR_BIN_RUNNER_CRATE_DIR: &str = "runner";
 const FMIR_BIN_RUNNER_TARGET_DIR: &str = "runner-target";
 const FMIR_BIN_RUNNER_PACKAGE_NAME: &str = "faber-fmir-bin-runner";
-const FNV1A64_OFFSET: u64 = 0xcbf29ce484222325;
-const FNV1A64_PRIME: u64 = 0x100000001b3;
+const FNV1A64_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
+const FNV1A64_PRIME: u64 = 0x0100_0000_01b3;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct PackageMirArtifact {
@@ -3226,7 +3226,7 @@ fn rewrite_stmt(
             }
         }
         HirStatementKind::Expr(expr) => {
-            rewrite_expr(unit_path, expr, interner, targets, namespaces, diagnostics)
+            rewrite_expr(unit_path, expr, interner, targets, namespaces, diagnostics);
         }
         HirStatementKind::Redde(Some(expr)) => {
             rewrite_expr(unit_path, expr, interner, targets, namespaces, diagnostics)

@@ -1,4 +1,4 @@
-//! `faber format` author pipeline: compile_author, normalization, re-parse.
+//! `faber format` author pipeline: `compile_author`, normalization, re-parse.
 
 use super::format::{formatted_source_for_write, normalize_trailing_newline, source_for_compare};
 use radix::driver::{Config, Session};

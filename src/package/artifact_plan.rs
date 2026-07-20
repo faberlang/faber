@@ -5,7 +5,7 @@
 //! source or scanning generated text for dependency policy.
 //!
 //! TARGET: Inspectable debug/test surface for artifact DAGs — not a public ABI.
-//! WHY: Product deliveries (Go CLI, browser, SQLite) share one analysis graph.
+//! WHY: Product deliveries (Go CLI, browser, `SQLite`) share one analysis graph.
 
 #![allow(dead_code)]
 

@@ -172,13 +172,13 @@ entry = "main.fab"
     .expect("write manifest");
     fs::write(
         src.join("main.fab"),
-        r##"
+        r#"
 importa ex "./thing" privata thing
 
 incipit {
   nota thing.label()
 }
-"##,
+"#,
     )
     .expect("write entry");
     fs::write(
@@ -1128,22 +1128,22 @@ entry = "main.fab"
         ),
         (
             format!("{root}src/main.fab"),
-            r##"
+            r#"
 importa ex "./thing" privata thing
 
 incipit {
   nota thing.label()
 }
-"##
+"#
             .to_owned(),
         ),
         (
             format!("{root}src/thing.fab"),
-            r#"
+            r"
 functio label() → numerus {
   redde 7
 }
-"#
+"
             .to_owned(),
         ),
     ]
@@ -1163,23 +1163,23 @@ fn script_private_namespace_failure_does_not_emit_rust() {
     let package = temp_dir("private-namespace");
     fs::write(
         package.join("main.fab"),
-        r##"
+        r#"
 importa ex "./auxilium" privata Aux
 
 incipit {
   nota Aux.secretum()
 }
-"##,
+"#,
     )
     .expect("write entry");
     fs::write(
         package.join("auxilium.fab"),
-        r#"
+        r"
 @ privata
 functio secretum() → numerus {
   redde 1
 }
-"#,
+",
     )
     .expect("write module");
 
@@ -1966,21 +1966,21 @@ fn script_archive_manifestless_root_executes_without_cargo_or_rust_emit() {
         &[
             (
                 "main.fab",
-                r##"
+                r#"
 importa ex "./thing" privata thing
 
 incipit {
   nota thing.label()
 }
-"##,
+"#,
             ),
             (
                 "thing.fab",
-                r#"
+                r"
 functio label() → numerus {
   redde 7
 }
-"#,
+",
             ),
         ],
     );
@@ -2049,22 +2049,22 @@ fn script_archive_package_diagnostic_reports_archive_member_path() {
         &[
             (
                 "main.fab",
-                r##"
+                r#"
 importa ex "./auxilium" privata Aux
 
 incipit {
   nota Aux.secretum()
 }
-"##,
+"#,
             ),
             (
                 "auxilium.fab",
-                r#"
+                r"
 @ privata
 functio secretum() → numerus {
   redde 1
 }
-"#,
+",
             ),
         ],
     );
@@ -2090,22 +2090,22 @@ fn script_manifestless_entry_package_executes_without_cargo_or_rust_emit() {
     let package = temp_dir("manifestless-numeric");
     fs::write(
         package.join("main.fab"),
-        r##"
+        r#"
 importa ex "./thing" privata thing
 
 incipit {
   nota thing.label()
 }
-"##,
+"#,
     )
     .expect("write entry");
     fs::write(
         package.join("thing.fab"),
-        r#"
+        r"
 functio label() → numerus {
   redde 7
 }
-"#,
+",
     )
     .expect("write module");
 
@@ -2164,13 +2164,13 @@ entry = "main.fab"
     .expect("write manifest");
     fs::write(
         src.join("main.fab"),
-        r##"
+        r#"
 importa ex "./thing" privata thing
 
 incipit {
   nota thing.label()
 }
-"##,
+"#,
     )
     .expect("write entry");
     fs::write(

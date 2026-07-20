@@ -544,7 +544,7 @@ fn unique_temp_dir(parent: &Path, hash: &str) -> Result<PathBuf, MaterializeErro
         ));
         match fs::create_dir(&path) {
             Ok(()) => return Ok(path),
-            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
             Err(error) => return Err(MaterializeError::io(error)),
         }
     }
@@ -612,7 +612,7 @@ fn quarantine_incomplete_entry(target: &Path) -> Result<(), MaterializeError> {
         ));
         match fs::rename(target, quarantined) {
             Ok(()) => return Ok(()),
-            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
             Err(error) => return Err(MaterializeError::io(error)),
         }
     }
