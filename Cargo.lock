@@ -597,6 +597,7 @@ dependencies = [
  "ariadne",
  "clap",
  "getrandom 0.2.17",
+ "radix-codegen-shared",
  "rand",
  "rustc-hash",
  "serde",
@@ -610,6 +611,10 @@ dependencies = [
  "wasm-encoder 0.250.0",
  "wat",
 ]
+
+[[package]]
+name = "radix-codegen-shared"
+version = "0.38.0"
 
 [[package]]
 name = "rand"
