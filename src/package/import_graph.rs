@@ -8,6 +8,7 @@ use radix::syntax::{AnnotationKind, ImportDecl, ImportKind, StmtKind};
 
 use super::paths::normalize_path;
 use super::{LibraryImportBinding, PackageFile, PackageSpec};
+use radix::diagnostics::DiagnosticConvert;
 
 #[derive(Default)]
 pub(super) struct MountPlan {

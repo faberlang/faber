@@ -10,6 +10,7 @@ use radix::syntax::Program;
 
 use super::frontmatter::validate_frontmatter_against_manifest;
 use super::manifest::FaberManifest;
+use radix::diagnostics::DiagnosticConvert;
 
 pub(super) struct LoadedPackageSource {
     pub(super) raw_source: String,

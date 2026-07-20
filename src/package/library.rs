@@ -27,6 +27,7 @@ use super::import_graph::{
     library_import_kind_diagnostic, library_resolve_diagnostic,
 };
 use super::{LibraryImportBinding, PackageFile};
+use radix::diagnostics::DiagnosticConvert;
 
 struct LibraryInterfaceItem {
     exported_name: String,
