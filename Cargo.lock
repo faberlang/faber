@@ -598,6 +598,7 @@ dependencies = [
  "clap",
  "getrandom 0.2.17",
  "radix-codegen-shared",
+ "radix-codegen-ts",
  "radix-diagnostics",
  "radix-hir",
  "radix-lexer",
@@ -620,6 +621,26 @@ dependencies = [
 [[package]]
 name = "radix-codegen-shared"
 version = "0.38.0"
+dependencies = [
+ "radix-diagnostics",
+ "radix-hir",
+ "radix-lexer",
+ "radix-types",
+ "rustc-hash",
+]
+
+[[package]]
+name = "radix-codegen-ts"
+version = "0.38.0"
+dependencies = [
+ "radix-codegen-shared",
+ "radix-diagnostics",
+ "radix-hir",
+ "radix-lexer",
+ "radix-syntax",
+ "radix-types",
+ "rustc-hash",
+]
 
 [[package]]
 name = "radix-diagnostics"
