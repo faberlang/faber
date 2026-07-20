@@ -10808,6 +10808,95 @@ fn g10_web3_rejects_local_scope_shadowing() {
 }
 
 #[test]
+fn g10_web3_rejects_missing_controllers() {
+    // Package imports web:web legitimately but declares no `@ WebController`
+    // function at all — controller discovery must fail closed with
+    // `product_controller_missing` rather than emitting an empty browser
+    // product.
+    let lib = sibling_faber_web_lib();
+    let root = test_temp_dir("g10-web3-missing-controllers");
+    let app = root.join("app");
+    write_web_consumer_app(
+        &app,
+        &lib,
+        r#"
+importa ex "web:web" privata web
+importa ex "web:dom" privata dom
+
+functio helper(dom.Scope scope) → vacuum {
+  nota dom.require(scope, "button")
+}
+"#,
+    );
+    write_static_asset_roots(&app);
+    let manifest = read_manifest(&app.join("faber.toml")).expect("manifest");
+    let err = build_browser_product(
+        &Config::default().with_target(Target::TypeScript),
+        &app,
+        manifest.product.as_ref().unwrap(),
+    )
+    .expect_err("browser product without WebController functions must fail closed");
+    assert!(diagnostic_has_issue(&err, "product_controller_missing"));
+}
+
+#[test]
+fn g10_web3_rewrites_unresolved_def_controller_typescript() {
+    // Imported nominal types (e.g. `dom.FrameState`, `dom.SubmitOptions`) have
+    // no DefId in the consuming unit's name table, so Radix's TS printer emits
+    // the `unresolved_def` sentinel in type positions and `new unresolved_def()`
+    // for struct construction. `adapt_controller_typescript` must rewrite those
+    // to `any` / `{}` so the emitted controller module passes `tsc`.
+    if Command::new("tsc").arg("--version").output().is_err() {
+        eprintln!("tsc not found on PATH; skipping WEB3 unresolved_def test");
+        return;
+    }
+    let lib = sibling_faber_web_lib();
+    let root = test_temp_dir("g10-web3-unresolved-def");
+    let app = root.join("app");
+    write_web_consumer_app(
+        &app,
+        &lib,
+        r##"
+importa ex "web:web" privata web
+importa ex "web:dom" privata dom
+
+@ WebController { selector = "#frame-demo" }
+functio frame_controller(dom.Scope scope) → vacuum {
+  fixum dom.Element status ← dom.require(scope, ".frame-status")
+  nota dom.on_frame((dom.FrameState frame) → vacuum ∴ dom.text_set(status, "frame-seen"))
+}
+
+@ WebController { selector = "#submit-demo" }
+functio submit_controller(dom.Scope scope) → vacuum {
+  fixum dom.Element form ← dom.require(scope, ".submit-form")
+  nota dom.on_submit(form, dom.SubmitOptions { prevent_default = verum }, (dom.Element el) → vacuum ∴ dom.text_set(el, "submitted"))
+}
+"##,
+    );
+    write_static_asset_roots(&app);
+
+    let manifest = read_manifest(&app.join("faber.toml")).expect("manifest");
+    let build = build_browser_product(
+        &Config::default().with_target(Target::TypeScript),
+        &app,
+        manifest.product.as_ref().unwrap(),
+    )
+    .expect("browser product build with unresolved_def rewrites (tsc must pass)");
+
+    let main_ts = fs::read_to_string(build.out_dir.join("faber-ts/main.ts"))
+        .expect("emitted controller module");
+    assert!(
+        !main_ts.contains("unresolved_def"),
+        "adapted controller TypeScript must not contain unresolved_def:\n{main_ts}"
+    );
+    assert!(
+        main_ts.contains("export function frame_controller("),
+        "controller export rewrite must survive adaptation:\n{main_ts}"
+    );
+    assert_eq!(build.controllers.len(), 2);
+}
+
+#[test]
 fn g10_web1_imported_web_controller_survives_package_graph_extract() {
     let lib = sibling_faber_web_lib();
     let root = test_temp_dir("g10-web-imported-controller");
