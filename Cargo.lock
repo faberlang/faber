@@ -599,8 +599,10 @@ dependencies = [
  "getrandom 0.2.17",
  "radix-codegen-shared",
  "radix-diagnostics",
+ "radix-hir",
  "radix-lexer",
  "radix-syntax",
+ "radix-types",
  "rand",
  "rustc-hash",
  "serde",
@@ -627,6 +629,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "radix-hir"
+version = "0.38.0"
+dependencies = [
+ "radix-lexer",
+ "radix-syntax",
+ "radix-types",
+ "rustc-hash",
+ "serde",
+]
+
+[[package]]
 name = "radix-lexer"
 version = "0.38.0"
 dependencies = [
@@ -642,6 +655,16 @@ name = "radix-syntax"
 version = "0.38.0"
 dependencies = [
  "radix-lexer",
+]
+
+[[package]]
+name = "radix-types"
+version = "0.38.0"
+dependencies = [
+ "radix-lexer",
+ "radix-syntax",
+ "rustc-hash",
+ "serde",
 ]
 
 [[package]]
