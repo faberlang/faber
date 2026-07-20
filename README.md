@@ -22,7 +22,8 @@ faberlang/
 Path dependencies (not published):
 
 - `../radix/crates/radix` — compiler library (includes `radix::forma` formatter and MIR stepper)
-- `../radix/crates/hygiene-ratchet` — hygiene tests only (dev-dependency)
+- `../cista` — package-store library CLI/lib
+- `crates/hygiene-ratchet` — hygiene budgets for non-test sources (dev-dependency)
 
 Generated packages from `faber build` depend on sibling **`faber-runtime`**
 (package name `faber-runtime`, crate name `faber`), not on this CLI crate.

@@ -117,7 +117,7 @@ fn materialize_payload(
     );
     // Unlock errors are non-fatal: the file descriptor closes after return,
     // which releases the OS-level lock.  Prefer the materialization result.
-    let _ = FileExt::unlock(&lock);
+    drop(FileExt::unlock(&lock));
     result
 }
 
