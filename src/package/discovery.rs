@@ -147,7 +147,7 @@ pub(crate) fn discover_package(input: &Path) -> PackageDiscoveryResult {
     if !input.exists() {
         return Err(Box::new(Diagnostic::io_error(
             &display_path,
-            std::io::Error::from_raw_os_error(2),
+            &std::io::Error::from_raw_os_error(2),
         )));
     }
 
@@ -254,7 +254,7 @@ pub fn discover_build_layout(input: &Path) -> Result<BuildLayout, Box<Diagnostic
     if !input.exists() {
         return Err(Box::new(Diagnostic::io_error(
             &display_path,
-            std::io::Error::from_raw_os_error(2),
+            &std::io::Error::from_raw_os_error(2),
         )));
     }
 

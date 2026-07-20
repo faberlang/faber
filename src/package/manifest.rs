@@ -285,7 +285,7 @@ pub(super) fn manifest_build_target(target: &str, path: &Path) -> Result<Target,
 /// mistakes become diagnostics rather than silently ignored configuration.
 pub fn read_manifest(path: &Path) -> Result<FaberManifest, Box<Diagnostic>> {
     let source =
-        fs::read_to_string(path).map_err(|err| Box::new(Diagnostic::io_error(path, err)))?;
+        fs::read_to_string(path).map_err(|err| Box::new(Diagnostic::io_error(path, &err)))?;
     toml::from_str::<FaberManifest>(&source).map_err(|err| {
         Box::new(
             crate::package_diagnostic_error(format!("invalid faber.toml manifest: {err}"))

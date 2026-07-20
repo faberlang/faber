@@ -293,7 +293,7 @@ pub(crate) fn emit_generated_crate_with_runtime_plan(
 
     let src_dir = layout.generated_crate_root.join("src");
     if let Err(err) = fs::create_dir_all(&src_dir) {
-        return Err(Box::new(Diagnostic::io_error(&src_dir, err)));
+        return Err(Box::new(Diagnostic::io_error(&src_dir, &err)));
     }
 
     let support = materialize().map_err(core_support_diagnostic)?;
@@ -303,10 +303,7 @@ pub(crate) fn emit_generated_crate_with_runtime_plan(
         render_generated_cargo_toml_with_support(layout.binary_name(), "0.1.0", plan, &support)?
     };
     if let Err(err) = fs::write(&layout.generated_cargo_manifest, &cargo_src) {
-        return Err(Box::new(Diagnostic::io_error(
-            &layout.generated_cargo_manifest,
-            err,
-        )));
+        return Err(Box::new(Diagnostic::io_error(&layout.generated_cargo_manifest, &err,)));
     }
 
     // Policy: keep an outer generated marker even when backend codegen already
@@ -315,13 +312,10 @@ pub(crate) fn emit_generated_crate_with_runtime_plan(
     let rust_code = rust_code.to_owned();
     if matches!(plan.host, Some(ManifestRustHost::Native)) {
         if let Err(err) = write_host_registration(&src_dir, plan) {
-            return Err(Box::new(Diagnostic::io_error(&src_dir, err)));
+            return Err(Box::new(Diagnostic::io_error(&src_dir, &err)));
         }
         if let Err(err) = write_host_manifest(&layout.generated_crate_root, plan) {
-            return Err(Box::new(Diagnostic::io_error(
-                &layout.generated_crate_root,
-                err,
-            )));
+            return Err(Box::new(Diagnostic::io_error(&layout.generated_crate_root, &err,)));
         }
     }
     let final_code = format!(
@@ -332,10 +326,7 @@ pub(crate) fn emit_generated_crate_with_runtime_plan(
     );
     let final_code = format_package_rust_source(&final_code);
     if let Err(err) = fs::write(&layout.generated_rust_entry, final_code) {
-        return Err(Box::new(Diagnostic::io_error(
-            &layout.generated_rust_entry,
-            err,
-        )));
+        return Err(Box::new(Diagnostic::io_error(&layout.generated_rust_entry, &err,)));
     }
 
     Ok(layout.generated_crate_root.clone())

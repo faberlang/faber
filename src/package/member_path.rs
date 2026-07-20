@@ -16,7 +16,7 @@ pub(crate) fn resolve_package_member(
 ) -> Result<PathBuf, Diagnostic> {
     let normalized = normalize_member_path(relative, anchor)?;
     let canonical_root = fs::canonicalize(package_root).map_err(|error| {
-        Diagnostic::io_error(package_root, error)
+        Diagnostic::io_error(package_root, &error)
             .with_arg("issue", "package_root_canonicalize_failed")
     })?;
     let resolved = package_root.join(&normalized);
@@ -30,7 +30,7 @@ pub(crate) fn resolve_package_member(
         )
     })?;
     let canonical_existing = fs::canonicalize(existing).map_err(|error| {
-        Diagnostic::io_error(existing, error)
+        Diagnostic::io_error(existing, &error)
             .with_arg("issue", "package_member_canonicalize_failed")
             .with_arg("path", relative.to_owned())
     })?;

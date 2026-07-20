@@ -87,7 +87,7 @@ pub(crate) fn run_rust_binding_probe(
     match fs::remove_dir_all(&root) {
         Ok(()) => result,
         Err(cleanup_error) => match result {
-            Ok(()) => Err(Diagnostic::io_error(&root, cleanup_error)
+            Ok(()) => Err(Diagnostic::io_error(&root, &cleanup_error)
                 .with_arg("issue", "binding_probe_cleanup_failed")),
             Err(mut diagnostic) => {
                 diagnostic.message.push_str(&format!(
@@ -150,24 +150,24 @@ fn run_probe_in(
     probes: &[String],
 ) -> Result<(), Diagnostic> {
     let source_dir = root.join("src");
-    fs::create_dir_all(&source_dir).map_err(|error| Diagnostic::io_error(&source_dir, error))?;
+    fs::create_dir_all(&source_dir).map_err(|error| Diagnostic::io_error(&source_dir, &error))?;
     let manifest_path = root.join("Cargo.toml");
     let manifest = probe_manifest(package_root, dependencies).map_err(|mut error| {
         error.file = anchor.display().to_string();
         error
     })?;
     fs::write(&manifest_path, manifest)
-        .map_err(|error| Diagnostic::io_error(&manifest_path, error))?;
+        .map_err(|error| Diagnostic::io_error(&manifest_path, &error))?;
     let source_path = source_dir.join("main.rs");
     fs::write(&source_path, probe_source(shim, probes))
-        .map_err(|error| Diagnostic::io_error(&source_path, error))?;
+        .map_err(|error| Diagnostic::io_error(&source_path, &error))?;
 
     let stdout_path = root.join("cargo.stdout");
     let stderr_path = root.join("cargo.stderr");
     let stdout =
-        File::create(&stdout_path).map_err(|error| Diagnostic::io_error(&stdout_path, error))?;
+        File::create(&stdout_path).map_err(|error| Diagnostic::io_error(&stdout_path, &error))?;
     let stderr =
-        File::create(&stderr_path).map_err(|error| Diagnostic::io_error(&stderr_path, error))?;
+        File::create(&stderr_path).map_err(|error| Diagnostic::io_error(&stderr_path, &error))?;
     let child = Command::new("cargo")
         .arg("check")
         .arg("--quiet")
@@ -311,10 +311,10 @@ fn probe_source(shim: Option<&Path>, probes: &[String]) -> String {
 
 #[allow(clippy::result_large_err)]
 fn read_output(path: &Path) -> Result<String, Diagnostic> {
-    let mut file = File::open(path).map_err(|error| Diagnostic::io_error(path, error))?;
+    let mut file = File::open(path).map_err(|error| Diagnostic::io_error(path, &error))?;
     let mut output = String::new();
     file.read_to_string(&mut output)
-        .map_err(|error| Diagnostic::io_error(path, error))?;
+        .map_err(|error| Diagnostic::io_error(path, &error))?;
     Ok(output)
 }
 

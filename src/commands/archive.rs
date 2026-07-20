@@ -92,7 +92,7 @@ fn create_temp_root(archive: &Path) -> ArchiveResult<PathBuf> {
             Ok(()) => return Ok(candidate),
             Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {}
             Err(err) => {
-                return Err(Box::new(Diagnostic::io_error(&candidate, err)));
+                return Err(Box::new(Diagnostic::io_error(&candidate, &err)));
             }
         }
     }
@@ -124,7 +124,7 @@ fn sanitize_temp_label(label: &str) -> String {
 
 fn extract_zip(archive: &Path, temp_root: &Path) -> ArchiveResult<()> {
     let file =
-        fs::File::open(archive).map_err(|err| Box::new(Diagnostic::io_error(archive, err)))?;
+        fs::File::open(archive).map_err(|err| Box::new(Diagnostic::io_error(archive, &err)))?;
     let mut zip = zip::ZipArchive::new(file).map_err(|err| {
         Box::new(
             crate::package_diagnostic_error(format!("cannot read zip archive: {err}"))
@@ -150,17 +150,17 @@ fn extract_zip(archive: &Path, temp_root: &Path) -> ArchiveResult<()> {
         let output = temp_root.join(relative);
         if entry.is_dir() {
             fs::create_dir_all(&output)
-                .map_err(|err| Box::new(Diagnostic::io_error(&output, err)))?;
+                .map_err(|err| Box::new(Diagnostic::io_error(&output, &err)))?;
             continue;
         }
         if let Some(parent) = output.parent() {
             fs::create_dir_all(parent)
-                .map_err(|err| Box::new(Diagnostic::io_error(parent, err)))?;
+                .map_err(|err| Box::new(Diagnostic::io_error(parent, &err)))?;
         }
         let mut out = fs::File::create(&output)
-            .map_err(|err| Box::new(Diagnostic::io_error(&output, err)))?;
+            .map_err(|err| Box::new(Diagnostic::io_error(&output, &err)))?;
         io::copy(&mut entry, &mut out)
-            .map_err(|err| Box::new(Diagnostic::io_error(&output, err)))?;
+            .map_err(|err| Box::new(Diagnostic::io_error(&output, &err)))?;
     }
 
     Ok(())
@@ -221,12 +221,12 @@ fn select_package_root(archive: &Path, temp_root: &Path) -> ArchiveResult<PathBu
 fn top_level_dirs(temp_root: &Path) -> ArchiveResult<Vec<PathBuf>> {
     let mut dirs = BTreeSet::new();
     for entry in
-        fs::read_dir(temp_root).map_err(|err| Box::new(Diagnostic::io_error(temp_root, err)))?
+        fs::read_dir(temp_root).map_err(|err| Box::new(Diagnostic::io_error(temp_root, &err)))?
     {
-        let entry = entry.map_err(|err| Box::new(Diagnostic::io_error(temp_root, err)))?;
+        let entry = entry.map_err(|err| Box::new(Diagnostic::io_error(temp_root, &err)))?;
         if entry
             .file_type()
-            .map_err(|err| Box::new(Diagnostic::io_error(&entry.path(), err)))?
+            .map_err(|err| Box::new(Diagnostic::io_error(&entry.path(), &err)))?
             .is_dir()
         {
             dirs.insert(PathBuf::from(entry.file_name()));

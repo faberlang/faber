@@ -22,7 +22,7 @@ pub(super) struct LoadedPackageSource {
 
 pub(super) fn package_source_files(source_root: &Path) -> Result<Vec<PathBuf>, Vec<Diagnostic>> {
     let canonical_root = fs::canonicalize(source_root)
-        .map_err(|error| vec![Diagnostic::io_error(source_root, error)])?;
+        .map_err(|error| vec![Diagnostic::io_error(source_root, &error)])?;
     let mut pending = vec![source_root.to_path_buf()];
     let mut files = Vec::new();
     let mut diagnostics = Vec::new();
@@ -30,7 +30,7 @@ pub(super) fn package_source_files(source_root: &Path) -> Result<Vec<PathBuf>, V
         let entries = match fs::read_dir(&directory) {
             Ok(entries) => entries,
             Err(error) => {
-                diagnostics.push(Diagnostic::io_error(&directory, error));
+                diagnostics.push(Diagnostic::io_error(&directory, &error));
                 continue;
             }
         };
@@ -38,7 +38,7 @@ pub(super) fn package_source_files(source_root: &Path) -> Result<Vec<PathBuf>, V
             let entry = match entry {
                 Ok(entry) => entry,
                 Err(error) => {
-                    diagnostics.push(Diagnostic::io_error(&directory, error));
+                    diagnostics.push(Diagnostic::io_error(&directory, &error));
                     continue;
                 }
             };
@@ -46,7 +46,7 @@ pub(super) fn package_source_files(source_root: &Path) -> Result<Vec<PathBuf>, V
             let canonical_path = match fs::canonicalize(&path) {
                 Ok(canonical_path) => canonical_path,
                 Err(error) => {
-                    diagnostics.push(Diagnostic::io_error(&path, error));
+                    diagnostics.push(Diagnostic::io_error(&path, &error));
                     continue;
                 }
             };
@@ -85,7 +85,7 @@ pub(super) fn load_package_source(
     let raw_source = match fs::read_to_string(path) {
         Ok(source) => source,
         Err(error) => {
-            diagnostics.push(Diagnostic::io_error(path, error));
+            diagnostics.push(Diagnostic::io_error(path, &error));
             return None;
         }
     };

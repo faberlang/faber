@@ -1157,5 +1157,5 @@ fn library_item_display_key(item: &radix::hir::LibraryItem) -> String {
 }
 
 fn io_diag(path: &Path, err: std::io::Error) -> Box<Diagnostic> {
-    Box::new(Diagnostic::io_error(path, err))
+    Box::new(Diagnostic::io_error(path, &err))
 }

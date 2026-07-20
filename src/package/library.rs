@@ -280,7 +280,7 @@ fn read_and_parse_library_interface(
     module: &ResolvedLibraryModule,
 ) -> Result<CachedLibraryInterface, Diagnostic> {
     let raw_source = fs::read_to_string(&module.interface_path)
-        .map_err(|err| Diagnostic::io_error(&module.interface_path, err))?;
+        .map_err(|err| Diagnostic::io_error(&module.interface_path, &err))?;
     let display_name = module.interface_path.display().to_string();
     let peeled = peel_raw_source(&display_name, &raw_source)
         .map_err(|error| source_load_diagnostic(&display_name, error))?;

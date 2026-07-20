@@ -139,7 +139,7 @@ pub fn verify_library_bindings(
 }
 
 fn read_binding_manifest(path: &Path) -> Result<BindingManifest, Vec<Diagnostic>> {
-    let source = fs::read_to_string(path).map_err(|err| vec![Diagnostic::io_error(path, err)])?;
+    let source = fs::read_to_string(path).map_err(|err| vec![Diagnostic::io_error(path, &err)])?;
     toml::from_str::<BindingManifest>(&source).map_err(|err| {
         vec![
             crate::package_diagnostic_error(format!("invalid binding manifest: {err}"))

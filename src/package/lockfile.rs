@@ -74,7 +74,7 @@ pub(crate) fn read_lock(package_root: &Path) -> Result<Option<FaberLock>, Box<Di
         return Ok(None);
     }
     let source =
-        fs::read_to_string(&path).map_err(|err| Box::new(Diagnostic::io_error(&path, err)))?;
+        fs::read_to_string(&path).map_err(|err| Box::new(Diagnostic::io_error(&path, &err)))?;
     let lock = toml::from_str::<FaberLock>(&source).map_err(|err| {
         Box::new(
             crate::package_diagnostic_error(format!("invalid {LOCK_FILE}: {err}"))
