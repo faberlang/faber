@@ -9,7 +9,7 @@ path diagnostics.
 
 ## Scope
 
-- Promote `lista.reducta((acc, x) ∴ expr, init)` from `CodegenOnly` to the
+- Promote `lista.reducta((acc, x) ergo expr, init)` from `CodegenOnly` to the
   existing higher-order lista MIR lowering path.
 - Reuse the current synthetic-closure function model used by `filtrata` and
   `mappata`.

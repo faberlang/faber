@@ -72,7 +72,7 @@ already rejects them as hard errors, so they cannot become HIR lints. Polish
 must decide its scope:
 
 **HIR-time idiom rules** (fit `LintContext` cleanly):
-- Block ending in single `redde x` → suggest `∴ redde x`
+- Block ending in single `redde x` → suggest `ergo redde x`
 - Empty collection literal missing `vacua` → suggest `vacua` form
 - String concatenation / target interpolation → suggest `"§"(arg)` template
   application

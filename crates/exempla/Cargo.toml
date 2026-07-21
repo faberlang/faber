@@ -1,0 +1,19 @@
+[package]
+name = "exempla"
+version = "0.1.0"
+edition = "2021"
+description = "Faber exempla e2e harnesses (public corpora live in sibling examples/ and norma/)"
+license = "MIT"
+publish = false
+
+[dependencies]
+radix = { path = "../../../radix/crates/radix" }
+rustc-hash = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "1.1.2"
+wait-timeout = "0.2"
+
+[dev-dependencies]
+# Package MIR lower/compile for norma:* and multi-file package exempla.
+faber = { path = "../.." }

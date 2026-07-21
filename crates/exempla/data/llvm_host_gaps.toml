@@ -1,0 +1,1078 @@
+# Gap ledger captured by the live LLVM host pairwise run on 2026-07-15.
+# This is measured live evidence, not an accepted-failure allowlist.
+schema_version = 1
+measured = "2026-07-15@883c6e200-live-pairwise-10f8c5703"
+rust_executable_denominator = 280
+gap_ceiling = 144
+
+[[gap]]
+path = "ad/sermo-conversio.fab"
+owner_stage = 4
+boundary = "link"
+issue = "runtime_import_unresolved"
+reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "ad/sermo-live-directional.fab"
+owner_stage = 4
+boundary = "link"
+issue = "runtime_import_unresolved"
+reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "ad/sermo-recovery.fab"
+owner_stage = 4
+boundary = "link"
+issue = "runtime_import_unresolved"
+reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "ad/sermo-tuus.fab"
+owner_stage = 4
+boundary = "link"
+issue = "runtime_import_unresolved"
+reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "ad/sermo-vacuum.fab"
+owner_stage = 4
+boundary = "link"
+issue = "runtime_import_unresolved"
+reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "ad/solum-lege-generic.fab"
+owner_stage = 4
+boundary = "emit"
+issue = "llvm_emission_unsupported"
+reason = "MIR lowers, but LLVM text emission rejects the live shape"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "adfirma/in-functione.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "annotation-sugar/cli-braced.fab"
+owner_stage = 8
+boundary = "mir"
+issue = "cli_runtime_record_pending"
+reason = "CLI runtime record binding is owned by Stage 8"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "annotation-sugar/optio-braced.fab"
+owner_stage = 8
+boundary = "mir"
+issue = "cli_runtime_record_pending"
+reason = "CLI runtime record binding is owned by Stage 8"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "assertio/nonnulla.fab"
+owner_stage = 4
+boundary = "link"
+issue = "runtime_import_unresolved"
+reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "aut/aut.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "binarius/binarius.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "clausa/clausa.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "cli/cli.fab"
+owner_stage = 8
+boundary = "mir"
+issue = "cli_runtime_record_pending"
+reason = "CLI runtime record binding is owned by Stage 8"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "conversio/fallibilis.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "stdout_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the Rust oracle"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "conversio/lista-tensor-shaped.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "conversio/rectangular-lista-literal-tensor.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "conversio/tensor.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "LLVM executable output does not match the expected fixture"
+first_seen = "2026-07-15@10f8c5703"
+
+[[gap]]
+path = "conversio/valor-boxing.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "conversio/valor-tensor.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "curata/curata.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "cursor/cursor.fab"
+owner_stage = 4
+boundary = "link"
+issue = "runtime_import_unresolved"
+reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "de/de.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "stdout_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the Rust oracle"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "destructura/lista.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "destructura/literal.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "stdout_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the Rust oracle"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "destructura/objectum.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "stdout_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the Rust oracle"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "directiva/directiva.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "dum/dum.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "ego/ego.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "elige/elige.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "errata/errata.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "est/est.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "exitus/exitus.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "exit_code_mismatch"
+reason = "live outcome mismatch: exit_code_mismatch"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "fac/fac-dum.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "fixum/fixum.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "fragilis/fragilis.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "functio/functio.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "futurum/futurum.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "genus/creo.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "stdout_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the Rust oracle"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "genus/methodi.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "immutata/immutata.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "implet/implet.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "importa/importa.fab"
+owner_stage = 4
+boundary = "link"
+issue = "runtime_import_unresolved"
+reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "instans/instans.fab"
+owner_stage = 4
+boundary = "link"
+issue = "runtime_import_unresolved"
+reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "integratio/arena-mixta.fab"
+owner_stage = 4
+boundary = "link"
+issue = "runtime_import_unresolved"
+reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "integratio/fluxus-cede.fab"
+owner_stage = 4
+boundary = "link"
+issue = "runtime_import_unresolved"
+reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "integratio/minimum-smoke.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "intrinseca/copia-algebra.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "stdout_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the Rust oracle"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "intrinseca/numeric-operator-methods.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "intrinseca/textus-transformationes.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "stdout_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the Rust oracle"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "intrinseca/vacua-ascribere.fab"
+owner_stage = 4
+boundary = "link"
+issue = "runtime_import_unresolved"
+reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "itera/cursor-iteratio.fab"
+owner_stage = 4
+boundary = "link"
+issue = "runtime_import_unresolved"
+reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "itera/de.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "stdout_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the Rust oracle"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "itera/ex.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "itera/nidificatus.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "json/json.fab"
+owner_stage = 4
+boundary = "link"
+issue = "runtime_import_unresolved"
+reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "lege/lege.fab"
+owner_stage = 4
+boundary = "link"
+issue = "runtime_import_unresolved"
+reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "lista/lista.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "lista/methodi-accessus.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "lista/methodi-copiae.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "lista/methodi-functionales.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "lista/methodi-mutatio.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "literalia/nihil.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "literalia/regex.fab"
+owner_stage = 4
+boundary = "link"
+issue = "runtime_import_unresolved"
+reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "membrum/membrum.fab"
+owner_stage = 4
+boundary = "link"
+issue = "runtime_import_unresolved"
+reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "meta/requirit.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "mone/mone.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "mori/mori.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "stdout_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the Rust oracle"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "morphologia/morphologia.fab"
+owner_stage = 4
+boundary = "link"
+issue = "runtime_import_unresolved"
+reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "nexum/nexum.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "nihil/nihil.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "nonnihil/nonnihil.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "nota/nota.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "numquam/numquam.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "octet/octet.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "octeti/octeti.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "octeti/unify.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "stdout_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the Rust oracle"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "omitte/omitte.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "operandus/operandus.fab"
+owner_stage = 8
+boundary = "mir"
+issue = "cli_runtime_record_pending"
+reason = "CLI runtime record binding is owned by Stage 8"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "operatores/control.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "operatores/logica.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "operatores/nonnull-chain.fab"
+owner_stage = 4
+boundary = "link"
+issue = "runtime_import_unresolved"
+reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "operatores/numerus-overflow.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "operatores/optional-chain.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "optio/optio.fab"
+owner_stage = 8
+boundary = "mir"
+issue = "cli_runtime_record_pending"
+reason = "CLI runtime record binding is owned by Stage 8"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "optionalis/optionalis.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "optiones/optiones.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "postpara/postpara.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "postparabit/postparabit.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "prae/prae.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "praepara/praepara.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "praeparabit/praeparabit.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "privata/privata.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "proba/proba.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "probandum/probandum.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "redde/redde.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "repete/repete.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "scalaria/scalaria.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "si/ergo-redde.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "sit/sit.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "solum-in/solum-in.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "solum/solum.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "sparsa/access.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "sparsa/conversio.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "sparsa/decl.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "sparsa/sparsa-codegen-smoke.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "sparsa/sugar.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "sponte/sponte.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "tabula/methodi-accessus.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "tabula/tabula.fab"
+owner_stage = 4
+boundary = "link"
+issue = "runtime_import_unresolved"
+reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "tag/tag.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "temporis/temporis.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "tensor/arithmetic-elementwise.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "tensor/bracket-access.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "tensor/index-width.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "tensor/method-errors.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "runtime_failure_mismatch"
+reason = "both lanes ran; expected runtime failure differs between the lanes"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "tensor/shape.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "tensor/textus.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "ternarius/ternarius.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "typus/typus.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "stdout_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the Rust oracle"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "ubique/ubique.fab"
+owner_stage = 8
+boundary = "mir"
+issue = "cli_runtime_record_pending"
+reason = "CLI runtime record binding is owned by Stage 8"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "unarius/unarius.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "unio/unio.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "vector/builtins.fab"
+owner_stage = 8
+boundary = "link"
+issue = "entry_or_package_link_missing"
+reason = "LLVM reaches native link, but the host entry or package adapter is missing"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "vector/cross.fab"
+owner_stage = 8
+boundary = "link"
+issue = "entry_or_package_link_missing"
+reason = "LLVM reaches native link, but the host entry or package adapter is missing"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "vector/decl.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "vector/dot.fab"
+owner_stage = 8
+boundary = "link"
+issue = "entry_or_package_link_missing"
+reason = "LLVM reaches native link, but the host entry or package adapter is missing"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "vector/elementwise.fab"
+owner_stage = 8
+boundary = "link"
+issue = "entry_or_package_link_missing"
+reason = "LLVM reaches native link, but the host entry or package adapter is missing"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "vector/infer.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "vector/kernel.fab"
+owner_stage = 8
+boundary = "link"
+issue = "entry_or_package_link_missing"
+reason = "LLVM reaches native link, but the host entry or package adapter is missing"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "vector/sugar.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_fixture_mismatch"
+reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-12@live-pairwise-sponte-vel"
+
+[[gap]]
+path = "vector/swizzle.fab"
+owner_stage = 8
+boundary = "link"
+issue = "entry_or_package_link_missing"
+reason = "LLVM reaches native link, but the host entry or package adapter is missing"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "vel/vel.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "vocatio/vocatio.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-07-10@32b4f09af"

@@ -290,6 +290,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "exempla"
+version = "0.1.0"
+dependencies = [
+ "faber",
+ "radix",
+ "rustc-hash",
+ "serde",
+ "serde_json",
+ "toml",
+ "wait-timeout",
+]
+
+[[package]]
 name = "faber"
 version = "1.1.1"
 dependencies = [
@@ -592,18 +605,29 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
 name = "radix"
-version = "0.38.0"
+version = "0.76.0"
 dependencies = [
  "ariadne",
  "clap",
  "getrandom 0.2.17",
+ "radix-codegen-faber",
  "radix-codegen-go",
  "radix-codegen-rust",
  "radix-codegen-shared",
  "radix-codegen-ts",
  "radix-diagnostics",
  "radix-hir",
+ "radix-host-abi",
  "radix-lexer",
+ "radix-mir",
+ "radix-mir-coverage",
+ "radix-mir-llvm",
+ "radix-mir-metal",
+ "radix-mir-sexp",
+ "radix-mir-stepper",
+ "radix-mir-wasm",
+ "radix-mir-wgsl",
+ "radix-runtime-contract",
  "radix-syntax",
  "radix-types",
  "rand",
@@ -621,8 +645,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "radix-codegen-faber"
+version = "0.76.0"
+dependencies = [
+ "radix-codegen-shared",
+ "radix-diagnostics",
+ "radix-hir",
+ "radix-lexer",
+ "radix-syntax",
+ "radix-types",
+ "rustc-hash",
+]
+
+[[package]]
 name = "radix-codegen-go"
-version = "0.38.0"
+version = "0.76.0"
 dependencies = [
  "radix-codegen-shared",
  "radix-diagnostics",
@@ -635,7 +672,7 @@ dependencies = [
 
 [[package]]
 name = "radix-codegen-rust"
-version = "0.38.0"
+version = "0.76.0"
 dependencies = [
  "radix-codegen-shared",
  "radix-diagnostics",
@@ -648,7 +685,7 @@ dependencies = [
 
 [[package]]
 name = "radix-codegen-shared"
-version = "0.38.0"
+version = "0.76.0"
 dependencies = [
  "radix-diagnostics",
  "radix-hir",
@@ -659,7 +696,7 @@ dependencies = [
 
 [[package]]
 name = "radix-codegen-ts"
-version = "0.38.0"
+version = "0.76.0"
 dependencies = [
  "radix-codegen-shared",
  "radix-diagnostics",
@@ -672,14 +709,14 @@ dependencies = [
 
 [[package]]
 name = "radix-diagnostics"
-version = "0.38.0"
+version = "0.76.0"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "radix-hir"
-version = "0.38.0"
+version = "0.76.0"
 dependencies = [
  "radix-lexer",
  "radix-syntax",
@@ -689,8 +726,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "radix-host-abi"
+version = "0.76.0"
+
+[[package]]
 name = "radix-lexer"
-version = "0.38.0"
+version = "0.76.0"
 dependencies = [
  "radix-diagnostics",
  "rustc-hash",
@@ -700,15 +741,125 @@ dependencies = [
 ]
 
 [[package]]
+name = "radix-mir"
+version = "0.76.0"
+dependencies = [
+ "radix-codegen-shared",
+ "radix-diagnostics",
+ "radix-hir",
+ "radix-lexer",
+ "radix-syntax",
+ "radix-types",
+ "rustc-hash",
+ "serde",
+]
+
+[[package]]
+name = "radix-mir-coverage"
+version = "0.76.0"
+dependencies = [
+ "radix-lexer",
+ "radix-mir",
+ "radix-mir-llvm",
+ "radix-mir-sexp",
+ "radix-mir-stepper",
+ "radix-mir-wasm",
+ "wat",
+]
+
+[[package]]
+name = "radix-mir-llvm"
+version = "0.76.0"
+dependencies = [
+ "radix-codegen-shared",
+ "radix-hir",
+ "radix-host-abi",
+ "radix-lexer",
+ "radix-mir",
+ "radix-types",
+ "rustc-hash",
+]
+
+[[package]]
+name = "radix-mir-metal"
+version = "0.76.0"
+dependencies = [
+ "radix-codegen-shared",
+ "radix-hir",
+ "radix-lexer",
+ "radix-mir",
+ "radix-types",
+ "rustc-hash",
+]
+
+[[package]]
+name = "radix-mir-sexp"
+version = "0.76.0"
+dependencies = [
+ "radix-codegen-shared",
+ "radix-hir",
+ "radix-lexer",
+ "radix-mir",
+ "radix-types",
+ "rustc-hash",
+]
+
+[[package]]
+name = "radix-mir-stepper"
+version = "0.76.0"
+dependencies = [
+ "getrandom 0.2.17",
+ "radix-hir",
+ "radix-lexer",
+ "radix-mir",
+ "radix-runtime-contract",
+ "radix-types",
+ "rand",
+ "rustc-hash",
+ "serde_json",
+ "uuid",
+]
+
+[[package]]
+name = "radix-mir-wasm"
+version = "0.76.0"
+dependencies = [
+ "radix-codegen-shared",
+ "radix-hir",
+ "radix-host-abi",
+ "radix-lexer",
+ "radix-mir",
+ "radix-types",
+ "rustc-hash",
+ "wat",
+]
+
+[[package]]
+name = "radix-mir-wgsl"
+version = "0.76.0"
+dependencies = [
+ "radix-codegen-shared",
+ "radix-hir",
+ "radix-lexer",
+ "radix-mir",
+ "radix-types",
+ "rustc-hash",
+]
+
+[[package]]
+name = "radix-runtime-contract"
+version = "0.76.0"
+
+[[package]]
 name = "radix-syntax"
-version = "0.38.0"
+version = "0.76.0"
 dependencies = [
  "radix-lexer",
 ]
 
 [[package]]
 name = "radix-types"
-version = "0.38.0"
+version = "0.76.0"
 dependencies = [
  "radix-lexer",
  "radix-syntax",
