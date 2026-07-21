@@ -516,6 +516,7 @@ fn fmir_runtime_cli_binding_skips_superset_decoy_record() {
             error_ty: None,
             is_async: false,
             is_generator: false,
+            shader_stage: None,
             span,
         }],
     };
