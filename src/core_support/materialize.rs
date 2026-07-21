@@ -44,7 +44,7 @@ impl MaterializedCoreSupport {
     /// Returns [`MaterializeError`] when the kernel directory is missing or is
     /// a symlink.
     pub fn host_kernel(&self) -> Result<PathBuf, MaterializeError> {
-        self.required_directory("host-kernel-rs")
+        self.required_directory("hosts/crates/host-kernel")
     }
 
     /// Verified source root for the native host crate.
@@ -53,7 +53,7 @@ impl MaterializedCoreSupport {
     /// Returns [`MaterializeError`] when the host directory is missing or is a
     /// symlink.
     pub fn host_native(&self) -> Result<PathBuf, MaterializeError> {
-        self.required_directory("host-native-rs")
+        self.required_directory("hosts/crates/host-native")
     }
 
     /// Verified source root for one explicit embedded provider crate.
@@ -70,7 +70,7 @@ impl MaterializedCoreSupport {
                 "unsupported core-support provider",
             ));
         }
-        self.required_directory(&format!("host-providers-rs/crates/{provider}"))
+        self.required_directory(&format!("hosts/crates/{provider}"))
     }
 
     fn required_directory(&self, relative: &str) -> Result<PathBuf, MaterializeError> {

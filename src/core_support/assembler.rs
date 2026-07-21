@@ -6,15 +6,14 @@ use std::path::{Component, Path, PathBuf};
 
 pub const EXPECTED_ROOTS: &[&str] = &[
     "faber-runtime",
-    "host-kernel-rs",
-    "host-native-rs",
-    "host-providers-rs/Cargo.toml",
-    "host-providers-rs/crates/aleator",
-    "host-providers-rs/crates/http",
-    "host-providers-rs/crates/consolum",
-    "host-providers-rs/crates/processus",
-    "host-providers-rs/crates/solum",
-    "host-providers-rs/crates/tempus",
+    "hosts/crates/host-kernel",
+    "hosts/crates/host-native",
+    "hosts/crates/aleator",
+    "hosts/crates/http",
+    "hosts/crates/consolum",
+    "hosts/crates/processus",
+    "hosts/crates/solum",
+    "hosts/crates/tempus",
 ];
 
 #[derive(Debug, Clone, Eq, PartialEq)]

@@ -32,18 +32,30 @@ fn fixture() -> PathBuf {
 #[test]
 fn assembly_is_deterministic_and_uses_only_the_explicit_roots() {
     let root = fixture();
-    fs::create_dir_all(root.join("host-providers-rs/crates/unlisted/src")).unwrap();
+    fs::create_dir_all(root.join("hosts/crates/unlisted/src")).unwrap();
     fs::write(
-        root.join("host-providers-rs/crates/unlisted/src/lib.rs"),
+        root.join("hosts/crates/unlisted/src/lib.rs"),
         "forbidden",
     )
     .unwrap();
-    fs::create_dir_all(root.join("host-kernel-rs/target")).unwrap();
-    fs::write(root.join("host-kernel-rs/target/ignored"), "binary cache").unwrap();
-    fs::create_dir_all(root.join("host-kernel-rs/build")).unwrap();
-    fs::write(root.join("host-kernel-rs/build/ignored"), "generated cache").unwrap();
-    fs::create_dir_all(root.join("host-kernel-rs/cache")).unwrap();
-    fs::write(root.join("host-kernel-rs/cache/ignored"), "cache state").unwrap();
+    fs::create_dir_all(root.join("hosts/crates/host-kernel/target")).unwrap();
+    fs::write(
+        root.join("hosts/crates/host-kernel/target/ignored"),
+        "binary cache",
+    )
+    .unwrap();
+    fs::create_dir_all(root.join("hosts/crates/host-kernel/build")).unwrap();
+    fs::write(
+        root.join("hosts/crates/host-kernel/build/ignored"),
+        "generated cache",
+    )
+    .unwrap();
+    fs::create_dir_all(root.join("hosts/crates/host-kernel/cache")).unwrap();
+    fs::write(
+        root.join("hosts/crates/host-kernel/cache/ignored"),
+        "cache state",
+    )
+    .unwrap();
 
     let roots = assembler::EXPECTED_ROOTS
         .iter()
@@ -61,9 +73,8 @@ fn assembly_is_deterministic_and_uses_only_the_explicit_roots() {
     assert!(first
         .files
         .iter()
-        .any(|file| file.path == "host-providers-rs/crates/aleator/src/lib.rs"));
-    assert!(assembler::file_manifest(&first.files)
-        .contains("host-providers-rs/crates/aleator/src/lib.rs"));
+        .any(|file| file.path == "hosts/crates/aleator/src/lib.rs"));
+    assert!(assembler::file_manifest(&first.files).contains("hosts/crates/aleator/src/lib.rs"));
 
     let mut archive =
         tar::Archive::new(zstd::stream::read::Decoder::new(first.archive.as_slice()).unwrap());
@@ -121,20 +132,20 @@ fn secret_like_and_executable_files_fail_closed() {
         .iter()
         .map(|root| (*root).to_owned())
         .collect::<Vec<_>>();
-    let secret = root.join("host-native-rs/.env.local");
+    let secret = root.join("hosts/crates/host-native/.env.local");
     fs::write(&secret, "secret").unwrap();
     assert!(assembler::assemble(&root, &roots).is_err());
     fs::remove_file(secret).unwrap();
-    let credentials = root.join("host-native-rs/credentials.json");
+    let credentials = root.join("hosts/crates/host-native/credentials.json");
     fs::write(&credentials, "secret").unwrap();
     assert!(assembler::assemble(&root, &roots).is_err());
     fs::remove_file(credentials).unwrap();
-    let binary = root.join("host-native-rs/opaque-data");
+    let binary = root.join("hosts/crates/host-native/opaque-data");
     fs::write(&binary, [0_u8, 1, 2]).unwrap();
     assert!(assembler::assemble(&root, &roots).is_err());
     fs::remove_file(binary).unwrap();
 
-    let executable = root.join("host-native-rs/build-tool");
+    let executable = root.join("hosts/crates/host-native/build-tool");
     fs::write(&executable, "#!/bin/sh\n").unwrap();
     #[cfg(unix)]
     {
@@ -149,7 +160,7 @@ fn secret_like_and_executable_files_fail_closed() {
 fn manifest_must_equal_the_canonical_allowlist() {
     let root = fixture();
     let manifest = root.join("manifest.txt");
-    fs::write(&manifest, "host-providers-rs/crates/unlisted\n").unwrap();
+    fs::write(&manifest, "hosts/crates/unlisted\n").unwrap();
     assert!(assembler::read_roots(&manifest).is_err());
     fs::remove_dir_all(root).unwrap();
 }

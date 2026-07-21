@@ -45,6 +45,7 @@ fn minimal_generated_cargo_manifest_links_only_materialized_runtime() -> Result<
         Some(support.faber_runtime()?.to_string_lossy().as_ref())
     );
     assert!(!rendered.contains(package_root.to_string_lossy().as_ref()));
+    assert!(!rendered.contains("hosts/crates/solum"));
     assert!(!rendered.contains("host-providers-rs"));
     Ok(())
 }

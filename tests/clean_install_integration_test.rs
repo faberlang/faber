@@ -113,6 +113,8 @@ fn assert_only_materialized_paths(manifest: &str, home: &Path) {
     );
     for forbidden in [
         "/faber-runtime",
+        "/hosts/crates/host-kernel",
+        "/hosts/crates/host-native",
         "/host-kernel-rs",
         "/host-native-rs",
         "faberlang/worktrees",
@@ -146,7 +148,8 @@ fn installed_faber_builds_minimal_package_without_sibling_core_sources() {
     let manifest = generated_manifest(&package);
     assert_only_materialized_paths(&manifest, &home);
     assert!(
-        !manifest.contains("host-providers-rs"),
+        !manifest.contains("hosts/crates/solum")
+            && !manifest.contains("host-providers-rs"),
         "minimal build selected a provider:\n{manifest}"
     );
 }
