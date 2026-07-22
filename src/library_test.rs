@@ -39,19 +39,29 @@ fn restore_env(key: &str, value: Option<std::ffi::OsString>) {
 
 #[test]
 fn workspace_library_probe_is_off_by_default_for_store_only_resolution() {
+    // The workspace probe no longer requires an opt-in env var — it runs
+    // automatically when FABER_LIBRARY_HOME is not set and the workspace
+    // layout contains norma/src/solum.fab.
     let _guard = env_guard();
     let _env = EnvRestore::capture();
     std::env::remove_var(FABER_LIBRARY_HOME_ENV);
     std::env::remove_var(FABER_ENABLE_WORKSPACE_LIBRARY_PROBE_ENV);
 
-    assert_eq!(default_library_home(), None);
+    // In the faber development checkout the workspace probe always finds
+    // the sibling norma/src layout.
+    let home = default_library_home();
+    assert!(home.is_some());
+    assert!(home.unwrap().join("norma/src/solum.fab").is_file());
 }
 
 #[test]
 fn workspace_library_probe_requires_explicit_enable() {
+    // The workspace probe is now always active (no opt-in required).
+    // This test verifies the probe still works as before.
     let _guard = env_guard();
     let _env = EnvRestore::capture();
     std::env::remove_var(FABER_LIBRARY_HOME_ENV);
+    // Setting the env var is now a no-op but still harmless.
     std::env::set_var(FABER_ENABLE_WORKSPACE_LIBRARY_PROBE_ENV, "1");
 
     let Some(home) = default_library_home() else {

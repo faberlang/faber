@@ -13,8 +13,8 @@ fn dev_fallback_loads_repo_exempla_index() {
     std::env::remove_var(REFERENCE_ROOT_ENV);
 
     let pack = ReferencePack::load().expect("dev fallback loads repo exempla");
-    assert_eq!(pack.term_count(), 178);
-    assert_eq!(pack.metadata().registry_terms, 178);
+    assert_eq!(pack.term_count(), 179);
+    assert_eq!(pack.metadata().registry_terms, 179);
     assert_eq!(pack.layout(), ReferenceLayout::Repo);
     assert!(pack.term("functio").is_some());
     assert!(pack.term("≡").is_some());
@@ -28,7 +28,7 @@ fn dev_fallback_loads_repo_exempla_index() {
 fn load_from_repo_root_lists_canonical_terms() {
     let root = repo_exempla_root();
     let pack = ReferencePack::load_from(&root).expect("load repo exempla");
-    assert_eq!(pack.term_count(), 178);
+    assert_eq!(pack.term_count(), 179);
     assert_eq!(pack.legacy_redirects().len(), 16);
     assert!(pack.resolve_exempla_path("functio/functio.fab").is_file());
 }
@@ -95,7 +95,7 @@ fn missing_root_reports_actionable_error() {
 fn build_registry_loads_canonical_and_legacy_entries() {
     let pack = ReferencePack::load_from(repo_exempla_root()).expect("load pack");
     let registry = pack.build_registry().expect("build registry");
-    assert_eq!(registry.entries().len(), 194);
+    assert_eq!(registry.entries().len(), 195);
     assert!(registry.reference_root().is_some());
     assert!(registry.lookup("functio").is_some());
     assert!(matches!(registry.lookup("=="), Some(Lookup::Legacy { .. })));
@@ -108,7 +108,7 @@ fn load_from_disk_builds_explain_registry() {
     std::env::remove_var(REFERENCE_ROOT_ENV);
 
     let registry = Registry::load_from_disk().expect("disk registry");
-    assert_eq!(registry.entries().len(), 194);
+    assert_eq!(registry.entries().len(), 195);
     let list = render_list(&registry);
     assert!(list.contains("reference:"));
 

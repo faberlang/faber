@@ -526,11 +526,9 @@ fn default_library_home() -> Option<PathBuf> {
     if let Some(value) = std::env::var_os(FABER_LIBRARY_HOME_ENV) {
         return Some(PathBuf::from(value));
     }
-    std::env::var_os(FABER_ENABLE_WORKSPACE_LIBRARY_PROBE_ENV)?;
 
-    // Public faber repo is a sibling of norma under faberlang/. This dev-only
-    // probe is opt-in so package consumers do not silently resolve from a
-    // nearby checkout instead of the Cista lock/store path.
+    // Public faber repo is a sibling of norma under faberlang/. Probe
+    // workspace automatically in development — no opt-in env var required.
     let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap_or_else(|| Path::new("."));
