@@ -85,23 +85,12 @@ jobs:
           repository: faberlang/faber-runtime
           path: faber-runtime
 
-      - name: Check out host-kernel-rs
+      - name: Check out hosts monorepo
         uses: actions/checkout@v4
         with:
-          repository: faberlang/host-kernel-rs
-          path: host-kernel-rs
-
-      - name: Check out host-native-rs
-        uses: actions/checkout@v4
-        with:
-          repository: faberlang/host-native-rs
-          path: host-native-rs
-
-      - name: Check out host-providers-rs
-        uses: actions/checkout@v4
-        with:
-          repository: faberlang/host-providers-rs
-          path: host-providers-rs
+          repository: faberlang/hosts
+          path: hosts
+          token: ${{ secrets.FABERLANG_RELEASES_TOKEN }}
 
       - name: Validate crate version
         shell: bash
