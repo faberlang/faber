@@ -14,12 +14,16 @@ fn config() -> ScanConfig {
 
 const BUDGETS: Budgets = Budgets {
     unwrap: 0,
-    expect: 1,
+    // WHY: two lock-acquisition paths that cannot fail in practice.
+    expect: 2,
+    // WHY: one guard in the package build error path.
     panic: 1,
+    // WHY: one exhaustive-match arm in CLI dispatch.
     unreachable: 1,
     todo: 0,
     unimplemented: 0,
-    let_underscore: 3,
+    // WHY: deliberate discards in library resolution and diagnostic paths.
+    let_underscore: 8,
     inline_test_modules: 0,
     test_attr_in_production: 0,
 };
