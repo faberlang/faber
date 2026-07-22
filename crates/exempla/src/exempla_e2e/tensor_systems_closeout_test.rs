@@ -86,12 +86,12 @@ fn tensor_systems_closeout_keeps_workload_blocker_and_package_proof_explicit() {
         .expect("workload proof row");
     assert_eq!(
         workload.bucket,
-        TensorWorkloadProofBucket::MirLoweringFailed
+        TensorWorkloadProofBucket::DeviceStagingFailed
     );
     assert!(!workload.output_checked);
     assert!(
-        workload.blocker_issue.contains("expression ad"),
-        "workload blocker must stay named: {workload:?}"
+        workload.blocker_issue.contains("host provider"),
+        "workload blocker must reference host provider gap: {workload:?}"
     );
 
     for target in [

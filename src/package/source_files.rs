@@ -94,7 +94,7 @@ pub(super) fn load_package_source(
     let peeled = match peel_raw_source(&display_name, &raw_source) {
         Ok(peeled) => peeled,
         Err(error) => {
-            diagnostics.push(source_load_diagnostic(&display_name, error));
+            diagnostics.push(source_load_diagnostic(&display_name, &error));
             return None;
         }
     };

@@ -283,7 +283,7 @@ fn read_and_parse_library_interface(
         .map_err(|err| Diagnostic::io_error(&module.interface_path, &err))?;
     let display_name = module.interface_path.display().to_string();
     let peeled = peel_raw_source(&display_name, &raw_source)
-        .map_err(|error| source_load_diagnostic(&display_name, error))?;
+        .map_err(|error| source_load_diagnostic(&display_name, &error))?;
     // Library interfaces may declare bodyless functions bound by target manifests (G4).
     let parse = parser::parse_with_options(
         radix::lexer::lex(peeled.body),

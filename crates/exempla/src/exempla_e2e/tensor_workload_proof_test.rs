@@ -24,15 +24,16 @@ fn tensor_workload_proof_selects_rung0_matmul() {
 fn tensor_workload_proof_records_current_stable_blocker() {
     let row = tensor_workload_proof_rows()[0];
 
-    assert_eq!(row.tier, TensorWorkloadProofTier::FrontendAnalyzed);
-    assert_eq!(row.bucket, TensorWorkloadProofBucket::MirLoweringFailed);
+    assert_eq!(row.tier, TensorWorkloadProofTier::MirLowered);
+    assert_eq!(row.bucket, TensorWorkloadProofBucket::DeviceStagingFailed);
     assert!(!row.output_checked);
     assert_eq!(
         row.blocker_owner,
         TensorWorkloadProofOwner::CudaKernelEmitHostProvider
     );
-    assert!(row.blocker_issue.contains("expression ad"));
-    assert!(row.blocker_issue.contains("CUDA launch"));
+    assert!(row.blocker_issue.contains("host provider"));
+    assert!(row.blocker_issue.contains("SermoOpen"));
+    assert!(row.blocker_issue.contains("cuda:launch"));
 }
 
 #[test]

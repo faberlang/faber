@@ -66,11 +66,12 @@ const EXPECTED_RUNG_3_OUTPUT_CHECKED_FLOOR: usize = 0;
 const EXPECTED_RUNG_4_OUTPUT_CHECKED_FLOOR: usize = 0;
 /// Maximum rungs that may stop at explicit unsupported/launch-contract gaps.
 ///
-/// WHY: baseline measurement pins all five rungs at the MIR `ad` lowering gap,
-/// before CUDA launch can be tested. Rung 0–2 route to the cuda-kernel-emit host
-/// provider skeleton; rung 3 routes to the AIR autodiff producer gate; rung 4
-/// routes to the placement producer gate. This is counted debt and must ratchet
-/// down as those producer gates land.
+/// WHY: first remeasurement (2026-07-09) moved rungs 0–4 from MirLoweringFailed
+/// to DeviceStagingFailed — `lower_ad_expr` produces SermoOpen which the LLVM
+/// text probe cannot verify because no host provider exists. Rung 0–2 route to
+/// the cuda-kernel-emit host provider skeleton; rung 3 routes to the AIR autodiff
+/// producer gate; rung 4 routes to the placement producer gate. This is counted
+/// debt and must ratchet down as those producer gates land.
 const EXPECTED_GPU_UNSUPPORTED_DIAGNOSTIC_CEILING: usize = 5;
 
 #[derive(Debug)]
