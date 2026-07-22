@@ -1308,7 +1308,8 @@ fn collect_runtime_call_requirement(
         | MirIntrinsic::SermoSetOpener
         | MirIntrinsic::Sermo(_)
         | MirIntrinsic::Cede
-        | MirIntrinsic::GpuBuiltin(_) => {}
+        | MirIntrinsic::GpuBuiltin(_)
+        | MirIntrinsic::Gradient(_) => {}
         MirIntrinsic::ReadLine => {
             requirements.insert("host:stdin".to_owned());
         }
