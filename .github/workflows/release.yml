@@ -88,9 +88,8 @@ jobs:
       - name: Check out hosts monorepo
         uses: actions/checkout@v4
         with:
-          repository: faberlang/hosts
+          repository: mintedgeek/hosts
           path: hosts
-          token: ${{ secrets.FABERLANG_RELEASES_TOKEN }}
 
       - name: Validate crate version
         shell: bash
