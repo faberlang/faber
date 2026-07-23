@@ -31,6 +31,7 @@ const SWIFT_EXPECTED_FAILURES: &[&str] = &[
     "annotation-sugar/optio-braced.fab",
     "argumenta/argumenta.fab",
     "assertio/nonnulla.fab",
+    "cape/cape.fab",
     "cede/cede.fab",
     "ceteri/ceteri.fab",
     "clausa/clausa.fab",
@@ -39,6 +40,7 @@ const SWIFT_EXPECTED_FAILURES: &[&str] = &[
     "conversio/bivalens.fab",
     "conversio/collectiones.fab",
     "conversio/conversio.fab",
+    "conversio/fallibilis.fab",
     "conversio/instans-valor-carrier.fab",
     "conversio/instans.fab",
     "conversio/lista-tensor-shaped.fab",
@@ -67,6 +69,7 @@ const SWIFT_EXPECTED_FAILURES: &[&str] = &[
     "elige/in-functione.fab",
     "est/est.fab",
     "exitus/exitus.fab",
+    "fac/fac-cape.fab",
     "fac/fac-dum.fab",
     "finge/finge.fab",
     "fixum/fixum.fab",
@@ -87,6 +90,10 @@ const SWIFT_EXPECTED_FAILURES: &[&str] = &[
     "gpu-core-types/f16-bf16-reject.fab",
     "gpu-core-types/matrix-register.fab",
     "gpu-core-types/matrix-tensor-reject.fab",
+    "iace/functio-fallibilis.fab",
+    "iace/functio-propagans.fab",
+    "iace/iace-si-guard.fab",
+    "iace/iace.fab",
     "implendum/implendum.fab",
     "implet/implet.fab",
     "importa/auxilium.fab",
@@ -170,8 +177,6 @@ const SWIFT_EXPECTED_FAILURES: &[&str] = &[
     "probandum/probandum.fab",
     "redde/redde.fab",
     "repete/repete.fab",
-    "rumpe/fac-dum-rumpe.fab",
-    "rumpe/fac-si-rumpe.fab",
     "rumpe/rumpe-top-level-error.fab",
     "rumpe/rumpe.fab",
     "scriptum/scriptum.fab",
@@ -233,9 +238,9 @@ const SWIFT_EXPECTED_COMPILE_FAILURES: &[(&str, &str)] = &[
 ];
 
 /// Baseline floor for accepted outcomes (passes + expected failures).
-const EXPECTED_SWIFT_PASS_FLOOR: usize = 91;
+const EXPECTED_SWIFT_PASS_FLOOR: usize = 93;
 const EXPECTED_SWIFT_ACCEPTED_OUTCOME_FLOOR: usize = 306;
-const EXPECTED_SWIFT_EXPECTED_FAILURE_CEILING: usize = 253;
+const EXPECTED_SWIFT_EXPECTED_FAILURE_CEILING: usize = 258;
 
 /// Compile a single Faber exemplum to Swift via the single-file emit path.
 fn compile_swift_exemplum(file: &Path) -> Result<String, String> {
