@@ -7,7 +7,7 @@ use crate::exempla_e2e::gpu_workload::read_reference_fixture;
 #[test]
 fn tensor_workload_proof_selects_rung0_matmul() {
     let rows = tensor_workload_proof_rows();
-    assert_eq!(rows.len(), 1);
+    assert_eq!(rows.len(), 2);
 
     let row = rows[0];
     assert_eq!(row.rung, 0);
@@ -25,11 +25,11 @@ fn tensor_workload_proof_records_current_stable_blocker() {
     let row = tensor_workload_proof_rows()[0];
 
     assert_eq!(row.tier, TensorWorkloadProofTier::MirLowered);
-    assert_eq!(row.bucket, TensorWorkloadProofBucket::DeviceStagingFailed);
+    assert_eq!(row.bucket, Some(TensorWorkloadProofBucket::DeviceStagingFailed));
     assert!(!row.output_checked);
     assert_eq!(
         row.blocker_owner,
-        TensorWorkloadProofOwner::CudaKernelEmitHostProvider
+        Some(TensorWorkloadProofOwner::CudaKernelEmitHostProvider)
     );
     assert!(row.blocker_issue.contains("host provider"));
     assert!(row.blocker_issue.contains("SermoOpen"));
