@@ -10,7 +10,7 @@ use radix::hir::{
     DefId, HirConst, HirFunction, HirInterface, HirInterfaceMethod, HirItemKind, HirParamMode,
     HirStruct, HirTypeParamConstraint,
 };
-use radix::semantic::{FuncSig, ParamMode, ParamType, TypeParamConstraint};
+use radix::semantic::{FuncSig, ParamType, TypeParamConstraint};
 use std::collections::BTreeSet;
 
 /// Portable export identity for annotation contracts on library file interfaces.
