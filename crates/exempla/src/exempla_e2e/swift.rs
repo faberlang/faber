@@ -25,8 +25,6 @@ const SWIFT_EXPECTED_FAILURES: &[&str] = &[
     "ad/sermo-tuus.fab",
     "ad/sermo-vacuum.fab",
     "ad/solum-lege-generic.fab",
-    "adfirma/adfirma.fab",
-    "adfirma/in-functione.fab",
     "annotation-sugar/cli-braced.fab",
     "annotation-sugar/optio-braced.fab",
     "argumenta/argumenta.fab",
@@ -37,18 +35,12 @@ const SWIFT_EXPECTED_FAILURES: &[&str] = &[
     "clausa/clausa.fab",
     "clausura/clausura.fab",
     "cli/cli.fab",
-    "conversio/bivalens.fab",
     "conversio/collectiones.fab",
-    "conversio/conversio.fab",
     "conversio/fallibilis.fab",
     "conversio/instans-valor-carrier.fab",
     "conversio/instans.fab",
     "conversio/lista-tensor-shaped.fab",
-    "conversio/numeric-bool.fab",
-    "conversio/octeti.fab",
-    "conversio/radix.fab",
     "conversio/rectangular-lista-literal-tensor.fab",
-    "conversio/regex.fab",
     "conversio/tensor.fab",
     "conversio/valor-genus.fab",
     "conversio/valor-boxing.fab",
@@ -129,25 +121,17 @@ const SWIFT_EXPECTED_FAILURES: &[&str] = &[
     "lista/methodi-copiae.fab",
     "lista/methodi-functionales.fab",
     "lista/methodi-mutatio.fab",
-    "literalia/ascii.fab",
     "literalia/block-string.fab",
     "literalia/nihil.fab",
-    "literalia/regex.fab",
-    "literalia/textus.fab",
     "membrum/membrum.fab",
     "meta/requirit.fab",
     "meta/versio.fab",
-    "mone/mone.fab",
+    "morphologia/morphologia.fab",
     "mori/mori-si-guard.fab",
     "mori/mori.fab",
-    "morphologia/morphologia.fab",
     "nihil/nihil.fab",
-    "nota/gradus.fab",
-    "nota/nota.fab",
     "numquam/numquam.fab",
     "octet/octet.fab",
-    "octeti/octeti.fab",
-    "octeti/unify.fab",
     "omitte/omitte.fab",
     "omnia/omnia.fab",
     "operandus/operandus.fab",
@@ -179,7 +163,6 @@ const SWIFT_EXPECTED_FAILURES: &[&str] = &[
     "repete/repete.fab",
     "rumpe/rumpe-top-level-error.fab",
     "rumpe/rumpe.fab",
-    "scriptum/scriptum.fab",
     "si/ergo-redde.fab",
     "sit/sit.fab",
     "solum-in/solum-in.fab",
@@ -238,9 +221,9 @@ const SWIFT_EXPECTED_COMPILE_FAILURES: &[(&str, &str)] = &[
 ];
 
 /// Baseline floor for accepted outcomes (passes + expected failures).
-const EXPECTED_SWIFT_PASS_FLOOR: usize = 93;
-const EXPECTED_SWIFT_ACCEPTED_OUTCOME_FLOOR: usize = 306;
-const EXPECTED_SWIFT_EXPECTED_FAILURE_CEILING: usize = 258;
+const EXPECTED_SWIFT_PASS_FLOOR: usize = 105;
+const EXPECTED_SWIFT_ACCEPTED_OUTCOME_FLOOR: usize = 320;
+const EXPECTED_SWIFT_EXPECTED_FAILURE_CEILING: usize = 244;
 
 /// Compile a single Faber exemplum to Swift via the single-file emit path.
 fn compile_swift_exemplum(file: &Path) -> Result<String, String> {
