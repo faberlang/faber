@@ -62,3 +62,34 @@ fn tensor_workload_proof_cites_pinned_gpu_baseline() {
         .contains("gpu-workload-floor/baseline-ledger.md"));
     assert!(row.evidence.contains("Bucket Ownership"));
 }
+
+#[test]
+fn tensor_workload_proof_selects_rung1_device_linear() {
+    let row = tensor_workload_proof_rows()[1];
+
+    assert_eq!(row.rung, 1);
+    assert_eq!(row.tier, TensorWorkloadProofTier::OutputChecked);
+    assert!(row.output_checked);
+    assert_eq!(row.bucket, None);
+    assert_eq!(row.blocker_owner, None);
+    assert_eq!(
+        row.exemplar_path,
+        "corpus/tensor-fragment/tiny-linear-device/src/main.fab"
+    );
+}
+
+#[test]
+#[ignore = "G-P-08 device linear reference + G-SPINE-02 tensor-workload output stepper gate not yet complete"]
+fn tensor_workload_proof_rung1_device_linear_matches_stepper() {
+    let row = tensor_workload_proof_rows()[1];
+    let path = crate::paths::gpu_workload_dir()
+        .parent()
+        .expect("examples home")
+        .join(row.exemplar_path);
+    let fixture = read_reference_fixture(&path, 1).expect("rung 1 reference fixture");
+    assert_eq!(fixture.tolerance, 0.00001);
+    assert_eq!(
+        fixture.reference,
+        serde_json::json!([9.1, 12.2, 18.1, 24.2, 27.1, 36.2, 36.1, 48.2])
+    );
+}

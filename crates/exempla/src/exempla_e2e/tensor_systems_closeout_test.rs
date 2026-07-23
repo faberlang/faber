@@ -86,7 +86,7 @@ fn tensor_systems_closeout_keeps_workload_blocker_and_package_proof_explicit() {
         .expect("workload proof row");
     assert_eq!(
         workload.bucket,
-        TensorWorkloadProofBucket::DeviceStagingFailed
+        Some(TensorWorkloadProofBucket::DeviceStagingFailed)
     );
     assert!(!workload.output_checked);
     assert!(
