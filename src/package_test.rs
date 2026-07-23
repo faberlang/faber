@@ -5171,8 +5171,7 @@ incipit {
     assert!(!output.code.contains("use faber::Valor as valor;"));
     assert!(output.code.contains("let tree: faber::Valor"));
     assert!(
-        output.code.contains("crate::json::solve")
-            || output.code.contains("json::solve"),
+        output.code.contains("crate::json::solve") || output.code.contains("json::solve"),
         "expected json::solve in generated code"
     );
     assert!(output

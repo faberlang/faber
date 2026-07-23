@@ -1113,7 +1113,7 @@ fn hir_item_name_and_kind(
         HirItemKind::Enum(enm) => {
             Some((interner.resolve(enm.name).to_owned(), LibraryItemKind::Enum))
         }
-        HirItemKind::Const(konst) => Some((
+        HirItemKind::Constant(konst) => Some((
             interner.resolve(konst.name).to_owned(),
             LibraryItemKind::Const,
         )),

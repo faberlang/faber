@@ -197,10 +197,7 @@ fn package_render_emits_sem010_for_installed_locales() {
                         .render_diagnostic_text(diag)
                         .expect("READER001 template should render")
                         .is_some());
-                    assert_plain_render_contract(
-                        &render_plain(diag, &pack),
-                        "warning[READER001",
-                    );
+                    assert_plain_render_contract(&render_plain(diag, &pack), "warning[READER001");
                 }
                 continue;
             }
@@ -224,7 +221,8 @@ fn package_render_emits_sem010_for_installed_locales() {
                 );
             }
         } else {
-            let issue_sem010 = diagnostics_with_issue(&sem010, ISSUE_INITIALIZER_ANNOTATION_MISMATCH);
+            let issue_sem010 =
+                diagnostics_with_issue(&sem010, ISSUE_INITIALIZER_ANNOTATION_MISMATCH);
             assert!(
                 !issue_sem010.is_empty(),
                 "missing initializer_annotation_mismatch fact for {locale}: {sem010:?}"
@@ -253,8 +251,9 @@ fn package_render_emits_sem001_for_installed_locales() {
         let (config, pack) =
             config_with_reader_locale(Target::Rust, &fault, Some(locale)).expect("reader config");
         let pack = pack.expect("reader pack");
-        assert!(pack.diagnostics.contains_key("SEM001")
-            || pack.diagnostics.contains_key("READER001"));
+        assert!(
+            pack.diagnostics.contains_key("SEM001") || pack.diagnostics.contains_key("READER001")
+        );
 
         let diagnostics = check_package(&config, &fault);
 
@@ -277,10 +276,7 @@ fn package_render_emits_sem001_for_installed_locales() {
                     .render_diagnostic_text(diag)
                     .expect("READER001 template should render")
                     .is_some());
-                assert_plain_render_contract(
-                    &render_plain(diag, &pack),
-                    "warning[READER001",
-                );
+                assert_plain_render_contract(&render_plain(diag, &pack), "warning[READER001");
             }
         } else {
             assert!(
@@ -347,10 +343,7 @@ fn package_render_emits_sem001_suggestion_for_vietnamese_name() {
         .iter()
         .any(|arg| arg.name == "spelling" && arg.value == "bắtđầu"));
 
-    assert_plain_render_contract(
-        &render_plain(suggestion, &pack),
-        "warning[READER002",
-    );
+    assert_plain_render_contract(&render_plain(suggestion, &pack), "warning[READER002");
 }
 
 #[test]

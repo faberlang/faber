@@ -123,7 +123,7 @@ pub(crate) fn extract_file_interface_with_identity(
             HirItemKind::Interface(interface_decl) => FileExportKind::Interface(
                 snapshot_interface(interface_decl, analysis, file_label, &name)?,
             ),
-            HirItemKind::Const(konst) => {
+            HirItemKind::Constant(konst) => {
                 FileExportKind::Const(snapshot_const(konst, analysis, file_label, &name)?)
             }
             HirItemKind::Import(_) => continue,
@@ -364,7 +364,7 @@ fn hir_item_name(item: &HirItemKind, analysis: &AnalyzedUnit) -> Option<String> 
         HirItemKind::Enum(enm) => analysis.interner.resolve(enm.name),
         HirItemKind::Interface(interface) => analysis.interner.resolve(interface.name),
         HirItemKind::TypeAlias(alias) => analysis.interner.resolve(alias.name),
-        HirItemKind::Const(konst) => analysis.interner.resolve(konst.name),
+        HirItemKind::Constant(konst) => analysis.interner.resolve(konst.name),
         HirItemKind::Import(_) => return None,
     };
     Some(name.to_owned())

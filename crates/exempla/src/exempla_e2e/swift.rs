@@ -274,13 +274,9 @@ fn exempla_swift_e2e() {
                     let reason = if passed {
                         format!("expected compile failure: {expected}")
                     } else {
-                        format!(
-                            "expected compile failure containing `{expected}`, got: {reason}"
-                        )
+                        format!("expected compile failure containing `{expected}`, got: {reason}")
                     };
-                    eprintln!(
-                        "[swift-e2e {idx:03}/{total}] {relative}  expected-compile-fail"
-                    );
+                    eprintln!("[swift-e2e {idx:03}/{total}] {relative}  expected-compile-fail");
                     results.push(E2eResult {
                         path: file.clone(),
                         passed,
@@ -288,9 +284,7 @@ fn exempla_swift_e2e() {
                     });
                     continue;
                 }
-                eprintln!(
-                    "[swift-e2e {idx:03}/{total}] {relative}  compile-fail"
-                );
+                eprintln!("[swift-e2e {idx:03}/{total}] {relative}  compile-fail");
                 results.push(E2eResult {
                     path: file.clone(),
                     passed: false,
@@ -502,7 +496,11 @@ fn swift_expected_failure_ledgers_reference_current_corpus() {
     let missing = SWIFT_EXPECTED_FAILURES
         .iter()
         .copied()
-        .chain(SWIFT_EXPECTED_COMPILE_FAILURES.iter().map(|(path, _)| *path))
+        .chain(
+            SWIFT_EXPECTED_COMPILE_FAILURES
+                .iter()
+                .map(|(path, _)| *path),
+        )
         .filter(|path| !corpus.join(path).is_file())
         .collect::<Vec<_>>();
     assert!(
@@ -541,7 +539,11 @@ fn exempla_swift_library_mode() {
     let code = match result.output {
         Some(Output::Swift(output)) => output.code,
         _ => {
-            let diags: Vec<_> = result.diagnostics.iter().map(|d| format!("{}: {}", d.code.as_deref().unwrap_or("?"), d.message)).collect();
+            let diags: Vec<_> = result
+                .diagnostics
+                .iter()
+                .map(|d| format!("{}: {}", d.code.as_deref().unwrap_or("?"), d.message))
+                .collect();
             panic!("library-mode emit failed: {diags:?}");
         }
     };
@@ -582,7 +584,10 @@ fn exempla_swift_library_mode() {
 
     // Verify .swiftmodule was produced.
     let module_file = dir.join("MyLib.swiftmodule");
-    assert!(module_file.exists(), "expected {module_file:?} to exist after swiftc -emit-module");
+    assert!(
+        module_file.exists(),
+        "expected {module_file:?} to exist after swiftc -emit-module"
+    );
 
     // Clean up.
     let _ = std::fs::remove_dir_all(&dir);
@@ -611,13 +616,20 @@ fn exempla_swift_library_mode_public_decls() {
     let code = match result.output {
         Some(Output::Swift(output)) => output.code,
         _ => {
-            let diags: Vec<_> = result.diagnostics.iter().map(|d| format!("{}: {}", d.code.as_deref().unwrap_or("?"), d.message)).collect();
+            let diags: Vec<_> = result
+                .diagnostics
+                .iter()
+                .map(|d| format!("{}: {}", d.code.as_deref().unwrap_or("?"), d.message))
+                .collect();
             panic!("library-mode emit failed: {diags:?}");
         }
     };
 
     // Top-level declarations must be public.
-    assert!(code.contains("public func salve"), "missing public func in:\n{code}");
+    assert!(
+        code.contains("public func salve"),
+        "missing public func in:\n{code}"
+    );
 
     // No @main anywhere.
     assert!(!code.contains("@main"), "unexpected @main in library mode");

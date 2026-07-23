@@ -303,7 +303,10 @@ pub(crate) fn emit_generated_crate_with_runtime_plan(
         render_generated_cargo_toml_with_support(layout.binary_name(), "0.1.0", plan, &support)?
     };
     if let Err(err) = fs::write(&layout.generated_cargo_manifest, &cargo_src) {
-        return Err(Box::new(Diagnostic::io_error(&layout.generated_cargo_manifest, &err,)));
+        return Err(Box::new(Diagnostic::io_error(
+            &layout.generated_cargo_manifest,
+            &err,
+        )));
     }
 
     // Policy: keep an outer generated marker even when backend codegen already
@@ -315,7 +318,10 @@ pub(crate) fn emit_generated_crate_with_runtime_plan(
             return Err(Box::new(Diagnostic::io_error(&src_dir, &err)));
         }
         if let Err(err) = write_host_manifest(&layout.generated_crate_root, plan) {
-            return Err(Box::new(Diagnostic::io_error(&layout.generated_crate_root, &err,)));
+            return Err(Box::new(Diagnostic::io_error(
+                &layout.generated_crate_root,
+                &err,
+            )));
         }
     }
     let final_code = format!(
@@ -326,7 +332,10 @@ pub(crate) fn emit_generated_crate_with_runtime_plan(
     );
     let final_code = format_package_rust_source(&final_code);
     if let Err(err) = fs::write(&layout.generated_rust_entry, final_code) {
-        return Err(Box::new(Diagnostic::io_error(&layout.generated_rust_entry, &err,)));
+        return Err(Box::new(Diagnostic::io_error(
+            &layout.generated_rust_entry,
+            &err,
+        )));
     }
 
     Ok(layout.generated_crate_root.clone())

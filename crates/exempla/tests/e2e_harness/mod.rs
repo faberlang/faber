@@ -9,8 +9,6 @@ pub(crate) mod types;
 
 #[path = "../../src/exempla_e2e/go.rs"]
 pub mod go;
-#[path = "../../src/exempla_e2e/swift.rs"]
-pub mod swift;
 #[path = "../../src/exempla_e2e/llvm.rs"]
 pub mod llvm;
 #[path = "../../src/exempla_e2e/llvm_host.rs"]
@@ -27,6 +25,8 @@ pub mod rust;
 pub mod rust_canonical;
 #[path = "../../src/exempla_e2e/sexp.rs"]
 pub mod sexp;
+#[path = "../../src/exempla_e2e/swift.rs"]
+pub mod swift;
 #[path = "../../src/exempla_e2e/ts.rs"]
 pub mod ts;
 #[path = "../../src/exempla_e2e/wasm.rs"]

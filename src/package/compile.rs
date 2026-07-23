@@ -1432,7 +1432,10 @@ fn generate_rust_code_for_analysis(
     let cli_ir = if module_mode {
         None
     } else {
-        analysis.cli_program.as_ref().map(radix::codegen::rust::to_cli_ir)
+        analysis
+            .cli_program
+            .as_ref()
+            .map(radix::codegen::rust::to_cli_ir)
     };
     // Leaf ModuleGenerationRequest borrows CLI IR; keep owned ir alive for the call.
     let cli_ir_ref = cli_ir.as_ref();

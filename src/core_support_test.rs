@@ -33,11 +33,7 @@ fn fixture() -> PathBuf {
 fn assembly_is_deterministic_and_uses_only_the_explicit_roots() {
     let root = fixture();
     fs::create_dir_all(root.join("hosts/crates/unlisted/src")).unwrap();
-    fs::write(
-        root.join("hosts/crates/unlisted/src/lib.rs"),
-        "forbidden",
-    )
-    .unwrap();
+    fs::write(root.join("hosts/crates/unlisted/src/lib.rs"), "forbidden").unwrap();
     fs::create_dir_all(root.join("hosts/crates/host-kernel/target")).unwrap();
     fs::write(
         root.join("hosts/crates/host-kernel/target/ignored"),
