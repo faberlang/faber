@@ -511,3 +511,118 @@ fn swift_expected_failure_ledgers_reference_current_corpus() {
         missing.join(", ")
     );
 }
+
+#[test]
+#[ignore = "slow swift library-mode e2e; run: cargo test -p exempla --test e2e_harness exempla_swift_library_mode -- --ignored --nocapture"]
+fn exempla_swift_library_mode() {
+    if !swift_available() {
+        eprintln!("swiftc not found on PATH; skipping Swift library-mode exempla");
+        return;
+    }
+
+    use radix::{codegen::OutputMode, tool::compile_cli_path_with_reader_pack};
+
+    // Create a simple library-mode Faber source: no incipit, one public function.
+    let dir = std::env::temp_dir().join("swift_lib_smoke");
+    let _ = std::fs::create_dir_all(&dir);
+    let fab_file = dir.join("mylib.fab");
+    let source = "functio salve() \u{2192} textus { redde \"salve\" }\n";
+    std::fs::write(&fab_file, source).expect("write test fab file");
+
+    let result = compile_cli_path_with_reader_pack(
+        &fab_file,
+        false,
+        Target::Swift,
+        None,
+        OutputMode::Library,
+        None,
+    );
+
+    let code = match result.output {
+        Some(Output::Swift(output)) => output.code,
+        _ => {
+            let diags: Vec<_> = result.diagnostics.iter().map(|d| format!("{}: {}", d.code.as_deref().unwrap_or("?"), d.message)).collect();
+            panic!("library-mode emit failed: {diags:?}");
+        }
+    };
+
+    // Verify library-mode characteristics.
+    assert!(
+        !code.contains("@main"),
+        "library mode must not emit @main, got:\n{code}"
+    );
+    assert!(
+        code.contains("public func salve"),
+        "library mode must emit public func, got:\n{code}"
+    );
+    assert!(
+        code.contains("// Swift module:"),
+        "library mode must emit module comment, got:\n{code}"
+    );
+
+    // Compile as library module.
+    let swift_file = dir.join("mylib.swift");
+    std::fs::write(&swift_file, &code).expect("write swift file");
+
+    let compile = std::process::Command::new("swiftc")
+        .arg("-emit-module")
+        .arg("-module-name")
+        .arg("MyLib")
+        .arg("-parse-as-library")
+        .arg(&swift_file)
+        .output()
+        .expect("swiftc execution");
+
+    assert!(
+        compile.status.success(),
+        "swiftc -emit-module failed:\n{}",
+        String::from_utf8_lossy(&compile.stderr)
+    );
+
+    // Verify .swiftmodule was produced.
+    let module_file = dir.join("MyLib.swiftmodule");
+    assert!(module_file.exists(), "expected {module_file:?} to exist after swiftc -emit-module");
+
+    // Clean up.
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn exempla_swift_library_mode_public_decls() {
+    use radix::{codegen::OutputMode, tool::compile_cli_path_with_reader_pack};
+
+    let dir = std::env::temp_dir().join("swift_lib_public");
+    let _ = std::fs::create_dir_all(&dir);
+    let fab_file = dir.join("publics.fab");
+    // Simple Faber with one function.
+    let source = "functio salve() \u{2192} textus { redde \"salve\" }\n";
+    std::fs::write(&fab_file, source).expect("write test fab file");
+
+    let result = compile_cli_path_with_reader_pack(
+        &fab_file,
+        false,
+        Target::Swift,
+        None,
+        OutputMode::Library,
+        None,
+    );
+
+    let code = match result.output {
+        Some(Output::Swift(output)) => output.code,
+        _ => {
+            let diags: Vec<_> = result.diagnostics.iter().map(|d| format!("{}: {}", d.code.as_deref().unwrap_or("?"), d.message)).collect();
+            panic!("library-mode emit failed: {diags:?}");
+        }
+    };
+
+    // Top-level declarations must be public.
+    assert!(code.contains("public func salve"), "missing public func in:\n{code}");
+
+    // No @main anywhere.
+    assert!(!code.contains("@main"), "unexpected @main in library mode");
+
+    // Module comment.
+    assert!(code.contains("// Swift module:"), "missing module comment");
+
+    let _ = std::fs::remove_dir_all(&dir);
+}

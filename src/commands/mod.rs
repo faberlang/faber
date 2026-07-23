@@ -156,6 +156,8 @@ fn dispatch(command: Command) {
                 diagnostic_mode: diagnostic_mode(args.diagnostics),
                 reader_pack: None,
                 reader_locale: args.reader_locale,
+                output_mode: radix::codegen::OutputMode::Application,
+                module_name: None,
             };
             if emit::is_faber_emit(args.target) {
                 emit::cmd_emit_faber(emit_command);
