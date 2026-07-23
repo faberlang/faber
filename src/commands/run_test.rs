@@ -52,6 +52,11 @@ fn run_target_name_maps_scena_and_fmir_variants() {
     assert_eq!(run_target_name(Target::FmirBin), "fmir-bin");
 }
 
+#[test]
+fn run_target_name_maps_swift() {
+    assert_eq!(run_target_name(Target::Swift), "swift");
+}
+
 // ── should_interpret — interpret flag override ────────────────────────────
 
 #[test]

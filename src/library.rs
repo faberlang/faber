@@ -26,6 +26,8 @@ mod tests;
 use std::path::{Path, PathBuf};
 
 pub(crate) const FABER_LIBRARY_HOME_ENV: &str = "FABER_LIBRARY_HOME";
+/// Env flag exercised by library probe tests; production probe path is not wired yet.
+#[cfg(test)]
 pub(crate) const FABER_ENABLE_WORKSPACE_LIBRARY_PROBE_ENV: &str =
     "FABER_ENABLE_WORKSPACE_LIBRARY_PROBE";
 
