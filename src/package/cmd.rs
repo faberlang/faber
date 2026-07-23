@@ -665,5 +665,6 @@ fn output_code(output: Output) -> String {
         Output::MetalText(out) => out.code,
         Output::WgslText(out) => out.code,
         Output::Sexp(out) => out.code,
+        Output::Swift(out) => out.code,
     }
 }
