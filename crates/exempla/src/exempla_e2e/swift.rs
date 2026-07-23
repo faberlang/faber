@@ -565,6 +565,7 @@ fn exempla_swift_library_mode() {
     std::fs::write(&swift_file, &code).expect("write swift file");
 
     let compile = std::process::Command::new("swiftc")
+        .current_dir(&dir)
         .arg("-emit-module")
         .arg("-module-name")
         .arg("MyLib")
