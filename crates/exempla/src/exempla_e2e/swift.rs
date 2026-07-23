@@ -28,8 +28,8 @@ const SWIFT_EXPECTED_COMPILE_FAILURES: &[(&str, &str)] = &[
 
 /// Baseline floor for accepted outcomes (passes + expected failures).
 /// SC-001: zero passes expected — all exempla use SC-002+ features.
-const EXPECTED_SWIFT_PASS_FLOOR: usize = 0;
-const EXPECTED_SWIFT_ACCEPTED_OUTCOME_FLOOR: usize = 4;
+const EXPECTED_SWIFT_PASS_FLOOR: usize = 3;
+const EXPECTED_SWIFT_ACCEPTED_OUTCOME_FLOOR: usize = 7;
 const EXPECTED_SWIFT_EXPECTED_FAILURE_CEILING: usize = 0;
 
 /// Compile a single Faber exemplum to Swift via the single-file emit path.
