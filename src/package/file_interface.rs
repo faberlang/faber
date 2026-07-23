@@ -10,7 +10,7 @@ use radix::hir::{
     DefId, HirConst, HirFunction, HirInterface, HirInterfaceMethod, HirItemKind, HirParamMode,
     HirStruct, HirTypeParamConstraint,
 };
-use radix::semantic::{FuncSig, ParamType, TypeParamConstraint};
+use radix::semantic::{FuncSig, ParamType, SemanticParamMode, TypeParamConstraint};
 use std::collections::BTreeSet;
 
 /// Portable export identity for annotation contracts on library file interfaces.
@@ -348,12 +348,12 @@ fn type_param_constraint(constraint: &HirTypeParamConstraint) -> TypeParamConstr
     }
 }
 
-fn param_mode(mode: HirParamMode) -> ParamMode {
+fn param_mode(mode: HirParamMode) -> SemanticParamMode {
     match mode {
-        HirParamMode::Owned => ParamMode::Owned,
-        HirParamMode::De => ParamMode::Ref,
-        HirParamMode::In => ParamMode::MutRef,
-        HirParamMode::Ex => ParamMode::Move,
+        HirParamMode::Owned => SemanticParamMode::Owned,
+        HirParamMode::De => SemanticParamMode::Ref,
+        HirParamMode::In => SemanticParamMode::MutRef,
+        HirParamMode::Ex => SemanticParamMode::Move,
     }
 }
 
