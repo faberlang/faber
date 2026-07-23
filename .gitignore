@@ -2,3 +2,9 @@
 target/
 .DS_Store
 tmp/
+
+# Swift compiler artifacts (local SC emit/e2e pollution)
+*.swiftmodule
+*.swiftdoc
+*.swiftsourceinfo
+MyLib.abi.json
