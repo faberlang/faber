@@ -614,6 +614,7 @@ dependencies = [
  "radix-codegen-go",
  "radix-codegen-rust",
  "radix-codegen-shared",
+ "radix-codegen-swift",
  "radix-codegen-ts",
  "radix-diagnostics",
  "radix-hir",
@@ -690,6 +691,19 @@ dependencies = [
  "radix-diagnostics",
  "radix-hir",
  "radix-lexer",
+ "radix-types",
+ "rustc-hash",
+]
+
+[[package]]
+name = "radix-codegen-swift"
+version = "0.77.0"
+dependencies = [
+ "radix-codegen-shared",
+ "radix-diagnostics",
+ "radix-hir",
+ "radix-lexer",
+ "radix-syntax",
  "radix-types",
  "rustc-hash",
 ]
