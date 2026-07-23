@@ -12,6 +12,9 @@ pub(super) enum TensorWorkloadProofTier {
     MirLowered,
     /// Output verified against stepper reference — the rung reaches the top tier.
     OutputChecked,
+    /// Device staging passed (gate fix + stub); launch is the next step.
+    /// Rung fails during launch, not staging.
+    DeviceStaged,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -20,6 +23,9 @@ pub(super) enum TensorWorkloadProofBucket {
     /// Device IR staging failed — the LLVM/MIR emitter cannot produce a
     /// device-side kernel without a device handle/HostProvider for the route.
     DeviceStagingFailed,
+    /// Launch contract step discovered no real device executor.
+    /// SermoOpen returns stub handle, but the kernel cannot be dispatched.
+    LaunchContractFailed,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,13 +55,13 @@ pub(super) const TENSOR_WORKLOAD_PROOF_ROWS: &[TensorWorkloadProofRow] =
         reference_path: "gpu-workload/rung-0-matmul.ref.json",
         expected_stdout_path: "gpu-workload/rung-0-matmul.expected",
         selected_operation: "rank-2 f32 matmul workload",
-        tier: TensorWorkloadProofTier::MirLowered,
-        bucket: Some(TensorWorkloadProofBucket::DeviceStagingFailed),
+        tier: TensorWorkloadProofTier::DeviceStaged,
+        bucket: Some(TensorWorkloadProofBucket::LaunchContractFailed),
         output_checked: false,
         blocker_owner: Some(TensorWorkloadProofOwner::CudaKernelEmitHostProvider),
         blocker_issue:
-            "host provider for route 'cuda:launch' is absent; SermoOpen intrinsic has no device-side handler",
-        evidence: "docs/factory/gpu-workload-floor/baseline-ledger.md::Bucket Ownership (2026-07-09 remeasurement)",
+            "host provider for route 'cuda:launch' has no real device executor; SermoOpen returns stub handle but launch contract step discovers no device-side kernel launcher",
+        evidence: "docs/factory/gpu-workload-floor/baseline-ledger.md::Bucket Ownership (2026-07-22 remeasurement)",
     },
     TensorWorkloadProofRow {
         rung: 1,

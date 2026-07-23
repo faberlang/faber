@@ -24,8 +24,11 @@ fn tensor_workload_proof_selects_rung0_matmul() {
 fn tensor_workload_proof_records_current_stable_blocker() {
     let row = tensor_workload_proof_rows()[0];
 
-    assert_eq!(row.tier, TensorWorkloadProofTier::MirLowered);
-    assert_eq!(row.bucket, Some(TensorWorkloadProofBucket::DeviceStagingFailed));
+    assert_eq!(row.tier, TensorWorkloadProofTier::DeviceStaged);
+    assert_eq!(
+        row.bucket,
+        Some(TensorWorkloadProofBucket::LaunchContractFailed)
+    );
     assert!(!row.output_checked);
     assert_eq!(
         row.blocker_owner,
@@ -34,6 +37,8 @@ fn tensor_workload_proof_records_current_stable_blocker() {
     assert!(row.blocker_issue.contains("host provider"));
     assert!(row.blocker_issue.contains("SermoOpen"));
     assert!(row.blocker_issue.contains("cuda:launch"));
+    assert!(row.blocker_issue.contains("no real device executor"));
+    assert!(row.blocker_issue.contains("launch contract step"));
 }
 
 #[test]
