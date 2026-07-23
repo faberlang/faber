@@ -62,7 +62,6 @@ const SWIFT_EXPECTED_FAILURES: &[&str] = &[
     "custodi/custodi.fab",
     "de/de.fab",
     "descriptio/descriptio.fab",
-    "destructura/lista.fab",
     "destructura/objectum.fab",
     "discerne/discerne.fab",
     "dum/conditio-complexa.fab",
@@ -135,9 +134,7 @@ const SWIFT_EXPECTED_FAILURES: &[&str] = &[
     "intrinseca/vacua-ascribere.fab",
     "itera/cursor-iteratio.fab",
     "itera/de.fab",
-    "itera/ex.fab",
     "itera/in-functione.fab",
-    "itera/nidificatus.fab",
     "lege/lege.fab",
     "lista/lista.fab",
     "lista/methodi-accessus.fab",
@@ -245,7 +242,6 @@ const SWIFT_EXPECTED_FAILURES: &[&str] = &[
     "ternarius/ternarius.fab",
     "typi/sized-family-error.fab",
     "typi/sized-numerus.fab",
-    "typus/typus.fab",
     "ubique/ubique.fab",
     "unarius/unarius.fab",
     "unio/unio.fab",
@@ -274,9 +270,9 @@ const SWIFT_EXPECTED_COMPILE_FAILURES: &[(&str, &str)] = &[
 ];
 
 /// Baseline floor for accepted outcomes (passes + expected failures).
-const EXPECTED_SWIFT_PASS_FLOOR: usize = 54;
-const EXPECTED_SWIFT_ACCEPTED_OUTCOME_FLOOR: usize = 57;
-const EXPECTED_SWIFT_EXPECTED_FAILURE_CEILING: usize = 249;
+const EXPECTED_SWIFT_PASS_FLOOR: usize = 61;
+const EXPECTED_SWIFT_ACCEPTED_OUTCOME_FLOOR: usize = 64;
+const EXPECTED_SWIFT_EXPECTED_FAILURE_CEILING: usize = 245;
 
 /// Compile a single Faber exemplum to Swift via the single-file emit path.
 fn compile_swift_exemplum(file: &Path) -> Result<String, String> {
