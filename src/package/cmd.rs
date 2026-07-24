@@ -47,7 +47,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
             }
         }
     } else {
-        (Config::default().with_target(target), None)
+        (Config::default().with_target(target).with_dev_stdlib(), None)
     };
 
     if is_package && target == Target::Scena {

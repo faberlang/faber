@@ -65,7 +65,7 @@ pub fn cmd_format(command: &FormatCommand) {
             };
             compile_canonical(&session, &name, &source)
         } else {
-            let session = Session::new(Config::default());
+            let session = Session::new(Config::default().with_dev_stdlib());
             compile_author(&session, &name, &source)
         };
 
@@ -138,7 +138,7 @@ pub fn cmd_format(command: &FormatCommand) {
 
 fn format_session(path: &Path, reader_locale: Option<&str>) -> Result<Session, String> {
     if reader_locale.is_none() {
-        return Ok(Session::new(Config::default()));
+        return Ok(Session::new(Config::default().with_dev_stdlib()));
     }
 
     crate::package::config_with_reader_locale(Target::Faber, path, reader_locale)
