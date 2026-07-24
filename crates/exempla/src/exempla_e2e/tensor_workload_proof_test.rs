@@ -84,7 +84,6 @@ fn tensor_workload_proof_selects_rung1_device_linear() {
 }
 
 #[test]
-#[ignore = "G-P-08 device linear reference + G-SPINE-02 tensor-workload output stepper gate not yet complete"]
 fn tensor_workload_proof_rung1_device_linear_matches_stepper() {
     let row = tensor_workload_proof_rows()[1];
     let path = crate::paths::gpu_workload_dir()
