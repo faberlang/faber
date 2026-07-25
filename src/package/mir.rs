@@ -2408,6 +2408,13 @@ fn import_semantic_type(
                 .collect();
             target.intern(Type::Union(members))
         }
+        Type::Tuple(members) => {
+            let members = members
+                .into_iter()
+                .map(|member| import_semantic_type(source, target, member, imported))
+                .collect();
+            target.intern(Type::Tuple(members))
+        }
         other @ (Type::Struct(_)
         | Type::Enum(_)
         | Type::Interface(_)
