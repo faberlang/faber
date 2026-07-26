@@ -3487,7 +3487,7 @@ fn rewrite_expr(
                 rewrite_expr(unit_path, value, interner, targets, namespaces, diagnostics);
             }
         }
-        HirExpressionKind::Tuple(items)
+        HirExpressionKind::Tuple(items, _)
         | HirExpressionKind::Scribe(_, items)
         | HirExpressionKind::Scriptum(_, items) => {
             for item in items {
