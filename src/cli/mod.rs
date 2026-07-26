@@ -101,6 +101,9 @@ pub enum Command {
 
     /// Script host introspection (kernel manifest)
     Host(crate::commands::host::HostArgs),
+
+    /// Inspect model file metadata (safetensors)
+    Model(ModelArgs),
 }
 
 /// Arguments for `faber format`.
@@ -384,4 +387,26 @@ pub struct TestArgs {
     /// Run normal tests and Rust-ignored tests
     #[arg(long, conflicts_with = "ignored")]
     pub include_ignored: bool,
+}
+
+/// Arguments for `faber model`.
+#[derive(clap::Args, Debug)]
+pub struct ModelArgs {
+    /// Subcommand for model operations.
+    #[command(subcommand)]
+    pub command: ModelCommand,
+}
+
+/// Model subcommands.
+#[derive(clap::Subcommand, Debug)]
+pub enum ModelCommand {
+    /// Inspect safetensors file header metadata
+    Inspect(ModelInspectArgs),
+}
+
+/// Arguments for `faber model inspect`.
+#[derive(clap::Args, Debug)]
+pub struct ModelInspectArgs {
+    /// Path to a .safetensors model file
+    pub path: std::path::PathBuf,
 }

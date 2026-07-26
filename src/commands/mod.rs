@@ -16,6 +16,10 @@ mod install;
 #[cfg(test)]
 #[path = "install_test.rs"]
 mod install_test;
+mod model;
+#[cfg(test)]
+#[path = "model_test.rs"]
+mod model_test;
 mod run;
 mod script;
 mod targets;
@@ -32,6 +36,7 @@ use format::cmd_format;
 use host::cmd_host;
 use init::cmd_init;
 use install::cmd_install;
+use model::cmd_model;
 use run::{cmd_fmir_run_image, cmd_run};
 use script::{cmd_eval, cmd_repl, cmd_script};
 use targets::cmd_targets;
@@ -190,6 +195,7 @@ fn dispatch(command: Command) {
             config: args.config,
         }),
         Command::Host(args) => cmd_host(args.command),
+        Command::Model(args) => cmd_model(args.command),
     }
 }
 
