@@ -6,7 +6,7 @@
 **Goal**: `faber/docs/factory/pytorch-session-continuation/crux-entropia-fab-binding-goal.md`
 **Goal verdict**: READY
 **Created**: 2026-07-26
-**Revised**: 2026-07-26 (hand-2 update — U2 unblocked, filed hand-5 after BERT 996bfae0c)
+**Revised**: 2026-07-26 (hand-2 update — U2 ACCEPT at b32ce3742; U3 now open)
 **Consumer**: factory Hands (mid-tier implementer)
 **Unit count**: 3
 
@@ -18,11 +18,10 @@
 > after `6638e9f89`) which held single-writer on `reverse_ad.rs`. BERT U3
 > forbade concurrent CE FAB U2. Unit 3 (exemplum wiring) gates on U1+U2.
 >
-> **Update (2026-07-26): U2 UNBLOCKED.** BERT U3 completed at commit
-> `996bfae0c` and released the single-writer lock on `reverse_ad.rs`. hand-5
-> was filed with a new task after that commit — no longer holding `reverse_ad`.
-> The delivery spec (unit graph, write scopes, done-when) remains correct.
-> Unit 2 is now ready to assign.
+> **Update (2026-07-26): U2 ACCEPT.** U2 (reverse_ad VJP) landed at commit
+> `b32ce3742` and is ACCEPTED on main. U1+U2 both on main. Unit 3 (exemplum
+> wiring) is now **open** — its dependency (U1+U2) is satisfied. See Unit 3
+> section below for the remaining work.
 
 ---
 
@@ -38,7 +37,8 @@ This delivery lowers the binding into three path-disjoint implementable units.
 All three follow the established tensor-op binding pattern used by Gelu,
 Softmax, and LayerNorm. Unit 2 (reverse_ad VJP) was deferred until hand-5
 completed BERT U3 (task 118a8e06, commit `996bfae0c`) which held the
-single-writer lock on `reverse_ad.rs`. That lock has now been released.
+single-writer lock on `reverse_ad.rs`. That lock has now been released and
+U2 landed at `b32ce3742` — both U1 and U2 are ACCEPTED on main.
 
 ## Normalized Spec
 
@@ -72,9 +72,9 @@ All units work from the current main tips:
 
 **Hard constraint**: `radix/crates/radix/src/air/reverse_ad.rs` was single-writer
 locked by hand-5 (BERT U3, task 118a8e06, until commit `996bfae0c`). That lock
-has been released — hand-5 has been filed with a new task after that commit.
-Unit 2 is now unblocked. Units 1 and 3 are path-disjoint from `reverse_ad.rs`
-and from each other.
+has been released and U2 landed at `b32ce3742` — ACCEPTED on main. Units 1 and 3
+are path-disjoint from `reverse_ad.rs` and from each other. U1+U2 both on main;
+U3 is now open for assignment.
 
 ## Ordered Unit Graph
 
@@ -115,13 +115,13 @@ and from each other.
 
 | Field | Value |
 |-------|-------|
-| **outcome** | Compiler-generated reverse AD produces correct gradient companion for functions containing `crux_entropia`. The VJP walk emits `(softmax(prediction) - targets) / N` in AIR. |
+| **outcome** | **LANDED** (`b32ce3742`) — compiler-generated reverse AD produces correct gradient companion for functions containing `crux_entropia`. The VJP walk emits `(softmax(prediction) - targets) / N` in AIR. All done-when criteria met; ACCEPTED on main. |
 | **write_scope** | `radix/crates/radix/src/air/reverse_ad.rs`, `radix/crates/radix/src/air/reverse_ad_test.rs` |
 | **forbidden** | All other radix files (already done in Unit 1); product code changes in faber-runtime, examples, or faber CLI |
 | **read_scope** | Full radix workspace; `faber-runtime/src/autograd_reference_test.rs` (FD oracle for formula verification); Unit 1 changes |
 | **done_when** | (a) `reverse_ad.rs` handles `AirTensorOp::CruxEntropia` in the differentiable-op gating arm (same as `Mean`, `Gelu`, `Softmax`). (b) `build_vjp_expr` returns the correct VJP expression: `(softmax(prediction_replay) - targets_replay) / N`. The VJP uses the forward input (logits, args[0]) to compute softmax, NOT the forward output (scalar loss). (c) Caller-side gradient accumulation handles the two-input case (logits gradient → accumulate; targets gradient → nil/skip). (d) `reverse_ad_test.rs`: new oracle test `test_crux_entropia_vjp_oracle_matches_tape` verifies the generated VJP matches the runtime FD oracle. Pattern: `sum(crux_entropia(logits, targets))` to make scalar output → AIR transform → compare VJP against finite-difference. (e) `cargo test -p radix reverse_ad` passes — all existing tests + new crux-entropia test green. |
 | **validation** | `cargo test -p radix reverse_ad` (all tests including new oracle) |
-| **depends_on** | Unit 1 (needs `AirTensorOp::CruxEntropia` to exist — **DONE**, `8efec35db` on main); **hand-5 BERT U3 completed at `996bfae0c`** — single-writer lock on `reverse_ad.rs` released |
+| **depends_on** | Unit 1 (`8efec35db`) — **DONE**; hand-5 BERT U3 lock (`996bfae0c`) — **RELEASED**; U2 landed at `b32ce3742` — **ACCEPTED** |
 | **non_goals** | Changing how other ops' VJP walks work; adding crux-entropia to fusion.rs (fusion handles ops already in the eligibility ledger — CruxEntropia will be eligible after this unit, fusion can be a follow-on if needed); WASM/WebGPU gradient execution (CPU reference proof only) |
 | **risk** | medium — reverse_ad.rs is a complex file; VJP formula is known and verified but the walk integration has nuance: forward output is a scalar loss but VJP needs the forward logits input to compute softmax; similar to Mean (scalar output, VJP needs element count N); higher risk than Unit 1's mechanical additions |
 
@@ -157,7 +157,7 @@ VJP computation, not just the output).
 | **read_scope** | `faber-runtime/src/tensor.rs` (crux_entropia docs for README); Unit 1+2 radix changes; current train.fab |
 | **done_when** | (a) `train.fab` line 34-35: `# cross-entropy` comment block uncommented; MSE lines 53-55 replaced with `redde prediction.crux_entropia(target)`. Keep the existing model (2×2 linear) — only swap the loss. (b) `README.md` lines 87-93: "FAB binding pending" note removed; cross-entropy section rewritten as "available and working." (c) `north-star-evidence-gate.md` Gate 1 (Cross-entropy loss) status changed from "Ready (PSC-1)" to "**Shipped (PSC-1 + FAB binding)**" with evidence: runtime bfba771 + radix binding SHA. (d) `faber run -t fmir examples/training/session-exemplum/` produces 8-element decreasing loss trace with cross-entropy loss. |
 | **validation** | `faber run -t fmir examples/training/session-exemplum/` — loss trace decreases monotonically; no compile errors; cross-entropy loss value is reasonable (not NaN, not zero) |
-| **depends_on** | Unit 1 (needs compiler to accept `.crux_entropia`); Unit 2 (needs `@ radix backward` to generate correct gradients — without gradients, the training loop can't update parameters) |
+| **depends_on** | Unit 1 (`8efec35db`) — **DONE**; Unit 2 (`b32ce3742`) — **DONE**. U1+U2 both on main — U3 is now **open** for assignment. |
 | **non_goals** | Changing the model architecture; adding a second loss exemplum; creating `norma:loss` package; touching linear-regression/mlp/bert-tiny exempla |
 | **risk** | low — simple file edits; primary risk is that the cross-entropy loss surface may need different hyperparameters (learning rate) than MSE to converge; if loss doesn't decrease, adjust lr from 0.01 and note the finding |
 
@@ -167,23 +167,20 @@ VJP computation, not just the output).
 
 | Gate | After | Check |
 |------|-------|-------|
-| Forward compiles | Unit 1 | `cargo test -p radix-mir-stepper tensor_crux_entropia` green; manual `.fab` compile |
-| Gradients work | Unit 2 | `cargo test -p radix reverse_ad` green with new oracle test |
-| Exemplum trains | Unit 3 | `faber run -t fmir examples/training/session-exemplum/` produces decreasing loss |
+| Forward compiles | Unit 1 | **DONE** (`8efec35db`) |
+| Gradients work | Unit 2 | **DONE** (`b32ce3742`) — `cargo test -p radix reverse_ad` green |
+| Exemplum trains | Unit 3 | **OPEN** — ready to assign |
 
 ## Validation Summary
 
 ```bash
-# Unit 1
-cargo test -p radix nodes_test
-cargo test -p radix generated_differentiable_eligibility
+# Unit 1 — DONE (8efec35db)
 cargo test -p radix-mir-stepper tensor_crux_entropia
-cargo test -p radix-mir  # validate module
 
-# Unit 2 (unblocked at 996bfae0c — ready to assign)
+# Unit 2 — DONE (b32ce3742)
 cargo test -p radix reverse_ad
 
-# Unit 3 (deferred — requires U1 + U2)
+# Unit 3 — OPEN (U1+U2 satisfied, ready to assign)
 faber run -t fmir examples/training/session-exemplum/
 ```
 
@@ -192,14 +189,18 @@ faber run -t fmir examples/training/session-exemplum/
 1. ~~**Unit 2 scheduling**: Does Mind want planner-2 to file a need when hand-5
    completes 0237b130, or should Unit 2 be pre-filed as a task with "BLOCKED"
    status?~~ **RESOLVED**: U2 is unblocked — hand-5 BERT U3 completed at
-   `996bfae0c`, `reverse_ad.rs` single-writer lock released. Unit 2 is ready to
-   assign.
+   `996bfae0c`, `reverse_ad.rs` single-writer lock released. Unit 2 landed at
+   `b32ce3742` and is ACCEPTED on main.
 
-2. **Fusion eligibility**: After Unit 2, CruxEntropia is differentiable in
+2. **Unit 3 now open**: U1 (`8efec35db`) + U2 (`b32ce3742`) both on main. U3
+   (exemplum wiring — uncomment train.fab, update README + evidence gate) is
+   ready to assign. No open blocking dependencies.
+
+3. **Fusion eligibility**: After Unit 2, CruxEntropia is differentiable in
    isolated functions. Fusion of crux-entropia into larger companions is
    follow-on work — not in scope of this delivery. OK to defer?
 
-3. **Learning rate for cross-entropy exemplum**: MSE loss uses lr=0.01 and
+4. **Learning rate for cross-entropy exemplum**: MSE loss uses lr=0.01 and
    converges in 8 steps. Cross-entropy may need a different lr. The Hand
    should adjust if the loss trace doesn't decrease — OK to change
    hyperparameters as a Unit 3 implementation detail?
