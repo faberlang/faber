@@ -40,7 +40,7 @@ All evidence operates within the dense Tensor<f32> proof boundary: contiguous ma
 
 | # | Gate | Gap description | Status | Estimated unit size | Dependency |
 |---|------|----------------|--------|-------------------|------------|
-| 1 | **Cross-entropy loss with softmax VJP** | `Tensor<f32>::crux_entropia` forward + `AutogradOp::CruxEntropia` analytical VJP + FD oracle. Softmax VJP no longer deferred. | **Ready (PSC-1)** | `faber-runtime/` — ~80 lines Rust + test | None — independent |
+| 1 | **Cross-entropy loss with softmax VJP** | `Tensor<f32>::crux_entropia` forward + `AutogradOp::CruxEntropia` analytical VJP + FD oracle. Softmax VJP no longer deferred. | **Shipped (PSC-1 + FAB binding)** — runtime `bfba771` + radix compiler pipeline `8efec35db` + reverse AD VJP `b32ce3742` | `faber-runtime/` + `radix/` | None — independent |
 | 2 | **Composable training session pattern** | Reusable training loop exemplum replacing copy-paste inline SGD. Model function + loss function + optimizer step + loop body. | **Ready (PSC-2)** | `examples/training/session-exemplum/` — ~3 files, ~100 lines Faber code | Logical: PSC-1 (can ship MSE-only if delayed) |
 | 3 | **Dataloader abstraction** | Bounded iteration over training data: batch slicing, shuffle, epoch management. No product library. | **Not started** | `examples/` or `norma/` — medium | After session pattern (PSC-2) |
 | 4 | **Checkpointing** | Save/restore parameter state between training runs. No model serialization format. | **Not started** | `examples/` or `norma/` — medium | After dataloader |
