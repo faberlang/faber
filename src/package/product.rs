@@ -541,8 +541,9 @@ pub(crate) fn build_browser_product(
     fs::create_dir_all(&ts_root).map_err(|err| io_diag(&ts_root, err))?;
     fs::create_dir_all(&esm_root).map_err(|err| io_diag(&esm_root, err))?;
 
-    emit_typescript_modules(&package, &ts_root, &controllers)?;
-    emit_library_typescript_modules(config, &layout.package_root, &ts_root)?;
+    let library_imports = build_library_ts_module_map(&layout.package_root)?;
+    emit_typescript_modules(&package, &ts_root, &controllers, &library_imports)?;
+    emit_library_typescript_modules(config, &layout.package_root, &ts_root, &library_imports)?;
     let browser_entry = ts_root.join(BROWSER_ENTRY_TS);
     fs::write(&browser_entry, render_browser_entry(&controllers))
         .map_err(|err| io_diag(&browser_entry, err))?;
@@ -820,6 +821,7 @@ fn emit_typescript_modules(
     package: &super::AnalyzedPackage,
     ts_root: &Path,
     controllers: &[BrowserController],
+    library_imports: &BTreeMap<String, String>,
 ) -> Result<(), Box<Diagnostic>> {
     let latin = radix::reader_locale::latin_reader_pack();
     let surface = radix::reader_locale::KeywordSurface::new(&latin);
@@ -852,6 +854,7 @@ fn emit_typescript_modules(
             .map(|s| s.as_str())
             .unwrap_or("main");
         let code = wrap_module_exports(code, module_name);
+        let code = rewrite_library_imports(code, library_imports);
         let path = ts_root.join(ts_module_file_name(unit));
         fs::write(&path, code).map_err(|err| io_diag(&path, err))?;
     }
@@ -937,6 +940,7 @@ fn emit_library_typescript_modules(
     config: &radix::driver::Config,
     package_root: &Path,
     ts_root: &Path,
+    library_imports: &BTreeMap<String, String>,
 ) -> Result<(), Box<Diagnostic>> {
     let lock = match super::lockfile::read_lock(package_root)? {
         Some(lock) => lock,
@@ -1001,6 +1005,8 @@ fn emit_library_typescript_modules(
             // Phase 3: apply emit-defect fixes before namespace wrapping.
             let code = apply_library_emit_fixes(code);
             let code = wrap_module_exports(code, stem);
+            // Phase 4: rewrite library specifier imports to relative ESM paths.
+            let code = rewrite_library_imports(code, library_imports);
             let ts_file_name = format!("{}-{}.ts", pkg.name, stem);
             let ts_path = ts_root.join(&ts_file_name);
             fs::write(&ts_path, code).map_err(|err| io_diag(&ts_path, err))?;
@@ -1008,6 +1014,85 @@ fn emit_library_typescript_modules(
     }
 
     Ok(())
+}
+
+/// Build a map from library import specifiers to relative ESM paths for all
+/// `kind=lib`, `target_language=ts` packages discovered via the lockfile.
+///
+/// Returns `{specifier} → {relative_path}` mappings, e.g.:
+///   "triga:triga" → "./triga-triga.js"
+///   "triga:geometry" → "./triga-geometry.js"
+///
+/// Phase 4: used by [`rewrite_library_imports`] to rewrite bare library
+/// specifiers in emitted TypeScript to relative ESM paths.
+fn build_library_ts_module_map(
+    package_root: &Path,
+) -> Result<BTreeMap<String, String>, Box<Diagnostic>> {
+    let lock = match super::lockfile::read_lock(package_root)? {
+        Some(lock) => lock,
+        None => return Ok(BTreeMap::new()),
+    };
+    let lock_path = package_root.join(super::lockfile::LOCK_FILE);
+    let index = super::lockfile::lock_index(&lock_path, &lock).map_err(|mut diags| {
+        diags.pop().unwrap_or_else(|| {
+            product_diag("failed to index faber.lock for library import map")
+                .with_file(package_root.display().to_string())
+                .with_arg("issue", "product_library_import_map_failed")
+        })
+    })?;
+
+    let mut map = BTreeMap::new();
+    for (_name, pkg) in &index {
+        if pkg.kind != "lib" || pkg.target_language != "ts" {
+            continue;
+        }
+        let pkg_root = pkg.package_root_path(package_root);
+        let src_dir = pkg_root.join("src");
+        if !src_dir.is_dir() {
+            continue;
+        }
+        let mut entries: Vec<_> = match fs::read_dir(&src_dir) {
+            Ok(entries) => entries
+                .filter_map(|e| e.ok())
+                .filter(|e| e.path().extension().is_some_and(|ext| ext == "fab"))
+                .collect(),
+            Err(err) => return Err(io_diag(&src_dir, err)),
+        };
+        entries.sort_by_key(|e| e.file_name());
+
+        for entry in &entries {
+            let stem = entry
+                .path()
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unknown")
+                .to_owned();
+            let spec = format!("{}:{}", pkg.name, stem);
+            let rel_path = format!("./{}-{}.js", pkg.name, stem);
+            map.insert(spec, rel_path);
+        }
+    }
+    Ok(map)
+}
+
+/// Rewrite bare library specifier imports to relative ESM paths in emitted
+/// TypeScript code.
+///
+/// Replaces `from "triga:triga"` with `from "./triga-triga.js"` using the
+/// pre-built import map from [`build_library_ts_module_map`].
+///
+/// Phase 4: enables the emitted library `.ts` files (not ambient declarations)
+/// to serve as the actual module definitions that tsc resolves.
+fn rewrite_library_imports(code: String, library_imports: &BTreeMap<String, String>) -> String {
+    let mut result = code;
+    for (spec, rel_path) in library_imports {
+        // Match `from "specifier"` (with quotes) so only import/export
+        // statements are affected, not unrelated string literals.
+        let from_pattern = format!("from {:?}", spec);
+        let to_pattern = format!("from {:?}", rel_path);
+        result = result.replace(&from_pattern, &to_pattern);
+    }
+    result
 }
 
 fn adapt_controller_typescript(mut code: String, controllers: &[BrowserController]) -> String {
@@ -1194,101 +1279,20 @@ export function mountControllers(root: ParentNode = globalThis.document): Contro
 }
 
 fn web_ambient_declarations() -> String {
-    let triga_decls = r#"declare module "triga:triga" {
-  export function vector3(x: number, y: number, z: number): any;
-  export function vector3_subtracta(a: any, b: any): any;
-  export function vector3_normalizata(v: any): any;
-  export function vector3_cross(a: any, b: any): any;
-  export function box3_intersecat(a: any, b: any): any;
-  export function box(min: any, max: any): any;
-  export function matrix4_identitas(): any;
-  export function matrix4_perspectiva(fov_degrees: number, aspect: number, near: number, far: number): any;
-  export function matrix4_conspectus(eye: any, target: any, up: any): any;
-  export function matrix4_multiplicata(a: any, b: any): any;
-  export function transform_payload(model: any, view_projection: any): any;
-  export function camera_pitch_coercita(pitch_degrees: number): number;
-  export function camera_yaw_pitch_facts(eye: any, yaw_degrees: number, pitch_degrees: number): any;
-  export function camera_motus_planus_ex_yaw(yaw_degrees: number, forward: number, right: number, speed: number, delta_seconds: number): any;
-  export function face_code_color(face_code: number): number;
-  export function face_code_colored_quad_mesh_append(positions: any, colors: any, indices: any, face_code: number, x: number, y: number, z: number, color: number): any;
-  export function face_code_normal(face_code: number): any;
-  export function face_code_valid(face_code: number): boolean;
-  export function face_code_x_offset(face_code: number): number;
-  export function face_code_y_offset(face_code: number): number;
-  export function face_code_z_offset(face_code: number): number;
-  export function matrix4_valid(matrix: any): boolean;
-  export function transform_payload_byte_count(payload: any): number | null;
-  export const triga: {
-    vector3(x: number, y: number, z: number): any;
-    vector3_subtracta(a: any, b: any): any;
-    vector3_normalizata(v: any): any;
-    vector3_cross(a: any, b: any): any;
-    box3_intersecat(a: any, b: any): any;
-    box(min: any, max: any): any;
-    matrix4_identitas(): any;
-    matrix4_perspectiva(fov_degrees: number, aspect: number, near: number, far: number): any;
-    matrix4_conspectus(eye: any, target: any, up: any): any;
-    matrix4_multiplicata(a: any, b: any): any;
-    transform_payload(model: any, view_projection: any): any;
-    camera_pitch_coercita(pitch_degrees: number): number;
-    camera_yaw_pitch_facts(eye: any, yaw_degrees: number, pitch_degrees: number): any;
-    camera_motus_planus_ex_yaw(yaw_degrees: number, forward: number, right: number, speed: number, delta_seconds: number): any;
-    face_code_color(face_code: number): number;
-    face_code_colored_quad_mesh_append(positions: any, colors: any, indices: any, face_code: number, x: number, y: number, z: number, color: number): any;
-    face_code_normal(face_code: number): any;
-    face_code_valid(face_code: number): boolean;
-    face_code_x_offset(face_code: number): number;
-    face_code_y_offset(face_code: number): number;
-    face_code_z_offset(face_code: number): number;
-    matrix4_valid(matrix: any): boolean;
-    transform_payload_byte_count(payload: any): number | null;
-  };
-}
-declare module "triga:geometry" {
-  export function box_wire_geometry(width: number, height: number, depth: number): any;
-  export function box_wire_draw_batch_facts(width: number, height: number, depth: number, color: number): any;
-  export function colored_quad_mesh_bounding_box(payload: any): any;
-  export function colored_quad_mesh_facts(payload: any): any;
-  export function colored_quad_mesh_append(positions: any, colors: any, indices: any, ax: number, ay: number, az: number, bx: number, by: number, bz: number, cx: number, cy: number, cz: number, dx: number, dy: number, dz: number, r: number, g: number, b: number): any;
-  export const geometry: {
-    box_wire_geometry(width: number, height: number, depth: number): any;
-    box_wire_draw_batch_facts(width: number, height: number, depth: number, color: number): any;
-    colored_quad_mesh_bounding_box(payload: any): any;
-    colored_quad_mesh_facts(payload: any): any;
-    colored_quad_mesh_append(positions: any, colors: any, indices: any, ax: number, ay: number, az: number, bx: number, by: number, bz: number, cx: number, cy: number, cz: number, dx: number, dy: number, dz: number, r: number, g: number, b: number): any;
-  };
-}
-declare module "triga:scene" {
-  export function resource_lifecycle_created(payload: any): any;
-  export function resource_lifecycle_removed(payload: any): any;
-  export function resource_lifecycle_replaced(payload: any): any;
-  export function resource_lifecycle_unchanged(payload: any): any;
-  export function resource_lifecycles_valid(payload: any): boolean;
-  export const scene: {
-    resource_lifecycle_created(payload: any): any;
-    resource_lifecycle_removed(payload: any): any;
-    resource_lifecycle_replaced(payload: any): any;
-    resource_lifecycle_unchanged(payload: any): any;
-    resource_lifecycles_valid(payload: any): boolean;
-  };
-}
-"#;
-
-    format!(
-        r#"declare module "web:dom" {{
-  export class Scope {{ selector: string; constructor(fields: {{ selector?: string }}); }}
-  export class Element {{ selector: string; constructor(fields: {{ selector?: string }}); }}
-  export class DomEvent {{ kind: string; default_prevented: boolean; }}
-  export class FrameState {{ frame: number; time_ms: number; delta_ms: number; }}
-  export class ResizeState {{ width: number; height: number; device_pixel_ratio: number; }}
-  export class KeyboardState {{ kind: string; key: string; code: string; repeat: boolean; alt: boolean; ctrl: boolean; shift: boolean; meta: boolean; }}
-  export class PointerState {{ kind: string; x: number; y: number; movement_x: number; movement_y: number; button: number; primary: boolean; }}
-  export class FocusState {{ focused: boolean; }}
-  export class PointerLockState {{ supported: boolean; locked: boolean; denied: boolean; target_matches: boolean; }}
-  export class Subscription {{ id: number; }}
-  export class SubmitOptions {{ prevent_default: boolean; constructor(fields?: {{ prevent_default?: boolean }}); }}
-  export class FetchRequest {{ url: string; method: string; body: string | null; constructor(fields: {{ url: string; method?: string; body?: string | null }}); }}
-  export class FetchResponse {{ status: number; ok: boolean; body: string; }}
+    r#"declare module "web:dom" {
+  export class Scope { selector: string; constructor(fields: { selector?: string }); }
+  export class Element { selector: string; constructor(fields: { selector?: string }); }
+  export class DomEvent { kind: string; default_prevented: boolean; }
+  export class FrameState { frame: number; time_ms: number; delta_ms: number; }
+  export class ResizeState { width: number; height: number; device_pixel_ratio: number; }
+  export class KeyboardState { kind: string; key: string; code: string; repeat: boolean; alt: boolean; ctrl: boolean; shift: boolean; meta: boolean; }
+  export class PointerState { kind: string; x: number; y: number; movement_x: number; movement_y: number; button: number; primary: boolean; }
+  export class FocusState { focused: boolean; }
+  export class PointerLockState { supported: boolean; locked: boolean; denied: boolean; target_matches: boolean; }
+  export class Subscription { id: number; }
+  export class SubmitOptions { prevent_default: boolean; constructor(fields?: { prevent_default?: boolean }); }
+  export class FetchRequest { url: string; method: string; body: string | null; constructor(fields: { url: string; method?: string; body?: string | null }); }
+  export class FetchResponse { status: number; ok: boolean; body: string; }
   export type EventHandler = (event: DomEvent) => void;
   export type InputHandler = (element: Element, value: string) => void;
   export type SubmitHandler = (form: Element) => void;
@@ -1326,7 +1330,7 @@ declare module "triga:scene" {
   export function on_pointer_lock(element: Element, handler: PointerLockHandler): Subscription;
   export function prevent_default(event: DomEvent): DomEvent;
   export function fetch_text(request: FetchRequest): Promise<FetchResponse>;
-  export const dom: {{
+  export const dom: {
     scope(selector: string): Scope;
     element(selector: string): Element;
     query(scope: Scope, selector: string): Element | null;
@@ -1355,19 +1359,18 @@ declare module "triga:scene" {
     on_pointer_lock(element: Element, handler: PointerLockHandler): Subscription;
     prevent_default(event: DomEvent): DomEvent;
     fetch_text(request: FetchRequest): Promise<FetchResponse>;
-  }};
-}}
-declare module "web:web" {{
-  export class Mount {{ selector: string; constructor(fields: {{ selector?: string }}); }}
+  };
+}
+declare module "web:web" {
+  export class Mount { selector: string; constructor(fields: { selector?: string }); }
   export function mount(selector: string): Mount;
   export function selector_of(mount: Mount): string;
-  export const web: {{
+  export const web: {
     mount(selector: string): Mount;
     selector_of(mount: Mount): string;
-  }};
-}}
-{triga_decls}"#
-    )
+  };
+}
+"#.to_string()
 }
 
 fn render_tsconfig(ts_root: &Path, esm_root: &Path) -> String {
