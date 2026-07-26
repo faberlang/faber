@@ -115,13 +115,13 @@ The crux-entropia VJP is not a simple elementwise gradient. Key design points:
 
 1. **Forward inputs**: `(logits: tensor<f32, [B,C]>, targets: tensor<f32, [B,C]>)`
 2. **Forward output**: scalar `f32` loss
-3. **VJP for logits**: `upstream * (softmax(logits) - targets) / N` where N = batch size (first dimension)
+3. **VJP for logits**: `upstream * (softmax(logits) - targets) / N` where N = number of classes (last dimension)
 4. **VJP for targets**: not needed (targets are a training data constant, not a parameter)
 
 The walk must:
 - Replay the logits input (not the scalar loss output) to compute softmax
 - Subtract targets from softmax
-- Divide by N (batch size — element count of logits' first dimension)
+- Divide by N (number of classes — element count of logits' last dimension)
 - Multiply by upstream scalar
 - Only accumulate gradient for args[0] (logits); args[1] (targets) gets nil
 
