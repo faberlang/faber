@@ -75,7 +75,7 @@ pub(super) const TENSOR_WORKLOAD_PROOF_ROWS: &[TensorWorkloadProofRow] =
         output_checked: true,
         blocker_owner: None,
         blocker_issue: "",
-        evidence: "crates/exempla/src/exempla_e2e/tensor_workload_proof_test.rs::tensor_workload_proof_rung1_device_linear_matches_stepper",
+        evidence: "crates/exempla/src/exempla_e2e/tensor_workload_proof_test.rs::tensor_workload_proof_rung1_device_linear_matches_stepper + triga/scripta/w4-06b-gpu-proof.mjs (headless Chrome WebGPU matmul+add, exit 0, values within f32 tolerance)",
     }];
 
 pub(super) fn tensor_workload_proof_rows() -> &'static [TensorWorkloadProofRow] {

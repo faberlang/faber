@@ -81,6 +81,9 @@ fn tensor_workload_proof_selects_rung1_device_linear() {
         row.exemplar_path,
         "corpus/tensor-fragment/tiny-linear-device/src/main.fab"
     );
+    assert!(row.evidence.contains("tensor_workload_proof_rung1_device_linear_matches_stepper"));
+    assert!(row.evidence.contains("w4-06b-gpu-proof.mjs"));
+    assert!(row.evidence.contains("headless Chrome"));
 }
 
 #[test]
