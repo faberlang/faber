@@ -4514,6 +4514,9 @@ fn lower_unit<'a>(
     unit: &'a mut AnalyzedPackageUnit,
     cli_entry_records: &CliEntryRecords,
 ) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
+    let bundle = radix::driver::prepare_air_backward_bundle(&mut unit.analysis)
+        .map_err(|err| vec![mir_lowering_diag(&unit.path, err.message)])?;
+
     let result = if unit.analysis.cli_program.is_some() {
         let fields = cli_entry_records
             .get(&unit.path)
@@ -4523,12 +4526,19 @@ fn lower_unit<'a>(
     } else {
         lower_analyzed_unit_with_context(&mut unit.analysis)
     };
-    result.map_err(|errors| {
+    let mut lowered = result.map_err(|errors| {
         errors
             .into_iter()
             .map(|error| mir_lowering_diag(&unit.path, error.message))
-            .collect()
-    })
+            .collect::<Vec<Diagnostic>>()
+    })?;
+
+    if let Some(bundle) = bundle {
+        radix::driver::apply_air_backward_bundle(&mut lowered, bundle)
+            .map_err(|err| vec![mir_lowering_diag(&unit.path, err.message)])?;
+    }
+
+    Ok(lowered)
 }
 
 fn append_shifted_program(merged: &mut LoweredMirUnit<'_>, lowered: &mut LoweredMirUnit<'_>) {
