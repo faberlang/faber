@@ -4,16 +4,13 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
-use std::time::{SystemTime, UNIX_EPOCH};
 
-fn temp_dir(label: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = env::temp_dir().join(format!("faber-clean-install-{label}-{nonce}"));
-    fs::create_dir_all(&root).expect("create clean-install root");
-    root
+#[path = "support/temp.rs"]
+mod temp;
+use temp::TempDir;
+
+fn temp_dir(label: &str) -> TempDir {
+    TempDir::new("faber-clean-install", label)
 }
 
 fn installed_faber(root: &Path) -> PathBuf {

@@ -2,7 +2,7 @@
 
 use super::common::{
     cargo_available, format_diagnostics, make_temp_root, normalize_newline, read_expected_stdout,
-    shared_target_dir, write_rust_cargo_project,
+    shared_target_dir, write_rust_cargo_project, TempRoot,
 };
 use radix::driver::Session;
 use radix::mir::{run_source, BufferHost, RunSourceError};
@@ -145,7 +145,7 @@ const MODULAR_WORD_WIDTH_FIXTURES: &[ParityFixture] = &[
 
 struct ParityHarness {
     corpus: PathBuf,
-    temp_root: PathBuf,
+    temp_root: TempRoot,
     shared_target: PathBuf,
     session: Session,
     compiler: Compiler,

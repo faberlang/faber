@@ -4,7 +4,10 @@ use std::fs;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::time::{SystemTime, UNIX_EPOCH};
+
+#[path = "support/temp.rs"]
+mod temp;
+use temp::{TempDir, TempPath};
 
 fn run_faber_emit_faber_stdin(source: &str) -> String {
     let mut child = Command::new(env!("CARGO_BIN_EXE_faber"))
@@ -49,21 +52,15 @@ fn reader_locale_example_root(locale: &str) -> PathBuf {
         .join(locale)
 }
 
-fn temp_dir(label: &str) -> PathBuf {
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let dir = std::env::temp_dir().join(format!("faber-emit-integration-{label}-{nanos}"));
-    fs::create_dir_all(&dir).expect("create temp dir");
-    dir
+fn temp_dir(label: &str) -> TempDir {
+    TempDir::new("faber-emit-integration", label)
 }
 
-fn write_plain_file(label: &str, contents: &str) -> PathBuf {
+fn write_plain_file(label: &str, contents: &str) -> TempPath {
     let dir = temp_dir(label);
     let path = dir.join("plain.txt");
     fs::write(&path, contents).expect("write plain file");
-    path
+    TempPath::new(dir, path)
 }
 
 fn run_faber(args: &[&str]) -> (String, String, bool) {
@@ -94,7 +91,7 @@ fn run_faber_emit(args: &[&str]) -> (String, String, bool) {
     run_faber(args)
 }
 
-fn write_basic_package(label: &str, source: &str) -> PathBuf {
+fn write_basic_package(label: &str, source: &str) -> TempDir {
     let package = temp_dir(label);
     fs::create_dir_all(package.join("src")).expect("create src");
     fs::write(

@@ -606,7 +606,7 @@ fn with_prepared_package_mir_with_cli_mode_and_consumer<R>(
         rewrite_unit_namespace_calls(unit, &links.calls, &links.namespaces)?;
     }
 
-    let mut lowered = lower_package_units(&mut package, entry_index, &links.sources, &cli_plan)?;
+    let mut lowered = lower_package_units(&mut package, entry_index, &links.sources, &cli_plan, config.no_fuse)?;
     validate_program(&lowered.program, &lowered.validation).map_err(|errors| {
         errors
             .into_iter()
@@ -3776,6 +3776,7 @@ fn lower_package_units<'a>(
     entry_index: usize,
     source_rewrites: &SourceRewrites,
     cli_plan: &CliPackagePlan,
+    no_fuse: bool,
 ) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
     struct PendingUnit<'a> {
         lowered: LoweredMirUnit<'a>,
@@ -3792,7 +3793,7 @@ fn lower_package_units<'a>(
     for unit in before.iter_mut().chain(after.iter_mut()) {
         let unit_path = unit.path.clone();
         let source_interner = unit.analysis.interner.clone();
-        let mut lowered = lower_unit(unit, &cli_plan.entry_records)?;
+        let mut lowered = lower_unit(unit, &cli_plan.entry_records, no_fuse)?;
         remap_program_text_symbols(
             &mut lowered.program,
             &source_interner,
@@ -3821,7 +3822,7 @@ fn lower_package_units<'a>(
         });
     }
 
-    let mut merged = lower_unit(entry, &cli_plan.entry_records)?;
+    let mut merged = lower_unit(entry, &cli_plan.entry_records, no_fuse)?;
     ensure_unique_definition_sources(&merged.program, &entry_path)?;
     let mut dispatch_function =
         selected_cli_dispatch_function(cli_plan, &entry_path, &merged.program);
@@ -4513,6 +4514,7 @@ fn rewrite_option_chain_sources(
 fn lower_unit<'a>(
     unit: &'a mut AnalyzedPackageUnit,
     cli_entry_records: &CliEntryRecords,
+    no_fuse: bool,
 ) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
     let bundle = radix::driver::prepare_air_backward_bundle(&mut unit.analysis)
         .map_err(|err| vec![mir_lowering_diag(&unit.path, err.message)])?;
@@ -4534,7 +4536,7 @@ fn lower_unit<'a>(
     })?;
 
     if let Some(bundle) = bundle {
-        radix::driver::apply_air_backward_bundle(&mut lowered, bundle)
+        radix::driver::apply_air_backward_bundle(&mut lowered, bundle, no_fuse)
             .map_err(|err| vec![mir_lowering_diag(&unit.path, err.message)])?;
     }
 

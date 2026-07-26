@@ -7,6 +7,7 @@
 
 use super::types::E2eResult;
 use std::fs;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -68,14 +69,92 @@ pub(crate) fn command_available(command: &str, args: &[&str]) -> bool {
         .is_ok_and(|output| output.status.success())
 }
 
-pub(crate) fn make_temp_root() -> PathBuf {
+pub(crate) struct TempRoot {
+    path: PathBuf,
+}
+
+impl TempRoot {
+    fn new(path: PathBuf) -> Self {
+        Self { path }
+    }
+}
+
+impl Deref for TempRoot {
+    type Target = Path;
+
+    fn deref(&self) -> &Self::Target {
+        &self.path
+    }
+}
+
+impl AsRef<Path> for TempRoot {
+    fn as_ref(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for TempRoot {
+    fn drop(&mut self) {
+        if std::env::var_os("FABER_E2E_PRESERVE_TEMP").is_some() {
+            eprintln!("preserving E2E temp root {}", self.path.display());
+            return;
+        }
+        if let Err(first_error) = fs::remove_dir_all(&self.path) {
+            let result =
+                make_tree_writable(&self.path).and_then(|()| fs::remove_dir_all(&self.path));
+            if let Err(error) = result {
+                eprintln!(
+                    "failed to remove E2E temp root {}: {error} (initially: {first_error})",
+                    self.path.display()
+                );
+            }
+        }
+    }
+}
+
+pub(crate) fn make_temp_root() -> TempRoot {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0);
     let dir = std::env::temp_dir().join(format!("radix-rs-e2e-{}-{nanos}", std::process::id()));
     fs::create_dir_all(&dir).expect("create e2e temp root");
-    dir
+    TempRoot::new(dir)
+}
+
+#[cfg(unix)]
+fn make_tree_writable(root: &Path) -> std::io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let metadata = fs::symlink_metadata(root)?;
+    if metadata.file_type().is_symlink() {
+        return Ok(());
+    }
+    if metadata.is_dir() {
+        for entry in fs::read_dir(root)? {
+            make_tree_writable(&entry?.path())?;
+        }
+        fs::set_permissions(root, fs::Permissions::from_mode(0o700))?;
+    } else {
+        fs::set_permissions(root, fs::Permissions::from_mode(0o600))?;
+    }
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn make_tree_writable(root: &Path) -> std::io::Result<()> {
+    let metadata = fs::symlink_metadata(root)?;
+    if metadata.file_type().is_symlink() {
+        return Ok(());
+    }
+    if metadata.is_dir() {
+        for entry in fs::read_dir(root)? {
+            make_tree_writable(&entry?.path())?;
+        }
+    }
+    let mut permissions = metadata.permissions();
+    permissions.set_readonly(false);
+    fs::set_permissions(root, permissions)
 }
 
 /// Returns a shared Cargo target directory for all exempla builds in this harness run.

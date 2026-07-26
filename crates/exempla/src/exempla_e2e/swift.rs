@@ -1,6 +1,6 @@
 use super::common::{
-    collect_exempla_files, format_diagnostics, is_expected_failure, normalize_newline,
-    read_expected_stdout,
+    collect_exempla_files, format_diagnostics, is_expected_failure, make_temp_root,
+    normalize_newline, read_expected_stdout,
 };
 use super::types::E2eResult;
 use radix::{codegen::Target, tool::compile_cli_path, Output};
@@ -239,6 +239,7 @@ fn exempla_swift_e2e() {
     let total = exempla.len();
     let mut results: Vec<E2eResult> = Vec::with_capacity(total);
     let mut expected_count = 0usize;
+    let temp_root = make_temp_root();
 
     for (idx, file) in exempla.iter().enumerate() {
         let relative = file
@@ -299,8 +300,8 @@ fn exempla_swift_e2e() {
             .file_stem()
             .and_then(|n| n.to_str())
             .unwrap_or("exemplum");
-        let swift_file = std::env::temp_dir().join(format!("swift_e2e_{idx:03}_{stem}.swift"));
-        let binary = std::env::temp_dir().join(format!("swift_e2e_{idx:03}_{stem}"));
+        let swift_file = temp_root.join(format!("swift_e2e_{idx:03}_{stem}.swift"));
+        let binary = temp_root.join(format!("swift_e2e_{idx:03}_{stem}"));
 
         if let Err(err) = fs::write(&swift_file, &code) {
             results.push(E2eResult {
@@ -521,7 +522,8 @@ fn exempla_swift_library_mode() {
     use radix::{codegen::OutputMode, tool::compile_cli_path_with_reader_pack};
 
     // Create a simple library-mode Faber source: no incipit, one public function.
-    let dir = std::env::temp_dir().join("swift_lib_smoke");
+    let temp_root = make_temp_root();
+    let dir = temp_root.join("swift_lib_smoke");
     let _ = std::fs::create_dir_all(&dir);
     let fab_file = dir.join("mylib.fab");
     let source = "functio salve() \u{2192} textus { redde \"salve\" }\n";
@@ -588,16 +590,14 @@ fn exempla_swift_library_mode() {
         module_file.exists(),
         "expected {module_file:?} to exist after swiftc -emit-module"
     );
-
-    // Clean up.
-    let _ = std::fs::remove_dir_all(&dir);
 }
 
 #[test]
 fn exempla_swift_library_mode_public_decls() {
     use radix::{codegen::OutputMode, tool::compile_cli_path_with_reader_pack};
 
-    let dir = std::env::temp_dir().join("swift_lib_public");
+    let temp_root = make_temp_root();
+    let dir = temp_root.join("swift_lib_public");
     let _ = std::fs::create_dir_all(&dir);
     let fab_file = dir.join("publics.fab");
     // Simple Faber with one function.
@@ -636,6 +636,4 @@ fn exempla_swift_library_mode_public_decls() {
 
     // Module comment.
     assert!(code.contains("// Swift module:"), "missing module comment");
-
-    let _ = std::fs::remove_dir_all(&dir);
 }

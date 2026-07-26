@@ -1,16 +1,13 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
 
-fn test_temp_dir(label: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let root = std::env::temp_dir().join(format!("faber-install-path-{label}-{nonce}"));
-    fs::create_dir_all(&root).expect("create temp dir");
-    root
+#[path = "support/temp.rs"]
+mod temp;
+use temp::TempDir;
+
+fn test_temp_dir(label: &str) -> TempDir {
+    TempDir::new("faber-install-path", label)
 }
 
 fn write_cista_package(root: &Path) {

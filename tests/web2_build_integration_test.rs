@@ -9,20 +9,17 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::time::{SystemTime, UNIX_EPOCH};
+
+#[path = "support/temp.rs"]
+mod temp;
+use temp::TempDir;
 
 fn faber_web_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../faber-web")
 }
 
-fn temp_dir(label: &str) -> PathBuf {
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let dir = std::env::temp_dir().join(format!("faber-web2-build-{label}-{nanos}"));
-    fs::create_dir_all(&dir).expect("create temp dir");
-    dir
+fn temp_dir(label: &str) -> TempDir {
+    TempDir::new("faber-web2-build", label)
 }
 
 /// Set up a browser-app product package identical in shape to the WEB3 unit

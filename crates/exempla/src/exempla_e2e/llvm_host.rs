@@ -477,7 +477,8 @@ fn exempla_llvm_host_parity() {
     let corpus_root = crate::paths::corpus_dir();
     let paths = common::collect_exempla_files(&corpus_root);
     let ledger = parse_gap_ledger(GAP_LEDGER).expect("checked-in LLVM host gap ledger must parse");
-    let temp_root = common::make_temp_root().join("llvm-host-parity");
+    let temp_guard = common::make_temp_root();
+    let temp_root = temp_guard.join("llvm-host-parity");
     std::fs::create_dir_all(&temp_root).expect("cannot create pairwise temp root");
     let rust = build_rust_lane(&corpus_root, &paths, &temp_root.join("rust"));
     let llvm = build_llvm_lane(&corpus_root, &paths, &temp_root.join("llvm"));

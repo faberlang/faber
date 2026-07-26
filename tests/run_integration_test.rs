@@ -9,24 +9,21 @@ use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::time::{SystemTime, UNIX_EPOCH};
 use zip::write::SimpleFileOptions;
 
-fn temp_dir(label: &str) -> PathBuf {
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let dir = std::env::temp_dir().join(format!("faber-run-integration-{label}-{nanos}"));
-    fs::create_dir_all(&dir).expect("create temp dir");
-    dir
+#[path = "support/temp.rs"]
+mod temp;
+use temp::{TempDir, TempPath};
+
+fn temp_dir(label: &str) -> TempDir {
+    TempDir::new("faber-run-integration", label)
 }
 
-fn write_plain_file(label: &str, contents: &str) -> PathBuf {
+fn write_plain_file(label: &str, contents: &str) -> TempPath {
     let dir = temp_dir(label);
     let path = dir.join("plain.txt");
     fs::write(&path, contents).expect("write plain file");
-    path
+    TempPath::new(dir, path)
 }
 
 fn reader_locale_example_root(locale: &str) -> PathBuf {
@@ -154,7 +151,7 @@ fn run_executable(path: &Path, args: &[&str]) -> (String, String, bool) {
     (stdout, stderr, status.success())
 }
 
-fn write_numeric_package(label: &str) -> PathBuf {
+fn write_numeric_package(label: &str) -> TempDir {
     let package = temp_dir(label);
     let src = package.join("src");
     fs::create_dir_all(&src).expect("create src");
@@ -197,7 +194,7 @@ functio label() → numerus {
     package
 }
 
-fn write_basic_package(label: &str, source: &str) -> PathBuf {
+fn write_basic_package(label: &str, source: &str) -> TempDir {
     let package = temp_dir(label);
     let src = package.join("src");
     fs::create_dir_all(&src).expect("create src");
@@ -317,11 +314,11 @@ fn check_manifest_rejects_entry_symlink_escape() {
     assert_package_path_rejected(&stderr, "package member resolves outside the package root");
 }
 
-fn write_single_file(label: &str, source: &str) -> PathBuf {
+fn write_single_file(label: &str, source: &str) -> TempPath {
     let dir = temp_dir(label);
     let file = dir.join("main.fab");
     fs::write(&file, source).expect("write single-file source");
-    file
+    TempPath::new(dir, file)
 }
 
 fn assert_no_generated_rust(package: &Path) {
@@ -996,7 +993,8 @@ incipit argumenta args {
 
     fs::remove_file(package.join("src/main.fab")).expect("remove source");
     fs::remove_file(package.join("target/faber-mir/exe/image.fmir")).expect("remove sidecar image");
-    let relocated = temp_dir("fmir-bin-relocated").join("run");
+    let _relocated_root = temp_dir("fmir-bin-relocated");
+    let relocated = _relocated_root.join("run");
     fs::copy(&entrypoint, &relocated).expect("relocate entrypoint");
     let (direct_stdout, direct_stderr, direct_ok) = run_executable(&relocated, &["runtime"]);
     assert!(
@@ -1093,7 +1091,7 @@ incipit {
     assert_no_generated_rust(&package);
 }
 
-fn write_zip_archive(label: &str, entries: &[(&str, &str)]) -> PathBuf {
+fn write_zip_archive(label: &str, entries: &[(&str, &str)]) -> TempPath {
     let dir = temp_dir(label);
     let archive = dir.join(format!("{label}.zip"));
     let file = fs::File::create(&archive).expect("create zip");
@@ -1104,7 +1102,7 @@ fn write_zip_archive(label: &str, entries: &[(&str, &str)]) -> PathBuf {
         zip.write_all(body.as_bytes()).expect("write zip file");
     }
     zip.finish().expect("finish zip");
-    archive
+    TempPath::new(dir, archive)
 }
 
 fn numeric_manifest_entries(prefix: &str) -> Vec<(String, String)> {
@@ -1149,7 +1147,7 @@ functio label() → numerus {
     ]
 }
 
-fn write_numeric_manifest_archive(label: &str, prefix: &str) -> PathBuf {
+fn write_numeric_manifest_archive(label: &str, prefix: &str) -> TempPath {
     let entries = numeric_manifest_entries(prefix);
     let borrowed = entries
         .iter()
@@ -2132,7 +2130,7 @@ fn script_package_inputs_execute_without_cargo_or_rust_emit() {
     let manifest = package.join("faber.toml");
     let entry = package.join("src/main.fab");
 
-    for input in [&package, &manifest, &entry] {
+    for input in [&*package, manifest.as_path(), entry.as_path()] {
         let (stdout, stderr, ok) =
             run_faber(&["script", input.to_str().expect("utf8 package path")]);
         assert!(ok, "faber run --interpret failed:\n{stderr}");

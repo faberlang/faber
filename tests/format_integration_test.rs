@@ -6,6 +6,10 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
+#[path = "support/temp.rs"]
+mod temp;
+use temp::TempDir;
+
 fn exempla(path: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../examples/corpus")
@@ -66,7 +70,8 @@ fn format_cmd_stdout_reparses_salve_munde() {
 fn format_cmd_stdout_is_idempotent_for_salve_munde() {
     let path = exempla("incipit/salve-munde.fab");
     let first = run_faber_format_stdout(&path);
-    let tmp = std::env::temp_dir().join("faber-format-idempotent-salve.fab");
+    let temp_root = TempDir::new("faber-format", "idempotent-salve");
+    let tmp = temp_root.join("salve.fab");
     fs::write(&tmp, &first).expect("write temp fab");
     let second = run_faber_format_stdout(&tmp);
     let _ = fs::remove_file(&tmp);
@@ -90,7 +95,8 @@ fn format_cmd_stdout_reparses_cura() {
 /// SC-3/verification step 5: CLI `format --stdout` on comment fixture re-parses.
 #[test]
 fn format_cmd_comment_fixture_cli_reparses() {
-    let fixture = std::env::temp_dir().join("faber-format-comment-fixture.fab");
+    let temp_root = TempDir::new("faber-format", "comment-fixture");
+    let fixture = temp_root.join("fixture.fab");
     fs::write(&fixture, "# lead comment\n\nincipit {\n  nota \"ok\"\n}\n")
         .expect("write comment fixture");
 

@@ -2,7 +2,7 @@ use super::{
     tensor_package_proof_rows, TensorPackageProofTarget, TENSOR_PACKAGE_PROOF_FIXTURE,
     TENSOR_PACKAGE_PROOF_STDOUT,
 };
-use crate::exempla_e2e::common::make_temp_root;
+use crate::exempla_e2e::common::{make_temp_root, TempRoot};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -28,7 +28,7 @@ fn tensor_package_rows_cover_fmir_package_targets() {
 #[test]
 fn tensor_package_runs_through_fmir_targets_without_rust_fallback() {
     for row in tensor_package_proof_rows() {
-        let package = copy_tensor_package_fixture(row.target);
+        let (_temp_root, package) = copy_tensor_package_fixture(row.target);
         let output = run_faber_package(row.target, &package);
 
         assert!(
@@ -52,11 +52,12 @@ fn tensor_package_runs_through_fmir_targets_without_rust_fallback() {
     }
 }
 
-fn copy_tensor_package_fixture(target: TensorPackageProofTarget) -> PathBuf {
+fn copy_tensor_package_fixture(target: TensorPackageProofTarget) -> (TempRoot, PathBuf) {
     let fixture = crate::paths::corpus_dir().join(TENSOR_PACKAGE_PROOF_FIXTURE);
-    let package = make_temp_root().join(format!("tensor-package-{}", target.cli_target()));
+    let temp_root = make_temp_root();
+    let package = temp_root.join(format!("tensor-package-{}", target.cli_target()));
     copy_dir(&fixture, &package);
-    package
+    (temp_root, package)
 }
 
 fn copy_dir(source: &Path, destination: &Path) {

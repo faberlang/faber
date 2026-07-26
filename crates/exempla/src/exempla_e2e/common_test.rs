@@ -1,9 +1,8 @@
 use super::{
     format_ceiling_line, format_count_floor_line, format_tier_line, generated_rust_needs_tokio,
-    write_rust_cargo_project,
+    make_temp_root, write_rust_cargo_project,
 };
 use std::fs;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
 fn format_tier_line_includes_live_total_and_floor() {
@@ -35,14 +34,21 @@ fn generated_rust_needs_tokio_detects_async_runtime() {
 }
 
 #[test]
+fn make_temp_root_removes_owned_tree_on_drop() {
+    let path = {
+        let temp_root = make_temp_root();
+        fs::write(temp_root.join("fixture.txt"), "fixture").expect("write temp fixture");
+        temp_root.to_path_buf()
+    };
+
+    assert!(!path.exists(), "E2E temp root leaked: {}", path.display());
+}
+
+#[test]
 fn write_rust_cargo_project_links_tokio_when_generated_code_uses_block_on() {
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
-    let dir = std::env::temp_dir().join(format!("radix-e2e-manifest-tokio-{nanos}"));
+    let temp_root = make_temp_root();
     let code = "fn main() { __faber_block_on(async { }); }";
-    let manifest_path = write_rust_cargo_project(&dir, "tokio_fixture", code);
+    let manifest_path = write_rust_cargo_project(&temp_root, "tokio_fixture", code);
     let manifest = fs::read_to_string(manifest_path).expect("read manifest");
     assert!(
         manifest.contains("package = \"faber-runtime\"") && manifest.contains("path ="),
