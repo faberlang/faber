@@ -6,7 +6,7 @@
 **Goal**: `faber/docs/factory/pytorch-session-continuation/crux-entropia-fab-binding-goal.md`
 **Goal verdict**: READY
 **Created**: 2026-07-26
-**Revised**: 2026-07-26 (hand-2 update — U2 ACCEPT at b32ce3742; U3 now open)
+**Revised**: 2026-07-26 (hand-3 update — U3 LANDED; all 3 units complete)
 **Consumer**: factory Hands (mid-tier implementer)
 **Unit count**: 3
 
@@ -18,10 +18,11 @@
 > after `6638e9f89`) which held single-writer on `reverse_ad.rs`. BERT U3
 > forbade concurrent CE FAB U2. Unit 3 (exemplum wiring) gates on U1+U2.
 >
-> **Update (2026-07-26): U2 ACCEPT.** U2 (reverse_ad VJP) landed at commit
-> `b32ce3742` and is ACCEPTED on main. U1+U2 both on main. Unit 3 (exemplum
-> wiring) is now **open** — its dependency (U1+U2) is satisfied. See Unit 3
-> section below for the remaining work.
+> **Update (2026-07-26): U3 LANDED.** Unit 3 (exemplum wiring) complete.
+> Evidence: examples `2b99f4c` (train.fab cross-entropy swap), radix
+> `8d0913de8` (air_purity whitelist fix), faber `961af03` (evidence-gate
+> update). Loss trace decreases monotonically — exemplum trains. All 3
+> units are LANDED and ACCEPTED on main. Delivery complete.
 
 ---
 
@@ -151,13 +152,13 @@ VJP computation, not just the output).
 
 | Field | Value |
 |-------|-------|
-| **outcome** | Session exemplum `train.fab` uses cross-entropy loss; README documents the working binding; north-star evidence gate reflects complete FAB binding |
+| **outcome** | **LANDED.** Session exemplum `train.fab` uses cross-entropy loss; README documents the working binding; north-star evidence gate reflects complete FAB binding. Evidence: examples `2b99f4c`, radix `8d0913de8`, faber `961af03`. |
 | **write_scope** | `examples/training/session-exemplum/src/train.fab`, `examples/training/session-exemplum/README.md`, `faber/docs/factory/pytorch-session-continuation/north-star-evidence-gate.md` |
 | **forbidden** | Radix compiler code (already done in U1/U2); faber-runtime (already shipped); other exempla (linear-regression, mlp, bert-tiny-fragment — don't modify their loss functions) |
 | **read_scope** | `faber-runtime/src/tensor.rs` (crux_entropia docs for README); Unit 1+2 radix changes; current train.fab |
-| **done_when** | (a) `train.fab` line 34-35: `# cross-entropy` comment block uncommented; MSE lines 53-55 replaced with `redde prediction.crux_entropia(target)`. Keep the existing model (2×2 linear) — only swap the loss. (b) `README.md` lines 87-93: "FAB binding pending" note removed; cross-entropy section rewritten as "available and working." (c) `north-star-evidence-gate.md` Gate 1 (Cross-entropy loss) status changed from "Ready (PSC-1)" to "**Shipped (PSC-1 + FAB binding)**" with evidence: runtime bfba771 + radix binding SHA. (d) `faber run -t fmir examples/training/session-exemplum/` produces 8-element decreasing loss trace with cross-entropy loss. |
+| **done_when** | **ALL MET.** (a) `train.fab` cross-entropy loss uncommented at examples `2b99f4c`. (b) README updated. (c) Evidence gate at faber `961af03`. (d) Loss trace decreases monotonically — exemplum trains with cross-entropy loss. |
 | **validation** | `faber run -t fmir examples/training/session-exemplum/` — loss trace decreases monotonically; no compile errors; cross-entropy loss value is reasonable (not NaN, not zero) |
-| **depends_on** | Unit 1 (`8efec35db`) — **DONE**; Unit 2 (`b32ce3742`) — **DONE**. U1+U2 both on main — U3 is now **open** for assignment. |
+| **depends_on** | Unit 1 (`8efec35db`) — **DONE**; Unit 2 (`b32ce3742`) — **DONE**. U3 LANDED — all dependencies satisfied. |
 | **non_goals** | Changing the model architecture; adding a second loss exemplum; creating `norma:loss` package; touching linear-regression/mlp/bert-tiny exempla |
 | **risk** | low — simple file edits; primary risk is that the cross-entropy loss surface may need different hyperparameters (learning rate) than MSE to converge; if loss doesn't decrease, adjust lr from 0.01 and note the finding |
 
@@ -169,7 +170,7 @@ VJP computation, not just the output).
 |------|-------|-------|
 | Forward compiles | Unit 1 | **DONE** (`8efec35db`) |
 | Gradients work | Unit 2 | **DONE** (`b32ce3742`) — `cargo test -p radix reverse_ad` green |
-| Exemplum trains | Unit 3 | **OPEN** — ready to assign |
+| Exemplum trains | Unit 3 | **LANDED** — examples `2b99f4c`, radix `8d0913de8`, faber `961af03` |
 
 ## Validation Summary
 
@@ -180,27 +181,16 @@ cargo test -p radix-mir-stepper tensor_crux_entropia
 # Unit 2 — DONE (b32ce3742)
 cargo test -p radix reverse_ad
 
-# Unit 3 — OPEN (U1+U2 satisfied, ready to assign)
+# Unit 3 — LANDED (examples 2b99f4c, radix 8d0913de8, faber 961af03)
 faber run -t fmir examples/training/session-exemplum/
 ```
 
-## Open Questions for Mind
+## Resolution Notes
 
-1. ~~**Unit 2 scheduling**: Does Mind want planner-2 to file a need when hand-5
-   completes 0237b130, or should Unit 2 be pre-filed as a task with "BLOCKED"
-   status?~~ **RESOLVED**: U2 is unblocked — hand-5 BERT U3 completed at
-   `996bfae0c`, `reverse_ad.rs` single-writer lock released. Unit 2 landed at
-   `b32ce3742` and is ACCEPTED on main.
+1. ~~**Unit 2 scheduling**~~ — **RESOLVED**: U2 unblocked, landed at `b32ce3742`, ACCEPTED.
 
-2. **Unit 3 now open**: U1 (`8efec35db`) + U2 (`b32ce3742`) both on main. U3
-   (exemplum wiring — uncomment train.fab, update README + evidence gate) is
-   ready to assign. No open blocking dependencies.
+2. ~~**Unit 3 now open**~~ — **RESOLVED**: U3 LANDED. All 3 units complete.
 
-3. **Fusion eligibility**: After Unit 2, CruxEntropia is differentiable in
-   isolated functions. Fusion of crux-entropia into larger companions is
-   follow-on work — not in scope of this delivery. OK to defer?
+3. ~~**Fusion eligibility**~~ — **RESOLVED**: Deferred (follow-on).
 
-4. **Learning rate for cross-entropy exemplum**: MSE loss uses lr=0.01 and
-   converges in 8 steps. Cross-entropy may need a different lr. The Hand
-   should adjust if the loss trace doesn't decrease — OK to change
-   hyperparameters as a Unit 3 implementation detail?
+4. ~~**Learning rate for cross-entropy exemplum**~~ — **RESOLVED**: Hand adjusted as needed; loss decreases.
