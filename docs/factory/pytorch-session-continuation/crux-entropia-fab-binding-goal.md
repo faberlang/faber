@@ -4,6 +4,7 @@
 **Planner**: planner-2
 **Assignment**: 23f35a39
 **Created**: 2026-07-26
+**Revised**: 2026-07-26 (planner-2 honesty update — U2 blocker refreshed: BERT U3 task 118a8e06 occupies reverse_ad)
 **Consumer**: delivery → factory Hands
 **Goal artifact**: this document (goal-check on implicit PSC-residual goal)
 
@@ -13,8 +14,10 @@
 
 The crux-entropia FAB binding is a well-bounded implementable goal with clear
 architecture, established patterns, and a single known blocking dependency
-(reverse_ad single-writer lock by hand-5 on task 0237b130). Non-reverse-ad
-units can proceed immediately.
+(reverse_ad single-writer lock by hand-5 on task 118a8e06, BERT C4/C5 U3
+gradient magnitude diagnostic). Original blocker task 0237b130 (BERT C4/C5
+Unit 1 diagnostic) closed at `5830802e0` and was Mind-accepted. Non-reverse-ad
+Unit 1 has already shipped (`8efec35db`). Unit 2 remains gated.
 
 ---
 
@@ -22,16 +25,15 @@ units can proceed immediately.
 
 PSC-1 (commit `bfba771`) shipped `Tensor<f32>::crux_entropia` forward pass +
 `AutogradOp::CruxEntropia` analytical VJP + finite-difference oracle in
-`faber-runtime`. The runtime layer is complete. What remains is the compiler
-pipeline to make `.crux_entropia(targets)` callable from Faber source code:
+`faber-runtime`. Unit 1 (`8efec35db`) shipped the forward compiler pipeline:
 
-- No `AirTensorOp::CruxEntropia` variant exists in the radix compiler
-- No `MirCollectionOp::TensorCruxEntropia` variant exists in MIR
-- No intrinsic registry entry maps the FAB method name to an AIR/MIR op
-- No MIR stepper/LLVM/Wasm codegen dispatches to the runtime `crux_entropia`
-- No reverse_ad VJP walk exists for compiler-generated gradients
+- ~~No `AirTensorOp::CruxEntropia` variant exists~~ — **SHIPPED** (`8efec35db`)
+- ~~No `MirCollectionOp::TensorCruxEntropia` variant exists~~ — **SHIPPED**
+- ~~No intrinsic registry entry~~ — **SHIPPED**
+- ~~No MIR stepper/LLVM/Wasm codegen dispatch~~ — **SHIPPED**
+- No reverse_ad VJP walk exists for compiler-generated gradients — **BLOCKED** (Unit 2)
 - `examples/training/session-exemplum/src/train.fab` has the call site
-  commented out with note "FAB binding pending"
+  commented out with note "FAB binding pending" — **BLOCKED** (Unit 3)
 
 ## Problem
 
@@ -99,18 +101,20 @@ runtime finite-difference oracle in `faber-runtime/src/autograd_reference_test.r
 | Claim | Evidence |
 |-------|----------|
 | Runtime crux_entropia forward + VJP + FD oracle shipped | `faber-runtime/` commit `bfba771`; `src/tensor.rs` line 811; `src/autograd.rs` line 265; `src/autograd_reference_test.rs` line 1006 |
-| No crux_entropia exists in radix compiler | `grep -r "crux_entropia" radix/` returns zero hits |
+| No crux_entropia exists in radix compiler | ~~`grep -r "crux_entropia" radix/` returns zero hits~~ — **STALE.** Unit 1 landed at `8efec35db`: `AirTensorOp::CruxEntropia`, `MirCollectionOp::TensorCruxEntropia`, stepper dispatch, LLVM symbols, Wasm import names, and eligibility ledger entries all shipped on main. Reverse AD VJP still absent — that is Unit 2. |
 | No crux_entropia exists in faber CLI | `grep -r "crux_entropia" faber/ --include="*.rs"` returns zero hits |
 | Binding pattern established by Gelu | `intrinsics/registry.rs` line 468 (`"gelu" → collection TensorGelu`); `air/nodes.rs` line 243 (`Gelu` variant); `mir/nodes.rs` line 824 (`TensorGelu`); stepper `runtime.rs` line 1611; LLVM `symbols.rs` line 158; Wasm `import_names.rs` line 359 |
 | Train.fab has commented crux_entropia call | `examples/training/session-exemplum/src/train.fab` line 34-35 (comment); `README.md` line 87-93 ("FAB binding pending") |
-| reverse_ad.rs is single-writer locked | Vivi task `0237b130` — hand-5 BERT C4/C5 Unit 1 diagnostic; write_scope includes `crates/radix/src/air/reverse_ad.rs` |
+| reverse_ad.rs is single-writer locked | Vivi task `118a8e06` — hand-5 BERT C4/C5 U3 gradient magnitude diagnostic; write_scope includes `crates/radix/src/air/reverse_ad.rs`. Original blocker `0237b130` closed at `5830802e0`, Mind-accepted. |
 | Eligibility ledger is independent of reverse_ad.rs | `generated_differentiable_eligibility.rs` imports only `AirTensorOp` from `air/nodes.rs`; reverse_ad.rs has no import of eligibility module |
 | VJP formula verified | `faber-runtime/src/autograd.rs`: backward computes `grad * (softmax - targets) / N`; FD oracle in `autograd_reference_test.rs::test_autograd_crux_entropia_gradient` |
 
 ## Constraints and Invariants
 
 1. **Do not touch reverse_ad.rs while hand-5 has single-writer lock.** Unit 2
-   (reverse_ad VJP) is deferred until hand-5 completes task 0237b130.
+   (reverse_ad VJP) is deferred until hand-5 completes task 118a8e06 (BERT
+   C4/C5 U3 gradient magnitude diagnostic). Original blocker task 0237b130
+   closed at `5830802e0` and was Mind-accepted.
 2. **Follow existing pattern exactly.** Copy the Gelu/Softmax binding pipeline
    — no novel architecture for a well-precedented op addition.
 3. **Dense Tensor<f32> proof boundary.** No sparse, packed, or quantized
@@ -128,7 +132,7 @@ Three path-disjoint units (see delivery spec for full field definitions):
 | Unit | ID | What | Blocked? |
 |------|----|------|----------|
 | Compiler pipeline | `ce-fab-binding-u1` | Intrinsic registry, AIR node, MIR variant, stepper/LLVM/Wasm codegen, MIR validate/dump, eligibility ledger | No |
-| Reverse AD VJP | `ce-fab-binding-u2` | VJP walk in reverse_ad.rs + reverse_ad test | Yes — hand-5 lock |
+| Reverse AD VJP | `ce-fab-binding-u2` | VJP walk in reverse_ad.rs + reverse_ad test | Yes — hand-5 lock (task 118a8e06) |
 | Exemplum wiring | `ce-fab-binding-u3` | Uncomment train.fab, update README + evidence gate | After U1+U2 |
 
 ## Acceptance Criteria
@@ -160,7 +164,9 @@ faber run -t fmir examples/training/session-exemplum/
 ## Open Questions
 
 None blocking. One scheduling note: Unit 2 depends on hand-5 completing
-diagnostic task 0237b130. No architecture uncertainty.
+task 118a8e06 (BERT C4/C5 U3 gradient magnitude diagnostic). Original blocker
+task 0237b130 closed at `5830802e0` and was Mind-accepted. No architecture
+uncertainty.
 
 ## Stop Conditions
 
@@ -189,6 +195,7 @@ diagnostic task 0237b130. No architecture uncertainty.
 
 ## Recommended Next Step
 
-**Delivery lowering** — the goal is READY. Proceed to unit graph with
-path-disjoint write scopes and explicit hand-5 dependency annotation for
-Unit 2.
+**Delivery lowering** — the goal is READY. Unit 1 already landed (`8efec35db`).
+Unit 2 blocked until hand-5 BERT U3 (task 118a8e06) signals reverse_ad free.
+Proceed to unit graph with path-disjoint write scopes and explicit hand-5
+dependency annotation for Unit 2.

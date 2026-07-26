@@ -6,8 +6,23 @@
 **Goal**: `faber/docs/factory/pytorch-session-continuation/crux-entropia-fab-binding-goal.md`
 **Goal verdict**: READY
 **Created**: 2026-07-26
+**Revised**: 2026-07-26 (planner-2 honesty update — U2 blockage fresh: BERT U3 task 118a8e06 occupies reverse_ad)
 **Consumer**: factory Hands (mid-tier implementer)
 **Unit count**: 3
+
+> **Readiness honesty (2026-07-26):** Unit 1 (forward compiler pipeline) landed
+> at `8efec35db` and is ACCEPTED on main. Unit 2 (reverse_ad VJP) is **BLOCKED**
+> until `reverse_ad.rs` single-writer is free. The original blocker (task
+> 0237b130, BERT C4/C5 diagnostic) closed at `5830802e0` and was Mind-accepted.
+> However, hand-5 immediately received BERT U3 (task 118a8e06: gradient magnitude
+> diagnostic after `6638e9f89`) which holds single-writer on `reverse_ad.rs` —
+> the file is currently modified (uncommitted) on disk. BERT U3 explicitly
+> forbids concurrent CE FAB U2. Unit 3 (exemplum wiring) gates on U1+U2.
+>
+> **Verdict: U2 NOT READY — BLOCKED on hand-5 BERT U3 (task 118a8e06).**
+> The delivery spec itself (unit graph, write scopes, done-when) is correct
+> and requires no architectural changes. File U2 immediately when hand-5
+> signals `reverse_ad` free.
 
 ---
 
@@ -105,7 +120,7 @@ until hand-5 completes and commits. Units 1 and 3 are path-disjoint from
 | **read_scope** | Full radix workspace; `faber-runtime/src/autograd_reference_test.rs` (FD oracle for formula verification); Unit 1 changes |
 | **done_when** | (a) `reverse_ad.rs` handles `AirTensorOp::CruxEntropia` in the differentiable-op gating arm (same as `Mean`, `Gelu`, `Softmax`). (b) `build_vjp_expr` returns the correct VJP expression: `(softmax(prediction_replay) - targets_replay) / N`. The VJP uses the forward input (logits, args[0]) to compute softmax, NOT the forward output (scalar loss). (c) Caller-side gradient accumulation handles the two-input case (logits gradient → accumulate; targets gradient → nil/skip). (d) `reverse_ad_test.rs`: new oracle test `test_crux_entropia_vjp_oracle_matches_tape` verifies the generated VJP matches the runtime FD oracle. Pattern: `sum(crux_entropia(logits, targets))` to make scalar output → AIR transform → compare VJP against finite-difference. (e) `cargo test -p radix reverse_ad` passes — all existing tests + new crux-entropia test green. |
 | **validation** | `cargo test -p radix reverse_ad` (all tests including new oracle) |
-| **depends_on** | Unit 1 (needs `AirTensorOp::CruxEntropia` to exist); **hand-5 completing task 0237b130** (BERT C4/C5 diagnostic — single-writer lock on `reverse_ad.rs`) |
+| **depends_on** | Unit 1 (needs `AirTensorOp::CruxEntropia` to exist — **DONE**, `8efec35db` on main); **hand-5 completing task 118a8e06** (BERT C4/C5 U3 — gradient magnitude diagnostic, single-writer lock on `reverse_ad.rs`) |
 | **non_goals** | Changing how other ops' VJP walks work; adding crux-entropia to fusion.rs (fusion handles ops already in the eligibility ledger — CruxEntropia will be eligible after this unit, fusion can be a follow-on if needed); WASM/WebGPU gradient execution (CPU reference proof only) |
 | **risk** | medium — reverse_ad.rs is a complex file; VJP formula is known and verified but the walk integration has nuance: forward output is a scalar loss but VJP needs the forward logits input to compute softmax; similar to Mean (scalar output, VJP needs element count N); higher risk than Unit 1's mechanical additions |
 
