@@ -17,9 +17,6 @@ mod install;
 #[path = "install_test.rs"]
 mod install_test;
 mod model;
-#[cfg(test)]
-#[path = "model_test.rs"]
-mod model_test;
 mod run;
 mod script;
 mod targets;

@@ -72,15 +72,24 @@ fn parse_valid_metadata_and_multiple_tensors() {
 
     assert_eq!(header.tensors.len(), 2);
 
-    let w = &header.tensors[0];
-    assert_eq!(w.name, "w");
+    // serde_json::Map iterates alphabetically without the `preserve_order`
+    // feature, so tensor order is not guaranteed to match file/insertion order.
+    // Look up by name instead of assuming position.
+    let w = header
+        .tensors
+        .iter()
+        .find(|t| t.name == "w")
+        .expect("tensor `w` present");
     assert_eq!(w.dtype, "F32");
     assert_eq!(w.shape, vec![128, 128]);
     assert_eq!(w.data_offsets, vec![0, 65536]);
     assert_eq!(w.element_count, 16384);
 
-    let b = &header.tensors[1];
-    assert_eq!(b.name, "b");
+    let b = header
+        .tensors
+        .iter()
+        .find(|t| t.name == "b")
+        .expect("tensor `b` present");
     assert_eq!(b.dtype, "F32");
     assert_eq!(b.shape, vec![128]);
     assert_eq!(b.data_offsets, vec![65536, 65664]);

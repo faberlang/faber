@@ -23,6 +23,7 @@ use std::fs;
 use std::path::Path;
 
 /// Describes one tensor entry from a safetensors header.
+#[derive(Debug)]
 struct TensorInfo {
     name: String,
     dtype: String,
@@ -54,6 +55,7 @@ impl fmt::Display for TensorInfo {
 }
 
 /// Parsed safetensors header metadata.
+#[derive(Debug)]
 struct SafetensorsHeader {
     metadata: Vec<(String, String)>,
     tensors: Vec<TensorInfo>,
