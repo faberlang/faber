@@ -542,6 +542,7 @@ pub(crate) fn build_browser_product(
     fs::create_dir_all(&esm_root).map_err(|err| io_diag(&esm_root, err))?;
 
     emit_typescript_modules(&package, &ts_root, &controllers)?;
+    emit_library_typescript_modules(config, &layout.package_root, &ts_root)?;
     let browser_entry = ts_root.join(BROWSER_ENTRY_TS);
     fs::write(&browser_entry, render_browser_entry(&controllers))
         .map_err(|err| io_diag(&browser_entry, err))?;
@@ -854,6 +855,91 @@ fn emit_typescript_modules(
         let path = ts_root.join(ts_module_file_name(unit));
         fs::write(&path, code).map_err(|err| io_diag(&path, err))?;
     }
+    Ok(())
+}
+
+/// Emit TypeScript for library dependencies (kind=lib, target=ts) into the
+/// TypeScript output directory alongside app modules.
+///
+/// Reads `faber.lock` to discover TS-targeting library packages, then
+/// emits each `.fab` source file via `faber emit -t ts` (same approach
+/// as `link-triga-ts.mjs`). Emitted files are named `{package}-{module}.ts`
+/// and get namespace-wrapped exports the same way app modules do.
+///
+/// Phase 2: minimal emit — no import rewriting, no tsc passthrough.
+/// Radix codegen defects are handled in Phase 3.
+fn emit_library_typescript_modules(
+    config: &radix::driver::Config,
+    package_root: &Path,
+    ts_root: &Path,
+) -> Result<(), Box<Diagnostic>> {
+    let lock = match super::lockfile::read_lock(package_root)? {
+        Some(lock) => lock,
+        None => return Ok(()),
+    };
+    let lock_path = package_root.join(super::lockfile::LOCK_FILE);
+    let index = super::lockfile::lock_index(&lock_path, &lock).map_err(|mut diags| {
+        diags.pop().unwrap_or_else(|| {
+            product_diag("failed to index faber.lock for library TS emit")
+        })
+    })?;
+
+    // Locate the faber binary for subprocess emit.
+    let faber_bin = std::env::current_exe()
+        .unwrap_or_else(|_| PathBuf::from("faber"));
+
+    for (_name, pkg) in &index {
+        if pkg.kind != "lib" || pkg.target_language != "ts" {
+            continue;
+        }
+        let pkg_root = pkg.package_root_path(package_root);
+        let src_dir = pkg_root.join("src");
+        if !src_dir.is_dir() {
+            continue;
+        }
+        let mut entries: Vec<_> = match fs::read_dir(&src_dir) {
+            Ok(entries) => entries
+                .filter_map(|e| e.ok())
+                .filter(|e| e.path().extension().is_some_and(|ext| ext == "fab"))
+                .collect(),
+            Err(err) => {
+                return Err(io_diag(&src_dir, err));
+            }
+        };
+        entries.sort_by_key(|e| e.file_name());
+
+        for entry in &entries {
+            let fab_path = entry.path();
+            let output = std::process::Command::new(&faber_bin)
+                .args(["emit", "-t", "ts"])
+                .arg(&fab_path)
+                .output();
+            let output = match output {
+                Ok(output) => output,
+                Err(err) => {
+                    eprintln!("faber: library TS emit subprocess failed for `{}`: {err}",
+                        fab_path.display());
+                    continue;
+                }
+            };
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                eprintln!("faber: library TS emit failed for `{}`: {stderr}",
+                    fab_path.display());
+                continue;
+            }
+            let code = String::from_utf8_lossy(&output.stdout).to_string();
+            let stem = fab_path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unknown");
+            let code = wrap_module_exports(code, stem);
+            let ts_file_name = format!("{}-{}.ts", pkg.name, stem);
+            let ts_path = ts_root.join(&ts_file_name);
+            fs::write(&ts_path, code).map_err(|err| io_diag(&ts_path, err))?;
+        }
+    }
+
     Ok(())
 }
 
