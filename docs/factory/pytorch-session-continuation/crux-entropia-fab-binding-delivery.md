@@ -6,23 +6,23 @@
 **Goal**: `faber/docs/factory/pytorch-session-continuation/crux-entropia-fab-binding-goal.md`
 **Goal verdict**: READY
 **Created**: 2026-07-26
-**Revised**: 2026-07-26 (planner-2 honesty update — U2 blockage fresh: BERT U3 task 118a8e06 occupies reverse_ad)
+**Revised**: 2026-07-26 (hand-2 update — U2 unblocked, filed hand-5 after BERT 996bfae0c)
 **Consumer**: factory Hands (mid-tier implementer)
 **Unit count**: 3
 
 > **Readiness honesty (2026-07-26):** Unit 1 (forward compiler pipeline) landed
-> at `8efec35db` and is ACCEPTED on main. Unit 2 (reverse_ad VJP) is **BLOCKED**
-> until `reverse_ad.rs` single-writer is free. The original blocker (task
+> at `8efec35db` and is ACCEPTED on main. Unit 2 (reverse_ad VJP) was **BLOCKED**
+> until `reverse_ad.rs` single-writer was free. The original blocker (task
 > 0237b130, BERT C4/C5 diagnostic) closed at `5830802e0` and was Mind-accepted.
-> However, hand-5 immediately received BERT U3 (task 118a8e06: gradient magnitude
-> diagnostic after `6638e9f89`) which holds single-writer on `reverse_ad.rs` —
-> the file is currently modified (uncommitted) on disk. BERT U3 explicitly
-> forbids concurrent CE FAB U2. Unit 3 (exemplum wiring) gates on U1+U2.
+> hand-5 then received BERT U3 (task 118a8e06: gradient magnitude diagnostic
+> after `6638e9f89`) which held single-writer on `reverse_ad.rs`. BERT U3
+> forbade concurrent CE FAB U2. Unit 3 (exemplum wiring) gates on U1+U2.
 >
-> **Verdict: U2 NOT READY — BLOCKED on hand-5 BERT U3 (task 118a8e06).**
-> The delivery spec itself (unit graph, write scopes, done-when) is correct
-> and requires no architectural changes. File U2 immediately when hand-5
-> signals `reverse_ad` free.
+> **Update (2026-07-26): U2 UNBLOCKED.** BERT U3 completed at commit
+> `996bfae0c` and released the single-writer lock on `reverse_ad.rs`. hand-5
+> was filed with a new task after that commit — no longer holding `reverse_ad`.
+> The delivery spec (unit graph, write scopes, done-when) remains correct.
+> Unit 2 is now ready to assign.
 
 ---
 
@@ -36,9 +36,9 @@ remains is the compiler pipeline that connects Faber source code
 
 This delivery lowers the binding into three path-disjoint implementable units.
 All three follow the established tensor-op binding pattern used by Gelu,
-Softmax, and LayerNorm. Unit 2 (reverse_ad VJP) is deferred until hand-5
-completes BERT diagnostic task 0237b130, which holds single-writer lock on
-`reverse_ad.rs`.
+Softmax, and LayerNorm. Unit 2 (reverse_ad VJP) was deferred until hand-5
+completed BERT U3 (task 118a8e06, commit `996bfae0c`) which held the
+single-writer lock on `reverse_ad.rs`. That lock has now been released.
 
 ## Normalized Spec
 
@@ -51,7 +51,7 @@ FAB source (.crux_entropia)
       → MIR lowering (MirCollectionOp::TensorCruxEntropia)
         → MIR stepper / LLVM / Wasm dispatch (runtime crux_entropia call)
           → Eligibility ledger (AirTensorOp + method name entry)
-            → Reverse AD VJP walk (BLOCKED — hand-5 lock)
+            → Reverse AD VJP walk (was BLOCKED — now unblocked at 996bfae0c)
               → Exemplum wiring (train.fab uncomment)
 ```
 
@@ -66,14 +66,15 @@ All units work from the current main tips:
 | Repo | Tip evidence |
 |------|-------------|
 | `faber-runtime` | `bfba771` — crux_entropia shipped |
-| `radix` | `831263b4c` — tip-honesty v24; reverse_ad.rs under hand-5 single-writer |
+| `radix` | `831263b4c` — tip-honesty v24; reverse_ad.rs unblocked after BERT 996bfae0c |
 | `faber` | `0f2ca28` — PSC-3 evidence gate |
 | `examples/training` | session-exemplum `train.fab` has commented crux_entropia call |
 
-**Hard constraint**: `radix/crates/radix/src/air/reverse_ad.rs` is single-writer
-locked by hand-5 (task 0237b130, BERT C4/C5 diagnostic). Unit 2 must not start
-until hand-5 completes and commits. Units 1 and 3 are path-disjoint from
-`reverse_ad.rs` and from each other.
+**Hard constraint**: `radix/crates/radix/src/air/reverse_ad.rs` was single-writer
+locked by hand-5 (BERT U3, task 118a8e06, until commit `996bfae0c`). That lock
+has been released — hand-5 has been filed with a new task after that commit.
+Unit 2 is now unblocked. Units 1 and 3 are path-disjoint from `reverse_ad.rs`
+and from each other.
 
 ## Ordered Unit Graph
 
@@ -120,7 +121,7 @@ until hand-5 completes and commits. Units 1 and 3 are path-disjoint from
 | **read_scope** | Full radix workspace; `faber-runtime/src/autograd_reference_test.rs` (FD oracle for formula verification); Unit 1 changes |
 | **done_when** | (a) `reverse_ad.rs` handles `AirTensorOp::CruxEntropia` in the differentiable-op gating arm (same as `Mean`, `Gelu`, `Softmax`). (b) `build_vjp_expr` returns the correct VJP expression: `(softmax(prediction_replay) - targets_replay) / N`. The VJP uses the forward input (logits, args[0]) to compute softmax, NOT the forward output (scalar loss). (c) Caller-side gradient accumulation handles the two-input case (logits gradient → accumulate; targets gradient → nil/skip). (d) `reverse_ad_test.rs`: new oracle test `test_crux_entropia_vjp_oracle_matches_tape` verifies the generated VJP matches the runtime FD oracle. Pattern: `sum(crux_entropia(logits, targets))` to make scalar output → AIR transform → compare VJP against finite-difference. (e) `cargo test -p radix reverse_ad` passes — all existing tests + new crux-entropia test green. |
 | **validation** | `cargo test -p radix reverse_ad` (all tests including new oracle) |
-| **depends_on** | Unit 1 (needs `AirTensorOp::CruxEntropia` to exist — **DONE**, `8efec35db` on main); **hand-5 completing task 118a8e06** (BERT C4/C5 U3 — gradient magnitude diagnostic, single-writer lock on `reverse_ad.rs`) |
+| **depends_on** | Unit 1 (needs `AirTensorOp::CruxEntropia` to exist — **DONE**, `8efec35db` on main); **hand-5 BERT U3 completed at `996bfae0c`** — single-writer lock on `reverse_ad.rs` released |
 | **non_goals** | Changing how other ops' VJP walks work; adding crux-entropia to fusion.rs (fusion handles ops already in the eligibility ledger — CruxEntropia will be eligible after this unit, fusion can be a follow-on if needed); WASM/WebGPU gradient execution (CPU reference proof only) |
 | **risk** | medium — reverse_ad.rs is a complex file; VJP formula is known and verified but the walk integration has nuance: forward output is a scalar loss but VJP needs the forward logits input to compute softmax; similar to Mean (scalar output, VJP needs element count N); higher risk than Unit 1's mechanical additions |
 
@@ -179,7 +180,7 @@ cargo test -p radix generated_differentiable_eligibility
 cargo test -p radix-mir-stepper tensor_crux_entropia
 cargo test -p radix-mir  # validate module
 
-# Unit 2 (deferred — hand-5 must complete first)
+# Unit 2 (unblocked at 996bfae0c — ready to assign)
 cargo test -p radix reverse_ad
 
 # Unit 3 (deferred — requires U1 + U2)
@@ -188,9 +189,11 @@ faber run -t fmir examples/training/session-exemplum/
 
 ## Open Questions for Mind
 
-1. **Unit 2 scheduling**: Does Mind want planner-2 to file a need when hand-5
+1. ~~**Unit 2 scheduling**: Does Mind want planner-2 to file a need when hand-5
    completes 0237b130, or should Unit 2 be pre-filed as a task with "BLOCKED"
-   status?
+   status?~~ **RESOLVED**: U2 is unblocked — hand-5 BERT U3 completed at
+   `996bfae0c`, `reverse_ad.rs` single-writer lock released. Unit 2 is ready to
+   assign.
 
 2. **Fusion eligibility**: After Unit 2, CruxEntropia is differentiable in
    isolated functions. Fusion of crux-entropia into larger companions is
