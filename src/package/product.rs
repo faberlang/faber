@@ -377,6 +377,11 @@ fn product_generated_output_paths(
             path: normalize_path(&out_dir.join(TSCONFIG_FILE)),
             is_dir: false,
         },
+        GeneratedOutput {
+            label: "product manifest",
+            path: normalize_path(&out_dir.join("product.json")),
+            is_dir: false,
+        },
     ]
 }
 
@@ -482,6 +487,131 @@ fn render_asset_manifest(out_dir: &Path, assets: &[BrowserProductAsset]) -> Stri
     out
 }
 
+/// Render the product identity manifest (`product.json`) after a successful
+/// browser product build.
+///
+/// Records every same-build artifact: the ESM entry, the controller manifest,
+/// host runtime files (`faber-kernel.js`, `webgpu-runtime.js`), and a
+/// reference to the asset manifest (`assets.json`). WGSL and reflection
+/// artifacts are omitted at Stage 1; the `next_stage_artifacts` field hints
+/// their addition for Stage 2.
+fn render_product_json(
+    out_dir: &Path,
+    esm_entry: &Path,
+    controllers_json: &Path,
+    static_assets: &[BrowserProductAsset],
+) -> Result<String, Box<Diagnostic>> {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let mut artifacts: Vec<serde_json::Value> = Vec::new();
+
+    // ESM entry: faber-browser.js
+    let entry_path = relative_manifest_path(out_dir, esm_entry);
+    let (size, sha256) = file_digest(esm_entry)?;
+    artifacts.push(serde_json::json!({
+        "path": entry_path,
+        "kind": "esm-entry",
+        "size": size,
+        "sha256": sha256,
+    }));
+
+    // Controller manifest: controllers.json
+    let ctrl_path = relative_manifest_path(out_dir, controllers_json);
+    let (size, sha256) = file_digest(controllers_json)?;
+    artifacts.push(serde_json::json!({
+        "path": ctrl_path,
+        "kind": "controller-manifest",
+        "size": size,
+        "sha256": sha256,
+    }));
+
+    // Host runtime files discovered from static assets.
+    for asset in static_assets {
+        let rel = relative_manifest_path(out_dir, &asset.output);
+        let fname = Path::new(&rel)
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("");
+        let kind = match fname {
+            "faber-kernel.js" => "host-runtime",
+            "webgpu-runtime.js" => "host-runtime",
+            _ => continue,
+        };
+        artifacts.push(serde_json::json!({
+            "path": rel,
+            "kind": kind,
+            "size": asset.size,
+            "sha256": asset.sha256,
+        }));
+    }
+
+    // Build timestamp (ISO 8601).
+    let duration = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
+    let build_timestamp = format_iso8601(duration);
+
+    let product = serde_json::json!({
+        "version": 1,
+        "stage": 1,
+        "build_timestamp": build_timestamp,
+        "artifacts": artifacts,
+        "assets_manifest": "assets.json",
+        "next_stage_artifacts": ["wgsl", "reflection"],
+    });
+
+    serde_json::to_string_pretty(&product)
+        .map(|mut json| {
+            json.push('\n');
+            json
+        })
+        .map_err(|err| {
+            Box::new(product_diag(format!(
+                "failed to render product.json: {err}"
+            )))
+        })
+}
+
+/// Compute the SHA-256 digest and size of a file.
+fn file_digest(path: &Path) -> Result<(u64, String), Box<Diagnostic>> {
+    let bytes = fs::read(path).map_err(|err| io_diag(path, err))?;
+    let size = bytes.len() as u64;
+    let sha256 = format!("{:x}", Sha256::digest(&bytes));
+    Ok((size, sha256))
+}
+
+/// Format a `Duration` since Unix epoch as an ISO 8601 UTC timestamp string.
+///
+/// Uses the civil-date algorithm from Howard Hinnant
+/// (<https://howardhinnant.github.io/date_algorithms.html>) — no external
+/// datetime dependency needed.
+fn format_iso8601(duration: std::time::Duration) -> String {
+    let total_secs = duration.as_secs();
+    let days = total_secs / 86400;
+    let time_secs = total_secs % 86400;
+
+    let hours = time_secs / 3600;
+    let minutes = (time_secs % 3600) / 60;
+    let seconds = time_secs % 60;
+
+    // Civil date from days since 1970-01-01 (Howard Hinnant algorithm).
+    let z = days as i64 + 719468;
+    let era = (if z >= 0 { z } else { z - 146096 }) / 146097;
+    let doe = z - era * 146097;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
+    let year = if month <= 2 { y + 1 } else { y } as u32;
+
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+        year, month, day, hours, minutes, seconds
+    )
+}
+
 fn relative_manifest_path(root: &Path, path: &Path) -> String {
     path.strip_prefix(root)
         .unwrap_or(path)
@@ -568,6 +698,17 @@ pub(crate) fn build_browser_product(
             .with_arg("issue", "product_esm_entry_missing"),
         ));
     }
+
+    // Emit product identity manifest after all build stages succeed.
+    let product_json_path = static_build.out_dir.join("product.json");
+    let product_json_content = render_product_json(
+        &static_build.out_dir,
+        &esm_entry,
+        &controllers_json,
+        &static_build.assets,
+    )?;
+    fs::write(&product_json_path, product_json_content)
+        .map_err(|err| io_diag(&product_json_path, err))?;
 
     Ok(BrowserProductBuild {
         out_dir: static_build.out_dir,
