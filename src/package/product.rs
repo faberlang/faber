@@ -868,6 +868,71 @@ fn emit_typescript_modules(
 ///
 /// Phase 2: minimal emit — no import rewriting, no tsc passthrough.
 /// Radix codegen defects are handled in Phase 3.
+/// Apply emit-defect post-processing for library TypeScript files.
+///
+/// Phase 3: these are minimal patches for codegen defects that would otherwise
+/// block TypeScript compilation. Each patch corresponds to a filed radix issue
+/// so the root cause is tracked in the compiler, not papered over indefinitely.
+fn apply_library_emit_fixes(mut code: String) -> String {
+    // Fix 1: `new unresolved_def()` must become `{}` (empty object) before
+    // the type-name pass, otherwise `new any()` is not a valid value.
+    code = code.replace("new unresolved_def()", "{}");
+
+    // Fix 2: Radix codegen emits `unresolved_def` for types it cannot resolve.
+    // TypeScript rejects this as an unbound name. Replace with `any`.
+    code = code.replace("unresolved_def", "any");
+
+    // Radix codegen emits IIFE array-access expressions as the left-hand side
+    // of assignment, which TypeScript rejects (TS2364).  Rewrite:
+    //   ((__o, __i) => { const __v = __o[__i]; ... })(arr, idx) = value;
+    // → arr[idx] = value;
+    //
+    // The IIFE pattern is:
+    //   ((__o, __i) => { const __v = __o[__i]; if (__v === undefined) throw new Error("index trap"); return __v; })(arr, idx)
+    // We replace it with a plain arr[idx] when it appears as LHS of `=`.
+    let iife_pattern =
+        r#"((__o, __i) => { const __v = __o[__i]; if (__v === undefined) throw new Error("index trap"); return __v; })("#;
+    // Process line by line to handle IIFE-on-LHS.
+    let mut result = String::with_capacity(code.len() + 4096);
+    for line in code.lines() {
+        let trimmed = line.trim();
+        // Detect IIFE-as-LHS: line matches pattern `((__o, ...)(expr, idx) = ...`
+        if trimmed.starts_with(iife_pattern) && trimmed.contains(") = ") {
+            // Extract array expression and index from IIFE call.
+            // Pattern: ((__o, __i) => { ... })(array_expr, index_expr) = value_expr
+            let rest = &trimmed[iife_pattern.len()..];
+            // Find the closing paren of the IIFE call.
+            if let Some(close_idx) = rest.rfind(") = ") {
+                let args_part = &rest[..close_idx];
+                // Split at the comma to get array and index
+                if let Some(comma_idx) = args_part.rfind(',') {
+                    let array_expr = args_part[..comma_idx].trim();
+                    let index_expr = args_part[comma_idx + 1..].trim();
+                    let value_part = rest[close_idx + 4..].trim(); // after ") = "
+                    // Determine indentation from original line
+                    let indent = &line[..line.len() - line.trim_start().len()];
+                    result.push_str(&format!("{}{}[{}] = {};\n", indent, array_expr, index_expr, value_part.trim_end_matches(';').trim()));
+                    continue;
+                }
+            }
+        }
+        result.push_str(line);
+        result.push('\n');
+    }
+    result
+}
+
+/// Emit TypeScript for library dependencies (kind=lib, target=ts) into the
+/// TypeScript output directory alongside app modules.
+///
+/// Reads `faber.lock` to discover TS-targeting library packages, then
+/// emits each `.fab` source file via `faber emit -t ts` (same approach
+/// as `link-triga-ts.mjs`). Emitted files are named `{package}-{module}.ts`
+/// and get namespace-wrapped exports the same way app modules do.
+///
+/// Phase 2: minimal emit — no import rewriting, no tsc passthrough.
+/// Phase 3: post-processing fixes for known codegen defects (unresolved_def,
+///          IIFE-as-LHS) applied via [`apply_library_emit_fixes`].
 fn emit_library_typescript_modules(
     config: &radix::driver::Config,
     package_root: &Path,
@@ -933,6 +998,8 @@ fn emit_library_typescript_modules(
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("unknown");
+            // Phase 3: apply emit-defect fixes before namespace wrapping.
+            let code = apply_library_emit_fixes(code);
             let code = wrap_module_exports(code, stem);
             let ts_file_name = format!("{}-{}.ts", pkg.name, stem);
             let ts_path = ts_root.join(&ts_file_name);
@@ -1149,6 +1216,8 @@ fn web_ambient_declarations() -> String {
   export function face_code_x_offset(face_code: number): number;
   export function face_code_y_offset(face_code: number): number;
   export function face_code_z_offset(face_code: number): number;
+  export function matrix4_valid(matrix: any): boolean;
+  export function transform_payload_byte_count(payload: any): number | null;
   export const triga: {
     vector3(x: number, y: number, z: number): any;
     vector3_subtracta(a: any, b: any): any;
@@ -1171,6 +1240,8 @@ fn web_ambient_declarations() -> String {
     face_code_x_offset(face_code: number): number;
     face_code_y_offset(face_code: number): number;
     face_code_z_offset(face_code: number): number;
+    matrix4_valid(matrix: any): boolean;
+    transform_payload_byte_count(payload: any): number | null;
   };
 }
 declare module "triga:geometry" {
@@ -1178,11 +1249,13 @@ declare module "triga:geometry" {
   export function box_wire_draw_batch_facts(width: number, height: number, depth: number, color: number): any;
   export function colored_quad_mesh_bounding_box(payload: any): any;
   export function colored_quad_mesh_facts(payload: any): any;
+  export function colored_quad_mesh_append(positions: any, colors: any, indices: any, ax: number, ay: number, az: number, bx: number, by: number, bz: number, cx: number, cy: number, cz: number, dx: number, dy: number, dz: number, r: number, g: number, b: number): any;
   export const geometry: {
     box_wire_geometry(width: number, height: number, depth: number): any;
     box_wire_draw_batch_facts(width: number, height: number, depth: number, color: number): any;
     colored_quad_mesh_bounding_box(payload: any): any;
     colored_quad_mesh_facts(payload: any): any;
+    colored_quad_mesh_append(positions: any, colors: any, indices: any, ax: number, ay: number, az: number, bx: number, by: number, bz: number, cx: number, cy: number, cz: number, dx: number, dy: number, dz: number, r: number, g: number, b: number): any;
   };
 }
 declare module "triga:scene" {
