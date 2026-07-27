@@ -1133,6 +1133,7 @@ fn emit_typescript_modules(
             .unwrap_or("main");
         let code = wrap_module_exports(code, module_name);
         let code = rewrite_library_imports(code, library_imports);
+        let code = rewrite_relative_import_extensions(code);
         let path = ts_root.join(ts_module_file_name(unit));
         fs::write(&path, code).map_err(|err| io_diag(&path, err))?;
     }
@@ -1335,6 +1336,7 @@ fn emit_library_typescript_modules(
             let code = wrap_module_exports(code, stem);
             // Phase 4: rewrite library specifier imports to relative ESM paths.
             let code = rewrite_library_imports(code, library_imports);
+            let code = rewrite_relative_import_extensions(code);
             let ts_file_name = format!("{}-{}.ts", pkg.name, stem);
             let ts_path = ts_root.join(&ts_file_name);
             fs::write(&ts_path, code).map_err(|err| io_diag(&ts_path, err))?;
@@ -1421,6 +1423,57 @@ fn rewrite_library_imports(code: String, library_imports: &BTreeMap<String, Stri
         result = result.replace(&from_pattern, &to_pattern);
     }
     result
+}
+
+/// Ensure relative ESM import paths carry a `.js` extension.
+///
+/// Browsers resolve bare relative imports like `from "./city"` as a path with
+/// no extension and static servers return 404. Library rewrites already use
+/// `./pkg-mod.js`; package-local codegen historically emitted extensionless
+/// paths (`from "./city"`). Append `.js` so tsc emit and the browser agree.
+///
+/// Only rewrites relative paths (`./` / `../`) that do not already end in a
+/// known extension (`.js`, `.json`, `.ts`, `.mjs`, `.cjs`).
+fn rewrite_relative_import_extensions(code: String) -> String {
+    let mut out = String::with_capacity(code.len() + 32);
+    let bytes = code.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        // Match `from "` or `from '` (import/export).
+        if bytes[i..].starts_with(b"from ")
+            && i + 6 < bytes.len()
+            && (bytes[i + 5] == b'"' || bytes[i + 5] == b'\'')
+        {
+            let quote = bytes[i + 5];
+            out.push_str("from ");
+            out.push(quote as char);
+            i += 6;
+            let start = i;
+            while i < bytes.len() && bytes[i] != quote {
+                i += 1;
+            }
+            let path = &code[start..i];
+            out.push_str(path);
+            if path.starts_with("./") || path.starts_with("../") {
+                let needs_js = !path.ends_with(".js")
+                    && !path.ends_with(".json")
+                    && !path.ends_with(".ts")
+                    && !path.ends_with(".mjs")
+                    && !path.ends_with(".cjs");
+                if needs_js {
+                    out.push_str(".js");
+                }
+            }
+            if i < bytes.len() {
+                out.push(quote as char);
+                i += 1;
+            }
+            continue;
+        }
+        out.push(bytes[i] as char);
+        i += 1;
+    }
+    out
 }
 
 fn adapt_controller_typescript(mut code: String, controllers: &[BrowserController]) -> String {
