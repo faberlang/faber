@@ -1302,8 +1302,35 @@ fn emit_library_typescript_modules(
         };
         entries.sort_by_key(|e| e.file_name());
 
+        // Prefer package-owned TS binding shims (e.g. faber-web/runtime/dom.ts)
+        // over emitting `nota` stubs from .fab — stubs only console.log.
+        let ts_bindings = load_ts_library_bindings(&pkg_root)?;
+
         for entry in &entries {
             let fab_path = entry.path();
+            let stem = fab_path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unknown");
+            let ts_file_name = format!("{}-{}.ts", pkg.name, stem);
+            let ts_path = ts_root.join(&ts_file_name);
+
+            if let Some(bindings) = ts_bindings.as_ref() {
+                if let Some(exports) = bindings.module_exports(stem) {
+                    if !exports.is_empty() {
+                        emit_ts_binding_facade(
+                            &pkg_root,
+                            &pkg.name,
+                            stem,
+                            bindings,
+                            &exports,
+                            ts_root,
+                        )?;
+                        continue;
+                    }
+                }
+            }
+
             let output = std::process::Command::new(&faber_bin)
                 .args(["emit", "-t", "ts"])
                 .arg(&fab_path)
@@ -1327,22 +1354,180 @@ fn emit_library_typescript_modules(
                 continue;
             }
             let code = String::from_utf8_lossy(&output.stdout).to_string();
-            let stem = fab_path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("unknown");
             // Phase 3: apply emit-defect fixes before namespace wrapping.
             let code = apply_library_emit_fixes(code);
             let code = wrap_module_exports(code, stem);
             // Phase 4: rewrite library specifier imports to relative ESM paths.
             let code = rewrite_library_imports(code, library_imports);
             let code = rewrite_relative_import_extensions(code);
-            let ts_file_name = format!("{}-{}.ts", pkg.name, stem);
-            let ts_path = ts_root.join(&ts_file_name);
             fs::write(&ts_path, code).map_err(|err| io_diag(&ts_path, err))?;
         }
     }
 
+    Ok(())
+}
+
+/// Parsed `[target.ts]` binding manifest for a TS library package.
+struct TsLibraryBindings {
+    /// Absolute path to the package-owned runtime shim (e.g. `runtime/dom.ts`).
+    shim_path: PathBuf,
+    /// Keyed by function route: `"web:dom.attr_set"` → `"webDomAttrSet"`.
+    functions: BTreeMap<String, String>,
+}
+
+impl TsLibraryBindings {
+    /// Faber API names and host symbols for one module stem (`dom` → attr_set…).
+    fn module_exports(&self, stem: &str) -> Option<Vec<(String, String)>> {
+        let mut exports = Vec::new();
+        let needle = format!(":{stem}.");
+        for (route, symbol) in &self.functions {
+            // route = "{provider}:{module}.{fn}" e.g. web:dom.attr_set
+            if let Some(idx) = route.find(&needle) {
+                // Ensure module boundary: character before ':' segment is provider end.
+                // Accept any provider prefix that ends with `:{stem}.`.
+                let after = &route[idx + needle.len()..];
+                if !after.is_empty() && !after.contains('.') && !after.contains(':') {
+                    exports.push((after.to_owned(), symbol.clone()));
+                }
+            }
+        }
+        if exports.is_empty() {
+            None
+        } else {
+            exports.sort_by(|a, b| a.0.cmp(&b.0));
+            Some(exports)
+        }
+    }
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct TsBindingFile {
+    #[serde(default)]
+    functions: BTreeMap<String, TsBindingFn>,
+    #[serde(default)]
+    shim: Option<TsBindingShim>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct TsBindingFn {
+    symbol: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct TsBindingShim {
+    path: String,
+}
+
+/// Load optional TS binding shim config from a library package's `faber.toml`.
+fn load_ts_library_bindings(pkg_root: &Path) -> Result<Option<TsLibraryBindings>, Box<Diagnostic>> {
+    let manifest_path = pkg_root.join(super::MANIFEST_FILE);
+    if !manifest_path.is_file() {
+        return Ok(None);
+    }
+    let manifest = match super::manifest::read_manifest(&manifest_path) {
+        Ok(m) => m,
+        Err(_) => return Ok(None),
+    };
+    let Some(target) = manifest.target.get("ts") else {
+        return Ok(None);
+    };
+    let Some(bindings_rel) = target.bindings.as_deref() else {
+        return Ok(None);
+    };
+    let binding_path = match super::resolve_package_member(pkg_root, bindings_rel, &manifest_path) {
+        Ok(p) => p,
+        Err(err) => return Err(Box::new(err)),
+    };
+    let source = fs::read_to_string(&binding_path).map_err(|err| io_diag(&binding_path, err))?;
+    let file: TsBindingFile = toml::from_str(&source).map_err(|err| {
+        Box::new(
+            product_diag(format!(
+                "invalid TS binding manifest `{}`: {err}",
+                binding_path.display()
+            ))
+            .with_file(binding_path.display().to_string())
+            .with_arg("issue", "product_ts_binding_manifest_invalid"),
+        )
+    })?;
+    let Some(shim) = file.shim else {
+        return Ok(None);
+    };
+    if shim.path.trim().is_empty() {
+        return Ok(None);
+    }
+    let shim_path = match super::resolve_package_member(pkg_root, &shim.path, &binding_path) {
+        Ok(p) => p,
+        Err(err) => return Err(Box::new(err)),
+    };
+    if !shim_path.is_file() {
+        return Err(Box::new(
+            product_diag(format!(
+                "TS binding shim missing: {}",
+                shim_path.display()
+            ))
+            .with_file(binding_path.display().to_string())
+            .with_arg("issue", "product_ts_binding_shim_missing"),
+        ));
+    }
+    let functions: BTreeMap<String, String> = file
+        .functions
+        .into_iter()
+        .map(|(k, v)| (k, v.symbol))
+        .collect();
+    Ok(Some(TsLibraryBindings {
+        shim_path,
+        functions,
+    }))
+}
+
+/// Copy the package TS runtime shim into the product tree and write a facade
+/// that re-exports host symbols under Faber API names (`attr_set`, …).
+fn emit_ts_binding_facade(
+    _pkg_root: &Path,
+    pkg_name: &str,
+    stem: &str,
+    bindings: &TsLibraryBindings,
+    exports: &[(String, String)],
+    ts_root: &Path,
+) -> Result<(), Box<Diagnostic>> {
+    let shim_stem = bindings
+        .shim_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("runtime");
+    let runtime_name = format!("{pkg_name}-shim-{shim_stem}.ts");
+    let runtime_path = ts_root.join(&runtime_name);
+    // Copy once (idempotent if several modules share the same shim).
+    if !runtime_path.is_file() {
+        fs::copy(&bindings.shim_path, &runtime_path).map_err(|err| io_diag(&runtime_path, err))?;
+    }
+
+    let runtime_import = format!("./{pkg_name}-shim-{shim_stem}.js");
+    let mut code = String::from(
+        "// Generated by faber product packaging — TS binding shim facade.\n",
+    );
+    code.push_str("import {\n");
+    for (api_name, symbol) in exports {
+        code.push_str(&format!("  {symbol} as {api_name},\n"));
+    }
+    code.push_str(&format!("}} from {runtime_import:?};\n\n"));
+
+    code.push_str("export {\n");
+    for (api_name, _) in exports {
+        code.push_str(&format!("  {api_name},\n"));
+    }
+    code.push_str("};\n\n");
+
+    // Namespace object matches wrap_module_exports shape: `import { dom } from …`.
+    code.push_str(&format!("export const {stem} = {{\n"));
+    for (i, (api_name, _)) in exports.iter().enumerate() {
+        let comma = if i + 1 < exports.len() { "," } else { "" };
+        code.push_str(&format!("  {api_name}{comma}\n"));
+    }
+    code.push_str("};\n");
+
+    let facade_path = ts_root.join(format!("{pkg_name}-{stem}.ts"));
+    fs::write(&facade_path, code).map_err(|err| io_diag(&facade_path, err))?;
     Ok(())
 }
 
@@ -1640,7 +1825,8 @@ export function mountControllers(root: ParentNode = globalThis.document): Contro
       continue;
     }
     try {
-      const cleanup = controller.mount({ selector: controller.selector });
+      // WebDomScope shape: real runtime requires `root` for query/require.
+      const cleanup = controller.mount({ root: element, selector: controller.selector });
       mounts.push({
         name: controller.name,
         selector: controller.selector,
@@ -1768,6 +1954,7 @@ fn render_tsconfig(ts_root: &Path, esm_root: &Path) -> String {
     "target": "ES2022",
     "module": "ES2022",
     "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "strict": true,
     "noEmitOnError": true,
     "rootDir": {root_dir:?},
