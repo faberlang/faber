@@ -610,6 +610,7 @@ dependencies = [
  "ariadne",
  "clap",
  "getrandom 0.2.17",
+ "radix-air",
  "radix-codegen-faber",
  "radix-codegen-go",
  "radix-codegen-rust",
@@ -628,6 +629,7 @@ dependencies = [
  "radix-mir-stepper",
  "radix-mir-wasm",
  "radix-mir-wgsl",
+ "radix-parser",
  "radix-runtime-contract",
  "radix-syntax",
  "radix-types",
@@ -643,6 +645,17 @@ dependencies = [
  "wait-timeout",
  "wasm-encoder 0.250.0",
  "wat",
+]
+
+[[package]]
+name = "radix-air"
+version = "0.77.0"
+dependencies = [
+ "radix-hir",
+ "radix-lexer",
+ "radix-mir",
+ "radix-types",
+ "rustc-hash",
 ]
 
 [[package]]
@@ -860,6 +873,16 @@ dependencies = [
  "rustc-hash",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "radix-parser"
+version = "0.77.0"
+dependencies = [
+ "radix-diagnostics",
+ "radix-lexer",
+ "radix-syntax",
+ "radix-types",
 ]
 
 [[package]]

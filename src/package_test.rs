@@ -80,7 +80,7 @@ impl Host for ExitRecordingHost {
         std::panic::panic_any(ExitPanic(code));
     }
 
-    fn argumenta(&self) -> &[String] {
+    fn argumenta(&self) -> Result<&[String], StepperError> {
         self.buffer.argumenta()
     }
 }
@@ -1741,7 +1741,7 @@ incipit {
         &entry,
         |lowered| {
             assert!(!lowered.program.functions.is_empty());
-            assert!(lowered.validation.interner.is_some());
+            assert!(lowered.validated.validation().interner.is_some());
             true
         },
     )
@@ -1769,14 +1769,11 @@ fn assert_package_corpus_llvm_smoke(relative: &str, label: &str) {
         &entry,
         |lowered| {
             let interner = lowered
-                .validation
+                .validated
+                .validation()
                 .interner
                 .expect("package MIR carries interner");
-            radix::mir::emit_llvm_text_probe_with_context(
-                &lowered.program,
-                &lowered.validation,
-                interner,
-            )
+            radix::mir::emit_llvm_text_probe(&lowered.validated, interner)
         },
     )
     .expect("corpus package lowers to MIR")

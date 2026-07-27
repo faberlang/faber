@@ -290,7 +290,10 @@ pub(crate) fn run_package_mir<H: Host + ?Sized>(
     input: &Path,
     host: &mut H,
 ) -> Result<(), Vec<Diagnostic>> {
-    let argumenta = host.argumenta().to_vec();
+    let argumenta = host
+        .argumenta()
+        .map_err(|e| vec![mir_diag(input, e.message)])?
+        .to_vec();
     with_prepared_package_mir(config, input, &argumenta, |prepared, lowered| {
         let image = fmir_package_image_from_lowered(
             prepared,
@@ -494,9 +497,10 @@ fn fmir_package_image_from_lowered(
         runtime_requirements: prepared.runtime_requirements.clone(),
         cli: prepared.fmir_text_cli.clone(),
         exit_code: prepared.cli_exit_code,
-        types: lowered.validation.types.snapshot(),
+        types: lowered.validated.validation().types.snapshot(),
         interner: lowered
-            .validation
+            .validated
+            .validation()
             .interner
             .map(|interner| interner.strings().to_vec())
             .unwrap_or_default(),
@@ -531,7 +535,14 @@ fn run_fmir_package_image<H: Host + ?Sized>(
     )?;
     let mut validation = radix::mir::MirValidationContext::new(&types);
     validation.interner = Some(&interner);
-    run_entry(&image.program, &validation, host)
+    let validated = radix::mir::ValidatedMir::new(image.program.clone(), validation)
+        .map_err(|errors| {
+            errors
+                .into_iter()
+                .map(|error| mir_diag(&image.diagnostic_path, error.message))
+                .collect::<Vec<_>>()
+        })?;
+    run_entry(&validated, host)
         .map_err(|errors| stepper_diagnostics(&image.diagnostic_path, errors))?;
     if let Some(code) = image.exit_code {
         host.exit(code);
@@ -607,7 +618,7 @@ fn with_prepared_package_mir_with_cli_mode_and_consumer<R>(
     }
 
     let mut lowered = lower_package_units(&mut package, entry_index, &links.sources, &cli_plan, config.no_fuse)?;
-    validate_program(&lowered.program, &lowered.validation).map_err(|errors| {
+    validate_program(&lowered.program, lowered.validated.validation()).map_err(|errors| {
         errors
             .into_iter()
             .map(|error| mir_lowering_diag(&entry_path, error.message))
@@ -704,10 +715,11 @@ fn package_fmir_text_image(
         cli: prepared.fmir_text_cli.clone(),
         exit_code: prepared.cli_exit_code,
         types: FmirTextTypesSection {
-            table: lowered.validation.types.snapshot(),
+            table: lowered.validated.validation().types.snapshot(),
         },
         interner: lowered
-            .validation
+            .validated
+            .validation()
             .interner
             .map(|interner| interner.strings().to_vec())
             .unwrap_or_default(),
@@ -749,10 +761,11 @@ fn package_fmir_binary_image(
         cli: prepared.fmir_text_cli.clone(),
         exit_code: prepared.cli_exit_code,
         types: FmirTextTypesSection {
-            table: lowered.validation.types.snapshot(),
+            table: lowered.validated.validation().types.snapshot(),
         },
         interner: lowered
-            .validation
+            .validated
+            .validation()
             .interner
             .map(|interner| interner.strings().to_vec())
             .unwrap_or_default(),
@@ -784,9 +797,18 @@ fn write_fmir_bin_runner(
     fs::write(runner_src.join("main.rs"), render_fmir_bin_runner_main_rs())
         .map_err(|error| vec![mir_diag(diagnostic_path, error.to_string())])?;
 
+    // Redirect the runner's cargo build to a shared target dir instead of
+    // <pkg>/target/faber-mir/exe/runner-target/. This prevents ~1.4 GB of
+    // compiled faber+radix artifacts from being written into every package
+    // that runs `faber build --target fmir-bin`. The shared dir is reused
+    // across all fmir-bin builds.
+    let runner_target_dir = shared_fmir_bin_runner_target_dir();
+    fs::create_dir_all(&runner_target_dir)
+        .map_err(|error| vec![mir_diag(diagnostic_path, error.to_string())])?;
+
     let built_runner = invoke_fmir_bin_runner_build(
         &runner_root.join("Cargo.toml"),
-        &artifact_root.join(FMIR_BIN_RUNNER_TARGET_DIR),
+        &runner_target_dir,
         diagnostic_path,
         release,
     )?;
@@ -794,6 +816,21 @@ fn write_fmir_bin_runner(
         .map_err(|error| vec![mir_diag(diagnostic_path, error.to_string())])?;
     make_fmir_bin_entrypoint_executable(entrypoint_path, diagnostic_path)?;
     Ok(())
+}
+
+/// Shared target directory for fmir-bin runner cargo builds.
+///
+/// Uses `CARGO_TARGET_DIR` from the environment when set (respects `.cargo/config.toml`),
+/// otherwise falls back to a per-user cache dir. This keeps the ~1.4 GB of
+/// compiled faber+radix artifacts out of individual package directories.
+fn shared_fmir_bin_runner_target_dir() -> PathBuf {
+    if let Some(dir) = std::env::var_os("CARGO_TARGET_DIR") {
+        return PathBuf::from(dir).join("fmir-bin-runner");
+    }
+    let cache = std::env::var("HOME")
+        .map(|h| PathBuf::from(h).join(".cache/faberlang-target/faber/fmir-bin-runner"))
+        .unwrap_or_else(|_| std::env::temp_dir().join("faber-fmir-bin-runner-target"));
+    cache
 }
 
 fn render_fmir_bin_runner_cargo_toml() -> String {
@@ -994,7 +1031,9 @@ fn bind_fmir_text_runtime_cli<H: Host + ?Sized>(
     if cli.root.operand.is_empty() {
         return Ok(());
     }
-    let argumenta = host.argumenta();
+    let argumenta = host
+        .argumenta()
+        .map_err(|e| vec![mir_diag(path, e.message)])?;
     if argumenta.len() != cli.root.operand.len() {
         return Err(vec![mir_diag(
             path,
@@ -1257,7 +1296,7 @@ fn collect_package_runtime_requirements(
     cli_plan: &CliPackagePlan,
 ) -> Vec<String> {
     let mut requirements = BTreeSet::new();
-    let interner = lowered.validation.interner;
+    let interner = lowered.validated.validation().interner;
     if cli_plan.uses_cli_runtime {
         requirements.insert("host:argv".to_owned());
     }
@@ -1452,7 +1491,7 @@ fn bridge_norma_providers_to_kernel(
     lowered: &mut LoweredMirUnit,
     entry_path: &Path,
 ) -> Result<(), Vec<Diagnostic>> {
-    let Some(interner) = lowered.validation.interner else {
+    let Some(interner) = lowered.validated.validation().interner else {
         return Err(vec![mir_diag(
             entry_path,
             "package MIR kernel bridge requires interner context",
@@ -3800,7 +3839,7 @@ fn lower_package_units<'a>(
             &mut entry.analysis.interner,
         );
         let source_to_entry_types =
-            import_lowered_semantic_types(lowered.validation.types, &mut entry.analysis.types);
+            import_lowered_semantic_types(lowered.validated.validation().types, &mut entry.analysis.types);
         rewrite_lowered_type_ids(&mut lowered, &source_to_entry_types);
         if let Some(rewrite) = cli_plan
             .dispatch
@@ -3961,7 +4000,7 @@ fn install_cli_dispatch_entry(
         .program
         .functions
         .iter()
-        .position(|function| is_explicit_entry_function(function, lowered.validation.types))
+        .position(|function| is_explicit_entry_function(function, lowered.validated.validation().types))
     else {
         return Err(vec![mir_diag(
             entry_path,
@@ -4552,7 +4591,8 @@ fn append_shifted_program(merged: &mut LoweredMirUnit<'_>, lowered: &mut Lowered
     );
     for environment in &lowered.closure_environments {
         merged
-            .validation
+            .validated
+            .validation_mut()
             .closure_environments
             .insert(environment.id, environment.clone());
     }

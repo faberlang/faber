@@ -40,19 +40,19 @@ impl Host for TrapHost<'_> {
         panic_trap(HostTrap::Exit(code));
     }
 
-    fn argumenta(&self) -> &[String] {
+    fn argumenta(&self) -> Result<&[String], StepperError> {
         self.inner.argumenta()
     }
 
-    fn env_get(&self, name: &str) -> Option<String> {
+    fn env_get(&self, name: &str) -> Result<Option<String>, StepperError> {
         self.inner.env_get(name)
     }
 
-    fn env_set(&mut self, name: &str, value: &str) {
-        self.inner.env_set(name, value);
+    fn env_set(&mut self, name: &str, value: &str) -> Result<(), StepperError> {
+        self.inner.env_set(name, value)
     }
 
-    fn cwd(&self) -> String {
+    fn cwd(&self) -> Result<String, StepperError> {
         self.inner.cwd()
     }
 
@@ -60,7 +60,7 @@ impl Host for TrapHost<'_> {
         self.inner.set_cwd(path)
     }
 
-    fn pid(&self) -> i64 {
+    fn pid(&self) -> Result<i64, StepperError> {
         self.inner.pid()
     }
 }
