@@ -47,7 +47,10 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
             }
         }
     } else {
-        (Config::default().with_target(target).with_dev_stdlib(), None)
+        (
+            Config::default().with_target(target).with_dev_stdlib(),
+            None,
+        )
     };
 
     if is_package && target == Target::Scena {
@@ -419,8 +422,7 @@ fn resolve_check_target(input_path: &Path) -> Target {
     let Ok(manifest) = read_manifest(&layout.manifest_path) else {
         return Target::Rust;
     };
-    manifest_build_target(&manifest.build.target, &layout.manifest_path)
-        .unwrap_or(Target::Rust)
+    manifest_build_target(&manifest.build.target, &layout.manifest_path).unwrap_or(Target::Rust)
 }
 
 /// Decide whether an input path should enter package-mode command handling.

@@ -535,8 +535,8 @@ fn run_fmir_package_image<H: Host + ?Sized>(
     )?;
     let mut validation = radix::mir::MirValidationContext::new(&types);
     validation.interner = Some(&interner);
-    let validated = radix::mir::ValidatedMir::new(image.program.clone(), validation)
-        .map_err(|errors| {
+    let validated =
+        radix::mir::ValidatedMir::new(image.program.clone(), validation).map_err(|errors| {
             errors
                 .into_iter()
                 .map(|error| mir_diag(&image.diagnostic_path, error.message))
@@ -617,7 +617,13 @@ fn with_prepared_package_mir_with_cli_mode_and_consumer<R>(
         rewrite_unit_namespace_calls(unit, &links.calls, &links.namespaces)?;
     }
 
-    let mut lowered = lower_package_units(&mut package, entry_index, &links.sources, &cli_plan, config.no_fuse)?;
+    let mut lowered = lower_package_units(
+        &mut package,
+        entry_index,
+        &links.sources,
+        &cli_plan,
+        config.no_fuse,
+    )?;
     validate_program(&lowered.program, lowered.validated.validation()).map_err(|errors| {
         errors
             .into_iter()
@@ -3838,8 +3844,10 @@ fn lower_package_units<'a>(
             &source_interner,
             &mut entry.analysis.interner,
         );
-        let source_to_entry_types =
-            import_lowered_semantic_types(lowered.validated.validation().types, &mut entry.analysis.types);
+        let source_to_entry_types = import_lowered_semantic_types(
+            lowered.validated.validation().types,
+            &mut entry.analysis.types,
+        );
         rewrite_lowered_type_ids(&mut lowered, &source_to_entry_types);
         if let Some(rewrite) = cli_plan
             .dispatch
@@ -3997,12 +4005,9 @@ fn install_cli_dispatch_entry(
     command: MirFunctionId,
     entry_path: &Path,
 ) -> Result<(), Vec<Diagnostic>> {
-    let Some(entry_index) = lowered
-        .program
-        .functions
-        .iter()
-        .position(|function| is_explicit_entry_function(function, lowered.validated.validation().types))
-    else {
+    let Some(entry_index) = lowered.program.functions.iter().position(|function| {
+        is_explicit_entry_function(function, lowered.validated.validation().types)
+    }) else {
         return Err(vec![mir_diag(
             entry_path,
             "package MIR could not find root CLI entry function",
@@ -4592,7 +4597,9 @@ fn append_shifted_program(merged: &mut LoweredMirUnit<'_>, lowered: &mut Lowered
     );
     // Closure environments are collected on the Vec and folded into a fresh
     // ValidatedMir token after all merges complete (rebuild_merged_validated).
-    merged.closure_environments.append(&mut lowered.closure_environments);
+    merged
+        .closure_environments
+        .append(&mut lowered.closure_environments);
     merged
         .program
         .functions
@@ -4613,8 +4620,8 @@ fn rebuild_merged_validated(
             .closure_environments
             .insert(environment.id, environment.clone());
     }
-    merged.validated = radix::mir::ValidatedMir::new(merged.program.clone(), context)
-        .map_err(|errors| {
+    merged.validated =
+        radix::mir::ValidatedMir::new(merged.program.clone(), context).map_err(|errors| {
             errors
                 .into_iter()
                 .map(|error| mir_lowering_diag(diagnostic_path, error.message))

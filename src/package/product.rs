@@ -991,7 +991,9 @@ fn emit_typescript_modules(
             }
         };
         let code = adapt_controller_typescript(code, controllers);
-        let module_name = unit.module_segments.last()
+        let module_name = unit
+            .module_segments
+            .last()
             .map(|s| s.as_str())
             .unwrap_or("main");
         let code = wrap_module_exports(code, module_name);
@@ -1034,8 +1036,7 @@ fn apply_library_emit_fixes(mut code: String) -> String {
     // The IIFE pattern is:
     //   ((__o, __i) => { const __v = __o[__i]; if (__v === undefined) throw new Error("index trap"); return __v; })(arr, idx)
     // We replace it with a plain arr[idx] when it appears as LHS of `=`.
-    let iife_pattern =
-        r#"((__o, __i) => { const __v = __o[__i]; if (__v === undefined) throw new Error("index trap"); return __v; })("#;
+    let iife_pattern = r#"((__o, __i) => { const __v = __o[__i]; if (__v === undefined) throw new Error("index trap"); return __v; })("#;
     // Process line by line to handle IIFE-on-LHS.
     let mut result = String::with_capacity(code.len() + 4096);
     for line in code.lines() {
@@ -1053,9 +1054,15 @@ fn apply_library_emit_fixes(mut code: String) -> String {
                     let array_expr = args_part[..comma_idx].trim();
                     let index_expr = args_part[comma_idx + 1..].trim();
                     let value_part = rest[close_idx + 4..].trim(); // after ") = "
-                    // Determine indentation from original line
+                                                                   // Determine indentation from original line
                     let indent = &line[..line.len() - line.trim_start().len()];
-                    result.push_str(&format!("{}{}[{}] = {};\n", indent, array_expr, index_expr, value_part.trim_end_matches(';').trim()));
+                    result.push_str(&format!(
+                        "{}{}[{}] = {};\n",
+                        indent,
+                        array_expr,
+                        index_expr,
+                        value_part.trim_end_matches(';').trim()
+                    ));
                     continue;
                 }
             }
@@ -1089,14 +1096,13 @@ fn emit_library_typescript_modules(
     };
     let lock_path = package_root.join(super::lockfile::LOCK_FILE);
     let index = super::lockfile::lock_index(&lock_path, &lock).map_err(|mut diags| {
-        diags.pop().unwrap_or_else(|| {
-            product_diag("failed to index faber.lock for library TS emit")
-        })
+        diags
+            .pop()
+            .unwrap_or_else(|| product_diag("failed to index faber.lock for library TS emit"))
     })?;
 
     // Locate the faber binary for subprocess emit.
-    let faber_bin = std::env::current_exe()
-        .unwrap_or_else(|_| PathBuf::from("faber"));
+    let faber_bin = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("faber"));
 
     for (_name, pkg) in &index {
         if pkg.kind != "lib" || pkg.target_language != "ts" {
@@ -1127,15 +1133,19 @@ fn emit_library_typescript_modules(
             let output = match output {
                 Ok(output) => output,
                 Err(err) => {
-                    eprintln!("faber: library TS emit subprocess failed for `{}`: {err}",
-                        fab_path.display());
+                    eprintln!(
+                        "faber: library TS emit subprocess failed for `{}`: {err}",
+                        fab_path.display()
+                    );
                     continue;
                 }
             };
             if !output.status.success() {
                 let stderr = String::from_utf8_lossy(&output.stderr);
-                eprintln!("faber: library TS emit failed for `{}`: {stderr}",
-                    fab_path.display());
+                eprintln!(
+                    "faber: library TS emit failed for `{}`: {stderr}",
+                    fab_path.display()
+                );
                 continue;
             }
             let code = String::from_utf8_lossy(&output.stdout).to_string();
@@ -1287,7 +1297,14 @@ fn wrap_module_exports(mut code: String, module_name: &str) -> String {
                 }
             }
         } else if let Some(name) = trimmed.strip_prefix("class ") {
-            let class_name = name.split(' ').next().unwrap_or("").split('{').next().unwrap_or("").trim();
+            let class_name = name
+                .split(' ')
+                .next()
+                .unwrap_or("")
+                .split('{')
+                .next()
+                .unwrap_or("")
+                .trim();
             if !class_name.is_empty() {
                 export_names.push(class_name.to_owned());
                 *line = format!("export {}", trimmed);
@@ -1299,10 +1316,7 @@ fn wrap_module_exports(mut code: String, module_name: &str) -> String {
     // Build the namespace export for this module (if not already present).
     let ns_marker = format!("export const {} = {{", module_name);
     if !export_names.is_empty() && !code.contains(&ns_marker) {
-        code.push_str(&format!(
-            "\nexport const {} = {{\n",
-            module_name
-        ));
+        code.push_str(&format!("\nexport const {} = {{\n", module_name));
         for (i, name) in export_names.iter().enumerate() {
             let comma = if i < export_names.len() - 1 { "," } else { "" };
             code.push_str(&format!("  {}{}\n", name, comma));
