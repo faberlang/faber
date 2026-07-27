@@ -42,6 +42,7 @@ fn assert_plain_render_contract(rendered: &str, header: &str) {
 }
 
 /// Assert that a locale's reader pack loads and contains the expected diagnostic template.
+#[expect(dead_code, reason = "kept as a focused reader-pack contract helper for locale additions")]
 fn assert_reader_pack_contains(locale: &str, fault_rel: &str, expected_code: &[&str]) {
     let fault = reader_locale_fault_path(locale, fault_rel);
     let (_config, pack) =

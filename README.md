@@ -13,6 +13,7 @@ faberlang/
   faber/           this repo (public CLI + corpus e2e harness)
   faber-runtime/   public Rust runtime types (`use faber::…`)
   radix/           private compiler (formatter is `radix::forma`)
+  hosts/           public host monorepo embedded in core support
   norma/           public standard library source
   triga/           optional graphics and geometry library
   examples/        public application examples + language corpus
@@ -36,8 +37,9 @@ cargo build --release
 ./target/release/faber --help
 ```
 
-End users of released binaries do not need the Radix tree. Building this crate
-from source requires a sibling Radix checkout.
+End users of released binaries do not need sibling checkouts. Building this
+crate from source requires the sibling Radix, Cista, `faber-runtime`, and
+`hosts` checkouts used by the local `faberlang/` layout.
 
 ## Commands
 

@@ -833,10 +833,9 @@ fn shared_fmir_bin_runner_target_dir() -> PathBuf {
     if let Some(dir) = std::env::var_os("CARGO_TARGET_DIR") {
         return PathBuf::from(dir).join("fmir-bin-runner");
     }
-    let cache = std::env::var("HOME")
+    std::env::var("HOME")
         .map(|h| PathBuf::from(h).join(".cache/faberlang-target/faber/fmir-bin-runner"))
-        .unwrap_or_else(|_| std::env::temp_dir().join("faber-fmir-bin-runner-target"));
-    cache
+        .unwrap_or_else(|_| std::env::temp_dir().join("faber-fmir-bin-runner-target"))
 }
 
 fn render_fmir_bin_runner_cargo_toml() -> String {

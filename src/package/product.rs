@@ -1282,7 +1282,7 @@ fn emit_library_typescript_modules(
     // Prefer the real CLI binary (not the cargo test harness binary).
     let faber_bin = resolve_faber_cli_binary();
 
-    for (_name, pkg) in &index {
+    for pkg in index.values() {
         if pkg.kind != "lib" || pkg.target_language != "ts" {
             continue;
         }
@@ -1557,7 +1557,7 @@ fn build_library_ts_module_map(
     })?;
 
     let mut map = BTreeMap::new();
-    for (_name, pkg) in &index {
+    for pkg in index.values() {
         if pkg.kind != "lib" || pkg.target_language != "ts" {
             continue;
         }

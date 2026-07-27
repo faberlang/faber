@@ -6,6 +6,7 @@ use std::path::{Component, Path, PathBuf};
 
 pub const EXPECTED_ROOTS: &[&str] = &[
     "faber-runtime",
+    "radix/crates/radix-runtime-contract",
     "hosts/crates/host-kernel",
     "hosts/crates/host-native",
     "hosts/crates/aleator",

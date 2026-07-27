@@ -104,6 +104,7 @@ fn run_target_name(target: Target) -> &'static str {
         Target::Fmir => "fmir",
         Target::FmirBin => "fmir-bin",
         Target::Swift => "swift",
+        Target::Fhir => "fhir",
     }
 }
 

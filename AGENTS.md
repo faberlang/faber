@@ -59,6 +59,7 @@ container (parent of the `faber/` crate). The manifest currently targets:
 
 ```
 faber-runtime
+radix/crates/radix-runtime-contract
 hosts/crates/host-kernel
 hosts/crates/host-native
 hosts/crates/aleator

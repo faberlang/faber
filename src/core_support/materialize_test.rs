@@ -217,7 +217,7 @@ fn rejects_empty_archive() {
     let root = test_root("empty-archive");
     let hash = hex(&Sha256::digest(b""));
     let manifest = "";
-    assert!(materialize_payload(&root, b"", &hash, &manifest).is_err());
+    assert!(materialize_payload(&root, b"", &hash, manifest).is_err());
     cleanup(&root);
 }
 
@@ -227,7 +227,7 @@ fn rejects_malformed_archive_format() {
     let garbage = b"not-a-zstd-tar-at-all";
     let hash = hex(&Sha256::digest(garbage));
     let manifest = "";
-    assert!(materialize_payload(&root, garbage, &hash, &manifest).is_err());
+    assert!(materialize_payload(&root, garbage, &hash, manifest).is_err());
     cleanup(&root);
 }
 

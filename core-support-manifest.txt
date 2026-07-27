@@ -3,6 +3,7 @@
 # Host libraries live under hosts/crates/; each crate uses explicit path deps
 # so the archive does not need the hosts workspace root.
 faber-runtime
+radix/crates/radix-runtime-contract
 hosts/crates/host-kernel
 hosts/crates/host-native
 hosts/crates/aleator

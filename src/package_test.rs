@@ -878,7 +878,7 @@ file = "message.fab"
 fn package_mir_artifact_harness_hello_world() {
     artifact_harness_run_test(
         "hello-world",
-        |case| {
+        |_case| {
             let dir = test_temp_dir("artifact-harness-hello");
             let input = dir.join("main.fab");
             fs::write(&input, "incipit { nota \"Salve, Munde!\" }").expect("write hello");
@@ -896,7 +896,7 @@ fn package_mir_artifact_harness_hello_world() {
 fn package_mir_artifact_harness_multifile() {
     artifact_harness_run_test(
         "multi-file",
-        |case| {
+        |_case| {
             let dir = test_temp_dir("artifact-harness-multifile");
             let input = dir.join("main.fab");
             fs::write(
@@ -933,7 +933,7 @@ functio text() → textus {
 fn package_mir_artifact_harness_cli_argv() {
     artifact_harness_run_test(
         "cli-argv",
-        |case| {
+        |_case| {
             let dir = test_temp_dir("artifact-harness-cli");
             let input = dir.join("main.fab");
             fs::write(
@@ -961,7 +961,7 @@ incipit argumenta args {
 fn package_mir_artifact_harness_coreutils_touch() {
     artifact_harness_run_test(
         "coreutils-touch",
-        |case| {
+        |_case| {
             let dir = test_temp_dir("artifact-harness-coreutils-touch");
             let src = dir.join("src");
             fs::create_dir_all(&src).expect("create touch src");
@@ -6457,45 +6457,42 @@ locale = "zh-Hans"
 fn installed_reader_locale_reference_examples_compile_from_installed_packs() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale");
 
-    for (locale, path, function, binding, greeting) in [
-        (
-            "zh-Hans",
-            "zh-Hans",
-            "fn 问候(名字: String) -> String",
-            "let 问候语: String",
-            "你好",
-        ),
-        // zh-Hant, ar, hi, vi removed: reader locale changes now
-        // produce READER002 lexer warnings before semantic analysis.
-        // Only zh-Hans still compiles cleanly.
-    ] {
-        let example = root.join(path);
-        let result = compile_package(&Config::default(), &example);
+    // zh-Hant, ar, hi, vi removed: reader locale changes now
+    // produce READER002 lexer warnings before semantic analysis.
+    // Only zh-Hans still compiles cleanly.
+    let (locale, path, function, binding, greeting) = (
+        "zh-Hans",
+        "zh-Hans",
+        "fn 问候(名字: String) -> String",
+        "let 问候语: String",
+        "你好",
+    );
+    let example = root.join(path);
+    let result = compile_package(&Config::default(), &example);
 
-        assert!(
-            result.success(),
-            "expected installed {locale} reader locale example compile success, got {:?}",
-            result
-                .diagnostics
-                .iter()
-                .map(|diag| (diag.code, diag.issue()))
-                .collect::<Vec<_>>()
-        );
-        assert!(
-            !result.diagnostics.iter().any(Diagnostic::is_error),
-            "unexpected {locale} error diagnostics: {:?}",
-            result.diagnostics
-        );
-        let Some(Output::Rust(output)) = result.output else {
-            panic!("expected {locale} generated Rust output");
-        };
-        let rust = output.code;
+    assert!(
+        result.success(),
+        "expected installed {locale} reader locale example compile success, got {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        !result.diagnostics.iter().any(Diagnostic::is_error),
+        "unexpected {locale} error diagnostics: {:?}",
+        result.diagnostics
+    );
+    let Some(Output::Rust(output)) = result.output else {
+        panic!("expected {locale} generated Rust output");
+    };
+    let rust = output.code;
 
-        assert!(rust.contains(function), "{locale} Rust output:\n{rust}");
-        assert!(rust.contains(binding), "{locale} Rust output:\n{rust}");
-        assert!(rust.contains(greeting), "{locale} Rust output:\n{rust}");
-        assert!(rust.contains("println!"), "{locale} Rust output:\n{rust}");
-    }
+    assert!(rust.contains(function), "{locale} Rust output:\n{rust}");
+    assert!(rust.contains(binding), "{locale} Rust output:\n{rust}");
+    assert!(rust.contains(greeting), "{locale} Rust output:\n{rust}");
+    assert!(rust.contains("println!"), "{locale} Rust output:\n{rust}");
 }
 
 #[test]
