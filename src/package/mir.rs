@@ -3874,6 +3874,7 @@ fn lower_package_units<'a>(
         append_shifted_program(&mut merged, &mut unit.lowered);
         ensure_unique_definition_sources(&merged.program, &entry_path)?;
     }
+    rebuild_merged_validated(&mut merged, &entry_path)?;
 
     if cli_plan.dispatch.is_some() {
         let Some(function) = dispatch_function else {
@@ -4589,17 +4590,37 @@ fn append_shifted_program(merged: &mut LoweredMirUnit<'_>, lowered: &mut Lowered
         &mut lowered.closure_environments,
         offset,
     );
-    for environment in &lowered.closure_environments {
-        merged
-            .validated
-            .validation_mut()
-            .closure_environments
-            .insert(environment.id, environment.clone());
-    }
+    // Closure environments are collected on the Vec and folded into a fresh
+    // ValidatedMir token after all merges complete (rebuild_merged_validated).
+    merged.closure_environments.append(&mut lowered.closure_environments);
     merged
         .program
         .functions
         .append(&mut lowered.program.functions);
+}
+
+/// Rebuild the validated-MIR token after package merging shifts IDs and
+/// appends functions/closure_environments. The prior token proved the
+/// pre-merge program; the merged program needs its own proof.
+fn rebuild_merged_validated(
+    merged: &mut LoweredMirUnit<'_>,
+    diagnostic_path: &Path,
+) -> Result<(), Vec<Diagnostic>> {
+    let mut context = merged.validated.validation().clone();
+    context.closure_environments.clear();
+    for environment in &merged.closure_environments {
+        context
+            .closure_environments
+            .insert(environment.id, environment.clone());
+    }
+    merged.validated = radix::mir::ValidatedMir::new(merged.program.clone(), context)
+        .map_err(|errors| {
+            errors
+                .into_iter()
+                .map(|error| mir_lowering_diag(diagnostic_path, error.message))
+                .collect::<Vec<_>>()
+        })?;
+    Ok(())
 }
 
 fn ensure_unique_definition_sources(
