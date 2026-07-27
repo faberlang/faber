@@ -225,11 +225,66 @@ fn snapshot_struct(
 
     let annotation_contract = annotation_contract_export(analysis, def_id, name, export_identity);
 
+    let methods = strukt
+        .methods
+        .iter()
+        .map(|method| {
+            Ok(InterfaceMethodExport {
+                name: analysis.interner.resolve(method.func.name).to_owned(),
+                callable: snapshot_struct_method(method, analysis, file_label, name)?,
+            })
+        })
+        .collect::<Result<Vec<_>, Diagnostic>>()?;
+
     Ok(InterfaceStructExport {
         name: analysis.interner.resolve(strukt.name).to_owned(),
         fields,
+        methods,
         annotation_contract,
     })
+}
+
+#[allow(clippy::result_large_err)]
+fn snapshot_struct_method(
+    method: &radix::hir::HirMethod,
+    analysis: &AnalyzedUnit,
+    file_label: &str,
+    struct_name: &str,
+) -> Result<radix::file_interface::InterfaceCallable, Diagnostic> {
+    let ret = method
+        .func
+        .ret_ty
+        .unwrap_or_else(|| analysis.types.primitive(radix::semantic::Primitive::Vacuum));
+    let sig = FuncSig {
+        type_params: method.func.type_params.iter().map(|param| param.name).collect(),
+        type_param_constraints: method
+            .func
+            .type_params
+            .iter()
+            .map(|param| type_param_constraint(&param.constraint))
+            .collect(),
+        params: method
+            .func
+            .params
+            .iter()
+            .map(|param| ParamType {
+                ty: param.ty,
+                mode: param_mode(param.mode),
+                optional: param.optional,
+            })
+            .collect(),
+        ret,
+        err: method.func.err_ty,
+        is_async: method.func.is_async,
+        is_generator: method.func.is_generator,
+    };
+    snapshot_interface_callable_with_resolver(
+        &sig,
+        &analysis.types,
+        &analysis.interner,
+        &analysis.resolver,
+    )
+    .map_err(|err| interface_error(file_label, struct_name, err))
 }
 
 fn annotation_contract_export(
