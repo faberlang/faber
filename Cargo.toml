@@ -42,3 +42,11 @@ hygiene-ratchet = { path = "crates/hygiene-ratchet" }
 members = [".", "crates/exempla", "crates/hygiene-ratchet"]
 resolver = "2"
 
+[profile.dev]
+debug = 1
+codegen-units = 256
+
+[profile.test]
+debug = 1
+codegen-units = 256
+

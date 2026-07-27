@@ -482,6 +482,11 @@ fn resolve_local_import(
     from_file: &Path,
     import_path: &str,
 ) -> Option<PathBuf> {
+    // Template form: §name/rest → templates[name]/rest
+    if import_path.starts_with('§') {
+        return resolve_template_import(spec, import_path);
+    }
+
     if import_path.starts_with('.') {
         return resolve_module_candidates(&from_file.parent()?.join(import_path));
     }
@@ -491,6 +496,28 @@ fn resolve_local_import(
     }
 
     resolve_module_candidates(&spec.source_root.join(import_path))
+}
+
+/// Resolve `§name/rest` against `[paths.templates]`.
+fn resolve_template_import(spec: &PackageSpec, import_path: &str) -> Option<PathBuf> {
+    // `§` is two UTF-8 bytes.
+    let after = import_path.get(2..)?;
+    if after.is_empty() || after.starts_with('/') {
+        return None;
+    }
+    let (name, rest) = match after.find('/') {
+        Some(idx) => (&after[..idx], &after[idx + 1..]),
+        None => (after, ""),
+    };
+    if name.is_empty() {
+        return None;
+    }
+    let base = spec.templates.get(name)?;
+    if rest.is_empty() {
+        resolve_module_candidates(base)
+    } else {
+        resolve_module_candidates(&base.join(rest))
+    }
 }
 
 fn resolve_module_candidates(base: &Path) -> Option<PathBuf> {

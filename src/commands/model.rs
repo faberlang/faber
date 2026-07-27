@@ -20,7 +20,6 @@ use crate::cli::{ModelCommand, ModelInspectArgs};
 use serde_json::Value;
 use std::fmt;
 use std::fs;
-use std::path::Path;
 
 /// Describes one tensor entry from a safetensors header.
 #[derive(Debug)]

@@ -1020,13 +1020,20 @@ fn emit_typescript_modules(
 /// block TypeScript compilation. Each patch corresponds to a filed radix issue
 /// so the root cause is tracked in the compiler, not papered over indefinitely.
 fn apply_library_emit_fixes(mut code: String) -> String {
-    // Fix 1: `new unresolved_def()` must become `{}` (empty object) before
-    // the type-name pass, otherwise `new any()` is not a valid value.
+    // Fix 1: construction of unresolved types → empty object (value position).
+    // Handle both bare and marker forms before any type-position rewrite.
     code = code.replace("new unresolved_def()", "{}");
+    code = code.replace("new /* unresolved_def */()", "{}");
 
-    // Fix 2: Radix codegen emits `unresolved_def` for types it cannot resolve.
-    // TypeScript rejects this as an unbound name. Replace with `any`.
+    // Fix 2: Codegen marker `/* unresolved_def */` is not a valid type position
+    // (`/* any */` after a naive substring replace is still invalid). Use `any`.
+    code = code.replace("/* unresolved_def */", "any");
+
+    // Fix 3: bare `unresolved_def` identifiers still need rewriting.
     code = code.replace("unresolved_def", "any");
+
+    // Fix 4: if a value-position rewrite was missed, `new any()` is still illegal.
+    code = code.replace("new any()", "{}");
 
     // Radix codegen emits IIFE array-access expressions as the left-hand side
     // of assignment, which TypeScript rejects (TS2364).  Rewrite:
@@ -1084,8 +1091,42 @@ fn apply_library_emit_fixes(mut code: String) -> String {
 /// Phase 2: minimal emit — no import rewriting, no tsc passthrough.
 /// Phase 3: post-processing fixes for known codegen defects (unresolved_def,
 ///          IIFE-as-LHS) applied via [`apply_library_emit_fixes`].
+/// Resolve the faber CLI binary for subprocess `emit`.
+///
+/// Unit tests run under a cargo test harness binary (`deps/faber-<hash>`), so
+/// `current_exe()` is not a usable CLI. Prefer `CARGO_BIN_EXE_faber`, then a
+/// sibling `faber` next to `deps/`, then `current_exe` when it *is* the CLI.
+fn resolve_faber_cli_binary() -> PathBuf {
+    if let Ok(path) = std::env::var("CARGO_BIN_EXE_faber") {
+        return PathBuf::from(path);
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(name) = exe.file_name().and_then(|n| n.to_str()) {
+            if name == "faber" || name == "faber.exe" {
+                return exe;
+            }
+        }
+        if let Some(parent) = exe.parent() {
+            // .../debug/deps/faber-<hash> → .../debug/faber
+            if parent.file_name().and_then(|n| n.to_str()) == Some("deps") {
+                if let Some(debug_dir) = parent.parent() {
+                    let candidate = debug_dir.join("faber");
+                    if candidate.is_file() {
+                        return candidate;
+                    }
+                }
+            }
+            let sibling = parent.join("faber");
+            if sibling.is_file() {
+                return sibling;
+            }
+        }
+    }
+    PathBuf::from("faber")
+}
+
 fn emit_library_typescript_modules(
-    config: &radix::driver::Config,
+    _config: &radix::driver::Config,
     package_root: &Path,
     ts_root: &Path,
     library_imports: &BTreeMap<String, String>,
@@ -1102,7 +1143,8 @@ fn emit_library_typescript_modules(
     })?;
 
     // Locate the faber binary for subprocess emit.
-    let faber_bin = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("faber"));
+    // Prefer the real CLI binary (not the cargo test harness binary).
+    let faber_bin = resolve_faber_cli_binary();
 
     for (_name, pkg) in &index {
         if pkg.kind != "lib" || pkg.target_language != "ts" {
@@ -1259,15 +1301,18 @@ fn adapt_controller_typescript(mut code: String, controllers: &[BrowserControlle
     // keep `tsc` fail-closed for the emitted JavaScript while WEB4 supplies the
     // concrete DOM runtime surface.
 
-    // Struct construction `new unresolved_def()` must become an empty object
-    // before the type-name pass, otherwise `new any()` is not a valid value.
+    // Struct construction of unresolved types → empty object (value position).
     code = code.replace("new unresolved_def()", "{}");
+    code = code.replace("new /* unresolved_def */()", "{}");
+    // Codegen marker is invalid in type position; replace whole marker first.
+    code = code.replace("/* unresolved_def */", "any");
     // Arrow-function closures with explicit `: void` return annotations reject
     // bodies that return a Promise (async handler).  Drop the annotation so
     // TypeScript infers the return type; assignment to a `void`-typed handler
     // parameter still accepts any return value.
     code = code.replace("): void =>", ") =>");
     code = code.replace("unresolved_def", "any");
+    code = code.replace("new any()", "{}");
     code
 }
 

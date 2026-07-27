@@ -72,6 +72,17 @@ pub struct ManifestPaths {
 
     /// Entry module path, relative to `source`; required for binary packages.
     pub entry: Option<String>,
+
+    /// Named import templates for `§name/rest` forms (values relative to package root).
+    ///
+    /// Example:
+    /// ```toml
+    /// [paths.templates]
+    /// gnu = "../common/gnu"
+    /// ```
+    /// then `importa ex "§gnu/argv"` resolves under that directory.
+    #[serde(default)]
+    pub templates: BTreeMap<String, String>,
 }
 
 /// `[library]` metadata for source-library packages.
@@ -201,6 +212,7 @@ impl Default for ManifestPaths {
         Self {
             source: default_source_path(),
             entry: None,
+            templates: BTreeMap::new(),
         }
     }
 }

@@ -1,7 +1,7 @@
 //! Exit/abort traps so interpreted Faber can return an [`ExitCode`] without
 //! terminating the embedder process.
 
-use radix::mir::{Host, MirDiagnosticKind, MirProvider, StepperError, Value};
+use radix::mir::{Host, KernelModule, MirDiagnosticKind, MirProvider, StepperError, Value};
 use std::any::Any;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::process::ExitCode;
@@ -34,6 +34,32 @@ impl Host for TrapHost<'_> {
 
     fn provider(&mut self, provider: &MirProvider) -> Result<Value, StepperError> {
         self.inner.provider(provider)
+    }
+
+    fn kernel_call(
+        &mut self,
+        module: KernelModule,
+        verb: &str,
+        args: &[Value],
+        span: radix::lexer::Span,
+    ) -> Result<Value, StepperError> {
+        // processus.exi must hit TrapHost::exit (HostTrap) rather than the
+        // inner BufferHost::exit panic, so embedders can return ExitCode.
+        if matches!(module, KernelModule::Processus) && verb == "exi" {
+            let [code] = args else {
+                return Err(StepperError::internal(span, "exi provider arity"));
+            };
+            let code = match code {
+                Value::Int(v) => i32::try_from(*v).unwrap_or(i32::MAX),
+                _ => return Err(StepperError::internal(span, "exi code is not numerus")),
+            };
+            self.exit(code);
+        }
+        self.inner.kernel_call(module, verb, args, span)
+    }
+
+    fn write_stdout_raw(&mut self, text: &str) -> Result<(), StepperError> {
+        self.inner.write_stdout_raw(text)
     }
 
     fn exit(&mut self, code: i32) -> ! {

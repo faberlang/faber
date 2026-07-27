@@ -82,10 +82,29 @@ fn format_test_gate_matches_compile_author_pipeline_for_salve() {
 }
 
 fn faber_binary() -> PathBuf {
-    std::env::var("CARGO_BIN_EXE_faber").map_or_else(
-        |_| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/debug/faber"),
-        PathBuf::from,
-    )
+    if let Ok(path) = std::env::var("CARGO_BIN_EXE_faber") {
+        return PathBuf::from(path);
+    }
+    // Shared-target layouts place the binary under CARGO_TARGET_DIR, not
+    // <manifest>/target/debug. Prefer current_exe's parent (cargo test sets
+    // CARGO_BIN_EXE when available; fallback walks from the test binary).
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            if parent.file_name().and_then(|n| n.to_str()) == Some("deps") {
+                if let Some(debug_dir) = parent.parent() {
+                    let candidate = debug_dir.join("faber");
+                    if candidate.is_file() {
+                        return candidate;
+                    }
+                }
+            }
+            let sibling = parent.join("faber");
+            if sibling.is_file() {
+                return sibling;
+            }
+        }
+    }
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/debug/faber")
 }
 
 fn run_faber_format_stdout(path: &Path) -> String {

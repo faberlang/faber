@@ -37,7 +37,10 @@ tagged commit, or the build fails. Follow this exact order:
 1. Bump version in `Cargo.toml` (`version = "X.Y.Z"`).
 2. Run `cargo update` to regenerate `Cargo.lock`.
 3. Verify: `cargo build --locked --release --bin faber` passes.
-4. Verify: `cargo test` passes (or known-ignored tests only).
+4. Verify: `cargo nextest run` passes (or known-ignored tests only).
+   For inner-loop verification during development, scope to touched crates:
+   `cargo nextest run -p faber --lib`. Full-workspace runs are auditor-only
+   at theme boundaries.
 5. **Single commit** containing both the version bump and the regenerated
    `Cargo.lock`. Do not commit them separately.
 6. Tag that commit: `git tag vX.Y.Z`.

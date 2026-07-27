@@ -1134,7 +1134,17 @@ fn analyze_package_spec(
         .iter()
         .find(|file| file.path == spec.entry)
         .and_then(|file| file.frontmatter.clone());
-    let session = Session::new(config.clone());
+    // Install [paths.templates] into the driver config so SEM006 accepts §name/…
+    // and validation matches package resolution.
+    let mut config = config.clone();
+    if !spec.templates.is_empty() {
+        let mut templates = std::collections::BTreeMap::new();
+        for (name, path) in &spec.templates {
+            templates.insert(name.clone(), path.display().to_string());
+        }
+        config.import_path_templates = Some(templates);
+    }
+    let session = Session::new(config);
     let mount_plan = build_mount_plan(&spec, &files)?;
     let mut diagnostics = Vec::new();
     let mut library_cache = LibraryInterfaceCache::default();
@@ -1273,6 +1283,7 @@ fn linked_crates_for_package_root(
             package_root: package_root.to_path_buf(),
             source_root: package_root.to_path_buf(),
             entry: package_root.to_path_buf(),
+            templates: std::collections::BTreeMap::new(),
         },
         units: Vec::new(),
         entry_frontmatter: None,

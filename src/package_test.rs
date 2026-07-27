@@ -136,6 +136,9 @@ name = "echo"
 [paths]
 source = "src"
 entry = "main.fab"
+
+[paths.templates]
+gnu = "../../common/gnu"
 "#,
     )
     .expect("write manifest");
@@ -3134,7 +3137,7 @@ fn package_mir_manifest_imports_shared_text_helper_outside_source_root() {
     fs::write(
         fixture.src.join("main.fab"),
         r##"
-importa ex "../../../common/gnu/format" privata gnu_format
+importa ex "§gnu/format" privata gnu_format
 
 @ cli "echo"
 @ operandus textus word
@@ -3176,7 +3179,7 @@ fn package_mir_manifest_shared_rest_operand_joiner_executes() {
     fs::write(
         fixture.src.join("main.fab"),
         r##"
-importa ex "../../../common/gnu/format" privata gnu_format
+importa ex "§gnu/format" privata gnu_format
 
 @ cli "echo"
 @ operandus ceteri textus words
@@ -3225,7 +3228,7 @@ fn package_mir_manifest_shared_import_chain_outside_source_root_executes() {
     fs::write(
         fixture.src.join("main.fab"),
         r##"
-importa ex "../../../common/gnu/stdio" privata gnu_stdio
+importa ex "§gnu/stdio" privata gnu_stdio
 
 @ cli "echo"
 @ operandus textus word
@@ -3278,7 +3281,7 @@ fn package_mir_manifest_shared_import_cycle_reports_cycle() {
     fs::write(
         fixture.src.join("main.fab"),
         r##"
-importa ex "../../../common/gnu/a" privata a
+importa ex "§gnu/a" privata a
 
 incipit {
   nota a.value()
@@ -3332,7 +3335,7 @@ fn package_mir_manifest_shared_private_export_reports_namespace_diagnostic() {
     fs::write(
         fixture.src.join("main.fab"),
         r##"
-importa ex "../../../common/gnu/format" privata gnu_format
+importa ex "§gnu/format" privata gnu_format
 
 incipit {
   nota gnu_format.hidden("salve")

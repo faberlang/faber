@@ -17,6 +17,9 @@ pub(crate) struct PackageSpec {
     pub(in crate::package) package_root: PathBuf,
     pub(in crate::package) source_root: PathBuf,
     pub(in crate::package) entry: PathBuf,
+    /// Import path templates (`§name/rest`) from `[paths.templates]`, values
+    /// resolved relative to [`Self::package_root`].
+    pub(in crate::package) templates: std::collections::BTreeMap<String, PathBuf>,
 }
 
 /// Layout for a package build: generated Rust crate under `target/faber/`,
@@ -166,6 +169,7 @@ pub(crate) fn discover_package(input: &Path) -> PackageDiscoveryResult {
             package_root: root.clone(),
             entry: root.join("main.fab"),
             source_root: root,
+            templates: std::collections::BTreeMap::new(),
         });
     }
 
@@ -181,6 +185,7 @@ pub(crate) fn discover_package(input: &Path) -> PackageDiscoveryResult {
         package_root: root.clone(),
         source_root: root,
         entry,
+        templates: std::collections::BTreeMap::new(),
     })
 }
 
@@ -202,10 +207,12 @@ fn parse_manifest(path: &Path) -> PackageDiscoveryResult {
         .map(|entry| manifest_entry_path(&package_root, &manifest.paths.source, entry, path))
         .transpose()?
         .unwrap_or_else(|| source_root.clone());
+    let templates = resolve_path_templates(&package_root, &manifest.paths.templates, path)?;
     Ok(PackageSpec {
         package_root,
         source_root,
         entry,
+        templates,
     })
 }
 
@@ -220,11 +227,47 @@ fn parse_manifest_with_entry(path: &Path, entry: PathBuf) -> PackageDiscoveryRes
 
     let source_root =
         resolve_package_member(&package_root, &manifest.paths.source, path).map_err(Box::new)?;
+    let templates = resolve_path_templates(&package_root, &manifest.paths.templates, path)?;
     Ok(PackageSpec {
         package_root,
         source_root,
         entry,
+        templates,
     })
+}
+
+fn resolve_path_templates(
+    package_root: &Path,
+    templates: &std::collections::BTreeMap<String, String>,
+    manifest_path: &Path,
+) -> Result<std::collections::BTreeMap<String, PathBuf>, Box<Diagnostic>> {
+    // Templates intentionally escape the package root (e.g. coreutils
+    // `[paths.templates] gnu = "../common/gnu"`). They must not use the
+    // package-member containment check that rejects `..`.
+    let mut resolved = std::collections::BTreeMap::new();
+    for (name, relative) in templates {
+        if relative.trim().is_empty() {
+            return Err(Box::new(
+                crate::package_diagnostic_error(format!(
+                    "paths.templates.{name} must not be empty"
+                ))
+                .with_file(manifest_path.display().to_string())
+                .with_arg("issue", "template_path_empty"),
+            ));
+        }
+        if Path::new(relative).is_absolute() {
+            return Err(Box::new(
+                crate::package_diagnostic_error(format!(
+                    "paths.templates.{name} must be a relative path, got `{relative}`"
+                ))
+                .with_file(manifest_path.display().to_string())
+                .with_arg("issue", "template_path_absolute"),
+            ));
+        }
+        let path = normalize_path(&package_root.join(relative));
+        resolved.insert(name.clone(), path);
+    }
+    Ok(resolved)
 }
 
 fn manifest_entry_path(
