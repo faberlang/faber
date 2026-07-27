@@ -93,7 +93,7 @@ pub(crate) use manifest::validate_manifest;
 pub use manifest::{
     read_manifest, FaberManifest, ManifestBuild, ManifestDispatch, ManifestLibrary,
     ManifestPackage, ManifestPaths, ManifestProduct, ManifestProductEmit, ManifestProductKind,
-    ManifestRustFieldNames, ManifestRustHost,
+    ManifestProductShaders, ManifestRustFieldNames, ManifestRustHost,
 };
 pub(crate) use product::build_browser_product;
 #[cfg(test)]

@@ -114,6 +114,22 @@ pub struct ManifestBuild {
     pub rust_field_names: ManifestRustFieldNames,
 }
 
+/// Configuration for shader artifact packaging.
+///
+/// When `shaders.source` is set, `faber build` copies pre-compiled shader
+/// artifacts from that directory into `dist/generated/` and includes them
+/// in the product manifest. This supports the non-goal of requiring the
+/// MIR→WGSL compiler pass — reference artifacts produced by U1 are
+/// checked into version control under `src/shaders/test-data/` and
+/// packaged at build time.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ManifestProductShaders {
+    /// Directory (relative to package root) containing pre-compiled shader
+    /// artifacts: `kernel.wgsl` and `reflection.json`.
+    pub source: String,
+}
+
 /// `[product]` browser application packaging metadata.
 ///
 /// This selects a faber-owned product recipe. It deliberately does not add a
@@ -136,6 +152,11 @@ pub struct ManifestProduct {
     pub assets_manifest: String,
     #[serde(default = "default_product_controllers_json")]
     pub controllers_json: String,
+    /// Optional shader artifact packaging config. When present, the build
+    /// copies pre-compiled WGSL + reflection from `shaders.source` into
+    /// `dist/generated/` and records them in the product manifest (stage 2+).
+    #[serde(default)]
+    pub shaders: Option<ManifestProductShaders>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
@@ -514,6 +535,9 @@ fn validate_product(product: &ManifestProduct, path: &Path) -> Result<(), Box<Di
     validate_product_path("public", &product.public, path)?;
     validate_product_path("assets_manifest", &product.assets_manifest, path)?;
     validate_product_path("controllers_json", &product.controllers_json, path)?;
+    if let Some(shaders) = &product.shaders {
+        validate_product_path("shaders.source", &shaders.source, path)?;
+    }
     Ok(())
 }
 

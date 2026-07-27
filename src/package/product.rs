@@ -22,6 +22,9 @@ const TSCONFIG_FILE: &str = "tsconfig.faber-browser.json";
 const BROWSER_ENTRY_TS: &str = "faber-browser.ts";
 const WEB_AMBIENT_DTS: &str = "faber-web.d.ts";
 const BROWSER_ENTRY_JS: &str = "faber-browser.js";
+const GENERATED_DIR: &str = "generated";
+const WGSL_FILE: &str = "kernel.wgsl";
+const REFLECTION_FILE: &str = "reflection.json";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BrowserProductAssetBuild {
@@ -346,12 +349,13 @@ fn reject_stale_outputs(
 /// product build writes into `out_dir` beyond copied static assets.
 ///
 /// This is the single source of truth for collision guards, stale-output
-/// checking, and cleanup.
+/// checking, and cleanup. Includes optional shader-generated outputs when
+/// the product config specifies a shader source directory.
 fn product_generated_output_paths(
     out_dir: &Path,
     product: &ManifestProduct,
 ) -> Vec<GeneratedOutput> {
-    vec![
+    let mut outputs = vec![
         GeneratedOutput {
             label: "assets manifest",
             path: normalize_path(&out_dir.join(&product.assets_manifest)),
@@ -382,7 +386,20 @@ fn product_generated_output_paths(
             path: normalize_path(&out_dir.join("product.json")),
             is_dir: false,
         },
-    ]
+    ];
+
+    // When shader config is present, add generated WGSL and reflection paths
+    // so collision/stale-output checking tracks them.
+    if product.shaders.is_some() {
+        let generated_dir = normalize_path(&out_dir.join(GENERATED_DIR));
+        outputs.push(GeneratedOutput {
+            label: "generated directory",
+            path: generated_dir,
+            is_dir: true,
+        });
+    }
+
+    outputs
 }
 
 /// Fail closed when any generated product output path collides with a planned
@@ -491,15 +508,16 @@ fn render_asset_manifest(out_dir: &Path, assets: &[BrowserProductAsset]) -> Stri
 /// browser product build.
 ///
 /// Records every same-build artifact: the ESM entry, the controller manifest,
-/// host runtime files (`faber-kernel.js`, `webgpu-runtime.js`), and a
-/// reference to the asset manifest (`assets.json`). WGSL and reflection
-/// artifacts are omitted at Stage 1; the `next_stage_artifacts` field hints
-/// their addition for Stage 2.
+/// host runtime files (`faber-kernel.js`, `webgpu-runtime.js`), shader
+/// artifacts (WGSL + reflection when configured), and a reference to the
+/// asset manifest (`assets.json`). Stage 2+ includes WGSL + reflection in
+/// the artifacts array and omits the `next_stage_artifacts` hint.
 fn render_product_json(
     out_dir: &Path,
     esm_entry: &Path,
     controllers_json: &Path,
     static_assets: &[BrowserProductAsset],
+    shader_artifacts: Option<&(BrowserProductAsset, BrowserProductAsset)>,
 ) -> Result<String, Box<Diagnostic>> {
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -545,20 +563,47 @@ fn render_product_json(
         }));
     }
 
+    // Shader artifacts (WGSL + reflection) when configured.
+    let has_shaders = shader_artifacts.is_some();
+    if let Some((wgsl, reflection)) = shader_artifacts {
+        let wgsl_path = relative_manifest_path(out_dir, &wgsl.output);
+        artifacts.push(serde_json::json!({
+            "path": wgsl_path,
+            "kind": "wgsl",
+            "size": wgsl.size,
+            "sha256": wgsl.sha256,
+        }));
+        let reflection_path = relative_manifest_path(out_dir, &reflection.output);
+        artifacts.push(serde_json::json!({
+            "path": reflection_path,
+            "kind": "reflection",
+            "size": reflection.size,
+            "sha256": reflection.sha256,
+        }));
+    }
+
     // Build timestamp (ISO 8601).
     let duration = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default();
     let build_timestamp = format_iso8601(duration);
 
-    let product = serde_json::json!({
+    // Stage 2 when shader artifacts are present; Stage 1 otherwise.
+    let stage: u32 = if has_shaders { 2 } else { 1 };
+
+    let mut product = serde_json::json!({
         "version": 1,
-        "stage": 1,
+        "stage": stage,
         "build_timestamp": build_timestamp,
         "artifacts": artifacts,
         "assets_manifest": "assets.json",
-        "next_stage_artifacts": ["wgsl", "reflection"],
     });
+
+    // Stage 1 includes the next_stage_artifacts hint; Stage 2 omits it
+    // (shader compilation is now part of the build).
+    if !has_shaders {
+        product["next_stage_artifacts"] = serde_json::json!(["wgsl", "reflection"]);
+    }
 
     serde_json::to_string_pretty(&product)
         .map(|mut json| {
@@ -699,6 +744,10 @@ pub(crate) fn build_browser_product(
         ));
     }
 
+    // Copy shader artifacts (WGSL + reflection) when configured.
+    let shader_artifacts =
+        copy_shader_artifacts(&layout.package_root, product, &static_build.out_dir)?;
+
     // Emit product identity manifest after all build stages succeed.
     let product_json_path = static_build.out_dir.join("product.json");
     let product_json_content = render_product_json(
@@ -706,6 +755,7 @@ pub(crate) fn build_browser_product(
         &esm_entry,
         &controllers_json,
         &static_build.assets,
+        shader_artifacts.as_ref(),
     )?;
     fs::write(&product_json_path, product_json_content)
         .map_err(|err| io_diag(&product_json_path, err))?;
@@ -716,6 +766,91 @@ pub(crate) fn build_browser_product(
         esm_entry,
         controllers,
     })
+}
+
+/// Copy pre-compiled shader artifacts from a package source directory into
+/// `dist/generated/`. Returns the paths of the copied WGSL and reflection
+/// files for inclusion in the product manifest.
+///
+/// Since the MIR → WGSL compiler pass (Faber V/F lower) is not yet
+/// implemented, this function packages reference artifacts produced by U1
+/// (checked into `src/shaders/test-data/`). The `shaders.source` field in
+/// `faber.toml` specifies the source directory relative to the package root.
+fn copy_shader_artifacts(
+    package_root: &Path,
+    product: &ManifestProduct,
+    out_dir: &Path,
+) -> Result<Option<(BrowserProductAsset, BrowserProductAsset)>, Box<Diagnostic>> {
+    let shaders = match &product.shaders {
+        Some(s) => s,
+        None => return Ok(None),
+    };
+
+    let source_dir = normalize_path(&package_root.join(&shaders.source));
+    if !source_dir.is_dir() {
+        return Err(Box::new(
+            product_diag(format!(
+                "shader source directory `{}` does not exist",
+                source_dir.display()
+            ))
+            .with_arg("issue", "product_shader_source_missing"),
+        ));
+    }
+
+    let wgsl_source = source_dir.join(WGSL_FILE);
+    let reflection_source = source_dir.join(REFLECTION_FILE);
+
+    if !wgsl_source.is_file() {
+        return Err(Box::new(
+            product_diag(format!(
+                "shader WGSL source `{}` does not exist",
+                wgsl_source.display()
+            ))
+            .with_arg("issue", "product_shader_wgsl_missing"),
+        ));
+    }
+    if !reflection_source.is_file() {
+        return Err(Box::new(
+            product_diag(format!(
+                "shader reflection source `{}` does not exist",
+                reflection_source.display()
+            ))
+            .with_arg("issue", "product_shader_reflection_missing"),
+        ));
+    }
+
+    let generated_dir = out_dir.join(GENERATED_DIR);
+    fs::create_dir_all(&generated_dir).map_err(|err| io_diag(&generated_dir, err))?;
+
+    let wgsl_output = generated_dir.join(WGSL_FILE);
+    fs::copy(&wgsl_source, &wgsl_output).map_err(|err| io_diag(&wgsl_output, err))?;
+
+    let reflection_output = generated_dir.join(REFLECTION_FILE);
+    fs::copy(&reflection_source, &reflection_output)
+        .map_err(|err| io_diag(&reflection_output, err))?;
+
+    let wgsl_bytes = fs::read(&wgsl_output).map_err(|err| io_diag(&wgsl_output, err))?;
+    let wgsl_sha256 = format!("{:x}", Sha256::digest(&wgsl_bytes));
+    let wgsl_asset = BrowserProductAsset {
+        kind: "wgsl",
+        source: wgsl_source,
+        output: wgsl_output,
+        size: wgsl_bytes.len() as u64,
+        sha256: wgsl_sha256,
+    };
+
+    let reflection_bytes =
+        fs::read(&reflection_output).map_err(|err| io_diag(&reflection_output, err))?;
+    let reflection_sha256 = format!("{:x}", Sha256::digest(&reflection_bytes));
+    let reflection_asset = BrowserProductAsset {
+        kind: "reflection",
+        source: reflection_source,
+        output: reflection_output,
+        size: reflection_bytes.len() as u64,
+        sha256: reflection_sha256,
+    };
+
+    Ok(Some((wgsl_asset, reflection_asset)))
 }
 
 /// Remove all generated product outputs from a previous build.
