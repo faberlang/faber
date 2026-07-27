@@ -140,6 +140,30 @@ import (
     assert!(imports.contains(&"os".to_owned()));
 }
 
+#[test]
+fn go_imports_ignores_commented_imports() {
+    let code = r#"
+// import (
+// 	"fmt"
+// )
+"#;
+    let imports = go_imports(code);
+    assert!(imports.is_empty());
+}
+
+#[test]
+fn go_imports_handles_blank_lines_in_block() {
+    let code = r#"
+import (
+	"fmt"
+
+	"os"
+)
+"#;
+    let imports = go_imports(code);
+    assert_eq!(imports, vec!["fmt", "os"]);
+}
+
 // ── go_import_path ─────────────────────────────────────────────────────────
 
 #[test]
@@ -227,4 +251,15 @@ fn allow_go_cli_dashed_rest_operands_passes_through_unmatched_code() {
     let code = r#"func main() { fmt.Println("hello") }"#;
     let result = allow_go_cli_dashed_rest_operands(code);
     assert_eq!(result, code);
+}
+
+#[test]
+fn ensure_go_import_handles_empty_code() {
+    let ensured = ensure_go_import("", "fmt");
+    assert!(ensured.is_empty());
+}
+
+#[test]
+fn go_import_path_returns_none_for_whitespace_only() {
+    assert_eq!(go_import_path("   "), None);
 }

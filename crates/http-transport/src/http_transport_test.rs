@@ -543,3 +543,70 @@ async fn shutdown_drain_uses_one_global_deadline() {
         started.elapsed()
     );
 }
+
+#[tokio::test]
+async fn empty_body_is_accepted() {
+    let transport =
+        HttpTransport::serve(loopback(), TransportConfig::default(), |_req| async move {
+            HttpResponse::text(200, "ok")
+        })
+        .await
+        .expect("bind");
+
+    let uri = format!("http://{}/empty", transport.local_addr());
+    let (status, body, _) = get_text(&uri, "").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body, "ok");
+
+    transport.shutdown_and_join().await;
+}
+
+#[tokio::test]
+async fn max_in_flight_zero_rejects_every_request() {
+    let hits = Arc::new(AtomicUsize::new(0));
+    let hits_h = Arc::clone(&hits);
+    let transport = HttpTransport::serve(
+        loopback(),
+        TransportConfig {
+            request_timeout: Duration::from_secs(5),
+            max_in_flight: 0,
+            ..TransportConfig::default()
+        },
+        move |_req| {
+            hits_h.fetch_add(1, Ordering::SeqCst);
+            async move { HttpResponse::text(200, "should-not-run") }
+        },
+    )
+    .await
+    .expect("bind");
+
+    let uri = format!("http://{}/zero-busy", transport.local_addr());
+    let (status, body, id) = get_text(&uri, "").await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(body, "server busy");
+    assert!(id.is_some());
+    assert_eq!(hits.load(Ordering::SeqCst), 0, "handler must not run when max_in_flight=0");
+
+    transport.shutdown_and_join().await;
+}
+
+#[tokio::test]
+async fn zero_max_body_bytes_rejects_any_body() {
+    let transport = HttpTransport::serve(
+        loopback(),
+        TransportConfig {
+            max_body_bytes: 0,
+            ..TransportConfig::default()
+        },
+        |_req| async move { HttpResponse::text(200, "should-not-run") },
+    )
+    .await
+    .expect("bind");
+
+    let uri = format!("http://{}/zero-body", transport.local_addr());
+    let (status, _text, id) = get_text(&uri, "").await;
+    assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+    assert!(id.is_some());
+
+    transport.shutdown_and_join().await;
+}

@@ -212,9 +212,9 @@ incipit {
 }
 
 #[test]
-fn package_check_diagnostics_uses_expanded_renderer() {
+fn package_check_normal_diagnostics_uses_coded_compact_headers() {
     let package = write_basic_package(
-        "package-check-diagnostics",
+        "package-check-normal",
         r#"
 incipit {
     fixum numerus n ← "not a number"
@@ -235,6 +235,19 @@ incipit {
     assert!(
         !normal_stderr.contains("\nphase:"),
         "normal package check must not render expanded records:\n{normal_stderr}"
+    );
+}
+
+#[test]
+fn package_check_expanded_diagnostics_includes_phase_and_span() {
+    let package = write_basic_package(
+        "package-check-expanded",
+        r#"
+incipit {
+    fixum numerus n ← "not a number"
+    nota n
+}
+"#,
     );
 
     let (expanded_stdout, expanded_stderr, expanded_ok) = run_faber(&[

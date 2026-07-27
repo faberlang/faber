@@ -138,3 +138,44 @@ fn diagnostic_json_render_preserves_code_issue_and_locale() {
     assert_eq!(json["reader_locale"], "la-test");
     assert_eq!(json["message"], "ISSUE_MSG");
 }
+
+#[test]
+fn diagnostic_query_parser_rejects_invalid_formats() {
+    assert!(!is_diagnostic_query(""));
+    assert!(!is_diagnostic_query("..."));
+    assert!(!is_diagnostic_query("SEM010."));
+    assert!(!is_diagnostic_query(".initializer"));
+}
+
+#[test]
+fn non_existent_code_returns_none_from_lookup() {
+    let pack = synthetic_pack();
+    assert!(lookup_diagnostic_in_pack("NOEXIST", &pack).is_none());
+    assert!(lookup_diagnostic_in_pack("SEM010.no_such_issue", &pack).is_none());
+}
+
+#[test]
+fn diagnostic_plain_render_includes_code_and_message() {
+    let pack = synthetic_pack();
+    let explanation = lookup_diagnostic_in_pack("SEM010", &pack).expect("code row should resolve");
+    let rendered = render_plain(&explanation);
+
+    assert!(rendered.contains("SEM010"));
+    assert!(rendered.contains("CODE_MSG"));
+    assert!(rendered.contains("CODE_HELP"));
+    assert!(rendered.contains("Faber Diagnostic Reference"));
+}
+
+#[test]
+fn diagnostic_json_render_for_code_only_includes_all_fields() {
+    let pack = synthetic_pack();
+    let explanation = lookup_diagnostic_in_pack("SEM010", &pack).expect("code row should resolve");
+    let rendered = render_json(&explanation).expect("json render");
+    let json: serde_json::Value = serde_json::from_str(&rendered).expect("valid json");
+
+    assert_eq!(json["code"], "SEM010");
+    assert!(json["issue"].is_null());
+    assert_eq!(json["reader_locale"], "la-test");
+    assert_eq!(json["message"], "CODE_MSG");
+    assert_eq!(json["help"], "CODE_HELP");
+}

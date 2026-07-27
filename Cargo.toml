@@ -37,6 +37,7 @@ zstd = "0.13"
 
 [dev-dependencies]
 hygiene-ratchet = { path = "crates/hygiene-ratchet" }
+tempfile = "3"
 
 [workspace]
 members = [".", "crates/exempla", "crates/hygiene-ratchet"]

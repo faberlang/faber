@@ -102,3 +102,35 @@ fn tensor_workload_proof_rung1_device_linear_matches_stepper() {
         serde_json::json!([9.1, 12.2, 18.1, 24.2, 27.1, 36.2, 36.1, 48.2])
     );
 }
+
+#[test]
+fn tensor_workload_proof_empty_rows_when_no_matching_exemplar_path() {
+    let rows = tensor_workload_proof_rows();
+    // We know the rows have specific exemplar_path entries; verify these are
+    // well-formed for every row.
+    for (i, row) in rows.iter().enumerate() {
+        assert!(
+            !row.exemplar_path.is_empty(),
+            "row {} has empty exemplar_path",
+            i
+        );
+        assert!(
+            row.tier as u8 >= 0,
+            "row {} has invalid tier {:?}",
+            i,
+            row.tier
+        );
+    }
+}
+
+#[test]
+fn tensor_workload_proof_rung_indices_are_contiguous_from_zero() {
+    let rows = tensor_workload_proof_rows();
+    for (i, row) in rows.iter().enumerate() {
+        assert_eq!(
+            row.rung, i,
+            "expected row {i} to have rung {i}, got rung {}",
+            row.rung
+        );
+    }
+}

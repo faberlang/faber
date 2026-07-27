@@ -373,7 +373,7 @@ fn normalize_trailing_newline_preserves_trailing_whitespace_lines() {
 
 #[test]
 fn formatted_source_for_write_without_frontmatter_returns_body_only() {
-    let path = Path::new("/tmp/test.fab");
+    let path = Path::new("test.fab");
     let raw = "incipit {\n  nota \"ok\"\n}\n";
     let formatted_body = "incipit {\n    nota \"ok\"\n}\n";
     let result = formatted_source_for_write(path, raw, formatted_body).expect("format source");
@@ -382,7 +382,7 @@ fn formatted_source_for_write_without_frontmatter_returns_body_only() {
 
 #[test]
 fn formatted_source_for_write_preserves_frontmatter_prefix() {
-    let path = Path::new("/tmp/test.fab");
+    let path = Path::new("test.fab");
     let raw = "+++\nterm = \"test\"\n+++\nincipit {\n  nota \"ok\"\n}\n";
     let formatted_body = "incipit {\n    nota \"ok\"\n}\n";
     let result = formatted_source_for_write(path, raw, formatted_body).expect("format source");
@@ -396,7 +396,7 @@ fn formatted_source_for_write_preserves_frontmatter_prefix() {
 
 #[test]
 fn formatted_source_for_write_rejects_bad_frontmatter() {
-    let path = Path::new("/tmp/test.fab");
+    let path = Path::new("test.fab");
     // Missing closing +++
     let raw = "+++\nterm = \"test\"\nincipit {\n  nota \"ok\"\n}\n";
     let formatted_body = "incipit {\n    nota \"ok\"\n}\n";
@@ -408,14 +408,45 @@ fn formatted_source_for_write_rejects_bad_frontmatter() {
 
 #[test]
 fn source_for_compare_returns_raw_source_unchanged() {
-    let path = Path::new("/tmp/test.fab");
+    let path = Path::new("test.fab");
     let raw = "incipit {}\n";
     assert_eq!(source_for_compare(path, raw), raw);
 }
 
 #[test]
 fn source_for_compare_handles_source_with_frontmatter() {
-    let path = Path::new("/tmp/test.fab");
+    let path = Path::new("test.fab");
     let raw = "+++\nterm = \"test\"\n+++\nincipit {\n  nota \"ok\"\n}\n";
     assert_eq!(source_for_compare(path, raw), raw);
+}
+
+#[test]
+fn source_for_compare_handles_empty_input() {
+    let path = Path::new("test.fab");
+    assert_eq!(source_for_compare(path, ""), "");
+}
+
+// ── normalize_trailing_newline edge cases ─────────────────────────────────
+
+#[test]
+fn normalize_trailing_newline_handles_mixed_whitespace() {
+    assert_eq!(normalize_trailing_newline("text\n \t \n"), "text\n \t \n");
+}
+
+// ── formatted_source_for_write edge cases ─────────────────────────────────
+
+#[test]
+fn formatted_source_for_write_handles_empty_body() {
+    let path = Path::new("test.fab");
+    let raw = "+++\nterm = \"test\"\n+++\n";
+    let formatted_body = "";
+    let result = formatted_source_for_write(path, raw, formatted_body).expect("format source");
+    assert!(result.starts_with("+++\nterm = \"test\"\n+++\n"));
+}
+
+#[test]
+fn formatted_source_for_write_handles_no_frontmatter_with_empty_raw() {
+    let path = Path::new("test.fab");
+    let result = formatted_source_for_write(path, "", "").expect("format source");
+    assert_eq!(result, "");
 }

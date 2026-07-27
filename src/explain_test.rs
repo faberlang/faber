@@ -227,3 +227,19 @@ fn assert_legacy_term(registry: &Registry, term: &str, canonical_term: &str) {
         other => panic!("expected legacy lookup for {term:?}, got {other:?}"),
     }
 }
+
+#[test]
+fn search_empty_query_returns_empty() {
+    let registry = disk_registry();
+    let hits = registry.search("");
+    assert!(hits.is_empty());
+    let rendered = render_search("", &hits);
+    assert!(rendered.starts_with("Search: "));
+}
+
+#[test]
+fn lookup_nonexistent_term_returns_none() {
+    let registry = disk_registry();
+    assert!(registry.lookup("no_such_term_xyzzy").is_none());
+    assert!(registry.lookup("").is_none());
+}

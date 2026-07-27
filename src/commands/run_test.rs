@@ -27,15 +27,27 @@ fn run_target_name_maps_faber() {
 }
 
 #[test]
-fn run_target_name_maps_wasm_variants() {
+fn run_target_name_maps_wasm_text() {
     assert_eq!(run_target_name(Target::WasmText), "wasm-text");
+}
+
+#[test]
+fn run_target_name_maps_wasm() {
     assert_eq!(run_target_name(Target::Wasm), "wasm");
 }
 
 #[test]
-fn run_target_name_maps_text_based_targets() {
+fn run_target_name_maps_llvm_text() {
     assert_eq!(run_target_name(Target::LlvmText), "llvm-text");
+}
+
+#[test]
+fn run_target_name_maps_metal_text() {
     assert_eq!(run_target_name(Target::MetalText), "metal-text");
+}
+
+#[test]
+fn run_target_name_maps_wgsl_text() {
     assert_eq!(run_target_name(Target::WgslText), "wgsl-text");
 }
 
@@ -45,10 +57,22 @@ fn run_target_name_maps_sexp() {
 }
 
 #[test]
-fn run_target_name_maps_scena_and_fmir_variants() {
+fn run_target_name_maps_scena() {
     assert_eq!(run_target_name(Target::Scena), "scena");
+}
+
+#[test]
+fn run_target_name_maps_fmir_text() {
     assert_eq!(run_target_name(Target::FmirText), "fmir-text");
+}
+
+#[test]
+fn run_target_name_maps_fmir() {
     assert_eq!(run_target_name(Target::Fmir), "fmir");
+}
+
+#[test]
+fn run_target_name_maps_fmir_bin() {
     assert_eq!(run_target_name(Target::FmirBin), "fmir-bin");
 }
 
@@ -178,6 +202,38 @@ fn package_directory_defaults_to_compiled_run_policy() {
     };
 
     assert!(!should_interpret(&args, &dir));
+}
+
+#[test]
+fn nonexistent_path_does_not_interpret() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let missing = dir.path().join("nonexistent_script.fab");
+    let args = RunArgs {
+        path: missing.clone(),
+        reader_locale: None,
+        target: radix::tool::CliTarget::Rust,
+        release: false,
+        interpret: false,
+        compile: false,
+        args: Vec::new(),
+    };
+    assert!(!should_interpret(&args, &missing));
+}
+
+#[test]
+fn nonexistent_path_with_interpret_flag_returns_true() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let missing = dir.path().join("nonexistent_script.fab");
+    let args = RunArgs {
+        path: missing.clone(),
+        reader_locale: None,
+        target: radix::tool::CliTarget::Rust,
+        release: false,
+        interpret: true,
+        compile: false,
+        args: Vec::new(),
+    };
+    assert!(should_interpret(&args, &missing));
 }
 
 #[test]

@@ -15,18 +15,21 @@ fn step(method: &str, path: &str, handler: &str) -> Valor {
 }
 
 #[test]
-fn static_get_and_post_dispatch() {
-    let mut table = route_table();
-    table = add_get(table, "/salve".into(), "greet".into()).expect("get");
-    table = add_post(table, "/echo".into(), "echo".into()).expect("post");
+fn static_get_route_matches_handler() {
+    let table = add_get(route_table(), "/salve".into(), "greet".into()).expect("get");
 
-    let hit = match_route(table.clone(), "GET".into(), "/salve".into())
+    let hit = match_route(table, "GET".into(), "/salve".into())
         .expect("ok")
         .expect("match");
     let Valor::Tabula(fields) = hit else {
         panic!("tabula");
     };
     assert_eq!(fields.get(KEY_HANDLER), Some(&text("greet")));
+}
+
+#[test]
+fn get_method_does_not_hit_post_only_route() {
+    let table = add_post(route_table(), "/echo".into(), "echo".into()).expect("post");
 
     let miss = match_route(table, "GET".into(), "/echo".into()).expect("ok");
     assert!(miss.is_none(), "GET must not hit POST-only path");
@@ -60,16 +63,23 @@ fn dynamic_path_params_keep_literal_plus() {
 }
 
 #[test]
-fn static_paths_decode_request_segments_before_matching() {
+fn static_path_encoded_request_matches_encoded_route() {
     let table = add_get(route_table(), "/hello%20world".into(), "hello".into()).expect("route");
     assert!(
-        match_route(table.clone(), "GET".into(), "/hello%20world".into())
+        match_route(table, "GET".into(), "/hello%20world".into())
             .expect("encoded match")
             .is_some()
     );
-    assert!(match_route(table, "GET".into(), "/hello world".into())
-        .expect("decoded match")
-        .is_some());
+}
+
+#[test]
+fn static_path_decoded_request_matches_encoded_route() {
+    let table = add_get(route_table(), "/hello%20world".into(), "hello".into()).expect("route");
+    assert!(
+        match_route(table, "GET".into(), "/hello world".into())
+            .expect("decoded match")
+            .is_some()
+    );
 }
 
 #[test]
@@ -82,7 +92,7 @@ fn encoded_slashes_stay_inside_dynamic_segments() {
 }
 
 #[test]
-fn traversal_segments_are_rejected_before_matching_or_registration() {
+fn traversal_paths_are_not_matched() {
     let table = add_get(route_table(), "/files/{path}".into(), "file".into()).expect("route");
     for path in ["/files/../secret", "/files/%2e%2e/secret"] {
         assert!(
@@ -92,7 +102,10 @@ fn traversal_segments_are_rejected_before_matching_or_registration() {
             "traversal path must not match: {path}"
         );
     }
+}
 
+#[test]
+fn traversal_paths_are_rejected_at_registration() {
     for path in ["/files/../secret", "/files/%2e%2e/secret"] {
         let error = add_get(route_table(), path.into(), "file".into())
             .expect_err("traversal route must be rejected");
@@ -101,11 +114,15 @@ fn traversal_segments_are_rejected_before_matching_or_registration() {
 }
 
 #[test]
-fn malformed_percent_decoded_utf8_fails_closed() {
+fn malformed_percent_decoded_utf8_path_fails_closed() {
     let table = add_get(route_table(), "/users/{id}".into(), "show".into()).expect("route");
     assert!(match_route(table, "GET".into(), "/users/%C3%28".into())
         .expect("malformed UTF-8 request should be a miss")
         .is_none());
+}
+
+#[test]
+fn malformed_percent_decoded_utf8_query_fails_closed() {
     assert_eq!(query_param("q=%C3%28".into(), "q".into()), None);
 }
 
@@ -186,31 +203,55 @@ fn duplicate_middleware_rejected() {
 }
 
 #[test]
-fn query_and_header_extraction() {
+fn query_param_decodes_plus_as_space() {
     assert_eq!(
         query_param("a=1&name=Ada+Lovelace".into(), "name".into()).as_deref(),
         Some("Ada Lovelace")
     );
+}
+
+#[test]
+fn query_param_preserves_encoded_plus() {
     assert_eq!(
         query_param("tag=A%2BB".into(), "tag".into()).as_deref(),
         Some("A+B")
     );
+}
+
+#[test]
+fn query_param_decodes_percent_encoded_name() {
     assert_eq!(
         query_param("na%6De=Ada".into(), "name".into()).as_deref(),
         Some("Ada")
     );
+}
+
+#[test]
+fn query_param_decodes_multibyte_utf8_value() {
     assert_eq!(
         query_param("mark=%E2%9C%93".into(), "mark".into()).as_deref(),
         Some("\u{2713}")
     );
+}
+
+#[test]
+fn query_param_preserves_malformed_percent() {
     assert_eq!(
         query_param("bad=%ZZ".into(), "bad".into()).as_deref(),
         Some("%ZZ")
     );
+}
+
+#[test]
+fn query_param_preserves_malformed_percent_adjacent_to_unicode() {
     assert_eq!(
         query_param("bad=%a%C3%A9".into(), "bad".into()).as_deref(),
         Some("%aé")
     );
+}
+
+#[test]
+fn header_value_is_case_insensitive() {
     let headers = Valor::Tabula(BTreeMap::from([
         ("Content-Type".to_owned(), text("application/json")),
         ("x-request-id".to_owned(), text("r1")),
@@ -222,25 +263,45 @@ fn query_and_header_extraction() {
 }
 
 #[test]
-fn json_body_object_and_reject_array() {
+fn query_param_missing_key_returns_none() {
+    assert_eq!(query_param("a=1&b=2".into(), "missing".into()), None);
+}
+
+#[test]
+fn header_value_missing_key_returns_none() {
+    let headers = Valor::Tabula(BTreeMap::from([
+        ("Content-Type".to_owned(), text("application/json")),
+    ]));
+    assert_eq!(header_value(headers, "x-missing".into()), None);
+}
+
+#[test]
+fn json_body_accepts_object() {
     let ok = json_body(r#"{"n":1}"#.into()).expect("object");
     let Valor::Tabula(fields) = ok else {
         panic!("tabula");
     };
     assert_eq!(fields.get("n"), Some(&Valor::Numerus(1)));
+}
+
+#[test]
+fn json_body_rejects_array_root() {
     let err = json_body("[1]".into()).expect_err("array root");
     assert!(!err.is_empty());
 }
 
 #[test]
-fn error_and_success_response_shapes() {
+fn error_response_shape_includes_error_true() {
     let err = error_response(404, "missing".into());
     let Valor::Tabula(fields) = err else {
         panic!("tabula");
     };
     assert_eq!(fields.get("status"), Some(&Valor::Numerus(404)));
     assert_eq!(fields.get("error"), Some(&Valor::Bivalens(true)));
+}
 
+#[test]
+fn success_response_shape_includes_error_false() {
     let ok = to_response(200, "ok".into());
     let Valor::Tabula(fields) = ok else {
         panic!("tabula");
@@ -254,4 +315,32 @@ fn no_match_returns_nihil() {
     assert!(match_route(table, "GET".into(), "/other".into())
         .expect("ok")
         .is_none());
+}
+
+#[test]
+fn empty_path_does_not_match_non_root_route() {
+    let table = add_get(route_table(), "/only".into(), "h".into()).expect("route");
+    assert!(match_route(table, "GET".into(), "".into())
+        .expect("ok")
+        .is_none());
+}
+
+#[test]
+fn path_param_missing_key_returns_none() {
+    let table = add_get(route_table(), "/users/{id}".into(), "show".into()).expect("route");
+    let hit = match_route(table, "GET".into(), "/users/42".into())
+        .expect("ok")
+        .expect("match");
+    assert_eq!(path_param(hit, "nonexistent".into()), None);
+}
+
+#[test]
+fn query_param_empty_string_returns_none() {
+    assert_eq!(query_param("".into(), "q".into()), None);
+}
+
+#[test]
+fn header_value_empty_table_returns_none() {
+    let headers = Valor::Tabula(BTreeMap::new());
+    assert_eq!(header_value(headers, "anything".into()), None);
 }

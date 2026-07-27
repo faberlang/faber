@@ -534,3 +534,25 @@ fn format_run_source_error(error: RunSourceError) -> String {
             .join(" | "),
     }
 }
+
+#[test]
+fn format_run_source_error_handles_mir_errors() {
+    let error = RunSourceError::Mir(vec![radix::mir::MirError {
+        issue: "stepper_tensor_structa_element_count_does_not_match_shape".to_owned(),
+        message: "element count mismatch".to_owned(),
+        span: radix::lexer::Span::default(),
+    }]);
+    let formatted = format_run_source_error(error);
+    assert!(formatted.contains("stepper_tensor_structa_element_count_does_not_match_shape"));
+}
+
+#[test]
+fn format_run_source_error_handles_stepper_errors() {
+    let error = RunSourceError::Stepper(vec![radix::mir::StepperError {
+        message: "test stepper failure".to_owned(),
+        issue: "stepper_unsupported".to_owned(),
+        span: radix::lexer::Span::default(),
+    }]);
+    let formatted = format_run_source_error(error);
+    assert!(formatted.contains("stepper_unsupported"));
+}

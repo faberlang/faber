@@ -289,3 +289,40 @@ faber = { package = "faber-runtime", path = "../../faber-runtime" }
         .expect("runtime path");
     assert!(paths_equivalent(Path::new(runtime_path), &runtime));
 }
+
+// ── truncate_output edge cases ────────────────────────────────────────────
+
+#[test]
+fn truncate_output_on_empty_string() {
+    assert_eq!(truncate_output(""), "");
+}
+
+#[test]
+fn truncate_output_on_exact_boundary() {
+    let exact = "a".repeat(8_000);
+    let truncated = truncate_output(&exact);
+    assert_eq!(truncated.len(), 8_000);
+    assert_eq!(truncated, exact);
+}
+
+// ── canonical_probe_path edge cases ────────────────────────────────────────
+
+#[test]
+fn canonical_probe_path_returns_path_as_is_when_relative() {
+    let path = Path::new("relative/path/to/nothing");
+    let result = canonical_probe_path(path);
+    assert_eq!(result, path.display().to_string());
+}
+
+// ── probe_key edge cases ───────────────────────────────────────────────────
+
+#[test]
+fn probe_key_handles_empty_probes_and_deps() {
+    let package_root = Path::new("/repo/pkg");
+    let anchor = Path::new("/repo/pkg/Cargo.toml");
+    let deps = BTreeMap::new();
+    let probes: Vec<String> = Vec::new();
+
+    let key = probe_key(package_root, anchor, &deps, None, &probes);
+    assert!(!key.is_empty(), "even empty inputs should produce a hash");
+}

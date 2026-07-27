@@ -197,6 +197,30 @@ fn parse_buffer_with_padding() {
     assert_eq!(header.tensors[0].name, "a");
 }
 
+#[test]
+fn parse_empty_header_no_tensors() {
+    let data = build_safetensors("{}");
+    let header = parse_safetensors_metadata(&data).expect("parse empty header");
+    assert_eq!(header.tensors.len(), 0);
+    assert!(header.metadata.is_empty());
+}
+
+#[test]
+fn parse_tensor_with_zero_dimension_shape() {
+    let data =
+        build_safetensors(r#"{"t":{"dtype":"F32","shape":[0],"data_offsets":[0,0]}}"#);
+    let header = parse_safetensors_metadata(&data).expect("parse zero-dim tensor");
+    assert_eq!(header.tensors[0].shape, vec![0]);
+    assert_eq!(header.tensors[0].element_count, 0);
+}
+
+#[test]
+fn parse_f64_dtype() {
+    let data = build_safetensors(r#"{"t":{"dtype":"F64","shape":[2],"data_offsets":[0,16]}}"#);
+    let header = parse_safetensors_metadata(&data).expect("parse F64");
+    assert_eq!(header.tensors[0].dtype, "F64");
+}
+
 // ---------------------------------------------------------------------------
 // Display format tests
 // ---------------------------------------------------------------------------

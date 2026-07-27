@@ -236,6 +236,12 @@ fn is_bridged_norma_import_path_rejects_norma_without_module_name() {
     assert!(!is_bridged_norma_import_path("norma:/solum"));
 }
 
+#[test]
+fn is_bridged_norma_import_path_accepts_known_norma_module() {
+    assert!(is_bridged_norma_import_path("norma:solum"));
+    assert!(is_bridged_norma_import_path("norma:processus"));
+}
+
 // ── fmir_text_cli_value_type ───────────────────────────────────────────────
 
 #[test]
@@ -329,6 +335,16 @@ fn is_bridged_norma_module_returns_false_for_package_provider() {
         module_path: vec!["solum".to_string()],
     };
     assert!(!is_bridged_norma_module(&identity));
+}
+
+#[test]
+fn is_bridged_norma_module_returns_true_for_norma_builtin() {
+    use radix::hir::LibraryProvider;
+    let identity = radix::hir::LibraryIdentity {
+        provider: LibraryProvider::Builtin("norma".to_owned()),
+        module_path: vec!["solum".to_string()],
+    };
+    assert!(is_bridged_norma_module(&identity));
 }
 
 // ── validate_package_mir_manifest ───────────────────────────────────────────
@@ -457,20 +473,20 @@ fn make_fmir_bin_entrypoint_executable_sets_755_permissions() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-// ── Existing tests ──────────────────────────────────────────────────────────
+// ── patch_fmir_text_cli_record (decoy superset) ────────────────────────────
 
-#[test]
-fn fmir_runtime_cli_binding_skips_superset_decoy_record() {
-    let mut interner = Interner::default();
+/// Shared setup for the decoy-superset patching tests.
+fn decoy_test_setup(
+    interner: &mut Interner,
+) -> (MirProgram, FmirTextCliSection, Symbol) {
     let run_entry = interner.intern("run_entry");
     let name = interner.intern("name");
     let extra = interner.intern("extra");
     let build_time = interner.intern("build-time");
     let decoy_extra = interner.intern("decoy-extra");
-    let runtime = interner.intern("runtime");
     let ty = MirType::semantic(TypeId(0));
     let span = Span::default();
-    let mut program = MirProgram {
+    let program = MirProgram {
         functions: vec![MirFunction {
             id: MirFunctionId(0),
             source: None,
@@ -529,6 +545,14 @@ fn fmir_runtime_cli_binding_skips_superset_decoy_record() {
             }],
         },
     };
+    (program, cli, name)
+}
+
+#[test]
+fn fmir_runtime_cli_binding_preserves_decoy_fields() {
+    let mut interner = Interner::default();
+    let (mut program, cli, name) = decoy_test_setup(&mut interner);
+    let runtime = interner.intern("runtime");
 
     let patched = patch_fmir_text_cli_record(
         &mut program,
@@ -541,8 +565,32 @@ fn fmir_runtime_cli_binding_skips_superset_decoy_record() {
         }],
     );
 
+    // Superset record (extra field) keeps its original value — only exact
+    // field-name matches are replaced.
     assert!(patched);
+    let build_time = interner.intern("build-time");
     assert_eq!(record_field_string(&program, 0, name), Some(build_time));
+}
+
+#[test]
+fn fmir_runtime_cli_binding_patches_matching_fields() {
+    let mut interner = Interner::default();
+    let (mut program, cli, name) = decoy_test_setup(&mut interner);
+    let runtime = interner.intern("runtime");
+
+    let patched = patch_fmir_text_cli_record(
+        &mut program,
+        &cli,
+        "run_entry",
+        &interner,
+        &[MirNamedOperand {
+            name,
+            value: MirOperand::Constant(MirConstant::String(runtime)),
+        }],
+    );
+
+    // Exact-match record gets the runtime binding value.
+    assert!(patched);
     assert_eq!(record_field_string(&program, 1, name), Some(runtime));
 }
 

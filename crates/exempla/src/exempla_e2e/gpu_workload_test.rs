@@ -42,6 +42,45 @@ fn numeric_output_parser_accepts_line_output() {
 }
 
 #[test]
+fn numeric_output_parser_rejects_empty_string() {
+    let err = parse_numeric_output("").expect_err("empty string");
+    assert!(err.contains("empty"));
+}
+
+#[test]
+fn numeric_output_parser_rejects_whitespace_only() {
+    let err = parse_numeric_output("  \n  \n").expect_err("whitespace");
+    assert!(err.contains("empty") || err.contains("no numeric"));
+}
+
+#[test]
+fn numeric_output_parser_rejects_non_numeric() {
+    let err = parse_numeric_output("hello").expect_err("non-numeric");
+    assert!(err.contains("parse"));
+}
+
+#[test]
+fn numeric_output_parser_accepts_json_array() {
+    let values = parse_numeric_output("[1.0, 2.5, 3.0]").expect("json array");
+    assert_eq!(values, vec![1.0, 2.5, 3.0]);
+}
+
+#[test]
+fn numeric_output_parser_accepts_json_object_with_numeric_values() {
+    let values = parse_numeric_output(r#"{"a": 1.0, "b": 2.5}"#).expect("json object");
+    assert_eq!(values, vec![1.0, 2.5]);
+}
+
+#[test]
+fn compare_numeric_output_accepts_exact_match() {
+    let fixture = GpuReferenceFixture {
+        tolerance: 0.0,
+        reference: serde_json::json!([1.0, 2.0]),
+    };
+    compare_numeric_output("[1.0, 2.0]", &fixture).expect("exact match");
+}
+
+#[test]
 fn checked_in_expected_stdout_fixtures_match_numeric_references() {
     let workload_dir = crate::paths::gpu_workload_dir();
 

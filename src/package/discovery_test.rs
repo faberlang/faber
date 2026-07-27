@@ -66,6 +66,26 @@ fn sanitize_crate_name_complex_with_special_characters() {
     );
 }
 
+#[test]
+fn sanitize_crate_name_preserves_unicode_letters() {
+    assert_eq!(sanitize_crate_name("café"), "café");
+}
+
+#[test]
+fn sanitize_crate_name_lowercases_unicode() {
+    assert_eq!(sanitize_crate_name("CAFÉ"), "café");
+}
+
+#[test]
+fn sanitize_crate_name_replaces_unicode_symbols() {
+    assert_eq!(sanitize_crate_name("hello·world"), "hello-world");
+}
+
+#[test]
+fn sanitize_crate_name_dots_only_falls_back_to_package() {
+    assert_eq!(sanitize_crate_name("..."), "package");
+}
+
 // ── BuildLayout::from_package_root ────────────────────────────────────────
 
 #[test]

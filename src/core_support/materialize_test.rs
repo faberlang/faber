@@ -211,3 +211,35 @@ fn repairs_noncompleted_state_but_preserves_completed_corruption() {
     assert!(materialized.root().exists());
     cleanup(&root);
 }
+
+#[test]
+fn rejects_empty_archive() {
+    let root = test_root("empty-archive");
+    let hash = hex(&Sha256::digest(b""));
+    let manifest = "";
+    assert!(materialize_payload(&root, b"", &hash, &manifest).is_err());
+    cleanup(&root);
+}
+
+#[test]
+fn rejects_malformed_archive_format() {
+    let root = test_root("bad-format");
+    let garbage = b"not-a-zstd-tar-at-all";
+    let hash = hex(&Sha256::digest(garbage));
+    let manifest = "";
+    assert!(materialize_payload(&root, garbage, &hash, &manifest).is_err());
+    cleanup(&root);
+}
+
+#[test]
+fn manifest_entry_outside_allowed_prefix_is_rejected() {
+    assert!(parse_manifest(&format!("{}  ../../etc/passwd\n", "0".repeat(64))).is_err());
+}
+
+#[test]
+fn is_safe_relative_rejects_absolute_and_parent_paths() {
+    assert!(!is_safe_relative(Path::new("/etc/passwd")));
+    assert!(!is_safe_relative(Path::new("a/../../../etc")));
+    assert!(is_safe_relative(Path::new("a/b/c")));
+    assert!(is_safe_relative(Path::new("simple.txt")));
+}

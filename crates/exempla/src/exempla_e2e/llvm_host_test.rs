@@ -172,3 +172,71 @@ fn assert_reaches_native_link(relative_path: &str) {
         probe.reason
     );
 }
+
+#[test]
+fn llvm_host_comparison_rejects_exit_code_mismatch() {
+    let oracle = RustOracleOutcome::RunSuccess {
+        args: &[],
+        stdout: super::super::oracle::ExpectedStdout::SiblingFixture,
+        exit_code: 0,
+    };
+    let rust = ProcessOutcome {
+        exit_code: Some(0),
+        stdout: b"ok\n".to_vec(),
+        stderr: vec![],
+    };
+    let llvm = LlvmOutcome::Ran(ProcessOutcome {
+        exit_code: Some(1),
+        stdout: b"ok\n".to_vec(),
+        stderr: vec![],
+    });
+    let comparison = compare_pair(oracle, Some(&rust), Some(&llvm), None);
+    assert_eq!(comparison, Comparison::Mismatch {
+        boundary: Boundary::Outcome,
+        issue: "exit_code_mismatch".to_owned(),
+    });
+}
+
+#[test]
+fn llvm_host_comparison_accepts_perfect_match() {
+    let oracle = RustOracleOutcome::RunSuccess {
+        args: &[],
+        stdout: super::super::oracle::ExpectedStdout::SiblingFixture,
+        exit_code: 0,
+    };
+    let rust = ProcessOutcome {
+        exit_code: Some(0),
+        stdout: b"salve\n".to_vec(),
+        stderr: vec![],
+    };
+    let llvm = LlvmOutcome::Ran(ProcessOutcome {
+        exit_code: Some(0),
+        stdout: b"salve\n".to_vec(),
+        stderr: vec![],
+    });
+    assert_eq!(
+        compare_pair(oracle, Some(&rust), Some(&llvm), None),
+        Comparison::Pass
+    );
+}
+
+#[test]
+fn llvm_host_comparison_rejects_stderr_mismatch() {
+    let oracle = RustOracleOutcome::RunSuccess {
+        args: &[],
+        stdout: super::super::oracle::ExpectedStdout::SiblingFixture,
+        exit_code: 0,
+    };
+    let rust = ProcessOutcome {
+        exit_code: Some(0),
+        stdout: b"ok\n".to_vec(),
+        stderr: vec![],
+    };
+    let llvm = LlvmOutcome::Ran(ProcessOutcome {
+        exit_code: Some(0),
+        stdout: b"ok\n".to_vec(),
+        stderr: b"unexpected\n".to_vec(),
+    });
+    let comparison = compare_pair(oracle, Some(&rust), Some(&llvm), None);
+    assert!(matches!(comparison, Comparison::Mismatch { .. }));
+}

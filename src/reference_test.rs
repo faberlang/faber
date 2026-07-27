@@ -118,20 +118,36 @@ fn load_from_disk_builds_explain_registry() {
 }
 
 #[test]
-fn parse_exempla_entry_for_spot_check_terms() {
+fn parse_exempla_entry_for_functio_keyword() {
     let root = repo_exempla_root();
-    let cases = [
-        ("functio/functio.fab", "functio", "keyword"),
-        ("operatores/comparatio.fab", "≡", "operator-group"),
-        ("meta/manifest.fab", "manifest", "concept"),
-    ];
-    for (rel, term, rule) in cases {
-        let path = root.join(rel);
-        let source = std::fs::read_to_string(&path).expect("read exempla");
-        let entry = entry_from_exempla(rel, &source, term, rule).expect("parse entry");
-        assert_eq!(entry.term, term);
-        assert!(entry.body.contains("```fab"));
-    }
+    let path = root.join("functio/functio.fab");
+    let source = std::fs::read_to_string(&path).expect("read exempla");
+    let entry = entry_from_exempla("functio/functio.fab", &source, "functio", "keyword")
+        .expect("parse entry");
+    assert_eq!(entry.term, "functio");
+    assert!(entry.body.contains("```fab"));
+}
+
+#[test]
+fn parse_exempla_entry_for_equivalence_operator() {
+    let root = repo_exempla_root();
+    let path = root.join("operatores/comparatio.fab");
+    let source = std::fs::read_to_string(&path).expect("read exempla");
+    let entry = entry_from_exempla("operatores/comparatio.fab", &source, "≡", "operator-group")
+        .expect("parse entry");
+    assert_eq!(entry.term, "≡");
+    assert!(entry.body.contains("```fab"));
+}
+
+#[test]
+fn parse_exempla_entry_for_manifest_concept() {
+    let root = repo_exempla_root();
+    let path = root.join("meta/manifest.fab");
+    let source = std::fs::read_to_string(&path).expect("read exempla");
+    let entry = entry_from_exempla("meta/manifest.fab", &source, "manifest", "concept")
+        .expect("parse entry");
+    assert_eq!(entry.term, "manifest");
+    assert!(entry.body.contains("```fab"));
 }
 
 #[test]
@@ -218,11 +234,46 @@ fn pack_version_skew_accepts_matching_release_version() {
 }
 
 #[test]
-fn release_version_parser_accepts_prerelease_and_build_metadata() {
+fn pack_version_skew_no_version_is_ok() {
+    let metadata = PackMetadata {
+        faber_version: None,
+        generated_on: None,
+        fab_count: 0,
+        registry_terms: 0,
+        source_commit: None,
+        index_generated_on: None,
+    };
+    assert!(pack_version_skew(&metadata)
+        .expect("no version")
+        .is_none());
+}
+
+#[test]
+fn release_version_parser_accepts_prerelease() {
     assert_eq!(parse_release_version("1.0.0-rc.1"), Some((1, 0, 0)));
+}
+
+#[test]
+fn release_version_parser_accepts_build_metadata() {
     assert_eq!(parse_release_version("1.0.0+local"), Some((1, 0, 0)));
+}
+
+#[test]
+fn release_version_parser_accepts_prerelease_with_build_metadata() {
     assert_eq!(parse_release_version("1.0.0-rc.1+local"), Some((1, 0, 0)));
+}
+
+#[test]
+fn release_version_parser_ci_is_none() {
     assert_eq!(parse_release_version("ci"), None);
+}
+
+#[test]
+fn release_version_parser_rejects_malformed_versions() {
+    assert_eq!(parse_release_version("1.0"), None);
+    assert_eq!(parse_release_version("abc"), None);
+    assert_eq!(parse_release_version("1.0.0.0"), None);
+    assert_eq!(parse_release_version(""), None);
 }
 
 #[test]

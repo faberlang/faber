@@ -262,6 +262,23 @@ fn compile_package_reports_unresolved_external_imports() {
 }
 
 #[test]
+fn compile_package_rejects_empty_source_file() {
+    let dir = test_temp_dir("empty-source");
+    let entry = dir.join("main.fab");
+    fs::write(&entry, "").expect("write empty entry");
+    let result = compile_package(&Config::default(), &entry);
+    assert!(result.output.is_none());
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.is_error()),
+        "empty source should produce error diagnostics, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
 fn compile_package_resolves_builtin_norma_library_imports_without_local_modules() {
     let dir = test_temp_dir("norma-json-import");
     fs::create_dir_all(dir.join("src")).expect("create src");
@@ -857,176 +874,100 @@ file = "message.fab"
     );
 }
 
-#[derive(Debug)]
-struct ArtifactHarnessFailure {
-    case: &'static str,
-    bucket: &'static str,
-    detail: String,
-}
-
-struct ArtifactHarnessCase {
-    name: &'static str,
-    input: PathBuf,
-    argumenta: Vec<String>,
-    expected_stdout: Vec<String>,
-    postcondition: Option<Box<dyn Fn() -> Result<(), String>>>,
-}
-
 #[test]
-fn package_mir_artifact_harness_initial_floor() {
-    let cases = vec![
-        artifact_harness_hello_case(),
-        artifact_harness_multifile_case(),
-        artifact_harness_cli_case(),
-        artifact_harness_coreutils_touch_case(),
-    ];
-    let mut failures = Vec::new();
-    for case in cases {
-        if let Err(failure) = run_artifact_harness_case(&case) {
-            failures.push(failure);
-        }
-    }
-    assert!(
-        failures.is_empty(),
-        "package artifact harness failures:\n{}",
-        format_artifact_harness_failures(&failures)
+fn package_mir_artifact_harness_hello_world() {
+    artifact_harness_run_test(
+        "hello-world",
+        |case| {
+            let dir = test_temp_dir("artifact-harness-hello");
+            let input = dir.join("main.fab");
+            fs::write(&input, "incipit { nota \"Salve, Munde!\" }").expect("write hello");
+            ArtifactHarnessCaseInner {
+                name: "hello-world",
+                input,
+                argumenta: Vec::new(),
+                expected_stdout: vec!["Salve, Munde!".to_owned()],
+            }
+        },
     );
 }
 
-fn format_artifact_harness_failures(failures: &[ArtifactHarnessFailure]) -> String {
-    failures
-        .iter()
-        .map(|failure| format!("{} [{}]: {}", failure.case, failure.bucket, failure.detail))
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
-fn run_artifact_harness_case(case: &ArtifactHarnessCase) -> Result<(), ArtifactHarnessFailure> {
-    let config = Config::default().with_stdlib(dev_norma_library_home());
-    let artifact = build_package_mir_artifact(&config, &case.input, &case.argumenta).map_err(
-        |diagnostics| ArtifactHarnessFailure {
-            case: case.name,
-            bucket: "build-or-link",
-            detail: format!("{:?}", diagnostic_facts(&diagnostics)),
-        },
-    )?;
-    if !artifact.manifest_path.exists() {
-        return Err(ArtifactHarnessFailure {
-            case: case.name,
-            bucket: "image-write",
-            detail: artifact.manifest_path.display().to_string(),
-        });
-    }
-    let mut host = BufferHost::with_argumenta(case.argumenta.clone());
-    run_package_mir_artifact(&config, &artifact, &mut host).map_err(|diagnostics| {
-        ArtifactHarnessFailure {
-            case: case.name,
-            bucket: "run",
-            detail: format!("{:?}", diagnostic_facts(&diagnostics)),
-        }
-    })?;
-    if host.stdout_lines != case.expected_stdout {
-        return Err(ArtifactHarnessFailure {
-            case: case.name,
-            bucket: "output-mismatch",
-            detail: format!(
-                "expected {:?}, got {:?}",
-                case.expected_stdout, host.stdout_lines
-            ),
-        });
-    }
-    if let Some(postcondition) = &case.postcondition {
-        postcondition().map_err(|detail| ArtifactHarnessFailure {
-            case: case.name,
-            bucket: "postcondition",
-            detail,
-        })?;
-    }
-    Ok(())
-}
-
-fn diagnostic_facts(diagnostics: &[Diagnostic]) -> Vec<(Option<&'static str>, Option<&str>)> {
-    diagnostics
-        .iter()
-        .map(|diag| (diag.code, diag.issue()))
-        .collect()
-}
-
-fn artifact_harness_hello_case() -> ArtifactHarnessCase {
-    let dir = test_temp_dir("artifact-harness-hello");
-    let input = dir.join("main.fab");
-    fs::write(&input, "incipit { nota \"Salve, Munde!\" }").expect("write hello");
-    ArtifactHarnessCase {
-        name: "hello-world",
-        input,
-        argumenta: Vec::new(),
-        expected_stdout: vec!["Salve, Munde!".to_owned()],
-        postcondition: None,
-    }
-}
-
-fn artifact_harness_multifile_case() -> ArtifactHarnessCase {
-    let dir = test_temp_dir("artifact-harness-multifile");
-    let input = dir.join("main.fab");
-    fs::write(
-        &input,
-        r#"
+#[test]
+fn package_mir_artifact_harness_multifile() {
+    artifact_harness_run_test(
+        "multi-file",
+        |case| {
+            let dir = test_temp_dir("artifact-harness-multifile");
+            let input = dir.join("main.fab");
+            fs::write(
+                &input,
+                r#"
 importa ex "./message" privata message
 
 incipit {
   nota message.text()
 }
 "#,
-    )
-    .expect("write entry");
-    fs::write(
-        dir.join("message.fab"),
-        r#"
+            )
+            .expect("write entry");
+            fs::write(
+                dir.join("message.fab"),
+                r#"
 functio text() → textus {
   redde "multi"
 }
 "#,
-    )
-    .expect("write module");
-    ArtifactHarnessCase {
-        name: "multi-file",
-        input,
-        argumenta: Vec::new(),
-        expected_stdout: vec!["multi".to_owned()],
-        postcondition: None,
-    }
+            )
+            .expect("write module");
+            ArtifactHarnessCaseInner {
+                name: "multi-file",
+                input,
+                argumenta: Vec::new(),
+                expected_stdout: vec!["multi".to_owned()],
+            }
+        },
+    );
 }
 
-fn artifact_harness_cli_case() -> ArtifactHarnessCase {
-    let dir = test_temp_dir("artifact-harness-cli");
-    let input = dir.join("main.fab");
-    fs::write(
-        &input,
-        r#"
+#[test]
+fn package_mir_artifact_harness_cli_argv() {
+    artifact_harness_run_test(
+        "cli-argv",
+        |case| {
+            let dir = test_temp_dir("artifact-harness-cli");
+            let input = dir.join("main.fab");
+            fs::write(
+                &input,
+                r#"
 @ cli "tool"
 @ operandus textus name
 incipit argumenta args {
   nota args.name
 }
 "#,
-    )
-    .expect("write cli");
-    ArtifactHarnessCase {
-        name: "cli-argv",
-        input,
-        argumenta: vec!["Ian".to_owned()],
-        expected_stdout: vec!["Ian".to_owned()],
-        postcondition: None,
-    }
+            )
+            .expect("write cli");
+            ArtifactHarnessCaseInner {
+                name: "cli-argv",
+                input,
+                argumenta: vec!["Ian".to_owned()],
+                expected_stdout: vec!["Ian".to_owned()],
+            }
+        },
+    );
 }
 
-fn artifact_harness_coreutils_touch_case() -> ArtifactHarnessCase {
-    let dir = test_temp_dir("artifact-harness-coreutils-touch");
-    let src = dir.join("src");
-    fs::create_dir_all(&src).expect("create touch src");
-    fs::write(
-        dir.join("faber.toml"),
-        r#"
+#[test]
+fn package_mir_artifact_harness_coreutils_touch() {
+    artifact_harness_run_test(
+        "coreutils-touch",
+        |case| {
+            let dir = test_temp_dir("artifact-harness-coreutils-touch");
+            let src = dir.join("src");
+            fs::create_dir_all(&src).expect("create touch src");
+            fs::write(
+                dir.join("faber.toml"),
+                r#"
 [package]
 name = "touch-artifact-floor"
 
@@ -1034,28 +975,75 @@ name = "touch-artifact-floor"
 source = "src"
 entry = "main.fab"
 "#,
-    )
-    .expect("write manifest");
-    let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-    let touch_source = workspace_root.join("examples/coreutils/packages/touch/src/main.fab");
-    fs::write(
-        src.join("main.fab"),
-        fs::read_to_string(&touch_source).expect("read coreutils touch"),
-    )
-    .expect("write touch source copy");
-    let touched = dir.join("created.txt");
-    let touched_for_check = touched.clone();
-    ArtifactHarnessCase {
-        name: "coreutils-touch",
-        input: dir,
-        argumenta: vec![touched.to_string_lossy().into_owned()],
-        expected_stdout: Vec::new(),
-        postcondition: Some(Box::new(move || {
-            touched_for_check
-                .is_file()
-                .then_some(())
-                .ok_or_else(|| format!("{} was not created", touched_for_check.display()))
-        })),
+            )
+            .expect("write manifest");
+            let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+            let touch_source = workspace_root.join("examples/coreutils/packages/touch/src/main.fab");
+            fs::write(
+                src.join("main.fab"),
+                fs::read_to_string(&touch_source).expect("read coreutils touch"),
+            )
+            .expect("write touch source copy");
+            let touched = dir.join("created.txt");
+            ArtifactHarnessCaseInner {
+                name: "coreutils-touch",
+                input: dir,
+                argumenta: vec![touched.to_string_lossy().into_owned()],
+                expected_stdout: Vec::new(),
+            }
+        },
+    );
+}
+
+struct ArtifactHarnessCaseInner {
+    name: &'static str,
+    input: PathBuf,
+    argumenta: Vec<String>,
+    expected_stdout: Vec<String>,
+}
+
+fn artifact_harness_run_test(
+    _case_name: &'static str,
+    setup: impl FnOnce(&'static str) -> ArtifactHarnessCaseInner,
+) {
+    let case = setup(_case_name);
+    let config = Config::default().with_stdlib(dev_norma_library_home());
+    let artifact = build_package_mir_artifact(&config, &case.input, &case.argumenta)
+        .unwrap_or_else(|diagnostics| {
+            panic!(
+                "{} build-or-link failed: {:?}",
+                case.name,
+                diagnostics
+                    .iter()
+                    .map(|diag| (diag.code, diag.issue()))
+                    .collect::<Vec<_>>()
+            )
+        });
+    assert!(
+        artifact.manifest_path.exists(),
+        "{} manifest path missing: {}",
+        case.name,
+        artifact.manifest_path.display()
+    );
+    let mut host = BufferHost::with_argumenta(case.argumenta.clone());
+    run_package_mir_artifact(&config, &artifact, &mut host).unwrap_or_else(|diagnostics| {
+        panic!(
+            "{} run failed: {:?}",
+            case.name,
+            diagnostics
+                .iter()
+                .map(|diag| (diag.code, diag.issue()))
+                .collect::<Vec<_>>()
+        )
+    });
+    assert_eq!(
+        host.stdout_lines, case.expected_stdout,
+        "{} output mismatch",
+        case.name
+    );
+    if case.name == "coreutils-touch" {
+        let touched = case.input.join("created.txt");
+        assert!(touched.is_file(), "coreutils-touch did not create {}", touched.display());
     }
 }
 
@@ -1804,8 +1792,8 @@ fn assert_package_corpus_llvm_smoke(relative: &str, label: &str) {
 }
 
 #[test]
-fn package_mir_bridges_norma_solum_file_mutation_verbs() {
-    let dir = test_temp_dir("package-mir-solum-mutation");
+fn package_mir_bridges_norma_solum_crea_iunge_exstat_dele() {
+    let dir = test_temp_dir("package-mir-solum-crea-dele");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
@@ -1818,20 +1806,8 @@ incipit argumenta args {
   varia lista<textus> partes ← [args.root, "nested"]
   fixum textus nested ← solum.iunge(partes)
   solum.crea(nested)
-  partes ← [nested, "source.txt"]
-  fixum textus source ← solum.iunge(partes)
-  partes ← [nested, "copy.txt"]
-  fixum textus copy ← solum.iunge(partes)
-  partes ← [nested, "moved.txt"]
-  fixum textus moved ← solum.iunge(partes)
-  solum.tange(source)
-  solum.scribe(source, "alpha")
-  solum.exscribe(source, copy)
-  solum.renomina(copy, moved)
-  nota solum.lege<textus>(moved)
-  solum.dele(source)
-  solum.dele(moved)
-  solum.amputa(nested)
+  nota solum.exstat(nested)
+  solum.dele(nested)
   nota solum.exstat(nested)
 }
 "#,
@@ -1846,26 +1822,186 @@ incipit argumenta args {
         &mut host,
     );
 
-    assert!(
-        result.is_ok(),
-        "expected norma:solum mutation bridge package MIR success, got {:?}",
-        result
-            .err()
-            .unwrap_or_default()
-            .iter()
-            .map(|diag| (diag.code, diag.issue()))
-            .collect::<Vec<_>>()
+    assert!(result.is_ok(), "expected solum crea/iunge/exstat/dele bridge success, got {:?}",
+        result.err().unwrap_or_default().iter().map(|diag| (diag.code, diag.issue())).collect::<Vec<_>>());
+    assert_eq!(host.stdout_lines, vec!["verum".to_owned(), "falsum".to_owned()]);
+}
+
+#[test]
+fn package_mir_bridges_norma_solum_tange_scribe_lege() {
+    let dir = test_temp_dir("package-mir-solum-tange-scribe");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+importa ex "norma:solum" privata solum
+
+@ cli "tool"
+@ operandus textus root
+incipit argumenta args {
+  varia lista<textus> partes ← [args.root]
+  fixum textus dir ← solum.iunge(partes)
+  solum.crea(dir)
+  partes ← [dir, "target.txt"]
+  fixum textus target ← solum.iunge(partes)
+  solum.tange(target)
+  solum.scribe(target, "alpha")
+  nota solum.lege<textus>(target)
+  solum.dele(target)
+  solum.amputa(dir)
+}
+"#,
+    )
+    .expect("write entry");
+    let fixture_root = dir.join("workspace");
+
+    let mut host = BufferHost::with_argumenta(vec![fixture_root.to_string_lossy().into_owned()]);
+    let result = run_package_mir(
+        &Config::default().with_stdlib(dev_norma_library_home()),
+        &entry,
+        &mut host,
     );
+
+    assert!(result.is_ok(), "expected solum tange/scribe/lege bridge success, got {:?}",
+        result.err().unwrap_or_default().iter().map(|diag| (diag.code, diag.issue())).collect::<Vec<_>>());
+    assert_eq!(host.stdout_lines, vec!["alpha".to_owned()]);
+}
+
+#[test]
+fn package_mir_bridges_norma_solum_exscribe_renomina() {
+    let dir = test_temp_dir("package-mir-solum-exscribe-renomina");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+importa ex "norma:solum" privata solum
+
+@ cli "tool"
+@ operandus textus root
+incipit argumenta args {
+  varia lista<textus> partes ← [args.root]
+  fixum textus dir ← solum.iunge(partes)
+  solum.crea(dir)
+  partes ← [dir, "source.txt"]
+  fixum textus source ← solum.iunge(partes)
+  partes ← [dir, "copy.txt"]
+  fixum textus copy ← solum.iunge(partes)
+  partes ← [dir, "moved.txt"]
+  fixum textus moved ← solum.iunge(partes)
+  solum.tange(source)
+  solum.scribe(source, "alpha")
+  solum.exscribe(source, copy)
+  solum.renomina(copy, moved)
+  nota solum.lege<textus>(moved)
+  solum.dele(source)
+  solum.dele(moved)
+  solum.amputa(dir)
+}
+"#,
+    )
+    .expect("write entry");
+    let fixture_root = dir.join("workspace");
+
+    let mut host = BufferHost::with_argumenta(vec![fixture_root.to_string_lossy().into_owned()]);
+    let result = run_package_mir(
+        &Config::default().with_stdlib(dev_norma_library_home()),
+        &entry,
+        &mut host,
+    );
+
+    assert!(result.is_ok(), "expected solum exscribe/renomina bridge success, got {:?}",
+        result.err().unwrap_or_default().iter().map(|diag| (diag.code, diag.issue())).collect::<Vec<_>>());
+    assert_eq!(host.stdout_lines, vec!["alpha".to_owned()]);
+}
+
+#[test]
+fn package_mir_bridges_norma_solum_mensura_regularene_directoriumne() {
+    let dir = test_temp_dir("package-mir-solum-mensura");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+importa ex "norma:solum" privata solum
+
+@ cli "tool"
+@ operandus textus root
+incipit argumenta args {
+  varia lista<textus> partes ← [args.root, "nested"]
+  fixum textus nested ← solum.iunge(partes)
+  solum.crea(nested)
+  partes ← [nested, "source.bin"]
+  fixum textus source ← solum.iunge(partes)
+  solum.tange(source)
+  nota solum.mensura(source)
+  nota solum.regularene(source)
+  nota solum.directoriumne(nested)
+  solum.dele(source)
+  solum.amputa(nested)
+}
+"#,
+    )
+    .expect("write entry");
+    let fixture_root = dir.join("workspace");
+
+    let mut host = BufferHost::with_argumenta(vec![fixture_root.to_string_lossy().into_owned()]);
+    let result = run_package_mir(
+        &Config::default().with_stdlib(dev_norma_library_home()),
+        &entry,
+        &mut host,
+    );
+
+    assert!(result.is_ok(), "expected solum mensura/regularene/directoriumne bridge success, got {:?}",
+        result.err().unwrap_or_default().iter().map(|diag| (diag.code, diag.issue())).collect::<Vec<_>>());
     assert_eq!(
         host.stdout_lines,
-        vec!["alpha".to_owned(), "falsum".to_owned()]
+        vec!["0".to_owned(), "verum".to_owned(), "verum".to_owned()]
     );
     assert!(!fixture_root.join("nested").exists());
 }
 
 #[test]
-fn package_mir_bridges_norma_solum_metadata_and_link_verbs() {
-    let dir = test_temp_dir("package-mir-solum-metadata");
+fn package_mir_bridges_norma_solum_modus_mode_verbs() {
+    let dir = test_temp_dir("package-mir-solum-modus");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+importa ex "norma:solum" privata solum
+
+@ cli "tool"
+@ operandus textus root
+incipit argumenta args {
+  varia lista<textus> partes ← [args.root, "nested"]
+  fixum textus nested ← solum.iunge(partes)
+  solum.crea(nested)
+  partes ← [nested, "target.bin"]
+  fixum textus target ← solum.iunge(partes)
+  solum.tange(target)
+  solum.modum(target, 384)
+  nota solum.modus(target)
+  solum.dele(target)
+  solum.amputa(nested)
+}
+"#,
+    )
+    .expect("write entry");
+    let fixture_root = dir.join("workspace");
+
+    let mut host = BufferHost::with_argumenta(vec![fixture_root.to_string_lossy().into_owned()]);
+    let result = run_package_mir(
+        &Config::default().with_stdlib(dev_norma_library_home()),
+        &entry,
+        &mut host,
+    );
+
+    assert!(result.is_ok(), "expected solum modus bridge success, got {:?}",
+        result.err().unwrap_or_default().iter().map(|diag| (diag.code, diag.issue())).collect::<Vec<_>>());
+    assert_eq!(host.stdout_lines, vec!["384".to_owned()]);
+}
+
+#[test]
+fn package_mir_bridges_norma_solum_link_verbs() {
+    let dir = test_temp_dir("package-mir-solum-link");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
@@ -1884,11 +2020,6 @@ incipit argumenta args {
   fixum textus link ← solum.iunge(partes)
   fixum octeti payload ← |41 42|
   solum.funde(source, payload)
-  nota solum.mensura(source)
-  nota solum.regularene(source)
-  nota solum.directoriumne(nested)
-  solum.modum(source, 384)
-  nota solum.modus(source)
   solum.vincula(source, link)
   nota solum.vinculumne(link)
   nota solum.sequere(link)
@@ -1909,28 +2040,57 @@ incipit argumenta args {
         &mut host,
     );
 
-    assert!(
-        result.is_ok(),
-        "expected norma:solum metadata bridge package MIR success, got {:?}",
-        result
-            .err()
-            .unwrap_or_default()
-            .iter()
-            .map(|diag| (diag.code, diag.issue()))
-            .collect::<Vec<_>>()
-    );
+    assert!(result.is_ok(), "expected solum link bridge success, got {:?}",
+        result.err().unwrap_or_default().iter().map(|diag| (diag.code, diag.issue())).collect::<Vec<_>>());
     assert_eq!(
         host.stdout_lines,
         vec![
-            "2".to_owned(),
-            "verum".to_owned(),
-            "verum".to_owned(),
-            "384".to_owned(),
             "verum".to_owned(),
             source.to_string_lossy().into_owned(),
         ]
     );
     assert!(!fixture_root.join("nested").exists());
+}
+
+#[test]
+fn package_mir_bridges_norma_solum_funde_octeti() {
+    let dir = test_temp_dir("package-mir-solum-funde");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+importa ex "norma:solum" privata solum
+
+@ cli "tool"
+@ operandus textus root
+incipit argumenta args {
+  varia lista<textus> partes ← [args.root, "dir"]
+  fixum textus dir ← solum.iunge(partes)
+  solum.crea(dir)
+  partes ← [dir, "data.bin"]
+  fixum textus target ← solum.iunge(partes)
+  fixum octeti payload ← |41 42 43|
+  solum.funde(target, payload)
+  nota solum.mensura(target)
+  solum.dele(target)
+  solum.amputa(dir)
+}
+"#,
+    )
+    .expect("write entry");
+    let fixture_root = dir.join("workspace");
+
+    let mut host = BufferHost::with_argumenta(vec![fixture_root.to_string_lossy().into_owned()]);
+    let result = run_package_mir(
+        &Config::default().with_stdlib(dev_norma_library_home()),
+        &entry,
+        &mut host,
+    );
+
+    assert!(result.is_ok(), "expected solum funde/octeti bridge success, got {:?}",
+        result.err().unwrap_or_default().iter().map(|diag| (diag.code, diag.issue())).collect::<Vec<_>>());
+    assert_eq!(host.stdout_lines, vec!["3".to_owned()]);
+    assert!(!fixture_root.join("dir").exists());
 }
 
 #[test]
@@ -1997,6 +2157,36 @@ incipit argumenta args {
         );
         assert_eq!(host.stdout_lines, vec![value.to_owned()]);
     }
+}
+
+#[test]
+fn package_mir_cli_root_numerus_operand_rejects_non_numeric() {
+    let dir = test_temp_dir("package-mir-cli-numerus-non-numeric");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+@ cli "tool"
+@ operandus numerus count
+incipit argumenta args {
+  nota args.count
+}
+"#,
+    )
+    .expect("write entry");
+
+    let mut host = BufferHost::with_argumenta(vec!["not-a-number".to_owned()]);
+    let diagnostics = run_package_mir(&Config::default(), &entry, &mut host)
+        .expect_err("non-numeric CLI operand should fail");
+
+    assert!(host.stdout_lines.is_empty());
+    assert!(
+        diagnostics.iter().any(|diag| {
+            diagnostic_has_issue(diag, "package_mir_cli_surface_unsupported")
+        }),
+        "expected CLI argument parsing diagnostic for non-numeric input, got {:?}",
+        diagnostics.iter().map(|diag| (diag.code, diag.issue())).collect::<Vec<_>>()
+    );
 }
 
 #[test]
@@ -2358,6 +2548,36 @@ incipit argumenta args {
             .iter()
             .map(|diag| (diag.code, diag.issue()))
             .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn package_mir_cli_rejects_missing_required_operand() {
+    let dir = test_temp_dir("package-mir-cli-missing-operand");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+@ cli "tool"
+@ operandus textus name
+incipit argumenta args {
+  nota args.name
+}
+"#,
+    )
+    .expect("write entry");
+
+    let mut host = BufferHost::default();
+    let diagnostics = run_package_mir(&Config::default(), &entry, &mut host)
+        .expect_err("missing required CLI operand should fail");
+
+    assert!(host.stdout_lines.is_empty());
+    assert!(
+        diagnostics.iter().any(|diag| {
+            diagnostic_has_issue(diag, "package_mir_cli_surface_unsupported")
+        }),
+        "expected CLI argument diagnostic for missing operand, got {:?}",
+        diagnostics.iter().map(|diag| (diag.code, diag.issue())).collect::<Vec<_>>()
     );
 }
 
@@ -5676,6 +5896,25 @@ entry = "main.fab"
 }
 
 #[test]
+fn compile_package_minimal_valid_manifest_name_only() {
+    let dir = test_temp_dir("minimal-valid");
+    let entry = dir.join("main.fab");
+    fs::write(&entry, "incipit { nota \"ok\" }").expect("write entry");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "minimal"
+"#,
+    )
+    .expect("write manifest");
+
+    let result = compile_package(&Config::default(), &entry);
+    assert!(result.success(), "minimal name-only manifest should compile, got {:?}",
+        result.diagnostics.iter().map(|diag| (diag.code, diag.issue())).collect::<Vec<_>>());
+}
+
+#[test]
 fn compile_package_discovers_faber_toml_from_directory() {
     let dir = test_temp_dir("manifest-dir");
     let src = dir.join("src");
@@ -5867,6 +6106,14 @@ name = "defaults"
     assert!(manifest.product.is_none());
     assert!(manifest.reader.locale.is_none());
     assert!(manifest.reader.pack.is_none());
+}
+
+#[test]
+fn read_manifest_rejects_nonexistent_path() {
+    let dir = test_temp_dir("manifest-missing");
+    let missing = dir.join("faber.toml");
+    let err = read_manifest(&missing).expect_err("non-existent manifest should fail");
+    assert!(diagnostic_has_issue(&err, "invalid_package_manifest"));
 }
 
 #[test]

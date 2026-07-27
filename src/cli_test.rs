@@ -164,31 +164,43 @@ fn cli_parses_emit_wgsl_text_target() {
 }
 
 #[test]
-fn cli_parses_legacy_ir_alias_subcommands() {
+fn cli_parses_lex_subcommand() {
     let lex = Cli::try_parse_from(["faber", "lex", "main.fab"]).expect("parse lex");
     let Some(crate::cli::Command::Lex(args)) = lex.command else {
         panic!("expected lex subcommand");
     };
     assert_eq!(args.input, vec!["main.fab"]);
+}
 
+#[test]
+fn cli_parses_parse_subcommand() {
     let parse = Cli::try_parse_from(["faber", "parse", "main.fab"]).expect("parse parse");
     let Some(crate::cli::Command::Parse(args)) = parse.command else {
         panic!("expected parse subcommand");
     };
     assert_eq!(args.input, vec!["main.fab"]);
+}
 
+#[test]
+fn cli_parses_hir_subcommand() {
     let hir = Cli::try_parse_from(["faber", "hir", "main.fab"]).expect("parse hir");
     let Some(crate::cli::Command::Hir(args)) = hir.command else {
         panic!("expected hir subcommand");
     };
     assert_eq!(args.input, vec!["main.fab"]);
+}
 
+#[test]
+fn cli_parses_mir_subcommand() {
     let mir = Cli::try_parse_from(["faber", "mir", "main.fab"]).expect("parse mir");
     let Some(crate::cli::Command::Mir(args)) = mir.command else {
         panic!("expected mir subcommand");
     };
     assert_eq!(args.input, vec!["main.fab"]);
+}
 
+#[test]
+fn cli_parses_cli_ir_subcommand() {
     let cli_ir = Cli::try_parse_from(["faber", "cli-ir", "main.fab"]).expect("parse cli-ir");
     let Some(crate::cli::Command::CliIr(args)) = cli_ir.command else {
         panic!("expected cli-ir subcommand");
@@ -197,7 +209,7 @@ fn cli_parses_legacy_ir_alias_subcommands() {
 }
 
 #[test]
-fn cli_parses_scena_target_for_build_and_run() {
+fn cli_parses_scena_target_for_build() {
     let build = Cli::try_parse_from(["faber", "build", "--target", "scena", "pkg"])
         .expect("parse build scena target");
     let Some(crate::cli::Command::Build(args)) = build.command else {
@@ -205,7 +217,10 @@ fn cli_parses_scena_target_for_build_and_run() {
     };
     assert_eq!(args.target, Some(radix::tool::CliTarget::Scena));
     assert_eq!(args.input, "pkg");
+}
 
+#[test]
+fn cli_parses_scena_target_for_run() {
     let run = Cli::try_parse_from(["faber", "run", "--target", "scena", "pkg", "--", "Ian"])
         .expect("parse run scena target");
     let Some(crate::cli::Command::Run(args)) = run.command else {
@@ -297,7 +312,7 @@ fn cli_parses_fmir_target_for_build() {
 }
 
 #[test]
-fn cli_parses_fmir_bin_target_for_build_and_run() {
+fn cli_parses_fmir_bin_target_for_build() {
     let build = Cli::try_parse_from(["faber", "build", "--target", "fmir-bin", "pkg"])
         .expect("parse build fmir-bin target");
     let Some(crate::cli::Command::Build(args)) = build.command else {
@@ -305,7 +320,10 @@ fn cli_parses_fmir_bin_target_for_build_and_run() {
     };
     assert_eq!(args.target, Some(radix::tool::CliTarget::FmirBin));
     assert_eq!(args.input, "pkg");
+}
 
+#[test]
+fn cli_parses_fmir_bin_target_for_run() {
     let run = Cli::try_parse_from(["faber", "run", "--target", "fmir-bin", "pkg", "--", "Ian"])
         .expect("parse run fmir-bin target");
     let Some(crate::cli::Command::Run(args)) = run.command else {
@@ -317,14 +335,17 @@ fn cli_parses_fmir_bin_target_for_build_and_run() {
 }
 
 #[test]
-fn cli_parses_reader_locale_on_check_emit_build_run_test_and_format() {
+fn cli_parses_reader_locale_on_check() {
     let check = Cli::try_parse_from(["faber", "check", "--reader-locale", "zh-Hans", "main.fab"])
         .expect("parse check reader locale");
     let Some(crate::cli::Command::Check(args)) = check.command else {
         panic!("expected check subcommand");
     };
     assert_eq!(args.reader_locale.as_deref(), Some("zh-Hans"));
+}
 
+#[test]
+fn cli_parses_reader_locale_on_emit() {
     let emit = Cli::try_parse_from([
         "faber",
         "emit",
@@ -339,28 +360,40 @@ fn cli_parses_reader_locale_on_check_emit_build_run_test_and_format() {
         panic!("expected emit subcommand");
     };
     assert_eq!(args.reader_locale.as_deref(), Some("zh-Hans"));
+}
 
+#[test]
+fn cli_parses_reader_locale_on_build() {
     let build = Cli::try_parse_from(["faber", "build", "--reader-locale", "zh-Hans", "main.fab"])
         .expect("parse build reader locale");
     let Some(crate::cli::Command::Build(args)) = build.command else {
         panic!("expected build subcommand");
     };
     assert_eq!(args.reader_locale.as_deref(), Some("zh-Hans"));
+}
 
+#[test]
+fn cli_parses_reader_locale_on_run() {
     let run = Cli::try_parse_from(["faber", "run", "--reader-locale", "zh-Hans", "main.fab"])
         .expect("parse run reader locale");
     let Some(crate::cli::Command::Run(args)) = run.command else {
         panic!("expected run subcommand");
     };
     assert_eq!(args.reader_locale.as_deref(), Some("zh-Hans"));
+}
 
+#[test]
+fn cli_parses_reader_locale_on_test() {
     let test = Cli::try_parse_from(["faber", "test", "--reader-locale", "zh-Hans", "main.fab"])
         .expect("parse test reader locale");
     let Some(crate::cli::Command::Test(args)) = test.command else {
         panic!("expected test subcommand");
     };
     assert_eq!(args.reader_locale.as_deref(), Some("zh-Hans"));
+}
 
+#[test]
+fn cli_parses_reader_locale_on_format() {
     let format = Cli::try_parse_from([
         "faber",
         "format",
@@ -445,7 +478,7 @@ fn cli_parses_reader_locale_on_explain() {
 }
 
 #[test]
-fn cli_parses_explain_query_modes() {
+fn cli_parses_explain_json_term() {
     let json =
         Cli::try_parse_from(["faber", "explain", "--json", "nihil"]).expect("parse explain json");
     let Some(crate::cli::Command::Explain(json_args)) = json.command else {
@@ -453,7 +486,10 @@ fn cli_parses_explain_query_modes() {
     };
     assert!(json_args.json);
     assert_eq!(json_args.term.as_deref(), Some("nihil"));
+}
 
+#[test]
+fn cli_parses_explain_search() {
     let search = Cli::try_parse_from(["faber", "explain", "--search", "host"])
         .expect("parse explain search");
     let Some(crate::cli::Command::Explain(search_args)) = search.command else {
@@ -461,14 +497,20 @@ fn cli_parses_explain_query_modes() {
     };
     assert_eq!(search_args.search.as_deref(), Some("host"));
     assert!(search_args.term.is_none());
+}
 
+#[test]
+fn cli_parses_explain_list() {
     let list = Cli::try_parse_from(["faber", "explain", "--list"]).expect("parse explain list");
     let Some(crate::cli::Command::Explain(list_args)) = list.command else {
         panic!("expected explain subcommand");
     };
     assert!(list_args.list);
     assert!(list_args.term.is_none());
+}
 
+#[test]
+fn cli_parses_explain_category() {
     let category = Cli::try_parse_from(["faber", "explain", "--category", "diagnostics"])
         .expect("parse explain category");
     let Some(crate::cli::Command::Explain(category_args)) = category.command else {
@@ -479,18 +521,24 @@ fn cli_parses_explain_query_modes() {
 }
 
 #[test]
-fn cli_rejects_conflicting_explain_query_modes() {
+fn cli_rejects_explain_list_and_term() {
     let mixed = Cli::try_parse_from(["faber", "explain", "--list", "nihil"])
         .expect_err("list and term should conflict");
     let mixed_rendered = mixed.to_string();
     assert!(mixed_rendered.contains("--list"));
+}
 
+#[test]
+fn cli_rejects_explain_search_and_json() {
     let search_json = Cli::try_parse_from(["faber", "explain", "--search", "host", "--json"])
         .expect_err("search and json should conflict");
     let search_json_rendered = search_json.to_string();
     assert!(search_json_rendered.contains("--search"));
     assert!(search_json_rendered.contains("--json"));
+}
 
+#[test]
+fn cli_rejects_explain_search_and_category() {
     let search_category = Cli::try_parse_from([
         "faber",
         "explain",
@@ -503,14 +551,20 @@ fn cli_rejects_conflicting_explain_query_modes() {
     let search_category_rendered = search_category.to_string();
     assert!(search_category_rendered.contains("--search"));
     assert!(search_category_rendered.contains("--category"));
+}
 
+#[test]
+fn cli_rejects_explain_list_and_reader_locale() {
     let list_reader_locale =
         Cli::try_parse_from(["faber", "explain", "--list", "--reader-locale", "la"])
             .expect_err("list and reader locale should conflict");
     let list_reader_locale_rendered = list_reader_locale.to_string();
     assert!(list_reader_locale_rendered.contains("--list"));
     assert!(list_reader_locale_rendered.contains("--reader-locale"));
+}
 
+#[test]
+fn cli_rejects_explain_search_and_reader_locale() {
     let search_reader_locale = Cli::try_parse_from([
         "faber",
         "explain",
@@ -523,7 +577,10 @@ fn cli_rejects_conflicting_explain_query_modes() {
     let search_reader_locale_rendered = search_reader_locale.to_string();
     assert!(search_reader_locale_rendered.contains("--search"));
     assert!(search_reader_locale_rendered.contains("--reader-locale"));
+}
 
+#[test]
+fn cli_rejects_explain_category_and_reader_locale() {
     let category_reader_locale = Cli::try_parse_from([
         "faber",
         "explain",
@@ -597,14 +654,17 @@ fn cli_init_defaults_to_current_directory() {
 }
 
 #[test]
-fn cli_script_and_test_default_to_current_directory() {
+fn cli_script_defaults_to_current_directory() {
     let script = Cli::try_parse_from(["faber", "script"]).expect("parse script defaults");
     let Some(crate::cli::Command::Script(script_args)) = script.command else {
         panic!("expected script subcommand");
     };
     assert_eq!(script_args.path, std::path::PathBuf::from("."));
     assert!(script_args.args.is_empty());
+}
 
+#[test]
+fn cli_test_defaults_to_current_directory() {
     let test = Cli::try_parse_from(["faber", "test"]).expect("parse test defaults");
     let Some(crate::cli::Command::Test(test_args)) = test.command else {
         panic!("expected test subcommand");
@@ -668,4 +728,25 @@ fn cli_parses_emit_reflection_flag() {
     };
     assert!(args.reflection);
     assert_eq!(args.target, FaberCliTarget::WgslText);
+}
+
+#[test]
+fn cli_rejects_unknown_subcommand() {
+    let err = Cli::try_parse_from(["faber", "unknown-command"])
+        .expect_err("unknown subcommand must be rejected");
+    assert_eq!(err.kind(), clap::error::ErrorKind::InvalidSubcommand);
+}
+
+#[test]
+fn cli_rejects_build_without_input() {
+    let err = Cli::try_parse_from(["faber", "build"])
+        .expect_err("build requires an input");
+    assert_eq!(err.kind(), clap::error::ErrorKind::MissingRequiredArgument);
+}
+
+#[test]
+fn cli_rejects_emit_without_target() {
+    let err = Cli::try_parse_from(["faber", "emit", "main.fab"])
+        .expect_err("emit requires a target");
+    assert_eq!(err.kind(), clap::error::ErrorKind::MissingRequiredArgument);
 }

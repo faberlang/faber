@@ -1,20 +1,19 @@
 use std::fs;
-use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use super::verify_library_bindings;
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
 
-fn test_package(label: &str, source: &str, bindings: &str, shim: &str) -> PathBuf {
-    let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
-    let root =
-        std::env::temp_dir().join(format!("faber-binding-{label}-{}-{id}", std::process::id()));
-    fs::create_dir_all(root.join("src")).expect("create source directory");
-    fs::create_dir_all(root.join("bindings")).expect("create binding directory");
-    fs::create_dir_all(root.join("rust")).expect("create shim directory");
+fn test_package(label: &str, source: &str, bindings: &str, shim: &str) -> tempfile::TempDir {
+    let _ = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+    let _ = label;
+    let root = tempfile::tempdir().expect("create temp root");
+    fs::create_dir_all(root.path().join("src")).expect("create source directory");
+    fs::create_dir_all(root.path().join("bindings")).expect("create binding directory");
+    fs::create_dir_all(root.path().join("rust")).expect("create shim directory");
     fs::write(
-        root.join("faber.toml"),
+        root.path().join("faber.toml"),
         r#"[package]
 name = "fixture"
 
@@ -33,9 +32,9 @@ bindings = "bindings/rust.toml"
 "#,
     )
     .expect("write package manifest");
-    fs::write(root.join("src/api.fab"), source).expect("write Faber source");
-    fs::write(root.join("bindings/rust.toml"), bindings).expect("write binding manifest");
-    fs::write(root.join("rust/shim.rs"), shim).expect("write Rust shim");
+    fs::write(root.path().join("src/api.fab"), source).expect("write Faber source");
+    fs::write(root.path().join("bindings/rust.toml"), bindings).expect("write binding manifest");
+    fs::write(root.path().join("rust/shim.rs"), shim).expect("write Rust shim");
     root
 }
 
@@ -71,7 +70,7 @@ path = "rust/shim.rs"
         "pub async fn delegata(value: String) -> String { value }\n",
     );
 
-    let result = verify_library_bindings(&root, "rust").expect("analyzed bindings verify");
+    let result = verify_library_bindings(root.path(), "rust").expect("analyzed bindings verify");
     assert_eq!(result.declarations, 2);
     assert_eq!(result.bindings, 1);
 }
@@ -95,7 +94,7 @@ path = "rust/shim.rs"
         "pub fn abscondita(value: String) -> String { value }\n",
     );
 
-    let diagnostics = verify_library_bindings(&root, "rust").expect_err("nested method rejected");
+    let diagnostics = verify_library_bindings(root.path(), "rust").expect_err("nested method rejected");
     assert!(has_issue(&diagnostics, "binding_unknown_declaration"));
 }
 
@@ -113,7 +112,7 @@ path = "rust/shim.rs"
         "pub fn aliud(value: String) -> String { value }\n",
     );
 
-    let diagnostics = verify_library_bindings(&root, "rust").expect_err("missing symbol rejected");
+    let diagnostics = verify_library_bindings(root.path(), "rust").expect_err("missing symbol rejected");
     assert!(has_issue(&diagnostics, "binding_rust_probe_failed"));
 }
 
@@ -131,7 +130,7 @@ path = "rust/shim.rs"
         "pub fn delegata(value: i64) -> String { value.to_string() }\n",
     );
 
-    let diagnostics = verify_library_bindings(&root, "rust").expect_err("wrong signature rejected");
+    let diagnostics = verify_library_bindings(root.path(), "rust").expect_err("wrong signature rejected");
     assert!(has_issue(&diagnostics, "binding_rust_probe_failed"));
 }
 
@@ -149,7 +148,7 @@ path = "rust/shim.rs"
         "pub fn delegata(value: String) -> String { value }\n",
     );
 
-    let diagnostics = verify_library_bindings(&root, "rust").expect_err("sync symbol rejected");
+    let diagnostics = verify_library_bindings(root.path(), "rust").expect_err("sync symbol rejected");
     assert!(has_issue(&diagnostics, "binding_rust_probe_failed"));
 }
 
@@ -168,7 +167,7 @@ path = "rust/shim.rs"
     );
 
     let diagnostics =
-        verify_library_bindings(&root, "rust").expect_err("missing error channel rejected");
+        verify_library_bindings(root.path(), "rust").expect_err("missing error channel rejected");
     assert!(has_issue(&diagnostics, "binding_rust_probe_failed"));
 }
 
@@ -186,7 +185,7 @@ symbol = "crate::shim::altera"
         "pub fn delegata(value: String) -> String { value }\n",
     );
 
-    let diagnostics = verify_library_bindings(&root, "rust").expect_err("duplicate row rejected");
+    let diagnostics = verify_library_bindings(root.path(), "rust").expect_err("duplicate row rejected");
     assert!(has_issue(&diagnostics, "invalid_binding_manifest"));
 }
 
@@ -198,14 +197,14 @@ fn parent_escaping_source_path_is_rejected() {
         "",
         "",
     );
-    let manifest = fs::read_to_string(root.join("faber.toml")).expect("read manifest");
+    let manifest = fs::read_to_string(root.path().join("faber.toml")).expect("read manifest");
     fs::write(
-        root.join("faber.toml"),
+        root.path().join("faber.toml"),
         manifest.replace("source = \"src\"", "source = \"../outside\""),
     )
     .expect("rewrite manifest");
 
-    let diagnostics = verify_library_bindings(&root, "rust").expect_err("escaping source rejected");
+    let diagnostics = verify_library_bindings(root.path(), "rust").expect_err("escaping source rejected");
     assert!(has_issue(&diagnostics, "package_member_parent_escape"));
 }
 
@@ -217,10 +216,10 @@ fn absolute_binding_manifest_path_is_rejected() {
         "",
         "",
     );
-    let absolute = root.join("bindings/rust.toml");
-    let manifest = fs::read_to_string(root.join("faber.toml")).expect("read manifest");
+    let absolute = root.path().join("bindings/rust.toml");
+    let manifest = fs::read_to_string(root.path().join("faber.toml")).expect("read manifest");
     fs::write(
-        root.join("faber.toml"),
+        root.path().join("faber.toml"),
         manifest.replace(
             "bindings = \"bindings/rust.toml\"",
             &format!("bindings = {:?}", absolute.display().to_string()),
@@ -229,7 +228,7 @@ fn absolute_binding_manifest_path_is_rejected() {
     .expect("rewrite manifest");
 
     let diagnostics =
-        verify_library_bindings(&root, "rust").expect_err("absolute binding rejected");
+        verify_library_bindings(root.path(), "rust").expect_err("absolute binding rejected");
     assert!(has_issue(&diagnostics, "package_member_absolute"));
 }
 
@@ -249,16 +248,16 @@ path = "rust/shim.rs"
 "#,
         "",
     );
-    let outside = root.with_extension("outside.rs");
+    let outside = root.path().with_extension("outside.rs");
     fs::write(
         &outside,
         "pub fn delegata(value: String) -> String { value }\n",
     )
     .expect("write outside shim");
-    fs::remove_file(root.join("rust/shim.rs")).expect("remove placeholder shim");
-    symlink(&outside, root.join("rust/shim.rs")).expect("symlink escaping shim");
+    fs::remove_file(root.path().join("rust/shim.rs")).expect("remove placeholder shim");
+    symlink(&outside, root.path().join("rust/shim.rs")).expect("symlink escaping shim");
 
-    let diagnostics = verify_library_bindings(&root, "rust").expect_err("symlink escape rejected");
+    let diagnostics = verify_library_bindings(root.path(), "rust").expect_err("symlink escape rejected");
     assert!(has_issue(&diagnostics, "package_member_symlink_escape"));
 }
 
@@ -273,18 +272,18 @@ fn missing_source_below_symlinked_parent_is_rejected() {
         "",
         "",
     );
-    let outside = root.with_extension("outside-dir");
+    let outside = root.path().with_extension("outside-dir");
     fs::create_dir_all(&outside).expect("create outside directory");
-    symlink(&outside, root.join("linked")).expect("symlink escaping source parent");
-    let manifest = fs::read_to_string(root.join("faber.toml")).expect("read manifest");
+    symlink(&outside, root.path().join("linked")).expect("symlink escaping source parent");
+    let manifest = fs::read_to_string(root.path().join("faber.toml")).expect("read manifest");
     fs::write(
-        root.join("faber.toml"),
+        root.path().join("faber.toml"),
         manifest.replace("source = \"src\"", "source = \"linked/missing\""),
     )
     .expect("rewrite manifest");
 
     let diagnostics =
-        verify_library_bindings(&root, "rust").expect_err("missing symlink child rejected");
+        verify_library_bindings(root.path(), "rust").expect_err("missing symlink child rejected");
     assert!(has_issue(&diagnostics, "package_member_symlink_escape"));
 }
 
@@ -299,15 +298,41 @@ fn symlinked_faber_source_outside_source_root_is_rejected() {
         "",
         "",
     );
-    let outside = root.with_extension("outside.fab");
+    let outside = root.path().with_extension("outside.fab");
     fs::write(
         &outside,
         "functio abscondita() → textus { redde \"outside\" }\n",
     )
     .expect("write outside source");
-    symlink(&outside, root.join("src/escape.fab")).expect("symlink escaping source file");
+    symlink(&outside, root.path().join("src/escape.fab")).expect("symlink escaping source file");
 
     let diagnostics =
-        verify_library_bindings(&root, "rust").expect_err("source symlink escape rejected");
+        verify_library_bindings(root.path(), "rust").expect_err("source symlink escape rejected");
     assert!(has_issue(&diagnostics, "package_source_symlink_escape"));
+}
+
+#[test]
+fn empty_source_has_no_declarations() {
+    let root = test_package(
+        "empty-source",
+        "",
+        "",
+        "",
+    );
+    let result = verify_library_bindings(root.path(), "rust").expect("empty source must not error");
+    assert_eq!(result.declarations, 0);
+    assert_eq!(result.bindings, 0);
+}
+
+#[test]
+fn all_local_functions_without_bindings() {
+    let root = test_package(
+        "local-only",
+        "functio localis() → textus { redde \"ok\" }\n",
+        "",
+        "",
+    );
+    let result = verify_library_bindings(root.path(), "rust").expect("local functions without bindings");
+    assert_eq!(result.declarations, 1);
+    assert_eq!(result.bindings, 0);
 }

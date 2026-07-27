@@ -3,6 +3,26 @@ use radix::codegen::Target;
 use radix::{Compiler, Config, Output};
 use std::fs;
 
+/// Helper: compile a fab file to LLVM text, write the .ll, run it, and assert OutputMatched.
+fn assert_llvm_text_output_matches(fab_relative: &str, stem: &str) {
+    let fab_path = crate::paths::corpus_dir().join(fab_relative);
+    let result = Compiler::new(Config::default().with_target(Target::LlvmText)).compile(&fab_path);
+    assert!(result.success(), "{fab_relative} LLVM compile failed");
+    let Some(Output::LlvmText(output)) = result.output else {
+        panic!("{fab_relative} did not produce LLVM text");
+    };
+    let temp_root = super::super::common::make_temp_root();
+    let llvm_file = temp_root.join(format!("{stem}.ll"));
+    fs::write(&llvm_file, output.code).expect("write {fab_relative} LLVM text");
+    let probe = run_llvm_exemplum(&llvm_file, &temp_root, stem, &fab_path);
+    assert_eq!(
+        probe.bucket,
+        LlvmRunBucket::OutputMatched,
+        "{fab_relative}: {}",
+        probe.reason
+    );
+}
+
 #[test]
 fn llvm_host_vertical_salve_munde_matches_raw_expected_bytes() {
     let fab_path = crate::paths::corpus_dir().join("incipit/salve-munde.fab");
@@ -54,103 +74,96 @@ fn llvm_host_boolean_display_matches_raw_expected_bytes() {
 }
 
 #[test]
-fn llvm_host_bivalens_display_fixtures_match_raw_expected_bytes() {
-    for (relative_path, stem) in [
-        ("conversio/bivalens.fab", "conversio-bivalens"),
-        ("falsum/falsum.fab", "falsum"),
-        ("verum/verum.fab", "verum"),
-    ] {
-        let fab_path = crate::paths::corpus_dir().join(relative_path);
-        let result =
-            Compiler::new(Config::default().with_target(Target::LlvmText)).compile(&fab_path);
-        assert!(result.success(), "{relative_path} LLVM compile failed");
-        let Some(Output::LlvmText(output)) = result.output else {
-            panic!("{relative_path} did not produce LLVM text");
-        };
-        let temp_root = super::super::common::make_temp_root();
-        let llvm_file = temp_root.join(format!("{stem}.ll"));
-        fs::write(&llvm_file, output.code).expect("write bivalens LLVM text");
-
-        let probe = run_llvm_exemplum(&llvm_file, &temp_root, stem, &fab_path);
-
-        assert_eq!(
-            probe.bucket,
-            LlvmRunBucket::OutputMatched,
-            "{relative_path}: {}",
-            probe.reason
-        );
-    }
+fn llvm_host_conversio_bivalens_matches_raw_expected_bytes() {
+    assert_llvm_text_output_matches("conversio/bivalens.fab", "conversio-bivalens");
 }
 
 #[test]
-fn llvm_host_diagnostic_text_fixtures_match_raw_expected_bytes() {
-    for (relative_path, stem) in [("vide/vide.fab", "vide"), ("mone/mone.fab", "mone")] {
-        let fab_path = crate::paths::corpus_dir().join(relative_path);
-        let result =
-            Compiler::new(Config::default().with_target(Target::LlvmText)).compile(&fab_path);
-        assert!(result.success(), "{relative_path} LLVM compile failed");
-        let Some(Output::LlvmText(output)) = result.output else {
-            panic!("{relative_path} did not produce LLVM text");
-        };
-        let temp_root = super::super::common::make_temp_root();
-        let llvm_file = temp_root.join(format!("{stem}.ll"));
-        fs::write(&llvm_file, output.code).expect("write diagnostic LLVM text");
-
-        let probe = run_llvm_exemplum(&llvm_file, &temp_root, stem, &fab_path);
-        assert_eq!(
-            probe.bucket,
-            LlvmRunBucket::OutputMatched,
-            "{relative_path}: {}",
-            probe.reason
-        );
-        if relative_path == "vide/vide.fab" {
-            let expected =
-                fs::read(fab_path.with_extension("expected")).expect("read vide expected bytes");
-            assert_eq!(probe.stdout.as_bytes(), expected);
-            assert!(
-                probe.stderr.is_empty(),
-                "unexpected vide stderr: {:?}",
-                probe.stderr
-            );
-        } else if relative_path == "mone/mone.fab" {
-            assert!(
-                probe.stdout.is_empty(),
-                "unexpected mone stdout: {:?}",
-                probe.stdout
-            );
-            assert_eq!(probe.stderr, "cave\n");
-        }
-    }
+fn llvm_host_falsum_matches_raw_expected_bytes() {
+    assert_llvm_text_output_matches("falsum/falsum.fab", "falsum");
 }
 
 #[test]
-fn llvm_host_format_text_fixtures_match_raw_expected_bytes() {
-    for (relative_path, stem) in [
-        ("literalia/ascii.fab", "literalia-ascii"),
-        ("literalia/block-string.fab", "literalia-block-string"),
-        ("literalia/forma.fab", "literalia-forma"),
-        ("literalia/textus.fab", "literalia-textus"),
-        ("scriptum/scriptum.fab", "scriptum"),
-    ] {
-        let fab_path = crate::paths::corpus_dir().join(relative_path);
-        let result =
-            Compiler::new(Config::default().with_target(Target::LlvmText)).compile(&fab_path);
-        assert!(result.success(), "{relative_path} LLVM compile failed");
-        let Some(Output::LlvmText(output)) = result.output else {
-            panic!("{relative_path} did not produce LLVM text");
-        };
-        let temp_root = super::super::common::make_temp_root();
-        let llvm_file = temp_root.join(format!("{stem}.ll"));
-        fs::write(&llvm_file, output.code).expect("write format/text LLVM text");
+fn llvm_host_verum_matches_raw_expected_bytes() {
+    assert_llvm_text_output_matches("verum/verum.fab", "verum");
+}
 
-        let probe = run_llvm_exemplum(&llvm_file, &temp_root, stem, &fab_path);
-        assert_eq!(
-            probe.bucket,
-            LlvmRunBucket::OutputMatched,
-            "{relative_path}: {}",
-            probe.reason
-        );
-    }
+#[test]
+fn llvm_host_vide_diagnostic_text_matches_raw_expected_bytes() {
+    let fab_path = crate::paths::corpus_dir().join("vide/vide.fab");
+    let result = Compiler::new(Config::default().with_target(Target::LlvmText)).compile(&fab_path);
+    assert!(result.success(), "vide/vide.fab LLVM compile failed");
+    let Some(Output::LlvmText(output)) = result.output else {
+        panic!("vide/vide.fab did not produce LLVM text");
+    };
+    let temp_root = super::super::common::make_temp_root();
+    let llvm_file = temp_root.join("vide.ll");
+    fs::write(&llvm_file, output.code).expect("write vide LLVM text");
+    let probe = run_llvm_exemplum(&llvm_file, &temp_root, "vide", &fab_path);
+    assert_eq!(
+        probe.bucket,
+        LlvmRunBucket::OutputMatched,
+        "vide/vide.fab: {}",
+        probe.reason
+    );
+    let expected = fs::read(fab_path.with_extension("expected")).expect("read vide expected bytes");
+    assert_eq!(probe.stdout.as_bytes(), expected);
+    assert!(
+        probe.stderr.is_empty(),
+        "unexpected vide stderr: {:?}",
+        probe.stderr
+    );
+}
+
+#[test]
+fn llvm_host_mone_diagnostic_text_matches_raw_expected_bytes() {
+    let fab_path = crate::paths::corpus_dir().join("mone/mone.fab");
+    let result = Compiler::new(Config::default().with_target(Target::LlvmText)).compile(&fab_path);
+    assert!(result.success(), "mone/mone.fab LLVM compile failed");
+    let Some(Output::LlvmText(output)) = result.output else {
+        panic!("mone/mone.fab did not produce LLVM text");
+    };
+    let temp_root = super::super::common::make_temp_root();
+    let llvm_file = temp_root.join("mone.ll");
+    fs::write(&llvm_file, output.code).expect("write mone LLVM text");
+    let probe = run_llvm_exemplum(&llvm_file, &temp_root, "mone", &fab_path);
+    assert_eq!(
+        probe.bucket,
+        LlvmRunBucket::OutputMatched,
+        "mone/mone.fab: {}",
+        probe.reason
+    );
+    assert!(
+        probe.stdout.is_empty(),
+        "unexpected mone stdout: {:?}",
+        probe.stdout
+    );
+    assert_eq!(probe.stderr, "cave\n");
+}
+
+#[test]
+fn llvm_host_literalia_ascii_matches_raw_expected_bytes() {
+    assert_llvm_text_output_matches("literalia/ascii.fab", "literalia-ascii");
+}
+
+#[test]
+fn llvm_host_literalia_block_string_matches_raw_expected_bytes() {
+    assert_llvm_text_output_matches("literalia/block-string.fab", "literalia-block-string");
+}
+
+#[test]
+fn llvm_host_literalia_forma_matches_raw_expected_bytes() {
+    assert_llvm_text_output_matches("literalia/forma.fab", "literalia-forma");
+}
+
+#[test]
+fn llvm_host_literalia_textus_matches_raw_expected_bytes() {
+    assert_llvm_text_output_matches("literalia/textus.fab", "literalia-textus");
+}
+
+#[test]
+fn llvm_host_scriptum_matches_raw_expected_bytes() {
+    assert_llvm_text_output_matches("scriptum/scriptum.fab", "scriptum");
 }
 
 #[test]
@@ -202,34 +215,33 @@ fn llvm_host_nota_grouping_matches_declared_stream_contract() {
 }
 
 #[test]
-fn llvm_host_scalar_conversion_and_failable_fixtures_match_raw_expected_bytes() {
-    for (relative_path, stem) in [
-        ("conversio/conversio.fab", "conversio-conversio"),
-        ("conversio/numeric-bool.fab", "conversio-numeric-bool"),
-        ("conversio/octeti.fab", "conversio-octeti"),
-        ("cape/cape.fab", "cape"),
-        ("iace/functio-fallibilis.fab", "iace-functio-fallibilis"),
-        ("iace/iace.fab", "iace"),
-    ] {
-        let fab_path = crate::paths::corpus_dir().join(relative_path);
-        let result =
-            Compiler::new(Config::default().with_target(Target::LlvmText)).compile(&fab_path);
-        assert!(result.success(), "{relative_path} LLVM compile failed");
-        let Some(Output::LlvmText(output)) = result.output else {
-            panic!("{relative_path} did not produce LLVM text");
-        };
-        let temp_root = super::super::common::make_temp_root();
-        let llvm_file = temp_root.join(format!("{stem}.ll"));
-        fs::write(&llvm_file, output.code).expect("write conversion LLVM text");
+fn llvm_host_conversio_conversio_matches_raw_expected_bytes() {
+    assert_llvm_text_output_matches("conversio/conversio.fab", "conversio-conversio");
+}
 
-        let probe = run_llvm_exemplum(&llvm_file, &temp_root, stem, &fab_path);
-        assert_eq!(
-            probe.bucket,
-            LlvmRunBucket::OutputMatched,
-            "{relative_path}: {}",
-            probe.reason
-        );
-    }
+#[test]
+fn llvm_host_numeric_bool_conversio_matches_raw_expected_bytes() {
+    assert_llvm_text_output_matches("conversio/numeric-bool.fab", "conversio-numeric-bool");
+}
+
+#[test]
+fn llvm_host_octeti_conversio_matches_raw_expected_bytes() {
+    assert_llvm_text_output_matches("conversio/octeti.fab", "conversio-octeti");
+}
+
+#[test]
+fn llvm_host_cape_matches_raw_expected_bytes() {
+    assert_llvm_text_output_matches("cape/cape.fab", "cape");
+}
+
+#[test]
+fn llvm_host_functio_fallibilis_matches_raw_expected_bytes() {
+    assert_llvm_text_output_matches("iace/functio-fallibilis.fab", "iace-functio-fallibilis");
+}
+
+#[test]
+fn llvm_host_iace_matches_raw_expected_bytes() {
+    assert_llvm_text_output_matches("iace/iace.fab", "iace");
 }
 
 #[test]
@@ -282,33 +294,16 @@ fn llvm_host_instans_failable_fixture_matches_rust_output() {
 }
 
 #[test]
-fn llvm_host_instans_conversion_fixtures_match_raw_expected_bytes() {
-    for (relative_path, stem) in [
-        ("conversio/instans.fab", "conversio-instans"),
-        (
-            "conversio/instans-valor-carrier.fab",
-            "conversio-instans-valor-carrier",
-        ),
-    ] {
-        let fab_path = crate::paths::corpus_dir().join(relative_path);
-        let result =
-            Compiler::new(Config::default().with_target(Target::LlvmText)).compile(&fab_path);
-        assert!(result.success(), "{relative_path} LLVM compile failed");
-        let Some(Output::LlvmText(output)) = result.output else {
-            panic!("{relative_path} did not produce LLVM text");
-        };
-        let temp_root = super::super::common::make_temp_root();
-        let llvm_file = temp_root.join(format!("{stem}.ll"));
-        fs::write(&llvm_file, output.code).expect("write instans conversion LLVM text");
+fn llvm_host_instans_conversio_matches_raw_expected_bytes() {
+    assert_llvm_text_output_matches("conversio/instans.fab", "conversio-instans");
+}
 
-        let probe = run_llvm_exemplum(&llvm_file, &temp_root, stem, &fab_path);
-        assert_eq!(
-            probe.bucket,
-            LlvmRunBucket::OutputMatched,
-            "{relative_path}: {}",
-            probe.reason
-        );
-    }
+#[test]
+fn llvm_host_instans_valor_carrier_matches_raw_expected_bytes() {
+    assert_llvm_text_output_matches(
+        "conversio/instans-valor-carrier.fab",
+        "conversio-instans-valor-carrier",
+    );
 }
 
 #[test]

@@ -74,79 +74,146 @@ fn verify_input_is_package_shaped_accepts_missing_extensionless_package_paths() 
 }
 
 #[test]
-fn reader_locale_supports_fab_entry_files_and_package_paths() {
+fn reader_locale_accepts_cargo_manifest_dir() {
     assert!(reader_locale_supports_input(
         &[env!("CARGO_MANIFEST_DIR").to_owned()],
         false
     ));
+}
+
+#[test]
+fn reader_locale_accepts_faber_toml() {
     assert!(reader_locale_supports_input(
         &["faber.toml".to_owned()],
         false
     ));
+}
+
+#[test]
+fn reader_locale_accepts_nested_faber_toml() {
     assert!(reader_locale_supports_input(
         &["pkg/faber.toml".to_owned()],
         false
     ));
+}
+
+#[test]
+fn reader_locale_accepts_missing_package() {
     assert!(reader_locale_supports_input(
         &["missing-package".to_owned()],
         false
     ));
+}
+
+#[test]
+fn reader_locale_accepts_fab_entry() {
     assert!(reader_locale_supports_input(
         &["main.fab".to_owned()],
         false
     ));
+}
+
+#[test]
+fn reader_locale_rejects_stdin() {
     assert!(!reader_locale_supports_input(&["-".to_owned()], false));
+}
+
+#[test]
+fn reader_locale_rejects_txt() {
     assert!(!reader_locale_supports_input(
         &["main.txt".to_owned()],
         false
     ));
+}
+
+#[test]
+fn reader_locale_rejects_plain_file() {
     let file = TempPlainFile::new();
     assert!(!reader_locale_supports_input(&[file.input()], false));
+}
+
+#[test]
+fn reader_locale_rejects_multiple_inputs() {
     assert!(!reader_locale_supports_input(
         &["main.fab".to_owned(), "other.fab".to_owned()],
         false
     ));
 }
 
+const READER_LOCALE_ERROR: &str =
+    "--reader-locale la requires a package path or .fab entry file";
+
 #[test]
-fn reader_locale_without_package_error_only_rejects_unsupported_inputs() {
+fn reader_locale_with_package_accepts_fab_entry() {
     assert_eq!(
         reader_locale_without_package_error(Some("la"), &["main.fab".to_owned()], false),
         None
     );
+}
+
+#[test]
+fn reader_locale_with_package_accepts_faber_toml() {
     assert_eq!(
         reader_locale_without_package_error(Some("la"), &["faber.toml".to_owned()], false),
         None
     );
+}
+
+#[test]
+fn reader_locale_with_package_accepts_nested_toml() {
     assert_eq!(
         reader_locale_without_package_error(Some("la"), &["pkg/faber.toml".to_owned()], false),
         None
     );
+}
+
+#[test]
+fn reader_locale_with_package_accepts_missing_package() {
     assert_eq!(
         reader_locale_without_package_error(Some("la"), &["missing-package".to_owned()], false),
         None
     );
+}
+
+#[test]
+fn reader_locale_without_package_rejects_txt() {
     assert_eq!(
         reader_locale_without_package_error(Some("la"), &["main.txt".to_owned()], false),
-        Some("--reader-locale la requires a package path or .fab entry file".to_owned())
+        Some(READER_LOCALE_ERROR.to_owned())
     );
+}
+
+#[test]
+fn reader_locale_without_package_rejects_plain_file() {
     let file = TempPlainFile::new();
     assert_eq!(
         reader_locale_without_package_error(Some("la"), &[file.input()], false),
-        Some("--reader-locale la requires a package path or .fab entry file".to_owned())
+        Some(READER_LOCALE_ERROR.to_owned())
     );
+}
+
+#[test]
+fn reader_locale_without_package_rejects_stdin() {
     assert_eq!(
         reader_locale_without_package_error(Some("la"), &["-".to_owned()], true),
-        Some("--reader-locale la requires a package path or .fab entry file".to_owned())
+        Some(READER_LOCALE_ERROR.to_owned())
     );
+}
+
+#[test]
+fn reader_locale_without_package_rejects_multiple_inputs() {
     assert_eq!(
         reader_locale_without_package_error(
             Some("la"),
             &["main.fab".to_owned(), "other.fab".to_owned()],
             false
         ),
-        Some("--reader-locale la requires a package path or .fab entry file".to_owned())
+        Some(READER_LOCALE_ERROR.to_owned())
     );
+}
+
+#[test]
+fn reader_locale_none_returns_none() {
     assert_eq!(
         reader_locale_without_package_error(None, &["main.fab".to_owned()], false),
         None

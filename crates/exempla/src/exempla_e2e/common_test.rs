@@ -56,3 +56,33 @@ fn write_rust_cargo_project_links_tokio_when_generated_code_uses_block_on() {
     );
     assert!(manifest.contains("tokio = { version = \"1\""));
 }
+
+#[test]
+fn generated_rust_does_not_need_tokio_for_simple_main() {
+    assert!(!generated_rust_needs_tokio("fn main() { println!(\"hi\"); }"));
+    assert!(!generated_rust_needs_tokio(
+        "fn main() { let x = 1 + 2; std::process::exit(x); }"
+    ));
+}
+
+#[test]
+fn format_tier_line_empty_counts_and_ceilings() {
+    assert_eq!(
+        format_tier_line("test", 0, 100, 0),
+        "  test: 0/100 (floor 0)"
+    );
+    assert_eq!(
+        format_tier_line("test", 100, 100, 100),
+        "  test: 100/100 (floor 100)"
+    );
+}
+
+#[test]
+fn format_ceiling_line_handles_zero() {
+    assert_eq!(format_ceiling_line("test", 0, 0), "  test: 0 (ceiling 0)");
+}
+
+#[test]
+fn format_count_floor_line_handles_zero() {
+    assert_eq!(format_count_floor_line("test", 0, 0), "  test: 0 (floor 0)");
+}

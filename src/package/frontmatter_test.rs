@@ -158,6 +158,32 @@ source = "src"
     assert!(result.is_none(), "no conflict when manifest has no entry");
 }
 
+#[test]
+fn frontmatter_unrelated_fields_do_not_conflict() {
+    let path = Path::new("main.fab");
+    let frontmatter =
+        parse_file_frontmatter("[metadata]\nauthor = \"test\"").expect("frontmatter");
+    let manifest = test_manifest();
+    let result = validate_frontmatter_against_manifest(path, Some(&frontmatter), &manifest);
+    assert!(
+        result.is_none(),
+        "unrelated frontmatter fields should not produce a conflict"
+    );
+}
+
+#[test]
+fn frontmatter_empty_frontmatter_does_not_conflict() {
+    let path = Path::new("main.fab");
+    let frontmatter = parse_file_frontmatter("").expect("frontmatter");
+    let manifest = test_manifest();
+    let result = validate_frontmatter_against_manifest(path, Some(&frontmatter), &manifest);
+    assert!(
+        result.is_none(),
+        "empty frontmatter should not produce a conflict"
+    );
+}
+
+
 // ── merge_entry_test_selection ────────────────────────────────────────────
 
 #[test]

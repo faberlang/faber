@@ -69,7 +69,7 @@ fn matrix_row_uses_post_lowering_interner_for_dum_in_functione() {
 }
 
 #[test]
-fn matrix_rows_match_sexp_aggregate_and_function_constant_support() {
+fn matrix_row_sexp_aggregate_and_matrix_register_mir_capable() {
     let session = Session::new(Config::default());
     let matrix = crate::paths::corpus_dir().join("gpu-core-types/matrix-register.fab");
     let matrix_row = classify_matrix_row(&session, &matrix);
@@ -86,7 +86,11 @@ fn matrix_rows_match_sexp_aggregate_and_function_constant_support() {
         "matrix construction is structurally supported by the S-expression emitter: {:?}",
         matrix_row.targets.get(&MirCoverageTarget::SexpStructural)
     );
+}
 
+#[test]
+fn matrix_rows_clausa_clausura_integratio_are_sexp_capable() {
+    let session = Session::new(Config::default());
     for relative in [
         "clausa/clausa.fab",
         "clausura/clausura.fab",

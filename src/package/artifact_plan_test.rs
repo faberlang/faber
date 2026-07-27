@@ -31,15 +31,27 @@ fn temp_dir(label: &str) -> PathBuf {
 }
 
 #[test]
-fn plan_package_rust_is_supported_and_deterministic() {
-    let package = empty_package("/tmp/g4-plan-a");
+fn plan_package_rust_is_supported() {
+    let package = empty_package("g4-plan-support");
     let a = plan_package(&package, Target::Rust);
-    let b = plan_package(&package, Target::Rust);
     assert!(a.supported);
     assert_eq!(a.target, "rust");
+}
+
+#[test]
+fn plan_package_rust_is_deterministic() {
+    let package = empty_package("g4-plan-det");
+    let a = plan_package(&package, Target::Rust);
+    let b = plan_package(&package, Target::Rust);
     let a_json = a.to_debug_json();
     let b_json = b.to_debug_json();
     assert_eq!(a_json, b_json);
+}
+
+#[test]
+fn plan_package_rust_includes_runtime_dependency() {
+    let package = empty_package("g4-plan-runtime-dep");
+    let a = plan_package(&package, Target::Rust);
     assert!(a
         .nodes
         .iter()

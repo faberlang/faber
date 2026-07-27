@@ -121,3 +121,29 @@ fn run_source_surfaces_frontend_errors() {
     let error = run_source("not faber", &mut host).expect_err("invalid source fails");
     assert!(matches!(error, RunSourceError::Frontend(_)));
 }
+
+#[test]
+fn empty_source_returns_frontend_error() {
+    let mut host = BufferHost::default();
+    let error = run_source("", &mut host).expect_err("empty source fails");
+    assert!(matches!(error, RunSourceError::Frontend(_)));
+}
+
+#[test]
+fn print_run_source_error_accepts_frontend_failures() {
+    let mut host = BufferHost::default();
+    let error = run_source("not faber", &mut host).expect_err("invalid source fails");
+    // Must not panic.
+    print_run_source_error(&error);
+}
+
+#[test]
+fn run_source_surfaces_stepper_errors() {
+    let mut host = BufferHost::default();
+    let error = run_source(
+        "@ futura\nfunctio bad() { }\n",
+        &mut host,
+    )
+    .expect_err("invalid async fails");
+    assert!(matches!(error, RunSourceError::Stepper(_)));
+}
