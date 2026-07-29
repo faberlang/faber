@@ -2,16 +2,13 @@ use super::install::install_store_source;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
+use tempfile::TempDir;
 
-fn test_temp_dir(label: &str) -> PathBuf {
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let dir = std::env::temp_dir().join(format!("faber-install-test-{label}-{nanos}"));
-    fs::create_dir_all(&dir).expect("create temp dir");
-    dir
+fn test_temp_dir(label: &str) -> TempDir {
+    tempfile::Builder::new()
+        .prefix(&format!("faber-install-{label}-"))
+        .tempdir()
+        .expect("create temp dir")
 }
 
 fn write_library_repo(root: &Path, package: &str, provider: &str, source: &str) -> PathBuf {
@@ -156,8 +153,6 @@ fn install_registry_pin_updates_store_and_project_lock() {
         PathBuf::from(&regmath.package_root),
         installed_root.canonicalize().unwrap()
     );
-
-    fs::remove_dir_all(fixture).expect("cleanup temp root");
 }
 
 #[test]
@@ -175,8 +170,6 @@ fn install_bare_name_fails_closed_instead_of_github_clone() {
         !store.exists(),
         "rejected bare name must not create a store"
     );
-
-    fs::remove_dir_all(fixture).expect("cleanup temp root");
 }
 
 #[test]
@@ -204,8 +197,6 @@ fn install_git_url_cista_package_updates_store_and_project_lock() {
         PathBuf::from(&gitmath.package_root),
         installed_root.canonicalize().unwrap()
     );
-
-    fs::remove_dir_all(fixture).expect("cleanup temp root");
 }
 
 #[test]
@@ -225,6 +216,4 @@ fn install_git_url_without_cista_manifest_fails_closed() {
         !store.exists(),
         "failed install must not create a store snapshot"
     );
-
-    fs::remove_dir_all(fixture).expect("cleanup temp root");
 }

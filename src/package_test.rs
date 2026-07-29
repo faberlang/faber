@@ -32,7 +32,8 @@ use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
+use tempfile::TempDir;
 
 fn diagnostic_has_issue(diag: &Diagnostic, issue: &str) -> bool {
     diag.args.contains(&DiagnosticArg::new("issue", issue))
@@ -84,14 +85,11 @@ impl Host for ExitRecordingHost {
     }
 }
 
-fn test_temp_dir(label: &str) -> PathBuf {
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("clock")
-        .as_nanos();
-    let dir = std::env::temp_dir().join(format!("radix-project-{label}-{nanos}"));
-    fs::create_dir_all(&dir).expect("create temp dir");
-    dir
+fn test_temp_dir(label: &str) -> TempDir {
+    tempfile::Builder::new()
+        .prefix(&format!("faber-{label}-"))
+        .tempdir()
+        .expect("create temp dir")
 }
 
 fn dev_norma_library_home() -> PathBuf {
@@ -4280,7 +4278,7 @@ genus Thing {
 fn compile_package_preserves_file_stem_named_type_under_import_alias() {
     let library_home = test_temp_dir("alias-stem-type-library_home");
     write_temp_library_fixture(
-        &library_home,
+        library_home.path(),
         "Thing",
         r#"
 genus Thing {
@@ -4304,7 +4302,7 @@ incipit {
     )
     .expect("write entry");
 
-    let result = compile_package(&config_with_library_home(&library_home), &entry);
+    let result = compile_package(&config_with_library_home(library_home.path()), &entry);
     assert!(
         result.success(),
         "expected aliased file-stem type package compile success, got {:?}",
@@ -6907,7 +6905,7 @@ incipit {
 fn check_package_types_top_level_json_solve_namespace_call() {
     let library_home = test_temp_dir("top-level-json-solve-library_home");
     write_temp_library_fixture(
-        &library_home,
+        library_home.path(),
         "json/solve",
         r#"
 functio solve(textus json) → valor {
@@ -6931,7 +6929,7 @@ incipit {
     )
     .expect("write entry");
 
-    let diagnostics = check_package(&config_with_library_home(&library_home), &entry);
+    let diagnostics = check_package(&config_with_library_home(library_home.path()), &entry);
     assert!(
         !diagnostics.iter().any(|diag| diag.is_error()),
         "expected typed top-level json/solve namespace call, got {:?}",
@@ -7225,7 +7223,7 @@ functio solve(textus input) → textus {
 fn compile_package_rejects_private_library_type_through_file_namespace_alias() {
     let library_home = test_temp_dir("private-library-type-library_home");
     write_temp_library_fixture(
-        &library_home,
+        library_home.path(),
         "types",
         r#"
 @ privata
@@ -7251,7 +7249,7 @@ incipit {
     )
     .expect("write entry");
 
-    let result = compile_package(&config_with_library_home(&library_home), &entry);
+    let result = compile_package(&config_with_library_home(library_home.path()), &entry);
     assert!(result.output.is_none());
     assert!(result
         .diagnostics
@@ -7263,7 +7261,7 @@ incipit {
 fn compile_package_rejects_private_library_function_through_file_namespace_alias() {
     let library_home = test_temp_dir("private-library-function-library_home");
     write_temp_library_fixture(
-        &library_home,
+        library_home.path(),
         "helpers",
         r#"
 @ privata
@@ -7291,7 +7289,7 @@ incipit {
     )
     .expect("write entry");
 
-    let result = compile_package(&config_with_library_home(&library_home), &entry);
+    let result = compile_package(&config_with_library_home(library_home.path()), &entry);
     assert!(result.output.is_none());
     assert!(result.diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "namespace_missing_export")
@@ -8322,7 +8320,7 @@ functio label() → textus {
 #[test]
 fn library_resolver_reports_installed_manifest_missing_source_root() {
     let library_home = test_temp_dir("installed-missing-source-root-home");
-    write_installed_library_manifest(&library_home, "altlib", "interfaces", None);
+    write_installed_library_manifest(library_home.path(), "altlib", "interfaces", None);
 
     let dir = test_temp_dir("installed-missing-source-root-app");
     fs::create_dir_all(dir.join("src")).expect("create app src");
@@ -8350,7 +8348,7 @@ incipit {
     )
     .expect("write app entry");
 
-    let result = compile_package(&config_with_library_home(&library_home), &dir);
+    let result = compile_package(&config_with_library_home(library_home.path()), &dir);
     assert!(result.output.is_none());
     assert!(result.diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "missing_installed_library_source_root")
@@ -8372,7 +8370,7 @@ fn transitive_test_diagnostic_facts(
 fn transitive_nested_lista_lista_textus_typechecks() {
     let library_home = test_temp_dir("transitive-nested-lista-library_home");
     write_temp_library_fixture(
-        &library_home,
+        library_home.path(),
         "nested_lista_probe",
         r#"
 functio vacua_tabula() → lista<lista<textus>> {
@@ -8396,7 +8394,7 @@ incipit {
     )
     .expect("write entry");
 
-    let result = compile_package(&config_with_library_home(&library_home), &entry);
+    let result = compile_package(&config_with_library_home(library_home.path()), &entry);
     assert!(
         result.success(),
         "expected nested lista<lista<textus>> typecheck success, got {:?}",
@@ -8407,9 +8405,9 @@ incipit {
 #[test]
 fn transitive_import_chorda_via_fixture_library_compiles() {
     let library_home = test_temp_dir("transitive-chorda-library_home");
-    seed_temp_library_chorda(&library_home);
+    seed_temp_library_chorda(library_home.path());
     write_temp_library_fixture(
-        &library_home,
+        library_home.path(),
         "transitive_fixture",
         r#"
 importa ex "norma:chorda" privata chorda
@@ -8435,7 +8433,7 @@ incipit {
     )
     .expect("write entry");
 
-    let result = compile_package(&config_with_library_home(&library_home), &entry);
+    let result = compile_package(&config_with_library_home(library_home.path()), &entry);
     assert!(
         result.success(),
         "expected transitive chorda fixture compile success, got {:?}",
@@ -8455,7 +8453,7 @@ incipit {
 fn transitive_library_import_cycle_is_rejected() {
     let library_home = test_temp_dir("transitive-cycle-library_home");
     write_temp_library_fixture(
-        &library_home,
+        library_home.path(),
         "cycle_a",
         r#"
 importa ex "norma:cycle_b" privata cycle_b
@@ -8466,7 +8464,7 @@ functio label() → textus {
 "#,
     );
     write_temp_library_fixture(
-        &library_home,
+        library_home.path(),
         "cycle_b",
         r#"
 importa ex "norma:cycle_a" privata cycle_a
@@ -8491,7 +8489,7 @@ incipit {
     )
     .expect("write entry");
 
-    let config = config_with_library_home(&library_home);
+    let config = config_with_library_home(library_home.path());
     let spec = discover_package(&entry).expect("package");
     let resolver = library_resolver_from_config(&config);
     let files = load_package(&spec, &resolver);
@@ -8540,7 +8538,7 @@ incipit {
 fn transitive_library_diamond_dedupes_shared_dependency() {
     let library_home = test_temp_dir("transitive-diamond-library_home");
     write_temp_library_fixture(
-        &library_home,
+        library_home.path(),
         "shared_d",
         r#"
 functio tag() → textus {
@@ -8549,7 +8547,7 @@ functio tag() → textus {
 "#,
     );
     write_temp_library_fixture(
-        &library_home,
+        library_home.path(),
         "dep_b",
         r#"
 importa ex "norma:shared_d" privata shared_d
@@ -8560,7 +8558,7 @@ functio via_b() → textus {
 "#,
     );
     write_temp_library_fixture(
-        &library_home,
+        library_home.path(),
         "dep_c",
         r#"
 importa ex "norma:shared_d" privata shared_d
@@ -8571,7 +8569,7 @@ functio via_c() → textus {
 "#,
     );
     write_temp_library_fixture(
-        &library_home,
+        library_home.path(),
         "leaf_a",
         r#"
 importa ex "norma:dep_b" privata dep_b
@@ -8597,7 +8595,7 @@ incipit {
     )
     .expect("write entry");
 
-    let config = config_with_library_home(&library_home);
+    let config = config_with_library_home(library_home.path());
     let spec = discover_package(&entry).expect("package");
     let resolver = library_resolver_from_config(&config);
     let files = load_package(&spec, &resolver).expect("load package");
@@ -8629,7 +8627,7 @@ incipit {
 fn transitive_library_import_closure_preserves_publica_visibility() {
     let library_home = test_temp_dir("transitive-publica-library_home");
     write_temp_library_fixture(
-        &library_home,
+        library_home.path(),
         "child",
         r#"
 functio label() → textus {
@@ -8638,7 +8636,7 @@ functio label() → textus {
 "#,
     );
     write_temp_library_fixture(
-        &library_home,
+        library_home.path(),
         "parent",
         r#"
 importa ex "norma:child" publica child
@@ -8663,7 +8661,7 @@ incipit {
     )
     .expect("write entry");
 
-    let config = config_with_library_home(&library_home);
+    let config = config_with_library_home(library_home.path());
     let spec = discover_package(&entry).expect("package");
     let resolver = library_resolver_from_config(&config);
     let files = load_package(&spec, &resolver).expect("load package");
@@ -8690,7 +8688,7 @@ incipit {
 fn publica_library_import_surfaces_as_nested_namespace_binding() {
     let library_home = test_temp_dir("publica-reexport-library_home");
     write_temp_library_fixture(
-        &library_home,
+        library_home.path(),
         "child",
         r#"
 functio label() → textus {
@@ -8699,7 +8697,7 @@ functio label() → textus {
 "#,
     );
     write_temp_library_fixture(
-        &library_home,
+        library_home.path(),
         "parent",
         r#"
 importa ex "norma:child" publica child
@@ -8724,7 +8722,7 @@ incipit {
     )
     .expect("write entry");
 
-    let result = compile_package(&config_with_library_home(&library_home), &entry);
+    let result = compile_package(&config_with_library_home(library_home.path()), &entry);
     assert!(
         result.success(),
         "expected public child re-export compile success, got {:?}",
@@ -8742,7 +8740,7 @@ incipit {
 fn privata_transitive_library_import_does_not_surface_as_nested_namespace_binding() {
     let library_home = test_temp_dir("privata-transitive-library_home");
     write_temp_library_fixture(
-        &library_home,
+        library_home.path(),
         "child",
         r#"
 functio label() → textus {
@@ -8751,7 +8749,7 @@ functio label() → textus {
 "#,
     );
     write_temp_library_fixture(
-        &library_home,
+        library_home.path(),
         "parent",
         r#"
 importa ex "norma:child" privata child
@@ -8776,7 +8774,7 @@ incipit {
     )
     .expect("write entry");
 
-    let result = compile_package(&config_with_library_home(&library_home), &entry);
+    let result = compile_package(&config_with_library_home(library_home.path()), &entry);
     assert!(result.output.is_none());
     assert!(result.diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "namespace_missing_export")

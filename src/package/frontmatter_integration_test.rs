@@ -116,7 +116,7 @@ incipit {}
     .expect("entry");
 
     let config = Config::default();
-    let spec = discover_package(&dir).expect("package");
+    let spec = discover_package(dir.path()).expect("package");
     let result = load_package(&spec, &library_resolver_from_config(&config));
     assert!(result.is_err());
     let err = result.err().expect("diagnostics");
