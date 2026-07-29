@@ -333,6 +333,12 @@ pub(crate) fn load_package_with_reader_pack(
 }
 
 #[cfg(test)]
+mod test_support;
+
+#[cfg(test)]
+mod frontmatter_integration_test;
+
+#[cfg(test)]
 #[path = "../package_test.rs"]
 mod tests;
 
