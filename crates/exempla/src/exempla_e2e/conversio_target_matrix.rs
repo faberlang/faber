@@ -120,8 +120,7 @@ fn measure_wasm_text(session: &Session, path: &std::path::Path) -> &'static str 
     device.attach_program(&lowered.program);
     let verdict = classify_mir_coverage(
         MirCoverageTarget::WasmText,
-        &lowered.program,
-        &lowered.validation,
+        &lowered.validated,
         &device,
         &lowered.interner,
     );

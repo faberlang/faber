@@ -232,8 +232,7 @@ pub(super) fn classify_llvm_exemplum(
 
     let llvm = match radix::mir::emit_llvm_text_probe_with_device_roles(
         &device_roles,
-        &mir.program,
-        &mir.validation,
+        &mir.validated,
         &mir.interner,
     ) {
         Ok(llvm) => llvm,
@@ -269,15 +268,11 @@ fn classify_package_llvm_exemplum(
 ) -> LlvmE2eResult {
     let config = radix::Config::default().with_target(Target::LlvmText);
     let emitted = faber_cli::package::with_lowered_package_mir(&config, file, |lowered| {
-        let Some(interner) = lowered.validation.interner else {
+        let Some(interner) = lowered.validated.validation().interner else {
             return Err("package MIR validation context has no interner".to_owned());
         };
-        radix::mir::emit_llvm_text_probe_with_context(
-            &lowered.program,
-            &lowered.validation,
-            interner,
-        )
-        .map_err(|error| format!("{}:{}", error.category, error.shape))
+        radix::mir::emit_llvm_text_probe_with_context(&lowered.validated, interner)
+            .map_err(|error| format!("{}:{}", error.category, error.shape))
     });
     let llvm = match emitted {
         Err(diagnostics) => {

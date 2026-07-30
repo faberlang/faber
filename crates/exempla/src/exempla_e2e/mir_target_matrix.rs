@@ -187,22 +187,13 @@ fn classify_matrix_row(session: &Session, file: &Path) -> MirTargetMatrixRow {
 
     let mut targets = FxHashMap::default();
     for target in MIR_COVERAGE_TARGETS {
-        let verdict = classify_mir_coverage(
-            target,
-            &lowered.program,
-            &lowered.validation,
-            &device,
-            &lowered.interner,
-        );
+        let verdict = classify_mir_coverage(target, &lowered.validated, &device, &lowered.interner);
         targets.insert(target, verdict);
     }
 
     // WHY: structural scena tier (SA-001) classifies lowerability without
     // executing; it is a lower bound on the run tier below it.
-    let scena_structural = Some(classify_stepper_lowerability(
-        &lowered.program,
-        &lowered.validation,
-    ));
+    let scena_structural = Some(classify_stepper_lowerability(&lowered.validated));
 
     let mir = mir_stand_in(
         file,

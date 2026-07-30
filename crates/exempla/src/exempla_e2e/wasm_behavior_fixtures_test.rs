@@ -23,12 +23,9 @@ fn wasm_behavior_fixtures_match_stub_host_diag_traces() {
         let mut analysis = analysis;
         let interner = analysis.interner.clone();
         let mir = radix::mir::lower_analyzed_unit_with_context(&mut analysis).unwrap();
-        let bytes = radix::mir::emit_wasm_binary_probe_with_context(
-            &mir.program,
-            &mir.validation,
-            &interner,
-        )
-        .unwrap();
+        let (_wat, bytes) =
+            radix::mir::emit_wasm_text_and_binary_probe_with_context(&mir.validated, &interner)
+                .unwrap();
         let wasm_file = temp_root.join(format!("{}.wasm", fixture.exemplum.replace('/', "_")));
         fs::write(&wasm_file, bytes).unwrap();
         let run_probe = run_wasm_entry_with_stub_host(&wasm_file);

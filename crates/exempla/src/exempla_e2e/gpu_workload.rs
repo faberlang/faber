@@ -214,8 +214,7 @@ fn classify_gpu_workload(
 
     let llvm = match radix::mir::emit_llvm_text_probe_with_device_roles(
         &device_roles,
-        &mir.program,
-        &mir.validation,
+        &mir.validated,
         &interner,
     ) {
         Ok(llvm) => llvm,

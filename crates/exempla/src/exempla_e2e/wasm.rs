@@ -146,23 +146,20 @@ fn classify_wasm_exemplum(
         }
     };
 
-    let (wat, wasm_bytes) = match radix::mir::emit_wasm_text_and_binary_probe_with_context(
-        &mir.program,
-        &mir.validation,
-        &interner,
-    ) {
-        Ok(pair) => pair,
-        Err(error) => {
-            return wasm_result(
-                file,
-                WasmTier::MirLowered,
-                format!("Wasm emission failed: {error}"),
-                None,
-                None,
-                None,
-            );
-        }
-    };
+    let (wat, wasm_bytes) =
+        match radix::mir::emit_wasm_text_and_binary_probe_with_context(&mir.validated, &interner) {
+            Ok(pair) => pair,
+            Err(error) => {
+                return wasm_result(
+                    file,
+                    WasmTier::MirLowered,
+                    format!("Wasm emission failed: {error}"),
+                    None,
+                    None,
+                    None,
+                );
+            }
+        };
 
     let stem = file
         .file_stem()
