@@ -2402,6 +2402,11 @@ fn import_semantic_type(
             let inner = import_semantic_type(source, target, inner, imported);
             target.cursor(inner)
         }
+        Type::AsyncCursor(item, alternate) => {
+            let item = import_semantic_type(source, target, item, imported);
+            let alternate = import_semantic_type(source, target, alternate, imported);
+            target.async_cursor(item, alternate)
+        }
         Type::Tensor(inner, shape) => {
             let inner = import_semantic_type(source, target, inner, imported);
             let shape = import_index_expr(source, target, shape);
