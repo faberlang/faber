@@ -269,10 +269,21 @@ pub(crate) fn load_package_with_reader_pack(
         }
     };
     let initial_files = if spec.entry.is_dir() {
-        package_source_files(&spec.entry, include_proba)?
-            .into_iter()
-            .filter(|path| proba_allowed(path))
-            .collect::<Vec<_>>()
+        let all = package_source_files(&spec.entry, include_proba)?;
+        // When `faber test --include/--exclude` selects proba files, seed only
+        // those tests. Product modules enter via local import edges, so a
+        // focused math.proba run does not compile the whole library graph.
+        let proba_only_seed = include_proba
+            && proba_filter.is_some_and(|filter| !filter.is_empty());
+        if proba_only_seed {
+            all.into_iter()
+                .filter(|path| is_proba_source_path(path) && proba_allowed(path))
+                .collect::<Vec<_>>()
+        } else {
+            all.into_iter()
+                .filter(|path| proba_allowed(path))
+                .collect::<Vec<_>>()
+        }
     } else {
         // Single-file entry: allow an explicit `.proba` path on the test path only.
         if is_proba_source_path(&spec.entry) && !include_proba {

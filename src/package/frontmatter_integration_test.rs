@@ -7,8 +7,8 @@
 //! Unit-level frontmatter tests live in `frontmatter_test.rs`.
 
 use super::{
-    compile_package, compile_package_with_test_selection, discover_package,
-    library_resolver_from_config, load_package,
+    compile_package, compile_package_with_test_options, compile_package_with_test_selection,
+    discover_package, library_resolver_from_config, load_package,
 };
 use super::test_support::{diagnostic_has_arg, diagnostic_has_issue, test_temp_dir};
 use radix::codegen::rust::TestSelection;
@@ -347,4 +347,89 @@ incipit { nota "comment-frontmatter" }
     // Comments-only frontmatter produces Some(FileFrontmatter({}));
     assert!(file.frontmatter.is_some(), "comment-only frontmatter produces an empty map");
     assert!(!file.source.contains("+++"));
+}
+
+// ---------------------------------------------------------------------------
+// Library packages without paths.entry
+// ---------------------------------------------------------------------------
+
+#[test]
+fn compile_lib_package_without_entry_synthesizes_harness_for_proba() {
+    let dir = test_temp_dir("lib-no-entry-proba");
+    let src = dir.path().join("src");
+    fs::create_dir_all(&src).expect("src");
+    fs::write(
+        dir.path().join("faber.toml"),
+        r#"[package]
+name = "leafy"
+version = "0.1.0"
+edition = "2026"
+
+[library]
+provider = "leafy"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        src.join("math.fab"),
+        r#"genus Vector3 {
+    f32 x
+    f32 y
+    f32 z
+}
+
+functio vector3(f32 x, f32 y, f32 z) → Vector3 {
+    redde Vector3 { x = x, y = y, z = z }
+}
+"#,
+    )
+    .expect("math.fab");
+    fs::write(
+        src.join("math.proba"),
+        r#"importa ex "./math" privata math
+
+proba "vector3 builds" {
+    fixum math.Vector3 v ← math.vector3(1.0, 2.0, 3.0)
+    adfirma v.x ≡ (1.0 ∷ f32)
+}
+"#,
+    )
+    .expect("math.proba");
+
+    let result =
+        compile_package_with_test_options(&Config::default(), dir.path(), None, None);
+    assert!(
+        result.success(),
+        "lib package without paths.entry should compile for faber test, got {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|diag| (&diag.message, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+    let Some(Output::Rust(output)) = result.output else {
+        panic!("expected rust output");
+    };
+    assert!(
+        output.code.contains("fn main() {}"),
+        "expected synthetic library harness entry:\n{}",
+        output.code
+    );
+    assert!(
+        output.code.contains("pub mod math"),
+        "expected product module in crate:\n{}",
+        output.code
+    );
+    assert!(
+        output.code.contains("pub mod math_proba") || output.code.contains("#[test]"),
+        "expected proba tests in crate:\n{}",
+        output.code
+    );
 }

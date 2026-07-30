@@ -69,6 +69,14 @@ struct GeneratedPackageRust {
     diagnostics: Vec<Diagnostic>,
 }
 
+/// Crate root for packages whose `faber.toml` has no `paths.entry` (typical
+/// `build.kind = "lib"` layout). Nested modules carry product + proba code;
+/// cargo test discovers `#[test]` inside those modules.
+const LIBRARY_PACKAGE_HARNESS_ENTRY: &str = "\
+// Generated library package harness — no paths.entry file.
+// Package units live in nested modules below.
+fn main() {}\n";
+
 fn rust_runtime_plan_for_package(
     package: &AnalyzedPackage,
     library_resolver: &crate::library::LibraryResolver,
@@ -907,6 +915,14 @@ fn generate_package_rust(
         } else {
             module_tree.insert(&unit.module_segments, rust);
         }
+    }
+
+    // Library packages often omit `paths.entry`, so discovery sets `entry` to the
+    // source directory. No unit path equals that directory → no `is_entry` unit.
+    // Synthesize a crate-root harness so module code (including `*.proba` tests)
+    // can still assemble into a cargo-testable crate.
+    if entry_code.is_none() {
+        entry_code = Some(LIBRARY_PACKAGE_HARNESS_ENTRY.to_owned());
     }
 
     if let Err(diag) = insert_generated_library_modules(

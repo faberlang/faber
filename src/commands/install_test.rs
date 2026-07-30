@@ -1,14 +1,28 @@
 use super::install::install_store_source;
 use std::fs;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
 
-fn test_temp_dir(label: &str) -> TempDir {
-    tempfile::Builder::new()
+struct TestDir {
+    inner: TempDir,
+}
+
+impl Deref for TestDir {
+    type Target = Path;
+
+    fn deref(&self) -> &Path {
+        self.inner.path()
+    }
+}
+
+fn test_temp_dir(label: &str) -> TestDir {
+    let inner = tempfile::Builder::new()
         .prefix(&format!("faber-install-{label}-"))
         .tempdir()
-        .expect("create temp dir")
+        .expect("create temp dir");
+    TestDir { inner }
 }
 
 fn write_library_repo(root: &Path, package: &str, provider: &str, source: &str) -> PathBuf {

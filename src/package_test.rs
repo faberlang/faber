@@ -33,7 +33,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::Duration;
-use tempfile::TempDir;
+
+use super::test_support::test_temp_dir;
 
 fn diagnostic_has_issue(diag: &Diagnostic, issue: &str) -> bool {
     diag.args.contains(&DiagnosticArg::new("issue", issue))
@@ -83,13 +84,6 @@ impl Host for ExitRecordingHost {
     fn argumenta(&self) -> Result<&[String], StepperError> {
         self.buffer.argumenta()
     }
-}
-
-fn test_temp_dir(label: &str) -> TempDir {
-    tempfile::Builder::new()
-        .prefix(&format!("faber-{label}-"))
-        .tempdir()
-        .expect("create temp dir")
 }
 
 fn dev_norma_library_home() -> PathBuf {
@@ -984,7 +978,7 @@ entry = "main.fab"
             let touched = dir.join("created.txt");
             ArtifactHarnessCaseInner {
                 name: "coreutils-touch",
-                input: dir,
+                input: dir.to_path_buf(),
                 argumenta: vec![touched.to_string_lossy().into_owned()],
                 expected_stdout: Vec::new(),
             }
