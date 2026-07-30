@@ -8,6 +8,7 @@ use crate::package;
 pub(super) fn cmd_test(args: &TestArgs) {
     use std::path::PathBuf;
 
+    crate::commands::validate_deny_codes(&args.deny);
     let input_path = PathBuf::from(&args.path);
     if let Some(message) = reader_locale_without_package_error(
         args.reader_locale.as_deref(),
@@ -33,12 +34,16 @@ pub(super) fn cmd_test(args: &TestArgs) {
 
     // POLICY: tests are package-scoped so generated harness metadata and source
     // selection stay aligned.
+    let warn_policy = radix::driver::WarnPolicy {
+        deny_all_warnings: args.deny_warnings,
+        deny_codes: args.deny.clone(),
+    };
     let (config, _reader_pack) = match package::config_with_reader_locale(
         radix::codegen::Target::Rust,
         &input_path,
         args.reader_locale.as_deref(),
     ) {
-        Ok(pair) => pair,
+        Ok(pair) => (pair.0.with_warn_policy(warn_policy), pair.1),
         Err(diag) => {
             eprintln!("error: {}", diag.message);
             std::process::exit(1);

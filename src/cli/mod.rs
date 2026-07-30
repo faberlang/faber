@@ -162,6 +162,14 @@ pub struct BuildArgs {
     #[arg(long)]
     pub linter: bool,
 
+    /// Promote all warning diagnostics to errors
+    #[arg(long)]
+    pub deny_warnings: bool,
+
+    /// Promote diagnostics matching this catalog code to errors (repeatable)
+    #[arg(long = "deny", value_name = "CODE")]
+    pub deny: Vec<String>,
+
     /// Reader locale used to select a package-local reader pack.
     #[arg(long = "reader-locale", value_name = "LOCALE")]
     pub reader_locale: Option<String>,
@@ -185,6 +193,14 @@ pub struct CheckArgs {
     /// Downgrade unresolved/import-driven semantic errors to warnings
     #[arg(long)]
     pub permissive: bool,
+
+    /// Promote all warning diagnostics to errors
+    #[arg(long)]
+    pub deny_warnings: bool,
+
+    /// Promote diagnostics matching this catalog code to errors (repeatable)
+    #[arg(long = "deny", value_name = "CODE")]
+    pub deny: Vec<String>,
 
     /// Force package checking mode
     #[arg(long)]
@@ -309,6 +325,14 @@ pub struct RunArgs {
     #[arg(long, conflicts_with = "interpret")]
     pub compile: bool,
 
+    /// Promote all warning diagnostics to errors
+    #[arg(long)]
+    pub deny_warnings: bool,
+
+    /// Promote diagnostics matching this catalog code to errors (repeatable)
+    #[arg(long = "deny", value_name = "CODE")]
+    pub deny: Vec<String>,
+
     /// Arguments passed to the executed program (after --)
     #[arg(allow_hyphen_values = true, last = true)]
     pub args: Vec<String>,
@@ -351,6 +375,14 @@ pub struct TestArgs {
     /// Reader locale used to select a package-local reader pack.
     #[arg(long = "reader-locale", value_name = "LOCALE")]
     pub reader_locale: Option<String>,
+
+    /// Promote all warning diagnostics to errors
+    #[arg(long)]
+    pub deny_warnings: bool,
+
+    /// Promote diagnostics matching this catalog code to errors (repeatable)
+    #[arg(long = "deny", value_name = "CODE")]
+    pub deny: Vec<String>,
 
     /// Test name filter passed to the Rust test harness (matches on generated proba_* names)
     #[arg(value_name = "FILTER")]

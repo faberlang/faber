@@ -47,6 +47,17 @@ fn diagnostic_mode(enabled: bool) -> DiagnosticMode {
     }
 }
 
+/// Validate that every `--deny <CODE>` entry is a known diagnostic catalog code.
+/// Exits with a clear message on the first unknown code.
+pub(super) fn validate_deny_codes(codes: &[String]) {
+    for code in codes {
+        if !radix::is_known_diagnostic_code(code) {
+            eprintln!("error: unknown diagnostic code '{code}' passed to --deny");
+            std::process::exit(1);
+        }
+    }
+}
+
 /// Print package compile diagnostics in the normal CLI style.
 pub(super) fn eprint_compile_diagnostics(diagnostics: &[radix::diagnostics::Diagnostic]) {
     for diag in diagnostics {
@@ -81,6 +92,7 @@ fn dispatch(command: Command) {
                 args.package,
             );
             let target_explicit = args.target.is_some();
+            validate_deny_codes(&args.deny);
             package::cmd_build(BuildCommand {
                 input: args.input,
                 out_dir: args.out_dir,
@@ -90,6 +102,8 @@ fn dispatch(command: Command) {
                 target_explicit,
                 format: args.format,
                 linter: args.linter,
+                deny_warnings: args.deny_warnings,
+                deny_codes: args.deny,
                 reader_locale: args.reader_locale,
             });
         }
@@ -100,11 +114,14 @@ fn dispatch(command: Command) {
                 &args.input,
                 args.package,
             );
+            validate_deny_codes(&args.deny);
             if args.package || package::should_treat_as_package_from_args(&args.input) {
                 package::cmd_check_package(CheckCommand {
                     input: args.input,
                     package: args.package,
                     permissive: args.permissive,
+                    deny_warnings: args.deny_warnings,
+                    deny_codes: args.deny,
                     diagnostic_mode: diagnostic_mode(args.diagnostics),
                     reader_pack: None,
                     reader_locale: args.reader_locale,
@@ -114,6 +131,8 @@ fn dispatch(command: Command) {
                     input: args.input,
                     package: args.package,
                     permissive: args.permissive,
+                    deny_warnings: args.deny_warnings,
+                    deny_codes: args.deny,
                     diagnostic_mode: diagnostic_mode(args.diagnostics),
                     reader_pack: None,
                     reader_locale: None,

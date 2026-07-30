@@ -38,9 +38,13 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
     let input_path = PathBuf::from(&command.input);
     let target = resolve_build_target(&command, &input_path);
     let is_package = use_package_compiler(target, &input_path, command.package);
+    let warn_policy = radix::driver::WarnPolicy {
+        deny_all_warnings: command.deny_warnings,
+        deny_codes: command.deny_codes,
+    };
     let (config, reader_pack) = if is_package {
         match config_with_reader_locale(target, &input_path, command.reader_locale.as_deref()) {
-            Ok(selection) => selection,
+            Ok((config, pack)) => (config.with_warn_policy(warn_policy), pack),
             Err(diag) => {
                 eprintln!("error: {}", diag.message);
                 std::process::exit(1);
@@ -48,7 +52,10 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
         }
     } else {
         (
-            Config::default().with_target(target).with_dev_stdlib(),
+            Config::default()
+                .with_target(target)
+                .with_dev_stdlib()
+                .with_warn_policy(warn_policy),
             None,
         )
     };
@@ -512,13 +519,20 @@ pub fn cmd_check_package(command: radix::tool::CheckCommand) {
         &input_path,
         command.reader_locale.as_deref(),
     ) {
-        Ok(selection) => selection,
+        Ok((config, pack)) => (
+            config.with_warn_policy(radix::driver::WarnPolicy {
+                deny_all_warnings: command.deny_warnings,
+                deny_codes: command.deny_codes,
+            }),
+            pack,
+        ),
         Err(diag) => {
             eprintln!("error: {}", diag.message);
             std::process::exit(1);
         }
     };
-    let diagnostics = check_package(&config, &input_path);
+    let mut diagnostics = check_package(&config, &input_path);
+    radix::apply_warn_policy(&mut diagnostics, &config.warn_policy);
 
     let mut fatal_errors = 0usize;
     let mut downgraded = 0usize;

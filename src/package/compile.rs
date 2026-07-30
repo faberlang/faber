@@ -188,7 +188,9 @@ impl HirVisitor for AdRouteCollector<'_> {
 /// backend result. Unsupported targets are reported as diagnostics instead of
 /// falling back to single-file compilation.
 pub fn compile_package(config: &Config, input: &Path) -> CompileResult {
-    compile_package_internal(config, input, None)
+    let mut result = compile_package_internal(config, input, None);
+    radix::apply_warn_policy(&mut result.diagnostics, &config.warn_policy);
+    result
 }
 
 /// Compile a package while forwarding a Rust test-selection policy to codegen.
@@ -200,7 +202,9 @@ pub fn compile_package_with_test_selection(
     input: &Path,
     test_selection: Option<&RustTestSelection>,
 ) -> CompileResult {
-    compile_package_internal(config, input, test_selection)
+    let mut result = compile_package_internal(config, input, test_selection);
+    radix::apply_warn_policy(&mut result.diagnostics, &config.warn_policy);
+    result
 }
 
 #[allow(clippy::result_large_err)]
@@ -1147,7 +1151,7 @@ fn analyze_package_spec(
     let session = Session::new(config);
     let mount_plan = build_mount_plan(&spec, &files)?;
     let mut diagnostics = Vec::new();
-    let mut library_cache = LibraryInterfaceCache::default();
+    let mut library_cache = LibraryInterfaceCache::with_config(&session.config);
     let mut units = Vec::new();
     let mut analyzed_interfaces_by_path = BTreeMap::new();
     // Linked crates are known from the package root + lock before unit analysis.
