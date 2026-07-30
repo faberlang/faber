@@ -1,5 +1,43 @@
 use super::*;
 
+#[test]
+fn compile_package_deny_warnings_suppresses_output_after_promotion() {
+    let dir = crate::package::test_support::test_temp_dir("package-deny-warnings");
+    std::fs::create_dir_all(dir.join("src")).expect("create src");
+    std::fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "package-deny-warnings"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("write manifest");
+    std::fs::write(
+        dir.join("src/main.fab"),
+        "incipit { fixum numerus unused ← 1 }\n",
+    )
+    .expect("write entry");
+
+    let config = Config::default().with_warn_policy(radix::driver::WarnPolicy {
+        deny_all_warnings: true,
+        deny_codes: vec![],
+    });
+    let result = compile_package(&config, &dir);
+
+    assert!(
+        result.output.is_none(),
+        "promoted package warnings must stop generated output"
+    );
+    assert!(
+        result.diagnostics.iter().any(Diagnostic::is_error),
+        "expected at least one promoted warning diagnostic"
+    );
+}
+
 // ── ensure_go_import edge cases ────────────────────────────────────────────
 
 #[test]

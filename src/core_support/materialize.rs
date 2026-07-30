@@ -494,7 +494,8 @@ fn verify_path_deps(root: &Path) -> Result<(), MaterializeError> {
                 pending.push(path);
                 continue;
             }
-            if !metadata.is_file() || path.file_name().and_then(|n| n.to_str()) != Some("Cargo.toml")
+            if !metadata.is_file()
+                || path.file_name().and_then(|n| n.to_str()) != Some("Cargo.toml")
             {
                 continue;
             }
@@ -507,14 +508,17 @@ fn verify_path_deps(root: &Path) -> Result<(), MaterializeError> {
                 Err(_) => continue,
             };
             for dep in super::path_deps::extract_path_deps(&relative.to_string_lossy(), &source) {
-                if let Some(resolved) = super::path_deps::resolve_against(&dep) {
-                    let target = root.join(&resolved);
-                    if !target.is_dir() {
-                        return Err(MaterializeError::InvalidPayload(
-                            "materialized core-support entry is missing a path dependency target; \
-                             run `faber build` to regenerate with the current binary's core support",
-                        ));
-                    }
+                let Some(resolved) = super::path_deps::resolve_against(&dep) else {
+                    return Err(MaterializeError::InvalidPayload(
+                        "materialized core-support entry contains an escaping path dependency",
+                    ));
+                };
+                let target = root.join(&resolved);
+                if !target.is_dir() {
+                    return Err(MaterializeError::InvalidPayload(
+                        "materialized core-support entry is missing a path dependency target; \
+                         run `faber build` to regenerate with the current binary's core support",
+                    ));
                 }
             }
         }

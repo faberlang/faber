@@ -113,7 +113,10 @@ fn validate_path_dependencies(
             Err(_) => continue,
         };
         // Skip generated target artifacts
-        if relative.components().any(|c| matches!(c, Component::Normal(s) if s == "target")) {
+        if relative
+            .components()
+            .any(|c| matches!(c, Component::Normal(s) if s == "target"))
+        {
             continue;
         }
         let source = match fs::read_to_string(file) {
@@ -122,18 +125,24 @@ fn validate_path_dependencies(
         };
         let rel_str = relative.to_string_lossy();
         for dep in extract_path_deps(&rel_str, &source) {
-            if let Some(resolved) = resolve_against(&dep) {
-                if !is_within_roots(&resolved, roots) {
-                    return Err(invalid(&format!(
-                        "core-support archive has an unresolvable path dependency: \
-                         {} declares path = \"{}\" (resolves to \"{}\") \
-                         which is not covered by the bundled roots. \
-                         Add it to core-support-manifest.txt and EXPECTED_ROOTS.",
-                        dep.manifest.display(),
-                        dep.raw_path,
-                        resolved.display()
-                    )));
-                }
+            let Some(resolved) = resolve_against(&dep) else {
+                return Err(invalid(&format!(
+                    "core-support archive has an escaping path dependency: \
+                     {} declares path = \"{}\"",
+                    dep.manifest.display(),
+                    dep.raw_path
+                )));
+            };
+            if !is_within_roots(&resolved, roots) {
+                return Err(invalid(&format!(
+                    "core-support archive has an unresolvable path dependency: \
+                     {} declares path = \"{}\" (resolves to \"{}\") \
+                     which is not covered by the bundled roots. \
+                     Add it to core-support-manifest.txt and EXPECTED_ROOTS.",
+                    dep.manifest.display(),
+                    dep.raw_path,
+                    resolved.display()
+                )));
             }
         }
     }

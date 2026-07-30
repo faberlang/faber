@@ -73,9 +73,3 @@ pub fn test_temp_dir(label: &str) -> TestDir {
         .expect("create temp dir");
     TestDir { inner }
 }
-
-/// Convenience for callers that need an owned path without keeping the temp dir.
-#[allow(dead_code)]
-pub fn test_temp_path(label: &str) -> PathBuf {
-    test_temp_dir(label).path().to_path_buf()
-}

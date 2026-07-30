@@ -19,7 +19,8 @@ pub struct PathDep {
     pub raw_path: String,
 }
 
-/// Extract every `path = "..."` dependency from a `Cargo.toml` source string.
+/// Extract every runtime/build `path = "..."` dependency from a `Cargo.toml`
+/// source string.
 ///
 /// `manifest_relative` is the path of the Cargo.toml relative to the archive
 /// root (e.g. `"faber-runtime/Cargo.toml"`). The returned `PathDep::raw_path`
@@ -33,11 +34,14 @@ pub fn extract_path_deps(manifest_relative: &str, source: &str) -> Vec<PathDep> 
     let mut deps = Vec::new();
     let mut in_dependencies = false;
     for line in source.lines() {
-        let trimmed = line.trim();
+        let trimmed = strip_toml_comment(line).trim();
 
-        // Track whether we're inside [dependencies]
+        // Track whether we're inside a Cargo dependency table.
         if trimmed.starts_with('[') {
-            in_dependencies = trimmed == "[dependencies]";
+            let table = trimmed.trim_matches(|ch| ch == '[' || ch == ']');
+            in_dependencies = matches!(table, "dependencies" | "build-dependencies")
+                || table.ends_with(".dependencies")
+                || table.ends_with(".build-dependencies");
             continue;
         }
         if !in_dependencies {
@@ -55,23 +59,59 @@ pub fn extract_path_deps(manifest_relative: &str, source: &str) -> Vec<PathDep> 
     deps
 }
 
+fn strip_toml_comment(line: &str) -> &str {
+    let mut quote = None;
+    let mut escaped = false;
+    for (idx, ch) in line.char_indices() {
+        match quote {
+            Some('"') if escaped => {
+                escaped = false;
+            }
+            Some('"') if ch == '\\' => {
+                escaped = true;
+            }
+            Some(current) if ch == current => {
+                quote = None;
+            }
+            Some(_) => {}
+            None if ch == '"' || ch == '\'' => {
+                quote = Some(ch);
+            }
+            None if ch == '#' => {
+                return &line[..idx];
+            }
+            None => {}
+        }
+    }
+    line
+}
+
 /// Extract the value of `path = "..."` from a single line, if present.
 fn extract_path_value(line: &str) -> Option<String> {
-    // Find `path = "..."` or `path = '...'` anywhere in the line
-    let key = "path";
-    let eq_idx = line.find('=')?;
-    let before_eq = &line[..eq_idx];
-    if !before_eq.trim().ends_with(key) {
-        return None;
+    // Find `path = "..."` or `path = '...'` anywhere in dependency table
+    // entries, including inline table forms such as `dep = { path = "../dep" }`.
+    for (idx, _) in line.match_indices("path") {
+        let before_ok = line[..idx]
+            .chars()
+            .next_back()
+            .is_none_or(|ch| !(ch.is_ascii_alphanumeric() || ch == '_' || ch == '-'));
+        if !before_ok {
+            continue;
+        }
+        let after_key = line[idx + "path".len()..].trim_start();
+        let Some(after_eq) = after_key.strip_prefix('=') else {
+            continue;
+        };
+        let after_eq = after_eq.trim_start();
+        let quote = after_eq.chars().next()?;
+        if quote != '"' && quote != '\'' {
+            continue;
+        }
+        let rest = &after_eq[1..];
+        let end = rest.find(quote)?;
+        return Some(rest[..end].to_owned());
     }
-    let after_eq = &line[eq_idx + 1..].trim_start();
-    let quote = after_eq.chars().next()?;
-    if quote != '"' && quote != '\'' {
-        return None;
-    }
-    let rest = &after_eq[1..];
-    let end = rest.find(quote)?;
-    Some(rest[..end].to_owned())
+    None
 }
 
 /// Resolve a `PathDep`'s raw path relative to its manifest's parent directory.
@@ -138,13 +178,66 @@ radix-runtime-contract = { path = "../radix/crates/radix-runtime-contract" }
     }
 
     #[test]
+    fn extracts_path_deps_from_target_and_build_tables() {
+        let source = r#"
+[build-dependencies]
+builder = { path = "../builder" }
+
+[target.'cfg(unix)'.dependencies]
+unix-only = { path = "../unix-only" }
+
+[package.metadata]
+fixture = { path = "../not-a-dep" }
+"#;
+        let deps = extract_path_deps("hosts/crates/host-kernel/Cargo.toml", source);
+        assert_eq!(
+            deps.iter()
+                .map(|dep| dep.raw_path.as_str())
+                .collect::<Vec<_>>(),
+            vec!["../builder", "../unix-only"]
+        );
+    }
+
+    #[test]
+    fn ignores_commented_path_dependencies() {
+        let source = r#"
+[dependencies]
+# disabled = { path = "../disabled" }
+active = { path = "../active" } # trailing comment
+"#;
+        let deps = extract_path_deps("hosts/crates/host-kernel/Cargo.toml", source);
+        assert_eq!(deps.len(), 1);
+        assert_eq!(deps[0].raw_path, "../active");
+    }
+
+    #[test]
+    fn ignores_dev_path_dependencies() {
+        let source = r#"
+[dependencies]
+runtime = { path = "../runtime" }
+
+[dev-dependencies]
+fixture = { path = "../fixture" }
+
+[target.'cfg(test)'.dev-dependencies]
+target_fixture = { path = "../target-fixture" }
+"#;
+        let deps = extract_path_deps("faber-runtime/Cargo.toml", source);
+        assert_eq!(deps.len(), 1);
+        assert_eq!(deps[0].raw_path, "../runtime");
+    }
+
+    #[test]
     fn resolves_relative_paths_correctly() {
         let dep = PathDep {
             manifest: PathBuf::from("faber-runtime/Cargo.toml"),
             raw_path: "../radix/crates/radix-runtime-contract".to_owned(),
         };
         let resolved = resolve_against(&dep).expect("should resolve");
-        assert_eq!(resolved, PathBuf::from("radix/crates/radix-runtime-contract"));
+        assert_eq!(
+            resolved,
+            PathBuf::from("radix/crates/radix-runtime-contract")
+        );
     }
 
     #[test]

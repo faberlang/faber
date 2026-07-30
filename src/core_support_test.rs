@@ -155,6 +155,48 @@ fn secret_like_and_executable_files_fail_closed() {
 }
 
 #[test]
+fn path_dependencies_must_stay_within_bundled_roots() {
+    let root = fixture();
+    let roots = assembler::EXPECTED_ROOTS
+        .iter()
+        .map(|root| (*root).to_owned())
+        .collect::<Vec<_>>();
+    let manifest = root.join("hosts/crates/host-kernel/Cargo.toml");
+
+    fs::write(
+        &manifest,
+        "[package]\nname = \"fixture\"\n\n[dependencies]\nhost-native = { path = \"../host-native\" }\n",
+    )
+    .unwrap();
+    assert!(
+        assembler::assemble(&root, &roots).is_ok(),
+        "covered inline path dependency should pass"
+    );
+
+    fs::write(
+        &manifest,
+        "[package]\nname = \"fixture\"\n\n[dependencies]\nunlisted = { path = \"../unlisted\" }\n",
+    )
+    .unwrap();
+    assert!(
+        assembler::assemble(&root, &roots).is_err(),
+        "unlisted path dependency should fail closed"
+    );
+
+    fs::write(
+        &manifest,
+        "[package]\nname = \"fixture\"\n\n[dependencies]\noutside = { path = \"../../../../outside\" }\n",
+    )
+    .unwrap();
+    assert!(
+        assembler::assemble(&root, &roots).is_err(),
+        "escaping path dependency should fail closed"
+    );
+
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn manifest_must_equal_the_canonical_allowlist() {
     let root = fixture();
     let manifest = root.join("manifest.txt");

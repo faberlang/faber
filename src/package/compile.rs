@@ -28,10 +28,9 @@ use super::{
     library_cached_expanded_imports, library_cached_file_interface, library_generates_rust_module,
     library_imported_function_params, library_interface_export_names, library_interface_has_module,
     library_module_segments, library_resolver_for_package, load_package_with_reader_pack,
-    load_provider_manifests, load_reader_pack_for_input,
-    program_export_names, read_manifest, selected_providers_for_routes,
-    with_library_cached_analysis_mut, LibraryImportBinding, LibraryInterfaceCache, PackageFile,
-    RustRuntimePlan,
+    load_provider_manifests, load_reader_pack_for_input, program_export_names, read_manifest,
+    selected_providers_for_routes, with_library_cached_analysis_mut, LibraryImportBinding,
+    LibraryInterfaceCache, PackageFile, RustRuntimePlan,
 };
 
 pub(crate) struct AnalyzedPackage {
@@ -196,9 +195,10 @@ impl HirVisitor for AdRouteCollector<'_> {
 /// backend result. Unsupported targets are reported as diagnostics instead of
 /// falling back to single-file compilation.
 pub fn compile_package(config: &Config, input: &Path) -> CompileResult {
-    let mut result = compile_package_internal(config, input, None, false, None);
-    radix::apply_warn_policy(&mut result.diagnostics, &config.warn_policy);
-    result
+    finalize_package_compile_result(
+        compile_package_internal(config, input, None, false, None),
+        &config.warn_policy,
+    )
 }
 
 /// Compile a package while forwarding a Rust test-selection policy to codegen.
@@ -222,8 +222,20 @@ pub fn compile_package_with_test_options(
     test_selection: Option<&RustTestSelection>,
     proba_filter: Option<&super::TestSourceFilter>,
 ) -> CompileResult {
-    let mut result = compile_package_internal(config, input, test_selection, true, proba_filter);
-    radix::apply_warn_policy(&mut result.diagnostics, &config.warn_policy);
+    finalize_package_compile_result(
+        compile_package_internal(config, input, test_selection, true, proba_filter),
+        &config.warn_policy,
+    )
+}
+
+fn finalize_package_compile_result(
+    mut result: CompileResult,
+    warn_policy: &radix::driver::WarnPolicy,
+) -> CompileResult {
+    radix::apply_warn_policy(&mut result.diagnostics, warn_policy);
+    if result.diagnostics.iter().any(Diagnostic::is_error) {
+        result.output = None;
+    }
     result
 }
 
@@ -1470,11 +1482,12 @@ fn generate_rust_code_for_analysis(
     if is_entry {
         if let Some(cli_program) = cli_program {
             let mut codegen =
-                radix::codegen::rust::RustCodegen::new_with_library_registry_and_test_selection(
+                radix::codegen::rust::RustCodegen::new_with_library_registry_test_selection_and_types(
                     &analysis.hir,
                     &analysis.interner,
                     &analysis.libraries,
                     test_selection.cloned(),
+                    Some(&analysis.types),
                 );
             if let Some(params) = imported_function_params {
                 codegen.set_imported_function_params(params);
