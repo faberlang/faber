@@ -12,3 +12,4 @@ pub const FILE_MANIFEST: &str =
     include_str!(concat!(env!("OUT_DIR"), "/core-support.files.sha256"));
 
 pub mod materialize;
+pub mod path_deps;

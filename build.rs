@@ -1,5 +1,7 @@
 #[path = "src/core_support/assembler.rs"]
 mod assembler;
+#[path = "src/core_support/path_deps.rs"]
+mod path_deps;
 
 use std::env;
 use std::fs;

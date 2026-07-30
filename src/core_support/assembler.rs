@@ -4,6 +4,8 @@ use std::fs;
 use std::io;
 use std::path::{Component, Path, PathBuf};
 
+use super::path_deps::{extract_path_deps, is_within_roots, resolve_against};
+
 pub const EXPECTED_ROOTS: &[&str] = &[
     "faber-runtime",
     "radix/crates/radix-runtime-contract",
@@ -56,6 +58,8 @@ pub fn assemble(workspace: &Path, roots: &[String]) -> io::Result<Assembly> {
         collect(workspace, &path, &mut files)?;
     }
 
+    validate_path_dependencies(workspace, &files, roots)?;
+
     let mut tar = tar::Builder::new(Vec::new());
     let mut records = Vec::new();
     for path in files {
@@ -85,6 +89,55 @@ pub fn assemble(workspace: &Path, roots: &[String]) -> io::Result<Assembly> {
         archive_sha256,
         files: records,
     })
+}
+
+/// Verify that every `path = "..."` dependency declared in a bundled
+/// `Cargo.toml` resolves to a directory covered by the bundled roots.
+///
+/// This prevents silently shipping an incomplete archive: if a bundled crate
+/// gains a new path dependency but the root isn't added to the manifest, the
+/// `faber` binary will fail to build instead of producing a confusing cargo
+/// error downstream.
+fn validate_path_dependencies(
+    workspace: &Path,
+    files: &BTreeSet<PathBuf>,
+    roots: &[String],
+) -> io::Result<()> {
+    for file in files {
+        let name = file.file_name().and_then(|n| n.to_str());
+        if name != Some("Cargo.toml") {
+            continue;
+        }
+        let relative = match file.strip_prefix(workspace) {
+            Ok(rel) => rel,
+            Err(_) => continue,
+        };
+        // Skip generated target artifacts
+        if relative.components().any(|c| matches!(c, Component::Normal(s) if s == "target")) {
+            continue;
+        }
+        let source = match fs::read_to_string(file) {
+            Ok(s) => s,
+            Err(_) => continue,
+        };
+        let rel_str = relative.to_string_lossy();
+        for dep in extract_path_deps(&rel_str, &source) {
+            if let Some(resolved) = resolve_against(&dep) {
+                if !is_within_roots(&resolved, roots) {
+                    return Err(invalid(&format!(
+                        "core-support archive has an unresolvable path dependency: \
+                         {} declares path = \"{}\" (resolves to \"{}\") \
+                         which is not covered by the bundled roots. \
+                         Add it to core-support-manifest.txt and EXPECTED_ROOTS.",
+                        dep.manifest.display(),
+                        dep.raw_path,
+                        resolved.display()
+                    )));
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 pub fn file_manifest(files: &[FileRecord]) -> String {

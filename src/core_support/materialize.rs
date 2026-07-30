@@ -158,6 +158,7 @@ fn materialize_locked(
         }
         Ok(metadata) if metadata.is_dir() => {
             if completed_entry_is_valid(target, expected_archive_hash, expected_files)? {
+                verify_path_deps(target)?;
                 return Ok(MaterializedCoreSupport {
                     root: target.to_path_buf(),
                 });
@@ -172,6 +173,7 @@ fn materialize_locked(
     let temp = unique_temp_dir(parent, expected_archive_hash)?;
     let published = (|| {
         extract(archive, &temp, expected_files)?;
+        verify_path_deps(&temp)?;
         fsync_tree(&temp)?;
         write_completion(&temp, expected_archive_hash, expected_files)?;
         make_immutable(&temp)?;
@@ -466,6 +468,58 @@ fn completed_entry_is_valid(
         ));
     }
     Ok(true)
+}
+
+/// Verify that every `path = "..."` dependency in bundled `Cargo.toml` files
+/// resolves within the materialized cache entry.
+///
+/// This catches stale cache entries from older `faber` binaries whose embedded
+/// archive predates a transitive dependency being added. Instead of a confusing
+/// cargo "path not found" error, the user gets a clear message pointing them to
+/// `faber build`.
+fn verify_path_deps(root: &Path) -> Result<(), MaterializeError> {
+    let mut pending = vec![root.to_path_buf()];
+    while let Some(dir) = pending.pop() {
+        let entries = match fs::read_dir(&dir) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+        for entry in entries {
+            let path = entry.map_err(MaterializeError::io)?.path();
+            let metadata = match fs::symlink_metadata(&path) {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            if metadata.is_dir() {
+                pending.push(path);
+                continue;
+            }
+            if !metadata.is_file() || path.file_name().and_then(|n| n.to_str()) != Some("Cargo.toml")
+            {
+                continue;
+            }
+            let relative = match path.strip_prefix(root) {
+                Ok(rel) => rel,
+                Err(_) => continue,
+            };
+            let source = match fs::read_to_string(&path) {
+                Ok(s) => s,
+                Err(_) => continue,
+            };
+            for dep in super::path_deps::extract_path_deps(&relative.to_string_lossy(), &source) {
+                if let Some(resolved) = super::path_deps::resolve_against(&dep) {
+                    let target = root.join(&resolved);
+                    if !target.is_dir() {
+                        return Err(MaterializeError::InvalidPayload(
+                            "materialized core-support entry is missing a path dependency target; \
+                             run `faber build` to regenerate with the current binary's core support",
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 fn has_only_expected_files(
