@@ -50,9 +50,30 @@ pub struct BindingVerification {
     pub shim: Option<PathBuf>,
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum BindingProbeMode {
+    ShapeOnly,
+    Cargo,
+}
+
 pub fn verify_library_bindings(
     package_root: &Path,
     target: &str,
+) -> Result<BindingVerification, Vec<Diagnostic>> {
+    verify_library_bindings_with_probe_mode(package_root, target, BindingProbeMode::Cargo)
+}
+
+pub fn verify_library_binding_shapes(
+    package_root: &Path,
+    target: &str,
+) -> Result<BindingVerification, Vec<Diagnostic>> {
+    verify_library_bindings_with_probe_mode(package_root, target, BindingProbeMode::ShapeOnly)
+}
+
+pub fn verify_library_bindings_with_probe_mode(
+    package_root: &Path,
+    target: &str,
+    probe_mode: BindingProbeMode,
 ) -> Result<BindingVerification, Vec<Diagnostic>> {
     let manifest_path = package_root.join(super::MANIFEST_FILE);
     let manifest = match read_manifest(&manifest_path) {
@@ -129,6 +150,7 @@ pub fn verify_library_bindings(
         &binding_manifest,
         &declarations,
         &package,
+        probe_mode,
     )?;
 
     Ok(BindingVerification {
@@ -296,6 +318,7 @@ fn prove_rust_bindings(
     manifest: &BindingManifest,
     declarations: &[BindingContract],
     package: &super::AnalyzedPackage,
+    probe_mode: BindingProbeMode,
 ) -> Result<(), Vec<Diagnostic>> {
     if manifest.functions.is_empty() {
         return Ok(());
@@ -345,6 +368,9 @@ fn prove_rust_bindings(
     }
     if !diagnostics.is_empty() {
         return Err(diagnostics);
+    }
+    if probe_mode == BindingProbeMode::ShapeOnly {
+        return Ok(());
     }
 
     run_rust_binding_probe(package_root, binding_path, dependencies, shim, &probes).map_err(

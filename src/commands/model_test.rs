@@ -207,8 +207,7 @@ fn parse_empty_header_no_tensors() {
 
 #[test]
 fn parse_tensor_with_zero_dimension_shape() {
-    let data =
-        build_safetensors(r#"{"t":{"dtype":"F32","shape":[0],"data_offsets":[0,0]}}"#);
+    let data = build_safetensors(r#"{"t":{"dtype":"F32","shape":[0],"data_offsets":[0,0]}}"#);
     let header = parse_safetensors_metadata(&data).expect("parse zero-dim tensor");
     assert_eq!(header.tensors[0].shape, vec![0]);
     assert_eq!(header.tensors[0].element_count, 0);

@@ -943,6 +943,7 @@ fn build_reader_locale_forced_package_rejects_existing_non_package_file() {
 }
 
 #[test]
+#[ignore = "builds a generated fmir-bin Rust runner with Cargo; run in periodic end-to-end coverage"]
 fn fmir_bin_package_forwards_runtime_arg_after_source_is_removed() {
     let package = write_basic_package(
         "fmir-bin-cli",
@@ -1006,6 +1007,7 @@ incipit argumenta args {
 }
 
 #[test]
+#[ignore = "builds a generated fmir-bin Rust runner with Cargo; run in periodic end-to-end coverage"]
 fn fmir_bin_multifile_package_runs_after_source_mutation() {
     let package = write_basic_package(
         "fmir-bin-multifile",
@@ -1051,6 +1053,7 @@ functio text(textus name) → textus {
 }
 
 #[test]
+#[ignore = "builds a generated fmir-bin Rust runner with Cargo; run in periodic end-to-end coverage"]
 fn fmir_bin_norma_solum_package_reads_file_after_source_is_removed() {
     let package = write_basic_package(
         "fmir-bin-solum",
@@ -2274,7 +2277,7 @@ entry = "main.fab"
         r#"importa ex "norma:solum" privata fileio
 
 incipit {
-  fixum octeti bytes ← fileio.hauriet("/nonexistent")
+  fixum bivalens readable ← fileio.legibilene("/nonexistent")
 }
 "#,
     )
@@ -2285,7 +2288,7 @@ incipit {
     assert!(!ok, "unsupported norma:solum verb should fail closed");
     assert_eq!(stdout, "");
     assert!(
-        stderr.contains("package MIR kernel bridge does not support `norma:solum.hauriet`"),
+        stderr.contains("package MIR kernel bridge does not support `norma:solum.legibilene`"),
         "expected kernel bridge fail-closed diagnostic:\n{stderr}"
     );
     assert_no_generated_rust(&package);

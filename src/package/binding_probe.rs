@@ -168,13 +168,15 @@ fn run_probe_in(
         File::create(&stdout_path).map_err(|error| Diagnostic::io_error(&stdout_path, &error))?;
     let stderr =
         File::create(&stderr_path).map_err(|error| Diagnostic::io_error(&stderr_path, &error))?;
+    let target_dir = shared_probe_target_dir();
+    fs::create_dir_all(&target_dir).map_err(|error| Diagnostic::io_error(&target_dir, &error))?;
     let child = Command::new("cargo")
         .arg("check")
         .arg("--quiet")
         .arg("--manifest-path")
         .arg(&manifest_path)
         .arg("--target-dir")
-        .arg(root.join("target"))
+        .arg(&target_dir)
         .stdout(Stdio::from(stdout))
         .stderr(Stdio::from(stderr))
         .spawn()
@@ -332,6 +334,21 @@ fn probe_root() -> PathBuf {
         "faber-binding-probe-{}-{timestamp}-{id}",
         std::process::id(),
     ))
+}
+
+fn shared_probe_target_dir() -> PathBuf {
+    if let Some(dir) = std::env::var_os("CARGO_TARGET_DIR") {
+        return PathBuf::from(dir);
+    }
+    std::env::var_os("HOME")
+        .map(|home| {
+            PathBuf::from(home)
+                .join(".cache")
+                .join("faberlang-target")
+                .join("faber")
+                .join("binding-probe")
+        })
+        .unwrap_or_else(|| std::env::temp_dir().join("faber-binding-probe-target"))
 }
 
 #[cfg(test)]

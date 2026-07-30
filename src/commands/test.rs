@@ -42,10 +42,7 @@ pub(super) fn cmd_test(args: &TestArgs) {
     };
 
     // Prefer explicit `--filter`; fall back to positional FILTER.
-    let harness_filter = args
-        .filter_flag
-        .as_deref()
-        .or(args.filter.as_deref());
+    let harness_filter = args.filter_flag.as_deref().or(args.filter.as_deref());
 
     // POLICY: tests are package-scoped so generated harness metadata and source
     // selection stay aligned.

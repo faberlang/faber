@@ -6,11 +6,11 @@
 //!
 //! Unit-level frontmatter tests live in `frontmatter_test.rs`.
 
+use super::test_support::{diagnostic_has_arg, diagnostic_has_issue, test_temp_dir};
 use super::{
     compile_package, compile_package_with_test_options, compile_package_with_test_selection,
     discover_package, library_resolver_from_config, load_package,
 };
-use super::test_support::{diagnostic_has_arg, diagnostic_has_issue, test_temp_dir};
 use radix::codegen::rust::TestSelection;
 use radix::driver::Config;
 use radix::Output;
@@ -316,7 +316,10 @@ incipit { nota "empty-frontmatter" }
 
     // An empty frontmatter block produces Some(FileFrontmatter({}));
     // the source body is still peeled of the delimiter lines.
-    assert!(file.frontmatter.is_some(), "empty frontmatter produces an empty map");
+    assert!(
+        file.frontmatter.is_some(),
+        "empty frontmatter produces an empty map"
+    );
     assert!(!file.source.contains("+++"));
 }
 
@@ -345,7 +348,10 @@ incipit { nota "comment-frontmatter" }
         .expect("entry file");
 
     // Comments-only frontmatter produces Some(FileFrontmatter({}));
-    assert!(file.frontmatter.is_some(), "comment-only frontmatter produces an empty map");
+    assert!(
+        file.frontmatter.is_some(),
+        "comment-only frontmatter produces an empty map"
+    );
     assert!(!file.source.contains("+++"));
 }
 
@@ -403,8 +409,7 @@ proba "vector3 builds" {
     )
     .expect("math.proba");
 
-    let result =
-        compile_package_with_test_options(&Config::default(), dir.path(), None, None);
+    let result = compile_package_with_test_options(&Config::default(), dir.path(), None, None);
     assert!(
         result.success(),
         "lib package without paths.entry should compile for faber test, got {:?}",

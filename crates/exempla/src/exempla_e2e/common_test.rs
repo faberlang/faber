@@ -59,7 +59,9 @@ fn write_rust_cargo_project_links_tokio_when_generated_code_uses_block_on() {
 
 #[test]
 fn generated_rust_does_not_need_tokio_for_simple_main() {
-    assert!(!generated_rust_needs_tokio("fn main() { println!(\"hi\"); }"));
+    assert!(!generated_rust_needs_tokio(
+        "fn main() { println!(\"hi\"); }"
+    ));
     assert!(!generated_rust_needs_tokio(
         "fn main() { let x = 1 + 2; std::process::exit(x); }"
     ));

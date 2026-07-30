@@ -101,20 +101,22 @@ fn nonexistent_path_is_not_single_fab_file() {
 #[test]
 fn is_package_interpret_input_rejects_nonexistent_path() {
     assert!(!is_package_interpret_input(Path::new("/nonexistent/dir")));
-    assert!(!is_package_interpret_input(Path::new("/nonexistent/file.fab")));
+    assert!(!is_package_interpret_input(Path::new(
+        "/nonexistent/file.fab"
+    )));
 }
 
 #[test]
-fn is_package_interpret_input_rejects_empty_directory() {
+fn is_package_interpret_input_accepts_empty_directory_for_package_route() {
     let dir = temp_dir("empty-dir");
-    assert!(!is_package_interpret_input(&dir));
+    assert!(is_package_interpret_input(&dir));
 }
 
 #[test]
-fn is_package_interpret_input_rejects_directory_without_manifest_or_entry() {
+fn is_package_interpret_input_accepts_directory_without_manifest_or_entry_for_package_route() {
     let dir = temp_dir("no-manifest");
     let src = dir.join("src");
     std::fs::create_dir_all(&src).expect("create src");
     // No faber.toml, no .fab files
-    assert!(!is_package_interpret_input(&dir));
+    assert!(is_package_interpret_input(&dir));
 }

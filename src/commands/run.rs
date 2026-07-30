@@ -144,7 +144,12 @@ fn run_config_or_exit(
 /// G6 GO3 — package compile → go build → exec with forwarded argv.
 fn cmd_run_go(args: &RunArgs) {
     let input_path = PathBuf::from(&args.path);
-    let config = run_config_or_exit(Target::Go, &input_path, args.reader_locale.as_deref(), warn_policy_from_args(args));
+    let config = run_config_or_exit(
+        Target::Go,
+        &input_path,
+        args.reader_locale.as_deref(),
+        warn_policy_from_args(args),
+    );
     let result = package::compile_package(&config, &input_path);
     super::eprint_compile_diagnostics(&result.diagnostics);
     let Some(output) = result.output else {
@@ -191,7 +196,12 @@ fn cmd_run_scena(args: RunArgs) {
     let warn_policy = warn_policy_from_args(&args);
     let argumenta = args.args.clone();
     let mut host = StdioHost::with_argumenta(args.args);
-    let config = run_config_or_exit(Target::Scena, &input_path, args.reader_locale.as_deref(), warn_policy);
+    let config = run_config_or_exit(
+        Target::Scena,
+        &input_path,
+        args.reader_locale.as_deref(),
+        warn_policy,
+    );
     let artifact = match package::build_package_mir_artifact(&config, &input_path, &argumenta) {
         Ok(artifact) => artifact,
         Err(diagnostics) => {
@@ -211,7 +221,12 @@ fn cmd_run_fmir_text(args: RunArgs) {
     let input_path = PathBuf::from(&args.path);
     let warn_policy = warn_policy_from_args(&args);
     let mut host = StdioHost::with_argumenta(args.args);
-    let config = run_config_or_exit(Target::FmirText, &input_path, args.reader_locale.as_deref(), warn_policy);
+    let config = run_config_or_exit(
+        Target::FmirText,
+        &input_path,
+        args.reader_locale.as_deref(),
+        warn_policy,
+    );
     let image = match package::build_package_fmir_text_image(&config, &input_path, &[]) {
         Ok(image) => image,
         Err(diagnostics) => {
@@ -231,7 +246,12 @@ fn cmd_run_fmir(args: RunArgs) {
     let input_path = PathBuf::from(&args.path);
     let warn_policy = warn_policy_from_args(&args);
     let mut host = StdioHost::with_argumenta(args.args);
-    let config = run_config_or_exit(Target::Fmir, &input_path, args.reader_locale.as_deref(), warn_policy);
+    let config = run_config_or_exit(
+        Target::Fmir,
+        &input_path,
+        args.reader_locale.as_deref(),
+        warn_policy,
+    );
     let image = match package::build_package_fmir_image(&config, &input_path, &[]) {
         Ok(image) => image,
         Err(diagnostics) => {
@@ -249,7 +269,12 @@ fn cmd_run_fmir(args: RunArgs) {
 
 fn cmd_run_fmir_bin(args: &RunArgs) {
     let input_path = PathBuf::from(&args.path);
-    let config = run_config_or_exit(Target::FmirBin, &input_path, args.reader_locale.as_deref(), warn_policy_from_args(&args));
+    let config = run_config_or_exit(
+        Target::FmirBin,
+        &input_path,
+        args.reader_locale.as_deref(),
+        warn_policy_from_args(&args),
+    );
     let bundle =
         match package::build_package_fmir_binary_bundle(&config, &input_path, &[], args.release) {
             Ok(bundle) => bundle,
@@ -287,7 +312,12 @@ fn cmd_run_compiled(args: &RunArgs) {
 
     // POLICY: `run` is package-scoped, so stale generated crates are never
     // trusted over the current Faber sources.
-    let config = run_config_or_exit(Target::Rust, &input_path, args.reader_locale.as_deref(), warn_policy_from_args(args));
+    let config = run_config_or_exit(
+        Target::Rust,
+        &input_path,
+        args.reader_locale.as_deref(),
+        warn_policy_from_args(args),
+    );
     let result = package::compile_package(&config, &input_path);
 
     super::eprint_compile_diagnostics(&result.diagnostics);

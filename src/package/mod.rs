@@ -56,7 +56,12 @@ mod test_source_filter;
 #[allow(unused_imports)]
 // public package API for library callers; binary crate does not use it.
 pub use artifact_plan::ArtifactPlan;
-pub use binding::verify_library_bindings;
+#[allow(unused_imports)]
+// public package API for library callers/tests; binary crate only uses full verification.
+pub use binding::{
+    verify_library_binding_shapes, verify_library_bindings,
+    verify_library_bindings_with_probe_mode, BindingProbeMode,
+};
 pub use test_source_filter::TestSourceFilter;
 // used by `commands/run.rs` / tests for G4 library path-deps on package emit
 #[allow(unused_imports)]
@@ -81,8 +86,8 @@ pub(crate) use compile::take_go_package_modules;
 #[allow(unused_imports)] // package MIR stages consume this crate-visible analysis API.
 pub(crate) use compile::{analyze_package, AnalyzedPackage, AnalyzedPackageUnit};
 pub use compile::{
-    check_package, compile_package, compile_package_with_test_selection,
-    compile_package_with_test_options,
+    check_package, compile_package, compile_package_with_test_options,
+    compile_package_with_test_selection,
 };
 #[allow(unused_imports)] // public package API; used by integration tests and external callers
 pub use discovery::{discover_build_layout, sanitize_crate_name, BuildLayout};
@@ -273,8 +278,8 @@ pub(crate) fn load_package_with_reader_pack(
         // When `faber test --include/--exclude` selects proba files, seed only
         // those tests. Product modules enter via local import edges, so a
         // focused math.proba run does not compile the whole library graph.
-        let proba_only_seed = include_proba
-            && proba_filter.is_some_and(|filter| !filter.is_empty());
+        let proba_only_seed =
+            include_proba && proba_filter.is_some_and(|filter| !filter.is_empty());
         if proba_only_seed {
             all.into_iter()
                 .filter(|path| is_proba_source_path(path) && proba_allowed(path))

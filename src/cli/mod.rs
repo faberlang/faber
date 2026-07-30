@@ -24,7 +24,7 @@ pub struct Cli {
     pub eval_source: Option<String>,
 
     /// Arguments for `-c` / `--command` (after `--`)
-    #[arg(trailing_var_arg = true, allow_hyphen_values = true, hide = true)]
+    #[arg(last = true, allow_hyphen_values = true, hide = true)]
     pub eval_args: Vec<String>,
 
     #[command(subcommand)]

@@ -51,9 +51,7 @@ impl TestSourceFilter {
 }
 
 fn normalize_rel(rel: &str) -> String {
-    rel.replace('\\', "/")
-        .trim_start_matches("./")
-        .to_owned()
+    rel.replace('\\', "/").trim_start_matches("./").to_owned()
 }
 
 fn relative_display(source_root: &Path, path: &Path) -> String {

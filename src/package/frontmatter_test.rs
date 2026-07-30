@@ -161,8 +161,7 @@ source = "src"
 #[test]
 fn frontmatter_unrelated_fields_do_not_conflict() {
     let path = Path::new("main.fab");
-    let frontmatter =
-        parse_file_frontmatter("[metadata]\nauthor = \"test\"").expect("frontmatter");
+    let frontmatter = parse_file_frontmatter("[metadata]\nauthor = \"test\"").expect("frontmatter");
     let manifest = test_manifest();
     let result = validate_frontmatter_against_manifest(path, Some(&frontmatter), &manifest);
     assert!(
@@ -182,7 +181,6 @@ fn frontmatter_empty_frontmatter_does_not_conflict() {
         "empty frontmatter should not produce a conflict"
     );
 }
-
 
 // ── merge_entry_test_selection ────────────────────────────────────────────
 

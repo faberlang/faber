@@ -1,5 +1,6 @@
 use super::*;
 use radix::codegen::Target;
+use radix::driver::WarnPolicy;
 use radix::mir::BufferHost;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -86,15 +87,7 @@ fn run_target_name_maps_swift() {
 #[test]
 fn interpret_flag_overrides_package_directory() {
     let dir = temp_dir("interpret-flag-override");
-    let args = RunArgs {
-        path: dir.clone(),
-        reader_locale: None,
-        target: radix::tool::CliTarget::Rust,
-        release: false,
-        interpret: true,
-        compile: false,
-        args: Vec::new(),
-    };
+    let args = run_args(dir.clone(), true, false, None, radix::tool::CliTarget::Rust);
     // Even though `dir` is a directory, `--interpret` forces interpreted mode.
     assert!(should_interpret(&args, &dir));
 }
@@ -102,15 +95,7 @@ fn interpret_flag_overrides_package_directory() {
 #[test]
 fn compile_flag_takes_precedence_over_interpret_flag() {
     let fab = PathBuf::from("script.fab");
-    let args = RunArgs {
-        path: fab.clone(),
-        reader_locale: None,
-        target: radix::tool::CliTarget::Rust,
-        release: false,
-        interpret: true,
-        compile: true,
-        args: Vec::new(),
-    };
+    let args = run_args(fab.clone(), true, true, None, radix::tool::CliTarget::Rust);
     // `--compile` gates at line 28 return false before `--interpret` is checked.
     assert!(!should_interpret(&args, &fab));
 }
@@ -118,15 +103,13 @@ fn compile_flag_takes_precedence_over_interpret_flag() {
 #[test]
 fn reader_locale_takes_precedence_over_interpret_flag() {
     let fab = PathBuf::from("script.fab");
-    let args = RunArgs {
-        path: fab.clone(),
-        reader_locale: Some("zh-Hans".to_owned()),
-        target: radix::tool::CliTarget::Rust,
-        release: false,
-        interpret: true,
-        compile: false,
-        args: Vec::new(),
-    };
+    let args = run_args(
+        fab.clone(),
+        true,
+        false,
+        Some("zh-Hans".to_owned()),
+        radix::tool::CliTarget::Rust,
+    );
     // reader_locale gate at line 23 returns false before `--interpret` is checked.
     assert!(!should_interpret(&args, &fab));
 }
@@ -134,15 +117,13 @@ fn reader_locale_takes_precedence_over_interpret_flag() {
 #[test]
 fn non_rust_target_takes_precedence_over_interpret_flag() {
     let fab = PathBuf::from("script.fab");
-    let args = RunArgs {
-        path: fab.clone(),
-        reader_locale: None,
-        target: radix::tool::CliTarget::Scena,
-        release: false,
-        interpret: true,
-        compile: false,
-        args: Vec::new(),
-    };
+    let args = run_args(
+        fab.clone(),
+        true,
+        false,
+        None,
+        radix::tool::CliTarget::Scena,
+    );
     // Target gate at line 25 returns false before `--interpret` is checked.
     assert!(!should_interpret(&args, &fab));
 }
@@ -157,49 +138,57 @@ fn temp_dir(label: &str) -> PathBuf {
     dir
 }
 
+fn run_args(
+    path: PathBuf,
+    interpret: bool,
+    compile: bool,
+    reader_locale: Option<String>,
+    target: radix::tool::CliTarget,
+) -> RunArgs {
+    RunArgs {
+        path,
+        reader_locale,
+        target,
+        release: false,
+        interpret,
+        compile,
+        deny_warnings: false,
+        deny: Vec::new(),
+        args: Vec::new(),
+    }
+}
+
 #[test]
 fn interpret_policy_defaults_to_single_fab_file() {
     let fab = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../examples/corpus/incipit/salve-munde.fab");
-    let args = RunArgs {
-        path: fab.clone(),
-        reader_locale: None,
-        target: radix::tool::CliTarget::Rust,
-        release: false,
-        interpret: false,
-        compile: false,
-        args: Vec::new(),
-    };
+    let args = run_args(
+        fab.clone(),
+        false,
+        false,
+        None,
+        radix::tool::CliTarget::Rust,
+    );
     assert!(should_interpret(&args, &fab));
 }
 
 #[test]
 fn compile_flag_overrides_single_fab_file() {
     let fab = PathBuf::from("script.fab");
-    let args = RunArgs {
-        path: fab.clone(),
-        reader_locale: None,
-        target: radix::tool::CliTarget::Rust,
-        release: false,
-        interpret: false,
-        compile: true,
-        args: Vec::new(),
-    };
+    let args = run_args(fab.clone(), false, true, None, radix::tool::CliTarget::Rust);
     assert!(!should_interpret(&args, &fab));
 }
 
 #[test]
 fn package_directory_defaults_to_compiled_run_policy() {
     let dir = temp_dir("compiled-package-policy");
-    let args = RunArgs {
-        path: dir.clone(),
-        reader_locale: None,
-        target: radix::tool::CliTarget::Rust,
-        release: false,
-        interpret: false,
-        compile: false,
-        args: Vec::new(),
-    };
+    let args = run_args(
+        dir.clone(),
+        false,
+        false,
+        None,
+        radix::tool::CliTarget::Rust,
+    );
 
     assert!(!should_interpret(&args, &dir));
 }
@@ -208,15 +197,13 @@ fn package_directory_defaults_to_compiled_run_policy() {
 fn nonexistent_path_does_not_interpret() {
     let dir = tempfile::tempdir().expect("temp dir");
     let missing = dir.path().join("nonexistent_script.fab");
-    let args = RunArgs {
-        path: missing.clone(),
-        reader_locale: None,
-        target: radix::tool::CliTarget::Rust,
-        release: false,
-        interpret: false,
-        compile: false,
-        args: Vec::new(),
-    };
+    let args = run_args(
+        missing.clone(),
+        false,
+        false,
+        None,
+        radix::tool::CliTarget::Rust,
+    );
     assert!(!should_interpret(&args, &missing));
 }
 
@@ -224,30 +211,26 @@ fn nonexistent_path_does_not_interpret() {
 fn nonexistent_path_with_interpret_flag_returns_true() {
     let dir = tempfile::tempdir().expect("temp dir");
     let missing = dir.path().join("nonexistent_script.fab");
-    let args = RunArgs {
-        path: missing.clone(),
-        reader_locale: None,
-        target: radix::tool::CliTarget::Rust,
-        release: false,
-        interpret: true,
-        compile: false,
-        args: Vec::new(),
-    };
+    let args = run_args(
+        missing.clone(),
+        true,
+        false,
+        None,
+        radix::tool::CliTarget::Rust,
+    );
     assert!(should_interpret(&args, &missing));
 }
 
 #[test]
 fn scena_target_never_uses_script_interpret_policy() {
     let fab = PathBuf::from("script.fab");
-    let args = RunArgs {
-        path: fab.clone(),
-        reader_locale: None,
-        target: radix::tool::CliTarget::Scena,
-        release: false,
-        interpret: false,
-        compile: false,
-        args: Vec::new(),
-    };
+    let args = run_args(
+        fab.clone(),
+        false,
+        false,
+        None,
+        radix::tool::CliTarget::Scena,
+    );
 
     assert!(!should_interpret(&args, &fab));
 }
@@ -255,15 +238,13 @@ fn scena_target_never_uses_script_interpret_policy() {
 #[test]
 fn reader_locale_forces_compiled_run_policy_for_single_fab_file() {
     let fab = PathBuf::from("script.fab");
-    let args = RunArgs {
-        path: fab.clone(),
-        reader_locale: Some("zh-Hans".to_owned()),
-        target: radix::tool::CliTarget::Rust,
-        release: false,
-        interpret: false,
-        compile: false,
-        args: Vec::new(),
-    };
+    let args = run_args(
+        fab.clone(),
+        false,
+        false,
+        Some("zh-Hans".to_owned()),
+        radix::tool::CliTarget::Rust,
+    );
 
     assert!(!should_interpret(&args, &fab));
 }
@@ -272,7 +253,8 @@ fn reader_locale_forces_compiled_run_policy_for_single_fab_file() {
 fn run_config_loads_reader_locale_pack_for_go_targets() {
     let example = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale/th-TH");
 
-    let config = run_config(Target::Go, &example, Some("th-TH")).expect("run config");
+    let config =
+        run_config(Target::Go, &example, Some("th-TH"), WarnPolicy::default()).expect("run config");
 
     assert_eq!(config.target, Target::Go);
     assert_eq!(
@@ -288,7 +270,8 @@ fn run_config_loads_reader_locale_pack_for_go_targets() {
 fn run_config_uses_manifest_reader_locale_for_non_rust_targets() {
     let example = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale/th-TH");
 
-    let config = run_config(Target::FmirText, &example, None).expect("run config");
+    let config =
+        run_config(Target::FmirText, &example, None, WarnPolicy::default()).expect("run config");
 
     assert_eq!(config.target, Target::FmirText);
     assert_eq!(

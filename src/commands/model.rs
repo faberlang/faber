@@ -134,7 +134,9 @@ fn parse_safetensors_metadata(data: &[u8]) -> Result<SafetensorsHeader, String> 
     }
 
     // Read 8-byte little-endian header length.
-    let header_len = u64::from_le_bytes(data[..8].try_into().unwrap()) as usize;
+    let mut header_len_bytes = [0_u8; 8];
+    header_len_bytes.copy_from_slice(&data[..8]);
+    let header_len = u64::from_le_bytes(header_len_bytes) as usize;
     if header_len == 0 {
         return Err("header length is zero".into());
     }

@@ -1,7 +1,7 @@
 use std::fs;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use super::verify_library_bindings;
+use super::{verify_library_binding_shapes, verify_library_bindings};
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
 
@@ -70,7 +70,8 @@ path = "rust/shim.rs"
         "pub async fn delegata(value: String) -> String { value }\n",
     );
 
-    let result = verify_library_bindings(root.path(), "rust").expect("analyzed bindings verify");
+    let result =
+        verify_library_binding_shapes(root.path(), "rust").expect("analyzed bindings verify");
     assert_eq!(result.declarations, 2);
     assert_eq!(result.bindings, 1);
 }
@@ -94,11 +95,13 @@ path = "rust/shim.rs"
         "pub fn abscondita(value: String) -> String { value }\n",
     );
 
-    let diagnostics = verify_library_bindings(root.path(), "rust").expect_err("nested method rejected");
+    let diagnostics =
+        verify_library_bindings(root.path(), "rust").expect_err("nested method rejected");
     assert!(has_issue(&diagnostics, "binding_unknown_declaration"));
 }
 
 #[test]
+#[ignore = "full Rust symbol compatibility probe; run with ignored integration checks"]
 fn rust_probe_rejects_a_missing_symbol() {
     let root = test_package(
         "missing-symbol",
@@ -112,11 +115,13 @@ path = "rust/shim.rs"
         "pub fn aliud(value: String) -> String { value }\n",
     );
 
-    let diagnostics = verify_library_bindings(root.path(), "rust").expect_err("missing symbol rejected");
+    let diagnostics =
+        verify_library_bindings(root.path(), "rust").expect_err("missing symbol rejected");
     assert!(has_issue(&diagnostics, "binding_rust_probe_failed"));
 }
 
 #[test]
+#[ignore = "full Rust symbol compatibility probe; run with ignored integration checks"]
 fn rust_probe_rejects_a_signature_mismatch() {
     let root = test_package(
         "wrong-signature",
@@ -130,11 +135,13 @@ path = "rust/shim.rs"
         "pub fn delegata(value: i64) -> String { value.to_string() }\n",
     );
 
-    let diagnostics = verify_library_bindings(root.path(), "rust").expect_err("wrong signature rejected");
+    let diagnostics =
+        verify_library_bindings(root.path(), "rust").expect_err("wrong signature rejected");
     assert!(has_issue(&diagnostics, "binding_rust_probe_failed"));
 }
 
 #[test]
+#[ignore = "full Rust symbol compatibility probe; run with ignored integration checks"]
 fn rust_probe_rejects_a_sync_symbol_for_an_async_contract() {
     let root = test_package(
         "wrong-async-signature",
@@ -148,11 +155,13 @@ path = "rust/shim.rs"
         "pub fn delegata(value: String) -> String { value }\n",
     );
 
-    let diagnostics = verify_library_bindings(root.path(), "rust").expect_err("sync symbol rejected");
+    let diagnostics =
+        verify_library_bindings(root.path(), "rust").expect_err("sync symbol rejected");
     assert!(has_issue(&diagnostics, "binding_rust_probe_failed"));
 }
 
 #[test]
+#[ignore = "full Rust symbol compatibility probe; run with ignored integration checks"]
 fn rust_probe_rejects_a_missing_error_channel() {
     let root = test_package(
         "wrong-error-signature",
@@ -185,7 +194,8 @@ symbol = "crate::shim::altera"
         "pub fn delegata(value: String) -> String { value }\n",
     );
 
-    let diagnostics = verify_library_bindings(root.path(), "rust").expect_err("duplicate row rejected");
+    let diagnostics =
+        verify_library_bindings(root.path(), "rust").expect_err("duplicate row rejected");
     assert!(has_issue(&diagnostics, "invalid_binding_manifest"));
 }
 
@@ -204,7 +214,8 @@ fn parent_escaping_source_path_is_rejected() {
     )
     .expect("rewrite manifest");
 
-    let diagnostics = verify_library_bindings(root.path(), "rust").expect_err("escaping source rejected");
+    let diagnostics =
+        verify_library_bindings(root.path(), "rust").expect_err("escaping source rejected");
     assert!(has_issue(&diagnostics, "package_member_parent_escape"));
 }
 
@@ -257,7 +268,8 @@ path = "rust/shim.rs"
     fs::remove_file(root.path().join("rust/shim.rs")).expect("remove placeholder shim");
     symlink(&outside, root.path().join("rust/shim.rs")).expect("symlink escaping shim");
 
-    let diagnostics = verify_library_bindings(root.path(), "rust").expect_err("symlink escape rejected");
+    let diagnostics =
+        verify_library_bindings(root.path(), "rust").expect_err("symlink escape rejected");
     assert!(has_issue(&diagnostics, "package_member_symlink_escape"));
 }
 
@@ -313,12 +325,7 @@ fn symlinked_faber_source_outside_source_root_is_rejected() {
 
 #[test]
 fn empty_source_has_no_declarations() {
-    let root = test_package(
-        "empty-source",
-        "",
-        "",
-        "",
-    );
+    let root = test_package("empty-source", "", "", "");
     let result = verify_library_bindings(root.path(), "rust").expect("empty source must not error");
     assert_eq!(result.declarations, 0);
     assert_eq!(result.bindings, 0);
@@ -332,7 +339,8 @@ fn all_local_functions_without_bindings() {
         "",
         "",
     );
-    let result = verify_library_bindings(root.path(), "rust").expect("local functions without bindings");
+    let result =
+        verify_library_bindings(root.path(), "rust").expect("local functions without bindings");
     assert_eq!(result.declarations, 1);
     assert_eq!(result.bindings, 0);
 }

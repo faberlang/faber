@@ -42,7 +42,10 @@ fn assert_plain_render_contract(rendered: &str, header: &str) {
 }
 
 /// Assert that a locale's reader pack loads and contains the expected diagnostic template.
-#[expect(dead_code, reason = "kept as a focused reader-pack contract helper for locale additions")]
+#[expect(
+    dead_code,
+    reason = "kept as a focused reader-pack contract helper for locale additions"
+)]
 fn assert_reader_pack_contains(locale: &str, fault_rel: &str, expected_code: &[&str]) {
     let fault = reader_locale_fault_path(locale, fault_rel);
     let (_config, pack) =
@@ -82,7 +85,7 @@ fn package_render_lex004_unexpected_character_vi() {
 }
 
 fn assert_single_locale_lex004(locale: &str) {
-    let fault = reader_locale_fault_path(locale, "src/non-ascii-number.fab");
+    let fault = reader_locale_fault_path(locale, "faults/non-ascii-number.fab");
     let (config, pack) =
         config_with_reader_locale(Target::Rust, &fault, Some(locale)).expect("reader config");
     let pack = pack.expect("reader pack");
@@ -119,7 +122,7 @@ fn assert_single_locale_lex004(locale: &str) {
 
 #[test]
 fn package_render_emits_thai_sem010_initializer_mismatch() {
-    let fault = reader_locale_fault_path("th-TH", "src/type-mismatch.fab");
+    let fault = reader_locale_fault_path("th-TH", "faults/type-mismatch.fab");
     let (config, pack) =
         config_with_reader_locale(Target::Rust, &fault, Some("th-TH")).expect("reader config");
     let pack = pack.expect("reader pack");
@@ -151,7 +154,7 @@ fn package_render_emits_thai_sem010_initializer_mismatch() {
 
 #[test]
 fn package_render_preserves_bidi_for_arabic_sem010() {
-    let fault = reader_locale_fault_path("ar", "src/type-mismatch.fab");
+    let fault = reader_locale_fault_path("ar", "faults/type-mismatch.fab");
     let (config, pack) =
         config_with_reader_locale(Target::Rust, &fault, Some("ar")).expect("reader config");
     let pack = pack.expect("reader pack");
@@ -187,22 +190,22 @@ fn package_render_preserves_bidi_for_arabic_sem010() {
 
 #[test]
 fn package_render_emits_sem010_initializer_mismatch_zh_hans() {
-    assert_single_locale_sem010("zh-Hans", "src/type-mismatch.fab");
+    assert_single_locale_sem010("zh-Hans", "faults/type-mismatch.fab");
 }
 
 #[test]
 fn package_render_emits_sem010_initializer_mismatch_zh_hant() {
-    assert_single_locale_sem010_or_sem001("zh-Hant", "src/type-mismatch.fab");
+    assert_single_locale_sem010_or_sem001("zh-Hant", "faults/type-mismatch.fab");
 }
 
 #[test]
 fn package_render_emits_sem010_initializer_mismatch_hi() {
-    assert_single_locale_sem010_or_sem001("hi", "src/type-mismatch.fab");
+    assert_single_locale_sem010_or_sem001("hi", "faults/type-mismatch.fab");
 }
 
 #[test]
 fn package_render_emits_sem010_initializer_mismatch_vi() {
-    assert_single_locale_sem010_accepts_reader001("vi", "src/type-mismatch.fab");
+    assert_single_locale_sem010_accepts_reader001("vi", "faults/type-mismatch.fab");
 }
 
 fn assert_single_locale_sem010(locale: &str, fault_rel: &str) {
@@ -251,8 +254,7 @@ fn assert_single_locale_sem010_or_sem001(locale: &str, fault_rel: &str) {
         .filter(|diag| diag.code == Some("SEM010"))
         .collect();
     if !sem010.is_empty() {
-        let issue_sem010 =
-            diagnostics_with_issue(&sem010, ISSUE_INITIALIZER_ANNOTATION_MISMATCH);
+        let issue_sem010 = diagnostics_with_issue(&sem010, ISSUE_INITIALIZER_ANNOTATION_MISMATCH);
         assert!(
             !issue_sem010.is_empty(),
             "missing initializer_annotation_mismatch fact for {locale}: {sem010:?}"
@@ -310,8 +312,7 @@ fn assert_single_locale_sem010_accepts_reader001(locale: &str, fault_rel: &str) 
         .filter(|diag| diag.code == Some("SEM010"))
         .collect();
     if !sem010.is_empty() {
-        let issue_sem010 =
-            diagnostics_with_issue(&sem010, ISSUE_INITIALIZER_ANNOTATION_MISMATCH);
+        let issue_sem010 = diagnostics_with_issue(&sem010, ISSUE_INITIALIZER_ANNOTATION_MISMATCH);
         assert!(
             !issue_sem010.is_empty(),
             "missing initializer_annotation_mismatch fact for {locale}: {sem010:?}"
@@ -372,27 +373,27 @@ fn assert_single_locale_sem010_accepts_reader001(locale: &str, fault_rel: &str) 
 
 #[test]
 fn package_render_emits_sem001_unknown_identifier_zh_hans() {
-    assert_single_locale_sem001_or_reader001("zh-Hans", "src/undefined-variable.fab");
+    assert_single_locale_sem001_or_reader001("zh-Hans", "faults/undefined-variable.fab");
 }
 
 #[test]
 fn package_render_emits_sem001_unknown_identifier_zh_hant() {
-    assert_single_locale_sem001_or_reader001("zh-Hant", "src/undefined-variable.fab");
+    assert_single_locale_sem001_or_reader001("zh-Hant", "faults/undefined-variable.fab");
 }
 
 #[test]
 fn package_render_emits_sem001_unknown_identifier_ar() {
-    assert_single_locale_sem001_or_reader001("ar", "src/undefined-variable.fab");
+    assert_single_locale_sem001_or_reader001("ar", "faults/undefined-variable.fab");
 }
 
 #[test]
 fn package_render_emits_sem001_unknown_identifier_hi() {
-    assert_single_locale_sem001_or_reader001("hi", "src/undefined-variable.fab");
+    assert_single_locale_sem001_or_reader001("hi", "faults/undefined-variable.fab");
 }
 
 #[test]
 fn package_render_emits_sem001_unknown_identifier_vi() {
-    assert_single_locale_sem001_or_reader001("vi", "src/undefined-variable.fab");
+    assert_single_locale_sem001_or_reader001("vi", "faults/undefined-variable.fab");
 }
 
 fn assert_single_locale_sem001_or_reader001(locale: &str, fault_rel: &str) {
@@ -400,9 +401,7 @@ fn assert_single_locale_sem001_or_reader001(locale: &str, fault_rel: &str) {
     let (config, pack) =
         config_with_reader_locale(Target::Rust, &fault, Some(locale)).expect("reader config");
     let pack = pack.expect("reader pack");
-    assert!(
-        pack.diagnostics.contains_key("SEM001") || pack.diagnostics.contains_key("READER001")
-    );
+    assert!(pack.diagnostics.contains_key("SEM001") || pack.diagnostics.contains_key("READER001"));
 
     let diagnostics = check_package(&config, &fault);
 
@@ -458,7 +457,7 @@ fn package_render_emits_sem001_suggestion_for_vietnamese_name() {
     // After radix reader locale changes, semantic-name-suggestion.fab
     // produces READER001/READER002 lexer diagnostics with a PARSE030
     // error. The test verifies READER002 spelling suggestions.
-    let fault = reader_locale_fault_path("vi", "src/semantic-name-suggestion.fab");
+    let fault = reader_locale_fault_path("vi", "faults/semantic-name-suggestion.fab");
     let (config, pack) =
         config_with_reader_locale(Target::Rust, &fault, Some("vi")).expect("reader config");
     let pack = pack.expect("reader pack");
@@ -496,7 +495,7 @@ fn package_render_emits_sem001_suggestion_for_vietnamese_name() {
 
 #[test]
 fn package_render_emits_reader002_accented_keyword_suggestion() {
-    let fault = reader_locale_fault_path("vi", "src/keyword-suggestion.fab");
+    let fault = reader_locale_fault_path("vi", "faults/keyword-suggestion.fab");
     let (config, pack) =
         config_with_reader_locale(Target::Rust, &fault, Some("vi")).expect("reader config");
     let pack = pack.expect("reader pack");
@@ -532,7 +531,7 @@ fn package_render_emits_reader002_accented_keyword_suggestion() {
 
 #[test]
 fn package_render_emits_reader002_typo_keyword_suggestion() {
-    let fault = reader_locale_fault_path("vi", "src/keyword-edit-distance.fab");
+    let fault = reader_locale_fault_path("vi", "faults/keyword-edit-distance.fab");
     let (config, pack) =
         config_with_reader_locale(Target::Rust, &fault, Some("vi")).expect("reader config");
     let pack = pack.expect("reader pack");

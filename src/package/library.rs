@@ -48,9 +48,26 @@ struct CachedLibraryInterface {
 
 type LibraryIdentityKey = (u8, String, Vec<String>);
 
-#[derive(Default)]
 pub(crate) struct LibraryInterfaceCache {
     entries: BTreeMap<LibraryIdentityKey, CachedLibraryInterface>,
+    analysis_config: Config,
+}
+
+impl Default for LibraryInterfaceCache {
+    fn default() -> Self {
+        Self::with_config(&Config::default())
+    }
+}
+
+impl LibraryInterfaceCache {
+    pub(crate) fn with_config(config: &Config) -> Self {
+        Self {
+            entries: BTreeMap::new(),
+            analysis_config: Config::default()
+                .with_target(config.target)
+                .with_bodyless_functions(),
+        }
+    }
 }
 
 #[allow(clippy::result_large_err)]
@@ -557,8 +574,9 @@ fn analyze_cached_library_interface(
         cached.peeled_body.clone()
     };
 
-    // Native-binding library interfaces declare bodyless functions (G4).
-    let session = Session::new(Config::default().with_bodyless_functions());
+    // Library interface analysis follows the package target. Browser products
+    // must not inherit Rust-only borrow qualification from Config::default().
+    let session = Session::new(library_cache.analysis_config.clone());
     let mut analysis = match analyze_source_with_cli_program_and_import_contract(
         &session,
         &import.module.interface_path.display().to_string(),
@@ -569,12 +587,15 @@ fn analyze_cached_library_interface(
     ) {
         Ok(analysis) => analysis,
         Err(diagnostics) => {
-            return Err(diagnostics.into_iter().next().unwrap_or_else(|| {
-                crate::package_diagnostic_error(
-                    "library interface analysis failed without diagnostics",
-                )
-                .with_file(import.module.interface_path.display().to_string())
-            }))
+            return Err(diagnostics
+                .into_iter()
+                .find(Diagnostic::is_error)
+                .unwrap_or_else(|| {
+                    crate::package_diagnostic_error(
+                        "library interface analysis failed without diagnostics",
+                    )
+                    .with_file(import.module.interface_path.display().to_string())
+                }))
         }
     };
     attach_library_provenance(

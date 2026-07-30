@@ -40,6 +40,19 @@ fn fmir_bin_entrypoint_and_runner_names_are_configured() {
 }
 
 #[test]
+fn fmir_bin_runner_source_fingerprints_embedded_image() {
+    let first = render_fmir_bin_runner_main_rs(b"first image");
+    let second = render_fmir_bin_runner_main_rs(b"second image");
+
+    assert_ne!(
+        first, second,
+        "shared cargo target builds must see image changes as source changes"
+    );
+    assert!(first.contains("embedded image fnv64:"));
+    assert!(first.contains("include_bytes!(\"../../image.fmir\")"));
+}
+
+#[test]
 fn fnv1a64_constants_are_standard() {
     // Standard FNV-1a 64-bit offset and prime values.
     assert_eq!(FNV1A64_OFFSET, 0xcbf2_9ce4_8422_2325);
@@ -476,9 +489,7 @@ fn make_fmir_bin_entrypoint_executable_sets_755_permissions() {
 // ── patch_fmir_text_cli_record (decoy superset) ────────────────────────────
 
 /// Shared setup for the decoy-superset patching tests.
-fn decoy_test_setup(
-    interner: &mut Interner,
-) -> (MirProgram, FmirTextCliSection, Symbol) {
+fn decoy_test_setup(interner: &mut Interner) -> (MirProgram, FmirTextCliSection, Symbol) {
     let run_entry = interner.intern("run_entry");
     let name = interner.intern("name");
     let extra = interner.intern("extra");

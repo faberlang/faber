@@ -191,10 +191,13 @@ fn llvm_host_comparison_rejects_exit_code_mismatch() {
         stderr: vec![],
     });
     let comparison = compare_pair(oracle, Some(&rust), Some(&llvm), None);
-    assert_eq!(comparison, Comparison::Mismatch {
-        boundary: Boundary::Outcome,
-        issue: "exit_code_mismatch".to_owned(),
-    });
+    assert_eq!(
+        comparison,
+        Comparison::Mismatch {
+            boundary: Boundary::Outcome,
+            issue: "exit_code_mismatch".to_owned(),
+        }
+    );
 }
 
 #[test]

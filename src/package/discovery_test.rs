@@ -67,13 +67,13 @@ fn sanitize_crate_name_complex_with_special_characters() {
 }
 
 #[test]
-fn sanitize_crate_name_preserves_unicode_letters() {
-    assert_eq!(sanitize_crate_name("café"), "café");
+fn sanitize_crate_name_replaces_unicode_letters_with_separators() {
+    assert_eq!(sanitize_crate_name("café"), "caf");
 }
 
 #[test]
-fn sanitize_crate_name_lowercases_unicode() {
-    assert_eq!(sanitize_crate_name("CAFÉ"), "café");
+fn sanitize_crate_name_lowercases_ascii_and_replaces_unicode_letters() {
+    assert_eq!(sanitize_crate_name("CAFÉ"), "caf");
 }
 
 #[test]

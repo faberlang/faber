@@ -404,7 +404,7 @@ pub(crate) fn build_package_fmir_binary_bundle(
                 .map_err(|error| vec![mir_diag(&prepared.entry_path, error.to_string())])?;
             let image_path = artifact_root.join(FMIR_IMAGE_FILE);
             let image = package_fmir_binary_image(prepared, lowered, &package_root)?;
-            fs::write(&image_path, image)
+            fs::write(&image_path, &image)
                 .map_err(|error| vec![mir_diag(&prepared.entry_path, error.to_string())])?;
 
             let entrypoint_path = artifact_root.join(FMIR_BIN_ENTRYPOINT_FILE);
@@ -412,6 +412,7 @@ pub(crate) fn build_package_fmir_binary_bundle(
                 &artifact_root,
                 &entrypoint_path,
                 &prepared.entry_path,
+                &image,
                 release,
             )?;
 
@@ -789,6 +790,7 @@ fn write_fmir_bin_runner(
     artifact_root: &Path,
     entrypoint_path: &Path,
     diagnostic_path: &Path,
+    image: &[u8],
     release: bool,
 ) -> Result<(), Vec<Diagnostic>> {
     let runner_root = artifact_root.join(FMIR_BIN_RUNNER_CRATE_DIR);
@@ -800,8 +802,11 @@ fn write_fmir_bin_runner(
         render_fmir_bin_runner_cargo_toml(),
     )
     .map_err(|error| vec![mir_diag(diagnostic_path, error.to_string())])?;
-    fs::write(runner_src.join("main.rs"), render_fmir_bin_runner_main_rs())
-        .map_err(|error| vec![mir_diag(diagnostic_path, error.to_string())])?;
+    fs::write(
+        runner_src.join("main.rs"),
+        render_fmir_bin_runner_main_rs(image),
+    )
+    .map_err(|error| vec![mir_diag(diagnostic_path, error.to_string())])?;
 
     // Redirect the runner's cargo build to a shared target dir instead of
     // <pkg>/target/faber-mir/exe/runner-target/. This prevents ~1.4 GB of
@@ -860,8 +865,10 @@ faber = {{ path = "{faber_cli_path}", version = "={PACKAGE_MIR_TOOLCHAIN_VERSION
     )
 }
 
-fn render_fmir_bin_runner_main_rs() -> &'static str {
-    r#"fn main() {
+fn render_fmir_bin_runner_main_rs(image: &[u8]) -> String {
+    let mut source = format!("// embedded image fnv64:{:016x}\n", fnv1a64(image));
+    source.push_str(
+        r#"fn main() {
     let args = std::env::args().skip(1).collect::<Vec<_>>();
     if let Err(diagnostics) = faber_cli::package::run_fmir_image_bytes_with_stdio(
         include_bytes!("../../image.fmir"),
@@ -879,7 +886,9 @@ fn render_fmir_bin_runner_main_rs() -> &'static str {
         std::process::exit(1);
     }
 }
-"#
+"#,
+    );
+    source
 }
 
 fn invoke_fmir_bin_runner_build(
@@ -2016,7 +2025,9 @@ fn push_cli_option_match_diagnostic(
         crate::package_diagnostic_error(format!(
             "package MIR could not match CLI option `{option}`; use compiled package execution for this surface"
         ))
-        .with_file(unit.path.display().to_string()),
+        .with_file(unit.path.display().to_string())
+        .with_arg("issue", "package_mir_cli_surface_unsupported")
+        .with_arg("surface", "CLI option match"),
     );
 }
 
@@ -2029,7 +2040,9 @@ fn push_cli_option_missing_value_diagnostic(
         crate::package_diagnostic_error(format!(
             "package MIR expected a value for CLI option `{option}`; use compiled package execution for this surface"
         ))
-        .with_file(unit.path.display().to_string()),
+        .with_file(unit.path.display().to_string())
+        .with_arg("issue", "package_mir_cli_surface_unsupported")
+        .with_arg("surface", "CLI option value"),
     );
 }
 
@@ -2379,6 +2392,11 @@ fn import_semantic_type(
         Type::Promissum(inner) => {
             let inner = import_semantic_type(source, target, inner, imported);
             target.promissum(inner)
+        }
+        Type::PromissumFailable(success, alternate) => {
+            let success = import_semantic_type(source, target, success, imported);
+            let alternate = import_semantic_type(source, target, alternate, imported);
+            target.promissum_failable(success, alternate)
         }
         Type::Cursor(inner) => {
             let inner = import_semantic_type(source, target, inner, imported);
@@ -2758,7 +2776,10 @@ fn push_cli_operand_parse_diagnostic(
         crate::package_diagnostic_error(format!(
             "package MIR could not parse CLI operand `{name}` value `{value}` as {ty}; use compiled package execution for this surface"
         ))
-        .with_file(unit.path.display().to_string()),
+        .with_file(unit.path.display().to_string())
+        .with_arg("issue", "package_mir_cli_surface_unsupported")
+        .with_arg("surface", "CLI operand parse")
+        .with_arg("operand", name),
     );
 }
 
@@ -2774,7 +2795,10 @@ fn push_cli_option_parse_diagnostic(
         crate::package_diagnostic_error(format!(
             "package MIR could not parse CLI option `{name}` value `{value}` as {ty}; use compiled package execution for this surface"
         ))
-        .with_file(unit.path.display().to_string()),
+        .with_file(unit.path.display().to_string())
+        .with_arg("issue", "package_mir_cli_surface_unsupported")
+        .with_arg("surface", "CLI option parse")
+        .with_arg("option", name),
     );
 }
 
@@ -2820,7 +2844,10 @@ fn push_cli_operand_missing_diagnostic(
         crate::package_diagnostic_error(format!(
             "package MIR expected CLI operand `{name}` but no value was provided; use compiled package execution for this surface"
         ))
-        .with_file(unit.path.display().to_string()),
+        .with_file(unit.path.display().to_string())
+        .with_arg("issue", "package_mir_cli_surface_unsupported")
+        .with_arg("surface", "CLI operand value")
+        .with_arg("operand", name),
     );
 }
 
@@ -3333,8 +3360,12 @@ fn rewrite_expr(
         }
         HirExpressionKind::Unary(_, inner)
         | HirExpressionKind::Cede(inner)
+        | HirExpressionKind::Reddet(inner)
+        | HirExpressionKind::Tacebit(inner)
+        | HirExpressionKind::Yield(inner)
         | HirExpressionKind::Panic(inner)
-        | HirExpressionKind::Throw(inner) => {
+        | HirExpressionKind::Throw(inner)
+        | HirExpressionKind::Praefixum(inner) => {
             rewrite_expr(unit_path, inner, interner, targets, namespaces, diagnostics)
         }
         HirExpressionKind::Call(callee, type_args, args) => {
@@ -3638,7 +3669,7 @@ fn rewrite_expr(
         HirExpressionKind::Path(_)
         | HirExpressionKind::Literal(_)
         | HirExpressionKind::Vacua
-        | HirExpressionKind::ReadLine
+        | HirExpressionKind::ReadLine(_)
         | HirExpressionKind::Error => {}
     }
 }

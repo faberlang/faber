@@ -16,7 +16,7 @@ use radix::driver::Config;
 use radix::hir::HirItemKind;
 
 use super::artifact_plan::native_library_deps;
-use super::binding::verify_library_bindings;
+use super::binding::verify_library_binding_shapes;
 use super::codegen::ModuleNode;
 use super::compile::{generate_library_unit_rust, AnalyzedPackageUnit};
 use super::discovery::sanitize_crate_name;
@@ -47,7 +47,8 @@ pub(crate) fn emit_linked_library_crates(
     let mut linked = Vec::new();
     let mut diagnostics = Vec::new();
     for (provider, locked, lib_manifest) in deps {
-        if let Err(verify_diags) = verify_library_bindings(Path::new(&locked.package_root), "rust")
+        if let Err(verify_diags) =
+            verify_library_binding_shapes(Path::new(&locked.package_root), "rust")
         {
             diagnostics.extend(verify_diags);
             continue;

@@ -256,7 +256,12 @@ fn snapshot_struct_method(
         .ret_ty
         .unwrap_or_else(|| analysis.types.primitive(radix::semantic::Primitive::Vacuum));
     let sig = FuncSig {
-        type_params: method.func.type_params.iter().map(|param| param.name).collect(),
+        type_params: method
+            .func
+            .type_params
+            .iter()
+            .map(|param| param.name)
+            .collect(),
         type_param_constraints: method
             .func
             .type_params

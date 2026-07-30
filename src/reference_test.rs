@@ -243,9 +243,7 @@ fn pack_version_skew_no_version_is_ok() {
         source_commit: None,
         index_generated_on: None,
     };
-    assert!(pack_version_skew(&metadata)
-        .expect("no version")
-        .is_none());
+    assert!(pack_version_skew(&metadata).expect("no version").is_none());
 }
 
 #[test]
@@ -270,10 +268,14 @@ fn release_version_parser_ci_is_none() {
 
 #[test]
 fn release_version_parser_rejects_malformed_versions() {
-    assert_eq!(parse_release_version("1.0"), None);
     assert_eq!(parse_release_version("abc"), None);
     assert_eq!(parse_release_version("1.0.0.0"), None);
     assert_eq!(parse_release_version(""), None);
+}
+
+#[test]
+fn release_version_parser_defaults_missing_patch_to_zero() {
+    assert_eq!(parse_release_version("1.0"), Some((1, 0, 0)));
 }
 
 #[test]

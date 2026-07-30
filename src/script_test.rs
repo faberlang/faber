@@ -123,10 +123,15 @@ fn run_source_surfaces_frontend_errors() {
 }
 
 #[test]
-fn empty_source_returns_frontend_error() {
+fn empty_source_returns_stepper_no_entry_error() {
     let mut host = BufferHost::default();
-    let error = run_source("", &mut host).expect_err("empty source fails");
-    assert!(matches!(error, RunSourceError::Frontend(_)));
+    let error = run_source("", &mut host).expect_err("empty source has no entry");
+    let RunSourceError::Stepper(errors) = error else {
+        panic!("expected stepper error for empty source");
+    };
+    assert!(errors
+        .iter()
+        .any(|error| error.issue == "stepper_no_entry_function_in_mir_program"));
 }
 
 #[test]
@@ -140,10 +145,7 @@ fn print_run_source_error_accepts_frontend_failures() {
 #[test]
 fn run_source_surfaces_stepper_errors() {
     let mut host = BufferHost::default();
-    let error = run_source(
-        "@ futura\nfunctio bad() { }\n",
-        &mut host,
-    )
-    .expect_err("invalid async fails");
+    let error =
+        run_source("@ futura\nfunctio bad() { }\n", &mut host).expect_err("invalid async fails");
     assert!(matches!(error, RunSourceError::Stepper(_)));
 }

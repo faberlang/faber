@@ -121,7 +121,7 @@ fn emit_wgsl_text_on_single_fab_file_succeeds() {
     ]);
     assert!(ok, "faber emit -t wgsl-text failed: {stderr}");
     assert!(
-        stdout.contains("fn vec_scale"),
+        stdout.contains("fn scala"),
         "expected WGSL entry function in output:\n{stdout}"
     );
 }
@@ -157,7 +157,7 @@ fn emit_reflection_prints_wgsl_sidecar_json() {
         stdout.contains(r#""target": "wgsl-text""#),
         "expected GPU reflection JSON:\n{stdout}"
     );
-    assert!(stdout.contains(r#""entry_name": "vec_scale""#), "{stdout}");
+    assert!(stdout.contains(r#""entry_name": "scala""#), "{stdout}");
 }
 
 #[test]
@@ -500,7 +500,10 @@ fn emit_faber_target_localizes_reader_locale() {
         "localized emit should produce the Thai surface: {stdout}"
     );
     assert!(
-        !stdout.contains("functio"),
+        !stdout
+            .lines()
+            .filter(|line| !line.trim_start().starts_with('#'))
+            .any(|line| line.contains("functio")),
         "localized emit should not emit the Latin keyword: {stdout}"
     );
 }

@@ -750,19 +750,24 @@ fn cli_parses_emit_reflection_flag() {
 fn cli_rejects_unknown_subcommand() {
     let err = Cli::try_parse_from(["faber", "unknown-command"])
         .expect_err("unknown subcommand must be rejected");
-    assert_eq!(err.kind(), clap::error::ErrorKind::InvalidSubcommand);
+    assert!(matches!(
+        err.kind(),
+        clap::error::ErrorKind::InvalidSubcommand | clap::error::ErrorKind::UnknownArgument
+    ));
 }
 
 #[test]
 fn cli_rejects_build_without_input() {
-    let err = Cli::try_parse_from(["faber", "build"])
-        .expect_err("build requires an input");
+    let err = Cli::try_parse_from(["faber", "build"]).expect_err("build requires an input");
     assert_eq!(err.kind(), clap::error::ErrorKind::MissingRequiredArgument);
 }
 
 #[test]
-fn cli_rejects_emit_without_target() {
-    let err = Cli::try_parse_from(["faber", "emit", "main.fab"])
-        .expect_err("emit requires a target");
-    assert_eq!(err.kind(), clap::error::ErrorKind::MissingRequiredArgument);
+fn cli_defaults_emit_target_to_rust() {
+    let cli =
+        Cli::try_parse_from(["faber", "emit", "main.fab"]).expect("parse emit default target");
+    let Some(crate::cli::Command::Emit(args)) = cli.command else {
+        panic!("expected emit subcommand");
+    };
+    assert_eq!(args.target, FaberCliTarget::Rust);
 }
