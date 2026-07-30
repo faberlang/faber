@@ -114,6 +114,10 @@ fn cli_parses_test_subcommand_selection_and_harness_flags() {
         "--test-threads",
         "4",
         "--include-ignored",
+        "--include",
+        "math*",
+        "--exclude",
+        "*edge*",
     ])
     .expect("parse test");
     let Some(crate::cli::Command::Test(args)) = cli.command else {
@@ -129,6 +133,18 @@ fn cli_parses_test_subcommand_selection_and_harness_flags() {
     assert_eq!(args.test_threads, Some(4));
     assert!(!args.ignored);
     assert!(args.include_ignored);
+    assert_eq!(args.include, vec!["math*".to_owned()]);
+    assert_eq!(args.exclude, vec!["*edge*".to_owned()]);
+}
+
+#[test]
+fn cli_parses_test_filter_long_flag() {
+    let cli = Cli::try_parse_from(["faber", "test", ".", "--filter", "smoke"]).expect("parse");
+    let Some(crate::cli::Command::Test(args)) = cli.command else {
+        panic!("expected test");
+    };
+    assert_eq!(args.filter_flag.as_deref(), Some("smoke"));
+    assert!(args.filter.is_none());
 }
 
 #[test]

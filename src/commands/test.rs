@@ -2,7 +2,7 @@
 
 use crate::cli::TestArgs;
 use crate::input_shape::reader_locale_without_package_error;
-use crate::package;
+use crate::package::{self, TestSourceFilter};
 
 /// Builds the package test harness and maps Faber-level selectors to Cargo test flags.
 pub(super) fn cmd_test(args: &TestArgs) {
@@ -32,6 +32,21 @@ pub(super) fn cmd_test(args: &TestArgs) {
         None
     };
 
+    let proba_filter = if args.include.is_empty() && args.exclude.is_empty() {
+        None
+    } else {
+        Some(TestSourceFilter {
+            include: args.include.clone(),
+            exclude: args.exclude.clone(),
+        })
+    };
+
+    // Prefer explicit `--filter`; fall back to positional FILTER.
+    let harness_filter = args
+        .filter_flag
+        .as_deref()
+        .or(args.filter.as_deref());
+
     // POLICY: tests are package-scoped so generated harness metadata and source
     // selection stay aligned.
     let warn_policy = radix::driver::WarnPolicy {
@@ -49,8 +64,12 @@ pub(super) fn cmd_test(args: &TestArgs) {
             std::process::exit(1);
         }
     };
-    let result =
-        package::compile_package_with_test_selection(&config, &input_path, test_selection.as_ref());
+    let result = package::compile_package_with_test_options(
+        &config,
+        &input_path,
+        test_selection.as_ref(),
+        proba_filter.as_ref(),
+    );
 
     super::eprint_compile_diagnostics(&result.diagnostics);
 
@@ -142,7 +161,7 @@ pub(super) fn cmd_test(args: &TestArgs) {
         harness_args.push("--include-ignored".to_string());
     }
 
-    let status = match package::invoke_cargo_test(&layout, args.filter.as_deref(), &harness_args) {
+    let status = match package::invoke_cargo_test(&layout, harness_filter, &harness_args) {
         Ok(s) => s,
         Err(d) => {
             eprintln!("error: {}", d.message);

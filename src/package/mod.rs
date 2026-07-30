@@ -51,11 +51,13 @@ mod product;
 mod reader;
 mod runtime_dependency;
 mod source_files;
+mod test_source_filter;
 
 #[allow(unused_imports)]
 // public package API for library callers; binary crate does not use it.
 pub use artifact_plan::ArtifactPlan;
 pub use binding::verify_library_bindings;
+pub use test_source_filter::TestSourceFilter;
 // used by `commands/run.rs` / tests for G4 library path-deps on package emit
 #[allow(unused_imports)]
 // library crate tests use this re-export; binary crate imports cargo directly.
@@ -78,7 +80,10 @@ pub(crate) use compile::package_rust_runtime_plan;
 pub(crate) use compile::take_go_package_modules;
 #[allow(unused_imports)] // package MIR stages consume this crate-visible analysis API.
 pub(crate) use compile::{analyze_package, AnalyzedPackage, AnalyzedPackageUnit};
-pub use compile::{check_package, compile_package, compile_package_with_test_selection};
+pub use compile::{
+    check_package, compile_package, compile_package_with_test_selection,
+    compile_package_with_test_options,
+};
 #[allow(unused_imports)] // public package API; used by integration tests and external callers
 pub use discovery::{discover_build_layout, sanitize_crate_name, BuildLayout};
 pub(crate) use dispatch::{
@@ -235,7 +240,7 @@ pub(crate) fn load_package(
     spec: &PackageSpec,
     library_resolver: &LibraryResolver,
 ) -> Result<Vec<PackageFile>, Vec<Diagnostic>> {
-    load_package_with_reader_pack(spec, library_resolver, None, false)
+    load_package_with_reader_pack(spec, library_resolver, None, false, None)
 }
 
 pub(crate) fn load_package_with_reader_pack(
@@ -243,10 +248,31 @@ pub(crate) fn load_package_with_reader_pack(
     library_resolver: &LibraryResolver,
     reader_pack: Option<&radix::reader_locale::ReaderLocalePack>,
     include_proba: bool,
+    proba_filter: Option<&TestSourceFilter>,
 ) -> Result<Vec<PackageFile>, Vec<Diagnostic>> {
     let manifest = manifest_path_for_spec(spec).and_then(|path| read_manifest(&path).ok());
+    let source_root_for_filter = if spec.source_root.is_dir() {
+        spec.source_root.clone()
+    } else {
+        spec.entry
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .to_path_buf()
+    };
+    let proba_allowed = |path: &Path| -> bool {
+        if !is_proba_source_path(path) {
+            return true;
+        }
+        match proba_filter {
+            Some(filter) if !filter.is_empty() => filter.allows_path(&source_root_for_filter, path),
+            _ => true,
+        }
+    };
     let initial_files = if spec.entry.is_dir() {
         package_source_files(&spec.entry, include_proba)?
+            .into_iter()
+            .filter(|path| proba_allowed(path))
+            .collect::<Vec<_>>()
     } else {
         // Single-file entry: allow an explicit `.proba` path on the test path only.
         if is_proba_source_path(&spec.entry) && !include_proba {
@@ -261,13 +287,8 @@ pub(crate) fn load_package_with_reader_pack(
         // when nothing imports them (they must not be importable).
         let mut files = vec![spec.entry.clone()];
         if include_proba {
-            let source_root = if spec.source_root.is_dir() {
-                &spec.source_root
-            } else {
-                spec.entry.parent().unwrap_or_else(|| Path::new("."))
-            };
-            for path in package_source_files(source_root, true)? {
-                if is_proba_source_path(&path) {
+            for path in package_source_files(&source_root_for_filter, true)? {
+                if is_proba_source_path(&path) && proba_allowed(&path) {
                     files.push(path);
                 }
             }

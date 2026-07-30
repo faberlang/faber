@@ -17,9 +17,14 @@ Inline `proba`/`probandum` support and CLI selection are shipped. As of 2026-07-
 - `faber build` / normal package load keep `include_proba = false`.
 - Module naming maps `name.proba` → Rust module `name_proba` (no collision with `name.fab`).
 - Imports of `.proba` paths are rejected with `proba_import_forbidden`.
+- Source path filters: `faber test . --include PATTERN --exclude PATTERN` (repeatable;
+  apply to `*.proba` discovery only).
+- Harness filter: `faber test . --filter SUBSTR` or positional `FILTER` (Cargo
+  substring on generated names / module paths). Source proba titles still use
+  `--name` / `--suite` / `--tag`.
 
 Still open: stdlib-scoped discovery conventions, richer fixture coverage under
-norma, and any library-provider edge cases for explicit `.proba` strings.
+norma, human-readable generated test ids, and library-provider edge cases.
 
 ## Historical summary
 

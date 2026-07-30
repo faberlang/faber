@@ -384,9 +384,24 @@ pub struct TestArgs {
     #[arg(long = "deny", value_name = "CODE")]
     pub deny: Vec<String>,
 
-    /// Test name filter passed to the Rust test harness (matches on generated proba_* names)
+    /// Harness name filter (substring of generated `proba_*` test names).
+    /// Positional form: `faber test . smoke`. Long form: `faber test . --filter smoke`.
+    #[arg(long = "filter", value_name = "FILTER")]
+    pub filter_flag: Option<String>,
+
+    /// Positional harness filter (same meaning as `--filter`)
     #[arg(value_name = "FILTER")]
     pub filter: Option<String>,
+
+    /// Load only `*.proba` sources matching this path pattern (repeatable).
+    /// Patterns are relative to the package source root (`*` wildcards allowed).
+    /// Bare stems match `name.proba` (e.g. `--include math`).
+    #[arg(long = "include", value_name = "PATTERN")]
+    pub include: Vec<String>,
+
+    /// Skip `*.proba` sources matching this path pattern (repeatable).
+    #[arg(long = "exclude", value_name = "PATTERN")]
+    pub exclude: Vec<String>,
 
     /// Select tests by source-level proba name
     #[arg(long)]

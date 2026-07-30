@@ -188,7 +188,7 @@ impl HirVisitor for AdRouteCollector<'_> {
 /// backend result. Unsupported targets are reported as diagnostics instead of
 /// falling back to single-file compilation.
 pub fn compile_package(config: &Config, input: &Path) -> CompileResult {
-    let mut result = compile_package_internal(config, input, None, false);
+    let mut result = compile_package_internal(config, input, None, false, None);
     radix::apply_warn_policy(&mut result.diagnostics, &config.warn_policy);
     result
 }
@@ -203,7 +203,18 @@ pub fn compile_package_with_test_selection(
     input: &Path,
     test_selection: Option<&RustTestSelection>,
 ) -> CompileResult {
-    let mut result = compile_package_internal(config, input, test_selection, true);
+    compile_package_with_test_options(config, input, test_selection, None)
+}
+
+/// Like [`compile_package_with_test_selection`], with optional path filters for
+/// which `*.proba` files are loaded (`--include` / `--exclude` on `faber test`).
+pub fn compile_package_with_test_options(
+    config: &Config,
+    input: &Path,
+    test_selection: Option<&RustTestSelection>,
+    proba_filter: Option<&super::TestSourceFilter>,
+) -> CompileResult {
+    let mut result = compile_package_internal(config, input, test_selection, true, proba_filter);
     radix::apply_warn_policy(&mut result.diagnostics, &config.warn_policy);
     result
 }
@@ -217,7 +228,7 @@ pub(crate) fn package_rust_runtime_plan(
     let spec = discover_package(input).map_err(|diag| vec![*diag])?;
     let package_root = package_root_for_input(input);
     let library_resolver = library_resolver_for_package(&config, &package_root)?;
-    let package = analyze_package_spec(&config, spec, &library_resolver, false)?;
+    let package = analyze_package_spec(&config, spec, &library_resolver, false, None)?;
     Ok(rust_runtime_plan_for_package(&package, &library_resolver))
 }
 
@@ -230,7 +241,7 @@ pub(crate) fn analyze_package(
     let spec = discover_package(input).map_err(|diag| vec![*diag])?;
     let package_root = package_root_for_input(input);
     let library_resolver = library_resolver_for_package(&config, &package_root)?;
-    analyze_package_spec(&config, spec, &library_resolver, false)
+    analyze_package_spec(&config, spec, &library_resolver, false, None)
 }
 
 fn package_root_for_input(input: &Path) -> PathBuf {
@@ -254,6 +265,7 @@ fn compile_package_internal(
     input: &Path,
     test_selection: Option<&RustTestSelection>,
     include_proba: bool,
+    proba_filter: Option<&super::TestSourceFilter>,
 ) -> CompileResult {
     // G4: analyze once before target rejection so Go/TS planners and diagnostics
     // share the same package graph (no reloading source per target).
@@ -296,7 +308,13 @@ fn compile_package_internal(
             }
         }
     };
-    let mut package = match analyze_package_spec(&config, spec, &library_resolver, include_proba) {
+    let mut package = match analyze_package_spec(
+        &config,
+        spec,
+        &library_resolver,
+        include_proba,
+        proba_filter,
+    ) {
         Ok(package) => package,
         Err(diagnostics) => {
             return CompileResult {
@@ -1132,12 +1150,23 @@ fn analyze_package_spec(
     spec: super::PackageSpec,
     library_resolver: &crate::library::LibraryResolver,
     include_proba: bool,
+    proba_filter: Option<&super::TestSourceFilter>,
 ) -> Result<AnalyzedPackage, Vec<Diagnostic>> {
     let files = match config.reader_pack.as_ref() {
-        Some(pack) => {
-            load_package_with_reader_pack(&spec, library_resolver, Some(pack), include_proba)?
-        }
-        None => load_package_with_reader_pack(&spec, library_resolver, None, include_proba)?,
+        Some(pack) => load_package_with_reader_pack(
+            &spec,
+            library_resolver,
+            Some(pack),
+            include_proba,
+            proba_filter,
+        )?,
+        None => load_package_with_reader_pack(
+            &spec,
+            library_resolver,
+            None,
+            include_proba,
+            proba_filter,
+        )?,
     };
     let entry_frontmatter = files
         .iter()
