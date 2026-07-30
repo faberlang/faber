@@ -44,3 +44,18 @@ fn module_segments_sanitize_outside_source_root_absolute_hyphen_path() {
     );
     assert_eq!(segments.last().map(String::as_str), Some("format"));
 }
+
+#[test]
+fn module_segments_map_proba_to_distinct_test_module() {
+    let source_root = PathBuf::from("/pkg/src");
+    let product = source_root.join("math.fab");
+    let tests = source_root.join("math.proba");
+    assert_eq!(
+        module_segments_for_file(&source_root, &product, None),
+        vec!["math".to_owned()]
+    );
+    assert_eq!(
+        module_segments_for_file(&source_root, &tests, None),
+        vec!["math_proba".to_owned()]
+    );
+}

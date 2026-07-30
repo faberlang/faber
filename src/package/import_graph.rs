@@ -418,6 +418,11 @@ pub(super) fn resolve_import(
         ));
     }
 
+    // Explicit `.proba` in the specifier is never a legal import target.
+    if import_path.ends_with(".proba") {
+        return ImportResolution::Error(proba_import_forbidden_diagnostic(from_file, import_path));
+    }
+
     match library_resolver.resolve(import_path) {
         Ok(Some(module)) => return ImportResolution::Library(module),
         Ok(None) => {}
@@ -425,10 +430,25 @@ pub(super) fn resolve_import(
     }
 
     if let Some(target) = resolve_local_import(spec, from_file, import_path) {
+        if super::source_files::is_proba_source_path(&target) {
+            return ImportResolution::Error(proba_import_forbidden_diagnostic(
+                from_file,
+                import_path,
+            ));
+        }
         return ImportResolution::Local(target);
     }
 
     ImportResolution::Unsupported
+}
+
+fn proba_import_forbidden_diagnostic(from_file: &Path, import_path: &str) -> Diagnostic {
+    crate::package_diagnostic_error(
+        ".proba files are test sources and cannot be imported; move shared helpers to a .fab module",
+    )
+    .with_file(from_file.display().to_string())
+    .with_arg("issue", "proba_import_forbidden")
+    .with_arg("import", import_path.to_owned())
 }
 
 fn detect_import_cycles_from(

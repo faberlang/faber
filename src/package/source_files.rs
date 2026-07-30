@@ -20,7 +20,16 @@ pub(super) struct LoadedPackageSource {
     pub(super) interner: Interner,
 }
 
-pub(super) fn package_source_files(source_root: &Path) -> Result<Vec<PathBuf>, Vec<Diagnostic>> {
+/// Walk `source_root` for package sources.
+///
+/// - Always includes `*.fab` product modules.
+/// - When `include_proba` is true (the `faber test` path), also includes
+///   `*.proba` test sources. Normal `faber build` / `faber run` keep
+///   `include_proba = false` so tests never enter the production graph.
+pub(super) fn package_source_files(
+    source_root: &Path,
+    include_proba: bool,
+) -> Result<Vec<PathBuf>, Vec<Diagnostic>> {
     let canonical_root = fs::canonicalize(source_root)
         .map_err(|error| vec![Diagnostic::io_error(source_root, &error)])?;
     let mut pending = vec![source_root.to_path_buf()];
@@ -63,7 +72,7 @@ pub(super) fn package_source_files(source_root: &Path) -> Result<Vec<PathBuf>, V
             }
             if path.is_dir() {
                 pending.push(path);
-            } else if path.extension().is_some_and(|extension| extension == "fab") {
+            } else if is_package_source_path(&path, include_proba) {
                 files.push(path);
             }
         }
@@ -75,6 +84,22 @@ pub(super) fn package_source_files(source_root: &Path) -> Result<Vec<PathBuf>, V
         Err(diagnostics)
     }
 }
+
+pub(super) fn is_package_source_path(path: &Path, include_proba: bool) -> bool {
+    match path.extension().and_then(|extension| extension.to_str()) {
+        Some("fab") => true,
+        Some("proba") => include_proba,
+        _ => false,
+    }
+}
+
+pub(super) fn is_proba_source_path(path: &Path) -> bool {
+    path.extension().and_then(|extension| extension.to_str()) == Some("proba")
+}
+
+#[cfg(test)]
+#[path = "source_files_test.rs"]
+mod source_files_test;
 
 pub(super) fn load_package_source(
     path: &Path,

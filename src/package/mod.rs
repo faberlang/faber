@@ -123,7 +123,7 @@ use radix::driver::FileFrontmatter;
 use radix::lexer::Interner;
 use radix::syntax::{Program, StmtKind, Visibility};
 use std::collections::{BTreeSet, VecDeque};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub(crate) use discovery::PackageSpec;
 use frontmatter::manifest_path_for_spec;
@@ -135,7 +135,7 @@ use library::expand_library_imports;
 pub(crate) use member_path::resolve_package_member;
 use modules::module_segments_for_file;
 use paths::normalize_path;
-use source_files::{load_package_source, package_source_files};
+use source_files::{is_proba_source_path, load_package_source, package_source_files};
 
 pub(crate) use library::{
     analysis_source_for_file, library_cached_analysis, library_cached_expanded_imports,
@@ -235,19 +235,44 @@ pub(crate) fn load_package(
     spec: &PackageSpec,
     library_resolver: &LibraryResolver,
 ) -> Result<Vec<PackageFile>, Vec<Diagnostic>> {
-    load_package_with_reader_pack(spec, library_resolver, None)
+    load_package_with_reader_pack(spec, library_resolver, None, false)
 }
 
 pub(crate) fn load_package_with_reader_pack(
     spec: &PackageSpec,
     library_resolver: &LibraryResolver,
     reader_pack: Option<&radix::reader_locale::ReaderLocalePack>,
+    include_proba: bool,
 ) -> Result<Vec<PackageFile>, Vec<Diagnostic>> {
     let manifest = manifest_path_for_spec(spec).and_then(|path| read_manifest(&path).ok());
     let initial_files = if spec.entry.is_dir() {
-        package_source_files(&spec.entry)?
+        package_source_files(&spec.entry, include_proba)?
     } else {
-        vec![spec.entry.clone()]
+        // Single-file entry: allow an explicit `.proba` path on the test path only.
+        if is_proba_source_path(&spec.entry) && !include_proba {
+            return Err(vec![crate::package_diagnostic_error(
+                ".proba files are test sources; use `faber test` to load them",
+            )
+            .with_file(spec.entry.display().to_string())
+            .with_arg("issue", "proba_source_build_forbidden")]);
+        }
+        // Product graph starts at the entry file. For `faber test`, also walk
+        // `source_root` for `*.proba` so colocated test files are not orphaned
+        // when nothing imports them (they must not be importable).
+        let mut files = vec![spec.entry.clone()];
+        if include_proba {
+            let source_root = if spec.source_root.is_dir() {
+                &spec.source_root
+            } else {
+                spec.entry.parent().unwrap_or_else(|| Path::new("."))
+            };
+            for path in package_source_files(source_root, true)? {
+                if is_proba_source_path(&path) {
+                    files.push(path);
+                }
+            }
+        }
+        files
     };
     let mut queue = VecDeque::from(initial_files);
     let mut seen = BTreeSet::new();
@@ -273,7 +298,22 @@ pub(crate) fn load_package_with_reader_pack(
             };
             let import_path = loaded.interner.resolve(decl.path);
             match resolve_import(spec, library_resolver, &canonical, import_path) {
-                ImportResolution::Local(target) => queue.push_back(target),
+                ImportResolution::Local(target) => {
+                    // Test sources may import product `.fab` modules; never the reverse.
+                    if is_proba_source_path(&target) {
+                        diagnostics.push(
+                            crate::package_diagnostic_error(
+                                ".proba files are test sources and cannot be imported; move shared helpers to a .fab module",
+                            )
+                            .with_file(canonical.display().to_string())
+                            .with_span(decl.span)
+                            .with_arg("issue", "proba_import_forbidden")
+                            .with_arg("import", import_path.to_owned()),
+                        );
+                    } else {
+                        queue.push_back(target);
+                    }
+                }
                 ImportResolution::Library(module) => {
                     if let Some(binding) = library_import_binding(&loaded.interner, decl, module) {
                         library_imports.push(binding);

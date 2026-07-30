@@ -36,6 +36,10 @@ fn module_segments(source_root: &Path, file: &Path) -> Vec<String> {
             parts.pop();
         } else if let Some(stripped) = last.strip_suffix(".fab") {
             *last = stripped.to_string();
+        } else if let Some(stripped) = last.strip_suffix(".proba") {
+            // Keep test modules distinct from product `name.fab` → `name`.
+            // `math.proba` becomes module `math_proba`, never colliding with `math`.
+            *last = format!("{stripped}_proba");
         }
     }
 

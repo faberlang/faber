@@ -1,6 +1,6 @@
 # Goal: `.proba` Test Source Files
 
-**Status**: partial — inline `proba`/`probandum` is shipped; separate `.proba` discovery remains proposed (verified 2026-07-15)
+**Status**: partial — inline `proba`/`probandum` shipped; package `*.proba` discovery on `faber test` shipped (2026-07-30); import rejection shipped; remaining open items below
 **Created**: 2026-07-01
 **Target repo**: `/Users/ianzepp/work/faberlang/faber`
 **Factory artifact dir**: `docs/factory/proba-test-sources/`
@@ -11,10 +11,15 @@ resolution, stdlib test layout, source extension handling.
 
 ## Current implementation boundary
 
-Inline `proba`/`probandum` support and CLI selection are shipped in the current
-Faber package/test path. No live source-extension discovery for separate
-`.proba` files was found; the remaining proposal is specifically the separate
-file boundary described below. Keep this goal open for that boundary only.
+Inline `proba`/`probandum` support and CLI selection are shipped. As of 2026-07-30:
+
+- `faber test` package discovery includes `*.proba` next to `*.fab` (source walk).
+- `faber build` / normal package load keep `include_proba = false`.
+- Module naming maps `name.proba` → Rust module `name_proba` (no collision with `name.fab`).
+- Imports of `.proba` paths are rejected with `proba_import_forbidden`.
+
+Still open: stdlib-scoped discovery conventions, richer fixture coverage under
+norma, and any library-provider edge cases for explicit `.proba` strings.
 
 ## Historical summary
 
