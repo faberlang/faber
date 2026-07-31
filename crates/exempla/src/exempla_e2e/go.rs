@@ -147,8 +147,8 @@ const GO_DECLARATION_ONLY_FIXTURES: &[&str] = &[
     "vector/kernel.fab",
 ];
 // Floors ratchet upward only; do not lower to absorb drift.
-const EXPECTED_GO_PASS_FLOOR: usize = 249;
-const EXPECTED_GO_ACCEPTED_OUTCOME_FLOOR: usize = 292;
+const EXPECTED_GO_PASS_FLOOR: usize = 253;
+const EXPECTED_GO_ACCEPTED_OUTCOME_FLOOR: usize = 310;
 // WHY: Remaining expected failures are tracked Go lowering gaps with
 // per-path reopen contracts in docs/factory/go-e2e-failures-matrix/baseline.md.
 const EXPECTED_GO_EXPECTED_FAILURE_CEILING: usize = 51;
