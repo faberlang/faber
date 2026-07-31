@@ -6,41 +6,55 @@ use radix::driver::{Config, Session};
 use radix::forma::compile_canonical;
 use std::fs;
 
+// Live radix/corpus debt (2026-07-30): first-compile rejects, second-compile
+// forma/semantic gaps, and non-idempotent forma emits. Paths must fail; when a
+// row starts passing, remove it (do not leave stale expected entries).
 const FABER_ROUNDTRIP_EXPECTED_FAILURES: &[&str] = &[
-    // Family F — CLI gate (Rust-only CLI lowering)
-    "cli/cli.fab",
-    // Triage Stage 0 — operatores surface (upstream)
-    "operatores/logica.fab",
-    // Family G — upstream typecheck (first compile fails; fix in semantic, not forma)
-    "chorda/angustat.fab",
-    "chorda/discidit.fab",
-    "chorda/retine.fab",
-    "conversio/valor-genus.fab",
-    "instans/instans.fab",
-    "stdlib-nativum/chorda.fab",
-    "stdlib-nativum/csv-chorda.fab",
-    "stdlib-nativum/mathesis-operators.fab",
-    "stdlib-nativum/mathesis.fab",
-    "stdlib-nativum/retorta.fab",
-    "stdlib-nativum/tempus-civil.fab",
-    "stdlib-nativum/tensor-applicata.fab",
-    "stdlib-nativum/tensor-bridge.fab",
-    "stdlib-nativum/vector-pending-placeholder.fab",
+    // First-compile: intentional reject / frontend SEM policy
+    "ad/async-solum-leget.fab",
+    "ad/async-tempus-dormiet.fab",
+    "ad/solum-lege-generic.fab",
     "gpu-core-types/atomic-element-reject.fab",
     "gpu-core-types/f16-bf16-reject.fab",
     "gpu-core-types/matrix-tensor-reject.fab",
+    "instans/instans.fab",
+    "json/json.fab",
+    "praefixum/praefixum.fab",
+    "protecta/protecta.fab",
+    "rumpe/rumpe-top-level-error.fab",
     "sparsa/conversio-reject.fab",
     "sparsa/non-numeric-reject.fab",
     "tensor/arithmetic-reject.fab",
+    "tensor/placement-execution-v1.fab",
     "typi/sized-family-error.fab",
-    // Deliberate error exempla (invalid programs)
-    "protecta/protecta.fab",
-    "rumpe/rumpe-top-level-error.fab",
+    // Second-compile: forma emit re-check fails (name_not_value / parse / types)
+    "abstractus/abstractus.fab",
+    "cli/cli.fab",
+    "conversio/collectiones.fab",
+    "discerne/discerne.fab",
+    "ego/ego.fab",
+    "est/est.fab",
+    "genus/creo.fab",
+    "genus/methodi.fab",
+    "implendum/implendum.fab",
+    "implet/implet.fab",
+    "integratio/arena-mixta.fab",
+    "membrum/membrum.fab",
+    "nexum/nexum.fab",
+    "nihil/nihil.fab",
     "si/ergo-redde.fab",
-    // Family C residual — forma template canonical round-trip (author idempotent)
+    "sub/sub.fab",
+    "vector/builtins.fab",
+    "vocatio/vocatio.fab",
+    // Non-idempotent forma emit (fenced-doc / forma surface)
+    "fient/fient.fab",
+    "fiet/fiet.fab",
+    "figendum/figendum.fab",
+    "fiunt/fiunt.fab",
     "literalia/forma.fab",
-    // Family D residual — conversio/tensor emit gap
-    "conversio/tensor.fab",
+    "reddet/reddet.fab",
+    "tacebit/tacebit.fab",
+    "variandum/variandum.fab",
 ];
 
 #[test]
