@@ -1,0 +1,70 @@
++++
+term = "tensor fragment"
+kind = "concept"
+category = "fragment"
+canonical = false
+summary = "Tiny linear inference fragment on WebGPU device: y = x·W + b. Rung 1 of the workload proof table — first device-executed inference fragment."
+syntax = "faber run --target fmir-bin faber/corpus/tensor-fragment/tiny-linear-device/"
+related = ["tensor", "matmul", "inference", "fragment", "device", "webgpu"]
++++
+
+# =============================================================================
+# tensor fragment — Tiny linear inference fragment on WebGPU device: y = x·W + b.
+# =============================================================================
+#
+# What this teaches:
+#   • Device execution pipeline — copy-in, kernel dispatch, readback through the placement contract
+#   • Multi-kernel composition — matmul and bias-add as separate WGSL kernels on device
+#   • @ nucleum annotation — marks a function as a GPU compute kernel entry point
+#
+# Common mistakes:
+#   • assuming device execution is available before G-P-08 (WGSL matmul emission) and G-SPINE-02 (multi-kernel dispatch) land
+#
+# See also: tensor, matmul, inference, fragment, device, webgpu
+# =============================================================================
+
+
+
+# tensor fragment — rung 1: tiny linear on WebGPU device (y = x·W + b)
+#
+# Shape: input [4×3] · weight [3×2] + bias [4×2] = output [4×2]
+#
+# This fragment mirrors rung 0 (stepper-only) but targets the WebGPU compute
+# device path through a @ nucleum kernel. matmul runs as a WGSL tiled kernel
+# and bias add runs as a WGSL elementwise kernel within the same device function.
+# Output is returned from the device function through the placement contract
+# and compared elementwise against the stepper reference.
+#
+# Device execution contract (gated on G-P-08 + G-SPINE-02):
+#   1. copy_in(x, W, b)  → device buffers
+#   2. linear_layer      → WGSL kernel (matmul → add, device side)
+#   3. readback(result)  → host buffer (placement contract)
+#   4. assert elements match expected reference
+#
+# EXPECTED output (hand-computed stepper reference):
+#   y = [[9.1, 12.2], [18.1, 24.2], [27.1, 36.2], [36.1, 48.2]]
+
+@ nucleum
+functio linear_layer(tf32[4, 3] x, tf32[3, 2] w, tf32[4, 2] b) → tf32[4, 2] {
+    fixum tf32[4, 2] c ← x.matmul(w)
+    redde c.addita(b)
+}
+
+incipit {
+    fixum lista<f32> flat_w ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    fixum lista<f32> flat_x ← [1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 3.0, 3.0, 3.0, 4.0, 4.0, 4.0]
+    fixum lista<f32> flat_b ← [0.1, 0.2, 0.1, 0.2, 0.1, 0.2, 0.1, 0.2]
+    fixum tf32[] seed ← vacua
+    fixum tf32[3, 2] W ← seed.strue(flat_w, [3, 2])
+    fixum tf32[4, 3] x ← seed.strue(flat_x, [4, 3])
+    fixum tf32[4, 2] b ← seed.strue(flat_b, [4, 2])
+    fixum tf32[4, 2] y ← linear_layer(x, W, b)
+    nota y.accipe([0, 0]) vel 0.0
+    nota y.accipe([0, 1]) vel 0.0
+    nota y.accipe([1, 0]) vel 0.0
+    nota y.accipe([1, 1]) vel 0.0
+    nota y.accipe([2, 0]) vel 0.0
+    nota y.accipe([2, 1]) vel 0.0
+    nota y.accipe([3, 0]) vel 0.0
+    nota y.accipe([3, 1]) vel 0.0
+}

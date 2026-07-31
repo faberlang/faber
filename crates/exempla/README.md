@@ -18,7 +18,8 @@ faber/
   crates/exempla/     this crate
   Cargo.toml          workspace root (members: ., crates/exempla, hygiene-ratchet)
 radix/corpus/         language keyword reference (resolved at runtime)
-examples/             app tracks + residual package fixtures
+faber/corpus/         package fixtures (faber.toml packages)
+examples/             app tracks only
 ```
 
 ## Run
@@ -41,5 +42,6 @@ See `src/paths.rs`. Overrides:
 | Env | Meaning |
 | --- | --- |
 | `FABER_EXEMPLA_CORPUS` | `radix/corpus` root |
+| `FABER_PACKAGE_CORPUS` | `faber/corpus` root |
 | `FABER_EXAMPLES_HOME` | `examples` repo root |
 | `FABER_NORMA_EXEMPLA` | `norma/exempla` root |

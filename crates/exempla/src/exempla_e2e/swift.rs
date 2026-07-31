@@ -164,8 +164,6 @@ const SWIFT_EXPECTED_FAILURES: &[&str] = &[
     "tag/tag.fab",
     "temporis/temporis.fab",
     "tensor-fragment/tiny-linear-device/src/main.fab",
-    "tensor-fragment/tiny-linear/src/main.fab",
-    "tensor-package/fmir-matmul/src/main.fab",
     "tensor/arithmetic-elementwise.fab",
     "tensor/arithmetic-matmul.fab",
     "tensor/arithmetic-reduction.fab",

@@ -112,7 +112,6 @@ const SEXP_EXPECTED_FAILURES: &[&str] = &[
     "tensor/method-policy.fab",
     "tensor/shape.fab",
     "tensor/textus.fab",
-    "tensor-package/fmir-matmul/src/main.fab",
     "typi/sized-family-error.fab",
     "ubique/ubique.fab",
     "vector/builtins.fab",

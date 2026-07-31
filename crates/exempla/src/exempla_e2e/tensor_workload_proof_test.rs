@@ -79,7 +79,7 @@ fn tensor_workload_proof_selects_rung1_device_linear() {
     assert_eq!(row.blocker_owner, None);
     assert_eq!(
         row.exemplar_path,
-        "corpus/tensor-fragment/tiny-linear-device/src/main.fab"
+        "tensor-fragment/tiny-linear-device/src/main.fab"
     );
     assert!(row
         .evidence
@@ -91,10 +91,7 @@ fn tensor_workload_proof_selects_rung1_device_linear() {
 #[test]
 fn tensor_workload_proof_rung1_device_linear_matches_stepper() {
     let row = tensor_workload_proof_rows()[1];
-    let path = crate::paths::gpu_workload_dir()
-        .parent()
-        .expect("examples home")
-        .join(row.exemplar_path);
+    let path = crate::paths::package_corpus_dir().join(row.exemplar_path);
     let fixture = read_reference_fixture(&path, 1).expect("rung 1 reference fixture");
     assert_eq!(fixture.tolerance, 0.00001);
     assert_eq!(

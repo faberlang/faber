@@ -53,7 +53,7 @@ fn tensor_package_runs_through_fmir_targets_without_rust_fallback() {
 }
 
 fn copy_tensor_package_fixture(target: TensorPackageProofTarget) -> (TempRoot, PathBuf) {
-    let fixture = crate::paths::corpus_dir().join(TENSOR_PACKAGE_PROOF_FIXTURE);
+    let fixture = crate::paths::package_corpus_dir().join(TENSOR_PACKAGE_PROOF_FIXTURE);
     let temp_root = make_temp_root();
     let package = temp_root.join(format!("tensor-package-{}", target.cli_target()));
     copy_dir(&fixture, &package);

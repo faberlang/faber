@@ -65,9 +65,9 @@ pub(super) const TENSOR_WORKLOAD_PROOF_ROWS: &[TensorWorkloadProofRow] =
     },
     TensorWorkloadProofRow {
         rung: 1,
-        exemplar_path: "corpus/tensor-fragment/tiny-linear-device/src/main.fab",
-        reference_path: "corpus/tensor-fragment/tiny-linear-device/src/main.ref.json",
-        expected_stdout_path: "corpus/tensor-fragment/tiny-linear-device/src/main.expected",
+        exemplar_path: "tensor-fragment/tiny-linear-device/src/main.fab",
+        reference_path: "tensor-fragment/tiny-linear-device/src/main.ref.json",
+        expected_stdout_path: "tensor-fragment/tiny-linear-device/src/main.expected",
         selected_operation:
             "rank-2 f32 linear layer on WebGPU device (matmul + elementwise add)",
         tier: TensorWorkloadProofTier::OutputChecked,

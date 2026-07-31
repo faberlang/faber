@@ -1,16 +1,19 @@
 //! Resolve exempla roots after the org corpus split.
 //!
 //! Language keyword programs live in sibling `radix/corpus/` (single-file,
-//! Radix-checkable — see radix `docs/factory/corpus-split-radix-faber`). Named
-//! public tracks remain under `examples/`. Norma stdlib tours live in
-//! `norma/exempla/`. Environment variables override every root for CI and
-//! alternate checkouts.
+//! Radix-checkable — see radix `docs/factory/corpus-split-radix-faber`). Package
+//! build fixtures live in-tree under `faber/corpus/`. Named public tracks remain
+//! under `examples/`. Norma stdlib tours live in `norma/exempla/`. Environment
+//! variables override every root for CI and alternate checkouts.
 
 use std::path::{Path, PathBuf};
 
 /// Env override for the keyword / language reference corpus root
 /// (`radix/corpus/` — directory containing `index.toml`).
 pub const CORPUS_ENV: &str = "FABER_EXEMPLA_CORPUS";
+
+/// Env override for package-shaped fixtures (`faber/corpus/`).
+pub const PACKAGE_CORPUS_ENV: &str = "FABER_PACKAGE_CORPUS";
 
 /// Env override for the examples repo root (`…/examples`).
 pub const EXAMPLES_ENV: &str = "FABER_EXAMPLES_HOME";
@@ -22,7 +25,7 @@ pub const NORMA_EXEMPLA_ENV: &str = "FABER_NORMA_EXEMPLA";
 ///
 /// Prefer `FABER_EXEMPLA_CORPUS`, then monorepo `radix/corpus/`, then a local
 /// pointer fallback under this crate. Does **not** default to `examples/corpus`
-/// (language tree is moving into radix).
+/// (language tree lives in radix).
 pub fn corpus_dir() -> PathBuf {
     if let Ok(path) = std::env::var(CORPUS_ENV) {
         return PathBuf::from(path);
@@ -31,6 +34,24 @@ pub fn corpus_dir() -> PathBuf {
         return corpus;
     }
     Path::new(env!("CARGO_MANIFEST_DIR")).join("corpus")
+}
+
+/// Package fixture root (`faber/corpus/` — each entry has `faber.toml`).
+///
+/// Prefer `FABER_PACKAGE_CORPUS`, then monorepo `faber/corpus/`, then in-tree
+/// `faber/corpus` relative to this crate.
+pub fn package_corpus_dir() -> PathBuf {
+    if let Ok(path) = std::env::var(PACKAGE_CORPUS_ENV) {
+        return PathBuf::from(path);
+    }
+    if let Some(home) = faberlang_home() {
+        let dir = home.join("faber").join("corpus");
+        if dir.is_dir() {
+            return dir;
+        }
+    }
+    // crates/exempla → faber/corpus
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus")
 }
 
 /// Monorepo `radix/corpus` when present (has `index.toml`).
@@ -169,6 +190,39 @@ mod tests {
         assert!(
             rendered.contains("radix/corpus") || rendered.ends_with("radix/corpus"),
             "corpus_dir should resolve under radix/corpus, got {rendered}"
+        );
+    }
+
+    #[test]
+    fn package_corpus_dir_holds_tensor_packages() {
+        std::env::remove_var(PACKAGE_CORPUS_ENV);
+        let dir = package_corpus_dir();
+        assert!(
+            dir.join("tensor-package/fmir-matmul/faber.toml").is_file(),
+            "expected package fixture under {}",
+            dir.display()
+        );
+        assert!(
+            dir.join("tensor-fragment/tiny-linear/faber.toml").is_file(),
+            "expected fragment package under {}",
+            dir.display()
+        );
+        assert!(
+            dir.join("tensor-fragment/tiny-linear-device/faber.toml")
+                .is_file(),
+            "expected device fragment under {}",
+            dir.display()
+        );
+        let rendered = dir.display().to_string().replace('\\', "/");
+        assert!(
+            rendered.contains("faber/corpus") || rendered.ends_with("faber/corpus"),
+            "package_corpus_dir should resolve under faber/corpus, got {rendered}"
+        );
+        // Language corpus must not host package manifests.
+        let language = corpus_dir();
+        assert!(
+            !language.join("tensor-package").is_dir(),
+            "language corpus must not contain tensor-package"
         );
     }
 }

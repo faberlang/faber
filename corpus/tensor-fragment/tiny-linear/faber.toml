@@ -1,0 +1,15 @@
+[package]
+name = "tensor-fragment/tiny-linear"
+version = "0.1.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+target = "fmir-text"
+kind = "bin"
+
+[dependencies]
+tensor = "*"
