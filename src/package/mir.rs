@@ -3591,19 +3591,6 @@ fn rewrite_expr(
             rewrite_block(unit_path, body, interner, targets, namespaces, diagnostics);
             rewrite_cape(unit_path, catch, interner, targets, namespaces, diagnostics);
         }
-        HirExpressionKind::Tempta {
-            body,
-            catch,
-            finally,
-        } => {
-            rewrite_block(unit_path, body, interner, targets, namespaces, diagnostics);
-            if let Some(block) = catch {
-                rewrite_block(unit_path, block, interner, targets, namespaces, diagnostics);
-            }
-            if let Some(block) = finally {
-                rewrite_block(unit_path, block, interner, targets, namespaces, diagnostics);
-            }
-        }
         HirExpressionKind::Clausura(_, _, _, body) => {
             rewrite_expr(unit_path, body, interner, targets, namespaces, diagnostics)
         }
