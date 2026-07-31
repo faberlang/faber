@@ -4758,10 +4758,10 @@ fn compile_package_resolves_builtin_norma_solum_ad_wrapped_imports() {
         r#"
 importa ex "norma:solum" privata solum ut terra
 
-incipit {
+incipiet {
   fixum _ exists ← terra.exstat(".")
   fixum _ parent ← terra.parens("a/b")
-  cede terra.fundet("fundet.bin", |41 42 43|)
+  tacebit terra.fundet("fundet.bin", |41 42 43|)
 }
 "#,
     )
@@ -4847,12 +4847,12 @@ fn compile_package_resolves_builtin_norma_tempus_ad_wrapped_imports() {
         r#"
 importa ex "norma:tempus" privata tempus
 
-incipit {
+incipiet {
   fixum _ now ← tempus.nunc()
   fixum _ mono ← tempus.monotonicum()
   fixum _ active ← tempus.activum()
   fixum _ ms ← tempus.MILLISECUNDUM()
-  cede tempus.dormiet(0)
+  tacebit tempus.dormiet(0)
 }
 "#,
     )
@@ -5067,7 +5067,7 @@ entry = "main.fab"
 importa ex "norma:http" privata http
 
 incipiet {
-    fixum _ responsum ← cede http.petet("http://127.0.0.1:9/test")
+    figendum _ responsum ← http.petet("http://127.0.0.1:9/test")
     nota responsum.status()
     fixum _ caput ← responsum.caput("x-faber-test")
     si caput est nihil { nota "header:missing" } secus { nota "header:present" }
@@ -5457,8 +5457,8 @@ fn aliased_norma_import_preserves_provider_identity_in_analysis() {
         r#"
 importa ex "norma:http" privata http ut rete
 
-incipit {
-  fixum _ responsum ← cede rete.petet("http://127.0.0.1:9")
+incipiet {
+  figendum _ responsum ← rete.petet("http://127.0.0.1:9")
 }
 "#,
     )
@@ -5514,7 +5514,7 @@ fn aliased_norma_http_import_lowers_by_provider_identity() {
 importa ex "norma:http" privata http ut rete
 
 incipiet {
-  fixum _ responsum ← cede rete.petet("http://127.0.0.1:9")
+  figendum _ responsum ← rete.petet("http://127.0.0.1:9")
 }
 "#,
     )
