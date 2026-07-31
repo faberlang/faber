@@ -84,7 +84,12 @@ pub(crate) use compile::package_rust_runtime_plan;
 #[allow(unused_imports)] // binary-only run path consumes this crate-visible helper.
 pub(crate) use compile::take_go_package_modules;
 #[allow(unused_imports)] // package MIR stages consume this crate-visible analysis API.
-pub(crate) use compile::{analyze_package, AnalyzedPackage, AnalyzedPackageUnit};
+pub(crate) use compile::{
+    analyze_package, analyze_package_for_tests, AnalyzedPackage, AnalyzedPackageUnit,
+};
+// `compile_package_with_test_*` remain public for lib tests / tooling; the
+// binary `faber test` path no longer emits Rust tests (stepper-only).
+#[allow(unused_imports)] // binary crate root does not call test compile helpers
 pub use compile::{
     check_package, compile_package, compile_package_with_test_options,
     compile_package_with_test_selection,
@@ -417,6 +422,9 @@ mod frontmatter_integration_test;
 
 #[cfg(test)]
 mod proba_integration_test;
+
+#[cfg(test)]
+mod proba_stepper_test;
 
 #[cfg(test)]
 #[path = "../package_test.rs"]

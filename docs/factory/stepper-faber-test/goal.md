@@ -1,6 +1,6 @@
 # Goal: Stepper-Exclusive `faber test` (No Target Lowering)
 
-**Status**: proposed — clean break authorized by operator (2026-07-30)
+**Status**: implemented (2026-07-30) — clean break; residuals in `residuals.md`
 **Created**: 2026-07-30
 **Target repos**:
 - primary: `/Users/ianzepp/work/faberlang/faber` (`faber test` CLI, package load for tests, UX)

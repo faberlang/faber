@@ -203,9 +203,9 @@ pub fn compile_package(config: &Config, input: &Path) -> CompileResult {
 
 /// Compile a package while forwarding a Rust test-selection policy to codegen.
 ///
-/// This is used by the package test command path so module and entry code are
-/// generated under the same test filtering contract. Discovers `*.proba` test
-/// sources in addition to `*.fab` product modules.
+/// Historical Rust harness path: still used by package integration tests that
+/// assert on generated Rust. Product `faber test` uses the MIR stepper instead.
+#[allow(dead_code)] // public API + lib tests; binary test command no longer calls this
 pub fn compile_package_with_test_selection(
     config: &Config,
     input: &Path,
@@ -216,6 +216,7 @@ pub fn compile_package_with_test_selection(
 
 /// Like [`compile_package_with_test_selection`], with optional path filters for
 /// which `*.proba` files are loaded (`--include` / `--exclude` on `faber test`).
+#[allow(dead_code)] // public API + lib tests; binary test command no longer calls this
 pub fn compile_package_with_test_options(
     config: &Config,
     input: &Path,
@@ -262,6 +263,27 @@ pub(crate) fn analyze_package(
     let package_root = package_root_for_input(input);
     let library_resolver = library_resolver_for_package(&config, &package_root)?;
     analyze_package_spec(&config, spec, &library_resolver, false, None)
+}
+
+/// Analyze a package for `faber test`: includes `*.proba` and optional path filters.
+///
+/// Production [`analyze_package`] keeps `include_proba = false` so build/run graphs
+/// stay free of test sources.
+///
+/// Used by the binary `faber test` command and lib tests; the lib crate root does
+/// not call it outside `cfg(test)`.
+#[allow(dead_code)] // binary `commands/test` + cfg(test); shared package sources
+#[allow(clippy::result_large_err)]
+pub(crate) fn analyze_package_for_tests(
+    config: &Config,
+    input: &Path,
+    proba_filter: Option<&super::TestSourceFilter>,
+) -> Result<AnalyzedPackage, Vec<Diagnostic>> {
+    let config = effective_package_config(config, input)?;
+    let spec = discover_package(input).map_err(|diag| vec![*diag])?;
+    let package_root = package_root_for_input(input);
+    let library_resolver = library_resolver_for_package(&config, &package_root)?;
+    analyze_package_spec(&config, spec, &library_resolver, true, proba_filter)
 }
 
 fn package_root_for_input(input: &Path) -> PathBuf {

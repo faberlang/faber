@@ -71,7 +71,7 @@ pub enum Command {
     /// Interactive MIR stepper REPL (accumulating cells, re-lowers each line)
     Repl(ReplArgs),
 
-    /// Run package tests via the generated Rust test harness (Cargo-backed)
+    /// Run proba cases on the MIR stepper (no Cargo / rustc on the package)
     Test(TestArgs),
 
     /// Internal FMIR image runner used by generated executable bundles
@@ -365,10 +365,10 @@ pub struct ScriptArgs {
     pub args: Vec<String>,
 }
 
-/// Arguments for `faber test`.
+/// Arguments for `faber test` (MIR stepper — no Cargo / rustc on the package).
 #[derive(clap::Args, Debug)]
 pub struct TestArgs {
-    /// Package path to test
+    /// Package path or single `.fab` / `.proba` file to test
     #[arg(default_value = ".")]
     pub path: PathBuf,
 
@@ -384,7 +384,7 @@ pub struct TestArgs {
     #[arg(long = "deny", value_name = "CODE")]
     pub deny: Vec<String>,
 
-    /// Harness name filter (substring of generated `proba_*` test names).
+    /// Substring filter on case path (`suite/name`) or title.
     /// Positional form: `faber test . smoke`. Long form: `faber test . --filter smoke`.
     #[arg(long = "filter", value_name = "FILTER")]
     pub filter_flag: Option<String>,
@@ -415,7 +415,7 @@ pub struct TestArgs {
     #[arg(long)]
     pub tag: Option<String>,
 
-    /// Run only tests whose name exactly matches the filter
+    /// Require the filter to match the full case path or title exactly
     #[arg(long)]
     pub exact: bool,
 
@@ -423,15 +423,15 @@ pub struct TestArgs {
     #[arg(long)]
     pub nocapture: bool,
 
-    /// Limit the number of test threads used by the harness
+    /// Reserved (serial execution only; ignored by the stepper runner)
     #[arg(long, value_name = "N")]
     pub test_threads: Option<usize>,
 
-    /// Only run Rust-ignored tests, including `omitte` / `futurum` and selection-ignored cases
+    /// Not supported on the stepper runner (exits with an error)
     #[arg(long, conflicts_with = "include_ignored")]
     pub ignored: bool,
 
-    /// Run normal tests and Rust-ignored tests
+    /// Include selection-filtered cases as skips in the report
     #[arg(long, conflicts_with = "ignored")]
     pub include_ignored: bool,
 }

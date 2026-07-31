@@ -35,11 +35,12 @@ Common flows:
   Run with arguments forwarded after `--`:
     faber run . -- --flag value
 
-  Test selection (Faber probanda metadata maps to Cargo harness):
+  Test selection (proba cases run on the MIR stepper, not a Cargo harness):
     faber test .
+    faber test path/to/file.fab
     faber test . --name my_case
     faber test . --suite suite/path
-    faber test . --tag slow -- --nocapture
+    faber test . --tag slow
 
   Explain corpus:
     faber explain --list

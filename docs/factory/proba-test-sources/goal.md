@@ -7,11 +7,11 @@
 **Primary surface**: `faber test`, package discovery/loading, local import
 resolution, stdlib test layout, source extension handling.
 
-**Runner successor**: execution of `faber test` must move to the MIR stepper
-under [`stepper-faber-test/goal.md`](../stepper-faber-test/goal.md) (clean
-break: no Rust/cargo harness). This goal still owns **discovery and source
-boundary** (`.proba` vs `.fab`); it does **not** own “generate Rust `#[test]`”
-as the long-term definition of testing.
+**Runner**: execution of `faber test` is the MIR stepper under
+[`stepper-faber-test/goal.md`](../stepper-faber-test/goal.md) (clean break:
+no Rust/cargo harness). This goal owns **discovery and source boundary**
+(`.proba` vs `.fab`); it does **not** define testing as “generate Rust
+`#[test]`”.
 
 ---
 
@@ -21,18 +21,21 @@ Inline `proba`/`probandum` support and CLI selection are shipped. As of 2026-07-
 
 - `faber test` package discovery includes `*.proba` next to `*.fab` (source walk).
 - `faber build` / normal package load keep `include_proba = false`.
-- Module naming maps `name.proba` → Rust module `name_proba` (no collision with `name.fab`).
+- Module naming maps `name.proba` → module segment `name_proba` (no collision with `name.fab`).
 - Imports of `.proba` paths are rejected with `proba_import_forbidden`.
 - Source path filters: `faber test . --include PATTERN --exclude PATTERN` (repeatable;
   apply to `*.proba` discovery only).
-- Harness filter: `faber test . --filter SUBSTR` or positional `FILTER` (Cargo
-  substring on generated names / module paths). Source proba titles still use
+- Case filter: `faber test . --filter SUBSTR` or positional `FILTER` (substring on
+  case path `suite/name` or title). Source proba titles also use
   `--name` / `--suite` / `--tag`.
+- **Execution**: MIR stepper interpretation (`stepper-faber-test`); not Rust emit
+  or `cargo test` on the package.
 
 Shipped residual closeout: focused package load/import tests, `norma/src/mathesis.proba`,
 norma `check-source` allows test-only `*.proba`, cista install filters interfaces to
-`*.fab` only. Deferred elsewhere: human-readable generated Cargo test ids;
-richer norma behavior coverage; dedicated `./scripta/test-stdlib` wrapper.
+`*.fab` only. Deferred elsewhere: richer norma behavior coverage; dedicated
+`./scripta/test-stdlib` wrapper; package-MIR linking for multi-file proba that
+need cross-unit bodies (fail-closed on the stepper today).
 
 ## Historical summary
 
@@ -74,8 +77,7 @@ test code part of production/library code.
 ## Goals
 
 - Treat `.proba` as full Faber syntax for parse, lower, typecheck, and inclusion
-  in `faber test` (execution runner: see `stepper-faber-test`; historically
-  Rust harness — do not extend that path).
+  in `faber test` (execution: MIR stepper — see `stepper-faber-test`).
 - Make `faber test` discover `.proba` files in package and stdlib test scopes.
 - Allow `.proba` files to contain arbitrary Faber helpers alongside
   `probandum` / `proba` declarations.
