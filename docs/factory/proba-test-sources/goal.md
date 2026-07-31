@@ -1,6 +1,6 @@
 # Goal: `.proba` Test Source Files
 
-**Status**: partial — inline `proba`/`probandum` shipped; package `*.proba` discovery on `faber test` shipped (2026-07-30); import rejection shipped; remaining open items below
+**Status**: complete (2026-07-30) — package `*.proba` discovery, import boundary, filters, lib harness, and stdlib colocated proof (`norma/src/mathesis.proba`) shipped; cista install publishes `*.fab` only
 **Created**: 2026-07-01
 **Target repo**: `/Users/ianzepp/work/faberlang/faber`
 **Factory artifact dir**: `docs/factory/proba-test-sources/`
@@ -29,8 +29,10 @@ Inline `proba`/`probandum` support and CLI selection are shipped. As of 2026-07-
   substring on generated names / module paths). Source proba titles still use
   `--name` / `--suite` / `--tag`.
 
-Still open: stdlib-scoped discovery conventions, richer fixture coverage under
-norma, human-readable generated test ids, and library-provider edge cases.
+Shipped residual closeout: focused package load/import tests, `norma/src/mathesis.proba`,
+norma `check-source` allows test-only `*.proba`, cista install filters interfaces to
+`*.fab` only. Deferred elsewhere: human-readable generated Cargo test ids;
+richer norma behavior coverage; dedicated `./scripta/test-stdlib` wrapper.
 
 ## Historical summary
 

@@ -416,6 +416,9 @@ mod test_support;
 mod frontmatter_integration_test;
 
 #[cfg(test)]
+mod proba_integration_test;
+
+#[cfg(test)]
 #[path = "../package_test.rs"]
 mod tests;
 
