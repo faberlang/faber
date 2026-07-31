@@ -14,10 +14,11 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 // Floors are calibrated to the full language corpus; live asserts use
 // `floor_for_corpus` so a small `radix/corpus` scaffold can pass while the
 // tree is migrated.
-const EXPECTED_TS_FRONTEND_ANALYZED_FLOOR: usize = 279;
-const EXPECTED_TS_EMITTED_FLOOR: usize = 276;
-const EXPECTED_TS_TYPECHECK_VALID_FLOOR: usize = 259;
-const EXPECTED_TS_RUNNABLE_FLOOR: usize = 256;
+// Floors ratchet upward only; calibrated to green 2026-07-30 run.
+const EXPECTED_TS_FRONTEND_ANALYZED_FLOOR: usize = 294;
+const EXPECTED_TS_EMITTED_FLOOR: usize = 284;
+const EXPECTED_TS_TYPECHECK_VALID_FLOOR: usize = 274;
+const EXPECTED_TS_RUNNABLE_FLOOR: usize = 272;
 
 #[derive(Debug)]
 struct TsE2eResult {
@@ -219,10 +220,10 @@ const TS_EXPECTED_OUTCOMES: &[ExpectedTsOutcome] = &[
     },
     ExpectedTsOutcome {
         path: "vector/builtins.fab",
-        highest_tier: TsHighestTier::TypeScriptEmitted,
+        highest_tier: TsHighestTier::FrontendAnalyzed,
         kind: ExpectedTsKind::TrackedGap,
-        bucket: "missing type/variant binding",
-        reason_contains: "Cannot find name 'unresolved_def'",
+        bucket: "vector def resolution",
+        reason_contains: "definition id 5 could not be resolved",
     },
     ExpectedTsOutcome {
         path: "ad/async-solum-leget.fab",
@@ -233,10 +234,10 @@ const TS_EXPECTED_OUTCOMES: &[ExpectedTsOutcome] = &[
     },
     ExpectedTsOutcome {
         path: "ad/async-tempus-dormiet.fab",
-        highest_tier: TsHighestTier::TypeScriptEmitted,
+        highest_tier: TsHighestTier::FrontendRejected,
         kind: ExpectedTsKind::SplitOut,
-        bucket: "package HAL split-out",
-        reason_contains: "norma:tempus",
+        bucket: "frontend semantic gap",
+        reason_contains: "cede_requires_promissum",
     },
     ExpectedTsOutcome {
         path: "destructura/literal.fab",
@@ -258,6 +259,62 @@ const TS_EXPECTED_OUTCOMES: &[ExpectedTsOutcome] = &[
         kind: ExpectedTsKind::SplitOut,
         bucket: "frontend semantic gap",
         reason_contains: "expression_type_mismatch",
+    },
+    ExpectedTsOutcome {
+        path: "operatores/modular-word.fab",
+        highest_tier: TsHighestTier::FrontendAnalyzed,
+        kind: ExpectedTsKind::TrackedGap,
+        bucket: "modular word target gap",
+        reason_contains: "modulus<u32> is not supported by the TypeScript target",
+    },
+    ExpectedTsOutcome {
+        path: "operatores/modular-word-u8.fab",
+        highest_tier: TsHighestTier::FrontendAnalyzed,
+        kind: ExpectedTsKind::TrackedGap,
+        bucket: "modular word target gap",
+        reason_contains: "modulus<u32> is not supported by the TypeScript target",
+    },
+    ExpectedTsOutcome {
+        path: "operatores/modular-word-u16.fab",
+        highest_tier: TsHighestTier::FrontendAnalyzed,
+        kind: ExpectedTsKind::TrackedGap,
+        bucket: "modular word target gap",
+        reason_contains: "modulus<u32> is not supported by the TypeScript target",
+    },
+    ExpectedTsOutcome {
+        path: "operatores/modular-word-u64.fab",
+        highest_tier: TsHighestTier::FrontendAnalyzed,
+        kind: ExpectedTsKind::TrackedGap,
+        bucket: "modular word target gap",
+        reason_contains: "modulus<u32> is not supported by the TypeScript target",
+    },
+    ExpectedTsOutcome {
+        path: "operatores/modular-word-sha-round.fab",
+        highest_tier: TsHighestTier::FrontendAnalyzed,
+        kind: ExpectedTsKind::TrackedGap,
+        bucket: "modular word target gap",
+        reason_contains: "modulus<u32> is not supported by the TypeScript target",
+    },
+    ExpectedTsOutcome {
+        path: "operatores/modular-word-u64-sha-round.fab",
+        highest_tier: TsHighestTier::FrontendAnalyzed,
+        kind: ExpectedTsKind::TrackedGap,
+        bucket: "modular word target gap",
+        reason_contains: "modulus<u32> is not supported by the TypeScript target",
+    },
+    ExpectedTsOutcome {
+        path: "praefixum/praefixum.fab",
+        highest_tier: TsHighestTier::FrontendRejected,
+        kind: ExpectedTsKind::CompileFail,
+        bucket: "expected compile-fail / frontend policy",
+        reason_contains: "expression_type_mismatch",
+    },
+    ExpectedTsOutcome {
+        path: "tensor/placement-execution-v1.fab",
+        highest_tier: TsHighestTier::FrontendRejected,
+        kind: ExpectedTsKind::CompileFail,
+        bucket: "expected compile-fail / frontend policy",
+        reason_contains: "numeric_operands_required",
     },
 ];
 
