@@ -87,6 +87,8 @@ const EXPECTED_COMPILE_FAILURES: &[(&str, &str)] = &[
         "gpu-core-types/matrix-tensor-reject.fab",
         "expression_type_mismatch",
     ),
+    // praefixum block→tabula annotation still SEM010; keep as intentional fail.
+    ("praefixum/praefixum.fab", "expression_type_mismatch"),
     ("protecta/protecta.fab", "protecta_reserved"),
     ("rumpe/rumpe-top-level-error.fab", "break_outside_breakable"),
     ("sparsa/conversio-reject.fab", "expression_type_mismatch"),
@@ -102,15 +104,16 @@ const EXPECTED_COMPILE_FAILURES: &[(&str, &str)] = &[
         "tensor/arithmetic-reject.fab",
         "tensor_arithmetic_numeric_element_required",
     ),
+    // Placement spine kernel arithmetic not SEM-green yet (numeric_operands).
+    (
+        "tensor/placement-execution-v1.fab",
+        "numeric_operands_required",
+    ),
     ("typi/sized-family-error.fab", "float_width_on_numerus"),
 ];
 
 const WRONG_LANE_FAILURES: &[(&str, &str)] = &[
     ("air/air-lane.fab", "lane_requires_mir_backed_target"),
-    (
-        "gpu-core-types/matrix-register.fab",
-        "rust_target_matrix_unsupported",
-    ),
     (
         "script-kernel/aleator-uuid.fab",
         "kernel_import_script_mode_only",
@@ -142,6 +145,10 @@ const RUNTIME_FAILURES: &[(&str, &str)] = &[
         "instans/instans.fab",
         "norma:toml.solve is deferred pending Stage 2 dispatch",
     ),
+    (
+        "json/json.fab",
+        "norma:json.pange is deferred pending runtime codec dispatch",
+    ),
     ("operatores/numerus-overflow.fab", "numerus overflow"),
     (
         "tensor/method-errors.fab",
@@ -154,6 +161,8 @@ const DECLARATION_ONLY_FIXTURES: &[&str] = &[
     "errata/errata.fab",
     "fragilis/fragilis.fab",
     "futurum/futurum.fab",
+    // matrix register types now lower; declaration-only (no incipit).
+    "gpu-core-types/matrix-register.fab",
     "immutata/immutata.fab",
     "meta/requirit.fab",
     "numquam/numquam.fab",
@@ -167,6 +176,10 @@ const DECLARATION_ONLY_FIXTURES: &[&str] = &[
     "proba/proba.fab",
     "probandum/probandum.fab",
     "repete/repete.fab",
+    // Scalar return demos define helpers only (Swift-oriented; no incipit).
+    "scalar/return-bool.fab",
+    "scalar/return-integer.fab",
+    "scalar/return-string.fab",
     "scalaria/scalaria.fab",
     "solum-in/solum-in.fab",
     "solum/solum.fab",

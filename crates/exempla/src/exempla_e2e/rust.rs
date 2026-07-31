@@ -11,11 +11,10 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-// The Rust oracle has 292 corpus files: 12 intentional compile/wrong-lane
-// outcomes and a 13-row executable-debt budget. KNOWN_FAILURES is the sole
-// accounting mechanism for that debt: every listed path must fail, and every
-// observed failure must be listed. Fixes remove rows and automatically ratchet
-// accepted/pass counts upward. Do not raise MAX_KNOWN_FAILURES to absorb drift.
+// Executable-debt budget for rust e2e. KNOWN_FAILURES is the sole accounting
+// mechanism: every listed path must fail, and every observed failure must be
+// listed. Fixes remove rows and ratchet accepted/pass counts upward. Do not
+// raise MAX_KNOWN_FAILURES to absorb drift — reclassify (oracle) or fix.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum KnownFailureKind {
     FixtureMismatch,
@@ -28,62 +27,21 @@ struct KnownFailure {
     kind: KnownFailureKind,
 }
 
+// Ceiling held at 13 for historical budget; live rows shrink as debt clears.
 const MAX_KNOWN_FAILURES: usize = 13;
 const KNOWN_FAILURES: &[KnownFailure] = &[
+    // sermo accipe/scrinium option double-wrap in rust codegen (E0308).
     KnownFailure {
-        path: "de/de.fab",
-        kind: KnownFailureKind::FixtureMismatch,
-    },
-    KnownFailure {
-        path: "destructura/objectum.fab",
-        kind: KnownFailureKind::FixtureMismatch,
-    },
-    KnownFailure {
-        path: "functio/sponte-vel.fab",
+        path: "ad/sermo-live-directional.fab",
         kind: KnownFailureKind::BuildFailure,
     },
+    // Relative `./auxilium` module link: Compiler/CLI path still CODEGEN001
+    // when the entry path is absolute (e2e corpus_dir); residual link debt.
     KnownFailure {
-        path: "genus/creo.fab",
-        kind: KnownFailureKind::FixtureMismatch,
-    },
-    KnownFailure {
-        path: "iace/functio-propagans.fab",
-        kind: KnownFailureKind::FixtureMismatch,
-    },
-    KnownFailure {
-        path: "intrinseca/copia-algebra.fab",
-        kind: KnownFailureKind::FixtureMismatch,
-    },
-    KnownFailure {
-        path: "intrinseca/numeric-operator-methods.fab",
-        kind: KnownFailureKind::FixtureMismatch,
-    },
-    KnownFailure {
-        path: "intrinseca/textus-transformationes.fab",
-        kind: KnownFailureKind::FixtureMismatch,
-    },
-    KnownFailure {
-        path: "itera/intervallum.fab",
-        kind: KnownFailureKind::FixtureMismatch,
-    },
-    KnownFailure {
-        path: "membrum/membrum.fab",
-        kind: KnownFailureKind::FixtureMismatch,
-    },
-    KnownFailure {
-        path: "mori/mori.fab",
-        kind: KnownFailureKind::FixtureMismatch,
-    },
-    KnownFailure {
-        path: "octeti/unify.fab",
+        path: "importa/importa.fab",
         kind: KnownFailureKind::BuildFailure,
-    },
-    KnownFailure {
-        path: "typus/typus.fab",
-        kind: KnownFailureKind::FixtureMismatch,
     },
 ];
-
 /// A compiled exemplum awaiting the batched workspace build and run.
 struct ExemplumJob {
     idx: usize,
@@ -669,14 +627,12 @@ pub(super) fn compile_rust_exemplum(
         return compile_package_library_exemplum(file);
     }
 
-    if file
-        .strip_prefix(exempla_dir)
-        .is_ok_and(|relative| relative == Path::new("importa/importa.fab"))
-    {
-        return compile_importa_package_exemplum(compiler, file);
-    }
-
-    let result = compiler.compile(file);
+    // Prefer the CLI compile path so relative `importa ex "./…"` siblings get an
+    // import contract (namespace + file interfaces) and emit a linked module —
+    // plain `Compiler::compile` leaves a bare `use crate::auxilium::…` with no
+    // module body.
+    let _ = compiler;
+    let result = radix::tool::compile_cli_path(file, false, radix::codegen::Target::Rust);
     match result.output {
         Some(Output::Rust(output)) => Ok(output.code),
         Some(_) => Err("compiler did not produce Rust output".to_owned()),
@@ -753,146 +709,6 @@ fn compile_package_library_exemplum(file: &Path) -> Result<String, String> {
             Err(format!("compile failed: {diagnostics}"))
         }
     }
-}
-
-fn compile_importa_package_exemplum(_compiler: &Compiler, entry: &Path) -> Result<String, String> {
-    let entry_source = fs::read_to_string(entry)
-        .map_err(|err| format!("cannot read package entry {}: {err}", entry.display()))?;
-    let module_path = entry
-        .parent()
-        .ok_or_else(|| "package entry has no parent directory".to_owned())?
-        .join("auxilium.fab");
-    let module_source = fs::read_to_string(&module_path).map_err(|err| {
-        format!(
-            "cannot read package module {}: {err}",
-            module_path.display()
-        )
-    })?;
-
-    let session = radix::driver::Session::new(radix::driver::Config::default());
-    let mut entry_analysis =
-        radix::driver::analyze_source(&session, &entry.display().to_string(), &entry_source)
-            .map_err(|diagnostics| format_importa_analysis_failure("package entry", diagnostics))?;
-    let mut module_analysis =
-        radix::driver::analyze_source(&session, &module_path.display().to_string(), &module_source)
-            .map_err(|diagnostics| {
-                format_importa_analysis_failure("package module", diagnostics)
-            })?;
-    module_analysis.hir.entry = None;
-
-    let siblings = [radix::codegen::rust::SiblingModuleExports {
-        module_key: "auxilium".to_owned(),
-        module_path: vec!["auxilium".to_owned()],
-        hir: &module_analysis.hir,
-        interner: &module_analysis.interner,
-        types: &module_analysis.types,
-        exports: vec!["saluta".to_owned()],
-    }];
-    let imported_function_params = radix::codegen::rust::build_local_import_function_params(
-        &entry_analysis.hir,
-        &entry_analysis.interner,
-        &mut entry_analysis.types,
-        &siblings,
-    );
-    let imported_namespace_info = radix::codegen::rust::build_local_import_namespaces(
-        &entry_analysis.hir,
-        &entry_analysis.interner,
-        &mut entry_analysis.types,
-        &entry_analysis.resolver,
-        &siblings,
-    );
-
-    let entry = radix::codegen::rust::generate_with_library_registry_test_selection_and_imports(
-        radix::codegen::rust::ModuleGenerationRequest {
-            hir: &entry_analysis.hir,
-            types: &entry_analysis.types,
-            interner: &entry_analysis.interner,
-            libraries: &entry_analysis.libraries,
-            test_selection: None,
-            module_mode: false,
-            cli_program: None,
-            imported_function_params: Some(imported_function_params),
-            imported_namespace_info: Some(imported_namespace_info),
-            gpu_builtins: &[],
-            field_name_policy: radix::codegen::rust::RustFieldNamePolicy::Preserve,
-            native_host_bootstrap: false,
-        },
-    )
-    .map_err(|err| format!("package entry codegen failed: {:?}", err.args))?;
-    let module = radix::codegen::rust::generate_module_with_library_registry_and_test_selection(
-        &module_analysis.hir,
-        &module_analysis.types,
-        &module_analysis.interner,
-        &module_analysis.libraries,
-        None,
-    )
-    .map_err(|err| format!("package module codegen failed: {:?}", err.args))?;
-
-    Ok(assemble_package_entry(
-        &entry.code,
-        &render_auxilium_module(&module.code),
-    ))
-}
-
-fn format_importa_analysis_failure(label: &str, diagnostics: Vec<radix::Diagnostic>) -> String {
-    format!(
-        "{label} compile failed: {}",
-        diagnostics
-            .iter()
-            .map(|diagnostic| format!("{:?}:{:?}", diagnostic.code, diagnostic.issue()))
-            .collect::<Vec<_>>()
-            .join("; ")
-    )
-}
-
-fn render_auxilium_module(module_code: &str) -> String {
-    let mut rendered = String::from("pub mod auxilium {\n");
-    for line in module_code.lines() {
-        rendered.push_str("    ");
-        rendered.push_str(line);
-        rendered.push('\n');
-    }
-    rendered.push_str("}\n");
-    rendered
-}
-
-fn assemble_package_entry(entry_code: &str, module_code: &str) -> String {
-    let lines = entry_code.lines().collect::<Vec<_>>();
-    let insert_after = leading_crate_attribute_end(&lines);
-    let mut output = String::new();
-
-    for (idx, line) in lines.iter().enumerate() {
-        output.push_str(line);
-        output.push('\n');
-        if idx + 1 == insert_after {
-            output.push('\n');
-            output.push_str(module_code);
-            output.push('\n');
-        }
-    }
-
-    if insert_after == 0 {
-        output.push('\n');
-        output.push_str(module_code);
-    }
-
-    output
-}
-
-fn leading_crate_attribute_end(lines: &[&str]) -> usize {
-    let mut last_attr = 0;
-    for (idx, line) in lines.iter().enumerate() {
-        let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.starts_with("//") {
-            continue;
-        }
-        if trimmed.starts_with("#![") {
-            last_attr = idx + 1;
-            continue;
-        }
-        break;
-    }
-    last_attr
 }
 
 fn expected_compile_failure(path: &Path) -> Option<&'static str> {
