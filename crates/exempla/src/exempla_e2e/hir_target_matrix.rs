@@ -28,7 +28,7 @@ struct TargetSummary {
 }
 
 /// Honest non-regression floors after first green G5 baseline (2026-07-10).
-/// Corpus: examples/corpus (292 files; 279 analysis_ok). Do not lower without
+/// Corpus: radix/corpus (~310 single-file units). Do not lower without
 /// a counted debt row in the G5 delivery closeout.
 const HIR_ANALYSIS_OK_FLOOR: usize = 279;
 const TARGET_CAPABLE_FLOORS: [(HirCoverageTarget, usize); 4] = [

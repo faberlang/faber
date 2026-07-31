@@ -12,7 +12,7 @@ use temp::TempDir;
 
 fn exempla(path: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../examples/corpus")
+        .join("../radix/corpus")
         .join(path)
 }
 

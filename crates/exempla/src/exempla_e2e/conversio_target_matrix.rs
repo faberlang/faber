@@ -24,8 +24,8 @@ use std::path::PathBuf;
 
 /// Resolve the conversio-matrix fixture root (`examples/conversio-matrix/`).
 fn fixture_root() -> PathBuf {
-    // corpus_dir() = examples/corpus; the matrix fixtures are a sibling tree.
-    crate::paths::corpus_dir()
+    // Fixtures are an examples track, not language-corpus content.
+    crate::paths::script_kernel_dir()
         .parent()
         .map(|examples| examples.join("conversio-matrix"))
         .unwrap_or_else(|| PathBuf::from("conversio-matrix"))

@@ -5,7 +5,8 @@ Private-to-CI integration harness for the public language corpus. Lives in the
 
 - single-file / compiler lanes use **radix** in-process;
 - package lanes (`norma:*`, multi-file packages) use **faber_cli** package APIs;
-- corpus sources live in public sibling **`examples/`** (and `norma/exempla/`).
+- language corpus lives in sibling **`radix/corpus/`**; app tracks in **`examples/`**;
+  Norma tours in **`norma/exempla/`**.
 
 This crate is **not** part of the private radix workspace. Radix must build from
 a standalone checkout without this package.
@@ -16,7 +17,8 @@ a standalone checkout without this package.
 faber/
   crates/exempla/     this crate
   Cargo.toml          workspace root (members: ., crates/exempla, hygiene-ratchet)
-examples/corpus/      public .fab language reference (resolved at runtime)
+radix/corpus/         language keyword reference (resolved at runtime)
+examples/             app tracks + residual package fixtures
 ```
 
 ## Run
@@ -38,6 +40,6 @@ See `src/paths.rs`. Overrides:
 
 | Env | Meaning |
 | --- | --- |
-| `FABER_EXEMPLA_CORPUS` | `examples/corpus` root |
+| `FABER_EXEMPLA_CORPUS` | `radix/corpus` root |
 | `FABER_EXAMPLES_HOME` | `examples` repo root |
 | `FABER_NORMA_EXEMPLA` | `norma/exempla` root |

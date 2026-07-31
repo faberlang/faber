@@ -162,7 +162,7 @@ mod tests {
         );
         assert!(
             dir.join("incipit/incipit.fab").is_file(),
-            "expected scaffold exemplum under {}",
+            "expected language exemplum under {}",
             dir.display()
         );
         let rendered = dir.display().to_string().replace('\\', "/");

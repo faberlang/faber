@@ -43,7 +43,7 @@ fn run_faber_emit_faber_stdin(source: &str) -> String {
 }
 
 fn corpus_root() -> std::path::PathBuf {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/corpus")
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../radix/corpus")
 }
 
 fn reader_locale_example_root(locale: &str) -> PathBuf {

@@ -63,6 +63,6 @@ fn ledger_path_renders_corpus_relative_path() {
         .join("salve-munde.fab");
     assert_eq!(
         ledger_path(&path),
-        "examples/corpus/incipit/salve-munde.fab"
+        "incipit/salve-munde.fab"
     );
 }

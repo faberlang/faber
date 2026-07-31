@@ -1784,7 +1784,7 @@ fn package_mir_stage4b_instans_emits_verifier_valid_llvm() {
 
 fn assert_package_corpus_llvm_smoke(relative: &str, label: &str) {
     let entry = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../examples/corpus")
+        .join("../radix/corpus")
         .join(relative);
     let emitted = with_lowered_package_mir(
         &Config::default().with_stdlib(dev_norma_library_home()),

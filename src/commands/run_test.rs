@@ -161,7 +161,7 @@ fn run_args(
 #[test]
 fn interpret_policy_defaults_to_single_fab_file() {
     let fab = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../examples/corpus/incipit/salve-munde.fab");
+        .join("../radix/corpus/incipit/salve-munde.fab");
     let args = run_args(
         fab.clone(),
         false,

@@ -13,10 +13,10 @@ pub(crate) fn env_lock() -> MutexGuard<'static, ()> {
 
 pub(crate) fn repo_exempla_root() -> PathBuf {
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let root = manifest.join("../examples/corpus");
+    let root = manifest.join("../radix/corpus");
     assert!(
         root.join("index.toml").is_file(),
-        "expected repo exempla at {}",
+        "expected language corpus at {}",
         root.display()
     );
     root

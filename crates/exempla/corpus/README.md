@@ -1,10 +1,11 @@
 # Exempla corpus relocated
 
-The language keyword corpus and public tracks no longer live in this private tree.
+This private crate no longer vendors language sources.
 
 | Content | Location |
 | ------- | -------- |
-| Keyword / language reference | sibling `examples/corpus/` |
+| Keyword / language reference | sibling `radix/corpus/` |
+| Package fixtures (tensor-*) | sibling `examples/corpus/` (moving to `faber/corpus/`) |
 | GPU workload rungs | sibling `examples/gpu-workload/` |
 | AIR lane demos | sibling `examples/air/` |
 | Script-kernel demos | sibling `examples/script-kernel/` |
