@@ -7,6 +7,12 @@
 **Primary surface**: `faber test`, package discovery/loading, local import
 resolution, stdlib test layout, source extension handling.
 
+**Runner successor**: execution of `faber test` must move to the MIR stepper
+under [`stepper-faber-test/goal.md`](../stepper-faber-test/goal.md) (clean
+break: no Rust/cargo harness). This goal still owns **discovery and source
+boundary** (`.proba` vs `.fab`); it does **not** own “generate Rust `#[test]`”
+as the long-term definition of testing.
+
 ---
 
 ## Current implementation boundary
@@ -65,8 +71,9 @@ test code part of production/library code.
 
 ## Goals
 
-- Treat `.proba` as full Faber syntax for parse, lower, typecheck, and Rust test
-  harness generation.
+- Treat `.proba` as full Faber syntax for parse, lower, typecheck, and inclusion
+  in `faber test` (execution runner: see `stepper-faber-test`; historically
+  Rust harness — do not extend that path).
 - Make `faber test` discover `.proba` files in package and stdlib test scopes.
 - Allow `.proba` files to contain arbitrary Faber helpers alongside
   `probandum` / `proba` declarations.
