@@ -157,9 +157,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.6.4"
+version = "4.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d91e0c145792ef73a6ad36d27c75ac09f1832222a3c209689d90f534685ee5b7"
+checksum = "301b56658598e48f3648647ac6fc887be7e7108eddfa4e9b63fcf3ec58c0cadf"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -167,9 +167,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.6.2"
+version = "4.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f09628afdcc538b57f3c6341e9c8e9970f18e4a481690a64974d7023bd33548b"
+checksum = "94a65403d1a1bd28f7dc68eb8506e8874808ee5eecb59298de588e2e1407a078"
 dependencies = [
  "anstream",
  "anstyle",
@@ -325,7 +325,7 @@ dependencies = [
 
 [[package]]
 name = "faber"
-version = "1.3.0"
+version = "1.4.0"
 dependencies = [
  "cista",
  "clap",
@@ -666,7 +666,7 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
 name = "radix"
-version = "0.78.0"
+version = "0.79.0"
 dependencies = [
  "ariadne",
  "clap",
@@ -712,7 +712,7 @@ dependencies = [
 
 [[package]]
 name = "radix-air"
-version = "0.78.0"
+version = "0.79.0"
 dependencies = [
  "radix-hir",
  "radix-lexer",
@@ -723,7 +723,7 @@ dependencies = [
 
 [[package]]
 name = "radix-codegen-faber"
-version = "0.78.0"
+version = "0.79.0"
 dependencies = [
  "radix-codegen-shared",
  "radix-diagnostics",
@@ -736,7 +736,7 @@ dependencies = [
 
 [[package]]
 name = "radix-codegen-go"
-version = "0.78.0"
+version = "0.79.0"
 dependencies = [
  "radix-codegen-shared",
  "radix-diagnostics",
@@ -749,7 +749,7 @@ dependencies = [
 
 [[package]]
 name = "radix-codegen-rust"
-version = "0.78.0"
+version = "0.79.0"
 dependencies = [
  "radix-codegen-shared",
  "radix-diagnostics",
@@ -762,7 +762,7 @@ dependencies = [
 
 [[package]]
 name = "radix-codegen-shared"
-version = "0.78.0"
+version = "0.79.0"
 dependencies = [
  "radix-diagnostics",
  "radix-hir",
@@ -773,7 +773,7 @@ dependencies = [
 
 [[package]]
 name = "radix-codegen-swift"
-version = "0.78.0"
+version = "0.79.0"
 dependencies = [
  "radix-codegen-shared",
  "radix-diagnostics",
@@ -786,7 +786,7 @@ dependencies = [
 
 [[package]]
 name = "radix-codegen-ts"
-version = "0.78.0"
+version = "0.79.0"
 dependencies = [
  "radix-codegen-shared",
  "radix-diagnostics",
@@ -799,14 +799,14 @@ dependencies = [
 
 [[package]]
 name = "radix-diagnostics"
-version = "0.78.0"
+version = "0.79.0"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "radix-hir"
-version = "0.78.0"
+version = "0.79.0"
 dependencies = [
  "postcard",
  "radix-lexer",
@@ -818,11 +818,11 @@ dependencies = [
 
 [[package]]
 name = "radix-host-abi"
-version = "0.78.0"
+version = "0.79.0"
 
 [[package]]
 name = "radix-lexer"
-version = "0.78.0"
+version = "0.79.0"
 dependencies = [
  "radix-diagnostics",
  "rustc-hash",
@@ -833,7 +833,7 @@ dependencies = [
 
 [[package]]
 name = "radix-mir"
-version = "0.78.0"
+version = "0.79.0"
 dependencies = [
  "radix-codegen-shared",
  "radix-diagnostics",
@@ -847,7 +847,7 @@ dependencies = [
 
 [[package]]
 name = "radix-mir-coverage"
-version = "0.78.0"
+version = "0.79.0"
 dependencies = [
  "radix-lexer",
  "radix-mir",
@@ -860,7 +860,7 @@ dependencies = [
 
 [[package]]
 name = "radix-mir-llvm"
-version = "0.78.0"
+version = "0.79.0"
 dependencies = [
  "radix-codegen-shared",
  "radix-hir",
@@ -873,7 +873,7 @@ dependencies = [
 
 [[package]]
 name = "radix-mir-metal"
-version = "0.78.0"
+version = "0.79.0"
 dependencies = [
  "radix-codegen-shared",
  "radix-hir",
@@ -885,7 +885,7 @@ dependencies = [
 
 [[package]]
 name = "radix-mir-sexp"
-version = "0.78.0"
+version = "0.79.0"
 dependencies = [
  "radix-codegen-shared",
  "radix-hir",
@@ -897,7 +897,7 @@ dependencies = [
 
 [[package]]
 name = "radix-mir-stepper"
-version = "0.78.0"
+version = "0.79.0"
 dependencies = [
  "getrandom 0.2.17",
  "radix-hir",
@@ -913,7 +913,7 @@ dependencies = [
 
 [[package]]
 name = "radix-mir-wasm"
-version = "0.78.0"
+version = "0.79.0"
 dependencies = [
  "radix-codegen-shared",
  "radix-hir",
@@ -927,7 +927,7 @@ dependencies = [
 
 [[package]]
 name = "radix-mir-wgsl"
-version = "0.78.0"
+version = "0.79.0"
 dependencies = [
  "radix-codegen-shared",
  "radix-hir",
@@ -941,7 +941,7 @@ dependencies = [
 
 [[package]]
 name = "radix-parser"
-version = "0.78.0"
+version = "0.79.0"
 dependencies = [
  "radix-diagnostics",
  "radix-lexer",
@@ -951,11 +951,11 @@ dependencies = [
 
 [[package]]
 name = "radix-runtime-contract"
-version = "0.78.0"
+version = "0.79.0"
 
 [[package]]
 name = "radix-syntax"
-version = "0.78.0"
+version = "0.79.0"
 dependencies = [
  "radix-lexer",
  "serde",
@@ -963,7 +963,7 @@ dependencies = [
 
 [[package]]
 name = "radix-types"
-version = "0.78.0"
+version = "0.79.0"
 dependencies = [
  "radix-lexer",
  "radix-syntax",
