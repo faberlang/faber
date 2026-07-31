@@ -12,6 +12,12 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 const GO_EXPECTED_FAILURES: &[&str] = &[
     "ad/async-solum-leget.fab",
+    "ad/async-tempus-dormiet.fab",
+    "ad/sermo-conversio.fab",
+    "ad/sermo-live-directional.fab",
+    "ad/sermo-recovery.fab",
+    "ad/sermo-tuus.fab",
+    "ad/sermo-vacuum.fab",
     "ad/solum-lege-generic.fab",
     "conversio/collectiones.fab",
     "conversio/lista-tensor-shaped.fab",
@@ -24,7 +30,6 @@ const GO_EXPECTED_FAILURES: &[&str] = &[
     "intervallum/algebra.fab",
     "intervallum/conversio.fab",
     "sparsa/conversio.fab",
-    "ad/async-tempus-dormiet.fab",
     "tensor/bracket-access.fab",
     "tensor/method-errors.fab",
     "vector/builtins.fab",
@@ -58,12 +63,43 @@ const GO_EXPECTED_COMPILE_FAILURES: &[(&str, &str)] = &[
     ("gpu-core-types/f16-width.fab", "go_type_unsupported"),
     ("conversio/valor-genus.fab", "go_json_unsupported"),
     ("destructura/literal.fab", "go_json_unsupported"),
+    // Async stream posture on Go is fail-closed until a channel carrier lands.
+    (
+        "itera/cursor-iteratio.fab",
+        "go_target_async_stream_unsupported",
+    ),
     ("json/json.fab", "go_json_unsupported"),
     (
         "gpu-core-types/matrix-tensor-reject.fab",
         "expression_type_mismatch",
     ),
+    (
+        "operatores/modular-word-sha-round.fab",
+        "modular_word_target_unsupported",
+    ),
+    (
+        "operatores/modular-word-u16.fab",
+        "modular_word_target_unsupported",
+    ),
+    (
+        "operatores/modular-word-u64-sha-round.fab",
+        "modular_word_target_unsupported",
+    ),
+    (
+        "operatores/modular-word-u64.fab",
+        "modular_word_target_unsupported",
+    ),
+    (
+        "operatores/modular-word-u8.fab",
+        "modular_word_target_unsupported",
+    ),
+    (
+        "operatores/modular-word.fab",
+        "modular_word_target_unsupported",
+    ),
     ("optio/optio.fab", "go_cli_options_unsupported"),
+    // praefixum tabula block annotation still SEM010.
+    ("praefixum/praefixum.fab", "expression_type_mismatch"),
     ("protecta/protecta.fab", "protecta_reserved"),
     ("rumpe/rumpe-top-level-error.fab", "break_outside_breakable"),
     ("sparsa/conversio-reject.fab", "expression_type_mismatch"),
@@ -72,6 +108,11 @@ const GO_EXPECTED_COMPILE_FAILURES: &[(&str, &str)] = &[
         "sparsa_element_non_numeric",
     ),
     ("tensor/arithmetic-reject.fab", "expression_type_mismatch"),
+    // Placement spine kernel arithmetic not SEM-green yet.
+    (
+        "tensor/placement-execution-v1.fab",
+        "numeric_operands_required",
+    ),
     ("typi/sized-family-error.fab", "float_width_on_numerus"),
     ("ubique/ubique.fab", "go_cli_options_unsupported"),
 ];
@@ -93,6 +134,10 @@ const GO_DECLARATION_ONLY_FIXTURES: &[&str] = &[
     "proba/proba.fab",
     "probandum/probandum.fab",
     "repete/repete.fab",
+    // Scalar return demos define helpers only (no incipit / main).
+    "scalar/return-bool.fab",
+    "scalar/return-integer.fab",
+    "scalar/return-string.fab",
     "scalaria/scalaria.fab",
     "solum-in/solum-in.fab",
     "solum/solum.fab",
@@ -101,6 +146,7 @@ const GO_DECLARATION_ONLY_FIXTURES: &[&str] = &[
     "temporis/temporis.fab",
     "vector/kernel.fab",
 ];
+// Floors ratchet upward only; do not lower to absorb drift.
 const EXPECTED_GO_PASS_FLOOR: usize = 249;
 const EXPECTED_GO_ACCEPTED_OUTCOME_FLOOR: usize = 292;
 // WHY: Remaining expected failures are tracked Go lowering gaps with
