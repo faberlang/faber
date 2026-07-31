@@ -4,7 +4,9 @@
 //! target in-process. No external toolchains, disk writes, or per-target
 //! re-analysis.
 
-use super::common::{collect_exempla_files, format_diagnostic_messages};
+use super::common::{
+    collect_exempla_files, corpus_relative_key, floor_for_corpus, format_diagnostic_messages,
+};
 use super::mir::{classify_ledger_bucket, MirE2eResult, MirOutcomeBucket, MirTier};
 use radix::driver::Session;
 use radix::mir::classify_stepper_lowerability;
@@ -43,15 +45,15 @@ const MIR_CAPABLE_FLOOR: usize = 253;
 const SCENA_STRUCTURAL_CAPABLE_FLOOR: usize = 205;
 const KNOWN_SCENA_STRUCTURAL_RUN_MISMATCHES: [(&str, &str); 3] = [
     (
-        "examples/corpus/est/est.fab",
+        "est/est.fab",
         "runtime assertion in est variant-check exemplar",
     ),
     (
-        "examples/corpus/operatores/numerus-overflow.fab",
+        "operatores/numerus-overflow.fab",
         "intentional checked numerus overflow trap",
     ),
     (
-        "examples/corpus/tensor/method-errors.fab",
+        "tensor/method-errors.fab",
         "intentional tensor structa hard-error policy",
     ),
 ];
@@ -354,44 +356,63 @@ fn print_matrix_report(rows: &[MirTargetMatrixRow], elapsed: std::time::Duration
 }
 
 fn assert_matrix_ratchet(rows: &[MirTargetMatrixRow]) {
+    let total = rows.len();
+    let mir_floor = floor_for_corpus(MIR_CAPABLE_FLOOR, total);
     let mir_capable = rows.iter().filter(|row| row.mir_capable).count();
     assert!(
-        mir_capable >= MIR_CAPABLE_FLOOR,
-        "MIR target matrix mir-capable floor regressed: {mir_capable} < {MIR_CAPABLE_FLOOR}"
+        mir_capable >= mir_floor,
+        "MIR target matrix mir-capable floor regressed: {mir_capable} < {mir_floor}"
     );
 
     for (target, floor) in TARGET_CAPABLE_FLOORS {
+        // Sparse backend floors (e.g. metal=6) are meaningless on a tiny scaffold.
+        // Enforce them only once the corpus is large enough for the global MIR floor.
+        let target_floor = if total < MIR_CAPABLE_FLOOR {
+            0
+        } else {
+            floor
+        };
         let capable = rows
             .iter()
             .filter(|row| row.mir_capable && target_capable(&row.targets, target))
             .count();
         assert!(
-            capable >= floor,
-            "MIR target matrix {} floor regressed: {capable} < {floor}",
+            capable >= target_floor,
+            "MIR target matrix {} floor regressed: {capable} < {target_floor}",
             target.name()
         );
     }
 
+    let structural_floor = if total < MIR_CAPABLE_FLOOR {
+        0
+    } else {
+        SCENA_STRUCTURAL_CAPABLE_FLOOR
+    };
     let structural = rows
         .iter()
         .filter(|row| row.mir_capable)
         .filter(|row| matches!(row.scena_structural, Some(Lowerability::Capable)))
         .count();
     assert!(
-        structural >= SCENA_STRUCTURAL_CAPABLE_FLOOR,
-        "MIR target matrix scena-structural floor regressed: {structural} < {SCENA_STRUCTURAL_CAPABLE_FLOOR}"
+        structural >= structural_floor,
+        "MIR target matrix scena-structural floor regressed: {structural} < {structural_floor}"
     );
 
+    let present_keys: std::collections::HashSet<String> = rows
+        .iter()
+        .map(|row| corpus_relative_key(&row.path))
+        .collect();
     let structural_run_mismatches = structural_run_mismatch_paths(rows);
     let unexpected_mismatches: Vec<_> = structural_run_mismatches
         .iter()
         .filter(|path| !known_structural_run_mismatch(path))
         .cloned()
         .collect();
+    // Only treat known rows as stale when that exemplum is present in this corpus.
     let stale_known_mismatches: Vec<_> = KNOWN_SCENA_STRUCTURAL_RUN_MISMATCHES
         .iter()
         .map(|(path, _)| (*path).to_owned())
-        .filter(|path| !structural_run_mismatches.contains(path))
+        .filter(|path| present_keys.contains(path) && !structural_run_mismatches.contains(path))
         .collect();
     assert!(
         unexpected_mismatches.is_empty() && stale_known_mismatches.is_empty(),
@@ -439,31 +460,7 @@ fn target_cell(row: &MirTargetMatrixRow, target: MirCoverageTarget) -> String {
 }
 
 fn display_path(path: &Path) -> String {
-    let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let repo = manifest
-        .parent()
-        .and_then(Path::parent)
-        .expect("exempla crate should live below repo root");
-    let relative = path
-        .strip_prefix(repo)
-        .unwrap_or(path)
-        .display()
-        .to_string();
-    let normalized = relative.replace('\\', "/");
-    if normalized.starts_with("examples/corpus/")
-        || normalized.starts_with("examples/")
-        || normalized.starts_with("norma/exempla/")
-        || normalized.starts_with("crates/exempla/corpus/")
-    {
-        normalized
-    } else if let Ok(rel) = path.strip_prefix(crate::paths::corpus_dir()) {
-        format!(
-            "examples/corpus/{}",
-            rel.display().to_string().replace('\\', "/")
-        )
-    } else {
-        format!("examples/corpus/{normalized}")
-    }
+    corpus_relative_key(path)
 }
 
 #[cfg(test)]

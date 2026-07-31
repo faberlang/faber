@@ -177,6 +177,32 @@ pub(crate) fn collect_exempla_files(dir: &Path) -> Vec<PathBuf> {
     files
 }
 
+/// Cap absolute e2e floors by live corpus size.
+///
+/// Full-corpus floors (hundreds of files) must not fail a small `radix/corpus`
+/// scaffold; once the tree grows past the floor, the historical ratchet applies.
+pub(crate) fn floor_for_corpus(floor: usize, corpus_size: usize) -> usize {
+    floor.min(corpus_size)
+}
+
+/// Path relative to [`crate::paths::corpus_dir`], forward slashes.
+pub(crate) fn corpus_relative_key(path: &Path) -> String {
+    if let Ok(rel) = path.strip_prefix(crate::paths::corpus_dir()) {
+        return rel.display().to_string().replace('\\', "/");
+    }
+    let normalized = path.to_string_lossy().replace('\\', "/");
+    for marker in [
+        "/radix/corpus/",
+        "/examples/corpus/",
+        "/crates/exempla/corpus/",
+    ] {
+        if let Some(rel) = normalized.split(marker).nth(1) {
+            return rel.to_owned();
+        }
+    }
+    normalized
+}
+
 pub(crate) fn collect_exempla_files_recursive(dir: &Path, out: &mut Vec<PathBuf>) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;

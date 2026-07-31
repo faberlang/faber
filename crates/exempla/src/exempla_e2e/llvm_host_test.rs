@@ -115,7 +115,7 @@ fn llvm_host_async_solum_leget_uses_existing_route_poll_boundary() {
             .validation()
             .interner
             .ok_or_else(|| "package MIR validation context has no interner".to_owned())?;
-        radix::mir::emit_llvm_text_probe_with_context(&lowered.validated, interner)
+        radix::mir::emit_llvm_text_probe(&lowered.validated, interner)
             .map_err(|error| format!("{}:{}", error.category, error.shape))
     })
     .expect("async solum package analysis must succeed")

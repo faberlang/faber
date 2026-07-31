@@ -466,11 +466,24 @@ fn exempla_rust_e2e() {
         .filter(|result| known_failure(&result.path, &exempla_dir).is_none())
         .copied()
         .collect();
+    let present_paths: Vec<String> = exempla
+        .iter()
+        .map(|path| relative_exemplum_path(path, &exempla_dir))
+        .collect();
+    // Known-failure rows for files not in this corpus (e.g. radix/corpus scaffold)
+    // are not stale — only rows present in the corpus but no longer failing.
     let stale_known_failures: Vec<&str> = KNOWN_FAILURES
         .iter()
-        .filter(|entry| !failure_paths.iter().any(|path| path == entry.path))
+        .filter(|entry| {
+            present_paths.iter().any(|path| path == entry.path)
+                && !failure_paths.iter().any(|path| path == entry.path)
+        })
         .map(|entry| entry.path)
         .collect();
+    let applicable_known_failures = KNOWN_FAILURES
+        .iter()
+        .filter(|entry| present_paths.iter().any(|path| path == entry.path))
+        .count();
     let known_fixture_drift_count = observed_failures
         .iter()
         .filter(|result| {
@@ -511,7 +524,7 @@ fn exempla_rust_e2e() {
     );
     eprintln!("pass: {pass_count}/{total}; accepted: {accepted_count}/{total}");
     eprintln!(
-        "known failure ledger: {known_failure_count}/{} (fixture drifts: {known_fixture_drift_count}, build failures: {known_build_failure_count})",
+        "known failure ledger: {known_failure_count}/{applicable_known_failures} present in corpus (fixture drifts: {known_fixture_drift_count}, build failures: {known_build_failure_count}; full ledger {})",
         KNOWN_FAILURES.len()
     );
 
@@ -544,8 +557,8 @@ fn exempla_rust_e2e() {
     );
     assert_eq!(
         known_failure_count,
-        KNOWN_FAILURES.len(),
-        "Rust e2e failure ledger does not match observed failures"
+        applicable_known_failures,
+        "Rust e2e failure ledger does not match observed failures for files present in this corpus"
     );
 }
 

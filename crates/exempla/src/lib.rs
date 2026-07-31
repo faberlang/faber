@@ -1,7 +1,7 @@
 //! Faber exempla harness crate.
 //!
 //! Public `.fab` corpora live in sibling repos after the org split:
-//! - keyword / language reference → `examples/corpus/`
+//! - keyword / language reference → `radix/corpus/` (via [`paths::corpus_dir`])
 //! - GPU / AIR / script tracks → `examples/{gpu-workload,air,script-kernel}/`
 //! - Norma stdlib tours → `norma/exempla/`
 //!
@@ -15,7 +15,7 @@ pub mod paths;
 /// Prefer [`paths::corpus_dir`] for new code. This constant remains only as a
 /// compile-time placeholder for the local pointer directory; harnesses must
 /// call [`paths::corpus_dir`].
-#[deprecated(note = "use exempla::paths::corpus_dir() — corpus lives in examples/corpus")]
+#[deprecated(note = "use exempla::paths::corpus_dir() — corpus lives in radix/corpus")]
 pub const CORPUS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/corpus");
 
 /// Shared exempla harness helpers and fast regression tests (parity, matrix).

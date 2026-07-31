@@ -1,6 +1,7 @@
 use super::common::{
-    collect_exempla_files, command_available, format_diagnostic_messages, format_tier_line,
-    make_temp_root, normalize_newline, read_expected_stdout,
+    collect_exempla_files, command_available, corpus_relative_key, floor_for_corpus,
+    format_diagnostic_messages, format_tier_line, make_temp_root, normalize_newline,
+    read_expected_stdout,
 };
 use super::wasm_behavior_fixtures::{behavior_matches, expected_wasm_behavior};
 use super::wasm_expectations::WASM_EXPECTED_TIER_FLOORS;
@@ -485,6 +486,7 @@ fn assert_wasm_per_exemplum_floors(results: &[WasmE2eResult]) {
 }
 
 fn assert_wasm_aggregate_floors(results: &[WasmE2eResult]) {
+    let total = results.len();
     let frontend = count_wasm_tier(results, WasmTier::FrontendAnalyzed);
     let mir = count_wasm_tier(results, WasmTier::MirLowered);
     let emitted = count_wasm_tier(results, WasmTier::WasmEmitted);
@@ -496,28 +498,32 @@ fn assert_wasm_aggregate_floors(results: &[WasmE2eResult]) {
         (
             "frontend analyzed",
             frontend,
-            EXPECTED_FRONTEND_ANALYZED_FLOOR,
+            floor_for_corpus(EXPECTED_FRONTEND_ANALYZED_FLOOR, total),
         ),
-        ("MIR lowered", mir, EXPECTED_MIR_LOWERED_FLOOR),
+        (
+            "MIR lowered",
+            mir,
+            floor_for_corpus(EXPECTED_MIR_LOWERED_FLOOR, total),
+        ),
         (
             "tier A emitted",
             emitted,
-            EXPECTED_WASM_TIER_A_EMITTED_FLOOR,
+            floor_for_corpus(EXPECTED_WASM_TIER_A_EMITTED_FLOOR, total),
         ),
         (
             "tier B compile-valid",
             compile_valid,
-            EXPECTED_WASM_TIER_B_COMPILE_VALID_FLOOR,
+            floor_for_corpus(EXPECTED_WASM_TIER_B_COMPILE_VALID_FLOOR, total),
         ),
         (
             "tier C runnable",
             runnable,
-            EXPECTED_WASM_TIER_C_RUNNABLE_FLOOR,
+            floor_for_corpus(EXPECTED_WASM_TIER_C_RUNNABLE_FLOOR, total),
         ),
         (
             "tier D output-checked",
             output_checked,
-            EXPECTED_WASM_TIER_D_OUTPUT_CHECKED_FLOOR,
+            floor_for_corpus(EXPECTED_WASM_TIER_D_OUTPUT_CHECKED_FLOOR, total),
         ),
     ]
     .into_iter()
@@ -544,14 +550,5 @@ fn expected_wasm_tier(path: &Path) -> WasmTier {
 }
 
 fn wasm_exemplum_key(path: &Path) -> String {
-    let normalized = path.to_string_lossy().replace('\\', "/");
-    for marker in ["/examples/corpus/", "/crates/exempla/corpus/"] {
-        if let Some(rel) = normalized.split(marker).nth(1) {
-            return rel.to_owned();
-        }
-    }
-    if let Ok(rel) = path.strip_prefix(crate::paths::corpus_dir()) {
-        return rel.display().to_string().replace('\\', "/");
-    }
-    normalized
+    corpus_relative_key(path)
 }

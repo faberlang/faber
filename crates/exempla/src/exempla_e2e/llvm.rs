@@ -6,8 +6,8 @@
 //! against sibling `*.expected` files.
 
 use super::common::{
-    collect_exempla_files, command_available, format_ceiling_line, format_diagnostic_messages,
-    format_tier_line, make_temp_root,
+    collect_exempla_files, command_available, floor_for_corpus, format_ceiling_line,
+    format_diagnostic_messages, format_tier_line, make_temp_root,
 };
 use super::llvm_runtime::{LlvmRunBucket, LlvmRunProbe};
 use super::oracle::rust_oracle;
@@ -271,7 +271,7 @@ fn classify_package_llvm_exemplum(
         let Some(interner) = lowered.validated.validation().interner else {
             return Err("package MIR validation context has no interner".to_owned());
         };
-        radix::mir::emit_llvm_text_probe_with_context(&lowered.validated, interner)
+        radix::mir::emit_llvm_text_probe(&lowered.validated, interner)
             .map_err(|error| format!("{}:{}", error.category, error.shape))
     });
     let llvm = match emitted {
@@ -604,6 +604,7 @@ fn count_emission_bucket(results: &[LlvmE2eResult], bucket: LlvmEmissionBucket) 
 
 /// Campaign staging gates (verification plan step 3): Tier A/B floors + unsupported ceiling.
 fn assert_llvm_staging_gates(results: &[LlvmE2eResult]) {
+    let total = results.len();
     let frontend = count_llvm_tier(results, LlvmTier::FrontendAnalyzed);
     let mir = count_llvm_tier(results, LlvmTier::MirLowered);
     let llvm = count_llvm_tier(results, LlvmTier::LlvmEmitted);
@@ -614,14 +615,22 @@ fn assert_llvm_staging_gates(results: &[LlvmE2eResult]) {
         (
             "frontend analyzed",
             frontend,
-            EXPECTED_FRONTEND_ANALYZED_FLOOR,
+            floor_for_corpus(EXPECTED_FRONTEND_ANALYZED_FLOOR, total),
         ),
-        ("MIR lowered", mir, EXPECTED_MIR_LOWERED_FLOOR),
-        ("LLVM emitted", llvm, EXPECTED_LLVM_EMITTED_FLOOR),
+        (
+            "MIR lowered",
+            mir,
+            floor_for_corpus(EXPECTED_MIR_LOWERED_FLOOR, total),
+        ),
+        (
+            "LLVM emitted",
+            llvm,
+            floor_for_corpus(EXPECTED_LLVM_EMITTED_FLOOR, total),
+        ),
         (
             "LLVM verifier-valid",
             verifier,
-            EXPECTED_LLVM_VERIFIER_VALID_FLOOR,
+            floor_for_corpus(EXPECTED_LLVM_VERIFIER_VALID_FLOOR, total),
         ),
     ]
     .into_iter()

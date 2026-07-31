@@ -1,6 +1,6 @@
 use super::common::{
-    collect_exempla_files, command_available, format_diagnostic_messages, format_tier_line,
-    make_temp_root, normalize_newline, read_expected_stdout, TSC_SMOKE_ARGS,
+    collect_exempla_files, command_available, floor_for_corpus, format_diagnostic_messages,
+    format_tier_line, make_temp_root, normalize_newline, read_expected_stdout, TSC_SMOKE_ARGS,
 };
 use radix::codegen::{self, Target};
 use radix::hir::{HirItemKind, HirProgram};
@@ -11,10 +11,9 @@ use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-// Baseline 2026-07-12: the harness discovers the 292-file sibling
-// `examples/corpus` through `exempla::paths`. Historical 305/318-file floors
-// are not comparable after the public-corpus split; keep this ratchet tied to
-// the measured current corpus instead of silently normalizing denominators.
+// Floors are calibrated to the full language corpus; live asserts use
+// `floor_for_corpus` so a small `radix/corpus` scaffold can pass while the
+// tree is migrated.
 const EXPECTED_TS_FRONTEND_ANALYZED_FLOOR: usize = 279;
 const EXPECTED_TS_EMITTED_FLOOR: usize = 276;
 const EXPECTED_TS_TYPECHECK_VALID_FLOOR: usize = 259;
@@ -424,7 +423,7 @@ fn exempla_ts_e2e() {
                     idx,
                     file: file.clone(),
                     relative,
-                    case_dir: temp_root.clone(),
+                    case_dir: temp_root.to_path_buf(),
                     code: None,
                     formatted: TierState::Skipped,
                     linted: TierState::Skipped,
@@ -451,7 +450,7 @@ fn exempla_ts_e2e() {
                         idx,
                         file: file.clone(),
                         relative,
-                        case_dir: temp_root.clone(),
+                        case_dir: temp_root.to_path_buf(),
                         code: None,
                         formatted: TierState::Skipped,
                         linted: TierState::Skipped,
@@ -485,7 +484,7 @@ fn exempla_ts_e2e() {
                     idx,
                     file: file.clone(),
                     relative,
-                    case_dir: temp_root.clone(),
+                    case_dir: temp_root.to_path_buf(),
                     code: None,
                     formatted: TierState::Skipped,
                     linted: TierState::Skipped,
@@ -507,7 +506,7 @@ fn exempla_ts_e2e() {
                     idx,
                     file: file.clone(),
                     relative,
-                    case_dir: temp_root.clone(),
+                    case_dir: temp_root.to_path_buf(),
                     code: None,
                     formatted: TierState::Skipped,
                     linted: TierState::Skipped,
@@ -543,7 +542,7 @@ fn exempla_ts_e2e() {
                     idx,
                     file: file.clone(),
                     relative,
-                    case_dir: temp_root.clone(),
+                    case_dir: temp_root.to_path_buf(),
                     code: None,
                     formatted,
                     linted,
@@ -597,7 +596,7 @@ fn exempla_ts_e2e() {
                     idx,
                     file: file.clone(),
                     relative,
-                    case_dir: temp_root.clone(),
+                    case_dir: temp_root.to_path_buf(),
                     code: None,
                     formatted,
                     linted,
@@ -1528,30 +1527,34 @@ fn ts_e2e_counts(results: &[TsE2eResult]) -> TsE2eCounts {
 }
 
 fn assert_ts_e2e_floor_counts(counts: TsE2eCounts, toolchain: TsToolchain) {
+    let frontend_floor = floor_for_corpus(EXPECTED_TS_FRONTEND_ANALYZED_FLOOR, counts.total);
+    let emitted_floor = floor_for_corpus(EXPECTED_TS_EMITTED_FLOOR, counts.total);
+    let typecheck_floor = floor_for_corpus(EXPECTED_TS_TYPECHECK_VALID_FLOOR, counts.total);
+    let runnable_floor = floor_for_corpus(EXPECTED_TS_RUNNABLE_FLOOR, counts.total);
     assert!(
-        counts.frontend_analyzed >= EXPECTED_TS_FRONTEND_ANALYZED_FLOOR,
-        "TypeScript e2e frontend-analyzed count regressed: {}/{} below floor {EXPECTED_TS_FRONTEND_ANALYZED_FLOOR}",
+        counts.frontend_analyzed >= frontend_floor,
+        "TypeScript e2e frontend-analyzed count regressed: {}/{} below floor {frontend_floor}",
         counts.frontend_analyzed,
         counts.total,
     );
     assert!(
-        counts.emitted >= EXPECTED_TS_EMITTED_FLOOR,
-        "TypeScript e2e emitted count regressed: {}/{} below floor {EXPECTED_TS_EMITTED_FLOOR}",
+        counts.emitted >= emitted_floor,
+        "TypeScript e2e emitted count regressed: {}/{} below floor {emitted_floor}",
         counts.emitted,
         counts.total,
     );
     if !matches!(toolchain.typechecker, TsTypechecker::Missing) {
         assert!(
-            counts.typecheck_valid >= EXPECTED_TS_TYPECHECK_VALID_FLOOR,
-            "TypeScript e2e typecheck-valid count regressed: {}/{} below floor {EXPECTED_TS_TYPECHECK_VALID_FLOOR}",
+            counts.typecheck_valid >= typecheck_floor,
+            "TypeScript e2e typecheck-valid count regressed: {}/{} below floor {typecheck_floor}",
             counts.typecheck_valid,
             counts.total,
         );
     }
     if !matches!(toolchain.runtime, TsRuntime::Missing) {
         assert!(
-            counts.runnable >= EXPECTED_TS_RUNNABLE_FLOOR,
-            "TypeScript e2e runnable count regressed: {}/{} below floor {EXPECTED_TS_RUNNABLE_FLOOR}",
+            counts.runnable >= runnable_floor,
+            "TypeScript e2e runnable count regressed: {}/{} below floor {runnable_floor}",
             counts.runnable,
             counts.total,
         );

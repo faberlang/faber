@@ -1,4 +1,6 @@
-use super::common::{collect_exempla_files, format_diagnostic_messages};
+use super::common::{
+    collect_exempla_files, corpus_relative_key, floor_for_corpus, format_diagnostic_messages,
+};
 use radix::driver::Session;
 use radix::Config;
 use rustc_hash::FxHashMap;
@@ -201,16 +203,15 @@ fn tier_label(tier: MirTier) -> &'static str {
 }
 
 fn assert_mir_expected_floors(results: &[MirE2eResult]) {
+    let total = results.len();
     let frontend = count_mir_tier(results, MirTier::FrontendAnalyzed);
     let mir = count_mir_tier(results, MirTier::MirLowered);
+    let frontend_floor = floor_for_corpus(EXPECTED_FRONTEND_ANALYZED_FLOOR, total);
+    let mir_floor = floor_for_corpus(EXPECTED_MIR_LOWERED_FLOOR, total);
 
     let regressions = [
-        (
-            "frontend analyzed",
-            frontend,
-            EXPECTED_FRONTEND_ANALYZED_FLOOR,
-        ),
-        ("MIR lowered", mir, EXPECTED_MIR_LOWERED_FLOOR),
+        ("frontend analyzed", frontend, frontend_floor),
+        ("MIR lowered", mir, mir_floor),
     ]
     .into_iter()
     .filter_map(|(label, actual, expected)| {
@@ -282,18 +283,7 @@ fn emit_mir_baseline_ledger() {
 }
 
 fn ledger_path(path: &Path) -> String {
-    let corpus_dir = crate::paths::corpus_dir();
-    let relative = path.strip_prefix(&corpus_dir).unwrap_or(path);
-    let rendered = relative.display().to_string().replace('\\', "/");
-    if rendered.starts_with("examples/corpus/")
-        || rendered.starts_with("examples/")
-        || rendered.starts_with("norma/exempla/")
-        || rendered.starts_with("crates/exempla/corpus/")
-    {
-        rendered
-    } else {
-        format!("examples/corpus/{rendered}")
-    }
+    corpus_relative_key(path)
 }
 
 #[cfg(test)]

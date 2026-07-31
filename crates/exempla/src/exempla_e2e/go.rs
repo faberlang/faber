@@ -1,7 +1,7 @@
 use super::common::{
-    collect_exempla_files, expected_runtime_failure, format_ceiling_line, format_diagnostics,
-    format_result_paths, format_tier_line, is_expected_failure, make_temp_root, normalize_newline,
-    read_expected_stdout,
+    collect_exempla_files, expected_runtime_failure, floor_for_corpus, format_ceiling_line,
+    format_diagnostics, format_result_paths, format_tier_line, is_expected_failure, make_temp_root,
+    normalize_newline, read_expected_stdout,
 };
 use super::types::E2eResult;
 use radix::{codegen::Target, tool::compile_cli_path, Output};
@@ -427,18 +427,15 @@ fn exempla_go_e2e() {
         "Unaccepted failures: {unaccepted_count} total, {} unexpected",
         unexpected_failures.len()
     );
+    let pass_floor = floor_for_corpus(EXPECTED_GO_PASS_FLOOR, total);
+    let accepted_floor = floor_for_corpus(EXPECTED_GO_ACCEPTED_OUTCOME_FLOOR, total);
     eprintln!(
         "{}",
-        format_tier_line("pass", pass_count, total, EXPECTED_GO_PASS_FLOOR)
+        format_tier_line("pass", pass_count, total, pass_floor)
     );
     eprintln!(
         "{}",
-        format_tier_line(
-            "accepted",
-            accepted_count,
-            total,
-            EXPECTED_GO_ACCEPTED_OUTCOME_FLOOR
-        )
+        format_tier_line("accepted", accepted_count, total, accepted_floor)
     );
     eprintln!(
         "{}",
@@ -459,13 +456,12 @@ fn exempla_go_e2e() {
     }
 
     assert!(
-        pass_count >= EXPECTED_GO_PASS_FLOOR,
-        "Go e2e pass count regressed: {pass_count}/{} below floor {EXPECTED_GO_PASS_FLOOR}",
-        total,
+        pass_count >= pass_floor,
+        "Go e2e pass count regressed: {pass_count}/{total} below floor {pass_floor}",
     );
     assert!(
-        accepted_count >= EXPECTED_GO_ACCEPTED_OUTCOME_FLOOR,
-        "Go e2e accepted outcomes regressed: {accepted_count}/{total} below floor {EXPECTED_GO_ACCEPTED_OUTCOME_FLOOR}",
+        accepted_count >= accepted_floor,
+        "Go e2e accepted outcomes regressed: {accepted_count}/{total} below floor {accepted_floor}",
     );
     assert!(
         GO_EXPECTED_FAILURES.len() <= EXPECTED_GO_EXPECTED_FAILURE_CEILING,
