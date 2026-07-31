@@ -112,12 +112,96 @@ impl Drop for TempRoot {
     }
 }
 
+/// Cargo-managed temp root: `<target-dir>/tmp/`.
+///
+/// All E2E temp data must live under the cargo target tree so `cargo clean`
+/// sweeps it. Prefers `CARGO_TARGET_TMPDIR` (set by cargo for integration
+/// tests/benches/examples); otherwise derives `<target-dir>/tmp` from the
+/// running test binary's own path.
+///
+/// # Panics
+///
+/// Panics when neither source is available. There is deliberately no
+/// system-temp fallback: leaked test temp dirs in `/tmp` have filled operator
+/// disk before, so a test that cannot reach its managed root must die fast.
+pub(crate) fn cargo_managed_temp_root() -> PathBuf {
+    let root = if let Some(dir) = std::env::var_os("CARGO_TARGET_TMPDIR") {
+        PathBuf::from(dir)
+    } else if let Ok(exe) = std::env::current_exe() {
+        // <target-dir>/<profile>/deps/<crate>-<hash> → <target-dir>/tmp
+        let under_deps_dir = exe
+            .parent()
+            .and_then(|p| p.file_name())
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| matches!(name, "deps" | "examples" | "benches"));
+        if under_deps_dir {
+            if let Some(target) = exe.parent().and_then(Path::parent).and_then(Path::parent) {
+                target.join("tmp")
+            } else {
+                panic!(
+                    "cargo_managed_temp_root: cannot walk up to the target dir from {}",
+                    exe.display()
+                );
+            }
+        } else {
+            panic!(
+                "cargo_managed_temp_root: test binary {} is not running from \
+                 target/<profile>/deps|examples|benches",
+                exe.display()
+            );
+        }
+    } else {
+        panic!("cargo_managed_temp_root: cannot resolve the test binary path");
+    };
+    fs::create_dir_all(&root)
+        .unwrap_or_else(|err| panic!("cargo_managed_temp_root: create {root:?}: {err}"));
+    root
+}
+
+/// Remove stale `prefix`-named entries under the managed temp root, once per
+/// process per prefix. Recovers dirs orphaned by crashed/killed test runs;
+/// `cargo clean` is the primary sweep and this is the safety net for abnormal
+/// termination (entries older than 24h).
+fn sweep_managed_temp(prefix: &str) {
+    static SWEPT: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+    let mut swept = SWEPT.lock().expect("sweep lock");
+    if swept.iter().any(|p| p == prefix) {
+        return;
+    }
+    swept.push(prefix.to_owned());
+    drop(swept); // do filesystem work outside the lock
+
+    let Ok(entries) = fs::read_dir(cargo_managed_temp_root()) else {
+        return;
+    };
+    let max_age = Duration::from_hours(24);
+    for entry in entries.flatten() {
+        let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
+            continue;
+        };
+        if !name.starts_with(prefix) {
+            continue;
+        }
+        let stale = entry
+            .metadata()
+            .and_then(|meta| meta.modified())
+            .ok()
+            .and_then(|modified| modified.elapsed().ok())
+            .is_some_and(|age| age > max_age);
+        if stale {
+            let _ = fs::remove_dir_all(entry.path());
+        }
+    }
+}
+
 pub(crate) fn make_temp_root() -> TempRoot {
+    sweep_managed_temp("radix-rs-e2e-");
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0);
-    let dir = std::env::temp_dir().join(format!("radix-rs-e2e-{}-{nanos}", std::process::id()));
+    let dir =
+        cargo_managed_temp_root().join(format!("radix-rs-e2e-{}-{nanos}", std::process::id()));
     fs::create_dir_all(&dir).expect("create e2e temp root");
     TempRoot::new(dir)
 }
