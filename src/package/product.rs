@@ -1284,6 +1284,16 @@ fn emit_library_typescript_modules(
     // Prefer the real CLI binary (not the cargo test harness binary).
     let faber_bin = resolve_faber_cli_binary();
 
+    // Pass 1: emit all library TS files into memory.
+    // We need all files emitted before augmenting imports so cross-module
+    // type references can be resolved.
+    struct EmittedLibFile {
+        ts_path: PathBuf,
+        stem: String,
+        code: String,
+    }
+    let mut emitted: Vec<EmittedLibFile> = Vec::new();
+
     for pkg in index.values() {
         if pkg.kind != "lib" || pkg.target_language != "ts" {
             continue;
@@ -1351,17 +1361,82 @@ fn emit_library_typescript_modules(
                 continue;
             }
             let code = String::from_utf8_lossy(&output.stdout).to_string();
-            // Phase 3: apply emit-defect fixes before namespace wrapping.
-            let code = apply_library_emit_fixes(code);
-            let code = wrap_module_exports(code, stem);
-            // Phase 4: rewrite library specifier imports to relative ESM paths.
-            let code = rewrite_library_imports(code, library_imports);
-            let code = rewrite_relative_import_extensions(code);
-            fs::write(&ts_path, code).map_err(|err| io_diag(&ts_path, err))?;
+            emitted.push(EmittedLibFile { ts_path, stem: stem.to_owned(), code });
         }
     }
 
+    // Pass 2: build namespace export map from emitted files.
+    // Each library module's raw declarations become its namespace exports.
+    // Other files that import that module namespace need the individual type
+    // names added to the import statement.
+    let mut namespace_exports: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for file in &emitted {
+        let exports = collect_ts_bare_decl_names(&file.code);
+        namespace_exports
+            .entry(file.stem.clone())
+            .or_default()
+            .extend(exports);
+    }
+
+    // Pass 3: write each file with import augmentation applied.
+    for file in &emitted {
+        // Phase 3: apply emit-defect fixes before namespace wrapping.
+        let code = apply_library_emit_fixes(file.code.clone());
+        let code = wrap_module_exports(code, &file.stem);
+        // Augment namespace imports with named type exports so TypeScript
+        // can resolve cross-module type references (e.g. Vector3 from math).
+        let local_names = collect_ts_local_decl_names(&code);
+        let code = augment_namespace_imports(code, &namespace_exports, &local_names);
+        // Phase 4: rewrite library specifier imports to relative ESM paths.
+        let code = rewrite_library_imports(code, library_imports);
+        let code = rewrite_relative_import_extensions(code);
+        fs::write(&file.ts_path, code).map_err(|err| io_diag(&file.ts_path, err))?;
+    }
+
     Ok(())
+}
+
+/// Collect top-level declaration names from raw TS codegen output.
+/// Only matches declarations at indent level 0 (no leading whitespace).
+/// The subprocess emit does not add `export` keywords — those are added
+/// later by `wrap_module_exports`.
+fn collect_ts_bare_decl_names(code: &str) -> Vec<String> {
+    let mut names = Vec::new();
+    for line in code.lines() {
+        // Only top-level declarations (no leading whitespace).
+        if line.chars().next().is_some_and(|c| c.is_whitespace()) {
+            continue;
+        }
+        for prefix in &["class ", "function ", "enum ", "interface ", "type "] {
+            if let Some(rest) = line.strip_prefix(prefix) {
+                let name = rest
+                    .split(|c: char| !c.is_alphanumeric() && c != '_')
+                    .next()
+                    .unwrap_or("");
+                if !name.is_empty() {
+                    names.push(name.to_owned());
+                }
+            }
+        }
+    }
+    names
+}
+
+/// Collect top-level declaration names from emitted TS code.
+fn collect_ts_local_decl_names(code: &str) -> BTreeSet<String> {
+    let mut names = BTreeSet::new();
+    for line in code.lines() {
+        let trimmed = line.trim_start();
+        for prefix in &["export class ", "export function ", "export enum ", "export interface ", "export type ", "export const "] {
+            if let Some(rest) = trimmed.strip_prefix(prefix) {
+                let name = rest.split(|c: char| !c.is_alphanumeric() && c != '_').next().unwrap_or("");
+                if !name.is_empty() {
+                    names.insert(name.to_owned());
+                }
+            }
+        }
+    }
+    names
 }
 
 /// Parsed `[target.ts]` binding manifest for a TS library package.
