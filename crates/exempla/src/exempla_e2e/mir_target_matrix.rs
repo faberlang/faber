@@ -59,11 +59,14 @@ const KNOWN_SCENA_STRUCTURAL_RUN_MISMATCHES: [(&str, &str); 3] = [
 ];
 const TARGET_CAPABLE_FLOORS: [(MirCoverageTarget, usize); 8] = [
     (MirCoverageTarget::LlvmText, 250),
-    // Stage 1 of the MIR lane usability campaign exposed existing Wasm/WAT
-    // floor drift after the LLVM floor recovered. Stage 4 owns the import/type
-    // floor burn-up; do not lower these again without a new counted debt row.
-    (MirCoverageTarget::WasmText, 203),
-    (MirCoverageTarget::Wasm, 201),
+    // Re-based 2026-07-31 (counted debt row): mir-wasm CPU host ABI v1
+    // remainder dispositions (`5c43df226` R2+R3) tightened the wasm lane —
+    // wasm-text/wasm capable fell 203→186 / 201→186. The EBNF matrix
+    // remeasure records the same drift (wasm-text 210→198 capable). The
+    // wasm lane usability campaign owns the burn-up; do not lower again
+    // without a new counted debt row.
+    (MirCoverageTarget::WasmText, 186),
+    (MirCoverageTarget::Wasm, 186),
     (MirCoverageTarget::MetalText, 6),
     (MirCoverageTarget::WgslText, 6),
     (MirCoverageTarget::SexpStructural, 193),
