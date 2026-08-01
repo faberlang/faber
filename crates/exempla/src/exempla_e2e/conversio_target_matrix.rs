@@ -1,4 +1,4 @@
-//! Conversio (`↦`) coverage matrix harness.
+//! Conversio (`↦`) coverage matrix harness (measured).
 //!
 //! The conversio analog of [`hir_target_matrix`] and [`mir_target_matrix`]. The
 //! universe is the type-family cartesian product (not the exempla corpus), so
@@ -7,20 +7,43 @@
 //! verdict as TSV. `scripta/generate-conversio-matrix.py` renders that TSV into
 //! `CONVERSIO_MATRIX.md`.
 //!
-//! Same honesty scope as the HIR/MIR target matrices: the classifier predicts
-//! dispatch tiers without emitting code. Drift risk mirrors
-//! `classify_hir_coverage`; non-regression floors land once the first green
-//! baseline is committed (goal "Later" phase).
+//! ## Measured, not predicted
+//!
+//! Since Phase 2 the harness measures fixture-backed cells instead of trusting
+//! the hand classifier:
+//!
+//! - `✕` comes from the real frontend ([`analyze_source`]) over the authored
+//!   `examples/conversio-matrix/<src>/<tgt>.fab` (the first error issue code is
+//!   captured).
+//! - MIR `✓`/`—` comes from [`classify_mir_coverage`] on the real lowered
+//!   fixture (per MIR target).
+//! - HIR `✓`/`◐` comes from **emit-arm detection**: each HIR backend records
+//!   which conversio arm handled the conversion during real emission
+//!   ([`conversio_arm`](radix::codegen::conversio_arm)); a fallback hit on the
+//!   cell's family pair means `◐`, a dedicated arm means `✓`.
+//!
+//! Cells without an authored fixture remain classifier predictions (plain
+//! glyphs in the matrix). Measured-vs-predicted disagreements are surfaced in
+//! the harness report (the hand classifier is kept as a cross-check oracle).
 
+use radix::codegen::conversio_arm::{conversio_arm_clear, conversio_arm_take, ConversioArm};
 use radix::codegen::conversio_coverage::{
     classify_conversio_coverage, ConversioCoverageTarget, ConversioTypeFamily,
 };
-use radix::driver::{analyze_source, Config, Session};
+use radix::codegen::generate_rust_from_analyzed;
+use radix::driver::{analyze_source, AnalyzedUnit, Config, Session};
 use radix::mir::{
     classify_mir_coverage, device_roles_from_hir, lower_analyzed_unit_with_context,
-    MirCoverageTarget, MirDeviceContext,
+    Lowerability, LoweredMirUnit, MirCoverageTarget, MirDeviceContext,
 };
+use rustc_hash::FxHashMap;
 use std::path::PathBuf;
+
+/// HIR backends measured via emit-arm detection (in column order).
+const HIR_MEASURED_TARGETS: [ConversioCoverageTarget; 1] = [ConversioCoverageTarget::Rust];
+
+/// MIR targets measured via `classify_mir_coverage` on the lowered fixture.
+const MIR_MEASURED_TARGETS: [ConversioCoverageTarget; 1] = [ConversioCoverageTarget::WasmText];
 
 /// Resolve the conversio-matrix fixture root (`examples/conversio-matrix/`).
 fn fixture_root() -> PathBuf {
@@ -31,42 +54,325 @@ fn fixture_root() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("conversio-matrix"))
 }
 
-/// One measured frontend outcome for a fixture.
-struct Outcome {
-    path: PathBuf,
-    accepted: bool,
-    issues: Vec<String>,
+/// Measured verdict for one (src, tgt, target) fixture-backed cell.
+#[derive(Debug, Clone)]
+enum MeasuredVerdict {
+    /// ✕ — the frontend rejected the fixture (issue code captured).
+    FrontendRejected { issue: String },
+    /// ✓ / — the MIR probe on the lowered fixture.
+    Mir { capable: bool, gap: Option<String> },
+    /// ✓ — a dedicated HIR arm handled the cell's conversion.
+    HirDedicated,
+    /// ◐ — the HIR unspecialized fallback handled the cell's conversion.
+    HirFallback,
+    /// — HIR codegen rejected the fixture outright (e.g. Go `intervallum`).
+    HirCodegenError { message: String },
+    /// No arm record matched the cell's family pair — falls back to the
+    /// classifier prediction (attribution gap, reported in the detail).
+    NoArmRecord,
 }
 
-fn measure_fixture(session: &Session, path: &std::path::Path) -> Outcome {
-    let source = std::fs::read_to_string(path).unwrap_or_else(|e| format!("# read error: {e}"));
-    let name = path.display().to_string();
-    let issues = match analyze_source(session, &name, &source) {
-        Ok(unit) => unit
-            .diagnostics
-            .iter()
-            .filter(|d| d.is_error())
-            .filter_map(|d| d.issue().map(|s| s.to_owned()))
-            .collect::<Vec<_>>(),
-        Err(diagnostics) => diagnostics
-            .iter()
-            .filter(|d| d.is_error())
-            .filter_map(|d| d.issue().map(|s| s.to_owned()))
-            .collect::<Vec<_>>(),
+impl MeasuredVerdict {
+    /// Stable tier name used in the ROWS TSV (mirrors `ConversioCoverage::name`).
+    fn tier_name(&self) -> &'static str {
+        match self {
+            Self::FrontendRejected { .. } => "rejected",
+            Self::Mir { capable: true, .. } => "dedicated",
+            Self::Mir { capable: false, .. } => "not-emitted",
+            Self::HirDedicated => "dedicated",
+            Self::HirFallback => "fallback",
+            Self::HirCodegenError { .. } => "not-emitted",
+            Self::NoArmRecord => "predicted",
+        }
+    }
+
+    /// One-line machine-readable detail for the MEASURED section.
+    fn detail(&self) -> String {
+        match self {
+            Self::FrontendRejected { issue } => format!("frontend:{issue}"),
+            Self::Mir { capable: true, .. } => "mir-capable".to_owned(),
+            Self::Mir { capable: false, gap } => {
+                format!("mir-gap:{}", gap.as_deref().unwrap_or("unknown"))
+            }
+            Self::HirDedicated => "arm:dedicated".to_owned(),
+            Self::HirFallback => "arm:fallback".to_owned(),
+            Self::HirCodegenError { message } => format!("codegen-error:{message}"),
+            Self::NoArmRecord => "no-arm-record".to_owned(),
+        }
+    }
+}
+
+/// Per-cell measurement state.
+struct CellMeasurement {
+    src: ConversioTypeFamily,
+    tgt: ConversioTypeFamily,
+    fixture: Option<PathBuf>,
+    targets: FxHashMap<ConversioCoverageTarget, MeasuredVerdict>,
+}
+
+fn measure_all_cells(session: &Session) -> Vec<CellMeasurement> {
+    let root = fixture_root();
+    let mut cells = Vec::new();
+    for &src in ConversioTypeFamily::ALL {
+        for &tgt in ConversioTypeFamily::ALL {
+            let path = root.join(src.name()).join(format!("{}.fab", tgt.name()));
+            let fixture = path.is_file().then_some(path);
+            cells.push(CellMeasurement {
+                src,
+                tgt,
+                fixture,
+                targets: FxHashMap::default(),
+            });
+        }
+    }
+    for cell in cells.iter_mut().filter(|cell| cell.fixture.is_some()) {
+        measure_cell(session, cell);
+    }
+    cells
+}
+
+fn measure_cell(session: &Session, cell: &mut CellMeasurement) {
+    let path = cell.fixture.as_ref().expect("fixture-backed cell");
+    let source = match std::fs::read_to_string(path) {
+        Ok(source) => source,
+        Err(error) => {
+            for &target in ConversioCoverageTarget::ALL {
+                cell.targets.insert(
+                    target,
+                    MeasuredVerdict::HirCodegenError {
+                        message: format!("cannot read fixture: {error}"),
+                    },
+                );
+            }
+            return;
+        }
     };
-    Outcome {
-        path: path.to_path_buf(),
-        accepted: issues.is_empty(),
-        issues,
+    let name = path.display().to_string();
+
+    let mut analysis = match analyze_source(session, &name, &source) {
+        Ok(unit) => unit,
+        Err(diagnostics) => {
+            let issue = first_issue(&diagnostics);
+            for &target in ConversioCoverageTarget::ALL {
+                cell.targets.insert(target, MeasuredVerdict::FrontendRejected { issue: issue.clone() });
+            }
+            return;
+        }
+    };
+    if analysis.diagnostics.iter().any(|d| d.is_error()) {
+        let issue = first_issue(&analysis.diagnostics);
+        for &target in ConversioCoverageTarget::ALL {
+            cell.targets.insert(target, MeasuredVerdict::FrontendRejected { issue: issue.clone() });
+        }
+        return;
+    }
+
+    // HIR targets first: emit-arm detection borrows the analysis immutably.
+    for &target in &HIR_MEASURED_TARGETS {
+        let verdict = measure_hir_target(target, &analysis, cell.src, cell.tgt);
+        cell.targets.insert(target, verdict);
+    }
+
+    // MIR targets: lower once, classify per target.
+    let device_roles = device_roles_from_hir(&analysis.hir);
+    let lowered = match lower_analyzed_unit_with_context(&mut analysis) {
+        Ok(lowered) => lowered,
+        Err(errors) => {
+            let shape = errors
+                .first()
+                .map_or_else(|| "mir lowering failed".to_owned(), |error| error.issue.clone());
+            for &target in &MIR_MEASURED_TARGETS {
+                cell.targets.insert(target, MeasuredVerdict::Mir { capable: false, gap: Some(shape.clone()) });
+            }
+            return;
+        }
+    };
+    let mut device = MirDeviceContext::from_hir_roles(device_roles);
+    device.attach_program(&lowered.program);
+    for &target in &MIR_MEASURED_TARGETS {
+        let verdict = measure_mir_target(target, &lowered, &device);
+        cell.targets.insert(target, verdict);
+    }
+}
+
+fn first_issue(diagnostics: &[radix::Diagnostic]) -> String {
+    diagnostics
+        .iter()
+        .filter(|d| d.is_error())
+        .find_map(|d| d.issue().map(str::to_owned))
+        .unwrap_or_else(|| "semantic_error".to_owned())
+}
+
+/// Run the backend's real codegen with the emit-arm probe armed, then
+/// attribute the recorded arms to the cell's family pair.
+fn measure_hir_target(
+    target: ConversioCoverageTarget,
+    analysis: &AnalyzedUnit,
+    src: ConversioTypeFamily,
+    tgt: ConversioTypeFamily,
+) -> MeasuredVerdict {
+    match target {
+        ConversioCoverageTarget::Rust => {
+            conversio_arm_clear();
+            let result = generate_rust_from_analyzed(analysis);
+            let records = conversio_arm_take();
+            match result {
+                Err(error) => MeasuredVerdict::HirCodegenError { message: error.message },
+                Ok(_) => {
+                    let mut saw_cell_conversio = false;
+                    for record in records {
+                        let record_src = record
+                            .source_ty
+                            .and_then(|id| ConversioTypeFamily::from_type_id(&analysis.types, id));
+                        let record_tgt = record
+                            .target_ty
+                            .and_then(|id| ConversioTypeFamily::from_type_id(&analysis.types, id));
+                        if record_src != Some(src) || record_tgt != Some(tgt) {
+                            continue;
+                        }
+                        saw_cell_conversio = true;
+                        if record.arm == ConversioArm::Fallback {
+                            return MeasuredVerdict::HirFallback;
+                        }
+                    }
+                    if saw_cell_conversio {
+                        MeasuredVerdict::HirDedicated
+                    } else {
+                        MeasuredVerdict::NoArmRecord
+                    }
+                }
+            }
+        }
+        _ => MeasuredVerdict::NoArmRecord,
+    }
+}
+
+/// Classify the lowered fixture against one MIR target.
+fn measure_mir_target(
+    target: ConversioCoverageTarget,
+    lowered: &LoweredMirUnit<'_>,
+    device: &MirDeviceContext,
+) -> MeasuredVerdict {
+    let mir_target = match target {
+        ConversioCoverageTarget::WasmText => MirCoverageTarget::WasmText,
+        _ => return MeasuredVerdict::NoArmRecord,
+    };
+    let verdict = classify_mir_coverage(
+        mir_target,
+        &lowered.validated,
+        device,
+        &lowered.interner,
+    );
+    match verdict {
+        Lowerability::Capable => MeasuredVerdict::Mir { capable: true, gap: None },
+        Lowerability::Rejected(gaps) => MeasuredVerdict::Mir {
+            capable: false,
+            gap: gaps.first().map(|gap| gap.shape().to_owned()),
+        },
+    }
+}
+
+/// Resolve the effective verdict for a cell × target: measured for
+/// fixture-backed cells, classifier prediction otherwise. `NoArmRecord` (an
+/// accepted fixture whose conversion never reached the instrumented emit
+/// path — e.g. a literal-source fold) falls back to the classifier prediction
+/// with the attribution gap surfaced in the measured detail.
+fn effective_verdict(
+    cell: &CellMeasurement,
+    target: ConversioCoverageTarget,
+) -> (String, String) {
+    if let Some(measured) = cell.targets.get(&target) {
+        if !matches!(measured, MeasuredVerdict::NoArmRecord) {
+            return (measured.tier_name().to_owned(), measured.detail());
+        }
+        let predicted = classify_conversio_coverage(cell.src, cell.tgt, target);
+        return (predicted.name().to_owned(), measured.detail());
+    }
+    let predicted = classify_conversio_coverage(cell.src, cell.tgt, target);
+    (predicted.name().to_owned(), "predicted".to_owned())
+}
+
+/// Emit machine-readable rows for the renderer (`ROWS` section).
+///
+/// One row per (src, tgt, target): `src<TAB>tgt<TAB>target<TAB>verdict`, where
+/// fixture-backed cells carry the **measured** verdict and the rest carry the
+/// classifier prediction. Followed by `MEASURED` (measured detail per
+/// fixture-backed cell × target) and `DISAGREEMENTS` (measured-vs-predicted
+/// mismatches).
+///
+/// ```text
+/// cargo test -p exempla --lib emit_conversio_target_matrix -- --ignored --nocapture
+/// ```
+#[test]
+#[ignore = "maintenance conversio matrix emit; run: cargo test -p exempla --lib emit_conversio_target_matrix -- --ignored --nocapture"]
+fn emit_conversio_target_matrix() {
+    let session = Session::new(Config::default());
+    let cells = measure_all_cells(&session);
+
+    // Leading newline keeps the ROWS marker on its own line when libtest has
+    // already printed `test … ` without a trailing newline under --nocapture.
+    print!("\n");
+    println!("ROWS");
+    for cell in &cells {
+        for &target in ConversioCoverageTarget::ALL {
+            let (verdict, _detail) = effective_verdict(cell, target);
+            println!(
+                "{}\t{}\t{}\t{}",
+                cell.src.name(),
+                cell.tgt.name(),
+                target.name(),
+                verdict
+            );
+        }
+    }
+
+    println!("MEASURED");
+    for cell in &cells {
+        if cell.fixture.is_none() {
+            continue;
+        }
+        for &target in ConversioCoverageTarget::ALL {
+            if let Some(measured) = cell.targets.get(&target) {
+                println!(
+                    "{}\t{}\t{}\t{}\t{}",
+                    cell.src.name(),
+                    cell.tgt.name(),
+                    target.name(),
+                    measured.tier_name(),
+                    measured.detail()
+                );
+            }
+        }
+    }
+
+    println!("DISAGREEMENTS");
+    for cell in &cells {
+        if cell.fixture.is_none() {
+            continue;
+        }
+        for &target in ConversioCoverageTarget::ALL {
+            if let Some(measured) = cell.targets.get(&target) {
+                let predicted = classify_conversio_coverage(cell.src, cell.tgt, target).name();
+                if measured.tier_name() != predicted {
+                    println!(
+                        "{}\t{}\t{}\t{}\t{}\t{}",
+                        cell.src.name(),
+                        cell.tgt.name(),
+                        target.name(),
+                        predicted,
+                        measured.tier_name(),
+                        measured.detail()
+                    );
+                }
+            }
+        }
     }
 }
 
 /// Evaluation experiment: run the real frontend over the sample fixtures,
 /// then lower accepted fixtures to MIR and run the real `wasm-text` emitter
-/// to measure the MIR `✓`/`—` tier from real artifacts.
-///
-/// Proves the full measurement loop (✕ via frontend, ✓/— via real emit) before
-/// scaling to the full family cartesian product.
+/// to measure the MIR `✓`/`—` tier from real artifacts, plus Rust emit-arm
+/// detection for the HIR `✓`/`◐` tier.
 ///
 /// ```text
 /// cargo test -p exempla --lib conversio_matrix_eval_experiment -- --ignored --nocapture
@@ -77,86 +383,40 @@ fn conversio_matrix_eval_experiment() {
     let session = Session::new(Config::default());
     let root = fixture_root();
     let samples = [
-        "numerus/fractus.fab",
-        "fractus/numerus.fab",
-        "textus/ascii.fab",
-        "numerus/octeti.fab",
+        ("numerus", "fractus"),
+        ("fractus", "numerus"),
+        ("textus", "ascii"),
+        ("numerus", "octeti"),
+        ("instans", "textus"),
+        ("modulus", "numerus"),
     ];
     println!(
         "conversio-matrix evaluation experiment (root: {})",
         root.display()
     );
-    for rel in samples {
-        let path = root.join(rel);
-        let outcome = measure_fixture(&session, &path);
-        if !outcome.accepted {
-            println!("  {:<24} ✕ REJECTED   issues={:?}", rel, outcome.issues);
-            continue;
-        }
-        let mir_tier = measure_wasm_text(&session, &path);
-        println!("  {:<24} accepted    wasm-text={}", rel, mir_tier);
+    for (src, tgt) in samples {
+        let path = root.join(src).join(format!("{tgt}.fab"));
+        let mut cell = CellMeasurement {
+            src: family_named(src),
+            tgt: family_named(tgt),
+            fixture: Some(path),
+            targets: FxHashMap::default(),
+        };
+        measure_cell(&session, &mut cell);
+        let rows: Vec<String> = cell
+            .targets
+            .iter()
+            .map(|(target, verdict)| format!("{}={}", target.name(), verdict.tier_name()))
+            .collect();
+        println!("  {src:>10} ↦ {tgt:<10} {}", rows.join("  "));
     }
     println!("done");
 }
 
-/// Lower an accepted fixture to MIR and run the real wasm-text probe.
-/// Returns the measured MIR tier: `✓` (probe emitted) or `—` (probe errored).
-fn measure_wasm_text(session: &Session, path: &std::path::Path) -> &'static str {
-    let source = match std::fs::read_to_string(path) {
-        Ok(s) => s,
-        Err(_) => return "— (read failed)",
-    };
-    let name = path.display().to_string();
-    let mut analysis = match analyze_source(session, &name, &source) {
-        Ok(unit) if !unit.diagnostics.iter().any(|d| d.is_error()) => unit,
-        _ => return "— (frontend rejected)",
-    };
-    let device_roles = device_roles_from_hir(&analysis.hir);
-    let lowered = match lower_analyzed_unit_with_context(&mut analysis) {
-        Ok(l) => l,
-        Err(_) => return "— (mir lowering failed)",
-    };
-    let mut device = MirDeviceContext::from_hir_roles(device_roles);
-    device.attach_program(&lowered.program);
-    let verdict = classify_mir_coverage(
-        MirCoverageTarget::WasmText,
-        &lowered.validated,
-        &device,
-        &lowered.interner,
-    );
-    if verdict.is_capable() {
-        "✓"
-    } else {
-        "—"
-    }
-}
-
-/// Emit machine-readable rows for the renderer (`ROWS` section).
-///
-/// One row per (src, tgt, target): `src<TAB>tgt<TAB>target<TAB>verdict`.
-///
-/// ```text
-/// cargo test -p exempla --lib emit_conversio_target_matrix -- --ignored --nocapture
-/// ```
-#[test]
-#[ignore = "maintenance conversio matrix emit; run: cargo test -p exempla --lib emit_conversio_target_matrix -- --ignored --nocapture"]
-fn emit_conversio_target_matrix() {
-    // Leading newline keeps the ROWS marker on its own line when libtest has
-    // already printed `test … ` without a trailing newline under --nocapture.
-    print!("\n");
-    println!("ROWS");
-    for &src in ConversioTypeFamily::ALL {
-        for &tgt in ConversioTypeFamily::ALL {
-            for &target in ConversioCoverageTarget::ALL {
-                let verdict = classify_conversio_coverage(src, tgt, target);
-                println!(
-                    "{}\t{}\t{}\t{}",
-                    src.name(),
-                    tgt.name(),
-                    target.name(),
-                    verdict.name()
-                );
-            }
-        }
-    }
+fn family_named(name: &str) -> ConversioTypeFamily {
+    ConversioTypeFamily::ALL
+        .iter()
+        .copied()
+        .find(|family| family.name() == name)
+        .expect("known family")
 }
