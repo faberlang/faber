@@ -514,8 +514,7 @@ fn exempla_rust_e2e() {
         stale_known_failures.join(", ")
     );
     assert_eq!(
-        known_failure_count,
-        applicable_known_failures,
+        known_failure_count, applicable_known_failures,
         "Rust e2e failure ledger does not match observed failures for files present in this corpus"
     );
 }

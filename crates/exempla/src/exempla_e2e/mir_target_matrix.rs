@@ -370,11 +370,7 @@ fn assert_matrix_ratchet(rows: &[MirTargetMatrixRow]) {
     for (target, floor) in TARGET_CAPABLE_FLOORS {
         // Sparse backend floors (e.g. metal=6) are meaningless on a tiny scaffold.
         // Enforce them only once the corpus is large enough for the global MIR floor.
-        let target_floor = if total < MIR_CAPABLE_FLOOR {
-            0
-        } else {
-            floor
-        };
+        let target_floor = if total < MIR_CAPABLE_FLOOR { 0 } else { floor };
         let capable = rows
             .iter()
             .filter(|row| row.mir_capable && target_capable(&row.targets, target))

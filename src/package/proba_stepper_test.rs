@@ -3,7 +3,9 @@
 //! Proves `faber test` definition: MIR interpretation, not Cargo/Rust harness.
 
 use super::test_support::test_temp_dir;
-use super::{analyze_package, analyze_package_for_tests, load_package, load_package_with_reader_pack};
+use super::{
+    analyze_package, analyze_package_for_tests, load_package, load_package_with_reader_pack,
+};
 use super::{discover_package, library_resolver_from_config};
 use radix::driver::{Config, Session};
 use radix::proba::{run_proba_source, CaseOutcome, TestSelection};
@@ -120,11 +122,9 @@ proba "math ok" {
     let spec = discover_package(dir.path()).expect("discover");
     let resolver = library_resolver_from_config(&config);
     let files = load_package(&spec, &resolver).expect("load");
-    assert!(
-        files
-            .iter()
-            .all(|f| f.path.extension().and_then(|e| e.to_str()) != Some("proba"))
-    );
+    assert!(files
+        .iter()
+        .all(|f| f.path.extension().and_then(|e| e.to_str()) != Some("proba")));
     let test_files =
         load_package_with_reader_pack(&spec, &resolver, None, true, None).expect("load tests");
     assert!(test_files
@@ -152,7 +152,11 @@ proba "identity holds" {
 
     let mut package =
         analyze_package_for_tests(&Config::default(), dir.path(), None).expect("analyze");
-    assert!(package.diagnostics.iter().all(|d| !d.is_error()), "{:?}", package.diagnostics);
+    assert!(
+        package.diagnostics.iter().all(|d| !d.is_error()),
+        "{:?}",
+        package.diagnostics
+    );
 
     let mut any = false;
     for unit in &mut package.units {

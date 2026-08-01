@@ -1361,7 +1361,11 @@ fn emit_library_typescript_modules(
                 continue;
             }
             let code = String::from_utf8_lossy(&output.stdout).to_string();
-            emitted.push(EmittedLibFile { ts_path, stem: stem.to_owned(), code });
+            emitted.push(EmittedLibFile {
+                ts_path,
+                stem: stem.to_owned(),
+                code,
+            });
         }
     }
 
@@ -1427,9 +1431,19 @@ fn collect_ts_local_decl_names(code: &str) -> BTreeSet<String> {
     let mut names = BTreeSet::new();
     for line in code.lines() {
         let trimmed = line.trim_start();
-        for prefix in &["export class ", "export function ", "export enum ", "export interface ", "export type ", "export const "] {
+        for prefix in &[
+            "export class ",
+            "export function ",
+            "export enum ",
+            "export interface ",
+            "export type ",
+            "export const ",
+        ] {
             if let Some(rest) = trimmed.strip_prefix(prefix) {
-                let name = rest.split(|c: char| !c.is_alphanumeric() && c != '_').next().unwrap_or("");
+                let name = rest
+                    .split(|c: char| !c.is_alphanumeric() && c != '_')
+                    .next()
+                    .unwrap_or("");
                 if !name.is_empty() {
                     names.insert(name.to_owned());
                 }

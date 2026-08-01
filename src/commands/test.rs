@@ -257,4 +257,3 @@ fn print_run_error(error: &radix::mir::RunSourceError) {
         }
     }
 }
-

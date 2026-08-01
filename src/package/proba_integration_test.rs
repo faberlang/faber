@@ -86,13 +86,7 @@ probandum "helpers" {
     let files = load_package_with_reader_pack(&spec, &resolver, None, true, None).expect("load");
     let names: Vec<_> = files
         .iter()
-        .map(|f| {
-            f.path
-                .file_name()
-                .unwrap()
-                .to_string_lossy()
-                .into_owned()
-        })
+        .map(|f| f.path.file_name().unwrap().to_string_lossy().into_owned())
         .collect();
     assert!(
         names.contains(&"helpers.fab".to_owned()),
@@ -125,13 +119,7 @@ fn load_without_include_proba_skips_sibling_proba() {
     let files = load_package(&spec, &resolver).expect("load");
     let names: Vec<_> = files
         .iter()
-        .map(|f| {
-            f.path
-                .file_name()
-                .unwrap()
-                .to_string_lossy()
-                .into_owned()
-        })
+        .map(|f| f.path.file_name().unwrap().to_string_lossy().into_owned())
         .collect();
     assert!(names.contains(&"helpers.fab".to_owned()));
     assert!(
@@ -165,7 +153,9 @@ fn single_file_proba_entry_fails_closed_outside_test_path() {
         err.iter()
             .any(|d| diagnostic_has_issue(d, "proba_source_build_forbidden")),
         "expected proba_source_build_forbidden, got {:?}",
-        err.iter().map(|d| (&d.message, d.issue())).collect::<Vec<_>>()
+        err.iter()
+            .map(|d| (&d.message, d.issue()))
+            .collect::<Vec<_>>()
     );
 }
 
@@ -195,7 +185,9 @@ fn product_fab_cannot_import_proba() {
         err.iter()
             .any(|d| diagnostic_has_issue(d, "proba_import_forbidden")),
         "expected proba_import_forbidden: {:?}",
-        err.iter().map(|d| (&d.message, d.issue())).collect::<Vec<_>>()
+        err.iter()
+            .map(|d| (&d.message, d.issue()))
+            .collect::<Vec<_>>()
     );
     assert!(
         err.iter().any(|d| d.message.contains(PROBA_IMPORT_MESSAGE)),
@@ -233,7 +225,9 @@ probandum "b" { proba "use a" { adfirma a.shared() ≡ 1 } }
             .any(|d| diagnostic_has_issue(d, "proba_import_forbidden")
                 && d.message.contains(PROBA_IMPORT_MESSAGE)),
         "expected proba_import_forbidden with required text: {:?}",
-        err.iter().map(|d| (&d.message, d.issue())).collect::<Vec<_>>()
+        err.iter()
+            .map(|d| (&d.message, d.issue()))
+            .collect::<Vec<_>>()
     );
 }
 

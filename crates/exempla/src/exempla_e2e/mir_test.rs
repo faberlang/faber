@@ -61,8 +61,5 @@ fn ledger_path_renders_corpus_relative_path() {
     let path = crate::paths::corpus_dir()
         .join("incipit")
         .join("salve-munde.fab");
-    assert_eq!(
-        ledger_path(&path),
-        "incipit/salve-munde.fab"
-    );
+    assert_eq!(ledger_path(&path), "incipit/salve-munde.fab");
 }

@@ -158,7 +158,9 @@ fn tensor_workload_proof_selects_rung2_device_relu() {
     assert!(row.evidence.contains("workgroupBarrier"));
     assert!(row.evidence.contains("05a47f864"));
     assert!(row.evidence.contains("0.00001"));
-    assert!(row.evidence.contains("[10.1, 0, 0, 24.2, 28.1, 0, 0, 48.2]"));
+    assert!(row
+        .evidence
+        .contains("[10.1, 0, 0, 24.2, 28.1, 0, 0, 48.2]"));
     assert!(row.evidence.contains("exit 0"));
     // The blocked/mismatch state is gone: the row is promoted, and the old
     // "kernel runtime call" staging rejection is still not claimed.
@@ -189,7 +191,10 @@ fn tensor_workload_proof_rung2_device_relu_matches_stepper() {
         .collect();
     let zero_count = values.iter().filter(|&&v| v == 0.0).count();
     let non_zero_count = values.iter().filter(|&&v| v != 0.0).count();
-    assert_eq!(zero_count, 4, "expected exactly 4 zeroed negative pre-activations");
+    assert_eq!(
+        zero_count, 4,
+        "expected exactly 4 zeroed negative pre-activations"
+    );
     assert_eq!(
         non_zero_count, 4,
         "expected exactly 4 unchanged positive pre-activations"

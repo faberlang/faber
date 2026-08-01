@@ -21,8 +21,8 @@ fn single_fab_file_detection() {
 
 #[test]
 fn salve_munde_is_single_fab_file() {
-    let fab = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../radix/corpus/incipit/salve-munde.fab");
+    let fab =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../radix/corpus/incipit/salve-munde.fab");
     assert!(is_single_fab_file(&fab));
 }
 
