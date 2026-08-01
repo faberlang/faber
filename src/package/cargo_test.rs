@@ -7,6 +7,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use super::{
+    emit_generated_crate_with_runtime_plan, inject_crate_snapshot_failure_at,
+    lock_generated_crate_build, BuildLayout,
+};
+
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
 
 fn temp_root(label: &str) -> PathBuf {
@@ -172,4 +177,205 @@ faber = {{ package = "faber-runtime", path = "{}" }}
         .expect("runtime path");
     assert!(paths_equivalent(Path::new(runtime_path), &runtime));
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// FBR-P2-004: atomic generated-crate publication (Stage 3)
+// ---------------------------------------------------------------------------
+
+fn assert_no_staging_temps(layout: &BuildLayout) {
+    let target_dir = &layout.cargo_target_dir;
+    for entry in fs::read_dir(target_dir)
+        .expect("read target dir")
+        .flatten()
+    {
+        let name = entry.file_name().to_string_lossy().to_string();
+        assert!(
+            !(name.starts_with(".crate.tmp-") || name.starts_with(".old.tmp-")),
+            "leftover staging directory `{name}` under {}",
+            target_dir.display()
+        );
+    }
+}
+
+#[test]
+fn interleaved_emit_sequences_never_publish_a_mixed_crate() {
+    let root = temp_root("interleaved-emit");
+    let pkg = root.join("pkg");
+    let layout = BuildLayout::from_package_root(&pkg, "mix");
+    let plans: Vec<(RustRuntimePlan, String)> = (0..6)
+        .map(|i| {
+            let mut plan = RustRuntimePlan {
+                needs_faber: true,
+                ..RustRuntimePlan::default()
+            };
+            plan.library_path_deps
+                .push((format!("lib-{i}"), root.join(format!("lib-{i}"))));
+            (
+                plan,
+                format!(
+                    "// marker-plan-{i}\nfn main() {{ println!(\"plan-{i}\"); }}\n"
+                ),
+            )
+        })
+        .collect();
+
+    // 12 interleaved emit sequences for the same package, each holding the
+    // per-package lock. Without serialization, files from different plans
+    // would interleave inside `target/faber/`.
+    std::thread::scope(|scope| {
+        for round in 0..12 {
+            let layout = &layout;
+            let plans = &plans;
+            scope.spawn(move || {
+                let (plan, code) = &plans[round % plans.len()];
+                let _lock = lock_generated_crate_build(layout).expect("lock");
+                emit_generated_crate_with_runtime_plan(layout, code, None, plan)
+                    .expect("emit");
+            });
+        }
+    });
+
+    // Whatever plan won, the published crate is one complete snapshot: the
+    // manifest's dependency marker and the source's marker always agree, the
+    // completion marker is present, and no staging directory is left behind.
+    let cargo = fs::read_to_string(&layout.generated_cargo_manifest).expect("cargo");
+    let main = fs::read_to_string(&layout.generated_rust_entry).expect("main");
+    let cargo_plan = (0..6usize).find(|i| cargo.contains(&format!("lib-{i} = {{ path")));
+    let source_plan = (0..6usize).find(|i| main.contains(&format!("marker-plan-{i}")));
+    assert!(
+        cargo_plan.is_some() && cargo_plan == source_plan,
+        "mixed snapshot published:\ncargo:\n{cargo}\nmain:\n{main}"
+    );
+    assert!(layout
+        .generated_crate_root
+        .join(".faber-crate-complete")
+        .is_file());
+    assert_no_staging_temps(&layout);
+}
+
+#[test]
+fn failed_generation_preserves_last_known_good_crate() {
+    let root = temp_root("failed-emit");
+    let pkg = root.join("pkg");
+    let layout = BuildLayout::from_package_root(&pkg, "last-good");
+    let plan_a = RustRuntimePlan {
+        needs_faber: true,
+        ..RustRuntimePlan::default()
+    };
+    let mut plan_b = RustRuntimePlan {
+        needs_faber: true,
+        ..RustRuntimePlan::default()
+    };
+    plan_b
+        .library_path_deps
+        .push(("lib-b".to_owned(), root.join("lib-b")));
+
+    emit_generated_crate_with_runtime_plan(
+        &layout,
+        "// marker-good\nfn main() {}\n",
+        None,
+        &plan_a,
+    )
+    .expect("first emit");
+    assert!(layout
+        .generated_crate_root
+        .join(".faber-crate-complete")
+        .is_file());
+
+    // Inject a failure after each major snapshot stage; the published crate
+    // must remain exactly the last-known-good one with no partial new files.
+    for stage in 1..=4 {
+        inject_crate_snapshot_failure_at(stage);
+        let err = emit_generated_crate_with_runtime_plan(
+            &layout,
+            "// marker-bad\nfn main() {}\n",
+            None,
+            &plan_b,
+        )
+        .expect_err("injected failure must abort generation");
+        assert!(
+            err.message.contains("injected"),
+            "stage {stage}: unexpected error: {}",
+            err.message
+        );
+        let main = fs::read_to_string(&layout.generated_rust_entry).expect("main");
+        assert!(
+            main.contains("marker-good"),
+            "last good source lost at stage {stage}"
+        );
+        assert!(
+            !main.contains("marker-bad"),
+            "partial new source leaked at stage {stage}"
+        );
+        let cargo = fs::read_to_string(&layout.generated_cargo_manifest).expect("cargo");
+        assert!(
+            !cargo.contains("lib-b"),
+            "partial new manifest leaked at stage {stage}"
+        );
+        assert!(layout
+            .generated_crate_root
+            .join(".faber-crate-complete")
+            .is_file());
+        assert_no_staging_temps(&layout);
+    }
+
+    // A clean generation after the injected failures publishes the new plan.
+    inject_crate_snapshot_failure_at(0);
+    emit_generated_crate_with_runtime_plan(
+        &layout,
+        "// marker-bad\nfn main() {}\n",
+        None,
+        &plan_b,
+    )
+    .expect("emit succeeds after reset");
+    let main = fs::read_to_string(&layout.generated_rust_entry).expect("main");
+    assert!(main.contains("marker-bad"));
+    assert!(!main.contains("marker-good"));
+    let cargo = fs::read_to_string(&layout.generated_cargo_manifest).expect("cargo");
+    assert!(cargo.contains("lib-b"));
+    assert!(layout
+        .generated_crate_root
+        .join(".faber-crate-complete")
+        .is_file());
+    assert_no_staging_temps(&layout);
+}
+
+#[test]
+fn republished_crate_preserves_library_dependency_tree() {
+    let root = temp_root("deps-preserved");
+    let pkg = root.join("pkg");
+    let layout = BuildLayout::from_package_root(&pkg, "deps-pkg");
+    let plan = RustRuntimePlan {
+        needs_faber: true,
+        ..RustRuntimePlan::default()
+    };
+    // Simulate the library crates that `emit_linked_library_crates` writes
+    // into `target/faber/deps/` before the application snapshot is published.
+    let lib_root = layout
+        .generated_crate_root
+        .join("deps")
+        .join("native-lib");
+    fs::create_dir_all(lib_root.join("src")).expect("lib src");
+    fs::write(
+        lib_root.join("Cargo.toml"),
+        "[package]\nname = \"native-lib\"\nversion = \"0.1.0\"\n",
+    )
+    .expect("lib manifest");
+    fs::write(lib_root.join("src/lib.rs"), "// library body\n").expect("lib body");
+
+    emit_generated_crate_with_runtime_plan(&layout, "fn main() {}", None, &plan)
+        .expect("first emit");
+    assert!(
+        lib_root.join("Cargo.toml").is_file(),
+        "deps lost on first publish"
+    );
+
+    emit_generated_crate_with_runtime_plan(&layout, "fn main() {}", None, &plan)
+        .expect("second emit");
+    assert!(
+        lib_root.join("src/lib.rs").is_file(),
+        "deps lost on republish"
+    );
+    assert_no_staging_temps(&layout);
 }

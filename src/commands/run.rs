@@ -11,9 +11,11 @@
 use crate::cli::{FmirRunArgs, RunArgs};
 use crate::input_shape::reader_locale_without_package_error;
 use crate::package;
+use fs2::FileExt;
 use radix::codegen::Target;
 use radix::diagnostics::Diagnostic;
 use radix::mir::StdioHost;
+use std::fs::{self, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -306,6 +308,42 @@ fn run_scena_package_with_host<H: radix::mir::Host + ?Sized>(
     package::run_package_mir_artifact(&config, &artifact, host)
 }
 
+/// Lock file for the per-package generated-crate sequence, stored beside the
+/// published crate (`target/faber/`) so atomic publication never replaces it.
+const GENERATED_CRATE_LOCK_FILE: &str = ".faber-build.lock";
+
+/// Exclusive per-package advisory lock covering the generated-crate emit +
+/// cargo sequence (FBR-P2-004).
+///
+/// Mirrors `package::cargo::lock_generated_crate_build` on the same lock file
+/// (`<pkg>/target/.faber-build.lock`) so `faber build` and `faber run` for the
+/// same package serialize against each other. The private `package::cargo`
+/// module is not reachable from `commands`, so the guard is reproduced here.
+fn lock_generated_crate(
+    layout: &package::BuildLayout,
+) -> Result<GeneratedCrateLock, Box<Diagnostic>> {
+    let target_dir = layout.cargo_target_dir.clone();
+    fs::create_dir_all(&target_dir)
+        .map_err(|err| Box::new(Diagnostic::io_error(&target_dir, &err)))?;
+    let lock_path = target_dir.join(GENERATED_CRATE_LOCK_FILE);
+    let file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(&lock_path)
+        .map_err(|err| Box::new(Diagnostic::io_error(&lock_path, &err)))?;
+    file.lock_exclusive()
+        .map_err(|err| Box::new(Diagnostic::io_error(&lock_path, &err)))?;
+    Ok(GeneratedCrateLock { _file: file })
+}
+
+/// RAII guard for the per-package generated-crate lock. Dropping the guard
+/// closes the file, which releases the OS-level advisory lock.
+struct GeneratedCrateLock {
+    _file: std::fs::File,
+}
+
 fn cmd_run_compiled(args: &RunArgs) {
     let input_path = PathBuf::from(&args.path);
 
@@ -330,6 +368,18 @@ fn cmd_run_compiled(args: &RunArgs) {
     // remain runnable while package manifests become the preferred surface.
     let layout = match package::discover_build_layout(&input_path) {
         Ok(l) => l,
+        Err(d) => {
+            eprintln!("error: {}", d.message);
+            std::process::exit(1);
+        }
+    };
+
+    // FBR-P2-004: the per-package advisory lock spans the emit + cargo
+    // sequence (library crates, generated crate snapshot, Cargo invocation) so
+    // a concurrent `faber build` for this package cannot interleave files from
+    // a different runtime plan. Released before the binary executes.
+    let _build_lock = match lock_generated_crate(&layout) {
+        Ok(lock) => lock,
         Err(d) => {
             eprintln!("error: {}", d.message);
             std::process::exit(1);
@@ -398,6 +448,10 @@ fn cmd_run_compiled(args: &RunArgs) {
             std::process::exit(1);
         }
     };
+
+    // Release the emit/cargo lock before executing the compiled program so a
+    // long-running binary never blocks a concurrent rebuild of the package.
+    drop(_build_lock);
 
     // CONTRACT: `faber run` behaves like the compiled program for callers that
     // depend on argv forwarding and process status.

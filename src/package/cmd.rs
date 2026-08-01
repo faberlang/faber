@@ -6,7 +6,9 @@ use std::path::Path;
 
 use crate::input_shape::reader_locale_without_package_error;
 
-use super::cargo::{emit_generated_crate_with_runtime_plan, invoke_cargo_build};
+use super::cargo::{
+    emit_generated_crate_with_runtime_plan, invoke_cargo_build, lock_generated_crate_build,
+};
 use super::go_build::{emit_go_module, invoke_go_build, GoBuildLayout};
 use super::manifest::manifest_build_target;
 use super::{
@@ -224,6 +226,17 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
                 std::process::exit(1);
             }
         };
+        // FBR-P2-004: the per-package advisory lock spans the full emit + cargo
+        // sequence (library crates, generated crate snapshot, Cargo invocation)
+        // so concurrent builds of this package cannot interleave files from
+        // different runtime plans. Dropped when the block ends.
+        let _build_lock = match lock_generated_crate_build(&layout) {
+            Ok(lock) => lock,
+            Err(d) => {
+                eprintln!("error: {}", d.message);
+                std::process::exit(1);
+            }
+        };
         let meta = if layout.manifest_path.exists() {
             read_manifest(&layout.manifest_path).ok()
         } else {
@@ -309,6 +322,15 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
                     .filter(|s| !s.is_empty())
                     .unwrap_or("faber_out");
                 let layout = BuildLayout::from_package_root(&package_root, stem);
+                // Same per-package lock as package builds: the emit + cargo
+                // sequence shares `target/faber/` under the current directory.
+                let _build_lock = match lock_generated_crate_build(&layout) {
+                    Ok(lock) => lock,
+                    Err(d) => {
+                        eprintln!("error: {}", d.message);
+                        std::process::exit(1);
+                    }
+                };
                 match emit_generated_crate_with_runtime_plan(&layout, &code, None, &plan) {
                     Ok(_) => match invoke_cargo_build(&layout, command.release) {
                         Ok(binary_path) => {

@@ -9,7 +9,8 @@ use super::{
     build_package_fmir_image, build_package_fmir_text_image, build_package_mir_artifact,
     check_package, compile_package, compile_package_go, config_with_reader_locale,
     discover_build_layout, discover_package, emit_generated_crate, emit_generated_crate_with_runtime_plan,
-    invoke_cargo_build, library_cached_file_interface, library_resolver_from_config, load_package,
+    invoke_cargo_build, library_cached_file_interface,
+    library_resolver_from_config, load_package,
     load_package_with_reader_pack, package_host_selection_diagnostic, package_rust_runtime_plan,
     read_manifest, run_package_fmir_image, run_package_fmir_text_image, run_package_mir,
     run_package_mir_artifact, sanitize_crate_name, use_package_compiler,
@@ -35,6 +36,7 @@ use std::thread;
 use std::time::Duration;
 
 use super::test_support::{test_temp_dir, TestDir};
+use super::product::inject_product_failure_at;
 
 fn diagnostic_has_issue(diag: &Diagnostic, issue: &str) -> bool {
     diag.args.contains(&DiagnosticArg::new("issue", issue))
@@ -11482,6 +11484,144 @@ functio submit_controller(dom.Scope scope) → vacuum {
         "controller export rewrite must survive adaptation:\n{main_ts}"
     );
     assert_eq!(build.controllers.len(), 2);
+}
+
+// ---------------------------------------------------------------------------
+// FBR-P2-005: atomic browser product publication (Stage 3)
+// ---------------------------------------------------------------------------
+
+fn assert_no_product_staging_temps(app: &Path, out_name: &str) {
+    let prefix_tmp = format!(".{out_name}.faber.tmp-");
+    let prefix_old = format!(".{out_name}.faber.old-");
+    for entry in fs::read_dir(app).expect("read app dir").flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        assert!(
+            !(name.starts_with(&prefix_tmp) || name.starts_with(&prefix_old)),
+            "leftover product staging directory `{name}`"
+        );
+    }
+}
+
+fn sample_web_app() -> (TestDir, PathBuf) {
+    let lib = sibling_faber_web_lib();
+    let root = test_temp_dir("g10-web3-transaction");
+    let app = root.join("app");
+    write_web_consumer_app(
+        &app,
+        &lib,
+        r#"
+importa ex "web:web" privata web
+importa ex "web:dom" privata dom
+
+@ WebController { selector = "[data-faber=shell]" }
+functio shell(dom.Scope scope) → vacuum {
+  nota dom.require(scope, "button")
+}
+"#,
+    );
+    write_static_asset_roots(&app);
+    fs::write(
+        app.join("pages/index.html"),
+        "<main data-faber=shell></main>\n",
+    )
+    .expect("page");
+    (root, app)
+}
+
+#[test]
+fn g10_web3_failed_rebuild_keeps_previous_product_usable() {
+    if Command::new("tsc").arg("--version").output().is_err() {
+        eprintln!("tsc not found on PATH; skipping WEB3 failure-injection test");
+        return;
+    }
+    let (_root, app) = sample_web_app();
+    let manifest = read_manifest(&app.join("faber.toml")).expect("manifest");
+    let product = manifest.product.as_ref().expect("product");
+    let build = build_browser_product(
+        &Config::default().with_target(Target::TypeScript),
+        &app,
+        product,
+    )
+    .expect("first product build");
+    let first_controllers = fs::read_to_string(&build.controllers_json).expect("controllers");
+    assert!(build.esm_entry.is_file());
+
+    // Inject a failure after each major build stage; the previous product must
+    // remain complete and usable, and no partial new product may appear.
+    for stage in 1..=5 {
+        inject_product_failure_at(stage);
+        let err = build_browser_product(
+            &Config::default().with_target(Target::TypeScript),
+            &app,
+            product,
+        )
+        .expect_err("injected failure must abort the product build");
+        assert!(
+            diagnostic_has_issue(&err, "product_injected_failure"),
+            "stage {stage}: unexpected error: {}",
+            err.message
+        );
+        let controllers_after =
+            fs::read_to_string(&build.controllers_json).expect("controllers");
+        assert_eq!(
+            controllers_after, first_controllers,
+            "previous product changed at stage {stage}"
+        );
+        assert!(
+            build.esm_entry.is_file(),
+            "previous esm entry lost at stage {stage}"
+        );
+        let product_json =
+            fs::read_to_string(build.out_dir.join("product.json")).expect("product.json");
+        assert!(
+            product_json.contains("\"version\": 1"),
+            "previous product manifest lost at stage {stage}"
+        );
+        assert_no_product_staging_temps(&app, "dist");
+    }
+    inject_product_failure_at(0);
+
+    // A clean rebuild after the injected failures still succeeds and swaps.
+    let rebuilt = build_browser_product(
+        &Config::default().with_target(Target::TypeScript),
+        &app,
+        product,
+    )
+    .expect("rebuild after reset");
+    assert_eq!(
+        fs::read_to_string(&rebuilt.controllers_json).expect("controllers"),
+        first_controllers
+    );
+    assert_no_product_staging_temps(&app, "dist");
+}
+
+#[test]
+fn g10_web3_first_build_failure_leaves_no_partial_product() {
+    if Command::new("tsc").arg("--version").output().is_err() {
+        eprintln!("tsc not found on PATH; skipping WEB3 failure-injection test");
+        return;
+    }
+    let (_root, app) = sample_web_app();
+    let manifest = read_manifest(&app.join("faber.toml")).expect("manifest");
+    let product = manifest.product.as_ref().expect("product");
+
+    for stage in 1..=5 {
+        inject_product_failure_at(stage);
+        let err = build_browser_product(
+            &Config::default().with_target(Target::TypeScript),
+            &app,
+            product,
+        )
+        .expect_err("injected failure must abort the product build");
+        assert!(diagnostic_has_issue(&err, "product_injected_failure"));
+        // No final output directory may appear for a failed first build.
+        assert!(
+            !app.join("dist").exists(),
+            "partial product directory leaked at stage {stage}"
+        );
+        assert_no_product_staging_temps(&app, "dist");
+    }
+    inject_product_failure_at(0);
 }
 
 #[test]

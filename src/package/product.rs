@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use radix::diagnostics::Diagnostic;
 use sha2::{Digest, Sha256};
@@ -177,13 +178,11 @@ struct PlannedAsset {
 }
 
 /// A generated product output path — written by the build into `out_dir`
-/// beyond copied static assets. `is_dir` marks directory outputs that own
-/// their entire subtree (e.g. `faber-ts/`, `faber-esm/`).
+/// beyond copied static assets.
 #[derive(Debug)]
 struct GeneratedOutput {
     label: &'static str,
     path: PathBuf,
-    is_dir: bool,
 }
 
 fn collect_root(
@@ -359,32 +358,26 @@ fn product_generated_output_paths(
         GeneratedOutput {
             label: "assets manifest",
             path: normalize_path(&out_dir.join(&product.assets_manifest)),
-            is_dir: false,
         },
         GeneratedOutput {
             label: "controllers json",
             path: normalize_path(&out_dir.join(&product.controllers_json)),
-            is_dir: false,
         },
         GeneratedOutput {
             label: "faber-ts directory",
             path: normalize_path(&out_dir.join(FABER_TS_DIR)),
-            is_dir: true,
         },
         GeneratedOutput {
             label: "faber-esm directory",
             path: normalize_path(&out_dir.join(FABER_ESM_DIR)),
-            is_dir: true,
         },
         GeneratedOutput {
             label: "tsconfig",
             path: normalize_path(&out_dir.join(TSCONFIG_FILE)),
-            is_dir: false,
         },
         GeneratedOutput {
             label: "product manifest",
             path: normalize_path(&out_dir.join("product.json")),
-            is_dir: false,
         },
     ];
 
@@ -395,7 +388,6 @@ fn product_generated_output_paths(
         outputs.push(GeneratedOutput {
             label: "generated directory",
             path: generated_dir,
-            is_dir: true,
         });
     }
 
@@ -698,8 +690,9 @@ pub(crate) fn build_browser_product(
     product: &ManifestProduct,
 ) -> Result<BrowserProductBuild, Box<Diagnostic>> {
     let layout = super::discover_build_layout(input)?;
-    // Preflight (collision containment) BEFORE cleanup so a collision error
-    // does not destroy previous generated outputs.
+    // Preflight (collision + stale-output containment) runs against the final
+    // output directory BEFORE any staging, so a preflight error never disturbs
+    // a previously published product.
     let plan = plan_browser_product_static_assets(&layout.package_root, product)?;
     let package = super::analyze_package(config, input).map_err(|diagnostics| {
         Box::new(diagnostics.into_iter().next().unwrap_or_else(|| {
@@ -709,63 +702,249 @@ pub(crate) fn build_browser_product(
         }))
     })?;
     let controllers = discover_controllers(&package)?;
-    remove_previous_product_generated_outputs(&layout.package_root, product)?;
-    let static_build = write_browser_product_static_assets(plan)?;
-    let ts_root = static_build.out_dir.join(FABER_TS_DIR);
-    let esm_root = static_build.out_dir.join(FABER_ESM_DIR);
-    fs::create_dir_all(&ts_root).map_err(|err| io_diag(&ts_root, err))?;
-    fs::create_dir_all(&esm_root).map_err(|err| io_diag(&esm_root, err))?;
 
-    let library_imports = build_library_ts_module_map(&layout.package_root)?;
-    emit_typescript_modules(&package, &ts_root, &controllers, &library_imports)?;
-    emit_library_typescript_modules(config, &layout.package_root, &ts_root, &library_imports)?;
-    let browser_entry = ts_root.join(BROWSER_ENTRY_TS);
-    fs::write(&browser_entry, render_browser_entry(&controllers))
-        .map_err(|err| io_diag(&browser_entry, err))?;
-    let declarations = ts_root.join(WEB_AMBIENT_DTS);
-    fs::write(&declarations, web_ambient_declarations())
-        .map_err(|err| io_diag(&declarations, err))?;
-    let tsconfig = static_build.out_dir.join(TSCONFIG_FILE);
-    fs::write(&tsconfig, render_tsconfig(&ts_root, &esm_root))
-        .map_err(|err| io_diag(&tsconfig, err))?;
-    invoke_tsc(&tsconfig)?;
+    // FBR-P2-005: build the complete product into a unique temporary sibling
+    // of the final output directory, run every check and write against that
+    // staging directory, and atomically swap the validated snapshot into the
+    // final output. A failure at any stage leaves the previous product usable.
+    let out_dir = plan.out_dir.clone();
+    let staging_parent = out_dir.parent().ok_or_else(|| {
+        Box::new(
+            product_diag("browser product output has no parent directory")
+                .with_arg("issue", "product_output_path_invalid"),
+        )
+    })?;
+    let temp = unique_product_temp(staging_parent, &out_dir)?;
+    let staged = (|| {
+        let staged_plan = remap_static_asset_plan(plan, &temp)?;
+        let static_build = write_browser_product_static_assets(staged_plan)?;
+        #[cfg(test)]
+        maybe_inject_product_failure(1)?;
+        let ts_root = static_build.out_dir.join(FABER_TS_DIR);
+        let esm_root = static_build.out_dir.join(FABER_ESM_DIR);
+        fs::create_dir_all(&ts_root).map_err(|err| io_diag(&ts_root, err))?;
+        fs::create_dir_all(&esm_root).map_err(|err| io_diag(&esm_root, err))?;
 
-    let controllers_json = static_build.out_dir.join(&product.controllers_json);
-    fs::write(&controllers_json, render_controllers_json(&controllers)?)
-        .map_err(|err| io_diag(&controllers_json, err))?;
-    let esm_entry = esm_root.join(BROWSER_ENTRY_JS);
-    if !esm_entry.is_file() {
-        return Err(Box::new(
-            product_diag(format!(
-                "browser product TypeScript build did not write `{}`",
-                esm_entry.display()
-            ))
-            .with_arg("issue", "product_esm_entry_missing"),
-        ));
+        let library_imports = build_library_ts_module_map(&layout.package_root)?;
+        emit_typescript_modules(&package, &ts_root, &controllers, &library_imports)?;
+        emit_library_typescript_modules(config, &layout.package_root, &ts_root, &library_imports)?;
+        let browser_entry = ts_root.join(BROWSER_ENTRY_TS);
+        fs::write(&browser_entry, render_browser_entry(&controllers))
+            .map_err(|err| io_diag(&browser_entry, err))?;
+        let declarations = ts_root.join(WEB_AMBIENT_DTS);
+        fs::write(&declarations, web_ambient_declarations())
+            .map_err(|err| io_diag(&declarations, err))?;
+        let tsconfig = static_build.out_dir.join(TSCONFIG_FILE);
+        fs::write(&tsconfig, render_tsconfig(&ts_root, &esm_root))
+            .map_err(|err| io_diag(&tsconfig, err))?;
+        invoke_tsc(&tsconfig)?;
+        #[cfg(test)]
+        maybe_inject_product_failure(2)?;
+
+        let controllers_json = static_build.out_dir.join(&product.controllers_json);
+        fs::write(&controllers_json, render_controllers_json(&controllers)?)
+            .map_err(|err| io_diag(&controllers_json, err))?;
+        let esm_entry = esm_root.join(BROWSER_ENTRY_JS);
+        if !esm_entry.is_file() {
+            return Err(Box::new(
+                product_diag(format!(
+                    "browser product TypeScript build did not write `{}`",
+                    esm_entry.display()
+                ))
+                .with_arg("issue", "product_esm_entry_missing"),
+            ));
+        }
+        #[cfg(test)]
+        maybe_inject_product_failure(3)?;
+
+        // Copy shader artifacts (WGSL + reflection) when configured.
+        let shader_artifacts =
+            copy_shader_artifacts(&layout.package_root, product, &static_build.out_dir)?;
+        #[cfg(test)]
+        maybe_inject_product_failure(4)?;
+
+        // Emit product identity manifest after all build stages succeed.
+        let product_json_path = static_build.out_dir.join("product.json");
+        let product_json_content = render_product_json(
+            &static_build.out_dir,
+            &esm_entry,
+            &controllers_json,
+            &static_build.assets,
+            shader_artifacts.as_ref(),
+        )?;
+        fs::write(&product_json_path, product_json_content)
+            .map_err(|err| io_diag(&product_json_path, err))?;
+        #[cfg(test)]
+        maybe_inject_product_failure(5)?;
+
+        // Every stage validated against the staging directory; publish now.
+        publish_product_directory(&temp, &out_dir)?;
+        Ok(())
+    })();
+    match staged {
+        Ok(()) => Ok(BrowserProductBuild {
+            out_dir: out_dir.clone(),
+            controllers_json: out_dir.join(&product.controllers_json),
+            esm_entry: out_dir.join(FABER_ESM_DIR).join(BROWSER_ENTRY_JS),
+            controllers,
+        }),
+        Err(error) => {
+            if fs::symlink_metadata(&temp).is_ok() {
+                remove_product_temp(&temp)?;
+            }
+            Err(error)
+        }
     }
+}
 
-    // Copy shader artifacts (WGSL + reflection) when configured.
-    let shader_artifacts =
-        copy_shader_artifacts(&layout.package_root, product, &static_build.out_dir)?;
-
-    // Emit product identity manifest after all build stages succeed.
-    let product_json_path = static_build.out_dir.join("product.json");
-    let product_json_content = render_product_json(
-        &static_build.out_dir,
-        &esm_entry,
-        &controllers_json,
-        &static_build.assets,
-        shader_artifacts.as_ref(),
-    )?;
-    fs::write(&product_json_path, product_json_content)
-        .map_err(|err| io_diag(&product_json_path, err))?;
-
-    Ok(BrowserProductBuild {
-        out_dir: static_build.out_dir,
-        controllers_json,
-        esm_entry,
-        controllers,
+/// Re-target a static asset plan from the final output directory onto a
+/// temporary sibling with the same relative layout (FBR-P2-005).
+fn remap_static_asset_plan(
+    plan: StaticAssetPlan,
+    temp: &Path,
+) -> Result<StaticAssetPlan, Box<Diagnostic>> {
+    let out_dir = plan.out_dir.clone();
+    let planned = plan
+        .planned
+        .into_iter()
+        .map(|(output, asset)| {
+            let relative = output.strip_prefix(&out_dir).map_err(|_| {
+                product_diag(format!(
+                    "browser product asset `{}` escaped output `{}`",
+                    output.display(),
+                    out_dir.display()
+                ))
+                .with_arg("issue", "product_output_path_escape")
+            })?;
+            Ok((temp.join(relative), asset))
+        })
+        .collect::<Result<BTreeMap<_, _>, Box<Diagnostic>>>()?;
+    let manifest_path = plan
+        .manifest_path
+        .strip_prefix(&out_dir)
+        .map(|relative| temp.join(relative))
+        .map_err(|_| {
+            Box::new(
+                product_diag("browser product asset manifest escaped output directory")
+                    .with_arg("issue", "product_output_path_escape"),
+            )
+        })?;
+    Ok(StaticAssetPlan {
+        out_dir: temp.to_path_buf(),
+        manifest_path,
+        planned,
     })
+}
+
+/// Create a unique temporary sibling directory for the product output.
+fn unique_product_temp(parent: &Path, out_dir: &Path) -> Result<PathBuf, Box<Diagnostic>> {
+    let name = out_dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("product");
+    for attempt in 0..128_u32 {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| {
+                Box::new(
+                    product_diag("system clock precedes epoch")
+                        .with_arg("issue", "product_temp_path_invalid"),
+                )
+            })?
+            .as_nanos();
+        let path = parent.join(format!(
+            ".{name}.faber.tmp-{}-{nonce}-{attempt}",
+            std::process::id()
+        ));
+        match fs::create_dir(&path) {
+            Ok(()) => return Ok(path),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(error) => return Err(io_diag(&path, error)),
+        }
+    }
+    Err(Box::new(
+        product_diag("could not create a unique temporary product directory")
+            .with_arg("issue", "product_temp_path_invalid"),
+    ))
+}
+
+/// Atomically swap a fully-built product directory into the final output path,
+/// quarantining the previous product and removing it only after the swap
+/// succeeds (FBR-P2-005). A failed swap restores the previous product, so the
+/// last good output survives any single publish failure.
+fn publish_product_directory(temp: &Path, target: &Path) -> Result<(), Box<Diagnostic>> {
+    if fs::symlink_metadata(target).is_err() {
+        return fs::rename(temp, target).map_err(|err| io_diag(target, err));
+    }
+    let quarantine = unique_product_quarantine(target)?;
+    fs::rename(target, &quarantine).map_err(|err| io_diag(target, err))?;
+    match fs::rename(temp, target) {
+        Ok(()) => {
+            ignore_io(fs::remove_dir_all(&quarantine));
+            Ok(())
+        }
+        Err(error) => {
+            let restored = fs::rename(&quarantine, target);
+            ignore_io(fs::remove_dir_all(temp));
+            match restored {
+                Ok(()) => Err(io_diag(target, error)),
+                Err(restore_error) => Err(Box::new(
+                    product_diag(format!(
+                        "product publish rename failed ({error}); restoring previous product failed ({restore_error})"
+                    ))
+                    .with_arg("issue", "product_publish_failed"),
+                )),
+            }
+        }
+    }
+}
+
+/// Pick an unused sibling name for the previous product during the swap.
+fn unique_product_quarantine(target: &Path) -> Result<PathBuf, Box<Diagnostic>> {
+    let parent = target.parent().ok_or_else(|| {
+        Box::new(
+            product_diag("browser product output has no parent directory")
+                .with_arg("issue", "product_output_path_invalid"),
+        )
+    })?;
+    let name = target
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("product");
+    for attempt in 0..128_u32 {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| {
+                Box::new(
+                    product_diag("system clock precedes epoch")
+                        .with_arg("issue", "product_output_path_invalid"),
+                )
+            })?
+            .as_nanos();
+        let path = parent.join(format!(
+            ".{name}.faber.old-{}-{nonce}-{attempt}",
+            std::process::id()
+        ));
+        if fs::symlink_metadata(&path).is_err() {
+            return Ok(path);
+        }
+    }
+    Err(Box::new(
+        product_diag("could not allocate a quarantine path for the previous product")
+            .with_arg("issue", "product_output_path_invalid"),
+    ))
+}
+
+/// Best-effort cleanup that must never mask the caller's result.
+fn ignore_io(result: std::io::Result<()>) {
+    match result {
+        Ok(()) => {}
+        Err(_) => {}
+    }
+}
+
+fn remove_product_temp(temp: &Path) -> Result<(), Box<Diagnostic>> {
+    fs::remove_dir_all(temp).map_err(|err| io_diag(temp, err))
 }
 
 /// Copy pre-compiled shader artifacts from a package source directory into
@@ -853,50 +1032,31 @@ fn copy_shader_artifacts(
     Ok(Some((wgsl_asset, reflection_asset)))
 }
 
-/// Remove all generated product outputs from a previous build.
-///
-/// Uses [`product_generated_output_paths`] as the single source of truth so
-/// that collision guards and cleanup stay in sync. Previously this function
-/// had its own hardcoded list that diverged (omitted `assets_manifest`).
-fn remove_previous_product_generated_outputs(
-    package_root: &Path,
-    product: &ManifestProduct,
-) -> Result<(), Box<Diagnostic>> {
-    let out_dir = normalize_path(&package_root.join(&product.out));
-    for gen in product_generated_output_paths(&out_dir, product) {
-        // Use the declared output kind, not the live path shape. A shape
-        // mismatch is corrupted state — fail closed rather than guessing.
-        if gen.is_dir {
-            if gen.path.exists() && !gen.path.is_dir() {
-                return Err(Box::new(
-                    product_diag(format!(
-                        "browser product {} path `{}` is declared as a directory but exists as a non-directory",
-                        gen.label,
-                        gen.path.display()
-                    ))
-                    .with_arg("issue", "product_output_shape_mismatch"),
-                ));
-            }
-            if gen.path.exists() {
-                fs::remove_dir_all(&gen.path).map_err(|err| io_diag(&gen.path, err))?;
-            }
+// Test-only failure injection for the browser product build (FBR-P2-005).
+// When the injected stage is non-zero, the build fails once the current stage
+// reaches that value. Never compiled into production binaries.
+#[cfg(test)]
+thread_local! {
+    static PRODUCT_STAGE_FAILURE: std::cell::Cell<u8> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(crate) fn inject_product_failure_at(stage: u8) {
+    PRODUCT_STAGE_FAILURE.with(|cell| cell.set(stage));
+}
+
+#[cfg(test)]
+fn maybe_inject_product_failure(stage: u8) -> Result<(), Box<Diagnostic>> {
+    PRODUCT_STAGE_FAILURE.with(|target| {
+        if target.get() != 0 && stage >= target.get() {
+            Err(Box::new(
+                product_diag("injected browser product failure")
+                    .with_arg("issue", "product_injected_failure"),
+            ))
         } else {
-            if gen.path.exists() && gen.path.is_dir() {
-                return Err(Box::new(
-                    product_diag(format!(
-                        "browser product {} path `{}` is declared as a file but exists as a directory",
-                        gen.label,
-                        gen.path.display()
-                    ))
-                    .with_arg("issue", "product_output_shape_mismatch"),
-                ));
-            }
-            if gen.path.exists() {
-                fs::remove_file(&gen.path).map_err(|err| io_diag(&gen.path, err))?;
-            }
+            Ok(())
         }
-    }
-    Ok(())
+    })
 }
 
 fn discover_controllers(
