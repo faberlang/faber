@@ -240,7 +240,6 @@ fn finalize_package_compile_result(
     result
 }
 
-#[allow(clippy::result_large_err)]
 pub(crate) fn package_rust_runtime_plan(
     config: &Config,
     input: &Path,
@@ -253,7 +252,6 @@ pub(crate) fn package_rust_runtime_plan(
     Ok(rust_runtime_plan_for_package(&package, &library_resolver))
 }
 
-#[allow(clippy::result_large_err)]
 pub(crate) fn analyze_package(
     config: &Config,
     input: &Path,
@@ -273,7 +271,6 @@ pub(crate) fn analyze_package(
 /// Used by the binary `faber test` command and lib tests; the lib crate root does
 /// not call it outside `cfg(test)`.
 #[allow(dead_code)] // binary `commands/test` + cfg(test); shared package sources
-#[allow(clippy::result_large_err)]
 pub(crate) fn analyze_package_for_tests(
     config: &Config,
     input: &Path,
@@ -1128,7 +1125,6 @@ fn extend_library_function_params<'entry>(
     Ok(())
 }
 
-#[allow(clippy::result_large_err)]
 fn insert_generated_library_modules(
     units: &[AnalyzedPackageUnit],
     library_resolver: &crate::library::LibraryResolver,
@@ -1568,7 +1564,6 @@ fn package_field_name_policy(
     Ok(manifest.build.rust_field_names.into())
 }
 
-#[allow(clippy::result_large_err)]
 fn file_interfaces_for_file(
     spec: &super::PackageSpec,
     file: &PackageFile,
@@ -1623,7 +1618,6 @@ fn file_interfaces_for_file(
     Ok(interfaces)
 }
 
-#[allow(clippy::result_large_err)]
 fn namespace_exports_for_file(
     spec: &super::PackageSpec,
     file: &PackageFile,

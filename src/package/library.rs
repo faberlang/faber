@@ -70,7 +70,6 @@ impl LibraryInterfaceCache {
     }
 }
 
-#[allow(clippy::result_large_err)]
 pub(crate) fn analysis_source_for_file(
     file: &PackageFile,
     _library_resolver: &LibraryResolver,
@@ -79,7 +78,6 @@ pub(crate) fn analysis_source_for_file(
     Ok(file.source.clone())
 }
 
-#[allow(clippy::result_large_err)]
 pub(crate) fn library_interface_export_names(
     import: &LibraryImportBinding,
     library_resolver: &LibraryResolver,
@@ -292,7 +290,6 @@ fn visit_transitive_library_import(
     walk.ordered.push(import.clone());
 }
 
-#[allow(clippy::result_large_err)]
 fn read_and_parse_library_interface(
     module: &ResolvedLibraryModule,
 ) -> Result<CachedLibraryInterface, Diagnostic> {
@@ -338,7 +335,6 @@ fn read_and_parse_library_interface(
     })
 }
 
-#[allow(clippy::result_large_err)]
 fn load_cached_library_interface<'a>(
     module: &ResolvedLibraryModule,
     library_cache: &'a mut LibraryInterfaceCache,
@@ -354,7 +350,6 @@ fn load_cached_library_interface<'a>(
     })
 }
 
-#[allow(clippy::result_large_err)]
 pub(crate) fn library_cached_file_interface(
     import: &LibraryImportBinding,
     library_resolver: &LibraryResolver,
@@ -382,7 +377,6 @@ pub(crate) fn library_cached_file_interface(
         })
 }
 
-#[allow(clippy::result_large_err)]
 pub(crate) fn library_cached_analysis<'a>(
     import: &LibraryImportBinding,
     library_resolver: &LibraryResolver,
@@ -406,7 +400,6 @@ pub(crate) fn library_cached_analysis<'a>(
         })
 }
 
-#[allow(clippy::result_large_err)]
 pub(crate) fn library_cached_expanded_imports(
     import: &LibraryImportBinding,
     library_resolver: &LibraryResolver,
@@ -430,7 +423,6 @@ pub(crate) fn library_cached_expanded_imports(
         })
 }
 
-#[allow(clippy::result_large_err)]
 pub(crate) fn with_library_cached_analysis_mut<T>(
     import: &LibraryImportBinding,
     library_resolver: &LibraryResolver,
@@ -471,7 +463,6 @@ pub(crate) fn library_module_segments(import: &LibraryImportBinding) -> Vec<Stri
     import.module.module_path.clone()
 }
 
-#[allow(clippy::result_large_err)]
 pub(crate) fn library_generates_rust_module(
     import: &LibraryImportBinding,
     library_cache: &mut LibraryInterfaceCache,
@@ -494,7 +485,6 @@ pub(crate) fn library_generates_rust_module(
     }))
 }
 
-#[allow(clippy::result_large_err)]
 pub(crate) fn library_imported_function_params<'entry>(
     import: &LibraryImportBinding,
     entry_types: &mut TypeTable,
@@ -516,7 +506,6 @@ pub(crate) fn library_imported_function_params<'entry>(
     Ok(params)
 }
 
-#[allow(clippy::result_large_err)]
 fn analyze_cached_library_interface(
     import: &LibraryImportBinding,
     library_resolver: &LibraryResolver,
@@ -669,7 +658,6 @@ fn library_imports_from_cached(
     imports
 }
 
-#[allow(clippy::result_large_err)]
 pub(crate) fn library_interface_has_module(
     _import: &LibraryImportBinding,
     _library_cache: &mut LibraryInterfaceCache,
@@ -677,7 +665,6 @@ pub(crate) fn library_interface_has_module(
     Ok(false)
 }
 
-#[allow(clippy::result_large_err)]
 pub(crate) fn attach_library_provenance(
     analysis: &mut radix::driver::AnalyzedUnit,
     imports: &[LibraryImportBinding],
@@ -688,7 +675,6 @@ pub(crate) fn attach_library_provenance(
 }
 
 /// Attach library provenance, routing native-binding package deps to external crates (G4).
-#[allow(clippy::result_large_err)]
 pub(crate) fn attach_library_provenance_with_links(
     analysis: &mut radix::driver::AnalyzedUnit,
     imports: &[LibraryImportBinding],
@@ -855,7 +841,6 @@ pub(crate) fn attach_library_provenance_with_links(
     Ok(())
 }
 
-#[allow(clippy::result_large_err)]
 fn library_namespace_member_export_names(
     import: &LibraryImportBinding,
     library_resolver: &LibraryResolver,
@@ -864,7 +849,6 @@ fn library_namespace_member_export_names(
     library_interface_export_names(import, library_resolver, library_cache)
 }
 
-#[allow(clippy::result_large_err)]
 fn public_library_imports(
     import: &LibraryImportBinding,
     library_resolver: &LibraryResolver,
@@ -962,7 +946,6 @@ fn library_identity(module: &ResolvedLibraryModule) -> LibraryIdentity {
     }
 }
 
-#[allow(clippy::result_large_err)]
 fn library_interface_items(
     import: &LibraryImportBinding,
     _library_resolver: &LibraryResolver,

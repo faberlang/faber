@@ -47,7 +47,6 @@ impl Drop for ProbeChild {
     }
 }
 
-#[allow(clippy::result_large_err)]
 pub(crate) fn run_rust_binding_probe(
     package_root: &Path,
     anchor: &Path,
@@ -140,7 +139,6 @@ fn canonical_probe_path(path: &Path) -> String {
         .to_string()
 }
 
-#[allow(clippy::result_large_err)]
 fn run_probe_in(
     root: &Path,
     package_root: &Path,
@@ -236,7 +234,6 @@ fn run_probe_in(
     .with_arg("issue", "binding_rust_probe_failed"))
 }
 
-#[allow(clippy::result_large_err)]
 fn probe_manifest(
     package_root: &Path,
     dependencies: &BTreeMap<String, String>,
@@ -311,7 +308,6 @@ fn probe_source(shim: Option<&Path>, probes: &[String]) -> String {
     source
 }
 
-#[allow(clippy::result_large_err)]
 fn read_output(path: &Path) -> Result<String, Diagnostic> {
     let mut file = File::open(path).map_err(|error| Diagnostic::io_error(path, &error))?;
     let mut output = String::new();

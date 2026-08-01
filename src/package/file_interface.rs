@@ -33,7 +33,6 @@ pub(crate) struct AnalyzedCallableContract {
     pub(crate) has_body: bool,
 }
 
-#[allow(clippy::result_large_err)]
 pub(crate) fn extract_callable_contracts(
     analysis: &AnalyzedUnit,
     export_names: &[String],
@@ -67,17 +66,6 @@ pub(crate) fn extract_callable_contracts(
         .collect()
 }
 
-#[allow(clippy::result_large_err)]
-#[allow(dead_code)] // retained for tests / callers without package identity
-pub(crate) fn extract_file_interface(
-    analysis: &AnalyzedUnit,
-    export_names: &[String],
-    file_label: &str,
-) -> Result<FileInterface, Diagnostic> {
-    extract_file_interface_with_identity(analysis, export_names, file_label, None)
-}
-
-#[allow(clippy::result_large_err)]
 pub(crate) fn extract_file_interface_with_identity(
     analysis: &AnalyzedUnit,
     export_names: &[String],
@@ -135,7 +123,6 @@ pub(crate) fn extract_file_interface_with_identity(
     Ok(interface)
 }
 
-#[allow(clippy::result_large_err)]
 fn snapshot_interface(
     interface: &HirInterface,
     analysis: &AnalyzedUnit,
@@ -159,7 +146,6 @@ fn snapshot_interface(
     })
 }
 
-#[allow(clippy::result_large_err)]
 fn snapshot_interface_method(
     method: &HirInterfaceMethod,
     analysis: &AnalyzedUnit,
@@ -195,7 +181,6 @@ fn snapshot_interface_method(
     .map_err(|err| interface_error(file_label, interface_name, err))
 }
 
-#[allow(clippy::result_large_err)]
 fn snapshot_struct(
     strukt: &HirStruct,
     analysis: &AnalyzedUnit,
@@ -244,7 +229,6 @@ fn snapshot_struct(
     })
 }
 
-#[allow(clippy::result_large_err)]
 fn snapshot_struct_method(
     method: &radix::hir::HirMethod,
     analysis: &AnalyzedUnit,
@@ -334,7 +318,6 @@ fn annotation_contract_export(
     })
 }
 
-#[allow(clippy::result_large_err)]
 fn snapshot_function(
     func: &HirFunction,
     analysis: &AnalyzedUnit,
@@ -378,7 +361,6 @@ fn snapshot_function(
     .map_err(|err| interface_error(file_label, name, err))
 }
 
-#[allow(clippy::result_large_err)]
 fn snapshot_const(
     konst: &HirConst,
     analysis: &AnalyzedUnit,

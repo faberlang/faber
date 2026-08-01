@@ -120,7 +120,6 @@ fn emit_one_library_crate(
     )
     .map_err(|d| vec![d])?;
     let binding_manifest = read_binding_manifest(&binding_path)?;
-    #[allow(clippy::result_large_err)]
     let shim_path = binding_manifest
         .shim
         .as_ref()
@@ -178,7 +177,6 @@ fn emit_one_library_crate(
     Ok(())
 }
 
-#[allow(clippy::result_large_err)]
 fn generate_linked_unit_rust(
     unit: &mut AnalyzedPackageUnit,
     bindings: &BTreeMap<String, FunctionBinding>,
@@ -288,7 +286,6 @@ fn promote_binding_function_visibility(source: &str) -> String {
     promoted
 }
 
-#[allow(clippy::result_large_err)]
 fn render_library_cargo_toml(
     crate_name: &str,
     version: &str,

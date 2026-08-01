@@ -384,7 +384,6 @@ impl GoBuildLayout {
 }
 
 /// Write Go sources + `go.mod` for a single-package product assembly.
-#[allow(clippy::result_large_err)]
 pub(crate) fn emit_go_module(
     layout: &GoBuildLayout,
     entry_code: &str,
@@ -443,7 +442,6 @@ pub(crate) fn emit_go_module(
     Ok(())
 }
 
-#[allow(clippy::result_large_err)]
 fn remove_stale_owned_go_files(
     layout: &GoBuildLayout,
     modules: &[(String, String)],
@@ -488,7 +486,6 @@ fn remove_stale_owned_go_files(
 }
 
 /// Invoke `go build` for an emitted module; returns the binary path.
-#[allow(clippy::result_large_err)]
 pub(crate) fn invoke_go_build(layout: &GoBuildLayout) -> Result<PathBuf, Diagnostic> {
     if let Some(parent) = layout.binary_path.parent() {
         fs::create_dir_all(parent).map_err(|err| {
@@ -547,7 +544,6 @@ fn sanitize_go_module_segment(name: &str) -> String {
 
 /// Run a built Go binary with forwarded argv.
 #[allow(dead_code)] // used by binary `commands/run` (not the lib test surface)
-#[allow(clippy::result_large_err)]
 pub(crate) fn run_go_binary(binary: &Path, args: &[String]) -> Result<i32, Diagnostic> {
     let status = Command::new(binary).args(args).status().map_err(|err| {
         crate::package_diagnostic_error(format!("failed to execute '{}': {err}", binary.display()))

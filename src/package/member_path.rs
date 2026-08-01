@@ -8,7 +8,6 @@ use std::path::{Component, Path, PathBuf};
 
 use radix::diagnostics::Diagnostic;
 
-#[allow(clippy::result_large_err)]
 pub(crate) fn resolve_package_member(
     package_root: &Path,
     relative: &str,
@@ -47,7 +46,6 @@ pub(crate) fn resolve_package_member(
     Ok(resolved)
 }
 
-#[allow(clippy::result_large_err)]
 fn normalize_member_path(relative: &str, anchor: &Path) -> Result<PathBuf, Diagnostic> {
     if relative.trim().is_empty() {
         return Err(path_diagnostic(

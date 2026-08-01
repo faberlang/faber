@@ -26,6 +26,9 @@
 //! packages so old examples keep deterministic binary names and target paths
 //! while `faber.toml` remains the preferred package surface.
 
+// Diagnostic is a large CLI error type by design; returning it by value is deliberate (faber is a CLI, not a hot library path).
+#![allow(clippy::result_large_err)]
+
 pub mod artifact_plan;
 pub mod binding;
 mod binding_probe;
