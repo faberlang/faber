@@ -14,8 +14,11 @@ related = ["tensor", "matmul", "inference", "fragment", "device", "webgpu"]
 #
 # What this teaches:
 #   • Device execution pipeline — copy-in, kernel dispatch, readback through the placement contract
-#   • Multi-kernel composition — matmul and bias-add as separate WGSL kernels on device
+#   • Single-kernel composition — matmul and bias-add fused as one WGSL kernel on device
 #   • @ nucleum annotation — marks a function as a GPU compute kernel entry point
+#   • Indexed-view kernel ABI — (inputs..., output, index: u32) → vacuum; the
+#     output tensor is an explicit parameter and the index parameter maps to
+#     the invocation id
 #
 # Common mistakes:
 #   • assuming device execution is available before G-P-08 (WGSL matmul emission) and G-SPINE-02 (multi-kernel dispatch) land
@@ -30,10 +33,11 @@ related = ["tensor", "matmul", "inference", "fragment", "device", "webgpu"]
 # Shape: input [4×3] · weight [3×2] + bias [4×2] = output [4×2]
 #
 # This fragment mirrors rung 0 (stepper-only) but targets the WebGPU compute
-# device path through a @ nucleum kernel. matmul runs as a WGSL tiled kernel
-# and bias add runs as a WGSL elementwise kernel within the same device function.
-# Output is returned from the device function through the placement contract
-# and compared elementwise against the stepper reference.
+# device path through a @ nucleum kernel. Matmul and bias-add run as a single
+# fused WGSL kernel (matmul → add) within the indexed-view device function.
+# The kernel takes the inputs (x, w, b), the output view (y), and the
+# invocation index (id), and returns vacuum — the output is written through
+# the explicit y parameter.
 #
 # Device execution contract (gated on G-P-08 + G-SPINE-02):
 #   1. copy_in(x, W, b)  → device buffers
@@ -45,9 +49,9 @@ related = ["tensor", "matmul", "inference", "fragment", "device", "webgpu"]
 #   y = [[9.1, 12.2], [18.1, 24.2], [27.1, 36.2], [36.1, 48.2]]
 
 @ nucleum
-functio linear_layer(tf32[4, 3] x, tf32[3, 2] w, tf32[4, 2] b) → tf32[4, 2] {
+functio linear_layer(tf32[4, 3] x, tf32[3, 2] w, tf32[4, 2] b, tf32[4, 2] y, u32 id) → vacuum {
     fixum tf32[4, 2] c ← x.matmul(w)
-    redde c.addita(b)
+    fixum tf32[4, 2] d ← c.addita(b)
 }
 
 incipit {
@@ -58,7 +62,8 @@ incipit {
     fixum tf32[3, 2] W ← seed.strue(flat_w, [3, 2])
     fixum tf32[4, 3] x ← seed.strue(flat_x, [4, 3])
     fixum tf32[4, 2] b ← seed.strue(flat_b, [4, 2])
-    fixum tf32[4, 2] y ← linear_layer(x, W, b)
+    fixum tf32[4, 2] y ← vacua
+    fixum _ v ← linear_layer(x, W, b, y, 0 ↦ numerus<u32>)
     nota y.accipe([0, 0]) vel 0.0
     nota y.accipe([0, 1]) vel 0.0
     nota y.accipe([1, 0]) vel 0.0
