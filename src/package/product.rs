@@ -1294,8 +1294,7 @@ fn emit_typescript_modules(
             .map(|s| s.as_str())
             .unwrap_or("main");
         let code = wrap_module_exports(code, module_name);
-        let code = rewrite_library_imports(code, library_imports);
-        let code = rewrite_relative_import_extensions(code);
+        let code = rewrite_import_specifiers(code, library_imports);
         let path = ts_root.join(ts_module_file_name(unit));
         fs::write(&path, code).map_err(|err| io_diag(&path, err))?;
     }
@@ -1551,9 +1550,8 @@ fn emit_library_typescript_modules(
         // can resolve cross-module type references (e.g. Vector3 from math).
         let local_names = collect_ts_local_decl_names(&code);
         let code = augment_namespace_imports(code, &namespace_exports, &local_names);
-        // Phase 4: rewrite library specifier imports to relative ESM paths.
-        let code = rewrite_library_imports(code, library_imports);
-        let code = rewrite_relative_import_extensions(code);
+        // Phase 4: one-pass rewrite of import/export specifier tokens.
+        let code = rewrite_import_specifiers(code, library_imports);
         fs::write(&file.ts_path, code).map_err(|err| io_diag(&file.ts_path, err))?;
     }
 
@@ -1793,7 +1791,7 @@ fn emit_ts_binding_facade(
 ///   "triga:triga" → "./triga-triga.js"
 ///   "triga:geometry" → "./triga-geometry.js"
 ///
-/// Phase 4: used by [`rewrite_library_imports`] to rewrite bare library
+/// Phase 4: used by [`rewrite_import_specifiers`] to rewrite bare library
 /// specifiers in emitted TypeScript to relative ESM paths.
 fn build_library_ts_module_map(
     package_root: &Path,
@@ -1847,44 +1845,58 @@ fn build_library_ts_module_map(
     Ok(map)
 }
 
-/// Rewrite bare library specifier imports to relative ESM paths in emitted
-/// TypeScript code.
+/// One-pass rewrite of import/export specifier tokens in emitted TypeScript.
 ///
-/// Replaces `from "triga:triga"` with `from "./triga-triga.js"` using the
-/// pre-built import map from [`build_library_ts_module_map`].
+/// Merges the former two-pass `rewrite_library_imports` +
+/// `rewrite_relative_import_extensions` into a single byte scan
+/// (FBR-P2-008):
 ///
-/// Phase 4: enables the emitted library `.ts` files (not ambient declarations)
-/// to serve as the actual module definitions that tsc resolves.
-fn rewrite_library_imports(code: String, library_imports: &BTreeMap<String, String>) -> String {
-    let mut result = code;
-    for (spec, rel_path) in library_imports {
-        // Match `from "specifier"` (with quotes) so only import/export
-        // statements are affected, not unrelated string literals.
-        let from_pattern = format!("from {:?}", spec);
-        let to_pattern = format!("from {:?}", rel_path);
-        result = result.replace(&from_pattern, &to_pattern);
-    }
-    result
-}
-
-/// Ensure relative ESM import paths carry a `.js` extension.
-///
-/// Browsers resolve bare relative imports like `from "./city"` as a path with
-/// no extension and static servers return 404. Library rewrites already use
-/// `./pkg-mod.js`; package-local codegen historically emitted extensionless
-/// paths (`from "./city"`). Append `.js` so tsc emit and the browser agree.
-///
-/// Only rewrites relative paths (`./` / `../`) that do not already end in a
-/// known extension (`.js`, `.json`, `.ts`, `.mjs`, `.cjs`).
-fn rewrite_relative_import_extensions(code: String) -> String {
+/// - Library specifiers (`from "name:stem"`) are replaced through exact map
+///   membership (`library_imports` from [`build_library_ts_module_map`]) — one
+///   pass, no per-specifier whole-file `String::replace` loop.
+/// - Relative specifiers (`./` / `../`) get a `.js` extension appended when
+///   they do not already carry a known extension.
+/// - Comments, string literals, and template literals are skipped, so
+///   specifier-looking text inside them is never rewritten.
+/// - Only `from "<spec>"` / `from '<spec>'` tokens are rewritten, and only
+///   when `from` is a standalone token (exact-token contract). Dynamic
+///   `import("...")` calls are never touched; `radix-codegen-ts` emits only
+///   static `import { ... } from "..."` declarations, pinned by test.
+fn rewrite_import_specifiers(code: String, library_imports: &BTreeMap<String, String>) -> String {
     let mut out = String::with_capacity(code.len() + 32);
     let bytes = code.as_bytes();
     let mut i = 0;
     while i < bytes.len() {
-        // Match `from "` or `from '` (import/export).
-        if bytes[i..].starts_with(b"from ")
-            && i + 6 < bytes.len()
+        let rest = &bytes[i..];
+        // Line comments are copied verbatim; their text is never a specifier.
+        if rest.starts_with(b"//") {
+            while i < bytes.len() && bytes[i] != b'\n' {
+                out.push(bytes[i] as char);
+                i += 1;
+            }
+            continue;
+        }
+        // Block comments are copied verbatim.
+        if rest.starts_with(b"/*") {
+            out.push_str("/*");
+            i += 2;
+            while i + 1 < bytes.len() && !(bytes[i] == b'*' && bytes[i + 1] == b'/') {
+                out.push(bytes[i] as char);
+                i += 1;
+            }
+            if i + 1 < bytes.len() {
+                out.push_str("*/");
+                i += 2;
+            }
+            continue;
+        }
+        // Import/export specifier token: `from "` / `from '`. The `from` must
+        // be a standalone token (not part of a longer identifier) and the
+        // quote pair encloses the whole specifier string.
+        if rest.starts_with(b"from ")
+            && i + 6 <= bytes.len()
             && (bytes[i + 5] == b'"' || bytes[i + 5] == b'\'')
+            && (i == 0 || !is_ts_ident_byte(bytes[i - 1]))
         {
             let quote = bytes[i + 5];
             out.push_str("from ");
@@ -1894,16 +1906,21 @@ fn rewrite_relative_import_extensions(code: String) -> String {
             while i < bytes.len() && bytes[i] != quote {
                 i += 1;
             }
-            let path = &code[start..i];
-            out.push_str(path);
-            if path.starts_with("./") || path.starts_with("../") {
-                let needs_js = !path.ends_with(".js")
-                    && !path.ends_with(".json")
-                    && !path.ends_with(".ts")
-                    && !path.ends_with(".mjs")
-                    && !path.ends_with(".cjs");
-                if needs_js {
-                    out.push_str(".js");
+            let spec = &code[start..i];
+            match library_imports.get(spec) {
+                Some(rel_path) => out.push_str(rel_path),
+                None => {
+                    out.push_str(spec);
+                    if spec.starts_with("./") || spec.starts_with("../") {
+                        let needs_js = !spec.ends_with(".js")
+                            && !spec.ends_with(".json")
+                            && !spec.ends_with(".ts")
+                            && !spec.ends_with(".mjs")
+                            && !spec.ends_with(".cjs");
+                        if needs_js {
+                            out.push_str(".js");
+                        }
+                    }
                 }
             }
             if i < bytes.len() {
@@ -1912,10 +1929,55 @@ fn rewrite_relative_import_extensions(code: String) -> String {
             }
             continue;
         }
+        // String literals are copied verbatim (backslash escapes respected).
+        if bytes[i] == b'"' || bytes[i] == b'\'' {
+            let quote = bytes[i];
+            out.push(quote as char);
+            i += 1;
+            while i < bytes.len() {
+                let current = bytes[i];
+                out.push(current as char);
+                i += 1;
+                if current == b'\\' {
+                    if i < bytes.len() {
+                        out.push(bytes[i] as char);
+                        i += 1;
+                    }
+                } else if current == quote {
+                    break;
+                }
+            }
+            continue;
+        }
+        // Template literals are copied verbatim (backslash escapes respected).
+        if bytes[i] == b'`' {
+            out.push('`');
+            i += 1;
+            while i < bytes.len() {
+                let current = bytes[i];
+                out.push(current as char);
+                i += 1;
+                if current == b'\\' {
+                    if i < bytes.len() {
+                        out.push(bytes[i] as char);
+                        i += 1;
+                    }
+                } else if current == b'`' {
+                    break;
+                }
+            }
+            continue;
+        }
         out.push(bytes[i] as char);
         i += 1;
     }
     out
+}
+
+/// Byte-level TypeScript identifier character check used for the exact
+/// `from` token boundary in [`rewrite_import_specifiers`] (FBR-P2-008).
+fn is_ts_ident_byte(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'$'
 }
 
 const DOM_TYPE_ALIASES: &[(&str, &str)] = &[

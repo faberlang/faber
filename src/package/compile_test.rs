@@ -335,3 +335,104 @@ fn ensure_go_import_handles_empty_code() {
 fn go_import_path_returns_none_for_whitespace_only() {
     assert_eq!(go_import_path("   "), None);
 }
+
+// ── Stage 4: normalized lookup indexes (FBR-P2-006, FBR-P2-007) ───────────
+
+#[test]
+fn go_multi_unit_local_import_resolves_via_normalized_index() {
+    // FBR-P2-006: Go local-import resolution must resolve each import edge
+    // with one lookup against a per-unit normalized path index instead of an
+    // O(U) scan with repeated path normalization per edge. A multi-unit
+    // package whose entry imports a sibling module proves the index finds the
+    // right unit: without it the namespace var for the imported binding is
+    // missing (and compile fails with package_go_import_unit_missing).
+    let dir = crate::package::test_support::test_temp_dir("go-multi-unit-index");
+    std::fs::write(
+        dir.join("main.fab"),
+        r#"
+importa ex "./lib" privata lib
+
+incipit {
+    nota lib.answer()
+}
+"#,
+    )
+    .expect("write entry");
+    std::fs::write(
+        dir.join("lib.fab"),
+        r#"
+functio answer() → numerus {
+    redde 42
+}
+"#,
+    )
+    .expect("write lib");
+
+    let result = compile_package(&Config::new().with_target(Target::Go), &dir.join("main.fab"));
+    assert!(
+        result.success(),
+        "expected Go multi-unit compile success, got {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+    let Some(Output::Go(GoOutput { code, .. })) = result.output else {
+        panic!("expected go output");
+    };
+    // The namespace var for the imported sibling unit is only injected when
+    // the import resolves through the index to the sibling's func signatures.
+    assert!(
+        code.contains("var lib = struct"),
+        "expected sibling namespace var in generated go code, got:\n{code}"
+    );
+}
+
+#[test]
+fn rust_multi_unit_sibling_exports_resolve_via_package_index() {
+    // FBR-P2-007: Rust sibling export resolution must use one package-wide
+    // normalized path index (built once, current unit excluded by identity)
+    // instead of rebuilding a candidate map per unit. A multi-unit package
+    // with a cross-module call proves the sibling set is complete and
+    // deterministic: the generated entry references the imported module.
+    let dir = crate::package::test_support::test_temp_dir("rust-sibling-index");
+    std::fs::write(
+        dir.join("main.fab"),
+        r#"
+importa ex "./lib" privata lib
+
+incipit {
+    nota lib.answer()
+}
+"#,
+    )
+    .expect("write entry");
+    std::fs::write(
+        dir.join("lib.fab"),
+        r#"
+functio answer() → numerus {
+    redde 42
+}
+"#,
+    )
+    .expect("write lib");
+
+    let result = compile_package(&Config::default(), &dir.join("main.fab"));
+    assert!(
+        result.success(),
+        "expected Rust multi-unit compile success, got {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+    let Some(Output::Rust(output)) = result.output else {
+        panic!("expected rust output");
+    };
+    assert!(
+        output.code.contains("pub mod lib"),
+        "expected sibling module declaration in generated rust code"
+    );
+}

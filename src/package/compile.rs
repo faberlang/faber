@@ -14,7 +14,7 @@ use radix::hir::{HirExpressionKind, HirItemKind};
 use radix::lexer::Interner;
 use radix::syntax::{ImportDecl, ImportKind, StmtKind};
 use radix::{CompileResult, GoOutput, Output, RustOutput};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 
 use super::codegen::{assemble_crate, ModuleNode};
@@ -580,6 +580,14 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Packag
         return compile_failure(diagnostics);
     }
 
+    // FBR-P2-006: normalize each unit path once and index the module function
+    // signatures; every local import then resolves in one map lookup instead
+    // of an O(U) scan with repeated path normalization per import edge.
+    let unit_funcs_by_path: HashMap<PathBuf, &[super::go_build::GoFuncSig]> = unit_funcs
+        .iter()
+        .map(|(path, funcs)| (normalize_path_buf(path), funcs.as_slice()))
+        .collect();
+
     // Namespace vars for local imports + explicit Norma host shims (entry + siblings).
     // WHY (79df18a): inject each binding name at most once — multi-unit packages
     // that all `importa … privata consolum` must not redeclare `var consolum`.
@@ -620,12 +628,7 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Packag
             else {
                 continue;
             };
-            let canon = normalize_path_buf(&target_path);
-            let Some(funcs) = unit_funcs
-                .iter()
-                .find(|(p, _)| normalize_path_buf(p) == canon)
-                .map(|(_, f)| f.as_slice())
-            else {
+            let Some(funcs) = unit_funcs_by_path.get(&target_path).copied() else {
                 diagnostics.push(
                     crate::package_diagnostic_error(format!(
                         "Go multi-module assembly could not find unit for import `{import_path}`"
@@ -873,6 +876,17 @@ fn generate_package_rust(
         .and_then(|manifest| manifest.target.get("rust").and_then(|target| target.host))
         .is_some_and(|host| matches!(host, super::ManifestRustHost::Native));
 
+    // FBR-P2-007: build one package-wide normalized path index once (unit
+    // paths are normalized by discovery); each unit resolves its local imports
+    // against it in one lookup and is excluded by identity. Sibling output
+    // order stays deterministic: it follows each unit's import order.
+    let units_by_path: HashMap<PathBuf, usize> = package
+        .units
+        .iter()
+        .enumerate()
+        .map(|(index, unit)| (super::paths::normalize_path(&unit.path), index))
+        .collect();
+
     for index in 0..package.units.len() {
         let (before, rest) = package.units.split_at_mut(index);
         let Some((unit, after)) = rest.split_first_mut() else {
@@ -880,7 +894,10 @@ fn generate_package_rust(
         };
         let siblings = local_import_siblings_for_unit(
             unit,
-            before.iter().chain(after.iter()),
+            index,
+            &units_by_path,
+            before,
+            after,
             &package.spec,
             library_resolver,
         );
@@ -1431,13 +1448,13 @@ fn visit_package_analysis_file<'a>(
 
 fn local_import_siblings_for_unit<'a>(
     unit: &AnalyzedPackageUnit,
-    candidates: impl Iterator<Item = &'a AnalyzedPackageUnit>,
+    unit_index: usize,
+    units_by_path: &HashMap<PathBuf, usize>,
+    before: &'a [AnalyzedPackageUnit],
+    after: &'a [AnalyzedPackageUnit],
     spec: &super::PackageSpec,
     library_resolver: &crate::library::LibraryResolver,
 ) -> Vec<SiblingModuleExports<'a>> {
-    let candidates_by_path = candidates
-        .map(|candidate| (candidate.path.clone(), candidate))
-        .collect::<BTreeMap<_, _>>();
     let mut siblings = Vec::new();
     for item in &unit.analysis.hir.items {
         let radix::hir::HirItemKind::Import(import) = &item.kind else {
@@ -1449,8 +1466,18 @@ fn local_import_siblings_for_unit<'a>(
         else {
             continue;
         };
-        let Some(sibling) = candidates_by_path.get(&target).copied() else {
+        // One lookup against the package-wide index; the current unit is
+        // never its own sibling (excluded by identity).
+        let Some(&candidate_index) = units_by_path.get(&target) else {
             continue;
+        };
+        if candidate_index == unit_index {
+            continue;
+        }
+        let sibling = if candidate_index < unit_index {
+            &before[candidate_index]
+        } else {
+            &after[candidate_index - unit_index - 1]
         };
         siblings.push(SiblingModuleExports {
             module_key: local_import_module_key(import_path),
