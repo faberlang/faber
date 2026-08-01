@@ -24,21 +24,73 @@
 //!
 //! Cells without an authored fixture remain classifier predictions (plain
 //! glyphs in the matrix). Measured-vs-predicted disagreements are surfaced in
-//! the harness report (the hand classifier is kept as a cross-check oracle).
+//! the harness report.
+//!
+//! ## Oracle fate (resolved, Phase 2 Stage 5)
+//!
+//! The hand classifier is **kept as a cross-check oracle** — it is not retired.
+//! Every fixture-backed cell is measured, so the oracle's only job is the
+//! disagreement report: each mismatch is either fixed or a documented,
+//! counted divergence (the baseline is snapshot into non-regression floors
+//! below; new drift trips the gate). Retirement would require zero
+//! disagreements across a full drift cycle, which the baseline does not meet.
 
 use radix::codegen::conversio_arm::{conversio_arm_clear, conversio_arm_take, ConversioArm};
 use radix::codegen::conversio_coverage::{
     classify_conversio_coverage, ConversioCoverageTarget, ConversioTypeFamily,
 };
-use radix::codegen::{generate_from_analyzed_with_options, generate_rust_from_analyzed, OutputMode, Target};
+use radix::codegen::{
+    generate_from_analyzed_with_options, generate_rust_from_analyzed, OutputMode, Target,
+};
 use radix::driver::{analyze_source, AnalyzedUnit, Config, Session};
 use radix::mir::{
-    classify_mir_coverage, device_roles_from_hir, lower_analyzed_unit_with_context,
-    Lowerability, LoweredMirUnit, MirCoverageTarget, MirDeviceContext,
+    classify_mir_coverage, device_roles_from_hir, lower_analyzed_unit_with_context, Lowerability,
+    LoweredMirUnit, MirCoverageTarget, MirDeviceContext,
 };
 use radix::reader_locale::{latin_reader_pack, KeywordSurface};
 use rustc_hash::FxHashMap;
 use std::path::PathBuf;
+
+// ---------------------------------------------------------------------------
+// Non-regression floors (first green measured baseline, 2026-07-31,
+// Phase 2 Stages 1–4). Do not lower without a counted debt row in the
+// conversio coverage matrix delivery closeout.
+// ---------------------------------------------------------------------------
+
+/// The corpus must stay complete: every family pair has an authored fixture.
+const FIXTURE_CELL_FLOOR: usize = 21 * 21;
+
+/// Measured `dedicated` (✓) cells per target on the green baseline. A backend
+/// arm regression (dedicated → fallback / not-emitted) trips the gate.
+const MEASURED_DEDICATED_FLOORS: [(ConversioCoverageTarget, usize); 10] = [
+    (ConversioCoverageTarget::Rust, 56),
+    (ConversioCoverageTarget::TypeScript, 166),
+    (ConversioCoverageTarget::Go, 113),
+    (ConversioCoverageTarget::Faber, 251),
+    (ConversioCoverageTarget::LlvmText, 235),
+    (ConversioCoverageTarget::WasmText, 6),
+    (ConversioCoverageTarget::Wasm, 6),
+    (ConversioCoverageTarget::WgslText, 0),
+    (ConversioCoverageTarget::SexpStructural, 0),
+    (ConversioCoverageTarget::Sexp, 0),
+];
+
+/// Measured-vs-predicted disagreement caps per target on the green baseline.
+/// The classifier is the cross-check oracle; the baseline drift is documented
+/// in `CONVERSIO_MATRIX.md` → Measured divergences. New (unclassified) drift
+/// trips the gate; fixing drift (shrinking) is always allowed.
+const DISAGREEMENT_CAPS: [(ConversioCoverageTarget, usize); 10] = [
+    (ConversioCoverageTarget::Rust, 73),
+    (ConversioCoverageTarget::TypeScript, 235),
+    (ConversioCoverageTarget::Go, 199),
+    (ConversioCoverageTarget::Faber, 72),
+    (ConversioCoverageTarget::LlvmText, 151),
+    (ConversioCoverageTarget::WasmText, 147),
+    (ConversioCoverageTarget::Wasm, 147),
+    (ConversioCoverageTarget::WgslText, 72),
+    (ConversioCoverageTarget::SexpStructural, 72),
+    (ConversioCoverageTarget::Sexp, 72),
+];
 
 /// HIR backends measured via emit-arm detection (in column order).
 const HIR_MEASURED_TARGETS: [ConversioCoverageTarget; 4] = [
@@ -116,7 +168,10 @@ impl MeasuredVerdict {
                 }
             }
             Self::Mir { capable: true, .. } => "mir-capable".to_owned(),
-            Self::Mir { capable: false, gap } => {
+            Self::Mir {
+                capable: false,
+                gap,
+            } => {
                 format!("mir-gap:{}", gap.as_deref().unwrap_or("unknown"))
             }
             Self::HirDedicated => "arm:dedicated".to_owned(),
@@ -128,7 +183,13 @@ impl MeasuredVerdict {
 
     /// Whether this is a fixture authoring bug (lex/parse rejection).
     fn is_malformed(&self) -> bool {
-        matches!(self, Self::FrontendRejected { malformed: true, .. })
+        matches!(
+            self,
+            Self::FrontendRejected {
+                malformed: true,
+                ..
+            }
+        )
     }
 }
 
@@ -186,7 +247,10 @@ fn measure_cell(session: &Session, cell: &mut CellMeasurement) {
             for &target in ConversioCoverageTarget::ALL {
                 cell.targets.insert(
                     target,
-                    MeasuredVerdict::FrontendRejected { issue: issue.clone(), malformed },
+                    MeasuredVerdict::FrontendRejected {
+                        issue: issue.clone(),
+                        malformed,
+                    },
                 );
             }
             return;
@@ -197,7 +261,10 @@ fn measure_cell(session: &Session, cell: &mut CellMeasurement) {
         for &target in ConversioCoverageTarget::ALL {
             cell.targets.insert(
                 target,
-                MeasuredVerdict::FrontendRejected { issue: issue.clone(), malformed },
+                MeasuredVerdict::FrontendRejected {
+                    issue: issue.clone(),
+                    malformed,
+                },
             );
         }
         return;
@@ -214,11 +281,18 @@ fn measure_cell(session: &Session, cell: &mut CellMeasurement) {
     let lowered = match lower_analyzed_unit_with_context(&mut analysis) {
         Ok(lowered) => lowered,
         Err(errors) => {
-            let shape = errors
-                .first()
-                .map_or_else(|| "mir lowering failed".to_owned(), |error| error.issue.clone());
+            let shape = errors.first().map_or_else(
+                || "mir lowering failed".to_owned(),
+                |error| error.issue.clone(),
+            );
             for &target in &MIR_MEASURED_TARGETS {
-                cell.targets.insert(target, MeasuredVerdict::Mir { capable: false, gap: Some(shape.clone()) });
+                cell.targets.insert(
+                    target,
+                    MeasuredVerdict::Mir {
+                        capable: false,
+                        gap: Some(shape.clone()),
+                    },
+                );
             }
             return;
         }
@@ -254,16 +328,22 @@ fn measure_hir_target(
             let result = generate_rust_from_analyzed(analysis);
             let records = conversio_arm_take();
             match result {
-                Err(error) => MeasuredVerdict::HirCodegenError { message: error.message },
+                Err(error) => MeasuredVerdict::HirCodegenError {
+                    message: error.message,
+                },
                 Ok(_) => attribute_records(records, analysis, src, tgt),
             }
         }
-        ConversioCoverageTarget::TypeScript | ConversioCoverageTarget::Go | ConversioCoverageTarget::Faber => {
+        ConversioCoverageTarget::TypeScript
+        | ConversioCoverageTarget::Go
+        | ConversioCoverageTarget::Faber => {
             // Replicate the driver's per-target policy (generate_output):
             // modulus is hard-blocked on Go/TS until modular edge-vector
             // parity lands (allowed on Rust and Faber).
-            if matches!(target, ConversioCoverageTarget::TypeScript | ConversioCoverageTarget::Go)
-                && analysis.types.first_modular_word_width().is_some()
+            if matches!(
+                target,
+                ConversioCoverageTarget::TypeScript | ConversioCoverageTarget::Go
+            ) && analysis.types.first_modular_word_width().is_some()
             {
                 return MeasuredVerdict::HirCodegenError {
                     message: format!(
@@ -290,7 +370,9 @@ fn measure_hir_target(
             );
             let records = conversio_arm_take();
             match result {
-                Err(error) => MeasuredVerdict::HirCodegenError { message: error.message },
+                Err(error) => MeasuredVerdict::HirCodegenError {
+                    message: error.message,
+                },
                 Ok(_) => attribute_records(records, analysis, src, tgt),
             }
         }
@@ -350,14 +432,12 @@ fn measure_mir_target(
         ConversioCoverageTarget::Sexp => MirCoverageTarget::Sexp,
         _ => return MeasuredVerdict::NoArmRecord,
     };
-    let verdict = classify_mir_coverage(
-        mir_target,
-        &lowered.validated,
-        device,
-        &lowered.interner,
-    );
+    let verdict = classify_mir_coverage(mir_target, &lowered.validated, device, &lowered.interner);
     match verdict {
-        Lowerability::Capable => MeasuredVerdict::Mir { capable: true, gap: None },
+        Lowerability::Capable => MeasuredVerdict::Mir {
+            capable: true,
+            gap: None,
+        },
         Lowerability::Rejected(gaps) => MeasuredVerdict::Mir {
             capable: false,
             gap: gaps.first().map(|gap| gap.shape().to_owned()),
@@ -370,10 +450,7 @@ fn measure_mir_target(
 /// accepted fixture whose conversion never reached the instrumented emit
 /// path — e.g. a literal-source fold) falls back to the classifier prediction
 /// with the attribution gap surfaced in the measured detail.
-fn effective_verdict(
-    cell: &CellMeasurement,
-    target: ConversioCoverageTarget,
-) -> (String, String) {
+fn effective_verdict(cell: &CellMeasurement, target: ConversioCoverageTarget) -> (String, String) {
     if let Some(measured) = cell.targets.get(&target) {
         if !matches!(measured, MeasuredVerdict::NoArmRecord) {
             return (measured.tier_name().to_owned(), measured.detail());
@@ -458,8 +535,36 @@ fn emit_conversio_target_matrix() {
         }
     }
 
+    let disagreements = collect_disagreements(&cells);
     println!("DISAGREEMENTS");
-    for cell in &cells {
+    for (src, tgt, target, predicted, measured, detail) in &disagreements {
+        println!(
+            "{}\t{}\t{}\t{}\t{}\t{}",
+            src.name(),
+            tgt.name(),
+            target.name(),
+            predicted,
+            measured,
+            detail
+        );
+    }
+
+    assert_matrix_ratchet(&cells, &disagreements);
+}
+
+/// Measured-vs-predicted mismatches for fixture-backed cells, in stable order.
+fn collect_disagreements(
+    cells: &[CellMeasurement],
+) -> Vec<(
+    ConversioTypeFamily,
+    ConversioTypeFamily,
+    ConversioCoverageTarget,
+    &'static str,
+    &'static str,
+    String,
+)> {
+    let mut rows = Vec::new();
+    for cell in cells {
         if cell.fixture.is_none() {
             continue;
         }
@@ -467,18 +572,70 @@ fn emit_conversio_target_matrix() {
             if let Some(measured) = cell.targets.get(&target) {
                 let predicted = classify_conversio_coverage(cell.src, cell.tgt, target).name();
                 if measured.tier_name() != predicted {
-                    println!(
-                        "{}\t{}\t{}\t{}\t{}\t{}",
-                        cell.src.name(),
-                        cell.tgt.name(),
-                        target.name(),
+                    rows.push((
+                        cell.src,
+                        cell.tgt,
+                        target,
                         predicted,
                         measured.tier_name(),
-                        measured.detail()
-                    );
+                        measured.detail(),
+                    ));
                 }
             }
         }
+    }
+    rows
+}
+
+/// Non-regression ratchet over the measured baseline (see the floor
+/// constants above). Fails the gate on: an incomplete fixture corpus, a
+/// backend arm regression, or new (unclassified) measured-vs-predicted drift.
+fn assert_matrix_ratchet(
+    cells: &[CellMeasurement],
+    disagreements: &[(
+        ConversioTypeFamily,
+        ConversioTypeFamily,
+        ConversioCoverageTarget,
+        &'static str,
+        &'static str,
+        String,
+    )],
+) {
+    let fixture_cells = cells.iter().filter(|cell| cell.fixture.is_some()).count();
+    assert_eq!(
+        fixture_cells, FIXTURE_CELL_FLOOR,
+        "conversio fixture corpus incomplete: {fixture_cells} != {FIXTURE_CELL_FLOOR}"
+    );
+
+    for (target, floor) in MEASURED_DEDICATED_FLOORS {
+        let dedicated = cells
+            .iter()
+            .filter(|cell| cell.fixture.is_some())
+            .filter(|cell| {
+                matches!(
+                    cell.targets.get(&target),
+                    Some(MeasuredVerdict::HirDedicated)
+                        | Some(MeasuredVerdict::Mir { capable: true, .. })
+                )
+            })
+            .count();
+        assert!(
+            dedicated >= floor,
+            "{} measured dedicated floor regressed: {dedicated} < {floor}",
+            target.name()
+        );
+    }
+
+    for (target, cap) in DISAGREEMENT_CAPS {
+        let count = disagreements
+            .iter()
+            .filter(|(_, _, t, _, _, _)| *t == target)
+            .count();
+        assert!(
+            count <= cap,
+            "{} measured-vs-predicted disagreement cap exceeded: {count} > {cap} (new unclassified drift; fix or document in the delivery closeout)",
+            target.name()
+        );
     }
 }
 
