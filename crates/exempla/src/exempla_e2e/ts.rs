@@ -14,11 +14,15 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 // Floors are calibrated to the full language corpus; live asserts use
 // `floor_for_corpus` so a small `radix/corpus` scaffold can pass while the
 // tree is migrated.
-// Floors ratchet upward only; calibrated to green 2026-07-30 run.
-const EXPECTED_TS_FRONTEND_ANALYZED_FLOOR: usize = 294;
-const EXPECTED_TS_EMITTED_FLOOR: usize = 284;
-const EXPECTED_TS_TYPECHECK_VALID_FLOOR: usize = 274;
-const EXPECTED_TS_RUNNABLE_FLOOR: usize = 272;
+// Floors ratchet upward only. Re-based to the measured 2026-07-31 baseline
+// after clean-break `3e70afa10` (radix) removed 6 fully-passing corpus files
+// (emitte, negativum, nonnihil, nonnulla, nulla, positivum): corpus denominator
+// 310 -> 304, and every tier dropped by exactly 6. The floors below are the
+// measured live values on that run (see ledger.md for the lineage).
+const EXPECTED_TS_FRONTEND_ANALYZED_FLOOR: usize = 288;
+const EXPECTED_TS_EMITTED_FLOOR: usize = 278;
+const EXPECTED_TS_TYPECHECK_VALID_FLOOR: usize = 268;
+const EXPECTED_TS_RUNNABLE_FLOOR: usize = 266;
 
 #[derive(Debug)]
 struct TsE2eResult {
@@ -1741,14 +1745,14 @@ fn ts_e2e_floor_constants_accept_missing_optional_tooling() {
 fn ts_e2e_floor_constants_reject_runnable_regression() {
     assert_ts_e2e_floor_counts(
         TsE2eCounts {
-            total: 292,
+            total: 304,
             frontend_analyzed: EXPECTED_TS_FRONTEND_ANALYZED_FLOOR,
             emitted: EXPECTED_TS_EMITTED_FLOOR,
             formatted: 0,
             linted: 0,
             typecheck_valid: EXPECTED_TS_TYPECHECK_VALID_FLOOR,
             runnable: EXPECTED_TS_RUNNABLE_FLOOR - 1,
-            behavior_checked: 241,
+            behavior_checked: 217,
         },
         full_ts_toolchain(),
     );
@@ -1756,14 +1760,14 @@ fn ts_e2e_floor_constants_reject_runnable_regression() {
 
 fn current_floor_counts() -> TsE2eCounts {
     TsE2eCounts {
-        total: 292,
+        total: 304,
         frontend_analyzed: EXPECTED_TS_FRONTEND_ANALYZED_FLOOR,
         emitted: EXPECTED_TS_EMITTED_FLOOR,
         formatted: 0,
         linted: 0,
         typecheck_valid: EXPECTED_TS_TYPECHECK_VALID_FLOOR,
         runnable: EXPECTED_TS_RUNNABLE_FLOOR,
-        behavior_checked: 241,
+        behavior_checked: 217,
     }
 }
 
