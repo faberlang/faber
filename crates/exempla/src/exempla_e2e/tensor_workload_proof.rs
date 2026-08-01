@@ -84,12 +84,12 @@ pub(super) const TENSOR_WORKLOAD_PROOF_ROWS: &[TensorWorkloadProofRow] =
         expected_stdout_path: "tensor-fragment/tiny-linear-device-relu/src/main.expected",
         selected_operation:
             "rank-2 f32 linear layer + ReLU activation on WebGPU device (matmul + elementwise add + relu)",
-        tier: TensorWorkloadProofTier::FrontendAnalyzed,
-        bucket: Some(TensorWorkloadProofBucket::MirLoweringFailed),
+        tier: TensorWorkloadProofTier::MirLowered,
+        bucket: Some(TensorWorkloadProofBucket::DeviceStagingFailed),
         output_checked: false,
         blocker_owner: None,
         blocker_issue: "",
-        evidence: "rung-2 recorded at the honest lower tier per wave-4 council item 10 (no OutputChecked claim from fixture validation alone): no w4-06d-gpu-relu-proof.mjs and no chain test exist yet, so device dispatch is a follow-on. Proven so far: radix wgsl_text_test.rs::relu_kernel_emits_valid_wgsl (MirUnOp::Relu emits `max(0.0, operand)` through the expr_for_value arm); exemplar corpus/tensor-fragment/tiny-linear-device-relu frontend-analyzes; hand-computed reference [10.1, 0.0, 0.0, 24.2, 28.1, 0.0, 0.0, 48.2] (4 zeros, 4 non-zeros — ReLU not identity). Blocked at MIR lowering: activatio_relu has no MIR method-call registry row (radix crates/radix/src/intrinsics/registry.rs + mir/lower/runtime.rs); wiring is a follow-on",
+        evidence: "rung-2 recorded at the honest tier per wave-4 council item 10 (no OutputChecked claim from fixture validation alone): no w4-06d-gpu-relu-proof.mjs and no chain test exist yet, so device dispatch is a follow-on. Measured 2026-08-01 through the real pipeline (hand-3 G-P-13 S4 probe): frontend analysis OK; MIR lowering now OK — radix 8a09995e4 wired activatio_relu (registry row + method-call lowering, radix crates/radix/src/intrinsics/registry.rs + mir/lower/runtime.rs), unblocking the formerly missing MIR method-call registry row. Current blocker is device IR staging: emit_chain_descriptor fails at the WGSL text probe — target-policy classifier rejects 'MIR-to-WGSL unsupported: kernel runtime call' (device kernel cannot contain a MIR runtime call). Proven so far: radix wgsl_text_test.rs::relu_kernel_emits_valid_wgsl (MirUnOp::Relu emits `max(0.0, operand)` through the expr_for_value arm); exemplar corpus/tensor-fragment/tiny-linear-device-relu frontend-analyzes; hand-computed reference [10.1, 0.0, 0.0, 24.2, 28.1, 0.0, 0.0, 48.2] (4 zeros, 4 non-zeros — ReLU not identity)",
     }];
 
 pub(super) fn tensor_workload_proof_rows() -> &'static [TensorWorkloadProofRow] {

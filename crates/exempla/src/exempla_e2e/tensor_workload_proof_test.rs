@@ -114,11 +114,17 @@ fn tensor_workload_proof_selects_rung2_device_relu() {
 
     assert_eq!(row.rung, 2);
     // Honest tier per need fe38bb00 (wave-4 council item 10): the proof row
-    // records rung 2 at the measured lower tier, NOT OutputChecked — no real
-    // ReLU device dispatch evidence exists yet (no w4-06d-gpu-relu-proof.mjs,
-    // no chain test). Fixture validation alone does not claim device output.
-    assert_eq!(row.tier, TensorWorkloadProofTier::FrontendAnalyzed);
-    assert_eq!(row.bucket, Some(TensorWorkloadProofBucket::MirLoweringFailed));
+    // records rung 2 at the MEASURED pipeline state (hand-3 G-P-13 S4 probe,
+    // 2026-08-01) — MIR lowering now passes (radix 8a09995e4 activatio_relu
+    // wiring), so the row is MirLowered with DeviceStagingFailed, NOT
+    // OutputChecked: no real ReLU device dispatch evidence exists yet (no
+    // w4-06d-gpu-relu-proof.mjs, no chain test). Fixture validation alone
+    // does not claim device output.
+    assert_eq!(row.tier, TensorWorkloadProofTier::MirLowered);
+    assert_eq!(
+        row.bucket,
+        Some(TensorWorkloadProofBucket::DeviceStagingFailed)
+    );
     assert!(!row.output_checked);
     assert_eq!(row.blocker_owner, None);
     assert_eq!(row.blocker_issue, "");
@@ -138,6 +144,12 @@ fn tensor_workload_proof_selects_rung2_device_relu() {
     assert!(row
         .evidence
         .contains("corpus/tensor-fragment/tiny-linear-device-relu"));
+    // Measured-evidence markers: activatio_relu wiring (radix 8a09995e4)
+    // unblocking MIR lowering, and the current device IR staging blocker —
+    // the WGSL text probe rejects the kernel runtime call.
+    assert!(row.evidence.contains("8a09995e4"));
+    assert!(row.evidence.contains("activatio_relu"));
+    assert!(row.evidence.contains("kernel runtime call"));
 }
 
 #[test]
