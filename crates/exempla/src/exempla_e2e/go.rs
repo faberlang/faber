@@ -147,8 +147,14 @@ const GO_DECLARATION_ONLY_FIXTURES: &[&str] = &[
     "vector/kernel.fab",
 ];
 // Floors ratchet upward only; do not lower to absorb drift.
-const EXPECTED_GO_PASS_FLOOR: usize = 253;
-const EXPECTED_GO_ACCEPTED_OUTCOME_FLOOR: usize = 310;
+// 2026-08-01 (GC-001 U0 baseline freeze, Mind-accepted need 3bbb5db2): re-pinned
+// from 253/310 to the measured live baseline 247/304. The 6-gap is corpus shrink
+// (radix clean-break 3e70afa10 removed 6 run-pass corpus files: emitte,
+// negativum, nonnihil, nonnulla, nulla, positivum), not a regression — ledgers
+// byte-identical since pin 27a6459, 0 unexpected failures. Triage in
+// radix/docs/factory/go-canonical/ledger.md.
+const EXPECTED_GO_PASS_FLOOR: usize = 247;
+const EXPECTED_GO_ACCEPTED_OUTCOME_FLOOR: usize = 304;
 // WHY: Remaining expected failures are tracked Go lowering gaps with
 // per-path reopen contracts in docs/factory/go-e2e-failures-matrix/baseline.md.
 const EXPECTED_GO_EXPECTED_FAILURE_CEILING: usize = 51;
