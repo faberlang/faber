@@ -43,7 +43,15 @@ use std::path::PathBuf;
 const HIR_MEASURED_TARGETS: [ConversioCoverageTarget; 1] = [ConversioCoverageTarget::Rust];
 
 /// MIR targets measured via `classify_mir_coverage` on the lowered fixture.
-const MIR_MEASURED_TARGETS: [ConversioCoverageTarget; 1] = [ConversioCoverageTarget::WasmText];
+/// `metal-text` (frozen probe) and `scena` (hidden legacy) stay out.
+const MIR_MEASURED_TARGETS: [ConversioCoverageTarget; 6] = [
+    ConversioCoverageTarget::LlvmText,
+    ConversioCoverageTarget::WasmText,
+    ConversioCoverageTarget::Wasm,
+    ConversioCoverageTarget::WgslText,
+    ConversioCoverageTarget::SexpStructural,
+    ConversioCoverageTarget::Sexp,
+];
 
 /// Resolve the conversio-matrix fixture root (`examples/conversio-matrix/`).
 fn fixture_root() -> PathBuf {
@@ -277,7 +285,12 @@ fn measure_mir_target(
     device: &MirDeviceContext,
 ) -> MeasuredVerdict {
     let mir_target = match target {
+        ConversioCoverageTarget::LlvmText => MirCoverageTarget::LlvmText,
         ConversioCoverageTarget::WasmText => MirCoverageTarget::WasmText,
+        ConversioCoverageTarget::Wasm => MirCoverageTarget::Wasm,
+        ConversioCoverageTarget::WgslText => MirCoverageTarget::WgslText,
+        ConversioCoverageTarget::SexpStructural => MirCoverageTarget::SexpStructural,
+        ConversioCoverageTarget::Sexp => MirCoverageTarget::Sexp,
         _ => return MeasuredVerdict::NoArmRecord,
     };
     let verdict = classify_mir_coverage(
