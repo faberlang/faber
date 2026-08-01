@@ -144,7 +144,6 @@ use std::collections::{BTreeSet, VecDeque};
 use std::path::{Path, PathBuf};
 
 pub(crate) use discovery::PackageSpec;
-use frontmatter::manifest_path_for_spec;
 use import_graph::{
     detect_import_cycles, import_unsupported_diagnostic, library_import_binding,
     library_import_kind_diagnostic, resolve_import, ImportResolution,
@@ -263,7 +262,10 @@ pub(crate) fn load_package_with_reader_pack(
     include_proba: bool,
     proba_filter: Option<&TestSourceFilter>,
 ) -> Result<Vec<PackageFile>, Vec<Diagnostic>> {
-    let manifest = manifest_path_for_spec(spec).and_then(|path| read_manifest(&path).ok());
+    let manifest = match manifest::manifest_for_spec(spec) {
+        Ok(manifest) => manifest,
+        Err(diag) => return Err(vec![*diag]),
+    };
     let source_root_for_filter = if spec.source_root.is_dir() {
         spec.source_root.clone()
     } else {

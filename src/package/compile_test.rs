@@ -1,6 +1,40 @@
 use super::*;
 
 #[test]
+fn rust_runtime_plan_surfaces_missing_manifest_after_validation() {
+    let dir = crate::package::test_support::test_temp_dir("plan-missing-manifest");
+    std::fs::create_dir_all(dir.join("src")).expect("create src");
+    std::fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "plan-missing"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("write manifest");
+    std::fs::write(dir.join("src/main.fab"), "incipit { }\n").expect("write entry");
+
+    let config = Config::default();
+    let resolver = crate::package::library_resolver_from_config(&config);
+    let package = crate::package::analyze_package(&config, &dir).expect("analyze package");
+    std::fs::remove_file(dir.join("faber.toml")).expect("delete manifest after analysis");
+
+    let Err(diag) = rust_runtime_plan_for_package(&package, &resolver) else {
+        panic!("missing manifest after validation must be a diagnostic, not a silent default");
+    };
+    assert!(diag
+        .args
+        .contains(&radix::diagnostics::DiagnosticArg::new(
+            "issue",
+            "package_manifest_missing_after_validation"
+        )));
+}
+
+#[test]
 fn compile_package_deny_warnings_suppresses_output_after_promotion() {
     let dir = crate::package::test_support::test_temp_dir("package-deny-warnings");
     std::fs::create_dir_all(dir.join("src")).expect("create src");

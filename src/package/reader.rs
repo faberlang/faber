@@ -5,8 +5,7 @@ use radix::reader_locale::ReaderLocalePack;
 use std::path::{Path, PathBuf};
 
 use super::discovery::discover_package;
-use super::frontmatter::manifest_path_for_spec;
-use super::manifest::{read_manifest, validate_manifest, FaberManifest};
+use super::manifest::{manifest_for_spec, FaberManifest};
 use super::paths::normalize_path;
 use super::PackageSpec;
 
@@ -32,21 +31,17 @@ pub(crate) fn load_reader_pack_for_input(
     cli_locale: Option<&str>,
 ) -> Result<Option<ReaderLocalePack>, Box<Diagnostic>> {
     let spec = discover_package(input)?;
-    let manifest_path = manifest_path_for_spec(&spec);
-    let manifest = manifest_path
-        .as_ref()
-        .map(|path| {
-            let manifest = read_manifest(path)?;
-            validate_manifest(&manifest, path)?;
-            Ok::<_, Box<Diagnostic>>(manifest)
-        })
-        .transpose()?;
+    // A validated manifest that disappeared is a diagnostic (FBR-P1-001);
+    // legacy manifestless inputs legitimately have none.
+    let manifest = manifest_for_spec(&spec)?;
+    let manifest_path = spec
+        .manifest_backed
+        .then(|| spec.package_root.join(super::MANIFEST_FILE));
+    let package_root = package_root_for_selection(&spec, manifest_path.as_deref());
 
     let Some(locale) = selected_locale(cli_locale, manifest.as_ref())? else {
         return Ok(None);
     };
-
-    let package_root = package_root_for_selection(&spec, manifest_path.as_deref());
     let pack_path = reader_pack_path(&package_root, &locale, cli_locale, manifest.as_ref());
     let pack = ReaderLocalePack::from_toml_path(&pack_path).map_err(|err| {
         Box::new(

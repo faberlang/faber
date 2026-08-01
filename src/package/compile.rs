@@ -79,8 +79,8 @@ fn main() {}\n";
 fn rust_runtime_plan_for_package(
     package: &AnalyzedPackage,
     library_resolver: &crate::library::LibraryResolver,
-) -> RustRuntimePlan {
-    let manifest = manifest_path_for_spec(&package.spec).and_then(|path| read_manifest(&path).ok());
+) -> Result<RustRuntimePlan, Box<Diagnostic>> {
+    let manifest = super::manifest::manifest_for_spec(&package.spec)?;
     let host = manifest
         .as_ref()
         .and_then(|manifest| manifest.target.get("rust").and_then(|target| target.host));
@@ -164,7 +164,7 @@ fn rust_runtime_plan_for_package(
         plan.selected_providers =
             selected_providers_for_routes(&host_required, &explicit_providers);
     }
-    plan
+    Ok(plan)
 }
 
 fn hir_item_is_async(item: &radix::hir::HirItem) -> bool {
@@ -249,7 +249,7 @@ pub(crate) fn package_rust_runtime_plan(
     let package_root = package_root_for_input(input);
     let library_resolver = library_resolver_for_package(&config, &package_root)?;
     let package = analyze_package_spec(&config, spec, &library_resolver, false, None)?;
-    Ok(rust_runtime_plan_for_package(&package, &library_resolver))
+    rust_runtime_plan_for_package(&package, &library_resolver).map_err(|diag| vec![*diag])
 }
 
 pub(crate) fn analyze_package(
@@ -1368,6 +1368,7 @@ fn linked_crates_for_package_root(
             source_root: package_root.to_path_buf(),
             entry: package_root.to_path_buf(),
             templates: std::collections::BTreeMap::new(),
+            manifest_backed: true,
         },
         units: Vec::new(),
         entry_frontmatter: None,

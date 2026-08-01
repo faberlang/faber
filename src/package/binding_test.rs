@@ -214,9 +214,12 @@ fn parent_escaping_source_path_is_rejected() {
     )
     .expect("rewrite manifest");
 
+    // Stage 0 restricts `paths.source` to the supported set (`src`, `.`), so
+    // an escaping source value is rejected at manifest validation before the
+    // member-path containment guards can run.
     let diagnostics =
         verify_library_bindings(root.path(), "rust").expect_err("escaping source rejected");
-    assert!(has_issue(&diagnostics, "package_member_parent_escape"));
+    assert!(has_issue(&diagnostics, "package_member_unsupported_source_root"));
 }
 
 #[test]
@@ -294,9 +297,12 @@ fn missing_source_below_symlinked_parent_is_rejected() {
     )
     .expect("rewrite manifest");
 
+    // Any non-`src`/`.` source value is rejected at manifest validation
+    // (Stage 0), so this symlinked-parent layout is caught before the
+    // member-path containment guards run.
     let diagnostics =
         verify_library_bindings(root.path(), "rust").expect_err("missing symlink child rejected");
-    assert!(has_issue(&diagnostics, "package_member_symlink_escape"));
+    assert!(has_issue(&diagnostics, "package_member_unsupported_source_root"));
 }
 
 #[cfg(unix)]

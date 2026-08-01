@@ -252,8 +252,14 @@ fn check_manifest_rejects_source_parent_escape() {
 
     let (_stdout, stderr, ok) = run_faber(&["check", package.to_str().expect("utf8 package path")]);
 
+    // Stage 0 restricts `paths.source` to the supported set (`src`, `.`), so
+    // an escaping source value is rejected at manifest validation before the
+    // member-path containment guards run. The check still fails loudly.
     assert!(!ok, "source parent escape must fail");
-    assert_package_path_rejected(&stderr, "package member path escapes through its parent");
+    assert_package_path_rejected(
+        &stderr,
+        "faber.toml paths.source '../outside' is not supported: only \"src\" (the default) and \".\" (the package root) are allowed until a usage contract for custom source roots is decided",
+    );
 }
 
 #[test]

@@ -12,6 +12,7 @@ fn empty_package(root: &str) -> AnalyzedPackage {
             source_root: PathBuf::from(root).join("src"),
             entry: PathBuf::from(root).join("src/main.fab"),
             templates: BTreeMap::new(),
+            manifest_backed: false,
         },
         units: Vec::new(),
         entry_frontmatter: None,

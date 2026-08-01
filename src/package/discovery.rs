@@ -12,6 +12,7 @@ use super::MANIFEST_FILE;
 /// The compiler keeps package discovery separate from build layout discovery:
 /// this type describes the Faber source graph only, not the generated Cargo
 /// crate that may later be emitted under `target/faber/`.
+#[derive(Debug)]
 pub(crate) struct PackageSpec {
     /// Directory containing `faber.toml`, or the legacy package root.
     pub(in crate::package) package_root: PathBuf,
@@ -20,6 +21,10 @@ pub(crate) struct PackageSpec {
     /// Import path templates (`§name/rest`) from `[paths.templates]`, values
     /// resolved relative to [`Self::package_root`].
     pub(in crate::package) templates: std::collections::BTreeMap<String, PathBuf>,
+    /// Whether discovery read and validated `package_root/faber.toml`. Only
+    /// legacy manifestless inputs are `false`; a validated manifest that later
+    /// disappears or becomes unreadable is a diagnostic, never a silent default.
+    pub(in crate::package) manifest_backed: bool,
 }
 
 /// Layout for a package build: generated Rust crate under `target/faber/`,
@@ -170,6 +175,7 @@ pub(crate) fn discover_package(input: &Path) -> PackageDiscoveryResult {
             entry: root.join("main.fab"),
             source_root: root,
             templates: std::collections::BTreeMap::new(),
+            manifest_backed: false,
         });
     }
 
@@ -186,6 +192,7 @@ pub(crate) fn discover_package(input: &Path) -> PackageDiscoveryResult {
         source_root: root,
         entry,
         templates: std::collections::BTreeMap::new(),
+        manifest_backed: false,
     })
 }
 
@@ -198,8 +205,7 @@ fn parse_manifest(path: &Path) -> PackageDiscoveryResult {
 
     validate_manifest(&manifest, path)?;
 
-    let source_root =
-        resolve_package_member(&package_root, &manifest.paths.source, path).map_err(Box::new)?;
+    let source_root = resolve_source_root(&package_root, &manifest.paths.source, path)?;
     let entry = manifest
         .paths
         .entry
@@ -213,6 +219,7 @@ fn parse_manifest(path: &Path) -> PackageDiscoveryResult {
         source_root,
         entry,
         templates,
+        manifest_backed: true,
     })
 }
 
@@ -225,14 +232,14 @@ fn parse_manifest_with_entry(path: &Path, entry: PathBuf) -> PackageDiscoveryRes
 
     validate_manifest(&manifest, path)?;
 
-    let source_root =
-        resolve_package_member(&package_root, &manifest.paths.source, path).map_err(Box::new)?;
+    let source_root = resolve_source_root(&package_root, &manifest.paths.source, path)?;
     let templates = resolve_path_templates(&package_root, &manifest.paths.templates, path)?;
     Ok(PackageSpec {
         package_root,
         source_root,
         entry,
         templates,
+        manifest_backed: true,
     })
 }
 
@@ -268,6 +275,24 @@ fn resolve_path_templates(
         resolved.insert(name.clone(), path);
     }
     Ok(resolved)
+}
+
+/// Resolve `[paths].source` to a source root inside the package.
+///
+/// The supported set is `"src"` (default) and `"."` (the package root). `"."`
+/// is the package root itself, so it short-circuits the member-path machinery
+/// (a bare `CurDir` normalizes to an empty path, which `resolve_package_member`
+/// correctly rejects as naming nothing). All other values are rejected earlier
+/// by `validate_manifest`.
+fn resolve_source_root(
+    package_root: &Path,
+    source: &str,
+    manifest_path: &Path,
+) -> Result<PathBuf, Box<Diagnostic>> {
+    if source.trim() == "." {
+        return Ok(package_root.to_path_buf());
+    }
+    resolve_package_member(package_root, source, manifest_path).map_err(Box::new)
 }
 
 fn manifest_entry_path(

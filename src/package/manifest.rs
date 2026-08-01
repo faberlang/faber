@@ -67,6 +67,11 @@ pub struct ManifestPackage {
 #[serde(deny_unknown_fields)]
 pub struct ManifestPaths {
     /// Directory containing package source files, relative to the manifest.
+    ///
+    /// Supported values are `"src"` (the default) and `"."` (the package
+    /// root). Any other value — nested roots such as `"components/faber"` or
+    /// depth-1 customs such as `"lib"` — is rejected at manifest validation
+    /// until a usage contract for custom source roots exists.
     #[serde(default = "default_source_path")]
     pub source: String,
 
@@ -328,6 +333,36 @@ pub fn read_manifest(path: &Path) -> Result<FaberManifest, Box<Diagnostic>> {
     })
 }
 
+/// Read the validated manifest for a package spec, if the package is
+/// manifest-backed.
+///
+/// Legacy manifestless inputs (file or directory without `faber.toml`) return
+/// `Ok(None)`. A spec whose manifest was read and validated during discovery
+/// must keep its manifest: a later missing or unreadable manifest is a
+/// diagnostic, never a silent `None` default (FBR-P1-001).
+pub(super) fn manifest_for_spec(
+    spec: &super::discovery::PackageSpec,
+) -> Result<Option<FaberManifest>, Box<Diagnostic>> {
+    if !spec.manifest_backed {
+        return Ok(None);
+    }
+    let Some(path) = super::frontmatter::manifest_path_for_spec(spec) else {
+        return Err(Box::new(
+            crate::package_diagnostic_error(
+                "package manifest faber.toml is missing after discovery validated it",
+            )
+            .with_file(
+                spec.package_root
+                    .join(super::MANIFEST_FILE)
+                    .display()
+                    .to_string(),
+            )
+            .with_arg("issue", "package_manifest_missing_after_validation"),
+        ));
+    };
+    read_manifest(&path).map(Some)
+}
+
 pub(crate) fn validate_manifest(
     manifest: &FaberManifest,
     path: &Path,
@@ -367,6 +402,25 @@ pub(crate) fn validate_manifest(
             crate::package_diagnostic_error("faber.toml paths.source must not be empty")
                 .with_file(path.display().to_string()),
         ));
+    }
+
+    // FBR-P1-001: the supported source-root set is exactly `src` (default) and
+    // `.` (package root). Everything else — nested roots like
+    // `components/faber` or depth-1 customs like `lib` — is rejected loudly
+    // until a usage contract for custom source roots is decided. The
+    // `manifest_path_for_spec` probes are only provably complete for this set.
+    match manifest.paths.source.trim() {
+        "src" | "." => {}
+        unsupported => {
+            return Err(Box::new(
+                crate::package_diagnostic_error(format!(
+                    "faber.toml paths.source '{unsupported}' is not supported: only \"src\" (the default) and \".\" (the package root) are allowed until a usage contract for custom source roots is decided"
+                ))
+                .with_file(path.display().to_string())
+                .with_arg("issue", "package_member_unsupported_source_root")
+                .with_arg("source", unsupported.to_owned()),
+            ));
+        }
     }
 
     if let Some(entry) = manifest.paths.entry.as_deref() {

@@ -144,6 +144,7 @@ fn single_file_proba_entry_fails_closed_outside_test_path() {
         source_root: dir.path().to_path_buf(),
         entry: proba.clone(),
         templates: Default::default(),
+        manifest_backed: false,
     };
     let resolver = library_resolver_from_config(&Config::default());
     let Err(err) = load_package_with_reader_pack(&spec, &resolver, None, false, None) else {

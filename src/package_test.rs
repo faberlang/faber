@@ -10,11 +10,12 @@ use super::{
     check_package, compile_package, config_with_reader_locale, discover_build_layout,
     discover_package, emit_generated_crate, emit_generated_crate_with_runtime_plan,
     invoke_cargo_build, library_cached_file_interface, library_resolver_from_config, load_package,
-    package_host_selection_diagnostic, package_rust_runtime_plan, read_manifest,
-    run_package_fmir_image, run_package_fmir_text_image, run_package_mir, run_package_mir_artifact,
-    sanitize_crate_name, use_package_compiler, use_package_compiler_from_args, validate_manifest,
-    verify_library_binding_shapes, verify_library_bindings, with_lowered_package_mir, BuildLayout,
-    LibraryInterfaceCache, ManifestProductEmit, ManifestProductKind, ManifestRustHost,
+    load_package_with_reader_pack, package_host_selection_diagnostic, package_rust_runtime_plan,
+    read_manifest, run_package_fmir_image, run_package_fmir_text_image, run_package_mir,
+    run_package_mir_artifact, sanitize_crate_name, use_package_compiler,
+    use_package_compiler_from_args, validate_manifest, verify_library_binding_shapes,
+    verify_library_bindings, with_lowered_package_mir, BuildLayout, LibraryInterfaceCache,
+    ManifestProductEmit, ManifestProductKind, ManifestRustHost,
 };
 use super::{fmir_image_test_summary, fmir_text_image_test_summary};
 use crate::library::{LibraryProviderKind, LibraryResolver, ResolvedLibraryModule};
@@ -6327,6 +6328,206 @@ targets = ["rust"]
 }
 
 #[test]
+fn validate_manifest_rejects_nested_source_root() {
+    let dir = test_temp_dir("manifest-nested-source-root");
+    let manifest_path = dir.join("faber.toml");
+    fs::write(
+        &manifest_path,
+        r#"
+[package]
+name = "nested-root"
+
+[paths]
+source = "components/faber"
+"#,
+    )
+    .expect("write manifest");
+
+    let manifest = read_manifest(&manifest_path).expect("read manifest");
+    let err = validate_manifest(&manifest, &manifest_path)
+        .expect_err("nested source root must be rejected");
+    assert!(diagnostic_has_issue(&err, "package_member_unsupported_source_root"));
+    assert!(
+        err.message.contains("src"),
+        "diagnostic must name the supported default, got: {}",
+        err.message
+    );
+    assert!(
+        err.message.contains("package root"),
+        "diagnostic must name the supported package-root value, got: {}",
+        err.message
+    );
+    assert!(
+        err.message.contains("usage contract"),
+        "diagnostic must name the pending usage contract, got: {}",
+        err.message
+    );
+}
+
+#[test]
+fn validate_manifest_rejects_custom_depth1_source_root() {
+    let dir = test_temp_dir("manifest-custom-depth1-source");
+    let manifest_path = dir.join("faber.toml");
+    fs::write(
+        &manifest_path,
+        r#"
+[package]
+name = "custom-root"
+
+[paths]
+source = "lib"
+"#,
+    )
+    .expect("write manifest");
+
+    let manifest = read_manifest(&manifest_path).expect("read manifest");
+    let err =
+        validate_manifest(&manifest, &manifest_path).expect_err("depth-1 custom root rejected");
+    assert!(diagnostic_has_issue(&err, "package_member_unsupported_source_root"));
+}
+
+#[test]
+fn compile_package_rejects_unsupported_source_root_no_compile_proceeds() {
+    let dir = test_temp_dir("manifest-unsupported-source");
+    fs::create_dir_all(dir.join("src")).expect("create src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "bad-source"
+
+[paths]
+source = "components/faber"
+entry = "main.fab"
+"#,
+    )
+    .expect("write manifest");
+    fs::write(dir.join("src/main.fab"), "incipit { }\n").expect("write entry");
+
+    let spec = discover_package(&dir)
+        .expect_err("discovery must reject an unsupported source root before resolution");
+    assert!(diagnostic_has_issue(&spec, "package_member_unsupported_source_root"));
+
+    let result = compile_package(&Config::default(), &dir);
+    assert!(result.output.is_none());
+    assert!(result
+        .diagnostics
+        .iter()
+        .any(|diag| diagnostic_has_issue(diag, "package_member_unsupported_source_root")));
+}
+
+#[test]
+fn discover_package_accepts_package_root_source_dot() {
+    let dir = test_temp_dir("manifest-dot-source");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "dot-pkg"
+
+[paths]
+source = "."
+entry = "main.fab"
+"#,
+    )
+    .expect("write manifest");
+    fs::write(dir.join("main.fab"), "incipit { }\n").expect("write entry");
+
+    let manifest = read_manifest(&dir.join("faber.toml")).expect("read manifest");
+    validate_manifest(&manifest, &dir.join("faber.toml"))
+        .expect("package-root source is in the supported set");
+
+    let spec = discover_package(&dir).expect("discover dot-source package");
+    assert!(spec.manifest_backed);
+    assert_eq!(spec.source_root, dir.path().to_path_buf());
+    assert_eq!(spec.entry, dir.join("main.fab"));
+
+    // Full compile proceeds with `source = "."` (examples/automation canary shape).
+    let result = compile_package(&Config::default(), &dir);
+    assert!(
+        result.output.is_some(),
+        "dot-source package must compile, got {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn load_package_with_reader_pack_surfaces_missing_manifest_after_validation() {
+    let dir = test_temp_dir("manifest-missing-after-validation");
+    fs::create_dir_all(dir.join("src")).expect("create src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "vanishing"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("write manifest");
+    fs::write(dir.join("src/main.fab"), "incipit { }\n").expect("write entry");
+
+    let spec = discover_package(&dir).expect("discover validated package");
+    assert!(spec.manifest_backed);
+    fs::remove_file(dir.join("faber.toml")).expect("delete manifest after discovery");
+
+    let resolver = library_resolver_from_config(&Config::default());
+    let Err(err) = load_package_with_reader_pack(&spec, &resolver, None, false, None) else {
+        panic!("missing manifest after validation must be a diagnostic, not a silent default");
+    };
+    assert!(err
+        .iter()
+        .any(|d| diagnostic_has_issue(d, "package_manifest_missing_after_validation")));
+}
+
+#[test]
+fn load_package_with_reader_pack_rejects_malformed_manifest() {
+    let dir = test_temp_dir("manifest-malformed-load");
+    fs::create_dir_all(dir.join("src")).expect("create src");
+    fs::write(dir.join("faber.toml"), "this is not toml [").expect("write malformed manifest");
+    fs::write(dir.join("src/main.fab"), "incipit { }\n").expect("write entry");
+
+    // Discovery itself fails loudly on a malformed manifest.
+    let err = discover_package(&dir).expect_err("malformed manifest must fail at discovery");
+    assert!(diagnostic_has_issue(&err, "invalid_package_manifest"));
+
+    // A manifest-backed spec must not silently swallow a malformed manifest either.
+    let spec = super::discovery::PackageSpec {
+        package_root: dir.path().to_path_buf(),
+        source_root: dir.join("src"),
+        entry: dir.join("src/main.fab"),
+        templates: Default::default(),
+        manifest_backed: true,
+    };
+    let resolver = library_resolver_from_config(&Config::default());
+    let Err(err) = load_package_with_reader_pack(&spec, &resolver, None, false, None) else {
+        panic!("malformed manifest must fail loudly on load, not be swallowed");
+    };
+    assert!(err.iter().any(|d| diagnostic_has_issue(d, "invalid_package_manifest")));
+}
+
+#[test]
+fn manifestless_legacy_spec_loads_without_manifest() {
+    let dir = test_temp_dir("legacy-manifestless-load");
+    let entry = dir.join("main.fab");
+    fs::write(&entry, "incipit { }\n").expect("write entry");
+
+    let spec = discover_package(&entry).expect("discover legacy file input");
+    assert!(!spec.manifest_backed);
+
+    let resolver = library_resolver_from_config(&Config::default());
+    let files = load_package_with_reader_pack(&spec, &resolver, None, false, None)
+        .expect("legacy manifestless load keeps working");
+    assert_eq!(files.len(), 1);
+}
+
+#[test]
 fn compile_package_rejects_binary_manifest_without_entry() {
     let dir = test_temp_dir("manifest-bin-missing-entry");
     fs::create_dir_all(dir.join("src")).expect("create src");
@@ -8407,7 +8608,10 @@ functio label() → textus {
 #[test]
 fn library_resolver_reports_installed_manifest_missing_source_root() {
     let library_home = test_temp_dir("installed-missing-source-root-home");
-    write_installed_library_manifest(library_home.path(), "altlib", "interfaces", None);
+    // A supported `src` root that was never materialized still surfaces the
+    // missing-source-root diagnostic; an unsupported root is rejected even
+    // earlier (see installed_library_with_unsupported_source_root_is_rejected).
+    write_installed_library_manifest(library_home.path(), "altlib", "src", None);
 
     let dir = test_temp_dir("installed-missing-source-root-app");
     fs::create_dir_all(dir.join("src")).expect("create app src");
@@ -8440,6 +8644,50 @@ incipit {
     assert!(result.diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "missing_installed_library_source_root")
             && diagnostic_has_arg(diag, "provider", "altlib")
+    }));
+}
+
+#[test]
+fn installed_library_with_unsupported_source_root_is_rejected() {
+    let library_home = test_temp_dir("installed-unsupported-source-root-home");
+    // Stage 0 restricts `[paths].source` to `src` and `.`, so an installed
+    // library whose manifest declares a depth-1 custom root is rejected at
+    // discovery instead of silently resolving (or dropping) a source dir.
+    write_installed_library_manifest(library_home.path(), "altlib", "interfaces", None);
+
+    let dir = test_temp_dir("installed-unsupported-source-root-app");
+    fs::create_dir_all(dir.join("src")).expect("create app src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "installed-unsupported-source-root-app"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("write app manifest");
+    fs::write(
+        dir.join("src/main.fab"),
+        r#"
+importa ex "altlib:math/add" privata add
+
+incipit {
+    nota add.label()
+}
+"#,
+    )
+    .expect("write app entry");
+
+    let result = compile_package(&config_with_library_home(library_home.path()), &dir);
+    assert!(result.output.is_none());
+    assert!(result.diagnostics.iter().any(|diag| {
+        diagnostic_has_issue(diag, "invalid_installed_library_manifest")
+            && diagnostic_has_arg(diag, "provider", "altlib")
+            && diag.message.contains("paths.source")
+            && diag.message.contains("is not supported")
     }));
 }
 
