@@ -150,9 +150,9 @@ fn cmd_run_go(args: &RunArgs) {
         args.reader_locale.as_deref(),
         warn_policy_from_args(args),
     );
-    let result = package::compile_package(&config, &input_path);
-    super::eprint_compile_diagnostics(&result.diagnostics);
-    let Some(output) = result.output else {
+    let result = package::compile_package_go(&config, &input_path);
+    super::eprint_compile_diagnostics(&result.compile_result.diagnostics);
+    let Some(output) = result.compile_result.output else {
         eprintln!("compilation failed");
         std::process::exit(1);
     };
@@ -170,8 +170,7 @@ fn cmd_run_go(args: &RunArgs) {
         }
     };
     let go_layout = package::GoBuildLayout::from_package(&layout);
-    let modules = package::take_go_package_modules();
-    if let Err(d) = package::emit_go_module(&go_layout, &code, &modules) {
+    if let Err(d) = package::emit_go_module(&go_layout, &code, &result.go_modules) {
         eprintln!("error: {}", d.message);
         std::process::exit(1);
     }

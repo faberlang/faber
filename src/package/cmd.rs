@@ -11,9 +11,9 @@ use super::go_build::{emit_go_module, invoke_go_build, GoBuildLayout};
 use super::manifest::manifest_build_target;
 use super::{
     build_package_fmir_binary_bundle, build_package_fmir_image, build_package_fmir_text_image,
-    build_package_mir_artifact, check_package, compile_package, config_with_reader_locale,
-    discover_build_layout, package_host_selection_diagnostic, package_rust_runtime_plan,
-    read_manifest, BuildLayout, MANIFEST_FILE,
+    build_package_mir_artifact, check_package, compile_package, compile_package_go,
+    config_with_reader_locale, discover_build_layout, package_host_selection_diagnostic,
+    package_rust_runtime_plan, read_manifest, BuildLayout, MANIFEST_FILE,
 };
 
 /// Execute the user-facing `faber build` command.
@@ -157,6 +157,45 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
         }
     }
 
+    // G6 GO3/GO4: package Go builds write target/faber/go and invoke `go build`.
+    // The multi-module file collection travels inside the compile result
+    // itself (FBR-P2-003) — no hidden thread-local state.
+    if is_package && target == radix::codegen::Target::Go {
+        let go_result = compile_package_go(&config, &input_path);
+        radix::tool::print_diagnostics(
+            &go_result.compile_result.diagnostics,
+            DiagnosticMode::Normal,
+            reader_pack.as_ref(),
+        );
+        let Some(output) = go_result.compile_result.output else {
+            eprintln!("compilation failed");
+            std::process::exit(1);
+        };
+        let layout = match discover_build_layout(&input_path) {
+            Ok(l) => l,
+            Err(d) => {
+                eprintln!("error: {}", d.message);
+                std::process::exit(1);
+            }
+        };
+        let go_layout = GoBuildLayout::from_package(&layout);
+        let code = output_code(output);
+        if let Err(d) = emit_go_module(&go_layout, &code, &go_result.go_modules) {
+            eprintln!("error: {}", d.message);
+            std::process::exit(1);
+        }
+        match invoke_go_build(&go_layout) {
+            Ok(binary_path) => {
+                println!("{}", binary_path.display());
+                return;
+            }
+            Err(d) => {
+                eprintln!("error: {}", d.message);
+                std::process::exit(1);
+            }
+        }
+    }
+
     let result = if is_package {
         compile_package(&config, &input_path)
     } else {
@@ -174,34 +213,6 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
         eprintln!("compilation failed");
         std::process::exit(1);
     };
-
-    // G6 GO3/GO4: package Go builds write target/faber/go and invoke `go build`.
-    if is_package && target == radix::codegen::Target::Go {
-        let layout = match discover_build_layout(&input_path) {
-            Ok(l) => l,
-            Err(d) => {
-                eprintln!("error: {}", d.message);
-                std::process::exit(1);
-            }
-        };
-        let go_layout = GoBuildLayout::from_package(&layout);
-        let code = output_code(output);
-        let modules = super::compile::take_go_package_modules();
-        if let Err(d) = emit_go_module(&go_layout, &code, &modules) {
-            eprintln!("error: {}", d.message);
-            std::process::exit(1);
-        }
-        match invoke_go_build(&go_layout) {
-            Ok(binary_path) => {
-                println!("{}", binary_path.display());
-                return;
-            }
-            Err(d) => {
-                eprintln!("error: {}", d.message);
-                std::process::exit(1);
-            }
-        }
-    }
 
     // Package Rust builds own a generated crate under target/faber/ and let
     // Cargo place artifacts in sibling debug/release directories.

@@ -84,8 +84,8 @@ pub use cmd::{
     use_package_compiler_from_args,
 };
 pub(crate) use compile::package_rust_runtime_plan;
-#[allow(unused_imports)] // binary-only run path consumes this crate-visible helper.
-pub(crate) use compile::take_go_package_modules;
+#[allow(unused_imports)] // binary build/run paths consume this crate-visible Go entry.
+pub(crate) use compile::compile_package_go;
 #[allow(unused_imports)] // package MIR stages consume this crate-visible analysis API.
 pub(crate) use compile::{
     analyze_package, analyze_package_for_tests, AnalyzedPackage, AnalyzedPackageUnit,

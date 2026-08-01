@@ -7,8 +7,8 @@
 use super::{
     analyze_package, build_browser_product, build_browser_product_static_assets,
     build_package_fmir_image, build_package_fmir_text_image, build_package_mir_artifact,
-    check_package, compile_package, config_with_reader_locale, discover_build_layout,
-    discover_package, emit_generated_crate, emit_generated_crate_with_runtime_plan,
+    check_package, compile_package, compile_package_go, config_with_reader_locale,
+    discover_build_layout, discover_package, emit_generated_crate, emit_generated_crate_with_runtime_plan,
     invoke_cargo_build, library_cached_file_interface, library_resolver_from_config, load_package,
     load_package_with_reader_pack, package_host_selection_diagnostic, package_rust_runtime_plan,
     read_manifest, run_package_fmir_image, run_package_fmir_text_image, run_package_mir,
@@ -10039,7 +10039,9 @@ incipit argumenta args exitus 0 {
     )
     .expect("entry");
 
-    let result = compile_package(&Config::default().with_target(Target::Go), &dir);
+    let result = compile_package_go(&Config::default().with_target(Target::Go), &dir);
+    let modules = result.go_modules;
+    let result = result.compile_result;
     assert!(
         result.success(),
         "go multi-module compile failed: {:?}",
@@ -10063,7 +10065,6 @@ incipit argumenta args exitus 0 {
         output.code
     );
 
-    let modules = super::take_go_package_modules();
     assert!(!modules.is_empty(), "expected non-entry module files");
     assert!(
         modules
@@ -10087,7 +10088,9 @@ fn g6_go4_coreutils_true_package_go_builds() {
         eprintln!("skip: coreutils true package missing at {}", path.display());
         return;
     }
-    let result = compile_package(&Config::default().with_target(Target::Go), &path);
+    let result = compile_package_go(&Config::default().with_target(Target::Go), &path);
+    let modules = result.go_modules;
+    let result = result.compile_result;
     assert!(
         result.success(),
         "true package go compile failed: {:?}",
@@ -10105,7 +10108,6 @@ fn g6_go4_coreutils_true_package_go_builds() {
         "expected argv namespace in entry:\n{}",
         output.code
     );
-    let modules = super::take_go_package_modules();
     let layout = discover_build_layout(&path).expect("layout");
     let go_layout = super::GoBuildLayout::from_package(&layout);
     super::emit_go_module(&go_layout, &output.code, &modules).expect("emit");
@@ -10161,7 +10163,9 @@ incipit argumenta args exitus 0 {
     )
     .expect("entry");
 
-    let result = compile_package(&Config::default().with_target(Target::Go), &dir);
+    let result = compile_package_go(&Config::default().with_target(Target::Go), &dir);
+    let modules = result.go_modules;
+    let result = result.compile_result;
     assert!(
         result.success(),
         "dual consolum import should compile: {:?}",
@@ -10180,7 +10184,6 @@ incipit argumenta args exitus 0 {
         "expected exactly one consolum shim, got {decls}:\n{}",
         output.code
     );
-    let modules = super::take_go_package_modules();
     let layout = discover_build_layout(&dir).expect("layout");
     let go_layout = super::GoBuildLayout::from_package(&layout);
     super::emit_go_module(&go_layout, &output.code, &modules).expect("emit");
@@ -10255,7 +10258,9 @@ fn g6_go4_coreutils_echo_package_go_builds() {
         eprintln!("skip: coreutils echo package missing at {}", path.display());
         return;
     }
-    let result = compile_package(&Config::default().with_target(Target::Go), &path);
+    let result = compile_package_go(&Config::default().with_target(Target::Go), &path);
+    let modules = result.go_modules;
+    let result = result.compile_result;
     assert!(
         result.success(),
         "echo package go compile failed: {:?}",
@@ -10278,7 +10283,6 @@ fn g6_go4_coreutils_echo_package_go_builds() {
         "expected Dic → fmt.Print in shim:\n{}",
         output.code
     );
-    let modules = super::take_go_package_modules();
     let layout = discover_build_layout(&path).expect("layout");
     let go_layout = super::GoBuildLayout::from_package(&layout);
     super::emit_go_module(&go_layout, &output.code, &modules).expect("emit");
@@ -10367,7 +10371,9 @@ incipit argumenta args exitus 0 {
     )
     .expect("entry");
 
-    let result = compile_package(&Config::default().with_target(Target::Go), &dir);
+    let result = compile_package_go(&Config::default().with_target(Target::Go), &dir);
+    let modules = result.go_modules;
+    let result = result.compile_result;
     assert!(
         result.success(),
         "consolum surface compile failed: {:?}",
@@ -10380,7 +10386,6 @@ incipit argumenta args exitus 0 {
     let Some(Output::Go(output)) = result.output else {
         panic!("expected Go");
     };
-    let modules = super::take_go_package_modules();
     let layout = discover_build_layout(&dir).expect("layout");
     let go_layout = super::GoBuildLayout::from_package(&layout);
     super::emit_go_module(&go_layout, &output.code, &modules).expect("emit");
@@ -10425,7 +10430,9 @@ fn g6_go4_coreutils_false_package_go_builds() {
         );
         return;
     }
-    let result = compile_package(&Config::default().with_target(Target::Go), &path);
+    let result = compile_package_go(&Config::default().with_target(Target::Go), &path);
+    let modules = result.go_modules;
+    let result = result.compile_result;
     assert!(
         result.success(),
         "false package go compile failed: {:?}",
@@ -10438,7 +10445,6 @@ fn g6_go4_coreutils_false_package_go_builds() {
     let Some(Output::Go(output)) = result.output else {
         panic!("expected Go");
     };
-    let modules = super::take_go_package_modules();
     let layout = discover_build_layout(&path).expect("layout");
     let go_layout = super::GoBuildLayout::from_package(&layout);
     super::emit_go_module(&go_layout, &output.code, &modules).expect("emit");
@@ -10448,6 +10454,262 @@ fn g6_go4_coreutils_false_package_go_builds() {
         .status()
         .expect("run false");
     assert_eq!(status.code(), Some(1), "GNU false should exit 1");
+}
+
+// ---------------------------------------------------------------------------
+// FBR-P2-003 — Go module files travel in the compile result, never through
+// hidden thread-local state. Failed, repeated, nested, and concurrent Go
+// compile calls must not exchange module output.
+// ---------------------------------------------------------------------------
+
+fn write_go_module_package(dir: &Path, pkg_name: &str, func_name: &str) {
+    fs::create_dir_all(dir.join("src")).expect("src");
+    fs::write(
+        dir.join("faber.toml"),
+        format!(
+            r#"
+[package]
+name = "{pkg_name}"
+version = "0.1.0"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#
+        ),
+    )
+    .expect("manifest");
+    fs::write(
+        dir.join("src/helper.fab"),
+        format!(
+            "functio {func_name}(textus s) → textus {{\n  redde s\n}}\n"
+        ),
+    )
+    .expect("helper");
+    fs::write(
+        dir.join("src/main.fab"),
+        format!(
+            r#"
+importa ex "./helper" privata helper
+
+@ cli "tool"
+@ operandus ceteri textus ignored
+incipit argumenta args exitus 0 {{
+  fixum textus _ ← helper.{func_name}("x")
+}}
+"#
+        ),
+    )
+    .expect("entry");
+}
+
+#[test]
+fn go_compile_failed_call_carries_no_modules_and_leaves_no_side_channel() {
+    // Two non-entry modules exporting the same function name fail closed at
+    // package assembly (see g6_go4_func_name_collision_fails_closed).
+    let bad = test_temp_dir("go-fbr-collision");
+    fs::create_dir_all(bad.join("src")).expect("src");
+    fs::write(
+        bad.join("faber.toml"),
+        r#"
+[package]
+name = "go-fbr-collision"
+version = "0.1.0"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        bad.join("src/a.fab"),
+        "functio identity(textus s) → textus {\n  redde s\n}\n",
+    )
+    .expect("a");
+    fs::write(
+        bad.join("src/b.fab"),
+        "functio identity(textus s) → textus {\n  redde s + \"!\"\n}\n",
+    )
+    .expect("b");
+    fs::write(
+        bad.join("src/main.fab"),
+        r#"
+importa ex "./a" privata a
+importa ex "./b" privata b
+@ cli "tool"
+@ operandus ceteri textus ignored
+incipit argumenta args exitus 0 {
+  fixum textus _ ← a.identity("x")
+  fixum textus __ ← b.identity("y")
+}
+"#,
+    )
+    .expect("entry");
+
+    let failed = compile_package_go(&Config::default().with_target(Target::Go), &bad);
+    assert!(
+        !failed.compile_result.success(),
+        "expected Go compile failure on name collision"
+    );
+    assert!(
+        failed.go_modules.is_empty(),
+        "failed Go compile must carry no modules"
+    );
+
+    // A later successful compile must produce exactly its own module set.
+    let good = test_temp_dir("go-fbr-good");
+    write_go_module_package(&good, "go-fbr-good", "identity");
+    let ok = compile_package_go(&Config::default().with_target(Target::Go), &good);
+    assert!(ok.compile_result.success(), "good package must compile");
+    assert_eq!(ok.go_modules.len(), 1, "expected one sibling module");
+    assert!(
+        ok.go_modules[0].1.contains("func identity"),
+        "expected identity func in module: {:?}",
+        ok.go_modules
+    );
+}
+
+#[test]
+fn go_compile_repeated_and_nested_calls_do_not_exchange_modules() {
+    let a = test_temp_dir("go-fbr-a");
+    write_go_module_package(&a, "go-fbr-a", "alpha");
+    let b = test_temp_dir("go-fbr-b");
+    write_go_module_package(&b, "go-fbr-b", "beta");
+
+    let first = compile_package_go(&Config::default().with_target(Target::Go), &a);
+    assert!(first.compile_result.success(), "package a must compile");
+    assert_eq!(first.go_modules.len(), 1, "package a has one sibling");
+    assert!(
+        first.go_modules[0].1.contains("func alpha"),
+        "package a module must carry alpha: {:?}",
+        first.go_modules
+    );
+
+    // Repeated call for a different package must not clobber the first
+    // result's modules.
+    let second = compile_package_go(&Config::default().with_target(Target::Go), &b);
+    assert!(second.compile_result.success(), "package b must compile");
+    assert_eq!(second.go_modules.len(), 1, "package b has one sibling");
+    assert!(
+        second.go_modules[0].1.contains("func beta"),
+        "package b module must carry beta: {:?}",
+        second.go_modules
+    );
+    assert!(
+        first.go_modules[0].1.contains("func alpha")
+            && !first.go_modules[0].1.contains("func beta"),
+        "first result must keep its own modules: {:?}",
+        first.go_modules
+    );
+
+    // Nested: a compile that runs while earlier results are still held keeps
+    // its own modules and leaves the earlier results untouched.
+    let third = compile_package_go(&Config::default().with_target(Target::Go), &a);
+    assert!(third.compile_result.success(), "repeat of package a compiles");
+    assert_eq!(third.go_modules.len(), 1);
+    assert!(
+        third.go_modules[0].1.contains("func alpha")
+            && !third.go_modules[0].1.contains("func beta"),
+        "nested result must carry only its own modules: {:?}",
+        third.go_modules
+    );
+    assert!(
+        second.go_modules[0].1.contains("func beta"),
+        "held result must be untouched by the nested compile: {:?}",
+        second.go_modules
+    );
+}
+
+#[test]
+fn go_compile_modules_stay_scoped_across_non_go_compiles() {
+    let go_dir = test_temp_dir("go-fbr-scope");
+    write_go_module_package(&go_dir, "go-fbr-scope", "alpha");
+    let go_result = compile_package_go(&Config::default().with_target(Target::Go), &go_dir);
+    assert!(go_result.compile_result.success());
+    assert!(
+        !go_result.go_modules.is_empty(),
+        "go result must carry its sibling modules"
+    );
+
+    // A Rust package compile in between must not disturb the held Go result
+    // and must not gain any Go modules itself.
+    let rust_dir = test_temp_dir("go-fbr-rust");
+    fs::create_dir_all(rust_dir.join("src")).expect("src");
+    fs::write(
+        rust_dir.join("faber.toml"),
+        r#"
+[package]
+name = "go-fbr-rust"
+version = "0.1.0"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("manifest");
+    fs::write(rust_dir.join("src/main.fab"), "incipit { }\n").expect("entry");
+    let rust_result = compile_package(&Config::default(), &rust_dir);
+    assert!(rust_result.success(), "rust package must compile");
+    assert!(
+        matches!(rust_result.output, Some(Output::Rust(_))),
+        "expected Rust output for the non-Go compile"
+    );
+
+    assert!(
+        go_result
+            .go_modules
+            .iter()
+            .any(|(_, body)| body.contains("func alpha")),
+        "go result must keep its own modules after a non-Go compile"
+    );
+}
+
+#[test]
+fn go_compile_concurrent_calls_do_not_exchange_modules() {
+    let a = test_temp_dir("go-fbr-conc-a");
+    write_go_module_package(&a, "go-fbr-conc-a", "alpha");
+    let b = test_temp_dir("go-fbr-conc-b");
+    write_go_module_package(&b, "go-fbr-conc-b", "beta");
+
+    let a_path = a.to_path_buf();
+    let b_path = b.to_path_buf();
+    let handle_a = thread::spawn(move || {
+        compile_package_go(&Config::default().with_target(Target::Go), &a_path)
+    });
+    let handle_b = thread::spawn(move || {
+        compile_package_go(&Config::default().with_target(Target::Go), &b_path)
+    });
+    let result_a = handle_a.join().expect("thread a");
+    let result_b = handle_b.join().expect("thread b");
+
+    assert!(result_a.compile_result.success(), "concurrent a must compile");
+    assert!(result_b.compile_result.success(), "concurrent b must compile");
+    assert!(
+        result_a
+            .go_modules
+            .iter()
+            .all(|(_, body)| body.contains("func alpha")),
+        "concurrent a must carry only its own modules: {:?}",
+        result_a.go_modules
+    );
+    assert!(
+        result_b
+            .go_modules
+            .iter()
+            .all(|(_, body)| body.contains("func beta")),
+        "concurrent b must carry only its own modules: {:?}",
+        result_b.go_modules
+    );
+    assert!(
+        !result_a.go_modules.iter().any(|(_, body)| body.contains("func beta"))
+            && !result_b
+                .go_modules
+                .iter()
+                .any(|(_, body)| body.contains("func alpha")),
+        "concurrent compiles must not exchange module output"
+    );
 }
 
 // ---------------------------------------------------------------------------

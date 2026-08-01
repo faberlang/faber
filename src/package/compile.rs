@@ -68,6 +68,30 @@ struct GeneratedPackageRust {
     diagnostics: Vec<Diagnostic>,
 }
 
+/// Result of a package compile that explicitly carries the Go multi-module
+/// file collection produced by the Go assembly path (G6 GO3/GO4).
+///
+/// The module files are an output of the Go compile path — never hidden
+/// thread-local state (FBR-P2-003) — so failed, repeated, nested, and
+/// concurrent compile calls cannot exchange module output.
+pub(crate) struct PackageCompileResult {
+    pub(crate) compile_result: CompileResult,
+    /// Go multi-module files `(file name, file body)` for non-entry units,
+    /// populated only for `Target::Go` packages that reached codegen.
+    pub(crate) go_modules: Vec<(String, String)>,
+}
+
+/// Failed compile: no output, no Go modules.
+fn compile_failure(diagnostics: Vec<Diagnostic>) -> PackageCompileResult {
+    PackageCompileResult {
+        compile_result: CompileResult {
+            output: None,
+            diagnostics,
+        },
+        go_modules: Vec::new(),
+    }
+}
+
 /// Crate root for packages whose `faber.toml` has no `paths.entry` (typical
 /// `build.kind = "lib"` layout). Nested modules carry product + proba code;
 /// cargo test discovers `#[test]` inside those modules.
@@ -196,9 +220,23 @@ impl HirVisitor for AdRouteCollector<'_> {
 /// falling back to single-file compilation.
 pub fn compile_package(config: &Config, input: &Path) -> CompileResult {
     finalize_package_compile_result(
-        compile_package_internal(config, input, None, false, None),
+        compile_package_internal(config, input, None, false, None).compile_result,
         &config.warn_policy,
     )
+}
+
+/// Compile a Go-targeted package, returning the entry output and the explicit
+/// multi-module sibling file collection in one result (no hidden thread-local
+/// side channel).
+///
+/// The `config` must target `Target::Go`; other targets leave
+/// [`PackageCompileResult::go_modules`] empty.
+pub(crate) fn compile_package_go(config: &Config, input: &Path) -> PackageCompileResult {
+    let result = compile_package_internal(config, input, None, false, None);
+    PackageCompileResult {
+        compile_result: finalize_package_compile_result(result.compile_result, &config.warn_policy),
+        go_modules: result.go_modules,
+    }
 }
 
 /// Compile a package while forwarding a Rust test-selection policy to codegen.
@@ -224,7 +262,7 @@ pub fn compile_package_with_test_options(
     proba_filter: Option<&super::TestSourceFilter>,
 ) -> CompileResult {
     finalize_package_compile_result(
-        compile_package_internal(config, input, test_selection, true, proba_filter),
+        compile_package_internal(config, input, test_selection, true, proba_filter).compile_result,
         &config.warn_policy,
     )
 }
@@ -305,26 +343,20 @@ fn compile_package_internal(
     test_selection: Option<&RustTestSelection>,
     include_proba: bool,
     proba_filter: Option<&super::TestSourceFilter>,
-) -> CompileResult {
+) -> PackageCompileResult {
     // G4: analyze once before target rejection so Go/TS planners and diagnostics
     // share the same package graph (no reloading source per target).
     let config = match effective_package_config(config, input) {
         Ok(config) => config,
         Err(diagnostics) => {
-            return CompileResult {
-                output: None,
-                diagnostics,
-            };
+            return compile_failure(diagnostics);
         }
     };
 
     let spec = match discover_package(input) {
         Ok(spec) => spec,
         Err(diag) => {
-            return CompileResult {
-                output: None,
-                diagnostics: vec![*diag],
-            }
+            return compile_failure(vec![*diag]);
         }
     };
 
@@ -332,19 +364,13 @@ fn compile_package_internal(
     let library_resolver = match library_resolver_for_package(&config, &package_root) {
         Ok(resolver) => resolver,
         Err(diagnostics) => {
-            return CompileResult {
-                output: None,
-                diagnostics,
-            };
+            return compile_failure(diagnostics);
         }
     };
     let field_name_policy = match package_field_name_policy(&spec) {
         Ok(policy) => policy,
         Err(diag) => {
-            return CompileResult {
-                output: None,
-                diagnostics: vec![*diag],
-            }
+            return compile_failure(vec![*diag]);
         }
     };
     let mut package = match analyze_package_spec(
@@ -356,27 +382,21 @@ fn compile_package_internal(
     ) {
         Ok(package) => package,
         Err(diagnostics) => {
-            return CompileResult {
-                output: None,
-                diagnostics,
-            }
+            return compile_failure(diagnostics);
         }
     };
 
     if config.target == Target::Go {
         let plan = super::artifact_plan::plan_package(&package, Target::Go);
         if !plan.supported {
-            return CompileResult {
-                output: None,
-                diagnostics: vec![
-                    crate::package_diagnostic_error(plan.rejection.unwrap_or_else(|| {
-                        "package compilation does not support this target".to_owned()
-                    }))
-                    .with_file(input.display().to_string())
-                    .with_arg("issue", "package_target_unsupported")
-                    .with_arg("target", plan.target),
-                ],
-            };
+            return compile_failure(vec![crate::package_diagnostic_error(
+                plan.rejection.unwrap_or_else(|| {
+                    "package compilation does not support this target".to_owned()
+                }),
+            )
+            .with_file(input.display().to_string())
+            .with_arg("issue", "package_target_unsupported")
+            .with_arg("target", plan.target)]);
         }
         return generate_package_go_result(&package, input);
     }
@@ -384,29 +404,23 @@ fn compile_package_internal(
     if config.target != Target::Rust {
         let plan = super::artifact_plan::plan_package(&package, config.target);
         if !plan.supported {
-            return CompileResult {
-                output: None,
-                diagnostics: vec![
-                    crate::package_diagnostic_error(plan.rejection.unwrap_or_else(|| {
-                        "package compilation does not support this target".to_owned()
-                    }))
-                    .with_file(input.display().to_string())
-                    .with_arg("issue", "package_target_unsupported")
-                    .with_arg("target", plan.target),
-                ],
-            };
+            return compile_failure(vec![crate::package_diagnostic_error(
+                plan.rejection.unwrap_or_else(|| {
+                    "package compilation does not support this target".to_owned()
+                }),
+            )
+            .with_file(input.display().to_string())
+            .with_arg("issue", "package_target_unsupported")
+            .with_arg("target", plan.target)]);
         }
         // Planner seams exist; full product emit for TS is later deliveries.
-        return CompileResult {
-            output: None,
-            diagnostics: vec![crate::package_diagnostic_error(format!(
-                "package compilation has a {} artifact plan but full product assembly is not implemented yet",
-                plan.target
-            ))
-            .with_file(input.display().to_string())
-            .with_arg("issue", "package_target_assembly_pending")
-            .with_arg("target", plan.target)],
-        };
+        return compile_failure(vec![crate::package_diagnostic_error(format!(
+            "package compilation has a {} artifact plan but full product assembly is not implemented yet",
+            plan.target
+        ))
+        .with_file(input.display().to_string())
+        .with_arg("issue", "package_target_assembly_pending")
+        .with_arg("target", plan.target)]);
     }
     let effective_test_selection =
         merge_entry_test_selection(test_selection, package.entry_frontmatter.as_ref());
@@ -420,26 +434,23 @@ fn compile_package_internal(
     let diagnostics = generated.diagnostics;
 
     if diagnostics.iter().any(|diag| diag.is_error()) {
-        return CompileResult {
-            output: None,
-            diagnostics,
-        };
+        return compile_failure(diagnostics);
     }
 
     let Some(entry_code) = generated.entry_code else {
-        return CompileResult {
-            output: None,
-            diagnostics: vec![crate::package_diagnostic_error(
-                "package compilation did not produce an entry module",
-            )
-            .with_file(package.spec.entry.display().to_string())],
-        };
+        return compile_failure(vec![crate::package_diagnostic_error(
+            "package compilation did not produce an entry module",
+        )
+        .with_file(package.spec.entry.display().to_string())]);
     };
 
     let crate_code = assemble_crate(&entry_code, &generated.module_tree.render(0));
-    CompileResult {
-        output: Some(Output::Rust(RustOutput { code: crate_code })),
-        diagnostics,
+    PackageCompileResult {
+        compile_result: CompileResult {
+            output: Some(Output::Rust(RustOutput { code: crate_code })),
+            diagnostics,
+        },
+        go_modules: Vec::new(),
     }
 }
 
@@ -448,22 +459,19 @@ fn compile_package_internal(
 /// Local Faber imports become same-package namespace vars (`binding.Field`) that
 /// point at package-level functions from sibling units. Norma/stdlib imports
 /// remain elided by Go codegen.
-fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> CompileResult {
+fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> PackageCompileResult {
     let mut diagnostics = package.diagnostics.clone();
     let Some(entry) = package.entry_unit() else {
-        return CompileResult {
-            output: None,
-            diagnostics: {
-                diagnostics.push(
-                    crate::package_diagnostic_error(
-                        "package has no entry unit for Go assembly".to_owned(),
-                    )
-                    .with_file(input.display().to_string())
-                    .with_arg("issue", "package_go_entry_missing"),
-                );
-                diagnostics
-            },
-        };
+        return compile_failure({
+            diagnostics.push(
+                crate::package_diagnostic_error(
+                    "package has no entry unit for Go assembly".to_owned(),
+                )
+                .with_file(input.display().to_string())
+                .with_arg("issue", "package_go_entry_missing"),
+            );
+            diagnostics
+        });
     };
 
     // Generate non-entry modules first (signatures feed namespace vars).
@@ -502,10 +510,7 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
                     .with_file(unit.path.display().to_string())
                     .with_arg("issue", "package_go_codegen_failed"),
                 );
-                return CompileResult {
-                    output: None,
-                    diagnostics,
-                };
+                return compile_failure(diagnostics);
             }
             Err(err) => {
                 let mut diag = crate::package_diagnostic_error(err.message)
@@ -514,10 +519,7 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
                     diag = diag.with_arg(arg.name, arg.value);
                 }
                 diagnostics.push(diag);
-                return CompileResult {
-                    output: None,
-                    diagnostics,
-                };
+                return compile_failure(diagnostics);
             }
         }
     }
@@ -537,10 +539,7 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
                     diag = diag.with_arg(arg.name, arg.value);
                 }
                 diagnostics.push(diag);
-                return CompileResult {
-                    output: None,
-                    diagnostics,
-                };
+                return compile_failure(diagnostics);
             }
         },
         None => {
@@ -554,10 +553,7 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
                         .with_file(entry.path.display().to_string())
                         .with_arg("issue", "package_go_codegen_failed"),
                     );
-                    return CompileResult {
-                        output: None,
-                        diagnostics,
-                    };
+                    return compile_failure(diagnostics);
                 }
                 Err(err) => {
                     let mut diag = crate::package_diagnostic_error(err.message)
@@ -566,10 +562,7 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
                         diag = diag.with_arg(arg.name, arg.value);
                     }
                     diagnostics.push(diag);
-                    return CompileResult {
-                        output: None,
-                        diagnostics,
-                    };
+                    return compile_failure(diagnostics);
                 }
             }
         }
@@ -584,10 +577,7 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
         &unit_funcs,
     ) {
         diagnostics.push(diag);
-        return CompileResult {
-            output: None,
-            diagnostics,
-        };
+        return compile_failure(diagnostics);
     }
 
     // Namespace vars for local imports + explicit Norma host shims (entry + siblings).
@@ -644,10 +634,7 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
                     .with_arg("issue", "package_go_import_unit_missing")
                     .with_arg("target", "go"),
                 );
-                return CompileResult {
-                    output: None,
-                    diagnostics,
-                };
+                return compile_failure(diagnostics);
             };
             for it in &import.items {
                 let binding = it
@@ -681,25 +668,15 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Compil
         entry_code = ensure_go_import(&entry_code, "strings");
     }
 
-    // Side-channel: multi-file emit for build/run (Output is entry main.go only).
-    GO_PACKAGE_MODULES.with(|slot| {
-        *slot.borrow_mut() = module_files;
-    });
-
-    CompileResult {
-        output: Some(Output::Go(GoOutput { code: entry_code })),
-        diagnostics,
+    // Multi-module files travel in the returned result (FBR-P2-003): the
+    // emitter consumes them from the result, never from a hidden thread-local.
+    PackageCompileResult {
+        compile_result: CompileResult {
+            output: Some(Output::Go(GoOutput { code: entry_code })),
+            diagnostics,
+        },
+        go_modules: module_files,
     }
-}
-
-std::thread_local! {
-    static GO_PACKAGE_MODULES: std::cell::RefCell<Vec<(String, String)>> =
-        const { std::cell::RefCell::new(Vec::new()) };
-}
-
-/// Take multi-module Go files produced by the last `compile_package` Go assembly.
-pub(crate) fn take_go_package_modules() -> Vec<(String, String)> {
-    GO_PACKAGE_MODULES.with(|slot| std::mem::take(&mut *slot.borrow_mut()))
 }
 
 fn resolve_local_import_path(
