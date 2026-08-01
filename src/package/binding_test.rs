@@ -223,6 +223,64 @@ fn parent_escaping_source_path_is_rejected() {
 }
 
 #[test]
+fn dot_source_library_with_bindings_verifies() {
+    // FBR-P1-001 scope update: `paths.source = "."` is a supported contract,
+    // so bindings must resolve the package root itself instead of failing
+    // with package_member_empty on the bare `.` member path.
+    let root = test_package(
+        "dot-source",
+        "functio localis() → textus { redde \"ok\" }\n",
+        r#"[functions."fixture:api.localis"]
+symbol = "crate::shim::localis"
+
+[shim]
+path = "rust/shim.rs"
+"#,
+        "pub fn localis(value: String) -> String { value }\n",
+    );
+    let manifest = fs::read_to_string(root.path().join("faber.toml")).expect("read manifest");
+    fs::write(
+        root.path().join("faber.toml"),
+        manifest.replace("source = \"src\"", "source = \".\""),
+    )
+    .expect("rewrite manifest");
+    // `.`-source keeps sources at the package root, not under `src/`.
+    fs::write(
+        root.path().join("api.fab"),
+        "functio localis() → textus { redde \"ok\" }\n",
+    )
+    .expect("write package-root source");
+    fs::remove_dir_all(root.path().join("src")).expect("remove default src dir");
+
+    let result =
+        verify_library_binding_shapes(root.path(), "rust").expect("dot-source bindings verify");
+    assert_eq!(result.declarations, 1);
+    assert_eq!(result.bindings, 1);
+}
+
+#[test]
+fn src_source_library_with_bindings_still_verifies() {
+    // Regression lock: the default `src` layout keeps verifying after
+    // source-root resolution was aligned with discovery's supported set.
+    let root = test_package(
+        "src-source",
+        "functio localis() → textus { redde \"ok\" }\n",
+        r#"[functions."fixture:api.localis"]
+symbol = "crate::shim::localis"
+
+[shim]
+path = "rust/shim.rs"
+"#,
+        "pub fn localis(value: String) -> String { value }\n",
+    );
+
+    let result =
+        verify_library_binding_shapes(root.path(), "rust").expect("src-source bindings verify");
+    assert_eq!(result.declarations, 1);
+    assert_eq!(result.bindings, 1);
+}
+
+#[test]
 fn absolute_binding_manifest_path_is_rejected() {
     let root = test_package(
         "binding-absolute",

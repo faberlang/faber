@@ -284,7 +284,7 @@ fn resolve_path_templates(
 /// (a bare `CurDir` normalizes to an empty path, which `resolve_package_member`
 /// correctly rejects as naming nothing). All other values are rejected earlier
 /// by `validate_manifest`.
-fn resolve_source_root(
+pub(crate) fn resolve_source_root(
     package_root: &Path,
     source: &str,
     manifest_path: &Path,

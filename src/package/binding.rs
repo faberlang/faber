@@ -118,11 +118,17 @@ pub fn verify_library_bindings_with_probe_mode(
         Err(diagnostic) => return Err(vec![diagnostic]),
     };
     let binding_manifest = read_binding_manifest(&binding_path)?;
-    let source_root =
-        match resolve_package_member(package_root, &manifest.paths.source, &manifest_path) {
-            Ok(path) => path,
-            Err(diagnostic) => return Err(vec![diagnostic]),
-        };
+    // FBR-P1-001: the supported source-root set is `src` (default) and `.`
+    // (package root). Reuse discovery's resolution so bindings follow the same
+    // contract; `resolve_package_member` rejects a bare `.` as naming nothing.
+    let source_root = match super::discovery::resolve_source_root(
+        package_root,
+        &manifest.paths.source,
+        &manifest_path,
+    ) {
+        Ok(path) => path,
+        Err(diagnostic) => return Err(vec![*diagnostic]),
+    };
     if !source_root.is_dir() {
         return Err(vec![diagnostic(
             &manifest_path,

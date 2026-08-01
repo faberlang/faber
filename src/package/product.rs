@@ -1303,15 +1303,15 @@ fn emit_library_typescript_modules(
         if !src_dir.is_dir() {
             continue;
         }
-        let mut entries: Vec<_> = match fs::read_dir(&src_dir) {
-            Ok(entries) => entries
-                .filter_map(|e| e.ok())
-                .filter(|e| e.path().extension().is_some_and(|ext| ext == "fab"))
-                .collect(),
-            Err(err) => {
-                return Err(io_diag(&src_dir, err));
-            }
-        };
+        // FBR-P2-001: per-entry directory read errors are diagnostic failures,
+        // never silently dropped modules.
+        let mut entries: Vec<_> = fs::read_dir(&src_dir)
+            .map_err(|err| io_diag(&src_dir, err))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|err| io_diag(&src_dir, err))?
+            .into_iter()
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "fab"))
+            .collect();
         entries.sort_by_key(|e| e.file_name());
 
         // Prefer package-owned TS binding shims (e.g. faber-web/runtime/dom.ts)
@@ -1661,13 +1661,15 @@ fn build_library_ts_module_map(
         if !src_dir.is_dir() {
             continue;
         }
-        let mut entries: Vec<_> = match fs::read_dir(&src_dir) {
-            Ok(entries) => entries
-                .filter_map(|e| e.ok())
-                .filter(|e| e.path().extension().is_some_and(|ext| ext == "fab"))
-                .collect(),
-            Err(err) => return Err(io_diag(&src_dir, err)),
-        };
+        // FBR-P2-001: per-entry directory read errors are diagnostic failures,
+        // never silently dropped modules.
+        let mut entries: Vec<_> = fs::read_dir(&src_dir)
+            .map_err(|err| io_diag(&src_dir, err))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|err| io_diag(&src_dir, err))?
+            .into_iter()
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "fab"))
+            .collect();
         entries.sort_by_key(|e| e.file_name());
 
         for entry in &entries {
@@ -2344,3 +2346,7 @@ fn library_item_display_key(item: &radix::hir::LibraryItem) -> String {
 fn io_diag(path: &Path, err: std::io::Error) -> Box<Diagnostic> {
     Box::new(Diagnostic::io_error(path, &err))
 }
+
+#[cfg(test)]
+#[path = "product_test.rs"]
+mod tests;
