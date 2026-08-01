@@ -60,8 +60,8 @@ pub(super) const TENSOR_WORKLOAD_PROOF_ROWS: &[TensorWorkloadProofRow] =
         output_checked: false,
         blocker_owner: Some(TensorWorkloadProofOwner::CudaKernelEmitHostProvider),
         blocker_issue:
-            "host provider for route 'cuda:launch' has no real device executor; SermoOpen returns stub handle but launch contract step discovers no device-side kernel launcher",
-        evidence: "docs/factory/gpu-workload-floor/baseline-ledger.md::Bucket Ownership (2026-07-22 remeasurement)",
+            "sermo_open declare+define collision fixed (radix 663cbfe58, 2026-07-31 23:07): emitted device LLVM text now stages and verifies with llvm-as; binding blocker is the absent CUDA launch provider — host provider for route 'cuda:launch' has no real device executor; SermoOpen returns stub handle but launch contract step discovers no device-side kernel launcher",
+        evidence: "docs/factory/gpu-workload-floor/baseline-ledger.md::Bucket Ownership (2026-07-31 re-measurement); re-measured 2026-08-01 (exempla_gpu_workload_e2e, llvm-as 22.1.8): sermo_open declare+define collision fixed in radix 663cbfe58 (2026-07-31 23:07) — emitted device LLVM text now stages and verifies with llvm-as, so rung 0 re-measured to DeviceStaged/LaunchContractFailed (LaunchContractFailed bucket reappeared per reconcile residual #2); CUDA launch provider/runner absent",
     },
     TensorWorkloadProofRow {
         rung: 1,
@@ -75,7 +75,7 @@ pub(super) const TENSOR_WORKLOAD_PROOF_ROWS: &[TensorWorkloadProofRow] =
         output_checked: true,
         blocker_owner: None,
         blocker_issue: "",
-        evidence: "crates/exempla/src/exempla_e2e/tensor_workload_proof_test.rs::tensor_workload_proof_rung1_device_linear_matches_stepper + triga/scripta/w4-06b-gpu-proof.mjs (hand-authored inline WGSL mirroring main.fab; headless Chrome WebGPU matmul+add, exit 0, values within f32 tolerance) + hosts/webgpu-browser/public/src/compiler-chain-bridge.mjs (G-P-12 S1 c11cd04c1+S2 275263e: compiler-emitted WGSL+reflection JSON through buildChainFromReflection+runKernelChain; headless Chrome WebGPU matmul+add, exit 0, values within f32 tolerance)",
+        evidence: "crates/exempla/src/exempla_e2e/tensor_workload_proof_test.rs::tensor_workload_proof_rung1_device_gpu_chain_dispatch (live: tiny-linear-device compiled via faber Session + WGSL chain-descriptor; headless Chrome WebGPU dispatch through triga/scripta/w4-06c-gpu-chain-proof.mjs + dispatchChainFromDescriptor (hosts 735df10); readback [9.1, 12.2, 18.1, 24.2, 27.1, 36.2, 36.1, 48.2] within 0.00001, exit 0) + triga/scripta/w4-06b-gpu-proof.mjs (hand-authored inline WGSL mirroring main.fab; headless Chrome WebGPU matmul+add, exit 0, values within f32 tolerance) + hosts/webgpu-browser/public/src/compiler-chain-bridge.mjs (G-P-12 S2 275263e: compiler-emitted WGSL+reflection JSON through buildChainFromReflection+runKernelChain; headless Chrome WebGPU matmul+add, exit 0) + hosts/webgpu-browser/public/matmul-proof.html + app-matmul.mjs (W4-06b proof page, e45a9e0)",
     },
     TensorWorkloadProofRow {
         rung: 2,

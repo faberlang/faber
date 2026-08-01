@@ -41,6 +41,13 @@ fn tensor_workload_proof_records_current_stable_blocker() {
         row.blocker_owner,
         Some(TensorWorkloadProofOwner::CudaKernelEmitHostProvider)
     );
+    // Measured 2026-08-01 (post-sermo_open-collision-fix): the emitted
+    // device LLVM text now stages and verifies with llvm-as (radix
+    // 663cbfe58 closed the declare+define collision on 2026-07-31 23:07);
+    // the binding blocker is the absent CUDA launch provider.
+    assert!(row.blocker_issue.contains("sermo_open"));
+    assert!(row.blocker_issue.contains("collision"));
+    assert!(row.blocker_issue.contains("663cbfe58"));
     assert!(row.blocker_issue.contains("host provider"));
     assert!(row.blocker_issue.contains("SermoOpen"));
     assert!(row.blocker_issue.contains("cuda:launch"));
@@ -73,6 +80,13 @@ fn tensor_workload_proof_cites_pinned_gpu_baseline() {
         .evidence
         .contains("gpu-workload-floor/baseline-ledger.md"));
     assert!(row.evidence.contains("Bucket Ownership"));
+    // U1 (G-P-12+S5): evidence cites the 2026-07-31 re-measurement (with the
+    // measured 2026-08-01 post-collision-fix re-measurement), never the stale
+    // 2026-07-22 remeasurement.
+    assert!(row.evidence.contains("2026-07-31"));
+    assert!(!row.evidence.contains("2026-07-22"));
+    assert!(row.evidence.contains("DeviceStaged"));
+    assert!(row.evidence.contains("LaunchContractFailed"));
 }
 
 #[test]
@@ -90,21 +104,15 @@ fn tensor_workload_proof_selects_rung1_device_linear() {
     );
     assert!(row
         .evidence
-        .contains("tensor_workload_proof_rung1_device_linear_matches_stepper"));
+        .contains("tensor_workload_proof_rung1_device_gpu_chain_dispatch"));
     assert!(row.evidence.contains("w4-06b-gpu-proof.mjs"));
+    assert!(row.evidence.contains("w4-06c-gpu-chain-proof.mjs"));
     assert!(row.evidence.contains("headless Chrome"));
-}
-
-#[test]
-fn tensor_workload_proof_rung1_device_linear_matches_stepper() {
-    let row = tensor_workload_proof_rows()[1];
-    let path = crate::paths::package_corpus_dir().join(row.exemplar_path);
-    let fixture = read_reference_fixture(&path, 1).expect("rung 1 reference fixture");
-    assert_eq!(fixture.tolerance, 0.00001);
-    assert_eq!(
-        fixture.reference,
-        serde_json::json!([9.1, 12.2, 18.1, 24.2, 27.1, 36.2, 36.1, 48.2])
-    );
+    // U1 (G-P-12+S5): resolvable hosts anchors 275263e + e45a9e0; the stale
+    // c11cd04c1 anchor is gone.
+    assert!(row.evidence.contains("275263e"));
+    assert!(row.evidence.contains("e45a9e0"));
+    assert!(!row.evidence.contains("c11cd04c1"));
 }
 
 #[test]
@@ -214,7 +222,9 @@ fn tensor_workload_proof_rung_indices_are_contiguous_from_zero() {
     }
 }
 
-/// G-SPINE-10 S4: headless Chrome WebGPU chain dispatch proof (task 9151ae7d).
+/// G-P-12 + G-SPINE-10 S5 (this delivery): LIVE headless Chrome WebGPU chain
+/// dispatch proof — the rung-1 `OutputChecked` evidence rests on real device
+/// execution, not fixture reading alone.
 ///
 /// Compiles the tiny-linear-device exemplar through the faber pipeline,
 /// extracts the G-SPINE-10 [`KernelChainDescriptor`] from compiler output,
@@ -223,15 +233,20 @@ fn tensor_workload_proof_rung_indices_are_contiguous_from_zero() {
 /// through `dispatchChainFromDescriptor` (hosts `735df10`) in headless Chrome
 /// WebGPU (SwiftShader), reads back the output, and asserts a bit-identical
 /// match to the stepper reference `[9.1, 12.2, ..., 36.1, 48.2]` within f32
-/// tolerance `0.00001`.
+/// tolerance `0.00001` (fixture discipline — not the proof page's looser
+/// `0.001`).
 ///
-/// Green gate: PARKED on the hand-1 radix-mir-wgsl `Collection(TensorAdd)`
-/// emission task (filed from need bccc236b; ABI premise corrections in need
-/// 4e156be2, task 9151ae7d). The compiler currently rejects the exemplar's
-/// kernel before emitting any descriptor, so this test fails at the compile
-/// step with the exact diagnostic until that task lands. The test is
-/// deliberately NOT `#[ignore]` — once the emitter gap closes it must run
-/// for real in CI (no Wave-3 G-P-12 ignored-integration-test pattern).
+/// Fixture validation is a sub-step of this same test: the stepper reference
+/// fixture (`main.ref.json`) is still read and asserted so the reference
+/// contract cannot drift. There is no separate fixture-only test claiming
+/// rung-1 device proof (spec U2 done-when (d)).
+///
+/// Skip discipline (spec Q4): the test skips with a RECORDED CONDITION only
+/// when the headless Chrome/WebGPU environment is unavailable — detected via
+/// the proof script's deterministic exit code 2 (environment error: missing
+/// Chrome, missing puppeteer deps). Exit 0 is a pass, exit 1 is a proof
+/// failure and fails the test. The script is a committed triga deliverable;
+/// its absence is a repo defect and fails loudly, it is not a skip.
 #[test]
 fn tensor_workload_proof_rung1_device_gpu_chain_dispatch() {
     // ── 1. Compile the exemplar through the faber pipeline ────────────────
@@ -248,20 +263,26 @@ fn tensor_workload_proof_rung1_device_gpu_chain_dispatch() {
     let device_roles = radix::mir::device_roles_from_hir(&analysis.hir);
     let mir = radix::mir::lower_analyzed_unit_with_context(&mut analysis)
         .expect("MIR lowering of tiny-linear-device");
-    let chain = radix::mir::emit_chain_descriptor(&device_roles, &mir.validated, &interner).expect(
-        "emit_chain_descriptor for tiny-linear-device — green gate parked on hand-1 \
-         TensorAdd emission (need bccc236b / 4e156be2); once that lands this must pass",
-    );
+    let chain = radix::mir::emit_chain_descriptor(&device_roles, &mir.validated, &interner)
+        .expect("emit_chain_descriptor for tiny-linear-device");
     assert!(
         !chain.chain.is_empty(),
         "chain descriptor must contain at least one kernel"
     );
 
-    // ── 2. Serialize the chain descriptor to JSON ─────────────────────────
+    // ── 2. Fixture validation sub-step (stepper reference contract) ───────
+    let fixture = read_reference_fixture(&path, 1).expect("rung 1 reference fixture");
+    assert_eq!(fixture.tolerance, 0.00001);
+    assert_eq!(
+        fixture.reference,
+        serde_json::json!([9.1, 12.2, 18.1, 24.2, 27.1, 36.2, 36.1, 48.2])
+    );
+
+    // ── 3. Serialize the chain descriptor to JSON ─────────────────────────
     let descriptor_json =
         serde_json::to_string(&chain).expect("serialize chain descriptor to JSON");
 
-    // ── 3. Build input data keyed by the descriptor's storage-buffer
+    // ── 4. Build input data keyed by the descriptor's storage-buffer
     //       @binding namespace. dispatchChainFromDescriptor resolves each
     //       bind-group entry via resources.buffers.get(bufDecl.binding).
     //       Output buffers are provided zero-initialized so the dispatch can
@@ -293,28 +314,33 @@ fn tensor_workload_proof_rung1_device_gpu_chain_dispatch() {
     }
     let input_json = serde_json::Value::Object(input).to_string();
 
-    // ── 4. Expected values from the stepper reference fixture ─────────────
-    let fixture = read_reference_fixture(&path, 1).expect("rung 1 reference fixture");
-    let expected_json = fixture.reference.to_string();
-
     // ── 5. Write artifacts to the managed temp root ───────────────────────
     let temp_root = make_temp_root();
     let descriptor_file = temp_root.join("chain-descriptor.json");
     fs::write(&descriptor_file, &descriptor_json).expect("write chain descriptor JSON");
+    // The expected reference is passed as the ref.json fixture path
+    // (spec §3.5 validation shape: `--expected <main.ref.json>`).
+    let expected_ref_path = crate::paths::package_corpus_dir().join(row.reference_path);
+    assert!(
+        expected_ref_path.is_file(),
+        "expected reference fixture missing: {}",
+        expected_ref_path.display()
+    );
 
     // ── 6. Spawn the Node proof script ────────────────────────────────────
     if !command_available("node", &["--version"]) {
-        eprintln!("SKIP: node not on PATH — chain dispatch proof cannot run (recorded condition)");
-        return;
-    }
-    let script = triga_scripta_dir().join("w4-06c-gpu-chain-proof.mjs");
-    if !script.is_file() {
         eprintln!(
-            "SKIP: proof script {} not present — chain dispatch proof cannot run (recorded condition)",
-            script.display()
+            "SKIP: node not on PATH — headless Chrome WebGPU environment unavailable \
+             (recorded condition, not a pass)"
         );
         return;
     }
+    let script = triga_scripta_dir().join("w4-06c-gpu-chain-proof.mjs");
+    assert!(
+        script.is_file(),
+        "proof script {} must be present (committed triga deliverable); refusing to skip a repo defect",
+        script.display()
+    );
 
     let output = Command::new("node")
         .arg(&script)
@@ -323,19 +349,32 @@ fn tensor_workload_proof_rung1_device_gpu_chain_dispatch() {
         .arg("--input")
         .arg(&input_json)
         .arg("--expected")
-        .arg(&expected_json)
+        .arg(&expected_ref_path)
         .arg("--tolerance")
         .arg("0.00001")
         .output()
         .expect("spawn node chain proof script");
 
-    assert!(
-        output.status.success(),
-        "chain dispatch proof failed (exit {:?}):\nstdout:\n{}\nstderr:\n{}",
-        output.status.code(),
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr),
-    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    match output.status.code() {
+        // Exit 0 — the chain dispatched on headless Chrome WebGPU and the
+        // readback matched the stepper reference within 0.00001.
+        Some(0) => {}
+        // Exit 2 — deterministic environment error from the proof script
+        // (missing Chrome for Testing / puppeteer deps). Recorded condition,
+        // NOT a pass; the proof did not execute.
+        Some(2) => {
+            eprintln!(
+                "SKIP: headless Chrome WebGPU unavailable (proof script exit 2, recorded \
+                 condition, not a pass):\nstderr:\n{stderr}"
+            );
+            return;
+        }
+        code => panic!(
+            "chain dispatch proof failed (exit {code:?}):\nstdout:\n{stdout}\nstderr:\n{stderr}"
+        ),
+    }
 }
 
 /// Resolve the `triga/scripta` directory containing the Puppeteer proof
