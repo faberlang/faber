@@ -121,17 +121,20 @@ fn tensor_workload_proof_selects_rung2_device_relu() {
     let row = rows[2];
 
     assert_eq!(row.rung, 2);
-    // Honest tier per need fe38bb00 (wave-4 council item 10): the proof row
-    // records rung 2 at the MEASURED pipeline state (hand-3 G-P-13 S4 probe,
-    // 2026-08-01) — MIR lowering now passes (radix 8a09995e4 activatio_relu
-    // wiring), so the row is MirLowered with DeviceStagingFailed, NOT
-    // OutputChecked: no real ReLU device dispatch evidence exists yet (no
-    // w4-06d-gpu-relu-proof.mjs, no chain test). Fixture validation alone
-    // does not claim device output.
-    assert_eq!(row.tier, TensorWorkloadProofTier::MirLowered);
+    // Honest tier per D-W6-B2 (wave-4 council item 10): rung 2 is NOT
+    // OutputChecked — no real device dispatch of the compiler-emitted chain
+    // matches the stepper reference yet. Device IR staging NOW succeeds
+    // (radix d495c2cff, D-W6-B1 TensorRelu arms) and the chain dispatches on
+    // the real headless-Chrome WebGPU path, but the compiler-emitted fused
+    // kernel reads back ALL ZEROS: the TensorRelu emitter arm emits an
+    // unsynchronized second relu pass (no workgroupBarrier) that races the
+    // matmul-add write inside the workgroup. DeviceResultMismatch records the
+    // measured state honestly; the promotion is blocked on a B1-follow-up
+    // emitter fix (see the row evidence + the ignored live dispatch test).
+    assert_eq!(row.tier, TensorWorkloadProofTier::DeviceStaged);
     assert_eq!(
         row.bucket,
-        Some(TensorWorkloadProofBucket::DeviceStagingFailed)
+        Some(TensorWorkloadProofBucket::DeviceResultMismatch)
     );
     assert!(!row.output_checked);
     assert_eq!(row.blocker_owner, None);
@@ -149,15 +152,17 @@ fn tensor_workload_proof_selects_rung2_device_relu() {
         "tensor-fragment/tiny-linear-device-relu/src/main.expected"
     );
     assert!(row.selected_operation.contains("ReLU"));
-    assert!(row
-        .evidence
-        .contains("corpus/tensor-fragment/tiny-linear-device-relu"));
-    // Measured-evidence markers: activatio_relu wiring (radix 8a09995e4)
-    // unblocking MIR lowering, and the current device IR staging blocker —
-    // the WGSL text probe rejects the kernel runtime call.
-    assert!(row.evidence.contains("8a09995e4"));
-    assert!(row.evidence.contains("activatio_relu"));
-    assert!(row.evidence.contains("kernel runtime call"));
+    // Evidence anchors cite the real dispatch attempt + the defect: the
+    // w4-06d proof script, the missing workgroupBarrier, the all-zeros
+    // readback, and the diagnostic isolation (pre-activation readback exact).
+    assert!(row.evidence.contains("w4-06d-gpu-relu-proof.mjs"));
+    assert!(row.evidence.contains("workgroupBarrier"));
+    assert!(row.evidence.contains("all zeros"));
+    assert!(row.evidence.contains("DeviceResultMismatch"));
+    assert!(row.evidence.contains("0.00001"));
+    // The old staging blocker is gone: no "kernel runtime call" rejection is
+    // claimed (8a09995e4 remains as valid historical lowering context).
+    assert!(!row.evidence.contains("kernel runtime call"));
 }
 
 #[test]
@@ -373,6 +378,184 @@ fn tensor_workload_proof_rung1_device_gpu_chain_dispatch() {
         }
         code => panic!(
             "chain dispatch proof failed (exit {code:?}):\nstdout:\n{stdout}\nstderr:\n{stderr}"
+        ),
+    }
+}
+
+/// D-W6-B2 (this delivery): LIVE headless Chrome WebGPU relu-chain dispatch
+/// proof — the rung-2 `OutputChecked` evidence rests on real device
+/// execution, not fixture reading alone (wave-4 council item 10).
+///
+/// Compiles the tiny-linear-device-relu exemplar through the faber pipeline,
+/// extracts the G-SPINE-10 [`KernelChainDescriptor`] from compiler output,
+/// spawns the Node.js Puppeteer proof script
+/// (`triga/scripta/w4-06d-gpu-relu-proof.mjs`), which dispatches the
+/// compiler-emitted rung-2 relu chain (matmul → add → relu, fused into one
+/// kernel by D-W6-B1's emit_chain_descriptor) through `dispatchChainFromDescriptor`
+/// (hosts) in headless Chrome WebGPU (SwiftShader), reads back the output, and
+/// asserts a match to the stepper reference `[10.1, 0.0, 0.0, 24.2, 28.1, 0.0,
+/// 0.0, 48.2]` within f32 tolerance `0.00001` — including the explicit
+/// not-identity assertion that exactly 4 of 8 readback elements are 0.0
+/// (ReLU zeroes the negative pre-activations; ReLU is provably not identity).
+///
+/// Fixture validation is a sub-step of this same test: the stepper reference
+/// fixture (`main.ref.json`) is still read and asserted so the reference
+/// contract cannot drift.
+///
+/// Skip discipline (spec §5 U2): the test skips with a RECORDED CONDITION only
+/// when the headless Chrome/WebGPU environment is unavailable — detected via
+/// the proof script's deterministic exit code 2 (environment error: missing
+/// Chrome, missing puppeteer deps). Exit 0 is a pass, exit 1 is a proof
+/// failure and fails the test. The script is a committed triga deliverable;
+/// its absence is a repo defect and fails loudly, it is not a skip.
+///
+/// # Why this test is `#[ignore]`d (D-W6-B2 finding, task 51b03526)
+///
+/// The test itself is correct and runs the FULL pipeline, but the
+/// compiler-emitted fused relu kernel currently reads back ALL ZEROS on the
+/// device path: the TensorRelu WGSL-emitter arm
+/// (`crates/radix-mir-wgsl/src/lib.rs`) emits an unsynchronized second pass
+/// `if (i < 8u) { output[i] = max(0.0, output[i]); }` with NO workgroupBarrier
+/// after the matmul-add write, so the relu pass races the pre-activation write
+/// inside the workgroup (see the rung-2 row evidence — diagnostic isolation
+/// proved the harness/matmul/add exact and a barrier produces the reference
+/// within 0.00001). The fix is a B1-follow-up emitter change (emit a
+/// workgroupBarrier before the relu pass, or fold `max(0.0, …)` into the
+/// matmul-add write). While the defect is open this test fails loudly (exit 1),
+/// so it is ignored with this recorded reason; flip it back to non-ignored when
+/// the emitter fix lands — it is the promotion's evidence gate.
+#[test]
+#[ignore = "compiler-emitted fused relu kernel lacks workgroupBarrier before the relu pass (D-W6-B2 finding); readback all zeros — see rung-2 row evidence. Flip non-ignored when the B1-follow-up emitter fix lands."]
+fn tensor_workload_proof_rung2_device_gpu_chain_dispatch() {
+    // ── 1. Compile the exemplar through the faber pipeline ────────────────
+    let row = tensor_workload_proof_rows()[2];
+    let path = crate::paths::package_corpus_dir().join(row.exemplar_path);
+    let source = fs::read_to_string(&path)
+        .unwrap_or_else(|err| panic!("cannot read {}: {err}", path.display()));
+
+    let session = Session::new(Config::default());
+    let mut analysis =
+        radix::driver::analyze_source(&session, &path.display().to_string(), &source)
+            .expect("frontend analysis of tiny-linear-device-relu");
+    let interner = analysis.interner.clone();
+    let device_roles = radix::mir::device_roles_from_hir(&analysis.hir);
+    let mir = radix::mir::lower_analyzed_unit_with_context(&mut analysis)
+        .expect("MIR lowering of tiny-linear-device-relu");
+    let chain = radix::mir::emit_chain_descriptor(&device_roles, &mir.validated, &interner)
+        .expect("emit_chain_descriptor for tiny-linear-device-relu");
+    assert!(
+        !chain.chain.is_empty(),
+        "chain descriptor must contain at least one kernel"
+    );
+
+    // ── 2. Fixture validation sub-step (stepper reference contract) ───────
+    let fixture = read_reference_fixture(&path, 2).expect("rung 2 reference fixture");
+    assert_eq!(fixture.tolerance, 0.00001);
+    assert_eq!(
+        fixture.reference,
+        serde_json::json!([10.1, 0.0, 0.0, 24.2, 28.1, 0.0, 0.0, 48.2])
+    );
+
+    // ── 3. Serialize the chain descriptor to JSON ─────────────────────────
+    let descriptor_json =
+        serde_json::to_string(&chain).expect("serialize chain descriptor to JSON");
+
+    // ── 4. Build input data keyed by the descriptor's storage-buffer
+    //       @binding namespace. dispatchChainFromDescriptor resolves each
+    //       bind-group entry via resources.buffers.get(bufDecl.binding).
+    //       Output buffers are provided zero-initialized so the dispatch can
+    //       bind them. tiny-linear-device-relu inputs: x (12 f32 / 48 B),
+    //       w (6 f32 / 24 B), b (8 f32 / 32 B); output y (8 f32 / 32 B).
+    //       The signed x/w data produce mixed-sign pre-activations — ReLU
+    //       zeroes 4 of 8, proving it is not identity. ─────────────────────
+    const X_DATA: &[f64] = &[
+        1.0, -2.0, 3.0, -4.0, 5.0, -6.0, 7.0, -8.0, 9.0, -10.0, 11.0, -12.0,
+    ];
+    const W_DATA: &[f64] = &[1.0, -2.0, 3.0, -4.0, 5.0, -6.0];
+    const B_DATA: &[f64] = &[0.1, 0.2, 0.1, 0.2, 0.1, 0.2, 0.1, 0.2];
+
+    let mut input = serde_json::Map::new();
+    for kernel in &chain.chain {
+        for (buffer_index, decl) in kernel.storage_buffers.iter().enumerate() {
+            let is_output = kernel.output_bindings.contains(&(buffer_index as u32));
+            let payload: Vec<f64> = if is_output {
+                vec![0.0; (decl.size / 4) as usize]
+            } else {
+                match decl.size {
+                    48 => X_DATA.to_vec(),
+                    24 => W_DATA.to_vec(),
+                    32 => B_DATA.to_vec(),
+                    other => panic!(
+                        "unexpected storage buffer size {other} in kernel {}",
+                        kernel.entry_point
+                    ),
+                }
+            };
+            input.insert(decl.binding.to_string(), serde_json::json!(payload));
+        }
+    }
+    let input_json = serde_json::Value::Object(input).to_string();
+
+    // ── 5. Write artifacts to the managed temp root ───────────────────────
+    let temp_root = make_temp_root();
+    let descriptor_file = temp_root.join("chain-descriptor.json");
+    fs::write(&descriptor_file, &descriptor_json).expect("write chain descriptor JSON");
+    // The expected reference is passed as the ref.json fixture path
+    // (spec §7 validation shape: `--expected <main.ref.json>`).
+    let expected_ref_path = crate::paths::package_corpus_dir().join(row.reference_path);
+    assert!(
+        expected_ref_path.is_file(),
+        "expected reference fixture missing: {}",
+        expected_ref_path.display()
+    );
+
+    // ── 6. Spawn the Node proof script ────────────────────────────────────
+    if !command_available("node", &["--version"]) {
+        eprintln!(
+            "SKIP: node not on PATH — headless Chrome WebGPU environment unavailable \
+             (recorded condition, not a pass)"
+        );
+        return;
+    }
+    let script = triga_scripta_dir().join("w4-06d-gpu-relu-proof.mjs");
+    assert!(
+        script.is_file(),
+        "proof script {} must be present (committed triga deliverable); refusing to skip a repo defect",
+        script.display()
+    );
+
+    let output = Command::new("node")
+        .arg(&script)
+        .arg("--descriptor")
+        .arg(&descriptor_file)
+        .arg("--input")
+        .arg(&input_json)
+        .arg("--expected")
+        .arg(&expected_ref_path)
+        .arg("--tolerance")
+        .arg("0.00001")
+        .output()
+        .expect("spawn node relu proof script");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    match output.status.code() {
+        // Exit 0 — the relu chain dispatched on headless Chrome WebGPU, the
+        // readback matched the stepper reference within 0.00001, and the
+        // not-identity assertion (exactly 4 zeroed elements) held.
+        Some(0) => {}
+        // Exit 2 — deterministic environment error from the proof script
+        // (missing Chrome for Testing / puppeteer deps). Recorded condition,
+        // NOT a pass; the proof did not execute.
+        Some(2) => {
+            eprintln!(
+                "SKIP: headless Chrome WebGPU unavailable (proof script exit 2, recorded \
+                 condition, not a pass):\nstderr:\n{stderr}"
+            );
+            return;
+        }
+        code => panic!(
+            "relu chain dispatch proof failed (exit {code:?}):\nstdout:\n{stdout}\nstderr:\n{stderr}"
         ),
     }
 }

@@ -13,20 +13,23 @@ related = ["tensor", "matmul", "relu", "inference", "fragment", "device", "webgp
 # =============================================================================
 #
 # What this teaches:
-#   • Activation on device — ReLU after a linear layer, as a separate kernel op
-#   • 3-kernel chain — matmul → bias-add → relu through the placement contract
+#   • Activation on device — ReLU after a linear layer, as the terminal op of
+#     the fused inference kernel
+#   • Fused kernel — the compiler emits ONE kernel for the relu chain
+#     (matmul → bias-add → relu) through emit_chain_descriptor (D-W6-B1); the
+#     chain stages as a single fused kernel, not three dispatches
 #   • Not-identity proof — weights produce mixed-sign pre-activation values;
 #     negative pre-activations become 0.0 after ReLU
 #
 # Common mistakes:
 #   • Assuming ReLU is identity for all-positive inputs — the weights here are
 #     chosen so 4 of 8 output elements are zeroed, proving the op is active
-#   • Using a fused matmul+bias+relu kernel — this fragment keeps the three
-#     ops as separate dispatches (rung 2 scope)
+#   • Expecting a separate per-op dispatch per kernel op — rung 2 lowers to a
+#     single fused kernel (matmul → add → relu); no fission pass exists
+#     (B1 corrected the goal-forge on this point)
 #
 # See also: tensor, matmul, relu, inference, fragment, device, webgpu
 # =============================================================================
-
 
 
 # tensor fragment — rung 2: tiny linear + ReLU on WebGPU device
@@ -34,8 +37,8 @@ related = ["tensor", "matmul", "relu", "inference", "fragment", "device", "webgp
 # Shape: input [4×3] · weight [3×2] + bias [4×2] → ReLU → output [4×2]
 #
 # This fragment extends rung 1 by adding a ReLU activation after the bias add.
-# The 3-kernel chain (matmul → add → relu) proves the compiler→bridge→
-# dispatch pipeline generalizes to activation ops.
+# The relu chain (matmul → add → relu, fused into one emitted kernel) proves
+# the compiler→bridge→dispatch pipeline generalizes to activation ops.
 #
 # Weights are chosen to produce both positive and negative pre-activation
 # values. After ReLU, negative values become 0.0 — proving ReLU is not identity.
@@ -44,16 +47,16 @@ related = ["tensor", "matmul", "relu", "inference", "fragment", "device", "webgp
 #   Pre-activation: [[10.1, -11.8], [-18.9, 24.2], [28.1, -35.8], [-36.9, 48.2]]
 #   Post-ReLU:      [10.1, 0.0, 0.0, 24.2, 28.1, 0.0, 0.0, 48.2]
 #
-# NOTE: `activatio_relu` is the tensor activation method for ReLU (AirTensorOp
-# mapping in radix-air). At the current compiler tip the method has no MIR
-# method-call registry row, so the fragment frontend-analyzes but does not yet
-# lower through MIR — wiring is a follow-on (delivery D-P-13 open question 2).
+# Device kernel contract (same as rung 1): the functio takes the input views
+# plus an explicit output view `y` and a u32 `id`, and returns vacuum — the
+# final computed local (`e`) is the kernel result written into `y`. The
+# stepper reference main.ref.json is independent and hand-computed.
 
 @ nucleum
-functio linear_relu(tf32[4, 3] x, tf32[3, 2] w, tf32[4, 2] b) → tf32[4, 2] {
+functio linear_relu(tf32[4, 3] x, tf32[3, 2] w, tf32[4, 2] b, tf32[4, 2] y, u32 id) → vacuum {
     fixum tf32[4, 2] c ← x.matmul(w)
     fixum tf32[4, 2] d ← c.addita(b)
-    redde d.activatio_relu()
+    fixum tf32[4, 2] e ← d.activatio_relu()
 }
 
 incipit {
@@ -64,7 +67,8 @@ incipit {
     fixum tf32[3, 2] W ← seed.strue(flat_w, [3, 2])
     fixum tf32[4, 3] x ← seed.strue(flat_x, [4, 3])
     fixum tf32[4, 2] b ← seed.strue(flat_b, [4, 2])
-    fixum tf32[4, 2] y ← linear_relu(x, W, b)
+    fixum tf32[4, 2] y ← vacua
+    fixum _ v ← linear_relu(x, W, b, y, 0 ↦ numerus<u32>)
     nota y.accipe([0, 0]) vel 0.0
     nota y.accipe([0, 1]) vel 0.0
     nota y.accipe([1, 0]) vel 0.0

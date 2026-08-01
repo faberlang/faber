@@ -26,6 +26,12 @@ pub(super) enum TensorWorkloadProofBucket {
     /// Launch contract step discovered no real device executor.
     /// SermoOpen returns stub handle, but the kernel cannot be dispatched.
     LaunchContractFailed,
+    /// The chain staged AND dispatched on the real device path, but the
+    /// readback does not match the stepper reference — a device-result
+    /// correctness defect (mirrors the gpu_workload harness NumericMismatch /
+    /// RunFailed family). NOT OutputChecked: real dispatch happened but the
+    /// output is wrong.
+    DeviceResultMismatch,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -84,12 +90,12 @@ pub(super) const TENSOR_WORKLOAD_PROOF_ROWS: &[TensorWorkloadProofRow] =
         expected_stdout_path: "tensor-fragment/tiny-linear-device-relu/src/main.expected",
         selected_operation:
             "rank-2 f32 linear layer + ReLU activation on WebGPU device (matmul + elementwise add + relu)",
-        tier: TensorWorkloadProofTier::MirLowered,
-        bucket: Some(TensorWorkloadProofBucket::DeviceStagingFailed),
+        tier: TensorWorkloadProofTier::DeviceStaged,
+        bucket: Some(TensorWorkloadProofBucket::DeviceResultMismatch),
         output_checked: false,
         blocker_owner: None,
         blocker_issue: "",
-        evidence: "rung-2 recorded at the honest tier per wave-4 council item 10 (no OutputChecked claim from fixture validation alone): no w4-06d-gpu-relu-proof.mjs and no chain test exist yet, so device dispatch is a follow-on. Measured 2026-08-01 through the real pipeline (hand-3 G-P-13 S4 probe): frontend analysis OK; MIR lowering now OK — radix 8a09995e4 wired activatio_relu (registry row + method-call lowering, radix crates/radix/src/intrinsics/registry.rs + mir/lower/runtime.rs), unblocking the formerly missing MIR method-call registry row. Current blocker is device IR staging: emit_chain_descriptor fails at the WGSL text probe — target-policy classifier rejects 'MIR-to-WGSL unsupported: kernel runtime call' (device kernel cannot contain a MIR runtime call). Proven so far: radix wgsl_text_test.rs::relu_kernel_emits_valid_wgsl (MirUnOp::Relu emits `max(0.0, operand)` through the expr_for_value arm); exemplar corpus/tensor-fragment/tiny-linear-device-relu frontend-analyzes; hand-computed reference [10.1, 0.0, 0.0, 24.2, 28.1, 0.0, 0.0, 48.2] (4 zeros, 4 non-zeros — ReLU not identity)",
+        evidence: "rung-2 measured 2026-08-01 through the real pipeline (B2 dispatch attempt, task 51b03526): frontend analysis OK; MIR lowering OK (radix 8a09995e4 activatio_relu wiring); device IR staging NOW OK — radix d495c2cff (D-W6-B1) added the TensorRelu device-classifier + WGSL-emitter arms, so emit_chain_descriptor succeeds and emits the fused matmul->add->relu kernel. Promotion to OutputChecked is BLOCKED by a device-result correctness defect (bucket DeviceResultMismatch): real headless-Chrome WebGPU dispatch of the compiler-emitted kernel (triga/scripta/w4-06d-gpu-relu-proof.mjs + dispatchChainFromDescriptor, hosts) reads back all zeros — the TensorRelu emitter arm (crates/radix-mir-wgsl/src/lib.rs, MirCollectionOp::TensorRelu statement arm) emits an unsynchronized second pass `if (i < 8u) { output[i] = max(0.0, output[i]); }` with NO workgroupBarrier after the matmul-add write, so the relu pass races the pre-activation write inside the workgroup. Diagnostic isolation on the same descriptor: with the relu pass removed the readback is the exact hand-computed pre-activation [10.1, -11.8, -18.9, 24.2, 28.1, -35.8, -36.9, 48.2] (harness/matmul/add correct); with a workgroupBarrier inserted before the relu pass the readback matches main.ref.json [10.1, 0.0, 0.0, 24.2, 28.1, 0.0, 0.0, 48.2] within 0.00001 (4 zeros, exit 0). Fix is a B1-follow-up emitter change (emit workgroupBarrier before the relu pass, or fold max(0.0, acc + b) into the matmul-add write); the w4-06d harness + tensor_workload_proof_rung2_device_gpu_chain_dispatch live test (ignored on this compiler defect) are the promotion's evidence harness",
     }];
 
 pub(super) fn tensor_workload_proof_rows() -> &'static [TensorWorkloadProofRow] {
