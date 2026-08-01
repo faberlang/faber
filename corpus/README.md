@@ -10,6 +10,7 @@ Package-shaped product fixtures for Faber build/run/test proofs.
 | --- | --- |
 | `tensor-fragment/tiny-linear/` | FMIR package fragment (host linear) |
 | `tensor-fragment/tiny-linear-device/` | FMIR + device linear + reference JSON |
+| `tensor-fragment/tiny-linear-device-relu/` | Rung-2 fragment: device linear + ReLU + reference JSON (negative pre-activation weights) |
 | `tensor-package/fmir-matmul/` | FMIR package matmul proof |
 
 ## Run

@@ -1,0 +1,76 @@
++++
+term = "tensor fragment"
+kind = "concept"
+category = "fragment"
+canonical = false
+summary = "Tiny linear + ReLU inference fragment on WebGPU device: y = relu(x·W + b). Rung 2 of the workload proof table — first activation op on the device inference chain."
+syntax = "faber run --target fmir-bin faber/corpus/tensor-fragment/tiny-linear-device-relu/"
+related = ["tensor", "matmul", "relu", "inference", "fragment", "device", "webgpu"]
++++
+
+# =============================================================================
+# tensor fragment — rung 2: tiny linear + ReLU on WebGPU device (y = relu(x·W + b))
+# =============================================================================
+#
+# What this teaches:
+#   • Activation on device — ReLU after a linear layer, as a separate kernel op
+#   • 3-kernel chain — matmul → bias-add → relu through the placement contract
+#   • Not-identity proof — weights produce mixed-sign pre-activation values;
+#     negative pre-activations become 0.0 after ReLU
+#
+# Common mistakes:
+#   • Assuming ReLU is identity for all-positive inputs — the weights here are
+#     chosen so 4 of 8 output elements are zeroed, proving the op is active
+#   • Using a fused matmul+bias+relu kernel — this fragment keeps the three
+#     ops as separate dispatches (rung 2 scope)
+#
+# See also: tensor, matmul, relu, inference, fragment, device, webgpu
+# =============================================================================
+
+
+
+# tensor fragment — rung 2: tiny linear + ReLU on WebGPU device
+#
+# Shape: input [4×3] · weight [3×2] + bias [4×2] → ReLU → output [4×2]
+#
+# This fragment extends rung 1 by adding a ReLU activation after the bias add.
+# The 3-kernel chain (matmul → add → relu) proves the compiler→bridge→
+# dispatch pipeline generalizes to activation ops.
+#
+# Weights are chosen to produce both positive and negative pre-activation
+# values. After ReLU, negative values become 0.0 — proving ReLU is not identity.
+#
+# EXPECTED output (hand-computed):
+#   Pre-activation: [[10.1, -11.8], [-18.9, 24.2], [28.1, -35.8], [-36.9, 48.2]]
+#   Post-ReLU:      [10.1, 0.0, 0.0, 24.2, 28.1, 0.0, 0.0, 48.2]
+#
+# NOTE: `activatio_relu` is the tensor activation method for ReLU (AirTensorOp
+# mapping in radix-air). At the current compiler tip the method has no MIR
+# method-call registry row, so the fragment frontend-analyzes but does not yet
+# lower through MIR — wiring is a follow-on (delivery D-P-13 open question 2).
+
+@ nucleum
+functio linear_relu(tf32[4, 3] x, tf32[3, 2] w, tf32[4, 2] b) → tf32[4, 2] {
+    fixum tf32[4, 2] c ← x.matmul(w)
+    fixum tf32[4, 2] d ← c.addita(b)
+    redde d.activatio_relu()
+}
+
+incipit {
+    fixum lista<f32> flat_w ← [1.0, -2.0, 3.0, -4.0, 5.0, -6.0]
+    fixum lista<f32> flat_x ← [1.0, -2.0, 3.0, -4.0, 5.0, -6.0, 7.0, -8.0, 9.0, -10.0, 11.0, -12.0]
+    fixum lista<f32> flat_b ← [0.1, 0.2, 0.1, 0.2, 0.1, 0.2, 0.1, 0.2]
+    fixum tf32[] seed ← vacua
+    fixum tf32[3, 2] W ← seed.strue(flat_w, [3, 2])
+    fixum tf32[4, 3] x ← seed.strue(flat_x, [4, 3])
+    fixum tf32[4, 2] b ← seed.strue(flat_b, [4, 2])
+    fixum tf32[4, 2] y ← linear_relu(x, W, b)
+    nota y.accipe([0, 0]) vel 0.0
+    nota y.accipe([0, 1]) vel 0.0
+    nota y.accipe([1, 0]) vel 0.0
+    nota y.accipe([1, 1]) vel 0.0
+    nota y.accipe([2, 0]) vel 0.0
+    nota y.accipe([2, 1]) vel 0.0
+    nota y.accipe([3, 0]) vel 0.0
+    nota y.accipe([3, 1]) vel 0.0
+}

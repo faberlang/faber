@@ -1,0 +1,10 @@
+{
+  "rung": 2,
+  "name": "tiny-linear-device-relu",
+  "dtype": "f32",
+  "shape": [4, 2],
+  "tolerance": 0.00001,
+  "reference": [10.1, 0.0, 0.0, 24.2, 28.1, 0.0, 0.0, 48.2],
+  "output_reference": [10.1, 0.0, 0.0, 24.2, 28.1, 0.0, 0.0, 48.2],
+  "source": "hand-computed: y = relu(x·W + b). Weights produce mixed-sign pre-activation; ReLU zeros 4 of 8 elements, proving not-identity."
+}

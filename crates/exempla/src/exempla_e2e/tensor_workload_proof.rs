@@ -76,6 +76,20 @@ pub(super) const TENSOR_WORKLOAD_PROOF_ROWS: &[TensorWorkloadProofRow] =
         blocker_owner: None,
         blocker_issue: "",
         evidence: "crates/exempla/src/exempla_e2e/tensor_workload_proof_test.rs::tensor_workload_proof_rung1_device_linear_matches_stepper + triga/scripta/w4-06b-gpu-proof.mjs (hand-authored inline WGSL mirroring main.fab; headless Chrome WebGPU matmul+add, exit 0, values within f32 tolerance) + hosts/webgpu-browser/public/src/compiler-chain-bridge.mjs (G-P-12 S1 c11cd04c1+S2 275263e: compiler-emitted WGSL+reflection JSON through buildChainFromReflection+runKernelChain; headless Chrome WebGPU matmul+add, exit 0, values within f32 tolerance)",
+    },
+    TensorWorkloadProofRow {
+        rung: 2,
+        exemplar_path: "tensor-fragment/tiny-linear-device-relu/src/main.fab",
+        reference_path: "tensor-fragment/tiny-linear-device-relu/src/main.ref.json",
+        expected_stdout_path: "tensor-fragment/tiny-linear-device-relu/src/main.expected",
+        selected_operation:
+            "rank-2 f32 linear layer + ReLU activation on WebGPU device (matmul + elementwise add + relu)",
+        tier: TensorWorkloadProofTier::FrontendAnalyzed,
+        bucket: Some(TensorWorkloadProofBucket::MirLoweringFailed),
+        output_checked: false,
+        blocker_owner: None,
+        blocker_issue: "",
+        evidence: "rung-2 recorded at the honest lower tier per wave-4 council item 10 (no OutputChecked claim from fixture validation alone): no w4-06d-gpu-relu-proof.mjs and no chain test exist yet, so device dispatch is a follow-on. Proven so far: radix wgsl_text_test.rs::relu_kernel_emits_valid_wgsl (MirUnOp::Relu emits `max(0.0, operand)` through the expr_for_value arm); exemplar corpus/tensor-fragment/tiny-linear-device-relu frontend-analyzes; hand-computed reference [10.1, 0.0, 0.0, 24.2, 28.1, 0.0, 0.0, 48.2] (4 zeros, 4 non-zeros — ReLU not identity). Blocked at MIR lowering: activatio_relu has no MIR method-call registry row (radix crates/radix/src/intrinsics/registry.rs + mir/lower/runtime.rs); wiring is a follow-on",
     }];
 
 pub(super) fn tensor_workload_proof_rows() -> &'static [TensorWorkloadProofRow] {
