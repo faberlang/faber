@@ -1462,35 +1462,31 @@ fn emit_library_typescript_modules(
         if !src_dir.is_dir() {
             continue;
         }
-        // FBR-P2-001: per-entry directory read errors are diagnostic failures,
-        // never silently dropped modules.
-        let mut entries: Vec<_> = fs::read_dir(&src_dir)
-            .map_err(|err| io_diag(&src_dir, err))?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|err| io_diag(&src_dir, err))?
-            .into_iter()
-            .filter(|e| e.path().extension().is_some_and(|ext| ext == "fab"))
-            .collect();
-        entries.sort_by_key(|e| e.file_name());
+        // FBR-P2-001: directory read errors anywhere in the tree are
+        // diagnostic failures, never silently dropped modules.
+        let src_files = library_src_fab_files(&src_dir)?;
 
         // Prefer package-owned TS binding shims (e.g. faber-web/runtime/dom.ts)
         // over emitting `nota` stubs from .fab — stubs only console.log.
         let ts_bindings = load_ts_library_bindings(&pkg_root)?;
 
-        for entry in &entries {
-            let fab_path = entry.path();
-            let stem = fab_path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("unknown");
-            let ts_file_name = format!("{}-{}.ts", pkg.name, stem);
-            let ts_path = ts_root.join(&ts_file_name);
+        for fab_path in &src_files {
+            let Some(naming) = ts_lib_module_naming(&pkg.name, &src_dir, fab_path) else {
+                continue;
+            };
+            let ts_path = ts_root.join(&naming.file_name);
 
             if let Some(bindings) = ts_bindings.as_ref() {
-                if let Some(exports) = bindings.module_exports(stem) {
+                if let Some(exports) = bindings.module_exports(&naming.leaf_stem) {
                     if !exports.is_empty() {
                         emit_ts_binding_facade(
-                            &pkg_root, &pkg.name, stem, bindings, &exports, ts_root,
+                            &pkg_root,
+                            &pkg.name,
+                            &naming.leaf_stem,
+                            &naming.file_name,
+                            bindings,
+                            &exports,
+                            ts_root,
                         )?;
                         continue;
                     }
@@ -1522,7 +1518,7 @@ fn emit_library_typescript_modules(
             let code = String::from_utf8_lossy(&output.stdout).to_string();
             emitted.push(EmittedLibFile {
                 ts_path,
-                stem: stem.to_owned(),
+                stem: naming.leaf_stem,
                 code,
             });
         }
@@ -1546,6 +1542,11 @@ fn emit_library_typescript_modules(
         // Phase 3: apply emit-defect fixes before namespace wrapping.
         let code = apply_library_emit_fixes(file.code.clone());
         let code = wrap_module_exports(code, &file.stem);
+        // Emitted modules export their leaf stem as the namespace const; a
+        // `privata` binding that differs (e.g. `import { lighting } from
+        // "triga:lighting/light"`) must alias the leaf stem or tsc fails
+        // (TS2305).
+        let code = normalize_library_namespace_bindings(code, library_imports);
         // Augment namespace imports with named type exports so TypeScript
         // can resolve cross-module type references (e.g. Vector3 from math).
         let local_names = collect_ts_local_decl_names(&code);
@@ -1569,7 +1570,14 @@ fn collect_ts_bare_decl_names(code: &str) -> Vec<String> {
         if line.chars().next().is_some_and(|c| c.is_whitespace()) {
             continue;
         }
-        for prefix in &["class ", "function ", "enum ", "interface ", "type "] {
+        for prefix in &[
+            "class ",
+            "function ",
+            "enum ",
+            "interface ",
+            "type ",
+            "const ",
+        ] {
             if let Some(rest) = line.strip_prefix(prefix) {
                 let name = rest
                     .split(|c: char| !c.is_alphanumeric() && c != '_')
@@ -1727,6 +1735,7 @@ fn emit_ts_binding_facade(
     _pkg_root: &Path,
     pkg_name: &str,
     stem: &str,
+    file_name: &str,
     bindings: &TsLibraryBindings,
     exports: &[(String, String)],
     ts_root: &Path,
@@ -1779,9 +1788,80 @@ fn emit_ts_binding_facade(
         }
     }
 
-    let facade_path = ts_root.join(format!("{pkg_name}-{stem}.ts"));
+    let facade_path = ts_root.join(file_name);
     fs::write(&facade_path, code).map_err(|err| io_diag(&facade_path, err))?;
     Ok(())
+}
+
+/// Recursively enumerate `.fab` files under a library `src/` directory.
+///
+/// FBR-P2-001: a directory read error anywhere in the tree is a diagnostic
+/// failure, never a silently dropped module. Reuses the package discovery
+/// walk in [`super::source_files::package_source_files`] (BFS, symlink-escape
+/// guarded) with `include_proba = false`.
+fn library_src_fab_files(src_dir: &Path) -> Result<Vec<PathBuf>, Box<Diagnostic>> {
+    super::source_files::package_source_files(src_dir, false).map_err(|mut diags| {
+        Box::new(diags.pop().unwrap_or_else(|| {
+            product_diag(format!(
+                "failed to read library source root {}",
+                src_dir.display()
+            ))
+            .with_file(src_dir.display().to_string())
+        }))
+    })
+}
+
+/// TypeScript product naming derived from one library `.fab` source file.
+struct TsLibModuleNaming {
+    /// Library import specifier, e.g. `triga:lighting/light`.
+    spec: String,
+    /// Emitted file name (relative to the TS output root), e.g.
+    /// `triga-lighting-light.ts`.
+    file_name: String,
+    /// Relative ESM path used for import rewrites, e.g.
+    /// `./triga-lighting-light.js`.
+    rel_path: String,
+    /// Leaf module stem — the namespace-export name importers bind, e.g.
+    /// `light` for `src/lighting/light.fab`.
+    leaf_stem: String,
+}
+
+/// Derive TypeScript product naming for a library `.fab` source file.
+///
+/// Top-level modules keep their historical flat names (`src/math.fab` →
+/// `triga:math` / `triga-math.ts` / `./triga-math.js`). Nested leaves always
+/// use the full relative path so a nested leaf can never collide with a
+/// top-level module that shares its stem (`src/lighting/light.fab` →
+/// `triga:lighting/light` / `triga-lighting-light.ts` / `./triga-lighting-light.js`).
+/// The `-` delimiter is shared between the emitted `.ts` file names and the
+/// `.js` map values so rewritten specifiers resolve against emitted files.
+fn ts_lib_module_naming(
+    pkg_name: &str,
+    src_dir: &Path,
+    fab_path: &Path,
+) -> Option<TsLibModuleNaming> {
+    let rel = fab_path.strip_prefix(src_dir).ok()?;
+    let segments: Vec<String> = rel
+        .with_extension("")
+        .components()
+        .filter_map(|component| match component {
+            std::path::Component::Normal(segment) => {
+                Some(segment.to_string_lossy().into_owned())
+            }
+            _ => None,
+        })
+        .collect();
+    if segments.is_empty() {
+        return None;
+    }
+    let rel_str = segments.join("/");
+    let dash_name = segments.join("-");
+    Some(TsLibModuleNaming {
+        spec: format!("{pkg_name}:{rel_str}"),
+        file_name: format!("{pkg_name}-{dash_name}.ts"),
+        rel_path: format!("./{pkg_name}-{dash_name}.js"),
+        leaf_stem: segments.last().cloned().unwrap_or_default(),
+    })
 }
 
 /// Build a map from library import specifiers to relative ESM paths for all
@@ -1790,6 +1870,10 @@ fn emit_ts_binding_facade(
 /// Returns `{specifier} → {relative_path}` mappings, e.g.:
 ///   "triga:triga" → "./triga-triga.js"
 ///   "triga:geometry" → "./triga-geometry.js"
+///   "triga:lighting/light" → "./triga-lighting-light.js"
+///
+/// Nested leaves are enumerated recursively and keyed by their full relative
+/// module path; top-level modules keep their historical flat names.
 ///
 /// Phase 4: used by [`rewrite_import_specifiers`] to rewrite bare library
 /// specifiers in emitted TypeScript to relative ESM paths.
@@ -1821,25 +1905,28 @@ fn build_library_ts_module_map(
         }
         // FBR-P2-001: per-entry directory read errors are diagnostic failures,
         // never silently dropped modules.
-        let mut entries: Vec<_> = fs::read_dir(&src_dir)
-            .map_err(|err| io_diag(&src_dir, err))?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|err| io_diag(&src_dir, err))?
-            .into_iter()
-            .filter(|e| e.path().extension().is_some_and(|ext| ext == "fab"))
-            .collect();
-        entries.sort_by_key(|e| e.file_name());
+        let src_files = library_src_fab_files(&src_dir)?;
+        let mut emitted_file_names: BTreeMap<String, String> = BTreeMap::new();
 
-        for entry in &entries {
-            let stem = entry
-                .path()
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("unknown")
-                .to_owned();
-            let spec = format!("{}:{}", pkg.name, stem);
-            let rel_path = format!("./{}-{}.js", pkg.name, stem);
-            map.insert(spec, rel_path);
+        for fab_path in &src_files {
+            let Some(naming) = ts_lib_module_naming(&pkg.name, &src_dir, fab_path) else {
+                continue;
+            };
+            // Fail closed on emitted-file name collisions (FBR-P2-001): two
+            // modules mapping to one output file would silently drop a module
+            // and corrupt the import map.
+            if let Some(existing_spec) = emitted_file_names.get(&naming.file_name) {
+                return Err(Box::new(
+                    product_diag(format!(
+                        "library TS modules `{existing_spec}` and `{}` both map to `{}`",
+                        naming.spec, naming.file_name
+                    ))
+                    .with_file(fab_path.display().to_string())
+                    .with_arg("issue", "product_library_ts_module_name_collision"),
+                ));
+            }
+            emitted_file_names.insert(naming.file_name.clone(), naming.spec.clone());
+            map.insert(naming.spec, naming.rel_path);
         }
     }
     Ok(map)
@@ -1972,6 +2059,90 @@ fn rewrite_import_specifiers(code: String, library_imports: &BTreeMap<String, St
         i += 1;
     }
     out
+}
+
+/// Rewrite namespace-import bindings to resolve against the emitted target
+/// module's namespace export (its leaf stem).
+///
+/// The radix TS emitter spells a module import's binding name verbatim from
+/// the `importa … privata <name>` alias (`import { lighting } from
+/// "triga:lighting/light"`), but emitted library modules export their leaf
+/// stem as the namespace const (`export const light = { … }`). A binding that
+/// does not match the target leaf stem fails `tsc` (TS2305); emit the alias
+/// form `import { light as lighting }` instead, matching what codegen already
+/// produces for `privata <stem> ut <name>`. Importers that bind the leaf stem
+/// (the norm) are untouched.
+///
+/// Only single-binding module imports are namespace bindings; augmented type
+/// names join later, after this pass.
+fn normalize_library_namespace_bindings(
+    code: String,
+    library_imports: &BTreeMap<String, String>,
+) -> String {
+    let mut out = String::with_capacity(code.len() + 64);
+    for line in code.lines() {
+        let trimmed = line.trim_start();
+        let rewritten = if let Some(rest) = trimmed.strip_prefix("import { ") {
+            if let Some((binding, from_part)) = rest.split_once(" } from ") {
+                let binding = binding.trim();
+                if !binding.is_empty() && !binding.contains(',') && !binding.contains(" as ") {
+                    let spec = import_clause_specifier(from_part);
+                    let spec = spec.and_then(|spec| library_imports.get_key_value(spec));
+                    if let Some((spec, _rel)) = spec {
+                        // Leaf module stem: last segment after both the
+                        // provider `:` and any nested `/` (`triga:math` →
+                        // `math`; `triga:lighting/light` → `light`).
+                        let leaf = spec.rsplit('/').next().and_then(|s| s.rsplit(':').next());
+                        if let Some(leaf) = leaf {
+                            if leaf != binding {
+                                let indent = &line[..line.len() - trimmed.len()];
+                                Some(format!(
+                                    "{indent}import {{ {leaf} as {binding} }} from {from_part}"
+                                ))
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        match rewritten {
+            Some(rewritten) => {
+                out.push_str(&rewritten);
+                out.push('\n');
+            }
+            None => {
+                out.push_str(line);
+                out.push('\n');
+            }
+        }
+    }
+    out
+}
+
+/// Extract the specifier string from an import clause's `from "<spec>";`
+/// remainder (which may carry a trailing `;` and any surrounding trivia).
+fn import_clause_specifier(from_part: &str) -> Option<&str> {
+    let from = from_part.trim();
+    let bytes = from.as_bytes();
+    if bytes.first().map_or(true, |first| *first != b'"' && *first != b'\'') {
+        return None;
+    }
+    let quote = char::from(bytes[0]);
+    let after = &from[1..];
+    let end = after.find(quote)?;
+    Some(&after[..end])
 }
 
 /// Byte-level TypeScript identifier character check used for the exact
@@ -2234,34 +2405,42 @@ fn rewrite_dom_type_constructors(mut code: String) -> String {
 /// post-build `link-triga-ts.mjs` script also adds namespace exports via
 /// `wrapNamespace` and skips re-adding when `export const <name> = {` exists.
 fn wrap_module_exports(mut code: String, module_name: &str) -> String {
-    // Export every top-level function and class declaration.
+    // Export every top-level declaration. The namespace export object only
+    // carries value members; pure types (`type`, `interface`) cannot be
+    // object properties.
     let mut export_names: Vec<String> = Vec::new();
 
-    // Process line by line to find top-level function/class declarations.
+    // Process line by line to find top-level declarations (indent level 0).
     let mut lines: Vec<String> = code.lines().map(|l| l.to_owned()).collect();
     for line in &mut lines {
+        if line.starts_with(' ') || line.starts_with('\t') {
+            continue;
+        }
         let trimmed = line.trim();
-        if let Some(name) = trimmed.strip_prefix("function ") {
-            if let Some(func_name) = name.split('(').next() {
-                let func_name = func_name.trim();
-                if !func_name.is_empty() {
-                    export_names.push(func_name.to_owned());
-                    *line = format!("export {}", trimmed);
-                }
-            }
-        } else if let Some(name) = trimmed.strip_prefix("class ") {
-            let class_name = name
-                .split(' ')
-                .next()
-                .unwrap_or("")
-                .split('{')
+        for prefix in [
+            "function ",
+            "class ",
+            "enum ",
+            "interface ",
+            "type ",
+            "const ",
+        ] {
+            let Some(rest) = trimmed.strip_prefix(prefix) else {
+                continue;
+            };
+            let name = rest
+                .split(|c: char| !c.is_alphanumeric() && c != '_')
                 .next()
                 .unwrap_or("")
                 .trim();
-            if !class_name.is_empty() {
-                export_names.push(class_name.to_owned());
-                *line = format!("export {}", trimmed);
+            if name.is_empty() {
+                continue;
             }
+            if prefix != "type " && prefix != "interface " {
+                export_names.push(name.to_owned());
+            }
+            *line = format!("export {}", trimmed);
+            break;
         }
     }
     code = lines.join("\n");

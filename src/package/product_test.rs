@@ -84,10 +84,16 @@ fn custom_source_root_ts_library_is_rejected_at_discovery() {
 #[test]
 fn library_ts_module_map_default_src_is_deterministic() {
     // Contract lock: default-`src` TS libraries keep contributing the same
-    // deterministic specifier → path entries to the import map.
+    // deterministic specifier → path entries to the import map. Top-level
+    // modules keep their historical flat names (`web:api` → `./web-api.js`);
+    // nested leaves are enumerated recursively and keyed by their full
+    // relative module path (`web:lighting/light` → `./web-lighting-light.js`).
+    // A nested leaf that shares its stem with a top-level module (both
+    // `light`) is disambiguated by the full-segment name, never a collision.
     let app = tempfile::tempdir().expect("create app temp root");
     let dep = tempfile::tempdir().expect("create dependency temp root");
     write_ts_library_dependency(dep.path(), "src");
+    fs::create_dir_all(dep.path().join("src/lighting")).expect("create nested source dir");
     fs::write(
         dep.path().join("src/api.fab"),
         "functio localis() → textus { redde \"ok\" }\n",
@@ -98,12 +104,24 @@ fn library_ts_module_map_default_src_is_deterministic() {
         "functio aliena() → textus { redde \"ok\" }\n",
     )
     .expect("write dependency source");
+    fs::write(
+        dep.path().join("src/light.fab"),
+        "functio top() → textus { redde \"ok\" }\n",
+    )
+    .expect("write dependency source");
+    fs::write(
+        dep.path().join("src/lighting/light.fab"),
+        "functio nested() → textus { redde \"ok\" }\n",
+    )
+    .expect("write dependency source");
     write_ts_library_lock(app.path(), dep.path());
 
     let map = build_library_ts_module_map(app.path()).expect("build library import map");
     let expected = BTreeMap::from([
         ("web:api".to_owned(), "./web-api.js".to_owned()),
         ("web:geo".to_owned(), "./web-geo.js".to_owned()),
+        ("web:light".to_owned(), "./web-light.js".to_owned()),
+        ("web:lighting/light".to_owned(), "./web-lighting-light.js".to_owned()),
     ]);
     assert_eq!(map, expected);
 }
@@ -148,6 +166,83 @@ fn library_ts_module_map_read_dir_failure_is_diagnostic() {
             eprintln!("skipped: permission-based read-dir failure not effective");
         }
     }
+}
+
+#[cfg(unix)]
+#[test]
+fn library_ts_module_map_nested_read_dir_failure_is_diagnostic() {
+    // FBR-P2-001 gate extended to nested module directories: an unreadable
+    // nested `src/<pkg>/` directory fails the recursive walk loudly instead of
+    // silently dropping the modules below it.
+    use std::os::unix::fs::PermissionsExt;
+
+    let app = tempfile::tempdir().expect("create app temp root");
+    let dep = tempfile::tempdir().expect("create dependency temp root");
+    write_ts_library_dependency(dep.path(), "src");
+    let nested = dep.path().join("src/lighting");
+    fs::create_dir_all(&nested).expect("create nested source dir");
+    fs::write(
+        nested.join("light.fab"),
+        "functio localis() → textus { redde \"ok\" }\n",
+    )
+    .expect("write nested dependency source");
+    write_ts_library_lock(app.path(), dep.path());
+
+    fs::set_permissions(&nested, fs::Permissions::from_mode(0o000))
+        .expect("make nested source dir unreadable");
+
+    let result = build_library_ts_module_map(app.path());
+    // Restore permissions so tempdir cleanup can traverse `nested`.
+    let _ = fs::set_permissions(&nested, fs::Permissions::from_mode(0o755));
+
+    match result {
+        Err(diagnostic) => {
+            assert!(
+                diagnostic.message.contains("cannot read"),
+                "expected an io diagnostic, got: {}",
+                diagnostic.message
+            );
+        }
+        Ok(map) => {
+            // Elevated privileges (e.g. running as root) bypass the
+            // permission drop; when the walk succeeds the nested leaf must
+            // still be present (never silently dropped).
+            eprintln!("skipped: permission-based read-dir failure not effective");
+            assert_eq!(map.get("web:lighting/light"), Some(&"./web-lighting-light.js".to_owned()));
+        }
+    }
+}
+
+#[test]
+fn library_ts_module_map_name_collision_is_diagnostic() {
+    // Naming-collision rule, fail closed: a top-level module whose stem
+    // happens to equal another module's full-segment emitted name (`lighting-light`
+    // vs nested `lighting/light`) would silently overwrite one output file.
+    // The map build must reject the collision instead of dropping a module.
+    let app = tempfile::tempdir().expect("create app temp root");
+    let dep = tempfile::tempdir().expect("create dependency temp root");
+    write_ts_library_dependency(dep.path(), "src");
+    fs::create_dir_all(dep.path().join("src/lighting")).expect("create nested source dir");
+    fs::write(
+        dep.path().join("src/lighting-light.fab"),
+        "functio top() → textus { redde \"ok\" }\n",
+    )
+    .expect("write dependency source");
+    fs::write(
+        dep.path().join("src/lighting/light.fab"),
+        "functio nested() → textus { redde \"ok\" }\n",
+    )
+    .expect("write dependency source");
+    write_ts_library_lock(app.path(), dep.path());
+
+    let result = build_library_ts_module_map(app.path());
+    let diagnostic = result.expect_err("collision rejected loudly");
+    assert_eq!(diagnostic.issue(), Some("product_library_ts_module_name_collision"));
+    assert!(
+        diagnostic.message.contains("web-lighting-light.ts"),
+        "expected the colliding emitted file name in the diagnostic, got: {}",
+        diagnostic.message
+    );
 }
 
 // ── Stage 4: one-pass import specifier rewriting (FBR-P2-008) ─────────────
@@ -239,4 +334,42 @@ import { y } from './city';
     let out = rewrite_import_specifiers(code.to_owned(), &library_import_map());
     assert!(out.contains(r#"from './triga-triga.js';"#));
     assert!(out.contains(r#"from './city.js';"#));
+}
+
+#[test]
+fn normalize_library_namespace_bindings_aliases_non_stem_privata_names() {
+    // Emitted modules export their leaf stem as the namespace const. A
+    // `privata` binding that differs (`import { lighting } from
+    // "triga:lighting/light"` where the module exports `light`) must be
+    // emitted as an `as` alias or tsc fails with TS2305. Stem-matching
+    // bindings, relative imports, and already-aliased imports are untouched.
+    let map = BTreeMap::from([
+        ("triga:lighting/light".to_owned(), "./triga-lighting-light.js".to_owned()),
+        ("triga:geometry/data".to_owned(), "./triga-geometry-data.js".to_owned()),
+    ]);
+    let code = r#"import { lighting } from "triga:lighting/light";
+import { data } from "triga:geometry/data";
+import { math as numeri } from "triga:math";
+import { city } from "./city";
+"#;
+    let out = normalize_library_namespace_bindings(code.to_owned(), &map);
+    assert!(out.contains(r#"import { light as lighting } from "triga:lighting/light";"#));
+    assert!(out.contains(r#"import { data } from "triga:geometry/data";"#));
+    assert!(out.contains(r#"import { math as numeri } from "triga:math";"#));
+    assert!(out.contains(r#"import { city } from "./city";"#));
+}
+
+#[test]
+fn normalize_library_namespace_bindings_skips_multi_binding_and_unknown_specifiers() {
+    // Multi-binding imports (post-augmentation style) and specifiers absent
+    // from the library map are never rewritten.
+    let map = BTreeMap::from([
+        ("triga:lighting/light".to_owned(), "./triga-lighting-light.js".to_owned()),
+    ]);
+    let code = r#"import { Light, lighting } from "triga:lighting/light";
+import { mystery } from "triga:mystery";
+"#;
+    let out = normalize_library_namespace_bindings(code.to_owned(), &map);
+    assert!(out.contains(r#"import { Light, lighting } from "triga:lighting/light";"#));
+    assert!(out.contains(r#"import { mystery } from "triga:mystery";"#));
 }
