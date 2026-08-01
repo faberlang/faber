@@ -16,6 +16,20 @@ build.rs                core-support assembler (reads core-support-manifest.txt)
 core-support-manifest.txt  sibling repo paths relative to faberlang container
 ```
 
+## Validation ladder
+
+The sibling radix ladder is the workspace test gate: `../radix/scripta/test`
+(run from `radix/`). Run it at the appropriate stage depth during and at the
+end of an implementation:
+
+- During work: `--check` (stages 1–3) or `--stage 1-4` for the touched surface.
+- Closeout: `--stage 1-6` (or `--full`); `--e2e <target>` for codegen e2e.
+- Stages 3 (proba), 5 (matrix), and 6 (parity) run this repo's binary and the
+  exempla corpus, so faber changes must pass them before closeout.
+- Inner loop: `cargo nextest run -p faber --lib` plus the hygiene ratchet gate
+  `cargo test --test hygiene` (budgets in `tests/hygiene.rs`: no new
+  `.expect(`/`.unwrap()`/`panic!`/`unreachable!`/`let _ =` in `src`).
+
 ## CI dependencies
 
 The release workflow (`.github/workflows/release.yml`) checks out sibling
