@@ -12,7 +12,9 @@ use std::process::Command;
 #[test]
 fn tensor_workload_proof_selects_rung0_matmul() {
     let rows = tensor_workload_proof_rows();
-    assert_eq!(rows.len(), 2);
+    // G-P-13 S4: proof table extended from 2 rows (rung 0 + 1) to 3 rows
+    // (rung 2 added by the S2 handoff).
+    assert_eq!(rows.len(), 3);
 
     let row = rows[0];
     assert_eq!(row.rung, 0);
@@ -102,6 +104,69 @@ fn tensor_workload_proof_rung1_device_linear_matches_stepper() {
     assert_eq!(
         fixture.reference,
         serde_json::json!([9.1, 12.2, 18.1, 24.2, 27.1, 36.2, 36.1, 48.2])
+    );
+}
+
+#[test]
+fn tensor_workload_proof_selects_rung2_device_relu() {
+    let rows = tensor_workload_proof_rows();
+    let row = rows[2];
+
+    assert_eq!(row.rung, 2);
+    // Honest tier per need fe38bb00 (wave-4 council item 10): the proof row
+    // records rung 2 at the measured lower tier, NOT OutputChecked — no real
+    // ReLU device dispatch evidence exists yet (no w4-06d-gpu-relu-proof.mjs,
+    // no chain test). Fixture validation alone does not claim device output.
+    assert_eq!(row.tier, TensorWorkloadProofTier::FrontendAnalyzed);
+    assert_eq!(row.bucket, Some(TensorWorkloadProofBucket::MirLoweringFailed));
+    assert!(!row.output_checked);
+    assert_eq!(row.blocker_owner, None);
+    assert_eq!(row.blocker_issue, "");
+    assert_eq!(
+        row.exemplar_path,
+        "tensor-fragment/tiny-linear-device-relu/src/main.fab"
+    );
+    assert_eq!(
+        row.reference_path,
+        "tensor-fragment/tiny-linear-device-relu/src/main.ref.json"
+    );
+    assert_eq!(
+        row.expected_stdout_path,
+        "tensor-fragment/tiny-linear-device-relu/src/main.expected"
+    );
+    assert!(row.selected_operation.contains("ReLU"));
+    assert!(row
+        .evidence
+        .contains("corpus/tensor-fragment/tiny-linear-device-relu"));
+}
+
+#[test]
+fn tensor_workload_proof_rung2_device_relu_matches_stepper() {
+    let row = tensor_workload_proof_rows()[2];
+    let path = crate::paths::package_corpus_dir().join(row.exemplar_path);
+    let fixture = read_reference_fixture(&path, 2).expect("rung 2 reference fixture");
+    assert_eq!(fixture.tolerance, 0.00001);
+    assert_eq!(
+        fixture.reference,
+        serde_json::json!([10.1, 0.0, 0.0, 24.2, 28.1, 0.0, 0.0, 48.2])
+    );
+
+    // Not-identity proof: 4 of 8 elements are 0.0 (were negative
+    // pre-activation values), 4 are positive and unchanged — ReLU is active,
+    // not identity.
+    let values: Vec<f64> = fixture
+        .reference
+        .as_array()
+        .expect("reference is array")
+        .iter()
+        .map(|v| v.as_f64().expect("f64"))
+        .collect();
+    let zero_count = values.iter().filter(|&&v| v == 0.0).count();
+    let non_zero_count = values.iter().filter(|&&v| v != 0.0).count();
+    assert_eq!(zero_count, 4, "expected exactly 4 zeroed negative pre-activations");
+    assert_eq!(
+        non_zero_count, 4,
+        "expected exactly 4 unchanged positive pre-activations"
     );
 }
 
