@@ -30,17 +30,23 @@ use radix::codegen::conversio_arm::{conversio_arm_clear, conversio_arm_take, Con
 use radix::codegen::conversio_coverage::{
     classify_conversio_coverage, ConversioCoverageTarget, ConversioTypeFamily,
 };
-use radix::codegen::generate_rust_from_analyzed;
+use radix::codegen::{generate_from_analyzed_with_options, generate_rust_from_analyzed, OutputMode, Target};
 use radix::driver::{analyze_source, AnalyzedUnit, Config, Session};
 use radix::mir::{
     classify_mir_coverage, device_roles_from_hir, lower_analyzed_unit_with_context,
     Lowerability, LoweredMirUnit, MirCoverageTarget, MirDeviceContext,
 };
+use radix::reader_locale::{latin_reader_pack, KeywordSurface};
 use rustc_hash::FxHashMap;
 use std::path::PathBuf;
 
 /// HIR backends measured via emit-arm detection (in column order).
-const HIR_MEASURED_TARGETS: [ConversioCoverageTarget; 1] = [ConversioCoverageTarget::Rust];
+const HIR_MEASURED_TARGETS: [ConversioCoverageTarget; 4] = [
+    ConversioCoverageTarget::Rust,
+    ConversioCoverageTarget::TypeScript,
+    ConversioCoverageTarget::Go,
+    ConversioCoverageTarget::Faber,
+];
 
 /// MIR targets measured via `classify_mir_coverage` on the lowered fixture.
 /// `metal-text` (frozen probe) and `scena` (hidden legacy) stay out.
@@ -249,32 +255,83 @@ fn measure_hir_target(
             let records = conversio_arm_take();
             match result {
                 Err(error) => MeasuredVerdict::HirCodegenError { message: error.message },
-                Ok(_) => {
-                    let mut saw_cell_conversio = false;
-                    for record in records {
-                        let record_src = record
-                            .source_ty
-                            .and_then(|id| ConversioTypeFamily::from_type_id(&analysis.types, id));
-                        let record_tgt = record
-                            .target_ty
-                            .and_then(|id| ConversioTypeFamily::from_type_id(&analysis.types, id));
-                        if record_src != Some(src) || record_tgt != Some(tgt) {
-                            continue;
-                        }
-                        saw_cell_conversio = true;
-                        if record.arm == ConversioArm::Fallback {
-                            return MeasuredVerdict::HirFallback;
-                        }
-                    }
-                    if saw_cell_conversio {
-                        MeasuredVerdict::HirDedicated
-                    } else {
-                        MeasuredVerdict::NoArmRecord
-                    }
-                }
+                Ok(_) => attribute_records(records, analysis, src, tgt),
+            }
+        }
+        ConversioCoverageTarget::TypeScript | ConversioCoverageTarget::Go | ConversioCoverageTarget::Faber => {
+            // Replicate the driver's per-target policy (generate_output):
+            // modulus is hard-blocked on Go/TS until modular edge-vector
+            // parity lands (allowed on Rust and Faber).
+            if matches!(target, ConversioCoverageTarget::TypeScript | ConversioCoverageTarget::Go)
+                && analysis.types.first_modular_word_width().is_some()
+            {
+                return MeasuredVerdict::HirCodegenError {
+                    message: format!(
+                        "modulus is not supported by the {} target until modular edge-vector parity is landed",
+                        target.name()
+                    ),
+                };
+            }
+            let target_kind = match target {
+                ConversioCoverageTarget::TypeScript => Target::TypeScript,
+                ConversioCoverageTarget::Go => Target::Go,
+                ConversioCoverageTarget::Faber => Target::Faber,
+                _ => unreachable!(),
+            };
+            let latin_pack = latin_reader_pack();
+            let surface = KeywordSurface::new(&latin_pack);
+            conversio_arm_clear();
+            let result = generate_from_analyzed_with_options(
+                target_kind,
+                analysis,
+                &surface,
+                OutputMode::Application,
+                None,
+            );
+            let records = conversio_arm_take();
+            match result {
+                Err(error) => MeasuredVerdict::HirCodegenError { message: error.message },
+                Ok(_) => attribute_records(records, analysis, src, tgt),
             }
         }
         _ => MeasuredVerdict::NoArmRecord,
+    }
+}
+
+/// Attribute the emit-arm records after a successful codegen run to the
+/// cell's family pair. Any fallback hit on the cell's pair decides ◐; a
+/// dedicated hit decides ✓; no matching record means the conversion never
+/// reached the instrumented path (attribution gap → classifier fallback).
+fn attribute_records(
+    records: Vec<radix::codegen::conversio_arm::ConversioArmRecord>,
+    analysis: &AnalyzedUnit,
+    src: ConversioTypeFamily,
+    tgt: ConversioTypeFamily,
+) -> MeasuredVerdict {
+    let mut saw_cell_conversio = false;
+    for record in records {
+        let record_src = record
+            .source_ty
+            .and_then(|id| ConversioTypeFamily::from_type_id(&analysis.types, id));
+        let record_tgt = match record.target_ty {
+            Some(id) => ConversioTypeFamily::from_type_id(&analysis.types, id),
+            // The operand-clamp form (`x ↦ 0‥100`, `HirConversioTarget::
+            // Intervallum`) has no lowered type id; it IS the intervallum
+            // family conversion.
+            None => (tgt == ConversioTypeFamily::Intervallum).then_some(tgt),
+        };
+        if record_src != Some(src) || record_tgt != Some(tgt) {
+            continue;
+        }
+        saw_cell_conversio = true;
+        if record.arm == ConversioArm::Fallback {
+            return MeasuredVerdict::HirFallback;
+        }
+    }
+    if saw_cell_conversio {
+        MeasuredVerdict::HirDedicated
+    } else {
+        MeasuredVerdict::NoArmRecord
     }
 }
 
