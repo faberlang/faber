@@ -121,22 +121,17 @@ fn tensor_workload_proof_selects_rung2_device_relu() {
     let row = rows[2];
 
     assert_eq!(row.rung, 2);
-    // Honest tier per D-W6-B2 (wave-4 council item 10): rung 2 is NOT
-    // OutputChecked — no real device dispatch of the compiler-emitted chain
-    // matches the stepper reference yet. Device IR staging NOW succeeds
-    // (radix d495c2cff, D-W6-B1 TensorRelu arms) and the chain dispatches on
-    // the real headless-Chrome WebGPU path, but the compiler-emitted fused
-    // kernel reads back ALL ZEROS: the TensorRelu emitter arm emits an
-    // unsynchronized second relu pass (no workgroupBarrier) that races the
-    // matmul-add write inside the workgroup. DeviceResultMismatch records the
-    // measured state honestly; the promotion is blocked on a B1-follow-up
-    // emitter fix (see the row evidence + the ignored live dispatch test).
-    assert_eq!(row.tier, TensorWorkloadProofTier::DeviceStaged);
-    assert_eq!(
-        row.bucket,
-        Some(TensorWorkloadProofBucket::DeviceResultMismatch)
-    );
-    assert!(!row.output_checked);
+    // Honest tier per D-W6-B2 (wave-4 council item 10): rung 2 is NOW
+    // OutputChecked — the B1-follow-up emitter fix (radix 05a47f864: a
+    // workgroupBarrier() between the fused matmul-add store and the relu pass
+    // in the TensorRelu emitter arm) closed the intra-workgroup readback race
+    // that previously read back all zeros (DeviceResultMismatch, radix
+    // d495c2cff). The live real-device dispatch test
+    // `tensor_workload_proof_rung2_device_gpu_chain_dispatch` is non-ignored
+    // and is the promotion's evidence gate.
+    assert_eq!(row.tier, TensorWorkloadProofTier::OutputChecked);
+    assert_eq!(row.bucket, None);
+    assert!(row.output_checked);
     assert_eq!(row.blocker_owner, None);
     assert_eq!(row.blocker_issue, "");
     assert_eq!(
@@ -152,16 +147,22 @@ fn tensor_workload_proof_selects_rung2_device_relu() {
         "tensor-fragment/tiny-linear-device-relu/src/main.expected"
     );
     assert!(row.selected_operation.contains("ReLU"));
-    // Evidence anchors cite the real dispatch attempt + the defect: the
-    // w4-06d proof script, the missing workgroupBarrier, the all-zeros
-    // readback, and the diagnostic isolation (pre-activation readback exact).
+    // Evidence anchors cite the live dispatch + the barrier fix: the
+    // non-ignored rung-2 dispatch test, the w4-06d proof script, the
+    // workgroupBarrier, the radix fix hash, the f32 tolerance, and the exact
+    // readback (with exactly 4 zeroed elements — ReLU active, not identity).
+    assert!(row
+        .evidence
+        .contains("tensor_workload_proof_rung2_device_gpu_chain_dispatch"));
     assert!(row.evidence.contains("w4-06d-gpu-relu-proof.mjs"));
     assert!(row.evidence.contains("workgroupBarrier"));
-    assert!(row.evidence.contains("all zeros"));
-    assert!(row.evidence.contains("DeviceResultMismatch"));
+    assert!(row.evidence.contains("05a47f864"));
     assert!(row.evidence.contains("0.00001"));
-    // The old staging blocker is gone: no "kernel runtime call" rejection is
-    // claimed (8a09995e4 remains as valid historical lowering context).
+    assert!(row.evidence.contains("[10.1, 0, 0, 24.2, 28.1, 0, 0, 48.2]"));
+    assert!(row.evidence.contains("exit 0"));
+    // The blocked/mismatch state is gone: the row is promoted, and the old
+    // "kernel runtime call" staging rejection is still not claimed.
+    assert!(!row.evidence.contains("DeviceResultMismatch"));
     assert!(!row.evidence.contains("kernel runtime call"));
 }
 
@@ -409,23 +410,16 @@ fn tensor_workload_proof_rung1_device_gpu_chain_dispatch() {
 /// failure and fails the test. The script is a committed triga deliverable;
 /// its absence is a repo defect and fails loudly, it is not a skip.
 ///
-/// # Why this test is `#[ignore]`d (D-W6-B2 finding, task 51b03526)
+/// # Promotion gate (task 42aed477)
 ///
-/// The test itself is correct and runs the FULL pipeline, but the
-/// compiler-emitted fused relu kernel currently reads back ALL ZEROS on the
-/// device path: the TensorRelu WGSL-emitter arm
-/// (`crates/radix-mir-wgsl/src/lib.rs`) emits an unsynchronized second pass
-/// `if (i < 8u) { output[i] = max(0.0, output[i]); }` with NO workgroupBarrier
-/// after the matmul-add write, so the relu pass races the pre-activation write
-/// inside the workgroup (see the rung-2 row evidence — diagnostic isolation
-/// proved the harness/matmul/add exact and a barrier produces the reference
-/// within 0.00001). The fix is a B1-follow-up emitter change (emit a
-/// workgroupBarrier before the relu pass, or fold `max(0.0, …)` into the
-/// matmul-add write). While the defect is open this test fails loudly (exit 1),
-/// so it is ignored with this recorded reason; flip it back to non-ignored when
-/// the emitter fix lands — it is the promotion's evidence gate.
+/// This test is NON-ignored: the B1-follow-up emitter fix (radix 05a47f864)
+/// emits a `workgroupBarrier()` between the fused matmul-add store and the
+/// relu pass in the `TensorRelu` emitter arm (`crates/radix-mir-wgsl/src/
+/// lib.rs`), closing the intra-workgroup readback race that previously read
+/// back all zeros (DeviceResultMismatch, radix d495c2cff). This live dispatch
+/// is the rung-2 `OutputChecked` evidence gate; a regression of the barrier
+/// ordering fails loudly here (exit 1) and in the wgsl_text ordering test.
 #[test]
-#[ignore = "compiler-emitted fused relu kernel lacks workgroupBarrier before the relu pass (D-W6-B2 finding); readback all zeros — see rung-2 row evidence. Flip non-ignored when the B1-follow-up emitter fix lands."]
 fn tensor_workload_proof_rung2_device_gpu_chain_dispatch() {
     // ── 1. Compile the exemplar through the faber pipeline ────────────────
     let row = tensor_workload_proof_rows()[2];
