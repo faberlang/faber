@@ -327,6 +327,14 @@ pub(crate) fn emit_generated_crate_with_runtime_plan(
         if fs::symlink_metadata(&deps).is_ok() {
             copy_tree(&deps, &temp.join("deps"))?;
         }
+        // Preserve Go package output written by go_build.rs
+        // (`target/faber/go/...`). It is not part of the crate snapshot, but
+        // the publish swap replaces all of `target/faber/`, so without this
+        // copy every Rust publish would silently delete the Go module tree.
+        let go_output = crate_root.join("go");
+        if fs::symlink_metadata(&go_output).is_ok() {
+            copy_tree(&go_output, &temp.join("go"))?;
+        }
         write_snapshot_completion(&temp)?;
         fsync_tree(&temp)?;
         #[cfg(test)]
@@ -461,10 +469,48 @@ fn unique_temp_sibling(parent: &Path, label: &str) -> Result<PathBuf, Box<Diagno
     )))
 }
 
+/// Pick an unused sibling path for quarantining the previously published
+/// generated crate during a swap — WITHOUT creating it.
+///
+/// The returned path must not exist before the rename that moves the old
+/// crate onto it: `fs::rename` cannot replace an existing directory on
+/// Windows, so a pre-created empty quarantine (as [`unique_temp_sibling`]
+/// returns) would make every republish fail there. Same non-created-path
+/// convention as `unique_product_quarantine` in product.rs and
+/// `quarantine_incomplete_entry` in core_support/materialize.rs. Stale paths
+/// (e.g. an orphaned quarantine from a previous crash) are skipped.
+fn unique_quarantine_sibling(parent: &Path) -> Result<PathBuf, Box<Diagnostic>> {
+    for attempt in 0..128_u32 {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| {
+                Box::new(crate::package_diagnostic_error(
+                    "system clock precedes epoch",
+                ))
+            })?
+            .as_nanos();
+        let path = parent.join(format!(
+            ".old.tmp-{}-{nonce}-{attempt}",
+            std::process::id()
+        ));
+        if fs::symlink_metadata(&path).is_err() {
+            return Ok(path);
+        }
+    }
+    Err(Box::new(crate::package_diagnostic_error(
+        "could not allocate a quarantine path for the previous generated crate",
+    )))
+}
+
 /// Atomically move a complete `temp` snapshot into `target`, quarantining any
 /// previously published directory and removing it only after the swap
 /// succeeds. A failed swap restores the previous directory, so the
 /// last-known-good generated crate survives any single publish failure.
+///
+/// The quarantine name is allocated WITHOUT creating it (see
+/// [`unique_quarantine_sibling`]): `fs::rename` cannot replace an existing
+/// destination on Windows, so a pre-created empty quarantine would make every
+/// republish fail there. A non-created path keeps the swap portable.
 fn publish_directory(temp: &Path, target: &Path) -> Result<(), Box<Diagnostic>> {
     if fs::symlink_metadata(target).is_err() {
         return fs::rename(temp, target).map_err(|err| Box::new(Diagnostic::io_error(target, &err)));
@@ -474,7 +520,7 @@ fn publish_directory(temp: &Path, target: &Path) -> Result<(), Box<Diagnostic>> 
             "generated crate root has no parent directory",
         ))
     })?;
-    let quarantine = unique_temp_sibling(parent, "old")?;
+    let quarantine = unique_quarantine_sibling(parent)?;
     fs::rename(target, &quarantine)
         .map_err(|err| Box::new(Diagnostic::io_error(target, &err)))?;
     match fs::rename(temp, target) {

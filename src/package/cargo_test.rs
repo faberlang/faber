@@ -379,3 +379,64 @@ fn republished_crate_preserves_library_dependency_tree() {
     );
     assert_no_staging_temps(&layout);
 }
+
+// ---------------------------------------------------------------------------
+// FBR-P2-004 Stage 3 residuals (audit a02d2e78): quarantine portability (R1)
+// and Go subtree preservation across the crate swap (R2)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn quarantine_path_is_never_pre_created() {
+    let parent = temp_root("quarantine");
+    let quarantine = super::unique_quarantine_sibling(&parent).expect("quarantine path");
+    assert!(
+        fs::symlink_metadata(&quarantine).is_err(),
+        "quarantine path `{}` must not be pre-created: a pre-created path \
+         makes the old-crate rename onto it fail on Windows",
+        quarantine.display()
+    );
+}
+
+#[test]
+fn republished_crate_preserves_go_module_tree() {
+    let root = temp_root("go-preserved");
+    let pkg = root.join("pkg");
+    let layout = BuildLayout::from_package_root(&pkg, "go-pkg");
+    let plan = RustRuntimePlan {
+        needs_faber: true,
+        ..RustRuntimePlan::default()
+    };
+    // Simulate Go module output that `go_build.rs` emits into
+    // `target/faber/go/` before a later Rust publish (GO3/GO4 layout).
+    let go_root = layout.generated_crate_root.join("go");
+    fs::create_dir_all(go_root.join("bin")).expect("go bin dir");
+    fs::write(go_root.join("main.go"), "package main\n\nfunc main() {}\n")
+        .expect("go entry");
+    fs::write(
+        go_root.join("go.mod"),
+        "module faber/go-pkg\n\ngo 1.21\n",
+    )
+    .expect("go module file");
+    fs::write(go_root.join("bin/go-pkg"), "binary-stub").expect("go binary");
+
+    emit_generated_crate_with_runtime_plan(&layout, "fn main() {}", None, &plan)
+        .expect("first emit");
+    assert!(
+        go_root.join("go.mod").is_file(),
+        "go output lost on first publish"
+    );
+
+    // Republish swaps the whole `target/faber/` directory; a previously
+    // emitted go/ subtree must survive the swap (residual R2).
+    emit_generated_crate_with_runtime_plan(&layout, "fn main() {}", None, &plan)
+        .expect("second emit");
+    assert!(
+        go_root.join("main.go").is_file(),
+        "go output lost on republish"
+    );
+    assert!(
+        go_root.join("bin/go-pkg").is_file(),
+        "go binary lost on republish"
+    );
+    assert_no_staging_temps(&layout);
+}
