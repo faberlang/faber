@@ -58,7 +58,12 @@ fn fixture_root() -> PathBuf {
 #[derive(Debug, Clone)]
 enum MeasuredVerdict {
     /// ✕ — the frontend rejected the fixture (issue code captured).
-    FrontendRejected { issue: String },
+    FrontendRejected {
+        issue: String,
+        /// `true` when the rejection is a lex/parse error — an authoring bug
+        /// in the fixture, not a semantic verdict. The emit test fails on any.
+        malformed: bool,
+    },
     /// ✓ / — the MIR probe on the lowered fixture.
     Mir { capable: bool, gap: Option<String> },
     /// ✓ — a dedicated HIR arm handled the cell's conversion.
@@ -89,7 +94,13 @@ impl MeasuredVerdict {
     /// One-line machine-readable detail for the MEASURED section.
     fn detail(&self) -> String {
         match self {
-            Self::FrontendRejected { issue } => format!("frontend:{issue}"),
+            Self::FrontendRejected { issue, malformed } => {
+                if *malformed {
+                    format!("frontend-parse:{issue}")
+                } else {
+                    format!("frontend:{issue}")
+                }
+            }
             Self::Mir { capable: true, .. } => "mir-capable".to_owned(),
             Self::Mir { capable: false, gap } => {
                 format!("mir-gap:{}", gap.as_deref().unwrap_or("unknown"))
@@ -99,6 +110,11 @@ impl MeasuredVerdict {
             Self::HirCodegenError { message } => format!("codegen-error:{message}"),
             Self::NoArmRecord => "no-arm-record".to_owned(),
         }
+    }
+
+    /// Whether this is a fixture authoring bug (lex/parse rejection).
+    fn is_malformed(&self) -> bool {
+        matches!(self, Self::FrontendRejected { malformed: true, .. })
     }
 }
 
@@ -152,17 +168,23 @@ fn measure_cell(session: &Session, cell: &mut CellMeasurement) {
     let mut analysis = match analyze_source(session, &name, &source) {
         Ok(unit) => unit,
         Err(diagnostics) => {
-            let issue = first_issue(&diagnostics);
+            let (issue, malformed) = first_issue(&diagnostics);
             for &target in ConversioCoverageTarget::ALL {
-                cell.targets.insert(target, MeasuredVerdict::FrontendRejected { issue: issue.clone() });
+                cell.targets.insert(
+                    target,
+                    MeasuredVerdict::FrontendRejected { issue: issue.clone(), malformed },
+                );
             }
             return;
         }
     };
     if analysis.diagnostics.iter().any(|d| d.is_error()) {
-        let issue = first_issue(&analysis.diagnostics);
+        let (issue, malformed) = first_issue(&analysis.diagnostics);
         for &target in ConversioCoverageTarget::ALL {
-            cell.targets.insert(target, MeasuredVerdict::FrontendRejected { issue: issue.clone() });
+            cell.targets.insert(
+                target,
+                MeasuredVerdict::FrontendRejected { issue: issue.clone(), malformed },
+            );
         }
         return;
     }
@@ -195,12 +217,13 @@ fn measure_cell(session: &Session, cell: &mut CellMeasurement) {
     }
 }
 
-fn first_issue(diagnostics: &[radix::Diagnostic]) -> String {
-    diagnostics
-        .iter()
-        .filter(|d| d.is_error())
-        .find_map(|d| d.issue().map(str::to_owned))
-        .unwrap_or_else(|| "semantic_error".to_owned())
+fn first_issue(diagnostics: &[radix::Diagnostic]) -> (String, bool) {
+    for d in diagnostics.iter().filter(|d| d.is_error()) {
+        let issue = d.issue().unwrap_or("semantic_error").to_owned();
+        let malformed = d.lex_kind().is_some() || d.parse_kind().is_some();
+        return (issue, malformed);
+    }
+    ("semantic_error".to_owned(), false)
 }
 
 /// Run the backend's real codegen with the emit-arm probe armed, then
@@ -308,6 +331,26 @@ fn effective_verdict(
 fn emit_conversio_target_matrix() {
     let session = Session::new(Config::default());
     let cells = measure_all_cells(&session);
+
+    // Fixture authoring integrity: a lex/parse rejection in a fixture-backed
+    // cell is a bug in the fixture (or the generator), not a measured verdict.
+    // The freshness gate runs this test, so a malformed generated fixture
+    // fails the gate loudly instead of silently rendering a bogus ✕.
+    let malformed: Vec<String> = cells
+        .iter()
+        .filter(|cell| cell.fixture.is_some())
+        .flat_map(|cell| {
+            cell.targets
+                .values()
+                .filter(|verdict| verdict.is_malformed())
+                .map(move |_| format!("{}/{}", cell.src.name(), cell.tgt.name()))
+        })
+        .collect();
+    assert!(
+        malformed.is_empty(),
+        "malformed conversio fixtures (lex/parse errors, not semantic verdicts): {}",
+        malformed.join(", ")
+    );
 
     // Leading newline keeps the ROWS marker on its own line when libtest has
     // already printed `test … ` without a trailing newline under --nocapture.
