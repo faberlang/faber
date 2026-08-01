@@ -17,12 +17,14 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 // Floors ratchet upward only. Re-based to the measured 2026-07-31 baseline
 // after clean-break `3e70afa10` (radix) removed 6 fully-passing corpus files
 // (emitte, negativum, nonnihil, nonnulla, nulla, positivum): corpus denominator
-// 310 -> 304, and every tier dropped by exactly 6. The floors below are the
+// 310 -> 304, and every tier dropped by exactly 6. The `vector/builtins` seam
+// fix (radix-codegen-ts GPU builtin DefId resolution) then raised emitted,
+// typecheck-valid, and runnable by one each. All four floors below are the
 // measured live values on that run (see ledger.md for the lineage).
 const EXPECTED_TS_FRONTEND_ANALYZED_FLOOR: usize = 288;
-const EXPECTED_TS_EMITTED_FLOOR: usize = 278;
-const EXPECTED_TS_TYPECHECK_VALID_FLOOR: usize = 268;
-const EXPECTED_TS_RUNNABLE_FLOOR: usize = 266;
+const EXPECTED_TS_EMITTED_FLOOR: usize = 279;
+const EXPECTED_TS_TYPECHECK_VALID_FLOOR: usize = 269;
+const EXPECTED_TS_RUNNABLE_FLOOR: usize = 267;
 
 #[derive(Debug)]
 struct TsE2eResult {
@@ -221,13 +223,6 @@ const TS_EXPECTED_OUTCOMES: &[ExpectedTsOutcome] = &[
         kind: ExpectedTsKind::CompileFail,
         bucket: "expected compile-fail / frontend policy",
         reason_contains: "float_width_on_numerus",
-    },
-    ExpectedTsOutcome {
-        path: "vector/builtins.fab",
-        highest_tier: TsHighestTier::FrontendAnalyzed,
-        kind: ExpectedTsKind::TrackedGap,
-        bucket: "vector def resolution",
-        reason_contains: "definition id 5 could not be resolved",
     },
     ExpectedTsOutcome {
         path: "ad/async-solum-leget.fab",
@@ -531,12 +526,7 @@ fn exempla_ts_e2e() {
                 }
             };
 
-        let ts = match codegen::generate(
-            Target::TypeScript,
-            &analysis.hir,
-            &analysis.types,
-            &analysis.interner,
-        ) {
+        let ts = match codegen::generate_ts_from_analyzed(&analysis) {
             Ok(Output::TypeScript(output)) => output.code,
             Ok(_) => {
                 eprintln!("[ts-e2e {idx:03}/{total}] {relative}  no-ts-output",);
