@@ -14,6 +14,7 @@ pub mod generic;
 pub mod gradient;
 pub mod inference_blocker_matrix;
 pub mod kernel_module;
+pub mod kernel_plan;
 pub mod layout;
 pub mod names;
 pub mod nodes;
@@ -80,6 +81,10 @@ pub use inference_blocker_matrix::{
     InferenceBlockerStatus, InferenceNonClaim, InferenceNonClaimKind,
 };
 pub use kernel_module::KernelModule;
+pub use kernel_plan::{
+    BarrierPhase, BarrierPoint, CollectionKernelPlan, MatMulPlan, OobPaddingPolicy,
+    PlanValidationError, ReduceOp, ReductionPlan, SharedMemoryLayout,
+};
 pub use layout::{
     MirAggregateCarrier, MirAggregateFamily, MirAggregateLayout, MirAtomicLayout,
     MirDeviceMatrixLayout, MirDeviceVectorLayout, MirDeviceViewLayout, MirLayout, MirLayoutError,
