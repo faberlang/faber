@@ -20,6 +20,7 @@ pub mod names;
 pub mod nodes;
 pub mod placement;
 pub mod rank2_reduction_readiness;
+pub mod shader_contract;
 pub mod tensor_operation_floor;
 pub mod tensor_operation_parity;
 pub mod tensor_placement;
@@ -101,6 +102,19 @@ pub use nodes::*;
 pub use rank2_reduction_readiness::{
     rank2_reduction_readiness_rows, Rank2ReductionReadinessPath, Rank2ReductionReadinessRow,
     Rank2ReductionReadinessStatus,
+};
+pub use shader_contract::{
+    color_target_format_from_code, depth_compare_function_from_code,
+    fragment_entry_from_shader_contract, fragment_output_reflection_from_shader_contract,
+    graphics_pipeline_from_shader_contract, input_step_mode_from_code,
+    primitive_topology_from_code, resource_access_from_code, resource_kind_from_code,
+    resource_reflection_from_shader_contract, resource_role_from_code,
+    source_fragment_entry_from_shader_contract, source_vertex_entry_from_shader_contract,
+    varying_interpolation_from_code, varying_reflection_from_shader_contract,
+    vertex_entry_from_shader_contract, vertex_format_from_code,
+    vertex_input_reflection_from_shader_contract, ContractProvenance, ShaderFragmentOutput,
+    ShaderPipelineState, ShaderResourceBinding, ShaderStageIoRole, ShaderVarying,
+    ShaderVertexAttribute,
 };
 pub use tensor_operation_floor::{
     required_tensor_operation_floor_families, tensor_operation_floor_rows,

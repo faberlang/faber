@@ -6,9 +6,9 @@
 //! target emitter.
 
 use crate::{
-    MirCollectionOp, MirFunction, MirFunctionId, MirIntrinsic, MirLayoutKind, MirLocalId,
-    MirOperand, MirParam, MirPlaceBase, MirRuntimeCall, MirScalarLayout, MirStatementKind, MirType,
-    MirValidationContext,
+    shader_contract::ShaderStageIoRole, MirCollectionOp, MirFunction, MirFunctionId, MirIntrinsic,
+    MirLayoutKind, MirLocalId, MirOperand, MirParam, MirPlaceBase, MirRuntimeCall, MirScalarLayout,
+    MirStatementKind, MirType, MirValidationContext,
 };
 use radix_hir::DefId;
 use radix_lexer::Interner;
@@ -102,7 +102,7 @@ impl MirAbiError {
         }
     }
 
-    fn with_detail(
+    pub(crate) fn with_detail(
         message: impl Into<String>,
         issue: &'static str,
         detail: impl Into<String>,
@@ -469,6 +469,8 @@ pub struct MirVertexInputReflection {
     pub step_mode: MirInputStepMode,
     pub offset_bytes: u64,
     pub stride_bytes: u64,
+    /// Explicit stage-I/O role (see [`crate::shader_contract::ShaderStageIoRole`]).
+    pub role: ShaderStageIoRole,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -508,23 +510,25 @@ impl MirTrigaPipelineFact {
     /// must merge those from the vertex/fragment kernel reflections after
     /// building this skeleton.
     /// # Errors
-    /// Returns an error when a Triga format or topology code is unrecognized.
+    /// Returns an error when a Triga format, topology, or depth code is
+    /// unrecognized. The depth code goes through the fail-closed generic
+    /// conversion: unknown codes error instead of degrading to `Never`.
     pub fn to_graphics_pipeline_reflection(
         &self,
     ) -> Result<MirGraphicsPipelineReflection, MirAbiError> {
         let color_target = MirColorTargetFormat::from_triga_code(self.color_target_format_code)?;
         let topology = MirPrimitiveTopology::from_triga_code(self.primitive_topology_code)?;
-        let depth_stencil = self.depth_compare_code.map(|code| {
-            let compare = MirDepthCompareFunction::from_triga_code(code);
-            MirDepthStencilState {
+        let depth_stencil = match self.depth_compare_code {
+            Some(code) => Some(MirDepthStencilState {
                 depth_write_enabled: self.depth_write_enabled,
-                depth_compare: compare,
+                depth_compare: crate::shader_contract::depth_compare_function_from_code(code)?,
                 stencil_read_mask: u32::MAX,
                 stencil_write_mask: u32::MAX,
                 stencil_front: MirStencilFaceState::DISABLED,
                 stencil_back: MirStencilFaceState::DISABLED,
-            }
-        });
+            }),
+            None => None,
+        };
         Ok(MirGraphicsPipelineReflection {
             color_target_formats: vec![color_target],
             primitive_topology: topology,
@@ -610,6 +614,8 @@ pub struct MirVaryingReflection {
     pub location: u32,
     pub format: MirVertexInputFormat,
     pub interpolation: MirVaryingInterpolation,
+    /// Explicit stage-I/O role (see [`crate::shader_contract::ShaderStageIoRole`]).
+    pub role: ShaderStageIoRole,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -635,6 +641,8 @@ impl MirVaryingInterpolation {
 pub struct MirFragmentOutputReflection {
     pub location: u32,
     pub format: MirVertexInputFormat,
+    /// Explicit stage-I/O role (see [`crate::shader_contract::ShaderStageIoRole`]).
+    pub role: ShaderStageIoRole,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2977,6 +2985,7 @@ fn vertex_inputs_from_triga_layout_facts(
                 },
                 offset_bytes: fact.offset_bytes,
                 stride_bytes: fact.stride_bytes,
+                role: ShaderStageIoRole::Other,
             })
         })
         .collect()
