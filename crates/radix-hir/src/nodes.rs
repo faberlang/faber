@@ -768,7 +768,7 @@ pub enum HirBreakableKind {
 /// HIR keeps expression-position blocks and statement-position blocks in one
 /// shape. Typecheck decides whether the trailing expression contributes a value
 /// in its context.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct HirBlock {
     /// Statements executed in order.
     pub statements: Vec<HirStatement>,
@@ -781,6 +781,14 @@ pub struct HirBlock {
 
     /// When set, `rumpe` may exit this block before its syntactic end.
     pub breakable: Option<HirBreakableKind>,
+
+    /// Structural end anchor for an authored executable block.
+    ///
+    /// Present only when the block was lowered from an authored executable
+    /// `BlockStmt` boundary; compiler-synthesized blocks carry no authored
+    /// end. The end is presentation structure, not a statement: visitors must
+    /// never count it or recurse into it, and it never lowers to a no-op.
+    pub end: Option<HirBlockEnd>,
 }
 
 impl HirBlock {
@@ -796,13 +804,8 @@ impl HirBlock {
             expr,
             span,
             breakable: None,
+            end: None,
         }
-    }
-}
-
-impl Default for HirBlock {
-    fn default() -> Self {
-        Self::simple(Vec::new(), None, Span::default())
     }
 }
 
@@ -1379,4 +1382,154 @@ pub enum HirPattern {
 
     /// Literal pattern.
     Literal(HirLiteral),
+}
+
+// ---------------------------------------------------------------------------
+// Presentation sidecar and structural end anchors
+// ---------------------------------------------------------------------------
+//
+// A separate ID namespace plus a serializable presentation sidecar give
+// line-start comments and structural ends stable owners without making comment
+// content executable or visible to semantic passes. Semantic nodes stay
+// trivia-blind: the sidecar back-references existing `HirId`/`DefId` values
+// instead of gaining new fields. The single structural carrier in the
+// semantic tree is `HirBlock::end`; it is a distinct anchor type, never a
+// statement, and is not visited by ordinary visitors.
+
+/// Stable identity for one legal source-anchor boundary in one analyzed unit.
+///
+/// A dedicated namespace, never overloaded with [`HirId`]. Spans remain
+/// diagnostic/source-map aids; the anchor is the attachment identity.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HirSourceAnchorId(pub u32);
+
+/// One piece of ordered trivia attached to a source anchor.
+///
+/// Raw comment prose is preserved verbatim; the anchor is the identity, spans
+/// are diagnostic aids only.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HirTrivia {
+    /// One line-start comment (`# ...`) with its stored text.
+    CommentLine {
+        /// Interned comment payload, preserved verbatim.
+        text: Symbol,
+        /// Source span for diagnostics.
+        span: Span,
+    },
+
+    /// One boundary newline captured in lexer/parser order.
+    Newline {
+        /// Source span for diagnostics.
+        span: Span,
+    },
+}
+
+/// Closed taxonomy of presentation owner kinds for one schema version.
+///
+/// Adding a future legal comment position means extending this taxonomy along
+/// with the syntax boundary, lowering rule, render slot, and tests.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HirTriviaOwnerKind {
+    /// A top-level item (`HirItem`).
+    Item,
+
+    /// An executable statement (`HirStatement`).
+    Statement,
+
+    /// A genus field or method (`HirField` / `HirMethod`).
+    Member,
+
+    /// The explicit program entry (`incipit`).
+    Entry,
+
+    /// An executable block's structural end.
+    BlockEnd,
+
+    /// The program's structural end.
+    ProgramEnd,
+}
+
+/// Back-reference from a presentation owner to the semantic node it annotates.
+///
+/// Items and statements use [`HirOwnerRef::Hir`]; members use
+/// [`HirOwnerRef::Def`]. This keeps the semantic tree trivia-blind — no new
+/// fields on `HirItem`, `HirStatement`, `HirMethod`, or `HirField`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HirOwnerRef {
+    /// An annotatable HIR node: `HirItem.id` or `HirStatement.id`.
+    Hir(HirId),
+
+    /// A named semantic definition: `HirMethod.def_id` or `HirField.def_id`.
+    Def(DefId),
+}
+
+/// One typed presentation owner keyed by its source anchor.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HirTriviaOwner {
+    /// Anchor identity for this owner (the attachment key).
+    pub id: HirSourceAnchorId,
+
+    /// Owner kind within the closed taxonomy.
+    pub kind: HirTriviaOwnerKind,
+
+    /// Semantic node back-reference, when the owner annotates one.
+    pub semantic: Option<HirOwnerRef>,
+}
+
+/// Ordered trivia attached to one source anchor.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HirTriviaAttachment {
+    /// Owner anchor this trivia attaches to.
+    pub anchor: HirSourceAnchorId,
+
+    /// Trivia in lexer/parser order (comments and newlines interleaved).
+    pub leading: Vec<HirTrivia>,
+}
+
+/// The durable, serializable presentation layer for one analyzed unit.
+///
+/// Lives in the analyzed-unit/artifact envelope — never on `HirProgram` — so
+/// semantic consumers stay trivia-blind while the HIR value and its
+/// presentation always travel together.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HirPresentation {
+    /// Typed owners keyed by source anchor.
+    pub owners: Vec<HirTriviaOwner>,
+
+    /// Ordered trivia attachments keyed by owner anchor.
+    pub attachments: Vec<HirTriviaAttachment>,
+
+    /// Structural ends of authored executable blocks.
+    pub block_ends: Vec<HirBlockEnd>,
+
+    /// The program's single structural end.
+    pub program_end: HirProgramEnd,
+
+    /// Anchor for the explicit entry (`incipit`) leading trivia, when present.
+    pub entry_start_anchor: Option<HirSourceAnchorId>,
+}
+
+/// Structural end of one authored executable block.
+///
+/// Carried as [`HirBlock::end`]; never visited as a statement and never
+/// lowered to a target no-op.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HirBlockEnd {
+    /// Source anchor identity of this block end.
+    pub id: HirSourceAnchorId,
+
+    /// Source span for diagnostics.
+    pub span: Span,
+}
+
+/// Structural end of the program.
+///
+/// Owned by the presentation sidecar — `HirProgram` carries no end field.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HirProgramEnd {
+    /// Source anchor identity of the program end.
+    pub id: HirSourceAnchorId,
+
+    /// Source span for diagnostics.
+    pub span: Span,
 }

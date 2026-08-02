@@ -993,8 +993,8 @@ fn walk_call_args_mut<V: HirVisitorMut>(visitor: &mut V, args: &mut [HirCallArg]
 mod tests {
     use super::*;
     use crate::nodes::{
-        HirAnnotation, HirAnnotationField, HirAnnotationValue, HirExpression, HirExpressionKind,
-        HirId, HirLiteral,
+        HirAnnotation, HirAnnotationField, HirAnnotationValue, HirBlockEnd, HirExpression,
+        HirExpressionKind, HirId, HirLiteral, HirSourceAnchorId,
     };
     use radix_lexer::{Span, Symbol};
 
@@ -1176,5 +1176,55 @@ mod tests {
             },
             _ => panic!("expected expr"),
         }
+    }
+
+    // U-2 Stage 2: `HirBlock.end` is a structural field, not a statement.
+    // A visitor counting statements must neither count nor recurse into it.
+    #[derive(Default)]
+    struct StatementCounter {
+        statements: usize,
+        blocks: usize,
+    }
+    impl HirVisitor for StatementCounter {
+        fn visit_stmt(&mut self, stmt: &HirStatement) {
+            self.statements += 1;
+            walk_stmt(self, stmt);
+        }
+        fn visit_block(&mut self, block: &HirBlock) {
+            self.blocks += 1;
+            walk_block(self, block);
+        }
+    }
+
+    #[test]
+    fn visitor_does_not_count_block_ends_as_statements() {
+        let entry = HirBlock {
+            statements: vec![HirStatement {
+                id: HirId(1),
+                kind: HirStatementKind::Tacet,
+                span: Span::default(),
+            }],
+            expr: None,
+            span: Span::default(),
+            breakable: None,
+            end: Some(HirBlockEnd {
+                id: HirSourceAnchorId(7),
+                span: Span::default(),
+            }),
+        };
+        let program = HirProgram {
+            items: Vec::new(),
+            entry: Some(entry),
+            entry_annotations: Vec::new(),
+            entry_args_name: None,
+            entry_is_async: false,
+        };
+        let mut counter = StatementCounter::default();
+        counter.visit_program(&program);
+        assert_eq!(
+            counter.statements, 1,
+            "the block end must not be visited as a statement"
+        );
+        assert_eq!(counter.blocks, 1, "the entry block is visited once");
     }
 }

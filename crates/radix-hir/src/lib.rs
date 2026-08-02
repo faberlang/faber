@@ -10,6 +10,8 @@
 
 pub mod artifact;
 mod nodes;
+#[cfg(test)]
+mod presentation_test;
 pub mod visit;
 
 pub use artifact::*;
