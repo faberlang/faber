@@ -12619,3 +12619,207 @@ incipit {
         vec!["7.5".to_owned(), "[0.25, 0.5, 0.75, 1.0]".to_owned()]
     );
 }
+
+#[test]
+fn package_mir_runs_library_imported_companion_with_sub_companion() {
+    // LIB-MIR blocker regression: a library primal that calls an unannotated
+    // AIR-lane function generates an auto-named `__backward_callee_N`
+    // sub-companion interned only into the lowered interner. The library
+    // lowering must remap symbols from the post-lowering interner (no
+    // out-of-bounds panic) and give the sub-companion a synthetic source.
+    let dir = test_temp_dir("package-mir-gradus-subcompanion");
+    let lib_root = dir.join("lib");
+    fs::create_dir_all(lib_root.join("testgrad/src")).expect("create library");
+    fs::write(
+        lib_root.join("testgrad/faber.toml"),
+        r#"[package]
+name = "testgrad"
+version = "0.1.0"
+edition = "2026"
+
+[library]
+provider = "testgrad"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+target = "fmir"
+targets = ["fmir"]
+"#,
+    )
+    .expect("write library manifest");
+    fs::write(
+        lib_root.join("testgrad/src/gradient.fab"),
+        r#"@ radix lane "air"
+functio inner(tensor<f32, [2,2]> a, tensor<f32, [2,2]> b) → tensor<f32, [2,2]> {
+    redde a.addita(b)
+}
+
+functio nil() → vacuum {
+    tacet
+}
+
+@ radix lane "air"
+@ radix backward "loss_backward"
+functio simple_loss(
+    tensor<f32, [2,2]> x,
+    tensor<f32, [2,2]> w
+) → f32 {
+    fixum tensor<f32, [2,2]> product ← x.multiplica(inner(x, w))
+    redde product.media()
+}
+"#,
+    )
+    .expect("write library module");
+
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+importa ex "testgrad:gradient" privata gradient
+
+incipit {
+    fixum tensor<f32, []> seed ← vacua
+    fixum lista<f32> data ← [1.0, 2.0, 3.0, 4.0]
+    fixum tensor<f32, [2,2]> x ← seed.strue(data, [2, 2])
+    fixum tensor<f32, [2,2]> w ← seed.strue(data, [2, 2])
+    fixum f32 loss ← gradient.simple_loss(x, w)
+    nota loss
+    fixum f32 upstream ← 1.0
+    fixum _ grads ← gradient.loss_backward(x, w, gradient.nil(), upstream)
+    fixum [_, gw] ← grads
+    nota gw
+}
+"#,
+    )
+    .expect("write entry");
+
+    let config = radix::driver::Config::default()
+        .with_target(radix::codegen::Target::Fmir)
+        .with_stdlib(lib_root);
+    let mut host = BufferHost::default();
+    let result = run_package_mir(&config, &entry, &mut host);
+
+    assert!(
+        result.is_ok(),
+        "library-imported companion with sub-companion should execute, got {:?}",
+        result
+            .err()
+            .unwrap_or_default()
+            .iter()
+            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        host.stdout_lines,
+        vec!["15.0".to_owned(), "[0.25, 0.5, 0.75, 1.0]".to_owned()]
+    );
+}
+
+#[test]
+fn package_mir_two_library_imports_with_nested_import_executes() {
+    // Mirrors the real gradus consumer shape: two imports, the first library
+    // itself importing a sibling module.
+    let dir = test_temp_dir("package-mir-two-libs");
+    let lib_root = dir.join("lib");
+    fs::create_dir_all(lib_root.join("testgrad/src")).expect("create library");
+    fs::write(
+        lib_root.join("testgrad/faber.toml"),
+        r#"[package]
+name = "testgrad"
+version = "0.1.0"
+edition = "2026"
+
+[library]
+provider = "testgrad"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+target = "fmir"
+targets = ["fmir"]
+"#,
+    )
+    .expect("write library manifest");
+    fs::write(
+        lib_root.join("testgrad/src/gradient.fab"),
+        r#"importa ex "testgrad:tensor" privata tensor
+
+functio nil() → vacuum {
+    tacet
+}
+
+@ radix lane "air"
+@ radix backward "loss_backward"
+functio simple_loss(
+    tensor<f32, [2,2]> x,
+    tensor<f32, [2,2]> w
+) → f32 {
+    fixum tensor<f32, [2,2]> product ← x.multiplica(w)
+    redde product.media()
+}
+"#,
+    )
+    .expect("write gradient module");
+    fs::write(
+        lib_root.join("testgrad/src/tensor.fab"),
+        r#"functio fill(f32 v) → f32 {
+    redde v
+}
+"#,
+    )
+    .expect("write tensor module");
+    fs::write(
+        lib_root.join("testgrad/src/math.fab"),
+        "fixum f32 epsilon ← 0.00001\n",
+    )
+    .expect("write math module");
+
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+importa ex "testgrad:gradient" privata gradient
+importa ex "testgrad:math" privata math
+
+incipit {
+    fixum tensor<f32, []> seed ← vacua
+    fixum lista<f32> data ← [1.0, 2.0, 3.0, 4.0]
+    fixum tensor<f32, [2,2]> x ← seed.strue(data, [2, 2])
+    fixum tensor<f32, [2,2]> w ← seed.strue(data, [2, 2])
+    fixum f32 loss ← gradient.simple_loss(x, w)
+    nota loss
+    fixum f32 upstream ← 1.0
+    fixum _ grads ← gradient.loss_backward(x, w, gradient.nil(), upstream)
+    fixum [_, gw] ← grads
+    nota gw
+}
+"#,
+    )
+    .expect("write entry");
+
+    let config = radix::driver::Config::default()
+        .with_target(radix::codegen::Target::Fmir)
+        .with_stdlib(lib_root);
+    let mut host = BufferHost::default();
+    let result = run_package_mir(&config, &entry, &mut host);
+
+    assert!(
+        result.is_ok(),
+        "two-library consumer should execute, got {:?}",
+        result
+            .err()
+            .unwrap_or_default()
+            .iter()
+            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        host.stdout_lines,
+        vec!["7.5".to_owned(), "[0.25, 0.5, 0.75, 1.0]".to_owned()]
+    );
+}

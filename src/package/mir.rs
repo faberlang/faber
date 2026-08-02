@@ -288,6 +288,10 @@ struct PackageMirLinks {
     calls: NamespaceCallTargets,
     namespaces: NamespaceExports,
     sources: SourceRewrites,
+    /// Next free synthetic def id; the library-lowering pass continues from
+    /// here so auto-generated sub-companion sources cannot collide with the
+    /// linker's allocations.
+    next_synthetic: u32,
     /// Library modules linked into the package MIR program. Each is lowered
     /// alongside package units; its exported functions (including `@ radix
     /// backward` companions) are reachable through synthetic definition ids.
@@ -3273,7 +3277,13 @@ fn local_namespace_call_targets(
                         }
                     }
                 }
-                ImportResolution::Error(diag) => diagnostics.push(diag),
+                ImportResolution::Error(diag) => {
+                    // External-target builds keep the previous silent-skip;
+                    // only the interpreted run path fails closed here.
+                    if consumer == PackageMirConsumer::Interpreted {
+                        diagnostics.push(diag);
+                    }
+                }
                 ImportResolution::Unsupported => continue,
             }
         }
@@ -3287,6 +3297,7 @@ fn local_namespace_call_targets(
         calls: targets,
         namespaces,
         sources: source_rewrites,
+        next_synthetic,
         libraries: linked_libraries,
     })
 }
@@ -3960,6 +3971,10 @@ fn lower_package_units<'a>(
     };
     let entry_path = entry.path.clone();
     let mut pending = Vec::new();
+    // Mutable copy of the link sources: the library-lowering pass extends it
+    // with synthetic ids for auto-generated sub-companion sources.
+    let mut source_rewrites = links.sources.clone();
+    let mut next_synthetic = links.next_synthetic;
 
     for unit in before.iter_mut().chain(after.iter_mut()) {
         let unit_path = unit.path.clone();
@@ -3967,7 +3982,7 @@ fn lower_package_units<'a>(
         let mut lowered = lower_unit(unit, &cli_plan.entry_records, no_fuse)?;
         remap_program_text_symbols(
             &mut lowered.program,
-            &source_interner,
+            &lowered.interner,
             &mut entry.analysis.interner,
         );
         let source_to_entry_types = import_lowered_semantic_types(
@@ -3985,7 +4000,7 @@ fn lower_package_units<'a>(
                 imported_dispatch_type_rewrites(rewrite, &source_to_entry_types);
             rewrite_lowered_type_ids(&mut lowered, &dispatch_rewrites);
         }
-        rewrite_program_sources(&mut lowered.program, &unit_path, &links.sources);
+        rewrite_program_sources(&mut lowered.program, &unit_path, &source_rewrites);
         ensure_unique_definition_sources(&lowered.program, &unit_path)?;
         let dispatch_function = selected_cli_dispatch_function(
             cli_plan,
@@ -4013,7 +4028,6 @@ fn lower_package_units<'a>(
             library_resolver,
             library_cache,
             |analysis, _cache| {
-                let source_interner = analysis.interner.clone();
                 let bundle = match radix::driver::prepare_air_backward_bundle(analysis) {
                     Ok(bundle) => bundle,
                     Err(err) => {
@@ -4042,7 +4056,7 @@ fn lower_package_units<'a>(
                 }
                 remap_program_text_symbols(
                     &mut lowered.program,
-                    &source_interner,
+                    &lowered.interner,
                     &mut entry.analysis.interner,
                 );
                 let source_to_entry_types = import_lowered_semantic_types(
@@ -4050,7 +4064,14 @@ fn lower_package_units<'a>(
                     &mut entry.analysis.types,
                 );
                 rewrite_lowered_type_ids(&mut lowered, &source_to_entry_types);
-                rewrite_program_sources(&mut lowered.program, &library.path, &links.sources);
+                rewrite_program_sources(&mut lowered.program, &library.path, &source_rewrites);
+                extend_unmapped_library_sources(
+                    &lowered.program,
+                    &library.path,
+                    &mut source_rewrites,
+                    &mut next_synthetic,
+                );
+                rewrite_program_sources(&mut lowered.program, &library.path, &source_rewrites);
                 if let Err(errors) =
                     ensure_unique_definition_sources(&lowered.program, &library.path)
                 {
@@ -4555,6 +4576,41 @@ fn rewritten_source(
     source_rewrites
         .get(&(unit_path.to_path_buf(), source))
         .copied()
+}
+
+/// Assign fresh synthetic sources to library functions whose source ids were
+/// not known at link time — the auto-generated `__backward_callee_N`
+/// companions for unannotated AIR callees. Separate library analyses reuse
+/// their own companion-id allocators, so their raw sources would collide in
+/// the merged program.
+fn extend_unmapped_library_sources(
+    program: &MirProgram,
+    library_path: &Path,
+    source_rewrites: &mut SourceRewrites,
+    next_synthetic: &mut u32,
+) {
+    let key = |source: DefId| (library_path.to_path_buf(), source);
+    // Sources already rewritten to a synthetic id are the map's *values*, not
+    // its keys; skip both so already-rewritten functions are never re-mapped.
+    let synthetic_values: HashSet<DefId> = source_rewrites.values().copied().collect();
+    let mut pending = Vec::new();
+    for function in &program.functions {
+        let Some(source) = function.source else {
+            continue;
+        };
+        if source_rewrites.contains_key(&key(source)) || synthetic_values.contains(&source) {
+            continue;
+        }
+        pending.push(source);
+    }
+    for source in pending {
+        if source_rewrites.contains_key(&key(source)) {
+            continue;
+        }
+        let synthetic = DefId(*next_synthetic);
+        *next_synthetic += 1;
+        source_rewrites.insert(key(source), synthetic);
+    }
 }
 
 fn rewrite_statement_sources(
