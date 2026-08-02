@@ -12,7 +12,7 @@ use crate::{
 };
 use radix_hir::DefId;
 use radix_lexer::Interner;
-use radix_types::{IndexExpr, Primitive, Type, TypeId};
+use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeId};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -1295,6 +1295,20 @@ pub enum MirKernelAxis {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum MirKernelResourceKind {
     StorageBuffer,
+    /// Runtime-extent count channel (U2, L3/L5).
+    ///
+    /// A host-supplied `u32` element count that device guards read instead of
+    /// the static dispatch shape. The extent is an explicit
+    /// [`MirKernelResource`] appended to `extra_inputs` — no parallel field
+    /// (L3) — so its binding falls out of the positional allocator and
+    /// `resources()` / `launch_plan()` / `emit_chain_descriptor` enumerate it
+    /// for free (L4: chain-descriptor JSON shape unchanged).
+    ///
+    /// NVVM forward obligation (L7): future NVVM/PTX device guards must
+    /// consume this channel (read the extent binding, with the shared
+    /// `oob_guard_limit` static axis as fallback) — they must not reintroduce
+    /// a static-shape guard.
+    RuntimeExtent,
 }
 
 impl MirKernelBuiltin {
@@ -1408,6 +1422,7 @@ impl MirKernelResourceKind {
     pub fn spelling(self) -> &'static str {
         match self {
             Self::StorageBuffer => "storage-buffer",
+            Self::RuntimeExtent => "runtime-extent",
         }
     }
 }
@@ -1485,6 +1500,77 @@ struct IndexedViewKernelContext<'a> {
     builtin_inputs: Vec<MirKernelBuiltinInput>,
     interner: Option<&'a Interner>,
     allow_host_owned_tensor_entry: bool,
+}
+
+/// Well-known resource name for the runtime-extent count channel.
+///
+/// The host contract populates the extent binding with a `u32` element count
+/// before dispatch (CTO #4 option b — well-known binding, `combineMetadata`
+/// runtime-param precedent). L8/L9 dtype/stride headroom: the extent is
+/// count-typed (`u32`) with no f32-width assumption; payload element types
+/// stay per-resource.
+const RUNTIME_EXTENT_RESOURCE_NAME: &str = "runtime_extent";
+
+/// Build a runtime-extent count resource.
+///
+/// CXO F2: extents are `Vec`-capable from day one — one entry per extent
+/// channel, appended to `extra_inputs`; Wave 1 populates at most one. The
+/// binding is caller-assigned as the next free binding from the positional
+/// allocator.
+fn runtime_extent_resource(binding: u32, extent_ty: TypeId) -> MirKernelResource {
+    MirKernelResource {
+        group: DEFAULT_KERNEL_RESOURCE_GROUP,
+        binding,
+        kind: MirKernelResourceKind::RuntimeExtent,
+        role: MirKernelResourceRole::Input,
+        access: MirKernelResourceAccess::Read,
+        element_ty: MirType::semantic(extent_ty),
+        element_count: 1,
+        source_local: None,
+        source_name: Some(RUNTIME_EXTENT_RESOURCE_NAME.to_owned()),
+    }
+}
+
+/// Append a runtime-extent count resource when the kernel is scalar-shaped.
+///
+/// "Where the runtime extent applies" (U2): a kernel whose static IO element
+/// count is 1 has `dispatch_size = (1, 1, 1)`, so a guard over the static
+/// count culls every host-dispatched thread past the first. The extent
+/// channel fixes that: the host supplies the element count at dispatch and
+/// the guard reads the binding. Kernels with statically-known multi-element
+/// shapes keep the static limit (correct), and collection-op contracts
+/// (reduction/matmul) stay static per the U2 non-goals.
+///
+/// The count type (`numerus<u32>`, L8/L9) must already exist in the frozen
+/// type table; when it cannot be resolved the kernel keeps the static
+/// dispatch-axis fallback (pre-U2 behavior). The faber pipeline always
+/// interns the u32 count type; only hand-built unit tables may lack it.
+fn maybe_append_runtime_extent(
+    function: &MirFunction,
+    signature: &mut MirKernelSignature,
+    validation: &MirValidationContext<'_>,
+) {
+    if kernel_has_collection_op(function, |_| true) {
+        return;
+    }
+    if signature.input.element_count != 1 || signature.output.element_count != 1 {
+        return;
+    }
+    let Some(extent_ty) = validation
+        .types
+        .find_sized_numeric(Primitive::Numerus, NumericWidth::U32)
+    else {
+        return;
+    };
+    let binding = signature
+        .resources()
+        .map(|resource| resource.binding)
+        .max()
+        .unwrap_or(0)
+        + 1;
+    signature
+        .extra_inputs
+        .push(runtime_extent_resource(binding, extent_ty));
 }
 
 impl MirKernelSignature {
@@ -1652,7 +1738,7 @@ impl MirKernelSignature {
         let param_element_count = buffer_element_count(param.ty, validation)?;
         let return_element_count = buffer_element_count(function.return_ty, validation)?;
 
-        Ok(Self {
+        let mut signature = Self {
             function: function.id,
             input: MirKernelResource {
                 group: DEFAULT_KERNEL_RESOURCE_GROUP,
@@ -1681,7 +1767,9 @@ impl MirKernelSignature {
             called_builtins: called_builtins_for_function(function),
             workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
             dispatch_size: dispatch_size_for_1d_elements(return_element_count),
-        })
+        };
+        maybe_append_runtime_extent(function, &mut signature, validation);
+        Ok(signature)
     }
 
     fn indexed_view_kernel(
@@ -1735,6 +1823,7 @@ impl MirKernelSignature {
             workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
             dispatch_size: dispatch_size_for_1d_elements(output_element_count),
         };
+        maybe_append_runtime_extent(function, &mut signature, validation);
         // PRP-004 U3 (D1-A): reduction/matmul kernels carry a corrected
         // dispatch/workgroup/output-buffer contract (shared ABI law, all
         // compute targets).
@@ -1808,6 +1897,7 @@ impl MirKernelSignature {
             workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
             dispatch_size: dispatch_size_for_1d_elements(output_element_count),
         };
+        maybe_append_runtime_extent(function, &mut signature, validation);
         // PRP-004 U3 (D1-A): reduction/matmul kernels carry a corrected
         // dispatch/workgroup/output-buffer contract (shared ABI law, all
         // compute targets).
@@ -1821,6 +1911,19 @@ impl MirKernelSignature {
 
     pub fn resources(&self) -> impl Iterator<Item = &MirKernelResource> {
         self.input_resources().chain(std::iter::once(&self.output))
+    }
+
+    /// The kernel's runtime-extent count resource, when present (U2).
+    ///
+    /// Both emitters read the guard limit from this binding and fall back to
+    /// the static dispatch-axis limit via [`Self::oob_guard_limit`] when
+    /// absent. Returns the first extent resource (CXO F2: `extra_inputs` is
+    /// `Vec`-capable; Wave 1 populates at most one).
+    #[must_use]
+    pub fn runtime_extent(&self) -> Option<&MirKernelResource> {
+        self.extra_inputs
+            .iter()
+            .find(|resource| resource.kind == MirKernelResourceKind::RuntimeExtent)
     }
 
     #[must_use]
@@ -3529,4 +3632,152 @@ fn kernel_element_byte_width(layout: MirScalarLayout) -> Result<u16, MirAbiError
         )));
     }
     Ok(size_bits / 8)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        MirBlock, MirBlockId, MirOperand, MirParam, MirParamMode, MirPlace, MirTerminator,
+        MirTerminatorKind,
+    };
+    use radix_lexer::Span;
+    use radix_types::TypeTable;
+
+    /// One-param scalar kernel: `functio add_one(x: f32) -> f32 { x }`.
+    fn scalar_kernel_function(ty: MirType) -> MirFunction {
+        MirFunction {
+            id: MirFunctionId(0),
+            source: Some(DefId(9)),
+            name: None,
+            params: vec![MirParam {
+                local: MirLocalId(0),
+                name: None,
+                ty,
+                mode: MirParamMode::Owned,
+                span: Span::default(),
+            }],
+            locals: Vec::new(),
+            temps: Vec::new(),
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: Vec::new(),
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                        MirLocalId(0),
+                    )))),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: ty,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }
+    }
+
+    #[test]
+    fn scalar_shaped_kernel_carries_runtime_extent_in_launch_plan() {
+        // U2 (DONE_WHEN d): a scalar-shaped kernel (static IO element count 1)
+        // carries a RuntimeExtent resource appended to extra_inputs, and the
+        // launch plan enumerates it with the next-free binding.
+        let mut types = TypeTable::new();
+        let _u32 = types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+        let ty = MirType::semantic(types.sized_numeric(Primitive::Fractus, NumericWidth::F32));
+        let validation = MirValidationContext::new(&types);
+        let function = scalar_kernel_function(ty);
+        let signature =
+            MirKernelSignature::storage_buffer_kernel(&function, &validation).expect("signature");
+
+        // Constructor wiring: input=0, output=1, extent=2 (next free binding).
+        let extent = signature
+            .runtime_extent()
+            .expect("scalar kernel carries a runtime extent");
+        assert_eq!(extent.kind, MirKernelResourceKind::RuntimeExtent);
+        assert_eq!(extent.binding, 2);
+        assert_eq!(extent.group, DEFAULT_KERNEL_RESOURCE_GROUP);
+        assert_eq!(extent.role, MirKernelResourceRole::Input);
+        assert_eq!(extent.access, MirKernelResourceAccess::Read);
+        assert_eq!(extent.element_count, 1);
+        assert_eq!(extent.source_local, None);
+        assert_eq!(extent.source_name.as_deref(), Some("runtime_extent"));
+
+        // Reflection enumerates the extent resource. `resources()` iterates
+        // input → extra_inputs (the extent) → output, so the extent is at
+        // index 1 in the reflection list.
+        let reflection = MirKernelReflection::from_signature("add_one", &signature, &validation)
+            .expect("reflection");
+        assert_eq!(reflection.resources.len(), 3);
+        assert_eq!(
+            reflection.resources[1].kind,
+            MirKernelResourceKind::RuntimeExtent
+        );
+        assert_eq!(reflection.resources[1].binding, 2);
+        assert_eq!(reflection.resources[1].element_layout, MirScalarLayout::U32);
+        assert_eq!(reflection.resources[1].element_byte_width, 4);
+        assert_eq!(reflection.resources[1].buffer_byte_len, 4);
+
+        // Launch plan enumerates the extent with its binding (L3: no parallel
+        // field — it flows through the positional allocator).
+        let launch = reflection.launch_plan();
+        assert_eq!(launch.bind_groups.len(), 1);
+        let bindings = &launch.bind_groups[0].bindings;
+        assert_eq!(bindings.len(), 3);
+        assert_eq!(bindings[2].binding, 2);
+        assert_eq!(bindings[2].kind, MirKernelResourceKind::RuntimeExtent);
+        assert_eq!(bindings[2].element_count, 1);
+        assert_eq!(bindings[2].buffer_byte_len, 4);
+        assert_eq!(bindings[2].source_name.as_deref(), Some("runtime_extent"));
+
+        // dispatch_size remains the static shape hint (U2 done_when e).
+        assert_eq!(signature.dispatch_size.x, 1);
+    }
+
+    #[test]
+    fn multi_element_shape_has_no_runtime_extent() {
+        // U2 non-goals: statically-known multi-element shapes keep the static
+        // limit — no extent resource.
+        let mut types = TypeTable::new();
+        let element_ty =
+            MirType::semantic(types.sized_numeric(Primitive::Fractus, NumericWidth::F32));
+        let signature = MirKernelSignature {
+            function: MirFunctionId(0),
+            input: MirKernelResource {
+                group: 0,
+                binding: 0,
+                kind: MirKernelResourceKind::StorageBuffer,
+                role: MirKernelResourceRole::Input,
+                access: MirKernelResourceAccess::Read,
+                element_ty,
+                element_count: 4,
+                source_local: Some(MirLocalId(0)),
+                source_name: None,
+            },
+            extra_inputs: Vec::new(),
+            output: MirKernelResource {
+                group: 0,
+                binding: 1,
+                kind: MirKernelResourceKind::StorageBuffer,
+                role: MirKernelResourceRole::Output,
+                access: MirKernelResourceAccess::Write,
+                element_ty,
+                element_count: 4,
+                source_local: None,
+                source_name: None,
+            },
+            builtin_inputs: Vec::new(),
+            called_builtins: Vec::new(),
+            workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
+            dispatch_size: MirKernelDispatchSize { x: 4, y: 1, z: 1 },
+        };
+        assert!(signature.runtime_extent().is_none());
+        // Static-axis fallback still drives the guard limit.
+        assert_eq!(
+            signature.oob_guard_limit(MirKernelBuiltin::GlobalInvocationX),
+            4
+        );
+    }
 }
