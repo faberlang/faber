@@ -1632,6 +1632,15 @@ impl MirKernelSignature {
                 interner,
                 allow_host_owned_tensor_entry,
             ),
+            [inputs @ ..] if !inputs.is_empty() && !is_vacuum(function.return_ty, validation) => {
+                Self::multi_input_return_buffer_kernel(
+                    function,
+                    validation,
+                    inputs,
+                    interner,
+                    allow_host_owned_tensor_entry,
+                )
+            }
             [input, output, index] => {
                 let context = IndexedViewKernelContext {
                     validation,
@@ -1755,6 +1764,80 @@ impl MirKernelSignature {
             output: MirKernelResource {
                 group: DEFAULT_KERNEL_RESOURCE_GROUP,
                 binding: 1,
+                kind: MirKernelResourceKind::StorageBuffer,
+                role: MirKernelResourceRole::Output,
+                access: MirKernelResourceAccess::Write,
+                element_ty: return_element_ty,
+                element_count: return_element_count,
+                source_local: None,
+                source_name: None,
+            },
+            builtin_inputs: Vec::new(),
+            called_builtins: called_builtins_for_function(function),
+            workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
+            dispatch_size: dispatch_size_for_1d_elements(return_element_count),
+        };
+        maybe_append_runtime_extent(function, &mut signature, validation);
+        Ok(signature)
+    }
+
+    /// Synthesize the storage-buffer ABI for a multi-input return-buffer
+    /// kernel (CUDA C3): every param becomes a read input buffer and the
+    /// tensor return becomes the write output buffer.
+    ///
+    /// Shared ABI law for all compute targets (WGSL/Metal auto-consume, LLVM
+    /// device consumes). Equal element counts across every input and the
+    /// return are enforced with the same equality law the single-input
+    /// return-buffer path uses, so a host can assume one elementwise shape
+    /// across bindings.
+    fn multi_input_return_buffer_kernel(
+        function: &MirFunction,
+        validation: &MirValidationContext<'_>,
+        inputs: &[MirParam],
+        interner: Option<&Interner>,
+        allow_host_owned_tensor_entry: bool,
+    ) -> Result<Self, MirAbiError> {
+        let return_element_ty =
+            buffer_element_type(function.return_ty, validation, allow_host_owned_tensor_entry)?;
+        let return_element_count = buffer_element_count(function.return_ty, validation)?;
+
+        let mut input_resources = Vec::with_capacity(inputs.len());
+        for (binding, input) in inputs.iter().enumerate() {
+            let input_element_ty =
+                buffer_element_type(input.ty, validation, allow_host_owned_tensor_entry)?;
+            require_same_element_type(input_element_ty, return_element_ty, validation)?;
+            let input_element_count = buffer_element_count(input.ty, validation)?;
+            if input_element_count != return_element_count {
+                return Err(MirAbiError::new(ERR_KERNEL_IO_ELEMENT_MISMATCH));
+            }
+            input_resources.push(MirKernelResource {
+                group: DEFAULT_KERNEL_RESOURCE_GROUP,
+                binding: u32::try_from(binding)
+                    .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?,
+                kind: MirKernelResourceKind::StorageBuffer,
+                role: MirKernelResourceRole::Input,
+                access: MirKernelResourceAccess::Read,
+                element_ty: input_element_ty,
+                element_count: input_element_count,
+                source_local: Some(input.local),
+                source_name: param_source_name(input, interner),
+            });
+        }
+
+        let input = input_resources
+            .first()
+            .cloned()
+            .ok_or_else(|| MirAbiError::new(ERR_INDEXED_VIEW_REQUIRES_INPUT))?;
+        let extra_inputs = input_resources.into_iter().skip(1).collect();
+
+        let mut signature = Self {
+            function: function.id,
+            input,
+            extra_inputs,
+            output: MirKernelResource {
+                group: DEFAULT_KERNEL_RESOURCE_GROUP,
+                binding: u32::try_from(inputs.len())
+                    .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?,
                 kind: MirKernelResourceKind::StorageBuffer,
                 role: MirKernelResourceRole::Output,
                 access: MirKernelResourceAccess::Write,
@@ -3779,5 +3862,142 @@ mod tests {
             signature.oob_guard_limit(MirKernelBuiltin::GlobalInvocationX),
             4
         );
+    }
+
+    /// Build a `MirValidationContext` with device-tensor layouts so tensor
+    /// types resolve to device-handle device views (the kernel ABI requires
+    /// the device locus; mirrors the radix crate's test_support helper).
+    fn validation_with_device_tensor_layouts(types: &TypeTable) -> MirValidationContext<'_> {
+        let mut validation = MirValidationContext::new(types);
+        for index in 0..types.type_count() {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "TypeId is u32 by design; type_count is bounded by u32::MAX"
+            )]
+            let ty = TypeId(index as u32);
+            let Ok(layout) = validation.layouts.layout_for_type(MirType::semantic(ty)) else {
+                continue;
+            };
+            let MirLayoutKind::DeviceView(view) = layout.kind else {
+                continue;
+            };
+            validation.layouts.set_type_layout(
+                ty,
+                MirLayoutKind::DeviceView(crate::MirDeviceViewLayout::device_handle_row_major(
+                    view.element,
+                    view.rank,
+                )),
+            );
+        }
+        validation
+    }
+
+    /// Two-param tensor kernel: `functio addita(tf32[4] a, tf32[4] b) -> tf32[4]`.
+    fn multi_input_return_kernel_function(
+        a_ty: MirType,
+        b_ty: MirType,
+        return_ty: MirType,
+    ) -> MirFunction {
+        MirFunction {
+            id: MirFunctionId(10),
+            source: Some(DefId(12)),
+            name: None,
+            params: vec![
+                MirParam {
+                    local: MirLocalId(0),
+                    name: None,
+                    ty: a_ty,
+                    mode: MirParamMode::Owned,
+                    span: Span::default(),
+                },
+                MirParam {
+                    local: MirLocalId(1),
+                    name: None,
+                    ty: b_ty,
+                    mode: MirParamMode::Owned,
+                    span: Span::default(),
+                },
+            ],
+            locals: Vec::new(),
+            temps: Vec::new(),
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: Vec::new(),
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }
+    }
+
+    #[test]
+    fn multi_input_return_buffer_kernel_synthesizes_signature() {
+        // C3-a: `addita(tf32[4] a, tf32[4] b) -> tf32[4]` matches the new
+        // multi-input return-buffer arm instead of the fallthrough — one
+        // input resource per param plus one output buffer, equal element
+        // counts enforced.
+        let mut types = TypeTable::new();
+        let f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+        let element_ty = MirType::semantic(f32);
+        let shape = types.intern_index(IndexExpr::Literal(4));
+        let tensor_ty = MirType::semantic(types.tensor_with_shape(f32, shape));
+        let validation = validation_with_device_tensor_layouts(&types);
+        let function = multi_input_return_kernel_function(tensor_ty, tensor_ty, tensor_ty);
+        let signature =
+            MirKernelSignature::storage_buffer_kernel(&function, &validation).expect("signature");
+
+        assert_eq!(signature.input.binding, 0);
+        assert_eq!(signature.input.role, MirKernelResourceRole::Input);
+        assert_eq!(signature.input.access, MirKernelResourceAccess::Read);
+        assert_eq!(signature.input.element_ty, element_ty);
+        assert_eq!(signature.input.element_count, 4);
+        assert_eq!(signature.extra_inputs.len(), 1);
+        assert_eq!(signature.extra_inputs[0].binding, 1);
+        assert_eq!(signature.extra_inputs[0].role, MirKernelResourceRole::Input);
+        assert_eq!(signature.extra_inputs[0].access, MirKernelResourceAccess::Read);
+        assert_eq!(signature.extra_inputs[0].element_ty, element_ty);
+        assert_eq!(signature.extra_inputs[0].element_count, 4);
+        assert_eq!(signature.output.binding, 2);
+        assert_eq!(signature.output.role, MirKernelResourceRole::Output);
+        assert_eq!(signature.output.access, MirKernelResourceAccess::Write);
+        assert_eq!(signature.output.element_ty, element_ty);
+        assert_eq!(signature.output.element_count, 4);
+        assert_eq!(
+            (
+                signature.dispatch_size.x,
+                signature.dispatch_size.y,
+                signature.dispatch_size.z
+            ),
+            (4, 1, 1)
+        );
+        // Statically-known multi-element shape keeps the static limit — no
+        // runtime-extent channel (U2 non-goals).
+        assert!(signature.runtime_extent().is_none());
+    }
+
+    #[test]
+    fn multi_input_return_buffer_kernel_rejects_mismatched_counts() {
+        // C3-a: mismatched element counts reject with the equality law's
+        // error instead of silently producing a mismatched-shape signature.
+        let mut types = TypeTable::new();
+        let f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+        let shape4 = types.intern_index(IndexExpr::Literal(4));
+        let shape8 = types.intern_index(IndexExpr::Literal(8));
+        let tensor4 = MirType::semantic(types.tensor_with_shape(f32, shape4));
+        let tensor8 = MirType::semantic(types.tensor_with_shape(f32, shape8));
+        let validation = validation_with_device_tensor_layouts(&types);
+        let function = multi_input_return_kernel_function(tensor4, tensor8, tensor4);
+        let error = MirKernelSignature::storage_buffer_kernel(&function, &validation)
+            .expect_err("mismatched element counts should reject");
+
+        assert_eq!(error.message, ERR_KERNEL_IO_ELEMENT_MISMATCH);
     }
 }
