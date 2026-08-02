@@ -2123,8 +2123,12 @@ fn push_unique_builtin(builtins: &mut Vec<MirKernelBuiltin>, builtin: MirKernelB
 ///   per-workgroup partial; the host combines);
 /// - **matmul (`TensorMatMul`)**: `workgroup (8,8,1)` (the emitted tile),
 ///   `dispatch (ceil(N/8), ceil(M/8), 1)` — one workgroup per output tile.
+///
+/// Consumed by the kernel plan module
+/// (`kernel_plan::CollectionKernelPlan::from_contract`) as the dispatch half
+/// of the collection-op recipe (council L5: plan and contract stay separate).
 #[derive(Debug, Clone, Copy)]
-enum CollectionOpContract {
+pub enum CollectionOpContract {
     Reduction {
         /// True flat tensor length `n`.
         length: u64,
@@ -2188,7 +2192,16 @@ fn apply_collection_op_contract(
 /// Detect a collection-op kernel and resolve its dispatch contract from the
 /// operand MIR types (statement scan analogous to
 /// [`called_builtins_for_function`]).
-fn collection_op_contract(
+///
+/// The plan pass (`kernel_plan::CollectionKernelPlan::from_contract`) consumes
+/// the resolved contract as its dispatch half (L5); this resolver stays the
+/// single source of truth for the dispatch math.
+///
+/// # Errors
+/// Returns [`MirAbiError`] when an operand type cannot be resolved to a
+/// static device-view shape, when the reduction tensor length is zero, or
+/// when matmul operands are not rank-2 with matching inner dimensions.
+pub fn collection_op_contract(
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
 ) -> Result<Option<CollectionOpContract>, MirAbiError> {
