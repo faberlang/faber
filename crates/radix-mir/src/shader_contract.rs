@@ -49,10 +49,12 @@ fn unsupported_code_error(message: &'static str, issue: &'static str, code: u32)
 /// Explicit stage-I/O role carried on shader-contract records and on the MIR
 /// reflection records the builders produce.
 ///
-/// The WGSL emitter consumes these roles instead of name spellings:
-/// [`Self::Position`] replaces `source_name == "position"`, [`Self::Color`]
-/// replaces `"color"` matching, and [`Self::Transform`] replaces transform
-/// resource detection by name. [`Self::Other`] is the neutral default for
+/// U1 carries the role on the records for the migration; the WGSL emitter will
+/// consume it in place of name spellings after U3 (the role-wiring unit) lands
+/// — [`Self::Position`] replacing `source_name == "position"`, [`Self::Color`]
+/// replacing `"color"` matching, and [`Self::Transform`] replacing
+/// transform-resource detection by name. Until then the emitter keeps
+/// name-spelling detection. [`Self::Other`] is the neutral default for
 /// attributes with no special stage semantics (normals, texture coordinates,
 /// …).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
