@@ -2968,6 +2968,26 @@ impl MirKernelReflection {
     }
 }
 
+/// Synthesize the stage-I/O role for a legacy Triga fact from its canonical
+/// source-name spelling (U3-P1 bridge).
+///
+/// The pre-U3 name-based emitter recognized the `"position"` / `"color"`
+/// spellings to drive vertex/fragment entry emission. With the U3
+/// role-driven emitter those facts must carry the equivalent
+/// [`ShaderStageIoRole`] so the previously-green entry-contract tests and the
+/// driver source path keep emitting identical WGSL. Bridge only: the legacy
+/// triga-facts builders are rewritten by U4 and deleted in U6; the generic
+/// [`crate::shader_contract`] records remain the source of truth for roles.
+#[must_use]
+pub fn stage_io_role_from_source_name(source_name: Option<&str>) -> ShaderStageIoRole {
+    match source_name {
+        Some("position") => ShaderStageIoRole::Position,
+        Some("color") => ShaderStageIoRole::Color,
+        Some("transform") => ShaderStageIoRole::Transform,
+        _ => ShaderStageIoRole::Other,
+    }
+}
+
 fn vertex_inputs_from_triga_layout_facts(
     facts: &[MirTrigaVertexLayoutFact],
 ) -> Result<Vec<MirVertexInputReflection>, MirAbiError> {
@@ -2985,7 +3005,7 @@ fn vertex_inputs_from_triga_layout_facts(
                 },
                 offset_bytes: fact.offset_bytes,
                 stride_bytes: fact.stride_bytes,
-                role: ShaderStageIoRole::Other,
+                role: stage_io_role_from_source_name(fact.source_name.as_deref()),
             })
         })
         .collect()
