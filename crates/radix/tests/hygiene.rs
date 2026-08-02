@@ -45,7 +45,11 @@ const BUDGETS: Budgets = Budgets {
     // (llvm_host.rs) — all are write-to-output/side-effect operations where
     // errors are surfaced through the caller's error path or are intentionally
     // best-effort. Lean checker best-effort cleanup uses `ignore_result`.
-    let_underscore: 41,
+    // Re-baselined 41→48: presentation_json (U-6, a7487ea0c) adds 7 more
+    // `let _ = writeln!` output discards to the hand-written JSON inspection
+    // surface (radix hir inspect presentation sidecar); same pattern and
+    // rationale as the existing json.rs discards.
+    let_underscore: 48,
     // WHY: remaining inline bodies: annotation.rs, forma/author/emit.rs,
     // semantic/broadcast_reduction.rs. Extract further in a dedicated burn-down.
     inline_test_modules: 3,
