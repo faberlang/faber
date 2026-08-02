@@ -21,6 +21,7 @@ fn spanned_impls_return_direct_parse_spans() {
 fn program() -> Program {
     Program {
         statements: Vec::new(),
+        end_trivia: Vec::new(),
         span: Span::new(1, 9),
     }
 }

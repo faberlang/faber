@@ -1,8 +1,9 @@
 //! Tests for comment and trivia preservation in parsed syntax trees.
 //!
-//! Contract: leading `#` comments and blank lines attach as `Trivia` on the following statement.
+//! Contract: leading `#` comments and blank lines attach as `Trivia` on the following statement;
+//! comments immediately before a block's `}` or before EOF attach to the block/program end boundary.
 
-use crate::parse;
+use crate::{parse, ParseErrorKind};
 use radix_lexer::lex;
 use radix_syntax::{CommentLine, StmtKind, Trivia};
 
@@ -160,13 +161,109 @@ fn comment_only_source_parses_with_empty_program() {
 fn comment_between_annotation_lines() {
     let source = "# top\n@ publica\n# between\n@ cli \"tool\"\nfunctio f() → vacuum { }\n";
     let result = parse_source(source);
-    assert!(result.success(), "{:?}", result.errors);
+    // The top comment attaches as leading trivia; the between-annotation
+    // comment is at an unnamed position and must fail with the structured
+    // invalid-placement diagnostic instead of being silently discarded.
+    assert!(!result.success());
+    assert_eq!(result.errors.len(), 1, "{:?}", result.errors);
+    assert_eq!(
+        result.errors[0].kind,
+        ParseErrorKind::InvalidCommentPlacement,
+        "{:?}",
+        result.errors
+    );
+    assert!(
+        result.errors[0]
+            .args
+            .iter()
+            .any(|arg| arg.name == "issue" && arg.value == "invalid_comment_placement"),
+        "{:?}",
+        result.errors[0].args
+    );
 
     let stmt = &result.program.as_ref().unwrap().statements[0];
     assert_eq!(stmt.annotations.len(), 2);
     let comments = comment_lines(&stmt.leading_trivia);
-    // Only the top comment attaches as leading trivia; the between comment
-    // attaches to the following annotation.
+    // Only the top comment attaches as leading trivia.
     assert_eq!(comments.len(), 1);
     assert_eq!(result.interner.resolve(comments[0].text), " top");
+}
+
+// ── End boundaries ──
+
+#[test]
+fn block_end_comment_survives_on_block_boundary() {
+    let source = "functio f() → vacuum {\n  tacet\n  # end note\n}\n";
+    let result = parse_source(source);
+    assert!(result.success(), "{:?}", result.errors);
+
+    let body = match &result.program.as_ref().unwrap().statements[0].kind {
+        StmtKind::Func(func) => func.body.as_ref().expect("body"),
+        other => panic!("expected Func, got {other:?}"),
+    };
+    let comments = comment_lines(&body.end_trivia);
+    assert_eq!(comments.len(), 1);
+    assert_eq!(result.interner.resolve(comments[0].text), " end note");
+    // The block-end run is ordered trivia: statement-terminating newline,
+    // comment line, then its trailing newline.
+    assert_eq!(newline_count(&body.end_trivia), 2);
+}
+
+#[test]
+fn comment_only_block_body_survives_on_block_boundary() {
+    let source = "functio f() → vacuum {\n  # only a comment\n}\n";
+    let result = parse_source(source);
+    assert!(result.success(), "{:?}", result.errors);
+
+    let body = match &result.program.as_ref().unwrap().statements[0].kind {
+        StmtKind::Func(func) => func.body.as_ref().expect("body"),
+        other => panic!("expected Func, got {other:?}"),
+    };
+    assert!(body.statements.is_empty());
+    let comments = comment_lines(&body.end_trivia);
+    assert_eq!(comments.len(), 1);
+    assert_eq!(result.interner.resolve(comments[0].text), " only a comment");
+}
+
+#[test]
+fn comment_only_file_preserves_comment_on_program_end() {
+    let source = "# just a comment\n";
+    let result = parse_source(source);
+    // A file with only a comment still parses with the comment retained on the
+    // program end — no statement-expected error and no invalid placement.
+    assert!(result.success(), "{:?}", result.errors);
+
+    let program = result.program.as_ref().unwrap();
+    assert!(program.statements.is_empty());
+    let comments = comment_lines(&program.end_trivia);
+    assert_eq!(comments.len(), 1);
+    assert_eq!(result.interner.resolve(comments[0].text), " just a comment");
+}
+
+#[test]
+fn comment_only_file_with_blank_lines_preserves_order() {
+    let source = "# one\n\n# two\n";
+    let result = parse_source(source);
+    assert!(result.success(), "{:?}", result.errors);
+
+    let program = result.program.as_ref().unwrap();
+    let comments = comment_lines(&program.end_trivia);
+    assert_eq!(comments.len(), 2);
+    assert_eq!(result.interner.resolve(comments[0].text), " one");
+    assert_eq!(result.interner.resolve(comments[1].text), " two");
+    // blank line (2 newlines) between comments + trailing newline
+    assert_eq!(newline_count(&program.end_trivia), 3);
+}
+
+#[test]
+fn trailing_comment_before_eof_survives_on_program_end() {
+    let source = "functio f() → vacuum { }\n# trailing\n";
+    let result = parse_source(source);
+    assert!(result.success(), "{:?}", result.errors);
+
+    let program = result.program.as_ref().unwrap();
+    assert_eq!(program.statements.len(), 1);
+    let comments = comment_lines(&program.end_trivia);
+    assert_eq!(comments.len(), 1);
+    assert_eq!(result.interner.resolve(comments[0].text), " trailing");
 }

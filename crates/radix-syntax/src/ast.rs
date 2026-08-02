@@ -49,6 +49,13 @@ pub struct Program {
     /// Top-level declarations and executable statements in source order.
     pub statements: Vec<Stmt>,
 
+    /// Comments and newlines collected immediately before EOF.
+    ///
+    /// WHY: A `#` comment run after the last declaration (or in a comment-only
+    /// file) has no following statement to attach to; it is retained on the
+    /// program end boundary so the post-parse completeness check can claim it.
+    pub end_trivia: Vec<Trivia>,
+
     /// Source span covering the parsed unit.
     pub span: Span,
 }
@@ -574,6 +581,15 @@ pub enum ProbaModifier {
 #[derive(Debug)]
 pub struct BlockStmt {
     pub statements: Vec<Stmt>,
+
+    /// Comments and newlines collected immediately before the consuming `}`.
+    ///
+    /// WHY: A `#` comment run directly before an executable block close has no
+    /// following statement to attach to; it is retained on the block-end
+    /// boundary so the post-parse completeness check can claim it. Syntax does
+    /// not manufacture a `tacet` statement for this boundary.
+    pub end_trivia: Vec<Trivia>,
+
     pub span: Span,
 }
 

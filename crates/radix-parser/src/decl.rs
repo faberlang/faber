@@ -1934,11 +1934,17 @@ impl Parser {
             }
         }
 
+        // Trivia immediately before the consuming `}` has no following
+        // statement; retain it on the block-end boundary so the post-parse
+        // completeness check can claim it.
+        let end_trivia = self.parse_block_end_trivia();
+
         self.expect(&TokenKind::RBrace, "expected '}'")?;
 
         let span = start.merge(self.previous_span());
         Ok(BlockStmt {
             statements: stmts,
+            end_trivia,
             span,
         })
     }

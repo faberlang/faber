@@ -930,6 +930,7 @@ mod tests {
     fn test_block() -> BlockStmt {
         BlockStmt {
             statements: vec![],
+            end_trivia: Vec::new(),
             span: Span::new(0, 1),
         }
     }

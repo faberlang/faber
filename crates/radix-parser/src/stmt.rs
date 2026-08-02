@@ -474,6 +474,7 @@ impl Parser {
             };
             let body = BlockStmt {
                 statements: vec![inner_stmt],
+                end_trivia: Vec::new(),
                 span: inner_span,
             };
             Ok(StmtKind::Si(SiStmt {
@@ -518,6 +519,7 @@ impl Parser {
             };
             let body = BlockStmt {
                 statements: vec![inner_stmt],
+                end_trivia: Vec::new(),
                 span: inner_span,
             };
             Ok(StmtKind::Si(SiStmt {

@@ -178,6 +178,11 @@ pub enum ParseErrorKind {
 
     // Import errors
     InvalidImport,
+
+    // Comment/trivia errors
+    /// A `LineComment` token was not claimed by a legal attachment boundary
+    /// (forward statement/member trivia, block end, or program end).
+    InvalidCommentPlacement,
 }
 
 /// Non-fatal semantic findings that share the normal diagnostic transport.

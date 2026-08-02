@@ -36,6 +36,7 @@
 //! file from diagnostics. Recovery is deliberately coarse: it preserves useful
 //! following structure rather than pretending malformed subtrees are valid.
 
+mod claim;
 mod decl;
 mod error;
 mod expr;
@@ -236,14 +237,25 @@ impl Parser {
             }
         }
 
+        // Trailing trivia (after the last declaration) has no following
+        // statement; retain it on the program-end boundary so the post-parse
+        // completeness check can claim it instead of discarding it.
+        let end_trivia = self.parse_block_end_trivia();
         let end = self.previous_span();
         let span = start.merge(end);
 
+        let program = Program {
+            statements: stmts,
+            span,
+            end_trivia,
+        };
+
+        // Claimed-comment accounting: every `LineComment` token is either
+        // present in a legal syntax trivia carrier or reported here.
+        claim::check(self, &program);
+
         ParseResult {
-            program: Some(Program {
-                statements: stmts,
-                span,
-            }),
+            program: Some(program),
             errors: std::mem::take(&mut self.errors),
             interner: std::mem::take(&mut self.interner),
         }
@@ -417,8 +429,14 @@ impl Parser {
     }
 
     /// Advance one token without skipping trivia.
+    ///
+    /// EDGE: The guard is raw-bounds (`pos < tokens.len()`) rather than
+    /// [`Parser::is_at_end`], which skips trivia. At a position where only
+    /// trivia followed by EOF remains, `is_at_end` is already true but the
+    /// trivia tokens must still be consumable (e.g. block/program end-trivia
+    /// capture).
     fn advance_raw(&mut self) -> &Token {
-        if !self.is_at_end() {
+        if self.pos < self.tokens.len() {
             self.pos += 1;
             // Keep non-trivia cursor consistent with raw advances past trivia or real tokens.
             while self.non_trivia_cursor < self.non_trivia_indices.len()
@@ -452,6 +470,16 @@ impl Parser {
         }
 
         trivia
+    }
+
+    /// Collect trivia immediately before a structural end boundary.
+    ///
+    /// WHY: A `LineComment`/`Newline` run before a consuming `}` or before EOF
+    /// is backward-attached to the block/program end rather than forward to a
+    /// following statement. The token shape is identical to
+    /// [`Parser::parse_leading_trivia`], but the semantic owner differs.
+    pub(crate) fn parse_block_end_trivia(&mut self) -> Vec<Trivia> {
+        self.parse_leading_trivia()
     }
 
     /// Consume token if it matches, return true.
@@ -850,6 +878,10 @@ mod comment_preservation_test;
 #[cfg(test)]
 #[path = "line_start_comment_test.rs"]
 mod line_start_comment_test;
+
+#[cfg(test)]
+#[path = "claim_test.rs"]
+mod claim_test;
 
 #[cfg(test)]
 #[path = "generic_call_test.rs"]
