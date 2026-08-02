@@ -358,8 +358,11 @@ pub enum GpuBuiltinWire {
 
 /// Schema version for the HIR artifact format.
 ///
-/// Starts at 1 and ratchets on each breaking HIR change (`F3`).
-pub const SCHEMA_VERSION: u32 = 1;
+/// Starts at 1 and ratchets on each breaking HIR change (`F3`). Version 2
+/// adds the [`HirPresentation`](crate::nodes::HirPresentation) sidecar to
+/// [`HirArtifact`]; schema-v1 artifacts are rejected by the loader (no
+/// compatibility decoder).
+pub const SCHEMA_VERSION: u32 = 2;
 
 /// Serializable snapshot of one analyzed compilation unit (F1, F2, F4).
 ///
@@ -391,6 +394,11 @@ pub struct HirArtifact {
 
     /// Full lowered HIR program (direct serde).
     pub hir: crate::nodes::HirProgram,
+
+    /// Presentation sidecar: trivia attachments, structural ends, and the
+    /// entry-start anchor (schema v2). Inseparable from the HIR value it
+    /// annotates; never on [`HirProgram`](crate::nodes::HirProgram).
+    pub presentation: crate::nodes::HirPresentation,
 
     /// CLI program contract when the unit declares `incipit argumenta` (`F17`, `F18`).
     pub cli_program: Option<CliProgramWire>,
@@ -427,7 +435,7 @@ pub struct HirArtifact {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::nodes::{HirId, HirItem, HirItemKind, HirProgram, LibraryRegistry};
+    use crate::nodes::{HirId, HirItem, HirItemKind, HirPresentation, HirProgram, LibraryRegistry};
     use radix_lexer::Symbol;
 
     /// Construct a minimal valid `HirProgram` with one empty function.
@@ -465,6 +473,21 @@ mod tests {
         }
     }
 
+    /// Construct a minimal valid `HirPresentation` with no trivia.
+    fn stub_presentation() -> HirPresentation {
+        use crate::nodes::{HirProgramEnd, HirSourceAnchorId};
+        HirPresentation {
+            owners: Vec::new(),
+            attachments: Vec::new(),
+            block_ends: Vec::new(),
+            program_end: HirProgramEnd {
+                id: HirSourceAnchorId(0),
+                span: radix_lexer::Span::default(),
+            },
+            entry_start_anchor: None,
+        }
+    }
+
     /// Construct a minimal valid `HirArtifact` with stub data in all required fields.
     fn stub_artifact() -> HirArtifact {
         use radix_types::TypeTable;
@@ -476,6 +499,7 @@ mod tests {
                 relative_path: "test.faber".to_string(),
             },
             hir: stub_hir_program(),
+            presentation: stub_presentation(),
             cli_program: None,
             types: types.snapshot(),
             interner: vec!["main".to_string(), "test".to_string()],
@@ -503,7 +527,7 @@ mod tests {
         let bytes = postcard::to_allocvec(&original).expect("serialize HirArtifact");
         let deserialized: HirArtifact =
             postcard::from_bytes(&bytes).expect("deserialize HirArtifact");
-        assert_eq!(original.schema_version, 1);
+        assert_eq!(original.schema_version, 2);
         assert_eq!(original, deserialized);
     }
 }
