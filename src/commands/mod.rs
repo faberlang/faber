@@ -179,6 +179,7 @@ fn dispatch(command: Command) {
                 reader_locale: args.reader_locale,
                 output_mode: radix::codegen::OutputMode::Application,
                 module_name: None,
+                cuda_descriptor: None,
             };
             if emit::is_faber_emit(args.target) {
                 emit::cmd_emit_faber(emit_command);

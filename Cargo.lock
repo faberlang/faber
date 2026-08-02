@@ -869,6 +869,7 @@ dependencies = [
  "radix-mir",
  "radix-types",
  "rustc-hash",
+ "serde",
 ]
 
 [[package]]
