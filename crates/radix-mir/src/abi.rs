@@ -473,138 +473,6 @@ pub struct MirVertexInputReflection {
     pub role: ShaderStageIoRole,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MirTrigaVertexLayoutFact {
-    pub source_name: Option<String>,
-    pub location: u32,
-    pub format_code: u32,
-    pub offset_bytes: u64,
-    pub stride_bytes: u64,
-    pub step_mode_code: u32,
-}
-
-/// Triga-source varying fact: a value the vertex stage writes and the fragment
-/// stage reads. Extracted from Triga library API calls before backend emission.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MirTrigaVaryingFact {
-    pub source_name: String,
-    pub location: u32,
-    pub format_code: u32,
-}
-
-/// Triga-source pipeline fact: pipeline-level configuration extracted from
-/// Triga library API calls before backend emission.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MirTrigaPipelineFact {
-    pub color_target_format_code: u32,
-    pub depth_compare_code: Option<u32>,
-    pub depth_write_enabled: bool,
-    pub primitive_topology_code: u32,
-    pub vertex_count: u32,
-}
-
-impl MirTrigaPipelineFact {
-    /// Build a [`MirGraphicsPipelineReflection`] from Triga-source pipeline facts.
-    ///
-    /// Per-stage resources and vertex/varying counts are zero here; callers
-    /// must merge those from the vertex/fragment kernel reflections after
-    /// building this skeleton.
-    /// # Errors
-    /// Returns an error when a Triga format, topology, or depth code is
-    /// unrecognized. The depth code goes through the fail-closed generic
-    /// conversion: unknown codes error instead of degrading to `Never`.
-    pub fn to_graphics_pipeline_reflection(
-        &self,
-    ) -> Result<MirGraphicsPipelineReflection, MirAbiError> {
-        let color_target = MirColorTargetFormat::from_triga_code(self.color_target_format_code)?;
-        let topology = MirPrimitiveTopology::from_triga_code(self.primitive_topology_code)?;
-        let depth_stencil = match self.depth_compare_code {
-            Some(code) => Some(MirDepthStencilState {
-                depth_write_enabled: self.depth_write_enabled,
-                depth_compare: crate::shader_contract::depth_compare_function_from_code(code)?,
-                stencil_read_mask: u32::MAX,
-                stencil_write_mask: u32::MAX,
-                stencil_front: MirStencilFaceState::DISABLED,
-                stencil_back: MirStencilFaceState::DISABLED,
-            }),
-            None => None,
-        };
-        Ok(MirGraphicsPipelineReflection {
-            color_target_formats: vec![color_target],
-            primitive_topology: topology,
-            vertex_count: self.vertex_count,
-            vertex_input_count: 0,
-            varying_count: 0,
-            vertex_resources: vec![],
-            vertex_resource_count: 0,
-            fragment_resources: vec![],
-            fragment_resource_count: 0,
-            depth_stencil,
-        })
-    }
-}
-
-/// Triga-source resource binding fact: a GPU resource binding extracted from
-/// Triga library API calls before backend emission.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MirTrigaResourceBindingFact {
-    pub group: u32,
-    pub binding: u32,
-    pub kind_code: u32,
-    pub role_code: u32,
-    pub access_code: u32,
-    pub source_name: Option<String>,
-    pub element_count: u64,
-}
-
-impl MirTrigaResourceBindingFact {
-    /// Build a [`MirKernelResourceReflection`] from a Triga-source binding fact.
-    ///
-    /// Uses f32 scalar defaults for layout fields that are not available at
-    /// the source-extraction level. Real layout resolution requires MIR
-    /// lowering; this is a best-effort contract for Goal 01 acceptance.
-    #[must_use]
-    pub fn to_resource_reflection(&self) -> MirKernelResourceReflection {
-        let kind = match self.kind_code {
-            1 => MirKernelResourceKind::StorageBuffer,
-            _ => MirKernelResourceKind::StorageBuffer,
-        };
-        let role = match self.role_code {
-            1 => MirKernelResourceRole::Input,
-            2 => MirKernelResourceRole::Output,
-            _ => MirKernelResourceRole::Input,
-        };
-        let access = match self.access_code {
-            1 => MirKernelResourceAccess::Read,
-            2 => MirKernelResourceAccess::Write,
-            3 => MirKernelResourceAccess::ReadWrite,
-            _ => MirKernelResourceAccess::Read,
-        };
-        MirKernelResourceReflection {
-            group: self.group,
-            binding: self.binding,
-            kind,
-            role,
-            access,
-            element_ty: MirType::semantic(TypeId(0)),
-            element_layout: MirScalarLayout::F32,
-            element_byte_width: 4,
-            element_count: self.element_count,
-            buffer_byte_len: self.element_count.saturating_mul(4),
-            source_local: None,
-            source_name: self.source_name.clone(),
-        }
-    }
-}
-
-/// Triga-source fragment output fact: a render-target output location and
-/// format. Extracted from Triga library API calls before backend emission.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MirTrigaFragmentOutputFact {
-    pub location: u32,
-    pub format_code: u32,
-}
-
 /// Vertex-output / fragment-input contract. A varying is a value that flows from
 /// the vertex stage to the fragment stage; its location, format, and
 /// interpolation must agree across both stages.
@@ -803,21 +671,6 @@ impl MirVertexInputFormat {
             Self::Float32x4 => "float32x4",
         }
     }
-
-    /// # Errors
-    /// Returns an error when validation or type resolution fails. See [`MirAbiError`].
-    pub fn from_triga_format_code(code: u32) -> Result<Self, MirAbiError> {
-        match code {
-            2 => Ok(Self::Float32x2),
-            3 => Ok(Self::Float32x3),
-            4 => Ok(Self::Float32x4),
-            _ => Err(MirAbiError::with_detail(
-                ERR_VERTEX_INPUT_UNSUPPORTED_FORMAT_CODE,
-                "mir_vertex_input_unsupported_format_code",
-                code.to_string(),
-            )),
-        }
-    }
 }
 
 /// Color attachment texture format for a graphics pipeline target.
@@ -837,20 +690,6 @@ impl MirColorTargetFormat {
             Self::Bgra8UnormSrgb => "bgra8unorm-srgb",
         }
     }
-
-    /// # Errors
-    /// Returns an error when the Triga format code is unrecognized.
-    pub fn from_triga_code(code: u32) -> Result<Self, MirAbiError> {
-        match code {
-            1 => Ok(Self::Bgra8Unorm),
-            2 => Ok(Self::Bgra8UnormSrgb),
-            _ => Err(MirAbiError::with_detail(
-                "unsupported Triga color target format code",
-                "mir_color_target_format_code_unsupported",
-                code.to_string(),
-            )),
-        }
-    }
 }
 
 /// Primitive topology for draw calls.
@@ -868,21 +707,6 @@ impl MirPrimitiveTopology {
             Self::TriangleList => "triangle-list",
             Self::LineList => "line-list",
             Self::PointList => "point-list",
-        }
-    }
-
-    /// # Errors
-    /// Returns an error when the Triga topology code is unrecognized.
-    pub fn from_triga_code(code: u32) -> Result<Self, MirAbiError> {
-        match code {
-            1 => Ok(Self::TriangleList),
-            2 => Ok(Self::LineList),
-            3 => Ok(Self::PointList),
-            _ => Err(MirAbiError::with_detail(
-                "unsupported Triga primitive topology code",
-                "mir_primitive_topology_code_unsupported",
-                code.to_string(),
-            )),
         }
     }
 }
@@ -912,20 +736,6 @@ impl MirDepthCompareFunction {
             Self::NotEqual => "not-equal",
             Self::GreaterEqual => "greater-equal",
             Self::Always => "always",
-        }
-    }
-
-    #[must_use]
-    pub fn from_triga_code(code: u32) -> Self {
-        match code {
-            1 => Self::Less,
-            2 => Self::Equal,
-            3 => Self::LessEqual,
-            4 => Self::Greater,
-            5 => Self::NotEqual,
-            6 => Self::GreaterEqual,
-            7 => Self::Always,
-            _ => Self::Never,
         }
     }
 }
@@ -1241,6 +1051,10 @@ pub struct MirKernelResourceReflection {
     pub buffer_byte_len: u64,
     pub source_local: Option<MirLocalId>,
     pub source_name: Option<String>,
+    /// Explicit stage-I/O role (see [`crate::shader_contract::ShaderStageIoRole`]).
+    /// Carried so transform detection and other role-driven emission can key
+    /// on the declared contract role instead of source-name spelling.
+    pub stage_io_role: ShaderStageIoRole,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2516,45 +2330,6 @@ impl MirKernelReflection {
         })
     }
 
-    /// # Errors
-    /// Returns an error when validation or type resolution fails. See [`MirAbiError`].
-    pub fn vertex_entry_from_triga_layout_facts(
-        function: MirFunctionId,
-        entry_name: impl Into<String>,
-        facts: &[MirTrigaVertexLayoutFact],
-        resources: Vec<MirKernelResourceReflection>,
-    ) -> Result<Self, MirAbiError> {
-        let vertex_inputs = vertex_inputs_from_triga_layout_facts(facts)?;
-        Self::vertex_entry(function, entry_name, vertex_inputs, resources)
-    }
-
-    /// # Errors
-    /// Returns an error when validation or type resolution fails. See [`MirAbiError`].
-    pub fn source_vertex_entry_from_triga_layout_facts(
-        source_def: DefId,
-        entry_name: impl Into<String>,
-        facts: &[MirTrigaVertexLayoutFact],
-        resources: Vec<MirKernelResourceReflection>,
-    ) -> Result<Self, MirAbiError> {
-        let vertex_inputs = vertex_inputs_from_triga_layout_facts(facts)?;
-        validate_vertex_input_locations(&vertex_inputs)?;
-        Ok(Self {
-            function: MirFunctionId(0),
-            provenance: MirKernelProvenance::SourceFunction(source_def),
-            entry_name: entry_name.into(),
-            shader_stage: MirKernelShaderStage::Vertex,
-            resources,
-            vertex_inputs,
-            varyings: Vec::new(),
-            fragment_outputs: Vec::new(),
-            builtin_inputs: Vec::new(),
-            called_builtins: Vec::new(),
-            workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
-            dispatch_size: MirKernelDispatchSize { x: 1, y: 1, z: 1 },
-            workgroup_count: MirKernelWorkgroupCount { x: 1, y: 1, z: 1 },
-        })
-    }
-
     /// Build a fragment-stage entry reflection. `varyings` are the values the
     /// fragment consumes from the vertex stage; `fragment_outputs` are its
     /// render-target outputs. Locations must be unique within each list.
@@ -2966,49 +2741,6 @@ impl MirKernelReflection {
             &self.called_builtins,
         )
     }
-}
-
-/// Synthesize the stage-I/O role for a legacy Triga fact from its canonical
-/// source-name spelling (U3-P1 bridge).
-///
-/// The pre-U3 name-based emitter recognized the `"position"` / `"color"`
-/// spellings to drive vertex/fragment entry emission. With the U3
-/// role-driven emitter those facts must carry the equivalent
-/// [`ShaderStageIoRole`] so the previously-green entry-contract tests and the
-/// driver source path keep emitting identical WGSL. Bridge only: the legacy
-/// triga-facts builders are rewritten by U4 and deleted in U6; the generic
-/// [`crate::shader_contract`] records remain the source of truth for roles.
-#[must_use]
-pub fn stage_io_role_from_source_name(source_name: Option<&str>) -> ShaderStageIoRole {
-    match source_name {
-        Some("position") => ShaderStageIoRole::Position,
-        Some("color") => ShaderStageIoRole::Color,
-        Some("transform") => ShaderStageIoRole::Transform,
-        _ => ShaderStageIoRole::Other,
-    }
-}
-
-fn vertex_inputs_from_triga_layout_facts(
-    facts: &[MirTrigaVertexLayoutFact],
-) -> Result<Vec<MirVertexInputReflection>, MirAbiError> {
-    facts
-        .iter()
-        .map(|fact| {
-            Ok(MirVertexInputReflection {
-                source_name: fact.source_name.clone(),
-                location: fact.location,
-                format: MirVertexInputFormat::from_triga_format_code(fact.format_code)?,
-                step_mode: if fact.step_mode_code == 2 {
-                    MirInputStepMode::Instance
-                } else {
-                    MirInputStepMode::Vertex
-                },
-                offset_bytes: fact.offset_bytes,
-                stride_bytes: fact.stride_bytes,
-                role: stage_io_role_from_source_name(fact.source_name.as_deref()),
-            })
-        })
-        .collect()
 }
 
 fn validate_vertex_input_locations(inputs: &[MirVertexInputReflection]) -> Result<(), MirAbiError> {
@@ -3477,6 +3209,7 @@ fn reflect_kernel_resource(
         buffer_byte_len,
         source_local: resource.source_local,
         source_name: resource.source_name.clone(),
+        stage_io_role: ShaderStageIoRole::Other,
     })
 }
 

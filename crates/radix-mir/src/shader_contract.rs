@@ -1,24 +1,20 @@
 //! Domain-neutral shader contract records (WGSL shader-contract boundary, U1).
 //!
-//! This module is the compiler-owned, generic shader-contract surface that
-//! replaces the Triga-shaped fact types (`MirTriga*` in [`crate::abi`]). A
+//! This module is the compiler-owned, generic shader-contract surface. A
 //! shader contract is the set of facts a library declares — vertex layout
 //! attributes, stage varyings, fragment outputs, resource bindings, and
 //! pipeline state — expressed with canonical fields, explicit stage-I/O
 //! [`ShaderStageIoRole`]s, and provenance (resolved source identity + span) for
 //! diagnostics.
 //!
-//! The records are domain-neutral: any library (Triga, …) maps its concrete API
-//! onto them, and the driver ingests them (identity-resolved). The roles are
-//! carried for the migration; the WGSL emitter consumes them in place of name
-//! spellings after U3 lands, with name-spelling detection remaining in the
-//! emitter until then. Unknown numeric codes fail closed with [`MirAbiError`] —
-//! including the depth-compare table, which must error rather than degrade to
-//! `Never`.
+//! The records are domain-neutral: any library maps its concrete API onto
+//! them, and the driver ingests them (identity-resolved). The roles are
+//! carried on the records and consumed by the WGSL emitter in place of name
+//! spellings (U3+); the legacy name-spelling bridges were retired in U6.
+//! Unknown numeric codes fail closed with [`MirAbiError`] — including the
+//! depth-compare table, which must error rather than degrade to `Never`.
 //!
-//! U1 is additive: [`crate::abi`]'s `MirTriga*` types, `from_triga_*`
-//! conversions, and the old builders stay until the cleanup unit (U6). The
-//! builders here produce the existing [`MirKernelReflection`] /
+//! The builders here produce the existing [`MirKernelReflection`] /
 //! [`MirGraphicsPipelineReflection`] / [`MirGpuReflection`] shapes unchanged,
 //! so the reflection JSON sidecar serializes identically to today.
 
@@ -43,6 +39,7 @@ const ERR_SHADER_INTERPOLATION_CODE: &str = "unsupported shader varying interpol
 const ERR_SHADER_RESOURCE_KIND_CODE: &str = "unsupported shader resource kind code";
 const ERR_SHADER_RESOURCE_ROLE_CODE: &str = "unsupported shader resource role code";
 const ERR_SHADER_RESOURCE_ACCESS_CODE: &str = "unsupported shader resource access code";
+const ERR_SHADER_STAGE_IO_ROLE_CODE: &str = "unsupported shader stage-I/O role code";
 
 fn unsupported_code_error(message: &'static str, issue: &'static str, code: u32) -> MirAbiError {
     MirAbiError::with_detail(message, issue, code.to_string())
@@ -51,14 +48,11 @@ fn unsupported_code_error(message: &'static str, issue: &'static str, code: u32)
 /// Explicit stage-I/O role carried on shader-contract records and on the MIR
 /// reflection records the builders produce.
 ///
-/// U1 carries the role on the records for the migration; the WGSL emitter will
-/// consume it in place of name spellings after U3 (the role-wiring unit) lands
-/// — [`Self::Position`] replacing `source_name == "position"`, [`Self::Color`]
-/// replacing `"color"` matching, and [`Self::Transform`] replacing
-/// transform-resource detection by name. Until then the emitter keeps
-/// name-spelling detection. [`Self::Other`] is the neutral default for
-/// attributes with no special stage semantics (normals, texture coordinates,
-/// …).
+/// The WGSL emitter consumes the role in place of name spellings:
+/// [`Self::Position`] for the vertex-position input, [`Self::Color`] for
+/// color-valued stage I/O, and [`Self::Transform`] for the transform storage
+/// resource. [`Self::Other`] is the neutral default for attributes with no
+/// special stage semantics (normals, texture coordinates, …).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
 pub enum ShaderStageIoRole {
     /// Vertex position output.
@@ -72,15 +66,22 @@ pub enum ShaderStageIoRole {
     Other,
 }
 
-impl ShaderStageIoRole {
-    #[must_use]
-    pub fn spelling(self) -> &'static str {
-        match self {
-            Self::Position => "position",
-            Self::Color => "color",
-            Self::Transform => "transform",
-            Self::Other => "other",
-        }
+/// # Errors
+/// Returns an error when the numeric code is not a canonical stage-I/O role.
+///
+/// Role codes are part of the canonical code tables; unknown codes fail
+/// closed. `Other` (the neutral default) is code `4`.
+pub fn stage_io_role_from_code(code: u32) -> Result<ShaderStageIoRole, MirAbiError> {
+    match code {
+        1 => Ok(ShaderStageIoRole::Position),
+        2 => Ok(ShaderStageIoRole::Color),
+        3 => Ok(ShaderStageIoRole::Transform),
+        4 => Ok(ShaderStageIoRole::Other),
+        _ => Err(unsupported_code_error(
+            ERR_SHADER_STAGE_IO_ROLE_CODE,
+            "shader_stage_io_role_code",
+            code,
+        )),
     }
 }
 
@@ -96,10 +97,9 @@ pub struct ContractProvenance {
 
 /// Vertex-layout contract: one vertex buffer attribute (shader input).
 ///
-/// Canonical fields replace the `MirTrigaVertexLayoutFact` numeric-code shape:
-/// the format is the canonical [`MirVertexInputFormat`], the step mode is the
-/// canonical [`MirInputStepMode`], and provenance carries the resolved source
-/// identity + span.
+/// Canonical fields: the format is the canonical [`MirVertexInputFormat`], the
+/// step mode is the canonical [`MirInputStepMode`], and provenance carries the
+/// resolved source identity + span.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShaderVertexAttribute {
     /// Semantic/source identity of the attribute (source member name).
@@ -176,6 +176,8 @@ pub struct ShaderResourceBinding {
     pub element_count: u64,
     /// Source name of the binding, when known.
     pub source_name: Option<String>,
+    /// Explicit stage-I/O role (declared on the contract call).
+    pub stage_io_role: ShaderStageIoRole,
     /// Provenance + source span for diagnostics.
     pub provenance: ContractProvenance,
 }
@@ -244,8 +246,7 @@ pub fn primitive_topology_from_code(code: u32) -> Result<MirPrimitiveTopology, M
 /// Returns an error when the numeric code is not a canonical depth compare.
 ///
 /// Fail-closed by design (council lock): unknown depth codes error instead of
-/// degrading to `Never` as the legacy `MirDepthCompareFunction::from_triga_code`
-/// table does.
+/// degrading to `Never`.
 pub fn depth_compare_function_from_code(code: u32) -> Result<MirDepthCompareFunction, MirAbiError> {
     match code {
         1 => Ok(MirDepthCompareFunction::Less),
@@ -400,6 +401,7 @@ pub fn resource_reflection_from_shader_contract(
             .saturating_mul(u64::from(binding.element_byte_width)),
         source_local: None,
         source_name: binding.source_name.clone(),
+        stage_io_role: binding.stage_io_role,
     }
 }
 
@@ -533,7 +535,7 @@ pub fn graphics_pipeline_from_shader_contract(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{MirStencilFaceState, MirTrigaPipelineFact, MirTrigaVertexLayoutFact};
+    use crate::MirStencilFaceState;
 
     fn provenance() -> ContractProvenance {
         ContractProvenance {
@@ -543,11 +545,18 @@ mod tests {
     }
 
     #[test]
-    fn role_spellings_are_stable() {
-        assert_eq!(ShaderStageIoRole::Position.spelling(), "position");
-        assert_eq!(ShaderStageIoRole::Color.spelling(), "color");
-        assert_eq!(ShaderStageIoRole::Transform.spelling(), "transform");
-        assert_eq!(ShaderStageIoRole::Other.spelling(), "other");
+    fn stage_io_role_from_code_accepts_known_codes() {
+        assert_eq!(stage_io_role_from_code(1), Ok(ShaderStageIoRole::Position));
+        assert_eq!(stage_io_role_from_code(2), Ok(ShaderStageIoRole::Color));
+        assert_eq!(stage_io_role_from_code(3), Ok(ShaderStageIoRole::Transform));
+        assert_eq!(stage_io_role_from_code(4), Ok(ShaderStageIoRole::Other));
+    }
+
+    #[test]
+    fn stage_io_role_from_code_rejects_unknown() {
+        let error = stage_io_role_from_code(0).expect_err("unknown role code must error");
+        assert_eq!(error.issue, "shader_stage_io_role_code");
+        assert_eq!(error.detail.as_deref(), Some("0"));
     }
 
     #[test]
@@ -655,7 +664,7 @@ mod tests {
     #[test]
     fn depth_compare_from_code_rejects_unknown_rather_than_never() {
         // Council lock: the depth path must ERROR on unknown codes, not return
-        // `Never` like the legacy fail-open `from_triga_code` table.
+        // `Never` like the legacy fail-open depth table.
         let error = depth_compare_function_from_code(0).expect_err("unknown depth code must error");
         assert_eq!(error.issue, "mir_shader_depth_compare_code_unsupported");
         assert_eq!(error.detail.as_deref(), Some("0"));
@@ -759,77 +768,11 @@ mod tests {
         assert_eq!(error.detail.as_deref(), Some("4"));
     }
 
-    /// Equivalent input through the legacy Triga-facts path and the generic
-    /// contract must produce the identical vertex reflection (the JSON sidecar
-    /// serializes exactly these fields), proving the round-trip shape.
-    ///
-    /// The legacy path synthesizes the stage-I/O role from the fact's
-    /// canonical source-name spelling (U3-P1 bridge), so the equivalent
-    /// generic contract declares the same role (`position` -> Position).
-    #[test]
-    fn generic_vertex_entry_matches_triga_facts_path() {
-        let generic = vertex_entry_from_shader_contract(
-            MirFunctionId(4),
-            "triga_plane_vertex",
-            &[
-                ShaderVertexAttribute {
-                    semantic: Some("position".to_owned()),
-                    location: 0,
-                    format: MirVertexInputFormat::Float32x3,
-                    offset_bytes: 0,
-                    stride_bytes: 12,
-                    step_mode: MirInputStepMode::Vertex,
-                    role: ShaderStageIoRole::Position,
-                    provenance: provenance(),
-                },
-                ShaderVertexAttribute {
-                    semantic: Some("uv".to_owned()),
-                    location: 2,
-                    format: MirVertexInputFormat::Float32x2,
-                    offset_bytes: 0,
-                    stride_bytes: 8,
-                    step_mode: MirInputStepMode::Vertex,
-                    role: ShaderStageIoRole::Other,
-                    provenance: provenance(),
-                },
-            ],
-            vec![],
-        )
-        .expect("generic vertex entry");
-
-        let triga = MirKernelReflection::vertex_entry_from_triga_layout_facts(
-            MirFunctionId(4),
-            "triga_plane_vertex",
-            &[
-                MirTrigaVertexLayoutFact {
-                    source_name: Some("position".to_owned()),
-                    location: 0,
-                    format_code: 3,
-                    offset_bytes: 0,
-                    stride_bytes: 12,
-                    step_mode_code: 1,
-                },
-                MirTrigaVertexLayoutFact {
-                    source_name: Some("uv".to_owned()),
-                    location: 2,
-                    format_code: 2,
-                    offset_bytes: 0,
-                    stride_bytes: 8,
-                    step_mode_code: 1,
-                },
-            ],
-            vec![],
-        )
-        .expect("Triga layout facts");
-
-        assert_eq!(generic, triga);
-    }
-
     #[test]
     fn vertex_entry_carries_roles_on_vertex_input_reflections() {
         let entry = vertex_entry_from_shader_contract(
             MirFunctionId(4),
-            "triga_plane_vertex",
+            "plane_vertex",
             &[
                 ShaderVertexAttribute {
                     semantic: Some("position".to_owned()),
@@ -928,7 +871,7 @@ mod tests {
     fn fragment_entry_carries_varying_and_output_roles() {
         let entry = fragment_entry_from_shader_contract(
             MirFunctionId(5),
-            "triga_plane_fragment",
+            "plane_fragment",
             &[ShaderVarying {
                 semantic: "color".to_owned(),
                 location: 0,
@@ -1023,6 +966,7 @@ mod tests {
             element_byte_width: 4,
             element_count: 36,
             source_name: Some("transform".to_owned()),
+            stage_io_role: ShaderStageIoRole::Transform,
             provenance: provenance(),
         };
         let reflection = resource_reflection_from_shader_contract(&binding);
@@ -1034,6 +978,7 @@ mod tests {
         assert_eq!(reflection.element_layout, MirScalarLayout::F32);
         assert_eq!(reflection.element_byte_width, 4);
         assert_eq!(reflection.element_count, 36);
+        assert_eq!(reflection.stage_io_role, ShaderStageIoRole::Transform);
         assert_eq!(reflection.buffer_byte_len, 144);
         assert_eq!(reflection.source_name.as_deref(), Some("transform"));
     }
@@ -1041,7 +986,7 @@ mod tests {
     fn vertex_entry() -> MirKernelReflection {
         let mut entry = vertex_entry_from_shader_contract(
             MirFunctionId(4),
-            "triga_plane_vertex",
+            "plane_vertex",
             &[ShaderVertexAttribute {
                 semantic: Some("position".to_owned()),
                 location: 0,
@@ -1069,7 +1014,7 @@ mod tests {
     fn fragment_entry() -> MirKernelReflection {
         fragment_entry_from_shader_contract(
             MirFunctionId(5),
-            "triga_plane_fragment",
+            "plane_fragment",
             &[ShaderVarying {
                 semantic: "color".to_owned(),
                 location: 0,
@@ -1140,23 +1085,5 @@ mod tests {
         )
         .expect_err("vertex stage pair without fragment must fail closed");
         assert_eq!(error.issue, "mir_graphics_pipeline_requires_fragment");
-    }
-
-    /// The legacy Triga pipeline builder shares the fail-closed depth table:
-    /// unknown depth codes error there too, never degrading to `Never`.
-    #[test]
-    fn triga_pipeline_path_errors_on_unknown_depth_code() {
-        let fact = MirTrigaPipelineFact {
-            color_target_format_code: 1,
-            depth_compare_code: Some(99),
-            depth_write_enabled: true,
-            primitive_topology_code: 1,
-            vertex_count: 36,
-        };
-        let error = fact
-            .to_graphics_pipeline_reflection()
-            .expect_err("unknown depth code must error, not degrade to Never");
-        assert_eq!(error.issue, "mir_shader_depth_compare_code_unsupported");
-        assert_eq!(error.detail.as_deref(), Some("99"));
     }
 }
