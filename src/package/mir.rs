@@ -7,7 +7,13 @@
 
 use super::compile::{analyze_package, AnalyzedPackage, AnalyzedPackageUnit};
 use super::import_graph::{resolve_import, ImportResolution};
+use super::library::{
+    library_cached_analysis, library_cached_file_interface, with_library_cached_analysis_mut,
+    LibraryInterfaceCache,
+};
 use super::library_resolver_from_config;
+use super::LibraryImportBinding;
+use crate::library::LibraryResolver;
 use radix::cli::{
     CliCommand, CliDefault, CliExit, CliMode, CliOperand, CliOption, CliProgram, CliType,
 };
@@ -16,7 +22,6 @@ use radix::driver::Config;
 use radix::hir::{
     DefId, HirBlock, HirCallArg, HirCape, HirCasuArm, HirExpression, HirExpressionKind,
     HirItemKind, HirObjectField, HirOptionalChainKind, HirStatement, HirStatementKind,
-    LibraryProvider,
 };
 use radix::lexer::{Interner, Symbol};
 use radix::mir::{
@@ -283,6 +288,18 @@ struct PackageMirLinks {
     calls: NamespaceCallTargets,
     namespaces: NamespaceExports,
     sources: SourceRewrites,
+    /// Library modules linked into the package MIR program. Each is lowered
+    /// alongside package units; its exported functions (including `@ radix
+    /// backward` companions) are reachable through synthetic definition ids.
+    libraries: Vec<LibraryLinkTarget>,
+}
+
+/// One library module lowered into the package MIR program.
+struct LibraryLinkTarget {
+    /// Library source file path; the `source_rewrites` key for this module.
+    path: PathBuf,
+    /// Binding used to load the analyzed program from the library cache.
+    import: LibraryImportBinding,
 }
 
 pub(crate) fn run_package_mir<H: Host + ?Sized>(
@@ -603,14 +620,12 @@ fn with_prepared_package_mir_with_cli_mode_and_consumer<R>(
     {
         return Err(package.diagnostics);
     }
-    if consumer == PackageMirConsumer::Interpreted {
-        if let Some(diagnostics) = library_import_diagnostics(&package) {
-            return Err(diagnostics);
-        }
-    }
     let cli_plan = plan_cli_package(&mut package, argumenta, cli_mode)?;
 
-    let links = local_namespace_call_targets(config, &package, consumer)?;
+    let library_resolver = library_resolver_from_config(config);
+    let mut library_cache = LibraryInterfaceCache::with_config(config);
+    let links =
+        local_namespace_call_targets(&package, consumer, &library_resolver, &mut library_cache)?;
     let entry_index = select_entry_unit(&package)?;
     let entry_path = package.units[entry_index].path.clone();
     let source_paths = package.units.iter().map(|unit| unit.path.clone()).collect();
@@ -621,7 +636,9 @@ fn with_prepared_package_mir_with_cli_mode_and_consumer<R>(
     let mut lowered = lower_package_units(
         &mut package,
         entry_index,
-        &links.sources,
+        &links,
+        &library_resolver,
+        &mut library_cache,
         &cli_plan,
         config.no_fuse,
     )?;
@@ -1436,42 +1453,6 @@ fn select_entry_unit(package: &AnalyzedPackage) -> Result<usize, Vec<Diagnostic>
     }
 }
 
-fn library_import_diagnostics(package: &AnalyzedPackage) -> Option<Vec<Diagnostic>> {
-    let mut diagnostics = Vec::new();
-    for unit in &package.units {
-        // Allow `norma:<kernel-manifest-module>` through: the post-lowering
-        // bridge satisfies those via the in-process stepper kernel. Everything
-        // else (e.g. `norma:chorda`, external libs) still fails closed here.
-        let mut imports = unit
-            .analysis
-            .libraries
-            .bindings
-            .values()
-            .map(|binding| &binding.identity)
-            .filter(|identity| !is_bridged_norma_module(identity))
-            .map(library_identity_label)
-            .collect::<BTreeSet<_>>();
-        diagnostics.extend(imports.pop_first().map(|first| {
-            crate::package_diagnostic_error(format!(
-                "package MIR does not yet support library imports such as `{first}`; use compiled package execution for this surface"
-            ))
-            .with_file(unit.path.display().to_string())
-            .with_arg("issue", "package_mir_library_imports_unsupported")
-            .with_arg("import", first)
-        }));
-    }
-    (!diagnostics.is_empty()).then_some(diagnostics)
-}
-
-/// Whether `identity` is a `norma:<kernel-manifest-module>` import that the
-/// interpreted-package bridge can satisfy through the stepper kernel.
-fn is_bridged_norma_module(identity: &radix::hir::LibraryIdentity) -> bool {
-    let radix::hir::LibraryProvider::Builtin(name) = &identity.provider else {
-        return false;
-    };
-    name == "norma" && is_bridged_norma_import_path(&library_identity_label(identity))
-}
-
 /// Whether an import path string (`norma:solum`) names a kernel-manifest
 /// module the interpreted-package bridge can satisfy. Shared by the
 /// library-import allowlist (identity-based) and the namespace-link pass
@@ -1480,13 +1461,6 @@ fn is_bridged_norma_import_path(path: &str) -> bool {
     path.strip_prefix("norma:")
         .and_then(radix::kernel::resolve_kernel_module_name)
         .is_some()
-}
-
-fn library_identity_label(identity: &radix::hir::LibraryIdentity) -> String {
-    let provider = match &identity.provider {
-        LibraryProvider::Builtin(name) | LibraryProvider::Package(name) => name.as_str(),
-    };
-    format!("{provider}:{}", identity.module_path.join("/"))
 }
 
 /// Bridge interpreted `norma:<kernel-manifest-module>` providers to the
@@ -1536,9 +1510,8 @@ fn bridge_norma_providers_to_kernel(
                     continue;
                 };
                 let Some(module) = radix::kernel::resolve_kernel_module_name(norma_module) else {
-                    // Non-manifest `norma:*` should have been rejected by
-                    // `library_import_diagnostics`; leave as Package and let the
-                    // stepper's `host.provider()` report it unsupported.
+                    // Non-manifest `norma:*` stays as Package; the stepper's
+                    // `host.provider()` reports it unsupported.
                     continue;
                 };
                 let verb = interner.resolve(provider.name);
@@ -3127,11 +3100,11 @@ fn package_mir_runtime_record_i32(value: &MirRuntimeRecordValue) -> Option<i32> 
 }
 
 fn local_namespace_call_targets(
-    config: &Config,
     package: &AnalyzedPackage,
     consumer: PackageMirConsumer,
+    library_resolver: &LibraryResolver,
+    library_cache: &mut LibraryInterfaceCache,
 ) -> Result<PackageMirLinks, Vec<Diagnostic>> {
-    let library_resolver = library_resolver_from_config(config);
     let units_by_path = package
         .units
         .iter()
@@ -3142,6 +3115,9 @@ fn local_namespace_call_targets(
     let mut source_rewrites = HashMap::new();
     let mut next_synthetic = PACKAGE_MIR_SYNTHETIC_DEF_BASE;
     let mut diagnostics = Vec::new();
+    // Linked library modules (deduplicated by source path), consumed by the
+    // lowering pass.
+    let mut linked_libraries: Vec<LibraryLinkTarget> = Vec::new();
 
     for unit in &package.units {
         for item in &unit.analysis.hir.items {
@@ -3150,52 +3126,155 @@ fn local_namespace_call_targets(
             };
             let import_path = unit.analysis.interner.resolve(import.path);
             let resolution =
-                resolve_import(&package.spec, &library_resolver, &unit.path, import_path);
-            let ImportResolution::Local(target_path) = resolution else {
-                if matches!(resolution, ImportResolution::Library(_))
-                    && !is_bridged_norma_import_path(import_path)
-                    && consumer == PackageMirConsumer::Interpreted
-                {
-                    diagnostics.push(
-                        crate::package_diagnostic_error(format!(
-                            "package MIR does not yet support library imports such as `{import_path}`; use compiled package execution for this surface"
-                        ))
-                        .with_file(unit.path.display().to_string())
-                        .with_arg("issue", "package_mir_library_imports_unsupported")
-                        .with_arg("import", import_path),
-                    );
+                resolve_import(&package.spec, library_resolver, &unit.path, import_path);
+            match resolution {
+                ImportResolution::Local(target_path) => {
+                    let Some(sibling) = units_by_path.get(&target_path).copied() else {
+                        continue;
+                    };
+                    for import_item in &import.items {
+                        let binding = unit
+                            .analysis
+                            .interner
+                            .resolve(import_item.alias.unwrap_or(import_item.name));
+                        let exports = unit
+                            .namespace_exports
+                            .get(binding)
+                            .cloned()
+                            .unwrap_or_default()
+                            .into_iter()
+                            .collect::<BTreeSet<_>>();
+                        namespaces.insert((unit.path.clone(), import_item.def_id), exports.clone());
+                        for function in exported_top_level_functions(sibling, &exports) {
+                            let synthetic = *source_rewrites
+                                .entry((sibling.path.clone(), function.def_id))
+                                .or_insert_with(|| {
+                                    let def_id = DefId(next_synthetic);
+                                    next_synthetic += 1;
+                                    def_id
+                                });
+                            targets.insert(
+                                (unit.path.clone(), import_item.def_id, function.name),
+                                synthetic,
+                            );
+                        }
+                    }
                 }
-                continue;
-            };
-            let Some(sibling) = units_by_path.get(&target_path).copied() else {
-                continue;
-            };
-            for import_item in &import.items {
-                let binding = unit
-                    .analysis
-                    .interner
-                    .resolve(import_item.alias.unwrap_or(import_item.name));
-                let exports = unit
-                    .namespace_exports
-                    .get(binding)
-                    .cloned()
-                    .unwrap_or_default()
-                    .into_iter()
-                    .collect::<BTreeSet<_>>();
-                namespaces.insert((unit.path.clone(), import_item.def_id), exports.clone());
-                for function in exported_top_level_functions(sibling, &exports) {
-                    let synthetic = *source_rewrites
-                        .entry((sibling.path.clone(), function.def_id))
-                        .or_insert_with(|| {
-                            let def_id = DefId(next_synthetic);
-                            next_synthetic += 1;
-                            def_id
-                        });
-                    targets.insert(
-                        (unit.path.clone(), import_item.def_id, function.name),
-                        synthetic,
-                    );
+                ImportResolution::Library(module) => {
+                    // Kernel-manifest `norma:*` modules stay on the
+                    // stepper-kernel bridge (`bridge_norma_providers_to_kernel`);
+                    // they are not linked into the program.
+                    if is_bridged_norma_import_path(import_path) {
+                        continue;
+                    }
+                    // Only the interpreted run path links library imports.
+                    // External-target builds keep the previous behavior:
+                    // library calls stay provider-backed and emit as-is.
+                    if consumer != PackageMirConsumer::Interpreted {
+                        continue;
+                    }
+                    let placeholder = LibraryImportBinding {
+                        binding: String::new(),
+                        visibility: radix::syntax::Visibility::Privata,
+                        import_span: radix::lexer::Span::default(),
+                        module: module.clone(),
+                    };
+                    let Ok(interface) = library_cached_file_interface(
+                        &placeholder,
+                        library_resolver,
+                        library_cache,
+                    ) else {
+                        push_library_import_unsupported(
+                            &mut diagnostics,
+                            &unit.path,
+                            import_path,
+                            consumer,
+                        );
+                        continue;
+                    };
+                    let Ok(analysis) =
+                        library_cached_analysis(&placeholder, library_resolver, library_cache)
+                    else {
+                        push_library_import_unsupported(
+                            &mut diagnostics,
+                            &unit.path,
+                            import_path,
+                            consumer,
+                        );
+                        continue;
+                    };
+                    for import_item in &import.items {
+                        let binding = LibraryImportBinding {
+                            binding: unit
+                                .analysis
+                                .interner
+                                .resolve(import_item.alias.unwrap_or(import_item.name))
+                                .to_owned(),
+                            visibility: import.visibility,
+                            import_span: radix::lexer::Span::default(),
+                            module: module.clone(),
+                        };
+                        let exports = interface.exports.keys().cloned().collect::<BTreeSet<_>>();
+                        namespaces.insert((unit.path.clone(), import_item.def_id), exports.clone());
+                        let library_path = module.interface_path.clone();
+                        // Every library function gets a synthetic source so no
+                        // raw def-id from the library's separate def-id space
+                        // leaks into the merged program; only exported names
+                        // become call targets for the consumer.
+                        for item in &analysis.hir.items {
+                            let HirItemKind::Function(function) = &item.kind else {
+                                continue;
+                            };
+                            let name = analysis.interner.resolve(function.name).to_owned();
+                            let synthetic = *source_rewrites
+                                .entry((library_path.clone(), item.def_id))
+                                .or_insert_with(|| {
+                                    let def_id = DefId(next_synthetic);
+                                    next_synthetic += 1;
+                                    def_id
+                                });
+                            if exports.contains(&name) {
+                                targets.insert(
+                                    (unit.path.clone(), import_item.def_id, name),
+                                    synthetic,
+                                );
+                            }
+                        }
+                        // `@ radix backward` companions: compiler-generated
+                        // functions with no HIR item; the companion `DefId` is
+                        // the source key the generated MIR carries.
+                        for (_, backward) in analysis.radix_lanes.iter_backward() {
+                            let name = analysis
+                                .interner
+                                .resolve(backward.companion_name)
+                                .to_owned();
+                            let synthetic = *source_rewrites
+                                .entry((library_path.clone(), backward.companion_def_id))
+                                .or_insert_with(|| {
+                                    let def_id = DefId(next_synthetic);
+                                    next_synthetic += 1;
+                                    def_id
+                                });
+                            if exports.contains(&name) {
+                                targets.insert(
+                                    (unit.path.clone(), import_item.def_id, name),
+                                    synthetic,
+                                );
+                            }
+                        }
+                        if linked_libraries
+                            .iter()
+                            .all(|target| target.path != module.interface_path)
+                        {
+                            linked_libraries.push(LibraryLinkTarget {
+                                path: module.interface_path.clone(),
+                                import: binding,
+                            });
+                        }
+                    }
                 }
+                ImportResolution::Error(diag) => diagnostics.push(diag),
+                ImportResolution::Unsupported => continue,
             }
         }
     }
@@ -3208,7 +3287,30 @@ fn local_namespace_call_targets(
         calls: targets,
         namespaces,
         sources: source_rewrites,
+        libraries: linked_libraries,
     })
+}
+
+/// Fail-closed diagnostic for a library import the MIR package path cannot
+/// link. Preserves the `package_mir_library_imports_unsupported` identity;
+/// external-target consumers keep the previous silent-skip behavior.
+fn push_library_import_unsupported(
+    diagnostics: &mut Vec<Diagnostic>,
+    unit_path: &Path,
+    import_path: &str,
+    consumer: PackageMirConsumer,
+) {
+    if consumer != PackageMirConsumer::Interpreted {
+        return;
+    }
+    diagnostics.push(
+        crate::package_diagnostic_error(format!(
+            "package MIR does not yet support library imports such as `{import_path}`; use compiled package execution for this surface"
+        ))
+        .with_file(unit_path.display().to_string())
+        .with_arg("issue", "package_mir_library_imports_unsupported")
+        .with_arg("import", import_path),
+    );
 }
 
 struct ExportedFunction {
@@ -3841,7 +3943,9 @@ fn rewrite_non_null_chain(
 fn lower_package_units<'a>(
     package: &'a mut AnalyzedPackage,
     entry_index: usize,
-    source_rewrites: &SourceRewrites,
+    links: &PackageMirLinks,
+    library_resolver: &LibraryResolver,
+    library_cache: &mut LibraryInterfaceCache,
     cli_plan: &CliPackagePlan,
     no_fuse: bool,
 ) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
@@ -3881,20 +3985,97 @@ fn lower_package_units<'a>(
                 imported_dispatch_type_rewrites(rewrite, &source_to_entry_types);
             rewrite_lowered_type_ids(&mut lowered, &dispatch_rewrites);
         }
-        rewrite_program_sources(&mut lowered.program, &unit_path, source_rewrites);
+        rewrite_program_sources(&mut lowered.program, &unit_path, &links.sources);
         ensure_unique_definition_sources(&lowered.program, &unit_path)?;
-        let dispatch_function =
-            selected_cli_dispatch_function(cli_plan, &unit_path, &lowered.program);
+        let dispatch_function = selected_cli_dispatch_function(
+            cli_plan,
+            &unit_path,
+            &lowered.program,
+            &source_interner,
+            &entry.analysis.interner.clone(),
+        );
         pending.push(PendingUnit {
             lowered,
             dispatch_function,
         });
     }
 
+    // Lower linked library modules before the entry lowers, so their symbols
+    // and types can be remapped into the entry's tables without aliasing the
+    // merged program. The lowered library programs are owned (functions +
+    // closure environments); the validation token is rebuilt on the merged
+    // program below.
+    let mut library_parts: Vec<(MirProgram, Vec<MirClosureEnvironment>)> = Vec::new();
+    for library in &links.libraries {
+        let mut diagnostics = Vec::new();
+        with_library_cached_analysis_mut(
+            &library.import,
+            library_resolver,
+            library_cache,
+            |analysis, _cache| {
+                let source_interner = analysis.interner.clone();
+                let bundle = match radix::driver::prepare_air_backward_bundle(analysis) {
+                    Ok(bundle) => bundle,
+                    Err(err) => {
+                        diagnostics.push(mir_lowering_diag(&library.path, err.message));
+                        return Ok(());
+                    }
+                };
+                let mut lowered = match lower_analyzed_unit_with_context(analysis) {
+                    Ok(lowered) => lowered,
+                    Err(errors) => {
+                        diagnostics.extend(
+                            errors
+                                .into_iter()
+                                .map(|error| mir_lowering_diag(&library.path, error.message)),
+                        );
+                        return Ok(());
+                    }
+                };
+                if let Some(bundle) = bundle {
+                    if let Err(err) =
+                        radix::driver::apply_air_backward_bundle(&mut lowered, bundle, no_fuse)
+                    {
+                        diagnostics.push(mir_lowering_diag(&library.path, err.message));
+                        return Ok(());
+                    }
+                }
+                remap_program_text_symbols(
+                    &mut lowered.program,
+                    &source_interner,
+                    &mut entry.analysis.interner,
+                );
+                let source_to_entry_types = import_lowered_semantic_types(
+                    lowered.validated.validation().types,
+                    &mut entry.analysis.types,
+                );
+                rewrite_lowered_type_ids(&mut lowered, &source_to_entry_types);
+                rewrite_program_sources(&mut lowered.program, &library.path, &links.sources);
+                if let Err(errors) =
+                    ensure_unique_definition_sources(&lowered.program, &library.path)
+                {
+                    diagnostics.extend(errors);
+                    return Ok(());
+                }
+                library_parts.push((lowered.program, lowered.closure_environments));
+                Ok(())
+            },
+        )
+        .map_err(|diag| vec![diag])?;
+        if !diagnostics.is_empty() {
+            return Err(diagnostics);
+        }
+    }
+
     let mut merged = lower_unit(entry, &cli_plan.entry_records, no_fuse)?;
     ensure_unique_definition_sources(&merged.program, &entry_path)?;
-    let mut dispatch_function =
-        selected_cli_dispatch_function(cli_plan, &entry_path, &merged.program);
+    let mut dispatch_function = selected_cli_dispatch_function(
+        cli_plan,
+        &entry_path,
+        &merged.program,
+        &merged.interner,
+        &merged.interner,
+    );
 
     for mut unit in pending {
         if let Some(local_id) = unit.dispatch_function {
@@ -3902,6 +4083,10 @@ fn lower_package_units<'a>(
             dispatch_function = Some(MirFunctionId(local_id.0 + offset));
         }
         append_shifted_program(&mut merged, &mut unit.lowered);
+        ensure_unique_definition_sources(&merged.program, &entry_path)?;
+    }
+    for (mut program, mut closure_environments) in library_parts {
+        append_shifted_parts(&mut merged, &mut program, &mut closure_environments);
         ensure_unique_definition_sources(&merged.program, &entry_path)?;
     }
     rebuild_merged_validated(&mut merged, &entry_path)?;
@@ -3923,19 +4108,25 @@ fn selected_cli_dispatch_function(
     cli_plan: &CliPackagePlan,
     unit_path: &Path,
     program: &MirProgram,
+    dispatch_interner: &Interner,
+    program_interner: &Interner,
 ) -> Option<MirFunctionId> {
     let dispatch = cli_plan.dispatch.as_ref()?;
     if dispatch.unit_path != unit_path {
         return None;
     }
-    find_cli_dispatch_function(program, dispatch.function)
-}
-
-fn find_cli_dispatch_function(program: &MirProgram, function: Symbol) -> Option<MirFunctionId> {
+    // Compare by resolved text: the mounted-command symbol is interned in the
+    // command unit's analysis, while lowered program names are re-interned
+    // into the entry interner during package symbol remapping.
+    let name_text = dispatch_interner.resolve(dispatch.function);
     program
         .functions
         .iter()
-        .find(|candidate| candidate.name == Some(function))
+        .find(|candidate| {
+            candidate
+                .name
+                .is_some_and(|name| program_interner.resolve(name) == name_text)
+        })
         .map(|candidate| candidate.id)
 }
 
@@ -4069,6 +4260,12 @@ fn is_explicit_entry_function(function: &MirFunction, types: &radix::semantic::T
 
 fn remap_program_text_symbols(program: &mut MirProgram, source: &Interner, target: &mut Interner) {
     for function in &mut program.functions {
+        // Function names are symbols from the lowering interner; they must be
+        // remapped too or `MirNames` (built against the merged interner)
+        // resolves a foreign symbol value.
+        if let Some(name) = function.name {
+            function.name = Some(target.intern(source.resolve(name)));
+        }
         for block in &mut function.blocks {
             for statement in &mut block.statements {
                 remap_statement_text_symbols(statement, source, target);
@@ -4611,21 +4808,26 @@ fn lower_unit<'a>(
 }
 
 fn append_shifted_program(merged: &mut LoweredMirUnit<'_>, lowered: &mut LoweredMirUnit<'_>) {
-    let offset = merged.program.functions.len() as u32;
-    shift_program_ids(
+    append_shifted_parts(
+        merged,
         &mut lowered.program,
         &mut lowered.closure_environments,
-        offset,
     );
+}
+
+/// Append owned program parts (functions + closure environments) into the
+/// merged program, shifting function and closure ids past the merged prefix.
+fn append_shifted_parts(
+    merged: &mut LoweredMirUnit<'_>,
+    program: &mut MirProgram,
+    closure_environments: &mut Vec<MirClosureEnvironment>,
+) {
+    let offset = merged.program.functions.len() as u32;
+    shift_program_ids(program, closure_environments, offset);
     // Closure environments are collected on the Vec and folded into a fresh
     // ValidatedMir token after all merges complete (rebuild_merged_validated).
-    merged
-        .closure_environments
-        .append(&mut lowered.closure_environments);
-    merged
-        .program
-        .functions
-        .append(&mut lowered.program.functions);
+    merged.closure_environments.append(closure_environments);
+    merged.program.functions.append(&mut program.functions);
 }
 
 /// Rebuild the validated-MIR token after package merging shifts IDs and

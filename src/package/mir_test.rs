@@ -296,68 +296,17 @@ fn fmir_text_cli_value_type_returns_none_for_list_types() {
     assert!(fmir_text_cli_value_type(&radix::cli::CliType::ListaNumerus).is_none());
 }
 
-// ── library_identity_label ─────────────────────────────────────────────────
+// ── is_bridged_norma_import_path ───────────────────────────────────────────
 
 #[test]
-fn library_identity_label_formats_builtin_provider() {
-    use radix::hir::LibraryProvider;
-    let identity = radix::hir::LibraryIdentity {
-        provider: LibraryProvider::Builtin("norma".to_owned()),
-        module_path: vec!["solum".to_string()],
-    };
-    assert_eq!(library_identity_label(&identity), "norma:solum");
+fn is_bridged_norma_import_path_returns_false_for_non_norma_provider() {
+    assert!(!is_bridged_norma_import_path("faber:solum"));
+    assert!(!is_bridged_norma_import_path("any-pkg:solum"));
 }
 
 #[test]
-fn library_identity_label_formats_package_provider() {
-    use radix::hir::LibraryProvider;
-    let identity = radix::hir::LibraryIdentity {
-        provider: LibraryProvider::Package("my-lib".to_owned()),
-        module_path: vec!["foo".to_string(), "bar".to_string()],
-    };
-    assert_eq!(library_identity_label(&identity), "my-lib:foo/bar");
-}
-
-#[test]
-fn library_identity_label_handles_multi_segment_module_path() {
-    use radix::hir::LibraryProvider;
-    let identity = radix::hir::LibraryIdentity {
-        provider: LibraryProvider::Builtin("norma".to_owned()),
-        module_path: vec!["http".to_string(), "v1".to_string(), "client".to_string()],
-    };
-    assert_eq!(library_identity_label(&identity), "norma:http/v1/client");
-}
-
-// ── is_bridged_norma_module ────────────────────────────────────────────────
-
-#[test]
-fn is_bridged_norma_module_returns_false_for_non_norma_builtin() {
-    use radix::hir::LibraryProvider;
-    let identity = radix::hir::LibraryIdentity {
-        provider: LibraryProvider::Builtin("faber".to_owned()),
-        module_path: vec!["solum".to_string()],
-    };
-    assert!(!is_bridged_norma_module(&identity));
-}
-
-#[test]
-fn is_bridged_norma_module_returns_false_for_package_provider() {
-    use radix::hir::LibraryProvider;
-    let identity = radix::hir::LibraryIdentity {
-        provider: LibraryProvider::Package("any-pkg".to_owned()),
-        module_path: vec!["solum".to_string()],
-    };
-    assert!(!is_bridged_norma_module(&identity));
-}
-
-#[test]
-fn is_bridged_norma_module_returns_true_for_norma_builtin() {
-    use radix::hir::LibraryProvider;
-    let identity = radix::hir::LibraryIdentity {
-        provider: LibraryProvider::Builtin("norma".to_owned()),
-        module_path: vec!["solum".to_string()],
-    };
-    assert!(is_bridged_norma_module(&identity));
+fn is_bridged_norma_import_path_returns_true_for_norma_kernel_module() {
+    assert!(is_bridged_norma_import_path("norma:solum"));
 }
 
 // ── validate_package_mir_manifest ───────────────────────────────────────────

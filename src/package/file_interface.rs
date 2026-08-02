@@ -10,7 +10,7 @@ use radix::hir::{
     DefId, HirConst, HirFunction, HirInterface, HirInterfaceMethod, HirItemKind, HirParamMode,
     HirStruct, HirTypeParamConstraint,
 };
-use radix::semantic::{FuncSig, ParamType, SemanticParamMode, TypeParamConstraint};
+use radix::semantic::{FuncSig, ParamType, SemanticParamMode, Type, TypeParamConstraint};
 use std::collections::BTreeSet;
 
 /// Portable export identity for annotation contracts on library file interfaces.
@@ -118,6 +118,41 @@ pub(crate) fn extract_file_interface_with_identity(
         };
 
         interface.insert(FileExport { name, kind });
+    }
+
+    // `@ radix backward` companions are compiler-generated synthetic functions
+    // with no HIR item, so they never appear in the loop above. Their typed
+    // signature is attached to the companion resolver symbol by radix's
+    // companion-signature pass; snapshot it into the interface so consumers
+    // can call the companion across the import boundary (SEM004).
+    for (_, backward) in analysis.radix_lanes.iter_backward() {
+        let name = analysis
+            .interner
+            .resolve(backward.companion_name)
+            .to_owned();
+        if !public_exports.contains(&name) {
+            continue;
+        }
+        let Some(symbol) = analysis.resolver.get_symbol(backward.companion_def_id) else {
+            continue;
+        };
+        let Some(ty) = symbol.ty else {
+            continue;
+        };
+        let Type::Func(sig) = analysis.types.get(ty) else {
+            continue;
+        };
+        let callable = snapshot_interface_callable_with_resolver(
+            sig,
+            &analysis.types,
+            &analysis.interner,
+            &analysis.resolver,
+        )
+        .map_err(|err| interface_error(file_label, &name, err))?;
+        interface.insert(FileExport {
+            name,
+            kind: FileExportKind::Function(callable),
+        });
     }
 
     Ok(interface)

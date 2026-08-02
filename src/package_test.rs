@@ -8,15 +8,14 @@ use super::{
     analyze_package, build_browser_product, build_browser_product_static_assets,
     build_package_fmir_image, build_package_fmir_text_image, build_package_mir_artifact,
     check_package, compile_package, compile_package_go, config_with_reader_locale,
-    discover_build_layout, discover_package, emit_generated_crate, emit_generated_crate_with_runtime_plan,
-    invoke_cargo_build, library_cached_file_interface,
-    library_resolver_from_config, load_package,
-    load_package_with_reader_pack, package_host_selection_diagnostic, package_rust_runtime_plan,
-    read_manifest, run_package_fmir_image, run_package_fmir_text_image, run_package_mir,
-    run_package_mir_artifact, sanitize_crate_name, use_package_compiler,
-    use_package_compiler_from_args, validate_manifest, verify_library_binding_shapes,
-    verify_library_bindings, with_lowered_package_mir, BuildLayout, LibraryInterfaceCache,
-    ManifestProductEmit, ManifestProductKind, ManifestRustHost,
+    discover_build_layout, discover_package, emit_generated_crate,
+    emit_generated_crate_with_runtime_plan, invoke_cargo_build, library_cached_file_interface,
+    library_resolver_from_config, load_package, load_package_with_reader_pack,
+    package_host_selection_diagnostic, package_rust_runtime_plan, read_manifest,
+    run_package_fmir_image, run_package_fmir_text_image, run_package_mir, run_package_mir_artifact,
+    sanitize_crate_name, use_package_compiler, use_package_compiler_from_args, validate_manifest,
+    verify_library_binding_shapes, verify_library_bindings, with_lowered_package_mir, BuildLayout,
+    LibraryInterfaceCache, ManifestProductEmit, ManifestProductKind, ManifestRustHost,
 };
 use super::{fmir_image_test_summary, fmir_text_image_test_summary};
 use crate::library::{LibraryProviderKind, LibraryResolver, ResolvedLibraryModule};
@@ -35,8 +34,8 @@ use std::process::{Command, Stdio};
 use std::thread;
 use std::time::Duration;
 
-use super::test_support::{test_temp_dir, TestDir};
 use super::product::inject_product_failure_at;
+use super::test_support::{test_temp_dir, TestDir};
 
 fn diagnostic_has_issue(diag: &Diagnostic, issue: &str) -> bool {
     diag.args.contains(&DiagnosticArg::new("issue", issue))
@@ -3891,8 +3890,11 @@ functio dupla(numerus n) → numerus {
 }
 
 #[test]
-fn package_mir_linking_reports_norma_imports_as_unsupported_without_execution() {
-    let dir = test_temp_dir("package-mir-norma-unsupported");
+fn package_mir_linking_executes_norma_source_library_import() {
+    // LIB-MIR: non-bridged `norma:*` source libraries are linked into the
+    // package MIR program and execute. Previously this import failed closed
+    // with `package_mir_library_imports_unsupported`.
+    let dir = test_temp_dir("package-mir-norma-linked");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
@@ -3907,24 +3909,23 @@ incipit {
     .expect("write entry");
 
     let mut host = BufferHost::default();
-    let diagnostics = run_package_mir(
+    let result = run_package_mir(
         &Config::default().with_stdlib(dev_norma_library_home()),
         &entry,
         &mut host,
-    )
-    .expect_err("norma imports should be explicit unsupported package MIR diagnostics");
+    );
 
-    assert!(host.stdout_lines.is_empty());
     assert!(
-        diagnostics
+        result.is_ok(),
+        "norma source-library import should link and run, got {:?}",
+        result
+            .err()
+            .unwrap_or_default()
             .iter()
-            .any(|diag| diagnostic_has_issue(diag, "package_mir_library_imports_unsupported")),
-        "expected package MIR library import diagnostic, got {:?}",
-        diagnostics
-            .iter()
-            .map(|diag| (diag.code, diag.issue()))
+            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
             .collect::<Vec<_>>()
     );
+    assert_eq!(host.stdout_lines, vec!["amor".to_owned()]);
 }
 
 #[test]
@@ -6348,7 +6349,10 @@ source = "components/faber"
     let manifest = read_manifest(&manifest_path).expect("read manifest");
     let err = validate_manifest(&manifest, &manifest_path)
         .expect_err("nested source root must be rejected");
-    assert!(diagnostic_has_issue(&err, "package_member_unsupported_source_root"));
+    assert!(diagnostic_has_issue(
+        &err,
+        "package_member_unsupported_source_root"
+    ));
     assert!(
         err.message.contains("src"),
         "diagnostic must name the supported default, got: {}",
@@ -6385,7 +6389,10 @@ source = "lib"
     let manifest = read_manifest(&manifest_path).expect("read manifest");
     let err =
         validate_manifest(&manifest, &manifest_path).expect_err("depth-1 custom root rejected");
-    assert!(diagnostic_has_issue(&err, "package_member_unsupported_source_root"));
+    assert!(diagnostic_has_issue(
+        &err,
+        "package_member_unsupported_source_root"
+    ));
 }
 
 #[test]
@@ -6408,7 +6415,10 @@ entry = "main.fab"
 
     let spec = discover_package(&dir)
         .expect_err("discovery must reject an unsupported source root before resolution");
-    assert!(diagnostic_has_issue(&spec, "package_member_unsupported_source_root"));
+    assert!(diagnostic_has_issue(
+        &spec,
+        "package_member_unsupported_source_root"
+    ));
 
     let result = compile_package(&Config::default(), &dir);
     assert!(result.output.is_none());
@@ -6511,7 +6521,9 @@ fn load_package_with_reader_pack_rejects_malformed_manifest() {
     let Err(err) = load_package_with_reader_pack(&spec, &resolver, None, false, None) else {
         panic!("malformed manifest must fail loudly on load, not be swallowed");
     };
-    assert!(err.iter().any(|d| diagnostic_has_issue(d, "invalid_package_manifest")));
+    assert!(err
+        .iter()
+        .any(|d| diagnostic_has_issue(d, "invalid_package_manifest")));
 }
 
 #[test]
@@ -10483,9 +10495,7 @@ entry = "main.fab"
     .expect("manifest");
     fs::write(
         dir.join("src/helper.fab"),
-        format!(
-            "functio {func_name}(textus s) → textus {{\n  redde s\n}}\n"
-        ),
+        format!("functio {func_name}(textus s) → textus {{\n  redde s\n}}\n"),
     )
     .expect("helper");
     fs::write(
@@ -10608,7 +10618,10 @@ fn go_compile_repeated_and_nested_calls_do_not_exchange_modules() {
     // Nested: a compile that runs while earlier results are still held keeps
     // its own modules and leaves the earlier results untouched.
     let third = compile_package_go(&Config::default().with_target(Target::Go), &a);
-    assert!(third.compile_result.success(), "repeat of package a compiles");
+    assert!(
+        third.compile_result.success(),
+        "repeat of package a compiles"
+    );
     assert_eq!(third.go_modules.len(), 1);
     assert!(
         third.go_modules[0].1.contains("func alpha")
@@ -10686,8 +10699,14 @@ fn go_compile_concurrent_calls_do_not_exchange_modules() {
     let result_a = handle_a.join().expect("thread a");
     let result_b = handle_b.join().expect("thread b");
 
-    assert!(result_a.compile_result.success(), "concurrent a must compile");
-    assert!(result_b.compile_result.success(), "concurrent b must compile");
+    assert!(
+        result_a.compile_result.success(),
+        "concurrent a must compile"
+    );
+    assert!(
+        result_b.compile_result.success(),
+        "concurrent b must compile"
+    );
     assert!(
         result_a
             .go_modules
@@ -10705,7 +10724,10 @@ fn go_compile_concurrent_calls_do_not_exchange_modules() {
         result_b.go_modules
     );
     assert!(
-        !result_a.go_modules.iter().any(|(_, body)| body.contains("func beta"))
+        !result_a
+            .go_modules
+            .iter()
+            .any(|(_, body)| body.contains("func beta"))
             && !result_b
                 .go_modules
                 .iter()
@@ -11561,8 +11583,7 @@ fn g10_web3_failed_rebuild_keeps_previous_product_usable() {
             "stage {stage}: unexpected error: {}",
             err.message
         );
-        let controllers_after =
-            fs::read_to_string(&build.controllers_json).expect("controllers");
+        let controllers_after = fs::read_to_string(&build.controllers_json).expect("controllers");
         assert_eq!(
             controllers_after, first_controllers,
             "previous product changed at stage {stage}"
@@ -12395,5 +12416,206 @@ incipit {
             "18446744073709551615".to_owned(),
             "9223372036854775808".to_owned()
         ]
+    );
+}
+
+#[test]
+fn library_interface_exports_backward_companion() {
+    // SEM004: `@ radix backward` companions must appear in the library file
+    // interface so consumers can call them across `importa` boundaries
+    // without a mirrored annotation. Covers both the parse-level export-name
+    // collection (program_export_names via package analysis) and the
+    // analyzed-program extractor (companion signature snapshot).
+    let dir = test_temp_dir("gradus-companion-export");
+    fs::create_dir_all(dir.join("src")).expect("create source");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"[package]
+name = "testgrad"
+version = "0.1.0"
+edition = "2026"
+
+[library]
+provider = "testgrad"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+target = "fmir"
+targets = ["fmir"]
+"#,
+    )
+    .expect("write manifest");
+    fs::write(
+        dir.join("src/gradient.fab"),
+        r#"functio nil() → vacuum {
+    tacet
+}
+
+@ radix lane "air"
+@ radix backward "loss_backward"
+functio simple_loss(
+    tensor<f32, [2,2]> x,
+    tensor<f32, [2,2]> w
+) → f32 {
+    fixum tensor<f32, [2,2]> product ← x.multiplica(w)
+    redde product.media()
+}
+"#,
+    )
+    .expect("write module");
+
+    let config = Config {
+        target: radix::codegen::Target::Fmir,
+        ..Config::default()
+    };
+    let package = analyze_package(&config, &dir).expect("analyze library package");
+    assert!(
+        !package.diagnostics.iter().any(radix::Diagnostic::is_error),
+        "expected no analysis errors, got {:?}",
+        package
+            .diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+
+    let gradient = package
+        .units
+        .iter()
+        .find(|unit| unit.module_segments == vec!["gradient".to_owned()])
+        .expect("gradient unit");
+
+    assert!(
+        gradient.export_names.contains(&"loss_backward".to_owned()),
+        "expected companion name in export_names, got {:?}",
+        gradient.export_names
+    );
+
+    let interface = super::file_interface::extract_file_interface_with_identity(
+        &gradient.analysis,
+        &gradient.export_names,
+        "gradient",
+        None,
+    )
+    .expect("extract file interface");
+
+    let export = interface
+        .exports
+        .get("loss_backward")
+        .expect("companion export present in interface");
+    let FileExportKind::Function(callable) = &export.kind else {
+        panic!(
+            "expected function export for companion, got {:?}",
+            export.kind
+        );
+    };
+    // Companion ABI: (tensor x, tensor w, vacuum residual, f32 upstream) → tuple.
+    assert_eq!(
+        callable.params.len(),
+        4,
+        "companion params: {:?}",
+        callable.params
+    );
+    assert!(
+        matches!(
+            callable.ret.as_ref(),
+            radix::file_interface::InterfaceTypeSnapshot::Tuple(_)
+        ),
+        "companion return should snapshot as a tuple, got {:?}",
+        callable.ret
+    );
+}
+
+#[test]
+fn package_mir_runs_library_imported_companion_end_to_end() {
+    // SEM004 + LIB-MIR seam: a consumer importing `testgrad:gradient` calls
+    // the library's exported `@ radix backward` companion across the import
+    // boundary with no mirrored annotation, and the fmir run executes it.
+    let dir = test_temp_dir("package-mir-gradus-seam");
+    let lib_root = dir.join("lib");
+    fs::create_dir_all(lib_root.join("testgrad/src")).expect("create library");
+    fs::write(
+        lib_root.join("testgrad/faber.toml"),
+        r#"[package]
+name = "testgrad"
+version = "0.1.0"
+edition = "2026"
+
+[library]
+provider = "testgrad"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+target = "fmir"
+targets = ["fmir"]
+"#,
+    )
+    .expect("write library manifest");
+    fs::write(
+        lib_root.join("testgrad/src/gradient.fab"),
+        r#"functio nil() → vacuum {
+    tacet
+}
+
+@ radix lane "air"
+@ radix backward "loss_backward"
+functio simple_loss(
+    tensor<f32, [2,2]> x,
+    tensor<f32, [2,2]> w
+) → f32 {
+    fixum tensor<f32, [2,2]> product ← x.multiplica(w)
+    redde product.media()
+}
+"#,
+    )
+    .expect("write library module");
+
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+importa ex "testgrad:gradient" privata gradient
+
+incipit {
+    fixum tensor<f32, []> seed ← vacua
+    fixum lista<f32> data ← [1.0, 2.0, 3.0, 4.0]
+    fixum tensor<f32, [2,2]> x ← seed.strue(data, [2, 2])
+    fixum tensor<f32, [2,2]> w ← seed.strue(data, [2, 2])
+    fixum f32 loss ← gradient.simple_loss(x, w)
+    nota loss
+    fixum f32 upstream ← 1.0
+    fixum _ grads ← gradient.loss_backward(x, w, gradient.nil(), upstream)
+    fixum [_, gw] ← grads
+    nota gw
+}
+"#,
+    )
+    .expect("write entry");
+
+    let config = radix::driver::Config::default()
+        .with_target(radix::codegen::Target::Fmir)
+        .with_stdlib(lib_root);
+    let mut host = BufferHost::default();
+    let result = run_package_mir(&config, &entry, &mut host);
+
+    assert!(
+        result.is_ok(),
+        "library-imported companion should execute, got {:?}",
+        result
+            .err()
+            .unwrap_or_default()
+            .iter()
+            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        host.stdout_lines,
+        vec!["7.5".to_owned(), "[0.25, 0.5, 0.75, 1.0]".to_owned()]
     );
 }

@@ -976,12 +976,51 @@ fn library_interface_items(
 }
 
 pub(crate) fn program_export_names(program: &Program, interner: &Interner) -> Vec<String> {
-    program
-        .statements
-        .iter()
-        .filter(|stmt| !has_private_visibility(&stmt.annotations, interner))
-        .filter_map(|stmt| stmt_export_name(stmt, interner))
-        .collect()
+    let mut names = Vec::new();
+    for stmt in &program.statements {
+        if has_private_visibility(&stmt.annotations, interner) {
+            continue;
+        }
+        if let Some(name) = stmt_export_name(stmt, interner) {
+            names.push(name);
+        }
+        // `@ radix backward` companions are compiler-generated and have no
+        // source statement of their own; their export names are derived from
+        // the annotation so consumers can call them across import boundaries
+        // (SEM004).
+        names.extend(backward_companion_export_names(stmt, interner));
+    }
+    names
+}
+
+/// Companion export names from `@ radix backward "name"` annotations on a
+/// function statement.
+fn backward_companion_export_names(stmt: &radix::syntax::Stmt, interner: &Interner) -> Vec<String> {
+    let StmtKind::Func(decl) = &stmt.kind else {
+        return Vec::new();
+    };
+    let mut names = Vec::new();
+    for annotation in stmt.annotations.iter().chain(decl.annotations.iter()) {
+        let AnnotationKind::Statement(annotation_stmt) = &annotation.kind else {
+            continue;
+        };
+        if interner.resolve(annotation_stmt.name.name) != "radix" {
+            continue;
+        }
+        let mut args = annotation_stmt.args.iter();
+        let Some(radix::lexer::TokenKind::Ident(directive)) = args.next().map(|arg| &arg.kind)
+        else {
+            continue;
+        };
+        if interner.resolve(*directive) != "backward" {
+            continue;
+        }
+        let Some(radix::lexer::TokenKind::String(name)) = args.next().map(|arg| &arg.kind) else {
+            continue;
+        };
+        names.push(interner.resolve(*name).to_owned());
+    }
+    names
 }
 
 pub(crate) fn has_private_visibility(
