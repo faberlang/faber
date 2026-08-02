@@ -760,6 +760,10 @@ mod tests {
     /// Equivalent input through the legacy Triga-facts path and the generic
     /// contract must produce the identical vertex reflection (the JSON sidecar
     /// serializes exactly these fields), proving the round-trip shape.
+    ///
+    /// The legacy path synthesizes the stage-I/O role from the fact's
+    /// canonical source-name spelling (U3-P1 bridge), so the equivalent
+    /// generic contract declares the same role (`position` -> Position).
     #[test]
     fn generic_vertex_entry_matches_triga_facts_path() {
         let generic = vertex_entry_from_shader_contract(
@@ -773,7 +777,7 @@ mod tests {
                     offset_bytes: 0,
                     stride_bytes: 12,
                     step_mode: MirInputStepMode::Vertex,
-                    role: ShaderStageIoRole::Other,
+                    role: ShaderStageIoRole::Position,
                     provenance: provenance(),
                 },
                 ShaderVertexAttribute {
