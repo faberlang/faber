@@ -243,7 +243,13 @@ fn trivia_is_a_standalone_presentation_type() {
         span: span(0),
     };
     let newline = HirTrivia::Newline { span: span(4) };
-    assert!(matches!(comment, HirTrivia::CommentLine { text: Symbol(1), .. }));
+    assert!(matches!(
+        comment,
+        HirTrivia::CommentLine {
+            text: Symbol(1),
+            ..
+        }
+    ));
     assert!(matches!(newline, HirTrivia::Newline { .. }));
 }
 
@@ -259,7 +265,10 @@ fn presentation_equality_is_deterministic() {
         id: HirSourceAnchorId(999),
         span: span(90),
     };
-    assert_ne!(first, changed_end, "program-end identity participates in equality");
+    assert_ne!(
+        first, changed_end,
+        "program-end identity participates in equality"
+    );
 
     let mut reordered = sample_presentation();
     reordered.attachments.reverse();
@@ -274,8 +283,7 @@ fn presentation_equality_is_deterministic() {
 fn postcard_round_trip_preserves_presentation_data() {
     let original = sample_presentation();
     let bytes = postcard::to_allocvec(&original).expect("serialize presentation");
-    let restored: HirPresentation =
-        postcard::from_bytes(&bytes).expect("deserialize presentation");
+    let restored: HirPresentation = postcard::from_bytes(&bytes).expect("deserialize presentation");
     assert_eq!(original, restored);
     // Spot-check that the trivia payload itself round-trips in order.
     assert_eq!(

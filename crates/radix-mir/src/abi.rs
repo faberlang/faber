@@ -1797,8 +1797,11 @@ impl MirKernelSignature {
         interner: Option<&Interner>,
         allow_host_owned_tensor_entry: bool,
     ) -> Result<Self, MirAbiError> {
-        let return_element_ty =
-            buffer_element_type(function.return_ty, validation, allow_host_owned_tensor_entry)?;
+        let return_element_ty = buffer_element_type(
+            function.return_ty,
+            validation,
+            allow_host_owned_tensor_entry,
+        )?;
         let return_element_count = buffer_element_count(function.return_ty, validation)?;
 
         let mut input_resources = Vec::with_capacity(inputs.len());
@@ -3962,7 +3965,10 @@ mod tests {
         assert_eq!(signature.extra_inputs.len(), 1);
         assert_eq!(signature.extra_inputs[0].binding, 1);
         assert_eq!(signature.extra_inputs[0].role, MirKernelResourceRole::Input);
-        assert_eq!(signature.extra_inputs[0].access, MirKernelResourceAccess::Read);
+        assert_eq!(
+            signature.extra_inputs[0].access,
+            MirKernelResourceAccess::Read
+        );
         assert_eq!(signature.extra_inputs[0].element_ty, element_ty);
         assert_eq!(signature.extra_inputs[0].element_count, 4);
         assert_eq!(signature.output.binding, 2);
