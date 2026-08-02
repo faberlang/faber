@@ -1103,8 +1103,9 @@ mod tests {
             workgroup_x: 256,
             partials: 4,
         };
-        let plan = CollectionKernelPlan::from_contract(&signature, &contract, MirCollectionOp::Sum, None)
-            .expect("reduction contract builds a plan");
+        let plan =
+            CollectionKernelPlan::from_contract(&signature, &contract, MirCollectionOp::Sum, None)
+                .expect("reduction contract builds a plan");
         let CollectionKernelPlan::TreeReduction(reduction) = &plan else {
             panic!("expected a tree-reduction plan");
         };
@@ -1138,9 +1139,13 @@ mod tests {
             workgroup_x: 256,
             partials: 4,
         };
-        let plan =
-            CollectionKernelPlan::from_contract(&signature, &contract, MirCollectionOp::TensorMean, None)
-                .expect("mean contract builds a plan");
+        let plan = CollectionKernelPlan::from_contract(
+            &signature,
+            &contract,
+            MirCollectionOp::TensorMean,
+            None,
+        )
+        .expect("mean contract builds a plan");
         let CollectionKernelPlan::TreeReduction(reduction) = &plan else {
             panic!("expected a tree-reduction plan");
         };
@@ -1155,8 +1160,9 @@ mod tests {
             workgroup_x: 1,
             partials: 1,
         };
-        let plan = CollectionKernelPlan::from_contract(&signature, &contract, MirCollectionOp::Sum, None)
-            .expect("single-lane contract builds a plan");
+        let plan =
+            CollectionKernelPlan::from_contract(&signature, &contract, MirCollectionOp::Sum, None)
+                .expect("single-lane contract builds a plan");
         let CollectionKernelPlan::TreeReduction(reduction) = &plan else {
             panic!("expected a tree-reduction plan");
         };
@@ -1179,8 +1185,13 @@ mod tests {
             partials: 4,
         };
         assert!(
-            CollectionKernelPlan::from_contract(&signature, &contract, MirCollectionOp::Append, None)
-                .is_none(),
+            CollectionKernelPlan::from_contract(
+                &signature,
+                &contract,
+                MirCollectionOp::Append,
+                None
+            )
+            .is_none(),
             "a non-reduction op must not produce a reduction plan"
         );
     }
@@ -1237,11 +1248,7 @@ mod tests {
 
     #[test]
     fn matmul_contract_without_shapes_returns_none() {
-        let shapes = MatMulShapes {
-            m: 16,
-            k: 8,
-            n: 32,
-        };
+        let shapes = MatMulShapes { m: 16, k: 8, n: 32 };
         let signature = matmul_signature(shapes, 4, 2);
         let contract = CollectionOpContract::MatMul {
             dispatch_x: 4,
@@ -1273,11 +1280,7 @@ mod tests {
                 &signature,
                 &contract,
                 MirCollectionOp::TensorMatMul,
-                Some(MatMulShapes {
-                    m: 33,
-                    k: 8,
-                    n: 33
-                }),
+                Some(MatMulShapes { m: 33, k: 8, n: 33 }),
             )
             .is_none(),
             "shapes that disagree with the contract dispatch must not build a plan"
@@ -1296,11 +1299,7 @@ mod tests {
                 &signature,
                 &contract,
                 MirCollectionOp::Sum,
-                Some(MatMulShapes {
-                    m: 16,
-                    k: 8,
-                    n: 32
-                }),
+                Some(MatMulShapes { m: 16, k: 8, n: 32 }),
             )
             .is_none(),
             "a reduction op must not produce a matmul plan"
@@ -1322,11 +1321,7 @@ mod tests {
                 &signature,
                 &contract,
                 MirCollectionOp::TensorMatMul,
-                Some(MatMulShapes {
-                    m: 16,
-                    k: 8,
-                    n: 32
-                }),
+                Some(MatMulShapes { m: 16, k: 8, n: 32 }),
             )
             .is_none(),
             "a signature that does not carry the contract must not build a plan"
