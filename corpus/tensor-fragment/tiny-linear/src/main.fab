@@ -1,0 +1,56 @@
++++
+term = "tensor fragment"
+kind = "concept"
+category = "fragment"
+canonical = false
+summary = "Tiny linear inference fragment: y = x·W + b. Proves matmul + bias-add compose through FMIR package path."
+syntax = "faber run --target fmir-bin faber/corpus/tensor-fragment/tiny-linear/"
+related = ["tensor", "matmul", "inference", "fragment"]
++++
+
+# =============================================================================
+# tensor fragment — Tiny linear inference fragment: y = x·W + b.
+# =============================================================================
+#
+# What this teaches:
+#   • Linear inference pipeline — constructing tensors, computing matmul, adding bias
+#   • FMIR package path — proving matmul and bias-add compose through the package target
+#
+# Common mistakes:
+#   • mismatching matrix dimensions for the matmul inner product — [M×K] · [K×N] requires matching K
+#
+# See also: tensor, matmul, inference, fragment
+# =============================================================================
+
+
+
+# tensor fragment — rung 0: tiny linear (y = x·W + b)
+#
+# Shape: input [4×3] · weight [3×2] + bias [4×2] = output [4×2]
+#
+# EXPECTED stdout (hand-computed reference):
+#   W = [[1, 2], [3, 4], [5, 6]]
+#   x = [[1, 1, 1], [2, 2, 2], [3, 3, 3], [4, 4, 4]]
+#   b = [[0.1, 0.2], [0.1, 0.2], [0.1, 0.2], [0.1, 0.2]]
+#   matmul: x·W = [[9, 12], [18, 24], [27, 36], [36, 48]]
+#   final: y = [[9.1, 12.2], [18.1, 24.2], [27.1, 36.2], [36.1, 48.2]]
+
+incipit {
+    fixum lista<f32> flat_w ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    fixum lista<f32> flat_x ← [1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 3.0, 3.0, 3.0, 4.0, 4.0, 4.0]
+    fixum lista<f32> flat_b ← [0.1, 0.2, 0.1, 0.2, 0.1, 0.2, 0.1, 0.2]
+    fixum tf32[] seed ← vacua
+    fixum tf32[3, 2] W ← seed.strue(flat_w, [3, 2])
+    fixum tf32[4, 3] x ← seed.strue(flat_x, [4, 3])
+    fixum tf32[4, 2] b ← seed.strue(flat_b, [4, 2])
+    fixum tf32[4, 2] c ← x.matmul(W)
+    fixum tf32[4, 2] y ← c.addita(b)
+    nota y.accipe([0, 0]) vel 0.0
+    nota y.accipe([0, 1]) vel 0.0
+    nota y.accipe([1, 0]) vel 0.0
+    nota y.accipe([1, 1]) vel 0.0
+    nota y.accipe([2, 0]) vel 0.0
+    nota y.accipe([2, 1]) vel 0.0
+    nota y.accipe([3, 0]) vel 0.0
+    nota y.accipe([3, 1]) vel 0.0
+}

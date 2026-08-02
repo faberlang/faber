@@ -1,0 +1,10 @@
+{
+  "rung": 1,
+  "name": "tiny-linear-device",
+  "dtype": "f32",
+  "shape": [4, 2],
+  "tolerance": 0.00001,
+  "reference": [9.1, 12.2, 18.1, 24.2, 27.1, 36.2, 36.1, 48.2],
+  "output_reference": [9.1, 12.2, 18.1, 24.2, 27.1, 36.2, 36.1, 48.2],
+  "source": "hand-computed stepper reference: y = x·W + b for tiny linear fragment"
+}
