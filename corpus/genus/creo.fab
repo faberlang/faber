@@ -75,8 +75,8 @@ incipit {
 
     nota rectus.accipe()
 
+    # creo clamps to 100
     fixum _ coactus ← Terminus {
-        # creo clamps to 100
         valor = 200
     }
 

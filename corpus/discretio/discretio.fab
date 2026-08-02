@@ -45,10 +45,10 @@ discretio Exitus {
 }
 
 # Discretio with mixed unit and payload variants
+# (Finis is a unit variant — no payload fields)
 discretio Actum {
     Pulsus { numerus x, numerus y }
     Clavis { textus clavis }
-    # unit variant (no payload fields)
     Finis
 }
 
