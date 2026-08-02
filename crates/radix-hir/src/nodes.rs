@@ -1400,7 +1400,10 @@ pub enum HirPattern {
 ///
 /// A dedicated namespace, never overloaded with [`HirId`]. Spans remain
 /// diagnostic/source-map aids; the anchor is the attachment identity.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+///
+/// `Hash` mirrors [`HirId`]: presentation consumers key deterministic maps by
+/// anchor identity.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct HirSourceAnchorId(pub u32);
 
 /// One piece of ordered trivia attached to a source anchor.
