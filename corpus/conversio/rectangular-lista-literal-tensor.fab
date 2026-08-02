@@ -1,0 +1,43 @@
++++
+term = "↦"
+kind = "operator-group"
+category = "conversion"
+canonical = false
+summary = "Rectangular nested lista literal to tensor conversio."
+syntax = "[[...], [...]] ↦ <tensor-type-with-literal-Figura>"
+related = ["↦", "lista", "tensor", "Figura"]
++++
+
+# =============================================================================
+# ↦ — Rectangular nested lista literal to tensor conversio.
+# =============================================================================
+#
+# What this teaches:
+#   • Nested literal to tensor — a rank-2 rectangular `[[...], [...]]` literal converts to a tensor with a matching Figura.
+#   • Compiler flattening — the compiler flattens row-major and lowers through structa.
+#
+# Common mistakes:
+#   • Providing a jagged (non-rectangular) nested lista — the target tensor requires a rectangular shape with uniform row lengths.
+#
+# See also: ↦, lista, tensor, Figura
+# =============================================================================
+
+
+# conversio — rectangular nested lista literal to tensor
+#
+# WHY: both the nested literal and the target Figura witness a complete rank-2
+# shape, so the compiler flattens row-major and lowers through structa.
+
+incipit {
+    fixum tf32[3, 3] grid ← [
+        [0.0, 0.0, 0.0],
+        [1.0, 2.0, 0.0],
+        [0.0, 0.0, 0.0],
+    ] ↦ tf32[3, 3]
+    fixum lista<numerus> dims ← grid.magnitudines()
+    fixum lista<f32> flat ← grid.planata()
+
+    nota dims
+    nota grid.longitudo()
+    nota flat.longitudo()
+}

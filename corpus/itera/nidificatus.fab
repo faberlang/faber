@@ -1,0 +1,65 @@
++++
+term = "itera"
+kind = "keyword"
+category = "control-flow"
+canonical = true
+summary = "Starts a for-each iteration statement."
+syntax = "itera <mode> <expression> <binding> <block>"
+aliases = ["iterate"]
+related = ["ex", "de", "ab"]
++++
+
+# =============================================================================
+# itera — Starts a for-each iteration statement.
+# =============================================================================
+#
+# What this teaches:
+#   • nested iteration — combining `itera ex` and `itera ab` loops for Cartesian products
+#   • multiplication tables and coordinate grids as practical examples
+#
+# Common mistakes:
+#   • Using ab (range iteration) when ex or de is needed for a collection — each nested itera must independently choose the correct mode.
+#
+# See also: ex, de, ab
+# =============================================================================
+
+# itera ex — nested loops (Cartesian product)
+#
+# itera ex <collection> fixum <item> { <body> }
+# itera ab <start>‥<end> fixum <item> { <body> }
+#
+# GRAMMAR:
+#   forInStmt    :← 'itera' 'ex' expr 'fixum' ident block
+#   forRangeStmt :← 'itera' 'ab' rangeExpr 'fixum' ident block
+#
+# EXPECTED OUTPUT:
+#   none — row/col pairs, multiplication table, coordinate grids.
+#
+# BACKEND:
+#   Go backend does not emit nested itera yet — compile-only smoke.
+
+incipit {
+    # Nested lista iteration — 3 × 3 combinations
+    fixum _ rows ← [1, 2, 3]
+    fixum _ cols ← ["A", "B", "C"]
+
+    itera ex rows fixum row {
+        itera ex cols fixum col {
+            nota row, col
+        }
+    }
+
+    # Multiplication table over exclusive ranges 1‥4 (i, j ∈ {1,2,3})
+    itera ab 1‥4 fixum i {
+        itera ab 1‥4 fixum j {
+            nota i, "*", j, "←", i * j
+        }
+    }
+
+    # Nested ranges: 4 × 4 grid of (x, y) with x, y ∈ {0,1,2,3}
+    itera ab 0‥3 fixum x {
+        itera ab 0‥3 fixum y {
+            nota x, y
+        }
+    }
+}

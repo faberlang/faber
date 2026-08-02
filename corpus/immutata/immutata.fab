@@ -1,0 +1,38 @@
++++
+term = "immutata"
+kind = "keyword"
+category = "function"
+canonical = true
+summary = "Marks a function as non-mutating."
+syntax = "functio <name>(...) immutata → <type>"
+related = ["curata", "iacit"]
++++
+# =============================================================================
+# immutata — Marks a function as non-mutating
+# =============================================================================
+#
+# What this teaches:
+#   • Marks a function as non-mutating.
+#   • Related keywords: curata, iacit
+#
+# Common mistakes:
+#   • Mutating state inside an `immutata` function — `immutata` is a non-mutation contract; modifying `in` parameters or external state breaks the contract.
+#
+# See also: curata, iacit
+# =============================================================================
+
+# immutata — immutability contract on functio
+#
+# GRAMMAR:
+#   funcModifier :← 'immutata'
+#
+# EXPECTED OUTPUT:
+#   No incipit — declaration or test-runner surface only.
+#
+# BACKEND:
+#   declaration-only function modifier (whitelist: immutata/immutata.fab).
+#
+
+functio inspecta() immutata → numerus {
+    redde 0
+}

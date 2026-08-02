@@ -1,0 +1,208 @@
+//! Shared MIR type-resolution helpers used by all MIR text probes.
+//!
+//! These helpers walk the semantic `TypeTable` to resolve target-neutral
+//! `MirType` queries: option payload unwrapping, nullable chain bases, constant
+//! type spelling, and place-base type lookup. Each probe maps `MirTypeError`
+//! into its own error type (typically via a `From` impl so `?` auto-converts).
+//!
+//! Projection-aware type resolution stays per-target because projection
+//! lowering is target-specific (LLVM declaration gathering vs Wasm import
+//! gathering produce side effects beyond the result type).
+
+use crate::{
+    MirConstant, MirFunctionId, MirLocalId, MirPlace, MirPlaceBase, MirProgram, MirTempId, MirType,
+};
+use radix_types::{NumericWidth, Primitive, Type, TypeTable};
+
+const MIR_TYPE_RESOLUTION_PREFIX: &str = "MIR type resolution unsupported";
+
+/// Spanless error from shared MIR type resolution.
+///
+/// Probes map this into their own error types at the call boundary. This is
+/// type *resolution* failure (the MIR shape is valid but the probe cannot
+/// determine a type), not validation failure (the MIR is malformed).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MirTypeError {
+    pub message: String,
+    pub issue: &'static str,
+}
+
+impl MirTypeError {
+    pub fn unsupported(shape: impl Into<String>) -> Self {
+        Self {
+            message: format!("{MIR_TYPE_RESOLUTION_PREFIX}: {}", shape.into()),
+            issue: "mir_type_unsupported",
+        }
+    }
+
+    #[must_use]
+    pub fn unknown_function(id: MirFunctionId) -> Self {
+        Self {
+            message: format!("{MIR_TYPE_RESOLUTION_PREFIX}: unknown function f{}", id.0),
+            issue: "mir_type_unknown_function",
+        }
+    }
+
+    #[must_use]
+    pub fn undefined_local(id: MirLocalId) -> Self {
+        Self {
+            message: format!(
+                "{MIR_TYPE_RESOLUTION_PREFIX}: undefined local type l{}",
+                id.0
+            ),
+            issue: "mir_type_undefined_local",
+        }
+    }
+
+    #[must_use]
+    pub fn undefined_temp(id: MirTempId) -> Self {
+        Self {
+            message: format!(
+                "{MIR_TYPE_RESOLUTION_PREFIX}: undefined temp type t{}",
+                id.0
+            ),
+            issue: "mir_type_undefined_temp",
+        }
+    }
+}
+
+impl std::fmt::Display for MirTypeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl std::error::Error for MirTypeError {}
+
+/// Per-function `MirType` lookup for place-base resolution.
+///
+/// Each probe's `FunctionContext` implements this so shared helpers can resolve
+/// local and temp storage types without depending on probe-specific state.
+pub trait MirTypeLookup {
+    fn local_ty(&self, id: MirLocalId) -> Option<MirType>;
+    fn temp_ty(&self, id: MirTempId) -> Option<MirType>;
+}
+
+/// Unwrap one layer of `Option<T>` / nullable `T ∪ nihil` / alias chain to the
+/// payload type. Non-option primitives pass through unchanged so callers can
+/// treat `nihil` and bare payloads uniformly.
+/// # Errors
+/// Returns an error when validation or type resolution fails. See [`MirTypeError`].
+pub fn option_payload_ty(ty: MirType, types: &TypeTable) -> Result<MirType, MirTypeError> {
+    match types.get(ty.semantic_id()) {
+        Type::Option(inner) => Ok(MirType::semantic(*inner)),
+        Type::Union(members) => {
+            let nihil = types.primitive(Primitive::Nihil);
+            members
+                .iter()
+                .find(|member| **member != nihil)
+                .map(|member| MirType::semantic(*member))
+                .ok_or_else(|| MirTypeError::unsupported("nullable union payload type"))
+        }
+        Type::Primitive(Primitive::Nihil) => Ok(ty),
+        Type::Alias(_, target) => option_payload_ty(MirType::semantic(*target), types),
+        Type::Primitive(_) => Ok(ty),
+        other => Err(MirTypeError::unsupported(format!("option type {other:?}"))),
+    }
+}
+
+/// Resolve the inner type of an option-chain projection base.
+///
+/// Infallible: non-option types pass through unchanged. This is used by
+/// projection chains that may start from a nullable base (`foo?.bar`) where the
+/// first projection operates on the payload type.
+#[must_use]
+pub fn option_chain_base_ty(ty: MirType, types: &TypeTable) -> MirType {
+    match types.get(ty.semantic_id()) {
+        Type::Option(inner) => MirType::semantic(*inner),
+        Type::Alias(_, target) => option_chain_base_ty(MirType::semantic(*target), types),
+        _ => ty,
+    }
+}
+
+/// Resolve the `MirType` of a constant.
+///
+/// Function constants resolve to the function's return type via the program's
+/// function table. All other constants map to their primitive type.
+/// # Errors
+/// Returns an error when validation or type resolution fails. See [`MirTypeError`].
+pub fn constant_ty(
+    constant: &MirConstant,
+    types: &TypeTable,
+    program: &MirProgram,
+) -> Result<MirType, MirTypeError> {
+    let primitive = match constant {
+        MirConstant::Int(_) => Primitive::Numerus,
+        MirConstant::UInt(_) => {
+            return Ok(types
+                .find_sized_numeric(Primitive::Numerus, NumericWidth::U64)
+                .map_or_else(
+                    || MirType::semantic(types.primitive(Primitive::Numerus)),
+                    MirType::semantic,
+                ));
+        }
+        MirConstant::Float(_) => Primitive::Fractus,
+        MirConstant::Bool(_) => Primitive::Bivalens,
+        MirConstant::Unit => Primitive::Vacuum,
+        MirConstant::String(_) => Primitive::Textus,
+        MirConstant::Ascii(_) => Primitive::Ascii,
+        MirConstant::Nil => Primitive::Nihil,
+        MirConstant::Octeti(_) => Primitive::Octeti,
+        MirConstant::Regex { .. } => Primitive::Regex,
+        MirConstant::Function(id) => {
+            return program.function_by_id(*id).map_or_else(
+                || Err(MirTypeError::unknown_function(*id)),
+                |function| Ok(function.return_ty),
+            );
+        }
+    };
+    Ok(MirType::semantic(types.primitive(primitive)))
+}
+
+/// Result type for an index projection on a supported collection or text base.
+///
+/// `octeti` follows the same rule as `lista<numerus<u8>>`: index yields the u8
+/// element type. See DEFER-029 / DEFER-030 parity.
+/// # Errors
+/// Returns an error when validation or type resolution fails. See [`MirTypeError`].
+pub fn index_projection_result_ty(
+    base_ty: MirType,
+    types: &TypeTable,
+) -> Result<MirType, MirTypeError> {
+    match types.get(base_ty.semantic_id()) {
+        Type::Array(inner) | Type::Tensor(inner, _) => Ok(MirType::semantic(*inner)),
+        Type::Map(_, value) => Ok(MirType::semantic(*value)),
+        Type::Primitive(Primitive::Textus) => {
+            Ok(MirType::semantic(types.primitive(Primitive::Textus)))
+        }
+        Type::Primitive(Primitive::Octeti) => types
+            .find_sized_numeric(Primitive::Numerus, NumericWidth::U8)
+            .map(MirType::semantic)
+            .ok_or_else(|| MirTypeError::unsupported("octeti element type")),
+        Type::Tuple(_) => Err(MirTypeError::unsupported(
+            "tuple index projection (use tuple_index_projection for physical aggregate tuples)",
+        )),
+        Type::Alias(_, target) => index_projection_result_ty(MirType::semantic(*target), types),
+        _ => Err(MirTypeError::unsupported("index projection base")),
+    }
+}
+
+/// Resolve the base `MirType` of a place (before projections).
+///
+/// Projections are resolved per-target because they depend on target-specific
+/// declaration/import catalogs.
+/// # Errors
+/// Returns an error when validation or type resolution fails. See [`MirTypeError`].
+pub fn place_base_ty(
+    place: &MirPlace,
+    lookup: &impl MirTypeLookup,
+) -> Result<MirType, MirTypeError> {
+    match place.base {
+        MirPlaceBase::Local(id) => lookup
+            .local_ty(id)
+            .ok_or_else(|| MirTypeError::undefined_local(id)),
+        MirPlaceBase::Temp(id) => lookup
+            .temp_ty(id)
+            .ok_or_else(|| MirTypeError::undefined_temp(id)),
+    }
+}

@@ -1,0 +1,42 @@
++++
+term = "string"
+kind = "existing-home"
+category = "literal"
+canonical = true
+summary = "Short quoted textus string literals and template application."
+syntax = "\"<text>\""
+aliases = ["\"...\""]
+related = ["block-string", "§", "textus"]
++++
+
+# =============================================================================
+# string — Short quoted textus string literals and template application.
+# =============================================================================
+#
+# What this teaches:
+#   • double-quoted string literals `"..."` — the standard textus syntax
+#   • template application with `§` placeholders — `"Salve, §!"(nomen)`
+#
+# Common mistakes:
+#   • Applying template § to ascii or octeti literals — template application works only on textus ("...") string literals.
+#
+# See also: block-string, §, textus
+# =============================================================================
+
+# literalia/textus — "..." string literals
+#
+# GRAMMAR:
+#   stringLit :← '"' ... '"'
+#   templateApp :← stringLit '(' expr (',' expr)* ')'
+#
+# EXPECTED OUTPUT:
+#   Salve, Salve, Mundus!
+
+incipit {
+    fixum _ greeting ← "Salve"
+    nota greeting
+
+    fixum _ nomen ← "Mundus"
+    fixum _ message ← "Salve, §!"(nomen)
+    nota message
+}

@@ -1,0 +1,40 @@
++++
+term = "repete"
+kind = "keyword"
+category = "testing"
+canonical = true
+summary = "Repeats a test a fixed number of times."
+syntax = "repete <number>"
+related = ["fragilis"]
++++
+
+# =============================================================================
+# repete — Repeats a test a fixed number of times.
+# =============================================================================
+#
+# What this teaches:
+#   • Test flakiness mitigation — `repete <N>` runs a test case up to N times
+#     until it passes; useful for non-deterministic or flaky tests
+#   • Declared as a test modifier on `proba`
+#
+# Common mistakes:
+#   • Confusing `repete` (test repetition modifier) with `itera` (loop iterator) or `fac`/`dum` (loop constructs).
+#
+# See also: fragilis
+# =============================================================================
+
+# repete — repeat test modifier
+#
+# GRAMMAR:
+#   testModifier :← 'repete' integer
+#
+# EXPECTED OUTPUT:
+#   No incipit — declaration or test-runner surface only.
+#
+# BACKEND:
+#   declaration-only test modifier (whitelist: repete/repete.fab).
+#
+
+proba "flaky guard" repete 2 {
+    adfirma verum
+}

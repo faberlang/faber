@@ -1,0 +1,50 @@
++++
+term = "regex"
+kind = "conversio"
+category = "literal"
+canonical = true
+summary = "Compile textus patterns to regex via ↦ regex."
+syntax = "<textus> ↦ regex"
+related = ["lege", "conversio", "scriptum"]
++++
+
+# =============================================================================
+# regex — Compile textus patterns to regex via ↦ regex.
+# =============================================================================
+#
+# What this teaches:
+#   • converting textus strings to compiled regex with `↦ regex`
+#   • inline regex flags like `(?i)` for case-insensitive matching
+#   • combining `§` template application with regex conversion for dynamic patterns
+#
+# Common mistakes:
+#   • Forgetting that ↦ regex requires a textus or ascii source — numerus and other types must convert to textus first.
+#
+# See also: lege, conversio, scriptum
+# =============================================================================
+
+# literalia/regex — textus ↦ regex conversio
+#
+# GRAMMAR:
+#   conversio :← stringLit '↦' 'regex'
+#   templateExpr :← stringLit '(' exprList ')'   -- then ↦ regex on the textus result
+#
+# EXPECTED OUTPUT:
+#   Regex pattern diagnostics for literals, inline flags, and a template-built path.
+#
+# BACKEND:
+#   Cross-ref lege/lege.fab for regex beside stdin reads.
+#   Cross-ref scriptum/scriptum.fab for § template application.
+
+incipit {
+    fixum _ digits ← "\d+" ↦ regex
+    nota digits
+
+    fixum _ word ← "(?i)\w+" ↦ regex
+    nota word
+
+    # Template application → textus, then conversio to regex (dynamic path segments)
+    fixum _ tenant ← "acme"
+    fixum _ homePath ← "/home/§/.*"(tenant) ↦ regex
+    nota homePath
+}

@@ -1,0 +1,44 @@
++++
+term = "≈"
+kind = "operator"
+category = "comparison"
+canonical = true
+summary = "Numeric value equality after promotion join — not fuzzy float."
+syntax = "<expression> ≈ <expression> | <expression> ≉ <expression>"
+related = ["≡", "≠", "↦", "adfirma"]
++++
+
+# =============================================================================
+# ≈ — Numeric value equality after promotion join — not fuzzy float.
+# =============================================================================
+#
+# What this teaches:
+#   • Value equality — `≈` promotes numeric types to a common width before comparing.
+#   • Exact comparison — Unlike `≡`, `≈` works across numeric widths (u8 vs i64), but still exact.
+#
+# Common mistakes:
+#   • Expecting ≈ to be fuzzy or approximate — it is exact value equality after promotion.
+#
+# See also: ≡, ≠, ↦, adfirma
+# =============================================================================
+
+# operatores/numeric-value-eq — ≈ ≉
+#
+# WHY: ≡ requires identical types; ≈ promotes numerics then exact-compares.
+# 42.145 ≈ 42 must stay false (no hidden tolerance).
+
+incipit {
+    fixum numerus<u8> port ← 42 ∷ numerus<u8>
+    fixum numerus count ← 42
+    fixum _ same_width ← port ≈ count
+    nota same_width
+
+    fixum _ int_float ← 1 ≈ 1.0
+    nota int_float
+
+    fixum _ not_fuzzy ← 42.145 ∷ fractus<f64> ≈ 42.0 ∷ fractus<f64>
+    nota not_fuzzy
+
+    fixum _ differs ← 1 ≉ 2
+    nota differs
+}

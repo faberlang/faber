@@ -1,0 +1,148 @@
++++
+term = "aut"
+kind = "operator-group"
+category = "logic"
+canonical = true
+summary = "Combines boolean expressions with logical or."
+syntax = "<expression> aut <expression>"
+aliases = ["or"]
+related = ["et", "vel", "⊻"]
++++
+
+
+# =============================================================================
+# aut — Combines boolean expressions with logical or.
+# =============================================================================
+#
+# What this teaches:
+#   • Complete binary operator tour — arithmetic (`+ − * / %`), comparison
+#     (`≡ ≠ < >`), logic (`et aut`), nullish coalescing (`vel`), ternary
+#     (`sic/secus`), and bitwise (`∧ ∨ ⊻ ⇐ ⇒`)
+#   • Assignment patterns — explicit assignment (`←`) and postfix increment
+#     (`⊕ ⊖` statements)
+#   • `sit` sugar — compact inference syntax alongside explicit `fixum _`
+#     type inference
+#
+# Common mistakes:
+#   • confusing `≡` (equality comparison) with `=` (structural field init) or `←` (assignment) — each operator has a distinct role
+#
+# See also: et, vel, ⊻
+# =============================================================================
+
+# binarius — binary operators and explicit assignment
+#
+# Covers arithmetic (+ − * / %), comparison (≡ ≠ < >), logic (et aut),
+# nullish coalescing (vel), ternary (sic/secus), bitwise (∧ ∨ ⊻ ⇐ ⇒),
+# explicit assignment (←), and postfix increment (⊕ ⊖ statements).
+#
+# GRAMMAR:
+#   binaryExpr :← expr (arithOp | cmpOp | logicOp | bitwiseOp) expr
+#
+# Inferred result locals below mix fixum _ (explicit infer marker) with sit
+# (compact sugar) so both spellings stay visible in one tour.
+#
+# EXPECTED OUTPUT:
+#   binarius.expected
+
+incipit {
+    # Arithmetica: + - * / %
+    fixum _ summa ← 10 + 5
+    nota summa
+
+    fixum _ differentia ← 10 - 5
+    nota differentia
+
+    sit productum ← 10 * 5
+    nota productum
+
+    sit quotiens ← 10 / 5
+    nota quotiens
+
+    sit reliquum ← 10 % 3
+    nota reliquum
+
+    # Assignatio explicita (compound glyphs removed)
+    varia _ index ← 0
+    index ← index + 10
+    index ⊕
+    index ⊖
+    index ← index * 2
+    nota index
+
+    # Comparationes
+    sit aequalis ← 10 ≡ 10
+    nota aequalis
+
+    sit diversus ← 10 ≠ 5
+    nota diversus
+
+    sit minor ← 5 < 10
+    nota minor
+
+    sit maior ← 10 > 5
+    nota maior
+
+    sit medius ← 0 < 5 et 5 < 10
+    nota medius
+
+    # Logica
+    sit ambo ← verum et verum
+    nota ambo
+
+    sit alterutrum ← falsum aut verum
+    nota alterutrum
+
+    sit neutrum ← falsum et falsum
+    nota neutrum
+
+    sit brevis ← falsum et carum()
+    nota brevis
+
+    # vel
+    fixum textus ∪ nihil nomen ← nihil
+    sit solutum ← nomen vel "defectum"
+    nota solutum
+
+    fixum textus ∪ nihil primum ← nihil
+    fixum textus ∪ nihil secundum ← nihil
+    fixum textus tertium ← "inventum"
+    sit inventum ← primum vel secundum vel tertium
+    nota inventum
+
+    # sic/secus — ternary conditional (sic = "thus", secus = "otherwise")
+    sit aetas ← 25
+    sit condicio ← aetas ≥ 18 sic "adultus" secus "minor"
+    nota condicio
+
+    sit puncta ← 85
+    sit gradus ← puncta ≥ 90 sic "A" secus puncta ≥ 80 sic "B" secus puncta ≥ 70 sic "C" secus "F"
+    nota gradus
+
+    # Bit per bit
+    sit vexilla ← 0b1010
+    sit persona ← 0b1100
+
+    sit coniuncta ← vexilla ∧ persona
+    nota coniuncta
+
+    sit velata ← vexilla ∨ persona
+    nota velata
+
+    sit diversa ← vexilla ⊻ persona
+    nota diversa
+
+    # Motus bit
+    sit sinistra ← 1 ⇐ 4
+    nota sinistra
+
+    sit dextra ← 16 ⇒ 2
+    nota dextra
+
+    sit persona_vacua ← (vexilla ∧ persona) ≡ 0
+    nota persona_vacua
+}
+
+functio carum() → bivalens {
+    nota "hoc non videatur"
+    redde verum
+}

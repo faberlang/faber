@@ -1,0 +1,56 @@
++++
+term = "↦"
+kind = "operator-group"
+category = "conversion"
+canonical = false
+summary = "Truthiness conversion to bivalens."
+syntax = "<expression> ↦ bivalens"
+related = ["↦", "bivalens"]
++++
+
+# =============================================================================
+# ↦ — Truthiness conversion to bivalens.
+# =============================================================================
+#
+# What this teaches:
+#   • Truthiness conversion — converts any expression to bivalens via the ↦ operator, following non-zero, non-empty truthiness rules.
+#   • Syntax shape — `<expr> ↦ bivalens` with the full range of source types (numerus, textus, expressions).
+#
+# Common mistakes:
+#   • Confusing truthiness (`0 ↦ bivalens` = falsum) with an explicit comparison — `↦ bivalens` uses non-zero truthiness, not `≡ 0`.
+#
+# See also: ↦, bivalens
+# =============================================================================
+
+
+# conversio — truthiness conversion to bivalens
+#
+# <expr> ↦ bivalens
+#
+# GRAMMAR:
+#   convertExpr :← expr '↦' 'bivalens'
+#
+# EXPECTED OUTPUT:
+#   falsum
+#   verum
+#   falsum
+#   verum
+#   verum
+#
+# BACKEND:
+#   HIR-direct Rust and MIR-stepper routes must agree for truthiness.
+
+incipit {
+    fixum _ b1 ← 0 ↦ bivalens
+    fixum _ b2 ← 42 ↦ bivalens
+    nota b1
+    nota b2
+
+    fixum _ b3 ← "" ↦ bivalens
+    fixum _ b4 ← "salve" ↦ bivalens
+    nota b3
+    nota b4
+
+    fixum _ habet ← ("123" ↦ numerus ⇥ 0) ↦ bivalens
+    nota habet
+}

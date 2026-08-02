@@ -1,0 +1,35 @@
++++
+term = "ad"
+kind = "endpoint"
+category = "conversio"
+canonical = false
+summary = "ad sermo materialization can drain a stream as vacuum."
+syntax = "ad 'runtime:echo' (payload) ↦ vacuum"
+related = ["ad", "sermo", "vacuum"]
++++
+
+# =============================================================================
+# ad — ad sermo materialization can drain a stream as vacuum.
+# =============================================================================
+#
+# What this teaches:
+#   • Vacuum materialization — `↦ vacuum` drains a sermo stream to completion
+#     without extracting any values
+#   • Side-effect-only consumption — useful when only the connection's side
+#     effects matter, not the returned data
+#
+# Common mistakes:
+#   • confusing ad route syntax — `↦ vacuum` drains the stream to completion and produces no usable value
+#
+# See also: ad, sermo, vacuum
+# =============================================================================
+
+# Exemplar: `sermo ↦ vacuum` drains the stream without extracting data.
+#
+# The exemplar just confirms compilation and no runtime error. `vacuum`
+# means "drain to terminal and ignore payloads."
+
+incipit {
+    fixum _ v ← ad 'runtime:echo' ("salve") ↦ vacuum
+    adfirma verum
+}

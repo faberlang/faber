@@ -1,0 +1,36 @@
++++
+term = "sparsa"
+kind = "type"
+category = "collection"
+canonical = false
+summary = "sparsa rejects non-numeric element types in v1."
+syntax = "sparsa<textus, [N]> — rejected"
+related = ["sparsa", "tensor"]
++++
+
+# =============================================================================
+# sparsa — sparsa rejects non-numeric element types in v1.
+# =============================================================================
+#
+# What this teaches:
+#   • Element type restriction — sparse tensors require numeric element types in v1
+#   • Compile-time guarding — non-numeric declarations are caught before codegen
+#
+# Common mistakes:
+#   • assuming sparse tensors can hold any element type like dense tensors can — sparsa requires numeric elements in v1
+#
+# See also: sparsa, tensor
+# =============================================================================
+
+
+# sparsa non-numeric reject case — expected compile failure
+#
+# WHY: sparse omission requires a zero/default numeric identity in v1.
+#
+# This exemplum intentionally fails to compile; it is registered in the
+# per-backend EXPECTED_FAILURES lists.
+
+incipit {
+    fixum sparsa<textus, [2]> words ← vacua
+    nota words.longitudo()
+}

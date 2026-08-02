@@ -1,0 +1,59 @@
++++
+term = "fac"
+kind = "keyword"
+category = "control-flow"
+canonical = true
+summary = "Starts a scoped do-while style loop."
+syntax = "fac <block> [cape <name> <block>] [dum <condition>]"
+aliases = ["do"]
+related = ["dum", "cape", "clausura", "perge"]
++++
+# =============================================================================
+# fac — Starts a scoped do-while style loop
+# =============================================================================
+#
+# What this teaches:
+#   • Starts a scoped do-while style loop.
+#   • Related keywords: dum, cape, clausura, perge
+#
+# Common mistakes:
+#   • Using `cape` on a non-`fac` block — `cape` only attaches to `fac` statements, not arbitrary blocks.
+#
+# See also: dum, cape, clausura, perge
+# =============================================================================
+
+# fac — try block with cape error handler
+#
+# fac { <body> }
+# cape err { <handler> }
+#
+# GRAMMAR:
+#   facStmt :← 'fac' block 'cape' ident block
+#
+# EXPECTED OUTPUT:
+#   none — success path then simulated failure on attempt 2
+#
+# BACKEND:
+#   Rust/Go: fac/cape not yet emitted — compile-only smoke.
+
+incipit {
+    fac {
+        nota "Block executed successfully"
+    }
+    cape err {
+        nota "Caught error: §"(err.nuntius)
+    }
+
+    # iace on second attempt; cape recovers and prints err.nuntius
+    varia numerus attempts ← 0
+    fac {
+        attempts ← attempts + 1
+        nota "Attempt §"(attempts)
+        si attempts ≡ 2 {
+            iace "Simulated failure"
+        }
+    }
+    cape err {
+        nota "Failed on attempt §: §"(attempts, err.nuntius)
+    }
+}

@@ -1,0 +1,48 @@
++++
+term = "ego"
+kind = "keyword"
+category = "object"
+canonical = true
+summary = "Refers to the current instance inside a method."
+syntax = "ego.<member>"
+aliases = ["self", "this"]
+related = ["generis", "nexum"]
++++
+
+# =============================================================================
+# ego — Refers to the current instance inside a method.
+# =============================================================================
+#
+# What this teaches:
+#   • Self-reference — `ego.<member>` accesses the current instance's fields and methods inside a genus method.
+#   • Method definition — functions defined inside a genus block receive the instance as `ego`.
+#
+# Common mistakes:
+#   • Using `ego` outside a genus method — `ego` is only valid inside methods defined on a genus (SEM008).
+#
+# See also: generis, nexum
+# =============================================================================
+
+# ego — current genus instance reference
+#
+# ego.<field>
+#
+# GRAMMAR:
+#   memberExpr inside genus method :← 'ego' '.' ident
+#
+# EXPECTED OUTPUT:
+#   capsa: prima
+
+genus Capsa {
+    textus titulus
+
+    functio narra() → textus {
+        # ego = the receiver instance
+        redde "capsa: " + ego.titulus
+    }
+}
+
+incipit {
+    fixum _ capsa ← Capsa { titulus = "prima" }
+    nota capsa.narra()
+}

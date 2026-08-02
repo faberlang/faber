@@ -1,0 +1,1465 @@
+//! [`TypeTable`] semantic contract coverage: assignability, equality, snapshots,
+//! and type constructor behavior (bare, sized, instans, collection, atomic,
+//! octeti, sparsa, matrix).
+//!
+//! Includes regression for Option→ignotum assignment (F2 regression) and
+//! bidirectional octeti↔lista<numerus<u8>> unify.
+
+use crate::index::{literal_index_i64s, IndexExpr, IndexId};
+use crate::DefId;
+use crate::InstansPrecision;
+use crate::NumericWidth;
+use crate::TypeId;
+use crate::{
+    collection_type_specs, lookup_collection_type_spec, lookup_primitive_type_spec,
+    primitive_type_specs, CollectionKind, FuncSig, ParamType, Primitive, SemanticParamMode, Type,
+    TypeParamConstraint, TypeTable,
+};
+
+#[test]
+fn allows_assigning_concrete_type_to_ignotum() {
+    let types = TypeTable::new();
+    let textus = types.primitive(Primitive::Textus);
+    let ignotum = types.primitive(Primitive::Ignotum);
+
+    assert!(types.assignable(textus, ignotum));
+}
+
+// F2 regression: Option<iuncta> must be assignable to ignotum.
+// Before the fix the Option→Tuple rejection (line ~633) fired before the
+// ignotum catch-all, so Option<iuncta<...>> → ignotum was rejected.
+#[test]
+fn option_iuncta_assignable_to_ignotum() {
+    let mut types = TypeTable::new();
+    let f32 = types.primitive(Primitive::Fractus);
+    let pair = types.tuple(vec![f32, f32]);
+    let option_pair = types.option(pair);
+    let ignotum = types.primitive(Primitive::Ignotum);
+
+    assert!(types.assignable(option_pair, ignotum));
+    // Sanity: Option→Tuple unwrap is still rejected for concrete destinations.
+    assert!(!types.assignable(option_pair, f32));
+}
+
+#[test]
+fn rejects_assigning_ignotum_to_concrete_type() {
+    let types = TypeTable::new();
+    let ignotum = types.primitive(Primitive::Ignotum);
+    let textus = types.primitive(Primitive::Textus);
+
+    assert!(!types.assignable(ignotum, textus));
+}
+
+#[test]
+fn still_assigns_same_type_id() {
+    let types = TypeTable::new();
+    let ignotum = types.primitive(Primitive::Ignotum);
+
+    assert!(types.assignable(ignotum, ignotum));
+}
+
+#[test]
+fn union_equality_ignores_member_order() {
+    let mut types = TypeTable::new();
+    let textus = types.primitive(Primitive::Textus);
+    let numerus = types.primitive(Primitive::Numerus);
+
+    let first = types.intern(Type::Union(vec![textus, numerus]));
+    let second = types.intern(Type::Union(vec![numerus, textus]));
+
+    assert!(types.equals(first, second));
+}
+
+#[test]
+fn union_equality_still_matches_each_member_once() {
+    let mut types = TypeTable::new();
+    let textus = types.primitive(Primitive::Textus);
+    let numerus = types.primitive(Primitive::Numerus);
+
+    let duplicate_text = types.intern(Type::Union(vec![textus, textus]));
+    let mixed = types.intern(Type::Union(vec![textus, numerus]));
+
+    assert!(!types.equals(duplicate_text, mixed));
+}
+
+#[test]
+fn union_member_sort_key_peels_deep_acyclic_alias_chains() {
+    // REV-3 (AUD-REV residual da1969ca): `union_member_sort_key` capped its
+    // alias peel at 32 hops while `equals`/`type_equal` peel unboundedly, so
+    // a >32-hop acyclic chain made `equals(a, b)` true but `key(a) != key(b)`.
+    // The key now terminates by cycle detection (visited set) and peels
+    // acyclic chains unboundedly — `equals(a, b) ⇒ key(a) == key(b)` is
+    // structural for all acyclic inputs. Pin it with a 40-hop chain.
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let textus = types.primitive(Primitive::Textus);
+
+    // a0 -> numerus, a1 -> a0, ..., a39 -> a38 (40 alias hops, no cycle).
+    let mut chain = Vec::with_capacity(40);
+    let mut inner = numerus;
+    for i in 0..40 {
+        inner = types.intern(Type::Alias(DefId(i), inner));
+        chain.push(inner);
+    }
+
+    // equals peels the whole chain; the key must too, at every depth.
+    for alias in &chain {
+        assert!(types.equals(*alias, numerus));
+        assert_eq!(
+            types.union_member_sort_key(*alias),
+            types.union_member_sort_key(numerus),
+            "equals-true members must share a sort key at any alias depth"
+        );
+    }
+    let deepest = *chain.last().expect("chain has 40 aliases");
+
+    // Lowering sequence (resolve.rs / hir/lower: sort by key, then
+    // dedup_by(equals)). A member sorting between the equals-true pair lets
+    // the redundant alias survive a fixed-hop peel; a structural key cannot
+    // leave it non-adjacent.
+    let mut members = vec![deepest, textus, numerus];
+    members.sort_by_key(|id| (types.union_member_sort_key(*id).0, id.0));
+    members.dedup_by(|a, b| types.equals(*a, *b));
+    assert_eq!(
+        members.len(),
+        2,
+        "redundant alias member must be deduplicated"
+    );
+    assert!(!members.contains(&deepest));
+
+    // Union canonical equality: both spellings compare equal after dedup.
+    let spelled_deep = types.intern(Type::Union(members.clone()));
+    let spelled_plain = types.intern(Type::Union(vec![numerus, textus]));
+    assert!(types.equals(spelled_deep, spelled_plain));
+}
+
+#[test]
+fn type_table_snapshot_round_trips_compound_types_and_indices() {
+    let mut types = TypeTable::new();
+    let textus = types.primitive(Primitive::Textus);
+    let numerus = types.primitive(Primitive::Numerus);
+    let len = types.intern_index(IndexExpr::Literal(3));
+    let tensor = types.tensor_with_shape(numerus, len);
+    let record = types.record([
+        (radix_lexer::Symbol(7), textus),
+        (radix_lexer::Symbol(8), tensor),
+    ]);
+
+    let restored = TypeTable::from_snapshot(types.snapshot()).expect("snapshot should restore");
+
+    assert_eq!(restored.type_count(), types.type_count());
+    assert!(restored.equals(record, record));
+    assert_eq!(restored.get_index(len), &IndexExpr::Literal(3));
+}
+
+#[test]
+fn primitive_from_name_maps_builtin_aliases() {
+    assert_eq!(Primitive::from_name("ascii"), Some(Primitive::Ascii));
+    assert_eq!(Primitive::from_name("textus"), Some(Primitive::Textus));
+    assert_eq!(Primitive::from_name("regex"), Some(Primitive::Regex));
+    assert_eq!(Primitive::from_name("json"), Some(Primitive::Json));
+    assert_eq!(Primitive::from_name("objectum"), Some(Primitive::Ignotum));
+    assert_eq!(Primitive::from_name("quidlibet"), Some(Primitive::Ignotum));
+    assert_eq!(Primitive::from_name("valor"), Some(Primitive::Valor));
+    assert_eq!(Primitive::from_name("instans"), Some(Primitive::Instans));
+    assert_eq!(Primitive::from_name("incognitus"), None);
+}
+
+#[test]
+fn primitive_type_surface_tracks_canonical_rows_and_aliases() {
+    let canonical = primitive_type_specs()
+        .iter()
+        .filter(|spec| spec.canonical)
+        .map(|spec| spec.text)
+        .collect::<Vec<_>>();
+
+    assert!(canonical.contains(&"textus"));
+    assert!(canonical.contains(&"numerus"));
+    assert!(canonical.contains(&"json"));
+    assert!(canonical.contains(&"instans"));
+
+    let objectum = lookup_primitive_type_spec("objectum").expect("objectum alias row");
+    let quidlibet = lookup_primitive_type_spec("quidlibet").expect("quidlibet alias row");
+
+    assert!(!objectum.canonical);
+    assert!(!quidlibet.canonical);
+    assert_eq!(objectum.primitive, Primitive::Ignotum);
+    assert_eq!(quidlibet.primitive, Primitive::Ignotum);
+    assert_eq!(
+        Primitive::from_name("objectum"),
+        Primitive::from_name("ignotum")
+    );
+}
+
+#[test]
+fn instans_precision_types_are_distinct_from_bare_instans() {
+    let mut types = TypeTable::new();
+    let bare = types.primitive(Primitive::Instans);
+    let millis = types.sized_instans(InstansPrecision::Millis);
+    assert!(!types.equals(bare, millis));
+}
+
+#[test]
+fn instans_coarse_to_fine_widening_assignable() {
+    let mut types = TypeTable::new();
+    let bare = types.primitive(Primitive::Instans);
+    let millis = types.sized_instans(InstansPrecision::Millis);
+    let micros = types.sized_instans(InstansPrecision::Micros);
+    let nanos = types.sized_instans(InstansPrecision::Nanos);
+
+    // Coarse → fine: assignable.
+    assert!(types.assignable(bare, millis));
+    assert!(types.assignable(bare, micros));
+    assert!(types.assignable(bare, nanos));
+    assert!(types.assignable(millis, micros));
+    assert!(types.assignable(millis, nanos));
+    assert!(types.assignable(micros, nanos));
+}
+
+#[test]
+fn instans_fine_to_coarse_not_assignable() {
+    let mut types = TypeTable::new();
+    let bare = types.primitive(Primitive::Instans);
+    let millis = types.sized_instans(InstansPrecision::Millis);
+    let micros = types.sized_instans(InstansPrecision::Micros);
+    let nanos = types.sized_instans(InstansPrecision::Nanos);
+
+    // Fine → coarse: not assignable.
+    assert!(!types.assignable(nanos, micros));
+    assert!(!types.assignable(nanos, millis));
+    assert!(!types.assignable(nanos, bare));
+    assert!(!types.assignable(micros, millis));
+    assert!(!types.assignable(micros, bare));
+    assert!(!types.assignable(millis, bare));
+
+    // Same precision is still assignable.
+    assert!(types.assignable(millis, millis));
+    assert!(types.assignable(bare, bare));
+}
+
+#[test]
+fn collection_kind_lowers_collection_types() {
+    let mut types = TypeTable::new();
+    let textus = types.primitive(Primitive::Textus);
+    let numerus = types.primitive(Primitive::Numerus);
+
+    let lista = CollectionKind::Lista.lower(&mut types, &[textus]);
+    let tabula = CollectionKind::Tabula.lower(&mut types, &[textus, numerus]);
+    let copia = CollectionKind::Copia.lower(&mut types, &[textus]);
+
+    assert!(matches!(types.get(lista), Type::Array(inner) if *inner == textus));
+    assert!(
+        matches!(types.get(tabula), Type::Map(key, value) if *key == textus && *value == numerus)
+    );
+    assert!(matches!(types.get(copia), Type::Set(inner) if *inner == textus));
+}
+
+#[test]
+fn collection_kind_lowers_promissum_and_cursor() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let textus = types.primitive(Primitive::Textus);
+
+    let promissum = CollectionKind::Promissum.lower(&mut types, &[numerus]);
+    let cursor = CollectionKind::Cursor.lower(&mut types, &[textus]);
+
+    assert!(matches!(types.get(promissum), Type::Promissum(inner) if *inner == numerus));
+    assert!(matches!(types.get(cursor), Type::Cursor(inner) if *inner == textus));
+}
+
+#[test]
+fn collection_kind_from_name_includes_host_route_collections() {
+    assert_eq!(
+        CollectionKind::from_name("promissum"),
+        Some(CollectionKind::Promissum)
+    );
+    assert_eq!(
+        CollectionKind::from_name("cursor"),
+        Some(CollectionKind::Cursor)
+    );
+    assert_eq!(CollectionKind::from_name("tensor"), None);
+    assert_eq!(CollectionKind::from_name("sparsa"), None);
+}
+
+#[test]
+fn collection_type_surface_tracks_canonical_rows() {
+    let rows = collection_type_specs()
+        .iter()
+        .map(|spec| (spec.text, spec.kind, spec.canonical))
+        .collect::<Vec<_>>();
+
+    assert!(rows.contains(&("lista", CollectionKind::Lista, true)));
+    assert!(rows.contains(&("tabula", CollectionKind::Tabula, true)));
+    assert!(rows.contains(&("promissum", CollectionKind::Promissum, true)));
+    assert_eq!(
+        lookup_collection_type_spec("cursor").map(|spec| spec.kind),
+        Some(CollectionKind::Cursor)
+    );
+    assert_eq!(lookup_collection_type_spec("tensor"), None);
+}
+
+#[test]
+fn sparsa_with_shape_and_format_roundtrip() {
+    let mut types = TypeTable::new();
+    let elem = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let dim2 = types.intern_index(IndexExpr::Literal(2));
+    let dim3 = types.intern_index(IndexExpr::Literal(3));
+    let shape = types.intern_index(IndexExpr::Tuple(vec![dim2, dim3]));
+    let sparsa_id = types.sparsa_with_shape(elem, shape);
+    assert!(matches!(types.get(sparsa_id), Type::Sparsa(e, s) if *e == elem && *s == shape));
+}
+
+#[test]
+fn matrix_with_shape_is_distinct_from_tensor() {
+    let mut types = TypeTable::new();
+    let elem = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let dim2 = types.intern_index(IndexExpr::Literal(2));
+    let dim3 = types.intern_index(IndexExpr::Literal(3));
+    let shape = types.intern_index(IndexExpr::Tuple(vec![dim2, dim3]));
+    let matrix_a = types.matrix_with_shape(elem, shape);
+    let matrix_b = types.matrix_with_shape(elem, shape);
+    let tensor = types.tensor_with_shape(elem, shape);
+
+    assert!(matches!(types.get(matrix_a), Type::Matrix(e, s) if *e == elem && *s == shape));
+    assert!(
+        types.equals(matrix_a, matrix_b),
+        "same element and shape must be equal"
+    );
+    assert!(
+        !types.equals(matrix_a, tensor),
+        "matrix must not equal tensor"
+    );
+    assert!(
+        !types.assignable(matrix_a, tensor),
+        "matrix must not assign to tensor implicitly"
+    );
+    assert!(
+        !types.assignable(tensor, matrix_a),
+        "tensor must not assign to matrix implicitly"
+    );
+}
+
+#[test]
+fn atomic_is_distinct_from_its_element_type() {
+    let mut types = TypeTable::new();
+    let i32 = types.sized_numeric(Primitive::Numerus, NumericWidth::I32);
+    let u32 = types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let atomic_i32_a = types.atomic(i32);
+    let atomic_i32_b = types.atomic(i32);
+    let atomic_u32 = types.atomic(u32);
+
+    assert!(matches!(types.get(atomic_i32_a), Type::Atomic(elem) if *elem == i32));
+    assert!(types.equals(atomic_i32_a, atomic_i32_b));
+    assert!(!types.equals(atomic_i32_a, atomic_u32));
+    assert!(!types.equals(atomic_i32_a, i32));
+    assert!(!types.assignable(i32, atomic_i32_a));
+    assert!(!types.assignable(atomic_i32_a, i32));
+}
+
+#[test]
+fn sized_numeric_widening_assignable_in_type_table() {
+    let mut types = TypeTable::new();
+    let i32 = types.sized_numeric(Primitive::Numerus, NumericWidth::I32);
+    let i64 = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
+    assert!(types.assignable(i32, i64));
+    assert!(!types.assignable(i64, i32));
+}
+
+#[test]
+fn nullable_inner_option_returns_inner() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+
+    let opt_numerus = types.option(numerus);
+    assert_eq!(types.nullable_inner(opt_numerus), Some(numerus));
+}
+
+#[test]
+fn nullable_inner_union_with_nihil_returns_inner() {
+    let mut types = TypeTable::new();
+    let nihil = types.primitive(Primitive::Nihil);
+    let textus = types.primitive(Primitive::Textus);
+
+    let union_nullable = types.intern(Type::Union(vec![textus, nihil]));
+    assert_eq!(types.nullable_inner(union_nullable), Some(textus));
+}
+
+#[test]
+fn nullable_inner_union_without_nihil_returns_none() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let textus = types.primitive(Primitive::Textus);
+
+    let union_plain = types.intern(Type::Union(vec![textus, numerus]));
+    assert_eq!(types.nullable_inner(union_plain), None);
+}
+
+#[test]
+fn nullable_inner_union_multi_arm_with_nihil_returns_none() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let nihil = types.primitive(Primitive::Nihil);
+    let textus = types.primitive(Primitive::Textus);
+
+    let union_multi = types.intern(Type::Union(vec![textus, numerus, nihil]));
+    assert_eq!(types.nullable_inner(union_multi), None);
+}
+
+#[test]
+fn nullable_inner_alias_traverses_to_underlying() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+
+    let opt_numerus = types.option(numerus);
+    let alias = types.intern(Type::Alias(DefId(0), opt_numerus));
+    assert_eq!(types.nullable_inner(alias), Some(numerus));
+}
+
+#[test]
+fn nullable_inner_alias_chain_to_option() {
+    // Multi-hop Alias peel still reaches Option payload (acyclic path).
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let opt = types.option(numerus);
+    let mid = types.intern(Type::Alias(DefId(1), opt));
+    let outer = types.intern(Type::Alias(DefId(2), mid));
+    assert_eq!(types.nullable_inner(outer), Some(numerus));
+}
+
+#[test]
+fn nullable_inner_self_cyclic_alias_returns_none() {
+    // PRP-059 residual: self-referential Alias must fail closed (no stack overflow).
+    let mut types = TypeTable::new();
+    let next = u32::try_from(types.type_count()).expect("type table fits u32");
+    let cyclic = types.intern(Type::Alias(DefId(0), TypeId(next)));
+    assert_eq!(types.nullable_inner(cyclic), None);
+}
+
+#[test]
+fn nullable_inner_mutual_cyclic_aliases_returns_none() {
+    // Two-node Alias cycle A → B → A.
+    let mut types = TypeTable::new();
+    let n = u32::try_from(types.type_count()).expect("type table fits u32");
+    let a = types.intern(Type::Alias(DefId(1), TypeId(n + 1)));
+    let b = types.intern(Type::Alias(DefId(2), TypeId(n)));
+    assert_eq!(a, TypeId(n));
+    assert_eq!(b, TypeId(n + 1));
+    assert_eq!(types.nullable_inner(a), None);
+    assert_eq!(types.nullable_inner(b), None);
+}
+
+#[test]
+fn nullable_inner_non_nullable_primitive_returns_none() {
+    let types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+
+    assert_eq!(types.nullable_inner(numerus), None);
+}
+
+#[test]
+fn nullable_inner_nihil_is_not_a_nullable_carrier() {
+    // `nihil` is the null marker itself, not `Option<T>` / `T ∪ nihil`.
+    // Payload extraction returns None (doc contract; not "unwrap to self").
+    let types = TypeTable::new();
+    let nihil = types.primitive(Primitive::Nihil);
+
+    assert_eq!(types.nullable_inner(nihil), None);
+}
+
+#[test]
+fn octeti_unifies_bidirectionally_with_lista_numerus_u8() {
+    // WHY: `octeti` is semantic sugar for `lista<numerus<u8>>`. Both directions
+    // must be assignable so octeti carries every `lista` method and either slot
+    // accepts the other. See `docs/factory/octeti-unify-lista/goal.md`, DEFER-029.
+    let mut types = TypeTable::new();
+    let octeti = types.primitive(Primitive::Octeti);
+    let u8 = types.sized_numeric(Primitive::Numerus, NumericWidth::U8);
+    let lista_u8 = types.array(u8);
+
+    assert!(
+        types.assignable(octeti, lista_u8),
+        "octeti should widen to lista<numerus<u8>>"
+    );
+    assert!(
+        types.assignable(lista_u8, octeti),
+        "lista<numerus<u8>> should narrow to octeti"
+    );
+}
+
+#[test]
+fn octeti_does_not_unify_with_non_u8_lista() {
+    // WHY: octeti is specifically `lista<numerus<u8>>`, not any lista. Other
+    // element widths and other element types must not silently cross over.
+    let mut types = TypeTable::new();
+    let octeti = types.primitive(Primitive::Octeti);
+    let u16 = types.sized_numeric(Primitive::Numerus, NumericWidth::U16);
+    let lista_u16 = types.array(u16);
+    let numerus = types.primitive(Primitive::Numerus);
+    let lista_numerus = types.array(numerus);
+    let textus = types.primitive(Primitive::Textus);
+    let lista_textus = types.array(textus);
+
+    assert!(!types.assignable(octeti, lista_u16));
+    assert!(!types.assignable(lista_u16, octeti));
+    assert!(!types.assignable(octeti, lista_numerus));
+    assert!(!types.assignable(octeti, lista_textus));
+}
+
+#[test]
+fn find_sized_numeric_returns_existing_intern() {
+    // WHY: codegen holds `&TypeTable` (immutable) and must look up sized
+    // numeric ids without interning. Octeti method routing depends on this.
+    let mut types = TypeTable::new();
+    assert!(types
+        .find_sized_numeric(Primitive::Numerus, NumericWidth::U8)
+        .is_none());
+    let u8 = types.sized_numeric(Primitive::Numerus, NumericWidth::U8);
+    assert_eq!(
+        types.find_sized_numeric(Primitive::Numerus, NumericWidth::U8),
+        Some(u8)
+    );
+    assert!(types
+        .find_sized_numeric(Primitive::Numerus, NumericWidth::U16)
+        .is_none());
+}
+
+#[test]
+fn sparsa_equals_compares_element_and_shape() {
+    let mut types = TypeTable::new();
+    let f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let f64 = types.sized_numeric(Primitive::Fractus, NumericWidth::F64);
+    let lit2 = types.intern_index(IndexExpr::Literal(2));
+    let lit3 = types.intern_index(IndexExpr::Literal(3));
+    let shape_2x3 = types.intern_index(IndexExpr::Tuple(vec![lit2, lit3]));
+    let shape_3x2 = types.intern_index(IndexExpr::Tuple(vec![lit3, lit2]));
+
+    let s1 = types.sparsa_with_shape(f32, shape_2x3);
+    let s2 = types.sparsa_with_shape(f32, shape_2x3);
+    let s3 = types.sparsa_with_shape(f64, shape_2x3);
+    let s4 = types.sparsa_with_shape(f32, shape_3x2);
+    let rank0 = types.rank0_shape();
+    let tensor_f32 = types.tensor_with_shape(f32, rank0);
+
+    assert!(types.equals(s1, s2), "same element and shape must be equal");
+    assert!(!types.equals(s1, s3), "different element must not be equal");
+    assert!(!types.equals(s1, s4), "different shape must not be equal");
+    assert!(!types.equals(s1, tensor_f32), "sparsa != tensor");
+}
+
+// --- PRP-017 / PRP-061 regression: intern hash-cons canonicalization ---
+
+#[test]
+fn intern_canonicalizes_compound_types() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+
+    let first = types.intern(Type::Array(numerus));
+    let second = types.intern(Type::Array(numerus));
+    assert_eq!(
+        first, second,
+        "structurally equal compound types must canonicalize to one TypeId"
+    );
+
+    let opt1 = types.option(numerus);
+    let opt2 = types.option(numerus);
+    assert_eq!(opt1, opt2, "Option canonicalizes");
+
+    let set1 = types.set(numerus);
+    let set2 = types.set(numerus);
+    assert_eq!(set1, set2, "Set canonicalizes");
+
+    let map1 = types.map(numerus, numerus);
+    let map2 = types.map(numerus, numerus);
+    assert_eq!(map1, map2, "Map canonicalizes");
+}
+
+#[test]
+fn intern_hash_cons_union_order_insensitive() {
+    let mut types = TypeTable::new();
+    let textus = types.primitive(Primitive::Textus);
+    let numerus = types.primitive(Primitive::Numerus);
+
+    let before = types.type_count();
+    let first = types.intern(Type::Union(vec![textus, numerus]));
+    let second = types.intern(Type::Union(vec![numerus, textus]));
+    assert_eq!(
+        first, second,
+        "union member order must not allocate a second TypeId under hash-cons"
+    );
+    assert_eq!(
+        types.type_count(),
+        before + 1,
+        "only one union entry is interned"
+    );
+    assert!(types.equals(first, second));
+}
+
+#[test]
+fn equals_is_stable_under_repeated_comparison() {
+    let mut types = TypeTable::new();
+    let textus = types.primitive(Primitive::Textus);
+    let numerus = types.primitive(Primitive::Numerus);
+    let a = types.array(textus);
+    let b = types.array(textus);
+    let c = types.array(numerus);
+
+    assert!(types.equals(a, b));
+    assert!(types.equals(a, b), "memoized equals must remain true");
+    assert!(!types.equals(a, c));
+    assert!(!types.equals(a, c), "memoized equals must remain false");
+}
+
+#[test]
+fn assignable_memo_keeps_directional_answers_stable() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let nihil = types.primitive(Primitive::Nihil);
+    let ignotum = types.primitive(Primitive::Ignotum);
+    let option_numerus = types.option(numerus);
+
+    // Repeated same-direction queries agree (memo hit must not flip answers).
+    assert!(types.assignable(nihil, option_numerus));
+    assert!(
+        types.assignable(nihil, option_numerus),
+        "memoized assignable must remain true"
+    );
+
+    // Directional: `option<T>` does NOT flow into `nihil` even though the
+    // reverse (`nihil` → `option<T>`) is accepted. A min/max-ordered memo key
+    // (the `equals` shape) would conflate the reversed pair and return the
+    // cached wrong answer, so `assignable` keys the memo by (from, to) order.
+    assert!(!types.assignable(option_numerus, nihil));
+    assert!(
+        !types.assignable(option_numerus, nihil),
+        "memoized assignable must remain false"
+    );
+
+    // One-way `ignotum` sink: concrete flows in, unknown does not flow out.
+    assert!(types.assignable(numerus, ignotum));
+    assert!(!types.assignable(ignotum, numerus));
+    assert!(
+        !types.assignable(ignotum, numerus),
+        "directional memo key must not conflate (ignotum, numerus) with (numerus, ignotum)"
+    );
+}
+
+// --- REV-1: assignable memo must not survive a snapshot/restore boundary ---
+//
+// The memo is runtime-only state: `TypeTableSnapshot` serializes the type and
+// index arenas but never the memos, so `from_snapshot` rebuilds
+// `assignable_memo` empty (types.rs). A restored table must recompute every
+// query against its own arena rather than serving an entry cached during the
+// source table's lifetime.
+
+#[test]
+fn assignable_memo_is_rebuilt_fresh_by_snapshot_restore() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let nihil = types.primitive(Primitive::Nihil);
+    let ignotum = types.primitive(Primitive::Ignotum);
+    let option_numerus = types.option(numerus);
+
+    // Populate the memo with directional answers.
+    assert!(types.assignable(nihil, option_numerus));
+    assert!(!types.assignable(option_numerus, nihil));
+    assert!(
+        !types.assignable_memo.borrow().is_empty(),
+        "directional queries must populate the memo"
+    );
+
+    // Snapshot/restore rebuilds the table from the serialized arenas only.
+    // The memo must come back empty so a re-query recomputes against the
+    // restored arena (CTM E.2: "caches rebuilt").
+    let mut restored = TypeTable::from_snapshot(types.snapshot()).expect("snapshot should restore");
+    assert!(
+        restored.assignable_memo.borrow().is_empty(),
+        "restore must rebuild assignable_memo fresh"
+    );
+
+    // Re-query recomputes and agrees with the pre-restore answers.
+    assert!(restored.assignable(nihil, option_numerus));
+    assert!(!restored.assignable(option_numerus, nihil));
+
+    // Append-only arena: interning more types after restore must not flip any
+    // answer computed against the restored arena.
+    let _extra = restored.array(ignotum);
+    assert!(restored.assignable(nihil, option_numerus));
+    assert!(!restored.assignable(option_numerus, nihil));
+}
+
+// --- PRP-017 F2 regression: find_equal uses equals, not raw TypeId == ---
+
+#[test]
+fn find_equal_uses_semantic_equality() {
+    let mut types = TypeTable::new();
+    // Primitive::Numerus and SizedNumeric(Numerus, I64) are semantically equal
+    // (equals returns true) but representationally distinct (derived PartialEq false).
+    let numerus = types.primitive(Primitive::Numerus);
+    let numerus_i64 = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
+    assert!(types.equals(numerus, numerus_i64));
+
+    // Intern Array(numerus).
+    let array_numerus = types.array(numerus);
+
+    // find_equal for Array(numerus_i64) must find the existing Array(numerus)
+    // because equals(numerus, numerus_i64) is true. A raw TypeId == comparison
+    // would miss this because numerus != numerus_i64 as TypeId values.
+    let found = types.find_equal(&Type::Array(numerus_i64));
+    assert_eq!(
+        found,
+        Some(array_numerus),
+        "find_equal must delegate to equals for child TypeId comparison"
+    );
+}
+
+// --- BO-C-1 regression: find_equal memoization (positive-only cache) ---
+
+#[test]
+fn find_equal_memo_hit_returns_stable_id() {
+    let mut types = TypeTable::new();
+    let textus = types.primitive(Primitive::Textus);
+    let array_textus = types.array(textus);
+
+    let first = types.find_equal(&Type::Array(textus));
+    let second = types.find_equal(&Type::Array(textus));
+    assert_eq!(first, Some(array_textus));
+    assert_eq!(
+        second, first,
+        "repeated find_equal for the same candidate must return the same TypeId"
+    );
+}
+
+#[test]
+fn find_equal_memo_no_stale_negative() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+
+    // Candidate absent from the table: two consecutive misses must both be
+    // None — misses are not cached, so a later intern is always observable.
+    let candidate = Type::Array(numerus);
+    assert_eq!(types.find_equal(&candidate), None);
+    assert_eq!(types.find_equal(&candidate), None);
+
+    let array_numerus = types.intern(Type::Array(numerus));
+    assert_eq!(
+        types.find_equal(&candidate),
+        Some(array_numerus),
+        "interning a matching type must not be hidden by a stale negative"
+    );
+}
+
+#[test]
+fn find_equal_memo_semantic_result_preserved() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let numerus_i64 = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
+    assert!(types.equals(numerus, numerus_i64));
+
+    // Arena order matters: Array(numerus_i64) is interned first, so the linear
+    // scan's first semantic match for candidate Array(numerus) is the earlier
+    // coerced entry, not the later structurally-identical Array(numerus). The
+    // memo must cache the scan's own result — an intern_map-style structural
+    // fast path would return the later representative instead and change which
+    // TypeId codegen renders.
+    let array_i64 = types.array(numerus_i64);
+    let array_plain = types.array(numerus);
+    assert_ne!(
+        array_i64, array_plain,
+        "structural entries must stay distinct"
+    );
+
+    let candidate = Type::Array(numerus);
+    let first = types.find_equal(&candidate);
+    assert_eq!(first, Some(array_i64), "first semantic match wins the scan");
+
+    let second = types.find_equal(&candidate);
+    assert_eq!(second, first, "memo must return the cached scan result");
+    assert_ne!(
+        second,
+        Some(array_plain),
+        "must not be an intern_map structural representative"
+    );
+}
+
+// --- PRP-026 regression: snapshot validation ---
+
+#[test]
+fn from_snapshot_rejects_dangling_type_ref() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let _array = types.array(numerus);
+    let mut snap = types.snapshot();
+    let last = snap.types.len() - 1;
+    snap.types[last] = Type::Array(TypeId(u32::MAX));
+    assert!(
+        TypeTable::from_snapshot(snap).is_err(),
+        "snapshot with out-of-bounds TypeId must be rejected"
+    );
+}
+
+#[test]
+fn from_snapshot_rejects_dangling_index_ref() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let shape = types.rank0_shape();
+    let tensor = types.tensor_with_shape(numerus, shape);
+    let mut snap = types.snapshot();
+    if let Type::Tensor(_, ref mut idx) = snap.types[tensor.0 as usize] {
+        *idx = IndexId(u32::MAX);
+    }
+    assert!(
+        TypeTable::from_snapshot(snap).is_err(),
+        "snapshot with out-of-bounds IndexId must be rejected"
+    );
+}
+
+// --- PRP-027 regression: DefId sentinel ---
+
+#[test]
+fn def_id_invalid_is_sentinel() {
+    assert_eq!(DefId::INVALID, DefId(u32::MAX));
+    assert_ne!(DefId::INVALID, DefId(0));
+    assert_ne!(DefId::INVALID, DefId(crate::USER_DEF_ID_BASE));
+}
+
+// --- Edge coverage: emptiness, cross-primitive rejection ---
+
+#[test]
+fn assignable_rejects_cross_primitives() {
+    let types = TypeTable::new();
+    let textus = types.primitive(Primitive::Textus);
+    let numerus = types.primitive(Primitive::Numerus);
+
+    assert!(!types.assignable(textus, numerus));
+    assert!(!types.assignable(numerus, textus));
+    assert!(!types.assignable(textus, types.primitive(Primitive::Fractus)));
+}
+
+#[test]
+fn assignable_accepts_same_primitive() {
+    let types = TypeTable::new();
+    let a = types.primitive(Primitive::Textus);
+    let b = types.primitive(Primitive::Textus);
+
+    assert!(types.assignable(a, b));
+}
+
+#[test]
+fn equals_rejects_cross_primitives() {
+    let types = TypeTable::new();
+    assert!(!types.equals(
+        types.primitive(Primitive::Textus),
+        types.primitive(Primitive::Numerus),
+    ));
+}
+
+#[test]
+fn primitive_from_name_returns_none_for_empty() {
+    assert_eq!(Primitive::from_name(""), None);
+}
+
+#[test]
+fn collection_kind_from_name_returns_none_for_empty() {
+    assert_eq!(CollectionKind::from_name(""), None);
+}
+
+#[test]
+fn sized_numeric_mixed_sign_not_assignable() {
+    let mut types = TypeTable::new();
+    let i8 = types.sized_numeric(Primitive::Numerus, NumericWidth::I8);
+    let u8 = types.sized_numeric(Primitive::Numerus, NumericWidth::U8);
+
+    assert!(!types.assignable(i8, u8));
+    assert!(!types.assignable(u8, i8));
+}
+
+#[test]
+fn type_table_new_seeds_primitives() {
+    // `TypeTable::new` preloads every `Primitive` for stable well-known IDs.
+    let types = TypeTable::new();
+    assert!(types.type_count() > 0);
+    let _ = types.primitive(Primitive::Numerus);
+    let _ = types.primitive(Primitive::Nihil);
+}
+
+#[test]
+fn first_modular_word_width_tracks_intern() {
+    let mut types = TypeTable::new();
+    assert_eq!(types.first_modular_word_width(), None);
+    let _ = types.intern(Type::ModularWord(NumericWidth::U32));
+    assert_eq!(types.first_modular_word_width(), Some(NumericWidth::U32));
+    // Later modular words do not replace the first.
+    let _ = types.intern(Type::ModularWord(NumericWidth::U64));
+    assert_eq!(types.first_modular_word_width(), Some(NumericWidth::U32));
+}
+
+#[test]
+fn first_modular_word_width_restored_from_snapshot() {
+    let mut types = TypeTable::new();
+    let _ = types.intern(Type::ModularWord(NumericWidth::U16));
+    let restored = TypeTable::from_snapshot(types.snapshot()).expect("snapshot");
+    assert_eq!(restored.first_modular_word_width(), Some(NumericWidth::U16));
+}
+
+// --- F-003: Alias wrappers break assignability / numeric carriers ---
+
+#[test]
+fn f003_alias_wrapped_sized_numeric_widening_assignable() {
+    // Intern `Alias(_, SizedNumeric(I32))` vs `Alias(_, SizedNumeric(I64))`;
+    // expect assignable because the alias wrappers should not hide the
+    // underlying numeric carrier widening rule.
+    let mut types = TypeTable::new();
+    let i32_id = types.sized_numeric(Primitive::Numerus, NumericWidth::I32);
+    let i64_id = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
+    let alias_i32 = types.intern(Type::Alias(DefId(1), i32_id));
+    let alias_i64 = types.intern(Type::Alias(DefId(2), i64_id));
+
+    assert!(
+        types.assignable(alias_i32, alias_i64),
+        "F-003: alias-wrapped SizedNumeric I32 must be assignable to alias-wrapped I64"
+    );
+    // Reverse: narrowing is still rejected.
+    assert!(
+        !types.assignable(alias_i64, alias_i32),
+        "F-003: alias-wrapped SizedNumeric I64 must NOT be assignable to I32"
+    );
+}
+
+#[test]
+fn f003_alias_wrapped_numerus_to_fractus_assignable() {
+    // Alias wrapping must not block the bare `numerus → fractus` widening rule.
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let fractus = types.primitive(Primitive::Fractus);
+    let alias_numerus = types.intern(Type::Alias(DefId(3), numerus));
+    let alias_fractus = types.intern(Type::Alias(DefId(4), fractus));
+
+    assert!(
+        types.assignable(alias_numerus, alias_fractus),
+        "F-003: alias-wrapped numerus must be assignable to alias-wrapped fractus"
+    );
+}
+
+#[test]
+fn f003_alias_wrapped_octeti_lista_unify_still_works() {
+    // Alias-wrapped Octeti and lista<numerus<u8>> must still unify bidirectionally.
+    let mut types = TypeTable::new();
+    let octeti = types.primitive(Primitive::Octeti);
+    let u8_id = types.sized_numeric(Primitive::Numerus, NumericWidth::U8);
+    let lista_u8 = types.array(u8_id);
+    let alias_octeti = types.intern(Type::Alias(DefId(5), octeti));
+    let alias_lista_u8 = types.intern(Type::Alias(DefId(6), lista_u8));
+
+    assert!(
+        types.assignable(alias_octeti, alias_lista_u8),
+        "F-003: alias-wrapped octeti must widen to alias-wrapped lista<numerus<u8>>"
+    );
+    assert!(
+        types.assignable(alias_lista_u8, alias_octeti),
+        "F-003: alias-wrapped lista<numerus<u8>> must narrow to alias-wrapped octeti"
+    );
+}
+
+#[test]
+fn f003_alias_wrapped_instans_carrier_assignable() {
+    // Alias wrapping must not block instans coarse→fine widening.
+    let mut types = TypeTable::new();
+    let bare = types.primitive(Primitive::Instans);
+    let millis = types.sized_instans(InstansPrecision::Millis);
+    let alias_bare = types.intern(Type::Alias(DefId(7), bare));
+    let alias_millis = types.intern(Type::Alias(DefId(8), millis));
+
+    assert!(
+        types.assignable(alias_bare, alias_millis),
+        "F-003: alias-wrapped bare instans must be assignable to alias-wrapped instans<ms>"
+    );
+    // Fine→coarse through alias is still rejected.
+    assert!(
+        !types.assignable(alias_millis, alias_bare),
+        "F-003: alias-wrapped instans<ms> must NOT be assignable to alias-wrapped bare instans"
+    );
+}
+
+// --- F-004: FuncSig equals vs PartialEq/Hash disagree on type_params ---
+
+#[test]
+fn f004_func_sig_equals_includes_type_params() {
+    // Two FuncSig values that differ only in type_param names must NOT be
+    // semantically equal because PartialEq includes type_params → distinct
+    // TypeIds. equals must agree: different type_params → not equal.
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let vacuum = types.primitive(Primitive::Vacuum);
+
+    let sig_t = FuncSig {
+        type_params: vec![radix_lexer::Symbol(100)], // "T"
+        type_param_constraints: vec![TypeParamConstraint::Any],
+        params: vec![ParamType {
+            ty: numerus,
+            mode: SemanticParamMode::Owned,
+            optional: false,
+        }],
+        ret: vacuum,
+        err: None,
+        is_async: false,
+        is_generator: false,
+    };
+    let sig_u = FuncSig {
+        type_params: vec![radix_lexer::Symbol(200)], // "U"
+        type_param_constraints: vec![TypeParamConstraint::Any],
+        params: vec![ParamType {
+            ty: numerus,
+            mode: SemanticParamMode::Owned,
+            optional: false,
+        }],
+        ret: vacuum,
+        err: None,
+        is_async: false,
+        is_generator: false,
+    };
+
+    let id_t = types.function(sig_t);
+    let id_u = types.function(sig_u);
+
+    assert_ne!(
+        id_t, id_u,
+        "F-004: f<T> and f<U> must have distinct TypeIds because PartialEq includes type_params"
+    );
+    assert!(
+        !types.equals(id_t, id_u),
+        "F-004: equals must NOT report true when PartialEq-based intern gives distinct TypeIds"
+    );
+}
+
+#[test]
+fn f004_func_sig_equal_when_type_params_match() {
+    // Two FuncSig values with identical type_params must still be equal.
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let vacuum = types.primitive(Primitive::Vacuum);
+
+    let sig_a = FuncSig {
+        type_params: vec![radix_lexer::Symbol(42)], // "T"
+        type_param_constraints: vec![TypeParamConstraint::Any],
+        params: vec![ParamType {
+            ty: numerus,
+            mode: SemanticParamMode::Owned,
+            optional: false,
+        }],
+        ret: vacuum,
+        err: None,
+        is_async: false,
+        is_generator: false,
+    };
+    let sig_b = FuncSig {
+        type_params: vec![radix_lexer::Symbol(42)], // same "T"
+        type_param_constraints: vec![TypeParamConstraint::Any],
+        params: vec![ParamType {
+            ty: numerus,
+            mode: SemanticParamMode::Owned,
+            optional: false,
+        }],
+        ret: vacuum,
+        err: None,
+        is_async: false,
+        is_generator: false,
+    };
+
+    let id_a = types.function(sig_a);
+    let id_b = types.function(sig_b);
+
+    assert_eq!(
+        id_a, id_b,
+        "F-004: identical FuncSig must hash-cons to same TypeId"
+    );
+    assert!(types.equals(id_a, id_b));
+}
+
+// --- F-005: Index u64::MAX clamp ---
+
+#[test]
+fn f005_literal_index_i64s_rejects_u64_max() {
+    // u64::MAX must return None, not silently clamp to i64::MAX.
+    let mut types = TypeTable::new();
+    let max_id = types.intern_index(IndexExpr::Literal(u64::MAX));
+    assert!(
+        literal_index_i64s(max_id, &types).is_none(),
+        "F-005: u64::MAX literal index must not silently clamp to i64::MAX"
+    );
+}
+
+#[test]
+fn f005_literal_index_i64s_still_accepts_i64_max_below() {
+    // Values that DO fit in i64 must still be accepted.
+    let mut types = TypeTable::new();
+    let ok_id = types.intern_index(IndexExpr::Literal(42));
+    assert_eq!(
+        literal_index_i64s(ok_id, &types),
+        Some(vec![42]),
+        "F-005: literal index 42 must still resolve"
+    );
+
+    let max_i64_id = types.intern_index(IndexExpr::Literal(i64::MAX as u64));
+    assert_eq!(
+        literal_index_i64s(max_i64_id, &types),
+        Some(vec![i64::MAX]),
+        "F-005: literal index i64::MAX must still resolve"
+    );
+
+    // i64::MAX + 1 (first value that overflows i64)
+    let overflow_id = types.intern_index(IndexExpr::Literal((i64::MAX as u64) + 1));
+    assert!(
+        literal_index_i64s(overflow_id, &types).is_none(),
+        "F-005: literal index i64::MAX + 1 must return None"
+    );
+}
+
+// --- F-064: nullable_inner counts arms by TypeId not equals ---
+
+#[test]
+fn f064_nullable_inner_union_with_alias_wrapped_nihil() {
+    // Nihil wrapped behind an alias must still be recognized as the null
+    // marker so the single non-null arm is extracted (F-064).
+    let mut types = TypeTable::new();
+    let nihil = types.primitive(Primitive::Nihil);
+    let textus = types.primitive(Primitive::Textus);
+    let alias_nihil = types.intern(Type::Alias(DefId(10), nihil));
+
+    let union_with_alias_nihil = types.intern(Type::Union(vec![textus, alias_nihil]));
+    assert_eq!(
+        types.nullable_inner(union_with_alias_nihil),
+        Some(textus),
+        "F-064: alias-wrapped nihil must still be recognized as null marker"
+    );
+}
+
+#[test]
+fn f064_nullable_inner_alias_wrapped_union_with_aliased_nihil() {
+    // Full chain: union wrapped in alias, with alias-wrapped nihil member.
+    let mut types = TypeTable::new();
+    let nihil = types.primitive(Primitive::Nihil);
+    let textus = types.primitive(Primitive::Textus);
+    let alias_nihil = types.intern(Type::Alias(DefId(11), nihil));
+    let union = types.intern(Type::Union(vec![textus, alias_nihil]));
+    let alias_union = types.intern(Type::Alias(DefId(12), union));
+
+    assert_eq!(
+        types.nullable_inner(alias_union),
+        Some(textus),
+        "F-064: alias-wrapped union with alias-wrapped nihil must still extract payload"
+    );
+}
+
+#[test]
+fn f064_nullable_inner_alias_wrapped_nihil_union_multi_arm_still_returns_none() {
+    // More than one non-nihil member is still not a nullable carrier,
+    // even when nihil is alias-wrapped (F-064).
+    let mut types = TypeTable::new();
+    let nihil = types.primitive(Primitive::Nihil);
+    let textus = types.primitive(Primitive::Textus);
+    let numerus = types.primitive(Primitive::Numerus);
+    let alias_nihil = types.intern(Type::Alias(DefId(13), nihil));
+
+    let union_multi = types.intern(Type::Union(vec![textus, numerus, alias_nihil]));
+    assert_eq!(
+        types.nullable_inner(union_multi),
+        None,
+        "F-064: multi-arm union with alias-wrapped nihil is still not nullable"
+    );
+}
+
+// --- F-065: snapshot nested IndexId unvalidated ---
+
+#[test]
+fn f065_from_snapshot_rejects_dangling_nested_index_ref() {
+    // A snapshot whose IndexExpr::Tuple contains an out-of-bounds IndexId
+    // must be rejected. Pre-F-065 only top-level index refs in Type nodes
+    // were validated; nested Tuple children went unchecked (F-065).
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let dim2 = types.intern_index(IndexExpr::Literal(2));
+    let dim3 = types.intern_index(IndexExpr::Literal(3));
+    let shape_2x3 = types.intern_index(IndexExpr::Tuple(vec![dim2, dim3]));
+    // Intern a tensor to anchor the shape in the snapshot.
+    let _tensor = types.tensor_with_shape(numerus, shape_2x3);
+
+    let mut snap = types.snapshot();
+    // Corrupt the Tuple child: point dim2 to an out-of-bounds IndexId.
+    if let IndexExpr::Tuple(ref mut dims) = snap.indices[shape_2x3.0 as usize] {
+        dims[0] = IndexId(u32::MAX);
+    }
+    assert!(
+        TypeTable::from_snapshot(snap).is_err(),
+        "F-065: snapshot with dangling nested IndexId must be rejected"
+    );
+
+    // Confirm the non-corrupt snapshot still restores.
+    let mut types2 = TypeTable::new();
+    let dim_a = types2.intern_index(IndexExpr::Literal(5));
+    let dim_b = types2.intern_index(IndexExpr::Literal(6));
+    let shape = types2.intern_index(IndexExpr::Tuple(vec![dim_a, dim_b]));
+    let _t2 = types2.tensor_with_shape(types2.primitive(Primitive::Numerus), shape);
+    let snap2 = types2.snapshot();
+    let _restored = TypeTable::from_snapshot(snap2).expect("valid snapshot must restore");
+}
+
+// --- F-066: structural assignability arms ---
+
+#[test]
+fn f066_tuple_covariant_assignable() {
+    // Tuple<i32, i64> must be assignable to Tuple<i64, i64> (pointwise covariant).
+    let mut types = TypeTable::new();
+    let i32 = types.sized_numeric(Primitive::Numerus, NumericWidth::I32);
+    let i64 = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
+    let tuple_i32_i64 = types.tuple(vec![i32, i64]);
+    let tuple_i64_i64 = types.tuple(vec![i64, i64]);
+
+    assert!(
+        types.assignable(tuple_i32_i64, tuple_i64_i64),
+        "F-066: Tuple<i32,i64> must be assignable to Tuple<i64,i64> (element-covariant)"
+    );
+    // Narrowing element → not assignable.
+    assert!(
+        !types.assignable(tuple_i64_i64, tuple_i32_i64),
+        "F-066: Tuple<i64,i64> must NOT be assignable to Tuple<i32,i64> (narrowing element)"
+    );
+}
+
+#[test]
+fn f066_tuple_different_length_not_assignable() {
+    let mut types = TypeTable::new();
+    let i32 = types.sized_numeric(Primitive::Numerus, NumericWidth::I32);
+    let pair = types.tuple(vec![i32, i32]);
+    let triple = types.tuple(vec![i32, i32, i32]);
+
+    assert!(
+        !types.assignable(pair, triple),
+        "F-066: different-length tuples must not be assignable"
+    );
+}
+
+#[test]
+fn f066_applied_invariant_assignable() {
+    // Applied<Vec, [numerus]> is assignable only to itself (invariant).
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let i64 = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
+    let base = types.intern(Type::Struct(DefId(100)));
+    let applied_numerus = types.intern(Type::Applied(base, vec![numerus]));
+    let applied_i64 = types.intern(Type::Applied(base, vec![i64]));
+
+    // numerus == i64 via equals, so Applied should still be equal.
+    assert!(
+        types.equals(applied_numerus, applied_i64),
+        "Applied<numerus> equals Applied<i64> because numerus == i64"
+    );
+    assert!(
+        types.assignable(applied_numerus, applied_i64),
+        "F-066: Applied<numerus> assignable to Applied<i64> via invariant equals"
+    );
+    assert!(
+        types.assignable(applied_numerus, applied_numerus),
+        "F-066: same Applied must be self-assignable"
+    );
+}
+
+#[test]
+fn f066_intervallum_covariant_assignable() {
+    // Intervallum<i32> must be assignable to Intervallum<i64> (covariant bound).
+    let mut types = TypeTable::new();
+    let i32 = types.sized_numeric(Primitive::Numerus, NumericWidth::I32);
+    let i64 = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
+    let inter_i32 = types.intervallum(i32);
+    let inter_i64 = types.intervallum(i64);
+
+    assert!(
+        types.assignable(inter_i32, inter_i64),
+        "F-066: Intervallum<i32> must be assignable to Intervallum<i64> (covariant)"
+    );
+    assert!(
+        !types.assignable(inter_i64, inter_i32),
+        "F-066: Intervallum<i64> must NOT be assignable to Intervallum<i32> (narrowing bound)"
+    );
+}
+
+#[test]
+fn f066_collection_covariant_assignable() {
+    // lista<numerus<i32>> must be assignable to lista<numerus<i64>> (element-covariant).
+    let mut types = TypeTable::new();
+    let i32 = types.sized_numeric(Primitive::Numerus, NumericWidth::I32);
+    let i64 = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
+    let lista_i32 = types.array(i32);
+    let lista_i64 = types.array(i64);
+
+    assert!(
+        types.assignable(lista_i32, lista_i64),
+        "F-066: lista<numerus<i32>> must be assignable to lista<numerus<i64>> (covariant)"
+    );
+    assert!(
+        !types.assignable(lista_i64, lista_i32),
+        "F-066: lista<numerus<i64>> must NOT be assignable to lista<numerus<i32>> (narrowing)"
+    );
+
+    // Set, Promissum, Cursor also covariant.
+    let set_i32 = types.set(i32);
+    let set_i64 = types.set(i64);
+    assert!(types.assignable(set_i32, set_i64));
+    assert!(!types.assignable(set_i64, set_i32));
+
+    let prom_i32 = types.promissum(i32);
+    let prom_i64 = types.promissum(i64);
+    assert!(types.assignable(prom_i32, prom_i64));
+    assert!(!types.assignable(prom_i64, prom_i32));
+
+    let cur_i32 = types.cursor(i32);
+    let cur_i64 = types.cursor(i64);
+    assert!(types.assignable(cur_i32, cur_i64));
+    assert!(!types.assignable(cur_i64, cur_i32));
+}
+
+#[test]
+fn f066_map_covariant_assignable() {
+    // tabula<K1, V1> must be assignable to tabula<K2, V2> when K1→K2 and V1→V2.
+    let mut types = TypeTable::new();
+    let i32 = types.sized_numeric(Primitive::Numerus, NumericWidth::I32);
+    let i64 = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
+    let map_i32_i32 = types.map(i32, i32);
+    let map_i64_i64 = types.map(i64, i64);
+
+    assert!(
+        types.assignable(map_i32_i32, map_i64_i64),
+        "F-066: tabula<i32,i32> must be assignable to tabula<i64,i64> (covariant)"
+    );
+    assert!(
+        !types.assignable(map_i64_i64, map_i32_i32),
+        "F-066: tabula<i64,i64> must NOT be assignable to tabula<i32,i32> (narrowing)"
+    );
+
+    // Mixed: key widens, value narrows → not assignable.
+    let map_i64_i32 = types.map(i64, i32);
+    assert!(
+        !types.assignable(map_i64_i64, map_i64_i32),
+        "F-066: value narrowing alone blocks map assignability"
+    );
+}
+
+#[test]
+fn f066_tensor_vector_matrix_sparsa_element_covariant_shape_invariant() {
+    // tensor<F32, [2,3]> must be assignable to tensor<F64, [2,3]>
+    // (element covariant, shape invariant).
+    let mut types = TypeTable::new();
+    let f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let f64 = types.sized_numeric(Primitive::Fractus, NumericWidth::F64);
+    let dim2 = types.intern_index(IndexExpr::Literal(2));
+    let dim3 = types.intern_index(IndexExpr::Literal(3));
+    let shape_2x3 = types.intern_index(IndexExpr::Tuple(vec![dim2, dim3]));
+    let dim4 = types.intern_index(IndexExpr::Literal(4));
+    let shape_2x4 = types.intern_index(IndexExpr::Tuple(vec![dim2, dim4]));
+
+    let t_f32_2x3 = types.tensor_with_shape(f32, shape_2x3);
+    let t_f64_2x3 = types.tensor_with_shape(f64, shape_2x3);
+    let t_f32_2x4 = types.tensor_with_shape(f32, shape_2x4);
+
+    assert!(
+        types.assignable(t_f32_2x3, t_f64_2x3),
+        "F-066: tensor<F32,[2,3]> must be assignable to tensor<F64,[2,3]> (element covariant)"
+    );
+    assert!(
+        !types.assignable(t_f32_2x3, t_f32_2x4),
+        "F-066: tensor<F32,[2,3]> must NOT be assignable to tensor<F32,[2,4]> (shape invariant)"
+    );
+
+    // Vector: element covariant, width invariant.
+    let v_f32_w2 = types.vector_with_width(f32, dim2);
+    let v_f64_w2 = types.vector_with_width(f64, dim2);
+    let v_f32_w3 = types.vector_with_width(f32, dim3);
+    assert!(types.assignable(v_f32_w2, v_f64_w2));
+    assert!(!types.assignable(v_f32_w2, v_f32_w3));
+
+    // Matrix: element covariant, shape invariant.
+    let m_f32_2x3 = types.matrix_with_shape(f32, shape_2x3);
+    let m_f64_2x3 = types.matrix_with_shape(f64, shape_2x3);
+    let m_f32_2x4 = types.matrix_with_shape(f32, shape_2x4);
+    assert!(types.assignable(m_f32_2x3, m_f64_2x3));
+    assert!(!types.assignable(m_f32_2x3, m_f32_2x4));
+
+    // Sparsa: element covariant, shape invariant.
+    let s_f32_2x3 = types.sparsa_with_shape(f32, shape_2x3);
+    let s_f64_2x3 = types.sparsa_with_shape(f64, shape_2x3);
+    let s_f32_2x4 = types.sparsa_with_shape(f32, shape_2x4);
+    assert!(types.assignable(s_f32_2x3, s_f64_2x3));
+    assert!(!types.assignable(s_f32_2x3, s_f32_2x4));
+}
+
+#[test]
+fn f066_atomic_not_assignable_across_elements() {
+    // Atomic wrappers are storage-sensitive: atomic<i32> must not be assignable
+    // to atomic<i64> even though i32→i64 is widening for bare numerus (F-066
+    // intentional exclusion). Same-TypeId atomic is trivially assignable via
+    // the top-level `equals` fast-path in `assignable`.
+    let mut types = TypeTable::new();
+    let i32 = types.sized_numeric(Primitive::Numerus, NumericWidth::I32);
+    let i64 = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
+    let atomic_i32 = types.atomic(i32);
+    let atomic_i64 = types.atomic(i64);
+
+    assert!(
+        !types.assignable(atomic_i32, atomic_i64),
+        "F-066: atomic<i32> must NOT be assignable to atomic<i64> (storage-sensitive)"
+    );
+    // Same element → same TypeId is trivially assignable (top-level equals).
+    assert!(types.assignable(atomic_i32, atomic_i32));
+
+    // Element type not assignable to atomic wrapper.
+    assert!(!types.assignable(i32, atomic_i32));
+    assert!(!types.assignable(atomic_i32, i32));
+}
+
+#[test]
+fn infallible_promissum_widens_to_failable() {
+    let mut types = TypeTable::new();
+    let textus = types.primitive(Primitive::Textus);
+    let error_ty = types.primitive(Primitive::Textus);
+    let infallible = types.promissum(textus);
+    let failable = types.promissum_failable(textus, error_ty);
+
+    // promissum<T> widens to promissum<T ⇥ E> (numquam bottom channel).
+    assert!(
+        types.assignable(infallible, failable),
+        "infallible promissum<T> must widen to promissum<T ⇥ E>"
+    );
+}
+
+#[test]
+fn failable_promissum_does_not_narrow_to_infallible() {
+    let mut types = TypeTable::new();
+    let textus = types.primitive(Primitive::Textus);
+    let error_ty = types.primitive(Primitive::Textus);
+    let infallible = types.promissum(textus);
+    let failable = types.promissum_failable(textus, error_ty);
+
+    // Failable promises must NOT narrow to infallible (erases alternate channel).
+    assert!(
+        !types.assignable(failable, infallible),
+        "failable promissum<T ⇥ E> must NOT narrow to promissum<T>"
+    );
+}
+
+#[test]
+fn failable_promissum_assignable_checks_both_channels() {
+    let mut types = TypeTable::new();
+    let textus = types.primitive(Primitive::Textus);
+    let numerus = types.primitive(Primitive::Numerus);
+
+    let a = types.promissum_failable(textus, textus);
+    let b = types.promissum_failable(textus, numerus);
+
+    // Alternate channel mismatch: textus not assignable to numerus.
+    assert!(
+        !types.assignable(a, b),
+        "failable promissum assignability must check both channels"
+    );
+
+    // Same channels: assignable.
+    assert!(types.assignable(a, a));
+}

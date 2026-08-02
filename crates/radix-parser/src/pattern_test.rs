@@ -1,0 +1,74 @@
+//! Tests for pattern parsing: path patterns, binding lists, separator syntax, literal patterns.
+//!
+//! Contract: each pattern form parses to the expected `Pattern` variant.
+
+use crate::test_support::parse_ok;
+use radix_syntax::{IfBody, Pattern, PatternBind, StmtKind};
+
+#[test]
+fn parses_path_patterns_with_binding_lists_and_et_separators() {
+    let result = parse_ok(
+        r"
+discerne event {
+    casu Result.Ok fixum payload, error et _ ergo redde payload
+}
+",
+    );
+
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Discerne(stmt) = &program.statements[0].kind else {
+        panic!("expected discerne statement");
+    };
+
+    assert_eq!(stmt.arms.len(), 1);
+    assert_eq!(stmt.arms[0].patterns.len(), 2);
+
+    let Pattern::Path(path) = &stmt.arms[0].patterns[0] else {
+        panic!("expected path pattern");
+    };
+    assert_eq!(path.segments.len(), 2);
+    assert_eq!(result.interner.resolve(path.segments[0].name), "Result");
+    assert_eq!(result.interner.resolve(path.segments[1].name), "Ok");
+
+    let Some(PatternBind::Bindings { bindings, .. }) = &path.bind else {
+        panic!("expected binding list");
+    };
+    assert_eq!(
+        bindings
+            .iter()
+            .map(|binding| result.interner.resolve(binding.name.name))
+            .collect::<Vec<_>>(),
+        ["payload", "error"]
+    );
+
+    assert!(matches!(stmt.arms[0].patterns[1], Pattern::Wildcard(_)));
+    assert!(matches!(stmt.arms[0].body, IfBody::Ergo(_)));
+}
+
+#[test]
+fn parses_ascii_and_octeti_literal_patterns() {
+    let result = parse_ok(
+        r"
+discerne sig {
+    casu 'pg:query' ergo redde 1
+    casu |deadbeef| ergo redde 2
+}
+",
+    );
+
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Discerne(stmt) = &program.statements[0].kind else {
+        panic!("expected discerne statement");
+    };
+    assert_eq!(stmt.arms.len(), 2);
+
+    let Pattern::Literal(radix_syntax::Literal::Ascii(sym), _) = &stmt.arms[0].patterns[0] else {
+        panic!("expected ascii literal pattern");
+    };
+    assert_eq!(result.interner.resolve(*sym), "pg:query");
+
+    let Pattern::Literal(radix_syntax::Literal::Octeti(sym), _) = &stmt.arms[1].patterns[0] else {
+        panic!("expected octeti literal pattern");
+    };
+    assert_eq!(result.interner.resolve(*sym), "deadbeef");
+}

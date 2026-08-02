@@ -1,0 +1,50 @@
++++
+term = "tensor"
+kind = "method"
+category = "collection"
+canonical = false
+summary = "Tensor elementwise arithmetic with addita, subtrahe, and multiplica."
+syntax = "tensor.addita(other) | tensor.subtrahe(other) | tensor.multiplica(other)"
+related = ["tensor", "fractus", "lista"]
++++
+
+# =============================================================================
+# tensor — Tensor elementwise arithmetic with addita, subtrahe, and multiplica.
+# =============================================================================
+#
+# What this teaches:
+#   • Elementwise operations — `addita`, `subtrahe`, and `multiplica` apply per-element
+#   • Broadcast semantics — same-shape operations here; broadcast covered by typecheck tests
+#
+# Common mistakes:
+#   • mixing tensors of different shapes without explicit forma (reshape) or broadcast, or using elementwise ops on non-numeric tensors
+#
+# See also: tensor, fractus, lista
+# =============================================================================
+
+
+
+# tensor elementwise arithmetic — addita, subtrahe, multiplica with broadcast
+#
+# WHY: receiver methods lowered by radix into faber::Tensor<T> kernels. Same-shape
+# add here; broadcast (`[N] + [N,1]`) is covered by the radix typecheck tests and
+# arithmetic-reduction exempla. Result shape is a static, typecheck-time property.
+#
+# EXPECTED stdout:
+#   [1.0, 4.0, 9.0, 16.0]
+
+incipit {
+    fixum lista<f32> flat_a ← [1.0, 2.0, 3.0, 4.0]
+    fixum lista<f32> flat_b ← [10.0, 20.0, 30.0, 40.0]
+    fixum tf32[] seed ← vacua
+
+    varia tf32[2, 2] a ← seed.strue(flat_a, [2, 2])
+    varia tf32[2, 2] b ← seed.strue(flat_b, [2, 2])
+
+    fixum tf32[2, 2] sum ← a.addita(b)
+    fixum tf32[2, 2] diff ← sum.subtrahe(b)
+    fixum tf32[2, 2] prod ← diff.multiplica(a)
+
+    fixum lista<f32> out ← prod.planata()
+    nota out
+}

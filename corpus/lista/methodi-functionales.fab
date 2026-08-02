@@ -1,0 +1,52 @@
++++
+term = "summa"
+kind = "existing-home"
+category = "collection"
+canonical = true
+summary = "Returns the sum of numeric list elements."
+syntax = "<lista>.summa()"
+related = ["prima", "ultima", "lista"]
++++
+
+# =============================================================================
+# summa — Returns the sum of numeric list elements.
+# =============================================================================
+#
+# What this teaches:
+#   • higher-order intrinsics for lists — `filtrata` (filter), `mappata` (map), `reducta` (fold)
+#   • closure syntax with `∴` — inline anonymous functions for collection operations
+#
+# Common mistakes:
+#   • Omitting the initial accumulator value in reducta — reducta requires an explicit seed argument.
+#
+# See also: prima, ultima, lista
+# =============================================================================
+
+# lista<T> higher-order intrinsics
+#
+# res.filtrata(T x ∴ <pred>)                        -- filter
+# res.mappata(T x ∴ <expr>)                         -- map
+# res.reducta((acc, x) ∴ <expr>, init)              -- fold
+#
+# GRAMMAR:
+#   listMethod :← expr '.' ('filtrata' | 'mappata' | 'reducta') '(' closure ')'
+#
+# EXPECTED OUTPUT:
+#   [2, 4]
+#   [2, 4, 6, 8, 10]
+#   15
+#
+# BACKEND: Go e2e whitelist — lista intrinsic methods not yet lowered for Go
+# (whitelist: lista/methodi-functionales.fab).
+
+incipit {
+    fixum _ res ← [1, 2, 3, 4, 5] ∷ lista<numerus>
+
+    fixum _ pares ← res.filtrata(numerus x ∴ x % 2 ≡ 0)
+    fixum _ duplicata ← res.mappata(numerus x ∴ x * 2)
+    fixum _ summa ← res.reducta((numerus collectus, numerus x) ∴ collectus + x, 0)
+
+    nota pares
+    nota duplicata
+    nota summa
+}

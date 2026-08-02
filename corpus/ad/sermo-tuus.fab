@@ -1,0 +1,34 @@
++++
+term = "tuus"
+kind = "method"
+category = "endpoint"
+canonical = true
+summary = "typed inbound sermo stream view"
+related = ["ad", "sermo", "scrinium", "cursor"]
++++
+
+# =============================================================================
+# tuus — typed inbound sermo stream view.
+# =============================================================================
+#
+# What this teaches:
+#   • Typed inbound stream — `s.tuus<T>()` creates a typed view over the
+#     incoming frames of a sermo connection
+#   • Cursor consumption — cursor() yields frames that can be iterated with
+#     `itera ex`
+#
+# Common mistakes:
+#   • confusing ad route syntax — accessing `tuus<T>` stream after `fini()` has been called leaves no usable data
+#
+# See also: ad, sermo, scrinium, cursor
+# =============================================================================
+
+# sermo.tuus<T>() — typed inbound frame stream
+
+incipit {
+    fixum _ s ← ad 'runtime:echo' ("salve")
+
+    itera ex s.tuus<textus>().cursor() fixum frame {
+        adfirma frame.data ≡ "salve"
+    }
+}

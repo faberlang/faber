@@ -1,0 +1,30 @@
++++
+term = "vector"
+kind = "kernel"
+category = "gpu"
+summary = "vector cross product lowers for GPU text emit"
++++
+
+# =============================================================================
+# vector — vector cross product lowers for GPU text emit.
+# =============================================================================
+#
+# What this teaches:
+#   • Cross product — `transversum()` computes the 3D vector cross product
+#   • GPU lowering — vector operations lower to WGSL for GPU kernel emission
+#
+# Common mistakes:
+#   • using transversum (cross product) on vectors of non-3D dimensions — cross product requires exactly 3 components
+#
+# See also: vector, gpu, nucleum
+# =============================================================================
+
+
+
+@ nucleum
+functio transversum(fractus<f32> x) → fractus<f32> {
+    fixum vf32[3] a ← [x, 2.0, 3.0] ↦ vf32[3]
+    fixum vf32[3] b ← [4.0, 5.0, 6.0] ↦ vf32[3]
+    fixum vf32[3] c ← a.transversum(b)
+    redde c.productum(b)
+}

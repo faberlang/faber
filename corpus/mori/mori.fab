@@ -1,0 +1,66 @@
++++
+term = "mori"
+kind = "keyword"
+category = "errors"
+canonical = true
+summary = "Raises a fatal error or panic."
+syntax = "mori <expression>"
+aliases = ["panic"]
+related = ["iace", "ergo"]
++++
+
+# =============================================================================
+# mori — Raises a fatal error or panic.
+# =============================================================================
+#
+# What this teaches:
+#   • fatal unrecoverable abort with `mori` — halts execution with an error message
+#   • invariant checking — using `mori` for divisor and bounds checks
+#
+# Common mistakes:
+#   • Using mori for recoverable errors — use iace with ⇥ for recoverable failure paths instead.
+#
+# See also: iace, ergo
+# =============================================================================
+
+# mori — fatal unrecoverable abort
+#
+# mori <nuntius>
+#
+# GRAMMAR:
+#   abortStmt :← 'mori' expr
+#
+# EXPECTED OUTPUT:
+#   Happy-path division and lista access; mori paths are commented out.
+
+functio divide(numerus a, numerus b) → fractus {
+    # Use mori for invariant violations
+    si b ≡ 0 {
+        mori "divisio per nihilum"
+    }
+    redde (a ↦ fractus) / (b ↦ fractus)
+}
+
+functio accipe(lista<numerus> res, numerus index) → numerus {
+    # Bounds check with mori
+    si index < 0 aut index ≥ res.longitudo() {
+        mori "index extra fines"
+    }
+    redde res[index]
+}
+
+incipit {
+    # Happy path — mori branches not taken
+    fixum _ valor ← divide(10, 2)
+    # 5.0
+    nota "valor: §"(valor)
+
+    # This would call mori:
+    # fixum _ malum ← divide(10, 0)
+
+    # Lista accessus
+    fixum _ nums ← [1, 2, 3]
+    fixum _ lectum ← accipe(nums, 1)
+    # 2
+    nota "valor: §"(lectum)
+}

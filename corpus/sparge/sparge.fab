@@ -1,0 +1,45 @@
++++
+term = "sparge"
+kind = "keyword"
+category = "collection"
+canonical = true
+summary = "Spreads an array or collection literal into its surrounding expression."
+syntax = "sparge <expression>"
+aliases = ["..."]
+related = ["lista"]
++++
+
+# =============================================================================
+# sparge — Spreads an array or collection literal into its surrounding expression.
+# =============================================================================
+#
+# What this teaches:
+#   • Spread syntax — how to splice a collection into a list literal or function call
+#   • Collection composition — building larger expressions by expanding collections inline
+#
+# Common mistakes:
+#   • confusing sparge (splice) with appende, or using sparge on a non-collection expression
+#
+# See also: lista
+# =============================================================================
+
+# sparge — spread a collection into another collection or call
+#
+# [a, sparge <lista>, b]           -- splice into list literal
+# functio(sparge <lista>)          -- spread call arguments
+#
+# GRAMMAR:
+#   spargeExpr :← 'sparge' expr
+#
+# EXPECTED OUTPUT:
+#   1, 2, 3, 4 (expanded list elements).
+
+incipit {
+    fixum _ media ← [2, 3]
+    # → [1, 2, 3, 4]
+    fixum _ numeri ← [1, sparge media, 4]
+
+    itera ex numeri fixum n {
+        nota n
+    }
+}

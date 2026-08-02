@@ -1,0 +1,46 @@
++++
+term = "fac"
+kind = "keyword"
+category = "control-flow"
+canonical = false
+summary = "Postfix dum loop attached to a fac block."
+syntax = "fac <block> dum <condition>"
+related = ["fac", "dum"]
++++
+# =============================================================================
+# fac — Postfix dum loop attached to a fac block
+# =============================================================================
+#
+# What this teaches:
+#   • Postfix dum loop attached to a fac block.
+#   • Related keywords: fac, dum
+#
+# Common mistakes:
+#   • Using `fac ... dum` inside a closure — closure `fac` bodies cannot use `dum`; restructure as a standalone loop.
+#
+# See also: fac, dum
+# =============================================================================
+
+# fac — postfix dum loop (do-while style)
+#
+# fac { <body> } dum <condition>
+#
+# GRAMMAR:
+#   facStmt :← 'fac' block 'dum' expr
+#
+# EXPECTED OUTPUT:
+#   fac-dum.expected
+
+incipit {
+    varia numerus counter ← 0
+    fac {
+        counter ← counter + 1
+        nota "Iteration §"(counter)
+    } dum counter < 3
+
+    varia numerus attempts ← 0
+    fac {
+        attempts ← attempts + 1
+        nota "Attempt §"(attempts)
+    } dum attempts < 2
+}

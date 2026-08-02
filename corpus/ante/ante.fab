@@ -1,0 +1,43 @@
++++
+term = "ante"
+kind = "keyword"
+category = "range"
+canonical = true
+summary = "Creates an exclusive range with a Latin keyword."
+syntax = "<expression> ante <expression>"
+related = ["usque", "‥"]
++++
+
+
+# =============================================================================
+# ante — Creates an exclusive range with a Latin keyword.
+# =============================================================================
+#
+# What this teaches:
+#   • Exclusive range iteration — `ab <initium> ante <finis>` iterates from
+#     initium up to (but not including) finis
+#   • Range keyword pattern — `ante` provides a natural-language alternative
+#     to symbolic range syntax
+#
+# Common mistakes:
+#   • confusing `ante` (exclusive upper bound) with `usque` (inclusive) — `0 ante 4` yields 0,1,2,3 while `0 usque 4` yields 0,1,2,3,4
+#
+# See also: usque, ‥
+# =============================================================================
+
+# ante — exclusive upper bound for range iteration
+#
+# itera ab <initium> ante <finis> <var> { … }
+#
+# GRAMMAR:
+#   iterStmt :← 'itera' 'ab' expr 'ante' expr binding '{' stmt* '}'
+#
+# EXPECTED OUTPUT:
+#   none
+
+incipit {
+    # i = 0, 1, 2, 3 (stops before 4)
+    itera ab 0 ante 4 fixum i {
+        nota i
+    }
+}

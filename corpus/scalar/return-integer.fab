@@ -1,0 +1,37 @@
++++
+term = "redde"
+kind = "keyword"
+category = "scalar"
+canonical = true
+summary = "Function returning an integer literal via redde 42."
+syntax = "redde <integer-literal>"
+aliases = ["return"]
+related = ["vacuum", "functio"]
++++
+
+# =============================================================================
+# redde — Function returning an integer literal via redde 42.
+# =============================================================================
+#
+# What this teaches:
+#   • Integer return values — `redde 42` returns an integer literal from a
+#     `numerus`-typed function
+#   • Verifies the backend emits the correct primitive type for integer returns
+#
+# Common mistakes:
+#   • Confusing a scalar (single-value) return with a collection return — this function returns one `numerus`, not a list.
+#
+# See also: vacuum, functio
+# =============================================================================
+
+# scalar/return-integer — return integer literal
+#
+# GRAMMAR:
+#   returnStmt :← 'redde' expr
+#
+# Verifies that the Swift backend emits a function returning an
+# integer literal (SC-001: primitives, functions, return).
+
+functio da_numerum() → numerus {
+    redde 42
+}

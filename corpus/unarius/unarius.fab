@@ -1,0 +1,76 @@
++++
+term = "unarius"
+kind = "operator-group"
+category = "operators"
+canonical = true
+summary = "Unary negation, logical not, sign comparisons, and optional presence tests."
+syntax = "-<expr> | non <expr> | <expr> > 0 | <expr> est nihil"
+related = ["non", "est", "non est"]
++++
+
+# =============================================================================
+# unarius — Unary negation, logical not, sign comparisons, and optional presence tests.
+# =============================================================================
+#
+# What this teaches:
+#   • Unary operators — negation (`-`), logical not (`non`), and sign comparisons
+#   • Null checks — `est nihil` and `non est nihil` for optional presence testing
+#
+# Common mistakes:
+#   • confusing non (logical not, prefix) with - (numeric negation) or ¬ (the Unicode not sign)
+#
+# See also: non, est, non est
+# =============================================================================
+
+
+
+
+# unarius — negation, logical not, sign comparisons, and optional presence
+#
+# -<expr>  non <bivalens>  <expr> > 0  <expr> < 0
+# <expr> est nihil   <expr> non est nihil
+#
+# GRAMMAR:
+#   unaryExpr :← ('-' | 'non') expr
+#
+# EXPECTED OUTPUT:
+#   unarius.expected — unary operator samples.
+
+incipit {
+    # Numeric negation
+    fixum _ x ← 5
+    fixum _ neg ← -x
+    # -5
+    nota neg
+
+    # Logical negation
+    fixum _ flag ← verum
+    fixum _ non_signum ← non flag
+    # falsum
+    nota non_signum
+
+    # Positive/negative checks
+    fixum _ a ← 10
+    fixum _ b ← -3
+    # verum
+    nota a > 0
+    # falsum
+    nota a < 0
+    # falsum
+    nota b > 0
+    # verum
+    nota b < 0
+
+    # Null checks
+    fixum textus ∪ nihil forsitan ← nihil
+    # verum
+    nota forsitan est nihil
+    # falsum
+    nota forsitan non est nihil
+
+    fixum textus ∪ nihil adest ← "salve"
+    # falsum
+    nota adest est nihil
+    # verum
+    nota adest non est nihil
+}

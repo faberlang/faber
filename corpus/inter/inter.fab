@@ -1,0 +1,49 @@
++++
+term = "inter"
+kind = "keyword"
+category = "collection"
+canonical = true
+summary = "Checks whether a value appears in a collection."
+syntax = "<expression> inter <collection>"
+related = ["intra"]
++++
+# =============================================================================
+# inter — Checks whether a value appears in a collection
+# =============================================================================
+#
+# What this teaches:
+#   • Checks whether a value appears in a collection.
+#   • Related keywords: intra
+#
+# Common mistakes:
+#   • Using `inter` with a non-collection right operand — `inter` checks membership in a lista, tabula, or copia, not a scalar comparison.
+#
+# See also: intra
+# =============================================================================
+
+# inter — collection membership (element in set)
+#
+# <expr> inter <lista>
+#
+# GRAMMAR:
+#   membershipExpr :← expr 'inter' expr
+#
+# EXPECTED OUTPUT:
+#   none — stdout not pinned for this exemplum.
+
+incipit {
+    fixum _ condicio ← "agens"
+    fixum _ aetas ← 21
+
+    # Basic inter with textus lista
+    si condicio inter ["pendens", "agens", "pausa"] {
+        nota "condicio valida"
+    }
+
+    # inter with numeric lista
+    si aetas inter [18, 21, 65] {
+        nota "aetas insignis"
+    }
+
+    nota "exempla inter"
+}

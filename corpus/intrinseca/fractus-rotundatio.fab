@@ -1,0 +1,45 @@
++++
+term = "fractus"
+kind = "keyword"
+category = "type"
+canonical = false
+summary = "Compiler-owned fractus rounding methodi."
+syntax = "valor.rotunda | pavimentum | tectum | trunca"
+related = ["fractus", "intrinseca"]
++++
+# =============================================================================
+# fractus — Compiler-owned fractus rounding methodi
+# =============================================================================
+#
+# What this teaches:
+#   • Compiler-owned fractus rounding methodi.
+#   • Related keywords: fractus, intrinseca
+#
+# Common mistakes:
+#   • Confusing rounding modes — `.rotunda()` rounds to nearest, `.pavimentum()` floors, `.tectum()` ceilings, `.trunca()` truncates toward zero.
+#
+# See also: fractus, intrinseca
+# =============================================================================
+
+# fractus rounding intrinsics
+#
+# Compiler-owned fractus methodi — rotunda, pavimentum, tectum, trunca.
+#
+# GRAMMAR:
+#   valor.rotunda() | valor.pavimentum() | valor.tectum() | valor.trunca()
+#
+# Rounding modes lower to per-target float intrinsics; Wasm tier Runnable.
+#
+# EXPECTED OUTPUT:
+#   Smoke asserts exit 0 only.
+
+incipit {
+    fixum fractus valor ← -3.75
+
+    fixum _ rotundus ← valor.rotunda()
+    fixum _ basis ← valor.pavimentum()
+    fixum _ culmen ← valor.tectum()
+    fixum _ truncatus ← valor.trunca()
+
+    nota rotundus, basis, culmen, truncatus
+}

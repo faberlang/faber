@@ -1,0 +1,20 @@
+# EBNF_MATRIX.md planned-support overlay.
+#
+# Curated (term, target) pairs that are PLANNED (not yet lowering, but intended),
+# so they render ○ instead of ✕ in radix/EBNF_MATRIX.md.
+#
+# Source of truth for "planned vs never" intent: the prose in
+# docs/design/target-capability-matrix.md. When you promote a planned item to
+# shipped (it lowers), REMOVE its entry here — the measured matrix will then
+# render ✓ automatically.
+#
+# Format:  "term"."target" = "short reason / owner"
+# Keys must match index.toml `term` spellings and the target column names
+# (rust, go, ts, faber, llvm-text, wasm-text, wasm, metal-text, wgsl-text,
+#  sexp-struct, sexp, scena).
+#
+# Seeded empty on purpose: do not guess planned items. Curate each entry from
+# the policy doc. Every entry here must trace to a stated deferral in
+# target-capability-matrix.md or an open factory track.
+
+[planned]

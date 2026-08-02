@@ -1,0 +1,59 @@
++++
+term = "functio"
+kind = "keyword"
+category = "function"
+canonical = false
+summary = "Failable function returns with ⇥ error channel and fac/cape recovery."
+syntax = "functio <name>(<params>) → <type> ⇥ <error-type> <block>"
+related = ["functio", "⇥", "fac", "cape"]
++++
+# =============================================================================
+# functio — Failable function returns with ⇥ error channel and fac/cape recovery
+# =============================================================================
+#
+# What this teaches:
+#   • Failable function returns with ⇥ error channel and fac/cape recovery.
+#   • Related keywords: functio, ⇥, fac, cape
+#
+# Common mistakes:
+#   • Calling a failable function (`→ T ⇥ E`) without handling the error path — wrap in `fac { ... } cape err { ... }` or declare `⇥` on the enclosing function.
+#
+# See also: functio, ⇥, fac, cape
+# =============================================================================
+
+# functio fallibilis — failable return with ⇥ error channel
+#
+# functio … → T ⇥ E
+# fac { … }
+# cape err { … }
+#
+# GRAMMAR:
+#   funcDecl :← 'functio' ident '(' params ')' '→' type '⇥' type block
+#
+# EXPECTED OUTPUT:
+#   5 then 0 (recovered from division-by-zero).
+#
+# BACKEND:
+#   Rust/Go lowering does not emit failable ⇥ syntax yet — compile-only smoke.
+
+functio divide(numerus a, numerus b) → numerus ⇥ textus {
+    si b ≡ 0 ergo iace "division by zero"
+    redde a / b
+}
+
+# Non-failable wrapper: cape intercepts ⇥ textus from divide
+functio tutum(numerus a, numerus b) → numerus {
+    fac {
+        redde divide(a, b)
+    }
+    cape err {
+        # log the error channel value
+        mone err
+        redde 0
+    }
+}
+
+incipit {
+    nota tutum(10, 2)
+    nota tutum(10, 0)
+}

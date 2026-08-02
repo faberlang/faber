@@ -1,0 +1,59 @@
++++
+term = "→"
+kind = "operator-group"
+category = "function"
+canonical = true
+summary = "Success return type and recoverable alternate-exit type in function signatures."
+syntax = "functio <name>(<params>) → <type> | functio <name>(<params>) → <success> ⇥ <error>"
+related = ["⇥", "functio", "redde", "iace", "cape"]
++++
+
+# =============================================================================
+# → — Success return type and recoverable alternate-exit type in function signatures.
+# =============================================================================
+#
+# What this teaches:
+#   • Return type annotation — `→` separates a function signature from its success return type.
+#   • Fallible return — `⇥` after `→` declares a recoverable error type, paired with `iace` and `cape`.
+#
+# Common mistakes:
+#   • Forgetting the ⇥ error type in signatures that use iace.
+#
+# See also: ⇥, functio, redde, iace, cape
+# =============================================================================
+
+# operatores/function-types — → and ⇥
+#
+# GRAMMAR:
+#   funcType :← 'functio' ident '(' params ')' ('→' type)? ('⇥' type)?
+#
+# EXPECTED OUTPUT:
+#   salve, 5, 0
+#
+# BACKEND:
+#   Cross-ref functio/functio.fab and iace/functio-fallibilis.fab.
+
+functio saluta() → textus {
+    redde "salve"
+}
+
+functio divide(numerus a, numerus b) → numerus ⇥ textus {
+    si b ≡ 0 ergo iace "division by zero"
+    redde a / b
+}
+
+functio tutum(numerus a, numerus b) → numerus {
+    fac {
+        redde divide(a, b)
+    }
+    cape err {
+        mone err
+        redde 0
+    }
+}
+
+incipit {
+    nota saluta()
+    nota tutum(10, 2)
+    nota tutum(10, 0)
+}

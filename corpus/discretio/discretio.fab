@@ -1,0 +1,64 @@
++++
+term = "discretio"
+kind = "keyword"
+category = "type"
+canonical = true
+summary = "Declares a tagged union with variant payloads."
+syntax = "discretio <name> [<type-params>] <block>"
+aliases = ["union", "sum type"]
+related = ["ordo", "discerne", "finge"]
++++
+
+# =============================================================================
+# discretio — Declares a tagged union with variant payloads.
+# =============================================================================
+#
+# What this teaches:
+#   • Tagged union declaration — `discretio <name> { <Variant> { fields }, ... }` declares a sum type with named variants.
+#   • Payload variants — variants can carry named fields (like structs) or be unit variants with no payload.
+#   • Multiple field variants — a variant can have many fields of different types.
+#
+# Common mistakes:
+#   • Confusing `discretio` with `genus` — `discretio` is a tagged union with variants, not a record with fixed fields; use `discerne` (not field access) to unpack values.
+#
+# See also: ordo, discerne, finge
+# =============================================================================
+
+# discretio — tagged union declarations
+#
+# discretio Nomen {
+#     Varians { <type> <field>, ... }
+#     Alius
+# }
+#
+# GRAMMAR:
+#   discretioDecl :← 'discretio' ident '{' variantDecl* '}'
+#   variant     :← ident ('{' fieldDecl (',' fieldDecl)* '}')?
+#
+# EXPECTED OUTPUT:
+#   discretiones paratae
+
+# Discretio with payload variants
+discretio Exitus {
+    Bonum { textus nuntius }
+    Malum { textus causa }
+}
+
+# Discretio with mixed unit and payload variants
+discretio Actum {
+    Pulsus { numerus x, numerus y }
+    Clavis { textus clavis }
+    # unit variant (no payload fields)
+    Finis
+}
+
+# Discretio with many fields per variant
+discretio Figura {
+    Rectum { numerus x, numerus y, numerus latitudo, numerus altitudo }
+    Circulus { numerus cx, numerus cy, numerus radius }
+    Punctum { numerus x, numerus y }
+}
+
+incipit {
+    nota "discretiones paratae"
+}

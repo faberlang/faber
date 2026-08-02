@@ -1,0 +1,87 @@
++++
+term = "secus"
+kind = "keyword"
+category = "control-flow"
+canonical = true
+summary = "Runs the fallback branch when preceding conditional branches do not match."
+syntax = "secus <block>"
+aliases = ["else", "otherwise"]
+related = ["si", "sin"]
++++
+
+# =============================================================================
+# secus — Runs the fallback branch when preceding conditional branches do not
+# match.
+# =============================================================================
+#
+# What this teaches:
+#   • If-else branches — `si { } secus { }` provides two-way branching; exactly
+#     one arm executes
+#   • `sin` chains additional conditions before the final `secus` fallback;
+#     first match wins
+#
+# Common mistakes:
+#   • TODO: placing `secus` before a `sin` branch — `secus` must always be the
+#     final clause
+#
+# See also: si, sin
+# =============================================================================
+
+# si-secus (if-else) conditionals
+#
+# si <condition> { <body> }                                   -- two-way branch
+# secus { <body> }
+# si <cond1> { }                                              -- else-if chain
+# sin <cond2> { }
+# secus { }
+#
+# GRAMMAR:
+#   ifStmt :← 'si' expr block ('sin' expr block)* ('secus' block)?
+#
+# EXPECTED OUTPUT:
+#   Grade and weather messages for sample scores and temperatures.
+
+incipit {
+    # Two-way branch: exactly one arm runs
+    fixum _ puncta ← 85
+
+    si puncta ≥ 90 {
+        nota "gradus: A"
+    }
+    secus {
+        # 85 < 90 → this arm
+        nota "gradus: B aut minor"
+    }
+
+    # Each branch may contain several statements
+    fixum _ calor ← 22
+
+    si calor > 30 {
+        nota "calidum"
+        nota "aquam bibe"
+    }
+    secus {
+        # 22 ≤ 30
+        nota "commodum"
+        nota "caelum mite"
+    }
+
+    # sin chains additional tests; first match wins (75 → C)
+    fixum _ gradus ← 75
+
+    si gradus ≥ 90 {
+        nota "A - optimum"
+    }
+    sin gradus ≥ 80 {
+        nota "B - bonum"
+    }
+    sin gradus ≥ 70 {
+        nota "C - satis"
+    }
+    sin gradus ≥ 60 {
+        nota "D - transit"
+    }
+    secus {
+        nota "F - deficit"
+    }
+}

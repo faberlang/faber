@@ -1,0 +1,63 @@
++++
+term = "itera"
+kind = "keyword"
+category = "control-flow"
+canonical = true
+summary = "Starts a for-each iteration statement."
+syntax = "itera <mode> <expression> <binding> <block>"
+aliases = ["iterate"]
+related = ["ex", "de", "ab"]
++++
+
+# =============================================================================
+# itera — Starts a for-each iteration statement.
+# =============================================================================
+#
+# What this teaches:
+#   • range iteration with a step value using `per` — controls stride between elements
+#   • descending ranges with negative step values
+#   • exclusive (`‥`) vs inclusive (`…`) range bounds with step
+#
+# Common mistakes:
+#   • Using a step value that never reaches the end bound — ensure the step direction matches the range direction.
+#
+# See also: ex, de, ab
+# =============================================================================
+
+# itera ab — ranges with step using per
+#
+# itera ab <start>‥<end> per <step> fixum <item> { <body> }
+# itera ab <start>…<end> per <step> fixum <item> { <body> }
+#
+# GRAMMAR:
+#   forRangeStmt :← 'itera' 'ab' rangeExpr 'per' expr ('fixum' | 'varia') ident block
+#
+# EXPECTED OUTPUT:
+#   none — stdout not pinned for this exemplum.
+
+incipit {
+    # Step by 2 (exclusive: 0, 2, 4, 6, 8)
+    itera ab 0‥10 per 2 fixum i {
+        nota i
+    }
+
+    # Step by 2 (inclusive: 0, 2, 4, 6, 8, 10)
+    itera ab 0…10 per 2 fixum i {
+        nota i
+    }
+
+    # Step by 3
+    itera ab 0‥15 per 3 fixum i {
+        nota i
+    }
+
+    # Descending with negative step
+    itera ab 10‥0 per -1 fixum i {
+        nota i
+    }
+
+    # Descending by 2
+    itera ab 10‥0 per -2 fixum i {
+        nota i
+    }
+}

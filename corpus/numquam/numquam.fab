@@ -1,0 +1,40 @@
++++
+term = "numquam"
+kind = "keyword"
+category = "type"
+canonical = true
+summary = "Primitive never type for code paths that do not return normally."
+syntax = "numquam"
+aliases = ["never"]
+related = ["mori", "exitus"]
++++
+
+# =============================================================================
+# numquam — Primitive never type for code paths that do not return normally.
+# =============================================================================
+#
+# What this teaches:
+#   • Diverging functions — `numquam` marks functions like `mori` that never return to the caller.
+#   • Type-system bottom — `numquam` is the bottom type, compatible with any return position.
+#
+# Common mistakes:
+#   • Using numquam for functions that might sometimes return normally — numquam is only for code paths that never return.
+#
+# See also: mori, exitus
+# =============================================================================
+
+# numquam — diverging return type
+#
+# GRAMMAR:
+#   returnType :← 'numquam'
+#
+# EXPECTED OUTPUT:
+#   Scalar stdout smoke (see body).
+#
+# BACKEND:
+#   Cross-ref: mori/mori.fab.
+#
+
+functio fail(textus message) → numquam {
+    mori message
+}

@@ -1,0 +1,47 @@
++++
+term = "fractus"
+kind = "keyword"
+category = "type"
+canonical = true
+summary = "Primitive floating-point number type."
+syntax = "fractus"
+aliases = ["float"]
+related = ["numerus", "↦"]
++++
+# =============================================================================
+# fractus — Primitive floating-point number type
+# =============================================================================
+#
+# What this teaches:
+#   • Primitive floating-point number type.
+#   • Related keywords: numerus, ↦
+#
+# Common mistakes:
+#   • Using `≡` for direct floating-point equality — float equality is unreliable due to precision; use `.approximata()` for tolerance-based comparison.
+#
+# See also: numerus, ↦
+# =============================================================================
+
+# fractus comparison and ordering intrinsics
+#
+# Compiler-owned fractus methodi — absolutum, signum, minimus, maximus.
+#
+# GRAMMAR:
+#   valor.absolutum() | valor.signum()
+#   valor.minimus(other) | valor.maximus(other)
+#
+# Mirrors numerus-methodi.fab for floating-point; Wasm tier Runnable.
+#
+# EXPECTED OUTPUT:
+#   Smoke asserts exit 0 only.
+
+incipit {
+    fixum fractus valor ← -3.75
+
+    fixum _ absolutus ← valor.absolutum()
+    fixum _ signum ← valor.signum()
+    fixum _ minor ← valor.minimus(2.5)
+    fixum _ maior ← valor.maximus(2.5)
+
+    nota absolutus, signum, minor, maior
+}

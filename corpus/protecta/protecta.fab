@@ -1,0 +1,46 @@
++++
+term = "protecta"
+kind = "keyword"
+category = "modifier"
+canonical = true
+summary = "Reserved visibility annotation rejected by semantic analysis."
+syntax = "@ protecta"
+aliases = ["protected"]
+related = ["publica", "privata"]
++++
+
+# =============================================================================
+# protecta — Reserved visibility annotation rejected by semantic analysis.
+# =============================================================================
+#
+# What this teaches:
+#   • Reserved keyword — `@ protecta` is syntactically valid but semantically
+#     rejected; it has no active visibility meaning
+#   • This demonstrates how Faber reserves syntax for future use without
+#     committing to semantics
+#
+# Common mistakes:
+#   • Expecting `@ protecta` to provide access control — it is reserved and rejected at compile time (SEM018).
+#
+# See also: publica, privata
+# =============================================================================
+
+# @ protecta is reserved visibility syntax
+#
+# This exemplum intentionally fails to compile. `@ protecta` is reserved and
+# has no active package, subclass, or sibling-file visibility meaning.
+#
+# GRAMMAR:
+#   annotatedDecl :← '@' 'protecta' funcDecl
+#
+# EXPECTED ERROR:
+#   `@ protecta` is reserved and has no active visibility meaning
+
+@ protecta
+functio protectum() → textus {
+    redde "protecta"
+}
+
+incipit {
+    nota protectum()
+}

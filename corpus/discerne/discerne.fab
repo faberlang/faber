@@ -1,0 +1,82 @@
++++
+term = "discerne"
+kind = "keyword"
+category = "control-flow"
+canonical = true
+summary = "Starts an exhaustive pattern match over a value or values."
+syntax = "discerne <subject> <block>"
+aliases = ["match"]
+related = ["discretio", "casu"]
++++
+
+# =============================================================================
+# discerne — Starts an exhaustive pattern match over a value or values.
+# =============================================================================
+#
+# What this teaches:
+#   • Exhaustive pattern matching — `discerne <value> { casu ... }` matches against all variants of a discretio (tagged union).
+#   • Variant destructuring — `casu <Variant> fixum <field>, ...` destructures variant payload fields.
+#   • Unit variants — variant without payload fields match by name alone.
+#
+# Common mistakes:
+#   • Non-exhaustive match — omitting a variant from `discerne` without a `ceterum` catchall; every discretio variant must be covered (SEM040).
+#
+# See also: discretio, casu
+# =============================================================================
+
+# discerne — pattern matching on discretio values
+#
+# discerne <value> {
+#     casu <Casus> { <body> }
+#     casu <Casus> ut <alias> { <body> }
+#     casu <Casus> fixum <bindings> { <body> }
+#     casu <Casus> fixum <field> ut <alias> { <body> }
+# }
+#
+# GRAMMAR:
+#   discerneStmt :← 'discerne' expr '{' casuClause* '}'
+#
+# EXPECTED OUTPUT:
+#   discerne exempla parata
+
+# discretio — tagged union / enum declaration
+discretio Condicio {
+    Agens,
+    Iners,
+    Pendens
+}
+
+discretio Nuntius {
+    Pulsus { numerus x, numerus y },
+    Clavis { textus clavis },
+    Finis
+}
+
+# Simple casu matching on unit variants (no payload)
+functio nomina(Condicio s) → textus {
+    discerne s {
+        casu Agens { redde "agens" }
+        casu Iners { redde "iners" }
+        casu Pendens { redde "pendens" }
+    }
+}
+
+# casu with fixum bindings destructures variant fields
+functio tracta(Nuntius e) → nihil {
+    discerne e {
+        casu Pulsus fixum x, y {
+            nota "pulsus: § §"(x, y)
+        }
+        casu Clavis fixum clavis {
+            nota "clavis: §"(clavis)
+        }
+        casu Finis {
+            nota "finis"
+        }
+    }
+}
+
+incipit {
+    # nomina/tracta are defined for downstream exempla; smoke check only
+    nota "discerne exempla parata"
+}

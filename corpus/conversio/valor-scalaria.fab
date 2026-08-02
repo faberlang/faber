@@ -1,0 +1,76 @@
++++
+term = "valor"
+kind = "conversio"
+category = "conversion"
+canonical = true
+summary = "Scalar valor ↦ T extraction via FromValor (variant match, fractus widen, textus|instans wire)."
+syntax = "<valor-expression> ↦ numerus | fractus | bivalens | textus | ascii | nihil"
+related = ["↦", "⇥", "instans", "textus"]
++++
+
+# =============================================================================
+# valor — Scalar valor ↦ T extraction via FromValor (variant match, fractus widen, textus|instans wire).
+# =============================================================================
+#
+# What this teaches:
+#   • Scalar extraction — `valor ↦ T` extracts typed values from dynamic JSON carriers using variant matching.
+#   • Widening — `valor ↦ fractus` widens `Numerus` variants losslessly.
+#   • Wire text — `valor ↦ textus` accepts both `Textus` and `Instans` wire strings.
+#   • Recovery — `⇥` provides a fallback on variant mismatch.
+#
+# Common mistakes:
+#   • Assuming `valor ↦ textus` works for non-text valor variants — only Textus and Instans wire strings are accepted; other variants fail without `⇥` recovery.
+#
+# See also: ↦, ⇥, instans, textus
+# =============================================================================
+
+# conversio — scalar valor extraction
+#
+# WHY: `valor ↦ T` is the default runtime extraction for dynamic JSON carriers.
+# Scalar arms match `Valor` variants; `valor ↦ fractus` widens `Numerus` losslessly;
+# `valor ↦ textus` accepts `Textus` and `Instans` wire strings. Typed datetime
+# provenance stays on `valor ↦ instans` (see conversio/instans.fab). `⇥`
+# recovers on variant mismatch.
+
+incipit {
+    fixum valor asInt ← 42
+    fixum numerus count ← asInt ↦ numerus
+    adfirma count ≡ 42
+
+    fixum valor asFloat ← 3.5
+    fixum fractus ratio ← asFloat ↦ fractus
+    adfirma ratio ≡ 3.5
+
+    fixum valor intForFloat ← 7
+    fixum fractus widened ← intForFloat ↦ fractus
+    adfirma widened ≡ 7.0
+
+    fixum valor asBool ← verum
+    fixum bivalens flag ← asBool ↦ bivalens
+    adfirma flag ≡ verum
+
+    fixum valor asText ← "salve"
+    fixum textus greeting ← asText ↦ textus
+    adfirma greeting ≡ "salve"
+
+    fixum valor asWire ← "1979-05-27T07:32:00Z"
+    fixum textus wire ← asWire ↦ textus
+    adfirma wire ≡ "1979-05-27T07:32:00Z"
+
+    fixum valor asAscii ← 'yes'
+    fixum ascii token ← asAscii ↦ ascii
+    adfirma token ≡ 'yes'
+
+    fixum valor bad ← "not-a-number"
+    fixum numerus recovered ← bad ↦ numerus ⇥ 0
+    adfirma recovered ≡ 0
+
+    nota count
+    nota ratio
+    nota widened
+    nota flag
+    nota greeting
+    nota wire
+    nota token
+    nota recovered
+}

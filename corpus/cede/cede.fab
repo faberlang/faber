@@ -1,0 +1,49 @@
++++
+term = "cede"
+kind = "keyword"
+category = "async"
+canonical = true
+summary = "Yields one value from a generator."
+syntax = "cede <expression>"
+aliases = ["yield"]
+related = ["cursor", "fiunt", "fient"]
++++
+
+
+# =============================================================================
+# cede — Yields one value from a generator.
+# =============================================================================
+#
+# What this teaches:
+#   • Yield — `cede <expression>` emits one item from a `fiunt` or `fient`
+#     callable
+#   • Async values use `figendum`, `variandum`, `reddet`, or `tacebit`; `cede`
+#     is not an await form
+#
+# Common mistakes:
+#   • using `cede` outside a generator body
+#
+# See also: cursor, fiunt, fient
+# =============================================================================
+
+# cede — yield from a stream function
+#
+# functio stream() fiunt → T { cede value }
+#
+# GRAMMAR:
+#   yieldStmt :← 'cede' expr
+#
+# EXPECTED OUTPUT:
+#   [1, 2]
+#
+# BACKEND:
+#   Cursor stream materialization smoke.
+
+functio stream() fiunt → numerus {
+    cede 1
+    cede 2
+}
+
+incipit {
+    nota stream()
+}

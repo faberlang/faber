@@ -1,0 +1,64 @@
++++
+term = "itera"
+kind = "keyword"
+category = "control-flow"
+canonical = true
+summary = "Starts a for-each iteration statement."
+syntax = "itera <mode> <expression> <binding> <block>"
+aliases = ["iterate"]
+related = ["ex", "de", "ab"]
++++
+
+# =============================================================================
+# itera — Starts a for-each iteration statement.
+# =============================================================================
+#
+# What this teaches:
+#   • range expressions with exclusive (`‥`) and inclusive (`…`) bounds
+#   • the explicit `ante` keyword for readability in exclusive ranges
+#   • descending direction in range iteration
+#
+# Common mistakes:
+#   • Confusing ‥ (exclusive upper bound) with … (inclusive upper bound) — off-by-one errors are the most common range bug.
+#
+# See also: ex, de, ab
+# =============================================================================
+
+# itera ab — range expressions with exclusive and inclusive bounds
+#
+# itera ab <start>‥<end> fixum <item> { <body> }       — exclusive end
+# itera ab <start> ante <end> fixum <item> { <body> }  — explicit exclusive
+# itera ab <start>…<end> fixum <item> { <body> }        — inclusive end
+#
+# GRAMMAR:
+#   forRangeStmt :← 'itera' 'ab' rangeExpr ('fixum' | 'varia') ident block
+#
+# EXPECTED OUTPUT:
+#   none — stdout not pinned for this exemplum.
+
+incipit {
+    # Basic range (exclusive: 0, 1, 2, 3, 4)
+    itera ab 0‥5 fixum i {
+        nota i
+    }
+
+    # Explicit exclusive with ante (same as ‥)
+    itera ab 0 ante 5 fixum i {
+        nota i
+    }
+
+    # Inclusive range with … (0, 1, 2, 3, 4, 5)
+    itera ab 0…5 fixum i {
+        nota i
+    }
+
+    # Range starting from non-zero
+    itera ab 5‥10 fixum i {
+        nota i
+    }
+
+    # Descending direction
+    itera ab 5‥0 fixum i {
+        nota i
+    }
+}

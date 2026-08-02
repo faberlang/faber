@@ -1,0 +1,35 @@
++++
+term = "vector"
+kind = "type"
+category = "register"
+canonical = false
+summary = "Vector width inference placeholder for generic vector return syntax."
+syntax = "vector<elem, _>"
+related = ["vector", "generic", "magnitudo"]
++++
+
+# =============================================================================
+# vector — Vector width inference placeholder for generic vector return syntax.
+# =============================================================================
+#
+# What this teaches:
+#   • Width inference — `vector<elem, _>` for generic vector return type syntax
+#   • Stub — placeholder for when full generic vector inference is implemented
+#
+# Common mistakes:
+#   • relying on vector width inference (vector<elem, _>) before it is fully implemented — use explicit widths
+#
+# See also: vector, generic, magnitudo
+# =============================================================================
+
+
+
+# vector width inference
+
+functio make<elem, magnitudo N>() → vector<elem, _> {
+    mori "infer width stub"
+}
+
+functio inferSmoke() → numerus {
+    redde 0
+}

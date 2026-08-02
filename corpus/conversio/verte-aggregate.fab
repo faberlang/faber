@@ -1,0 +1,59 @@
++++
+term = "∷"
+kind = "operator-group"
+category = "conversion"
+canonical = false
+summary = "Aggregate construction into struct, lista, and tabula targets."
+syntax = "Type { fields } | <lista-expression> ∷ lista<T> | { \"key\": value }"
+related = ["verte", "genus", "lista", "tabula"]
++++
+
+# =============================================================================
+# ∷ — Aggregate construction into struct, lista, and tabula targets.
+# =============================================================================
+#
+# What this teaches:
+#   • Aggregate construction pathways — genus values use typed `Type { fields }`, lista uses `∷` for static shape, tabula uses typed JSON literals.
+#   • Defaultable fields — omitted `sponte` and default-valued fields in genus constructors.
+#   • HIR/MIR agreement — aggregate construction should stay identical across Rust and MIR lowering.
+#
+# Common mistakes:
+#   • Omitting a mandatory genus field without a default or sponte marker — all required fields must be provided in the `Type { field = expr }` constructor.
+#
+# See also: verte, genus, lista, tabula
+# =============================================================================
+
+# conversio — aggregate construction
+#
+# WHY: aggregate construction should stay identical across HIR-direct Rust emit
+# and MIR aggregate lowering. Current grammar uses typed construction for genus
+# values, `∷` for static lista target shape, and typed JSON literals for tabula.
+# This fixture pins omitted defaultable struct fields plus lista and tabula
+# targets.
+#
+# EXPECTED stdout:
+#   Livia
+#   Roma
+#   0
+#   3
+#   2
+#   10
+
+genus Civis {
+    textus nomen
+    textus regio = "Roma"
+    numerus aetas sponte
+}
+
+incipit {
+    fixum Civis civis ← Civis { nomen = "Livia" }
+    fixum lista<numerus> numeri ← [1, 2, 3] ∷ lista<numerus>
+    fixum tabula<textus, numerus> puncta ← { "alpha": 10, "beta": 20 }
+
+    nota civis.nomen
+    nota civis.regio
+    nota civis.aetas vel 0
+    nota numeri.longitudo()
+    nota numeri.accipe(1) vel 0
+    nota puncta.accipe("alpha") vel 0
+}

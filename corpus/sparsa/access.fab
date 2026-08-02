@@ -1,0 +1,44 @@
++++
+term = "sparsa"
+kind = "type"
+category = "collection"
+canonical = false
+summary = "Sparse tensor accipe/ponde access and zero-removal semantics."
+syntax = "sparsa.accipe(indices) | sparsa.ponde(indices, value)"
+related = ["sparsa", "accipe", "ponde"]
++++
+
+# =============================================================================
+# sparsa — Sparse tensor accipe/ponde access and zero-removal semantics.
+# =============================================================================
+#
+# What this teaches:
+#   • Sparse tensor access — reading values with `accipe` and writing with `ponde`
+#   • Zero-removal semantics — assigning zero removes the entry from storage
+#
+# Common mistakes:
+#   • assuming absent coordinates return an error rather than a zero value, or forgetting that ponde(…, 0.0) deletes the entry
+#
+# See also: sparsa, accipe, ponde
+# =============================================================================
+
+
+# sparsa — sparse access and update policy
+#
+# EXPECTED OUTPUT:
+#   Stored fractus value, absent-coordinate zero, and stored count after zero
+#   removal.
+
+incipit {
+    varia sparsa<fractus<f32>, [2, 3]> grid ← vacua
+
+    grid.ponde([0, 1], 4.0)
+    grid.ponde([1, 2], 9.0)
+    grid.ponde([1, 2], 0.0)
+
+    fixum f32 stored ← grid.accipe([0, 1])
+    fixum f32 absent ← grid.accipe([1, 2])
+    fixum numerus count ← grid.nonnihil()
+
+    nota stored, absent, count
+}

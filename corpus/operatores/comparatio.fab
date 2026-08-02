@@ -1,0 +1,62 @@
++++
+term = "≡"
+kind = "operator-group"
+category = "comparison"
+canonical = true
+summary = "Equality and ordering comparisons returning bivalens."
+syntax = "<expression> ≡ <expression> | <expression> ≠ <expression> | <expression> ≤ <expression> | <expression> ≥ <expression>"
+related = ["≠", "≤", "≥", "est", "adfirma"]
++++
+
+# =============================================================================
+# ≡ — Equality and ordering comparisons returning bivalens.
+# =============================================================================
+#
+# What this teaches:
+#   • Comparison operators — `≡` (equal), `≠` (not equal), `≤` (less-or-equal), `≥` (greater-or-equal).
+#   • Chaining — Comparisons can be chained with `et` for interval tests like `0 < x et x < 10`.
+#
+# Common mistakes:
+#   • Using == instead of ≡ for equality, or != instead of ≠ for inequality — Faber uses Unicode operators.
+#
+# See also: ≠, ≤, ≥, est, adfirma
+# =============================================================================
+
+# operatores/comparatio — ≡ ≠ ≤ ≥
+#
+# GRAMMAR:
+#   cmpExpr :← expr ('≡' | '≠' | '≤' | '≥' | '<' | '>') expr
+#
+# EXPECTED OUTPUT:
+#   verum, verum, verum, verum, verum
+#
+# BACKEND:
+#   Scalar bivalens stdout; chain with et for interval tests.
+
+incipit {
+    fixum _ aequalis ← 10 ≡ 10
+    nota aequalis
+
+    fixum _ diversus ← 10 ≠ 5
+    nota diversus
+
+    fixum _ nonMaior ← 5 ≤ 10
+    nota nonMaior
+
+    fixum _ nonMinor ← 10 ≥ 5
+    nota nonMinor
+
+    fixum _ intervallum ← 0 < 5 et 5 < 10
+    nota intervallum
+}
+
+proba "equal and not-equal comparisons" {
+    adfirma 10 ≡ 10
+    adfirma 10 ≠ 5
+}
+
+proba "ordering and chained interval" {
+    adfirma 5 ≤ 10
+    adfirma 10 ≥ 5
+    adfirma 0 < 5 et 5 < 10
+}

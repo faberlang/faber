@@ -1,0 +1,47 @@
++++
+term = "ex"
+kind = "keyword"
+category = "destructuring"
+canonical = true
+summary = "Extracts fields from a value into local bindings."
+syntax = "ex <expression> <fixum|varia> <field> [, ...] [ceteri <ident>]"
+related = ["de", "ut", "ceteri"]
++++
+
+# =============================================================================
+# ex — Extracts fields from a value into local bindings.
+# =============================================================================
+#
+# What this teaches:
+#   • Field extraction — `ex <expr> fixum <field>, ...` extracts named fields from genus records into local scope.
+#   • Multiple field extraction — extract several fields from a single expression in one statement.
+#
+# Common mistakes:
+#   • Mode mismatch — passing a `de` (read-only) parameter to an `ex` (consume) position, or extracting a field that doesn't exist on the target type.
+#
+# See also: de, ut, ceteri
+# =============================================================================
+
+# ex — field extract statement
+#
+# GRAMMAR:
+#   extractStmt :← 'ex' expr bindingList
+#
+# EXPECTED OUTPUT:
+#   Scalar stdout smoke (see body).
+#
+# BACKEND:
+#   Cross-ref: destructura/objectum.fab, itera/ex.fab (itera ex mode).
+#
+
+genus Persona {
+    textus nomen
+    numerus aetas
+}
+
+incipit {
+    fixum _ p ← Persona { nomen = "Marcus", aetas = 30 }
+    ex p fixum nomen, aetas
+    nota nomen
+    nota aetas
+}

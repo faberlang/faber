@@ -1,0 +1,55 @@
++++
+term = "meus"
+kind = "method"
+category = "endpoint"
+canonical = true
+summary = "live outbound and inbound sermo directional views"
+related = ["ad", "sermo", "tuus", "scrinium", "cursor", "accipe"]
++++
+
+# =============================================================================
+# meus — live outbound and inbound sermo directional views.
+# =============================================================================
+#
+# What this teaches:
+#   • Directional sermo views — `meus<T>` for outbound frames, `tuus<T>` for
+#     inbound frames on a sermo connection
+#   • Cursor iteration — `itera ex t.cursor()` consumes inbound frames
+#   • Accipe reception — `accipe()` pulls a single scrinium from the inbound
+#     queue
+#
+# Common mistakes:
+#   • confusing `meus` (outbound) and `tuus` (inbound) sermo directional views, or mixing accipe/cursor/exhauri without intentional ordered consumption
+#
+# See also: ad, sermo, tuus, scrinium, cursor, accipe
+# =============================================================================
+
+# Live `meus<T>` / `tuus<T>` directional views
+#
+# runtime:echo returns one inbound textus frame per conversation.
+# accipe, cursor, and exhauri may share one tuus queue; mix them only when
+# ordered consumption is intentional.
+
+incipit {
+    fixum sermo s ← ad 'runtime:echo' ("salve")
+
+    fixum meus<textus> m ← s.meus<textus>()
+    m.da("ping")
+    fixum status outbound ← m.fini()
+
+    fixum tuus<textus> t ← s.tuus<textus>()
+    itera ex t.cursor() fixum frame {
+        adfirma frame.data ≡ "salve"
+    }
+    fixum status inbound ← t.fini()
+
+    fixum sermo s2 ← ad 'runtime:echo' ("salve")
+    fixum tuus<textus> t2 ← s2.tuus<textus>()
+    fixum scrinium<textus> ∪ nihil got ← t2.accipe()
+    fixum status accipe_done ← t2.fini()
+
+    nota outbound
+    nota inbound
+    nota got
+    nota accipe_done
+}

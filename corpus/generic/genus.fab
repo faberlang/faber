@@ -1,0 +1,55 @@
++++
+term = "generic"
+kind = "concept"
+category = "type"
+canonical = false
+summary = "Generic discretio and implendum declarations."
+syntax = "discretio <name><T> { … } | implendum <name><T> { … }"
+related = ["generic", "discretio", "implendum"]
++++
+# =============================================================================
+# generic — Generic discretio and implendum declarations
+# =============================================================================
+#
+# What this teaches:
+#   • Generic discretio and implendum declarations.
+#   • Related keywords: generic, discretio, implendum
+#
+# Common mistakes:
+#   • Using a type parameter that doesn't satisfy the bounds of a generic discretio or implendum — type arguments must match declared constraints.
+#
+# See also: generic, discretio, implendum
+# =============================================================================
+
+# Generic discretio and implendum declarations
+#
+# discretio and implendum accept type parameter lists like genus.
+#
+# GRAMMAR:
+#   discretioDecl :← 'discretio' ident '<' typeParamList '>' '{' ... '}'
+#   implendumDecl    :← 'implendum' ident '<' typeParamList '>' '{' ... '}'
+#
+# EXPECTED OUTPUT:
+#   generic genus and implendum parata
+#
+# BACKEND: Generic `discerne` enum lowering gap on Rust (whitelist: generic/genus.fab).
+
+discretio Resultatus<T> {
+    Ok { T valor },
+    Err { textus nuntius }
+}
+
+implendum Reponens<T> {
+    functio accipe() → T
+}
+
+functio describe(Resultatus<numerus> r) → textus {
+    discerne r {
+        casu Ok fixum valor { redde "ok: §"(valor) }
+        casu Err fixum nuntius { redde "err: §"(nuntius) }
+    }
+}
+
+incipit {
+    nota "generic genus and implendum parata"
+}

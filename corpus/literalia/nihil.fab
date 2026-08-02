@@ -1,0 +1,50 @@
++++
+term = "nihil"
+kind = "keyword"
+category = "literal"
+canonical = true
+summary = "Null literal and nullable union bindings."
+syntax = "nihil"
+related = ["∪", "sponte", "nihil"]
++++
+
+# =============================================================================
+# nihil — Null literal and nullable union bindings.
+# =============================================================================
+#
+# What this teaches:
+#   • the `nihil` literal — represents absence of a value (null)
+#   • nullable union types with `∪` — `T ∪ nihil` for values that may be absent
+#   • null checks with `est nihil` and `non est nihil`
+#
+# Common mistakes:
+#   • Using nihil without declaring the type as T ∪ nihil — nihil requires a nullable union type.
+#
+# See also: ∪, sponte, nihil
+# =============================================================================
+
+# literalia/nihil — nihil literal and T ∪ nihil
+#
+# GRAMMAR:
+#   literal :← 'nihil'
+#   unionType :← type '∪' 'nihil'
+#
+# EXPECTED OUTPUT:
+#   nihil, verum, 42
+#
+# BACKEND:
+#   Cross-ref nihil/nihil.fab.
+
+functio maybe() → numerus ∪ nihil {
+    redde 42
+}
+
+incipit {
+    fixum numerus ∪ nihil absent ← nihil
+    nota absent
+
+    fixum _ nihilne ← absent est nihil
+    nota nihilne
+
+    nota maybe() non est nihil
+}

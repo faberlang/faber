@@ -1,0 +1,43 @@
++++
+term = "vacuum"
+kind = "keyword"
+category = "type"
+canonical = true
+summary = "Primitive no-value return type."
+syntax = "vacuum"
+aliases = ["void", "unit"]
+related = ["functio", "redde"]
++++
+
+# =============================================================================
+# vacuum — Primitive no-value return type.
+# =============================================================================
+#
+# What this teaches:
+#   • Void return — `vacuum` for functions that produce no value
+#   • Side-effect functions — functions returning `vacuum` execute for their side effects like `nota`
+#
+# Common mistakes:
+#   • confusing vacuum (void return type) with vacua (empty collection initializer) or nihil (null singleton)
+#
+# See also: functio, redde
+# =============================================================================
+
+
+
+# vacuum — void return type
+#
+# GRAMMAR:
+#   returnType :← 'vacuum'
+#
+# EXPECTED OUTPUT:
+#   Scalar stdout smoke (see body).
+#
+
+functio log(textus message) → vacuum {
+    nota message
+}
+
+incipit {
+    log("vacuum smoke")
+}

@@ -1,0 +1,47 @@
++++
+term = "incipit"
+kind = "keyword"
+category = "function"
+canonical = false
+summary = "Entry point that calls module-level functio declarations."
+syntax = "incipit { <callee>(<args>) }"
+related = ["incipit", "functio"]
++++
+# =============================================================================
+# incipit — Entry point that calls module-level functio declarations
+# =============================================================================
+#
+# What this teaches:
+#   • Entry point that calls module-level functio declarations.
+#   • Related keywords: incipit, functio
+#
+# Common mistakes:
+#   • Defining a function after `incipit` — all function declarations must precede the entry point.
+#
+# See also: incipit, functio
+# =============================================================================
+
+# incipit — entry point calling module-level functio
+#
+# functio name(params) → type { … }
+# incipit { nota callee(args) }
+#
+# GRAMMAR:
+#   funcDecl   :← 'functio' ident '(' params ')' ('→' type)? block
+#   entryBlock :← 'incipit' block
+#
+# EXPECTED OUTPUT:
+#   none — smoke asserts exit 0; no .expected sidecar.
+
+functio saluta(textus nomen) → textus {
+    redde "Salve, §!"(nomen)
+}
+
+functio adde(numerus a, numerus b) → numerus {
+    redde a + b
+}
+
+incipit {
+    nota saluta("Marcus")
+    nota "summa: §"(adde(3, 5))
+}

@@ -1,0 +1,51 @@
++++
+term = "sponte"
+kind = "keyword"
+category = "declaration"
+canonical = true
+summary = "Marks a named declaration slot (parameter or genus field) as voluntary — the caller or provider may omit the value."
+syntax = "<type> <name> sponte [= default | vel default]"
+aliases = ["optional", "voluntary"]
+related = ["vel", "nihil", "∪", "functio", "genus"]
++++
+
+# =============================================================================
+# sponte — Marks a named declaration slot (parameter or genus field) as voluntary — the caller or provider may omit the value.
+# =============================================================================
+#
+# What this teaches:
+#   • Voluntary parameter syntax — using `sponte` to mark function parameters or genus fields as optional
+#   • Default values — combining `sponte` with `vel` to provide fallbacks when the value is omitted
+#
+# Common mistakes:
+#   • confusing sponte (optional parameter with a default) with ∪ nihil (nullable type) — sponte marks omission, ∪ nihil marks absence
+#
+# See also: vel, nihil, ∪, functio, genus
+# =============================================================================
+
+
+
+# sponte — optional parameter / field marker
+#
+# GRAMMAR:
+#   optionalMarker :← 'sponte'
+#
+# EXPECTED OUTPUT:
+#   No incipit — declaration or test-runner surface only.
+#
+# BACKEND:
+#   declaration-only optional slots (whitelist: sponte/sponte.fab). Cross-ref: optionalis/optionalis.fab.
+#
+
+functio greet(textus nomen, textus titulus sponte) → textus {
+    redde nomen
+}
+
+functio paginate(numerus pagina sponte vel 1) → textus {
+    redde "page"
+}
+
+genus User {
+    textus name
+    textus email sponte
+}

@@ -1,0 +1,58 @@
++++
+term = "tacet"
+kind = "keyword"
+category = "transfer"
+canonical = true
+summary = "Marks an explicit no-op statement."
+syntax = "tacet"
+aliases = ["silent noop"]
+related = ["ergo", "redde"]
++++
+
+# =============================================================================
+# tacet — Marks an explicit no-op statement.
+# =============================================================================
+#
+# What this teaches:
+#   • Explicit no-op — `tacet` as a deliberate empty statement, especially in control flow
+#   • Musical rest metaphor — `tacet` signals intentional absence of action
+#
+# Common mistakes:
+#   • using tacet where logic is expected, which hides missing code; tacet is also outside the v1 AIR pure subset
+#
+# See also: ergo, redde
+# =============================================================================
+
+
+# tacet — explicit no-op (musical rest)
+#
+# tacet                                    -- deliberate empty statement
+# si <cond> ergo tacet                     -- guarded no-op
+#
+# GRAMMAR:
+#   noopStmt :← 'tacet'
+#
+# EXPECTED OUTPUT:
+#   cond verum, finis (tacet.expected).
+
+functio maybeNota(bivalens cond) → vacuum {
+    si cond {
+        nota "cond verum"
+    }
+    secus {
+        # deliberate no-op in else branch
+        tacet
+    }
+}
+
+incipit {
+    # prints
+    maybeNota(verum)
+    # tacet — no output
+    maybeNota(falsum)
+
+    # condition false, so tacet never runs
+    si falsum ergo tacet
+
+    nota "finis"
+}

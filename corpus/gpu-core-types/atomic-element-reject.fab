@@ -1,0 +1,33 @@
++++
+term = "atomic"
+kind = "type"
+category = "storage"
+summary = "atomic<T> v1 accepts only i32 and u32 elements."
+syntax = "atomic<i32> | atomic<u32>"
+related = ["numerus"]
++++
+# =============================================================================
+# atomic — atomic<T> v1 accepts only i32 and u32 elements
+# =============================================================================
+#
+# What this teaches:
+#   • atomic<T> v1 accepts only i32 and u32 elements.
+#   • Related keywords: numerus
+#
+# Common mistakes:
+#   • Using non-i32/u32 element types with `atomic<T>` — v1 accepts only `atomic<i32>` and `atomic<u32>`.
+#
+# See also: numerus
+# =============================================================================
+
+# atomic — unsupported element rejection
+#
+# GRAMMAR:
+#   type :← 'atomic' '<' ('i32' | 'u32') '>'
+#
+# EXPECTED OUTPUT:
+#   reject: atomic<f32> is outside the v1 element set.
+
+functio rejected_atomic(atomic<f32> cell) → vacuum {
+    redde
+}

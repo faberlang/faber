@@ -1,0 +1,60 @@
++++
+term = "et"
+kind = "operator-group"
+category = "logic"
+canonical = true
+summary = "Combines boolean expressions with logical and."
+syntax = "<expression> et <expression>"
+aliases = ["and"]
+related = ["aut", "non"]
++++
+
+# =============================================================================
+# et — Combines boolean expressions with logical and.
+# =============================================================================
+#
+# What this teaches:
+#   • Logical AND — `<bivalens> et <bivalens>` combines two boolean operands with short-circuit evaluation.
+#   • Short-circuit behavior — if the left operand is falsum, the right operand is not evaluated.
+#
+# Common mistakes:
+#   • Confusing `et` with `aut` — `et` requires both operands to be bivalens (truthy); `aut` requires at least one operand to be truthy.
+#
+# See also: aut, non
+# =============================================================================
+
+
+# et — logical AND on bivalent operands (short-circuit)
+#
+# <bivalens> et <bivalens>
+#
+# GRAMMAR:
+#   binaryExpr :← expr 'et' expr
+#
+# EXPECTED OUTPUT:
+#   none
+
+incipit {
+    # left operand: verum
+    fixum _ paratus ← verum
+    # right operand: verum
+    fixum _ licet ← verum
+    # verum et verum → verum
+    fixum _ currit ← paratus et licet
+
+    nota currit
+}
+
+proba "and requires both operands" {
+    adfirma (verum et verum) ≡ verum
+    adfirma (falsum et verum) ≡ falsum
+    adfirma (verum et falsum) ≡ falsum
+    adfirma (falsum et falsum) ≡ falsum
+}
+
+proba "and mirrors the incipit smoke" {
+    fixum _ paratus ← verum
+    fixum _ licet ← verum
+    fixum _ currit ← paratus et licet
+    adfirma currit ≡ verum
+}

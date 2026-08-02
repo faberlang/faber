@@ -1,0 +1,41 @@
++++
+term = "solum_in"
+kind = "keyword"
+category = "testing"
+canonical = true
+summary = "Restricts a test to a named environment or target."
+syntax = "solum_in <string> <string>"
+related = ["requirit"]
++++
+
+# =============================================================================
+# solum_in — Restricts a test to a named environment or target.
+# =============================================================================
+#
+# What this teaches:
+#   • Environment scoping — `solum_in "ci"` restricts a test to only run in
+#     the specified environment (e.g., CI, local)
+#   • Useful for tests that depend on external infrastructure or specific
+#     runtime conditions
+#
+# Common mistakes:
+#   • Confusing `solum_in` (environment-scoping keyword) with `solum` (stdlib module / test modifier).
+#
+# See also: requirit
+# =============================================================================
+
+# solum_in — environment-scoped test modifier
+#
+# GRAMMAR:
+#   testModifier :← 'solum_in' stringLit
+#
+# EXPECTED OUTPUT:
+#   No incipit — declaration or test-runner surface only.
+#
+# BACKEND:
+#   declaration-only test modifier (whitelist: solum-in/solum-in.fab).
+#
+
+proba "ci only" solum_in "ci" {
+    adfirma verum
+}

@@ -1,0 +1,70 @@
++++
+term = "redde"
+kind = "keyword"
+category = "transfer"
+canonical = true
+summary = "Returns a value from a function."
+syntax = "redde <expression>"
+aliases = ["return"]
+related = ["→", "⇥", "ergo", "iace", "tacet"]
++++
+
+# =============================================================================
+# redde — Returns a value from a function.
+# =============================================================================
+#
+# What this teaches:
+#   • Function return — `redde <expression>` returns a value from a `functio`,
+#     and bare `redde` returns `vacuum`
+#   • Early returns with `si <cond> ergo redde <expr>` for guard clauses
+#
+# Common mistakes:
+#   • Using `redde` outside a function body — `redde` is only valid inside `functio` declarations (SEM032).
+#
+# See also: →, ⇥, ergo, iace, tacet
+# =============================================================================
+
+# redde statements (function return)
+#
+# redde <expression>   -- return a value
+# redde                -- return void (vacuum)
+#
+# GRAMMAR:
+#   returnStmt :← 'redde' expr?
+#
+# EXPECTED OUTPUT:
+#   30, Salve, Munde, 42, 0, 20
+
+functio adde(numerus a, numerus b) → numerus {
+    redde a + b
+}
+
+functio saluta(textus nomen) → textus {
+    redde "Salve, " + nomen
+}
+
+functio duoetquadraginta() → numerus {
+    redde 42
+}
+
+functio tace() → vacuum {
+    # bare redde for vacuum return type
+    redde
+}
+
+functio porta(numerus x) → numerus {
+    si x < 0 {
+        # early return on negative input
+        redde 0
+    }
+    redde x * 2
+}
+
+incipit {
+    nota adde(10, 20)
+    nota saluta("Munde")
+    nota duoetquadraginta()
+    tace()
+    nota porta(-5)
+    nota porta(10)
+}

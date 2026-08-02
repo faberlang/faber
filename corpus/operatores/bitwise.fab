@@ -1,0 +1,56 @@
++++
+term = "∧"
+kind = "operator-group"
+category = "bitwise"
+canonical = true
+summary = "Bitwise and, or, xor, not, and shifts on numerus operands."
+syntax = "<expression> ∧ <expression> | <expression> ⊻ <expression> | ¬ <expression> | <expression> ⇐ <expression> | <expression> ⇒ <expression>"
+related = ["∨", "⊻", "¬", "⇐", "⇒"]
++++
+
+# =============================================================================
+# ∧ — Bitwise and, or, xor, not, and shifts on numerus operands.
+# =============================================================================
+#
+# What this teaches:
+#   • Bitwise operators — `∧` (and), `∨` (or), `⊻` (xor), `¬` (not), `⇐` (shift left), `⇒` (shift right).
+#   • Integer bit patterns — Visual demonstration of bitwise operations with binary literals.
+#
+# Common mistakes:
+#   • Confusing ∧ (bitwise and) with et (logical and) — they operate at different levels.
+#
+# See also: ∨, ⊻, ¬, ⇐, ⇒
+# =============================================================================
+
+# operatores/bitwise — ∧ ⊻ ¬ ⇐ ⇒
+#
+# GRAMMAR:
+#   bitwiseExpr :← expr ('∧' | '⊻' | '⇐' | '⇒') expr | '¬' expr
+#
+# EXPECTED OUTPUT:
+#   8, 6, 16, 4
+#
+# BACKEND:
+#   Integer bit patterns; cross-ref binarius/binarius.fab for combined tour.
+#   Unary ¬ documented in syntax; Rust emits `~` (whitelist if reintroduced in body).
+
+incipit {
+    fixum _ vexilla ← 0b1010
+    fixum _ persona ← 0b1100
+
+    fixum _ coniuncta ← vexilla ∧ persona
+    # 8 (0b1000)
+    nota coniuncta
+
+    fixum _ diversa ← vexilla ⊻ persona
+    # 6 (0b0110)
+    nota diversa
+
+    fixum _ sinistra ← 1 ⇐ 4
+    # 16
+    nota sinistra
+
+    fixum _ dextra ← 16 ⇒ 2
+    # 4
+    nota dextra
+}

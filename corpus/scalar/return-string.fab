@@ -1,0 +1,37 @@
++++
+term = "redde"
+kind = "keyword"
+category = "scalar"
+canonical = true
+summary = "Function returning a string literal via redde \"textus\"."
+syntax = "redde <string-literal>"
+aliases = ["return"]
+related = ["textus", "functio"]
++++
+
+# =============================================================================
+# redde — Function returning a string literal via redde "textus".
+# =============================================================================
+#
+# What this teaches:
+#   • String return values — `redde "textus"` returns a string literal from a
+#     `textus`-typed function
+#   • Verifies the backend handles string literal return types correctly
+#
+# Common mistakes:
+#   • Confusing a scalar (single-value) return with a collection return — this function returns one `textus`, not a list.
+#
+# See also: textus, functio
+# =============================================================================
+
+# scalar/return-string — return string literal
+#
+# GRAMMAR:
+#   returnStmt :← 'redde' expr
+#
+# Verifies that the Swift backend emits a function returning a
+# string literal (SC-001: primitives, functions, return).
+
+functio da_textum() → textus {
+    redde "textus"
+}

@@ -1,0 +1,52 @@
++++
+term = "ceteri"
+kind = "keyword"
+category = "function"
+canonical = true
+summary = "Collects remaining parameters, operands, or extracted fields."
+syntax = "ceteri <type> <name>"
+aliases = ["rest"]
+related = ["functio", "operandus", "ex"]
++++
+
+
+# =============================================================================
+# ceteri — Collects remaining parameters, operands, or extracted fields.
+# =============================================================================
+#
+# What this teaches:
+#   • Rest parameters — `ceteri <type> <name>` in a function signature collects
+#     all remaining arguments into a list
+#   • Variadic functions — `ceteri lista<numerus> numeri` enables summing an
+#     arbitrary number of numeric arguments
+#
+# Common mistakes:
+#   • confusing `ceteri` (rest parameter collecting remaining args into a list) with `vacua` (an empty collection initializer)
+#
+# See also: functio, operandus, ex
+# =============================================================================
+
+# ceteri — rest parameter (collects remaining arguments)
+#
+# functio <nomen>(ceteri <typus> <nomen>) → <typus>
+#
+# GRAMMAR:
+#   param :← 'ceteri' type ident
+#
+# EXPECTED OUTPUT:
+#   none
+
+functio summa(ceteri lista<numerus> numeri) → numerus {
+    varia _ total ← 0
+
+    itera ex numeri fixum n {
+        total ← total + n
+    }
+
+    redde total
+}
+
+incipit {
+    # ceteri receives the whole lista
+    nota summa([1, 2, 3, 4])
+}

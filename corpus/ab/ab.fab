@@ -1,0 +1,39 @@
++++
+term = "ab"
+kind = "keyword"
+category = "iteration"
+canonical = true
+summary = "Selects numeric range iteration in an itera loop."
+syntax = "itera ab <range> <binding>"
+related = ["itera", "ex", "de", "per", "ab pipeline"]
++++
+
+# =============================================================================
+# ab — Selects numeric range iteration in an itera loop.
+# =============================================================================
+#
+# What this teaches:
+#   • `itera ab` bounded range iteration — iterates over a numeric range with
+#     an optional step
+#   • Step syntax — the `per <step>` clause controls stride within the range
+#
+# Common mistakes:
+#   • using the retired `ab`/`ubi` collection pipeline DSL; use ordinary collection methods and closures instead
+#
+# See also: itera, ex, de, per, ab pipeline
+# =============================================================================
+
+# ab — bounded iteration step
+#
+# GRAMMAR:
+#   iteraStmt :← 'itera' 'ab' expr '‥' expr step? 'fixum' ident block
+#
+# EXPECTED OUTPUT:
+#   Scalar stdout smoke (see body).
+#
+
+incipit {
+    itera ab 0‥10 per 2 fixum i {
+        nota i
+    }
+}

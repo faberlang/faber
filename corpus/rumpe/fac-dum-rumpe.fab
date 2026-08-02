@@ -1,0 +1,39 @@
++++
+term = "rumpe"
+kind = "keyword"
+category = "transfer"
+canonical = false
+summary = "innermost dum wins over enclosing fac for rumpe"
+related = ["fac", "dum"]
++++
+
+# =============================================================================
+# rumpe — innermost dum wins over enclosing fac for rumpe
+# =============================================================================
+#
+# What this teaches:
+#   • Loop scoping — `rumpe` exits the innermost `dum` loop, not the enclosing
+#     `fac` block
+#   • Demonstrates that `rumpe` targets the nearest enclosing loop construct
+#
+# Common mistakes:
+#   • TODO: assuming `rumpe` inside `dum` inside `fac` exits the `fac`
+#
+# See also: fac, dum
+# =============================================================================
+
+# loop wins over enclosing fac — rumpe exits dum only
+
+incipit {
+    varia numerus x ← 0
+    fac {
+        dum x < 3 {
+            x ← x + 1
+            si x ≡ 2 ergo rumpe
+        }
+        nota x
+    }
+    cape err {
+        nota 0
+    }
+}

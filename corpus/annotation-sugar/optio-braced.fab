@@ -1,0 +1,41 @@
++++
+term = "optio"
+kind = "annotation"
+category = "cli"
+canonical = true
+summary = "Braced canonical @ optio CLI option record."
+syntax = "@ optio { binding = NAME, brevis = \"x\", longum = \"name\", typus = TYPE, descriptio = \"...\", ubique = verum }"
+related = ["optio", "cli", "annotation-sugar"]
++++
+
+# =============================================================================
+# optio — Braced canonical @ optio CLI option record.
+# =============================================================================
+#
+# What this teaches:
+#   • Braced option annotation — `@ optio { binding = NAME, … }` configures a
+#     CLI option with named fields
+#   • Option fields — binding, brevis, longum, typus, descriptio, and ubique
+#     control how the option is parsed and documented
+#
+# Common mistakes:
+#   • omitting required fields like `binding` or `longum` in `@ optio` braced records; boolean flags need `typus bivalens`
+#
+# See also: optio, cli, annotation-sugar
+# =============================================================================
+
+# Braced @ optio — canonical option record
+#
+# TARGET: annotation-sugar stage 2
+# PAIR: sugar `@ optio NAME brevis \"x\" ...` (see optio/optio.fab)
+
+@ cli { nomen = "optio-braced-smoke" }
+@ optio {
+    binding = verbose,
+    brevis = "v",
+    longum = "verbose",
+    typus = bivalens,
+    descriptio = "Verbose mode",
+    ubique = verum,
+}
+incipit argumenta args { }

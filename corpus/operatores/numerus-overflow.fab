@@ -1,0 +1,34 @@
++++
+term = "numerus"
+kind = "operator-group"
+category = "arithmetic"
+canonical = true
+summary = "Checked numerus arithmetic traps instead of wrapping on overflow."
+syntax = "<numerus> + <numerus>"
+related = ["+", "numerus"]
++++
+
+# =============================================================================
+# numerus — Checked numerus arithmetic traps instead of wrapping on overflow.
+# =============================================================================
+#
+# What this teaches:
+#   • Overflow safety — `numerus` (i64) traps on arithmetic overflow rather than wrapping.
+#   • Policy distinction — Bare numerus follows checked semantics, unlike Rust's release-mode wrapping.
+#
+# Common mistakes:
+#   • Assuming numerus wraps on overflow like modular word types.
+#
+# See also: +, numerus
+# =============================================================================
+
+# numerus-overflow — checked scalar arithmetic failure
+#
+# POLICY:
+#   Bare `numerus` is i64. Integer arithmetic traps on overflow; it does not
+#   inherit Rust release wrapping.
+
+incipit {
+    fixum numerus max ← 9223372036854775807
+    nota max + 1
+}

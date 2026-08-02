@@ -1,0 +1,73 @@
++++
+term = "←"
+kind = "operator-group"
+category = "assignment"
+canonical = true
+summary = "Assigns a value to a binding, field, or assignable expression."
+syntax = "<place> ← <expression>"
+aliases = ["assignment", "assign"]
+related = ["=", "fixum", "varia", "⊕", "⊖"]
++++
+
+
+# =============================================================================
+# ← — Assigns a value to a binding, field, or assignable expression.
+# =============================================================================
+#
+# What this teaches:
+#   • Explicit assignment — `place ← expression` rebinds a mutable variable
+#     to a new value
+#   • Compound operations — arithmetic expressions like `x ← x + 5` replace
+#     removed compound assignment glyphs
+#   • Postfix increment — `⊕` and `⊖` provide unit increment/decrement as
+#     standalone statements
+#
+# Common mistakes:
+#   • using `=` instead of `←` for assignment — `=` is structural field initialization in records, `←` is value assignment
+#
+# See also: =, fixum, varia, ⊕, ⊖
+# =============================================================================
+
+# assignatio — simple explicit assignment
+#
+# <place> ← <expression>
+#
+# Compound assignment glyphs were removed. Use explicit assignment, or postfix
+# ⊕ / ⊖ for unit increment/decrement (see incrementa/incrementa.fab).
+#
+# EXPECTED OUTPUT:
+#   20
+#   25
+#   15
+#   30
+#   10
+#   salve munde
+
+incipit {
+    varia numerus x ← 10
+
+    x ← 20
+    # 20
+    nota x
+
+    x ← x + 5
+    # 25
+    nota x
+
+    x ← x - 10
+    # 15
+    nota x
+
+    x ← x * 2
+    # 30
+    nota x
+
+    x ← x / 3
+    # 10
+    nota x
+
+    varia textus s ← "salve"
+    s ← s + " munde"
+    # salve munde
+    nota s
+}

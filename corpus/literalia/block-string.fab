@@ -1,0 +1,41 @@
++++
+term = "block-string"
+kind = "existing-home"
+category = "literal"
+canonical = true
+summary = "Block textus literals with embedded quotes and newlines."
+syntax = "«<text>»"
+aliases = ["«...»"]
+related = ["string", "textus"]
++++
+
+# =============================================================================
+# block-string — Block textus literals with embedded quotes and newlines.
+# =============================================================================
+#
+# What this teaches:
+#   • block string literals with `«...»` — embed quotes and newlines without escaping
+#   • multiline content in a single literal value
+#
+# Common mistakes:
+#   • Using triple-quote """...""" or ❝...❞ instead of «...» — block strings use guillemets only.
+#
+# See also: string, textus
+# =============================================================================
+
+# literalia/block-string — « ... » literals
+#
+# GRAMMAR:
+#   blockStringLit :← '«' ... '»'
+#
+# EXPECTED OUTPUT:
+#   he said "salve", line one
+
+incipit {
+    fixum _ quote ← «he said "salve"»
+    nota quote
+
+    fixum _ multiline ← «line one
+still line one»
+    nota multiline.sectio(0, 8)
+}

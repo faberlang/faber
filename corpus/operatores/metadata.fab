@@ -1,0 +1,40 @@
++++
+term = "§"
+kind = "operator-group"
+category = "format"
+canonical = true
+summary = "String-template substitution holes inside quoted literals."
+syntax = "\"<template>\"(<args>...)"
+related = ["textus", "scribe"]
++++
+
+# =============================================================================
+# § — String-template substitution holes inside quoted literals.
+# =============================================================================
+#
+# What this teaches:
+#   • String interpolation — `§` marks substitution holes in string literals, filled by parenthesized arguments.
+#   • Template syntax — `"Salve, §!"(nomen)` replaces `§` with the value of `nomen`.
+#
+# Common mistakes:
+#   • Forgetting that arguments come after the string in parentheses, not inline with § inside the string.
+#
+# See also: textus, scribe
+# =============================================================================
+
+# operatores/metadata — § string templates
+#
+# GRAMMAR:
+#   stringTemplate :← stringLit '(' expr (',' expr)* ')'
+#
+# EXPECTED OUTPUT:
+#   Salve, Marcus!, 1 + 2 = 3
+#
+# BACKEND:
+#   Per-file metadata belongs in +++ frontmatter, not line-start § directives.
+
+incipit {
+    fixum _ nomen ← "Marcus"
+    nota "Salve, §!"(nomen)
+    nota "§ + § = §"(1, 2, 3)
+}

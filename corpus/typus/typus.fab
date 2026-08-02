@@ -1,0 +1,70 @@
++++
+term = "typus"
+kind = "keyword"
+category = "type"
+canonical = true
+summary = "Declares a type alias."
+syntax = "typus <name> = <type>"
+aliases = ["type"]
+related = ["genus", "implendum", "objectum", "∪"]
++++
+
+# =============================================================================
+# typus — Declares a type alias.
+# =============================================================================
+#
+# What this teaches:
+#   • Type aliases — `typus` for creating shorthand names for complex types
+#   • Generic aliases — aliases can wrap generic types like `lista<T>` and `tabula<K,V>`
+#
+# Common mistakes:
+#   • confusing typus (type alias) with genus (nominal type) — typus creates a transparent alias, not a new type
+#
+# See also: genus, implendum, objectum, ∪
+# =============================================================================
+
+
+
+
+# Type aliases
+#
+# typus Nomen = Typus
+#
+# GRAMMAR:
+#   typeAliasDecl :← 'typus' ident '=' typeExpr
+#
+# EXPECTED OUTPUT:
+#   42, "Marcus", verum, ["Gaius", "Lucius", "Titus"], [100, 95, 87]
+
+# --- Primitive type aliases ---
+
+typus Signum = numerus
+typus Cognomen = textus
+typus Viget = bivalens
+
+# --- Generic type aliases ---
+
+typus Nomina = lista<textus>
+typus Puncta = lista<numerus>
+typus Index = tabula<textus, numerus>
+
+# Nullable type alias (canonical T ∪ nihil form)
+typus NomenOptivum = textus ∪ nihil
+
+incipit {
+    # Using primitive aliases
+    fixum Signum signum ← 42
+    fixum Cognomen cognomen ← "Marcus"
+    fixum Viget viget ← verum
+
+    nota signum
+    nota cognomen
+    nota viget
+
+    # Using generic aliases
+    fixum Nomina sodales ← ["Gaius", "Lucius", "Titus"]
+    nota sodales
+
+    fixum Puncta puncta ← [100, 95, 87]
+    nota puncta
+}

@@ -1,0 +1,19 @@
+[package]
+name = "radix-types"
+version = "0.79.0"
+edition = "2021"
+description = "Semantic type model, TypeTable, and shared DefId for the Radix compiler"
+license = "MIT"
+publish = false
+
+[dependencies]
+radix-lexer = { path = "../radix-lexer" }
+radix-syntax = { path = "../radix-syntax" }
+rustc-hash = "2"
+serde = { version = "1.0.228", features = ["derive"] }
+
+[dev-dependencies]
+rand = "0.8"
+
+[lints.clippy]
+pedantic = "deny"

@@ -1,0 +1,65 @@
++++
+term = "instans"
+kind = "conversio"
+category = "conversion"
+canonical = true
+summary = "Conversio arms for instans precision family and textus datetime provenance."
+syntax = "<expression> ↦ instans | instans<ms> | instans<us> | instans<ns>"
+related = ["↦", "⇥", "textus"]
++++
+
+# =============================================================================
+# instans — Conversio arms for instans precision family and textus datetime provenance.
+# =============================================================================
+#
+# What this teaches:
+#   • Precision family — `instans<ms>`, `instans<us>`, `instans<ns>` let you choose sub-second precision on datetime conversion.
+#   • Widening vs narrowing — coarse→fine widening is lossless; fine→coarse narrowing truncates sub-second bits.
+#   • RFC3339 roundtrip — text→instans parses, instans→textus emits at the declared precision without fabricated digits.
+#
+# Common mistakes:
+#   • Converting `instans<ns>` to `instans` and expecting sub-second precision in the text output — fine→coarse narrowing truncates sub-second bits.
+#
+# See also: ↦, ⇥, textus
+# =============================================================================
+
+# conversio — instans precision family and valor provenance
+#
+# WHY: `textus ↦ instans<N>` restores datetime provenance from wire carriers;
+# `instans ↔ instans` re-tags precision; `instans ↦ textus` emits RFC3339 UTC
+# at the declared precision contract (no fabricated sub-precision digits).
+#
+# textus ↦ instans<N>    — RFC3339 wire per target precision
+# instans ↦ instans<ms>  — coarse→fine widening (lossless at storage)
+# instans<ns> ↦ instans    — fine→coarse narrowing (truncates sub-second bits)
+# instans ↦ textus        — precision-honoring RFC3339 `Z` emit
+# textus ↦ instans ⇥ …     — explicit recovery when wire is not a datetime
+
+incipit {
+    fixum textus utc ← "1979-05-27T07:32:00.123456Z"
+    fixum textus offset ← "1979-05-27T16:32:00+0900"
+
+    fixum instans seconds ← utc ↦ instans
+    fixum instans<ms> millis ← seconds ↦ instans<ms>
+    fixum instans<us> micros ← utc ↦ instans<us>
+    fixum instans<ns> nanos ← utc ↦ instans<ns>
+    fixum instans normalized ← offset ↦ instans
+
+    adfirma millis ↦ textus ≡ "1979-05-27T07:32:00.000Z"
+    adfirma micros ↦ textus ≡ "1979-05-27T07:32:00.123456Z"
+    adfirma normalized ≡ seconds secus "offset ingest lands on same UTC instant"
+
+    fixum instans<ns> fine ← nanos
+    fixum instans narrowed ← fine ↦ instans
+    adfirma narrowed ↦ textus ≡ "1979-05-27T07:32:00Z"
+
+    fixum textus bad ← "not-a-datetime"
+    fixum instans recovered ← bad ↦ instans ⇥ seconds
+    adfirma recovered ≡ seconds
+
+    nota seconds ↦ textus
+    nota millis ↦ textus
+    nota micros ↦ textus
+    nota nanos ↦ textus
+    nota narrowed ↦ textus
+}

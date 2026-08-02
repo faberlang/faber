@@ -1,0 +1,39 @@
++++
+term = "async tempus dormiet"
+kind = "concept"
+category = "ad"
+canonical = true
+summary = "Async tempus.dormiet and sync tempus.expectet share the tempus:dormiet route."
+syntax = "tempus.expectet(ms) | tacebit tempus.dormiet(ms)"
+related = ["ad", "tempus", "futura", "sermo"]
++++
+
+# =============================================================================
+# async tempus dormiet — async tempus.dormiet and sync tempus.expectet share
+# the tempus:dormiet route.
+# =============================================================================
+#
+# What this teaches:
+#   • Timer proof pair — `expectet` (sync) and `dormiet` (async) use the same
+#     `tempus:dormiet` route; caller posture selects the materializer
+#   • Async entry — `incipiet { … }` is the async program entry point
+#
+# Common mistakes:
+#   • confusing ad route syntax — `tacebit` awaits and discards async completion
+#
+# See also: ad, tempus, futura, sermo
+# =============================================================================
+
+# Timer proof pair for async `ad` materialization.
+#
+# `expectet` is the synchronous wrapper and `dormiet` is the async wrapper.
+# Norma currently declares the async wrapper with compatibility `@ futura`; this
+# example consumes it through `tacebit`.
+
+importa ex "norma:tempus" privata tempus
+
+incipiet {
+    tempus.expectet(0)
+    tacebit tempus.dormiet(0)
+    adfirma verum
+}

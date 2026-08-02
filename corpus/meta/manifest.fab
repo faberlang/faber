@@ -1,0 +1,61 @@
++++
+term = "manifest"
+kind = "concept"
+category = "package"
+canonical = true
+summary = "faber.toml package metadata for build, run, and test."
+syntax = "faber.toml"
+aliases = ["faber.toml", "package manifest"]
+related = ["targets", "cli", "incipit", "proba"]
++++
+
+# =============================================================================
+# manifest — faber.toml package metadata for build, run, and test.
+# =============================================================================
+#
+# What this teaches:
+#   • the package manifest file `faber.toml` — configures build, run, and test for a Faber package
+#   • key manifest sections: `[package]`, `[paths]`, `[build]`
+#
+# Common mistakes:
+#   • Omitting the required [package], [paths], or [build] sections — a valid faber.toml must include all three.
+#
+# See also: targets, cli, incipit, proba
+# =============================================================================
+
+# meta/manifest — package manifest (META)
+#
+# Website/tooling documents faber.toml; this exemplum is not a manifest file.
+#
+# Example package layout:
+#
+#   faber.toml
+#   src/main.fab
+#
+# Example faber.toml:
+#
+#   [package]
+#   name = "salve"
+#   version = "0.1.0"
+#   edition = "2026"
+#
+#   [paths]
+#   source = "src"
+#   entry = "main.fab"
+#
+#   [build]
+#   target = "rust"
+#   kind = "bin"
+#
+# GRAMMAR:
+#   packageManifest :← toml document (faber tool, not Faber source)
+#
+# EXPECTED OUTPUT:
+#   manifest exemplum
+#
+# BACKEND:
+#   META-only — runnable body is compile smoke only.
+
+incipit {
+    nota "manifest exemplum — configure packages via faber.toml"
+}

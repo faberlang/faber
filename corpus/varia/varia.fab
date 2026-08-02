@@ -1,0 +1,68 @@
++++
+term = "varia"
+kind = "keyword"
+category = "binding"
+canonical = true
+summary = "Declares a mutable binding."
+syntax = "varia <type|_> <pattern> [← <expression>]"
+aliases = ["let", "mutable"]
+related = ["fixum", "←", "⊕"]
++++
+
+# =============================================================================
+# varia — Declares a mutable binding.
+# =============================================================================
+#
+# What this teaches:
+#   • Mutable bindings — `varia` for values that can be reassigned after declaration
+#   • Immutable bindings — `fixum` and `sit` for values that cannot be reassigned
+#
+# Common mistakes:
+#   • declaring varia when the binding is never reassigned — use fixum instead (WARN013)
+#
+# See also: fixum, ←, ⊕
+# =============================================================================
+
+
+
+
+# Mutable and immutable variable declarations
+#
+# varia <nomen> ← <expr>   -- mutable binding (may reassign)
+# fixum <nomen> ← <expr>   -- immutable binding (see fixum/fixum.fab)
+#
+# GRAMMAR:
+#   bindingStmt :← ('varia' | 'fixum') type? ident '←' expr
+#
+# EXPECTED OUTPUT:
+#   0, 1, 11, "Salve, Mundus!", 30, "Vale"
+
+incipit {
+    # --- Mutable bindings with varia ---
+
+    varia _ computus ← 0
+    nota computus
+
+    computus ← 1
+    nota computus
+
+    computus ← computus + 10
+    nota computus
+
+    # --- Immutable bindings: fixum _ and sit ---
+
+    fixum _ salutatio ← "Salve, Mundus!"
+    nota salutatio
+
+    # sit compresses repeated fixum _ when chaining inferred locals
+    sit x ← 10
+    sit y ← 20
+    sit summa ← x + y
+    nota summa
+
+    # --- Reassign only varia bindings ---
+
+    varia _ nuntius ← "Salve"
+    nuntius ← "Vale"
+    nota nuntius
+}

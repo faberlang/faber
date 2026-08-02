@@ -1,0 +1,52 @@
++++
+term = "metior"
+kind = "existing-home"
+category = "testing"
+canonical = true
+summary = "Marks a test for metered or measured execution."
+syntax = "metior"
+related = ["temporis", "prima", "ultima"]
++++
+
+# =============================================================================
+# metior — Marks a test for metered or measured execution.
+# =============================================================================
+#
+# What this teaches:
+#   • lista access and query intrinsics — `primus()`, `ultimus()`, `accipe()`, `longitudo()`
+#   • membership checks — `vacua()` and `continet()`
+#
+# Common mistakes:
+#   • Calling primus() or ultimus() on an empty lista — these methods require at least one element.
+#
+# See also: temporis, prima, ultima
+# =============================================================================
+
+# lista<T> access and query intrinsics
+#
+# res.primus() | res.ultimus() | res.accipe(i) | res.longitudo()   -- query
+# res.vacua() | res.continet(elem)                                 -- membership
+#
+# GRAMMAR:
+#   listMethod :← expr '.' ('primus' | 'ultimus' | 'accipe' | 'longitudo'
+#                         | 'vacua' | 'continet') '(' args? ')'
+#
+# EXPECTED OUTPUT:
+#   No pinned stdout — smoke asserts exit 0 and typed lowering only.
+#
+# BACKEND: Go e2e whitelist — lista intrinsic methods not yet lowered for Go
+# (whitelist: lista/methodi-accessus.fab).
+
+incipit {
+    fixum _ res ← [1, 2, 3, 4, 5] ∷ lista<numerus>
+
+    fixum _ primus ← res.primus()
+    fixum _ ultimus ← res.ultimus()
+    fixum _ tertius ← res.accipe(2)
+    fixum _ longitudo ← res.longitudo()
+    fixum _ vacuaest ← res.vacua()
+    fixum _ habettres ← res.continet(3)
+
+    nota primus, ultimus, tertius
+    nota longitudo, vacuaest, habettres
+}

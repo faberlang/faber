@@ -1,0 +1,36 @@
++++
+term = "nihil"
+kind = "keyword"
+category = "boolean"
+canonical = true
+summary = "Represents the null value and can prefix a null check."
+syntax = "nihil [<expression>]"
+related = ["∪", "sponte"]
++++
+
+# =============================================================================
+# nihil — Represents the null value and can prefix a null check.
+# =============================================================================
+#
+# What this teaches:
+#   • the `nihil` keyword — used for null/none values
+#
+# Common mistakes:
+#   • Using nihil without ∪ in the type position — nullable types must be declared as T ∪ nihil.
+#
+# See also: ∪, sponte
+# =============================================================================
+
+# nihil — null literal
+#
+# GRAMMAR:
+#   literal :← 'nihil'
+#
+# EXPECTED OUTPUT:
+#   Scalar stdout smoke (see body).
+#
+
+incipit {
+    fixum _ nothing ← nihil
+    nota nothing
+}

@@ -1,0 +1,37 @@
++++
+term = "ad"
+kind = "keyword"
+category = "endpoint"
+canonical = true
+summary = "ad opens a sermo endpoint and materializes the stream with an explicit conversio target."
+syntax = "ad 'runtime:echo' (payload) ↦ textus"
+related = ["conversio"]
++++
+
+# =============================================================================
+# ad — ad opens a sermo endpoint and materializes the stream with an explicit
+# conversio target.
+# =============================================================================
+#
+# What this teaches:
+#   • Endpoint materialization — `ad 'runtime:echo'(payload) ↦ textus` opens a
+#     sermo connection and converts the stream to a concrete type
+#   • The `↦` materialization operator — directs how the inbound frame stream
+#     is interpreted
+#
+# Common mistakes:
+#   • confusing ad route syntax — the materialization target type must match the endpoint's actual return shape
+#
+# See also: conversio
+# =============================================================================
+
+# Exemplar: expression `ad` with `sermo ↦ textus` materialization.
+#
+# Proves the conversio returns the echoed opener text as a `textus` value.
+# The runtime:echo backend echoes the opener back as a single textus frame;
+# `↦ textus` materializes it. The exemplar asserts equality.
+
+incipit {
+    fixum textus t ← ad 'runtime:echo' ("salve, munde") ↦ textus
+    adfirma t ≡ "salve, munde"
+}

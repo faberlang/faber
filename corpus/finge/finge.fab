@@ -1,0 +1,71 @@
++++
+term = "finge"
+kind = "keyword"
+category = "object"
+canonical = true
+summary = "Constructs a tagged union variant."
+syntax = "finge <variant> [{ <field> = <expr>, ... }] [∷ <type>]"
+related = ["discretio"]
++++
+# =============================================================================
+# finge — Constructs a tagged union variant
+# =============================================================================
+#
+# What this teaches:
+#   • Constructs a tagged union variant.
+#   • Related keywords: discretio
+#
+# Common mistakes:
+#   • Constructing a variant with the wrong field names — `finge Varians { field = expr } ∷ DiscretioNomen` must match the variant's declared fields exactly.
+#
+# See also: discretio
+# =============================================================================
+
+# finge — variant construction expressions
+#
+# finge Varians { … } ∷ DiscretioNomen
+#
+# GRAMMAR:
+#   variantExpr :← 'finge' variantName (fieldInitBlock)? '∷' typeName
+#
+# EXPECTED OUTPUT:
+#   finge expressiones paratae
+
+# --- Discretio types to construct ---
+
+discretio Condicio {
+    Agens,
+    Iners,
+    Pendens
+}
+
+discretio Nuntius {
+    Pulsus { numerus x, numerus y },
+    Clavis { textus clavis },
+    Finis
+}
+
+discretio Responsum {
+    Bonum { textus nuntius },
+    Malum { textus causa }
+}
+
+incipit {
+    # --- Unit variants with explicit type ---
+
+    fixum Condicio s1 ← finge Agens ∷ Condicio
+    fixum Condicio s2 ← finge Pendens ∷ Condicio
+
+    # --- Payload variants with explicit type ---
+
+    fixum Nuntius e1 ← finge Pulsus { x = 100, y = 200 } ∷ Nuntius
+    fixum Nuntius e2 ← finge Clavis { clavis = "intro" } ∷ Nuntius
+    fixum Nuntius e3 ← finge Finis ∷ Nuntius
+
+    # --- Responsum variants ---
+
+    fixum Responsum r1 ← finge Bonum { nuntius = "opus perfectum" } ∷ Responsum
+    fixum Responsum r2 ← finge Malum { causa = "opus fractum" } ∷ Responsum
+
+    nota "finge expressiones paratae"
+}

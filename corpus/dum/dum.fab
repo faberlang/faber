@@ -1,0 +1,71 @@
++++
+term = "dum"
+kind = "keyword"
+category = "control-flow"
+canonical = true
+summary = "Repeats a block while a condition remains true."
+syntax = "dum <condition> <block|ergo statement>"
+aliases = ["while"]
+related = ["si", "ergo", "fac"]
++++
+
+# =============================================================================
+# dum — Repeats a block while a condition remains true.
+# =============================================================================
+#
+# What this teaches:
+#   • While loop — `dum <condition> { <body> }` repeats a block as long as the condition is true.
+#   • Loop variable mutation — mutable `varia` bindings allow counter-based loop control.
+#   • Ascending and descending loops — counting up from 0 or down from N until the condition is falsum.
+#
+# Common mistakes:
+#   • Using `rumpe` or `perge` outside a loop — both are only valid inside `dum`, `itera`, `fac`, `meus`, or `tuus` blocks (SEM030, SEM031).
+#
+# See also: si, ergo, fac
+# =============================================================================
+
+# dum — while loop
+#
+# dum <condition> { <body> }
+#
+# GRAMMAR:
+#   loopStmt :← 'dum' expr '{' stmt* '}'
+#
+# EXPECTED OUTPUT:
+#   dum.expected
+
+incipit {
+    # Ascending counter: varia so the loop variable can mutate
+    varia numerus computus ← 0
+
+    dum computus < 5 {
+        nota computus
+        computus ← computus + 1
+    }
+
+    # Descending loop: condition becomes falsum at 0
+    varia numerus reliquum ← 3
+
+    dum reliquum > 0 {
+        nota "reliquum: §"(reliquum)
+        reliquum ← reliquum - 1
+    }
+
+    nota "perfectum!"
+}
+
+proba "dum counts up to its condition" {
+    varia numerus computus ← 0
+    dum computus < 5 {
+        computus ← computus + 1
+    }
+    adfirma computus ≡ 5
+}
+
+proba "dum counts down to zero" {
+    varia numerus reliquum ← 3
+    dum reliquum > 0 {
+        reliquum ← reliquum - 1
+    }
+    adfirma reliquum ≡ 0
+}

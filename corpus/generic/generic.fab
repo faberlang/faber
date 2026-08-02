@@ -1,0 +1,48 @@
++++
+term = "generic"
+kind = "concept"
+category = "type"
+canonical = true
+summary = "Generic functions with angle-bracket type and magnitudo parameters."
+syntax = "functio <name><T, magnitudo N>(<params>) → <type> <block>"
+related = ["functio", "genus", "magnitudo"]
++++
+# =============================================================================
+# generic — Generic functions with angle-bracket type and magnitudo parameters
+# =============================================================================
+#
+# What this teaches:
+#   • Generic functions with angle-bracket type and magnitudo parameters.
+#   • Related keywords: functio, genus, magnitudo
+#
+# Common mistakes:
+#   • Type parameter not satisfying bounds — generic parameters must meet any constraints declared on the generic function or genus.
+#
+# See also: functio, genus, magnitudo
+# =============================================================================
+
+# Generic functions with angle-bracket type parameters
+#
+# Type and size parameters appear in `<...>` before value parameters.
+#
+# GRAMMAR:
+#   funcDecl :← 'functio' ident genericParams? '(' valueParams ')' ...
+#   genericParams :← '<' (ident | 'magnitudo' ident) (',' (ident | 'magnitudo' ident))* '>'
+#
+# EXPECTED OUTPUT:
+#   generic function signatures paratae
+#
+# BACKEND: Generic call codegen gap on Rust (`T: Clone`; whitelist: generic/generic.fab).
+# Call sites are deferred in this smoke exemplar.
+
+functio identitas<T>(T valor) → T {
+    redde valor
+}
+
+functio primum<T>(lista<T> res) → T ∪ nihil {
+    redde res.primus()
+}
+
+incipit {
+    nota "generic function signatures paratae"
+}

@@ -1,0 +1,58 @@
++++
+term = "tabula"
+kind = "keyword"
+category = "collection"
+canonical = true
+summary = "Generic key/value map type."
+syntax = "tabula<K,V>"
+aliases = ["map", "dictionary"]
+related = ["lista", "copia", "∷", "itera"]
++++
+
+# =============================================================================
+# tabula — Generic key/value map type.
+# =============================================================================
+#
+# What this teaches:
+#   • Map access methods — `accipe`, `ponde`, `habet`, `dele`, `longitudo`, `vacua`
+#   • Null-safe access — using `vel` to supply defaults when a key is absent
+#
+# Common mistakes:
+#   • attempting to access a missing key without a default and getting a ∪ nihil value — use vel for fallback
+#
+# See also: lista, copia, ∷, itera
+# =============================================================================
+
+
+
+
+# tabula<K,V> access and mutation intrinsics
+#
+# puncta.pone(k, v) | puncta.accipe(k) | puncta.habet(k)   -- get/put
+# puncta.dele(k) | puncta.longitudo() | puncta.vacua()      -- delete/size
+#
+# GRAMMAR:
+#   mapMethod :← expr '.' ('pone' | 'accipe' | 'habet' | 'dele'
+#                         | 'longitudo' | 'vacua') '(' args? ')'
+#
+# EXPECTED OUTPUT:
+#   No pinned stdout — smoke asserts exit 0; tabula/tabula.fab carries scalar contract.
+#
+# BACKEND: Wasm tier floor FrontendAnalyzed (method surface not yet Runnable;
+# whitelist: tabula/methodi-accessus.fab).
+
+incipit {
+    varia tabula<textus, numerus> puncta ← vacua
+    puncta.pone("aelia", 95)
+    puncta.pone("balbus", 87)
+
+    fixum _ aelia ← puncta.accipe("aelia")
+    fixum _ absens ← puncta.accipe("carus")
+    fixum _ carus ← puncta.accipe("carus") vel 0
+    fixum _ habetbalbum ← puncta.habet("balbus")
+    fixum _ remotus ← puncta.dele("balbus")
+    fixum _ longitudo ← puncta.longitudo()
+    fixum _ vacuaest ← puncta.vacua()
+
+    nota aelia, absens, carus, habetbalbum, remotus, longitudo, vacuaest
+}

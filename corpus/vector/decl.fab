@@ -1,0 +1,31 @@
++++
+term = "vector"
+kind = "type"
+category = "register"
+summary = "vector type declarations: long form and vf32 sugar"
+syntax = "vector<T, N> | vf32[N]"
++++
+
+# =============================================================================
+# vector — vector type declarations: long form and vf32 sugar.
+# =============================================================================
+#
+# What this teaches:
+#   • Vector declaration — `vector<T, N>` long form and `vf32[N]` sugar syntax
+#   • Register type — vectors are fixed-width register types, different from collection tensors
+#
+# Common mistakes:
+#   • confusing vector<T, N> (register type) with tensor<T, [N]> (collection type) — vector is a GPU register, not a collection
+#
+# See also: vector, vf32, gpu
+# =============================================================================
+
+
+
+functio takes(vector<fractus<f32>, 4> v, vf32[4] w) → numerus {
+    redde 0
+}
+
+functio declSmoke() → numerus {
+    redde 0
+}

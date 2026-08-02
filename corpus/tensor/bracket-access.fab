@@ -1,0 +1,64 @@
++++
+term = "tensor"
+kind = "type"
+category = "collection"
+canonical = false
+summary = "Tensor bracket access lowers to accipe and ponde."
+syntax = "tensor[index] | tensor[index] ← value"
+related = ["tensor", "accipe", "ponde", "lista"]
++++
+
+# =============================================================================
+# tensor — Tensor bracket access lowers to accipe and ponde.
+# =============================================================================
+#
+# What this teaches:
+#   • Bracket sugar — `tensor[index]` and `tensor[index] ← value` as syntactic sugar
+#   • Nullable reads — bracket access keeps `∪ nihil` semantics, so use `vel` before arithmetic
+#
+# Common mistakes:
+#   • forgetting that bracket reads return T ∪ nihil and need vel before arithmetic
+#
+# See also: tensor, accipe, ponde, lista
+# =============================================================================
+
+
+
+
+# tensor — bracket access sugar for accipe / ponde
+#
+# Rank-1 tensors accept scalar integer indices. Rank-N tensors use a list-shaped
+# bracket expression such as `[[r, c]]` or a bound `lista<integer>` value.
+# Reads keep `accipe` semantics and return `T ∪ nihil`, so ordinary source uses
+# `vel` before arithmetic.
+#
+# EXPECTED stdout:
+#   3.0
+#   3.0
+#   4.0
+#   4.0
+#   4.0
+
+incipit {
+    fixum tf32[] seed ← vacua
+    varia tf32[4] input ← seed.crea(0.0, [4])
+    varia tf32[4] output ← seed.crea(0.0, [4])
+
+    fixum u32 id ← 1
+    input[id] ← 3.0
+    fixum f32 old ← input[id] vel 0.0
+    fixum f32 oldMethod ← input.accipe([id]) vel 0.0
+    output[id] ← old + 1.0
+    fixum f32 updated ← output[id] vel 0.0
+
+    varia tf32[2, 2] grid ← seed.crea(0.0, [2, 2])
+    grid[[1, 0]] ← updated
+    fixum f32 cell ← grid[[1, 0]] vel 0.0
+    fixum f32 cellMethod ← grid.accipe([1, 0]) vel 0.0
+
+    nota old
+    nota oldMethod
+    nota updated
+    nota cell
+    nota cellMethod
+}

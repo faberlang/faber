@@ -1,0 +1,79 @@
++++
+term = "varia"
+kind = "keyword"
+category = "binding"
+canonical = false
+summary = "Type-first fixum and varia bindings with explicit types."
+syntax = "varia <type> <name> ← <expr> | fixum <type> <name> ← <expr>"
+related = ["varia", "fixum", "←"]
++++
+
+# =============================================================================
+# varia — Type-first fixum and varia bindings with explicit types.
+# =============================================================================
+#
+# What this teaches:
+#   • Typed declarations — `varia <type> <name>` and `fixum <type> <name>` with explicit type annotations
+#   • Mutability — `varia` for mutable bindings, `fixum` for immutable
+#
+# Common mistakes:
+#   • providing a type annotation that doesn't match the assigned expression's type — the compiler checks exact type agreement
+#
+# See also: varia, fixum, ←
+# =============================================================================
+
+
+
+
+# Typed variable declarations (type-first syntax)
+#
+# varia <type> <nomen> ← <expr>   -- typed mutable
+# fixum <type> <nomen> ← <expr>   -- typed immutable
+#
+# GRAMMAR:
+#   bindingStmt :← ('varia' | 'fixum') type ident '←' expr
+#
+# EXPECTED OUTPUT:
+#   Prints initial and updated values for numerus, textus, bivalens, and fractus.
+
+incipit {
+    # --- Typed immutable declarations ---
+
+    fixum numerus aetas ← 30
+    fixum textus nomen ← "Marcus"
+    fixum bivalens viget ← verum
+
+    nota aetas
+    nota nomen
+    nota viget
+
+    # --- Typed mutable declarations ---
+
+    varia numerus numeratio ← 0
+    varia textus condicio ← "pendens"
+    varia bivalens currit ← falsum
+
+    nota numeratio
+    nota condicio
+    nota currit
+
+    # Reassign mutable typed variables (fixum bindings cannot be reassigned)
+    numeratio ← 100
+    condicio ← "perfectum"
+    currit ← verum
+
+    nota numeratio
+    nota condicio
+    nota currit
+
+    # --- Fractional (fractus) typed bindings ---
+
+    fixum fractus pi ← 3.14159
+    varia fractus ratio ← 0.05
+
+    nota pi
+    nota ratio
+
+    ratio ← 0.10
+    nota ratio
+}

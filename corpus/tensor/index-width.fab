@@ -1,0 +1,74 @@
++++
+term = "tensor"
+kind = "type"
+category = "collection"
+canonical = false
+summary = "Tensor index intrinsics accept integer-width index lists that fit the i64 runtime boundary (lista<u32>, lista<numerus<i32>>, …)."
+syntax = "tensor.accipe(lista<i64-fit integer>) | tensor.ponde(lista<i64-fit integer>, value)"
+related = ["tensor", "lista", "accipe", "ponde"]
++++
+
+# =============================================================================
+# tensor — Tensor index intrinsics accept integer-width index lists.
+# =============================================================================
+#
+# What this teaches:
+#   • Index width flexibility — `accipe` and `ponde` accept any i64-fit integer list type
+#   • GPU integration — u32 thread ids flow directly without a bare-numerus detour
+#
+# Common mistakes:
+#   • using u64 index values before a checked conversion policy exists — u64 is rejected for index vectors
+#
+# See also: tensor, lista, accipe, ponde
+# =============================================================================
+
+
+
+
+# tensor — index vectors accept i64-fit integer widths (DEFER-064)
+# STYLE: lu32 / tf32 sugar — numeric corpus; see docs/design/numeric-type-sugar.md
+#
+# KIR/GPU source naturally uses u32 thread ids. `accipe` / `ponde` accept
+# integer index vectors that fit the runtime `&[i64]` boundary at call sites;
+# widening happens at codegen, not in the source program. `u64` is rejected
+# until there is a checked conversion policy. The global signed↔unsigned
+# widening lattice is not relaxed — only index-vector slots are.
+#
+# GRAMMAR:
+#   tensorIndexVector :← lista<i64-fit integer>  (accepted at NumerusArray intrinsic slots)
+#
+# WHY:
+#   GPU thread ids are u32; forcing a bare-numerus detour broke the KIR source
+#   shape. The exception is structural (i64-fit lista<integer>), not a lattice
+#   widening.
+#
+# EXPECTED OUTPUT:
+#   index-width.fab stdout contract (u32 thread-id index, rank-2 u32 origin).
+
+incipit {
+    fixum tf32[] seed ← vacua
+    varia tf32[4] input ← seed.crea(0.0, [4])
+
+    # u32 thread id flowing directly into accipe — no bare-numerus detour.
+    fixum u32 id ← 1
+    fixum f32 first ← input.accipe([id]) vel 0.0
+    input.ponde([id], 9.0)
+    fixum f32 updated ← input.accipe([id]) vel 0.0
+
+    # A bound lu32 index vector also typechecks (lista width sugar).
+    fixum lu32 idx ← [id]
+    fixum f32 bound ← input.accipe(idx) vel 0.0
+
+    # Rank-2 grid with a lista<u32> origin index.
+    varia tf32[4, 4] grid ← seed.crea(0.0, [4, 4])
+    fixum u32 r ← 2
+    fixum u32 c ← 3
+    fixum lista<u32> origin ← [r, c]
+    grid.ponde(origin, 7.0)
+    fixum f32 cell ← grid.accipe(origin) vel 0.0
+
+    nota first
+    nota updated
+    nota bound
+    nota cell
+}

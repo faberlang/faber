@@ -1,0 +1,35 @@
++++
+term = "tacebit"
+kind = "keyword"
+category = "async"
+canonical = true
+summary = "Awaits a promissum and discards the success value."
+syntax = "tacebit future"
+aliases = ["await"]
+related = ["figendum", "reddet", "fiet", "promissum"]
++++
+
+# =============================================================================
+# tacebit — Await-discard
+# =============================================================================
+#
+# What this teaches:
+#   • Await any success type `T` and discard the resolved value.
+#   • Prefer when side effects matter and the success payload is unused.
+#
+# See also: figendum, reddet, fiet, promissum
+# =============================================================================
+
+# GRAMMAR:
+#   awaitDiscard :← 'tacebit' expr
+
+```fab
+functio responde() fiet → numerus {
+    redde 1
+}
+
+incipiet {
+    tacebit responde()
+    nota "done"
+}
+```

@@ -1,0 +1,53 @@
++++
+term = "nota"
+kind = "keyword"
+category = "output"
+canonical = false
+summary = "Diagnostic output severities: nota, vide, and mone."
+syntax = "nota <expr> | vide <expr> | mone <expr>"
+related = ["nota", "vide", "mone", "scribe"]
++++
+
+
+# =============================================================================
+# nota — Diagnostic output severities: nota, vide, and mone.
+# =============================================================================
+#
+# What this teaches:
+#   • Diagnostic severity levels — `nota` for neutral info, `vide` for inspection, `mone` for warnings.
+#   • Multiple arguments — Each statement accepts comma-separated expressions.
+#
+# Common mistakes:
+#   • Confusing diagnostic output (nota/vide/mone) with scribe (stdout) — diagnostic statements go to diagnostic channels, not stdout.
+#
+# See also: nota, vide, mone, scribe
+# =============================================================================
+
+# nota, vide, mone — diagnostic severity levels
+#
+# nota <expr>[, <expr>…]
+# vide <expr>[, <expr>…]
+# mone <expr>[, <expr>…]
+#
+# GRAMMAR:
+#   outputStmt :← ('nota' | 'vide' | 'mone') expr (',' expr)*
+#
+# EXPECTED OUTPUT:
+#   none — output mixes diagnostic channels; no .expected sidecar.
+
+incipit {
+    fixum _ condicio ← "currit"
+    fixum _ quantitas ← 42
+
+    # Neutral diagnostic note
+    nota "opus initum"
+    nota "condicio: §"(condicio)
+
+    # Inspection note
+    vide "vide: ansa incipit"
+    vide "vide: numerus ←", quantitas
+
+    # Warning note
+    mone "mone: forma vetus usa"
+    mone "mone: numerus limen superat:", quantitas
+}

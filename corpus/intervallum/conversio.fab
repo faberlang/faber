@@ -1,0 +1,59 @@
++++
+term = "intervallum"
+kind = "type"
+category = "range"
+canonical = true
+summary = "Clamp, materialize, and contain via conversio and continet."
+related = ["intra", "↦", "lista"]
++++
+# =============================================================================
+# intervallum — Clamp, materialize, and contain via conversio and continet
+# =============================================================================
+#
+# What this teaches:
+#   • Clamp, materialize, and contain via conversio and continet.
+#   • Related keywords: intra, ↦, lista
+#
+# Common mistakes:
+#   • Confusing `‥` (exclusive end) with `…` (inclusive end) — `15 ↦ 0‥10` clamps to 9, while `15 ↦ 0…10` clamps to 10.
+#
+# See also: intra, ↦, lista
+# =============================================================================
+
+# intervallum — conversio clamp, materialize, and continet
+#
+# Value clamp result type is bound `numerus` (refinement-target special case).
+# Range materialize honors declared inclusivity on `‥` / `…`.
+#
+# EXPECTED OUTPUT:
+#   none — stdout not pinned for this exemplum.
+
+incipit {
+    # --- value clamp (half-open interior vs inclusive endpoint) ---
+    fixum _ half ← 15 ↦ 0‥10
+    fixum _ closed ← 15 ↦ 0…10
+    adfirma half ≡ 9
+    adfirma closed ≡ 10
+
+    # --- materialize to lista or 1-d tensor ---
+    fixum lista<numerus> half_list ← 0‥10 ↦ lista<numerus>
+    fixum lista<numerus> closed_list ← 0…3 ↦ lista<numerus>
+    fixum tensor<numerus, [10]> half_grid ← 0‥10 ↦ tensor<numerus, [10]>
+    fixum tensor<numerus, [4]> closed_grid ← 0…3 ↦ tensor<numerus, [4]>
+    fixum lista<numerus> half_flat ← half_grid.planata()
+    fixum lista<numerus> closed_flat ← closed_grid.planata()
+    adfirma half_list.longitudo() ≡ 10
+    adfirma closed_list.longitudo() ≡ 4
+    adfirma half_flat.longitudo() ≡ 10
+    adfirma closed_flat.longitudo() ≡ 4
+
+    # --- range-to-range clamp inherits target inclusivity ---
+    fixum intervallum<numerus> wide ← 0‥100
+    fixum intervallum<numerus> narrow ← wide ↦ 10…50
+    adfirma narrow.longitudo() ≡ 41
+
+    # --- stored containment via continet (intra desugars to the same surface) ---
+    fixum intervallum<numerus> fines ← 0‥10
+    fixum _ inside ← fines.continet(5)
+    adfirma inside
+}

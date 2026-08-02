@@ -1,0 +1,43 @@
++++
+term = "nondum"
+kind = "annotation"
+category = "availability"
+canonical = true
+summary = "Marks an interface method as planned but unavailable for a target."
+syntax = "@ nondum [target] [reason]"
+related = ["implendum", "@"]
++++
+
+# =============================================================================
+# nondum — Marks an interface method as planned but unavailable for a target.
+# =============================================================================
+#
+# What this teaches:
+#   • the `@nondum` annotation — marks interface methods as planned but not yet implemented for a target backend
+#   • target-specific availability annotations with optional reason strings
+#
+# Common mistakes:
+#   • Calling a method marked @ nondum — the compiler rejects calls to nondum methods for the current target (SEM017).
+#
+# See also: implendum, @
+# =============================================================================
+
+# meta/nondum — planned-but-unavailable interface methods
+#
+# GRAMMAR:
+#   interfaceMethod :← '@' 'nondum' target? stringLit
+#
+# EXPECTED OUTPUT:
+#   nondum implendum declared
+#
+# BACKEND:
+#   Calls to @ nondum methods fail semantic check (SEM017); do not invoke here.
+
+implendum tempus {
+    @ nondum rs "timer handles are not implemented yet"
+    functio siste(numerus handle) → vacuum
+}
+
+incipit {
+    nota "nondum implendum declared"
+}

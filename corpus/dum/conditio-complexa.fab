@@ -1,0 +1,61 @@
++++
+term = "dum"
+kind = "keyword"
+category = "control-flow"
+canonical = false
+summary = "While loops with compound et/aut conditions."
+syntax = "dum <condition> <block>"
+related = ["dum", "et", "aut"]
++++
+
+# =============================================================================
+# dum — While loops with compound et/aut conditions.
+# =============================================================================
+#
+# What this teaches:
+#   • Compound conditions — `dum <cond1> et <cond2>` loops until both are falsum; `dum <cond1> aut <cond2>` loops while at least one is true.
+#   • Loop control via flag — a mutable `bivalens` flag can break the `et` condition on the next iteration.
+#
+# Common mistakes:
+#   • Confusing `et` and `aut` semantics — `et` requires both to be true (stops when either is false), `aut` requires at least one to be true (stops when both are false).
+#
+# See also: dum, et, aut
+# =============================================================================
+
+
+# dum — compound conditions (et / aut)
+#
+# dum <cond1> et <cond2> { <body> }
+# dum <cond1> aut <cond2> { <body> }
+#
+# GRAMMAR:
+#   loopStmt :← 'dum' expr '{' stmt* '}'
+#
+# EXPECTED OUTPUT:
+#   Retry counts and paired decrements of a and b.
+
+incipit {
+    # et: loop stops when currit becomes falsum (after 3 iterations)
+    varia bivalens currit ← verum
+    varia numerus conatus ← 0
+
+    dum currit et conatus < 5 {
+        nota "conatus: §"(conatus)
+        conatus ← conatus + 1
+
+        si conatus ≥ 3 {
+            # breaks the et condition on next check
+            currit ← falsum
+        }
+    }
+
+    # aut: continues while at least one counter is positive
+    varia numerus a ← 5
+    varia numerus b ← 3
+
+    dum a > 0 aut b > 0 {
+        nota "a: § b: §"(a, b)
+        a ← a - 1
+        b ← b - 1
+    }
+}

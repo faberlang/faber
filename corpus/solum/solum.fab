@@ -1,0 +1,41 @@
++++
+term = "solum"
+kind = "keyword"
+category = "testing"
+canonical = true
+summary = "Marks a test as the only test to run."
+syntax = "solum"
+related = ["omitte", "futurum"]
++++
+
+# =============================================================================
+# solum — Marks a test as the only test to run.
+# =============================================================================
+#
+# What this teaches:
+#   • Focused test execution — `solum` marks a `proba` to run in isolation,
+#     skipping all other tests in the suite
+#   • Useful during development to run a single test without modifying the
+#     test runner configuration
+#
+# Common mistakes:
+#   • Confusing `solum` (stdlib module) with `solum_in` (environment-scoping keyword) — they serve different purposes.
+#
+# See also: omitte, futurum
+# =============================================================================
+
+# solum — focused test modifier
+#
+# GRAMMAR:
+#   testModifier :← 'solum'
+#
+# EXPECTED OUTPUT:
+#   No incipit — declaration or test-runner surface only.
+#
+# BACKEND:
+#   declaration-only test modifier (whitelist: solum/solum.fab).
+#
+
+proba "focus me" solum {
+    adfirma verum
+}

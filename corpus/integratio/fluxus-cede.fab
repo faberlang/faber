@@ -1,0 +1,61 @@
++++
+term = "integratio"
+kind = "concept"
+category = "integration"
+canonical = false
+summary = "Async await-bind and stream yield in one program."
+syntax = "integratio — multi-feature happy path"
+related = ["fiet", "fiunt", "cede", "incipiet"]
++++
+# =============================================================================
+# integratio — Async await-bind and stream yield in one program
+# =============================================================================
+#
+# What this teaches:
+#   • Async `fiet` await-bind and `fiunt` stream yield in one program.
+#   • Related keywords: fiet, fiunt, cede, incipiet
+#
+# Common mistakes:
+#   • Using `cede` outside a generator body; use `figendum`/`variandum` for
+#     await-bind in async contexts.
+#
+# See also: fiet, fiunt, cede, incipiet
+# =============================================================================
+
+# integratio — async finite and stream yield in one program
+#
+# functio f() fiet → T { … }
+# functio g(n) fiunt → T { itera … { cede expr } }
+# incipiet { figendum _ x ← f(); … }
+#
+# GRAMMAR:
+#   postureFunc   :← funcDecl ('fiet' | 'fiunt' | 'fient')?
+#   awaitBind     :← 'figendum' type binding '←' callExpr
+#   asyncEntry    :← 'incipiet' block
+#
+# EXPECTED OUTPUT:
+#   none — smoke asserts exit 0 when runtime is linked.
+#
+# BACKEND:
+#   Rust/Go e2e whitelist — async/tokio runtime not linked in harness.
+
+functio accipe() fiet → textus {
+    redde "Livia"
+}
+
+functio paria(numerus finis) fiunt → numerus {
+    itera ab 0 ante finis fixum i {
+        si i % 2 ≡ 0 {
+            cede i
+        }
+    }
+}
+
+incipiet {
+    figendum _ nomen ← accipe()
+    nota "salve §"(nomen)
+
+    itera ex paria(8) fixum n {
+        nota n
+    }
+}

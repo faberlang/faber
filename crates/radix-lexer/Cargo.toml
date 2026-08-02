@@ -1,0 +1,20 @@
+[package]
+name = "radix-lexer"
+version = "0.79.0"
+edition = "2021"
+description = "Lexer, spans-adjacent tokens, and interner for the Radix compiler"
+license = "MIT"
+publish = false
+
+[dependencies]
+radix-diagnostics = { path = "../radix-diagnostics" }
+rustc-hash = "2"
+serde = { version = "1.0.228", features = ["derive"] }
+unicode-ident = "1"
+unicode-normalization = "0.1"
+
+[lints.clippy]
+pedantic = "deny"
+
+[dev-dependencies]
+proptest = "1.11.0"

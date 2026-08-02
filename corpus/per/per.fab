@@ -1,0 +1,41 @@
++++
+term = "per"
+kind = "keyword"
+category = "range"
+canonical = true
+summary = "Sets the step for a range."
+syntax = "<range> per <expression>"
+related = ["ante", "usque"]
++++
+
+
+# =============================================================================
+# per — Sets the step for a range.
+# =============================================================================
+#
+# What this teaches:
+#   • Range stepping — `per <expr>` after a range specifies the increment between iterations.
+#   • Custom step sizes — Unlike the default step of 1, `per 2` iterates over even numbers only.
+#
+# Common mistakes:
+#   • Confusing `per` (range step) with `perge` (continue) — they are unrelated keywords.
+#
+# See also: ante, usque
+# =============================================================================
+
+# per — step size for range iteration
+#
+# itera ab <initium>‥<finis> per <gradus> <var> { … }   -- half-open range step
+#
+# GRAMMAR:
+#   iterStmt :← 'itera' 'ab' expr '‥' expr 'per' expr binding block
+#
+# EXPECTED OUTPUT:
+#   0, 2, 4, 6 (step by 2 over 0‥8).
+
+incipit {
+    # i = 0, 2, 4, 6 (step by 2)
+    itera ab 0‥8 per 2 fixum i {
+        nota i
+    }
+}

@@ -1,0 +1,55 @@
++++
+term = "tensor"
+kind = "method"
+category = "collection"
+canonical = false
+summary = "Tensor reduction methods for summa and media."
+syntax = "tensor.summa() | tensor.media()"
+related = ["tensor", "fractus", "lista"]
++++
+
+# =============================================================================
+# tensor — Tensor reduction methods for summa and media.
+# =============================================================================
+#
+# What this teaches:
+#   • Sum reduction — `summa()` folds all elements using the element type
+#   • Mean reduction — `media()` returns a fractus result to avoid integer division
+#
+# Common mistakes:
+#   • integer overflow with summa() on large integer tensors — widen with ↦ to fractus first
+#
+# See also: tensor, fractus, lista
+# =============================================================================
+
+
+
+# tensor reductions — summa (element-type fold) and media (float mean)
+#
+# WHY: summa reduces to the element type (integer overflow is author
+# responsibility — widen with ↦ first); media reduces to fractus to dodge
+# integer division (f64 for numerus family, matching width for fractus family).
+# grid = [[1,2,3],[4,5,6]]: summa = 21.0, media = 3.5.
+#
+# EXPECTED stdout:
+#   21.0
+#   3.5
+
+incipit {
+    fixum lista<f32> flat ← [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0,
+    ]
+    fixum tf32[] seed ← vacua
+    varia tf32[2, 3] grid ← seed.strue(flat, [2, 3])
+
+    fixum f32 total ← grid.summa()
+    fixum f32 mean ← grid.media()
+
+    nota total
+    nota mean
+}

@@ -1,0 +1,155 @@
++++
+term = "ex"
+kind = "keyword"
+category = "destructuring"
+canonical = true
+summary = "Extracts fields from a value into local bindings."
+syntax = "ex <expression> <fixum|varia> <field> [, ...] [ceteri <ident>]"
+related = ["de", "ut", "ceteri"]
++++
+
+# =============================================================================
+# ex — Extracts fields from a value into local bindings.
+# =============================================================================
+#
+# What this teaches:
+#   • Field destructuring — `ex <expr> fixum <field>, ...` extracts named fields from genus records into local bindings.
+#   • Aliasing — `ex <expr> fixum <field> ut <alias>` renames extracted fields.
+#   • Mutable extraction — `ex <expr> varia <field>, ...` for mutable field bindings.
+#   • Rest pattern — `ex <expr> fixum <field>, ceteri <rest>` captures remaining fields as a tabula.
+#   • Nested paths — `ex <expr>.<field> fixum ...` destructures through nested paths.
+#
+# Common mistakes:
+#   • Destructuring a field that does not exist on the target type — the field must be present in the genus definition or the type must support open shapes.
+#
+# See also: de, ut, ceteri
+# =============================================================================
+
+
+# destructura — field destructuring with `ex`
+#
+# ex <expr> fixum <field>, ...
+# ex <expr> varia <field>, ...
+# ex <expr> fixum <field> ut <alias>
+# ex <expr> fixum <field>, ceteri <rest>
+#
+# Field destructuring works on genus records (fixed fields) and tabula/valor
+# (open shapes). This tour uses genus types so that field names are statically
+# known and codegen-complete.
+#
+# GRAMMAR:
+#   destructStmt :← 'ex' expr ('fixum' | 'varia') patternList
+#
+# EXPECTED OUTPUT:
+#   Extracted field values, aliased names, mutated varia bindings, rest maps.
+
+genus Persona {
+    textus nomen
+    numerus aetas
+    textus urbs
+}
+
+genus Civis {
+    textus nomen
+    textus epistula
+}
+
+genus Datum {
+    numerus numerus
+    bivalens activus
+}
+
+genus Forma {
+    textus hospes
+    numerus portus
+    bivalens tutus
+}
+
+genus Plenus {
+    numerus signum
+    textus nomen
+    textus epistula
+    textus munus
+}
+
+genus Sodalis {
+    textus nomen
+    bivalens probatus
+}
+
+genus Relatus {
+    Sodalis civis
+}
+
+genus Responsum {
+    Relatus datum
+}
+
+genus Vestis {
+    textus modus
+    textus lingua
+}
+
+incipit {
+    # --- Basic field extraction ---
+
+    fixum _ persona ← Persona { nomen = "Marcus", aetas = 30, urbs = "Roma" }
+    ex persona fixum nomen, aetas
+
+    nota nomen
+    nota aetas
+
+    # --- Extract with alias using 'ut' ---
+
+    fixum _ civis ← Civis { nomen = "Julia", epistula = "julia@roma.com" }
+    ex civis fixum nomen ut cognomen, epistula ut epistula2
+
+    nota cognomen
+    nota epistula2
+
+    # --- Mutable destructuring with varia ---
+
+    fixum _ datum ← Datum { numerus = 100, activus = verum }
+    ex datum varia numerus, activus
+
+    nota numerus
+    nota activus
+
+    numerus ← 200
+    activus ← falsum
+
+    nota numerus
+    nota activus
+
+    # --- Mixed alias and regular fields ---
+
+    fixum _ forma ← Forma { hospes = "localis", portus = 8080, tutus = verum }
+    ex forma fixum hospes, portus ut porta, tutus
+
+    nota hospes
+    nota porta
+    nota tutus
+
+    # --- Rest pattern with ceteri ---
+
+    fixum _ plenus ← Plenus { signum = 1, nomen = "Gaius", epistula = "g@roma.com", munus = "admin" }
+    ex plenus fixum signum, ceteri reliqua
+
+    nota signum
+    nota reliqua
+
+    # --- Destructura ex nested path ---
+
+    fixum _ responsum ← Responsum { datum = Relatus { civis = Sodalis { nomen = "Claudia", probatus = verum } } }
+    ex responsum.datum.civis fixum nomen ut internum, probatus
+
+    nota internum
+    nota probatus
+
+    # --- Single field extraction ---
+
+    fixum _ vestis ← Vestis { modus = "nigrum", lingua = "la" }
+    ex vestis fixum modus
+
+    nota modus
+}

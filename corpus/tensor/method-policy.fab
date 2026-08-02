@@ -1,0 +1,48 @@
++++
+term = "tensor"
+kind = "type"
+category = "collection"
+canonical = false
+summary = "Tensor method policy parity for accipe, out-of-bounds reads, and ponde."
+syntax = "tensor.accipe(indices) | tensor.ponde(indices, value)"
+related = ["tensor", "accipe", "ponde", "lista"]
++++
+
+# =============================================================================
+# tensor — Tensor method policy parity for accipe, out-of-bounds reads, and ponde.
+# =============================================================================
+#
+# What this teaches:
+#   • Bounds checking — `accipe` returns `∪ nihil` for out-of-bounds indices
+#   • Mutation — `ponde` updates in-place at the given index
+#
+# Common mistakes:
+#   • assuming out-of-bounds access throws an error rather than returning nihil — accipe returns T ∪ nihil
+#
+# See also: tensor, accipe, ponde, lista
+# =============================================================================
+
+
+
+
+# tensor — method policy parity
+#
+# EXPECTED stdout:
+#   2.0
+#   99.0
+#   8.0
+
+incipit {
+    fixum tf32[] seed ← vacua
+    varia tf32[3] input ← seed.strue([1.0, 2.0, 3.0], [3])
+
+    fixum f32 in_bounds ← input.accipe([1]) vel 0.0
+    fixum f32 out_of_bounds ← input.accipe([9]) vel 99.0
+
+    input.ponde([2], 8.0)
+    fixum f32 updated ← input.accipe([2]) vel 0.0
+
+    nota in_bounds
+    nota out_of_bounds
+    nota updated
+}

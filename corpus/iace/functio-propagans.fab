@@ -1,0 +1,69 @@
++++
+term = "functio"
+kind = "keyword"
+category = "function"
+canonical = false
+summary = "Failable call propagation: a ⇥-declaring function re-throws a callee error without fac/cape."
+syntax = "functio <name>(<params>) → <type> ⇥ <error-type> <block>"
+related = ["functio", "⇥", "iace", "↦", "fac", "cape"]
++++
+# =============================================================================
+# functio — Failable call propagation: a ⇥-declaring function re-throws a callee error without fac/cape
+# =============================================================================
+#
+# What this teaches:
+#   • Failable call propagation: a ⇥-declaring function re-throws a callee error without fac/cape.
+#   • Related keywords: functio, ⇥, iace, ↦, fac, cape
+#
+# Common mistakes:
+#   • Wrapping every failable call in `fac/cape` — propagation functions with `⇥` auto-forward errors without a local handler.
+#
+# See also: functio, ⇥, iace, ↦, fac, cape
+# =============================================================================
+
+# functio propagans — failable call propagation through ⇥
+#
+# A failable function call (→ T ⇥ E) inside a ⇥-declaring function propagates
+# its error to the enclosing function's alternate exit without a fac/cape
+# wrapper, mirroring how bare ↦ conversio and iace throws already behave. The
+# call lowers to Rust `?`. This closes the former three-way asymmetry where ↦
+# and iace honored the function-level ⇥ but ordinary calls did not.
+#
+# GRAMMAR:
+#   funcDecl :← 'functio' ident '(' params ')' '→' type '⇥' type block
+#
+# EXPECTED OUTPUT:
+#   4 then 0 (propagated through the ⇥ chain and recovered at tractatus).
+#
+# BACKEND:
+#   Rust application lane emits `?`; MIR/script lowers the call through
+#   try_call with a function-level return_error edge.
+
+functio divide(numerus a, numerus b) → numerus ⇥ textus {
+    si b ≡ 0 ergo iace "division by zero"
+    redde a / b
+}
+
+# Propagating caller: divide's ⇥ error re-throws through this function's ⇥ exit
+# with no fac/cape ceremony. Equivalent to `redde divide(a, b)?` in Rust.
+functio propagans(numerus a, numerus b) → numerus ⇥ textus {
+    fixum numerus q ← divide(a, b)
+    redde q * 2
+}
+
+# Recovery boundary: the only place a fac/cape is needed is where the ⇥ chain
+# terminates and the error is actually handled.
+functio tractatus(numerus a, numerus b) → numerus {
+    fac {
+        redde propagans(a, b)
+    }
+    cape err {
+        mone err
+        redde 0
+    }
+}
+
+incipit {
+    nota tractatus(5, 2)
+    nota tractatus(5, 0)
+}

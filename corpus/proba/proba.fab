@@ -1,0 +1,41 @@
++++
+term = "proba"
+kind = "keyword"
+category = "testing"
+canonical = true
+summary = "Defines a single test case."
+syntax = "proba <name> [modifiers] <block>"
+aliases = ["test", "it"]
+related = ["probandum", "adfirma", "omitte", "futurum"]
++++
+
+# =============================================================================
+# proba — Defines a single test case.
+# =============================================================================
+#
+# What this teaches:
+#   • Individual test cases — `proba` declares one test with a descriptive name
+#     and optional modifiers
+#   • Tests live inside `probandum` suites and contain `adfirma` assertions
+#
+# Common mistakes:
+#   • Using `adfirma` outside a `proba`/`probandum` test block — `adfirma` is deprecated in production code (WARN006).
+#
+# See also: probandum, adfirma, omitte, futurum
+# =============================================================================
+
+# proba — single test case
+#
+# GRAMMAR:
+#   testDecl :← 'proba' stringLit block
+#
+# EXPECTED OUTPUT:
+#   No incipit — declaration or test-runner surface only.
+#
+# BACKEND:
+#   declaration-only test case (whitelist: proba/proba.fab). Cross-ref: probandum/probandum.fab.
+#
+
+proba "arithmetic passes" tag "math" {
+    adfirma 1 + 1 ≡ 2
+}

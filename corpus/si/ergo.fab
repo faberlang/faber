@@ -1,0 +1,59 @@
++++
+term = "ergo"
+kind = "operator-group"
+category = "control-flow"
+canonical = true
+summary = "Introduces a compact statement consequent."
+syntax = "<head> ergo <statement>"
+aliases = ["ergo", "therefore"]
+related = ["si", "dum", "clausura", "redde", "tacet", "ergo"]
++++
+
+# =============================================================================
+# ergo — Introduces a compact statement consequent.
+# =============================================================================
+#
+# What this teaches:
+#   • Inline conditionals — `ergo` replaces a single-statement block body on
+#     `si` and `secus` branches
+#   • `si <cond> ergo <stmt> secus ergo <stmt>` forms a two-way one-liner
+#     without braces
+#
+# Common mistakes:
+#   • TODO: chaining multiple statements after `ergo` (it accepts only one
+#     statement)
+#
+# See also: si, dum, clausura, redde, tacet
+# =============================================================================
+
+# One-liner conditionals with ergo
+#
+# si <condition> ergo <statement>                              -- single consequent
+# si <condition> ergo <statement> secus ergo <statement>     -- if-else one-liner
+#
+# GRAMMAR:
+#   ifStmt :← 'si' expr 'ergo' stmt ('secus' 'ergo' stmt)?
+#
+# EXPECTED OUTPUT:
+#   Validation and grading lines for sample x, aetas, and puncta values.
+
+incipit {
+    # ergo replaces a one-statement block body
+    fixum _ x ← 10
+
+    si x > 5 ergo nota "x magnum est"
+
+    # secus ergo pairs else with a single consequent
+    fixum _ aetas ← 25
+    si aetas ≥ 18 ergo nota "adultus"
+    secus ergo nota "minor"
+
+    # Two-way one-liner (85 < 90 → "non A")
+    fixum _ puncta ← 85
+    si puncta ≥ 90 ergo nota "A"
+    secus ergo nota "non A"
+
+    # bivalens condition used directly
+    fixum _ valet ← verum
+    si valet ergo nota "Recte"
+}

@@ -1,0 +1,59 @@
++++
+term = "si"
+kind = "keyword"
+category = "control-flow"
+canonical = true
+summary = "Starts a conditional branch that runs when its condition is true."
+syntax = "si <condition> <block>"
+aliases = ["if"]
+related = ["sin", "secus", "ergo"]
++++
+
+# =============================================================================
+# si — Starts a conditional branch that runs when its condition is true.
+# =============================================================================
+#
+# What this teaches:
+#   • Nested conditionals — `si` blocks can contain further `si`/`secus`
+#     branches for multi-level decision trees
+#   • Demonstrates a login + permission gate: outer `si` checks authentication,
+#     inner `si` checks authorization
+#
+# Common mistakes:
+#   • TODO: deeply nesting conditionals instead of using `sin` chains or
+#     guard returns
+#
+# See also: sin, secus, ergo
+# =============================================================================
+
+# Nested si (if) conditionals
+#
+# si <cond> { <body> }                    -- inner branch inside outer arm
+# secus { <body> }
+#
+# GRAMMAR:
+#   ifStmt :← 'si' expr block ('secus' block)?
+#
+# EXPECTED OUTPUT:
+#   Access granted when intravit and licet are both verum.
+
+incipit {
+    # logged in
+    fixum _ intravit ← verum
+    # has permission
+    fixum _ licet ← verum
+
+    si intravit {
+        # Inner branch: permission check after login succeeds
+        si licet {
+            nota "Access granted"
+        }
+        secus {
+            nota "Permission denied"
+        }
+    }
+    secus {
+        # outer else: not logged in
+        nota "Please log in"
+    }
+}

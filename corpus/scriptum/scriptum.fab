@@ -1,0 +1,53 @@
++++
+term = "scriptum"
+kind = "keyword"
+category = "format"
+canonical = true
+summary = "Creates a formatted string with `§` placeholders."
+syntax = "\"<template>\"(<args>...)"
+related = ["lege", "lineam"]
++++
+
+# =============================================================================
+# scriptum — Creates a formatted string with `§` placeholders.
+# =============================================================================
+#
+# What this teaches:
+#   • String template interpolation — `"template § and §"(arg1, arg2)` replaces
+#     `§` placeholders with positional arguments
+#   • Templates can contain any expression as an argument, not just variables
+#
+# Common mistakes:
+#   • Confusing `scriptum` (template desugaring into function calls) with bare `§` interpolation outside of the template syntax.
+#
+# See also: lege, lineam
+# =============================================================================
+
+
+
+# scriptum — string-template interpolation ("§" slots)
+#
+# "literal § more §"(arg1, arg2)   -- each § replaced by the corresponding arg
+#
+# GRAMMAR:
+#   templateExpr :← stringLit '(' exprList ')'
+#
+# EXPECTED OUTPUT:
+#   Salve greeting, persona notice, and computed summa string.
+
+incipit {
+    fixum _ nomen ← "Marcus"
+    fixum _ aetas ← 30
+
+    # One slot
+    fixum _ salutatio ← "Salve, §!"(nomen)
+    nota salutatio
+
+    # Multiple slots
+    fixum _ notitia ← "§ habet annos §"(nomen, aetas)
+    nota notitia
+
+    # With an expression
+    fixum _ summa ← "10 + 20 ← §"(10 + 20)
+    nota summa
+}

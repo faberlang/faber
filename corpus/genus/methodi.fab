@@ -1,0 +1,91 @@
++++
+term = "genus"
+kind = "keyword"
+category = "type"
+canonical = false
+summary = "Genus methods using ego for field access."
+syntax = "genus <name> { functio <method>(<params>) → <type> { … ego.<field> … } }"
+related = ["genus", "ego", "functio"]
++++
+# =============================================================================
+# genus — Genus methods using ego for field access
+# =============================================================================
+#
+# What this teaches:
+#   • Genus methods using ego for field access.
+#   • Related keywords: genus, ego, functio
+#
+# Common mistakes:
+#   • Mutating `ego` fields on a `fixum` instance — methods that mutate state via `ego` require the instance to be bound with `varia`.
+#
+# See also: genus, ego, functio
+# =============================================================================
+
+# Genus with methods using ego
+#
+# genus Nomen {
+#     <type> <field>
+#     functio <opus>() → <type> { ... ego.<field> ... }
+# }
+#
+# GRAMMAR:
+#   methodDecl inside genusDecl; ego refers to the current instance
+#
+# EXPECTED OUTPUT:
+#   50, 30, falsum, then counter values 0, 1, 3
+
+genus Forma {
+    numerus latitudo = 1
+    numerus altitudo = 1
+
+    functio area() → numerus {
+        redde ego.latitudo * ego.altitudo
+    }
+
+    functio ambitus() → numerus {
+        redde 2 * (ego.latitudo + ego.altitudo)
+    }
+
+    functio aequilatera() → bivalens {
+        redde ego.latitudo ≡ ego.altitudo
+    }
+}
+
+genus Numerator {
+    numerus numerus = 0
+
+    functio auge() {
+        # mutate instance state via ego
+        ego.numerus ← ego.numerus + 1
+    }
+
+    functio accipe() → numerus {
+        redde ego.numerus
+    }
+}
+
+incipit {
+    # --- Methods that return values ---
+
+    fixum _ forma ← Forma {
+        latitudo = 10,
+        altitudo = 5
+    }
+
+    nota forma.area()
+    nota forma.ambitus()
+    nota forma.aequilatera()
+
+    # --- Methods that modify state (varia instance binding) ---
+
+    varia _ numerator ← Numerator {}
+
+    nota numerator.accipe()
+
+    numerator.auge()
+    nota numerator.accipe()
+
+    numerator.auge()
+    numerator.auge()
+    nota numerator.accipe()
+}

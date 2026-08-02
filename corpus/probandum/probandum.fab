@@ -1,0 +1,57 @@
++++
+term = "probandum"
+kind = "keyword"
+category = "testing"
+canonical = true
+summary = "Groups related test cases into a named suite."
+syntax = "probandum <name> [modifiers] <block>"
+aliases = ["describe", "suite"]
+related = ["proba", "adfirma"]
++++
+
+# =============================================================================
+# probandum — Groups related test cases into a named suite.
+# =============================================================================
+#
+# What this teaches:
+#   • Test suite grouping — `probandum` organizes related `proba` test cases
+#     under a descriptive name
+#   • Suites can be nested to create hierarchical test organization
+#
+# Common mistakes:
+#   • Placing `proba` outside a `probandum` suite, or forgetting a `tag` modifier on the test case.
+#
+# See also: proba, adfirma
+# =============================================================================
+
+# probandum / proba — declaration-only test suites
+#
+# probandum "name" { proba "case" { adfirma expr } … }   -- test group
+# probandum "nested" { probandum "inner" { … } }         -- nested suite
+#
+# GRAMMAR:
+#   probandumDecl :← 'probandum' stringLit block
+#   probaDecl     :← 'proba' stringLit block
+#
+# EXPECTED OUTPUT:
+#   No stdout — adfirma cases produce no nota output when run as tests.
+#
+# BACKEND: No incipit block — test-runner surface; exempla e2e whitelists as
+# declaration-only (whitelist: probandum/probandum.fab).
+
+probandum "arithmetica" {
+    proba "unum plus unum" {
+        adfirma 1 + 1 ≡ 2
+    }
+
+    proba "multiplicatio" {
+        adfirma 3 * 4 ≡ 12
+    }
+
+    probandum "implicata" {
+        proba "comparatio" {
+            fixum _ x ← 10
+            adfirma x ≥ 10
+        }
+    }
+}

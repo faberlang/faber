@@ -1,0 +1,38 @@
++++
+term = "fragilis"
+kind = "keyword"
+category = "testing"
+canonical = true
+summary = "Marks a test as fragile."
+syntax = "fragilis <number>"
+related = ["requirit"]
++++
+# =============================================================================
+# fragilis — Marks a test as fragile
+# =============================================================================
+#
+# What this teaches:
+#   • Marks a test as fragile.
+#   • Related keywords: requirit
+#
+# Common mistakes:
+#   • Marking a test as fragile without a reason — `fragilis <number>` requires a numeric identifier for the failure-tracking system.
+#
+# See also: requirit
+# =============================================================================
+
+# fragilis — allow-failure test modifier
+#
+# GRAMMAR:
+#   testModifier :← 'fragilis' integer
+#
+# EXPECTED OUTPUT:
+#   No incipit — declaration or test-runner surface only.
+#
+# BACKEND:
+#   declaration-only test modifier (whitelist: fragilis/fragilis.fab).
+#
+
+proba "fragile case" fragilis 1 {
+    adfirma verum
+}

@@ -1,0 +1,98 @@
++++
+term = "vel"
+kind = "operator-group"
+category = "logic"
+canonical = true
+summary = "Provides a default when the left side is null."
+syntax = "<expression> vel <expression>"
+aliases = ["nullish coalescing"]
+related = ["nihil"]
++++
+
+# =============================================================================
+# vel — Provides a default when the left side is null.
+# =============================================================================
+#
+# What this teaches:
+#   • Nullish coalescing — `vel` supplies a fallback when the left operand is `nihil`
+#   • Chaining — multiple `vel` expressions fall through until the first non-`nihil` value
+#
+# Common mistakes:
+#   • confusing vel (nullish coalescing, checks nihil only) with aut (logical OR), or using vel for conversio recovery instead of ⇥
+#
+# See also: nihil
+# =============================================================================
+
+
+
+
+# vel — nullish coalescing (not logical OR)
+#
+# <expr> vel <expr>   -- right side only when left is nihil
+#
+# GRAMMAR:
+#   coalesceExpr :← expr 'vel' expr
+#
+# EXPECTED OUTPUT:
+#   ignotus, Marcus, 0, false, defectum, inventum (vel.expected).
+
+incipit {
+    # Basic nihil coalescing
+    fixum textus ∪ nihil nomen ← nihil
+    sit ostensum ← nomen vel "ignotus"
+    # "ignotus"
+    nota ostensum
+
+    # With present value
+    fixum textus ∪ nihil adest ← "Marcus"
+    sit ostensum2 ← adest vel "ignotus"
+    # "Marcus"
+    nota ostensum2
+
+    # Difference from logical aut: vel only checks nihil
+    sit nihilum ← 0
+    sit vacuus ← ""
+    sit falsus2 ← falsum
+
+    # vel preserves non-nihil values
+    # 0
+    nota nihilum vel 999
+    # ""
+    nota vacuus vel "defectum"
+    # falsum
+    nota falsus2 vel verum
+
+    sit alter ← nomen vel "defectum"
+    nota alter
+
+    # Chaining
+    fixum textus ∪ nihil a ← nihil
+    fixum textus ∪ nihil b ← nihil
+    fixum textus ∪ nihil c ← "inventum"
+    sit primum ← a vel b vel c vel "nihil"
+    # "inventum"
+    nota primum
+}
+
+proba "vel supplies a fallback for nihil" {
+    fixum textus ∪ nihil nomen ← nihil
+    sit ostensum ← nomen vel "ignotus"
+    adfirma ostensum ≡ "ignotus"
+}
+
+proba "vel preserves non-nihil values" {
+    sit nihilum ← 0
+    sit vacuus ← ""
+    sit falsus2 ← falsum
+    adfirma (nihilum vel 999) ≡ 0
+    adfirma (vacuus vel "defectum") ≡ ""
+    adfirma (falsus2 vel verum) ≡ falsum
+}
+
+proba "vel chains to the first non-nihil value" {
+    fixum textus ∪ nihil a ← nihil
+    fixum textus ∪ nihil b ← nihil
+    fixum textus ∪ nihil c ← "inventum"
+    sit primum ← a vel b vel c vel "nihil"
+    adfirma primum ≡ "inventum"
+}

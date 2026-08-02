@@ -1,0 +1,8 @@
+
+        select id, email, plan
+        from accounts
+        where tenant_id = §
+          and plan = §
+    
+where tenant_id = §0 or parent_tenant_id = §0
+select 1

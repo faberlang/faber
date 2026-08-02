@@ -1,0 +1,54 @@
++++
+term = "ergo"
+kind = "operator-group"
+category = "control-flow"
+canonical = true
+summary = "Compact consequent after si/dum heads via ergo, with ∴ reserved for closure bodies."
+syntax = "<head> ergo <statement>"
+aliases = ["ergo", "therefore"]
+related = ["si", "redde", "clausura", "ergo"]
++++
+
+# =============================================================================
+# ergo — Compact consequent after si/dum heads via ergo, with ∴ reserved for closure bodies.
+# =============================================================================
+#
+# What this teaches:
+#   • Compact consequents — `ergo` follows `si`, `sin`, `secus`, or `dum` heads with a single consequent statement.
+#   • Guard-return pattern — `si <cond> ergo redde <value>` is a concise guard clause.
+#
+# Common mistakes:
+#   • Using -> instead of → for function return types — Faber uses the Unicode arrow.
+#
+# See also: si, redde, clausura, ergo
+# =============================================================================
+
+# operatores/control — ergo therefore consequent
+#
+# GRAMMAR:
+#   consequentStmt :← ('si' | 'sin' | 'secus' | 'dum') expr 'ergo' stmt
+#
+# EXPECTED OUTPUT:
+#   0, 100, 42
+#
+# BACKEND:
+#   Cross-ref si/ergo-redde.fab for ergo-redde guard-return spelling.
+
+functio clamp(numerus x) → numerus {
+    si x < 0 ergo redde 0
+    si x > 100 ergo redde 100
+    redde x
+}
+
+functio inveni(lista<numerus> res, numerus quaesitum) → numerus ∪ nihil {
+    itera ex res fixum item {
+        si item ≡ quaesitum ergo redde item
+    }
+    redde nihil
+}
+
+incipit {
+    nota clamp(-5)
+    nota clamp(150)
+    nota inveni([10, 20, 42], 42)
+}

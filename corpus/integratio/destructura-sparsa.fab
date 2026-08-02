@@ -1,0 +1,63 @@
++++
+term = "integratio"
+kind = "concept"
+category = "integration"
+canonical = false
+summary = "Destructuring, sparge, and lista methodi in one program."
+syntax = "integratio — multi-feature happy path"
+related = ["ex", "sparge", "lista"]
++++
+# =============================================================================
+# integratio — Destructuring, sparge, and lista methodi in one program
+# =============================================================================
+#
+# What this teaches:
+#   • Destructuring, sparge, and lista methodi in one program.
+#   • Related keywords: ex, sparge, lista
+#
+# Common mistakes:
+#   • Using `sparge` on a non-collection expression — `sparge` expands a lista/tabula/tensor into an outer collection literal.
+#
+# See also: ex, sparge, lista
+# =============================================================================
+
+# integratio — destructuring, sparge, and lista methodi together
+#
+# fixum [a, b, c] ← lista
+# [sparge expr, …]
+# lista.filtrata(T x ∴ …) | lista.mappata(T x → T ∴ fac { … })
+#
+# GRAMMAR:
+#   bindingStmt :← 'fixum' destructure '←' expr
+#   spargeField :← 'sparge' expr
+#   methodCall  :← expr '.' ident '(' … ')'
+#
+# EXPECTED OUTPUT:
+#   none — smoke asserts exit 0 only.
+#
+# BACKEND:
+#   Go e2e whitelist — expression-valued block / typing not yet for Go.
+
+functio summa(lista<numerus> numeri) → numerus {
+    varia _ total ← 0
+    itera ex numeri fixum n {
+        total ← total + n
+    }
+    redde total
+}
+
+incipit {
+    fixum _ prima ← [1, 2]
+    fixum _ secunda ← [3, 4]
+    fixum _ omnes ← [0, sparge prima, sparge secunda, 5]
+
+    fixum [initium, alterum, tertium] ← omnes
+    nota "caput: § § §"(initium, alterum, tertium)
+
+    fixum _ paria ← omnes.filtrata(numerus n ∴ n % 2 ≡ 0)
+    fixum _ aucta ← paria.mappata(numerus n → numerus ∴ fac {
+        redde n + 10
+    })
+
+    nota summa(aucta)
+}

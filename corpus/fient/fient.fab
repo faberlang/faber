@@ -1,0 +1,42 @@
++++
+term = "fient"
+kind = "keyword"
+category = "async"
+canonical = true
+summary = "Callable posture for asynchronous stream functions."
+syntax = "functio name(…) fient → T"
+aliases = ["async_generator"]
+related = ["fiunt", "fiet", "cede"]
++++
+
+# =============================================================================
+# fient — Asynchronous stream callable posture
+# =============================================================================
+#
+# What this teaches:
+#   • Async stream posture: `fient → T` yields promised pulls of `T`.
+#   • Yield with `cede`; await other work with await morphology.
+#
+# Common mistakes:
+#   • Expecting every backend to lower `fient` — some fail closed until a
+#     channel/async-cursor carrier lands.
+#
+# See also: fiunt, fiet, cede
+# =============================================================================
+
+# GRAMMAR:
+#   callablePosture :← 'fient'
+#
+# BACKEND:
+#   Product path is Rust async-cursor; other backends may fail closed.
+
+```fab
+functio stream() fient → numerus {
+    cede 1
+    cede 2
+}
+
+incipiet {
+    nota stream()
+}
+```

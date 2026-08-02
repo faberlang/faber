@@ -1,0 +1,51 @@
++++
+term = "futura"
+kind = "annotation"
+category = "async"
+canonical = true
+summary = "Compatibility annotation for asynchronous posture."
+syntax = "@ futura"
+related = ["cursor", "figendum", "tacebit"]
++++
+# =============================================================================
+# futura — Compatibility annotation for asynchronous posture
+# =============================================================================
+#
+# What this teaches:
+#   • Preferred async posture — write `fiet` for a finite async function.
+#   • Compatibility annotation — `@ futura` remains accepted and preserved as
+#     the legacy spelling for async posture.
+#   • Related keywords: cursor, figendum, tacebit
+#
+# Common mistakes:
+#   • Calling an async function and forgetting to consume the promissum with
+#     `figendum`, `variandum`, `reddet`, or `tacebit`.
+#
+# See also: cursor, figendum, tacebit
+# =============================================================================
+
+# @ futura — compatibility async function annotation
+#
+# @ futura
+# functio nomen(…) → typus { … }
+#
+# GRAMMAR:
+#   annotatedFunc :← '@' 'futura' funcDecl
+#   callablePosture :← 'fiet'
+#
+# EXPECTED OUTPUT:
+#   none — Rust async runtime whitelist (compile-only in harness)
+#
+# BACKEND:
+#   Rust async runtime not linked in exempla harness (whitelist: futura/futura.fab).
+
+@ futura
+functio responde() → numerus {
+    redde 42
+}
+
+incipiet {
+    # figendum awaits the promissum and binds the resolved value
+    figendum _ responsum ← responde()
+    nota responsum
+}

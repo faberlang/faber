@@ -1,0 +1,47 @@
++++
+term = "de"
+kind = "keyword"
+category = "iteration"
+canonical = true
+summary = "Introduces borrowed iteration or borrowed parameters."
+syntax = "de <expression>"
+related = ["ex", "in"]
++++
+
+# =============================================================================
+# de — Introduces borrowed iteration or borrowed parameters.
+# =============================================================================
+#
+# What this teaches:
+#   • Borrowed iteration — `itera de <expr> fixum <ident> { ... }` iterates over a collection without taking ownership.
+#   • Tabula key iteration — iterating over tabula keys via borrowed iteration.
+#   • Index iteration — iterating over lista indices via `de`.
+#
+# Common mistakes:
+#   • Passing a `de` parameter to an `in` or `ex` position — mode mismatch; cannot pass a read-only reference where mutation or consumption is expected (SEM057).
+#
+# See also: ex, in
+# =============================================================================
+
+# de — borrowed iteration / parameters
+#
+# GRAMMAR:
+#   forDeStmt :← 'itera' 'de' expr 'fixum' ident block
+#
+# EXPECTED OUTPUT:
+#   Scalar stdout smoke (see body).
+#
+# BACKEND:
+#   Cross-ref: itera/de.fab.
+#
+
+incipit {
+    fixum tabula<textus, numerus> persona ← { "nomen": 1, "aetas": 30 }
+    itera de persona fixum clavis {
+        nota clavis
+    }
+    fixum _ numeri ← [10, 20, 30]
+    itera de numeri fixum index {
+        nota index
+    }
+}

@@ -1,0 +1,40 @@
++++
+term = "versio"
+kind = "annotation"
+category = "cli"
+canonical = true
+summary = "Attaches a version string to a CLI root."
+syntax = "@ versio <string>"
+related = ["cli", "descriptio"]
++++
+
+# =============================================================================
+# versio — Attaches a version string to a CLI root.
+# =============================================================================
+#
+# What this teaches:
+#   • the `@versio` annotation — attaches a semantic version string to a CLI application
+#   • combining with `@cli` and `@descriptio` for complete CLI metadata
+#
+# Common mistakes:
+#   • Applying @ versio without @ cli — @ versio only has meaning when attached to a CLI incipit.
+#
+# See also: cli, descriptio
+# =============================================================================
+
+# meta/versio — CLI version annotation
+#
+# GRAMMAR:
+#   annotation :← '@' 'versio' stringLit
+#
+# EXPECTED OUTPUT:
+#   No incipit runtime — declaration-only CLI metadata.
+#
+# BACKEND:
+#   declaration-only CLI metadata (whitelist: meta/versio.fab).
+
+@ cli "versio-smoke"
+@ versio "0.1.0"
+@ descriptio "Version metadata exemplum"
+incipit argumenta args {
+}

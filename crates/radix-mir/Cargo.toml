@@ -1,0 +1,27 @@
+[package]
+name = "radix-mir"
+version = "0.79.0"
+edition = "2021"
+description = "Faber MIR model, validation, and systems analysis (core, no emit backends)"
+license = "MIT"
+publish = false
+
+[dependencies]
+radix-codegen-shared = { path = "../radix-codegen-shared" }
+radix-diagnostics = { path = "../radix-diagnostics" }
+radix-hir = { path = "../radix-hir" }
+radix-lexer = { path = "../radix-lexer" }
+radix-syntax = { path = "../radix-syntax" }
+radix-types = { path = "../radix-types" }
+rustc-hash = "2"
+serde = { version = "1", features = ["derive"] }
+
+[lints.clippy]
+# Group first at lower priority so per-lint allows below win package-wide.
+pedantic = { level = "deny", priority = -1 }
+too_many_lines = "allow"
+match_same_arms = "allow"
+similar_names = "allow"
+items_after_statements = "allow"
+used_underscore_binding = "allow"
+implicit_hasher = "allow"

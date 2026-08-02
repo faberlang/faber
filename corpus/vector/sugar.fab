@@ -1,0 +1,30 @@
++++
+term = "vector"
+kind = "type"
+category = "register"
+summary = "vf32[4] width sugar in type position"
++++
+
+# =============================================================================
+# vector — vf32[4] width sugar in type position.
+# =============================================================================
+#
+# What this teaches:
+#   • Sugar syntax — `vf32[4]` as concise notation for `vector<fractus<f32>, 4>`
+#   • Type position — sugar works wherever type annotations are expected
+#
+# Common mistakes:
+#   • using vector sugar with angle brackets (vf32<4>) instead of brackets (vf32[4]) — type sugar uses brackets for shapes
+#
+# See also: vector, vf32, f32
+# =============================================================================
+
+
+
+functio takes(vf32[4] v) → numerus {
+    redde 0
+}
+
+functio vectorSugarSmoke() → numerus {
+    redde 0
+}

@@ -1,0 +1,32 @@
++++
+term = "applications"
+kind = "pointer"
+category = "application"
+canonical = true
+summary = "Points to the coreutils application exempla workspace."
+related = ["cli", "argumenta", "operandus", "exitus"]
++++
+
+# =============================================================================
+# applications — Points to the coreutils application exempla workspace.
+# =============================================================================
+#
+# What this teaches:
+#   • Corpus pointer — this file is a placeholder that directs readers to the
+#     coreutils application exempla outside the syntax corpus
+#   • Cross-referencing — corpus files can point to external example
+#     workspaces for larger, real-world demonstrations
+#
+# Common mistakes:
+#   • looking for full application exempla inside the syntax corpus instead of the `examples/coreutils/` workspace
+#
+# See also: cli, argumenta, operandus, exitus
+# =============================================================================
+
+# Coreutils application exempla live outside the syntax corpus.
+#
+# See examples/coreutils/ and docs/factory/coreutils/CAMPAIGN.md.
+
+incipit {
+    nota "coreutils application exempla"
+}

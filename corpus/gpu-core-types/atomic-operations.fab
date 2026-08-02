@@ -1,0 +1,45 @@
++++
+term = "atomic"
+kind = "type"
+category = "storage"
+summary = "atomic<i32> operations are storage-sensitive compiler-owned methods."
+syntax = "atomic<i32> | atomic<u32>"
+related = ["numerus"]
++++
+# =============================================================================
+# atomic — atomic<i32> operations are storage-sensitive compiler-owned methods
+# =============================================================================
+#
+# What this teaches:
+#   • atomic<i32> operations are storage-sensitive compiler-owned methods.
+#   • Related keywords: numerus
+#
+# Common mistakes:
+#   • Calling non-atomic methods on an `atomic<T>` — operations like `.load()`, `.store()`, `.exchange()` are compiler-owned and storage-sensitive.
+#
+# See also: numerus
+# =============================================================================
+
+# atomic — storage-sensitive operations
+#
+# atomic<i32> cell
+# cell.load()
+# cell.store(value)
+# cell.exchange(value)
+# cell.compare_exchange(old, new)
+#
+# GRAMMAR:
+#   type :← 'atomic' '<' ('i32' | 'u32') '>'
+#
+# EXPECTED OUTPUT:
+#   none; this is a semantic/MIR systems-lane typecheck example.
+#
+# BACKEND:
+#   Package and probe targets reject until atomic storage ABI lowering exists.
+
+functio atomic_ops(atomic<i32> cell, i32 value) → bivalens {
+    fixum i32 loaded ← cell.load()
+    cell.store(value)
+    fixum i32 old ← cell.exchange(loaded)
+    redde cell.compare_exchange(old, value)
+}

@@ -1,0 +1,44 @@
++++
+term = "generics"
+kind = "concept"
+category = "type"
+canonical = true
+summary = "Angle-bracket generic parameters on functions and declarations."
+syntax = "functio name<T>(...) | genus Name<T, magnitudo N>"
+aliases = ["type parameters", "magnitudo"]
+related = ["typus", "functio"]
++++
+
+# =============================================================================
+# generics — Angle-bracket generic parameters on functions and declarations.
+# =============================================================================
+#
+# What this teaches:
+#   • Type parameters — Functions and types can accept angle-bracket generic parameters like `<T>`.
+#   • Magnitudo parameters — Compile-time integer parameters use the `magnitudo` keyword.
+#
+# Common mistakes:
+#   • Forgetting that `magnitudo` declares a compile-time integer generic parameter — regular types use bare `<T>` syntax.
+#
+# See also: typus, functio
+# =============================================================================
+
+# generics — angle-bracket parameters (replaces removed prae typus)
+#
+# GRAMMAR:
+#   genericParams :← '<' (ident | 'magnitudo' ident) (',' (ident | 'magnitudo' ident))* '>'
+#
+# EXPECTED OUTPUT:
+#   No incipit — declaration or test-runner surface only.
+#
+# BACKEND:
+#   declaration-only generic surface (whitelist: prae/prae.fab). Cross-ref: generic/generic.fab.
+#
+
+functio identitas<T>(T valor) → T {
+    redde valor
+}
+
+functio primum<T>(lista<T> res) → T ∪ nihil {
+    redde res.primus()
+}

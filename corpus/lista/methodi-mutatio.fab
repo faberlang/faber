@@ -1,0 +1,53 @@
++++
+term = "lista"
+kind = "keyword"
+category = "collection"
+canonical = true
+summary = "Generic ordered collection type."
+syntax = "lista<T>"
+aliases = ["array", "list"]
+related = ["tabula", "copia", "∷", "itera"]
++++
+
+# =============================================================================
+# lista — Generic ordered collection type.
+# =============================================================================
+#
+# What this teaches:
+#   • mutation intrinsics for lists — `appende()`, `decapita()`, `detrahe()`, `inverte()`, `ordina()`
+#   • contrast between mutation methods and copy-returning participle forms
+#
+# Common mistakes:
+#   • Expecting mutation methods (appende, inverte, ordina) to return a new list — they mutate in place and do not return a value.
+#
+# See also: tabula, copia, ∷, itera
+# =============================================================================
+
+# lista<T> mutation intrinsics
+#
+# res.appende(x) | res.decapita() | res.detrahe() | res.inverte() | res.ordina()
+#
+# GRAMMAR:
+#   listMethod :← expr '.' ('appende' | 'decapita' | 'detrahe' | 'inverte' | 'ordina') '(' args? ')'
+#
+# EXPECTED OUTPUT:
+#   [1, 2]
+#   3
+#   4
+#
+# BACKEND: Go e2e whitelist — lista intrinsic methods not yet lowered for Go
+# (whitelist: lista/methodi-mutatio.fab).
+
+incipit {
+    varia _ res ← [3, 1, 2] ∷ lista<numerus>
+
+    res.appende(4)
+    fixum _ primusremotus ← res.decapita()
+    fixum _ ultimusremotus ← res.detrahe()
+    res.inverte()
+    res.ordina()
+
+    nota res
+    nota primusremotus
+    nota ultimusremotus
+}

@@ -1,0 +1,64 @@
++++
+term = "discerne"
+kind = "keyword"
+category = "integration"
+summary = "Multi-feature smoke: discretio, finge, discerne omnia, and per-field ut aliases."
+syntax = "discerne omnia <subject> <block>"
+related = ["discretio", "finge", "ut", "casu"]
++++
+# =============================================================================
+# discerne — Multi-feature smoke: discretio, finge, discerne omnia, and per-field ut aliases
+# =============================================================================
+#
+# What this teaches:
+#   • Multi-feature smoke: discretio, finge, discerne omnia, and per-field ut aliases.
+#   • Related keywords: discretio, finge, ut, casu
+#
+# Common mistakes:
+#   • Using `discerne omnia` with a catchall arm — `omnia` forbids `ceterum`; list every variant explicitly or remove `omnia` (SEM044).
+#
+# See also: discretio, finge, ut, casu
+# =============================================================================
+
+# integratio — discretio, finge, discerne omnia, and payload destructuring
+#
+# discretio Name { Variant { fields… }, … }
+# fixum T v ← finge Variant { field = value }
+# discerne omnia v { casu Variant fixum fields { … } }
+#
+# GRAMMAR:
+#   discretioDecl :← 'discretio' ident '{' variantDecl* '}'
+#   matchStmt     :← 'discerne' ('omnia')? expr '{' casuClause* '}'
+#
+# EXPECTED OUTPUT:
+#   none — deterministic variant strings; no .expected sidecar.
+
+discretio Mandatum {
+    Moveo { textus locus, numerus passus },
+    Loquere { textus verba },
+    Tace
+}
+
+functio narra(Mandatum m) → textus {
+    discerne omnia m {
+        casu Moveo fixum locus, passus {
+            redde "moveo § per §"(locus, passus)
+        }
+        casu Loquere fixum verba ut dictum {
+            redde "loquere §"(dictum)
+        }
+        casu Tace {
+            redde "silentium"
+        }
+    }
+}
+
+incipit {
+    fixum Mandatum a ← finge Moveo { locus = "forum", passus = 8 }
+    fixum Mandatum b ← finge Loquere { verba = "salve" }
+    fixum Mandatum c ← finge Tace
+
+    nota narra(a)
+    nota narra(b)
+    nota narra(c)
+}

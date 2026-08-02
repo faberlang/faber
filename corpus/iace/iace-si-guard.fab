@@ -1,0 +1,75 @@
++++
+term = "iace"
+kind = "keyword"
+category = "errors"
+canonical = true
+summary = "Conditional throw with si guard."
+syntax = "iace <expression> si <condition>"
+related = ["cape", "mori", "si", "⇥"]
++++
+# =============================================================================
+# iace — Conditional throw with si guard
+# =============================================================================
+#
+# What this teaches:
+#   • Conditional throw with si guard.
+#   • Related keywords: cape, mori, si, ⇥
+#
+# Common mistakes:
+#   • Using `iace si` without a `⇥` on the enclosing function or a `fac/cape` wrapper — the guard sugar expands to `si cond { iace val }`, which still needs an error context.
+#
+# See also: cape, mori, si, ⇥
+# =============================================================================
+
+# iace with optional si guard
+#
+# iace <value> [si <condicio>]
+#
+# GRAMMAR:
+#   throwStmt :← 'iace' expr ['si' expr]
+#
+# The optional `si` guard is parser sugar:
+#   iace val si cond  →  si cond { iace val }
+#
+# Without the guard, iace is unconditional (unchanged).
+#
+# EXPECTED OUTPUT:
+#   "ok: valid input"
+#   "caught: empty input"
+#   "caught: negative"
+
+functio validata(textus input) → textus ⇥ textus {
+    # Guard: throw if input is empty
+    iace "empty input" si input.longitudo() ≡ 0
+
+    redde "valid: §"(input)
+}
+
+incipit {
+    # Happy path — guard not triggered
+    fac {
+        fixum textus a ← validata("hello")
+        nota "ok: §"(a)
+    }
+    cape err {
+        nota "unexpected: §"(err)
+    }
+
+    # Empty input — iace si guard triggers
+    fac {
+        fixum textus b ← validata("")
+        nota "should not reach"
+    }
+    cape err {
+        nota "caught: §"(err)
+    }
+
+    # iace with si on same line
+    fac {
+        iace "force throw" si verum
+        nota "should not reach"
+    }
+    cape err {
+        nota "caught: §"(err)
+    }
+}

@@ -1,0 +1,33 @@
+[workspace]
+members = [
+    "crates/hygiene-ratchet",
+    "crates/radix",
+    "crates/radix-codegen-shared",
+    "crates/radix-mir",
+    "crates/radix-parser",
+    "crates/radix-host-abi",
+    "crates/radix-runtime-contract",
+    "crates/radix-diagnostics",
+    "crates/radix-hir",
+    "crates/radix-lexer",
+    "crates/radix-syntax",
+    "crates/radix-types",
+]
+resolver = "2"
+
+# Faster debug builds for test cycles. Line-table-only debuginfo is enough
+# for stack traces and basic debugging; full debuginfo (default) is expensive
+# to compile and bloats artifacts. Higher codegen-units lets rustc parallelize
+# the codegen phase across more threads.
+[profile.dev]
+debug = 1
+codegen-units = 256
+
+[profile.test]
+debug = 1
+codegen-units = 256
+
+# Public export: the private code generators' feature names stay
+# declared so the `cfg(feature = ...)` gates they leave behind are known.
+[workspace.lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("device", "device-runtime", "hir-cobol", "hir-fortran", "hir-go", "hir-haskell", "hir-odin", "hir-pascal", "hir-python", "hir-rust", "hir-swift", "hir-ts", "mir-amd", "mir-basic", "mir-coverage", "mir-llvm", "mir-metal", "mir-sexp", "mir-wasm", "mir-wgsl"))'] }

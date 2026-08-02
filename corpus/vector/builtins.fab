@@ -1,0 +1,28 @@
++++
+term = "vector"
+kind = "kernel"
+category = "gpu"
+summary = "global_invocation_id returns vector<u32, 3>"
++++
+
+# =============================================================================
+# vector — global_invocation_id returns vector<u32, 3>.
+# =============================================================================
+#
+# What this teaches:
+#   • GPU built-in — `global_invocation_id()` provides the thread ID within the compute grid
+#   • Vector return type — built-in returns `vector<u32, 3>` for 3D workgroup dispatch
+#
+# Common mistakes:
+#   • assuming global_invocation_id() is available outside @ nucleum kernel functions — it is GPU-only
+#
+# See also: vector, gpu, nucleum
+# =============================================================================
+
+
+
+@ nucleum
+functio builtin_probe(fractus<f32> x) → fractus<f32> {
+    fixum vector<u32, 3> gid ← global_invocation_id()
+    redde x
+}

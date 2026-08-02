@@ -1,0 +1,42 @@
++++
+term = "operandus"
+kind = "keyword"
+category = "cli"
+canonical = true
+summary = "Declares a CLI operand annotation."
+syntax = "@ operandus [ceteri] <type> <binding> [descriptio \"...\"] [ubique] [vel <default>]"
+related = ["optio", "cli", "imperium", "ceteri", "ubique"]
++++
+
+# =============================================================================
+# operandus — Declares a CLI operand annotation.
+# =============================================================================
+#
+# What this teaches:
+#   • CLI operands — `@operandus` declares positional arguments for CLI subcommands.
+#   • Binding and description — Each operand specifies a type, binding name, and description.
+#   • Variadic operands — The `ceteri` keyword marks an operand that consumes remaining arguments.
+#
+# Common mistakes:
+#   • Duplicate operand bindings or type mismatches — each operand name must be unique and match its declared type.
+#
+# See also: optio, cli, imperium, ceteri, ubique
+# =============================================================================
+
+# operandus — CLI positional operand
+#
+# GRAMMAR:
+#   annotation :← '@' 'operandus' operandSpec
+#
+# EXPECTED OUTPUT:
+#   No incipit — declaration or test-runner surface only.
+#
+# BACKEND:
+#   declaration-only CLI metadata (whitelist: operandus/operandus.fab).
+#
+
+@ cli "operandus-smoke"
+@ operandus textus input descriptio "Input path"
+@ operandus ceteri textus files descriptio "Extra files"
+incipit argumenta args {
+}

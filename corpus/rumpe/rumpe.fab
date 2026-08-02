@@ -1,0 +1,66 @@
++++
+term = "rumpe"
+kind = "keyword"
+category = "transfer"
+canonical = true
+summary = "Breaks out of the innermost loop."
+syntax = "rumpe"
+aliases = ["break"]
+related = ["perge", "dum"]
++++
+
+# =============================================================================
+# rumpe — Breaks out of the innermost loop.
+# =============================================================================
+#
+# What this teaches:
+#   • Loop control flow — `rumpe` exits the innermost `dum` or `itera` loop
+#     immediately
+#   • In nested loops, only the innermost loop is broken; outer loops continue
+#     executing
+#
+# Common mistakes:
+#   • Using `rumpe` outside a breakable block — `dum`, `itera`, `fac`, `meus`, or `tuus` (SEM030).
+#
+# See also: perge, dum
+# =============================================================================
+
+# Break (rumpe) in loops
+#
+# rumpe   -- exit innermost dum/itera immediately
+#
+# GRAMMAR:
+#   breakStmt :← 'rumpe'
+#
+# EXPECTED OUTPUT:
+#   0–4 (stops before 5), then nested pairs until interior hits 2.
+
+incipit {
+    # Break when reaching 5
+    varia _ i ← 0
+
+    dum i < 10 {
+        si i ≡ 5 {
+            rumpe
+        }
+        nota i
+        i ← i + 1
+    }
+
+    # Break in nested loop
+    varia _ exterior ← 0
+
+    dum exterior < 3 {
+        varia _ interior ← 0
+
+        dum interior < 10 {
+            si interior ≡ 2 {
+                rumpe
+            }
+            nota "exterior←§, interior←§"(exterior, interior)
+            interior ← interior + 1
+        }
+
+        exterior ← exterior + 1
+    }
+}

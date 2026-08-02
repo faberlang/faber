@@ -1,0 +1,70 @@
++++
+term = "clausa"
+kind = "keyword"
+category = "function"
+canonical = true
+summary = "Closure and lambda expressions with inferred or annotated types."
+syntax = "<params> ∴ <expression> | (<params>) → <type> ∴ <expression>"
+aliases = ["lambda", "closure"]
+related = ["∴", "functio", "numerus"]
++++
+
+# =============================================================================
+# clausa — Closure and lambda expressions with inferred or annotated types.
+# =============================================================================
+#
+# What this teaches:
+#   • Closure syntax — `<params> ∴ <expression>` defines an inline anonymous
+#     function with inferred return type
+#   • Typed closures — `(params) → <type> ∴ <expression>` adds explicit
+#     return type annotation
+#   • Higher-order usage — closures can be stored in variables, passed to
+#     iterators, and used as predicates
+#
+# Common mistakes:
+#   • confusing `clausa` (closure expression) with `functio` (named function declaration), or omitting parentheses on multi-parameter typed closures
+#
+# See also: ∴, functio, numerus
+# =============================================================================
+
+# clausa — closure / lambda expressions
+#
+# <params> ∴ <expr>
+# (<params>) → <typus> ∴ <expr>
+#
+# GRAMMAR:
+#   closureExpr :← paramList '∴' expr | '(' paramList ')' '→' type '∴' expr
+#
+# EXPECTED OUTPUT:
+#   clausa.expected
+
+incipit {
+    # Single-parameter closure: numerus x ∴ x * 2
+    fixum _ duplica ← numerus x ∴ x * 2
+    nota duplica(5)
+
+    # Multi-parameter typed closure
+    fixum _ adde ← (numerus a, numerus b) → numerus ∴ a + b
+    nota adde(3, 4)
+
+    fixum _ numeri ← [1, 2, 3]
+    varia lista<numerus> duplicati ← vacua
+    # predicate closure
+    fixum _ par ← numerus x → bivalens ∴ x % 2 ≡ 0
+    varia lista<numerus> pares ← vacua
+    itera ex numeri fixum n {
+        duplicati.appende(duplica(n))
+        si par(n) {
+            pares.appende(n)
+        }
+    }
+    nota duplicati.longitudo()
+    nota duplicati[0]
+    nota duplicati[2]
+    nota pares.longitudo()
+    nota pares[0]
+
+    fixum _ positivus ← numerus n → bivalens ∴ n > 0
+    nota positivus(10)
+    nota positivus(-5)
+}

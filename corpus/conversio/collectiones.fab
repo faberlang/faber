@@ -1,0 +1,62 @@
++++
+term = "↦"
+kind = "operator-group"
+category = "conversion"
+canonical = false
+summary = "Cross-collection conversio between lista, copia, tabula, tensor, and cursor."
+syntax = "<expression> ↦ <collection-type>"
+related = ["↦", "lista", "copia", "tabula", "tensor"]
++++
+
+# =============================================================================
+# ↦ — Cross-collection conversio between lista, copia, tabula, tensor, and cursor.
+# =============================================================================
+#
+# What this teaches:
+#   • Collection bridging — how `↦` converts between collection types (lista, copia, tabula, tensor, cursor) with different structural semantics.
+#   • Edge cases — holdouts like `lista ↦ tabula` reject at typecheck rather than guessing.
+#
+# Common mistakes:
+#   • Assuming all collection-to-collection conversions are valid — holdouts like `lista ↦ tabula` reject at typecheck.
+#
+# See also: ↦, lista, copia, tabula, tensor
+# =============================================================================
+
+
+# conversio — cross-collection conversions
+#
+# WHY: `↦` owns the normal expectation for collection bridges. `lista ↦ copia`
+# dedupes; `copia ↦ lista` materializes (unordered). `tensor ↦ lista` flattens
+# via `planata()`; `lista ↦ tensor` uses literal target shape or a 1-d fallback.
+# `tabula ↦ lista<K>`
+# and `tabula ↦ lista<V>` project keys or values from the target element type.
+# `lista ↔ cursor` materialize/wrap eagerly while both lower to `Vec` today.
+# Holdouts (`lista ↦ tabula`, async `promissum` boundaries) reject at typecheck.
+# See docs/factory/conversio-collection-coverage/.
+
+incipit {
+    fixum lista<numerus> xs ← [1, 2, 2, 3]
+    fixum copia<numerus> unique ← xs ↦ copia<numerus>
+    nota unique.longitudo()
+
+    fixum lista<numerus> roundtrip ← unique ↦ lista<numerus>
+    nota roundtrip.longitudo()
+
+    fixum lista<numerus> tensorSource ← [4, 5, 6]
+    fixum tensor<numerus, [3]> grid ← tensorSource ↦ tensor<numerus, [3]>
+    fixum lista<numerus> flat ← grid ↦ lista<numerus>
+    nota flat.longitudo()
+
+    fixum tabula<textus, numerus> scores ← { "alpha": 10, "beta": 20 }
+    fixum lista<textus> keys ← scores ↦ lista<textus>
+    nota keys.longitudo()
+
+    fixum tabula<textus, numerus> moreScores ← { "gamma": 30, "delta": 40 }
+    fixum lista<numerus> values ← moreScores ↦ lista<numerus>
+    nota values.longitudo()
+
+    fixum lista<numerus> cursorSource ← [7, 8, 9]
+    fixum cursor<numerus> stream ← cursorSource ↦ cursor<numerus>
+    fixum lista<numerus> materialized ← stream ↦ lista<numerus>
+    nota materialized.longitudo()
+}

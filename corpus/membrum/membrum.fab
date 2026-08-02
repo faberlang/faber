@@ -1,0 +1,111 @@
++++
+term = "membrum"
+kind = "concept"
+category = "expression"
+canonical = true
+summary = "Dot, bracket, chained, and optional member access expressions."
+syntax = "<expr>.<field> | <expr>[<index>] | <expr>?.<field>"
+related = ["?.", "lista", "tabula", "genus"]
++++
+
+# =============================================================================
+# membrum — Dot, bracket, chained, and optional member access expressions.
+# =============================================================================
+#
+# What this teaches:
+#   • dot access (`expr.field`) on genus records — direct field lookup
+#   • bracket access (`expr[index]`) on listas and tabulae — indexed access
+#   • optional chaining (`expr?.field`) — safe navigation that returns nihil on missing values
+#   • chained access combining dot, bracket, and optional access
+#
+# Common mistakes:
+#   • Accessing a field that does not exist on the receiver type — dot access requires a matching member on the genus.
+#
+# See also: ?., lista, tabula, genus
+# =============================================================================
+
+# membrum — dot, bracket, chained, and optional access
+#
+# expr.<field>        -- dot access on genus records
+# expr[index]         -- bracket access on listas and tabulae
+# expr?.<field>       -- optional chaining (see optionalis/optionalis.fab)
+#
+# GRAMMAR:
+#   memberExpr :← primary ('.' ident | '[' expr ']' | '?.' ident)*
+#
+# EXPECTED OUTPUT:
+#   membrum.expected — chained access samples.
+
+genus Punctum {
+    numerus x
+    numerus y
+}
+
+genus Forma {
+    textus nomen
+    numerus valor
+}
+
+genus Imum {
+    textus imum
+}
+
+genus Medium {
+    Imum medium
+}
+
+genus Extra {
+    Medium extra
+}
+
+genus Datum {
+    lista<textus> res
+}
+
+genus Adest {
+    numerus valor
+}
+
+genus Forsitan {
+    Adest adest
+}
+
+incipit {
+    # --- Dot accessus ---
+
+    fixum _ punctum ← Punctum { x = 10, y = 20 }
+    nota punctum.x
+    nota punctum.y
+
+    # --- Bracket accessus on lista ---
+
+    fixum _ numeri ← [1, 2, 3]
+    nota numeri[0]
+    nota numeri[2]
+
+    # --- Bracket accessus on tabula ---
+
+    fixum tabula<textus, numerus> tab ← { "nomen": 1, "valor": 42 }
+    nota tab["nomen"]
+    nota tab["valor"]
+
+    # --- Chained member access ---
+
+    fixum _ nidum ← Extra { extra = Medium { medium = Imum { imum = "inventum" } } }
+    nota nidum.extra.medium.imum
+
+    # --- Mixed dot and bracket ---
+
+    fixum _ datum ← Datum { res = ["primus", "secundus", "tertius"] }
+    nota datum.res[0]
+    nota datum.res[2]
+
+    # --- Accessus optionalis ---
+
+    fixum _ forsitan ← Forsitan { adest = Adest { valor = 100 } }
+    nota forsitan?.adest?.valor
+
+    # Accessus optionalis on nihil binding
+    fixum _ vacuum ← nihil
+    nota vacuum?.absens
+}

@@ -1,0 +1,64 @@
++++
+term = "implendum"
+kind = "keyword"
+category = "type"
+canonical = true
+summary = "Declares a behavioral contract with method signatures."
+syntax = "implendum <name> [<type-params>] <block>"
+aliases = ["interface"]
+related = ["genus", "implet"]
++++
+# =============================================================================
+# implendum — Declares a behavioral contract with method signatures
+# =============================================================================
+#
+# What this teaches:
+#   • Declares a behavioral contract with method signatures.
+#   • Related keywords: genus, implet
+#
+# Common mistakes:
+#   • Declaring a `genus implet Implendum` without implementing all required methods — every method signature in the implendum must have a body in the genus.
+#
+# See also: genus, implet
+# =============================================================================
+
+# implendum definition and implementation
+#
+# implendum Nomen { functio opus() → <type> }
+# genus Nomen implet Implendum { ... }
+#
+# GRAMMAR:
+#   implendumDecl :← 'implendum' ident '{' methodSig* '}'
+#   genusDecl     :← 'genus' ident 'implet' ident '{' ... '}'
+#
+# EXPECTED OUTPUT:
+#   circulus radius: 25
+#   quadratum latus: 15
+
+implendum Figurabile {
+    functio depinge() → vacuum
+}
+
+genus Circulus implet Figurabile {
+    numerus radius = 10
+
+    functio depinge() {
+        nota "circulus radius: §"(ego.radius)
+    }
+}
+
+genus Quadratum implet Figurabile {
+    numerus latus = 5
+
+    functio depinge() {
+        nota "quadratum latus: §"(ego.latus)
+    }
+}
+
+incipit {
+    fixum _ circulus ← Circulus { radius = 25 }
+    fixum _ quadratum ← Quadratum { latus = 15 }
+
+    circulus.depinge()
+    quadratum.depinge()
+}

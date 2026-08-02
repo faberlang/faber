@@ -1,0 +1,87 @@
++++
+term = "custodi"
+kind = "keyword"
+category = "control-flow"
+canonical = true
+summary = "Groups early-exit guard checks before the main body of a function."
+syntax = "custodi <block>"
+aliases = ["guard"]
+related = ["si", "redde"]
++++
+
+# =============================================================================
+# custodi — Groups early-exit guard checks before the main body of a function.
+# =============================================================================
+#
+# What this teaches:
+#   • Guard blocks — `custodi { si <conditio> { <exitus> } }` groups early-exit checks before a function's main logic.
+#   • Separation of concerns — guard blocks keep preconditions clearly separated from the main body.
+#   • Multiple guards — multiple `si` conditions in one custodi block, each with its own exit path.
+#
+# Common mistakes:
+#   • Using `custodi` outside a function — guard blocks are only valid inside functio bodies.
+#
+# See also: si, redde
+# =============================================================================
+
+# custodi — guard blocks for early exit
+#
+# custodi { si <conditio> { <exitus> } }
+#
+# GRAMMAR:
+#   custodiStmt :← 'custodi' '{' stmt* '}'
+#
+# EXPECTED OUTPUT:
+#   Division, clamping, and range-validation scalar results.
+
+functio divide(numerus a, numerus b) → numerus {
+    custodi {
+        si b ≡ 0 {
+            redde 0
+        }
+    }
+
+    redde a / b
+}
+
+functio tracta(numerus x) → numerus {
+    custodi {
+        si x < 0 {
+            redde -1
+        }
+        si x > 100 {
+            redde -1
+        }
+    }
+
+    # Main logic, clearly separated from custodi
+    redde x * 2
+}
+
+functio stringe(numerus valor, numerus minimum, numerus maximum) → numerus {
+    custodi {
+        si minimum > valor {
+            redde minimum
+        }
+        si maximum < valor {
+            redde maximum
+        }
+    }
+
+    redde valor
+}
+
+incipit {
+    # Guard returns 0 instead of dividing by zero
+    nota divide(10, 2)
+    nota divide(10, 0)
+
+    # Out-of-range inputs short-circuit to -1
+    nota tracta(50)
+    nota tracta(-10)
+    nota tracta(150)
+
+    nota stringe(5, 0, 10)
+    nota stringe(-5, 0, 10)
+    nota stringe(15, 0, 10)
+}

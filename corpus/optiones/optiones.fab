@@ -1,0 +1,39 @@
++++
+term = "optiones"
+kind = "keyword"
+category = "entry"
+canonical = true
+summary = "Binds CLI options metadata to a function declaration."
+syntax = "functio <name>(...) optiones <ident> → <type>"
+related = ["argumenta", "ad"]
++++
+
+# =============================================================================
+# optiones — Binds CLI options metadata to a function declaration.
+# =============================================================================
+#
+# What this teaches:
+#   • Options bundle — The `optiones <ident> → <type>` syntax attaches a CLI options struct to a function.
+#   • Declaration syntax — Options are declared as a modifier on the function signature, after the parameter list.
+#
+# Common mistakes:
+#   • Duplicate flag definitions in optiones — each short and long flag must be unique within the CLI surface.
+#
+# See also: argumenta, ad
+# =============================================================================
+
+# optiones — CLI options bundle on functio
+#
+# GRAMMAR:
+#   funcModifier :← ')' 'optiones' ident '→' type
+#
+# EXPECTED OUTPUT:
+#   No incipit — declaration or test-runner surface only.
+#
+# BACKEND:
+#   declaration-only CLI binding (whitelist: optiones/optiones.fab).
+#
+
+functio mitte() optiones Opts → textus {
+    redde "ok"
+}

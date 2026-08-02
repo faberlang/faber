@@ -1,0 +1,16 @@
++++
+term = "verum"
+kind = "keyword"
+category = "literal"
+canonical = true
+summary = "Boolean literals verum and falsum with bivalens bindings."
+syntax = "verum | falsum"
+related = ["falsum", "bivalens", "verum"]
++++
+incipit {
+    fixum bivalens enabled ← verum
+    fixum bivalens disabled ← falsum
+    nota enabled
+    nota disabled
+    nota enabled et non disabled
+}

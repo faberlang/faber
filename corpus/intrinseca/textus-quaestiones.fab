@@ -1,0 +1,45 @@
++++
+term = "textus"
+kind = "keyword"
+category = "type"
+canonical = false
+summary = "Compiler-owned textus query methodi."
+syntax = "s.longitudo | continet | initium | finis"
+related = ["textus", "intrinseca"]
++++
+# =============================================================================
+# textus — Compiler-owned textus query methodi
+# =============================================================================
+#
+# What this teaches:
+#   • Compiler-owned textus query methodi.
+#   • Related keywords: textus, intrinseca
+#
+# Common mistakes:
+#   • Using `textus` query methods on non-text types — `.continet()`, `.initium()`, `.finis()` are textus-only compiler intrinsics.
+#
+# See also: textus, intrinseca
+# =============================================================================
+
+# textus query intrinsics
+#
+# Compiler-owned textus methodi — longitudo, continet, initium, finis.
+#
+# GRAMMAR:
+#   s.longitudo() | s.continet(sub) | s.initium(prefix) | s.finis(suffix)
+#
+# Predicate methodi return bivalens; Wasm tier Runnable.
+#
+# EXPECTED OUTPUT:
+#   Smoke asserts exit 0 only.
+
+incipit {
+    fixum _ nuntius ← " Ave Roma "
+
+    fixum _ longitudo ← nuntius.longitudo()
+    fixum _ habetroma ← nuntius.continet("Roma")
+    fixum _ initiumest ← nuntius.initium(" Ave")
+    fixum _ finisest ← nuntius.finis(" ")
+
+    nota longitudo, habetroma, initiumest, finisest
+}

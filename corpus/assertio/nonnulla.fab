@@ -1,0 +1,58 @@
++++
+term = "!."
+kind = "operator-group"
+category = "non-null-chain"
+canonical = false
+summary = "Non-null assertion before member, index, or call access."
+syntax = "<expression>!.<name> | <expression>![<expression>] | <expression>!(<args>)"
+related = ["!."]
++++
+
+
+# =============================================================================
+# !. — Non-null assertion before member, index, or call access.
+# =============================================================================
+#
+# What this teaches:
+#   • Non-null assertion operator — `expr!.member` asserts the value is not
+#     `nihil` before accessing a field or method
+#   • Index access with assertion — `expr![index]` combines non-null assertion
+#     with element access on arrays
+#   • Safe unwrap pattern — useful when logic guarantees a value is present
+#     despite an optional type
+#
+# Common mistakes:
+#   • using `!.` asserted access when the value might actually be `nihil`, causing a runtime panic instead of handling the absent case
+#
+# See also: !.
+# =============================================================================
+
+# assertio — non-null assertion with !.
+#
+# <expr>!.<member>
+#
+# GRAMMAR:
+#   memberExpr :← expr '!' '.' ident
+#
+# EXPECTED OUTPUT:
+#   Field and index accesses on known-present values.
+#
+# BACKEND:
+#   Rust: assertio !. not yet emitted — compile-only smoke.
+
+genus Persona {
+    textus nomen
+    textus urbs sponte
+}
+
+incipit {
+    # Optional genus value — !. asserts it is not nihil before field access
+    fixum Persona ∪ nihil p ← Persona { nomen = "Marcus", urbs = "Roma" }
+    nota p!.nomen
+    nota p!.urbs
+
+    # !. on lista index — asserts element exists
+    fixum _ litterae ← ["a", "b", "c"]
+    nota litterae![0]
+    nota litterae![2]
+}

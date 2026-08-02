@@ -1,0 +1,53 @@
++++
+term = "json"
+kind = "type"
+category = "type"
+canonical = true
++++
+
+# =============================================================================
+# json — JSON serialization and deserialization
+# =============================================================================
+#
+# What this teaches:
+#   • JSON type conversions using `↦` — converting between `json`, `valor`, and concrete Faber types
+#   • the `@json` annotation for custom field naming and genus-level JSON configuration
+#   • roundtrip serialization with `json.pange()` and deserialization with `json.solve()`
+#
+# Common mistakes:
+#   • Applying @ json to a non-genus declaration — @ json is only supported on genus declarations and their fields.
+#
+# See also: 
+# =============================================================================
+
+importa ex "norma:json" privata json
+
+@ json
+genus Payload {
+    @ json { nomen = "wire_name" }
+    textus name
+}
+
+incipit {
+    fixum json literal ← { "wire_name": "Ada", "items": [1, { "ok": true }] }
+    fixum valor broad ← literal ↦ valor
+    fixum json narrowed ← broad ↦ json
+
+    fixum Payload payload ← narrowed ↦ Payload
+    fixum json encoded ← payload ↦ json
+    fixum textus wire ← json.pange(encoded)
+    fixum json ∪ nihil tentativa ← json.tempta(wire)
+
+    nota payload.name
+    nota wire
+    nota tentativa
+
+    fac {
+        fixum json reparsed ← json.solve(wire)
+        fixum Payload roundtrip ← reparsed ↦ Payload
+        nota roundtrip.name
+    }
+    cape err {
+        nota err
+    }
+}

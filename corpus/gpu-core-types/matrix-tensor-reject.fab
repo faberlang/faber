@@ -1,0 +1,33 @@
++++
+term = "matrix"
+kind = "type"
+category = "register"
+summary = "matrix<T, [R, C]> is not a tensor<T, [R, C]> alias."
+syntax = "matrix<T, [R, C]> != tensor<T, [R, C]>"
+related = ["tensor"]
++++
+# =============================================================================
+# matrix — matrix<T, [R, C]> is not a tensor<T, [R, C]> alias
+# =============================================================================
+#
+# What this teaches:
+#   • matrix<T, [R, C]> is not a tensor<T, [R, C]> alias.
+#   • Related keywords: tensor
+#
+# Common mistakes:
+#   • Assigning a `matrix` to a `tensor` without explicit conversion — `matrix` and `tensor` are distinct type constructors; use an explicit bridge.
+#
+# See also: tensor
+# =============================================================================
+
+# matrix — tensor boundary rejection
+#
+# GRAMMAR:
+#   matrix and tensor are separate type constructors.
+#
+# EXPECTED OUTPUT:
+#   reject: matrix is not assignable to tensor without an explicit conversion policy.
+
+functio matrix_is_not_tensor(matrix<f32, [2, 2]> m) → tensor<f32, [2, 2]> {
+    redde m
+}

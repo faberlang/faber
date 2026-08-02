@@ -1,0 +1,42 @@
++++
+term = "numerus"
+kind = "keyword"
+category = "type"
+canonical = false
+summary = "Sized numerus and fractus width annotations in type position."
+syntax = "numerus<W> | fractus<W>"
+related = ["numerus", "fractus", "instans"]
++++
+
+# =============================================================================
+# numerus — Sized numerus and fractus width annotations in type position.
+# =============================================================================
+#
+# What this teaches:
+#   • Width annotations — `numerus<i32>`, `numerus<u64>`, `fractus<f32>` carry explicit bit widths
+#   • Signedness — `i32` (signed) vs `u64` (unsigned) distinction in type position
+#
+# Common mistakes:
+#   • confusing sized family widths — fractus<f32> vs numerus<f32>, or modulus<i32> instead of modulus<u32>
+#
+# See also: numerus, fractus, instans
+# =============================================================================
+
+
+
+
+# sized numerus/fractus width annotations
+#
+# WHY: `numerus<W>` and `fractus<W>` carry explicit target widths in type position.
+
+incipit {
+    fixum numerus<i32> narrow ← 7 ∷ numerus<i32>
+    fixum numerus<u64> wide ← 255 ∷ numerus<u64>
+    fixum numerus<i64> signed ← narrow
+    fixum fractus<f32> single ← 1.5 ∷ fractus<f32>
+
+    nota narrow
+    nota wide
+    nota signed
+    nota single
+}

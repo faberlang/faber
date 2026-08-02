@@ -1,0 +1,45 @@
++++
+term = "generis"
+kind = "keyword"
+category = "type"
+canonical = true
+summary = "Marks a class member as belonging to the type itself."
+syntax = "generis <type> <name> [= <expression>]"
+related = ["genus", "nexum"]
++++
+# =============================================================================
+# generis — Marks a class member as belonging to the type itself
+# =============================================================================
+#
+# What this teaches:
+#   • Marks a class member as belonging to the type itself.
+#   • Related keywords: genus, nexum
+#
+# Common mistakes:
+#   • Accessing a `generis` field on an instance instead of the type — `generis` fields are static members accessed via the genus name, not via `ego`.
+#
+# See also: genus, nexum
+# =============================================================================
+
+# generis marks a static genus field (shared across instances)
+#
+# generis <type> <field> = <initium>  -- class-level binding, not per-instance
+#
+# GRAMMAR:
+#   fieldDecl inside genusDecl :← 'generis'? type ident ('=' expr)?
+#
+# EXPECTED OUTPUT:
+#   ruber
+#
+# Instance field `nomen` is per-object; `generis ruber` would be accessed on the
+# genus type in full programs (here only instance fields are read).
+
+genus Color {
+    generis textus ruber = "#ff0000"
+    textus nomen = "ruber"
+}
+
+incipit {
+    fixum _ color ← Color {}
+    nota color.nomen
+}

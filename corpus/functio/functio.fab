@@ -1,0 +1,65 @@
++++
+term = "functio"
+kind = "keyword"
+category = "function"
+canonical = true
+summary = "Declares a named function or method."
+syntax = "functio <name>(<params>) [modifiers] [→ <type>] [⇥ <error-type>] <block>"
+aliases = ["function"]
+related = ["→", "⇥", "redde", "sponte", "ceteri", "prae", "curata", "futura", "cursor"]
++++
+# =============================================================================
+# functio — Declares a named function or method
+# =============================================================================
+#
+# What this teaches:
+#   • Declares a named function or method.
+#   • Related keywords: →, ⇥, redde, sponte, ceteri, prae, curata, futura, cursor
+#
+# Common mistakes:
+#   • Omitting the `→ T` return type annotation — if a function uses `redde`, the return type must be declared; `redde` outside a function body is also an error (SEM032).
+#
+# See also: →, ⇥, redde, sponte, ceteri, prae, curata, futura, cursor
+# =============================================================================
+
+# Basic function declarations
+#
+# functio <nomen>() { <body> }
+# functio <nomen>() → <type> { <body> }
+#
+# GRAMMAR:
+#   funcDecl :← 'functio' ident '(' paramList ')' ('→' type)? block
+#
+# EXPECTED OUTPUT:
+#   functio.expected — four diagnostics (greetings, name, integer).
+
+# Function with no parameters, no return
+functio saluta() {
+    nota "Salve, Mundus!"
+}
+
+# Function with parameter, no explicit return type
+functio dic(textus verbum) {
+    nota verbum
+}
+
+# Function with return type
+functio nomen() → textus {
+    redde "Marcus Aurelius"
+}
+
+# Function with parameter and return type
+functio duplica(numerus n) → numerus {
+    redde n * 2
+}
+
+incipit {
+    saluta()
+
+    dic("Bonum diem!")
+
+    fixum _ rex ← nomen()
+    nota rex
+
+    nota duplica(21)
+}

@@ -1,0 +1,53 @@
++++
+term = "modulus<u64>"
+kind = "operator-group"
+category = "arithmetic"
+canonical = false
+summary = "One native SHA-512 compression round using modulus<u64>."
+syntax = "modulus<u64>"
+related = ["numerus", "⇐", "⇒", "∧", "∨", "⊻", "¬"]
++++
+
+# =============================================================================
+# modulus<u64> — One native SHA-512 compression round using modulus<u64>.
+# =============================================================================
+#
+# What this teaches:
+#   • 64-bit modular arithmetic — Demonstrates `modulus<u64>` in a real SHA-512 compression round.
+#   • Bitwise operations on 64-bit words — Combines shifts, xor, and, and not for cryptographic primitives.
+#
+# Common mistakes:
+#   • Forgetting that shift counts must be modulo the word size (64).
+#
+# See also: numerus, ⇐, ⇒, ∧, ∨, ⊻, ¬
+# =============================================================================
+
+# A small proof of the 64-bit word contract: one textbook SHA-512 round for
+# the first padded word of "abc". This is not the full digest implementation.
+
+functio dextra(modulus<u64> value, modulus<u64> count) → modulus<u64> {
+    redde (value ⇒ count) ∨ (value ⇐ (64 - count))
+}
+
+incipit {
+    fixum modulus<u64> a ← 7640891576956012808
+    fixum modulus<u64> b ← 13503953896175478587
+    fixum modulus<u64> c ← 4354685564936845355
+    fixum modulus<u64> d ← 11912009170470909681
+    fixum modulus<u64> e ← 5840696475078001361
+    fixum modulus<u64> f ← 11170449401992604703
+    fixum modulus<u64> g ← 2270897969802886507
+    fixum modulus<u64> h ← 6620516959814648809
+    fixum modulus<u64> w ← 7017280452245743616
+    fixum modulus<u64> k ← 4794697086780616226
+
+    fixum modulus<u64> sigma1 ← dextra(e, 14 ∷ modulus<u64>) ⊻ dextra(e, 18 ∷ modulus<u64>) ⊻ dextra(e, 41 ∷ modulus<u64>)
+    fixum modulus<u64> choose ← (e ∧ f) ⊻ ((¬e) ∧ g)
+    fixum modulus<u64> temp1 ← h + sigma1 + choose + k + w
+    fixum modulus<u64> sigma0 ← dextra(a, 28 ∷ modulus<u64>) ⊻ dextra(a, 34 ∷ modulus<u64>) ⊻ dextra(a, 39 ∷ modulus<u64>)
+    fixum modulus<u64> majority ← (a ∧ b) ⊻ (a ∧ c) ⊻ (b ∧ c)
+    fixum modulus<u64> temp2 ← sigma0 + majority
+
+    nota temp1 + temp2
+    nota d + temp1
+}

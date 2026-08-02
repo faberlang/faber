@@ -1,0 +1,41 @@
++++
+term = "tag"
+kind = "keyword"
+category = "testing"
+canonical = true
+summary = "Attaches a test tag string."
+syntax = "tag <string>"
+related = ["solum", "temporis"]
++++
+
+# =============================================================================
+# tag — Attaches a test tag string.
+# =============================================================================
+#
+# What this teaches:
+#   • Test tagging — using `tag` to attach metadata strings to `proba` blocks
+#   • Test filtering — tags enable selective test execution by category
+#
+# Common mistakes:
+#   • attaching duplicate tags or using tag on a non-probandum block
+#
+# See also: solum, temporis
+# =============================================================================
+
+
+
+# tag — test tag modifier
+#
+# GRAMMAR:
+#   testModifier :← 'tag' stringLit
+#
+# EXPECTED OUTPUT:
+#   No incipit — declaration or test-runner surface only.
+#
+# BACKEND:
+#   declaration-only test modifier (whitelist: tag/tag.fab).
+#
+
+proba "tagged case" tag "focus" {
+    adfirma verum
+}

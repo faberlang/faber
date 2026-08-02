@@ -1,0 +1,42 @@
++++
+term = "redde"
+kind = "keyword"
+category = "scalar"
+canonical = true
+summary = "Functions returning boolean literals via redde verum and redde falsum."
+syntax = "redde <bool-literal>"
+aliases = ["return"]
+related = ["verum", "falsum", "bivalens", "functio"]
++++
+
+# =============================================================================
+# redde — Functions returning boolean literals via redde verum and redde falsum.
+# =============================================================================
+#
+# What this teaches:
+#   • Boolean return values — `redde verum` and `redde falsum` are valid return
+#     expressions for `bivalens`-typed functions
+#   • Demonstrates that boolean literals pass through the return statement
+#     unchanged
+#
+# Common mistakes:
+#   • Confusing a scalar (single-value) return with a collection return — this function returns one `bivalens`, not a list.
+#
+# See also: verum, falsum, bivalens, functio
+# =============================================================================
+
+# scalar/return-bool — return boolean literals
+#
+# GRAMMAR:
+#   returnStmt :← 'redde' expr
+#
+# Verifies that the Swift backend emits functions returning
+# boolean literals (SC-001: primitives, functions, return).
+
+functio da_verum() → bivalens {
+    redde verum
+}
+
+functio da_falsum() → bivalens {
+    redde falsum
+}

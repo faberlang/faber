@@ -1,0 +1,68 @@
++++
+term = "∪"
+kind = "operator-group"
+category = "type"
+canonical = true
+summary = "Inline value unions and discerne on discretio variants."
+syntax = "typus <name> = <type> ∪ <type>"
+related = ["typus", "discerne", "discretio"]
++++
+
+# =============================================================================
+# ∪ — Inline value unions and discerne on discretio variants.
+# =============================================================================
+#
+# What this teaches:
+#   • Inline unions — `∪` creates ad-hoc union types without a full `discretio` declaration
+#   • Tagged variants — `discretio` with `casu` pattern matching for structured payloads
+#
+# Common mistakes:
+#   • confusing unio (ad-hoc union typus A ∪ B) with ∪ used as a set operator — unio is a type-level construct
+#
+# See also: typus, discerne, discretio
+# =============================================================================
+
+
+
+
+# Inline value unions and discerne on discretio
+#
+# typus Valor = numerus ∪ textus models a non-nullable ad-hoc union.
+# discretio + discerne handles tagged variants with payloads.
+#
+# GRAMMAR:
+#   typeAlias :← 'typus' ident '=' typeExpr ('∪' typeExpr)*
+#   discerne  :← 'discerne' expr '{' 'casu' variant pattern block ... '}'
+#
+# EXPECTED OUTPUT:
+#   42, "salve", "n: 7", "t: faber"
+#
+# BACKEND: Inline-union `discerne` enum lowering gap on Rust (whitelist: unio/unio.fab).
+
+typus Valor = numerus ∪ textus
+
+discretio Forma {
+    Numerus { numerus v },
+    Textus { textus v }
+}
+
+functio describe(Forma f) → textus {
+    discerne f {
+        casu Numerus fixum v { redde "n: §"(v) }
+        casu Textus fixum v { redde "t: §"(v) }
+    }
+}
+
+incipit {
+    # --- Ad-hoc inline union values ---
+
+    fixum Valor a ← 42
+    fixum Valor b ← "salve"
+    nota a
+    nota b
+
+    # --- Tagged discretio variants via finge ---
+
+    nota describe(finge Numerus { v = 7 } ∷ Forma)
+    nota describe(finge Textus { v = "faber" } ∷ Forma)
+}

@@ -1,0 +1,47 @@
++++
+term = "intervallum"
+kind = "type"
+category = "range"
+canonical = true
+summary = "Interval algebra: intersection, union, and span count."
+related = ["inter", "union", "longitudo", "nihil"]
++++
+# =============================================================================
+# intervallum — Interval algebra: intersection, union, and span count
+# =============================================================================
+#
+# What this teaches:
+#   • Interval algebra: intersection, union, and span count.
+#   • Related keywords: inter, union, longitudo, nihil
+#
+# Common mistakes:
+#   • Confusing `‥` (exclusive end) with `…` (inclusive end) — `0‥6` is [0,6), `0…6` is [0,6]; the wrong boundary operator changes the span.
+#
+# See also: inter, union, longitudo, nihil
+# =============================================================================
+
+# intervallum — range algebra (inter, union, longitudo)
+#
+# `inter` / `union` return `intervallum<numerus> ∪ nihil` (nihil when disjoint
+# or non-adjacent). `longitudo` returns discrete bound-count for numerus v1.
+#
+# EXPECTED OUTPUT:
+#   none — stdout not pinned for this exemplum.
+
+incipit {
+    fixum intervallum<numerus> morning ← 0‥6
+    fixum intervallum<numerus> afternoon ← 4‥10
+    fixum intervallum<numerus> overlap ← morning.inter(afternoon) vel 0‥0
+    fixum intervallum<numerus> early ← 0‥5
+    fixum intervallum<numerus> late ← 5‥10
+    fixum intervallum<numerus> workday ← early.union(late) vel 0‥0
+    fixum _ overlap_span ← overlap.longitudo()
+    fixum _ workday_span ← workday.longitudo()
+    adfirma overlap_span ≡ 2
+    adfirma workday_span ≡ 10
+
+    fixum intervallum<numerus> gap_left ← 0‥3
+    fixum intervallum<numerus> gap_right ← 6‥9
+    fixum _ no_union ← gap_left.union(gap_right)
+    adfirma no_union est nihil
+}

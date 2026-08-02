@@ -1,0 +1,43 @@
++++
+term = "in"
+kind = "keyword"
+category = "function"
+canonical = true
+summary = "Marks a mutable borrowed parameter."
+syntax = "in <type> <name>"
+related = ["de", "ex"]
++++
+# =============================================================================
+# in — Marks a mutable borrowed parameter
+# =============================================================================
+#
+# What this teaches:
+#   • Marks a mutable borrowed parameter.
+#   • Related keywords: de, ex
+#
+# Common mistakes:
+#   • Mode mismatch — passing a `de` (read-only) value to an `in` position, or using `in` to mutate a parameter declared as `de` (SEM057).
+#
+# See also: de, ex
+# =============================================================================
+
+# in — value parameter passing mode
+#
+# GRAMMAR:
+#   paramMode :← 'in' type
+#
+# EXPECTED OUTPUT:
+#   Scalar stdout smoke (see body).
+#
+# BACKEND:
+#   Cross-ref: functio/in-ex.fab.
+#
+
+functio summa(in lista<numerus> values) → numerus {
+    redde values.summa()
+}
+
+incipit {
+    fixum _ xs ← [1, 2, 3]
+    nota summa(xs)
+}

@@ -1,0 +1,91 @@
++++
+term = "instans"
+kind = "keyword"
+category = "type"
+canonical = true
+summary = "Absolute point-in-time primitive with precision contract."
+syntax = "instans | instans<ms> | instans<us> | instans<ns>"
+related = ["↦", "⇥", "textus"]
++++
+# =============================================================================
+# instans — Absolute point-in-time primitive with precision contract
+# =============================================================================
+#
+# What this teaches:
+#   • Absolute point-in-time primitive with precision contract.
+#   • Related keywords: ↦, ⇥, textus
+#
+# Common mistakes:
+#   • Using `instans ∷ T` (static ascription) instead of `instans ↦ T` (runtime conversion) — use `↦` for runtime datetime parsing and extraction (SEM016).
+#
+# See also: ↦, ⇥, textus
+# =============================================================================
+
+# instans — wall clock, precision contract, offset ingest, TOML provenance
+#
+# GRAMMAR:
+#   instans | instans<ms> | instans<us> | instans<ns>
+#   tempus.nunc() → instans<ns>; downconvert at use site
+#   valor ↦ instans<N> | instans ↦ textus
+#
+# EXPECTED OUTPUT:
+#   Smoke asserts exit 0 only.
+
+importa ex "norma:tempus" privata tempus
+importa ex "norma:toml" privata toml
+importa ex "norma:valor" privata valor
+
+functio epoch_wire(instans t) → textus {
+    redde t ↦ textus
+}
+
+incipit {
+    # --- precision declarations from canonical nanosecond wall clock ---
+    fixum instans<ns> nanos ← tempus.nunc()
+    fixum instans secunda ← nanos ↦ instans
+    fixum instans<ms> millis ← nanos ↦ instans<ms>
+    fixum instans<us> micros ← nanos ↦ instans<us>
+
+    # --- valor ↦ instans: UTC wire and numeric offset normalize to same instant ---
+    fixum valor utc ← "1979-05-27T07:32:00Z"
+    fixum valor offset ← "1979-05-27T03:32:00-04:00"
+    fixum instans parsed ← utc ↦ instans
+    fixum instans normalized ← offset ↦ instans
+
+    adfirma parsed ≡ normalized secus "offset ingest normalizes to UTC instant"
+
+    # --- TOML datetime provenance (Valor::Instans carrier, not textus) ---
+    fixum valor doc ← toml.solve("creatus = 1979-05-27T07:32:00.123456Z")
+    fixum valor carrier ← valor.cape(doc, "creatus")
+    fixum instans<us> fromToml ← carrier ↦ instans<us>
+    adfirma fromToml ↦ textus ≡ "1979-05-27T07:32:00.123456Z" secus "emit honors micros contract"
+
+    # --- precision-tagged equality: distinct at ns, equal at ms ---
+    fixum valor leftWire ← "1979-05-27T07:32:00.123456Z"
+    fixum valor rightWire ← "1979-05-27T07:32:00.123999Z"
+    fixum instans<ns> left ← leftWire ↦ instans<ns>
+    fixum instans<ns> right ← rightWire ↦ instans<ns>
+    adfirma left ≠ right secus "sub-millisecond bits differ at nanosecond precision"
+    fixum instans<ms> leftMs ← left ↦ instans<ms>
+    fixum instans<ms> rightMs ← right ↦ instans<ms>
+    adfirma leftMs ≡ rightMs secus "same millisecond at declared ms precision"
+
+    # --- cross-precision conversio: widen and narrow with observable truncation ---
+    fixum instans<ns> fine ← parsed ↦ instans<ns>
+    fixum instans<ms> coarse ← fine ↦ instans<ms>
+    fixum instans seconds ← fine ↦ instans
+    adfirma seconds ↦ textus ≡ "1979-05-27T07:32:00Z" secus "narrow to seconds strips sub-second wire"
+
+    fixum instans<ms> wider ← secunda ↦ instans<ms>
+    adfirma wider ≤ millis secus "cross-precision comparison at coarser operand"
+
+    # --- wire emit and parse-back via TOML (same instant) ---
+    fixum textus wire ← epoch_wire(parsed)
+    fixum valor replayDoc ← toml.solve("creatus = 1979-05-27T07:32:00Z")
+    fixum valor replayCarrier ← valor.cape(replayDoc, "creatus")
+    fixum instans roundtrip ← replayCarrier ↦ instans
+    adfirma roundtrip ≡ parsed secus "TOML ingest roundtrip matches UTC valor extract"
+    adfirma wire ≡ "1979-05-27T07:32:00Z" secus "seconds-precision wire emit"
+
+    nota wire, secunda, millis, micros, nanos, fromToml, coarse
+}

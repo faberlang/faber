@@ -1,0 +1,47 @@
++++
+term = "aut"
+kind = "operator-group"
+category = "logic"
+canonical = false
+summary = "Short-circuit logical or on bivalent operands."
+syntax = "<expression> aut <expression>"
+related = ["et", "vel", "binarius"]
++++
+
+
+# =============================================================================
+# aut — Short-circuit logical or on bivalent operands.
+# =============================================================================
+#
+# What this teaches:
+#   • Short-circuit OR — `aut` evaluates the right operand only when the left
+#     operand is `falsum`
+#   • Bivalent logic — `aut` operates on `bivalens` values (`verum`/`falsum`)
+#     and returns a `bivalens` result
+#
+# Common mistakes:
+#   • confusing `aut` with `et`, or using `aut` with non-`bivalens` operands expecting truthiness coercion — `aut` requires explicit boolean operands
+#
+# See also: et, vel, binarius
+# =============================================================================
+
+# aut — logical OR on bivalent operands (short-circuit)
+#
+# <bivalens> aut <bivalens>
+#
+# GRAMMAR:
+#   binaryExpr :← expr 'aut' expr
+#
+# EXPECTED OUTPUT:
+#   aut.expected (true)
+
+incipit {
+    # left operand: falsum
+    fixum _ invitatus ← falsum
+    # right operand: verum
+    fixum _ membrum ← verum
+    # falsum aut verum → verum
+    fixum _ intrat ← invitatus aut membrum
+
+    nota intrat
+}

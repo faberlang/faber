@@ -1,0 +1,35 @@
++++
+term = "numerus"
+kind = "keyword"
+category = "type"
+canonical = false
+summary = "Sized primitive family violation (expect type error)."
+syntax = "numerus<f32> — rejected; use fractus<f32>"
+related = ["numerus", "fractus"]
++++
+
+# =============================================================================
+# numerus — Sized primitive family violation (expect type error).
+# =============================================================================
+#
+# What this teaches:
+#   • Type family restriction — `numerus<W>` rejects float width markers; use `fractus<W>` instead
+#   • Compile-time error — type family violations are caught and reported at compile time
+#
+# Common mistakes:
+#   • using numerus<f32> instead of fractus<f32> for floating-point types — width families are type-specific
+#
+# See also: numerus, fractus
+# =============================================================================
+
+
+
+
+# sized primitive family violation (expect type error)
+#
+# WHY: `numerus<W>` rejects float width markers; use `fractus<f32>` instead.
+
+incipit {
+    fixum numerus<f32> invalid ← 1.0 ∷ fractus<f32>
+    nota invalid
+}

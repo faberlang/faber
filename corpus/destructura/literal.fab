@@ -1,0 +1,68 @@
++++
+term = "valor"
+kind = "existing-home"
+category = "type"
+canonical = true
+summary = "JSON-shaped dynamic value literal for open object-shaped data."
+syntax = "valor"
+aliases = ["json", "object"]
+related = ["genus", "∷", "ignotum", "tabula"]
++++
+
+# =============================================================================
+# valor — JSON-shaped dynamic value literal for open object-shaped data.
+# =============================================================================
+#
+# What this teaches:
+#   • JSON valor literals — `{ "key": value, ... }` creates dynamic valor objects using JSON5 syntax with trailing commas.
+#   • Nested objects — JSON valor literals can be nested for complex data shapes.
+#   • Constraint — JSON valor literals accept only constant values (strings, numbers, booleans, null, nested objects/arrays); use genus or tabula for variable-backed construction.
+#
+# Common mistakes:
+#   • Using retired bare object literals `{ key = expr }` instead of genus construction `Type { field = expr }` — bare `{ }` is now a JSON valor literal with quoted keys and `:` separator.
+#
+# See also: genus, ∷, ignotum, tabula
+# =============================================================================
+
+# destructura — valor literal expressions (inline JSON)
+#
+# { "clavis": expr, ... }              -- JSON object literal (valor)
+# { "clavis": expr, "nidum": { ... } } -- nested JSON objects
+#
+# Anonymous Faber object literals (`{ key = expr }`) are retired. Bare `{ }`
+# now denotes a JSON valor literal: keys are quoted JSON strings separated by
+# `:`, values are JSON scalars, arrays, or nested objects. Trailing commas are
+# permitted (JSON5-style). Duplicate keys are an error (second occurrence).
+#
+# GRAMMAR:
+#   jsonLiteral :← '{' (jsonMember (',' jsonMember)* ','?)? '}'
+#   jsonMember  :← string ':' jsonValue
+#
+# EXPECTED OUTPUT:
+#   Empty valor, point coords, keyed fields, nested records.
+#
+# BACKEND: Go emitter does not lower object `sparge` into maps (whitelist:
+# destructura/literal.fab).
+
+incipit {
+    # --- Empty and simple records ---
+
+    fixum _ vacuum ← {}
+    nota vacuum
+
+    fixum _ punctum ← { "x": 10, "y": 20 }
+    nota punctum
+
+    # Text keys and constant values
+    fixum _ forma ← { "clavis": 42 }
+    nota forma
+
+    # NOTE: JSON valor literals accept only constant values (strings, numbers,
+    # booleans, null, nested objects/arrays). For variable-backed field
+    # construction, use genus `Type { field = expr }` or tabula insertion.
+
+    # --- Nested valor ---
+
+    fixum _ nidum ← { "extra": { "medium": 1 } }
+    nota nidum
+}

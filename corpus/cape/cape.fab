@@ -1,0 +1,52 @@
++++
+term = "cape"
+kind = "keyword"
+category = "errors"
+canonical = true
+summary = "Starts a catch block."
+syntax = "<structured-statement> cape <name> <block>"
+aliases = ["catch"]
+related = ["fac", "iace", "⇥"]
++++
+
+# =============================================================================
+# cape — Starts a catch block.
+# =============================================================================
+#
+# What this teaches:
+#   • Error recovery — `fac { … } cape err { … }` attempts a block and catches
+#     errors with a named handler
+#   • Guarded execution — code inside the `fac` block can `iace` errors that
+#     are intercepted by the `cape` handler
+#
+# Common mistakes:
+#   • attaching `cape` to a bare `{ }` block — `cape` only attaches to `fac` blocks and structured statements; use `fac { ... } cape err { ... }`
+#
+# See also: fac, iace, ⇥
+# =============================================================================
+
+# cape — catch handler on fac
+#
+# GRAMMAR:
+#   facStmt :← 'fac' block 'cape' ident block
+#
+# EXPECTED OUTPUT:
+#   Scalar stdout smoke (see body).
+#
+# BACKEND:
+#   Rust/Go: fac/cape emit gap (whitelist: cape/cape.fab).
+#
+
+incipit {
+    varia numerus attempt ← 0
+    fac {
+        attempt ← attempt + 1
+        si attempt > 1 {
+            iace "simulated failure"
+        }
+        nota "attempt §"(attempt)
+    }
+    cape err {
+        nota "caught"
+    }
+}

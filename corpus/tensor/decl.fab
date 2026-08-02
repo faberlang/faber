@@ -1,0 +1,48 @@
++++
+term = "tensor"
+kind = "type"
+category = "collection"
+canonical = true
+summary = "tensor<T, Figura> declaration shell with rank-0 vacua."
+syntax = "tensor<T, Figura> | tensor<T, []>"
+related = ["tensor", "lista"]
++++
+
+# =============================================================================
+# tensor — tensor<T, Figura> declaration shell with rank-0 vacua.
+# =============================================================================
+#
+# What this teaches:
+#   • Tensor declaration — `tensor<T, Figura>` type syntax with `vacua` as the empty initializer
+#   • Identity functions — passing tensors through functions preserves shape and rank
+#
+# Common mistakes:
+#   • declaring tensor<T> without a Figura shape parameter — use tensor<T, Figura> with explicit dimensions
+#
+# See also: tensor, lista
+# =============================================================================
+
+
+
+
+# tensor — declaration shell for tensor<T, Figura>
+#
+# tensor<T, []> name ← vacua
+# functio f(tensor<T, []> value) → tensor<T, []>
+#
+# GRAMMAR:
+#   type :← 'tensor' '<' type ',' shape '>'
+#
+# EXPECTED OUTPUT:
+#   Rank-0 tensor longitudo after round-trip identity call.
+
+functio identity(tensor<fractus<f32>, []> value) → tensor<fractus<f32>, []> {
+    redde value
+}
+
+incipit {
+    fixum tensor<fractus<f32>, []> empty ← vacua
+    fixum tensor<fractus<f32>, []> roundtrip ← identity(empty)
+
+    nota roundtrip.longitudo()
+}

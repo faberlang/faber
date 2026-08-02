@@ -1,0 +1,17 @@
++++
+term = "futura"
+kind = "annotation"
+category = "async"
+canonical = true
+summary = "Braced canonical @ futura unit marker."
+syntax = "@ futura { }"
+related = ["futura", "annotation-sugar"]
++++
+@ futura { }
+functio f() → vacuum {
+    redde
+}
+
+incipit {
+    nota "futura-braced"
+}

@@ -1,0 +1,84 @@
++++
+term = "elige"
+kind = "keyword"
+category = "control-flow"
+canonical = true
+summary = "Starts a value-based branch statement."
+syntax = "elige <expression> <block>"
+aliases = ["switch", "choose"]
+related = ["casu", "ceterum"]
++++
+
+# =============================================================================
+# elige — Starts a value-based branch statement.
+# =============================================================================
+#
+# What this teaches:
+#   • Value-based branching — `elige <expr> { casu <value> { ... } }` dispatches on a value (switch/choose pattern).
+#   • Multiple types — `elige` works with textus, numerus, and other comparable types.
+#   • Multi-statement cases — each `casu` block can have multiple statements.
+#
+# Common mistakes:
+#   • Non-exhaustive `elige` without `ceterum` — unmatched values silently produce no output; use `ceterum` for a default branch or cover all possible values.
+#
+# See also: casu, ceterum
+# =============================================================================
+
+# elige — switch on a value
+#
+# elige <expr> {
+#     casu <value> { <body> }
+#     ceterum { <body> }
+# }
+#
+# GRAMMAR:
+#   eligeStmt :← 'elige' expr '{' casuClause* '}'
+#
+# EXPECTED OUTPUT:
+#   elige.expected
+
+incipit {
+    # Text matching
+    fixum _ condicio ← "agens"
+
+    elige condicio {
+        casu "pendens" {
+            nota "exspectat..."
+        }
+        casu "agens" {
+            nota "currit"
+        }
+        casu "perfectum" {
+            nota "perfectum"
+        }
+    }
+
+    # Numerus matching
+    fixum _ codex ← 200
+
+    elige codex {
+        casu 200 {
+            nota "Recte"
+        }
+        casu 404 {
+            nota "non inventum"
+        }
+        casu 500 {
+            nota "error ministri"
+        }
+    }
+
+    # Multiple statements per case
+    fixum _ modus ← "opera"
+
+    elige modus {
+        casu "labor" {
+            nota "modus laboris"
+            nota "verba multa"
+        }
+        casu "opera" {
+            nota "modus operis"
+            nota "opera parata"
+        }
+    }
+}

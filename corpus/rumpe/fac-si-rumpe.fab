@@ -1,0 +1,40 @@
++++
+term = "rumpe"
+kind = "keyword"
+category = "transfer"
+canonical = false
+summary = "rumpe exits fac from nested si without entering cape"
+related = ["fac", "si", "cape"]
++++
+
+# =============================================================================
+# rumpe — rumpe exits fac from nested si without entering cape
+# =============================================================================
+#
+# What this teaches:
+#   • `rumpe` inside a `fac`-`cape` block exits the `fac` without entering
+#     the `cape` handler
+#   • Demonstrates that `rumpe` is a clean exit from a breakable block, not
+#     an error path
+#
+# Common mistakes:
+#   • TODO: assuming `rumpe` inside a `fac` block triggers the `cape` handler
+#
+# See also: fac, si, cape
+# =============================================================================
+
+incipit {
+    varia numerus valorem ← 0
+    fac {
+        si verum {
+            si verum {
+                rumpe
+            }
+        }
+        valorem ← 2
+    }
+    cape err {
+        valorem ← 3
+    }
+    nota valorem
+}

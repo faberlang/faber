@@ -1,0 +1,40 @@
++++
+term = "cli"
+kind = "annotation"
+category = "cli"
+canonical = true
+summary = "Braced canonical @ cli program marker."
+syntax = "@ cli { nomen = \"NAME\" }"
+related = ["cli", "optio", "annotation-sugar"]
++++
+
+# =============================================================================
+# cli — Braced canonical @ cli program marker.
+# =============================================================================
+#
+# What this teaches:
+#   • Braced annotation syntax — `@ cli { nomen = "NAME" }` sets the CLI
+#     program name using brace-delimited key-value pairs
+#   • Multi-annotation CLI setup — combining `@ cli` with `@ optio` to
+#     configure a command-line program and its options
+#
+# Common mistakes:
+#   • mixing braced and sugar annotation syntax on the same declaration; pick one canonical form per annotation
+#
+# See also: cli, optio, annotation-sugar
+# =============================================================================
+
+# Braced @ cli — canonical program name record
+#
+# TARGET: annotation-sugar stage 2
+# PAIR: sugar `@ cli "NAME"` (see optio/optio.fab)
+
+@ cli { nomen = "annotation-sugar-smoke" }
+@ optio {
+    binding = verbose,
+    brevis = "v",
+    longum = "verbose",
+    typus = bivalens,
+    descriptio = "Verbose mode",
+}
+incipit argumenta args { }

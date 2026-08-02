@@ -1,0 +1,47 @@
++++
+term = "falsum"
+kind = "keyword"
+category = "boolean"
+canonical = true
+summary = "Represents the false boolean value and can prefix a falsity check."
+syntax = "falsum [<expression>]"
+related = ["verum", "nihil"]
++++
+# =============================================================================
+# falsum — Represents the false boolean value and can prefix a falsity check
+# =============================================================================
+#
+# What this teaches:
+#   • Represents the false boolean value and can prefix a falsity check.
+#   • Related keywords: verum, nihil
+#
+# Common mistakes:
+#   • Confusing `falsum` with `nihil` — `falsum` is a bivalens literal (false); `nihil` is the null/absent sentinel.
+#
+# See also: verum, nihil
+# =============================================================================
+
+# falsum — false literal
+#
+# GRAMMAR:
+#   literal :← 'falsum'
+#
+# EXPECTED OUTPUT:
+#   Scalar stdout smoke (see body).
+#
+
+incipit {
+    fixum _ inactive ← falsum
+    nota inactive
+}
+
+proba "falsum is the false literal" {
+    fixum _ inactive ← falsum
+    adfirma inactive ≡ falsum
+    adfirma non inactive
+}
+
+proba "falsum contrasts with verum" {
+    adfirma falsum ≠ verum
+    adfirma falsum ≡ falsum
+}

@@ -1,0 +1,71 @@
++++
+term = "functio"
+kind = "keyword"
+category = "function"
+canonical = true
+summary = "Declares a named function or method."
+syntax = "functio <name>(<params>) [modifiers] [→ <type>] [⇥ <error-type>] <block>"
+aliases = ["function"]
+related = ["→", "⇥", "redde", "sponte", "ceteri", "prae", "curata", "futura", "cursor"]
++++
+# =============================================================================
+# functio — Declares a named function or method
+# =============================================================================
+#
+# What this teaches:
+#   • Declares a named function or method.
+#   • Related keywords: →, ⇥, redde, sponte, ceteri, prae, curata, futura, cursor
+#
+# Common mistakes:
+#   • Reversing type and name — Faber uses type-first syntax (`Type name`), not name-then-type (`name: Type`).
+#
+# See also: →, ⇥, redde, sponte, ceteri, prae, curata, futura, cursor
+# =============================================================================
+
+# Functions with typed parameters (type-first syntax)
+#
+# functio <nomen>(<type> <param>, ...) → <type> { <body> }
+#
+# GRAMMAR:
+#   funcDecl :← 'functio' ident '(' paramList ')' ('→' type)? block
+#
+# EXPECTED OUTPUT:
+#   49, 300, "Julius habet 30 annos", falsum, verum, 5.0
+
+# Single typed parameter
+functio quadratum(numerus n) → numerus {
+    redde n * n
+}
+
+# Multiple typed parameters
+functio adde(numerus a, numerus b) → numerus {
+    redde a + b
+}
+
+# Mixed types for string formatting
+functio narra(textus nomen, numerus aetas) → textus {
+    redde "§ habet § annos"(nomen, aetas)
+}
+
+# Boolean parameter and return
+functio nega(bivalens valor) → bivalens {
+    redde non valor
+}
+
+# fractus (floating-point) parameters
+functio media(fractus a, fractus b) → fractus {
+    redde (a + b) / 2.0
+}
+
+incipit {
+    nota quadratum(7)
+
+    nota adde(100, 200)
+
+    nota narra("Julius", 30)
+
+    nota nega(verum)
+    nota nega(falsum)
+
+    nota media(3.0, 7.0)
+}

@@ -1,0 +1,59 @@
++++
+term = "abstractus"
+kind = "keyword"
+category = "type"
+canonical = true
+summary = "Marks a type or member as abstract."
+syntax = "abstractus genus <name> <block>"
+related = ["genus", "implendum"]
++++
+
+
+# =============================================================================
+# abstractus — Marks a type or member as abstract.
+# =============================================================================
+#
+# What this teaches:
+#   • Abstract type declaration — `abstractus genus` defines a type that
+#     requires concrete subtypes to provide member implementations
+#   • Inheritance and override — concrete genera extend abstract ones and
+#     supply their own `functio` bodies
+#
+# Common mistakes:
+#   • forgetting to provide concrete `functio` implementations for abstract methods declared in `abstractus genus`
+#
+# See also: genus, implendum
+# =============================================================================
+
+# abstractus — abstract genus contract marker
+#
+# abstractus genus Nomen { … }
+#
+# GRAMMAR:
+#   genusDecl :← 'abstractus'? 'genus' ident '{' ... '}'
+#
+# EXPECTED OUTPUT:
+#   rota, 16
+
+abstractus genus Figura {
+    textus nomen
+
+    functio titulus() → textus {
+        redde "§"(ego.nomen)
+    }
+}
+
+genus Circulus {
+    textus nomen
+    numerus radius = 1
+
+    functio area() → numerus {
+        redde ego.radius * ego.radius
+    }
+}
+
+incipit {
+    fixum _ c ← Circulus { nomen = "rota", radius = 4 }
+    nota c.nomen
+    nota c.area()
+}

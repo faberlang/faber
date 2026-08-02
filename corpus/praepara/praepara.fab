@@ -1,0 +1,46 @@
++++
+term = "praepara"
+kind = "keyword"
+category = "testing"
+canonical = true
+summary = "Registers a before-each test hook."
+syntax = "praepara <block>"
+related = ["postpara", "omnia"]
++++
+
+# =============================================================================
+# praepara — Registers a before-each test hook.
+# =============================================================================
+#
+# What this teaches:
+#   • Testing setup hooks — `praepara` registers a block that runs before each
+#     test case (`proba`) in the suite, ensuring shared state or side effects
+#     are prepared
+#   • Works with `postpara` (after-each) for paired setup/teardown
+#
+# Common mistakes:
+#   • Confusing `praepara` (setup) with `postpara` (teardown) — they run at opposite ends of each test.
+#
+# See also: postpara, omnia
+# =============================================================================
+
+# praepara — before-each test hook
+#
+# GRAMMAR:
+#   hookDecl :← 'praepara' block
+#
+# EXPECTED OUTPUT:
+#   No incipit — declaration or test-runner surface only.
+#
+# BACKEND:
+#   declaration-only test hook (whitelist: praepara/praepara.fab).
+#
+
+probandum "hooks" {
+    praepara {
+        nota "before each"
+    }
+    proba "sample" {
+        adfirma verum
+    }
+}

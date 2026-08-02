@@ -1,0 +1,46 @@
++++
+term = "sparsa"
+kind = "type"
+category = "collection"
+canonical = true
+summary = "sparsa<T, Figura> declaration shell with all-zero vacua."
+syntax = "sparsa<T, Figura> | sparsa<T, []>"
+related = ["sparsa", "tensor", "vacua"]
++++
+
+# =============================================================================
+# sparsa — sparsa<T, Figura> declaration shell with all-zero vacua.
+# =============================================================================
+#
+# What this teaches:
+#   • Sparse tensor declaration — the `sparsa<T, Figura>` type syntax and `vacua` initializer
+#   • Identity functions — passing sparsa values through functions preserves shape and rank
+#
+# Common mistakes:
+#   • confusing sparsa<T, Figura> with tensor<T, Figura> — sparse tensors use the same shape syntax but different storage semantics
+#
+# See also: sparsa, tensor, vacua
+# =============================================================================
+
+
+# sparsa — declaration shell for sparsa<T, Figura>
+#
+# sparsa<T, Figura> name ← vacua
+# functio f(sparsa<T, Figura> value) → sparsa<T, Figura>
+#
+# GRAMMAR:
+#   type :← 'sparsa' '<' type ',' shape '>'
+#
+# EXPECTED OUTPUT:
+#   Rank and stored non-zero count after round-trip identity call.
+
+functio identity(sparsa<fractus<f32>, [2, 3]> value) → sparsa<fractus<f32>, [2, 3]> {
+    redde value
+}
+
+incipit {
+    fixum sparsa<fractus<f32>, [2, 3]> empty ← vacua
+    fixum sparsa<fractus<f32>, [2, 3]> roundtrip ← identity(empty)
+
+    nota roundtrip.longitudo(), roundtrip.nonnihil()
+}

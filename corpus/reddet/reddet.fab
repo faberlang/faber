@@ -1,0 +1,35 @@
++++
+term = "reddet"
+kind = "keyword"
+category = "async"
+canonical = true
+summary = "Awaits a promissum and returns its success value from a fiet body."
+syntax = "reddet future"
+aliases = ["return_await"]
+related = ["figendum", "tacebit", "fiet", "redde"]
++++
+
+# =============================================================================
+# reddet — Await-return
+# =============================================================================
+#
+# What this teaches:
+#   • Await and return from a `fiet` function only (`reddet future`).
+#
+# See also: figendum, tacebit, fiet, redde
+# =============================================================================
+
+```fab
+functio inner() fiet → numerus {
+    redde 9
+}
+
+functio outer() fiet → numerus {
+    reddet inner()
+}
+
+incipiet {
+    figendum numerus v ← outer()
+    nota v
+}
+```

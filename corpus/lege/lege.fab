@@ -1,0 +1,46 @@
++++
+term = "lege"
+kind = "keyword"
+category = "io"
+canonical = true
+summary = "Reads input from the active input stream."
+syntax = "lege [lineam]"
+related = ["lineam", "scribe"]
++++
+
+# =============================================================================
+# lege — Reads input from the active input stream.
+# =============================================================================
+#
+# What this teaches:
+#   • stdin input with `lege` — reads one line from the active input stream
+#   • the `↦ regex` conversion — compiling a textus pattern into a regex value
+#
+# Common mistakes:
+#   • Not checking est nihil before using the value — lege may return nihil at end of input.
+#
+# See also: lineam, scribe
+# =============================================================================
+
+# lege and regex conversio — I/O read and compiled pattern expressions
+#
+# fixum _ pattern ← "\d+" ↦ regex   -- compiled regex from textus
+# fixum _ line ← lege                  -- stdin line read
+#
+# GRAMMAR:
+#   conversio :← stringLit '↦' 'regex'
+#   readExpr :← 'lege'
+#
+# EXPECTED OUTPUT:
+#   Regex pattern diagnostic, then one stdin line (no .expected — interactive).
+#
+# BACKEND: Rust/Go/roundtrip e2e whitelist — lege not yet lowered for Rust/Go
+# (whitelist: lege/lege.fab).
+
+incipit {
+    fixum _ pattern ← "(?g)\d+" ↦ regex
+    nota pattern
+
+    fixum _ line ← lege
+    nota line
+}

@@ -1,0 +1,52 @@
++++
+term = "forma"
+kind = "literal"
+category = "template"
+canonical = true
+summary = "Captured backtick templates for bound payloads."
+syntax = "`template`(args)"
+related = ["scriptum", "textus", "valor"]
++++
+
+# =============================================================================
+# forma — Captured backtick templates for bound payloads.
+# =============================================================================
+#
+# What this teaches:
+#   • backtick template syntax `template`(args) — captures template text and parameters into the builtin `forma` genus
+#   • indexed placeholders `§0` for repeated parameter references
+#   • templates without holes for static text
+#
+# Common mistakes:
+#   • Expecting template application to render the string inline — \`...\`(args) captures into a forma genus, it does not interpolate into a textus.
+#
+# See also: scriptum, textus, valor
+# =============================================================================
+
+# Captured `forma` templates
+#
+# Backtick template application captures template text and parameters into the
+# builtin `forma` genus. It does not render holes into the template string.
+#
+# EXPECTED OUTPUT:
+#   Raw template text lines showing preserved § holes.
+
+incipit {
+    fixum textus tenantId ← "tenant-42"
+    fixum textus plan ← "pro"
+
+    fixum _ q ← `
+        select id, email, plan
+        from accounts
+        where tenant_id = §
+          and plan = §
+    `(tenantId, plan)
+
+    nota q.template
+
+    fixum _ indexed ← `where tenant_id = §0 or parent_tenant_id = §0`(tenantId)
+    nota indexed.template
+
+    fixum _ bare ← `select 1`
+    nota bare.template
+}

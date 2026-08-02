@@ -1,0 +1,42 @@
++++
+term = "tensor"
+kind = "type"
+category = "collection"
+canonical = false
+summary = "tensor<textus, [N]> as a universal container with non-numeric elements."
+syntax = "tensor<textus, [N]>"
+related = ["tensor", "textus"]
++++
+
+# =============================================================================
+# tensor — tensor<textus, [N]> as a universal container with non-numeric elements.
+# =============================================================================
+#
+# What this teaches:
+#   • Universal container — tensors accept any element type, not just numerics
+#   • Non-numeric indexing — `accipe`, `ponde`, `strue` work uniformly regardless of element type
+#
+# Common mistakes:
+#   • attempting arithmetic intrinsics like addita or matmul on non-numeric tensors — arithmetic is numeric-only
+#
+# See also: tensor, textus
+# =============================================================================
+
+
+
+
+# tensor<textus, [N]> — universal container with non-numeric elements
+#
+# WHY: element type is unrestricted; indexing works uniformly. Arithmetic intrinsics
+# (`addita`, `matmul`, …) reject non-numeric elements at typecheck.
+#
+# EXPECTED stdout:
+#   alpha
+
+incipit {
+    fixum lista<textus> flat ← ["alpha", "beta", "gamma"]
+    fixum tensor<textus, []> seed ← vacua
+    fixum tensor<textus, [3]> grid ← seed.strue(flat, [3])
+    fixum textus cell ← grid.accipe([0]) vel ""
+    nota cell
+}

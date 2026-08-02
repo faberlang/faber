@@ -1,0 +1,17 @@
+[package]
+name = "radix-codegen-shared"
+version = "0.79.0"
+edition = "2021"
+description = "Shared codegen text utilities for the Radix compiler workspace"
+license = "MIT"
+publish = false
+
+[dependencies]
+radix-diagnostics = { path = "../radix-diagnostics" }
+radix-hir = { path = "../radix-hir" }
+radix-lexer = { path = "../radix-lexer" }
+radix-types = { path = "../radix-types" }
+rustc-hash = "2"
+
+[lints.clippy]
+pedantic = "deny"

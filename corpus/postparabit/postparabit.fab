@@ -1,0 +1,44 @@
++++
+term = "postparabit"
+kind = "keyword"
+category = "testing"
+canonical = true
+summary = "Registers an async after-each test hook."
+syntax = "postparabit <block>"
+related = ["postpara", "praeparabit"]
++++
+
+# =============================================================================
+# postparabit — Registers an async after-each test hook.
+# =============================================================================
+#
+# What this teaches:
+#   • Async test hooks — `postparabit` registers an async cleanup hook that runs after each test case.
+#   • Async counterpart — Pairs with `praeparabit` (async before-each) and mirrors `postpara` (sync after-each).
+#
+# Common mistakes:
+#   • Confusing `postparabit` (async teardown) with `praeparabit` (async setup) — they run at opposite ends of each test.
+#
+# See also: postpara, praeparabit
+# =============================================================================
+
+# postparabit — async after-each hook
+#
+# GRAMMAR:
+#   hookDecl :← 'postparabit' block
+#
+# EXPECTED OUTPUT:
+#   No incipit — declaration or test-runner surface only.
+#
+# BACKEND:
+#   declaration-only test hook (whitelist: postparabit/postparabit.fab).
+#
+
+probandum "async hooks" {
+    postparabit {
+        nota "after each async"
+    }
+    proba "sample" {
+        adfirma verum
+    }
+}

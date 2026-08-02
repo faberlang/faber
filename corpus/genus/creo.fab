@@ -1,0 +1,94 @@
++++
+term = "genus"
+kind = "keyword"
+category = "type"
+canonical = false
+summary = "Genus constructor hook that runs after field initialization."
+syntax = "genus <name> { … functio creo() { … } }"
+related = ["genus", "creo"]
++++
+# =============================================================================
+# genus — Genus constructor hook that runs after field initialization
+# =============================================================================
+#
+# What this teaches:
+#   • Genus constructor hook that runs after field initialization.
+#   • Related keywords: genus, creo
+#
+# Common mistakes:
+#   • Using `ego` outside a genus method — `ego` is only valid inside genus methods including `creo` (SEM008).
+#
+# See also: genus, creo
+# =============================================================================
+
+# Genus with constructor hook (creo)
+#
+# genus Nomen {
+#     <type> <field> = <initium>
+#     functio creo() { ... }
+# }
+#
+# creo() runs after defaults and field overrides are merged.
+# Use for validation, clamping, or derived initialization.
+#
+# GRAMMAR:
+#   creo method inside genusDecl; ego fields are fully initialized before creo runs
+#
+# EXPECTED OUTPUT:
+#   50, 100 (clamped), then radius 5 with derived diameter 10 and area
+
+genus Terminus {
+    numerus valor = 0
+
+    functio creo() {
+        si ego.valor < 0 {
+            ego.valor ← 0
+        }
+
+        si ego.valor > 100 {
+            ego.valor ← 100
+        }
+    }
+
+    functio accipe() → numerus {
+        redde ego.valor
+    }
+}
+
+genus Circulus {
+    numerus radius = 1
+    numerus diameter = 0
+    fractus area = 0
+
+    functio creo() {
+        ego.diameter ← ego.radius * 2
+        ego.area ← 3.14159 * (ego.radius ↦ fractus) * (ego.radius ↦ fractus)
+    }
+}
+
+incipit {
+    # --- Validation in creo ---
+
+    fixum _ rectus ← Terminus {
+        valor = 50
+    }
+
+    nota rectus.accipe()
+
+    fixum _ coactus ← Terminus {
+        # creo clamps to 100
+        valor = 200
+    }
+
+    nota coactus.accipe()
+
+    # --- Derived initialization in creo ---
+
+    fixum _ c ← Circulus {
+        radius = 5
+    }
+
+    nota c.radius
+    nota c.diameter
+    nota c.area
+}

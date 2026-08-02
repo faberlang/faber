@@ -1,0 +1,39 @@
++++
+term = "errata"
+kind = "keyword"
+category = "function"
+canonical = true
+summary = "Marks a function parameter or binding as carrying an error value."
+syntax = "functio <name>(...) errata <ident> → <type>"
+related = ["⇥", "cape", "iace"]
++++
+
+# =============================================================================
+# errata — Marks a function parameter or binding as carrying an error value.
+# =============================================================================
+#
+# What this teaches:
+#   • Error channel parameter — `errata <type>` marks a function as having a typed error channel, enabling structured error handling.
+#   • Declaration-only — currently a declaration-only modifier; the error channel is whitelisted for syntax validation and future codegen.
+#
+# Common mistakes:
+#   • Confusing errata with ⇥ recovery — `errata` declares a typed error parameter on a function; `⇥` provides inline fallback recovery on conversion.
+#
+# See also: ⇥, cape, iace
+# =============================================================================
+
+# errata — typed error channel parameter
+#
+# GRAMMAR:
+#   funcModifier :← 'errata' type
+#
+# EXPECTED OUTPUT:
+#   No incipit — declaration or test-runner surface only.
+#
+# BACKEND:
+#   declaration-only error channel (whitelist: errata/errata.fab).
+#
+
+functio parse(textus raw) errata textus → numerus {
+    redde 0
+}

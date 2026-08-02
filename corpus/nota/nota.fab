@@ -1,0 +1,59 @@
++++
+term = "scribe"
+kind = "keyword"
+category = "output"
+canonical = true
+summary = "Writes a value to standard output."
+syntax = "scribe <expression>"
+related = ["vide", "mone"]
++++
+
+
+# =============================================================================
+# scribe — Writes a value to standard output.
+# =============================================================================
+#
+# What this teaches:
+#   • Standard output — `scribe` sends values to stdout, the primary output channel.
+#   • Expression evaluation — Any expression can be passed, including variables and literals.
+#
+# Common mistakes:
+#   • Confusing scribe (stdout without trailing newline) with nota (diagnostic output with trailing newline).
+#
+# See also: vide, mone
+# =============================================================================
+
+# nota — diagnostic output statements
+#
+# nota literal-textus
+# nota expr
+# nota template with § interpolation
+# nota labeled template with multiple § placeholders
+#
+# GRAMMAR:
+#   outputStmt :← 'nota' expr (',' expr)*
+#
+# EXPECTED OUTPUT:
+#   nota.expected — greeting, variable, formatted strings, sum, coordinates.
+
+incipit {
+    # Simple string output
+    nota "Salve, Munde!"
+
+    # Variable output
+    fixum _ nomen ← "Marcus"
+    nota nomen
+
+    # Multiple arguments
+    fixum _ aetas ← 30
+    nota "nomen: §"(nomen)
+    nota "aetas: §"(aetas)
+
+    # Expressions
+    fixum _ x ← 10
+    fixum _ y ← 20
+    nota "summa: §"(x + y)
+
+    # Multiple values in one statement
+    nota "coordinata: § §"(x, y)
+}

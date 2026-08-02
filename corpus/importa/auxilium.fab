@@ -1,0 +1,45 @@
++++
+term = "importa"
+kind = "keyword"
+category = "package"
+canonical = false
+summary = "Sibling module consumed by importa ex … privata."
+syntax = "importa ex \"<path>\" privata (<name> [ut <alias>] | *)"
+related = ["importa", "privata", "ex"]
++++
+# =============================================================================
+# importa — Sibling module consumed by importa ex … privata
+# =============================================================================
+#
+# What this teaches:
+#   • Sibling module consumed by importa ex … privata.
+#   • Related keywords: importa, privata, ex
+#
+# Common mistakes:
+#   • Exporting a name without the module being importable — standalone compilation may fail to resolve sibling imports; use package or module mode.
+#
+# See also: importa, privata, ex
+# =============================================================================
+
+# importa auxilium — sibling module for importa/importa.fab
+#
+# Exported functio saluta consumed via importa ex "./auxilium" privata.
+#
+# GRAMMAR:
+#   functio saluta(textus nomen) → textus { … }   (module-level export)
+#
+# This file is the dependency target; importa/importa.fab is the consumer exemplum.
+# Runnable standalone (own incipit) or as an imported module in package mode.
+#
+# EXPECTED OUTPUT:
+#   "Salve, auxilium!" when run standalone.
+#
+# BACKEND: importa/importa.fab whitelisted when compiled alone (no sibling link).
+
+functio saluta(textus nomen) → textus {
+    redde "Salve, §!"(nomen)
+}
+
+incipit {
+    nota saluta("auxilium")
+}

@@ -1,0 +1,83 @@
++++
+term = "functio"
+kind = "keyword"
+category = "function"
+canonical = true
+summary = "Declares a named function or method."
+syntax = "functio <name>(<params>) [modifiers] [→ <type>] [⇥ <error-type>] <block>"
+aliases = ["function"]
+related = ["→", "⇥", "redde", "sponte", "ceteri", "prae", "curata", "futura", "cursor"]
++++
+# =============================================================================
+# functio — Declares a named function or method
+# =============================================================================
+#
+# What this teaches:
+#   • Declares a named function or method.
+#   • Related keywords: →, ⇥, redde, sponte, ceteri, prae, curata, futura, cursor
+#
+# Common mistakes:
+#   • Omitting a base case — recursive functions without a terminating condition cause infinite recursion and stack overflow.
+#
+# See also: →, ⇥, redde, sponte, ceteri, prae, curata, futura, cursor
+# =============================================================================
+
+# Recursive functions
+#
+# A function may call itself; every recursion path needs a base case.
+#
+# GRAMMAR:
+#   funcDecl with callExpr naming the enclosing function
+#
+# EXPECTED OUTPUT:
+#   factorial: 1, 1, 120, 3628800
+#   fibonacci: 0, 1, 55
+#   summatio: 15, 55
+
+# Factorial: n! ← n * (n-1)!
+functio factorial(numerus n) → numerus {
+    si n ≤ 1 {
+        # base case
+        redde 1
+    }
+    redde n * factorial(n - 1)
+}
+
+# Fibonacci: fib(n) ← fib(n-1) + fib(n-2)
+functio fibonacci(numerus n) → numerus {
+    si n ≤ 0 {
+        redde 0
+    }
+    si n ≡ 1 {
+        redde 1
+    }
+    redde fibonacci(n - 1) + fibonacci(n - 2)
+}
+
+# Sum from 1 to n
+functio summatio(numerus n) → numerus {
+    si n ≤ 0 {
+        redde 0
+    }
+    redde n + summatio(n - 1)
+}
+
+incipit {
+    # --- Factorial examples ---
+
+    nota factorial(0)
+    nota factorial(1)
+    nota factorial(5)
+    nota factorial(10)
+
+    # --- Fibonacci examples ---
+
+    nota fibonacci(0)
+    nota fibonacci(1)
+    nota fibonacci(10)
+
+    # --- Summation examples ---
+
+    nota summatio(5)
+    nota summatio(10)
+}

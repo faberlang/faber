@@ -1,0 +1,81 @@
++++
+term = "conversio-fallibilis"
+kind = "conversio"
+category = "conversion"
+canonical = true
+summary = "Three recovery postures for fallible conversio: inline ⇥, ⇥ propagation, and fac/cape."
+syntax = "<expression> ↦ <type> | functio … → T ⇥ E | fac { … } cape err { … }"
+related = ["↦", "⇥", "fac", "cape", "iace"]
++++
+
+# =============================================================================
+# conversio-fallibilis — Three recovery postures for fallible conversio: inline ⇥, ⇥ propagation, and fac/cape.
+# =============================================================================
+#
+# What this teaches:
+#   • Recovery postures — three strategies for handling conversion failure: inline `⇥` fallback, `⇥` propagation to callers, and `fac { … } cape err { … }` error absorption.
+#   • Type signatures — how `→ T ⇥ textus` propagates conversion error as a typed channel.
+#
+# Common mistakes:
+#   • Mixing propagation and inline recovery — bare `↦` without `⇥` inside a `→ T ⇥ textus` function still propagates errors rather than handling them locally.
+#
+# See also: ↦, ⇥, fac, cape, iace
+# =============================================================================
+
+# conversio fallibilis — inline ⇥, propagation, and fac/cape recovery
+#
+# Posture 1: `expr ↦ T ⇥ recovery` handles failure at the site.
+# Posture 2: bare `↦` inside `→ T ⇥ textus` propagates to callers.
+# Posture 3: `fac { … }` with `cape err { … }` absorbs propagated conversio failure.
+#
+# BACKEND:
+#   Rust lowers all three postures (inline `⇥`, propagation, `fac`/`cape`).
+#   Go/TS remain diagnostic-only until their failable stacks mature.
+
+functio epochZero() → instans {
+    redde "1970-01-01T00:00:00Z" ↦ instans
+}
+
+functio parseInstans(valor v) → instans ⇥ textus {
+    redde v ↦ instans
+}
+
+functio inlineRecovery(valor v) → instans {
+    redde v ↦ instans ⇥ epochZero()
+}
+
+functio tutum(valor v) → instans {
+    fac {
+        redde parseInstans(v)
+    }
+    cape err {
+        mone err
+        redde epochZero()
+    }
+}
+
+functio tutumDirect(valor v) → instans {
+    fac {
+        redde v ↦ instans
+    }
+    cape err {
+        mone err
+        redde epochZero()
+    }
+}
+
+incipit {
+    fixum valor good ← "1979-05-27T07:32:00Z"
+    fixum valor bad ← "not-a-datetime"
+
+    adfirma inlineRecovery(good) ≡ (good ↦ instans)
+    adfirma inlineRecovery(bad) ≡ epochZero()
+
+    adfirma tutum(good) ≡ (good ↦ instans)
+    adfirma tutum(bad) ≡ epochZero()
+
+    adfirma tutumDirect(good) ≡ (good ↦ instans)
+    adfirma tutumDirect(bad) ≡ epochZero()
+
+    nota inlineRecovery(good), tutum(good), tutumDirect(good)
+}

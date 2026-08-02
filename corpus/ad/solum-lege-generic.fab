@@ -1,0 +1,50 @@
++++
+term = "solum lege generic"
+kind = "concept"
+category = "ad"
+canonical = true
+summary = "solum.lege<T> admits only supported materialization target types."
+syntax = "solum.lege<textus>(via) | solum.lege<lista<textus>>(via) | solum.lege<octeti>(via)"
+related = ["ad", "solum", "generic"]
++++
+
+# =============================================================================
+# solum lege generic — solum.lege<T> admits only supported materialization
+# target types.
+# =============================================================================
+#
+# What this teaches:
+#   • Generic materialization — `solum.lege<T>` reads file contents and
+#     materializes them into a specified target type
+#   • Supported type domain — only `textus`, `lista<textus>`, and `octeti` are
+#     accepted as T, enforced by compiler-owned `@ radix typus` metadata
+#
+# Common mistakes:
+#   • confusing ad route syntax — `solum.lege<T>` admits only `textus`, `lista<textus>`, and `octeti` as materialization targets
+#
+# See also: ad, solum, generic
+# =============================================================================
+
+# solum.lege<T> — generic materialization domain
+#
+# `solum.lege<T>` is constrained by compiler-owned `@ radix typus` metadata in
+# `stdlib/norma/solum.fab`. This fixture proves the accepted target types.
+#
+# Runtime check: files are prepared under /tmp so the generic materializer can
+# prove each accepted target shape independently of the harness working
+# directory.
+
+importa ex "norma:solum" privata solum
+
+incipit {
+    fixum textus textPath ← "/tmp/faber-solum-lege-generic.txt"
+    solum.scribe(textPath, "prima\nsecunda\n")
+
+    fixum textus body ← solum.lege<textus>(textPath)
+    fixum lista<textus> lineae ← solum.lege<lista<textus>>(textPath)
+    fixum octeti bytes ← solum.lege<octeti>(textPath)
+    nota body
+    nota lineae
+    nota bytes
+    nota "solum lege generic parata"
+}

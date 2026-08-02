@@ -1,0 +1,42 @@
++++
+term = "iacit"
+kind = "modifier"
+category = "function"
+canonical = true
+summary = "Marks a function as able to throw along a recoverable channel."
+syntax = "functio <name>(...) iacit → <type> [⇥ <error-type>]"
+related = ["iace", "cape", "⇥", "errata", "immutata"]
++++
+
+# =============================================================================
+# iacit — Marks a function as able to throw along a recoverable channel.
+# =============================================================================
+#
+# What this teaches:
+#   • the `iacit` modifier on function declarations — marks a function as throwable
+#   • the `⇥` error type annotation for specifying the error type contract
+#
+# Common mistakes:
+#   • Forgetting to declare the ⇥ error type — iacit requires an explicit ⇥ error type in the function signature.
+#
+# See also: iace, cape, ⇥, errata, immutata
+# =============================================================================
+
+# meta/iacit — throwable function modifier
+#
+# GRAMMAR:
+#   funcModifier :← 'iacit'
+#
+# EXPECTED OUTPUT:
+#   iacit surface declared
+#
+# BACKEND:
+#   Prefer explicit ⇥ error types for callable contracts; see iace/functio-fallibilis.fab.
+
+implendum Canens {
+    functio canta(textus vox) iacit → vacuum
+}
+
+incipit {
+    nota "iacit modifier declared"
+}

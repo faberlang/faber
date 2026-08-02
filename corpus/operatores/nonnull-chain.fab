@@ -1,0 +1,48 @@
++++
+term = "!."
+kind = "operator-group"
+category = "non-null-chain"
+canonical = true
+summary = "Asserted member, index, and call access on known-present values."
+syntax = "<expression>!.<name> | <expression>![<expression>] | <expression>!(<args>)"
+related = ["!.", "![", "!("]
++++
+
+# =============================================================================
+# !. — Asserted member, index, and call access on known-present values.
+# =============================================================================
+#
+# What this teaches:
+#   • Non-null assertion — `!.` accesses fields on values that are known to be present.
+#   • Index and call variants — `![ ]` for index access, `!( )` for call access on non-null values.
+#
+# Common mistakes:
+#   • Using non-null chain when the value could actually be null — causes a runtime failure.
+#
+# See also: !., ![, !(
+# =============================================================================
+
+# operatores/nonnull-chain — !. ![ !(
+#
+# GRAMMAR:
+#   nonNullSuffix :← '!.' IDENTIFIER | '![' expr ']' | '!(' argumentList ')'
+#
+# EXPECTED OUTPUT:
+#   Marcus, Roma, a
+#
+# BACKEND:
+#   Rust: non-null chain lowering gap (whitelist: operatores/nonnull-chain.fab).
+
+genus Persona {
+    textus nomen
+    textus urbs sponte
+}
+
+incipit {
+    fixum Persona ∪ nihil p ← Persona { nomen = "Marcus", urbs = "Roma" }
+    nota p!.nomen
+    nota p!.urbs
+
+    fixum _ litterae ← ["a", "b", "c"]
+    nota litterae![0]
+}

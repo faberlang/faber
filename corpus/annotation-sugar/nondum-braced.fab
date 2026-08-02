@@ -1,0 +1,34 @@
++++
+term = "nondum"
+kind = "annotation"
+category = "availability"
+canonical = true
+summary = "Braced canonical @ nondum availability record."
+syntax = "@ nondum { target = rs, ratio = \"…\" }"
+related = ["nondum", "annotation-sugar"]
++++
+
+# =============================================================================
+# nondum — Braced canonical @ nondum availability record.
+# =============================================================================
+#
+# What this teaches:
+#   • Unimplemented marker — `@ nondum` annotates a declaration as not yet
+#     implemented for a specific backend target
+#   • Braced annotation syntax — `@ nondum { target = rs, ratio = "…" }`
+#     provides the target backend and a rationale string
+#
+# Common mistakes:
+#   • using `@ nondum` on declarations that are actually implemented for the current target (SEM017)
+#
+# See also: nondum, annotation-sugar
+# =============================================================================
+
+implendum tempus {
+  @ nondum { target = rs, ratio = "timer handles are not implemented" }
+  functio siste(numerus handle) → vacuum
+}
+
+incipit {
+    nota "nondum-braced"
+}

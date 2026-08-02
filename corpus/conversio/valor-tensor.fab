@@ -1,0 +1,46 @@
++++
+term = "valor"
+kind = "conversio"
+category = "conversion"
+canonical = true
+summary = "Compose valor ↔ tensor roundtrip via lista bridges (no dedicated valor↔tensor arms)."
+syntax = "<valor> ↦ lista<T> ↦ tensor<T, [N]> ↦ lista<T> ↦ valor"
+related = ["↦", "valor", "lista", "tensor"]
++++
+
+# =============================================================================
+# valor — Compose valor ↔ tensor roundtrip via lista bridges (no dedicated valor↔tensor arms).
+# =============================================================================
+#
+# What this teaches:
+#   • Indirect tensor conversion — `valor ↔ tensor` has no dedicated codegen arms; it materializes through `lista<T>` as an intermediate step.
+#   • Roundtrip path — valor → lista → tensor → lista → valor, showing composition of existing operators.
+#
+# Common mistakes:
+#   • Expecting `valor ↦ tensor` to work directly without the lista bridge — there are no dedicated valor↔tensor arms; compose through `lista<T>` instead.
+#
+# See also: ↦, valor, lista, tensor
+# =============================================================================
+
+# conversio — valor ↔ tensor compose roundtrip
+#
+# WHY: `valor ↔ tensor` has no dedicated codegen arms. Extraction materializes
+# `lista<T>` first; construction uses shipped `lista ↦ tensor` (`structa`) and
+# flatten via `tensor ↦ lista` (`.planata()`), then `lista ↦ valor` boxing.
+
+incipit {
+    fixum valor arr ← [1, 2, 3, 4]
+    fixum lista<numerus> xs ← arr ↦ lista<numerus>
+    adfirma xs.longitudo() ≡ 4
+
+    fixum tensor<numerus, [4]> grid ← xs ↦ tensor<numerus, [4]>
+    fixum lista<numerus> flat ← grid ↦ lista<numerus>
+    adfirma flat.longitudo() ≡ 4
+
+    fixum valor roundtrip ← flat ↦ valor
+    nota roundtrip
+
+    fixum valor obj ← { "alpha": 10, "beta": 20 } ↦ valor
+    fixum tabula<textus, numerus> scores ← obj ↦ tabula<textus, numerus>
+    nota scores.accipe("alpha") vel 0
+}

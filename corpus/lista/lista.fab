@@ -1,0 +1,66 @@
++++
+term = "lista"
+kind = "keyword"
+category = "collection"
+canonical = true
+summary = "Generic ordered collection type."
+syntax = "lista<T>"
+aliases = ["array", "list"]
+related = ["tabula", "copia", "∷", "itera"]
++++
+
+# =============================================================================
+# lista — Generic ordered collection type.
+# =============================================================================
+#
+# What this teaches:
+#   • lista literal syntax — `[elem, ...]` with typed empty collections using `vacua`
+#   • the `sparge` operator — splicing one list into another literal
+#   • basic access: `longitudo()` and indexed reads via `[n]`
+#
+# Common mistakes:
+#   • Using vacua without an explicit type annotation — vacua requires a declared collection type like lista<T>.
+#
+# See also: tabula, copia, ∷, itera
+# =============================================================================
+
+# lista<T> literals, vacua, and sparge (long-form types — default Faber readability).
+# Numeric/tensor modules may use lf32/lu32 sugar; see docs/design/numeric-type-sugar.md.
+#
+# lista<T> nomen ← vacua        -- typed empty collection (forma innata)
+# fixum _ nomen ← [elem, …]     -- list literal
+# [sparge expr, …]              -- splice into literal
+#
+# GRAMMAR:
+#   listDecl :← ('varia' | 'fixum') 'lista<' type '>' ident '←' expr
+#   listLit  :← '[' (expr | sparge)* ']'
+#
+# EXPECTED OUTPUT:
+#   Scalar longitudo() and indexed accipe only (lista.expected).
+
+incipit {
+    fixum lista<numerus> vacuares ← vacua
+    fixum _ numeri ← [1, 2, 3, 4, 5]
+    fixum _ nomina ← ["Marcus", "Julia", "Gaius"]
+    fixum _ vexilla ← [verum, falsum, verum]
+    fixum _ matrix ← [[1, 2], [3, 4], [5, 6]]
+    fixum _ prima ← [1, 2, 3]
+    fixum _ secunda ← [4, 5, 6]
+    fixum _ coniuncta ← [sparge prima, sparge secunda]
+    fixum _ aucta ← [0, sparge prima, 99]
+
+    nota vacuares.longitudo()
+    nota numeri.longitudo()
+    nota numeri[0]
+    nota numeri[4]
+    nota nomina.longitudo()
+    nota nomina[1]
+    nota vexilla[0]
+    nota vexilla[2]
+    nota matrix.longitudo()
+    nota matrix[1][0]
+    nota coniuncta.longitudo()
+    nota aucta.longitudo()
+    nota aucta[0]
+    nota aucta[4]
+}

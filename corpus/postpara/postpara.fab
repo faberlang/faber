@@ -1,0 +1,44 @@
++++
+term = "postpara"
+kind = "keyword"
+category = "testing"
+canonical = true
+summary = "Registers an after-each test hook."
+syntax = "postpara <block>"
+related = ["praepara", "omnia"]
++++
+
+# =============================================================================
+# postpara — Registers an after-each test hook.
+# =============================================================================
+#
+# What this teaches:
+#   • Test hooks — `postpara` registers cleanup logic that runs after every test case in a `probandum` block.
+#   • Teardown guarantee — The hook runs regardless of whether the test passes or fails.
+#
+# Common mistakes:
+#   • Confusing `postpara` (teardown) with `praepara` (setup) — they run at opposite ends of each test.
+#
+# See also: praepara, omnia
+# =============================================================================
+
+# postpara — after-each test hook
+#
+# GRAMMAR:
+#   hookDecl :← 'postpara' block
+#
+# EXPECTED OUTPUT:
+#   No incipit — declaration or test-runner surface only.
+#
+# BACKEND:
+#   declaration-only test hook (whitelist: postpara/postpara.fab).
+#
+
+probandum "hooks" {
+    postpara {
+        nota "after each"
+    }
+    proba "sample" {
+        adfirma verum
+    }
+}

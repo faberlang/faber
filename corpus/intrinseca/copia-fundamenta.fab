@@ -1,0 +1,53 @@
++++
+term = "copia"
+kind = "keyword"
+category = "collection"
+canonical = true
+summary = "Generic set collection type."
+syntax = "copia<T>"
+aliases = ["set"]
+related = ["lista", "tabula", "inter"]
++++
+# =============================================================================
+# copia — Generic set collection type
+# =============================================================================
+#
+# What this teaches:
+#   • Generic set collection type.
+#   • Related keywords: lista, tabula, inter
+#
+# Common mistakes:
+#   • Using `copia<T>` without an explicit type — `vacua` requires an explicit type annotation like `copia<numerus>` (SEM014).
+#
+# See also: lista, tabula, inter
+# =============================================================================
+
+# copia<T> basic intrinsics
+#
+# Compiler-owned copia<T> methodi — adde, habet, dele, longitudo, vacua.
+#
+# GRAMMAR:
+#   copia.adde(x) | copia.habet(x) | copia.dele(x)
+#   copia.longitudo() | copia.vacua()
+#
+# copia<T> is a set-like collection; vacua with copia<T> creates an empty set.
+#
+# EXPECTED OUTPUT:
+#   Smoke asserts exit 0 only.
+#
+# BACKEND: Go e2e whitelist — copia method surface not yet lowered for Go.
+
+incipit {
+    varia copia<numerus> numeri ← vacua
+
+    numeri.adde(1)
+    numeri.adde(2)
+    numeri.adde(3)
+
+    fixum _ habetduo ← numeri.habet(2)
+    fixum _ remotus ← numeri.dele(3)
+    fixum _ longitudo ← numeri.longitudo()
+    fixum _ vacuaest ← numeri.vacua()
+
+    nota habetduo, remotus, longitudo, vacuaest
+}

@@ -1,0 +1,52 @@
++++
+term = "omnia"
+kind = "keyword"
+category = "testing"
+canonical = true
+summary = "Marks a test hook as applying to every case."
+syntax = "omnia"
+related = ["praepara", "postpara"]
++++
+
+
+# =============================================================================
+# omnia — Marks a test hook as applying to every case.
+# =============================================================================
+#
+# What this teaches:
+#   • Exhaustive matching — `discerne omnia` requires every variant of a `discretio` to have a `casu` branch.
+#   • Safety guarantee — The compiler rejects incomplete matches, eliminating forgotten variant bugs.
+#
+# Common mistakes:
+#   • Using ceterum with discerne omnia — omnia forbids catchall arms; list every variant explicitly.
+#
+# See also: praepara, postpara
+# =============================================================================
+
+# omnia — exhaustive discerne (must cover every variant)
+#
+# discerne omnia <discretio> { casu <Variant> { … } … }
+#
+# GRAMMAR:
+#   matchStmt :← 'discerne' 'omnia' expr '{' casuClause* '}'
+#
+# EXPECTED OUTPUT:
+#   none — stdout not pinned for this exemplum.
+
+discretio Condicio {
+    Activa,
+    Quietus
+}
+
+functio narra(Condicio condicio) → textus {
+    # every variant must have a casu
+    discerne omnia condicio {
+        casu Activa { redde "activa" }
+        casu Quietus { redde "quietus" }
+    }
+}
+
+incipit {
+    fixum _ condicio ← finge Activa
+    nota narra(condicio)
+}

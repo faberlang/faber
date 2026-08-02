@@ -1,0 +1,57 @@
++++
+term = "ex"
+kind = "keyword"
+category = "destructuring"
+canonical = true
+summary = "Extracts fields from a value into local bindings."
+syntax = "ex <expression> <fixum|varia> <field> [, ...] [ceteri <ident>]"
+related = ["de", "ut", "ceteri"]
++++
+
+# =============================================================================
+# ex — Extracts fields from a value into local bindings.
+# =============================================================================
+#
+# What this teaches:
+#   • value iteration (`itera ex`) over lista elements — the primary workhorse for iterating over collections
+#   • transforming values inside the loop body (e.g., doubling each element)
+#
+# Common mistakes:
+#   • Using ex (value iteration) when de (key/index iteration) is needed — ex iterates values, de iterates keys or indices.
+#
+# See also: de, ut, ceteri
+# =============================================================================
+
+# itera ex — for-in value iteration over listas
+#
+# itera ex <collection> fixum <item> { <body> }
+#
+# GRAMMAR:
+#   forInStmt :← 'itera' 'ex' expr 'fixum' ident block
+#
+# EXPECTED OUTPUT:
+#   ex.expected — numbers, names, and doubled values.
+
+incipit {
+    # Iterate over number lista
+    fixum _ numeri ← [1, 2, 3, 4, 5]
+
+    itera ex numeri fixum n {
+        nota n
+    }
+
+    # Iterate over textus lista
+    fixum _ nomina ← ["Marcus", "Julia", "Claudia"]
+
+    itera ex nomina fixum nomen {
+        nota nomen
+    }
+
+    # Transform values
+    fixum _ valores ← [10, 20, 30]
+
+    itera ex valores fixum v {
+        fixum _ duplex ← v * 2
+        nota duplex
+    }
+}

@@ -1,0 +1,30 @@
++++
+term = "vector"
+kind = "kernel"
+category = "gpu"
+summary = "vector constructor and dot product lower for GPU text emit"
++++
+
+# =============================================================================
+# vector — vector constructor and dot product lower for GPU text emit.
+# =============================================================================
+#
+# What this teaches:
+#   • Dot product — `productum()` computes the inner product of two vectors
+#   • Vector construction — using `↦` to convert list literals to vector values
+#
+# Common mistakes:
+#   • providing vectors of different lengths to productum (dot product) — both vectors must have the same width
+#
+# See also: vector, gpu, nucleum
+# =============================================================================
+
+
+
+@ nucleum
+functio productum(fractus<f32> x) → fractus<f32> {
+    fixum vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
+    fixum vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
+    fixum fractus<f32> d ← a.productum(b)
+    redde d
+}

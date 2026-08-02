@@ -1,0 +1,38 @@
++++
+term = "generic-call-type-args"
+kind = "concept"
+category = "function"
+canonical = true
+summary = "Explicit type arguments at function and namespaced call sites."
+syntax = "callee<type, ...>(args) — id<textus>(...), module.f<T>(...), tensor.creata<T>(...)"
+related = ["functio", "tensor", "typi-parametri"]
++++
+# =============================================================================
+# generic-call-type-args — Explicit type arguments at function and namespaced call sites
+# =============================================================================
+#
+# What this teaches:
+#   • Explicit type arguments at function and namespaced call sites.
+#   • Related keywords: functio, tensor, typi-parametri
+#
+# Common mistakes:
+#   • Type parameter not satisfying the function's bounds — explicit type arguments must meet any constraints declared on the generic function.
+#
+# See also: functio, tensor, typi-parametri
+# =============================================================================
+
+# functio/generic-call-type-args — explicit call-site type arguments
+#
+# EXPECTED OUTPUT:
+#   creata
+#
+# Application lane (`faber check` / `faber build` / Rust emit). Default
+# `faber run` / script stepper do not yet lower explicit call-site type args.
+
+functio identitas<T>(T x) → T {
+    redde x
+}
+
+incipit {
+    nota identitas<textus>("creata")
+}

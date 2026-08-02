@@ -1,0 +1,39 @@
++++
+term = "sparsa"
+kind = "type"
+category = "collection"
+canonical = false
+summary = "Same-shape tensor ↔ sparsa representation conversio."
+syntax = "tensor<T, F> ↦ sparsa<T, F> | sparsa<T, F> ↦ tensor<T, F>"
+related = ["sparsa", "tensor", "↦"]
++++
+
+# =============================================================================
+# sparsa — Same-shape tensor ↔ sparsa representation conversio.
+# =============================================================================
+#
+# What this teaches:
+#   • Dense-to-sparse conversion — using `↦` to change representation while preserving shape
+#   • Round-trip semantics — converting back and forth yields the same rank
+#
+# Common mistakes:
+#   • not matching element type and Figura exactly between the two representations during ↔↦ conversion
+#
+# See also: sparsa, tensor, ↦
+# =============================================================================
+
+
+# sparsa — same-shape dense/sparse conversio
+#
+# WHY: `↦` changes representation only. Element type and Figura must match.
+#
+# EXPECTED OUTPUT:
+#   Sparse stored count and dense round-trip rank.
+
+incipit {
+    fixum tf32[2, 2] dense ← [[1.0, 0.0], [0.0, 2.0]] ↦ tf32[2, 2]
+    fixum sf32[2, 2] sparse ← dense ↦ sf32[2, 2]
+    fixum tf32[2, 2] roundtrip ← sparse ↦ tf32[2, 2]
+
+    nota sparse.nonnihil(), roundtrip.longitudo()
+}

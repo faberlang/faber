@@ -1,0 +1,76 @@
++++
+term = "itera"
+kind = "keyword"
+category = "control-flow"
+canonical = true
+summary = "Starts a for-each iteration statement."
+syntax = "itera <mode> <expression> <binding> <block>"
+aliases = ["iterate"]
+related = ["ex", "de", "ab"]
++++
+
+# =============================================================================
+# itera — Starts a for-each iteration statement.
+# =============================================================================
+#
+# What this teaches:
+#   • for-each iteration using stream functions — consumes values yielded via
+#     `cede` from `fiunt` and `fient` functions
+#   • sync and async stream modes — `fiunt` and `fient` function signatures
+#
+# Common mistakes:
+#   • Forgetting that stream functions must use `fiunt` or `fient` and yield
+#     values with `cede`.
+#
+# See also: ex, de, ab
+# =============================================================================
+
+# itera ex — cursor function return iteration
+#
+# itera ex <cursor-call> fixum <item> { <body> }
+#
+# GRAMMAR:
+#   forInStmt  :← 'itera' 'ex' callExpr 'fixum' ident block
+#   cursorDecl :← funcDecl 'fiunt' | funcDecl 'fient'
+#
+# EXPECTED OUTPUT:
+#   Sync cursor values and collected lista of doubled results.
+#
+# BACKEND:
+#   Rust lowers `fient` through the async-cursor carrier. Go supports the
+#   `fiunt` half and reports `fient` as an explicit target gap.
+
+# Multi-value sync stream function that yields values via cede
+functio grena(numerus n) fiunt → numerus {
+    itera ab 0‥n fixum i {
+        cede i
+    }
+}
+
+# Multi-value async stream function that yields values via cede
+functio grena_futurum(numerus n) fient → numerus {
+    itera ab 0‥n fixum i {
+        cede i
+    }
+}
+
+incipiet {
+    # Direct consumption of cursor yield stream
+    nota "Sync cursor iteration:"
+    itera ex grena(3) fixum num {
+        nota "  numerus: §"(num)
+    }
+
+    # Collect all results from cursor function
+    varia _ effecta ← []
+    itera ex grena(5) fixum num {
+        effecta.appende(num * 2)
+    }
+    nota "Sync collected:"
+    nota effecta
+
+    nota "Async cursor iteration:"
+    itera ex grena_futurum(3) fixum num {
+        nota "  async numerus: §"(num)
+    }
+}

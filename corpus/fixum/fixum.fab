@@ -1,0 +1,87 @@
++++
+term = "fixum"
+kind = "keyword"
+category = "binding"
+canonical = true
+summary = "Declares an immutable binding."
+syntax = "fixum <type|_> <pattern> [← <expression>]"
+aliases = ["const", "immutable"]
+related = ["varia", "sit", "←"]
++++
+# =============================================================================
+# fixum — Declares an immutable binding
+# =============================================================================
+#
+# What this teaches:
+#   • Declares an immutable binding.
+#   • Related keywords: varia, sit, ←
+#
+# Common mistakes:
+#   • Reassigning a `fixum` binding after initialization — `fixum` is immutable; use `varia` for mutable bindings (SEM020) or defer init with a single later assignment.
+#
+# See also: varia, sit, ←
+# =============================================================================
+
+# fixum — immutable bindings
+#
+# Immediate init:
+#   fixum numerus count ← 0
+#   fixum _ nomen ← "Marcus"
+#
+# Deferred init (write-once): declare without ←, assign exactly once later, then
+# freeze. The definite-assignment pass rejects reads before that assignment and
+# any second assignment.
+#   fixum numerus pending
+#   pending ← 42
+#
+# `sit x` is sugar for `fixum _ x` in both immediate and deferred shapes; see
+# sit/sit.fab for the compact inferred spelling.
+#
+# GRAMMAR:
+#   varDecl := ('fixum' | 'varia') typeAnnotation IDENTIFIER ('←' expression)?
+#
+# EXPECTED OUTPUT:
+#   fixum.expected (Salve, Marcus! / 7 / 30 / 300)
+
+functio scale(bivalens compact, numerus base) → numerus {
+    fixum numerus factor
+    si compact {
+        factor ← 10
+    }
+    secus {
+        factor ← 100
+    }
+    redde base * factor
+}
+
+incipit {
+    fixum _ nomen ← "Marcus"
+    fixum _ salve ← "Salve, §!"(nomen)
+
+    nota salve
+
+    fixum numerus pending
+    pending ← 7
+    nota pending
+
+    nota scale(verum, 3)
+    nota scale(falsum, 3)
+}
+
+proba "fixum immediate init" {
+    fixum _ nomen ← "Marcus"
+    fixum _ salve ← "Salve, §!"(nomen)
+    adfirma nomen ≡ "Marcus"
+    adfirma salve ≡ "Salve, Marcus!"
+}
+
+proba "fixum deferred init writes once" {
+    fixum numerus pending
+    pending ← 7
+    adfirma pending ≡ 7
+}
+
+proba "fixum factor selected per branch" {
+    adfirma scale(verum, 3) ≡ 30
+    adfirma scale(falsum, 3) ≡ 300
+}

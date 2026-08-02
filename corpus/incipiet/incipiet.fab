@@ -1,0 +1,61 @@
++++
+term = "incipiet"
+kind = "keyword"
+category = "entry"
+canonical = true
+summary = "Declares the asynchronous program entry point."
+syntax = "incipiet <block>"
+related = ["incipit", "figendum", "tacebit"]
++++
+# =============================================================================
+# incipiet — Declares the asynchronous program entry point
+# =============================================================================
+#
+# What this teaches:
+#   • Declares the asynchronous program entry point.
+#   • Related keywords: incipit, figendum, tacebit
+#
+# Common mistakes:
+#   • Calling a `fiet` function without consuming its promissum; use
+#     `figendum`, `variandum`, `reddet`, or `tacebit` inside an `incipiet`.
+#
+# See also: incipit, figendum, tacebit
+# =============================================================================
+
+# incipiet — async program entry point
+#
+# incipiet { <body> }
+#
+# GRAMMAR:
+#   asyncEntry :← 'incipiet' block
+#
+# EXPECTED OUTPUT:
+#   none — Rust async runtime whitelist (compile-only in harness)
+#
+# BACKEND:
+#   Pairs with `fiet` and awaited bindings; contrast with incipit
+#   (synchronous entry).
+
+# Helper async finite function
+functio accipe() fiet → textus {
+    # Simulates async finite operation
+    redde "datum paratum"
+}
+
+functio metire(textus datum) fiet → numerus {
+    redde datum.longitudo()
+}
+
+# Futura entry point
+incipiet {
+    nota "incipiet initium"
+
+    # Await fiet functions with figendum
+    figendum _ datum ← accipe()
+    nota "acceptum: §"(datum)
+
+    figendum _ longitudo ← metire(datum)
+    nota "longitudo: §"(longitudo)
+
+    nota "opus perfectum"
+}

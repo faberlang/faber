@@ -1,0 +1,29 @@
++++
+term = "vector"
+kind = "kernel"
+category = "gpu"
+summary = "same-width literal vector swizzle lowers for GPU text emit"
++++
+
+# =============================================================================
+# vector — same-width literal vector swizzle lowers for GPU text emit.
+# =============================================================================
+#
+# What this teaches:
+#   • Swizzle — `swizzle("wzyx")` permutes vector components, e.g. for byte-order manipulation
+#   • Same-width swizzle — swizzle preserves the vector width (4 → 4)
+#
+# Common mistakes:
+#   • using swizzle masks with component names (e.g. "wzyx" on a 3D vector) that exceed the vector's dimension
+#
+# See also: vector, gpu, nucleum
+# =============================================================================
+
+
+
+@ nucleum
+functio vector_swizzle(fractus<f32> x) → fractus<f32> {
+    fixum vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
+    fixum vf32[4] b ← a.swizzle("wzyx")
+    redde b.productum(a)
+}

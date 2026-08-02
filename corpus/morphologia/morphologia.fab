@@ -1,0 +1,106 @@
++++
+term = "morphologia"
+kind = "concept"
+category = "collection"
+canonical = true
+summary = "Verb-form dispatch on collection methodi (imperative vs participle endings)."
+syntax = "<collection>.<verb-a|verb-ata|verb-e|verb-ita>(<args>)"
+related = ["lista", "appende", "filtrata"]
++++
+
+# =============================================================================
+# morphologia — Verb-form dispatch on collection methodi (imperative vs participle endings).
+# =============================================================================
+#
+# What this teaches:
+#   • verb-form dispatch — imperative endings (`-a`, `-e`, `-i`) mutate in place vs participle endings (`-ata`, `-ita`) return new values
+#   • complete coverage of paired methods: filtra/filtrata, adde/addita, inverte/inversa, ordina/ordinata, mappa/mappata
+#
+# Common mistakes:
+#   • Confusing imperative mutation forms (-a, -e, -i) with participle copy-returning forms (-ata, -ita) — imperatives mutate in place, participles return new values.
+#
+# See also: lista, appende, filtrata
+# =============================================================================
+
+# morphologia — verb-form dispatch on collection methods
+#
+# Imperative (-a, -e, -i): mutates in place  (appende, inverte, ordina)
+# Participle (-ata, -ita):   returns new value (filtrata, addita, inversa)
+#
+# GRAMMAR:
+#   methodCall :← expr '.' ident '(' … ')'   (verb ending selects semantics)
+#
+# EXPECTED OUTPUT:
+#   filtrata nova: [2, 4]
+#   addita nova: [1, 2, 3, 4, 5, 6]
+#   appende mutat: [1, 2, 3, 4]
+#   inversa nova: [5, 4, 3, 2, 1]
+#   inverte mutat: [3, 2, 1]
+#   ordinata nova: [1, 2, 3, 4, 5]
+#   ordina mutat: [1, 2, 3]
+#   mappata nova: [2, 4, 6, 8, 10]
+#   res prima: [1, 2, 3, 4, 5]
+
+incipit {
+    varia _ res ← [1, 2, 3, 4, 5] ∷ lista<numerus>
+
+    # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
+    # FILTRA: filtr-
+    # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
+
+    # filtrata returns a new filtered list
+    fixum _ pares ← res.filtrata(numerus x ∴ x % 2 ≡ 0)
+    nota "filtrata nova: §"(pares)
+
+    # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
+    # ADDE: adde-
+    # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
+
+    # addita returns a new list with an added element
+    fixum _ aucta ← res.addita(6)
+    nota "addita nova: §"(aucta)
+
+    # appende mutates in place
+    varia _ mutanda ← [1, 2, 3]
+    mutanda.appende(4)
+    nota "appende mutat: §"(mutanda)
+
+    # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
+    # INVERTE: invert-/invers-
+    # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
+
+    # inversa returns a new reversed list
+    fixum _ versa ← res.inversa()
+    nota "inversa nova: §"(versa)
+
+    # inverte mutates in place
+    varia _ invertenda ← [1, 2, 3]
+    invertenda.inverte()
+    nota "inverte mutat: §"(invertenda)
+
+    # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
+    # ORDINA: ordin-
+    # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
+
+    # ordinata returns a new sorted list
+    fixum _ ordinata ← res.ordinata()
+    nota "ordinata nova: §"(ordinata)
+
+    # ordina mutates in place
+    varia _ ordinanda ← [3, 1, 2]
+    ordinanda.ordina()
+    nota "ordina mutat: §"(ordinanda)
+
+    # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
+    # MAPPA: mapp-
+    # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
+
+    # mappata returns a new mapped list
+    fixum _ duplicata ← res.mappata(numerus x ∴ x * 2)
+    nota "mappata nova: §"(duplicata)
+
+    # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
+    # Participle operations leave the original list unchanged
+    # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
+    nota "res prima: §"(res)
+}

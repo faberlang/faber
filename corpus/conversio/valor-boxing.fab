@@ -1,0 +1,60 @@
++++
+term = "valor"
+kind = "conversio"
+category = "conversion"
+canonical = true
+summary = "T ↦ valor boxing for scalar, byte, collection, genus, and tensor carriers."
+syntax = "<typed-expression> ↦ valor"
+related = ["↦", "valor", "octeti", "lista", "tabula", "genus", "tensor"]
++++
+
+# =============================================================================
+# valor — T ↦ valor boxing for scalar, byte, collection, genus, and tensor carriers.
+# =============================================================================
+#
+# What this teaches:
+#   • Boxing into valor — `T ↦ valor` boxes any typed value (scalar, byte, collection, genus, tensor) into the canonical dynamic carrier.
+#   • Byte preservation — `octeti ↦ valor` composes as numeric byte values; it must not lossy-decode bytes as text.
+#
+# Common mistakes:
+#   • Expecting to extract a specific type from valor without a matching variant — valor requires the correct runtime variant or `⇥` recovery.
+#
+# See also: ↦, valor, octeti, lista, tabula, genus, tensor
+# =============================================================================
+
+# conversio — typed values to valor boxing
+#
+# WHY: `T ↦ valor` boxes typed values into the canonical dynamic carrier.
+# `octeti` composes as a list of numeric byte values; it must not lossy-decode
+# bytes as text.
+
+genus Punctum {
+    numerus x
+    numerus y
+}
+
+incipit {
+    fixum numerus n ← 42
+    fixum valor scalar ← n ↦ valor
+    nota scalar
+
+    fixum octeti bytes ← |de ad|
+    fixum valor boxedBytes ← bytes ↦ valor
+    nota boxedBytes
+
+    fixum lista<numerus> xs ← [1, 2]
+    fixum valor boxedList ← xs ↦ valor
+    nota boxedList
+
+    fixum tabula<textus, numerus> scores ← { "alpha": 10 }
+    fixum valor boxedMap ← scores ↦ valor
+    nota boxedMap
+
+    fixum Punctum pt ← Punctum { x = 3, y = 4 }
+    fixum valor boxedGenus ← pt ↦ valor
+    nota boxedGenus
+
+    fixum tensor<numerus, [2]> grid ← [5, 6] ↦ tensor<numerus, [2]>
+    fixum valor boxedTensor ← grid ↦ valor
+    nota boxedTensor
+}

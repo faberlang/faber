@@ -1,0 +1,51 @@
++++
+term = "implet"
+kind = "keyword"
+category = "type"
+canonical = true
+summary = "Declares that a type implements one or more implendum contracts."
+syntax = "genus <name> implet <interface-list> <block>"
+aliases = ["implements"]
+related = ["genus", "implendum"]
++++
+# =============================================================================
+# implet — Declares that a type implements one or more implendum contracts
+# =============================================================================
+#
+# What this teaches:
+#   • Declares that a type implements one or more implendum contracts.
+#   • Related keywords: genus, implendum
+#
+# Common mistakes:
+#   • Declaring `genus implet Implendum` without implementing all required methods — every method signature in the implendum must have a body in the genus.
+#
+# See also: genus, implendum
+# =============================================================================
+
+# implet — genus implements a implendum (interface contract)
+#
+# genus Nomen implet Implendum { … }
+#
+# GRAMMAR:
+#   genusDecl :← 'genus' ident 'implet' ident '{' methodDecl* '}'
+#
+# EXPECTED OUTPUT:
+#   implet.expected — Aurelia from implendum plenum().
+
+implendum Nominatum {
+    functio plenum() → textus
+}
+
+genus Civis implet Nominatum {
+    textus nomen
+
+    functio plenum() → textus {
+        # satisfies implendum requirement
+        redde "§"(ego.nomen)
+    }
+}
+
+incipit {
+    fixum _ civis ← Civis { nomen = "Aurelia" }
+    nota civis.plenum()
+}

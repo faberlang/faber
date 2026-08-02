@@ -1,0 +1,68 @@
++++
+term = "cli"
+kind = "annotation"
+category = "cli"
+canonical = true
+summary = "CLI root with options, operands, subcommands, and module mounts."
+syntax = "@ cli <name>"
+related = ["imperium", "imperia", "optio", "operandus", "argumenta", "descriptio", "ubique", "versio", "alias"]
++++
+
+# =============================================================================
+# cli — CLI root with options, operands, subcommands, and module mounts.
+# =============================================================================
+#
+# What this teaches:
+#   • Full CLI framework — `@ cli`, `@ versio`, `@ descriptio`, `@ optio`,
+#     `@ operandus`, `@ imperium`, and `@ alias` compose a complete CLI
+#     application definition
+#   • Subcommands — `@ imperium "greet"` declares a subcommand with its own
+#     options and operands
+#   • Module mounting — `@ imperia` imports command modules from packages
+#
+# Common mistakes:
+#   • attaching `@ cli` to a `functio` instead of an `incipit` (SEM009), or reusing duplicate CLI flags or binding names within the same CLI surface
+#
+# See also: imperium, imperia, optio, operandus, argumenta, descriptio,
+#   ubique, versio, alias
+# =============================================================================
+
+# cli — structured CLI annotation tour
+#
+# @ cli / @ versio / @ descriptio / @ optio / @ operandus / @ imperium / @ alias
+# @ imperia mounts imported command modules (see package-cli fixture).
+#
+# GRAMMAR:
+#   cliDecl :← '@' 'cli' stringLit
+#   incipit argumenta args { ... }
+#
+# EXPECTED OUTPUT:
+#   Requires CLI flags/args at run time; no fixed stdout contract.
+#
+# BACKEND:
+#   Rust runtime whitelist (missing operand 'nomen'); Go compile whitelist.
+#   Cross-ref optio/, operandus/, descriptio/, ubique/, argumenta/ keyword dirs.
+
+@ cli "exemplum"
+@ versio "0.1.0"
+@ descriptio "Faber CLI framework smoke exemplum"
+@ optio verbose brevis "v" longum "verbose" typus bivalens ubique descriptio "Enable verbose output"
+incipit argumenta args {
+}
+
+@ imperium "greet"
+@ alias "g"
+@ descriptio "Greet by name"
+@ operandus textus nomen descriptio "Name to greet"
+functio greet() argumenta args → vacuum {
+    si args.verbose {
+        nota "verbose"
+    }
+    nota "Salve, §!"(args.nomen)
+}
+
+@ imperium "version"
+@ alias "v"
+functio version() → vacuum {
+    nota "exemplum v0.1.0"
+}

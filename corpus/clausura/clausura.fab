@@ -1,0 +1,46 @@
++++
+term = "clausura"
+kind = "keyword"
+category = "function"
+canonical = true
+summary = "Declares or explains an inline closure expression; compact ∴ syntax is preferred for new code."
+syntax = "<type> <name> [→ <type>] [⇥ <error-type>] ∴ <expression|fac-block>"
+aliases = []
+related = ["∴", "functio", "fac", "cape", "cede"]
++++
+
+# =============================================================================
+# clausura — Declares or explains an inline closure expression; compact ∴
+# syntax is preferred for new code.
+# =============================================================================
+#
+# What this teaches:
+#   • Closure basics — `∴` (therefore) introduces a closure body after the
+#     parameter list
+#   • Compact syntax — the `∴` form is preferred over block-delimited closures
+#     for simple expressions
+#
+# Common mistakes:
+#   • confusing `∴` (clausura joint for compact closures) with `ergo` (single-statement body joint for `si`, `dum`, `casu`) — they are not interchangeable
+#
+# See also: ∴, functio, fac, cape, cede
+# =============================================================================
+
+# clausura — closure bodies with ∴ and ⇥
+#
+# GRAMMAR:
+#   closureExpr :← paramList '∴' expr
+#
+# EXPECTED OUTPUT:
+#   Scalar stdout smoke (see body).
+#
+# BACKEND:
+#   Cross-ref: clausa/clausa.fab.
+#
+
+incipit {
+    fixum _ dupla ← numerus x ∴ x * 2
+    nota dupla(5)
+    fixum _ summa ← (numerus a, numerus b) → numerus ∴ a + b
+    nota summa(2, 3)
+}

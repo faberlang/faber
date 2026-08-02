@@ -1,0 +1,46 @@
++++
+term = "promissum"
+kind = "keyword"
+category = "async"
+canonical = true
+summary = "Promise-like result type associated with async finite functions."
+syntax = "promissum<T> | promissum<T ⇥ E>"
+aliases = ["promise"]
+related = ["fiet", "futura", "figendum", "tacebit"]
++++
+
+# =============================================================================
+# promissum — Promise-like result type associated with async finite functions.
+# =============================================================================
+#
+# What this teaches:
+#   • Async return type — `promissum<T>` is the return-type wrapper for `fiet`
+#     functions and compatibility `@ futura` functions.
+#   • Failable async return type — `promissum<T ⇥ E>` preserves both the
+#     resolved value and delayed alternate channel.
+#
+# Common mistakes:
+#   • Creating a `promissum<T>` but never awaiting it with `figendum`,
+#     `variandum`, `reddet`, or `tacebit` — the promise goes unobserved.
+#
+# See also: fiet, futura, figendum, tacebit
+# =============================================================================
+
+# promissum<T> — async result type (paired with fiet)
+#
+# functio … fiet → <typus>       -- lowers to promissum<<typus>>
+# functio … fiet → <typus> ⇥ E   -- lowers to promissum<<typus> ⇥ E>
+#
+# GRAMMAR:
+#   futuraDecl :← funcDecl 'fiet'
+#
+# EXPECTED OUTPUT:
+#   promissum typus notus (promissum.expected).
+
+functio compute() fiet → numerus {
+    redde 7
+}
+
+incipit {
+    nota "promissum typus notus"
+}

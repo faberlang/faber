@@ -1,0 +1,74 @@
++++
+term = "modulus<u64>"
+kind = "operator-group"
+category = "arithmetic"
+canonical = true
+summary = "Unsigned 64-bit modular-word arithmetic and bit-pattern edges."
+syntax = "modulus<u64>"
+related = ["numerus", "¬", "⇐", "⇒"]
++++
+
+# =============================================================================
+# modulus<u64> — Unsigned 64-bit modular-word arithmetic and bit-pattern edges.
+# =============================================================================
+#
+# What this teaches:
+#   • Modular word contract — `modulus<u64>` wraps on overflow; demonstrates max + 1, zero - 1.
+#   • Carrier-mix equality — Conversions and arithmetic results compare by value across carriers.
+#
+# Common mistakes:
+#   • Assuming 64-bit modular words trap on overflow like checked numerus types.
+#
+# See also: numerus, ¬, ⇐, ⇒
+# =============================================================================
+
+# operatores/modular-word-u64 — modulus<u64> edge vectors
+#
+# MODULAR WORD CONTRACT:
+#   modulus<u64> is an unsigned 64-bit modular word. Addition, subtraction,
+#   multiplication, negation, bitwise operations, and shifts use u64 wrapping.
+#   Division and remainder by zero fail.
+
+incipit {
+    varia modulus<u64> max ← 18446744073709551615
+    fixum modulus<u64> one ← 1
+    varia modulus<u64> zero ← 0
+    fixum numerus<u64> converted ← one ↦ numerus<u64>
+
+    nota max + one
+    nota zero - one
+    nota max * 2
+    nota -one
+    nota ¬zero
+    nota one ⇐ 64
+    nota max ⇒ 64
+    nota max > zero
+
+    # Carrier-mix equality: conversions and arithmetic results compare by
+    # value against literals (review regression).
+    fixum modulus<u64> uno ← 1 ↦ modulus<u64>
+    nota one ≡ uno
+    nota one ≡ one + 0
+
+    max ⊕
+    zero ⊖
+    nota max
+    nota zero
+
+    fixum modulus<u64> methodSum ← max.addita(one)
+    fixum modulus<u64> methodShift ← max.sinistrata(64)
+    varia modulus<u64> methodAcc ← 0
+    methodAcc.adde(one)
+    methodAcc.sinistra(64)
+    nota converted
+    nota methodSum
+    nota methodShift
+    nota methodAcc
+
+    fixum lista<modulus<u64>> words ← [one, max]
+    nota words.accipe(1) vel (0 ∷ modulus<u64>)
+
+    varia lista<modulus<u64>> sorted ← [18446744073709551615, 3, 10, 2]
+    sorted.ordina()
+    nota sorted
+}

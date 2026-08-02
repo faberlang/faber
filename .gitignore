@@ -1,0 +1,75 @@
+# dependencies (bun install)
+node_modules
+
+# output
+out
+dist
+opus/
+*.tgz
+.*.bun-build
+
+# code coverage
+coverage
+*.lcov
+
+# logs
+logs
+_.log
+report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
+
+# dotenv environment variable files
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# caches
+.eslintcache
+.cache
+*.tsbuildinfo
+
+# IntelliJ based IDEs
+.idea
+
+# Finder (MacOS) folder config
+.DS_Store
+
+# Temp files
+tmp/
+.timing/
+__pycache__/
+.zig-cache/
+.zed/settings.json
+
+# Auto-generated files
+**/norma-registry.gen.*
+**/norma.gen.ts
+
+# Build artifacts
+# lib/norma/
+fons/nanus-go/nanus-go
+
+# Rust build files
+**/target/
+*.rmeta
+*.profraw
+# Generated Faber→Rust emit artifacts must not live at the repo root;
+# the workspace keeps all hand-written Rust under crates/ or stdlib/.
+/*.rs
+
+# Local Codex worktrees
+.codex/worktrees/*
+!.codex/worktrees/.gitkeep
+
+# Claude Code local artifacts
+.claude/
+
+# Project-local Vivi mailspace (agent bus; do not commit)
+.vivi/
+
+# Generated website output (monorepo docs site)
+website/dist/
+
+# Local cargo config (shared target dir, machine-specific)
+/.cargo/

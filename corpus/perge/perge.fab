@@ -1,0 +1,69 @@
++++
+term = "perge"
+kind = "keyword"
+category = "transfer"
+canonical = true
+summary = "Continues with the next loop iteration."
+syntax = "perge"
+aliases = ["continue"]
+related = ["rumpe", "dum"]
++++
+
+
+# =============================================================================
+# perge — Continues with the next loop iteration.
+# =============================================================================
+#
+# What this teaches:
+#   • Loop control — `perge` skips the rest of the current iteration and proceeds to the next.
+#   • Nested loops — In nested loops, `perge` applies to the innermost loop.
+#
+# Common mistakes:
+#   • Using `perge` outside a loop — `perge` is only valid inside `dum` or `itera` (SEM031).
+#
+# See also: rumpe, dum
+# =============================================================================
+
+# Continue (perge) in loops
+#
+# perge   -- skip to next iteration of innermost loop
+#
+# GRAMMAR:
+#   continueStmt :← 'perge'
+#
+# EXPECTED OUTPUT:
+#   Odd integers 1–9, then nested pairs skipping interior == 3.
+
+incipit {
+    # Skip even numbers
+    varia _ i ← 0
+
+    dum i < 10 {
+        i ← i + 1
+
+        si i % 2 ≡ 0 {
+            perge
+        }
+
+        nota i
+    }
+
+    # Continue in nested loop
+    varia _ exterior ← 0
+
+    dum exterior < 3 {
+        varia _ interior ← 0
+
+        dum interior < 5 {
+            interior ← interior + 1
+
+            si interior ≡ 3 {
+                perge
+            }
+
+            nota "exterior←§, interior←§"(exterior, interior)
+        }
+
+        exterior ← exterior + 1
+    }
+}

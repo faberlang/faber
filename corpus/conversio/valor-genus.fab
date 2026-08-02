@@ -1,0 +1,61 @@
++++
+term = "valor"
+kind = "conversio"
+category = "conversion"
+canonical = true
+summary = "valor ↦ genus extraction with missing-field defaults and mandatory-field failure via ⇥ recovery."
+syntax = "<valor-expression> ↦ <genus-type> [⇥ <recovery>]"
+related = ["↦", "⇥"]
++++
+
+# =============================================================================
+# valor — valor ↦ genus extraction with missing-field defaults and mandatory-field failure via ⇥ recovery.
+# =============================================================================
+#
+# What this teaches:
+#   • JSON-to-struct deserialization — `valor ↦ genus` deserializes JSON objects into typed genus records.
+#   • Field policies — missing `sponte` fields zero-initialize; missing mandatory fields fail at runtime (recoverable via `⇥`); extra JSON keys are ignored.
+#
+# Common mistakes:
+#   • Omitting a mandatory field from the JSON and expecting a default value — only `sponte` or default-valued fields are optional; missing mandatory fields fail at runtime.
+#
+# See also: ↦, ⇥
+# =============================================================================
+
+# conversio — valor to genus extraction
+#
+# WHY: `valor ↦ genus` deserializes JSON objects into typed records. Missing
+# defaultable fields zero-initialize; missing mandatory fields fail at runtime
+# (recoverable via `⇥`). Extra JSON keys are ignored.
+
+genus Persona {
+    textus nomen
+    numerus aetas sponte
+    textus regio = "Roma"
+    instans born
+}
+
+incipit {
+    fixum valor payload ← {
+        "nomen": "Marcus",
+        "born": "1979-05-27T07:32:00Z",
+        "extra": "ignored"
+    } ↦ valor
+    fixum Persona good ← payload ↦ Persona
+    adfirma good.nomen ≡ "Marcus"
+    adfirma good.aetas ≡ nihil
+    adfirma good.regio ≡ "Roma"
+
+    fixum valor stale ← { "nomen": "Livia" } ↦ valor
+    fixum Persona recovered ← stale ↦ Persona ⇥ good
+    adfirma recovered.nomen ≡ "Marcus"
+
+    fixum valor boxed ← recovered ↦ valor
+    fixum Persona roundtrip ← boxed ↦ Persona
+    adfirma roundtrip.nomen ≡ "Marcus"
+    adfirma roundtrip.regio ≡ "Roma"
+
+    nota roundtrip.nomen
+    nota roundtrip.regio
+    nota roundtrip.born ↦ textus
+}

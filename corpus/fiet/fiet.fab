@@ -1,0 +1,42 @@
++++
+term = "fiet"
+kind = "keyword"
+category = "async"
+canonical = true
+summary = "Callable posture for asynchronous finite functions."
+syntax = "functio name(…) fiet → T"
+aliases = ["async"]
+related = ["futura", "promissum", "figendum", "tacebit"]
++++
+
+# =============================================================================
+# fiet — Asynchronous finite callable posture
+# =============================================================================
+#
+# What this teaches:
+#   • Preferred async posture word after the parameter list: `fiet → T`.
+#   • Return type is observed as `promissum<T>` at call sites.
+#   • Consume with `figendum`, `variandum`, `reddet`, or `tacebit`.
+#
+# Common mistakes:
+#   • Using bare `cede` to await — await is not yield; use await morphology.
+#
+# See also: futura, promissum, figendum, tacebit
+# =============================================================================
+
+# GRAMMAR:
+#   callablePosture :← 'fiet'
+#
+# EXPECTED OUTPUT:
+#   none — async runtime compile smoke (whitelist with futura if needed).
+
+```fab
+functio responde() fiet → numerus {
+    redde 42
+}
+
+incipiet {
+    figendum _ responsum ← responde()
+    nota responsum
+}
+```

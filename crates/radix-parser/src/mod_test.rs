@@ -1,0 +1,3782 @@
+//! Parser behavior and structured diagnostic contract tests.
+//!
+//! Rendered diagnostic prose belongs in renderer/reader-pack contract tests,
+//! not here. Shared parse plumbing lives in `parser::test_support`.
+
+use crate::test_support::{
+    assert_parse_error_has_no_legacy_message, assert_parse_error_issue, assert_parse_error_matches,
+    has_arg, parse_ok, parse_program, span_for, symbol_name, ParseExpectation,
+};
+use crate::ParseErrorKind;
+use radix_syntax::{
+    AnnotationKind, AstMutability, AstParamMode, BindingPattern, CallablePosture, ClassMemberKind,
+    ClausuraBody, CuraKind, ExprKind, IfBody, ImportKind, IteraMode, JsonValue, Literal, Pattern,
+    PatternBind, PraeparaKind, ProbaModifier, ScribeKind, SecusClause, StmtKind, TypeExprKind,
+};
+
+#[test]
+fn parses_empty_source() {
+    let result = parse_ok("");
+    let program = result.program.as_ref().expect("program");
+    assert!(program.statements.is_empty());
+}
+
+#[test]
+fn missing_function_name_emits_structured_parse_error() {
+    let result = parse_program("functio () → vacuum {}\n");
+
+    let err = result
+        .errors
+        .iter()
+        .find(|err| err.kind == ParseErrorKind::MissingFunctionName)
+        .expect("missing function name diagnostic");
+
+    assert_parse_error_has_no_legacy_message(err);
+    assert_eq!(err.args.len(), 1);
+    assert_eq!(err.args[0].name, "functio");
+    assert_eq!(err.args[0].value, "functio");
+}
+
+#[test]
+fn missing_class_name_emits_structured_parse_error() {
+    let result = parse_program("genus {}\n");
+    let err = result
+        .errors
+        .iter()
+        .find(|err| err.kind == ParseErrorKind::MissingClassName)
+        .expect("missing class name diagnostic");
+
+    assert_parse_error_has_no_legacy_message(err);
+    assert_eq!(err.args.len(), 1);
+    assert_eq!(err.args[0].name, "genus");
+    assert_eq!(err.args[0].value, "genus");
+}
+
+#[test]
+fn missing_class_body_emits_structured_parse_error() {
+    let result = parse_program("genus Nomen\n");
+    let err = result
+        .errors
+        .iter()
+        .find(|err| err.kind == ParseErrorKind::MissingClassBody)
+        .expect("missing class body diagnostic");
+
+    assert_parse_error_has_no_legacy_message(err);
+    assert_eq!(err.args.len(), 1);
+    assert_eq!(err.args[0].name, "genus");
+    assert_eq!(err.args[0].value, "genus");
+}
+
+#[test]
+fn bare_cli_optio_requires_string_default() {
+    let result = parse_program(
+        r"
+@ cli
+incipit argumenta args {}
+",
+    );
+    let err = result
+        .errors
+        .iter()
+        .find(|err| {
+            err.kind == ParseErrorKind::Expected
+                && err
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "expected" && arg.value == "string literal")
+        })
+        .expect("structured expected diagnostic");
+
+    assert_parse_error_has_no_legacy_message(err);
+}
+
+#[test]
+fn bare_optio_annotation_expected_identifier() {
+    let result = parse_program(
+        r"
+@ optio
+incipit argumenta args {}
+",
+    );
+    let err = result
+        .errors
+        .iter()
+        .find(|err| {
+            err.kind == ParseErrorKind::Expected
+                && err
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "expected" && arg.value == "identifier")
+        })
+        .expect("structured expected diagnostic");
+
+    assert_parse_error_has_no_legacy_message(err);
+}
+
+#[test]
+fn incipit_tacet_expected_brace() {
+    let result = parse_program("incipit tacet");
+    let err = result
+        .errors
+        .iter()
+        .find(|err| {
+            err.kind == ParseErrorKind::Expected
+                && err
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "expected" && arg.value == "'{'")
+        })
+        .expect("structured parser-core expected diagnostic");
+
+    assert_parse_error_has_no_legacy_message(err);
+}
+
+#[test]
+fn functio_missing_close_paren_expected() {
+    let result = parse_program("functio f(textus name → vacuum {}");
+    let err = result
+        .errors
+        .iter()
+        .find(|err| {
+            err.kind == ParseErrorKind::Expected
+                && err
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "expected" && arg.value == "')' after parameters")
+        })
+        .expect("structured parser-core expected diagnostic");
+
+    assert_parse_error_has_no_legacy_message(err);
+}
+
+#[test]
+fn same_line_futura_stops_before_functio_declaration() {
+    let result = parse_ok("@ futura functio f() → vacuum { }");
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 1);
+
+    let StmtKind::Func(_) = &program.statements[0].kind else {
+        panic!("expected function declaration");
+    };
+    assert_eq!(program.statements[0].annotations.len(), 1);
+
+    let AnnotationKind::Statement(stmt) = &program.statements[0].annotations[0].kind else {
+        panic!("expected statement annotation for @ futura");
+    };
+    assert_eq!(symbol_name(&result, stmt.name.name), "futura");
+    assert!(
+        stmt.args.is_empty(),
+        "functio must not be consumed as annotation arg: {:?}",
+        stmt.args
+    );
+}
+
+#[test]
+fn parses_braced_futura_cli_and_optio_annotations() {
+    let result = parse_ok(
+        r#"
+@ futura { }
+@ cli { nomen = "smoke" }
+@ optio {
+    binding = verbose,
+    brevis = "v",
+    longum = "verbose",
+    typus = bivalens,
+    descriptio = "Verbose mode",
+}
+functio f() → vacuum { }
+"#,
+    );
+
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 1);
+    assert_eq!(program.statements[0].annotations.len(), 3);
+
+    let AnnotationKind::Braced(futura) = &program.statements[0].annotations[0].kind else {
+        panic!("expected braced @ futura");
+    };
+    assert_eq!(symbol_name(&result, futura.name.name), "futura");
+    assert!(futura.fields.is_empty());
+
+    let AnnotationKind::Braced(cli) = &program.statements[0].annotations[1].kind else {
+        panic!("expected braced @ cli");
+    };
+    assert_eq!(symbol_name(&result, cli.name.name), "cli");
+    assert_eq!(cli.fields.len(), 1);
+    assert_eq!(symbol_name(&result, cli.fields[0].name.name), "nomen");
+
+    let AnnotationKind::Braced(optio) = &program.statements[0].annotations[2].kind else {
+        panic!("expected braced @ optio");
+    };
+    assert_eq!(symbol_name(&result, optio.name.name), "optio");
+    assert_eq!(optio.fields.len(), 5);
+}
+
+#[test]
+fn stacked_braced_annotations_on_one_line_before_functio() {
+    let result = parse_ok(
+        "@ futura { } @ optio { binding = verbose, brevis = \"v\" } functio f() → vacuum { }",
+    );
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 1);
+    assert_eq!(program.statements[0].annotations.len(), 2);
+    assert!(matches!(
+        program.statements[0].annotations[0].kind,
+        AnnotationKind::Braced(_)
+    ));
+    assert!(matches!(
+        program.statements[0].annotations[1].kind,
+        AnnotationKind::Braced(_)
+    ));
+    assert!(matches!(program.statements[0].kind, StmtKind::Func(_)));
+}
+
+#[test]
+fn parses_compact_braced_futura_before_functio_without_whitespace() {
+    let result = parse_ok("@futura{}functio f() → vacuum { }");
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 1);
+    assert_eq!(program.statements[0].annotations.len(), 1);
+    let AnnotationKind::Braced(futura) = &program.statements[0].annotations[0].kind else {
+        panic!("expected braced futura");
+    };
+    assert_eq!(symbol_name(&result, futura.name.name), "futura");
+    assert!(matches!(program.statements[0].kind, StmtKind::Func(_)));
+}
+
+#[test]
+fn parses_cli_and_imperium_annotations_as_structured_ast() {
+    let result = parse_ok(
+        r#"
+@ cli "faber"
+@ versio "0.1.0"
+incipit argumenta args {}
+
+@ imperium "emit"
+@ alias "e"
+functio emit() {}
+"#,
+    );
+
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 2);
+
+    assert!(matches!(
+        &program.statements[0].annotations[0].kind,
+        AnnotationKind::Cli(cli) if symbol_name(&result, cli.name) == "faber"
+    ));
+    assert!(
+        matches!(
+            program.statements[0].annotations[1].kind,
+            AnnotationKind::Statement(_)
+        ),
+        "@ versio remains generic in phase 01"
+    );
+
+    assert!(matches!(
+        &program.statements[1].annotations[0].kind,
+        AnnotationKind::Imperium(command) if symbol_name(&result, command.name) == "emit"
+    ));
+    assert!(
+        matches!(
+            program.statements[1].annotations[1].kind,
+            AnnotationKind::Statement(_)
+        ),
+        "@ alias remains generic in phase 01"
+    );
+}
+
+#[test]
+fn keeps_other_cli_metadata_annotations_generic() {
+    let result = parse_ok(
+        r#"
+@ descriptio "Compile source files"
+@ imperia "jobs" ex jobsModulum
+incipit argumenta args {}
+"#,
+    );
+
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements[0].annotations.len(), 2);
+
+    let AnnotationKind::Statement(description) = &program.statements[0].annotations[0].kind else {
+        panic!("@ descriptio should remain generic in phase 01");
+    };
+    assert_eq!(symbol_name(&result, description.name.name), "descriptio");
+    assert_eq!(description.args.len(), 1);
+
+    let AnnotationKind::Statement(imperia) = &program.statements[0].annotations[1].kind else {
+        panic!("@ imperia should remain generic in phase 01");
+    };
+    assert_eq!(symbol_name(&result, imperia.name.name), "imperia");
+    assert_eq!(imperia.args.len(), 3);
+}
+
+#[test]
+fn parses_radix_typus_domain_annotation_as_structured_ast() {
+    let result = parse_ok(
+        r"
+@ radix typus T in textus lista<textus> octeti
+functio load<T>(textus via) → T {}
+",
+    );
+
+    let program = result.program.as_ref().expect("program");
+    let AnnotationKind::RadixTypusDomain(domain) = &program.statements[0].annotations[0].kind
+    else {
+        panic!("expected structured @ radix typus domain annotation");
+    };
+    assert_eq!(symbol_name(&result, domain.param.name), "T");
+    assert_eq!(domain.allowed.len(), 3);
+    assert!(matches!(
+        &domain.allowed[0].kind,
+        TypeExprKind::Named(name, params) if params.is_empty() && symbol_name(&result, name.name) == "textus"
+    ));
+    assert!(matches!(
+        &domain.allowed[1].kind,
+        TypeExprKind::Named(name, params) if params.len() == 1 && symbol_name(&result, name.name) == "lista"
+    ));
+    assert!(matches!(
+        &domain.allowed[2].kind,
+        TypeExprKind::Named(name, params) if params.is_empty() && symbol_name(&result, name.name) == "octeti"
+    ));
+}
+
+#[test]
+fn parses_repeated_radix_typus_domain_annotations() {
+    let result = parse_ok(
+        r"
+@ radix typus T in i8 i16 i32 i64
+@ radix typus T in u8 u16 u32 u64
+@ radix typus T in f32 f64
+functio numeric<T>(T value) → T {}
+",
+    );
+
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements[0].annotations.len(), 3);
+    for annotation in &program.statements[0].annotations {
+        assert!(matches!(
+            annotation.kind,
+            AnnotationKind::RadixTypusDomain(_)
+        ));
+    }
+}
+
+#[test]
+fn parses_radix_lane_annotation_as_structured_ast() {
+    let result = parse_ok(
+        r#"
+@ radix lane "air"
+functio compute() → vacuum {}
+"#,
+    );
+
+    let program = result.program.as_ref().expect("program");
+    let AnnotationKind::RadixLane(lane) = &program.statements[0].annotations[0].kind else {
+        panic!("expected structured @ radix lane annotation");
+    };
+    assert_eq!(symbol_name(&result, lane.lane), "air");
+}
+
+#[test]
+fn parses_radix_lane_with_mir_annotation() {
+    let result = parse_ok(
+        r#"
+@ radix lane "mir"
+functio process() → vacuum {}
+"#,
+    );
+
+    let program = result.program.as_ref().expect("program");
+    let AnnotationKind::RadixLane(lane) = &program.statements[0].annotations[0].kind else {
+        panic!("expected structured @ radix lane annotation");
+    };
+    assert_eq!(symbol_name(&result, lane.lane), "mir");
+}
+
+#[test]
+fn parses_radix_lane_with_hir_direct_annotation() {
+    let result = parse_ok(
+        r#"
+@ radix lane "hir-direct"
+functio render() → vacuum {}
+"#,
+    );
+
+    let program = result.program.as_ref().expect("program");
+    let AnnotationKind::RadixLane(lane) = &program.statements[0].annotations[0].kind else {
+        panic!("expected structured @ radix lane annotation");
+    };
+    assert_eq!(symbol_name(&result, lane.lane), "hir-direct");
+}
+
+#[test]
+fn parses_canonical_optio_annotation_as_structured_ast() {
+    let result = parse_ok(
+        r#"
+@ optio target brevis "t" longum "target" typus lista<textus> descriptio "Target language" ubique vel "rust"
+incipit argumenta args {}
+"#,
+    );
+
+    let program = result.program.as_ref().expect("program");
+    let AnnotationKind::Optio(optio) = &program.statements[0].annotations[0].kind else {
+        panic!("expected structured @ optio");
+    };
+
+    assert_eq!(symbol_name(&result, optio.binding.name), "target");
+    assert_eq!(symbol_name(&result, optio.short.expect("short")), "t");
+    assert_eq!(symbol_name(&result, optio.long.expect("long")), "target");
+    assert_eq!(
+        symbol_name(&result, optio.description.expect("description")),
+        "Target language"
+    );
+    assert!(!optio.flag);
+    assert!(optio.global);
+    assert!(optio.default.is_some());
+
+    let ty = optio.ty.as_ref().expect("explicit type");
+    let TypeExprKind::Named(name, params) = &ty.kind else {
+        panic!("expected named option type");
+    };
+    assert_eq!(symbol_name(&result, name.name), "lista");
+    assert_eq!(params.len(), 1);
+    let TypeExprKind::Named(param_name, param_params) = &params[0].kind else {
+        panic!("expected named type parameter");
+    };
+    assert_eq!(symbol_name(&result, param_name.name), "textus");
+    assert!(param_params.is_empty());
+}
+
+#[test]
+fn parses_bivalens_optio_type_as_boolean_flag() {
+    let result = parse_ok(
+        r#"
+@ optio verbose longum "verbose" typus bivalens
+incipit argumenta args {}
+"#,
+    );
+
+    let program = result.program.as_ref().expect("program");
+    let AnnotationKind::Optio(optio) = &program.statements[0].annotations[0].kind else {
+        panic!("expected structured @ optio");
+    };
+
+    assert_eq!(symbol_name(&result, optio.binding.name), "verbose");
+    assert!(optio.flag, "typus bivalens marks a boolean flag");
+    assert!(
+        optio.default.is_none(),
+        "absent boolean flag defaults are applied by CLI validation/lowering"
+    );
+}
+
+#[test]
+fn parses_numeric_optio_default() {
+    let result = parse_ok(
+        r#"
+@ optio limit longum "limit" typus numerus vel 100
+incipit argumenta args {}
+"#,
+    );
+    let program = result.program.as_ref().expect("program");
+    let AnnotationKind::Optio(limit) = &program.statements[0].annotations[0].kind else {
+        panic!("expected structured numeric @ optio");
+    };
+    let Some(default) = &limit.default else {
+        panic!("expected numeric default");
+    };
+    assert!(matches!(default.kind, ExprKind::Literal(Literal::Int(100))));
+}
+
+#[test]
+fn parses_bivalens_optio_default() {
+    let result = parse_ok(
+        r#"
+@ optio strict longum "strict" typus bivalens vel verum
+incipit argumenta args {}
+"#,
+    );
+    let program = result.program.as_ref().expect("program");
+    let AnnotationKind::Optio(strict) = &program.statements[0].annotations[0].kind else {
+        panic!("expected structured boolean @ optio");
+    };
+    let Some(default) = &strict.default else {
+        panic!("expected boolean default");
+    };
+    assert!(strict.flag);
+    assert!(matches!(
+        default.kind,
+        ExprKind::Literal(Literal::Bool(true))
+    ));
+}
+
+#[test]
+fn omitted_optio_type_is_left_for_textus_defaulting() {
+    let result = parse_ok(
+        r#"
+@ optio output longum "output" descriptio "Output path"
+incipit argumenta args {}
+"#,
+    );
+
+    let program = result.program.as_ref().expect("program");
+    let AnnotationKind::Optio(optio) = &program.statements[0].annotations[0].kind else {
+        panic!("expected structured @ optio");
+    };
+
+    assert_eq!(symbol_name(&result, optio.binding.name), "output");
+    assert!(
+        optio.ty.is_none(),
+        "omitted typus means textus in later CLI validation/lowering"
+    );
+}
+
+#[test]
+fn parses_operandus_annotation_with_rest_type_global_and_default() {
+    let result = parse_ok(
+        r#"
+@ operandus ceteri lista<textus> files descriptio "Input files" ubique vel "src"
+incipit argumenta args {}
+"#,
+    );
+
+    let program = result.program.as_ref().expect("program");
+    let AnnotationKind::Operandus(operandus) = &program.statements[0].annotations[0].kind else {
+        panic!("expected structured @ operandus");
+    };
+
+    assert!(operandus.rest);
+    assert_eq!(symbol_name(&result, operandus.binding.name), "files");
+    assert_eq!(
+        symbol_name(&result, operandus.description.expect("description")),
+        "Input files"
+    );
+    assert!(operandus.global);
+    assert!(operandus.default.is_some());
+
+    let TypeExprKind::Named(name, params) = &operandus.ty.kind else {
+        panic!("expected named operand type");
+    };
+    assert_eq!(symbol_name(&result, name.name), "lista");
+    assert_eq!(params.len(), 1);
+}
+
+#[test]
+fn optio_historical_type_first_rejected() {
+    assert_parse_error_matches(
+        r#"
+@ optio textus output longum "output"
+incipit argumenta args {}
+"#,
+        ParseExpectation::Args(&[("issue", "invalid_modifier"), ("annotation", "optio")]),
+    );
+}
+
+#[test]
+fn optio_bare_bivalens_form_rejected() {
+    assert_parse_error_matches(
+        r#"
+@ optio verbose longum "verbose" bivalens
+incipit argumenta args {}
+"#,
+        ParseExpectation::Args(&[("issue", "invalid_modifier"), ("annotation", "optio")]),
+    );
+}
+
+#[test]
+fn optio_ignotum_modifier_rejected() {
+    assert_parse_error_matches(
+        r"
+@ optio output ignotum
+incipit argumenta args {}
+",
+        ParseExpectation::Args(&[("issue", "invalid_modifier"), ("annotation", "optio")]),
+    );
+}
+
+#[test]
+fn operandus_longum_modifier_in_annotation_error() {
+    assert_parse_error_matches(
+        r#"
+@ operandus textus input longum "input"
+incipit argumenta args {}
+"#,
+        ParseExpectation::Args(&[("issue", "invalid_modifier"), ("annotation", "operandus")]),
+    );
+}
+
+#[test]
+fn radix_typus_empty_domain_as_invalid_annotation() {
+    assert_parse_error_matches(
+        r"
+@ radix typus T in
+functio load<T>() → T {}
+",
+        ParseExpectation::Args(&[("issue", "empty_radix_typus_domain")]),
+    );
+}
+
+#[test]
+fn cli_extra_token_as_invalid_annotation() {
+    assert_parse_error_matches(
+        r#"
+@ cli "faber" extra
+incipit argumenta args {}
+"#,
+        ParseExpectation::Args(&[
+            ("issue", "unexpected_annotation_token"),
+            ("context", "@ cli name"),
+        ]),
+    );
+}
+
+#[test]
+fn secus_si_else_if_rejected() {
+    assert_parse_error_matches(
+        "si verum { tacet } secus si falsum { tacet }",
+        ParseExpectation::Args(&[("issue", "secus_si_else_if")]),
+    );
+}
+
+#[test]
+fn cura_unknown_allocator_kind_rejected() {
+    assert_parse_error_matches(
+        r#"cura "general" fixum _ alloc {}"#,
+        ParseExpectation::Args(&[
+            ("issue", "allocator_kind"),
+            ("expected", "allocator kind \"arena\" or \"page\""),
+        ]),
+    );
+}
+
+#[test]
+fn ex_without_mutability_marker_rejected() {
+    assert_parse_error_matches(
+        r"ex data name",
+        ParseExpectation::Args(&[
+            ("issue", "mutability_marker"),
+            ("expected", "'fixum' or 'varia'"),
+        ]),
+    );
+}
+
+#[test]
+fn itera_pro_mode_rejected() {
+    assert_parse_error_matches(
+        r"itera pro 0‥3 fixum i { nota i }",
+        ParseExpectation::Args(&[("issue", "itera_mode"), ("expected", "'ex', 'de', or 'ab'")]),
+    );
+}
+
+#[test]
+fn sit_underscore_identifier_rejected() {
+    assert_parse_error_matches(
+        r"sit _ nomen ← 1",
+        ParseExpectation::Args(&[("issue", "sit_identifier_binding")]),
+    );
+}
+
+#[test]
+fn sit_destructuring_rejected() {
+    assert_parse_error_matches(
+        r"sit [a, b] ← [1, 2]",
+        ParseExpectation::Args(&[("issue", "sit_no_destructuring")]),
+    );
+}
+
+#[test]
+fn duplicate_rest_pattern_rejected() {
+    assert_parse_error_matches(
+        r"fixum [a, ceteri rest, ceteri again] ← values",
+        ParseExpectation::Args(&[("issue", "duplicate_rest_pattern")]),
+    );
+}
+
+#[test]
+fn enum_member_negative_missing_number_rejected() {
+    assert_parse_error_matches(
+        r"ordo Color { Red = - }",
+        ParseExpectation::Arg {
+            name: "expected",
+            value: "number",
+        },
+    );
+}
+
+#[test]
+fn enum_member_missing_value_rejected() {
+    assert_parse_error_matches(
+        r"ordo Color { Red = }",
+        ParseExpectation::Arg {
+            name: "expected",
+            value: "value",
+        },
+    );
+}
+
+#[test]
+fn proba_temporis_modifier_requires_integer() {
+    assert_parse_error_matches(
+        r#"probandum "suite" { proba "case" temporis { adfirma verum } }"#,
+        ParseExpectation::Args(&[("issue", "test_modifier_integer"), ("modifier", "temporis")]),
+    );
+}
+
+#[test]
+fn bare_at_annotation_name_rejected() {
+    assert_parse_error_matches(
+        "@\nincipit argumenta args {}\n",
+        ParseExpectation::Args(&[("issue", "annotation_name")]),
+    );
+}
+
+#[test]
+fn bare_cli_annotation_requires_string_default() {
+    assert_parse_error_matches(
+        r"
+@ cli
+incipit argumenta args {}
+",
+        ParseExpectation::Arg {
+            name: "expected",
+            value: "string literal",
+        },
+    );
+}
+
+#[test]
+fn cli_annotation_extra_token_rejected() {
+    assert_parse_error_matches(
+        r#"
+@ cli "faber" extra
+incipit argumenta args {}
+"#,
+        ParseExpectation::Args(&[
+            ("issue", "unexpected_annotation_token"),
+            ("context", "@ cli name"),
+        ]),
+    );
+}
+
+#[test]
+fn bare_imperium_annotation_requires_string_default() {
+    assert_parse_error_matches(
+        r"
+@ imperium
+functio run() {}
+",
+        ParseExpectation::Arg {
+            name: "expected",
+            value: "string literal",
+        },
+    );
+}
+
+#[test]
+fn imperium_annotation_extra_token_rejected() {
+    assert_parse_error_matches(
+        r#"
+@ imperium "run" extra
+functio run() {}
+"#,
+        ParseExpectation::Args(&[
+            ("issue", "unexpected_annotation_token"),
+            ("context", "@ imperium name"),
+        ]),
+    );
+}
+
+#[test]
+fn radix_typus_domain_missing_in_clause_rejected() {
+    assert_parse_error_matches(
+        r"
+@ radix typus T
+functio load<T>() → T {}
+",
+        ParseExpectation::Args(&[("issue", "expected_annotation_ident"), ("expected", "in")]),
+    );
+}
+
+#[test]
+fn radix_typus_domain_empty_list_rejected() {
+    assert_parse_error_matches(
+        r"
+@ radix typus T in
+functio load<T>() → T {}
+",
+        ParseExpectation::Issue("empty_radix_typus_domain"),
+    );
+}
+
+#[test]
+fn radix_typus_domain_comma_separated_rejected() {
+    assert_parse_error_matches(
+        r"
+@ radix typus T in textus, octeti
+functio load<T>() → T {}
+",
+        ParseExpectation::Args(&[
+            ("issue", "unexpected_annotation_token"),
+            ("context", "@ radix typus domain"),
+        ]),
+    );
+}
+
+#[test]
+fn bare_optio_annotation_requires_identifier() {
+    assert_parse_error_matches(
+        r"
+@ optio
+incipit argumenta args {}
+",
+        ParseExpectation::Arg {
+            name: "expected",
+            value: "identifier",
+        },
+    );
+}
+
+#[test]
+fn optio_brevis_requires_string_literal() {
+    assert_parse_error_matches(
+        r"
+@ optio output brevis
+incipit argumenta args {}
+",
+        ParseExpectation::Arg {
+            name: "expected",
+            value: "string literal",
+        },
+    );
+}
+
+#[test]
+fn optio_longum_requires_string_literal() {
+    assert_parse_error_matches(
+        r"
+@ optio output longum
+incipit argumenta args {}
+",
+        ParseExpectation::Arg {
+            name: "expected",
+            value: "string literal",
+        },
+    );
+}
+
+#[test]
+fn optio_descriptio_requires_string_literal() {
+    assert_parse_error_matches(
+        r"
+@ optio output descriptio
+incipit argumenta args {}
+",
+        ParseExpectation::Arg {
+            name: "expected",
+            value: "string literal",
+        },
+    );
+}
+
+#[test]
+fn optio_typus_requires_identifier() {
+    assert_parse_error_matches(
+        r"
+@ optio output typus
+incipit argumenta args {}
+",
+        ParseExpectation::Arg {
+            name: "expected",
+            value: "identifier",
+        },
+    );
+}
+
+#[test]
+fn optio_vel_requires_expression() {
+    assert_parse_error_matches(
+        r"
+@ optio output vel
+incipit argumenta args {}
+",
+        ParseExpectation::Issue("expected_expression"),
+    );
+}
+
+#[test]
+fn operandus_requires_identifier_after_type() {
+    assert_parse_error_matches(
+        r"
+@ operandus textus
+incipit argumenta args {}
+",
+        ParseExpectation::Arg {
+            name: "expected",
+            value: "identifier",
+        },
+    );
+}
+
+#[test]
+fn operandus_descriptio_requires_string_literal() {
+    assert_parse_error_matches(
+        r"
+@ operandus textus input descriptio
+incipit argumenta args {}
+",
+        ParseExpectation::Arg {
+            name: "expected",
+            value: "string literal",
+        },
+    );
+}
+
+#[test]
+fn operandus_longum_modifier_rejected() {
+    assert_parse_error_matches(
+        r#"
+@ operandus textus input longum "input"
+incipit argumenta args {}
+"#,
+        ParseExpectation::Args(&[("issue", "invalid_modifier"), ("annotation", "operandus")]),
+    );
+}
+
+#[test]
+fn operandus_vel_requires_expression() {
+    assert_parse_error_matches(
+        r"
+@ operandus textus input vel
+incipit argumenta args {}
+",
+        ParseExpectation::Issue("expected_expression"),
+    );
+}
+
+#[test]
+fn recovery_stops_at_transfer_statement_boundaries() {
+    let result = parse_program(
+        r"
+fixum = 1
+rumpe
+",
+    );
+
+    assert_eq!(result.errors.len(), 1, "expected one parse error");
+
+    let program = result
+        .program
+        .expect("parser should still produce a program");
+    assert_eq!(
+        program.statements.len(),
+        1,
+        "recovery should preserve the following statement"
+    );
+    assert!(matches!(program.statements[0].kind, StmtKind::Rumpe(_)));
+}
+
+#[test]
+fn recovery_stops_at_block_closure() {
+    let result = parse_program(
+        r"
+incipit {
+    fixum = 1
+    rumpe
+}
+",
+    );
+
+    assert_eq!(result.errors.len(), 1, "expected one parse error");
+
+    let program = result
+        .program
+        .expect("parser should still produce a program");
+    assert_eq!(program.statements.len(), 1);
+
+    let StmtKind::Incipit(entry) = &program.statements[0].kind else {
+        panic!("expected incipit statement");
+    };
+
+    let radix_syntax::IfBody::Block(block) = &entry.body else {
+        panic!("expected block body");
+    };
+
+    assert_eq!(
+        block.statements.len(),
+        1,
+        "recovery should preserve valid statements inside the block"
+    );
+    assert!(matches!(block.statements[0].kind, StmtKind::Rumpe(_)));
+}
+
+#[test]
+fn recovery_consumes_modulus_when_it_is_not_a_statement_start() {
+    let result = parse_program(
+        r#"
+incipit {
+    nota { "a": 1 ∷ modulus<u32> }
+}
+"#,
+    );
+
+    assert!(
+        !result.errors.is_empty(),
+        "malformed modulus input must report a parse error"
+    );
+    assert!(
+        result.program.is_some(),
+        "parser recovery must still produce a program"
+    );
+}
+
+#[test]
+fn recovery_preserves_annotated_following_statements() {
+    let result = parse_program(
+        r"
+fixum = 1
+@ futura
+functio vale() {}
+",
+    );
+
+    assert_eq!(result.errors.len(), 1, "expected one parse error");
+
+    let program = result
+        .program
+        .expect("parser should still produce a program");
+    assert_eq!(
+        program.statements.len(),
+        1,
+        "recovery should preserve the following declaration"
+    );
+
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function declaration");
+    };
+
+    assert_eq!(
+        program.statements[0].annotations.len(),
+        1,
+        "annotation should remain attached after recovery"
+    );
+    assert!(func.body.is_some());
+}
+
+#[test]
+fn parses_following_variable_after_if_body_error() {
+    let result = parse_program(
+        r"
+si verum
+fixum numerus postea ← 2
+",
+    );
+
+    assert_eq!(result.errors.len(), 1, "expected one parse error");
+
+    let program = result
+        .program
+        .expect("parser should still produce a program");
+    assert_eq!(
+        program.statements.len(),
+        1,
+        "recovery should preserve the following variable declaration"
+    );
+
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+
+    let BindingPattern::Ident(name) = &var.binding else {
+        panic!("expected identifier binding");
+    };
+
+    assert_eq!(result.interner.resolve(name.name), "postea");
+}
+
+#[test]
+fn genus_field_defaults_with_literals_do_not_consume_following_fields() {
+    let result = parse_ok(
+        r"
+genus Thing {
+    bivalens visible = falsum
+    bivalens enabled = verum
+    textus maybe = nihil
+    textus name
+}
+",
+    );
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Class(class) = &program.statements[0].kind else {
+        panic!("expected genus");
+    };
+    assert_eq!(class.members.len(), 4);
+    for member in &class.members[..3] {
+        let ClassMemberKind::Field(field) = &member.kind else {
+            panic!("expected field");
+        };
+        assert!(field.init.is_some(), "expected literal field default");
+    }
+}
+
+#[test]
+fn parses_import_with_public_alias() {
+    let result = parse_ok(r#"importa ex "mod" publica Value ut Alias"#);
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(program.statements.len(), 1);
+
+    let StmtKind::Import(import) = &program.statements[0].kind else {
+        panic!("expected import statement");
+    };
+    assert_eq!(symbol_name(&result, import.path), "mod");
+    match &import.kind {
+        ImportKind::Named { name, alias, .. } => {
+            assert_eq!(symbol_name(&result, name.name), "Value");
+            assert_eq!(
+                symbol_name(&result, alias.as_ref().expect("alias").name),
+                "Alias"
+            );
+        }
+        _ => panic!("expected named import"),
+    }
+}
+
+#[test]
+fn import_with_empty_path_rejected() {
+    assert_parse_error_matches(
+        r#"importa ex "" privata Value"#,
+        ParseExpectation::Kind(ParseErrorKind::InvalidImport),
+    );
+}
+
+#[test]
+fn parses_fixum_typed_variable() {
+    let result = parse_ok("fixum numerus count ← 1");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(program.statements.len(), 1);
+
+    let StmtKind::Var(const_var) = &program.statements[0].kind else {
+        panic!("expected const variable declaration");
+    };
+    assert!(matches!(const_var.binding, BindingPattern::Ident(_)));
+}
+
+#[test]
+fn parses_varia_destructuring() {
+    let result = parse_ok("varia [head, ceteri tail] ← values");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(program.statements.len(), 1);
+
+    let StmtKind::Var(array_var) = &program.statements[0].kind else {
+        panic!("expected destructuring variable declaration");
+    };
+    let BindingPattern::Array { elements, rest, .. } = &array_var.binding else {
+        panic!("expected array binding pattern");
+    };
+    assert_eq!(elements.len(), 1);
+    assert_eq!(
+        symbol_name(&result, rest.as_ref().expect("rest binding").name),
+        "tail"
+    );
+}
+
+#[test]
+fn parses_object_destructuring() {
+    let result = parse_ok("fixum { nomen ut n, aetas } ← persona");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(program.statements.len(), 1);
+
+    let StmtKind::Var(object_var) = &program.statements[0].kind else {
+        panic!("expected object destructuring variable declaration");
+    };
+    let BindingPattern::Object { fields, rest, .. } = &object_var.binding else {
+        panic!("expected object binding pattern");
+    };
+    assert_eq!(fields.len(), 2);
+    assert_eq!(symbol_name(&result, fields[0].name.name), "nomen");
+    assert_eq!(
+        symbol_name(&result, fields[0].alias.as_ref().expect("alias").name),
+        "n"
+    );
+    assert!(rest.is_none());
+}
+
+#[test]
+fn parses_functio_with_all_modifiers() {
+    let result = parse_ok("@ futura\nfunctio mitte<T>(de textus nomen sponte ut alias vel \"anon\", ex numerus item, ceteri T reliqua) curata allocator errata Error exitus 7 immutata iacit optiones Opts → textus {}");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(program.statements.len(), 1);
+
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function declaration");
+    };
+    assert_eq!(program.statements[0].annotations.len(), 1);
+    assert!(matches!(
+        program.statements[0].annotations[0].kind,
+        AnnotationKind::Statement(_)
+    ));
+    assert_eq!(func.type_params.len(), 1);
+    assert_eq!(func.params.len(), 3);
+    assert!(func.body.is_some());
+    assert!(func.params[0].sponte);
+    assert!(matches!(func.params[0].mode, AstParamMode::De));
+    assert_eq!(
+        symbol_name(&result, func.params[0].alias.as_ref().expect("alias").name),
+        "alias"
+    );
+    assert!(func.params[0].default.is_some());
+    assert!(matches!(func.params[1].mode, AstParamMode::Ex));
+    assert!(func.params[2].rest);
+    assert_eq!(func.modifiers.len(), 6);
+}
+
+#[test]
+fn rejects_functio_without_body() {
+    assert_parse_error_matches(
+        "functio greet(textus name) → textus",
+        ParseExpectation::Kind(ParseErrorKind::MissingFunctionBody),
+    );
+}
+
+#[test]
+fn parses_typus_alias() {
+    let result = parse_ok("typus Nomen = textus");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(program.statements.len(), 1);
+
+    let StmtKind::TypeAlias(alias) = &program.statements[0].kind else {
+        panic!("expected type alias");
+    };
+    assert_eq!(symbol_name(&result, alias.name.name), "Nomen");
+}
+
+#[test]
+fn parses_ordo_enum() {
+    let result = parse_ok("ordo Status { Bonus = 1, Malus = -1, Textus = \"x\" }");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(program.statements.len(), 1);
+
+    let StmtKind::Enum(enum_decl) = &program.statements[0].kind else {
+        panic!("expected enum declaration");
+    };
+    assert_eq!(enum_decl.members.len(), 3);
+}
+
+#[test]
+fn parses_empty_ordo() {
+    let result = parse_ok("ordo Empty {}");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Enum(enum_decl) = &program.statements[0].kind else {
+        panic!("expected enum declaration");
+    };
+    assert!(enum_decl.members.is_empty());
+}
+
+#[test]
+fn parses_discretio_union() {
+    let result = parse_ok("discretio Resultatus<T> { Ok { T valor }, Err { textus nuntius } }");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(program.statements.len(), 1);
+
+    let StmtKind::Union(union_decl) = &program.statements[0].kind else {
+        panic!("expected union declaration");
+    };
+    assert_eq!(union_decl.type_params.len(), 1);
+    assert_eq!(union_decl.variants.len(), 2);
+    assert_eq!(union_decl.variants[0].fields.len(), 1);
+}
+
+#[test]
+fn parses_empty_discretio() {
+    let result = parse_ok("discretio Empty {}");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Union(union_decl) = &program.statements[0].kind else {
+        panic!("expected union declaration");
+    };
+    assert!(union_decl.variants.is_empty());
+}
+
+#[test]
+fn parses_minimal_import_sugar_with_default_private_name() {
+    let result = parse_ok(
+        r#"
+importa ex "norma:json/solve"
+functio f() → vacuum { }
+"#,
+    );
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 2);
+
+    let StmtKind::Import(import) = &program.statements[0].kind else {
+        panic!("expected import statement");
+    };
+    assert_eq!(symbol_name(&result, import.path), "norma:json/solve");
+    assert_eq!(import.visibility, radix_syntax::Visibility::Privata);
+    let ImportKind::Named {
+        name,
+        alias,
+        inferred,
+    } = &import.kind
+    else {
+        panic!("expected named import");
+    };
+    assert_eq!(symbol_name(&result, name.name), "solve");
+    assert!(alias.is_none());
+    assert!(*inferred);
+}
+
+#[test]
+fn minimal_import_sugar_does_not_consume_following_statement_keyword() {
+    let result = parse_ok(
+        r#"
+importa ex "norma:chorda"
+nota "importa-minimal"
+"#,
+    );
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 2);
+
+    let StmtKind::Import(import) = &program.statements[0].kind else {
+        panic!("expected import statement");
+    };
+    let ImportKind::Named { name, inferred, .. } = &import.kind else {
+        panic!("expected named import");
+    };
+    assert_eq!(symbol_name(&result, name.name), "chorda");
+    assert!(*inferred);
+    assert!(matches!(program.statements[1].kind, StmtKind::Scribe(_)));
+}
+
+#[test]
+fn parses_braced_import_defaults() {
+    let result = parse_ok(r#"importa { ex = "norma:chorda" }"#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Import(import) = &program.statements[0].kind else {
+        panic!("expected import statement");
+    };
+
+    assert_eq!(symbol_name(&result, import.path), "norma:chorda");
+    assert_eq!(import.visibility, radix_syntax::Visibility::Privata);
+    let ImportKind::Named {
+        name,
+        alias,
+        inferred,
+    } = &import.kind
+    else {
+        panic!("expected named import");
+    };
+    assert_eq!(symbol_name(&result, name.name), "chorda");
+    assert!(alias.is_none());
+    assert!(*inferred);
+}
+
+#[test]
+fn parses_braced_import_alias_and_visibility() {
+    let result =
+        parse_ok(r#"importa { ex = "norma:json/solve", visibilitas = publica, ut = solve_mod }"#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Import(import) = &program.statements[0].kind else {
+        panic!("expected import statement");
+    };
+
+    assert_eq!(import.visibility, radix_syntax::Visibility::Publica);
+    let ImportKind::Named {
+        name,
+        alias,
+        inferred,
+    } = &import.kind
+    else {
+        panic!("expected named import");
+    };
+    assert_eq!(symbol_name(&result, name.name), "solve");
+    assert_eq!(
+        symbol_name(&result, alias.as_ref().expect("alias").name),
+        "solve_mod"
+    );
+    assert!(*inferred);
+}
+
+#[test]
+fn parses_braced_wildcard_import() {
+    let result = parse_ok(r#"importa { ex = "lodash", omnia = lodash }"#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Import(import) = &program.statements[0].kind else {
+        panic!("expected import statement");
+    };
+
+    let ImportKind::Wildcard { alias } = &import.kind else {
+        panic!("expected wildcard import");
+    };
+    assert_eq!(symbol_name(&result, alias.name), "lodash");
+}
+
+#[test]
+fn minimal_import_requires_inferrable_name() {
+    let result = parse_program(r#"importa ex "faber:*""#);
+    let err = result
+        .errors
+        .iter()
+        .find(|err| err.kind == ParseErrorKind::InvalidImport)
+        .expect("invalid import diagnostic");
+    assert!(err
+        .args
+        .iter()
+        .any(|arg| arg.name == "issue" && arg.value == "import_name_inference_failed"));
+}
+
+#[test]
+fn import_unknown_field_rejected() {
+    assert_parse_error_matches(
+        r#"importa { alienum = "norma:chorda" }"#,
+        ParseExpectation::Issue("unknown_import_field"),
+    );
+}
+
+#[test]
+fn import_missing_source_rejected() {
+    assert_parse_error_matches(
+        r"importa { nomen = chorda }",
+        ParseExpectation::Issue("missing_import_source"),
+    );
+}
+
+#[test]
+fn import_mixed_wildcard_and_named_rejected() {
+    assert_parse_error_matches(
+        r#"importa { ex = "norma:chorda", nomen = chorda, omnia = all }"#,
+        ParseExpectation::Issue("mixed_wildcard_and_named_import"),
+    );
+}
+
+#[test]
+fn import_invalid_visibility_rejected() {
+    assert_parse_error_matches(
+        r#"importa { ex = "norma:chorda", visibilitas = aliena }"#,
+        ParseExpectation::Issue("invalid_import_visibility"),
+    );
+}
+
+#[test]
+fn import_name_inference_failed_rejected() {
+    let result = parse_program(r#"importa ex "faber:*""#);
+    let err = result
+        .errors
+        .iter()
+        .find(|err| err.kind == ParseErrorKind::InvalidImport)
+        .expect("invalid import diagnostic");
+    assert!(err
+        .args
+        .iter()
+        .any(|arg| arg.name == "issue" && arg.value == "import_name_inference_failed"));
+    assert!(
+        err.args
+            .iter()
+            .any(|arg| arg.name == "path" && arg.value == "faber:*"),
+        "import name inference diagnostic should expose path, got {:?}",
+        err.args
+    );
+}
+
+#[test]
+fn parses_infer_marker_as_type_annotation() {
+    let result = parse_ok(
+        r#"
+fixum _ name ← "Marcus"
+varia _ count ← 1
+functio answer() → _ { redde 42 }
+"#,
+    );
+
+    let program = result.program.as_ref().expect("program");
+
+    let StmtKind::Var(name_var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    assert!(matches!(
+        name_var.ty.as_ref().expect("explicit infer marker").kind,
+        TypeExprKind::Infer
+    ));
+
+    let StmtKind::Func(func) = &program.statements[2].kind else {
+        panic!("expected function declaration");
+    };
+    assert!(matches!(
+        func.ret.as_ref().expect("explicit inferred return").kind,
+        TypeExprKind::Infer
+    ));
+}
+
+#[test]
+fn parses_sit_as_inferred_immutable_binding() {
+    let result = parse_ok(
+        r#"
+sit nomen ← "Marcus"
+sit annus ← 42
+"#,
+    );
+
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 2);
+
+    for stmt in &program.statements {
+        let StmtKind::Var(var) = &stmt.kind else {
+            panic!("expected variable declaration");
+        };
+        assert_eq!(var.mutability, AstMutability::Immutable);
+        assert!(matches!(
+            var.ty.as_ref().expect("inferred type").kind,
+            TypeExprKind::Infer
+        ));
+        assert!(var.init.is_some());
+    }
+}
+
+#[test]
+fn parses_sit_deferred_binding_without_initializer() {
+    // TARGET: `sit x` (no initializer) is sugar for `fixum _ x` — the inferred
+    // deferred immutable. It parses with an inferred type slot and no init.
+    let result = parse_ok("sit nomen");
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 1);
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    assert_eq!(var.mutability, AstMutability::Immutable);
+    assert!(matches!(
+        var.ty.as_ref().expect("inferred type").kind,
+        TypeExprKind::Infer
+    ));
+    assert!(
+        var.init.is_none(),
+        "deferred sit binding should have no initializer"
+    );
+}
+
+#[test]
+fn parses_fixum_deferred_binding_without_initializer() {
+    // TARGET: typed deferred immutable — `fixum numerus x` with no initializer.
+    let result = parse_ok(
+        r"
+fixum numerus pending
+fixum _ label
+",
+    );
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 2);
+
+    let StmtKind::Var(typed) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    assert_eq!(typed.mutability, AstMutability::Immutable);
+    assert!(matches!(
+        typed.ty.as_ref().expect("typed slot").kind,
+        TypeExprKind::Named(_, _)
+    ));
+    assert!(
+        typed.init.is_none(),
+        "deferred fixum binding should have no initializer"
+    );
+
+    let StmtKind::Var(inferred) = &program.statements[1].kind else {
+        panic!("expected variable declaration");
+    };
+    assert_eq!(inferred.mutability, AstMutability::Immutable);
+    assert!(matches!(
+        inferred.ty.as_ref().expect("inferred slot").kind,
+        TypeExprKind::Infer
+    ));
+    assert!(inferred.init.is_none());
+}
+
+#[test]
+fn sit_underscore_binding_rejected_as_malformed() {
+    assert_parse_error_matches(
+        r"sit _ nomen ← 1",
+        ParseExpectation::Issue("sit_identifier_binding"),
+    );
+}
+
+#[test]
+fn sit_destructuring_rejected_as_malformed() {
+    assert_parse_error_matches(
+        r"sit [a, b] ← [1, 2]",
+        ParseExpectation::Issue("sit_no_destructuring"),
+    );
+}
+
+#[test]
+fn sit_accepts_tokenless_keyword_as_binding_name() {
+    // `varia` is tokenless since Batch E: `sit varia ← 1` binds a variable
+    // named `varia`. Pre-migration the reserved Varia token made any binding
+    // named `varia` a parse error (`sit_varia_modifier_rejected`).
+    let result = parse_ok("sit varia ← 1");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let BindingPattern::Ident(name) = &var.binding else {
+        panic!("expected identifier binding");
+    };
+    assert_eq!(symbol_name(&result, name.name), "varia");
+}
+
+#[test]
+fn fixum_bare_name_rejected() {
+    assert_parse_error_matches(
+        r#"fixum name ← "Marcus""#,
+        ParseExpectation::Kind(ParseErrorKind::Expected),
+    );
+}
+
+#[test]
+fn varia_bare_name_rejected() {
+    assert_parse_error_matches(
+        r"varia count ← 1",
+        ParseExpectation::Kind(ParseErrorKind::Expected),
+    );
+}
+
+#[test]
+fn object_destructuring_rejects_colon_rename() {
+    assert_parse_error_matches(
+        r"fixum { nomen: n } ← persona",
+        ParseExpectation::Arg {
+            name: "expected",
+            value: "'}' after pattern",
+        },
+    );
+}
+
+#[test]
+fn cura_rejects_unknown_allocator_kind() {
+    assert_parse_error_matches(
+        r#"cura "general" fixum _ alloc {}"#,
+        ParseExpectation::Issue("allocator_kind"),
+    );
+}
+
+#[test]
+fn parses_abstract_genus_with_extends_implements() {
+    let result = parse_ok(
+        r#"
+abstractus genus Animal<T> sub Vivens implet Canens, Currens {
+    @ futura
+    functio canta(textus vox) → vacuum {}
+    generis textus nomen = "leo"
+    nexum numerus aetas = 3
+}
+"#,
+    );
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Class(class) = &program.statements[0].kind else {
+        panic!("expected class declaration");
+    };
+    assert!(class.is_abstract);
+    assert!(class.extends.is_some());
+    assert_eq!(class.implements.len(), 2);
+    assert_eq!(class.members.len(), 3);
+    assert!(matches!(class.members[0].kind, ClassMemberKind::Method(_)));
+    assert!(matches!(class.members[1].kind, ClassMemberKind::Field(_)));
+    assert!(matches!(class.members[2].kind, ClassMemberKind::Field(_)));
+    assert_eq!(class.members[0].annotations.len(), 1);
+
+    let ClassMemberKind::Field(static_field) = &class.members[1].kind else {
+        panic!("expected static field");
+    };
+    assert!(static_field.is_static);
+
+    let ClassMemberKind::Field(bound_field) = &class.members[2].kind else {
+        panic!("expected bound field");
+    };
+    assert!(bound_field.is_bound);
+}
+
+#[test]
+fn parses_implendum_interface_with_type_params() {
+    let result = parse_ok(
+        r"
+implendum Canens<T> {
+    functio canta(textus vox) iacit → vacuum
+    functio aliter() → textus
+}
+",
+    );
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Interface(interface) = &program.statements[0].kind else {
+        panic!("expected interface declaration");
+    };
+    assert_eq!(interface.type_params.len(), 1);
+    assert_eq!(interface.methods.len(), 2);
+    assert_eq!(interface.methods[0].modifiers.len(), 1);
+}
+
+#[test]
+fn parses_probandum_with_all_modifiers() {
+    let result = parse_ok(
+        r#"
+probandum "suite" tag "parser" {
+    praepara omnia {}
+    postpara {}
+    proba "case" omitte "skip" futurum "later" solum tag "focus" temporis 5 metior repete 2 fragilis 1 requirit "net" solum_in "ci" {}
+    probandum "nested" { proba "inner" {} }
+}
+"#,
+    );
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Probandum(test) = &program.statements[0].kind else {
+        panic!("expected probandum declaration");
+    };
+    assert_eq!(test.modifiers.len(), 1);
+    assert!(matches!(test.modifiers[0], ProbaModifier::Tag(_)));
+    assert_eq!(test.body.setup.len(), 2);
+    assert!(matches!(test.body.setup[0].kind, PraeparaKind::Praepara));
+    assert!(test.body.setup[0].all);
+    assert!(matches!(test.body.setup[1].kind, PraeparaKind::Postpara));
+    assert_eq!(test.body.tests.len(), 1);
+    assert_eq!(test.body.nested.len(), 1);
+
+    let case = &test.body.tests[0];
+    assert_eq!(case.modifiers.len(), 10);
+    assert!(matches!(case.modifiers[0], ProbaModifier::Omitte(_)));
+    assert!(matches!(case.modifiers[1], ProbaModifier::Futurum(_)));
+    assert!(matches!(case.modifiers[2], ProbaModifier::Solum));
+    assert!(matches!(case.modifiers[3], ProbaModifier::Tag(_)));
+    assert!(matches!(case.modifiers[4], ProbaModifier::Temporis(5)));
+    assert!(matches!(case.modifiers[5], ProbaModifier::Metior));
+    assert!(matches!(case.modifiers[6], ProbaModifier::Repete(2)));
+    assert!(matches!(case.modifiers[7], ProbaModifier::Fragilis(1)));
+    assert!(matches!(
+        case.modifiers[8],
+        ProbaModifier::Requirit(_) | ProbaModifier::SolumIn(_)
+    ));
+    assert!(
+        case.modifiers
+            .iter()
+            .any(|modifier| matches!(modifier, ProbaModifier::Requirit(_))),
+        "expected requirit modifier"
+    );
+    assert!(
+        case.modifiers
+            .iter()
+            .any(|modifier| matches!(modifier, ProbaModifier::SolumIn(_))),
+        "expected solumIn modifier"
+    );
+}
+
+#[test]
+fn parses_structural_equals_fields_and_typed_construction() {
+    let result = parse_ok(
+        r#"
+genus Point {
+    numerus x = 0
+    numerus y = 0
+}
+
+functio main() → numerus {
+    fixum _ p ← Point { x = 10, y = 20 }
+    fixum _ raw ← { "x": 10, "y": 20 }
+    fixum _ event ← finge Click { x = 1, y = 2 } ∷ Event
+    redde p.x
+}
+"#,
+    );
+
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    let StmtKind::Class(class) = &program.statements[0].kind else {
+        panic!("expected class declaration");
+    };
+    let ClassMemberKind::Field(field) = &class.members[0].kind else {
+        panic!("expected field declaration");
+    };
+    assert!(field.init.is_some());
+
+    let StmtKind::Func(func) = &program.statements[1].kind else {
+        panic!("expected function declaration");
+    };
+    let Some(body) = &func.body else {
+        panic!("expected function body");
+    };
+
+    // Genus construction (Type { = }) stays Faber = grammar.
+    let StmtKind::Var(typed_ctor) = &body.statements[0].kind else {
+        panic!("expected typed constructor binding");
+    };
+    let Some(init) = typed_ctor.init.as_deref() else {
+        panic!("expected initializer");
+    };
+    assert!(matches!(init.kind, ExprKind::Verte(_)));
+
+    // Bare { } is now a JSON valor literal (Goal Stage 2 of inline-json-valor).
+    // The anonymous Faber record { key = expr } is retired.
+    let StmtKind::Var(raw_object) = &body.statements[1].kind else {
+        panic!("expected raw object binding");
+    };
+    let Some(init) = raw_object.init.as_deref() else {
+        panic!("expected initializer");
+    };
+    let ExprKind::Literal(Literal::JsonValor(JsonValue::Object(members))) = &init.kind else {
+        panic!("expected JSON valor object literal, got {:?}", init.kind);
+    };
+    assert_eq!(members.len(), 2);
+    assert!(matches!(members[0].value, JsonValue::Numerus(10)));
+    assert!(matches!(members[1].value, JsonValue::Numerus(20)));
+
+    // finge variant construction keeps Faber = grammar.
+    let StmtKind::Var(finge_var) = &body.statements[2].kind else {
+        panic!("expected finge binding");
+    };
+    let Some(init) = finge_var.init.as_deref() else {
+        panic!("expected initializer");
+    };
+    let ExprKind::Finge(finge) = &init.kind else {
+        panic!("expected finge expression");
+    };
+    assert_eq!(finge.fields.len(), 2);
+}
+
+#[test]
+fn malformed_json_negative_number_reports_structured_unexpected_error() {
+    let source = r#"fixum _ value ← { "x": - }"#;
+    let result = parse_program(source);
+    let err = result
+        .errors
+        .iter()
+        .find(|err| {
+            err.kind == ParseErrorKind::Unexpected
+                && err.args.iter().any(|arg| {
+                    arg.name == "issue" && arg.value == "expected_json_number_after_minus"
+                })
+        })
+        .expect("malformed JSON negative number diagnostic");
+
+    assert_parse_error_has_no_legacy_message(err);
+    assert_eq!(err.args.len(), 1);
+    assert_eq!(err.args[0].name, "issue");
+    assert_eq!(err.args[0].value, "expected_json_number_after_minus");
+    assert_eq!(err.span, span_for(source, "}"));
+}
+
+#[test]
+fn genus_field_colon_init_rejected() {
+    assert_parse_error_matches(
+        r"genus Point { numerus x : 0 }",
+        ParseExpectation::Arg {
+            name: "expected",
+            value: "identifier",
+        },
+    );
+}
+
+#[test]
+fn finge_colon_field_rejected() {
+    assert_parse_error_matches(
+        r"fixum _ event ← finge Click { x: 1 } ∷ Event",
+        ParseExpectation::Issue("field_value_separator"),
+    );
+}
+
+#[test]
+fn genus_colon_ctor_rejected() {
+    assert_parse_error_matches(
+        r"fixum _ point ← Point { x: 10 }",
+        ParseExpectation::Issue("expected_expression"),
+    );
+}
+
+#[test]
+fn bare_brace_equals_form_rejected() {
+    assert_parse_error_issue(r"fixum _ point ← { x = 10 }", "json_quoted_key");
+}
+
+#[test]
+fn bare_brace_colon_unquoted_key_rejected() {
+    assert_parse_error_issue(r"fixum _ point ← { x: 10 }", "json_quoted_key");
+}
+
+#[test]
+fn inline_union_types_parse_flat() {
+    let result = parse_ok("typus Maybe = textus ∪ numerus ∪ nihil");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::TypeAlias(alias) = &program.statements[0].kind else {
+        panic!("expected type alias");
+    };
+    let TypeExprKind::Union(members) = &alias.ty.kind else {
+        panic!("expected flat union");
+    };
+    assert_eq!(members.len(), 3);
+}
+
+#[test]
+fn proba_temporis_modifier_requires_number() {
+    assert_parse_error_matches(
+        r#"probandum "suite" { proba "case" temporis { adfirma verum } }"#,
+        ParseExpectation::Args(&[("issue", "test_modifier_integer"), ("modifier", "temporis")]),
+    );
+}
+
+#[test]
+fn proba_repete_modifier_requires_number() {
+    assert_parse_error_matches(
+        r#"probandum "suite" { proba "case" repete { adfirma verum } }"#,
+        ParseExpectation::Args(&[("issue", "test_modifier_integer"), ("modifier", "repete")]),
+    );
+}
+
+#[test]
+fn proba_fragilis_modifier_requires_number() {
+    assert_parse_error_matches(
+        r#"probandum "suite" { proba "case" fragilis { adfirma verum } }"#,
+        ParseExpectation::Args(&[("issue", "test_modifier_integer"), ("modifier", "fragilis")]),
+    );
+}
+
+#[test]
+fn proba_modifiers_must_follow_name() {
+    assert_parse_error_matches(
+        r#"proba solum tag "parser" "parses input" {}"#,
+        ParseExpectation::Arg {
+            name: "expected",
+            value: "string literal",
+        },
+    );
+}
+
+#[test]
+fn probandum_modifiers_must_follow_name() {
+    assert_parse_error_matches(
+        r#"probandum solum tag "parser" "suite" {}"#,
+        ParseExpectation::Arg {
+            name: "expected",
+            value: "string literal",
+        },
+    );
+}
+
+#[test]
+fn parses_si_control_flow() {
+    let result = parse_ok(
+        r#"si verum ergo nota "yes" cape err {} sin falsum ergo redde 1 secus ergo tacet"#,
+    );
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(program.statements.len(), 1);
+
+    let StmtKind::Si(if_stmt) = &program.statements[0].kind else {
+        panic!("expected if statement");
+    };
+    assert!(matches!(if_stmt.then, IfBody::Ergo(_)));
+    assert!(if_stmt.catch.is_some());
+    let SecusClause::Sin(sin_stmt) = if_stmt.else_.as_ref().expect("else clause") else {
+        panic!("expected sin clause");
+    };
+    assert!(matches!(sin_stmt.then, IfBody::Ergo(_)));
+    assert!(matches!(
+        sin_stmt.else_.as_ref().expect("secus clause"),
+        SecusClause::Stmt { .. }
+    ));
+}
+
+#[test]
+fn parses_dum_while_loop() {
+    let result = parse_ok("dum verum { perge } cape err {}");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(program.statements.len(), 1);
+
+    let StmtKind::Dum(while_stmt) = &program.statements[0].kind else {
+        panic!("expected while statement");
+    };
+    assert!(matches!(while_stmt.body, IfBody::Block(_)));
+    assert!(while_stmt.catch.is_some());
+}
+
+#[test]
+fn parses_itera_loop() {
+    let result = parse_ok("itera ab items fixum item ergo redde item cape err {}");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(program.statements.len(), 1);
+
+    let StmtKind::Itera(iter_stmt) = &program.statements[0].kind else {
+        panic!("expected itera statement");
+    };
+    assert!(matches!(iter_stmt.mode, IteraMode::Ab));
+    assert!(matches!(iter_stmt.mutability, AstMutability::Immutable));
+    assert!(matches!(iter_stmt.body, IfBody::Ergo(_)));
+}
+
+#[test]
+fn parses_elige_switch() {
+    let result = parse_ok("elige value { casu 1 ergo redde 1 ceterum ergo tacet } cape err {}");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(program.statements.len(), 1);
+
+    let StmtKind::Elige(switch_stmt) = &program.statements[0].kind else {
+        panic!("expected elige statement");
+    };
+    assert_eq!(switch_stmt.cases.len(), 1);
+    assert!(switch_stmt.default.is_some());
+    assert!(switch_stmt.catch.is_some());
+}
+
+#[test]
+fn parses_discerne_match() {
+    let result =
+        parse_ok("discerne omnia value, other { casu Ok ut result, _ ergo redde result ceterum ergo mori \"bad\" }");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(program.statements.len(), 1);
+
+    let StmtKind::Discerne(match_stmt) = &program.statements[0].kind else {
+        panic!("expected discerne statement");
+    };
+    assert!(match_stmt.exhaustive);
+    assert_eq!(match_stmt.subjects.len(), 2);
+    assert_eq!(match_stmt.arms.len(), 1);
+    assert!(match_stmt.default.is_some());
+    match &match_stmt.arms[0].patterns[0] {
+        Pattern::Ident(_, Some(PatternBind::Alias(alias))) => {
+            assert_eq!(symbol_name(&result, alias.name), "result");
+        }
+        _ => panic!("expected alias-bound pattern"),
+    }
+}
+
+#[test]
+fn parses_custodi_guard() {
+    let result = parse_ok("custodi { si verum ergo redde 1 si falsum ergo nota \"no\" }");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(program.statements.len(), 1);
+
+    let StmtKind::Custodi(guard_stmt) = &program.statements[0].kind else {
+        panic!("expected custodi statement");
+    };
+    assert_eq!(guard_stmt.clauses.len(), 2);
+}
+
+#[test]
+fn parses_fac_do_while() {
+    let result = parse_ok("fac {} cape err {} dum verum");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(program.statements.len(), 1);
+
+    let StmtKind::Fac(fac_stmt) = &program.statements[0].kind else {
+        panic!("expected fac statement");
+    };
+    assert!(fac_stmt.catch.is_some());
+    assert!(fac_stmt.while_.is_some());
+}
+
+#[test]
+fn parses_adfirma_assert() {
+    let result = parse_ok("adfirma verum secus \"msg\"");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(program.statements.len(), 1);
+    assert!(matches!(program.statements[0].kind, StmtKind::Adfirma(_)));
+}
+
+#[test]
+fn rejects_adfirma_comma_message() {
+    assert_parse_error_matches(
+        "adfirma verum, \"msg\"",
+        ParseExpectation::Args(&[("issue", "expected_expression")]),
+    );
+}
+
+#[test]
+fn parses_adfirma_without_message() {
+    let result = parse_ok("adfirma verum");
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 1);
+    assert!(matches!(program.statements[0].kind, StmtKind::Adfirma(_)));
+}
+
+#[test]
+fn parses_nota_diagnostic() {
+    let result = parse_ok("nota \"a\", \"b\"");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(program.statements.len(), 1);
+    match &program.statements[0].kind {
+        StmtKind::Scribe(stmt) => assert!(matches!(stmt.kind, ScribeKind::Nota)),
+        _ => panic!("expected nota statement"),
+    }
+}
+
+#[test]
+fn parses_vide_diagnostic() {
+    let result = parse_ok("vide \"c\"");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(program.statements.len(), 1);
+    match &program.statements[0].kind {
+        StmtKind::Scribe(stmt) => assert!(matches!(stmt.kind, ScribeKind::Vide)),
+        _ => panic!("expected vide statement"),
+    }
+}
+
+#[test]
+fn parses_mone_diagnostic() {
+    let result = parse_ok("mone \"d\"");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(program.statements.len(), 1);
+    match &program.statements[0].kind {
+        StmtKind::Scribe(stmt) => assert!(matches!(stmt.kind, ScribeKind::Mone)),
+        _ => panic!("expected mone statement"),
+    }
+}
+
+#[test]
+fn parses_scribe_diagnostic() {
+    let result = parse_ok("scribe \"e\"");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(program.statements.len(), 1);
+    match &program.statements[0].kind {
+        StmtKind::Scribe(stmt) => assert!(matches!(stmt.kind, ScribeKind::Scribe)),
+        _ => panic!("expected scribe compatibility statement"),
+    }
+}
+
+#[test]
+fn parses_redde_return() {
+    let result = parse_ok("redde 1");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(program.statements.len(), 1);
+    assert!(matches!(program.statements[0].kind, StmtKind::Redde(_)));
+}
+
+#[test]
+fn parses_bare_redde_return() {
+    let result = parse_ok("redde");
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 1);
+    assert!(matches!(program.statements[0].kind, StmtKind::Redde(_)));
+}
+
+#[test]
+fn parses_rumpe_break() {
+    let result = parse_ok("rumpe");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(program.statements.len(), 1);
+    assert!(matches!(program.statements[0].kind, StmtKind::Rumpe(_)));
+}
+
+#[test]
+fn parses_perge_continue() {
+    let result = parse_ok("perge");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(program.statements.len(), 1);
+    assert!(matches!(program.statements[0].kind, StmtKind::Perge(_)));
+}
+
+#[test]
+fn parses_iace_throw() {
+    let result = parse_ok("iace \"err\"");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(program.statements.len(), 1);
+    assert!(matches!(program.statements[0].kind, StmtKind::Iace(_)));
+}
+
+#[test]
+fn parses_mori_panic() {
+    let result = parse_ok("mori \"panic\"");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(program.statements.len(), 1);
+    assert!(matches!(program.statements[0].kind, StmtKind::Mori(_)));
+}
+
+#[test]
+fn parses_tacet_noop() {
+    let result = parse_ok("tacet");
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(program.statements.len(), 1);
+    assert!(matches!(program.statements[0].kind, StmtKind::Tacet(_)));
+}
+
+#[test]
+fn invalid_discerne_pattern_emits_structured_parse_error() {
+    let result = parse_program("discerne value { casu + ergo tacet }");
+    let err = result
+        .errors
+        .iter()
+        .find(|err| err.kind == ParseErrorKind::InvalidPattern)
+        .expect("invalid pattern diagnostic");
+
+    assert_parse_error_has_no_legacy_message(err);
+    assert_eq!(err.args.len(), 2);
+    assert_eq!(err.args[0].name, "wildcard");
+    assert_eq!(err.args[0].value, "_");
+    assert_eq!(err.args[1].name, "identifier");
+    assert_eq!(err.args[1].value, "identifier");
+}
+
+#[test]
+fn elige_missing_casu_rejected() {
+    let result = parse_program("elige value { tacet }");
+    let err = result
+        .errors
+        .iter()
+        .find(|err| err.kind == ParseErrorKind::InvalidCasuArm)
+        .expect("invalid casu arm diagnostic");
+
+    assert_parse_error_has_no_legacy_message(err);
+    assert_eq!(err.args.len(), 2);
+    assert_eq!(err.args[0].name, "casu");
+    assert_eq!(err.args[0].value, "casu");
+    assert_eq!(err.args[1].name, "ceterum");
+    assert_eq!(err.args[1].value, "ceterum");
+}
+
+#[test]
+fn discerne_missing_casu_rejected() {
+    let result = parse_program("discerne value { tacet }");
+    let err = result
+        .errors
+        .iter()
+        .find(|err| err.kind == ParseErrorKind::InvalidCasuArm)
+        .expect("invalid casu arm diagnostic");
+
+    assert_parse_error_has_no_legacy_message(err);
+    assert_eq!(err.args.len(), 2);
+    assert_eq!(err.args[0].name, "casu");
+    assert_eq!(err.args[0].value, "casu");
+    assert_eq!(err.args[1].name, "ceterum");
+    assert_eq!(err.args[1].value, "ceterum");
+}
+
+#[test]
+fn parses_ergo_keyword_as_statement_tail() {
+    let result = parse_ok(
+        r#"
+si verum ergo nota "yes"
+dum falsum ergo tacet
+itera ab items fixum item ergo redde item
+"#,
+    );
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 3);
+    let StmtKind::Si(stmt) = &program.statements[0].kind else {
+        panic!("expected si statement");
+    };
+    assert!(matches!(stmt.then, IfBody::Ergo(_)));
+    let StmtKind::Dum(stmt) = &program.statements[1].kind else {
+        panic!("expected dum statement");
+    };
+    assert!(matches!(stmt.body, IfBody::Ergo(_)));
+}
+
+#[test]
+fn rejects_therefore_glyph_as_statement_body_joint() {
+    let result = parse_program(
+        r#"
+si verum ∴ nota "yes"
+"#,
+    );
+    assert!(
+        result
+            .errors
+            .iter()
+            .any(|err| err.kind == ParseErrorKind::ThereforeWrongContext),
+        "expected ThereforeWrongContext, got {:?}",
+        result.errors
+    );
+}
+
+#[test]
+fn rejects_ergo_keyword_as_clausura_joint() {
+    let result = parse_program(
+        r"
+incipit {
+    fixum _ dupla ← numerus x ergo x * 2
+}
+",
+    );
+    assert!(
+        result
+            .errors
+            .iter()
+            .any(|err| err.kind == ParseErrorKind::ErgoWrongContext),
+        "expected ErgoWrongContext, got {:?}",
+        result.errors
+    );
+}
+
+#[test]
+fn parses_block_si_when_condition_ends_with_star_textus_literal() {
+    let result = parse_ok(
+        r#"
+functio f(textus segmentum) → vacuum {
+    si segmentum ≡ "*" {
+        nota "star"
+    } secus {
+        nota "literal"
+    }
+}
+"#,
+    );
+
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    let body = func.body.as_ref().expect("function body");
+    assert!(matches!(body.statements[0].kind, StmtKind::Si(_)));
+}
+
+#[test]
+fn rejects_retired_itera_pro_mode() {
+    assert_parse_error_matches(
+        r"itera pro 0‥3 fixum i { nota i }",
+        ParseExpectation::Arg {
+            name: "expected",
+            value: "'ex', 'de', or 'ab'",
+        },
+    );
+}
+
+#[test]
+fn parses_single_param_implicit_type_closure() {
+    let result = parse_ok("fixum _ a ← users.filtrata(_ user ∴ non user.activus)");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable");
+    };
+    let ExprKind::Call(call) = &var.init.as_ref().expect("init").kind else {
+        panic!("expected call");
+    };
+    let ExprKind::Clausura(closure) = &call.args[0].value.kind else {
+        panic!("expected compact closure");
+    };
+    assert!(matches!(closure.body, ClausuraBody::Expr(_)));
+}
+
+#[test]
+fn parses_single_param_explicit_type_closure() {
+    let result = parse_ok("fixum _ b ← users.filtrata(User user ∴ non user.activus)");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable");
+    };
+    let ExprKind::Call(call) = &var.init.as_ref().expect("init").kind else {
+        panic!("expected call");
+    };
+    let ExprKind::Clausura(closure) = &call.args[0].value.kind else {
+        panic!("expected compact closure");
+    };
+    assert!(matches!(closure.body, ClausuraBody::Expr(_)));
+}
+
+#[test]
+fn parses_multi_param_implicit_type_closure() {
+    let result = parse_ok("fixum _ c ← numeri.compone((_ a, _ b) ∴ a + b)");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable");
+    };
+    let ExprKind::Call(call) = &var.init.as_ref().expect("init").kind else {
+        panic!("expected call");
+    };
+    let ExprKind::Clausura(closure) = &call.args[0].value.kind else {
+        panic!("expected compact closure");
+    };
+    assert!(matches!(closure.body, ClausuraBody::Expr(_)));
+}
+
+#[test]
+fn parses_multi_param_explicit_type_fac_closure() {
+    let result =
+        parse_ok("fixum _ d ← numeri.compone((numerus a, numerus b) ∴ fac { redde a + b })");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(block_var) = &program.statements[0].kind else {
+        panic!("expected variable");
+    };
+    let ExprKind::Call(call) = &block_var.init.as_ref().expect("init").kind else {
+        panic!("expected call");
+    };
+    let ExprKind::Clausura(closure) = &call.args[0].value.kind else {
+        panic!("expected compact closure");
+    };
+    assert_eq!(closure.params.len(), 2);
+    assert!(matches!(closure.body, ClausuraBody::Fac(_)));
+}
+
+#[test]
+fn parses_fallible_typed_closure() {
+    let result = parse_ok("fixum _ e ← texts.mappata(textus s → numerus ⇥ ParseError ∴ fac { redde parse(s) } cape err { redde 0 })");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(fallible_var) = &program.statements[0].kind else {
+        panic!("expected variable");
+    };
+    let ExprKind::Call(call) = &fallible_var.init.as_ref().expect("init").kind else {
+        panic!("expected call");
+    };
+    let ExprKind::Clausura(closure) = &call.args[0].value.kind else {
+        panic!("expected compact closure");
+    };
+    assert!(closure.ret.is_some());
+    assert!(closure.err.is_some());
+    assert!(matches!(closure.body, ClausuraBody::Fac(_)));
+}
+
+#[test]
+fn closure_block_body_rejected_with_structured_error() {
+    let result =
+        parse_program("fixum _ inactive ← users.filtrata(_ user ∴ { redde non user.activus })");
+    let err = result
+        .errors
+        .iter()
+        .find(|err| {
+            err.kind == ParseErrorKind::InvalidExpression
+                && err
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "issue" && arg.value == "closure_block_body")
+        })
+        .expect("invalid expression diagnostic");
+
+    assert_parse_error_has_no_legacy_message(err);
+    assert!(
+        err.args
+            .iter()
+            .any(|arg| arg.name == "fac_body" && arg.value == "fac { ... }"),
+        "closure block diagnostic should expose pack-safe repair text, got {:?}",
+        err.args
+    );
+}
+
+#[test]
+fn closure_fac_body_dum_rejected() {
+    assert_parse_error_matches(
+        "fixum _ inactive ← users.filtrata(_ user ∴ fac { redde non user.activus } dum user.activus)",
+        ParseExpectation::Issue("closure_fac_body_dum"),
+    );
+}
+
+#[test]
+fn parses_structured_cape_attachment_targets() {
+    let result = parse_ok(
+        r"
+si verum { tacet } cape err {} sin falsum { tacet } cape err {} secus { tacet } cape err {}
+dum verum { tacet } cape err {}
+fac { tacet } cape err {}
+",
+    );
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 3);
+
+    let StmtKind::Si(si_stmt) = &program.statements[0].kind else {
+        panic!("expected si");
+    };
+    assert!(si_stmt.catch.is_some());
+    let SecusClause::Sin(sin_stmt) = si_stmt.else_.as_ref().expect("sin") else {
+        panic!("expected sin");
+    };
+    assert!(sin_stmt.catch.is_some());
+    let SecusClause::Block { catch, .. } = sin_stmt.else_.as_ref().expect("secus") else {
+        panic!("expected secus block");
+    };
+    assert!(catch.is_some());
+
+    let StmtKind::Dum(dum_stmt) = &program.statements[1].kind else {
+        panic!("expected dum");
+    };
+    assert!(dum_stmt.catch.is_some());
+
+    let StmtKind::Fac(fac_stmt) = &program.statements[2].kind else {
+        panic!("expected fac");
+    };
+    assert!(fac_stmt.catch.is_some());
+}
+
+#[test]
+fn bare_block_with_cape_rejected() {
+    assert_parse_error_matches(
+        r"functio invalid() → vacuum { { tacet } cape err { tacet } }",
+        ParseExpectation::Issue("expected_expression"),
+    );
+}
+
+#[test]
+fn removed_tempta_fails_with_plain_parse_error() {
+    // `tempta` is no longer a keyword: it must fail as an ordinary parse
+    // error, never with a targeted `retired_statement` migration diagnostic.
+    let source = r"functio old() → vacuum { tempta { tacet } cape err { tacet } }";
+    let result = parse_program(source);
+    assert!(!result.success());
+    assert!(
+        !result
+            .errors
+            .iter()
+            .any(|err| has_arg(err, "issue", "retired_statement")),
+        "removed tempta must not emit a retired_statement diagnostic"
+    );
+}
+
+#[test]
+fn removed_demum_is_an_identifier_without_targeted_diagnostic() {
+    // `demum` is now an ordinary identifier: `demum { tacet }` parses as an
+    // expression statement plus a block, and later phases reject the unknown
+    // identifier generically. No targeted `retired_statement` diagnostic.
+    let source = r"functio old() → vacuum { fac { tacet } cape err { tacet } demum { tacet } }";
+    let result = parse_program(source);
+    assert!(result.success());
+    assert!(
+        !result
+            .errors
+            .iter()
+            .any(|err| has_arg(err, "issue", "retired_statement")),
+        "removed demum must not emit a retired_statement diagnostic"
+    );
+}
+
+#[test]
+fn removed_emitte_is_an_identifier_without_targeted_diagnostic() {
+    // `emitte "hello"` parses as adjacent expression statements; the retired
+    // statement keyword and its `retired_statement_form` diagnostic are gone.
+    let result = parse_program("incipit { emitte \"hello\" }");
+    assert!(result.success());
+    assert!(
+        !result
+            .errors
+            .iter()
+            .any(|err| has_arg(err, "issue", "retired_statement_form")),
+        "removed emitte must not emit a retired_statement_form diagnostic"
+    );
+}
+
+#[test]
+fn removed_sed_is_an_identifier_without_targeted_diagnostic() {
+    // `sed "\d+" g` parses as adjacent expression statements; the spelling gate
+    // and its `retired_sed` diagnostic are gone.
+    let result = parse_program(r#"incipit { fixum _ r ← sed "\d+" g }"#);
+    assert!(result.success());
+    assert!(
+        !result
+            .errors
+            .iter()
+            .any(|err| has_arg(err, "issue", "retired_sed")),
+        "removed sed must not emit a retired_sed diagnostic"
+    );
+}
+
+#[test]
+fn removed_spellings_are_usable_as_identifiers() {
+    // The retired spellings become ordinary identifiers where the grammar
+    // permits identifiers: function names, binding names, and members.
+    let result = parse_ok(
+        r"
+functio tempta() → vacuum { tacet }
+functio demum() → vacuum { tacet }
+functio emitte() → vacuum { tacet }
+functio pro() → vacuum { tacet }
+incipit {
+  fixum _ pro ← 1
+  fixum _ tempta ← 2
+  nota tempta
+}
+",
+    );
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 5);
+}
+
+#[test]
+fn modulus_type_and_itera_ab_range_iteration_stay_live() {
+    // Positive regression proof: `modulus<W>` types and `itera ab <range>`
+    // range iteration are canonical and must keep parsing after the removals.
+    let result = parse_ok(
+        r"
+functio checksum() → numerus {
+  fixum modulus<u32> m ← 1779033703
+  itera ab 0‥10 per 2 fixum i {
+    nota i
+  }
+  redde 0
+}
+",
+    );
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 1);
+}
+
+#[test]
+fn migrated_keywords_usable_as_contextual_identifiers() {
+    // "Contextual" means a word is only special inside its grammar slot —
+    // everywhere else it is an ordinary identifier. Each migrated keyword
+    // (Batches A–B) is proven usable in name positions (variable, function,
+    // parameter) and as a member name. Statement/type-position words are also
+    // free in value position; expression-primary words (`iuncta`, `lege`,
+    // `lineam`, `scriptum`) are intentionally claimed at expression start, so
+    // a bare value reference is not asserted for them.
+    let words = [
+        "modulus",
+        "iuncta",
+        "nota",
+        "mone",
+        "vide",
+        "lege",
+        "lineam",
+        "scriptum",
+        "verum",
+        "falsum",
+        "nihil",
+        "aut",
+        "et",
+        "non",
+        "est",
+        "vel",
+        "functio",
+        "genus",
+        "ordo",
+        "implendum",
+        "typus",
+        "discretio",
+        "fixum",
+        "varia",
+        "sit",
+        "si",
+        "secus",
+        "sin",
+        "ergo",
+        "discerne",
+        "elige",
+        "dum",
+        "fac",
+        "casu",
+        "ceterum",
+        "rumpe",
+        "perge",
+        "redde",
+        "ego",
+        "finge",
+        "sub",
+        "implet",
+        "cura",
+        "ad",
+        "omnia",
+        "inter",
+        "intra",
+        "per",
+        "usque",
+        "ante",
+        "praefixum",
+        "clausura",
+        "sponte",
+        "tacet",
+    ];
+    let name_position_templates = [
+        "fixum _ {word} ← 5\n",
+        "functio {word}() → numerus {{ redde 0 }}\n",
+        "functio f(numerus {word}) → numerus {{ redde 0 }}\n",
+        "incipit {{ fixum _ x ← 5\nnota x.{word}\n}}\n",
+    ];
+    for word in words {
+        for template in name_position_templates {
+            let source = template.replace("{word}", word);
+            let result = parse_program(&source);
+            assert!(
+                result.success(),
+                "keyword '{word}' must be usable as an identifier:\n{source}\nerrors: {:?}",
+                result.errors
+            );
+        }
+    }
+    // Value position: words not claimed at expression-primary. `non` is
+    // excluded — unary `non` claims it at expression start, so a bare value
+    // reference is ambiguous (same tradeoff as expression-primary words).
+    for word in [
+        "modulus",
+        "nota",
+        "mone",
+        "vide",
+        "aut",
+        "et",
+        "est",
+        "vel",
+        "functio",
+        "genus",
+        "ordo",
+        "implendum",
+        "typus",
+        "discretio",
+        "fixum",
+        "varia",
+        "sit",
+        "si",
+        "secus",
+        "sin",
+        "ergo",
+        "discerne",
+        "elige",
+        "dum",
+        "fac",
+        "casu",
+        "ceterum",
+        "rumpe",
+        "perge",
+        "redde",
+        "sub",
+        "implet",
+        "cura",
+        "omnia",
+        "inter",
+        "intra",
+        "per",
+        "usque",
+        "ante",
+        "sponte",
+        "tacet",
+    ] {
+        let source = format!("functio f() → numerus {{ fixum _ {word} ← 5\nredde {word}\n}}\n");
+        let result = parse_program(&source);
+        assert!(
+            result.success(),
+            "keyword '{word}' must be usable in value position:\n{source}\nerrors: {:?}",
+            result.errors
+        );
+    }
+}
+
+#[test]
+fn statement_level_ad_rejected_with_structured_error() {
+    let result = parse_program("incipit { ad 'noop:ping' { meus { } } }");
+    let err = result
+        .errors
+        .iter()
+        .find(|err| err.kind == ParseErrorKind::InvalidStatement)
+        .expect("invalid statement diagnostic");
+
+    assert_parse_error_has_no_legacy_message(err);
+    assert_eq!(err.args.len(), 3);
+    assert_eq!(err.args[0].name, "issue");
+    assert_eq!(err.args[0].value, "ad_expression_only");
+    assert_eq!(err.args[1].name, "statement");
+    assert_eq!(err.args[1].value, "ad");
+    assert_eq!(err.args[2].name, "replacement");
+    assert_eq!(err.args[2].value, "ad 'route' (opener) ↦ T expression form");
+    assert_eq!(
+        err.span,
+        span_for("incipit { ad 'noop:ping' { meus { } } }", "ad")
+    );
+}
+
+#[test]
+fn legacy_ad_route_expression_rejected_with_structured_error() {
+    let source = r#"incipit { ad "legacy:route" () → textus x ⇥ textus { } }"#;
+    let result = parse_program(source);
+    let err = result
+        .errors
+        .iter()
+        .find(|err| err.kind == ParseErrorKind::InvalidStatement)
+        .expect("invalid statement diagnostic");
+
+    assert_parse_error_has_no_legacy_message(err);
+    assert_eq!(err.args.len(), 3);
+    assert_eq!(err.args[0].name, "issue");
+    assert_eq!(err.args[0].value, "ad_expression_only");
+    assert_eq!(err.args[1].name, "statement");
+    assert_eq!(err.args[1].value, "ad");
+    assert_eq!(err.args[2].name, "replacement");
+    assert_eq!(err.args[2].value, "ad 'route' (opener) ↦ T expression form");
+    assert_eq!(err.span, span_for(source, "ad"));
+}
+
+#[test]
+fn si_without_block_or_ergo_rejected() {
+    let result = parse_program("si verum tacet");
+    let err = result
+        .errors
+        .iter()
+        .find(|err| err.kind == ParseErrorKind::MissingBlock)
+        .expect("missing block diagnostic");
+
+    assert_parse_error_has_no_legacy_message(err);
+    assert_eq!(err.args.len(), 2);
+    assert_eq!(err.args[0].name, "block");
+    assert_eq!(err.args[0].value, "{ ... }");
+    assert_eq!(err.args[1].name, "ergo");
+    assert_eq!(err.args[1].value, "ergo");
+}
+
+#[test]
+fn si_secus_without_block_or_ergo_rejected() {
+    let result = parse_program("si verum ergo tacet secus tacet");
+    let err = result
+        .errors
+        .iter()
+        .find(|err| err.kind == ParseErrorKind::MissingBlock)
+        .expect("missing block diagnostic");
+
+    assert_parse_error_has_no_legacy_message(err);
+    assert_eq!(err.args.len(), 2);
+    assert_eq!(err.args[0].name, "block");
+    assert_eq!(err.args[0].value, "{ ... }");
+    assert_eq!(err.args[1].name, "ergo");
+    assert_eq!(err.args[1].value, "ergo");
+}
+
+#[test]
+fn elige_without_block_rejected() {
+    let result = parse_program("elige value { casu 1 tacet }");
+    let err = result
+        .errors
+        .iter()
+        .find(|err| err.kind == ParseErrorKind::MissingBlock)
+        .expect("missing block diagnostic");
+
+    assert_parse_error_has_no_legacy_message(err);
+    assert_eq!(err.args.len(), 2);
+    assert_eq!(err.args[0].name, "block");
+    assert_eq!(err.args[0].value, "{ ... }");
+    assert_eq!(err.args[1].name, "ergo");
+    assert_eq!(err.args[1].value, "ergo");
+}
+
+#[test]
+fn dum_without_block_rejected() {
+    let result = parse_program("dum verum tacet");
+    let err = result
+        .errors
+        .iter()
+        .find(|err| err.kind == ParseErrorKind::MissingBlock)
+        .expect("missing block diagnostic");
+
+    assert_parse_error_has_no_legacy_message(err);
+    assert_eq!(err.args.len(), 2);
+    assert_eq!(err.args[0].name, "block");
+    assert_eq!(err.args[0].value, "{ ... }");
+    assert_eq!(err.args[1].name, "ergo");
+    assert_eq!(err.args[1].value, "ergo");
+}
+
+#[test]
+fn incipit_tacet_expected_block() {
+    assert_parse_error_matches(
+        "incipit tacet",
+        ParseExpectation::Arg {
+            name: "expected",
+            value: "'{'",
+        },
+    );
+}
+
+#[test]
+fn parses_entry_resource_endpoint_and_extract_keywords() {
+    let result = parse_ok(
+        r#"
+incipit argumenta args exitus 1 {}
+incipiet argumenta argv {}
+cura "arena" fixum _ alloc {}
+cura "page" fixum _ page {}
+ex source varia nomen ut name, ceteri reliqua
+"#,
+    );
+
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    assert_eq!(program.statements.len(), 5);
+
+    let StmtKind::Incipit(main_stmt) = &program.statements[0].kind else {
+        panic!("expected incipit statement");
+    };
+    assert!(!main_stmt.is_async);
+    assert!(main_stmt.args.is_some());
+    assert!(main_stmt.exitus.is_some());
+    assert!(matches!(main_stmt.body, IfBody::Block(_)));
+
+    let StmtKind::Incipit(async_main) = &program.statements[1].kind else {
+        panic!("expected incipiet statement");
+    };
+    assert!(async_main.is_async);
+    assert!(matches!(async_main.body, IfBody::Block(_)));
+
+    let StmtKind::Cura(arena_stmt) = &program.statements[2].kind else {
+        panic!("expected arena cura");
+    };
+    assert!(matches!(arena_stmt.kind, CuraKind::Arena));
+
+    let StmtKind::Cura(page_stmt) = &program.statements[3].kind else {
+        panic!("expected bound page cura");
+    };
+    assert!(matches!(page_stmt.kind, CuraKind::Page));
+    assert!(matches!(page_stmt.mutability, AstMutability::Immutable));
+
+    let StmtKind::Ex(extract) = &program.statements[4].kind else {
+        panic!("expected ex destructuring statement");
+    };
+    assert!(matches!(extract.mutability, AstMutability::Mutable));
+    assert_eq!(extract.fields.len(), 1);
+    assert_eq!(
+        symbol_name(
+            &result,
+            extract.fields[0].alias.as_ref().expect("field alias").name
+        ),
+        "name"
+    );
+    assert_eq!(
+        symbol_name(&result, extract.rest.as_ref().expect("rest binding").name),
+        "reliqua"
+    );
+}
+
+#[test]
+fn parses_curata_allocator_alias() {
+    let result = parse_ok(r"functio greet(textus name) curata alloc ut a → textus { redde name }");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function declaration");
+    };
+    let radix_syntax::FuncModifier::Curata {
+        required,
+        alias: Some(alias),
+    } = &func.modifiers[0]
+    else {
+        panic!("expected curata alias modifier");
+    };
+    assert_eq!(symbol_name(&result, required.name), "alloc");
+    assert_eq!(symbol_name(&result, alias.name), "a");
+}
+
+#[test]
+fn parses_function_alternate_exit_type() {
+    let result = parse_ok(r"functio divide(numerus a, numerus b) → numerus ⇥ textus { redde a }");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function declaration");
+    };
+    assert!(matches!(
+        func.ret.as_ref().map(|ty| &ty.kind),
+        Some(TypeExprKind::Named(_, _))
+    ));
+    assert!(matches!(
+        func.err.as_ref().map(|ty| &ty.kind),
+        Some(TypeExprKind::Named(_, _))
+    ));
+    let Some(err) = &func.err else {
+        panic!("expected alternate-exit type");
+    };
+    let TypeExprKind::Named(name, params) = &err.kind else {
+        panic!("expected named alternate-exit type");
+    };
+    assert!(params.is_empty());
+    assert_eq!(symbol_name(&result, name.name), "textus");
+}
+
+#[test]
+fn parses_implendum_method_alternate_exit_type() {
+    let result = parse_ok(
+        r"
+implendum Divisor {
+  functio divide(numerus a, numerus b) → numerus ⇥ textus
+}
+",
+    );
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Interface(interface) = &program.statements[0].kind else {
+        panic!("expected implendum declaration");
+    };
+    assert_eq!(interface.methods.len(), 1);
+    assert!(interface.methods[0].ret.is_some());
+    assert!(interface.methods[0].err.is_some());
+}
+
+#[test]
+fn preserves_implendum_method_annotations() {
+    let result = parse_ok(
+        r#"
+implendum Horologium {
+  @ nondum rs "timer handles are not implemented"
+  functio repete(numerus ms) → vacuum
+}
+"#,
+    );
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Interface(interface) = &program.statements[0].kind else {
+        panic!("expected implendum declaration");
+    };
+    assert_eq!(interface.methods.len(), 1);
+    assert_eq!(interface.methods[0].annotations.len(), 1);
+    let AnnotationKind::Statement(annotation) = &interface.methods[0].annotations[0].kind else {
+        panic!("expected statement annotation");
+    };
+    assert_eq!(symbol_name(&result, annotation.name.name), "nondum");
+    assert_eq!(annotation.args.len(), 2);
+}
+
+#[test]
+fn parses_failable_function_type() {
+    let result = parse_ok(r"typus Op = (numerus) → numerus ⇥ textus");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::TypeAlias(alias) = &program.statements[0].kind else {
+        panic!("expected type alias");
+    };
+    let TypeExprKind::Func(func) = &alias.ty.kind else {
+        panic!("expected function type");
+    };
+    assert_eq!(func.params.len(), 1);
+    assert!(func.err.is_some());
+}
+
+#[test]
+fn param_binds_tokenless_keyword_as_identifier() {
+    // `si` is tokenless since Batch F: `functio f(_ si)` names a parameter
+    // `si`. Pre-migration the reserved Si token made any parameter named
+    // `si` a parse error (`legacy_si_in_param_prefix_rejected`).
+    let result = parse_ok("functio f(_ si) → vacuum {}");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function declaration");
+    };
+    let Some(param) = func.params.first() else {
+        panic!("expected a parameter");
+    };
+    assert_eq!(symbol_name(&result, param.name.name), "si");
+}
+
+#[test]
+fn si_is_usable_as_a_type_name_after_tokenless_migration() {
+    // `si` is tokenless since Batch F: it may name a type in any type
+    // position. Pre-migration the reserved Si token made these parse errors
+    // (`legacy_si_*_rejected` family).
+    for source in [
+        "fixum si x ← nihil\n",
+        "functio f(si handle) → vacuum {}\n",
+        "functio find() → si { redde nihil }\n",
+        "typus MaybeSi = si\n",
+        "genus User { si email }\n",
+    ] {
+        let result = parse_program(source);
+        assert!(
+            result.success(),
+            "'si' must be usable as a type name:\n{source}\nerrors: {:?}",
+            result.errors
+        );
+    }
+}
+
+#[test]
+fn varia_binds_tokenless_keyword_as_identifier() {
+    // `si` is tokenless since Batch F: `varia _ si ← 5` binds a variable
+    // named `si`. Pre-migration the reserved Si token made any binding named
+    // `si` a parse error (`legacy_si_in_varia_declaration_rejected`).
+    let result = parse_ok("varia _ si ← 5");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let BindingPattern::Ident(name) = &var.binding else {
+        panic!("expected identifier binding");
+    };
+    assert_eq!(symbol_name(&result, name.name), "si");
+}
+
+#[test]
+fn legacy_question_mark_in_fixum_rejected() {
+    assert_parse_error_matches(
+        r"fixum textus? maybe ← nihil",
+        ParseExpectation::Arg {
+            name: "expected",
+            value: "identifier",
+        },
+    );
+}
+
+#[test]
+fn legacy_question_mark_in_function_return_rejected() {
+    assert_parse_error_matches(
+        r"functio find() → textus? { redde nihil }",
+        ParseExpectation::Kind(ParseErrorKind::MissingFunctionBody),
+    );
+}
+
+#[test]
+fn legacy_question_mark_in_type_alias_rejected() {
+    assert_parse_error_matches(
+        r"typus MaybeText = textus?",
+        ParseExpectation::Issue("expected_expression"),
+    );
+}
+
+#[test]
+fn removed_fixus_in_param_rejected() {
+    assert_parse_error_matches(
+        r"functio f(textus name fixus) → vacuum {}",
+        ParseExpectation::Issue("removed_fixus"),
+    );
+    let result = parse_program(r"functio f(textus name fixus) → vacuum {}");
+    let err = result
+        .errors
+        .iter()
+        .find(|err| {
+            err.kind == ParseErrorKind::InvalidParameter
+                && err
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "issue" && arg.value == "removed_fixus")
+        })
+        .expect("removed fixus diagnostic");
+    assert_parse_error_has_no_legacy_message(err);
+    assert_eq!(err.args[1].name, "keyword");
+    assert_eq!(err.args[1].value, "fixus");
+}
+
+#[test]
+fn removed_fixus_in_genus_field_rejected() {
+    assert_parse_error_matches(
+        r"genus User { textus email fixus }",
+        ParseExpectation::Issue("removed_fixus"),
+    );
+    let result = parse_program(r"genus User { textus email fixus }");
+    let err = result
+        .errors
+        .iter()
+        .find(|err| {
+            err.kind == ParseErrorKind::InvalidParameter
+                && err
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "issue" && arg.value == "removed_fixus")
+        })
+        .expect("removed fixus diagnostic");
+    assert_parse_error_has_no_legacy_message(err);
+    assert_eq!(err.args[1].name, "keyword");
+    assert_eq!(err.args[1].value, "fixus");
+}
+
+#[test]
+fn removed_sed_expression_is_an_identifier_without_targeted_diagnostic() {
+    // `sed "x"` is retired: no spelling gate, so the spellings parse as
+    // ordinary identifiers and the generic unknown-identifier path applies —
+    // never a targeted `retired_sed` diagnostic.
+    let result = parse_program(r#"incipit { fixum _ r ← sed "\d+" g }"#);
+    assert!(result.success());
+    assert!(
+        !result
+            .errors
+            .iter()
+            .any(|err| has_arg(err, "issue", "retired_sed")),
+        "removed sed must not emit a retired_sed diagnostic"
+    );
+}
+
+#[test]
+fn parses_contextual_keywords_in_declaration_and_param_positions() {
+    let result = parse_ok(
+        r"
+functio retorque(textus via) → textus { redde via }
+functio genera(lista<textus> argumenta) → vacuum { tacet }
+implendum Par {
+    functio publica() → octeti
+    functio privata() → octeti
+    functio incipiet() → vacuum
+}
+",
+    );
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 3);
+    let StmtKind::Func(retorque) = &program.statements[0].kind else {
+        panic!("expected retorque function");
+    };
+    let StmtKind::Func(genera) = &program.statements[1].kind else {
+        panic!("expected genera function");
+    };
+    assert_eq!(symbol_name(&result, retorque.name.name), "retorque");
+    assert_eq!(
+        symbol_name(&result, genera.params[0].name.name),
+        "argumenta"
+    );
+}
+
+#[test]
+fn solum_keyword_as_binding_name_rejected() {
+    assert_parse_error_matches(
+        r"fixum solum x ← 1",
+        ParseExpectation::Arg {
+            name: "expected",
+            value: "identifier",
+        },
+    );
+}
+
+#[test]
+fn mori_keyword_as_binding_name_rejected() {
+    assert_parse_error_matches(
+        r"fixum mori x ← 1",
+        ParseExpectation::Arg {
+            name: "expected",
+            value: "identifier",
+        },
+    );
+}
+
+#[test]
+fn parses_test_annotation_keywords_as_import_binding_names() {
+    let result = parse_ok(r#"importa ex "norma:solum" privata solum"#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Import(import) = &program.statements[0].kind else {
+        panic!("expected import");
+    };
+    let ImportKind::Named { name, alias, .. } = &import.kind else {
+        panic!("expected named import");
+    };
+    assert_eq!(symbol_name(&result, name.name), "solum");
+    assert!(alias.is_none());
+}
+
+#[test]
+fn parses_tensor_bridge_member_method_names() {
+    let result = parse_ok(
+        r"incipit {
+  fixum tensor<fractus<f32>, []> t ← vacua
+  fixum _ g ← t.strue(flat, shape)
+  fixum _ f ← g.planata()
+}",
+    );
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Incipit(entry) = &program.statements[0].kind else {
+        panic!("expected incipit entry");
+    };
+    let radix_syntax::IfBody::Block(block) = &entry.body else {
+        panic!("expected incipit block body");
+    };
+    let StmtKind::Var(structa_call) = &block.statements[1].kind else {
+        panic!("expected structa binding");
+    };
+    let ExprKind::Call(structa_expr) = &structa_call.init.as_ref().expect("init").kind else {
+        panic!("expected call");
+    };
+    let ExprKind::Member(structa_member) = &structa_expr.callee.kind else {
+        panic!("expected member callee");
+    };
+    assert_eq!(symbol_name(&result, structa_member.member.name), "strue");
+    let StmtKind::Var(planata_call) = &block.statements[2].kind else {
+        panic!("expected planata binding");
+    };
+    let ExprKind::Call(planata_expr) = &planata_call.init.as_ref().expect("init").kind else {
+        panic!("expected call");
+    };
+    let ExprKind::Member(planata_member) = &planata_expr.callee.kind else {
+        panic!("expected member callee");
+    };
+    assert_eq!(symbol_name(&result, planata_member.member.name), "planata");
+}
+
+#[test]
+fn rejects_removed_prae_typus_in_param_lists() {
+    let source = "functio old(prae typus T, T x) → T {}";
+    let result = parse_program(source);
+    assert!(!result.success());
+    let err = result
+        .errors
+        .iter()
+        .find(|err| {
+            err.kind == ParseErrorKind::InvalidTypeParameter
+                && err
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "issue" && arg.value == "removed_prae_typus")
+        })
+        .expect("removed prae typus diagnostic");
+    assert_parse_error_has_no_legacy_message(err);
+    assert_eq!(err.args[1].name, "keyword");
+    assert_eq!(err.args[1].value, "prae typus");
+}
+
+#[test]
+fn parses_function_and_declaration_generic_params() {
+    let result = parse_ok(
+        r"
+functio matmul<T, magnitudo N, magnitudo K>(lista<T> a) → vacuum {}
+typus Vector<T, magnitudo N> = lista<T>
+",
+    );
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    assert_eq!(func.type_params.len(), 3);
+    assert_eq!(
+        func.type_params[0].kind,
+        radix_syntax::GenericParamKind::Typus
+    );
+    assert_eq!(
+        func.type_params[1].kind,
+        radix_syntax::GenericParamKind::Magnitudo
+    );
+    let StmtKind::TypeAlias(alias) = &program.statements[1].kind else {
+        panic!("expected type alias");
+    };
+    assert_eq!(alias.type_params.len(), 2);
+}
+
+#[test]
+fn rejects_type_params_after_magnitudo_params() {
+    let source = "functio invalid<magnitudo N, T>(lista<T> values) → vacuum {}";
+    assert_parse_error_issue(source, "type_param_after_magnitudo");
+
+    let result = parse_program(source);
+    let err = result
+        .errors
+        .iter()
+        .find(|err| {
+            err.kind == ParseErrorKind::InvalidTypeParameter
+                && err
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "issue" && arg.value == "type_param_after_magnitudo")
+        })
+        .expect("type parameter ordering diagnostic");
+    assert_parse_error_has_no_legacy_message(err);
+    assert_eq!(err.args[1].name, "size_param");
+    assert_eq!(err.args[1].value, "magnitudo");
+}
+
+// =============================================================================
+// mori / iace optional si guard
+// =============================================================================
+
+#[test]
+fn mori_without_si_is_unconditional() {
+    let result = parse_ok(r#"incipit { mori "boom" }"#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Incipit(incipit) = &program.statements[0].kind else {
+        panic!("expected incipit");
+    };
+    let IfBody::Block(body) = &incipit.body else {
+        panic!("expected incipit block body");
+    };
+    assert!(
+        matches!(body.statements[0].kind, StmtKind::Mori(_)),
+        "mori without si should be unconditional Mori"
+    );
+}
+
+#[test]
+fn mori_with_si_desugars_to_si_block() {
+    let result = parse_ok(r#"incipit { mori "boom" si x < 0 }"#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Incipit(incipit) = &program.statements[0].kind else {
+        panic!("expected incipit");
+    };
+    let IfBody::Block(body) = &incipit.body else {
+        panic!("expected incipit block body");
+    };
+    let StmtKind::Si(si) = &body.statements[0].kind else {
+        panic!("expected Si, got {:?}", body.statements[0].kind);
+    };
+    let IfBody::Block(block) = &si.then else {
+        panic!("expected block body");
+    };
+    assert!(
+        matches!(block.statements[0].kind, StmtKind::Mori(_)),
+        "inner statement should be Mori"
+    );
+}
+
+#[test]
+fn iace_without_si_is_unconditional() {
+    let result = parse_ok(r#"incipit { iace "err" }"#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Incipit(incipit) = &program.statements[0].kind else {
+        panic!("expected incipit");
+    };
+    let IfBody::Block(body) = &incipit.body else {
+        panic!("expected incipit block body");
+    };
+    assert!(
+        matches!(body.statements[0].kind, StmtKind::Iace(_)),
+        "iace without si should be unconditional Iace"
+    );
+}
+
+#[test]
+fn iace_with_si_desugars_to_si_block() {
+    let result = parse_ok(r#"incipit { iace "err" si ok }"#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Incipit(incipit) = &program.statements[0].kind else {
+        panic!("expected incipit");
+    };
+    let IfBody::Block(body) = &incipit.body else {
+        panic!("expected incipit block body");
+    };
+    let StmtKind::Si(si) = &body.statements[0].kind else {
+        panic!("expected Si, got {:?}", body.statements[0].kind);
+    };
+    let IfBody::Block(block) = &si.then else {
+        panic!("expected block body");
+    };
+    assert!(
+        matches!(block.statements[0].kind, StmtKind::Iace(_)),
+        "inner statement should be Iace"
+    );
+}
+
+#[test]
+fn mori_si_inside_function_body() {
+    let result = parse_ok(
+        r#"functio f(numerus x) → vacuum {
+  mori "bad" si x < 0
+  redde
+}"#,
+    );
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    let body = func.body.as_ref().expect("function body");
+    let StmtKind::Si(si) = &body.statements[0].kind else {
+        panic!(
+            "expected Si inside function, got {:?}",
+            body.statements[0].kind
+        );
+    };
+    assert!(si.catch.is_none());
+    assert!(si.else_.is_none());
+}
+
+#[test]
+fn mori_si_with_gt_comparison() {
+    let result = parse_ok(r#"incipit { mori "bad" si a > b }"#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Incipit(incipit) = &program.statements[0].kind else {
+        panic!("expected incipit");
+    };
+    let IfBody::Block(body) = &incipit.body else {
+        panic!("expected incipit block body");
+    };
+    assert!(
+        matches!(body.statements[0].kind, StmtKind::Si(_)),
+        "mori si with > should desugar to Si"
+    );
+}
+
+#[test]
+fn mori_with_si_on_next_line_stays_unconditional() {
+    // When si is on the next line, it is a new statement, not a guard.
+    let result = parse_ok(
+        r#"incipit {
+  mori "boom"
+  si ok ergo tacet
+}"#,
+    );
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Incipit(incipit) = &program.statements[0].kind else {
+        panic!("expected incipit");
+    };
+    let IfBody::Block(body) = &incipit.body else {
+        panic!("expected incipit block body");
+    };
+    // First statement should be unconditional mori
+    assert!(
+        matches!(body.statements[0].kind, StmtKind::Mori(_)),
+        "mori should be unconditional when si is on next line"
+    );
+    // Second statement should be the si
+    assert!(
+        matches!(body.statements[1].kind, StmtKind::Si(_)),
+        "next-line si should be its own statement"
+    );
+}
+
+#[test]
+fn mori_si_inside_ergo_body() {
+    let result = parse_ok(
+        r#"functio f(bivalens ok) → vacuum {
+  si ok ergo mori "bad" si ok
+}"#,
+    );
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    let body = func.body.as_ref().expect("function body");
+    let StmtKind::Si(outer_si) = &body.statements[0].kind else {
+        panic!("expected outer Si");
+    };
+    // The ergo body should be a Si wrapping a Mori
+    let IfBody::Ergo(ergo_stmt) = &outer_si.then else {
+        panic!("expected ergo body");
+    };
+    let StmtKind::Si(_inner_si) = &ergo_stmt.kind else {
+        panic!(
+            "expected inner Si from mori si guard, got {:?}",
+            ergo_stmt.kind
+        );
+    };
+}
+
+#[test]
+fn mori_si_with_complex_expression() {
+    let result = parse_ok(r#"incipit { mori "bad" si x < 0 aut x > 100 }"#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Incipit(incipit) = &program.statements[0].kind else {
+        panic!("expected incipit");
+    };
+    let IfBody::Block(body) = &incipit.body else {
+        panic!("expected incipit block body");
+    };
+    assert!(
+        matches!(body.statements[0].kind, StmtKind::Si(_)),
+        "mori si with aut expression should desugar to Si"
+    );
+}
+
+#[test]
+fn mori_si_does_not_consume_next_si_statement() {
+    // Regression: mori si guard should not eat the next statement's si keyword.
+    let result = parse_ok(
+        r#"custodi {
+  si n ≡ 0 ergo mori "first" si n < 0
+  si n ≡ 1 ergo mori "second"
+}"#,
+    );
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Custodi(custodi) = &program.statements[0].kind else {
+        panic!("expected custodi");
+    };
+    assert_eq!(custodi.clauses.len(), 2, "should have two custodi guards");
+    // Second guard should still parse — its si was not consumed by the first guard
+    assert!(
+        matches!(custodi.clauses[1].body, IfBody::Ergo(_)),
+        "second guard should have ergo body"
+    );
+}
+
+// =============================================================================
+// Morphology-driven async/stream surface
+// =============================================================================
+
+fn func_posture(result: &super::ParseResult) -> CallablePosture {
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function declaration");
+    };
+    func.posture
+}
+
+#[test]
+fn parses_fiet_posture() {
+    let result = parse_ok("functio f() fiet → vacuum { tacet }");
+    assert_eq!(func_posture(&result), CallablePosture::AsyncFinite);
+}
+
+#[test]
+fn parses_fiunt_posture() {
+    let result = parse_ok("functio f() fiunt → numerus { cede 1 }");
+    assert_eq!(func_posture(&result), CallablePosture::SyncStream);
+}
+
+#[test]
+fn parses_fient_posture() {
+    let result = parse_ok("functio f() fient → numerus { cede 1 }");
+    assert_eq!(func_posture(&result), CallablePosture::AsyncStream);
+}
+
+#[test]
+fn parses_cede_as_yield_statement_only() {
+    let result = parse_ok("functio f() fiunt → numerus { cede 1 }");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    let body = func.body.as_ref().expect("body");
+    let StmtKind::Expr(expr_stmt) = &body.statements[0].kind else {
+        panic!("expected expression statement");
+    };
+    assert!(matches!(expr_stmt.expr.kind, ExprKind::Cede(_)));
+}
+
+#[test]
+fn rejects_cede_in_initializer_expression_position() {
+    assert_parse_error_matches(
+        "functio f() fiunt → numerus { fixum _ x ← cede 1 cede 2 }",
+        ParseExpectation::Issue("expected_expression"),
+    );
+}
+
+#[test]
+fn rejects_cede_in_call_argument_expression_position() {
+    assert_parse_error_matches(
+        "functio f() fiunt → numerus { nota cede 1 cede 2 }",
+        ParseExpectation::Issue("expected_expression"),
+    );
+}
+
+#[test]
+fn parses_bare_posture_is_sync_finite() {
+    let result = parse_ok("functio f() → vacuum { tacet }");
+    assert_eq!(func_posture(&result), CallablePosture::SyncFinite);
+}
+
+#[test]
+fn parses_figendum_await_binding() {
+    let result = parse_ok("functio f() fiet → vacuum { figendum numerus x ← fut redde x }");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    let body = func.body.as_ref().expect("body");
+    let StmtKind::Var(decl) = &body.statements[0].kind else {
+        panic!("expected var decl");
+    };
+    assert!(decl.is_await);
+    assert_eq!(decl.mutability, AstMutability::Immutable);
+}
+
+#[test]
+fn parses_variandum_await_binding() {
+    let result = parse_ok("functio f() fiet → vacuum { variandum numerus x ← fut redde x }");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    let body = func.body.as_ref().expect("body");
+    let StmtKind::Var(decl) = &body.statements[0].kind else {
+        panic!("expected var decl");
+    };
+    assert!(decl.is_await);
+    assert_eq!(decl.mutability, AstMutability::Mutable);
+}
+
+#[test]
+fn parses_reddet_await_return() {
+    let result = parse_ok("functio f() fiet → vacuum { reddet fut }");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    let body = func.body.as_ref().expect("body");
+    assert!(matches!(body.statements[0].kind, StmtKind::Reddet(_)));
+}
+
+#[test]
+fn parses_tacebit_await_discard() {
+    let result = parse_ok("functio f() fiet → vacuum { tacebit fut }");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    let body = func.body.as_ref().expect("body");
+    assert!(matches!(body.statements[0].kind, StmtKind::Tacebit(_)));
+}
+
+#[test]
+fn posture_words_remain_legal_identifiers() {
+    // fiet/fiunt/fient/figendum/variandum/reddet/tacebit must remain usable as
+    // ordinary identifiers outside their grammar slots.
+    let result = parse_ok("functio f() → vacuum { fixum numerus fiet ← 1 redde fiet }");
+    assert!(result.success());
+}
+
+#[test]
+fn parses_posture_before_error_channel() {
+    let result = parse_ok("functio f() fiet → vacuum ⇥ textus { tacet }");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    assert_eq!(func.posture, CallablePosture::AsyncFinite);
+    assert!(func.err.is_some());
+}
+
+#[test]
+fn parses_posture_in_genus_method() {
+    let result = parse_ok("genus C { functio m() fiet → vacuum { tacet } }");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Class(cls) = &program.statements[0].kind else {
+        panic!("expected class");
+    };
+    let ClassMemberKind::Method(method) = &cls.members[0].kind else {
+        panic!("expected method");
+    };
+    assert_eq!(method.posture, CallablePosture::AsyncFinite);
+}
+
+#[test]
+fn parses_posture_in_implendum_method_signature() {
+    let result = parse_ok("implendum C { functio m() fient → numerus ⇥ textus }");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Interface(interface) = &program.statements[0].kind else {
+        panic!("expected interface");
+    };
+    assert_eq!(interface.methods[0].posture, CallablePosture::AsyncStream);
+    assert!(interface.methods[0].ret.is_some());
+    assert!(interface.methods[0].err.is_some());
+}

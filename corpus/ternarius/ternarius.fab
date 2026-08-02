@@ -1,0 +1,68 @@
++++
+term = "sic"
+kind = "keyword"
+category = "control-flow"
+canonical = false
+summary = "Ternary conditional expressions with sic and secus."
+syntax = "<condition> sic <then-expr> secus <else-expr>"
+related = ["sic", "secus", "si"]
++++
+
+# =============================================================================
+# sic — Ternary conditional expressions with sic and secus.
+# =============================================================================
+#
+# What this teaches:
+#   • Ternary expressions — `sic`/`secus` as Latin-inspired conditional syntax
+#   • Nesting — `sic`/`secus` chains read more clearly than nested if-else
+#
+# Common mistakes:
+#   • confusing ternarius (sic/secus ternary) with si/ergo (statement conditional) — ternarius is an expression, si is a statement
+#
+# See also: sic, secus, si
+# =============================================================================
+
+
+
+
+# sic — ternary conditional expressions (sic/secus)
+#
+# <conditio> sic <tunc> secus <aliter>
+#
+# GRAMMAR:
+#   ternaryExpr :← expr 'sic' expr 'secus' expr
+#
+# EXPECTED OUTPUT:
+#   ternarius.expected — nested and flat ternary results.
+
+incipit {
+    fixum _ aetas ← 25
+
+    # Latin ternary
+    fixum _ gradusaetatis ← aetas ≥ 18 sic "adultus" secus "minor"
+    # "adultus"
+    nota gradusaetatis
+
+    # Latin nested (reads more clearly)
+    fixum _ puncta ← 85
+    fixum _ gradus ←
+        puncta ≥ 90 sic "A" secus
+        puncta ≥ 80 sic "B" secus
+        puncta ≥ 70 sic "C" secus "F"
+    # "B"
+    nota gradus
+
+    # In expressions
+    fixum _ maximum ← aetas > 30 sic aetas secus 30
+    nota "maximum: §"(maximum)
+
+    # With nullish values
+    varia _ forsitan ← nihil ∷ textus ∪ nihil
+    fixum _ solutum ← forsitan non est nihil sic forsitan secus "defectum"
+    # "defectum"
+    nota solutum
+
+    # Prefer sic/secus for clarity
+    fixum _ licentia ← aetas ≥ 21 sic "licet bibere" secus "bibere non licet"
+    nota licentia
+}

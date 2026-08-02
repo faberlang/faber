@@ -1,0 +1,1774 @@
+//! Integration-level lexer coverage: token recognition, error recovery, NFKC
+//! normalization, and `#` comment policy.
+//!
+//! These tests exercise the public `lex()` path over operators, keywords,
+//! literals, retired syntax, and diagnostic emission. They do not depend on
+//! parser or semantic layers.
+
+use super::{Interner, INLINE_COMMENT_ISSUE};
+use crate::{
+    keyword_specs, lex, lookup_keyword_spec, KeywordScope, LexErrorKind, LexResult, TokenKind,
+};
+
+fn has_arg(err: &crate::LexError, name: &str, value: &str) -> bool {
+    err.args
+        .iter()
+        .any(|arg| arg.name == name && arg.value == value)
+}
+
+// =============================================================================
+// 3.1a — Empty input
+// =============================================================================
+
+#[test]
+fn empty_input_produces_only_eof() {
+    let result = lex("");
+    assert!(
+        result.errors.is_empty(),
+        "empty input should produce no errors"
+    );
+    assert_eq!(
+        result.tokens.len(),
+        1,
+        "empty input should yield exactly one token (EOF)"
+    );
+    assert_eq!(result.tokens[0].kind, TokenKind::Eof);
+    assert_eq!(result.tokens[0].span, crate::Span::new(0, 0));
+}
+
+// =============================================================================
+// 3.1b — Whitespace-only input
+// =============================================================================
+
+#[test]
+fn whitespace_only_input_produces_only_eof() {
+    let result = lex("  \t  ");
+    assert!(
+        result.errors.is_empty(),
+        "whitespace-only input should produce no errors"
+    );
+    assert_eq!(
+        result.tokens.len(),
+        1,
+        "whitespace-only should yield exactly one token (EOF)"
+    );
+    assert_eq!(result.tokens[0].kind, TokenKind::Eof);
+    assert_eq!(result.tokens[0].span, crate::Span::new(5, 5));
+}
+
+#[test]
+fn lexes_unicode_identifiers() {
+    let result = lex("fixum 变量 = 1");
+    assert!(result.errors.is_empty());
+    assert!(result
+        .tokens
+        .iter()
+        .any(|token| matches!(token.kind, TokenKind::Ident(_))));
+    // 3.1c — span: fixum at 0..5
+    assert_eq!(result.tokens[0].span, crate::Span::new(0, 5));
+    // `fixum` is tokenless since Batch E; it lexes as an identifier.
+    assert!(matches!(result.tokens[0].kind, TokenKind::Ident(_)));
+}
+
+#[test]
+fn lexes_therefore_glyph_as_therefore_token() {
+    let result = lex("numerus x ∴ x");
+    assert!(result.errors.is_empty());
+    assert!(result
+        .tokens
+        .iter()
+        .any(|token| token.kind == TokenKind::Therefore));
+    // 3.1c — span: numerus ident at 0..7, ∴ glyph at 10..13
+    assert_eq!(result.tokens[0].span, crate::Span::new(0, 7));
+    let therefore = result
+        .tokens
+        .iter()
+        .find(|t| t.kind == TokenKind::Therefore)
+        .expect("∴ token must exist");
+    assert_eq!(therefore.span, crate::Span::new(10, 13));
+}
+
+#[test]
+fn lexes_control_flow_keywords_as_identifiers_after_tokenless_migration() {
+    let result = lex("si verum ergo");
+    assert!(result.errors.is_empty());
+    // None of the migrated control-flow/literal words is `Therefore`.
+    assert!(!result
+        .tokens
+        .iter()
+        .any(|token| token.kind == TokenKind::Therefore));
+    for token in result.tokens.iter().filter(|t| t.kind != TokenKind::Eof) {
+        assert!(
+            matches!(token.kind, TokenKind::Ident(_)),
+            "control-flow keyword should lex as an identifier, got {:?}",
+            token.kind
+        );
+    }
+    // 3.1c — spans unchanged: si at 0..2, ergo at 9..13
+    assert_eq!(result.tokens[0].span, crate::Span::new(0, 2));
+    assert_eq!(result.tokens[2].span, crate::Span::new(9, 13));
+}
+
+#[test]
+fn lexes_modulus_as_identifier_after_tokenless_migration() {
+    let result = lex("modulus chorda {");
+    assert!(result.errors.is_empty());
+    // Batch A made `modulus` tokenless: it lexes as an identifier and the
+    // parser claims it by spelling in type position.
+    assert!(matches!(result.tokens[0].kind, TokenKind::Ident(_)));
+    let spec = lookup_keyword_spec("modulus").expect("modulus should be registered");
+    assert_eq!(spec.token_kind, None);
+    // 3.1c — span: modulus at 0..7
+    assert_eq!(result.tokens[0].span, crate::Span::new(0, 7));
+}
+
+#[test]
+fn keyword_registry_specs_lex_to_current_tokens() {
+    for spec in keyword_specs()
+        .iter()
+        .filter(|spec| spec.currently_lexes_as_keyword())
+    {
+        let result = lex(spec.text);
+        assert!(
+            result.errors.is_empty(),
+            "failed to lex keyword spec '{}'",
+            spec.text
+        );
+        let token_kind = spec.token_kind.as_ref().expect("checked above");
+
+        assert_eq!(
+            format!("{:?}", result.tokens[0].kind),
+            format!("{token_kind:?}"),
+            "lexer disagrees with KeywordSpec for '{}'",
+            spec.text
+        );
+    }
+}
+
+#[test]
+fn keyword_lookup_uses_nfkc_normalized_identifier_text() {
+    let result = lex("ｃａｐｅ textus name ← \"ok\"");
+
+    assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+    assert_eq!(result.tokens[0].kind, TokenKind::Cape);
+}
+
+#[test]
+fn metadata_only_keyword_specs_lex_as_identifiers() {
+    for spec in keyword_specs()
+        .iter()
+        .filter(|spec| !spec.currently_lexes_as_keyword())
+    {
+        let result = lex(spec.text);
+        assert!(
+            result.errors.is_empty(),
+            "failed to lex metadata spec '{}'",
+            spec.text
+        );
+        assert!(
+            matches!(result.tokens[0].kind, TokenKind::Ident(_)),
+            "metadata-only KeywordSpec '{}' should lex as an identifier, got {:?}",
+            spec.text,
+            result.tokens[0].kind
+        );
+    }
+}
+
+#[test]
+fn allocator_kind_names_are_not_keywords() {
+    assert!(lookup_keyword_spec("arena").is_none());
+    assert!(lookup_keyword_spec("page").is_none());
+
+    let result = lex("fixum _ arena ← page");
+    let idents = result
+        .tokens
+        .iter()
+        .filter(|token| matches!(token.kind, TokenKind::Ident(_)))
+        .count();
+    // `fixum` is tokenless since Batch E, so it also counts as an identifier.
+    assert_eq!(idents, 3);
+}
+
+#[test]
+fn keyword_registry_alias_entries_preserve_source_text() {
+    let spec =
+        lookup_keyword_spec("scribe").expect("scribe compatibility spelling should be registered");
+    assert_eq!(spec.text, "scribe");
+
+    match spec.scope {
+        KeywordScope::Alias { canonical } => assert_eq!(canonical, "nota"),
+        other => panic!("scribe should be recorded as an alias, got {other:?}"),
+    }
+}
+
+#[test]
+fn keyword_registry_texts_are_unique() {
+    let mut texts = std::collections::BTreeSet::new();
+    for spec in keyword_specs() {
+        assert!(
+            texts.insert(spec.text),
+            "duplicate KeywordSpec for '{}'",
+            spec.text
+        );
+    }
+}
+
+#[test]
+fn rejects_line_start_section_directive() {
+    let result = lex("§ sectio \"smoke\"\n");
+    assert!(!result.success());
+    assert!(result.errors.iter().any(|err| {
+        err.kind == LexErrorKind::RemovedSectionDirective
+            && has_arg(err, "issue", "removed_section_directive")
+    }));
+}
+
+#[test]
+fn rejects_c_style_line_comment() {
+    let result = lex("incipit {\n    // not a Faber comment\n}\n");
+    assert!(!result.success());
+    assert!(result.errors.iter().any(|err| {
+        err.kind == LexErrorKind::InvalidCommentSyntax
+            && has_arg(err, "issue", "c_style_line_comment")
+    }));
+    assert!(!result
+        .tokens
+        .iter()
+        .any(|token| matches!(token.kind, TokenKind::Slash)));
+}
+
+#[test]
+fn rejects_c_style_block_comment() {
+    let result = lex("incipit { /* block */ }\n");
+    assert!(!result.success());
+    assert!(result.errors.iter().any(|err| {
+        err.kind == LexErrorKind::InvalidCommentSyntax
+            && has_arg(err, "issue", "c_style_block_comment")
+    }));
+}
+
+#[test]
+fn rejects_unterminated_c_style_block_comment() {
+    let result = lex("incipit { /* open\n}\n");
+    assert!(!result.success());
+    assert!(result.errors.iter().any(|err| {
+        err.kind == LexErrorKind::InvalidCommentSyntax
+            && has_arg(err, "issue", "unterminated_c_style_block_comment")
+    }));
+}
+
+// ---------------------------------------------------------------------------
+// F-058: /* */ eater must advance current_line
+// ---------------------------------------------------------------------------
+
+#[test]
+fn c_block_comment_newlines_advance_current_line() {
+    // Newlines inside /* */ must be tracked so subsequent diagnostics have
+    // correct line numbers. After the block comment an Error token is emitted
+    // on the line where */ appears. We verify line tracking indirectly by
+    // checking that a comment on the *next* line is treated as line-start.
+    let result = lex("/*\n*/\n# good\n");
+    assert!(!result.success());
+    assert!(result.errors.iter().any(|err| {
+        err.kind == LexErrorKind::InvalidCommentSyntax
+            && has_arg(err, "issue", "c_style_block_comment")
+    }));
+    // The # good must lex as a LineComment (not InlineComment), which proves
+    // current_line was advanced past the newline inside /* */.
+    assert!(
+        result
+            .tokens
+            .iter()
+            .any(|t| matches!(t.kind, TokenKind::LineComment(_))),
+        "expected LineComment on the line after unterminated /* */"
+    );
+}
+
+#[test]
+fn terminated_c_block_comment_newlines_advance_current_line() {
+    // Even when terminated, newlines inside /* */ must advance current_line.
+    let result = lex("/*\n*/\n# next\n");
+    assert!(!result.success());
+    assert!(
+        result
+            .tokens
+            .iter()
+            .any(|t| matches!(t.kind, TokenKind::LineComment(_))),
+        "expected LineComment after terminated /* */ with interior newline"
+    );
+}
+
+// ---------------------------------------------------------------------------
+
+#[test]
+fn division_slash_remains_valid_operator() {
+    let result = lex("fixum numerus x ← 10 / 2");
+    assert!(result.success(), "errors: {:?}", result.errors);
+    assert!(result
+        .tokens
+        .iter()
+        .any(|token| matches!(token.kind, TokenKind::Slash)));
+    // 3.1c — span: fixum at 0..5, slash at 23..24
+    assert_eq!(result.tokens[0].span, crate::Span::new(0, 5));
+    // `fixum` is tokenless since Batch E; it lexes as an identifier.
+    assert!(matches!(result.tokens[0].kind, TokenKind::Ident(_)));
+    let slash = result
+        .tokens
+        .iter()
+        .find(|t| matches!(t.kind, TokenKind::Slash))
+        .expect("slash token must exist");
+    assert_eq!(slash.span, crate::Span::new(23, 24));
+}
+
+#[test]
+fn string_template_section_holes_remain_valid() {
+    let result = lex(r#"fixum _ greeting ← "Salve, §!"(name)"#);
+    assert!(result.success(), "errors: {:?}", result.errors);
+}
+
+#[test]
+fn rejects_non_xid_identifier_start() {
+    let result = lex("\u{0301}abc");
+    assert!(!result.errors.is_empty());
+    assert!(result
+        .errors
+        .iter()
+        .any(|err| err.kind == LexErrorKind::UnexpectedCharacter));
+}
+
+#[test]
+fn digit_run_then_letters_lex_as_integer_then_identifier() {
+    // "1abc" is not a single invalid identifier: the number scanner consumes `1`,
+    // then `abc` is a separate Ident. No UnexpectedCharacter diagnostic.
+    let result = lex("1abc");
+    assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+    assert!(
+        matches!(result.tokens[0].kind, TokenKind::Integer(1)),
+        "got {:?}",
+        result.tokens[0].kind
+    );
+    assert!(
+        matches!(result.tokens[1].kind, TokenKind::Ident(_)),
+        "got {:?}",
+        result.tokens[1].kind
+    );
+}
+
+#[test]
+fn rejects_null_byte_in_source() {
+    let result = lex("abc\0def");
+    assert!(!result.errors.is_empty());
+    assert!(result
+        .errors
+        .iter()
+        .any(|err| err.kind == LexErrorKind::UnexpectedCharacter));
+}
+
+#[test]
+fn empty_line_comment_produces_comment_token() {
+    let result = lex("#\n");
+    assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+    assert!(matches!(result.tokens[0].kind, TokenKind::LineComment(_)));
+}
+
+#[test]
+fn unexpected_bidi_control_diagnostic_uses_codepoint_not_raw_control() {
+    let raw = '\u{202E}';
+    let result = lex(&format!("{raw}abc"));
+    let err = result
+        .errors
+        .iter()
+        .find(|err| err.kind == LexErrorKind::UnexpectedCharacter)
+        .expect("unexpected bidi control diagnostic");
+
+    assert!(has_arg(err, "char", "U+202E"), "{:?}", err.args);
+    assert!(
+        !err.args.iter().any(|arg| arg.value.contains(raw)),
+        "{:?}",
+        err.args
+    );
+}
+
+#[test]
+fn normalizes_interned_identifiers_to_nfkc() {
+    // Canonical NFC equivalence (composed vs decomposed) still holds under NFKC.
+    let mut interner = Interner::new();
+    let composed = interner.intern("café");
+    let decomposed = interner.intern("cafe\u{301}");
+
+    assert_eq!(composed, decomposed);
+    assert_eq!(interner.resolve(composed), "café");
+
+    // NFKC additionally applies compatibility decompositions.
+    // Full-width Latin letters normalize to their ASCII equivalents.
+    let half_width = interner.intern("nomen");
+    let full_width = interner.intern("\u{FF4E}\u{FF4F}\u{FF4D}\u{FF45}\u{FF4E}");
+    assert_eq!(
+        half_width, full_width,
+        "full-width identifiers must normalize to ASCII under NFKC"
+    );
+}
+
+#[test]
+fn string_literal_payloads_preserve_source_bytes() {
+    // PRP-013 R3: full-width parens inside a string literal must not collapse
+    // via NFKC. Literal payloads preserve source bytes; only identifiers use NFKC.
+    let result = lex("\"hello\u{FF08}world\u{FF09}\"");
+    assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+
+    let str_token = result
+        .tokens
+        .iter()
+        .find(|t| matches!(t.kind, TokenKind::String(_)));
+    let str_token = str_token.expect("expected string literal token");
+    if let TokenKind::String(sym) = str_token.kind {
+        let content = result.interner.resolve(sym);
+        assert_eq!(
+            content, "hello\u{FF08}world\u{FF09}",
+            "string literal payloads must preserve full-width source bytes"
+        );
+        assert_ne!(
+            content, "hello(world)",
+            "string literal payloads must not be NFKC-collapsed"
+        );
+    } else {
+        panic!("token kind mismatch");
+    }
+}
+
+#[test]
+fn comment_payloads_preserve_source_bytes() {
+    // PRP-013: LineComment payload is not NFKC-normalized.
+    let result = lex("# full-width \u{FF08}\n");
+    assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+
+    let comment = result
+        .tokens
+        .iter()
+        .find(|t| matches!(t.kind, TokenKind::LineComment(_)))
+        .expect("expected LineComment token");
+    if let TokenKind::LineComment(sym) = comment.kind {
+        let content = result.interner.resolve(sym);
+        assert_eq!(
+            content, " full-width \u{FF08}",
+            "comment payload must preserve full-width source bytes"
+        );
+    } else {
+        panic!("token kind mismatch");
+    }
+}
+
+#[test]
+fn string_literal_preserves_distinct_unicode_forms() {
+    // Identifiers NFKC-merge café forms; string literals must stay distinct.
+    let composed = lex("\"café\"");
+    let decomposed = lex("\"cafe\u{0301}\"");
+    assert!(composed.errors.is_empty() && decomposed.errors.is_empty());
+
+    let c_sym = match &composed.tokens[0].kind {
+        TokenKind::String(s) => *s,
+        other => panic!("expected String, got {other:?}"),
+    };
+    let d_sym = match &decomposed.tokens[0].kind {
+        TokenKind::String(s) => *s,
+        other => panic!("expected String, got {other:?}"),
+    };
+    assert_eq!(composed.interner.resolve(c_sym), "café");
+    assert_eq!(decomposed.interner.resolve(d_sym), "cafe\u{0301}");
+}
+
+#[test]
+fn nfkc_does_not_reject_ideographic_punctuation() {
+    // Ideographic 。 (U+3002) has no NFKC compatibility decomposition.
+    // It remains a lex error (unexpected character) just as under NFC.
+    let result = lex("。test");
+    assert!(
+        !result.errors.is_empty(),
+        "ideographic punctuation remains a lex error under NFKC"
+    );
+    assert!(
+        result
+            .errors
+            .iter()
+            .any(|e| matches!(e.kind, LexErrorKind::UnexpectedCharacter)),
+        "expected UnexpectedCharacter error, got {:?}",
+        result.errors
+    );
+}
+
+#[test]
+fn lexer_interns_equivalent_unicode_forms_as_one_symbol() {
+    let result = lex("cape café = 1\ncape cafe\u{301} = 2");
+    assert!(result.errors.is_empty());
+
+    let mut idents = result.tokens.iter().filter_map(|token| match token.kind {
+        TokenKind::Ident(sym) => Some(sym),
+        _ => None,
+    });
+
+    let first = idents.next().expect("first identifier");
+    let second = idents.next().expect("second identifier");
+    assert_eq!(first, second);
+}
+
+// ---------------------------------------------------------------------------
+// Operator glyph groups (split from one mega-test for fast diagnostics)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn lexes_arithmetic_operators() {
+    let result = lex("+ - * / %");
+    assert!(result.errors.is_empty());
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert_eq!(
+        kinds,
+        vec![
+            TokenKind::Plus,
+            TokenKind::Minus,
+            TokenKind::Star,
+            TokenKind::Slash,
+            TokenKind::Percent,
+            TokenKind::Eof,
+        ]
+    );
+}
+
+#[test]
+fn lexes_postfix_inc_dec_operators() {
+    let result = lex("⊕ ⊖");
+    assert!(result.errors.is_empty());
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert_eq!(
+        kinds,
+        vec![TokenKind::PostInc, TokenKind::PostDec, TokenKind::Eof,]
+    );
+}
+
+#[test]
+fn lexes_equality_comparison_operators() {
+    let result = lex("≡ ≠");
+    assert!(result.errors.is_empty());
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert_eq!(
+        kinds,
+        vec![TokenKind::EqEq, TokenKind::BangEq, TokenKind::Eof,]
+    );
+}
+
+#[test]
+fn lexes_relational_operators() {
+    let result = lex("< ≤ > ≥");
+    assert!(result.errors.is_empty());
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert_eq!(
+        kinds,
+        vec![
+            TokenKind::Lt,
+            TokenKind::LtEq,
+            TokenKind::Gt,
+            TokenKind::GtEq,
+            TokenKind::Eof,
+        ]
+    );
+}
+
+#[test]
+fn lexes_logical_bitwise_operators() {
+    let result = lex("⊻ ¬ ∧ ∨");
+    assert!(result.errors.is_empty());
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert_eq!(
+        kinds,
+        vec![
+            TokenKind::BitwiseXor,
+            TokenKind::BitwiseNot,
+            TokenKind::BitwiseAnd,
+            TokenKind::BitwiseOr,
+            TokenKind::Eof,
+        ]
+    );
+}
+
+#[test]
+fn lexes_arrow_shift_operators() {
+    let result = lex("→ ⇥ ⇐ ⇒ ↦ ∷");
+    assert!(result.errors.is_empty());
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert_eq!(
+        kinds,
+        vec![
+            TokenKind::Arrow,
+            TokenKind::ExitArrow,
+            TokenKind::BitwiseShl,
+            TokenKind::BitwiseShr,
+            TokenKind::Conversio,
+            TokenKind::Verte,
+            TokenKind::Eof,
+        ]
+    );
+}
+
+#[test]
+fn lexes_bang_prefix_operators() {
+    let result = lex("!. ![ !(");
+    assert!(result.errors.is_empty());
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert_eq!(
+        kinds,
+        vec![
+            TokenKind::BangDot,
+            TokenKind::BangBracket,
+            TokenKind::BangParen,
+            TokenKind::Eof,
+        ]
+    );
+}
+
+#[test]
+fn lexes_null_conditional_operators() {
+    let result = lex("?. ?[ ?( ??");
+    assert!(result.errors.is_empty());
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert_eq!(
+        kinds,
+        vec![
+            TokenKind::QuestionDot,
+            TokenKind::QuestionBracket,
+            TokenKind::QuestionParen,
+            TokenKind::Question,
+            TokenKind::Question,
+            TokenKind::Eof,
+        ]
+    );
+}
+
+#[test]
+fn lexes_assignment_operators() {
+    let result = lex("= ←");
+    assert!(result.errors.is_empty());
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert_eq!(
+        kinds,
+        vec![TokenKind::Eq, TokenKind::Assign, TokenKind::Eof,]
+    );
+}
+
+#[test]
+fn rejects_old_ascii_compound_operators() {
+    // Explicit negative tests proving the clean break.
+    // Old ASCII compounds no longer produce dedicated compound TokenKinds.
+    let cases: &[(&str, TokenKind)] = &[
+        ("==", TokenKind::EqEq),
+        ("!=", TokenKind::BangEq),
+        ("<=", TokenKind::LtEq),
+        (">=", TokenKind::GtEq),
+        ("->", TokenKind::Arrow),
+    ];
+    for &(op, ref compound) in cases {
+        let src = format!("fixum _ x = 1 {op} 2");
+        let result = lex(&src);
+        let emits_compound = result
+            .tokens
+            .iter()
+            .any(|t| std::mem::discriminant(&t.kind) == std::mem::discriminant(compound));
+        assert!(
+            !emits_compound,
+            "legacy operator {op} must not produce {compound:?} token after clean break",
+        );
+    }
+
+    // ASCII += and friends lex as separate tokens, never as postfix inc/dec glyphs.
+    for op in ["+=", "-=", "*=", "/="] {
+        let result = lex(&format!("varia numerus x ← 0 x {op} 1"));
+        assert!(
+            !result
+                .tokens
+                .iter()
+                .any(|t| matches!(t.kind, TokenKind::PostInc | TokenKind::PostDec)),
+            "legacy operator {op} must not produce postfix inc/dec tokens",
+        );
+    }
+
+    // Triple forms also gone (no EqEqEq etc from source).
+    let triples = lex("1 === 2");
+    assert!(!triples
+        .tokens
+        .iter()
+        .any(|t| matches!(t.kind, TokenKind::EqEqEq | TokenKind::BangEqEq)));
+}
+
+#[test]
+fn lexes_hexadecimal_number() {
+    let result = lex("0xCAFE_F00D");
+    assert!(result.errors.is_empty());
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert_eq!(
+        kinds,
+        vec![TokenKind::Integer(3_405_705_229), TokenKind::Eof]
+    );
+}
+
+#[test]
+fn lexes_binary_number() {
+    let result = lex("0b1010_1111");
+    assert!(result.errors.is_empty());
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert_eq!(kinds, vec![TokenKind::Integer(175), TokenKind::Eof]);
+}
+
+#[test]
+fn lexes_octal_number() {
+    let result = lex("0o755");
+    assert!(result.errors.is_empty());
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert_eq!(kinds, vec![TokenKind::Integer(493), TokenKind::Eof]);
+}
+
+// ---------------------------------------------------------------------------
+// F-057: Float underflow must emit diagnostic
+// ---------------------------------------------------------------------------
+
+#[test]
+fn rejects_float_underflow() {
+    // 1e-400 underflows to 0.0 — must produce an error, not silent Float(0.0)
+    let result = lex("1e-400");
+    assert!(!result.success());
+    assert!(result.errors.iter().any(|err| {
+        err.kind == LexErrorKind::InvalidNumber && has_arg(err, "issue", "float_underflow")
+    }));
+    assert!(
+        result.tokens.iter().any(|t| t.kind == TokenKind::Error),
+        "expected Error token for float underflow"
+    );
+}
+
+#[test]
+fn zero_float_underflow_does_not_false_positive() {
+    // True zero must not trigger underflow diagnostic
+    let result = lex("0e-400");
+    assert!(
+        result.success(),
+        "true zero should not underflow: {:?}",
+        result.errors
+    );
+}
+
+#[test]
+fn zero_dot_zero_is_not_underflow() {
+    let result = lex("0.0");
+    assert!(
+        result.success(),
+        "0.0 is a valid float: {:?}",
+        result.errors
+    );
+}
+
+// ---------------------------------------------------------------------------
+// F-002: Oversized float must not become Inf silently
+// ---------------------------------------------------------------------------
+
+#[test]
+fn rejects_float_overflow_to_infinity() {
+    // Magnitude beyond f64::MAX parses as Inf — must diagnostic + Error token.
+    let result = lex("1e400");
+    assert!(
+        !result.success(),
+        "1e400 must not lex as a successful float"
+    );
+    assert!(
+        result.errors.iter().any(|err| {
+            err.kind == LexErrorKind::InvalidNumber && has_arg(err, "issue", "float_overflow")
+        }),
+        "expected float_overflow diagnostic, got {:?}",
+        result.errors
+    );
+    assert!(
+        result.tokens.iter().any(|t| t.kind == TokenKind::Error),
+        "expected Error recovery token for float overflow"
+    );
+    assert!(
+        !result
+            .tokens
+            .iter()
+            .any(|t| matches!(t.kind, TokenKind::Float(n) if n.is_infinite())),
+        "must not emit Float(+Inf) for overflow literal"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// F-001: invalid number paths must emit Error tokens (not diagnostic-only)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn rejects_invalid_hexadecimal_literal() {
+    let result = lex("0x");
+    assert!(!result.success());
+    assert!(result.errors.iter().any(|err| {
+        err.kind == LexErrorKind::InvalidNumber
+            && has_arg(err, "issue", "invalid_hexadecimal_number")
+    }));
+    assert!(
+        result.tokens.iter().any(|t| t.kind == TokenKind::Error),
+        "F-001: empty 0x must emit Error token for parser recovery"
+    );
+}
+
+#[test]
+fn rejects_invalid_binary_literal() {
+    let result = lex("0b");
+    assert!(!result.success());
+    assert!(result.errors.iter().any(|err| {
+        err.kind == LexErrorKind::InvalidNumber && has_arg(err, "issue", "invalid_binary_number")
+    }));
+}
+
+#[test]
+fn rejects_invalid_octal_literal() {
+    let result = lex("0o");
+    assert!(!result.success());
+    assert!(result.errors.iter().any(|err| {
+        err.kind == LexErrorKind::InvalidNumber && has_arg(err, "issue", "invalid_octal_number")
+    }));
+}
+
+// ---------------------------------------------------------------------------
+// F-056: Invalid trailing digit after radix prefix must not split silently
+// ---------------------------------------------------------------------------
+
+#[test]
+fn rejects_invalid_trailing_digit_in_octal() {
+    // 0o18 must not produce Integer(1) + Integer(8)
+    let result = lex("0o18");
+    assert!(!result.success());
+    assert!(result.errors.iter().any(|err| {
+        err.kind == LexErrorKind::InvalidNumber && has_arg(err, "issue", "invalid_octal_number")
+    }));
+    // The whole span from 0 to after the bad digit is consumed as Error.
+    assert!(
+        result.tokens.iter().any(|t| t.kind == TokenKind::Error),
+        "expected Error token for invalid octal"
+    );
+    // No Integer(8) as a separate token.
+    let ints: Vec<&u64> = result
+        .tokens
+        .iter()
+        .filter_map(|t| match &t.kind {
+            TokenKind::Integer(n) => Some(n),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(ints.len(), 0, "no integer tokens should leak from 0o18");
+}
+
+#[test]
+fn rejects_invalid_trailing_digit_in_binary() {
+    // 0b12 must not produce Integer(1) + Integer(2)
+    let result = lex("0b12");
+    assert!(!result.success());
+    assert!(result.errors.iter().any(|err| {
+        err.kind == LexErrorKind::InvalidNumber && has_arg(err, "issue", "invalid_binary_number")
+    }));
+    let ints: Vec<&u64> = result
+        .tokens
+        .iter()
+        .filter_map(|t| match &t.kind {
+            TokenKind::Integer(n) => Some(n),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(ints.len(), 0);
+}
+
+#[test]
+fn rejects_invalid_trailing_digit_in_hexadecimal() {
+    // 0x1G must not produce Integer(1) + G-as-something
+    let result = lex("0x1G");
+    assert!(!result.success());
+    assert!(result.errors.iter().any(|err| {
+        err.kind == LexErrorKind::InvalidNumber
+            && has_arg(err, "issue", "invalid_hexadecimal_number")
+    }));
+}
+
+#[test]
+fn unterminated_string_at_eof_preserves_payload() {
+    let result = lex("\"salve");
+    assert!(result
+        .errors
+        .iter()
+        .any(|err| err.kind == LexErrorKind::UnterminatedString));
+
+    assert_eq!(first_string_payload(&result), "salve");
+}
+
+#[test]
+fn unterminated_string_at_newline_preserves_payload_without_newline() {
+    let result = lex("\"salve\nfixum x ← 1");
+    assert!(result
+        .errors
+        .iter()
+        .any(|err| err.kind == LexErrorKind::UnterminatedString));
+
+    assert_eq!(first_string_payload(&result), "salve");
+}
+
+fn first_string_payload(result: &LexResult) -> &str {
+    let TokenKind::String(sym) = result.tokens[0].kind else {
+        panic!(
+            "expected recovered string token, got {:?}",
+            result.tokens[0].kind
+        );
+    };
+    result.interner.resolve(sym)
+}
+
+fn first_ascii_string_payload(result: &LexResult) -> &str {
+    let TokenKind::AsciiString(sym) = result.tokens[0].kind else {
+        panic!(
+            "expected recovered AsciiString token, got {:?}",
+            result.tokens[0].kind
+        );
+    };
+    result.interner.resolve(sym)
+}
+
+// =============================================================================
+// PRP-014 — Escaped newlines in single-line literals
+// =============================================================================
+
+#[test]
+fn escaped_newline_in_string_literal_rejected() {
+    let result = lex("\"salve\\\nfixum x ← 1");
+    assert!(result
+        .errors
+        .iter()
+        .any(|err| err.kind == LexErrorKind::UnterminatedString
+            && has_arg(err, "issue", "newline_in_string_literal")));
+    // Payload should include the `\` before the newline
+    assert_eq!(first_string_payload(&result), "salve\\");
+}
+
+#[test]
+fn escaped_newline_in_ascii_literal_rejected() {
+    let result = lex("'salve\\\nfixum x ← 1");
+    assert!(result
+        .errors
+        .iter()
+        .any(|err| err.kind == LexErrorKind::UnterminatedString
+            && has_arg(err, "issue", "newline_in_ascii_literal")));
+    // Payload should include the `\` before the newline
+    assert_eq!(first_ascii_string_payload(&result), "salve\\");
+}
+
+// =============================================================================
+// PRP-078 — Bare carriage return in single-line literals
+// =============================================================================
+
+#[test]
+fn bare_cr_in_string_literal_rejected() {
+    let result = lex("\"salve\rfixum x ← 1");
+    assert!(result
+        .errors
+        .iter()
+        .any(|err| err.kind == LexErrorKind::UnterminatedString
+            && has_arg(err, "issue", "newline_in_string_literal")));
+    assert_eq!(first_string_payload(&result), "salve");
+}
+
+#[test]
+fn bare_cr_in_ascii_literal_rejected() {
+    let result = lex("'salve\rfixum x ← 1");
+    assert!(result
+        .errors
+        .iter()
+        .any(|err| err.kind == LexErrorKind::UnterminatedString
+            && has_arg(err, "issue", "newline_in_ascii_literal")));
+    assert_eq!(first_ascii_string_payload(&result), "salve");
+}
+
+#[test]
+fn escaped_cr_in_string_literal_rejected() {
+    let result = lex("\"salve\\\rfixum x ← 1");
+    assert!(result
+        .errors
+        .iter()
+        .any(|err| err.kind == LexErrorKind::UnterminatedString
+            && has_arg(err, "issue", "newline_in_string_literal")));
+    // Payload should include the `\` before the CR
+    assert_eq!(first_string_payload(&result), "salve\\");
+}
+
+#[test]
+fn escaped_cr_in_ascii_literal_rejected() {
+    let result = lex("'salve\\\rfixum x ← 1");
+    assert!(result
+        .errors
+        .iter()
+        .any(|err| err.kind == LexErrorKind::UnterminatedString
+            && has_arg(err, "issue", "newline_in_ascii_literal")));
+    // Payload should include the `\` before the CR
+    assert_eq!(first_ascii_string_payload(&result), "salve\\");
+}
+
+#[test]
+fn normal_escaped_chars_in_string_literal_still_work() {
+    let result = lex(r#""salve\"mundus""#);
+    assert!(
+        result.errors.is_empty(),
+        "normal escaped chars should not produce errors"
+    );
+    // The `\"` is consumed as an escape; the payload is the text between the
+    // outer quotes with the escape consumed (the `\"` is not a terminator).
+    assert_eq!(first_string_payload(&result), r#"salve\"mundus"#);
+}
+
+#[test]
+fn normal_escaped_chars_in_ascii_literal_still_work() {
+    let result = lex(r"'salve\'mundus'");
+    assert!(
+        result.errors.is_empty(),
+        "normal escaped chars should not produce errors"
+    );
+    assert_eq!(first_ascii_string_payload(&result), r"salve\'mundus");
+}
+
+#[test]
+fn lexes_unicode_range_operators() {
+    let result = lex("0‥5 0…5 0 ante 5 0 usque 5");
+    assert!(result.errors.is_empty());
+
+    // 3.1c — span: first 0 at 0..1, ‥ at 1..4, second 5 at 4..5
+    assert_eq!(result.tokens[0].span, crate::Span::new(0, 1));
+    assert_eq!(result.tokens[1].span, crate::Span::new(1, 4));
+    assert_eq!(result.tokens[2].span, crate::Span::new(4, 5));
+
+    let kinds: Vec<&str> = result
+        .tokens
+        .iter()
+        .map(|token| match &token.kind {
+            TokenKind::Integer(_) => "Int",
+            TokenKind::DotDot => "DotDot",
+            TokenKind::Ellipsis => "Ellipsis",
+            // `ante`/`usque` are tokenless since Batch G.
+            TokenKind::Ident(_) => "Ident",
+            TokenKind::Eof => "Eof",
+            other => panic!("unexpected token {other:?}"),
+        })
+        .collect();
+    let expected = vec![
+        "Int", "DotDot", "Int", "Int", "Ellipsis", "Int", "Int", "Ident", "Int", "Int", "Ident",
+        "Int", "Eof",
+    ];
+
+    assert_eq!(kinds, expected);
+}
+
+#[test]
+fn lexes_conversio_glyph() {
+    let result = lex("x ↦ numerus");
+    assert!(result.errors.is_empty());
+    assert!(
+        matches!(result.tokens[1].kind, TokenKind::Conversio),
+        "'↦' should lex as TokenKind::Conversio"
+    );
+    // 3.1c — span: x ident at 0..1, ↦ at 2..5
+    assert_eq!(result.tokens[0].span, crate::Span::new(0, 1));
+    assert_eq!(result.tokens[1].span, crate::Span::new(2, 5));
+}
+
+#[test]
+fn lexes_shift_arrow_glyphs() {
+    let result = lex("1 ⇐ 4 16 ⇒ 2");
+    assert!(result.errors.is_empty());
+    assert!(matches!(result.tokens[1].kind, TokenKind::BitwiseShl));
+    assert!(matches!(result.tokens[4].kind, TokenKind::BitwiseShr));
+    assert!(
+        !result
+            .tokens
+            .iter()
+            .any(|t| matches!(t.kind, TokenKind::Conversio)),
+        "'⇒' must lex as BitwiseShr, not Conversio"
+    );
+    // 3.1c — span: first integer at 0..1, ⇐ at 2..5, ⇒ at 11..14
+    assert_eq!(result.tokens[0].span, crate::Span::new(0, 1));
+    assert_eq!(result.tokens[1].span, crate::Span::new(2, 5));
+    assert_eq!(result.tokens[4].span, crate::Span::new(11, 14));
+}
+
+#[test]
+fn rejects_retired_shift_glyphs() {
+    for src in ["1 ≪ 4", "16 ≫ 2"] {
+        let result = lex(src);
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|err| err.kind == LexErrorKind::UnexpectedCharacter),
+            "retired shift glyph in {src:?} should be a scan error"
+        );
+    }
+}
+
+#[test]
+fn rejects_retired_verte_arrow() {
+    let result = lex("x ⇢ textus");
+    assert!(
+        result
+            .errors
+            .iter()
+            .any(|err| err.kind == LexErrorKind::UnexpectedCharacter),
+        "retired ⇢ glyph should no longer lex as a type-ascription operator"
+    );
+}
+
+#[test]
+fn removed_verte_aliases_now_lex_as_identifiers() {
+    // Post verte-alias-clean-break: qua/innatum/novum are ordinary identifiers in normal mode.
+    // Only the ∷ glyph produces TokenKind::Verte.
+    for word in &["qua", "innatum", "novum"] {
+        let result = lex(&format!("x {word} textus"));
+        assert!(result.errors.is_empty(), "failed for word: {word}");
+        assert!(
+            matches!(&result.tokens[1].kind, TokenKind::Ident(_)),
+            "'{word}' should now lex as Ident (Verte aliases removed)",
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Proba modifier keyword groups (split from one mega-test for speed)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn lexes_proba_header_keywords() {
+    let result = lex(r#"proba "case" omitte "blocked""#);
+    assert!(result.errors.is_empty());
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert!(matches!(kinds[0], TokenKind::Proba));
+    assert!(matches!(kinds[1], TokenKind::String(_)));
+    assert!(matches!(kinds[2], TokenKind::Omitte));
+    assert!(matches!(kinds[3], TokenKind::String(_)));
+    assert!(matches!(kinds[4], TokenKind::Eof));
+}
+
+#[test]
+fn lexes_proba_scheduling_keywords() {
+    let result = lex(r#"futurum "later" solum tag "focus" temporis 5"#);
+    assert!(result.errors.is_empty());
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert!(matches!(kinds[0], TokenKind::Futurum));
+    assert!(matches!(kinds[1], TokenKind::String(_)));
+    assert!(matches!(kinds[2], TokenKind::Solum));
+    assert!(matches!(kinds[3], TokenKind::Tag));
+    assert!(matches!(kinds[4], TokenKind::String(_)));
+    assert!(matches!(kinds[5], TokenKind::Temporis));
+    assert!(matches!(kinds[6], TokenKind::Integer(5)));
+    assert!(matches!(kinds[7], TokenKind::Eof));
+}
+
+#[test]
+fn lexes_proba_metrics_keywords() {
+    let result = lex("metior repete 2 fragilis 1");
+    assert!(result.errors.is_empty());
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert!(matches!(kinds[0], TokenKind::Metior));
+    assert!(matches!(kinds[1], TokenKind::Repete));
+    assert!(matches!(kinds[2], TokenKind::Integer(2)));
+    assert!(matches!(kinds[3], TokenKind::Fragilis));
+    assert!(matches!(kinds[4], TokenKind::Integer(1)));
+    assert!(matches!(kinds[5], TokenKind::Eof));
+}
+
+#[test]
+fn lexes_proba_environment_keywords() {
+    let result = lex(r#"requirit "net" solum_in "ci""#);
+    assert!(result.errors.is_empty());
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert!(matches!(kinds[0], TokenKind::Requirit));
+    assert!(matches!(kinds[1], TokenKind::String(_)));
+    assert!(matches!(kinds[2], TokenKind::SolumIn));
+    assert!(matches!(kinds[3], TokenKind::String(_)));
+    assert!(matches!(kinds[4], TokenKind::Eof));
+}
+
+#[test]
+fn lexes_proba_block_braces() {
+    let result = lex("{}");
+    assert!(result.errors.is_empty());
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert!(matches!(kinds[0], TokenKind::LBrace));
+    assert!(matches!(kinds[1], TokenKind::RBrace));
+    assert!(matches!(kinds[2], TokenKind::Eof));
+}
+
+#[test]
+fn guillemet_block_string_allows_embedded_quotes_and_newlines() {
+    let result = lex("«he said \"salve\"»");
+    assert!(result.errors.is_empty());
+    assert_eq!(first_string_payload(&result), "he said \"salve\"");
+    // 3.1c — span: «…» block string at 0..19
+    assert_eq!(result.tokens[0].span, crate::Span::new(0, 19));
+
+    let multiline = lex("«line one\nstill line one»");
+    assert!(multiline.errors.is_empty());
+    assert_eq!(first_string_payload(&multiline), "line one\nstill line one");
+}
+
+#[test]
+fn backtick_template_lexes_multiline_payload() {
+    let result = lex("`select §\nfrom t`");
+    assert!(result.success());
+    let TokenKind::BacktickString(sym) = result.tokens[0].kind else {
+        panic!("expected BacktickString, got {:?}", result.tokens[0].kind);
+    };
+    assert_eq!(result.interner.resolve(sym), "select §\nfrom t");
+}
+
+#[test]
+fn octeti_literal_lexes_hex_payload_and_empty_form() {
+    let spaced = lex("|48 65 6c 6c 6f|");
+    assert!(spaced.errors.is_empty());
+    let TokenKind::OctetiString(sym) = spaced.tokens[0].kind else {
+        panic!("expected OctetiString, got {:?}", spaced.tokens[0].kind);
+    };
+    assert_eq!(spaced.interner.resolve(sym), "48 65 6c 6c 6f");
+
+    let empty = lex("||");
+    assert!(empty.errors.is_empty());
+    let TokenKind::OctetiString(empty_sym) = empty.tokens[0].kind else {
+        panic!("expected OctetiString, got {:?}", empty.tokens[0].kind);
+    };
+    assert_eq!(empty.interner.resolve(empty_sym), "");
+}
+
+#[test]
+fn unterminated_octeti_literal_emits_diagnostic() {
+    let result = lex("|deadbeef");
+    assert!(result
+        .errors
+        .iter()
+        .any(|err| has_arg(err, "issue", "unterminated_octeti_literal")));
+}
+
+#[test]
+fn ascii_literal_lexes_single_quoted_payload() {
+    let result = lex("'pg:query'");
+    assert!(result.errors.is_empty());
+    let TokenKind::AsciiString(sym) = result.tokens[0].kind else {
+        panic!(
+            "expected ascii literal token, got {:?}",
+            result.tokens[0].kind
+        );
+    };
+    assert_eq!(result.interner.resolve(sym), "pg:query");
+    // 3.1c — span: 'pg:query' at 0..10
+    assert_eq!(result.tokens[0].span, crate::Span::new(0, 10));
+}
+
+#[test]
+fn empty_string_literal() {
+    let result = lex(r#""""#);
+    assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+    let TokenKind::String(sym) = result.tokens[0].kind else {
+        panic!("expected String token, got {:?}", result.tokens[0].kind);
+    };
+    assert_eq!(result.interner.resolve(sym), "");
+    assert_eq!(result.tokens[0].span, crate::Span::new(0, 2));
+}
+
+#[test]
+fn empty_ascii_literal() {
+    let result = lex("''");
+    assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+    let TokenKind::AsciiString(sym) = result.tokens[0].kind else {
+        panic!(
+            "expected AsciiString token, got {:?}",
+            result.tokens[0].kind
+        );
+    };
+    assert_eq!(result.interner.resolve(sym), "");
+    assert_eq!(result.tokens[0].span, crate::Span::new(0, 2));
+}
+
+// =============================================================================
+// 3.1d — Unterminated quote recovery (ascii, backtick, guillemet)
+// =============================================================================
+
+#[test]
+fn unterminated_ascii_literal_at_eof_recovers() {
+    let result = lex("'hello world");
+    assert!(result
+        .errors
+        .iter()
+        .any(|err| err.kind == LexErrorKind::UnterminatedString));
+    // Must produce at least an EOF token without panicking.
+    assert!(!result.tokens.is_empty());
+    assert_eq!(result.tokens.last().unwrap().kind, TokenKind::Eof);
+    // The unterminated ascii payload should be recovered.
+    let TokenKind::AsciiString(sym) = result.tokens[0].kind else {
+        panic!(
+            "expected recovered AsciiString token, got {:?}",
+            result.tokens[0].kind
+        );
+    };
+    assert_eq!(result.interner.resolve(sym), "hello world");
+}
+
+#[test]
+fn unterminated_backtick_literal_at_eof_recovers() {
+    let result = lex("`hello world");
+    assert!(result
+        .errors
+        .iter()
+        .any(|err| err.kind == LexErrorKind::UnterminatedString));
+    // Must produce at least an EOF token without panicking.
+    assert!(!result.tokens.is_empty());
+    assert_eq!(result.tokens.last().unwrap().kind, TokenKind::Eof);
+    // The unterminated backtick payload should be recovered.
+    let TokenKind::BacktickString(sym) = result.tokens[0].kind else {
+        panic!(
+            "expected recovered BacktickString token, got {:?}",
+            result.tokens[0].kind
+        );
+    };
+    assert_eq!(result.interner.resolve(sym), "hello world");
+}
+
+#[test]
+fn unterminated_guillemet_literal_at_eof_recovers() {
+    let result = lex("«hello world");
+    assert!(result
+        .errors
+        .iter()
+        .any(|err| err.kind == LexErrorKind::UnterminatedString));
+    // Must produce at least an EOF token without panicking.
+    assert!(!result.tokens.is_empty());
+    assert_eq!(result.tokens.last().unwrap().kind, TokenKind::Eof);
+    // The unterminated guillemet payload should be recovered.
+    let TokenKind::String(sym) = result.tokens[0].kind else {
+        panic!(
+            "expected recovered String token, got {:?}",
+            result.tokens[0].kind
+        );
+    };
+    assert_eq!(result.interner.resolve(sym), "hello world");
+}
+
+#[test]
+fn retired_block_string_glyph_is_unexpected_character() {
+    // Guillemets `«...»` are the only block-string spelling. The retired `❝`
+    // opener must fail as a plain unexpected character, not a block-string
+    // token with a targeted replacement diagnostic.
+    let result = lex("❝legacy❞");
+    assert!(result
+        .errors
+        .iter()
+        .any(|err| has_arg(err, "issue", "unexpected_character")));
+    assert!(!result.errors.iter().any(|err| has_arg(
+        err,
+        "issue",
+        "retired_block_string_delimiter"
+    )));
+    assert!(matches!(result.tokens[0].kind, TokenKind::Error));
+}
+
+#[test]
+fn triple_quote_is_not_a_special_lex_surface() {
+    // The retired `"""` triple-quote pre-check is gone: `"""` must fail as an
+    // ordinary string lex error (unterminated at EOF), never with the retired
+    // `unsupported_triple_quote_string` diagnostic.
+    let result = lex("\"\"\"");
+    assert!(!result.success());
+    assert!(!result.errors.iter().any(|err| has_arg(
+        err,
+        "issue",
+        "unsupported_triple_quote_string"
+    )));
+}
+
+#[test]
+fn newline_tokens_separate_comments_and_keywords() {
+    let result = lex("# foo\n\n# bar\nincipit");
+    assert!(result.errors.is_empty());
+
+    let kinds: Vec<_> = result
+        .tokens
+        .iter()
+        .take(6)
+        .map(|token| match &token.kind {
+            TokenKind::LineComment(_) => "Comment",
+            TokenKind::Newline => "Newline",
+            TokenKind::Incipit => "Incipit",
+            TokenKind::Eof => "Eof",
+            other => panic!("unexpected token {other:?}"),
+        })
+        .collect();
+
+    assert_eq!(
+        kinds,
+        vec!["Comment", "Newline", "Newline", "Comment", "Newline", "Incipit"]
+    );
+}
+
+#[test]
+fn crlf_emits_single_newline_token() {
+    let result = lex("# note\r\nincipit");
+    assert!(result.errors.is_empty());
+
+    let kinds: Vec<_> = result
+        .tokens
+        .iter()
+        .take(3)
+        .map(|token| match &token.kind {
+            TokenKind::LineComment(_) => "Comment",
+            TokenKind::Newline => "Newline",
+            TokenKind::Incipit => "Incipit",
+            other => panic!("unexpected token {other:?}"),
+        })
+        .collect();
+
+    assert_eq!(kinds, vec!["Comment", "Newline", "Incipit"]);
+    assert_eq!(result.tokens[1].span.len(), 2);
+}
+
+// =============================================================================
+// PRP-030 — Trailing trivia / recovery (lexer scope)
+//
+// Locks Newline/Error adjacency, line_has_code reset after error recovery, and
+// post-PRP-014 residual: escaped-newline rejection must not swallow the
+// physical line break or corrupt the next line's comment policy.
+// =============================================================================
+
+/// Compact kind labels for adjacency assertions (non-Eof sequence).
+fn kind_labels(result: &LexResult) -> Vec<&'static str> {
+    result
+        .tokens
+        .iter()
+        .filter_map(|token| match &token.kind {
+            TokenKind::Newline => Some("Newline"),
+            TokenKind::Error => Some("Error"),
+            TokenKind::LineComment(_) => Some("Comment"),
+            TokenKind::String(_) => Some("String"),
+            TokenKind::AsciiString(_) => Some("AsciiString"),
+            TokenKind::Ident(_) => Some("Ident"),
+            TokenKind::Integer(_) => Some("Integer"),
+            TokenKind::Eof => None,
+            _ => Some("Other"),
+        })
+        .collect()
+}
+
+#[test]
+fn prp030_inline_hash_error_then_newline_adjacency() {
+    // R1/R3: inline-# emits Error at `#`; physical LF still yields Newline.
+    let result = lex("fixum x ← 1 # bad\n");
+    assert!(result.errors.iter().any(|err| {
+        err.kind == LexErrorKind::InlineComment && has_arg(err, "issue", INLINE_COMMENT_ISSUE)
+    }));
+
+    let labels = kind_labels(&result);
+    let error_idx = labels
+        .iter()
+        .position(|k| *k == "Error")
+        .expect("Error token for inline #");
+    assert_eq!(
+        labels.get(error_idx + 1),
+        Some(&"Newline"),
+        "Newline must follow Error at physical line break; got {labels:?}"
+    );
+
+    let error_token = result
+        .tokens
+        .iter()
+        .find(|t| t.kind == TokenKind::Error)
+        .expect("Error token");
+    // `#` starts after "fixum x ← 1 " — ASCII offset 13 (fixum=5, space, x, spaces, ← is 3 bytes...)
+    // Span start must match the diagnostic and the `#` source position.
+    let hash_offset = u32::try_from("fixum x ← 1 ".len()).expect("test source offset fits u32");
+    assert_eq!(error_token.span.start, hash_offset);
+    let err = result
+        .errors
+        .iter()
+        .find(|e| e.kind == LexErrorKind::InlineComment)
+        .expect("InlineComment");
+    assert_eq!(err.span.start, error_token.span.start);
+}
+
+#[test]
+fn prp030_line_has_code_resets_after_inline_hash_error() {
+    // R2: after Error + Newline, next line-start `#` is a real LineComment.
+    let result = lex("x # bad\n# good\nfunctio\n");
+    assert!(result
+        .errors
+        .iter()
+        .any(|err| err.kind == LexErrorKind::InlineComment));
+
+    let labels = kind_labels(&result);
+    assert_eq!(
+        labels,
+        vec!["Ident", "Error", "Newline", "Comment", "Newline", "Ident", "Newline"],
+        "expected Ident/Error/Newline/Comment… adjacency; got {labels:?}"
+    );
+    assert_eq!(
+        result
+            .tokens
+            .iter()
+            .filter(|t| matches!(t.kind, TokenKind::LineComment(_)))
+            .count(),
+        1,
+        "only the second-line # should be LineComment"
+    );
+}
+
+#[test]
+fn prp030_crlf_after_inline_hash_emits_single_newline() {
+    let result = lex("x # bad\r\n# good\r\n");
+    assert!(result
+        .errors
+        .iter()
+        .any(|err| err.kind == LexErrorKind::InlineComment));
+
+    let labels = kind_labels(&result);
+    assert_eq!(
+        labels,
+        vec!["Ident", "Error", "Newline", "Comment", "Newline"],
+        "CRLF must not drop or double Newline after Error; got {labels:?}"
+    );
+    // Newline after Error spans both CR and LF.
+    let newline_after_error = result
+        .tokens
+        .iter()
+        .enumerate()
+        .find(|(i, t)| {
+            *i > 0 && t.kind == TokenKind::Newline && result.tokens[i - 1].kind == TokenKind::Error
+        })
+        .map(|(_, t)| t)
+        .expect("Newline after Error");
+    assert_eq!(newline_after_error.span.len(), 2);
+}
+
+#[test]
+fn prp030_escaped_newline_string_still_emits_newline_token() {
+    // Post-PRP-014 residual: `\<LF>` rejects the string but must not swallow LF.
+    let result = lex("\"salve\\\nmundus\n");
+    assert!(result.errors.iter().any(|err| {
+        err.kind == LexErrorKind::UnterminatedString
+            && has_arg(err, "issue", "newline_in_string_literal")
+    }));
+
+    let labels = kind_labels(&result);
+    assert!(
+        labels.windows(2).any(|w| w == ["String", "Newline"]),
+        "unterminated string must be followed by Newline; got {labels:?}"
+    );
+    // Remaining line content after the rejected string is still lexed.
+    assert!(
+        labels.contains(&"Ident"),
+        "expected Ident(mundus) after recovered line break; got {labels:?}"
+    );
+}
+
+#[test]
+fn prp030_line_start_comment_after_escaped_newline_string() {
+    // line_has_code must reset at the Newline that follows the recovered string
+    // so the next line may open with `#`.
+    let result = lex("\"salve\\\n# next\n");
+    assert!(result.errors.iter().any(|err| {
+        err.kind == LexErrorKind::UnterminatedString
+            && has_arg(err, "issue", "newline_in_string_literal")
+    }));
+    assert!(
+        !result
+            .errors
+            .iter()
+            .any(|err| err.kind == LexErrorKind::InlineComment),
+        "line-start # after recovered newline must not be InlineComment"
+    );
+
+    let labels = kind_labels(&result);
+    assert!(
+        labels
+            .windows(3)
+            .any(|w| w == ["String", "Newline", "Comment"]),
+        "expected String/Newline/Comment sequence; got {labels:?}"
+    );
+}
+
+#[test]
+fn prp030_escaped_newline_ascii_then_line_start_comment() {
+    let result = lex("'salve\\\n# next\n");
+    assert!(result.errors.iter().any(|err| {
+        err.kind == LexErrorKind::UnterminatedString
+            && has_arg(err, "issue", "newline_in_ascii_literal")
+    }));
+    assert!(!result
+        .errors
+        .iter()
+        .any(|err| err.kind == LexErrorKind::InlineComment));
+    let labels = kind_labels(&result);
+    assert!(
+        labels
+            .windows(3)
+            .any(|w| w == ["AsciiString", "Newline", "Comment"]),
+        "expected AsciiString/Newline/Comment; got {labels:?}"
+    );
+}
+
+#[test]
+fn prp030_error_token_counts_as_line_code_for_same_line_hash() {
+    // UnexpectedCharacter Error sets line_has_code; mid-line # still rejected.
+    let result = lex("$ # not comment\n# real\n");
+    assert!(result
+        .errors
+        .iter()
+        .any(|err| err.kind == LexErrorKind::UnexpectedCharacter));
+    assert!(result
+        .errors
+        .iter()
+        .any(|err| err.kind == LexErrorKind::InlineComment));
+
+    let labels = kind_labels(&result);
+    // `$` → Error, then `# not comment` → Error, Newline, `# real` → Comment
+    assert_eq!(
+        labels,
+        vec!["Error", "Error", "Newline", "Comment", "Newline"],
+        "got {labels:?}"
+    );
+}
+
+mod line_start_comment {
+    use super::super::INLINE_COMMENT_ISSUE;
+    use super::*;
+
+    fn assert_rejects_inline_comment(source: &str) {
+        let result = lex(source);
+        assert!(
+            !result.success(),
+            "expected inline # rejection for: {source:?}"
+        );
+        assert!(result.errors.iter().any(|err| {
+            err.kind == LexErrorKind::InlineComment && has_arg(err, "issue", INLINE_COMMENT_ISSUE)
+        }));
+    }
+
+    fn assert_rejects_inline_comment_at(source: &str, expected_offset: u32) {
+        let result = lex(source);
+        assert!(!result.success());
+        let err = result
+            .errors
+            .iter()
+            .find(|err| err.kind == LexErrorKind::InlineComment)
+            .expect("inline comment diagnostic");
+        assert!(has_arg(err, "issue", INLINE_COMMENT_ISSUE));
+        assert_eq!(err.span.start, expected_offset);
+        let error_token = result
+            .tokens
+            .iter()
+            .find(|token| token.kind == TokenKind::Error)
+            .expect("Error token for inline #");
+        assert_eq!(err.span.start, error_token.span.start);
+    }
+
+    #[test]
+    fn rejects_inline_hash_after_code() {
+        assert_rejects_inline_comment_at("fixum numerus x ← 1  # inline\n", 23);
+    }
+
+    #[test]
+    fn rejects_inline_hash_in_block_not_at_brace() {
+        assert_rejects_inline_comment("functio f() → vacuum { fixum numerus x ← 1  # inline }\n");
+    }
+
+    #[test]
+    fn allows_hash_at_column_zero() {
+        let result = lex("# lead\nnota 0\n");
+        assert!(result.success(), "{:?}", result.errors);
+        assert!(result
+            .tokens
+            .iter()
+            .any(|token| matches!(token.kind, TokenKind::LineComment(_))));
+    }
+
+    #[test]
+    fn allows_indented_line_start_comment() {
+        let result = lex("  # indented comment\nnota 0\n");
+        assert!(result.success(), "{:?}", result.errors);
+    }
+
+    #[test]
+    fn hash_inside_string_literal_is_not_a_comment() {
+        let result = lex(r#""hello # world""#);
+        assert!(result.success(), "{:?}", result.errors);
+        assert!(!result
+            .tokens
+            .iter()
+            .any(|token| matches!(token.kind, TokenKind::LineComment(_))));
+    }
+
+    #[test]
+    fn multiple_line_start_comments_on_consecutive_lines() {
+        let result = lex("# one\n# two\nnota 0\n");
+        assert!(result.success(), "{:?}", result.errors);
+        let comments = result
+            .tokens
+            .iter()
+            .filter(|token| matches!(token.kind, TokenKind::LineComment(_)))
+            .count();
+        assert_eq!(comments, 2);
+    }
+
+    #[test]
+    fn hash_inside_ascii_literal_is_not_a_comment() {
+        let result = lex("'hello # world'");
+        assert!(result.success(), "{:?}", result.errors);
+        assert!(!result
+            .tokens
+            .iter()
+            .any(|token| matches!(token.kind, TokenKind::LineComment(_))));
+    }
+
+    #[test]
+    fn hash_inside_backtick_forma_literal_is_not_a_comment() {
+        let result = lex("`hello # world`");
+        assert!(result.success(), "{:?}", result.errors);
+        assert!(!result
+            .tokens
+            .iter()
+            .any(|token| matches!(token.kind, TokenKind::LineComment(_))));
+    }
+
+    #[test]
+    fn hash_inside_guillemet_literal_is_not_a_comment() {
+        let result = lex("«hello # world»");
+        assert!(result.success(), "{:?}", result.errors);
+        assert!(!result
+            .tokens
+            .iter()
+            .any(|token| matches!(token.kind, TokenKind::LineComment(_))));
+    }
+
+    #[test]
+    fn hash_inside_octeti_literal_is_not_a_comment() {
+        let result = lex("|68#23|");
+        assert!(result.success(), "{:?}", result.errors);
+        assert!(!result
+            .tokens
+            .iter()
+            .any(|token| matches!(token.kind, TokenKind::LineComment(_))));
+    }
+
+    #[test]
+    fn rejects_inline_hash_after_string_literal() {
+        assert_rejects_inline_comment(r#""done" # trailing note"#);
+    }
+
+    #[test]
+    fn rejects_inline_hash_after_annotation_token() {
+        assert_rejects_inline_comment("@ publica # note on same line\nfunctio f() → vacuum { }\n");
+    }
+
+    #[test]
+    fn rejects_inline_hash_after_opening_brace() {
+        assert_rejects_inline_comment("incipit { # inner comment on same line\n  tacet\n}\n");
+    }
+}

@@ -1,0 +1,5 @@
+# Terms intentionally omitted from faber explain.
+# - raw arithmetic glyphs
+# - `faber` script-kernel surface lives under examples/script-kernel/, not the keyword corpus
+
+terms = ["+", "-", "*", "/", "%", "faber"]

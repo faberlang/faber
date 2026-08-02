@@ -1,0 +1,64 @@
++++
+term = "modulus<u32>"
+kind = "operator-group"
+category = "arithmetic"
+canonical = true
+summary = "Unsigned 32-bit modular-word arithmetic and bit-pattern edges."
+syntax = "modulus<u32>"
+related = ["numerus", "¬", "⇐", "⇒"]
++++
+
+# =============================================================================
+# modulus<u32> — Unsigned 32-bit modular-word arithmetic and bit-pattern edges.
+# =============================================================================
+#
+# What this teaches:
+#   • Modular word contract — `modulus<u32>` is an unsigned 32-bit word with wrapping arithmetic.
+#   • Edge cases — Max + 1, zero - 1, and 1 ⇐ 32 demonstrate wrapping at the 32-bit boundary.
+#
+# Common mistakes:
+#   • Assuming modular word division or remainder by zero returns a value instead of failing.
+#
+# See also: numerus, ¬, ⇐, ⇒
+# =============================================================================
+
+# operatores/modular-word — modulus<u32> edge vectors
+#
+# MODULAR WORD CONTRACT:
+#   modulus<u32> is an unsigned 32-bit modular word. Addition, subtraction,
+#   multiplication, negation, bitwise operations, and shifts use u32 wrapping.
+#   Division and remainder by zero fail.
+
+incipit {
+    varia modulus<u32> max ← 4294967295
+    fixum modulus<u32> one ← 1
+    varia modulus<u32> zero ← 0
+    fixum numerus<u32> converted ← one ↦ numerus<u32>
+
+    nota max + one
+    nota zero - one
+    nota max * 2
+    nota -one
+    nota ¬zero
+    nota one ⇐ 32
+    nota max ⇒ 32
+    nota max > zero
+
+    max ⊕
+    zero ⊖
+    nota max
+    nota zero
+
+    fixum modulus<u32> methodSum ← max.addita(one)
+    fixum modulus<u32> methodShift ← max.sinistrata(32)
+    varia modulus<u32> methodAcc ← 0
+    methodAcc.adde(one)
+    methodAcc.sinistra(32)
+    nota converted
+    nota methodSum
+    nota methodShift
+    nota methodAcc
+
+    fixum lista<modulus<u32>> words ← [one, max]
+    nota words.accipe(1) vel (0 ∷ modulus<u32>)
+}

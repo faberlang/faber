@@ -1,0 +1,50 @@
++++
+term = "‥"
+kind = "operator-group"
+category = "range"
+canonical = true
+summary = "Half-open and inclusive range endpoints in itera ab and intra."
+syntax = "<expression> ‥ <expression> | <expression> … <expression>"
+related = ["‥", "…", "ante", "usque", "intra"]
++++
+
+# =============================================================================
+# ‥ — Half-open and inclusive range endpoints in itera ab and intra.
+# =============================================================================
+#
+# What this teaches:
+#   • Exclusive ranges — `‥` (two dots) creates half-open ranges: start inclusive, end exclusive.
+#   • Inclusive ranges — `…` (three dots) creates inclusive ranges: both endpoints included.
+#
+# Common mistakes:
+#   • Confusing ‥ (exclusive range) with … (inclusive range) — off-by-one errors are the most common range bug.
+#
+# See also: ‥, …, ante, usque, intra
+# =============================================================================
+
+# operatores/range-glyphs — ‥ (exclusive) and … (inclusive)
+#
+# GRAMMAR:
+#   rangeExpr :← expr ('‥' | '…') expr
+#
+# EXPECTED OUTPUT:
+#   0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5
+#
+# BACKEND:
+#   Cross-ref itera/intervallum.fab and intra/intra.fab.
+
+incipit {
+    varia numerus exclusivus ← 0
+    itera ab 0‥5 fixum _ {
+        exclusivus ⊕
+    }
+    # 5 iterations
+    nota exclusivus
+
+    varia numerus inclusivus ← 0
+    itera ab 0…5 fixum _ {
+        inclusivus ⊕
+    }
+    # 6 iterations
+    nota inclusivus
+}

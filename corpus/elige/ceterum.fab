@@ -1,0 +1,91 @@
++++
+term = "elige"
+kind = "keyword"
+category = "control-flow"
+canonical = false
+summary = "Value branch with a default ceterum clause."
+syntax = "elige <expression> { casu … ceterum { … } }"
+related = ["elige", "casu", "ceterum"]
++++
+
+# =============================================================================
+# elige — Value branch with a default ceterum clause.
+# =============================================================================
+#
+# What this teaches:
+#   • Default branch — `ceterum { ... }` in an `elige` statement catches unmatched cases.
+#   • Practical examples — matching days, commands, and grade levels with a fallback for unrecognized values.
+#
+# Common mistakes:
+#   • Placing `ceterum` before specific `casu` clauses — `ceterum` must be the last branch in an `elige` statement.
+#
+# See also: elige, casu, ceterum
+# =============================================================================
+
+
+# elige — default branch with ceterum
+#
+# elige <expr> {
+#     casu <value> { <body> }
+#     ceterum { <body> }
+# }
+#
+# GRAMMAR:
+#   eligeStmt :← 'elige' expr '{' casuClause* '}'
+#
+# EXPECTED OUTPUT:
+#   Weekday, command, and custom-grade messages.
+
+incipit {
+    # ceterum handles unmatched cases
+    fixum _ dies ← "mercurii"
+
+    elige dies {
+        casu "lunae" {
+            nota "initium hebdomadis"
+        }
+        casu "veneris" {
+            nota "finis hebdomadis"
+        }
+        ceterum {
+            nota "medium hebdomadis"
+        }
+    }
+
+    # ceterum with unknown input
+    fixum _ imperium ← "ignotum"
+
+    elige imperium {
+        casu "incipe" {
+            nota "incipit..."
+        }
+        casu "siste" {
+            nota "sistit..."
+        }
+        casu "redintegra" {
+            nota "reincipit..."
+        }
+        ceterum {
+            nota "imperium ignotum"
+        }
+    }
+
+    # Multiple statements in ceterum
+    fixum _ gradus ← 99
+
+    elige gradus {
+        casu 1 {
+            nota "rudis"
+        }
+        casu 2 {
+            nota "medius"
+        }
+        casu 3 {
+            nota "provectus"
+        }
+        ceterum {
+            nota "gradus proprius"
+            nota "gradus: §"(gradus)
+        }
+    }
+}

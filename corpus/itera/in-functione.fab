@@ -1,0 +1,80 @@
++++
+term = "itera"
+kind = "keyword"
+category = "control-flow"
+canonical = true
+summary = "Starts a for-each iteration statement."
+syntax = "itera <mode> <expression> <binding> <block>"
+aliases = ["iterate"]
+related = ["ex", "de", "ab"]
++++
+
+# =============================================================================
+# itera — Starts a for-each iteration statement.
+# =============================================================================
+#
+# What this teaches:
+#   • accumulator patterns inside functions — using `itera ex` to compute sums, maxima, and counts
+#   • combining iteration with conditional logic (`si`) inside the loop body
+#
+# Common mistakes:
+#   • Using the wrong iteration keyword — ex for values, de for indices/keys, ab for ranges; mixing them up produces unexpected results.
+#
+# See also: ex, de, ab
+# =============================================================================
+
+# itera ex — accumulator pattern inside functio
+#
+# itera ex <lista> fixum <item> { <body> }
+#
+# GRAMMAR:
+#   forInStmt :← 'itera' 'ex' expr 'fixum' ident block
+#
+# EXPECTED OUTPUT:
+#   Sums, maxima, and counts above a threshold for sample listas.
+
+functio summa(lista<numerus> numeri) → numerus {
+    varia numerus total ← 0
+
+    itera ex numeri fixum n {
+        total ← total + n
+    }
+
+    redde total
+}
+
+# Assumes non-empty lista (seed from first element)
+functio maximum(lista<numerus> numeri) → numerus {
+    varia numerus max ← numeri[0]
+
+    itera ex numeri fixum n {
+        si n > max {
+            max ← n
+        }
+    }
+
+    redde max
+}
+
+functio supra(lista<numerus> numeri, numerus limen) → numerus {
+    varia numerus numerus ← 0
+
+    itera ex numeri fixum n {
+        si n > limen {
+            numerus ← numerus + 1
+        }
+    }
+
+    redde numerus
+}
+
+incipit {
+    fixum _ numeri ← [1, 2, 3, 4, 5]
+
+    nota summa(numeri)
+    nota maximum(numeri)
+    nota supra(numeri, 3)
+
+    nota summa([10, 20, 30])
+    nota maximum([5, 12, 8, 20, 3])
+}

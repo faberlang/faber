@@ -1,0 +1,60 @@
++++
+term = "sin"
+kind = "keyword"
+category = "control-flow"
+canonical = true
+summary = "Adds an else-if branch after a previous si branch."
+syntax = "sin <condition> <block>"
+aliases = ["else if"]
+related = ["si", "secus"]
++++
+
+# =============================================================================
+# sin — Adds an else-if branch after a previous si branch.
+# =============================================================================
+#
+# What this teaches:
+#   • Else-if chains — `sin <condition> { body }` adds intermediate conditional
+#     branches between `si` and `secus`
+#   • First match wins: evaluation stops at the first `si` or `sin` whose
+#     condition is `verum`
+#
+# Common mistakes:
+#   • TODO: forgetting that `sin` blocks are skipped once a preceding branch
+#     matches
+#
+# See also: si, secus
+# =============================================================================
+
+# si-sin-secus (poetic if-else-if chain)
+#
+# si <cond> { }
+# sin <cond> { }
+# secus { }
+#
+# GRAMMAR:
+#   ifStmt :← 'si' expr block ('sin' expr block)* ('secus' block)?
+#
+# EXPECTED OUTPUT:
+#   Afternoon (hour=14 matches first sin branch).
+
+incipit {
+    fixum _ hour ← 14
+
+    si hour < 6 {
+        nota "Late night"
+    }
+    sin hour < 12 {
+        nota "Morning"
+    }
+    sin hour < 18 {
+        # 14 ≥ 12 and 14 < 18
+        nota "Afternoon"
+    }
+    sin hour < 22 {
+        nota "Evening"
+    }
+    secus {
+        nota "Night"
+    }
+}

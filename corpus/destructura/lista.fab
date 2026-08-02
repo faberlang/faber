@@ -1,0 +1,102 @@
++++
+term = "ex"
+kind = "keyword"
+category = "destructuring"
+canonical = true
+summary = "Extracts fields from a value into local bindings."
+syntax = "ex <expression> <fixum|varia> <field> [, ...] [ceteri <ident>]"
+related = ["de", "ut", "ceteri"]
++++
+
+# =============================================================================
+# ex — Extracts fields from a value into local bindings.
+# =============================================================================
+#
+# What this teaches:
+#   • Lista destructuring — `fixum [a, b, c] ← lista` extracts elements from a lista into individual bindings.
+#   • Rest patterns — `fixum [caput, ceteri cauda] ← lista` captures remaining elements.
+#   • Mutable destructuring — `varia [x, y] ← lista` for mutable bindings.
+#   • Skip and nested patterns — underscore `_` skips elements; nested listas destructure recursively.
+#
+# Common mistakes:
+#   • Destructuring fewer or more elements than the lista contains without handling bounds — pattern must match or the destructuring will fail.
+#
+# See also: de, ut, ceteri
+# =============================================================================
+
+
+# destructura — lista destructuring patterns
+#
+# fixum [a, b, c] ← lista
+# varia [x, y, z] ← lista
+# fixum [caput, ceteri cauda] ← lista
+# fixum [_, medius, _] ← lista
+#
+# GRAMMAR:
+#   destructStmt :← ('fixum' | 'varia') '[' patternList ']' '←' expr
+#
+# EXPECTED OUTPUT:
+#   Element values from inline and bound listas, rest slices, nested rows.
+
+incipit {
+    # --- Basic lista destructuring ---
+
+    fixum _ numeri ← [1, 2, 3]
+    fixum [a, b, c] ← numeri
+
+    nota a
+    nota b
+    nota c
+
+    # Destructure inline lista literal
+    fixum [primus, secundus, tertius] ← [10, 20, 30]
+
+    nota primus
+    nota secundus
+    nota tertius
+
+    # --- Mutable destructuring with varia ---
+
+    fixum _ coordinata ← [100, 200]
+    varia [x, y] ← coordinata
+
+    nota x
+    nota y
+
+    x ← x + 50
+    y ← y + 50
+
+    nota x
+    nota y
+
+    # --- Partial destructuring (fewer variables than elements) ---
+
+    fixum _ valores ← [1, 2, 3, 4, 5]
+    fixum [unus, duo] ← valores
+
+    nota unus
+    nota duo
+
+    # --- Rest pattern with ceteri ---
+
+    fixum _ res ← [1, 2, 3, 4, 5]
+    fixum [caput, ceteri cauda] ← res
+
+    nota caput
+    nota cauda
+
+    # --- Skip elements with underscore ---
+
+    fixum _ triplex ← [10, 20, 30]
+    fixum [_, medius, _] ← triplex
+
+    nota medius
+
+    # --- Nested listas ---
+
+    fixum _ matrix ← [[1, 2], [3, 4]]
+    fixum [ordo1, ordo2] ← matrix
+
+    nota ordo1
+    nota ordo2
+}

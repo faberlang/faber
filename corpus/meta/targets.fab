@@ -1,0 +1,43 @@
++++
+term = "targets"
+kind = "concept"
+category = "package"
+canonical = true
+summary = "Compilation backends listed by faber targets or radix targets."
+syntax = "faber targets"
+aliases = ["target compatibility", "backends"]
+related = ["manifest", "cli", "∷", "↦"]
++++
+
+# =============================================================================
+# targets — Compilation backends listed by faber targets or radix targets.
+# =============================================================================
+#
+# What this teaches:
+#   • querying compilation backends via `faber targets` or `radix targets`
+#   • cross-target function compatibility — syntax lowering varies by backend
+#
+# Common mistakes:
+#   • Assuming all syntax lowers to every backend — target availability varies; use faber targets to query the capability matrix.
+#
+# See also: manifest, cli, ∷, ↦
+# =============================================================================
+
+# meta/targets — backend compatibility (META)
+#
+# Run `faber targets` or `radix targets` for the live capability matrix.
+# Core Faber syntax lowers where implemented; gaps are backend-specific.
+#
+# EXPECTED OUTPUT:
+#   salve
+#
+# BACKEND:
+#   META prose + minimal cross-target function smoke.
+
+functio salve() → textus {
+    redde "salve"
+}
+
+incipit {
+    nota salve()
+}

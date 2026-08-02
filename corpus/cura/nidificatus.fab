@@ -1,0 +1,45 @@
++++
+term = "cura"
+kind = "keyword"
+category = "resource"
+canonical = false
+summary = "Nested allocator scopes with inner and outer arena bindings."
+syntax = "cura \"arena\" fixum _ <alloc> { … }"
+related = ["cura", "arena"]
++++
+
+# =============================================================================
+# cura — Nested allocator scopes with inner and outer arena bindings.
+# =============================================================================
+#
+# What this teaches:
+#   • Nested arena scopes — `cura "arena"` blocks can be nested, with outer and inner arena bindings.
+#   • Scope nesting variant — exercises the same Rust no-op lowering as the basic case but with nesting for completeness.
+#
+# Common mistakes:
+#   • Assuming nested arenas have different allocation behavior — currently identical no-op lowering.
+#
+# See also: cura, arena
+# =============================================================================
+
+
+# cura "arena" — nested allocator scopes
+#
+# Nested cura "arena" blocks — outer and inner arena bindings.
+#
+# GRAMMAR:
+#   cura "arena" fixum _ outer { … cura "arena" fixum _ inner { … } }
+#
+# Variant of cura/cura.fab exercising scope nesting; same Rust no-op lowering.
+#
+# EXPECTED OUTPUT:
+#   "outer" then "inner" lines.
+
+incipit {
+    cura "arena" fixum _ outer {
+        nota "outer"
+        cura "arena" fixum _ inner {
+            nota "inner"
+        }
+    }
+}

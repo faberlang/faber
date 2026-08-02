@@ -1,0 +1,34 @@
++++
+term = "verte"
+kind = "annotation"
+category = "codegen"
+canonical = true
+summary = "Braced canonical @ verte rename mapping."
+syntax = "@ verte { target = rs, methodus = \"…\" }"
+related = ["verte", "annotation-sugar"]
++++
+
+# =============================================================================
+# verte — Braced canonical @ verte rename mapping.
+# =============================================================================
+#
+# What this teaches:
+#   • Backend rename mapping — `@ verte { target = rs, methodus = "push" }`
+#     maps a Faber function to a differently-named backend method
+#   • Braced annotation syntax — the target backend and methodus fields
+#     configure code generation renaming
+#
+# Common mistakes:
+#   • forgetting to specify the target backend in `@ verte { target = rs, methodus = "..." }`
+#
+# See also: verte, annotation-sugar
+# =============================================================================
+
+@ verte { target = rs, methodus = "push" }
+functio addeExemplar() → vacuum {
+    tacet
+}
+
+incipit {
+    nota "verte-braced"
+}

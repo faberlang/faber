@@ -1,0 +1,37 @@
++++
+term = "tensor"
+kind = "type"
+category = "collection"
+canonical = false
+summary = "Tensor method hard-error policy for structa count mismatch."
+syntax = "tensor.strue(flat, shape)"
+related = ["tensor", "structa"]
++++
+
+# =============================================================================
+# tensor — Tensor method hard-error policy for structa count mismatch.
+# =============================================================================
+#
+# What this teaches:
+#   • Runtime validation — `strue` rejects flat lists whose element count doesn't match the shape
+#   • Error policy — tensor methods hard-error on invalid input rather than silently truncating
+#
+# Common mistakes:
+#   • providing a flat list whose length is not the product of all dimension sizes when calling strue
+#
+# See also: tensor, structa
+# =============================================================================
+
+
+
+
+# tensor — hard-error method policy
+#
+# EXPECTED failure:
+#   tensor structa element count does not match shape
+
+incipit {
+    fixum tf32[] seed ← vacua
+    fixum tf32[2, 2] grid ← seed.strue([1.0, 2.0, 3.0], [2, 2])
+    nota grid.longitudo()
+}

@@ -1,0 +1,61 @@
++++
+term = "sit"
+kind = "keyword"
+category = "binding"
+canonical = true
+summary = "Declares an inferred immutable local."
+syntax = "sit <name> [← <expression>]"
+aliases = []
+related = ["fixum", "varia", "←"]
++++
+
+# =============================================================================
+# sit — Declares an inferred immutable local.
+# =============================================================================
+#
+# What this teaches:
+#   • Immutable binding sugar — `sit name` is a compact alternative to
+#     `fixum _ name` for inferred-type immutable locals
+#   • Supports immediate init (`sit x ← expr`) and deferred init
+#     (`sit x` then `x ← expr` later)
+#
+# Common mistakes:
+#   • Confusing `sit` (sugar for `fixum _`) with `varia` — `sit` creates an immutable binding.
+#
+# See also: fixum, varia, ←
+# =============================================================================
+
+
+
+# sit — inferred immutable bindings
+#
+# Immediate init:
+#   sit nomen ← expr        -- compact sugar for fixum _ nomen ← expr
+#
+# Deferred init:
+#   sit nomen               -- compact sugar for fixum _ nomen (assign once later)
+#   nomen ← expr
+#
+# Prefer sit when a block chains several inferred locals; keep fixum _ when
+# teaching the explicit infer marker or mixing typed and inferred bindings.
+#
+# GRAMMAR:
+#   sitDecl := 'sit' IDENTIFIER ('←' expression)?
+#
+# EXPECTED OUTPUT:
+#   sit.expected
+
+incipit {
+    sit salve ← "Salve"
+    sit nomen ← "Marcus"
+    sit nuntius ← "§, §!"(salve, nomen)
+
+    nota nuntius
+
+    sit label
+    label ← "deferred"
+    nota label
+
+    fixum _ idem ← nuntius
+    nota idem
+}

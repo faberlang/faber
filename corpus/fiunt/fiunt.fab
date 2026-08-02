@@ -1,0 +1,42 @@
++++
+term = "fiunt"
+kind = "keyword"
+category = "async"
+canonical = true
+summary = "Callable posture for synchronous stream (generator) functions."
+syntax = "functio name(…) fiunt → T"
+aliases = ["generator"]
+related = ["cursor", "cede", "fient"]
++++
+
+# =============================================================================
+# fiunt — Synchronous stream callable posture
+# =============================================================================
+#
+# What this teaches:
+#   • Preferred stream posture: `fiunt → T` yields `T` items.
+#   • Yield with statement-initial `cede value` inside the body.
+#
+# Common mistakes:
+#   • Using `@ cursor` only when teaching preferred morphology — prefer `fiunt`.
+#
+# See also: cursor, cede, fient
+# =============================================================================
+
+# GRAMMAR:
+#   callablePosture :← 'fiunt'
+#   yieldStmt :← 'cede' expr
+#
+# EXPECTED OUTPUT:
+#   [1, 2]
+
+```fab
+functio stream() fiunt → numerus {
+    cede 1
+    cede 2
+}
+
+incipit {
+    nota stream()
+}
+```

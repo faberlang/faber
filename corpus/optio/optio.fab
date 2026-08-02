@@ -1,0 +1,41 @@
++++
+term = "optio"
+kind = "keyword"
+category = "cli"
+canonical = true
+summary = "Declares a CLI option annotation."
+syntax = "@ optio <binding> [brevis \"x\"] [longum \"name\"] [typus <type>] [descriptio \"...\"] [ubique] [vel <default>]"
+related = ["operandus", "cli", "imperium", "ubique", "vel"]
++++
+
+# =============================================================================
+# optio — Declares a CLI option annotation.
+# =============================================================================
+#
+# What this teaches:
+#   • CLI options — `@optio` declares named flags (short and long forms) for CLI subcommands.
+#   • Option metadata — Each option specifies binding, type, description, and optional default values.
+#
+# Common mistakes:
+#   • Declaring a boolean optio without at least one of brevis or longum — boolean flags need a flag form to be usable.
+#
+# See also: operandus, cli, imperium, ubique, vel
+# =============================================================================
+
+# optio — CLI option annotation
+#
+# GRAMMAR:
+#   annotation :← '@' 'optio' optionSpec
+#
+# EXPECTED OUTPUT:
+#   No incipit — declaration or test-runner surface only.
+#
+# BACKEND:
+#   declaration-only CLI metadata (whitelist: optio/optio.fab).
+#
+
+@ cli "optio-smoke"
+@ optio verbose brevis "v" longum "verbose" typus bivalens descriptio "Verbose mode"
+@ optio count longum "count" typus numerus descriptio "Repeat count"
+incipit argumenta args {
+}

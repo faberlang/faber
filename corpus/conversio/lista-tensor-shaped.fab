@@ -1,0 +1,41 @@
++++
+term = "↦"
+kind = "operator-group"
+category = "conversion"
+canonical = false
+summary = "Literal-shaped lista to tensor conversio."
+syntax = "<lista> ↦ <tensor-type-with-literal-Figura>"
+related = ["↦", "lista", "tensor", "Figura"]
++++
+
+# =============================================================================
+# ↦ — Literal-shaped lista to tensor conversio.
+# =============================================================================
+#
+# What this teaches:
+#   • Flat-to-shaped conversion — a flat `lista` converts into a shaped `tensor` when the target type witnesses a literal Figura (e.g., `tf32[2, 2]`).
+#   • Shared lowering path — this conversion goes through the same `structa`/`tensor_from_flat` path as explicit tensor construction.
+#
+# Common mistakes:
+#   • Providing a flat lista whose length does not match the target tensor's element count — the shape must be a multiple of the flat data size.
+#
+# See also: ↦, lista, tensor, Figura
+# =============================================================================
+
+
+# conversio — literal-shaped lista to tensor
+#
+# WHY: the target tensor type witnesses both element type and static shape.
+# The flat lista lowers through the same structa/tensor_from_flat path as the
+# explicit tensor construction method.
+
+incipit {
+    fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    fixum tf32[2, 2] grid ← flat ↦ tf32[2, 2]
+    fixum lista<numerus> dims ← grid.magnitudines()
+    fixum lista<f32> out ← grid.planata()
+
+    nota dims
+    nota grid.longitudo()
+    nota out.longitudo()
+}

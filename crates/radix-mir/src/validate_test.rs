@@ -1,0 +1,2488 @@
+use super::*;
+use crate::{
+    MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBinOp, MirBlock,
+    MirBlockId, MirCallee, MirCollectionOp, MirConstant, MirFunction, MirFunctionId, MirGradientOp,
+    MirIntrinsic, MirLocal, MirOperand, MirPlace, MirPlaceBase, MirProgram, MirProjection,
+    MirRuntimeCall, MirStatement, MirStatementKind, MirSwitchCase, MirTerminator,
+    MirTerminatorKind, MirType, MirUnOp, MirValue, MirValueId, MirValueKind,
+};
+use radix_lexer::{Span, Symbol};
+use radix_types::{IndexExpr, Primitive};
+
+// -----------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------
+
+/// Create a `tensor<element, [dim1, dim2, ...]>` type.
+fn tensor_type(types: &mut TypeTable, element: Primitive, dims: &[u64]) -> TypeId {
+    let elem_id = types.primitive(element);
+    let dim_ids: Vec<_> = dims
+        .iter()
+        .map(|&d| types.intern_index(IndexExpr::Literal(d)))
+        .collect();
+    let shape = if dim_ids.is_empty() {
+        types.rank0_shape()
+    } else if dim_ids.len() == 1 {
+        types.intern_index(IndexExpr::Literal(dims[0]))
+    } else {
+        types.intern_index(IndexExpr::Tuple(dim_ids))
+    };
+    types.tensor_with_shape(elem_id, shape)
+}
+
+/// Run validation on a program and return the error messages.
+fn validate(program: &MirProgram, types: &TypeTable) -> Vec<String> {
+    let context = MirValidationContext::new(types);
+    match validate_program(program, &context) {
+        Ok(()) => vec![],
+        Err(errors) => errors.into_iter().map(|e| e.message).collect(),
+    }
+}
+
+/// Build a one-function program whose block contains a single
+/// `TensorLayerNorm` runtime call.
+#[allow(clippy::too_many_arguments)]
+fn layernorm_program(
+    types: &mut TypeTable,
+    input_dims: &[u64],
+    axis: i64,
+    epsilon: f64,
+    has_gamma: bool,
+    has_beta: bool,
+    // Override types for negative testing (None = derive from dims).
+    override_input_ty: Option<MirType>,
+    override_gamma_ty: Option<MirType>,
+    override_beta_ty: Option<MirType>,
+    override_return_ty: Option<MirType>,
+) -> MirProgram {
+    let input_mty = override_input_ty.unwrap_or_else(|| {
+        let tid = tensor_type(types, Primitive::Fractus, input_dims);
+        MirType::semantic(tid)
+    });
+    let gamma_mty = override_gamma_ty.unwrap_or_else(|| {
+        let tid = tensor_type(types, Primitive::Fractus, input_dims);
+        MirType::semantic(tid)
+    });
+    let beta_mty = override_beta_ty.unwrap_or_else(|| {
+        let tid = tensor_type(types, Primitive::Fractus, input_dims);
+        MirType::semantic(tid)
+    });
+    let return_mty = override_return_ty.unwrap_or_else(|| {
+        let tid = tensor_type(types, Primitive::Fractus, input_dims);
+        MirType::semantic(tid)
+    });
+
+    let mut locals: Vec<MirLocal> = vec![
+        MirLocal {
+            id: MirLocalId(0),
+            ty: input_mty,
+            name: None,
+            mutable: false,
+            span: Span::default(),
+        },
+        MirLocal {
+            id: MirLocalId(1),
+            ty: return_mty,
+            name: None,
+            mutable: false,
+            span: Span::default(),
+        },
+    ];
+    let mut next_local = MirLocalId(2);
+
+    let mut args: Vec<MirOperand> = vec![MirOperand::Place(MirPlace {
+        base: MirPlaceBase::Local(MirLocalId(0)),
+        projections: vec![],
+    })];
+
+    // Method-call order: input.laminatio(axis, epsilon, gamma?, beta?).
+    args.push(MirOperand::Constant(MirConstant::Int(axis)));
+    args.push(MirOperand::Constant(MirConstant::Float(epsilon)));
+
+    let destination = Some(MirPlace {
+        base: MirPlaceBase::Local(MirLocalId(1)),
+        projections: vec![],
+    });
+
+    if has_gamma {
+        locals.push(MirLocal {
+            id: next_local,
+            ty: gamma_mty,
+            name: None,
+            mutable: false,
+            span: Span::default(),
+        });
+        args.push(MirOperand::Place(MirPlace {
+            base: MirPlaceBase::Local(next_local),
+            projections: vec![],
+        }));
+        next_local.0 += 1;
+    }
+
+    if has_beta {
+        locals.push(MirLocal {
+            id: next_local,
+            ty: beta_mty,
+            name: None,
+            mutable: false,
+            span: Span::default(),
+        });
+        args.push(MirOperand::Place(MirPlace {
+            base: MirPlaceBase::Local(next_local),
+            projections: vec![],
+        }));
+    }
+
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+
+    MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals,
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination,
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorLayerNorm),
+                            args,
+                            return_ty: return_mty,
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    }
+}
+
+// -----------------------------------------------------------------------
+// Positive tests — structurally valid TensorLayerNorm calls
+// -----------------------------------------------------------------------
+
+#[test]
+fn test_layernorm_valid_rank1_3args() {
+    let mut types = TypeTable::new();
+    let program = layernorm_program(
+        &mut types,
+        &[4],  // rank-1 [4]
+        0,     // axis 0
+        1e-5,  // epsilon
+        false, // no gamma
+        false, // no beta
+        None,
+        None,
+        None,
+        None,
+    );
+    let errors = validate(&program, &types);
+    assert!(errors.is_empty(), "expected no errors, got: {errors:?}");
+}
+
+#[test]
+fn test_layernorm_valid_rank2_3args() {
+    let mut types = TypeTable::new();
+    let program = layernorm_program(
+        &mut types,
+        &[8, 16], // rank-2 [8, 16]
+        1,        // axis 1
+        1e-5,
+        false,
+        false,
+        None,
+        None,
+        None,
+        None,
+    );
+    let errors = validate(&program, &types);
+    assert!(errors.is_empty(), "expected no errors, got: {errors:?}");
+}
+
+#[test]
+fn test_layernorm_valid_with_gamma() {
+    let mut types = TypeTable::new();
+    // gamma is rank-1 [4] matching the input.
+    let program = layernorm_program(
+        &mut types,
+        &[4],
+        0,
+        1e-5,
+        true,  // has gamma
+        false, // no beta
+        None,
+        None,
+        None,
+        None,
+    );
+    let errors = validate(&program, &types);
+    assert!(errors.is_empty(), "expected no errors, got: {errors:?}");
+}
+
+#[test]
+fn test_layernorm_valid_with_gamma_beta() {
+    let mut types = TypeTable::new();
+    let program = layernorm_program(
+        &mut types,
+        &[4],
+        0,
+        1e-5,
+        true, // has gamma
+        true, // has beta
+        None,
+        None,
+        None,
+        None,
+    );
+    let errors = validate(&program, &types);
+    assert!(errors.is_empty(), "expected no errors, got: {errors:?}");
+}
+
+#[test]
+fn test_layernorm_valid_rank2_axis0() {
+    let mut types = TypeTable::new();
+    let program = layernorm_program(
+        &mut types,
+        &[8, 16],
+        0, // axis 0 (normalize over dim 0)
+        1e-5,
+        false,
+        false,
+        None,
+        None,
+        None,
+        None,
+    );
+    let errors = validate(&program, &types);
+    assert!(errors.is_empty(), "expected no errors, got: {errors:?}");
+}
+
+// -----------------------------------------------------------------------
+// Negative tests — structurally invalid TensorLayerNorm calls
+// -----------------------------------------------------------------------
+
+#[test]
+fn test_layernorm_invalid_not_tensor() {
+    let mut types = TypeTable::new();
+    let numerus = MirType::semantic(types.primitive(Primitive::Numerus));
+    let program = layernorm_program(
+        &mut types,
+        &[4],
+        0,
+        1e-5,
+        false,
+        false,
+        Some(numerus), // input is numerus, not tensor
+        None,
+        None,
+        None,
+    );
+    let errors = validate(&program, &types);
+    assert!(
+        errors.iter().any(|e| e.contains("input is not tensor")),
+        "expected 'input is not tensor' error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn test_layernorm_invalid_rank3() {
+    let mut types = TypeTable::new();
+    // Rank-3 tensor — validation limits layernorm to rank 1 or 2.
+    let tid = tensor_type(&mut types, Primitive::Fractus, &[2, 4, 8]);
+    let ty = MirType::semantic(tid);
+    let program = layernorm_program(
+        &mut types,
+        &[4],
+        0,
+        1e-5,
+        false,
+        false,
+        Some(ty), // input is rank-3
+        None,
+        None,
+        None,
+    );
+    let errors = validate(&program, &types);
+    assert!(
+        errors.iter().any(|e| e.contains("must have rank 1 or 2")),
+        "expected rank error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn test_layernorm_invalid_axis_out_of_range() {
+    let mut types = TypeTable::new();
+    let program = layernorm_program(
+        &mut types,
+        &[4], // rank-1
+        2,    // axis 2 is out of range for rank 1
+        1e-5,
+        false,
+        false,
+        None,
+        None,
+        None,
+        None,
+    );
+    let errors = validate(&program, &types);
+    assert!(
+        errors.iter().any(|e| e.contains("out of range")),
+        "expected 'out of range' error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn test_layernorm_invalid_axis_negative() {
+    let mut types = TypeTable::new();
+    let program = layernorm_program(
+        &mut types,
+        &[4],
+        -1, // negative axis is invalid
+        1e-5,
+        false,
+        false,
+        None,
+        None,
+        None,
+        None,
+    );
+    let errors = validate(&program, &types);
+    assert!(
+        errors.iter().any(|e| e.contains("out of range")),
+        "expected 'out of range' error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn test_layernorm_invalid_axis_not_int() {
+    let mut types = TypeTable::new();
+    // Only override axis: use float constant instead of int by constructing
+    // the program manually — we need to replace the axis operand.
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let tid = tensor_type(&mut types, Primitive::Fractus, &[4]);
+    let input_mty = MirType::semantic(tid);
+    let out_tid = tensor_type(&mut types, Primitive::Fractus, &[4]);
+    let out_mty = MirType::semantic(out_tid);
+
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![MirLocal {
+                id: MirLocalId(0),
+                ty: input_mty,
+                name: None,
+                mutable: false,
+                span: Span::default(),
+            }],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: None,
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorLayerNorm),
+                            args: vec![
+                                MirOperand::Place(MirPlace {
+                                    base: MirPlaceBase::Local(MirLocalId(0)),
+                                    projections: vec![],
+                                }),
+                                MirOperand::Constant(MirConstant::Float(1.0)), // ← not Int
+                                MirOperand::Constant(MirConstant::Float(1e-5)),
+                            ],
+                            return_ty: out_mty,
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("axis must be an int constant")),
+        "expected 'axis must be an int constant' error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn test_layernorm_invalid_epsilon_not_float() {
+    let mut types = TypeTable::new();
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let tid = tensor_type(&mut types, Primitive::Fractus, &[4]);
+    let input_mty = MirType::semantic(tid);
+    let out_tid = tensor_type(&mut types, Primitive::Fractus, &[4]);
+    let out_mty = MirType::semantic(out_tid);
+
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![MirLocal {
+                id: MirLocalId(0),
+                ty: input_mty,
+                name: None,
+                mutable: false,
+                span: Span::default(),
+            }],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: None,
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorLayerNorm),
+                            args: vec![
+                                MirOperand::Place(MirPlace {
+                                    base: MirPlaceBase::Local(MirLocalId(0)),
+                                    projections: vec![],
+                                }),
+                                MirOperand::Constant(MirConstant::Int(0)),
+                                MirOperand::Constant(MirConstant::Int(1)), // ← Int, not float
+                            ],
+                            return_ty: out_mty,
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("epsilon must be a float constant")),
+        "expected 'epsilon must be a float constant' error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn test_layernorm_invalid_epsilon_non_positive() {
+    let mut types = TypeTable::new();
+    let program = layernorm_program(
+        &mut types,
+        &[4],
+        0,
+        -1.0, // epsilon must be positive
+        false,
+        false,
+        None,
+        None,
+        None,
+        None,
+    );
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("epsilon must be positive")),
+        "expected 'epsilon must be positive' error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn test_layernorm_invalid_gamma_not_tensor() {
+    let mut types = TypeTable::new();
+    let numerus = MirType::semantic(types.primitive(Primitive::Numerus));
+    let program = layernorm_program(
+        &mut types,
+        &[4],
+        0,
+        1e-5,
+        true, // has gamma
+        false,
+        None,
+        Some(numerus), // gamma is numerus, not tensor
+        None,
+        None,
+    );
+    let errors = validate(&program, &types);
+    assert!(
+        errors.iter().any(|e| e.contains("gamma is not tensor")),
+        "expected 'gamma is not tensor' error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn test_layernorm_invalid_beta_not_tensor() {
+    let mut types = TypeTable::new();
+    let numerus = MirType::semantic(types.primitive(Primitive::Numerus));
+    let program = layernorm_program(
+        &mut types,
+        &[4],
+        0,
+        1e-5,
+        true, // has gamma
+        true, // has beta
+        None,
+        None,          // gamma is fine
+        Some(numerus), // beta is numerus
+        None,
+    );
+    let errors = validate(&program, &types);
+    assert!(
+        errors.iter().any(|e| e.contains("beta is not tensor")),
+        "expected 'beta is not tensor' error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn test_layernorm_invalid_result_not_tensor() {
+    let mut types = TypeTable::new();
+    let numerus = MirType::semantic(types.primitive(Primitive::Numerus));
+    let program = layernorm_program(
+        &mut types,
+        &[4],
+        0,
+        1e-5,
+        false,
+        false,
+        None,
+        None,
+        None,
+        Some(numerus), // return type is numerus
+    );
+    let errors = validate(&program, &types);
+    assert!(
+        errors.iter().any(|e| e.contains("result is not tensor")),
+        "expected 'result is not tensor' error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn test_layernorm_invalid_arity_too_few() {
+    // Only one arg — should not panic from axis_idx underflow.
+    let mut types = TypeTable::new();
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let f32_id = types.primitive(Primitive::Fractus);
+    let shape1 = types.intern_index(IndexExpr::Literal(4));
+    let input_tid = types.tensor_with_shape(f32_id, shape1);
+    let input_mty = MirType::semantic(input_tid);
+
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![MirLocal {
+                id: MirLocalId(0),
+                ty: input_mty,
+                name: None,
+                mutable: false,
+                span: Span::default(),
+            }],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: None,
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorLayerNorm),
+                            args: vec![MirOperand::Place(MirPlace {
+                                base: MirPlaceBase::Local(MirLocalId(0)),
+                                projections: vec![],
+                            })],
+                            return_ty: input_mty,
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    // Validate should NOT panic from usize underflow on axis_idx = n - 2.
+    let errors = validate(&program, &types);
+    // At minimum the arity check should have fired.
+    assert!(
+        !errors.is_empty(),
+        "expected at least one arity error, got none"
+    );
+}
+
+// -----------------------------------------------------------------------
+// Stage 1B — tuple aggregate construction
+// -----------------------------------------------------------------------
+
+#[test]
+fn test_tuple_aggregate_valid() {
+    let mut types = TypeTable::new();
+    let bivalens = types.primitive(Primitive::Bivalens);
+    let tuple_tid = types.tuple(vec![bivalens, bivalens]);
+    let tuple_mty = MirType::semantic(tuple_tid);
+
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![MirLocal {
+                id: MirLocalId(0),
+                ty: tuple_mty,
+                name: None,
+                mutable: false,
+                span: Span::default(),
+            }],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Construct {
+                        destination: MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(0)),
+                            projections: vec![],
+                        },
+                        aggregate: MirAggregate {
+                            kind: MirAggregateKind::Tuple,
+                            ty: tuple_mty,
+                            fields: MirAggregateFields::Ordered(vec![
+                                MirAggregateItem::Operand(MirOperand::Constant(MirConstant::Bool(
+                                    true,
+                                ))),
+                                MirAggregateItem::Operand(MirOperand::Constant(MirConstant::Bool(
+                                    false,
+                                ))),
+                            ]),
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace {
+                        base: MirPlaceBase::Local(MirLocalId(0)),
+                        projections: vec![],
+                    }))),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: tuple_mty,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(errors.is_empty(), "expected no errors, got: {errors:?}");
+}
+
+#[test]
+fn test_tuple_aggregate_element_count_mismatch() {
+    let mut types = TypeTable::new();
+    let bivalens = types.primitive(Primitive::Bivalens);
+    // Tuple arity 2 but we provide 1 element
+    let tuple_tid = types.tuple(vec![bivalens, bivalens]);
+    let tuple_mty = MirType::semantic(tuple_tid);
+
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![MirLocal {
+                id: MirLocalId(0),
+                ty: tuple_mty,
+                name: None,
+                mutable: false,
+                span: Span::default(),
+            }],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Construct {
+                        destination: MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(0)),
+                            projections: vec![],
+                        },
+                        aggregate: MirAggregate {
+                            kind: MirAggregateKind::Tuple,
+                            ty: tuple_mty,
+                            fields: MirAggregateFields::Ordered(vec![MirAggregateItem::Operand(
+                                MirOperand::Constant(MirConstant::Bool(true)),
+                            )]),
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace {
+                        base: MirPlaceBase::Local(MirLocalId(0)),
+                        projections: vec![],
+                    }))),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: tuple_mty,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(
+        errors.iter().any(|e| e.contains("element count")),
+        "expected 'element count' error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn test_tuple_aggregate_element_type_mismatch() {
+    let mut types = TypeTable::new();
+    let bivalens = types.primitive(Primitive::Bivalens);
+    let tuple_tid = types.tuple(vec![bivalens, bivalens]);
+    let tuple_mty = MirType::semantic(tuple_tid);
+
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![MirLocal {
+                id: MirLocalId(0),
+                ty: tuple_mty,
+                name: None,
+                mutable: false,
+                span: Span::default(),
+            }],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Construct {
+                        destination: MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(0)),
+                            projections: vec![],
+                        },
+                        aggregate: MirAggregate {
+                            kind: MirAggregateKind::Tuple,
+                            ty: tuple_mty,
+                            fields: MirAggregateFields::Ordered(vec![
+                                MirAggregateItem::Operand(MirOperand::Constant(MirConstant::Bool(
+                                    true,
+                                ))),
+                                // Second element should be bivalens but is numerus
+                                MirAggregateItem::Operand(MirOperand::Constant(MirConstant::Int(
+                                    42,
+                                ))),
+                            ]),
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace {
+                        base: MirPlaceBase::Local(MirLocalId(0)),
+                        projections: vec![],
+                    }))),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: tuple_mty,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(
+        errors.iter().any(|e| e.contains("element type mismatch")),
+        "expected 'element type mismatch' error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn test_tuple_aggregate_spread_rejected() {
+    let mut types = TypeTable::new();
+    let bivalens = types.primitive(Primitive::Bivalens);
+    let tuple_tid = types.tuple(vec![bivalens, bivalens]);
+    let tuple_mty = MirType::semantic(tuple_tid);
+
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![
+                MirLocal {
+                    id: MirLocalId(0),
+                    ty: tuple_mty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+                MirLocal {
+                    id: MirLocalId(1),
+                    ty: tuple_mty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+            ],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Construct {
+                        destination: MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(0)),
+                            projections: vec![],
+                        },
+                        aggregate: MirAggregate {
+                            kind: MirAggregateKind::Tuple,
+                            ty: tuple_mty,
+                            fields: MirAggregateFields::Ordered(vec![
+                                MirAggregateItem::Operand(MirOperand::Constant(MirConstant::Bool(
+                                    true,
+                                ))),
+                                MirAggregateItem::Spread(MirOperand::Place(MirPlace {
+                                    base: MirPlaceBase::Local(MirLocalId(1)),
+                                    projections: vec![],
+                                })),
+                            ]),
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace {
+                        base: MirPlaceBase::Local(MirLocalId(0)),
+                        projections: vec![],
+                    }))),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: tuple_mty,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("tuple aggregate spread is unsupported")),
+        "expected 'tuple aggregate spread is unsupported' error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn test_tuple_aggregate_empty() {
+    let mut types = TypeTable::new();
+    // Empty tuple () is the unit type.
+    let unit_tid = types.unit();
+    let unit_mty = MirType::semantic(unit_tid);
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![MirLocal {
+                id: MirLocalId(0),
+                ty: unit_mty,
+                name: None,
+                mutable: false,
+                span: Span::default(),
+            }],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Construct {
+                        destination: MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(0)),
+                            projections: vec![],
+                        },
+                        aggregate: MirAggregate {
+                            kind: MirAggregateKind::Tuple,
+                            ty: unit_mty,
+                            fields: MirAggregateFields::Ordered(vec![]),
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(
+        errors.is_empty(),
+        "expected no errors for empty tuple, got: {errors:?}"
+    );
+}
+
+// -----------------------------------------------------------------------
+// Stage 1B — tuple index projection
+// -----------------------------------------------------------------------
+
+#[test]
+fn test_tuple_index_projection_valid() {
+    let mut types = TypeTable::new();
+    let bivalens = types.primitive(Primitive::Bivalens);
+    let tuple_tid = types.tuple(vec![bivalens]);
+    let tuple_mty = MirType::semantic(tuple_tid);
+    let bivalens_mty = MirType::semantic(bivalens);
+
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![
+                MirLocal {
+                    id: MirLocalId(0),
+                    ty: tuple_mty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+                MirLocal {
+                    id: MirLocalId(1),
+                    ty: bivalens_mty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+            ],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Assign {
+                        place: MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(1)),
+                            projections: vec![],
+                        },
+                        value: MirValue {
+                            id: MirValueId(0),
+                            kind: MirValueKind::Operand(MirOperand::Place(MirPlace {
+                                base: MirPlaceBase::Local(MirLocalId(0)),
+                                projections: vec![MirProjection::Index(MirOperand::Constant(
+                                    MirConstant::Int(0),
+                                ))],
+                            })),
+                            ty: bivalens_mty,
+                            span: Span::default(),
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: MirType::semantic(types.primitive(Primitive::Vacuum)),
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(errors.is_empty(), "expected no errors, got: {errors:?}");
+}
+
+#[test]
+fn test_tuple_index_projection_out_of_bounds() {
+    let mut types = TypeTable::new();
+    let bivalens = types.primitive(Primitive::Bivalens);
+    let tuple_tid = types.tuple(vec![bivalens]);
+    let tuple_mty = MirType::semantic(tuple_tid);
+    let bivalens_mty = MirType::semantic(bivalens);
+
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![
+                MirLocal {
+                    id: MirLocalId(0),
+                    ty: tuple_mty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+                MirLocal {
+                    id: MirLocalId(1),
+                    ty: bivalens_mty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+            ],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Assign {
+                        place: MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(1)),
+                            projections: vec![],
+                        },
+                        value: MirValue {
+                            id: MirValueId(0),
+                            kind: MirValueKind::Operand(MirOperand::Place(MirPlace {
+                                base: MirPlaceBase::Local(MirLocalId(0)),
+                                projections: vec![MirProjection::Index(MirOperand::Constant(
+                                    MirConstant::Int(5),
+                                ))],
+                            })),
+                            // The out-of-bounds index means project_index returns None,
+                            // so the value ty won't be checked against the projection result.
+                            // Use a placeholder type since the value is never fully resolved.
+                            ty: bivalens_mty,
+                            span: Span::default(),
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: MirType::semantic(types.primitive(Primitive::Vacuum)),
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(
+        errors.iter().any(|e| e.contains("out of bounds")),
+        "expected 'out of bounds' error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn test_tuple_index_projection_non_constant() {
+    let mut types = TypeTable::new();
+    let bivalens = types.primitive(Primitive::Bivalens);
+    let numerus = types.primitive(Primitive::Numerus);
+    let tuple_tid = types.tuple(vec![bivalens]);
+    let tuple_mty = MirType::semantic(tuple_tid);
+    let numerus_mty = MirType::semantic(numerus);
+
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![
+                MirLocal {
+                    id: MirLocalId(0),
+                    ty: tuple_mty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+                MirLocal {
+                    id: MirLocalId(1),
+                    ty: numerus_mty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+            ],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Assign {
+                        place: MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(1)),
+                            projections: vec![],
+                        },
+                        value: MirValue {
+                            id: MirValueId(0),
+                            kind: MirValueKind::Operand(MirOperand::Place(MirPlace {
+                                base: MirPlaceBase::Local(MirLocalId(0)),
+                                projections: vec![MirProjection::Index(
+                                    // Non-constant index: a place operand
+                                    MirOperand::Place(MirPlace {
+                                        base: MirPlaceBase::Local(MirLocalId(1)),
+                                        projections: vec![],
+                                    }),
+                                )],
+                            })),
+                            ty: numerus_mty,
+                            span: Span::default(),
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: MirType::semantic(types.primitive(Primitive::Vacuum)),
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("compile-time constant index")),
+        "expected 'compile-time constant index' error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn test_tuple_index_projection_rejects_negative_index() {
+    let mut types = TypeTable::new();
+    let bivalens = types.primitive(Primitive::Bivalens);
+    let tuple_tid = types.tuple(vec![bivalens]);
+    let tuple_mty = MirType::semantic(tuple_tid);
+    let bivalens_mty = MirType::semantic(bivalens);
+
+    // Negative index -1 on 1-element tuple must be rejected.
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![
+                MirLocal {
+                    id: MirLocalId(0),
+                    ty: tuple_mty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+                MirLocal {
+                    id: MirLocalId(1),
+                    ty: bivalens_mty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+            ],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Assign {
+                        place: MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(1)),
+                            projections: vec![],
+                        },
+                        value: MirValue {
+                            id: MirValueId(0),
+                            kind: MirValueKind::Operand(MirOperand::Place(MirPlace {
+                                base: MirPlaceBase::Local(MirLocalId(0)),
+                                projections: vec![MirProjection::Index(MirOperand::Constant(
+                                    MirConstant::Int(-1),
+                                ))],
+                            })),
+                            ty: bivalens_mty,
+                            span: Span::default(),
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: MirType::semantic(types.primitive(Primitive::Vacuum)),
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(
+        errors.iter().any(|e| e.contains("out of bounds")),
+        "expected 'out of bounds' error for negative index, got: {errors:?}"
+    );
+}
+
+// -----------------------------------------------------------------------
+// Stage 1 — CFG reachability + termination invariants (PRP-021)
+// -----------------------------------------------------------------------
+
+#[test]
+fn rejects_function_with_no_blocks() {
+    let types = TypeTable::new();
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![],
+            temps: vec![],
+            blocks: vec![], // empty — no entry block
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(
+        errors.iter().any(|e| e.contains("no entry block")),
+        "expected 'no entry block' error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn rejects_orphan_block_not_reachable_from_entry() {
+    let types = TypeTable::new();
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![],
+            temps: vec![],
+            blocks: vec![
+                MirBlock {
+                    id: MirBlockId(0),
+                    statements: vec![],
+                    terminator: MirTerminator {
+                        kind: MirTerminatorKind::Return(None),
+                        span: Span::default(),
+                    },
+                    span: Span::default(),
+                },
+                // Block 1 is dead code — no terminator references it, so
+                // it is not flagged as unreachable (the lowerer creates
+                // dead blocks during lowering).
+                MirBlock {
+                    id: MirBlockId(1),
+                    statements: vec![],
+                    terminator: MirTerminator {
+                        kind: MirTerminatorKind::Goto(MirBlockId(2)),
+                        span: Span::default(),
+                    },
+                    span: Span::default(),
+                },
+                // Block 2 is referenced by block 1 but not reachable from
+                // entry block 0 — a genuine orphan.
+                MirBlock {
+                    id: MirBlockId(2),
+                    statements: vec![],
+                    terminator: MirTerminator {
+                        kind: MirTerminatorKind::Return(None),
+                        span: Span::default(),
+                    },
+                    span: Span::default(),
+                },
+            ],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("not reachable from entry")),
+        "expected 'not reachable from entry' error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn rejects_function_with_only_goto_cycle() {
+    let types = TypeTable::new();
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![],
+            temps: vec![],
+            blocks: vec![
+                MirBlock {
+                    id: MirBlockId(0),
+                    statements: vec![],
+                    terminator: MirTerminator {
+                        kind: MirTerminatorKind::Goto(MirBlockId(1)),
+                        span: Span::default(),
+                    },
+                    span: Span::default(),
+                },
+                MirBlock {
+                    id: MirBlockId(1),
+                    statements: vec![],
+                    terminator: MirTerminator {
+                        kind: MirTerminatorKind::Goto(MirBlockId(0)),
+                        span: Span::default(),
+                    },
+                    span: Span::default(),
+                },
+            ],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("does not reach a terminator")),
+        "expected 'does not reach a terminator' error, got: {errors:?}"
+    );
+}
+
+// -----------------------------------------------------------------------
+// F-025 – unary/binary operand type checks
+// -----------------------------------------------------------------------
+
+/// Neg on a bool operand should be rejected — Neg requires numeric.
+#[test]
+fn test_unary_neg_on_bivalens_rejected() {
+    let types = TypeTable::new();
+    let bivalens = types.primitive(Primitive::Bivalens);
+    let bivalens_mty = MirType::semantic(bivalens);
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![
+                MirLocal {
+                    id: MirLocalId(0),
+                    ty: bivalens_mty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+                MirLocal {
+                    id: MirLocalId(1),
+                    ty: bivalens_mty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+            ],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Assign {
+                        place: MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(1)),
+                            projections: vec![],
+                        },
+                        value: MirValue {
+                            id: MirValueId(0),
+                            kind: MirValueKind::Unary {
+                                op: MirUnOp::Neg,
+                                operand: MirOperand::Place(MirPlace {
+                                    base: MirPlaceBase::Local(MirLocalId(0)),
+                                    projections: vec![],
+                                }),
+                            },
+                            ty: bivalens_mty,
+                            span: Span::default(),
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(
+        errors.iter().any(|e| e.contains("not numeric")),
+        "expected 'not numeric' error for Neg on bivalens, got: {errors:?}"
+    );
+}
+
+/// Sqrt on a numerus operand should be rejected — float unary ops require fractus.
+#[test]
+fn test_unary_sqrt_on_numerus_rejected() {
+    let types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let numerus_mty = MirType::semantic(numerus);
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![
+                MirLocal {
+                    id: MirLocalId(0),
+                    ty: numerus_mty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+                MirLocal {
+                    id: MirLocalId(1),
+                    ty: numerus_mty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+            ],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Assign {
+                        place: MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(1)),
+                            projections: vec![],
+                        },
+                        value: MirValue {
+                            id: MirValueId(0),
+                            kind: MirValueKind::Unary {
+                                op: MirUnOp::Sqrt,
+                                operand: MirOperand::Place(MirPlace {
+                                    base: MirPlaceBase::Local(MirLocalId(0)),
+                                    projections: vec![],
+                                }),
+                            },
+                            ty: numerus_mty,
+                            span: Span::default(),
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(
+        errors.iter().any(|e| e.contains("not fractus")),
+        "expected 'not fractus' error for Sqrt on numerus, got: {errors:?}"
+    );
+}
+
+/// Build a one-function program with a single unary statement:
+/// `local1 <- unary(op, local0)`, where local0 has `operand_ty` and the
+/// value/local1 have `result_ty`.
+fn unary_op_program(
+    types: &TypeTable,
+    op: MirUnOp,
+    operand_ty: MirType,
+    result_ty: MirType,
+) -> MirProgram {
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![
+                MirLocal {
+                    id: MirLocalId(0),
+                    ty: operand_ty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+                MirLocal {
+                    id: MirLocalId(1),
+                    ty: result_ty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+            ],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Assign {
+                        place: MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(1)),
+                            projections: vec![],
+                        },
+                        value: MirValue {
+                            id: MirValueId(0),
+                            kind: MirValueKind::Unary {
+                                op,
+                                operand: MirOperand::Place(MirPlace {
+                                    base: MirPlaceBase::Local(MirLocalId(0)),
+                                    projections: vec![],
+                                }),
+                            },
+                            ty: result_ty,
+                            span: Span::default(),
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    }
+}
+
+/// R-W1 regression: float-unary ops on `tensor<f32,…>` must validate.
+/// AIR lowers `AirTensorOp::Gelu/Tanh/Exp/Log/Relu/Sqrt` to `MirUnOp` on the
+/// tensor operand (MLP fmir path); the F-035/F-036 scalar-only float check
+/// rejected them as "not fractus".
+#[test]
+fn test_unary_float_ops_on_tensor_f32_accepted() {
+    for op in [
+        MirUnOp::Sqrt,
+        MirUnOp::Relu,
+        MirUnOp::Gelu,
+        MirUnOp::Tanh,
+        MirUnOp::Exp,
+        MirUnOp::Log,
+    ] {
+        let mut types = TypeTable::new();
+        let tensor_f32 = MirType::semantic(tensor_type(&mut types, Primitive::Fractus, &[4, 4]));
+        let errors = validate(
+            &unary_op_program(&types, op, tensor_f32, tensor_f32),
+            &types,
+        );
+        assert!(
+            errors.is_empty(),
+            "expected no errors for {op:?} on tensor<f32,[4,4]>, got: {errors:?}"
+        );
+    }
+}
+
+/// R-W1 hardening-preservation: a tensor whose ELEMENT type is non-float is
+/// still rejected — the F-035/F-036 intent extends to tensor element types.
+#[test]
+fn test_unary_sqrt_on_tensor_numerus_rejected() {
+    let mut types = TypeTable::new();
+    let tensor_numerus = MirType::semantic(tensor_type(&mut types, Primitive::Numerus, &[4, 4]));
+    let errors = validate(
+        &unary_op_program(&types, MirUnOp::Sqrt, tensor_numerus, tensor_numerus),
+        &types,
+    );
+    assert!(
+        errors.iter().any(|e| e.contains("not fractus")),
+        "expected 'not fractus' error for Sqrt on tensor<numerus>, got: {errors:?}"
+    );
+}
+
+/// Binary Add with a bivalens lhs should be rejected — arithmetic needs numeric.
+#[test]
+fn test_binary_add_non_numeric_operand_rejected() {
+    let types = TypeTable::new();
+    let bivalens = types.primitive(Primitive::Bivalens);
+    let bivalens_mty = MirType::semantic(bivalens);
+    let numerus_mty = MirType::semantic(types.primitive(Primitive::Numerus));
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![
+                MirLocal {
+                    id: MirLocalId(0),
+                    ty: bivalens_mty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+                MirLocal {
+                    id: MirLocalId(1),
+                    ty: numerus_mty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+            ],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Assign {
+                        place: MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(1)),
+                            projections: vec![],
+                        },
+                        value: MirValue {
+                            id: MirValueId(0),
+                            kind: MirValueKind::Binary {
+                                op: MirBinOp::Add,
+                                lhs: MirOperand::Place(MirPlace {
+                                    base: MirPlaceBase::Local(MirLocalId(0)),
+                                    projections: vec![],
+                                }),
+                                rhs: MirOperand::Constant(MirConstant::Int(1)),
+                            },
+                            ty: numerus_mty,
+                            span: Span::default(),
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(
+        errors.iter().any(|e| e.contains("not numeric")),
+        "expected 'not numeric' error for Add with bivalens lhs, got: {errors:?}"
+    );
+}
+
+/// Binary Eq should produce bivalens result, not numerus.
+#[test]
+fn test_binary_eq_result_not_bivalens_rejected() {
+    let types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let numerus_mty = MirType::semantic(numerus);
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![
+                MirLocal {
+                    id: MirLocalId(0),
+                    ty: numerus_mty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+                MirLocal {
+                    id: MirLocalId(1),
+                    ty: numerus_mty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+            ],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Assign {
+                        place: MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(1)),
+                            projections: vec![],
+                        },
+                        value: MirValue {
+                            id: MirValueId(0),
+                            kind: MirValueKind::Binary {
+                                op: MirBinOp::Eq,
+                                lhs: MirOperand::Place(MirPlace {
+                                    base: MirPlaceBase::Local(MirLocalId(0)),
+                                    projections: vec![],
+                                }),
+                                rhs: MirOperand::Constant(MirConstant::Int(1)),
+                            },
+                            ty: numerus_mty,
+                            span: Span::default(),
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(
+        errors.iter().any(|e| e.contains("not bivalens")),
+        "expected 'not bivalens' error for Eq result, got: {errors:?}"
+    );
+}
+
+/// Binary And with non-bivalens operands should be rejected.
+#[test]
+fn test_binary_and_non_bivalens_rejected() {
+    let types = TypeTable::new();
+    let _numerus_mty = MirType::semantic(types.primitive(Primitive::Numerus));
+    let bivalens_mty = MirType::semantic(types.primitive(Primitive::Bivalens));
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![MirLocal {
+                id: MirLocalId(0),
+                ty: bivalens_mty,
+                name: None,
+                mutable: false,
+                span: Span::default(),
+            }],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Assign {
+                        place: MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(0)),
+                            projections: vec![],
+                        },
+                        value: MirValue {
+                            id: MirValueId(0),
+                            kind: MirValueKind::Binary {
+                                op: MirBinOp::And,
+                                lhs: MirOperand::Constant(MirConstant::Int(1)),
+                                rhs: MirOperand::Constant(MirConstant::Int(2)),
+                            },
+                            ty: bivalens_mty,
+                            span: Span::default(),
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(
+        errors.iter().any(|e| e.contains("bivalens")),
+        "expected bivalens operand error for And, got: {errors:?}"
+    );
+}
+
+// -----------------------------------------------------------------------
+// F-026 – Symbol ID as tuple field index
+// -----------------------------------------------------------------------
+
+/// Field projection on a tuple uses Symbol.0 as raw index. This must be
+/// rejected — tuples have no named fields.
+#[test]
+fn test_tuple_field_projection_rejected() {
+    let mut types = TypeTable::new();
+    let bivalens = types.primitive(Primitive::Bivalens);
+    let tuple_tid = types.tuple(vec![bivalens, bivalens]);
+    let tuple_mty = MirType::semantic(tuple_tid);
+    let bivalens_mty = MirType::semantic(bivalens);
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![
+                MirLocal {
+                    id: MirLocalId(0),
+                    ty: tuple_mty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+                MirLocal {
+                    id: MirLocalId(1),
+                    ty: bivalens_mty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+            ],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Assign {
+                        place: MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(1)),
+                            projections: vec![],
+                        },
+                        value: MirValue {
+                            id: MirValueId(0),
+                            kind: MirValueKind::Operand(MirOperand::Place(MirPlace {
+                                base: MirPlaceBase::Local(MirLocalId(0)),
+                                projections: vec![MirProjection::Field(Symbol(0))],
+                            })),
+                            ty: bivalens_mty,
+                            span: Span::default(),
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(
+        errors.iter().any(|e| e.contains("not a struct or record")),
+        "expected field-projection-on-tuple rejection, got: {errors:?}"
+    );
+}
+
+// -----------------------------------------------------------------------
+// F-027 – non-function Value callee unchecked
+// -----------------------------------------------------------------------
+
+/// Calling a Value whose type is not a function must produce an error.
+#[test]
+fn test_value_callee_not_callable_rejected() {
+    let types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let numerus_mty = MirType::semantic(numerus);
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![MirLocal {
+                id: MirLocalId(0),
+                ty: numerus_mty,
+                name: None,
+                mutable: false,
+                span: Span::default(),
+            }],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Call {
+                        destination: None,
+                        callee: MirCallee::Value(MirOperand::Place(MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(0)),
+                            projections: vec![],
+                        })),
+                        args: vec![],
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(
+        errors.iter().any(|e| e.contains("not callable")),
+        "expected 'not callable' error for Value callee, got: {errors:?}"
+    );
+}
+
+// -----------------------------------------------------------------------
+// F-028 – gradient arity-only → add minimal type/handle checks
+// -----------------------------------------------------------------------
+
+/// Gradient Read with a non-pointer-type handle should be rejected.
+#[test]
+fn test_gradient_read_handle_not_opaque_rejected() {
+    let types = TypeTable::new();
+    let numerus_mty = MirType::semantic(types.primitive(Primitive::Numerus));
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+
+    // Gradient Read with a numerus handle (should be an opaque pointer).
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![MirLocal {
+                id: MirLocalId(0),
+                ty: numerus_mty,
+                name: None,
+                mutable: false,
+                span: Span::default(),
+            }],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: None,
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Gradient(MirGradientOp::Read),
+                            args: vec![MirOperand::Place(MirPlace {
+                                base: MirPlaceBase::Local(MirLocalId(0)),
+                                projections: vec![],
+                            })],
+                            return_ty: numerus_mty,
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(
+        errors.iter().any(|e| e.contains("gradient handle")),
+        "expected gradient handle type error, got: {errors:?}"
+    );
+}
+
+/// Gradient Create with non-numerus rank should be rejected.
+#[test]
+fn test_gradient_create_rank_not_numerus_rejected() {
+    let types = TypeTable::new();
+    let bivalens_mty = MirType::semantic(types.primitive(Primitive::Bivalens));
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![
+                MirLocal {
+                    id: MirLocalId(0),
+                    ty: bivalens_mty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+                MirLocal {
+                    id: MirLocalId(1),
+                    ty: bivalens_mty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+                MirLocal {
+                    id: MirLocalId(2),
+                    ty: bivalens_mty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+                MirLocal {
+                    id: MirLocalId(3),
+                    ty: bivalens_mty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+                MirLocal {
+                    id: MirLocalId(4),
+                    ty: bivalens_mty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+            ],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: None,
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Gradient(MirGradientOp::Create),
+                            args: vec![
+                                MirOperand::Place(MirPlace {
+                                    base: MirPlaceBase::Local(MirLocalId(0)),
+                                    projections: vec![],
+                                }),
+                                MirOperand::Place(MirPlace {
+                                    base: MirPlaceBase::Local(MirLocalId(1)),
+                                    projections: vec![],
+                                }),
+                                MirOperand::Place(MirPlace {
+                                    base: MirPlaceBase::Local(MirLocalId(2)),
+                                    projections: vec![],
+                                }),
+                                MirOperand::Place(MirPlace {
+                                    base: MirPlaceBase::Local(MirLocalId(3)),
+                                    projections: vec![],
+                                }),
+                                MirOperand::Place(MirPlace {
+                                    base: MirPlaceBase::Local(MirLocalId(4)),
+                                    projections: vec![],
+                                }),
+                            ],
+                            return_ty: vacuum,
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("gradient") && e.contains("rank")),
+        "expected gradient rank type error, got: {errors:?}"
+    );
+}
+
+// -----------------------------------------------------------------------
+// F-080 – switch cases untyped (empty / duplicate unchecked)
+// -----------------------------------------------------------------------
+
+/// Switch with an empty cases vector must be rejected.
+#[test]
+fn test_switch_empty_cases_rejected() {
+    let types = TypeTable::new();
+    let bivalens_mty = MirType::semantic(types.primitive(Primitive::Bivalens));
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![MirLocal {
+                id: MirLocalId(0),
+                ty: bivalens_mty,
+                name: None,
+                mutable: false,
+                span: Span::default(),
+            }],
+            temps: vec![],
+            blocks: vec![
+                MirBlock {
+                    id: MirBlockId(0),
+                    statements: vec![],
+                    terminator: MirTerminator {
+                        kind: MirTerminatorKind::Switch {
+                            value: MirOperand::Place(MirPlace {
+                                base: MirPlaceBase::Local(MirLocalId(0)),
+                                projections: vec![],
+                            }),
+                            cases: vec![], // empty — must be rejected
+                            default: MirBlockId(1),
+                        },
+                        span: Span::default(),
+                    },
+                    span: Span::default(),
+                },
+                MirBlock {
+                    id: MirBlockId(1),
+                    statements: vec![],
+                    terminator: MirTerminator {
+                        kind: MirTerminatorKind::Return(None),
+                        span: Span::default(),
+                    },
+                    span: Span::default(),
+                },
+            ],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("switch") && e.contains("no cases")),
+        "expected switch empty cases error, got: {errors:?}"
+    );
+}
+
+/// Switch with duplicate case constant values must be rejected.
+#[test]
+fn test_switch_duplicate_cases_rejected() {
+    let types = TypeTable::new();
+    let numerus_mty = MirType::semantic(types.primitive(Primitive::Numerus));
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![MirLocal {
+                id: MirLocalId(0),
+                ty: numerus_mty,
+                name: None,
+                mutable: false,
+                span: Span::default(),
+            }],
+            temps: vec![],
+            blocks: vec![
+                MirBlock {
+                    id: MirBlockId(0),
+                    statements: vec![],
+                    terminator: MirTerminator {
+                        kind: MirTerminatorKind::Switch {
+                            value: MirOperand::Place(MirPlace {
+                                base: MirPlaceBase::Local(MirLocalId(0)),
+                                projections: vec![],
+                            }),
+                            cases: vec![
+                                MirSwitchCase {
+                                    value: MirConstant::Int(1),
+                                    target: MirBlockId(1),
+                                },
+                                MirSwitchCase {
+                                    value: MirConstant::Int(1), // duplicate!
+                                    target: MirBlockId(2),
+                                },
+                            ],
+                            default: MirBlockId(3),
+                        },
+                        span: Span::default(),
+                    },
+                    span: Span::default(),
+                },
+                MirBlock {
+                    id: MirBlockId(1),
+                    statements: vec![],
+                    terminator: MirTerminator {
+                        kind: MirTerminatorKind::Return(None),
+                        span: Span::default(),
+                    },
+                    span: Span::default(),
+                },
+                MirBlock {
+                    id: MirBlockId(2),
+                    statements: vec![],
+                    terminator: MirTerminator {
+                        kind: MirTerminatorKind::Return(None),
+                        span: Span::default(),
+                    },
+                    span: Span::default(),
+                },
+                MirBlock {
+                    id: MirBlockId(3),
+                    statements: vec![],
+                    terminator: MirTerminator {
+                        kind: MirTerminatorKind::Return(None),
+                        span: Span::default(),
+                    },
+                    span: Span::default(),
+                },
+            ],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("duplicate") && e.contains("switch case")),
+        "expected duplicate switch case error, got: {errors:?}"
+    );
+}
+
+// -----------------------------------------------------------------------
+// F-081 – cede on non-Promissum identity-accepts
+// -----------------------------------------------------------------------
+
+/// Cede on a non-Promissum type must be rejected.
+#[test]
+fn test_cede_non_promissum_rejected() {
+    let types = TypeTable::new();
+    let numerus_mty = MirType::semantic(types.primitive(Primitive::Numerus));
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![
+                MirLocal {
+                    id: MirLocalId(0),
+                    ty: numerus_mty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+                MirLocal {
+                    id: MirLocalId(1),
+                    ty: numerus_mty,
+                    name: None,
+                    mutable: true,
+                    span: Span::default(),
+                },
+            ],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: Some(MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(1)),
+                            projections: vec![],
+                        }),
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Cede,
+                            args: vec![MirOperand::Place(MirPlace {
+                                base: MirPlaceBase::Local(MirLocalId(0)),
+                                projections: vec![],
+                            })],
+                            return_ty: numerus_mty,
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("cede") && e.contains("promissum")),
+        "expected cede promissum error, got: {errors:?}"
+    );
+}

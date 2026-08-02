@@ -1,0 +1,72 @@
+# Legacy spellings without runnable exempla. Copied into the reference pack by
+# scripta/assemble-reference-pack.py.
+
+[[redirects]]
+term = "ab pipeline"
+canonical = "lista"
+message = "Retired collection pipeline syntax; use ordinary collection methods and closures."
+
+[[redirects]]
+term = "=="
+canonical = "≡"
+message = "Legacy equality spelling; use ≡ in Faber source."
+
+[[redirects]]
+term = "!="
+canonical = "≠"
+message = "Legacy inequality spelling; use ≠ in Faber source."
+
+[[redirects]]
+term = "<="
+canonical = "≤"
+message = "Legacy less-than-or-equal spelling; use ≤ in Faber source."
+
+[[redirects]]
+term = ">="
+canonical = "≥"
+message = "Legacy greater-than-or-equal spelling; use ≥ in Faber source."
+
+[[redirects]]
+term = "->"
+canonical = "→"
+message = "Legacy return-arrow spelling; use → in Faber source."
+
+[[redirects]]
+term = "==="
+canonical = "est"
+message = "Legacy equality spelling; use est in Faber source."
+
+[[redirects]]
+term = "!=="
+canonical = "non est"
+message = "Legacy inequality spelling; use non est in Faber source."
+
+[[redirects]]
+term = "ubi"
+canonical = "lista"
+message = "Retired collection pipeline filter syntax; use ordinary collection filtering APIs."
+
+[[redirects]]
+term = "negativum"
+canonical = "≡"
+message = "Retired prefix predicate; use value < 0."
+
+[[redirects]]
+term = "positivum"
+canonical = "≡"
+message = "Retired prefix predicate; use value > 0."
+
+[[redirects]]
+term = "nonnihil"
+canonical = "est"
+message = "Retired prefix predicate; use value non est nihil."
+
+[[redirects]]
+term = "nonnulla"
+canonical = "est"
+message = "Retired prefix predicate; use value non est nihil."
+
+[[redirects]]
+term = "nulla"
+canonical = "est"
+message = "Retired prefix predicate; use value est nihil."

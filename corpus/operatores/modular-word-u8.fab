@@ -1,0 +1,64 @@
++++
+term = "modulus<u8>"
+kind = "operator-group"
+category = "arithmetic"
+canonical = true
+summary = "Unsigned 8-bit modular-word arithmetic and bit-pattern edges."
+syntax = "modulus<u8>"
+related = ["numerus", "¬", "⇐", "⇒"]
++++
+
+# =============================================================================
+# modulus<u8> — Unsigned 8-bit modular-word arithmetic and bit-pattern edges.
+# =============================================================================
+#
+# What this teaches:
+#   • Modular word contract — `modulus<u8>` wraps on 8-bit overflow; edge cases wrap predictably.
+#   • Bit-pattern edges — Shifting 1 ⇐ 8 wraps to 0; negating 1 wraps to 255.
+#
+# Common mistakes:
+#   • Expecting division or remainder by zero to produce a value rather than fail.
+#
+# See also: numerus, ¬, ⇐, ⇒
+# =============================================================================
+
+# operatores/modular-word-u8 — modulus<u8> edge vectors
+#
+# MODULAR WORD CONTRACT:
+#   modulus<u8> is an unsigned 8-bit modular word. Addition, subtraction,
+#   multiplication, negation, bitwise operations, and shifts use u8 wrapping.
+#   Division and remainder by zero fail.
+
+incipit {
+    varia modulus<u8> max ← 255
+    fixum modulus<u8> one ← 1
+    varia modulus<u8> zero ← 0
+    fixum numerus<u8> converted ← one ↦ numerus<u8>
+
+    nota max + one
+    nota zero - one
+    nota max * 2
+    nota -one
+    nota ¬zero
+    nota one ⇐ 8
+    nota max ⇒ 8
+    nota max > zero
+
+    max ⊕
+    zero ⊖
+    nota max
+    nota zero
+
+    fixum modulus<u8> methodSum ← max.addita(one)
+    fixum modulus<u8> methodShift ← max.sinistrata(8)
+    varia modulus<u8> methodAcc ← 0
+    methodAcc.adde(one)
+    methodAcc.sinistra(8)
+    nota converted
+    nota methodSum
+    nota methodShift
+    nota methodAcc
+
+    fixum lista<modulus<u8>> words ← [one, max]
+    nota words.accipe(1) vel (0 ∷ modulus<u8>)
+}

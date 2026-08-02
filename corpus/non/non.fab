@@ -1,0 +1,57 @@
++++
+term = "non"
+kind = "keyword"
+category = "logic"
+canonical = true
+summary = "Negates a boolean expression."
+syntax = "non <expression>"
+aliases = ["!"]
+related = ["verum", "falsum"]
++++
+
+# =============================================================================
+# non — Negates a boolean expression.
+# =============================================================================
+#
+# What this teaches:
+#   • the `non` keyword — unary boolean negation (equivalent to `!`)
+#
+# Common mistakes:
+#   • Confusing non (logical negation) with ≠ (inequality comparison) — non negates a boolean, ≠ compares two values.
+#
+# See also: verum, falsum
+# =============================================================================
+
+# non — logical not
+#
+# GRAMMAR:
+#   unaryExpr :← 'non' expr
+#
+# EXPECTED OUTPUT:
+#   Scalar stdout smoke (see body).
+#
+
+incipit {
+    fixum _ flag ← falsum
+    fixum _ negated ← non flag
+    nota negated
+}
+
+proba "non negates falsum" {
+    fixum _ flag ← falsum
+    fixum _ negated ← non flag
+    adfirma negated
+}
+
+proba "non negates verum" {
+    fixum _ flag ← verum
+    fixum _ negated ← non flag
+    adfirma negated ≡ falsum
+}
+
+proba "non applied twice returns the original" {
+    fixum _ flag ← falsum
+    fixum _ negated ← non flag
+    fixum _ bis ← non negated
+    adfirma bis ≡ falsum
+}

@@ -1,0 +1,53 @@
++++
+term = "∨"
+kind = "operator-group"
+category = "logic"
+canonical = true
+summary = "Bitwise or and est-negation operators."
+syntax = "<expression> ∨ <expression> | <expression> non est <expression>"
+related = ["∧", "⊻", "¬", "et", "aut", "vel", "non est", "est"]
++++
+
+# =============================================================================
+# ∨ — Bitwise or and est-negation operators.
+# =============================================================================
+#
+# What this teaches:
+#   • Bitwise or — `∨` combines bit flags; distinct from logical short-circuit `aut` and `vel`.
+#   • Negated est — `non est` checks that a value is not null or not equal to a target.
+#
+# Common mistakes:
+#   • Confusing ∨ (bitwise or) with aut (exclusive or) or vel (inclusive or).
+#
+# See also: ∧, ⊻, ¬, et, aut, vel, non est, est
+# =============================================================================
+
+# operatores/logica — ∨ and non est
+#
+# GRAMMAR:
+#   binaryExpr :← expr ('∨' | 'non' 'est') expr
+#
+# EXPECTED OUTPUT:
+#   14, verum, falsum
+#
+# BACKEND:
+#   Cross-ref boolean short-circuit: et/et.fab, aut/binarius.fab, vel/binarius.fab.
+#   Negated est parses as `expr non est target`.
+
+incipit {
+    fixum _ vexilla ← 0b1010
+    fixum _ persona ← 0b1100
+    fixum _ velata ← vexilla ∨ persona
+    # 14 (0b1110)
+    nota velata
+
+    fixum textus ∪ nihil praesens ← "salve"
+    fixum textus ∪ nihil absens ← nihil
+    fixum _ habetValorem ← praesens non est nihil
+    # verum
+    nota habetValorem
+
+    fixum _ caretValorem ← absens non est nihil
+    # falsum
+    nota caretValorem
+}

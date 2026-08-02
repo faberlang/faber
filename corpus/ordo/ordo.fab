@@ -1,0 +1,74 @@
++++
+term = "ordo"
+kind = "keyword"
+category = "type"
+canonical = true
+summary = "Declares an enumeration."
+syntax = "ordo <name> <block>"
+aliases = ["enum"]
+related = ["discretio"]
++++
+
+
+# =============================================================================
+# ordo — Declares an enumeration.
+# =============================================================================
+#
+# What this teaches:
+#   • Enumeration declaration — `ordo <Name> { member, ... }` declares a set of ordered, named constants.
+#   • Discriminant values — Members can have explicit numeric values with `= <number>`.
+#   • Pattern matching — `elige` with `casu` branches selects on ordo variants.
+#
+# Common mistakes:
+#   • Confusing ordo (enum with named constants) with discretio (tagged union with payloads) — ordo members carry no data.
+#
+# See also: discretio
+# =============================================================================
+
+# ordo — enumerated constants (ordered variants)
+#
+# ordo <Nomen> { <membrum>, … }
+# ordo <Nomen> { <membrum> = <valor>, … }
+#
+# GRAMMAR:
+#   ordoDecl :← 'ordo' ident '{' ordoMember (',' ordoMember)* '}'
+#
+# EXPECTED OUTPUT:
+#   rubrum
+#   actum
+
+ordo Color { rubrum, viridis, caeruleum }
+
+ordo Condicio { pendens = 0, actum = 1, finitum = 2 }
+
+incipit {
+    # Using ordo values
+    fixum _ color ← Color.rubrum
+    fixum _ condicio ← Condicio.actum
+
+    # Select by ordo
+    elige color {
+        casu Color.rubrum {
+            nota "rubrum"
+        }
+        casu Color.viridis {
+            nota "viridis"
+        }
+        casu Color.caeruleum {
+            nota "caeruleum"
+        }
+    }
+
+    # Select by ordo with numeric values
+    elige condicio {
+        casu Condicio.pendens {
+            nota "pendens"
+        }
+        casu Condicio.actum {
+            nota "actum"
+        }
+        casu Condicio.finitum {
+            nota "finitum"
+        }
+    }
+}

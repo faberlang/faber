@@ -1,0 +1,46 @@
++++
+term = "numerus"
+kind = "keyword"
+category = "type"
+canonical = true
+summary = "Primitive integer number type."
+syntax = "numerus"
+aliases = ["integer", "int"]
+related = ["fractus", "↦"]
++++
+# =============================================================================
+# numerus — Primitive integer number type
+# =============================================================================
+#
+# What this teaches:
+#   • Primitive integer number type.
+#   • Related keywords: fractus, ↦
+#
+# Common mistakes:
+#   • Using `numerus` comparison methods on non-numeric types — `.absolutum()`, `.signum()`, `.minimus()`, `.maximus()` are numerus-only intrinsics.
+#
+# See also: fractus, ↦
+# =============================================================================
+
+# numerus comparison and ordering intrinsics
+#
+# Compiler-owned numerus methodi — absolutum, signum, minimus, maximus.
+#
+# GRAMMAR:
+#   valor.absolutum() | valor.signum()
+#   valor.minimus(other) | valor.maximus(other)
+#
+# Integer counterpart to fractus-comparatio.fab; Wasm tier Runnable.
+#
+# EXPECTED OUTPUT:
+#   Smoke asserts exit 0 only.
+
+incipit {
+    fixum numerus valor ← -7
+    fixum _ absolutus ← valor.absolutum()
+    fixum _ signum ← valor.signum()
+    fixum _ minor ← valor.minimus(3)
+    fixum _ maior ← valor.maximus(3)
+
+    nota absolutus, signum, minor, maior
+}

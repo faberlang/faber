@@ -1,0 +1,38 @@
++++
+term = "lineam"
+kind = "keyword"
+category = "io"
+canonical = true
+summary = "Reads one line of input."
+syntax = "lege lineam"
+related = ["lege"]
++++
+
+# =============================================================================
+# lineam — Reads one line of input.
+# =============================================================================
+#
+# What this teaches:
+#   • line-oriented input mode — `lege lineam` reads a single line from stdin
+#
+# Common mistakes:
+#   • Confusing lineam (reads one line without trailing newline) with nota (writes diagnostic output with newline).
+#
+# See also: lege
+# =============================================================================
+
+# lineam — line-oriented lege read
+#
+# GRAMMAR:
+#   readMode :← 'lege' 'lineam'
+#
+# EXPECTED OUTPUT:
+#   Scalar stdout smoke (see body).
+#
+# BACKEND:
+#   Rust/Go/roundtrip whitelist like lege/lege.fab.
+#
+
+incipit {
+    nota "lineam exemplum — stdin read deferred in harness"
+}

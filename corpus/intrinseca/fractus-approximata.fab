@@ -1,0 +1,39 @@
++++
+term = "fractus-approximata"
+kind = "concept"
+category = "intrinseca"
+canonical = false
+summary = "DEFER-036 tolerance compare on fractus receiver (not ≈)."
+syntax = "x.approximata(aliud, toleratio)"
+related = ["fractus", "approximata", "DEFER-036"]
++++
+# =============================================================================
+# fractus-approximata — DEFER-036 tolerance compare on fractus receiver (not ≈)
+# =============================================================================
+#
+# What this teaches:
+#   • DEFER-036 tolerance compare on fractus receiver (not ≈).
+#   • Related keywords: fractus, approximata, DEFER-036
+#
+# Common mistakes:
+#   • Using `≡` for floating-point comparison — direct float equality is unreliable; use `.approximata(aliud, toleratio)` instead.
+#
+# See also: fractus, approximata, DEFER-036
+# =============================================================================
+
+# intrinseca/fractus-approximata — tolerance-based float compare (DEFER-036)
+#
+# EXPECTED OUTPUT:
+#   verum
+#   falsum
+
+incipit {
+    fixum fractus a ← 42.145
+    fixum fractus b ← 42.0
+
+    fixum bivalens near ← a.approximata(b, 0.2)
+    fixum bivalens exact_promo ← a ≈ b
+
+    nota near
+    nota exact_promo
+}

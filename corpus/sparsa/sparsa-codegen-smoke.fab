@@ -1,0 +1,30 @@
++++
+term = "sparsa"
+kind = "smoke"
+category = "collection"
+canonical = false
+summary = "Sparse tensor codegen smoke for longitudo and nonnihil calls."
+syntax = "sparsa<T, Figura>.longitudo() | sparsa<T, Figura>.nonnihil()"
+related = ["sparsa", "tensor", "vacua"]
++++
+
+# =============================================================================
+# sparsa — Sparse tensor codegen smoke for longitudo and nonnihil calls.
+# =============================================================================
+#
+# What this teaches:
+#   • Sparse tensor intrinsics — `longitudo()` for rank and `nonnihil()` for stored element count
+#   • Codegen smoke — minimal proof that sparse tensor operations produce executable code
+#
+# Common mistakes:
+#   • confusing longitudo() (rank) with nonnihil() (stored nonzero count)
+#
+# See also: sparsa, tensor, vacua
+# =============================================================================
+
+incipit {
+  fixum sparsa<fractus, [2, 3]> s ← vacua
+  fixum _ len ← s.longitudo()
+  fixum _ count ← s.nonnihil()
+  nota len, count
+}

@@ -1,0 +1,37 @@
++++
+term = "mone"
+kind = "keyword"
+category = "output"
+canonical = true
+summary = "Writes a warning message."
+syntax = "mone <expression>"
+related = ["scribe", "vide"]
++++
+
+# =============================================================================
+# mone — Writes a warning message.
+# =============================================================================
+#
+# What this teaches:
+#   • the `mone` keyword — emits a warning-style diagnostic (distinct from `nota`/`vide`)
+#   • diagnostic output categories — mone for warnings vs scribe/vide for other I/O
+#
+# Common mistakes:
+#   • Confusing mone (stderr warning) with nota (diagnostic info) — mone emits warnings, nota emits neutral informational output.
+#
+# See also: scribe, vide
+# =============================================================================
+
+# mone diagnostic output
+#
+# mone <expr>  -- emit a warning-style diagnostic (distinct from nota/vide)
+#
+# GRAMMAR:
+#   outputStmt :← 'mone' expr
+#
+# EXPECTED OUTPUT:
+#   mone-style warning diagnostic (single mone call).
+
+incipit {
+    mone "cave"
+}

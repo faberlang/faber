@@ -1,0 +1,73 @@
++++
+term = "integratio"
+kind = "concept"
+category = "integration"
+canonical = false
+summary = "Dense syntax tour: genus, closures, ranges, and optional chaining."
+syntax = "integratio — multi-feature happy path"
+related = ["genus", "clausa", "?.", "itera"]
++++
+# =============================================================================
+# integratio — Dense syntax tour: genus, closures, ranges, and optional chaining
+# =============================================================================
+#
+# What this teaches:
+#   • Dense syntax tour: genus, closures, ranges, and optional chaining.
+#   • Related keywords: genus, clausa, ?., itera
+#
+# Common mistakes:
+#   • Using optional chaining (`?.`) on a non-nullable value — `?.` is only valid on `T ∪ nihil` types; use `.` for non-nullable values.
+#
+# See also: genus, clausa, ?., itera
+# =============================================================================
+
+# integratio — dense syntax tour (genus, closures, ranges, optional chaining)
+#
+# genus G { field sponte; field = default; functio … }
+# fixum T f ← T x ∴ fac { … }
+# n?.field vel default
+# itera ab lo usque hi per step { … }
+#
+# GRAMMAR:
+#   (multi-construct tour — genus, sponte, vel, ?., itera, lista intrinsics)
+#
+# EXPECTED OUTPUT:
+#   none — smoke asserts exit 0 only.
+#
+# BACKEND:
+#   Go e2e whitelist — expression-valued block / arena typing not yet for Go.
+
+genus Nauta {
+    textus nomen
+    textus navis sponte
+    numerus gradus = 0
+
+    functio titulus() → textus {
+        redde "§@§"(ego.nomen, ego.navis vel "terra")
+    }
+}
+
+functio classis(numerus n) → textus {
+    redde n ≥ 10 sic "veteranus" secus (n ≥ 5 sic "peritus" secus "novus")
+}
+
+incipit {
+    fixum _ nautae ← [Nauta { nomen = "Aelia", navis = "Fortuna", gradus = 12 }, Nauta { nomen = "Brutus", gradus = 3 }, Nauta { nomen = "Claudia", navis = "Aurora", gradus = 7 }]
+
+    fixum _ titulus ← Nauta n → textus ∴ fac {
+        fixum _ navis ← n?.navis vel "nulla navis"
+        redde "§ :: § :: §"(n.nomen, navis, classis(n.gradus))
+    }
+
+    itera ex nautae fixum n {
+        nota titulus(n)
+    }
+
+    varia lista<numerus> gradus ← vacua
+    itera ab 0…6 per 2 fixum i {
+        gradus.appende(i * 3)
+    }
+
+    fixum _ magni ← gradus.filtrata(numerus g ∴ g ≥ 6).mappata(numerus g ∴ g + 1)
+    nota magni
+}

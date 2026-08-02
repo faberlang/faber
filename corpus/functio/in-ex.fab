@@ -1,0 +1,70 @@
++++
+term = "functio"
+kind = "keyword"
+category = "function"
+canonical = true
+summary = "Declares a named function or method."
+syntax = "functio <name>(<params>) [modifiers] [→ <type>] [⇥ <error-type>] <block>"
+aliases = ["function"]
+related = ["→", "⇥", "redde", "sponte", "ceteri", "prae", "curata", "futura", "cursor"]
++++
+# =============================================================================
+# functio — Declares a named function or method
+# =============================================================================
+#
+# What this teaches:
+#   • Declares a named function or method.
+#   • Related keywords: →, ⇥, redde, sponte, ceteri, prae, curata, futura, cursor
+#
+# Common mistakes:
+#   • Using a value after it has been moved by `ex` — `ex` consumes ownership; accessing the value after a move is a use-after-move error (SEM050).
+#
+# See also: →, ⇥, redde, sponte, ceteri, prae, curata, futura, cursor
+# =============================================================================
+
+# Parameter borrow markers: de (shared), in (mutable), ex (consume)
+#
+# de <type> <nomen>  -- shared borrow (read-only from caller's view)
+# in <type> <nomen>  -- mutable borrow (callee may modify the binding)
+# ex <type> <nomen>  -- consume/move ownership into callee
+#
+# GRAMMAR:
+#   parameter :← ('de' | 'in' | 'ex')? type ident ...
+#
+# EXPECTED OUTPUT:
+#   mutabile
+#   6
+#   salve
+#
+# BACKEND: Rust lowering treats `in` as immutable args (borrow lowering gap;
+# whitelist: functio/in-ex.fab). Go target is runnable.
+
+# --- Shared borrow: read label without taking ownership ---
+
+functio imprime(de textus label) → vacuum {
+    nota label
+}
+
+# --- Mutable borrow: double the caller's numerus in place ---
+
+functio duplica(in numerus value) → vacuum {
+    value ← value * 2
+    nota value
+}
+
+# --- Consume: take ownership of textus and return it ---
+
+functio consume(ex textus buffer) → textus {
+    redde buffer
+}
+
+incipit {
+    imprime("mutabile")
+
+    varia numerus valor ← 3
+    # in borrows valor mutably inside duplica
+    duplica(valor)
+
+    # ex moves the literal into consume
+    nota consume("salve")
+}

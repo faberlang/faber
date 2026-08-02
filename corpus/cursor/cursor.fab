@@ -1,0 +1,49 @@
++++
+term = "cursor"
+kind = "keyword"
+category = "async"
+canonical = true
+summary = "Compatibility annotation for stream/generator posture."
+syntax = "@ cursor"
+related = ["fiunt", "fient", "cede"]
++++
+
+# =============================================================================
+# cursor — Compatibility annotation for stream/generator posture.
+# =============================================================================
+#
+# What this teaches:
+#   • Preferred stream posture — write `fiunt` for a synchronous stream or
+#     `fient` for an asynchronous stream.
+#   • Compatibility annotation — `@ cursor` remains accepted and preserved as
+#     the legacy spelling for stream/generator posture.
+#
+# Common mistakes:
+#   • Using `cede` outside a stream body — `cede` is valid only inside `fiunt`
+#     or `fient` bodies, including compatible `@ cursor` declarations.
+#
+# See also: fiunt, fient, cede
+# =============================================================================
+
+# cursor — compatibility stream annotation
+#
+# GRAMMAR:
+#   annotation :← '@' 'cursor'
+#   callablePosture :← 'fiunt' | 'fient'
+#
+# EXPECTED OUTPUT:
+#   Scalar stdout smoke (see body).
+#
+# BACKEND:
+#   Cross-ref: futura/futura.fab, itera/cursor-iteratio.fab; Go whitelist: cursor/cursor.fab.
+#
+
+@ cursor
+functio stream() → numerus {
+    cede 1
+    cede 2
+}
+
+incipit {
+    nota stream()
+}

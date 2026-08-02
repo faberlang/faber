@@ -1,0 +1,33 @@
++++
+term = "ascii"
+kind = "existing-home"
+category = "literal"
+canonical = true
+summary = "Single-quoted ASCII machine-text literals."
+syntax = "'<text>'"
+aliases = ["'...'"]
+related = ["textus", "string"]
++++
+
+# =============================================================================
+# ascii — Single-quoted ASCII machine-text literals.
+# =============================================================================
+#
+# What this teaches:
+#   • single-quoted ASCII literals `'...'` — compact syntax for machine-facing strings like route paths
+#
+# Common mistakes:
+#   • Including non-ASCII characters in ascii literals — ascii literals are ASCII-only; use "..." for Unicode textus.
+#
+# See also: textus, string
+# =============================================================================
+
+# literalia/ascii — '...' literals
+#
+# EXPECTED OUTPUT:
+#   pg:query
+
+incipit {
+    fixum _ route ← 'pg:query'
+    nota route
+}

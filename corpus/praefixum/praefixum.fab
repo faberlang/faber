@@ -1,0 +1,62 @@
++++
+term = "praefixum"
+kind = "keyword"
+category = "comptime"
+canonical = true
+summary = "Forces compile-time evaluation of an expression."
+syntax = "praefixum(<expression>)"
++++
+
+
+# =============================================================================
+# praefixum — Forces compile-time evaluation of an expression.
+# =============================================================================
+#
+# What this teaches:
+#   • Compile-time evaluation — `praefixum(expr)` folds expressions at compile time, enabling constant computation.
+#   • Block evaluation — `praefixum { ... }` evaluates a block at compile time for complex constants like maps.
+#
+# Common mistakes:
+#   • Confusing `praefixum` (compile-time evaluation) with `scriptum` (string formatting) or `∷` (type ascription).
+#
+# See also: (none)
+# =============================================================================
+
+# praefixum — compile-time constant evaluation
+#
+# praefixum(<expr>)   -- fold a single expression at compile time
+# praefixum { … }      -- fold a block literal at compile time
+#
+# GRAMMAR:
+#   constExpr :← 'praefixum' '(' expr ')'
+#   constBlock :← 'praefixum' block
+#
+# EXPECTED OUTPUT:
+#   pi/tau strings, computed day/hour/second counts, block-evaluated sum.
+
+incipit {
+    # Constant expression
+    fixum _ pi ← praefixum(3.14159)
+    fixum _ tau ← praefixum((2 ↦ fractus) * 3.14159)
+    nota "pi: §"(pi)
+    nota "tau: §"(tau)
+
+    # Computation
+    fixum _ diesanno ← praefixum(365)
+    fixum _ horaeanno ← praefixum(365 * 24)
+    fixum _ secundaanno ← praefixum(365 * 24 * 60 * 60)
+
+    nota "dies: §"(diesanno)
+    nota "horae: §"(horaeanno)
+    nota "secunda: §"(secundaanno)
+
+    # Block
+    fixum tabula<textus, numerus> codices ← praefixum({
+        "ok": 200,
+        "creatum": 201,
+        "noninventum": 404,
+        "error": 500
+    })
+
+    nota "codex rectus: §"(codices["ok"])
+}

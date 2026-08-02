@@ -1,0 +1,42 @@
++++
+term = "async solum leget"
+kind = "concept"
+category = "ad"
+canonical = true
+summary = "Async solum.leget<T> uses the same solum:lege route as sync solum.lege<T>."
+syntax = "solum.leget<textus>(via)"
+related = ["ad", "solum", "futura", "sermo"]
++++
+
+# =============================================================================
+# async solum leget — async solum.leget<T> uses the same solum:lege route as
+# sync solum.lege<T>.
+# =============================================================================
+#
+# What this teaches:
+#   • Async/sync proof pair — `solum.leget<T>` and `solum.lege<T>` share the
+#     same host route; the async callable posture selects the async receive path
+#   • Import syntax — `importa ex "norma:solum"` brings in standard library
+#     modules
+#
+# Common mistakes:
+#   • using an ad expression outside the AIR lane or confusing the async route syntax — `solum.leget<T>` must be awaited from `incipiet`
+#
+# See also: ad, solum, futura, sermo
+# =============================================================================
+
+# Async `ad` materialization through a standard-library proof pair.
+#
+# `solum.leget<T>` is the async-posture twin of `solum.lege<T>`. Norma currently
+# declares the wrapper with compatibility `@ futura`; callers consume it through
+# the explicit morphology forms such as `figendum`.
+
+importa ex "norma:solum" privata solum
+
+incipiet {
+    fixum textus textPath ← "/tmp/faber-async-solum-leget.txt"
+    solum.scribe(textPath, "async solum\n")
+
+    figendum textus body ← solum.leget<textus>(textPath)
+    adfirma body ≡ "async solum\n"
+}

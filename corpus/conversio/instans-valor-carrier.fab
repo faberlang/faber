@@ -1,0 +1,45 @@
++++
+term = "instans"
+kind = "conversio"
+category = "conversion"
+canonical = false
+summary = "Valor datetime carriers to instans through runtime extraction."
+syntax = "valor ↦ instans | instans<ms> [⇥ fallback]"
+related = ["↦", "⇥", "valor"]
++++
+
+# =============================================================================
+# instans — Valor datetime carriers to instans through runtime extraction.
+# =============================================================================
+#
+# What this teaches:
+#   • Datetime conversion from valor — how `valor ↦ instans` extracts RFC3339 datetime values from dynamic valor carriers.
+#   • Precision parameterization — `instans<ms>` targets millisecond precision on extraction.
+#
+# Common mistakes:
+#   • Assuming all text values in valor are valid RFC3339 strings — invalid carriers require `⇥` recovery.
+#
+# See also: ↦, ⇥, valor
+# =============================================================================
+
+
+# conversio — valor datetime carrier to instans
+#
+# WHY: `valor ↦ instans<N>` must apply the dynamic Valor carrier policy on the
+# Rust route and the MIR stepper route. Text wire values are parsed as RFC3339;
+# invalid carriers recover through `⇥`.
+
+incipit {
+    fixum valor utc ← "1979-05-27T07:32:00Z"
+    fixum valor offset ← "1979-05-27T16:32:00+0900"
+    fixum instans seconds ← utc ↦ instans
+    fixum instans<ms> millis ← utc ↦ instans<ms>
+    fixum instans normalized ← offset ↦ instans
+    fixum valor bad ← "not-a-datetime"
+    fixum instans recovered ← bad ↦ instans ⇥ seconds
+
+    nota seconds ↦ textus
+    nota millis ↦ textus
+    nota normalized ↦ textus
+    nota recovered ↦ textus
+}

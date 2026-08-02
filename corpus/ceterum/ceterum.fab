@@ -1,0 +1,46 @@
++++
+term = "ceterum"
+kind = "keyword"
+category = "control-flow"
+canonical = true
+summary = "Starts the default branch of an elige or discerne statement."
+syntax = "ceterum <block>"
+aliases = ["default"]
+related = ["elige", "discerne"]
++++
+
+# =============================================================================
+# ceterum — Starts the default branch of an elige or discerne statement.
+# =============================================================================
+#
+# What this teaches:
+#   • Default arm — `ceterum <block>` is the catch-all branch in an `elige`
+#     or `discerne` match expression
+#   • Fallback handling — when no `casu` pattern matches, execution falls
+#     through to the `ceterum` block
+#
+# Common mistakes:
+#   • using `ceterum` with `discerne omnia` — `omnia` forbids catchall arms and requires listing every variant explicitly (SEM044)
+#
+# See also: elige, discerne
+# =============================================================================
+
+# ceterum — default elige arm
+#
+# GRAMMAR:
+#   defaultClause :← 'ceterum' block
+#
+# EXPECTED OUTPUT:
+#   Scalar stdout smoke (see body).
+#
+# BACKEND:
+#   Cross-ref: elige/ceterum.fab.
+#
+
+incipit {
+    fixum _ tag ← "z"
+    elige tag {
+        casu "a" { nota "a" }
+        ceterum { nota "default" }
+    }
+}

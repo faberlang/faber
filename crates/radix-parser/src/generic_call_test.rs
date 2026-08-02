@@ -1,0 +1,149 @@
+//! Parser coverage for explicit call-site type arguments.
+
+use crate::test_support::parse_ok;
+use radix_syntax::{ExprKind, IfBody, StmtKind, TypeExprKind};
+
+fn first_call_expr(result: &crate::ParseResult) -> &radix_syntax::CallExpr {
+    let program = result.program.as_ref().expect("program");
+    let stmt = program.statements.last().expect("statement");
+    let StmtKind::Incipit(entry) = &stmt.kind else {
+        panic!("expected incipit");
+    };
+    let IfBody::Block(block) = &entry.body else {
+        panic!("expected block body");
+    };
+    let StmtKind::Var(var) = &block.statements[0].kind else {
+        panic!("expected var decl");
+    };
+    let init = var.init.as_ref().expect("initializer");
+    let ExprKind::Call(call) = &init.kind else {
+        panic!("expected call expression, got {:?}", init.kind);
+    };
+    call
+}
+
+#[test]
+fn parses_explicit_type_args_on_direct_call() {
+    let result = parse_ok(
+        r#"incipit {
+    fixum textus x ← id<textus>("salve")
+}"#,
+    );
+    let call = first_call_expr(&result);
+    assert_eq!(call.type_args.len(), 1);
+    assert!(matches!(call.type_args[0].kind, TypeExprKind::Named(_, _)));
+}
+
+#[test]
+fn parses_explicit_type_args_on_member_call() {
+    let result = parse_ok(
+        r#"incipit {
+    fixum textus x ← module.f<textus>("x")
+}"#,
+    );
+    let call = first_call_expr(&result);
+    assert_eq!(call.type_args.len(), 1);
+    let ExprKind::Member(member) = &call.callee.kind else {
+        panic!("expected member callee");
+    };
+    assert!(matches!(member.object.kind, ExprKind::Ident(_)));
+}
+
+#[test]
+fn parses_explicit_type_args_on_keyword_import_alias_method_call() {
+    let result = parse_ok(
+        r#"incipit {
+    fixum textus x ← solum.lege<textus>("x")
+}"#,
+    );
+    let call = first_call_expr(&result);
+    assert_eq!(call.type_args.len(), 1);
+    let ExprKind::Member(member) = &call.callee.kind else {
+        panic!("expected member callee");
+    };
+    assert!(matches!(member.object.kind, ExprKind::Ident(_)));
+}
+
+#[test]
+fn parses_explicit_type_args_on_receiver_method_call() {
+    let result = parse_ok(
+        r"incipit {
+    fixum octeti frame ← receiver.method<octeti>()
+}",
+    );
+    let call = first_call_expr(&result);
+    assert_eq!(call.type_args.len(), 1);
+    let ExprKind::Member(member) = &call.callee.kind else {
+        panic!("expected member callee");
+    };
+    assert!(matches!(member.object.kind, ExprKind::Ident(_)));
+}
+
+#[test]
+fn comparison_expression_still_parses_as_binary() {
+    let result = parse_ok(
+        r"incipit {
+    fixum bivalens ok ← a < b
+}",
+    );
+    let program = result.program.as_ref().expect("program");
+    let stmt = program.statements.last().expect("statement");
+    let StmtKind::Incipit(entry) = &stmt.kind else {
+        panic!("expected incipit");
+    };
+    let IfBody::Block(block) = &entry.body else {
+        panic!("expected block body");
+    };
+    let StmtKind::Var(var) = &block.statements[0].kind else {
+        panic!("expected var decl");
+    };
+    let init = var.init.as_ref().expect("initializer");
+    assert!(matches!(init.kind, ExprKind::Binary(_)));
+}
+
+#[test]
+fn parses_multiple_type_args_on_direct_call() {
+    let result = parse_ok(
+        r"incipit {
+    fixum bivalens ok ← convert<numerus, textus>(42)
+}",
+    );
+    let call = first_call_expr(&result);
+    assert_eq!(call.type_args.len(), 2);
+    assert!(matches!(call.type_args[0].kind, TypeExprKind::Named(_, _)));
+    assert!(matches!(call.type_args[1].kind, TypeExprKind::Named(_, _)));
+}
+
+#[test]
+fn parsers_call_without_type_args_has_empty_type_args() {
+    let result = parse_ok(
+        r#"incipit {
+    fixum textus x ← greet("salve")
+}"#,
+    );
+    let call = first_call_expr(&result);
+    assert!(call.type_args.is_empty());
+}
+
+#[test]
+fn parses_double_less_than_as_comparison_not_broken_type_args() {
+    // Regression: shift must not be parsed as call-site type arguments.
+    let result = parse_ok(
+        r"incipit {
+    fixum numerus x ← a ⇐ 2
+}",
+    );
+    let program = result.program.as_ref().expect("program");
+    let stmt = program.statements.last().expect("statement");
+    let StmtKind::Incipit(entry) = &stmt.kind else {
+        panic!("expected incipit")
+    };
+    let IfBody::Block(block) = &entry.body else {
+        panic!("expected block body")
+    };
+    let StmtKind::Var(var) = &block.statements[0].kind else {
+        panic!("expected var decl")
+    };
+    let init = var.init.as_ref().expect("initializer");
+    assert!(matches!(init.kind, ExprKind::Binary(_)));
+}

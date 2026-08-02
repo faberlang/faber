@@ -1,0 +1,45 @@
++++
+term = "importa"
+kind = "keyword"
+category = "package"
+canonical = true
+summary = "Imports names from another module or package source."
+syntax = "importa ex <source> <privata|publica> (<name> [ut <alias>] | * ut <alias>)"
+aliases = ["import"]
+related = ["ex", "privata", "publica", "ut"]
++++
+# =============================================================================
+# importa — Imports names from another module or package source
+# =============================================================================
+#
+# What this teaches:
+#   • Imports names from another module or package source.
+#   • Related keywords: ex, privata, publica, ut
+#
+# Common mistakes:
+#   • Missing the `ex` source in the import record — an import record requires an `ex` source path.
+#
+# See also: ex, privata, publica, ut
+# =============================================================================
+
+# importa ex — named import from a sibling module
+#
+# importa ex relative path with privata symbol selection.
+#
+# GRAMMAR:
+#   importa ex "<path>" privata <name> [ut <alias>]
+#
+# Requires module layout: importa/importa.fab imports from importa/auxilium.fab.
+# Harness compiles single files in isolation — sibling resolution needs package
+# or module mode (faber check --package), not bare single-file emit.
+#
+# EXPECTED OUTPUT:
+#   "Salve, Marcus!" on successful link.
+#
+# BACKEND: Rust/Go e2e whitelist — single-file compile cannot resolve sibling.
+
+importa ex "./auxilium" privata auxilium
+
+incipit {
+    nota auxilium.saluta("Marcus")
+}

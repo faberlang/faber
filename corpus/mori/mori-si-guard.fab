@@ -1,0 +1,74 @@
++++
+term = "mori"
+kind = "keyword"
+category = "errors"
+canonical = true
+summary = "Conditional fatal abort with si guard."
+syntax = "mori <expression> si <condition>"
+related = ["iace", "ergo", "si"]
++++
+
+# =============================================================================
+# mori — Conditional fatal abort with si guard.
+# =============================================================================
+#
+# What this teaches:
+#   • fatal abort with `mori` — unconditional and conditional (`si` guard) forms
+#   • invariant enforcement — using `mori` with guards to validate function preconditions
+#   • the `si` guard is parser sugar for `si cond { mori "msg" }`
+#
+# Common mistakes:
+#   • Using mori for recoverable errors — use iace with a si guard and ⇥ for recoverable failure paths instead.
+#
+# See also: iace, ergo, si
+# =============================================================================
+
+# mori with optional si guard
+#
+# mori <nuntius> [si <condicio>]
+#
+# GRAMMAR:
+#   abortStmt :← 'mori' expr ['si' expr]
+#
+# The optional `si` guard is parser sugar:
+#   mori "msg" si cond  →  si cond { mori "msg" }
+#
+# Without the guard, mori is unconditional (unchanged).
+#
+# EXPECTED OUTPUT:
+#   "within range"
+#   "positive"
+#   "not empty"
+
+functio clamp(numerus x, numerus min, numerus max) → numerus {
+    # Guard: abort if min > max — invariant violation
+    mori "range inverted" si min > max
+
+    # Guard: abort if value out of range
+    mori "value out of range" si x < min aut x > max
+
+    redde x
+}
+
+functio accessus(lista<numerus> res, numerus index) → numerus {
+    # Unconditional mori — unchanged form
+    si index < 0 aut index ≥ res.longitudo() {
+        mori "index out of bounds"
+    }
+    redde res[index]
+}
+
+incipit {
+    # Happy path — guards not triggered
+    fixum numerus n ← clamp(5, 0, 10)
+    nota "within range"
+
+    # Happy path — empty list guard not triggered
+    fixum lista<numerus> xs ← [1, 2, 3]
+    fixum numerus y ← accessus(xs, 1)
+    nota "positive"
+
+    fixum lista<numerus> ys ← [42]
+    fixum numerus z ← accessus(ys, 0)
+    nota "not empty"
+}

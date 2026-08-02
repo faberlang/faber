@@ -1,0 +1,76 @@
++++
+term = "↦"
+kind = "operator-group"
+category = "conversion"
+canonical = false
+summary = "Tensor bridges and element-width conversio."
+syntax = "<tensor> ↦ <tensor-type> | <lista> ↦ tensor | tensor ↦ lista"
+related = ["↦", "tensor", "lista"]
++++
+
+# =============================================================================
+# ↦ — Tensor bridges and element-width conversio.
+# =============================================================================
+#
+# What this teaches:
+#   • Collection↔tensor — `lista ↦ tensor` with literal target shape or 1-d fallback; `tensor ↦ lista` flattens.
+#   • Element-width lattice — tensor element types widen/narrow following the scalar signed int (i8→i16→i32→i64), unsigned int, and float (f32→f64) lattices.
+#   • Conversion boundaries — scalar extraction, reshape, and broadcast construction reject at typecheck (use `accipe`, `forma`, `crea` instead).
+#
+# Common mistakes:
+#   • Expecting tensor↔lista conversion to preserve shape information — `tensor ↦ lista` flattens via `planata()`, losing dimension structure.
+#
+# See also: ↦, tensor, lista
+# =============================================================================
+
+
+# conversio — tensor bridges and element-width conversion
+#
+# WHY: `lista ↦ tensor` uses a literal target shape when the target witnesses
+# `Figura`; otherwise it falls back to default 1-d construction. `tensor ↦ lista`
+# flattens.
+# `tensor<numerus, [N]> ↦ tensor<fractus, [N]>` widens element-wise; the reverse
+# truncates toward zero (Rust `as`). Sized `numerus<W>` / `fractus<W>` pairs mirror
+# the scalar lattice element-wise on each chain:
+#   signed int: i8 → i16 → i32 → i64
+#   unsigned int: u8 → u16 → u32 → u64
+#   float: f32 → f64; signed int may widen to fractus<f64> (bare `fractus`)
+#   fractus → numerus is explicit narrow (any width)
+# Exhaustive pair regression lives in radix lattice matrix tests (100 cells).
+# Scalar extraction, reshape, and broadcast construction reject at typecheck —
+# use `accipe`, `forma`, and `crea` instead.
+# See docs/factory/conversio-tensor-coverage/.
+
+incipit {
+    fixum lista<numerus> xs ← [1, 2, 3, 4]
+    fixum tensor<numerus, [4]> grid ← xs ↦ tensor<numerus, [4]>
+    fixum lista<numerus> flat ← grid ↦ lista<numerus>
+    nota flat.longitudo()
+
+    fixum tensor<fractus, [4]> floats ← grid ↦ tensor<fractus, [4]>
+    fixum tensor<numerus, [4]> ints ← floats ↦ tensor<numerus, [4]>
+    nota ints.longitudo()
+
+    fixum tensor<numerus<i32>, []> narrow ← vacua
+    fixum tensor<numerus<i64>, []> wide ← narrow ↦ tensor<numerus<i64>, []>
+    fixum tensor<numerus<i32>, []> narrowed ← wide ↦ tensor<numerus<i32>, []>
+    nota narrowed.longitudo()
+
+    fixum tensor<numerus<u8>, []> bytes ← vacua
+    fixum tensor<numerus<u16>, []> words ← bytes ↦ tensor<numerus<u16>, []>
+    fixum tensor<numerus<u8>, []> shrunk ← words ↦ tensor<numerus<u8>, []>
+    nota shrunk.longitudo()
+
+    fixum tensor<fractus<f32>, []> half ← vacua
+    fixum tensor<fractus, []> full ← half ↦ tensor<fractus, []>
+    fixum tensor<fractus<f32>, []> single ← full ↦ tensor<fractus<f32>, []>
+    nota single.longitudo()
+
+    fixum tensor<fractus, []> fromFloat ← vacua
+    fixum tensor<numerus<i32>, []> fromFractus ← fromFloat ↦ tensor<numerus<i32>, []>
+    nota fromFractus.longitudo()
+
+    fixum tensor<numerus<i32>, []> signed ← vacua
+    fixum tensor<fractus, []> promoted ← signed ↦ tensor<fractus, []>
+    nota promoted.longitudo()
+}

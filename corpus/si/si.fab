@@ -1,0 +1,86 @@
++++
+term = "si"
+kind = "keyword"
+category = "control-flow"
+canonical = true
+summary = "Starts a conditional branch that runs when its condition is true."
+syntax = "si <condition> <block>"
+aliases = ["if"]
+related = ["sin", "secus", "ergo"]
++++
+
+# =============================================================================
+# si — Starts a conditional branch that runs when its condition is true.
+# =============================================================================
+#
+# What this teaches:
+#   • Basic conditional execution — `si <condition> { body }` runs the body
+#     only when the condition evaluates to `verum`
+#   • Multiple independent `si` blocks can be chained; each evaluates its own
+#     condition independently
+#
+# Common mistakes:
+#   • Using a non-`bivalens` expression as the `si` condition (SEM011), or using `∴` instead of `ergo` for a single-statement body.
+#
+# See also: sin, secus, ergo
+# =============================================================================
+
+# Basic si (if) conditionals
+#
+# si <condition> { <body> }   -- truthy branch
+#
+# GRAMMAR:
+#   ifStmt :← 'si' expr block
+#
+# EXPECTED OUTPUT:
+#   x maior quam 5, Adult, Can vote (si.expected).
+
+incipit {
+    # Simple truthy branch — only the first condition matches
+    fixum _ x ← 10
+
+    si x > 5 {
+        nota "x maior quam 5"
+    }
+
+    si x > 20 {
+        # skipped: 10 ≯ 20
+        nota "x maior quam 20"
+    }
+
+    # Block body: multiple statements run together when condition holds
+    fixum _ aetas ← 25
+
+    si aetas ≥ 18 {
+        nota "Adult"
+        nota "Can vote"
+    }
+}
+
+proba "si runs its body on a verum condition" {
+    fixum _ x ← 10
+    varia bivalens maior ← falsum
+    si x > 5 {
+        maior ← verum
+    }
+    adfirma maior
+}
+
+proba "si skips its body on a falsum condition" {
+    fixum _ x ← 10
+    varia bivalens maior ← falsum
+    si x > 20 {
+        maior ← verum
+    }
+    adfirma non maior
+}
+
+proba "si block body runs every statement" {
+    fixum _ aetas ← 25
+    varia numerus gradus ← 0
+    si aetas ≥ 18 {
+        gradus ← gradus + 1
+        gradus ← gradus + 1
+    }
+    adfirma gradus ≡ 2
+}

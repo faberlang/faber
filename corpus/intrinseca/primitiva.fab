@@ -1,0 +1,54 @@
++++
+term = "bivalens"
+kind = "keyword"
+category = "type"
+canonical = true
+summary = "Primitive types bivalens, vacuum, and ignotum."
+syntax = "bivalens | vacuum | ignotum"
+related = ["verum", "falsum", "functio", "∷", "vacuum"]
++++
+# =============================================================================
+# bivalens — Primitive types bivalens, vacuum, and ignotum
+# =============================================================================
+#
+# What this teaches:
+#   • Primitive types bivalens, vacuum, and ignotum.
+#   • Related keywords: verum, falsum, functio, ∷, vacuum
+#
+# Common mistakes:
+#   • Using `ignotum` where a concrete type is expected — `ignotum` is the dynamic dispatch type; use `est` checks or match before extracting.
+#
+# See also: verum, falsum, functio, ∷, vacuum
+# =============================================================================
+
+# intrinseca/primitiva — bivalens, vacuum, ignotum
+#
+# GRAMMAR:
+#   typeExpr :← 'bivalens' | 'vacuum' | 'ignotum'
+#
+# EXPECTED OUTPUT:
+#   ping, nihil est, verum est, aliud est
+#
+# BACKEND:
+#   Cross-ref vacuum/vacuum.fab for void returns; numerus/fractus/textus intrinseca files.
+
+functio ping() → vacuum {
+    nota "primitiva smoke"
+}
+
+functio describe(ignotum value) → textus {
+    si value est nihil { redde "nihil est" }
+    redde "aliud est"
+}
+
+functio describe_boolean(bivalens value) → textus {
+    si value est verum { redde "verum est" }
+    redde "aliud est"
+}
+
+incipit {
+    ping()
+    nota describe(nihil)
+    nota describe_boolean(verum)
+    nota describe(42)
+}

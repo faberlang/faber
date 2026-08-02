@@ -1,0 +1,65 @@
++++
+term = "vacua"
+kind = "concept"
+category = "collection"
+canonical = false
+summary = "Typed empty collection construction with vacua."
+syntax = "varia <collection-type> <name> ← vacua"
+related = ["vacua", "lista", "tabula", "copia"]
++++
+# =============================================================================
+# vacua — Typed empty collection construction with vacua
+# =============================================================================
+#
+# What this teaches:
+#   • Typed empty collection construction with vacua.
+#   • Related keywords: vacua, lista, tabula, copia
+#
+# Common mistakes:
+#   • Using `vacua` without an explicit declared type — the compiler cannot infer the collection type from `vacua` alone; always annotate the type (SEM014).
+#
+# See also: vacua, lista, tabula, copia
+# =============================================================================
+
+# vacua — typed empty collection construction (forma innata)
+#
+# Compiler-owned vacua initializer for tabula, lista, and copia types.
+#
+# GRAMMAR:
+#   varia tabula<K,V> t ← vacua
+#   varia lista<T> res ← vacua
+#   varia copia<T> visi ← vacua
+#   fixum lista<T> xs ← […] ∷ lista<T>   (ascription when type is not inferable)
+#
+# vacua reads the declared collection type and emits the target-native empty
+# container — no literal syntax required. ∷ ascription is for expressions that
+# already exist but need an explicit collection type.
+#
+# intrinseca/ exempla document compiler-owned type surfaces (methodi, vacua),
+# distinct from lista/ and tabula/ construct smoke tests.
+#
+# EXPECTED OUTPUT:
+#   Smoke asserts exit 0 only.
+#
+# BACKEND: Go e2e whitelist — collection method surface not yet lowered for Go.
+
+incipit {
+    varia tabula<textus, numerus> tabula ← vacua
+    tabula["primus"] ← 42
+    tabula["secundus"] ← 99
+
+    varia lista<textus> res ← vacua
+    res.appende("alpha")
+    res.appende("beta")
+
+    varia copia<numerus> visi ← vacua
+    visi.adde(1)
+    visi.adde(2)
+
+    fixum tabula<textus, numerus> puncta ← { "aelia": 95, "balbus": 87 }
+    fixum _ numeri ← [1, 2, 3] ∷ lista<numerus>
+    fixum _ claves ← ["primus", "secundus"] ∷ lista<textus>
+
+    nota tabula["primus"], res.longitudo(), visi.habet(2)
+    nota puncta["aelia"], numeri.primus(), claves.ultimus()
+}

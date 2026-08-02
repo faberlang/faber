@@ -1,0 +1,32 @@
++++
+term = "importa"
+kind = "keyword"
+category = "package"
+canonical = true
+summary = "Canonical braced import record with private binding inferred from the path."
+syntax = "importa { ex = \"norma:chorda\" }"
+aliases = ["import"]
+related = ["ex", "privata", "annotation-sugar"]
++++
+# =============================================================================
+# importa — Canonical braced import record with private binding inferred from the path
+# =============================================================================
+#
+# What this teaches:
+#   • Canonical braced import record with private binding inferred from the path.
+#   • Related keywords: ex, privata, annotation-sugar
+#
+# Common mistakes:
+#   • Letting the compiler infer an import name that collides with an existing top-level binding — use `nomen` or `ut` to disambiguate (SEM005).
+#
+# See also: ex, privata, annotation-sugar
+# =============================================================================
+
+# importa — canonical braced record
+#
+# The canonical record spells the source field and lets visibility/name defaults
+# materialize the same ImportDecl as `importa ex "norma:chorda"`.
+
+importa { ex = "norma:chorda" }
+
+nota "importa-braced"

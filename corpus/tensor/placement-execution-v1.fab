@@ -1,0 +1,51 @@
++++
+term = "placement-execution-v1"
+kind = "exemplum"
+category = "tensor"
+summary = "Minimal exemplar: rank-1 f32 placement execution — copy-in → kernel → readback."
+related = ["tensor", "placement", "gpu", "spine"]
++++
+
+# =============================================================================
+# tensor — Minimal exemplar: rank-1 f32 placement execution — copy-in → kernel → readback.
+# =============================================================================
+#
+# What this teaches:
+#   • Placement pipeline — copy-in, sync, kernel dispatch, readback through the placement contract
+#   • Device kernel — `@ nucleum` annotated functions run on GPU via WGSL codegen
+#
+# Common mistakes:
+#   • assuming placement execution works before the spine GPU path (G-P-08 + G-SPINE-02) is fully implemented
+#
+# See also: tensor, placement, gpu, spine
+# =============================================================================
+
+
+
+# D-SPINE-02 S4 — placement-execution-v1
+# Minimal exemplar proof: rank-1 f32 Materialized tensor.
+# All placement operations go through the placement contract.
+#
+# Pipeline:
+#   host creates tensor [1.0, 2.0, 3.0, 4.0]
+#   → __faber_gpu_v1_copy_in (placement)
+#   → __faber_gpu_v1_sync (placement)
+#   → kernel dispatch: elementwise multiply-by-2
+#   → __faber_gpu_v1_readback (placement)
+#   → host asserts [2.0, 4.0, 6.0, 8.0]
+
+@ nucleum
+functio multiply_by_two(tf32[4] data) → tf32[4] {
+    redde data * 2.0
+}
+
+incipit {
+    fixum lista<f32> xs ← [1.0, 2.0, 3.0, 4.0]
+    fixum tf32[] seed ← vacua
+    fixum tf32[4] input ← seed.strue(xs, [4])
+
+    fixum tf32[4] output ← multiply_by_two(input)
+    fixum lista<f32> result ← output.planata()
+
+    nota result
+}

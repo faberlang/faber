@@ -1,0 +1,40 @@
++++
+term = "omitte"
+kind = "keyword"
+category = "testing"
+canonical = true
+summary = "Marks a test case as skipped with a reason."
+syntax = "proba <name> omitte <reason> <block>"
+aliases = ["skip"]
+related = ["proba", "futurum"]
++++
+
+# =============================================================================
+# omitte — Marks a test case as skipped with a reason.
+# =============================================================================
+#
+# What this teaches:
+#   • Test skipping — `omitte` marks a test case to be skipped, with a required reason string.
+#   • Test modifiers — Tests can be modified with `omitte` to temporarily disable them.
+#
+# Common mistakes:
+#   • Confusing omitte (test skip) with tacet (no-op) — omitte marks a test as skipped, tacet is an empty statement.
+#
+# See also: proba, futurum
+# =============================================================================
+
+# omitte — skipped test modifier
+#
+# GRAMMAR:
+#   testModifier :← 'omitte' stringLit
+#
+# EXPECTED OUTPUT:
+#   No incipit — declaration or test-runner surface only.
+#
+# BACKEND:
+#   declaration-only test modifier (whitelist: omitte/omitte.fab).
+#
+
+proba "database connection" omitte "blocked" {
+    adfirma falsum
+}

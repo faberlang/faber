@@ -1,0 +1,45 @@
++++
+term = "f16"
+kind = "type"
+category = "numeric"
+summary = "f16 and fractus<f16> type-position width markers."
+syntax = "f16 | fractus<f16>"
+related = ["fractus", "matrix"]
++++
+# =============================================================================
+# f16 — f16 and fractus<f16> type-position width markers
+# =============================================================================
+#
+# What this teaches:
+#   • f16 and fractus<f16> type-position width markers.
+#   • Related keywords: fractus, matrix
+#
+# Common mistakes:
+#   • Using `f16` / `f32` / `f64` with `numerus` — float widths belong to `fractus`; use `fractus<f16>`, `fractus<f32>`, or `fractus<f64>`.
+#
+# See also: fractus, matrix
+# =============================================================================
+
+# f16 — half-width float marker
+#
+# f16 x
+# fractus<f16> y
+#
+# GRAMMAR:
+#   type :← 'f16' | 'fractus' '<' 'f16' '>'
+#
+# EXPECTED OUTPUT:
+#   none; this is a semantic/MIR systems-lane typecheck example.
+#
+# BACKEND:
+#   TS uses the reference number carrier in e2e. Rust/Go and LLVM/Wasm/WGSL/Metal
+#   still reject until a real half carrier is implemented. Sexp can carry this
+#   identity-style example but is not a half runtime authority.
+
+functio keep_half(f16 x) → f16 {
+    redde x
+}
+
+functio keep_half_long(fractus<f16> x) → fractus<f16> {
+    redde x
+}

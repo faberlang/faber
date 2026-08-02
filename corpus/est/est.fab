@@ -1,0 +1,105 @@
++++
+term = "est"
+kind = "keyword"
+category = "logic"
+canonical = true
+summary = "Tests whether a value is or matches a type-like target."
+syntax = "<expression> est <expression>"
+related = ["non est"]
++++
+
+# =============================================================================
+# est — Tests whether a value is or matches a type-like target.
+# =============================================================================
+#
+# What this teaches:
+#   • Type checking — `<expr> est <type>` tests a valor's runtime variant tag without extraction.
+#   • Null checking — `<expr> est nihil` checks for null values.
+#   • Boolean checks — `<expr> est verum` / `<expr> est falsum` for exact boolean comparison.
+#   • Negation — `<expr> non est <type>` negates the type check.
+#   • Chaining — `est` composes with `et` and parenthesized expressions.
+#
+# Common mistakes:
+#   • Using `est` for equality comparison — `est` checks variant tags and type-like targets, not structural equality; use `≡` for value comparison.
+#
+# See also: non est
+# =============================================================================
+
+
+# est — type, null, and boolean checks
+#
+# <expr> est nihil       — null check (legacy, lowers to == Valor::Nihil)
+# <expr> est <type>      — variant tag check (lowers to matches!)
+# <expr> non est <type>  — negated variant tag check
+# <expr> est verum       — exact true check
+# <expr> est falsum      — exact false check
+#
+# GRAMMAR:
+#   typeCheckExpr :← expr 'est' type
+#
+# EXPECTED OUTPUT:
+#   est.expected
+
+functio explora(ignotum x) → textus {
+    si x est nihil { redde "nihil est" }
+    redde "aliud est"
+}
+
+functio explora_bivalens(bivalens x) → textus {
+    si x est verum { redde "verum est" }
+    si x est falsum { redde "falsum est" }
+    redde "aliud est"
+}
+
+incipit {
+    # Null checking with est
+    fixum numerus ∪ nihil forsitan ← nihil
+    fixum _ nihil_est ← forsitan est nihil
+    nota nihil_est
+
+    # Boolean true check with est
+    fixum _ enabled ← verum
+    fixum _ verum_est ← enabled est verum
+    nota verum_est
+
+    # Boolean false check with est
+    fixum _ disabled ← falsum
+    fixum _ falsum_est ← disabled est falsum
+    nota falsum_est
+
+    # Chained with logical operators
+    fixum textus ∪ nihil nomen ← nihil
+    fixum _ defectum_debet ← nomen est nihil et enabled est verum
+    nota defectum_debet
+
+    # Parenthesized for clarity
+    fixum _ utraque_nihil ← (forsitan est nihil) et (nomen est nihil)
+    nota utraque_nihil
+
+    # Dynamic ignotum dispatch for nihil and exact boolean checks on bivalens
+    nota explora(nihil)
+    nota explora_bivalens(verum)
+    nota explora(42)
+
+    # --- Variant checks against concrete types ---
+    #
+    # `est <type>` tests a valor's runtime variant tag directly, without
+    # attempting extraction. The inner type parameters of lista/tabula are
+    # not checked (width and element types are erased at Valor boxing time
+    # by design — see docs/factory/est-variant-check/goal.md).
+
+    fixum valor name ← "faber" ↦ valor
+    fixum valor count ← 42 ↦ valor
+    fixum valor tags ← ["a", "b"] ↦ valor
+    fixum valor active ← verum ↦ valor
+    fixum valor ratio ← 1.5 ↦ valor
+
+    adfirma name est textus
+    adfirma count est numerus
+    adfirma tags est lista<valor>
+    adfirma active est bivalens
+    adfirma ratio est fractus
+
+    adfirma count non est textus
+    adfirma name non est numerus
+}

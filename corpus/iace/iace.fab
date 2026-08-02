@@ -1,0 +1,70 @@
++++
+term = "iace"
+kind = "keyword"
+category = "errors"
+canonical = true
+summary = "Throws a recoverable error."
+syntax = "iace <expression>"
+aliases = ["throw"]
+related = ["⇥", "cape", "mori", "redde"]
++++
+# =============================================================================
+# iace — Throws a recoverable error
+# =============================================================================
+#
+# What this teaches:
+#   • Throws a recoverable error.
+#   • Related keywords: ⇥, cape, mori, redde
+#
+# Common mistakes:
+#   • Using `iace` without a `⇥` on the enclosing function or a `fac { ... } cape err { ... }` wrapper — `iace` requires an error-handling context (SEM010).
+#
+# See also: ⇥, cape, mori, redde
+# =============================================================================
+
+# iace — recoverable throw and cape handler
+#
+# iace <value>
+# fac { <body> }
+# cape err { <handler> }
+#
+# GRAMMAR:
+#   throwStmt :← 'iace' expr
+#   facStmt   :← 'fac' block catchClause?
+#
+# EXPECTED OUTPUT:
+#   Caught error messages from fac/cape recovery paths.
+#
+# BACKEND:
+#   Rust/Go lowering does not emit iace/cape yet — compile-only smoke.
+
+incipit {
+    # Bare iace with textus payload
+    fac {
+        iace "Something went wrong"
+    }
+    cape err {
+        nota "Caught:", err
+    }
+
+    # iace with interpolated message
+    fixum _ code ← 404
+    fac {
+        iace "Error code: §"(code)
+    }
+    cape err {
+        nota "Caught:", err
+    }
+
+    # Conditional iace inside fac — validation guard
+    fixum _ value ← -5
+    fac {
+        si value < 0 {
+            iace "Value must be non-negative"
+        }
+        nota "Value is valid"
+    }
+    cape err {
+        nota "Validation failed:", err
+    }
+}

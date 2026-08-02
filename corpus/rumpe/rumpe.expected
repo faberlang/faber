@@ -1,0 +1,11 @@
+0
+1
+2
+3
+4
+exterior←0, interior←0
+exterior←0, interior←1
+exterior←1, interior←0
+exterior←1, interior←1
+exterior←2, interior←0
+exterior←2, interior←1

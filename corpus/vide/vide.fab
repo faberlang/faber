@@ -1,0 +1,40 @@
++++
+term = "vide"
+kind = "keyword"
+category = "output"
+canonical = true
+summary = "Writes a debug value to standard output."
+syntax = "vide <expression>"
+related = ["scribe", "mone"]
++++
+
+# =============================================================================
+# vide — Writes a debug value to standard output.
+# =============================================================================
+#
+# What this teaches:
+#   • Diagnostic output — `vide` for inspection-style debugging, distinct from `nota` and `mone`
+#   • Output variety — Faber provides multiple output functions for different purposes
+#
+# Common mistakes:
+#   • confusing vide (diagnostic output) with proba (test block) or adfirma (assertion) — vide is for inspection, not validation
+#
+# See also: scribe, mone
+# =============================================================================
+
+
+
+
+# vide diagnostic output
+#
+# vide <expr>  -- emit a vide-style inspection diagnostic (distinct from nota/mone)
+#
+# GRAMMAR:
+#   outputStmt :← 'vide' expr
+#
+# EXPECTED OUTPUT:
+#   vide-style diagnostic: "inspecta"
+
+incipit {
+    vide "inspecta"
+}

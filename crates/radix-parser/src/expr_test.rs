@@ -1,0 +1,768 @@
+//! Tests for expression parsing: conversio, coalesce, binary operators, JSON valor literals,
+//! and retired-form diagnostics.
+//!
+//! Contract: new expressions parse to the expected `ExprKind` variant; retired surface forms
+//! emit structured diagnostics.
+
+use crate::parse;
+use crate::test_support::args_have_no_legacy_message;
+use crate::test_support::parse_ok;
+use radix_lexer::lex;
+use radix_syntax::{
+    BinOp, ConversioTarget, ExprKind, FiguraExpr, JsonValue, Literal, StmtKind, TypeExprKind,
+};
+
+#[test]
+fn conversio_with_exit_arrow_recovery_parses() {
+    let result = parse_ok(r#"fixum _ n ← "bad" ↦ numerus ⇥ 0"#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Conversio(conversio) = &expr.kind else {
+        panic!("expected conversio expression, got {:?}", expr.kind);
+    };
+    assert!(matches!(conversio.target, ConversioTarget::Explicit(_)));
+    let recovery = conversio.recovery.as_deref().expect("recovery expression");
+    assert!(matches!(recovery.kind, ExprKind::Literal(Literal::Int(0))));
+}
+
+#[test]
+fn conversio_capitalized_user_type_target_parses_as_type() {
+    let result = parse_ok(r"fixum _ person ← payload ↦ Persona");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Conversio(conversio) = &expr.kind else {
+        panic!("expected conversio expression, got {:?}", expr.kind);
+    };
+    assert!(matches!(conversio.target, ConversioTarget::Explicit(_)));
+}
+
+#[test]
+fn conversio_to_tokenless_type_keyword_target_parses_as_type() {
+    // Batch A made `modulus`/`iuncta` tokenless; as conversio targets they must
+    // still route to an explicit type, not the range fallback.
+    let result = parse_ok(r"fixum _ w ← checked ↦ modulus<u32>");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Conversio(conversio) = &expr.kind else {
+        panic!("expected conversio expression, got {:?}", expr.kind);
+    };
+    assert!(matches!(conversio.target, ConversioTarget::Explicit(_)));
+}
+
+#[test]
+fn tokenless_keyword_after_nihil_value_does_not_trigger_retired_prefix() {
+    // Batch B regression: a `nihil` VALUE followed by a tokenless statement
+    // keyword (`nota`) on the next line must not make the retired
+    // `nihil x` prefix-predicate detection fire. The lookahead must treat
+    // tokenless statement keywords as grammar structure, not value operands.
+    let result = parse_ok(
+        r"
+incipit {
+  fixum numerus ∪ nihil maybe ← nihil
+  nota 42
+}
+",
+    );
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 1);
+}
+
+#[test]
+fn conversio_tensor_sugar_target_parses_as_type() {
+    let result = parse_ok(r"fixum _ grid ← flat ↦ tf32[2, 2]");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Conversio(conversio) = &expr.kind else {
+        panic!("expected conversio expression, got {:?}", expr.kind);
+    };
+    let ConversioTarget::Explicit(target) = &conversio.target else {
+        panic!("expected explicit conversio target");
+    };
+    let TypeExprKind::Tensor(elem, figura) = &target.kind else {
+        panic!("expected tensor sugar target");
+    };
+    let TypeExprKind::Named(elem_name, _) = &elem.kind else {
+        panic!("expected tensor element type");
+    };
+    assert_eq!(result.interner.resolve(elem_name.name), "f32");
+    let FiguraExpr::Tuple(dims) = figura else {
+        panic!("expected tuple Figura");
+    };
+    assert!(matches!(dims[0], FiguraExpr::Literal(2)));
+    assert!(matches!(dims[1], FiguraExpr::Literal(2)));
+}
+
+#[test]
+fn conversio_lista_sugar_target_parses_as_type() {
+    let result = parse_ok(r"fixum _ xs ← wire ↦ lu32");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Conversio(conversio) = &expr.kind else {
+        panic!("expected conversio expression, got {:?}", expr.kind);
+    };
+    let ConversioTarget::Explicit(target) = &conversio.target else {
+        panic!("expected explicit conversio target");
+    };
+    let TypeExprKind::Named(lista, params) = &target.kind else {
+        panic!("expected lista sugar target");
+    };
+    assert_eq!(result.interner.resolve(lista.name), "lista");
+    let TypeExprKind::Named(elem, _) = &params[0].kind else {
+        panic!("expected width element");
+    };
+    assert_eq!(result.interner.resolve(elem.name), "u32");
+}
+
+#[test]
+fn conversio_followed_by_vel_parses_as_nullish_coalesce() {
+    let result = parse_ok(r"fixum _ n ← (a ↦ numerus) vel 0");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Binary(coalesce) = &expr.kind else {
+        panic!("expected nullish coalesce, got {:?}", expr.kind);
+    };
+    assert_eq!(coalesce.op, BinOp::Coalesce);
+    let lhs = match &coalesce.lhs.kind {
+        ExprKind::Conversio(_) => &coalesce.lhs,
+        ExprKind::Paren(inner) => inner,
+        other => panic!("expected conversio left-hand side, got {other:?}"),
+    };
+    assert!(matches!(lhs.kind, ExprKind::Conversio(_)));
+    assert!(matches!(
+        coalesce.rhs.kind,
+        ExprKind::Literal(Literal::Int(0))
+    ));
+}
+
+#[test]
+fn mixed_or_and_coalesce_tokens_parse_as_one_expression() {
+    let result = parse_ok("fixum _ value ← a vel b aut c");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+
+    let ExprKind::Binary(top) = &expr.kind else {
+        panic!("expected binary expression");
+    };
+    assert_eq!(top.op, BinOp::Or);
+
+    let ExprKind::Binary(lhs) = &top.lhs.kind else {
+        panic!("expected coalesce left-hand side");
+    };
+    assert_eq!(lhs.op, BinOp::Coalesce);
+}
+
+/// Local nullable elimination: `vel` binds tighter than additive operators on the RHS.
+#[test]
+fn vel_binds_tighter_than_additive_on_rhs() {
+    let result = parse_ok(r#"fixum _ value ← prefix + item vel """#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Binary(add) = &expr.kind else {
+        panic!("expected additive root, got {:?}", expr.kind);
+    };
+    assert_eq!(add.op, BinOp::Add);
+    let ExprKind::Binary(coalesce) = &add.rhs.kind else {
+        panic!("expected coalesce on additive RHS, got {:?}", add.rhs.kind);
+    };
+    assert_eq!(coalesce.op, BinOp::Coalesce);
+}
+
+/// Local nullable elimination: `vel` binds tighter than additive operators on the LHS.
+#[test]
+fn vel_binds_tighter_than_additive_on_lhs() {
+    let result = parse_ok(r#"fixum _ value ← item vel "" + suffix"#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Binary(add) = &expr.kind else {
+        panic!("expected additive root, got {:?}", expr.kind);
+    };
+    assert_eq!(add.op, BinOp::Add);
+    let ExprKind::Binary(coalesce) = &add.lhs.kind else {
+        panic!("expected coalesce on additive LHS, got {:?}", add.lhs.kind);
+    };
+    assert_eq!(coalesce.op, BinOp::Coalesce);
+}
+
+/// Local nullable elimination: `vel` binds tighter than multiplicative operators.
+#[test]
+fn vel_binds_tighter_than_multiplicative() {
+    let result = parse_ok("fixum _ value ← scale * factor vel 1");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Binary(mul) = &expr.kind else {
+        panic!("expected multiplicative root, got {:?}", expr.kind);
+    };
+    assert_eq!(mul.op, BinOp::Mul);
+    let ExprKind::Binary(coalesce) = &mul.rhs.kind else {
+        panic!(
+            "expected coalesce on multiplicative RHS, got {:?}",
+            mul.rhs.kind
+        );
+    };
+    assert_eq!(coalesce.op, BinOp::Coalesce);
+}
+
+/// Interval constructors complete as `vel` `RHS` values: not `(x vel 0)‥0`.
+#[test]
+fn vel_rhs_completes_intervallum_constructor() {
+    let result = parse_ok("fixum _ value ← maybeRange vel 0‥0");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Binary(coalesce) = &expr.kind else {
+        panic!("expected coalesce root, got {:?}", expr.kind);
+    };
+    assert_eq!(coalesce.op, BinOp::Coalesce);
+    assert!(
+        matches!(coalesce.rhs.kind, ExprKind::Intervallum(_)),
+        "expected interval constructor RHS, got {:?}",
+        coalesce.rhs.kind
+    );
+}
+
+/// `vel` chains left-associatively at the local defaulting tier.
+#[test]
+fn vel_chains_left_associatively() {
+    let result = parse_ok(r#"fixum _ value ← a vel b vel c vel "fallback""#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Binary(outer) = &expr.kind else {
+        panic!("expected coalesce root, got {:?}", expr.kind);
+    };
+    assert_eq!(outer.op, BinOp::Coalesce);
+    let ExprKind::Binary(mid) = &outer.lhs.kind else {
+        panic!("expected nested coalesce LHS");
+    };
+    assert_eq!(mid.op, BinOp::Coalesce);
+    let ExprKind::Binary(inner) = &mid.lhs.kind else {
+        panic!("expected innermost coalesce");
+    };
+    assert_eq!(inner.op, BinOp::Coalesce);
+}
+
+#[test]
+fn non_est_parses_as_identity_negation() {
+    let result = parse_ok("fixum _ present ← value non est nihil");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Binary(binary) = &expr.kind else {
+        panic!("expected binary expression, got {:?}", expr.kind);
+    };
+    assert_eq!(binary.op, BinOp::IsNot);
+}
+
+#[test]
+fn est_non_is_not_the_identity_negation_spelling() {
+    let result = parse(lex("fixum _ present ← value est non nihil"));
+    let err = result
+        .errors
+        .iter()
+        .find(|err| {
+            err.args
+                .iter()
+                .any(|arg| arg.name == "issue" && arg.value == "est_non_spelling")
+        })
+        .expect("structured est non spelling diagnostic");
+    assert!(
+        args_have_no_legacy_message(&err.args),
+        "migrated diagnostic should not choose prose at emit site"
+    );
+}
+
+#[test]
+fn expression_ad_parses_with_ascii_route_and_opener() {
+    let result = parse_ok(r#"fixum _ s ← ad 'runtime:echo' ("salve")"#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Ad(ad) = &expr.kind else {
+        panic!("expected ad expression, got {:?}", expr.kind);
+    };
+    assert_eq!(result.interner.resolve(ad.path), "runtime:echo");
+    assert!(ad.opener.is_some());
+}
+
+// =============================================================================
+// JSON valor literal parser (Goal Stage 2 of inline-json-valor)
+// See docs/factory/inline-json-valor/contract.md for the full contract.
+// =============================================================================
+
+/// Extract the initializer expression from `fixum _ name ← <expr>`.
+fn json_literal_of(source: &str) -> JsonValue {
+    let result = parse_ok(source);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!(
+            "expected variable declaration, got {:?}",
+            program.statements[0].kind
+        );
+    };
+    let init = var.init.as_deref().expect("initializer");
+    let ExprKind::Literal(Literal::JsonValor(value)) = &init.kind else {
+        panic!("expected JSON valor literal, got {:?}", init.kind);
+    };
+    value.clone()
+}
+
+#[test]
+fn json_literal_empty_object_is_valor() {
+    assert!(
+        matches!(json_literal_of("fixum _ e ← {}"), JsonValue::Object(members) if members.is_empty())
+    );
+}
+
+#[test]
+fn json_literal_object_with_all_scalar_wire_tokens() {
+    // true/false/null arrive as Ident (only verum/falsum/nihil are keywords).
+    let value = json_literal_of(r#"fixum _ v ← { "flag": true, "off": false, "gap": null }"#);
+    let JsonValue::Object(members) = value else {
+        panic!("expected object")
+    };
+    assert_eq!(members.len(), 3);
+    assert!(matches!(members[0].value, JsonValue::Bool(true)));
+    assert!(matches!(members[1].value, JsonValue::Bool(false)));
+    assert!(matches!(members[2].value, JsonValue::Null));
+}
+
+#[test]
+fn json_literal_number_mapping_splits_numerus_and_fractus() {
+    // No `.` or `e` -> Numerus; with `.` or `e` -> Fractus (contract §5).
+    let value =
+        json_literal_of(r#"fixum _ v ← { "int": 42, "float": 3.14, "big": 1000000, "exp": 1e5 }"#);
+    let JsonValue::Object(members) = value else {
+        panic!("expected object")
+    };
+    assert!(matches!(members[0].value, JsonValue::Numerus(42)));
+    assert!(matches!(members[1].value, JsonValue::Fractus(_)));
+    assert!(matches!(members[2].value, JsonValue::Numerus(1000000)));
+    assert!(matches!(members[3].value, JsonValue::Fractus(_)));
+}
+
+#[test]
+fn json_literal_negative_numbers_assemble_minus_and_magnitude() {
+    let value = json_literal_of(r#"fixum _ v ← { "a": -7, "b": -3.5 }"#);
+    let JsonValue::Object(members) = value else {
+        panic!("expected object")
+    };
+    assert!(matches!(members[0].value, JsonValue::Numerus(-7)));
+    assert!(matches!(members[1].value, JsonValue::Fractus(f) if (f - (-3.5)).abs() < f64::EPSILON));
+}
+
+#[test]
+fn json_literal_nested_objects_and_arrays() {
+    let value = json_literal_of(
+        r#"fixum _ v ← { "paths": { "/health": { "get": {} } }, "ids": [1, "two", false, null] }"#,
+    );
+    let JsonValue::Object(members) = value else {
+        panic!("expected object")
+    };
+    assert_eq!(members.len(), 2);
+    // nested object under "paths"
+    assert!(matches!(&members[0].value, JsonValue::Object(_)));
+    // nested array under "ids"
+    let JsonValue::Array(elements) = &members[1].value else {
+        panic!("expected array")
+    };
+    assert_eq!(elements.len(), 4);
+    assert!(matches!(elements[0], JsonValue::Numerus(1)));
+    assert!(matches!(elements[1], JsonValue::String(_)));
+    assert!(matches!(elements[2], JsonValue::Bool(false)));
+    assert!(matches!(elements[3], JsonValue::Null));
+}
+
+#[test]
+fn json_literal_trailing_commas_allowed_in_object_and_array() {
+    let value = json_literal_of(r#"fixum _ v ← { "x": 1, "y": [1, 2, 3,], }"#);
+    let JsonValue::Object(members) = value else {
+        panic!("expected object")
+    };
+    assert_eq!(members.len(), 2);
+    let JsonValue::Array(elements) = &members[1].value else {
+        panic!("expected array")
+    };
+    assert_eq!(elements.len(), 3);
+}
+
+#[test]
+fn json_literal_rejects_faber_equals_field_syntax() {
+    // The retired anonymous record form. Clean break: diagnose with a hint.
+    let result = parse(lex(r#"fixum _ v ← { "x" = 1 }"#));
+    assert!(
+        !result.errors.is_empty(),
+        "expected '=' to be rejected inside JSON literal"
+    );
+}
+
+#[test]
+fn json_literal_rejects_unterminated_object() {
+    let result = parse(lex(r#"fixum _ v ← { "x": 1 "#));
+    assert!(
+        !result.errors.is_empty(),
+        "expected unterminated-object diagnostic"
+    );
+}
+
+#[test]
+fn json_literal_genus_construction_keeps_faber_equals_grammar() {
+    // Protected path: Type { field = expr } must still parse with `=`.
+    // This is the genus construction regression guard (contract §12).
+    let result = parse_ok(
+        r"
+genus Point { numerus x = 0 }
+functio main() → numerus {
+    fixum _ p ← Point { x = 10 }
+    redde 0
+}
+",
+    );
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Class(_) = &program.statements[0].kind else {
+        panic!("expected class declaration");
+    };
+    let StmtKind::Func(func) = &program.statements[1].kind else {
+        panic!("expected function declaration");
+    };
+    let body = func.body.as_ref().expect("body");
+    let StmtKind::Var(var) = &body.statements[0].kind else {
+        panic!("expected var binding");
+    };
+    let init = var.init.as_deref().expect("initializer");
+    assert!(
+        matches!(init.kind, ExprKind::Verte(_)),
+        "genus construction must stay Verte"
+    );
+}
+
+#[test]
+fn qualified_genus_construction_keeps_faber_equals_grammar() {
+    let result = parse_ok(
+        r#"
+functio main() → vacuum {
+    fixum _ endpoint ← terminus.Terminus { hospes = "localhost", portus = 8080 }
+}
+"#,
+    );
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function declaration");
+    };
+    let body = func.body.as_ref().expect("body");
+    let StmtKind::Var(var) = &body.statements[0].kind else {
+        panic!("expected var binding");
+    };
+    let init = var.init.as_deref().expect("initializer");
+    let ExprKind::Verte(verte) = &init.kind else {
+        panic!("expected qualified genus construction to parse as Verte");
+    };
+    let TypeExprKind::Qualified(path, params) = &verte.ty.kind else {
+        panic!("expected qualified constructor type");
+    };
+    assert!(params.is_empty());
+    assert_eq!(path.len(), 2);
+    assert_eq!(result.interner.resolve(path[0].name), "terminus");
+    assert_eq!(result.interner.resolve(path[1].name), "Terminus");
+}
+
+#[test]
+fn vector_conversio_from_lista_literal_parses() {
+    let result = parse_ok("fixum _ v ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let ExprKind::Conversio(conversio) = &var.init.as_deref().expect("initializer").kind else {
+        panic!("expected vector construction to parse as conversio");
+    };
+    assert!(matches!(conversio.expr.kind, ExprKind::Array(_)));
+    let ConversioTarget::Explicit(target) = &conversio.target else {
+        panic!("expected explicit conversio target");
+    };
+    let TypeExprKind::Vector(elem, FiguraExpr::Literal(4)) = &target.kind else {
+        panic!("expected vector conversio target type");
+    };
+    let TypeExprKind::Named(name, _) = &elem.kind else {
+        panic!("expected named vector element type");
+    };
+    assert_eq!(result.interner.resolve(name.name), "f32");
+}
+
+#[test]
+fn matrix_conversio_from_nested_lista_literal_parses() {
+    let result = parse_ok("fixum _ m ← [[1.0, 0.0], [0.0, 1.0]] ↦ matrix<f32, [2, 2]>");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let ExprKind::Conversio(conversio) = &var.init.as_deref().expect("initializer").kind else {
+        panic!("expected matrix construction to parse as conversio");
+    };
+    assert!(matches!(conversio.expr.kind, ExprKind::Array(_)));
+    let ConversioTarget::Explicit(target) = &conversio.target else {
+        panic!("expected explicit conversio target");
+    };
+    let TypeExprKind::Matrix(elem, FiguraExpr::Tuple(dims)) = &target.kind else {
+        panic!("expected matrix conversio target type");
+    };
+    let TypeExprKind::Named(name, _) = &elem.kind else {
+        panic!("expected named matrix element type");
+    };
+    assert_eq!(result.interner.resolve(name.name), "f32");
+    assert_eq!(dims.len(), 2);
+}
+
+#[test]
+fn intervallum_materialize_conversio_parses_after_range() {
+    let result = parse_ok("fixum _ xs ← 0‥10 ↦ lista<numerus>");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Conversio(conversio) = &expr.kind else {
+        panic!("expected conversio expression, got {:?}", expr.kind);
+    };
+    assert!(matches!(conversio.expr.kind, ExprKind::Intervallum(_)));
+    assert!(matches!(conversio.target, ConversioTarget::Explicit(_)));
+}
+
+// =============================================================================
+// F-059: conversio target miss range tails with non-type identifiers
+// F-060: speculative Integer/Float discards non-range in conversio target
+// =============================================================================
+
+#[test]
+fn conversio_lowercase_ident_range_target_parses_as_intervallum() {
+    // F-059: range tails after non-type idents in conversio target.
+    // Lowercase identifiers that are not type keywords should be parsed
+    // as range starts, producing an Intervallum target with the full range.
+    let result = parse_ok(r"fixum _ clamped ← value ↦ min‥max");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Conversio(conversio) = &expr.kind else {
+        panic!("expected conversio expression, got {:?}", expr.kind);
+    };
+    assert!(
+        matches!(conversio.target, ConversioTarget::Intervallum(_)),
+        "expected intervallum target for lowercase ident range, got {:?}",
+        conversio.target
+    );
+    let ConversioTarget::Intervallum(operand) = &conversio.target else {
+        unreachable!()
+    };
+    assert!(
+        matches!(operand.kind, ExprKind::Intervallum(_)),
+        "expected IntervallumExpr inside target, got {:?}",
+        operand.kind
+    );
+}
+
+#[test]
+fn conversio_integer_non_range_does_not_discard_token() {
+    // F-060: speculative Integer/Float that does not form a range must
+    // restore state so the token is not silently consumed. When followed
+    // by a type keyword, the parser must not silently drop the Integer
+    // and parse the type keyword as the target.
+    let result = crate::test_support::parse_program(r"fixum _ clamped ← value ↦ 42 numerus");
+    assert!(
+        !result.success(),
+        "expected parse error for Integer followed by type keyword, got success"
+    );
+}
+
+#[test]
+fn parses_iuncta_construction_with_two_elements() {
+    let result = parse_ok(r#"incipit { fixum _ pair ← iuncta<textus, numerus> ["salve", 42] }"#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Incipit(incipit) = &program.statements[0].kind else {
+        panic!("expected incipit");
+    };
+    let radix_syntax::IfBody::Block(block) = &incipit.body else {
+        panic!("expected block body");
+    };
+    let StmtKind::Var(var) = &block.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Iuncta(iuncta) = &expr.kind else {
+        panic!("expected iuncta expression, got {:?}", expr.kind);
+    };
+    assert_eq!(iuncta.type_args.len(), 2);
+    let TypeExprKind::Named(first_type, _) = &iuncta.type_args[0].kind else {
+        panic!("expected named type");
+    };
+    assert_eq!(result.interner.resolve(first_type.name), "textus");
+    let TypeExprKind::Named(second_type, _) = &iuncta.type_args[1].kind else {
+        panic!("expected named type");
+    };
+    assert_eq!(result.interner.resolve(second_type.name), "numerus");
+    assert_eq!(iuncta.elements.len(), 2);
+    assert!(matches!(
+        iuncta.elements[0].kind,
+        ExprKind::Literal(Literal::String(_))
+    ));
+    assert!(matches!(
+        iuncta.elements[1].kind,
+        ExprKind::Literal(Literal::Int(42))
+    ));
+}
+
+#[test]
+fn parses_iuncta_construction_with_single_element() {
+    let result = parse_ok(r#"incipit { fixum _ wrap ← iuncta<textus> ["solum"] }"#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Incipit(incipit) = &program.statements[0].kind else {
+        panic!("expected incipit");
+    };
+    let radix_syntax::IfBody::Block(block) = &incipit.body else {
+        panic!("expected block body");
+    };
+    let StmtKind::Var(var) = &block.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Iuncta(iuncta) = &expr.kind else {
+        panic!("expected iuncta expression, got {:?}", expr.kind);
+    };
+    assert_eq!(iuncta.type_args.len(), 1);
+    assert_eq!(iuncta.elements.len(), 1);
+}
+
+#[test]
+fn parses_iuncta_construction_with_nested_types() {
+    let result = parse_ok(
+        r#"incipit { fixum _ nested ← iuncta<iuncta<textus, numerus>, textus> [iuncta<textus, numerus> ["a", 1], "b"] }"#,
+    );
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Incipit(incipit) = &program.statements[0].kind else {
+        panic!("expected incipit");
+    };
+    let radix_syntax::IfBody::Block(block) = &incipit.body else {
+        panic!("expected block body");
+    };
+    let StmtKind::Var(var) = &block.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Iuncta(outer) = &expr.kind else {
+        panic!("expected iuncta expression, got {:?}", expr.kind);
+    };
+    assert_eq!(outer.type_args.len(), 2);
+    assert_eq!(outer.elements.len(), 2);
+    // First element is a nested iuncta
+    let ExprKind::Iuncta(inner) = &outer.elements[0].kind else {
+        panic!("expected nested iuncta expression");
+    };
+    assert_eq!(inner.type_args.len(), 2);
+    assert_eq!(inner.elements.len(), 2);
+}
+
+// ── JSON literal edge tests ─────────────────────────────────────────────────
+
+#[test]
+fn empty_array_literal_parses_as_array_expression() {
+    let result = parse_ok("fixum _ e ← []");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let init = var.init.as_deref().expect("initializer");
+    let ExprKind::Array(array) = &init.kind else {
+        panic!("expected array expression, got {:?}", init.kind);
+    };
+    assert!(array.elements.is_empty());
+}
+
+#[test]
+fn json_literal_rejects_unterminated_array() {
+    let result = parse(lex("fixum _ v ← [1, 2"));
+    assert!(
+        !result.errors.is_empty(),
+        "expected unterminated-array diagnostic"
+    );
+}
+
+#[test]
+fn json_literal_rejects_unquoted_key() {
+    let result = parse(lex(r"fixum _ v ← { unquoted: 1 }"));
+    assert!(
+        !result.errors.is_empty(),
+        "expected diagnostic for unquoted JSON key"
+    );
+}
+
+// ── non est edge tests ──────────────────────────────────────────────────────
+
+#[test]
+fn non_est_with_concrete_rhs_parses_as_inequality() {
+    let result = parse_ok("fixum _ v ← value non est 0");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Binary(binary) = &expr.kind else {
+        panic!("expected binary expression, got {:?}", expr.kind);
+    };
+    assert_eq!(binary.op, BinOp::IsNot);
+}
+
+#[test]
+fn nihil_non_est_parses_as_identity_negation() {
+    // A value followed by `non est` is a comparison chain, not the retired
+    // `nihil <value>` prefix predicate. Batch D made `non` tokenless; the
+    // retired-prefix lookahead must not treat the operator as a value
+    // operand start (`Operator` is not expression-primary).
+    let result = parse_ok("fixum _ v ← nihil non est 0");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Binary(binary) = &expr.kind else {
+        panic!("expected binary expression, got {:?}", expr.kind);
+    };
+    assert_eq!(binary.op, BinOp::IsNot);
+}

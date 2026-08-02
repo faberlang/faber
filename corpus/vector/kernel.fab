@@ -1,0 +1,27 @@
++++
+term = "vector"
+kind = "kernel"
+category = "gpu"
+summary = "nucleum kernel baseline for vector GPU emit"
++++
+
+# =============================================================================
+# vector — nucleum kernel baseline for vector GPU emit.
+# =============================================================================
+#
+# What this teaches:
+#   • Kernel baseline — minimal `@ nucleum` function that compiles to WGSL
+#   • GPU entry point — `@ nucleum` marks a function as a GPU compute kernel entry
+#
+# Common mistakes:
+#   • using non-numeric types or non-kernel-compatible operations inside @ nucleum — kernels are numeric-only
+#
+# See also: vector, gpu, nucleum
+# =============================================================================
+
+
+
+@ nucleum
+functio scala(fractus<f32> x) → fractus<f32> {
+    redde x + 1.0
+}

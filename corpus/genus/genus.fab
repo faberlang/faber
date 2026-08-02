@@ -1,0 +1,82 @@
++++
+term = "genus"
+kind = "keyword"
+category = "type"
+canonical = true
+summary = "Declares a concrete type with fields and methods."
+syntax = "genus <name> [<type-params>] <block>"
+aliases = ["class", "struct"]
+related = ["implendum", "abstractus", "implet", "sub"]
++++
+# =============================================================================
+# genus — Declares a concrete type with fields and methods
+# =============================================================================
+#
+# What this teaches:
+#   • Declares a concrete type with fields and methods.
+#   • Related keywords: implendum, abstractus, implet, sub
+#
+# Common mistakes:
+#   • Using retired bare object literals (`{ key = expr }`) — use `GenusName { field = expr }` instead; bare `{ }` is now a JSON valor literal.
+#
+# See also: implendum, abstractus, implet, sub
+# =============================================================================
+
+# Basic genus (record type) with fields
+#
+# genus <Name> {
+#     <type> <property>
+#     <type> <property> = <default>
+# }
+#
+# GRAMMAR:
+#   genusDecl :← 'genus' ident '{' fieldDecl* '}'
+#   instance  :← ident '{' fieldInit (',' fieldInit)* '}'
+#
+# EXPECTED OUTPUT:
+#   Field values for Punctum and Persona instances (defaults and overrides).
+
+genus Punctum {
+    numerus x
+    numerus y
+}
+
+genus Persona {
+    textus nomen
+    # default when omitted at instantiation
+    numerus aetas = 0
+    bivalens activus = verum
+}
+
+incipit {
+    # Instantiate with all required fields
+    fixum _ p ← Punctum {
+        x = 10,
+        y = 20
+    }
+
+    nota p.x
+    nota p.y
+
+    # Instantiate with required + optional defaults
+    fixum _ marcus ← Persona {
+        nomen = "Marcus"
+    }
+
+    nota marcus.nomen
+    # 0 from default
+    nota marcus.aetas
+    # verum from default
+    nota marcus.activus
+
+    # Override defaults explicitly
+    fixum _ julia ← Persona {
+        nomen = "Julia",
+        aetas = 25,
+        activus = falsum
+    }
+
+    nota julia.nomen
+    nota julia.aetas
+    nota julia.activus
+}

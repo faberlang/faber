@@ -1,0 +1,48 @@
++++
+term = "secus"
+kind = "keyword"
+category = "control-flow"
+canonical = true
+summary = "Runs the fallback branch when preceding conditional branches do not match."
+syntax = "secus <block>"
+aliases = ["else", "otherwise"]
+related = ["si", "sin"]
++++
+
+# =============================================================================
+# secus — Runs the fallback branch when preceding conditional branches do not
+# match.
+# =============================================================================
+#
+# What this teaches:
+#   • Conditional fallback — `secus` provides the else/otherwise branch that
+#     runs when no preceding `si` or `sin` condition matched
+#   • Always comes last in an if-else chain; takes a block body
+#
+# Common mistakes:
+#   • Writing `secus si` instead of the canonical `sin` for else-if branches — `secus` must always be final.
+#
+# See also: si, sin
+# =============================================================================
+
+# secus — final else branch
+#
+# GRAMMAR:
+#   elseClause :← 'secus' block
+#
+# EXPECTED OUTPUT:
+#   Scalar stdout smoke (see body).
+#
+# BACKEND:
+#   Cross-ref: si/secus.fab.
+#
+
+incipit {
+    fixum _ hour ← 23
+    si hour < 12 {
+        nota "morning"
+    }
+    secus {
+        nota "afternoon-or-later"
+    }
+}

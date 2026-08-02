@@ -1,0 +1,103 @@
++++
+term = "vocatio"
+kind = "concept"
+category = "expression"
+canonical = true
+summary = "Function, method, chained, and sparge spread call expressions."
+syntax = "<name>(<args>) | <expr>.<method>(<args>) | <name>(sparge <lista>)"
+related = ["functio", "sparge", "genus"]
++++
+
+# =============================================================================
+# vocatio — Function, method, chained, and sparge spread call expressions.
+# =============================================================================
+#
+# What this teaches:
+#   • Call expressions — function calls, method calls, and chained fluent interface calls
+#   • Spread arguments — `sparge <lista>` expands a list into positional call arguments
+#
+# Common mistakes:
+#   • confusing vocatio (function-call expression) with functio declaration syntax — vocatio is the call site, not the definition
+#
+# See also: functio, sparge, genus
+# =============================================================================
+
+
+
+
+# vocatio — function and method call expressions
+#
+# <nomen>()                    -- zero-arg call
+# <nomen>(<args>)              -- positional arguments
+# <expr>.<method>(<args>)      -- method call on receiver
+# <expr>.<m1>().<m2>()         -- chained calls (fluent interface)
+# <nomen>(sparge <lista>)      -- spread arguments into call
+#
+# GRAMMAR:
+#   callExpr :← expr '(' (expr | sparge expr)* ')'
+#
+# EXPECTED OUTPUT:
+#   Salve, arithmetic results, chained builder output, spread-arg sum.
+
+functio saluta() {
+    nota "Salve!"
+}
+
+functio adde(numerus a, numerus b) → numerus {
+    redde a + b
+}
+
+functio multiplica(numerus x, numerus y) → numerus {
+    redde x * y
+}
+
+genus Computator {
+    numerus valor = 0
+
+    functio pone(numerus n) → Computator {
+        ego.valor ← n
+        redde ego
+    }
+
+    functio duplica() → Computator {
+        ego.valor ← ego.valor * 2
+        redde ego
+    }
+
+    functio accipe() → numerus {
+        redde ego.valor
+    }
+}
+
+incipit {
+    # Simple call (no arguments)
+    saluta()
+
+    # Call with arguments
+    fixum _ summa ← adde(10, 20)
+    # 30
+    nota summa
+
+    # Multiple arguments
+    fixum _ productum ← multiplica(5, 6)
+    # 30
+    nota productum
+
+    # Method call on objectum
+    varia _ computator ← Computator {}
+    computator.pone(10)
+    # 10
+    nota computator.accipe()
+
+    # Chained method calls
+    varia _ alter ← Computator {}
+    fixum _ valor ← alter.pone(5).duplica().duplica().accipe()
+    # 20
+    nota valor
+
+    # Call with sparge
+    fixum lista<numerus> numeri ← [3, 7]
+    fixum _ sparsa ← adde(sparge numeri)
+    # 10
+    nota sparsa
+}

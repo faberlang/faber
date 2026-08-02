@@ -1,0 +1,29 @@
++++
+term = "rumpe"
+kind = "keyword"
+category = "transfer"
+canonical = false
+summary = "compile error when rumpe has no enclosing breakable block"
+related = ["fac", "dum"]
++++
+
+# =============================================================================
+# rumpe — compile error when rumpe has no enclosing breakable block
+# =============================================================================
+#
+# What this teaches:
+#   • Compile-time error — `rumpe` is only valid inside a breakable block
+#     (`dum`, `fac`); this file intentionally fails semantic analysis
+#   • Serves as a negative test case for the compiler error path
+#
+# Common mistakes:
+#   • TODO: placing `rumpe` outside any loop or breakable context
+#
+# See also: fac, dum
+# =============================================================================
+
+# expected: rumpe outside breakable block
+
+incipit {
+    rumpe
+}

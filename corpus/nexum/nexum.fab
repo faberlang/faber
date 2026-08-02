@@ -1,0 +1,49 @@
++++
+term = "nexum"
+kind = "keyword"
+category = "type"
+canonical = true
+summary = "Marks a class member as bound to the current instance."
+syntax = "nexum <type> <name> [= <expression>]"
+related = ["genus", "ego"]
++++
+
+# =============================================================================
+# nexum — Marks a class member as bound to the current instance.
+# =============================================================================
+#
+# What this teaches:
+#   • the `nexum` keyword — declares a compile-time constant bound to a genus (same value for every instance)
+#   • accessing `nexum` fields via `ego` (implicit instance reference)
+#   • instance overrides — bound fields can be overridden per-instance in constructor literals
+#
+# Common mistakes:
+#   • Confusing nexum (compile-time constant bound to a genus) with cat (concatenation) or scriptum (string interpolation).
+#
+# See also: genus, ego
+# =============================================================================
+
+# nexum — bound genus field (compile-time constant)
+#
+# nexum <typus> <nomen> = <expressio>
+#
+# GRAMMAR:
+#   boundField :← 'nexum' type ident '=' expr
+#
+# EXPECTED OUTPUT:
+#   nexum.expected — bound field value 7 via accipe().
+
+genus Computator {
+    # bound field — same value for every instance
+    nexum numerus valor = 0
+
+    functio accipe() → numerus {
+        redde ego.valor
+    }
+}
+
+incipit {
+    # instance overrides bound default
+    fixum _ c ← Computator { valor = 7 }
+    nota c.accipe()
+}

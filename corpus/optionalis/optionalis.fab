@@ -1,0 +1,87 @@
++++
+term = "?."
+kind = "operator-group"
+category = "optional-chain"
+canonical = false
+summary = "Optional chaining for nested voluntary field access."
+syntax = "<expression>?.<name> | <expression>?[<expression>]"
+related = ["?.", "sponte", "vel"]
++++
+
+
+# =============================================================================
+# ?. — Optional chaining for nested voluntary field access.
+# =============================================================================
+#
+# What this teaches:
+#   • Optional chaining — `?.` safely accesses nested voluntary (nullable) fields without runtime failure.
+#   • Default fallback — Combine `?.` with `vel` to provide defaults when a path is absent.
+#
+# Common mistakes:
+#   • Using a wildcard _ pattern on a nullable scrutinee — the catchall silently absorbs nihil; add an explicit casu nihil arm (WARN011).
+#
+# See also: ?., sponte, vel
+# =============================================================================
+
+# ?. — optional chaining for voluntary fields
+#
+# Safely access nested voluntary fields without failing when a path is absent.
+#
+# GRAMMAR:
+#   optionalAccess :← expr '?.' (ident | '[' expr ']')
+#
+# EXPECTED OUTPUT:
+#   optionalis.expected — present and absent path samples.
+
+genus Locus {
+    textus urbs
+    textus regio sponte
+}
+
+genus Civis {
+    textus nomen
+    # voluntary nested record
+    Locus locus sponte
+}
+
+incipit {
+    # --- Civis with full locus ---
+
+    fixum _ aelia ← Civis {
+        nomen = "Aelia",
+        locus = Locus { urbs = "Roma", regio = "Italia" }
+    }
+
+    fixum _ urbs ← aelia?.locus?.urbs
+    # "Roma"
+    nota urbs
+
+    fixum _ regio ← aelia?.locus?.regio
+    # "Italia"
+    nota regio
+
+    # --- Civis with no locus (chain short-circuits to nihil) ---
+
+    fixum _ brutus ← Civis { nomen = "Brutus" }
+    fixum _ urbs2 ← brutus?.locus?.urbs
+    # nihil
+    nota urbs2
+
+    fixum _ regio2 ← brutus?.locus?.regio
+    # nihil
+    nota regio2
+
+    # --- Accessus optionalis on lista ---
+
+    fixum _ litterae ← ["a", "b", "c"]
+    # "a"
+    nota litterae?[0]
+    # nihil (out of range)
+    nota litterae?[10]
+
+    # --- Combining with vel for defaults ---
+
+    fixum _ defecta ← brutus?.locus?.urbs vel "ignota"
+    # "ignota"
+    nota defecta
+}

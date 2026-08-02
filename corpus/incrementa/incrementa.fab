@@ -1,0 +1,49 @@
++++
+term = "⊕"
+kind = "operator"
+category = "mutation"
+canonical = true
+summary = "Postfix increment statement for a mutable numerus place."
+syntax = "<place> ⊕"
+aliases = ["postfix increment", "increment statement"]
+related = ["⊖", "varia", "←", "numerus"]
++++
+# =============================================================================
+# ⊕ — Postfix increment statement for a mutable numerus place
+# =============================================================================
+#
+# What this teaches:
+#   • Postfix increment statement for a mutable numerus place.
+#   • Related keywords: ⊖, varia, ←, numerus
+#
+# Common mistakes:
+#   • Using `⊕` / `⊖` inside an expression — postfix increment/decrement are statements only and cannot appear inside larger expressions.
+#
+# See also: ⊖, varia, ←, numerus
+# =============================================================================
+
+# incrementa — postfix increment and decrement statements
+#
+# <place> ⊕   -- add 1 (statement only, no value)
+# <place> ⊖   -- subtract 1
+#
+# Postfix forms are statements, not expressions. They cannot appear inside
+# larger expressions. Operand must be a mutable numerus place.
+
+incipit {
+    varia numerus count ← 0
+    count ⊕
+    # 1
+    nota count
+
+    count ⊖
+    # 0
+    nota count
+
+    varia numerus exclusivus ← 0
+    itera ab 0‥3 fixum _ {
+        exclusivus ⊕
+    }
+    # 3
+    nota exclusivus
+}

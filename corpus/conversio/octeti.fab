@@ -1,0 +1,69 @@
++++
+term = "↦"
+kind = "operator-group"
+category = "conversion"
+canonical = false
+summary = "Text and byte conversio between textus, ascii, and octeti."
+syntax = "<expression> ↦ octeti | <expression> ↦ textus | <expression> ↦ ascii"
+related = ["↦", "octeti", "textus", "chorda"]
++++
+
+# =============================================================================
+# ↦ — Text and byte conversio between textus, ascii, and octeti.
+# =============================================================================
+#
+# What this teaches:
+#   • Text↔byte bridges — `textus ↦ octeti` (UTF-8 encode), `ascii ↦ octeti` (ASCII encode), `octeti ↦ textus` (UTF-8 decode), `octeti ↦ ascii` (ASCII narrow).
+#   • Fallible decoding — byte-to-text conversions can fail on invalid bytes; recover with `⇥`.
+#   • Stdlib foundation — these language-level bridges are what stdlib's chorda mechanical trio (pange/solve/tempta) builds on.
+#
+# Common mistakes:
+#   • Assuming `octeti ↦ textus` always succeeds — invalid UTF-8 bytes require a `⇥` recovery value.
+#
+# See also: ↦, octeti, textus, chorda
+# =============================================================================
+
+
+# conversio — textus/ascii ↔ octeti (byte conversions)
+#
+# WHY: `↦ octeti` and `↦ textus`/`↦ ascii` are the standard Faber conversion
+# paths between text and bytes. They are the language-level bridge that the
+# stdlib's chorda mechanical trio (pange/solve/tempta) builds on, not a
+# competitor to it. See DEFER-029 and docs/factory/octeti-unify-lista/.
+#
+# textus ↦ octeti: UTF-8 encode (lossless; String is already UTF-8 in Rust).
+# ascii  ↦ octeti: ASCII encode (lossless; ASCII is a strict subset of UTF-8).
+# octeti ↦ textus: UTF-8 decode (can fail on invalid bytes; use `⇥` to recover).
+# octeti ↦ ascii:  ASCII narrow (can fail on any byte ≥ 128; use `⇥`).
+
+incipit {
+    # textus → octeti (UTF-8 encode)
+    fixum textus hi ← "hi"
+    fixum octeti enc ← hi ↦ octeti
+    nota enc.longitudo()
+
+    # octeti → textus (UTF-8 decode, valid bytes)
+    # "hi" in UTF-8
+    fixum octeti raw ← |68 69|
+    fixum textus dec ← raw ↦ textus
+    nota dec
+
+    # octeti → textus with recovery (invalid UTF-8 → recovery value)
+    fixum octeti badUtf8 ← |ff ff|
+    fixum textus recovered ← badUtf8 ↦ textus ⇥ "?"
+    nota recovered
+
+    # ascii → octeti
+    fixum ascii a ← 'hi'
+    fixum octeti aenc ← a ↦ octeti
+    nota aenc.longitudo()
+
+    # octeti → ascii (valid ASCII bytes)
+    fixum ascii adec ← raw ↦ ascii
+    nota adec
+
+    # octeti → ascii with recovery (non-ASCII byte → recovery value)
+    fixum octeti nonAscii ← |ff|
+    fixum ascii arecovery ← nonAscii ↦ ascii ⇥ 'x'
+    nota arecovery
+}
