@@ -1632,7 +1632,7 @@ impl MirKernelSignature {
                 interner,
                 allow_host_owned_tensor_entry,
             ),
-            [inputs @ ..] if !inputs.is_empty() && !is_vacuum(function.return_ty, validation) => {
+            inputs if !inputs.is_empty() && !is_vacuum(function.return_ty, validation) => {
                 Self::multi_input_return_buffer_kernel(
                     function,
                     validation,
@@ -3869,7 +3869,7 @@ mod tests {
 
     /// Build a `MirValidationContext` with device-tensor layouts so tensor
     /// types resolve to device-handle device views (the kernel ABI requires
-    /// the device locus; mirrors the radix crate's test_support helper).
+    /// the device locus; mirrors the radix crate's `test_support` helper).
     fn validation_with_device_tensor_layouts(types: &TypeTable) -> MirValidationContext<'_> {
         let mut validation = MirValidationContext::new(types);
         for index in 0..types.type_count() {
