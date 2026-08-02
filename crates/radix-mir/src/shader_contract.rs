@@ -9,10 +9,12 @@
 //! diagnostics.
 //!
 //! The records are domain-neutral: any library (Triga, …) maps its concrete API
-//! onto them, the driver ingests them (identity-resolved), and the WGSL emitter
-//! consumes the role fields instead of name spellings. Unknown numeric codes
-//! fail closed with [`MirAbiError`] — including the depth-compare table, which
-//! must error rather than degrade to `Never`.
+//! onto them, and the driver ingests them (identity-resolved). The roles are
+//! carried for the migration; the WGSL emitter consumes them in place of name
+//! spellings after U3 lands, with name-spelling detection remaining in the
+//! emitter until then. Unknown numeric codes fail closed with [`MirAbiError`] —
+//! including the depth-compare table, which must error rather than degrade to
+//! `Never`.
 //!
 //! U1 is additive: [`crate::abi`]'s `MirTriga*` types, `from_triga_*`
 //! conversions, and the old builders stay until the cleanup unit (U6). The
