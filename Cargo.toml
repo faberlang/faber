@@ -1,0 +1,21 @@
+[workspace]
+members = []
+resolver = "2"
+
+[profile.dev]
+debug = 1
+codegen-units = 256
+
+[profile.test]
+debug = 1
+codegen-units = 256
+
+# Non-Cargo host product: webgpu-browser/
+# Library crates use explicit path deps (not workspace inheritance) so Faber's
+# embedded core-support archive can path-depend on individual crates without
+# shipping this workspace root or product hosts.
+
+# Public export: the private code generators' feature names stay
+# declared so the `cfg(feature = ...)` gates they leave behind are known.
+[workspace.lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("device", "device-runtime", "hir-cobol", "hir-fortran", "hir-go", "hir-haskell", "hir-odin", "hir-pascal", "hir-python", "hir-rust", "hir-swift", "hir-ts", "mir-amd", "mir-basic", "mir-coverage", "mir-llvm", "mir-metal", "mir-sexp", "mir-wasm", "mir-wgsl"))'] }

@@ -1,0 +1,6 @@
+/target/
+.DS_Store
+tmp/
+
+# Local cargo config (shared target dir, machine-specific)
+/.cargo/
