@@ -361,6 +361,60 @@ pub struct MirKernelSignature {
     pub dispatch_size: MirKernelDispatchSize,
 }
 
+/// Classified builtin usage for a kernel signature — which invocation-header
+/// parameters each backend must declare. This is shared classification data
+/// only (L2); backend-local text mapping stays in each emitter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct MirKernelBuiltinUsage {
+    /// Any global-invocation builtin is referenced. An empty builtin list
+    /// still declares the grid position (the default header), so this is true
+    /// for an empty list.
+    pub uses_global_invocation: bool,
+    /// A workgroup-id builtin is referenced.
+    pub uses_workgroup_id: bool,
+    /// A local-invocation-id builtin is referenced.
+    pub uses_local_invocation_id: bool,
+    /// A workgroup-size builtin is referenced. Metal declares a
+    /// `threads_per_threadgroup` param for it; WGSL emits workgroup-size
+    /// constants inline and ignores this flag.
+    pub uses_workgroup_size: bool,
+}
+
+impl MirKernelBuiltinUsage {
+    /// Classify an explicit builtin list. The WGSL emitter classifies its
+    /// post-`additional_header_builtins()`-augmented list; the signature
+    /// method classifies `header_builtins()`.
+    #[must_use]
+    pub fn from_builtins(builtins: &[MirKernelBuiltin]) -> Self {
+        let mut usage = MirKernelBuiltinUsage {
+            uses_global_invocation: builtins.is_empty(),
+            uses_workgroup_id: false,
+            uses_local_invocation_id: false,
+            uses_workgroup_size: false,
+        };
+        for builtin in builtins {
+            match builtin {
+                MirKernelBuiltin::GlobalInvocationX
+                | MirKernelBuiltin::GlobalInvocationY
+                | MirKernelBuiltin::GlobalInvocationZ
+                | MirKernelBuiltin::GlobalInvocationId => usage.uses_global_invocation = true,
+                MirKernelBuiltin::WorkgroupIdX
+                | MirKernelBuiltin::WorkgroupIdY
+                | MirKernelBuiltin::WorkgroupIdZ
+                | MirKernelBuiltin::WorkgroupId => usage.uses_workgroup_id = true,
+                MirKernelBuiltin::LocalInvocationIdX
+                | MirKernelBuiltin::LocalInvocationIdY
+                | MirKernelBuiltin::LocalInvocationIdZ
+                | MirKernelBuiltin::LocalInvocationId => usage.uses_local_invocation_id = true,
+                MirKernelBuiltin::WorkgroupSizeX
+                | MirKernelBuiltin::WorkgroupSizeY
+                | MirKernelBuiltin::WorkgroupSizeZ => usage.uses_workgroup_size = true,
+            }
+        }
+        usage
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct MirGpuReflection {
     pub kernels: Vec<MirKernelReflection>,
@@ -1775,6 +1829,51 @@ impl MirKernelSignature {
             self.builtin_inputs.iter().map(|input| input.builtin),
             &self.called_builtins,
         )
+    }
+
+    /// Classify which invocation-header params the signature's builtins
+    /// require. Backend-local text mapping stays in each emitter (L2).
+    #[must_use]
+    pub fn builtin_usage(&self) -> MirKernelBuiltinUsage {
+        MirKernelBuiltinUsage::from_builtins(&self.header_builtins())
+    }
+
+    /// Return the dispatch-size axis that corresponds to the first invocation
+    /// builtin.
+    ///
+    /// F-036/F-049: the OOB guard must compare against the correct dispatch
+    /// axis instead of always using `dispatch_size.x`.
+    ///
+    /// `first_builtin` is an explicit argument (L1) because the WGSL emitter
+    /// augments the header builtins with body-required builtins before
+    /// selecting the first one; Metal passes `header_builtins().first()`.
+    #[must_use]
+    pub fn oob_guard_limit(&self, first_builtin: MirKernelBuiltin) -> u32 {
+        match first_builtin {
+            // WorkgroupSize* are compile-time constants and never drive an OOB
+            // guard; fall back to the X axis bound (same as pure-X invocation ids).
+            MirKernelBuiltin::GlobalInvocationX
+            | MirKernelBuiltin::GlobalInvocationId
+            | MirKernelBuiltin::WorkgroupIdX
+            | MirKernelBuiltin::WorkgroupId
+            | MirKernelBuiltin::LocalInvocationIdX
+            | MirKernelBuiltin::LocalInvocationId
+            | MirKernelBuiltin::WorkgroupSizeX
+            | MirKernelBuiltin::WorkgroupSizeY
+            | MirKernelBuiltin::WorkgroupSizeZ => {
+                u32::try_from(self.dispatch_size.x).unwrap_or(u32::MAX)
+            }
+            MirKernelBuiltin::GlobalInvocationY
+            | MirKernelBuiltin::WorkgroupIdY
+            | MirKernelBuiltin::LocalInvocationIdY => {
+                u32::try_from(self.dispatch_size.y).unwrap_or(u32::MAX)
+            }
+            MirKernelBuiltin::GlobalInvocationZ
+            | MirKernelBuiltin::WorkgroupIdZ
+            | MirKernelBuiltin::LocalInvocationIdZ => {
+                u32::try_from(self.dispatch_size.z).unwrap_or(u32::MAX)
+            }
+        }
     }
 }
 

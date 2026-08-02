@@ -45,7 +45,7 @@ pub use abi::{
     MirFragmentOutputReflection, MirFunctionAbi, MirFunctionAbiParam, MirGpuReflection,
     MirGraphicsPipelineReflection, MirInputStepMode, MirKernelAxis, MirKernelBufferBindingType,
     MirKernelBuiltin, MirKernelBuiltinInput, MirKernelBuiltinInputReflection,
-    MirKernelDispatchSize, MirKernelLaunchBindGroup, MirKernelLaunchBindGroupLayoutEntry,
+    MirKernelBuiltinUsage, MirKernelDispatchSize, MirKernelLaunchBindGroup, MirKernelLaunchBindGroupLayoutEntry,
     MirKernelLaunchBinding, MirKernelLaunchPipelineBindGroupLayout, MirKernelLaunchPipelineLayout,
     MirKernelLaunchPlan, MirKernelOffsetMode, MirKernelProvenance, MirKernelReflection,
     MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceReflection,
