@@ -18,7 +18,8 @@
 //! (L5): the contract stops at dispatch/workgroup/output-count; the plan adds
 //! the algorithm structure — shared-memory layout, barrier schedule, OOB
 //! padding policy. [`CollectionKernelPlan::from_contract`] consumes the
-//! resolved contract and the collection op from the MIR statement scan.
+//! resolved contract, the statement-scan collection op, and the matmul
+//! operand shapes from the MIR statement scan.
 //!
 //! Reference algorithm: `radix-mir-wgsl/src/lib.rs:1470-1555` (tree
 //! reduction) and `:1610-1700` (tiled matmul). The WGSL emitter stays the
@@ -51,6 +52,15 @@ pub const MATMUL_TILE: u32 = 8;
 /// syntax (`var<workgroup>` / `threadgroup` / `addrspace(3)`).
 pub const REDUCTION_SHARED_BUFFER_NAME: &str = "wg_shared";
 
+/// Logical shared-memory buffer name for the left-matrix operand tile (the
+/// WGSL reference's `shared_a`). The matmul recipe has two distinct tiles;
+/// `shared` alone is a WGSL reserved identifier (W6-A2 lesson), so backends
+/// map these names onto their shared-memory declaration syntax.
+pub const MATMUL_SHARED_A_BUFFER_NAME: &str = "shared_a";
+
+/// Logical shared-memory buffer name for the right-matrix operand tile.
+pub const MATMUL_SHARED_B_BUFFER_NAME: &str = "shared_b";
+
 /// The closed recipe set for collection-op kernel bodies (L3).
 ///
 /// Adding a variant is an explicit, reviewable change; the plan never carries
@@ -66,20 +76,48 @@ pub enum CollectionKernelPlan {
     /// when they prefer a uniform type.
     Elementwise,
     /// Tiled matmul recipe (cooperative K-tile load, barrier, inner-product
-    /// accumulation). The recipe fields are stubbed in this delivery and
-    /// populated by P2.
+    /// accumulation). See [`MatMulPlan`].
     TiledMatMul(MatMulPlan),
     /// Sequential tree-reduction recipe (grid-stride partial + power-of-2
     /// halving + mean divisor).
     TreeReduction(ReductionPlan),
 }
 
+/// Matmul operand shapes `(M, K, N)`, resolved from the rank-2 tensor types
+/// of the two matmul operands — the same literal dims
+/// [`CollectionOpContract::MatMul`]'s dispatch is derived from
+/// (`dispatch_y = ceil(M/8)`, `dispatch_x = ceil(N/8)`).
+///
+/// The contract carries only the tile grid; the recipe needs the exact dims
+/// (K for the K-tile loop count, M/N for the output write guard and the OOB
+/// tile tails), so the caller threads the shapes from the operand types in
+/// the MIR statement scan.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MatMulShapes {
+    /// Left matrix rows `M`.
+    pub m: u64,
+    /// Contracted inner dimension `K` (left columns / right rows).
+    pub k: u64,
+    /// Right matrix columns `N`.
+    pub n: u64,
+}
+
 /// Tiled-matmul recipe (WGSL `radix-mir-wgsl/src/lib.rs:1610-1700`).
 ///
-/// The struct exists now to keep [`CollectionKernelPlan`] closed (L3).
-/// `m`/`k`/`n` are stubbed to zero in this delivery; P2 populates them from
-/// the operand shapes (mirroring `matmul_shapes`) and adds the recipe fields
-/// (`shared_memory`, `barriers`, `oob_padding`).
+/// Algorithmic invariants carried from the reference body:
+/// - one workgroup per `tile × tile` output tile; the workgroup must equal
+///   the tile on both axes (PRP-004 U2: tile-local addressing derives from
+///   workgroup-local ids, so any other workgroup size aliases shared slots);
+/// - `ceil(k / tile)` K-tile iterations; each iteration cooperatively loads
+///   an A tile (`shared_a`) and a B tile (`shared_b`), barriers, then
+///   accumulates the inner product `acc += shared_a[ty][kk] * shared_b[kk][tx]`;
+/// - per-K-tile barrier schedule ([`MatMulPlan::barriers`]): the
+///   post-cooperative-load barrier first, then the post-inner-product-step
+///   barrier (the second publishes the read completion before the next K
+///   tile's load overwrites the buffers);
+/// - zero-filled tail tiles (L16): loads past `m×k` (A) / `k×n` (B) write 0;
+/// - the output element is written from global row/col within `M×N`, once
+///   per workgroup (F-035: each workgroup writes a distinct output tile).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MatMulPlan {
     /// Left matrix rows `M`.
@@ -91,6 +129,28 @@ pub struct MatMulPlan {
     /// Square tile edge; the contract dispatches one workgroup per
     /// `tile × tile` output tile.
     pub tile: u32,
+    /// Workgroup lane count on `x`; tile-local addressing is only correct
+    /// when it equals `tile` (PRP-004 U2).
+    pub workgroup_x: u32,
+    /// Workgroup lane count on `y`; must equal `tile`.
+    pub workgroup_y: u32,
+    /// The two shared-memory operand tiles (`shared_a`, `shared_b`), each
+    /// `tile × tile`.
+    pub shared_memory: MatMulSharedMemory,
+    /// Per-K-tile barrier schedule: the post-cooperative-load barrier first,
+    /// then the post-inner-product-step barrier.
+    pub barriers: Vec<BarrierPoint>,
+    /// Zero-fill policy for the operand tail tiles (L16).
+    pub oob_padding: OobPaddingPolicy,
+}
+
+/// The two shared-memory operand tiles of the tiled-matmul recipe.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MatMulSharedMemory {
+    /// Left-matrix tile (`A[row][k_start + tx]`), `tile × tile` slots.
+    pub shared_a: SharedMemoryLayout,
+    /// Right-matrix tile (`B[k_start + ty][col]`), `tile × tile` slots.
+    pub shared_b: SharedMemoryLayout,
 }
 
 /// Tree-reduction recipe (WGSL `radix-mir-wgsl/src/lib.rs:1470-1555`).
@@ -171,6 +231,10 @@ pub enum BarrierPhase {
     SharedMemoryLoad,
     /// After each tree halving step.
     ReductionStep,
+    /// After the inner product over one K tile: every lane has finished
+    /// reading `shared_a`/`shared_b`, so the next K tile's cooperative load
+    /// may overwrite them.
+    InnerProductStep,
 }
 
 /// Policy for out-of-bounds element reads in collection-op recipes.
@@ -205,19 +269,25 @@ impl CollectionKernelPlan {
     /// `op` is the collection intrinsic resolved from the kernel body's
     /// statement scan (the same scan `abi::collection_op_contract` runs); the
     /// contract itself does not distinguish `Sum` from `TensorMean`, so the
-    /// op is threaded through here. `signature` must already carry the
-    /// contract it was built from (the shape `apply_collection_op_contract`
-    /// produces: corrected workgroup, dispatch, and output count) — a
-    /// mismatched signature yields `None` rather than a plan that assumes a
-    /// dispatch the host will not honor.
+    /// op is threaded through here. `matmul_shapes` carries the rank-2
+    /// operand dims `(M, K, N)` resolved from the matmul operands' tensor
+    /// types in the same scan — the contract stops at the tile grid, the
+    /// recipe needs the exact dims (K-tile loop count, output guard, OOB
+    /// tails). `signature` must already carry the contract it was built from
+    /// (the shape `apply_collection_op_contract` produces: corrected
+    /// workgroup, dispatch, and output count) — a mismatched signature yields
+    /// `None` rather than a plan that assumes a dispatch the host will not
+    /// honor.
     ///
     /// Returns `None` for elementwise kernels (no plan needed) and for
-    /// contract/op mismatches (the kernel keeps the elementwise fallback).
+    /// contract/op/shape mismatches (the kernel keeps the elementwise
+    /// fallback).
     #[must_use]
     pub fn from_contract(
         signature: &MirKernelSignature,
         contract: &CollectionOpContract,
         op: MirCollectionOp,
+        matmul_shapes: Option<MatMulShapes>,
     ) -> Option<CollectionKernelPlan> {
         match *contract {
             CollectionOpContract::Reduction {
@@ -254,16 +324,40 @@ impl CollectionKernelPlan {
                 if op != MirCollectionOp::TensorMatMul {
                     return None;
                 }
-                if !signature_matches_matmul(signature, dispatch_x, dispatch_y) {
+                let Some(shapes) = matmul_shapes else {
+                    // The recipe needs the exact operand dims; the contract
+                    // alone cannot reconstruct them from the tile grid.
+                    return None;
+                };
+                let tile = MATMUL_TILE;
+                if !shapes_match_matmul_dispatch(shapes, dispatch_x, dispatch_y, tile) {
                     return None;
                 }
-                // P2 resolves m/k/n from the operand shapes and populates the
-                // recipe; the stub keeps the enum closed (L3).
+                if !signature_matches_matmul(signature, dispatch_x, dispatch_y, shapes) {
+                    return None;
+                }
+                let tile_slots = tile * tile;
                 Some(CollectionKernelPlan::TiledMatMul(MatMulPlan {
-                    m: 0,
-                    k: 0,
-                    n: 0,
-                    tile: MATMUL_TILE,
+                    m: shapes.m,
+                    k: shapes.k,
+                    n: shapes.n,
+                    tile,
+                    workgroup_x: signature.workgroup.x,
+                    workgroup_y: signature.workgroup.y,
+                    shared_memory: MatMulSharedMemory {
+                        shared_a: SharedMemoryLayout {
+                            element_byte_width: F32_ELEMENT_BYTE_WIDTH,
+                            slot_count: tile_slots,
+                            buffer_name: MATMUL_SHARED_A_BUFFER_NAME.to_owned(),
+                        },
+                        shared_b: SharedMemoryLayout {
+                            element_byte_width: F32_ELEMENT_BYTE_WIDTH,
+                            slot_count: tile_slots,
+                            buffer_name: MATMUL_SHARED_B_BUFFER_NAME.to_owned(),
+                        },
+                    },
+                    barriers: matmul_barrier_schedule(),
+                    oob_padding: OobPaddingPolicy::ZeroFill,
                 }))
             }
         }
@@ -281,17 +375,19 @@ impl CollectionKernelPlan {
     /// - OOB-padding coverage: the padding policy covers the tail range of
     ///   the last workgroup.
     ///
+    /// Matmul adds: the workgroup equals the `tile × tile` grid (PRP-004
+    /// U2), both operand tiles are sized `tile × tile` and within the
+    /// workgroup-memory limit, the per-K-tile barrier pair is present and
+    /// ordered, and the zero-fill policy covers both operand tile tails.
+    ///
     /// # Errors
     /// Returns [`PlanValidationError`] when any check fails. Elementwise
-    /// kernels and the matmul stub (whose recipe lands in P2) always
-    /// validate.
+    /// kernels always validate.
     pub fn validate(&self) -> Result<(), PlanValidationError> {
         match self {
             CollectionKernelPlan::Elementwise => Ok(()),
             CollectionKernelPlan::TreeReduction(plan) => validate_reduction_plan(plan),
-            // The matmul recipe fields (shared_memory, barriers, oob_padding)
-            // arrive with P2; its checks land with them.
-            CollectionKernelPlan::TiledMatMul(_) => Ok(()),
+            CollectionKernelPlan::TiledMatMul(plan) => validate_matmul_plan(plan),
         }
     }
 }
@@ -313,6 +409,36 @@ fn reduction_barrier_schedule(workgroup_x: u32) -> Vec<BarrierPoint> {
     barriers
 }
 
+/// Per-K-tile barrier schedule for the tiled-matmul recipe: the
+/// post-cooperative-load barrier (publishes the loaded A/B tiles to the
+/// inner product), then the post-inner-product-step barrier (publishes the
+/// read completion before the next K tile's cooperative load overwrites the
+/// buffers). The K-tile loop repeats this pair `ceil(k / tile)` times.
+fn matmul_barrier_schedule() -> Vec<BarrierPoint> {
+    vec![
+        BarrierPoint {
+            after: BarrierPhase::SharedMemoryLoad,
+        },
+        BarrierPoint {
+            after: BarrierPhase::InnerProductStep,
+        },
+    ]
+}
+
+/// The matmul shapes must reproduce the contract's tile grid: `dispatch_y`
+/// tiles the `M` rows and `dispatch_x` tiles the `N` columns. A
+/// shapes/dispatch mismatch means the caller resolved shapes that disagree
+/// with the contract the signature carries.
+fn shapes_match_matmul_dispatch(
+    shapes: MatMulShapes,
+    dispatch_x: u64,
+    dispatch_y: u64,
+    tile: u32,
+) -> bool {
+    let tile = u64::from(tile);
+    dispatch_y == shapes.m.div_ceil(tile) && dispatch_x == shapes.n.div_ceil(tile)
+}
+
 /// The reduction signature must already carry the contract it was built
 /// from: `apply_collection_op_contract` sets workgroup `(ws, 1, 1)`,
 /// dispatch `(length, 1, 1)`, and output count `partials`.
@@ -332,12 +458,14 @@ fn signature_matches_reduction(
 }
 
 /// The matmul signature must already carry the contract it was built from:
-/// `apply_collection_op_contract` sets workgroup `(8, 8, 1)` and the tile
-/// grid dispatch.
+/// `apply_collection_op_contract` sets workgroup `(8, 8, 1)`, the tile-grid
+/// dispatch, and the operand buffers hold the flat `M·K` (left) / `K·N`
+/// (right) element counts with the `M·N` output.
 fn signature_matches_matmul(
     signature: &MirKernelSignature,
     dispatch_x: u64,
     dispatch_y: u64,
+    shapes: MatMulShapes,
 ) -> bool {
     signature.workgroup.x == MATMUL_TILE
         && signature.workgroup.y == MATMUL_TILE
@@ -345,6 +473,10 @@ fn signature_matches_matmul(
         && signature.dispatch_size.x == dispatch_x
         && signature.dispatch_size.y == dispatch_y
         && signature.dispatch_size.z == 1
+        && signature.input.element_count == shapes.m.saturating_mul(shapes.k)
+        && signature.output.element_count == shapes.m.saturating_mul(shapes.n)
+        && signature.extra_inputs.len() == 1
+        && signature.extra_inputs[0].element_count == shapes.k.saturating_mul(shapes.n)
 }
 
 fn validate_reduction_plan(plan: &ReductionPlan) -> Result<(), PlanValidationError> {
@@ -375,6 +507,16 @@ fn validate_barrier_dominance(plan: &ReductionPlan) -> Result<(), PlanValidation
         match point.after {
             BarrierPhase::SharedMemoryLoad => load_barriers += 1,
             BarrierPhase::ReductionStep => reduction_barriers += 1,
+            // A matmul-only phase has no place in the tree recipe; the plan
+            // is a closed recipe set (L2), so a cross-recipe barrier is a
+            // malformed plan.
+            BarrierPhase::InnerProductStep => {
+                return Err(PlanValidationError::BarrierDominance {
+                    phase: BarrierPhase::InnerProductStep,
+                    required_count: 0,
+                    present_count: 1,
+                });
+            }
         }
     }
     // The post-load barrier must dominate the first tree read: it is the
@@ -423,13 +565,15 @@ fn validate_output_write_exclusivity(plan: &ReductionPlan) -> Result<(), PlanVal
 
 /// Shared-memory sizing (L12): `slot_count * element_byte_width` within the
 /// conservative device workgroup-memory limit (`32KB`). The reduction recipe
-/// allocates one shared slot per workgroup lane; an oversize footprint fails
-/// to compile/launch on the target.
+/// allocates one shared slot per workgroup lane; the matmul recipe allocates
+/// two `tile × tile` operand tiles. An oversize footprint fails to
+/// compile/launch on the target.
 fn validate_shared_memory_sizing(layout: &SharedMemoryLayout) -> Result<(), PlanValidationError> {
     let element_width = u64::try_from(layout.element_byte_width).unwrap_or(u64::MAX);
     let bytes = u64::from(layout.slot_count).saturating_mul(element_width);
     if bytes > WORKGROUP_SHARED_MEMORY_LIMIT_BYTES {
         return Err(PlanValidationError::SharedMemorySizing {
+            buffer_name: layout.buffer_name.clone(),
             bytes,
             limit: WORKGROUP_SHARED_MEMORY_LIMIT_BYTES,
         });
@@ -474,6 +618,169 @@ fn validate_oob_padding_coverage(plan: &ReductionPlan) -> Result<(), PlanValidat
     Ok(())
 }
 
+fn validate_matmul_plan(plan: &MatMulPlan) -> Result<(), PlanValidationError> {
+    validate_matmul_workgroup(plan)?;
+    validate_matmul_shared_memory(plan)?;
+    validate_matmul_barrier_coverage(plan)?;
+    validate_matmul_oob_padding_coverage(plan)?;
+    Ok(())
+}
+
+/// Workgroup coupling (L12 / PRP-004 U2): tile-local addressing derives from
+/// workgroup-local ids, so the shared-memory tile is only correct when the
+/// workgroup equals the tile grid on both axes — the pre-fix `id % 8` aliased
+/// shared slots for any other workgroup size. A zero tile is degenerate (no
+/// dispatch arithmetic could tile it) and is rejected here, before any
+/// `div_ceil` runs.
+fn validate_matmul_workgroup(plan: &MatMulPlan) -> Result<(), PlanValidationError> {
+    if plan.tile == 0 {
+        return Err(PlanValidationError::MatMulZeroDimension {
+            m: plan.m,
+            k: plan.k,
+            n: plan.n,
+            tile: plan.tile,
+        });
+    }
+    if plan.workgroup_x != plan.tile || plan.workgroup_y != plan.tile {
+        return Err(PlanValidationError::MatMulWorkgroupMismatch {
+            workgroup_x: plan.workgroup_x,
+            workgroup_y: plan.workgroup_y,
+            tile: plan.tile,
+        });
+    }
+    Ok(())
+}
+
+/// Shared-memory sizing (L12): both operand tiles must be exactly
+/// `tile × tile` slots (the cooperative load fills the whole tile) and each
+/// footprint must fit the conservative device workgroup-memory limit.
+fn validate_matmul_shared_memory(plan: &MatMulPlan) -> Result<(), PlanValidationError> {
+    let expected_slots = u64::from(plan.tile) * u64::from(plan.tile);
+    for layout in [&plan.shared_memory.shared_a, &plan.shared_memory.shared_b] {
+        if u64::from(layout.slot_count) != expected_slots {
+            return Err(PlanValidationError::MatMulSharedMemoryLayout {
+                buffer_name: layout.buffer_name.clone(),
+                slot_count: u64::from(layout.slot_count),
+                expected_slots,
+            });
+        }
+        validate_shared_memory_sizing(layout)?;
+    }
+    Ok(())
+}
+
+/// Barrier coverage (L12): every shared-memory read must be dominated by a
+/// barrier after the corresponding write. The matmul recipe reads the tiles
+/// inside the inner-product step; the post-cooperative-load barrier must
+/// head the per-K-tile schedule, and a post-inner-product-step barrier must
+/// follow (it publishes the read completion before the next tile load
+/// overwrites the buffers).
+fn validate_matmul_barrier_coverage(plan: &MatMulPlan) -> Result<(), PlanValidationError> {
+    let load = BarrierPoint {
+        after: BarrierPhase::SharedMemoryLoad,
+    };
+    let step = BarrierPoint {
+        after: BarrierPhase::InnerProductStep,
+    };
+    for point in &plan.barriers {
+        if matches!(point.after, BarrierPhase::ReductionStep) {
+            // A reduction-only phase has no place in the matmul recipe; the
+            // plan is a closed recipe set (L2), so a cross-recipe barrier is
+            // a malformed plan.
+            return Err(PlanValidationError::BarrierDominance {
+                phase: BarrierPhase::ReductionStep,
+                required_count: 0,
+                present_count: 1,
+            });
+        }
+    }
+    let load_count = plan.barriers.iter().filter(|point| **point == load).count();
+    let step_count = plan.barriers.iter().filter(|point| **point == step).count();
+    if plan.barriers.first() != Some(&load) {
+        return Err(PlanValidationError::BarrierDominance {
+            phase: BarrierPhase::SharedMemoryLoad,
+            required_count: 1,
+            present_count: u32::try_from(load_count).unwrap_or(u32::MAX),
+        });
+    }
+    if step_count == 0 {
+        return Err(PlanValidationError::BarrierDominance {
+            phase: BarrierPhase::InnerProductStep,
+            required_count: 1,
+            present_count: u32::try_from(step_count).unwrap_or(u32::MAX),
+        });
+    }
+    Ok(())
+}
+
+/// OOB-padding coverage (L12 / L16): the zero-fill policy must cover the
+/// operand tile tails — the padded row/column/K spans the grid reaches past
+/// `M`, `N`, and `K` (`shared_a` reads `A[row][k_start + tx]`, `shared_b`
+/// reads `B[k_start + ty][col]`). The check pins the padded-extent
+/// arithmetic (`ceil(d / tile) * tile`) against the policy; a policy that
+/// leaves any index of the last tile uncovered fails here. Zero dimensions
+/// are rejected before the arithmetic (a zero dim dispatches an empty grid,
+/// and `div_ceil` by a zero tile must not run).
+///
+/// The shared-memory sizing check runs before this one and rejects tiles
+/// larger than ~90 slots, so the four tail loops are each bounded by the
+/// tile edge.
+fn validate_matmul_oob_padding_coverage(plan: &MatMulPlan) -> Result<(), PlanValidationError> {
+    if plan.tile == 0 || plan.m == 0 || plan.k == 0 || plan.n == 0 {
+        return Err(PlanValidationError::MatMulZeroDimension {
+            m: plan.m,
+            k: plan.k,
+            n: plan.n,
+            tile: plan.tile,
+        });
+    }
+    let tile = u64::from(plan.tile);
+    // shared_a holds A[row][k_start + tx]: the tail rows past M and the tail
+    // K columns past K are both out of bounds of the M×K left matrix.
+    let padded_m = plan.m.div_ceil(tile) * tile;
+    for row in plan.m..padded_m {
+        if !plan.oob_padding.covers(row, plan.m) {
+            return Err(PlanValidationError::MatMulOobPaddingCoverage {
+                buffer_name: MATMUL_SHARED_A_BUFFER_NAME.to_owned(),
+                length: plan.m,
+                covered_until: padded_m,
+            });
+        }
+    }
+    let padded_k = plan.k.div_ceil(tile) * tile;
+    for k_index in plan.k..padded_k {
+        if !plan.oob_padding.covers(k_index, plan.k) {
+            return Err(PlanValidationError::MatMulOobPaddingCoverage {
+                buffer_name: MATMUL_SHARED_A_BUFFER_NAME.to_owned(),
+                length: plan.k,
+                covered_until: padded_k,
+            });
+        }
+    }
+    // shared_b holds B[k_start + ty][col]: the tail K rows past K and the
+    // tail columns past N are both out of bounds of the K×N right matrix.
+    for k_index in plan.k..padded_k {
+        if !plan.oob_padding.covers(k_index, plan.k) {
+            return Err(PlanValidationError::MatMulOobPaddingCoverage {
+                buffer_name: MATMUL_SHARED_B_BUFFER_NAME.to_owned(),
+                length: plan.k,
+                covered_until: padded_k,
+            });
+        }
+    }
+    let padded_n = plan.n.div_ceil(tile) * tile;
+    for col in plan.n..padded_n {
+        if !plan.oob_padding.covers(col, plan.n) {
+            return Err(PlanValidationError::MatMulOobPaddingCoverage {
+                buffer_name: MATMUL_SHARED_B_BUFFER_NAME.to_owned(),
+                length: plan.n,
+                covered_until: padded_n,
+            });
+        }
+    }
+    Ok(())
+}
+
 /// Plan validation failure (L12 static plan checks).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PlanValidationError {
@@ -491,11 +798,38 @@ pub enum PlanValidationError {
         expected_partials: u64,
     },
     /// The shared-memory footprint exceeds the device workgroup-memory limit.
-    SharedMemorySizing { bytes: u64, limit: u64 },
+    SharedMemorySizing {
+        buffer_name: String,
+        bytes: u64,
+        limit: u64,
+    },
     /// The OOB padding policy does not cover the last workgroup's tail.
     OobPaddingCoverage {
         length: u64,
         workgroup_x: u32,
+        covered_until: u64,
+    },
+    /// Matmul requires the workgroup to equal the tile on both axes
+    /// (PRP-004 U2).
+    MatMulWorkgroupMismatch {
+        workgroup_x: u32,
+        workgroup_y: u32,
+        tile: u32,
+    },
+    /// The shared-memory tile slot count is not `tile × tile`.
+    MatMulSharedMemoryLayout {
+        buffer_name: String,
+        slot_count: u64,
+        expected_slots: u64,
+    },
+    /// Matmul requires positive M/K/N and a non-zero tile (a zero dimension
+    /// dispatches an empty grid and the padded-tile arithmetic would divide
+    /// by a zero tile).
+    MatMulZeroDimension { m: u64, k: u64, n: u64, tile: u32 },
+    /// The OOB padding policy does not cover a matmul operand tile tail.
+    MatMulOobPaddingCoverage {
+        buffer_name: String,
+        length: u64,
         covered_until: u64,
     },
 }
@@ -522,9 +856,13 @@ impl fmt::Display for PlanValidationError {
                 f,
                 "output-write exclusivity: {output_slots} partial slot(s) does not tile the tensor (expected {expected_partials})"
             ),
-            Self::SharedMemorySizing { bytes, limit } => write!(
+            Self::SharedMemorySizing {
+                buffer_name,
+                bytes,
+                limit,
+            } => write!(
                 f,
-                "shared-memory sizing: {bytes} bytes exceeds the {limit}-byte workgroup-memory limit"
+                "shared-memory sizing: {buffer_name} is {bytes} bytes, exceeding the {limit}-byte workgroup-memory limit"
             ),
             Self::OobPaddingCoverage {
                 length,
@@ -533,6 +871,34 @@ impl fmt::Display for PlanValidationError {
             } => write!(
                 f,
                 "OOB padding coverage: tensor length {length} with workgroup_x {workgroup_x} is not covered up to {covered_until}"
+            ),
+            Self::MatMulWorkgroupMismatch {
+                workgroup_x,
+                workgroup_y,
+                tile,
+            } => write!(
+                f,
+                "matmul workgroup ({workgroup_x}, {workgroup_y}) must equal the {tile}×{tile} tile grid (PRP-004 U2)"
+            ),
+            Self::MatMulSharedMemoryLayout {
+                buffer_name,
+                slot_count,
+                expected_slots,
+            } => write!(
+                f,
+                "matmul shared memory {buffer_name} has {slot_count} slots, expected {expected_slots} (tile × tile)"
+            ),
+            Self::MatMulZeroDimension { m, k, n, tile } => write!(
+                f,
+                "matmul requires positive M/K/N and a non-zero tile, got M={m}, K={k}, N={n}, tile={tile}"
+            ),
+            Self::MatMulOobPaddingCoverage {
+                buffer_name,
+                length,
+                covered_until,
+            } => write!(
+                f,
+                "matmul OOB padding coverage: {buffer_name} tail up to {covered_until} is not zero-filled against length {length}"
             ),
         }
     }
@@ -601,8 +967,14 @@ mod tests {
     }
 
     /// A post-contract matmul signature: workgroup `(8, 8, 1)`, tile-grid
-    /// dispatch.
-    fn matmul_signature(dispatch_x: u64, dispatch_y: u64) -> MirKernelSignature {
+    /// dispatch, left/right operand buffers sized to the flat `M·K` / `K·N`
+    /// element counts and an `M·N` output — the shape the kernel ABI
+    /// produces for a two-tensor-param matmul kernel.
+    fn matmul_signature(
+        shapes: MatMulShapes,
+        dispatch_x: u64,
+        dispatch_y: u64,
+    ) -> MirKernelSignature {
         let mut types = TypeTable::new();
         let element_ty = f32_ty(&mut types);
         MirKernelSignature {
@@ -614,19 +986,29 @@ mod tests {
                 role: MirKernelResourceRole::Input,
                 access: MirKernelResourceAccess::Read,
                 element_ty,
-                element_count: 1,
+                element_count: shapes.m * shapes.k,
                 source_local: Some(MirLocalId(0)),
                 source_name: None,
             },
-            extra_inputs: Vec::new(),
-            output: MirKernelResource {
+            extra_inputs: vec![MirKernelResource {
                 group: 0,
                 binding: 1,
+                kind: MirKernelResourceKind::StorageBuffer,
+                role: MirKernelResourceRole::Input,
+                access: MirKernelResourceAccess::Read,
+                element_ty,
+                element_count: shapes.k * shapes.n,
+                source_local: Some(MirLocalId(1)),
+                source_name: None,
+            }],
+            output: MirKernelResource {
+                group: 0,
+                binding: 2,
                 kind: MirKernelResourceKind::StorageBuffer,
                 role: MirKernelResourceRole::Output,
                 access: MirKernelResourceAccess::Write,
                 element_ty,
-                element_count: 1,
+                element_count: shapes.m * shapes.n,
                 source_local: None,
                 source_name: None,
             },
@@ -642,6 +1024,48 @@ mod tests {
                 y: dispatch_y,
                 z: 1,
             },
+        }
+    }
+
+    /// A tail-tile shapes fixture: `17×12` times `12×33` → dispatch `(5, 3)`
+    /// — the padded grid reaches rows/cols/K the matrices do not have, so the
+    /// zero-fill tails are non-empty.
+    fn matmul_fixture_shapes() -> MatMulShapes {
+        MatMulShapes {
+            m: 17,
+            k: 12,
+            n: 33,
+        }
+    }
+
+    /// Build the canonical tiled-matmul plan for the deliberately-broken-plan
+    /// corpus: tail-tile fixture with the correct workgroup, operand tiles,
+    /// and per-K-tile barrier pair.
+    fn matmul_plan() -> MatMulPlan {
+        let shapes = matmul_fixture_shapes();
+        let tile = MATMUL_TILE;
+        let tile_slots = tile * tile;
+        MatMulPlan {
+            m: shapes.m,
+            k: shapes.k,
+            n: shapes.n,
+            tile,
+            workgroup_x: tile,
+            workgroup_y: tile,
+            shared_memory: MatMulSharedMemory {
+                shared_a: SharedMemoryLayout {
+                    element_byte_width: F32_ELEMENT_BYTE_WIDTH,
+                    slot_count: tile_slots,
+                    buffer_name: MATMUL_SHARED_A_BUFFER_NAME.to_owned(),
+                },
+                shared_b: SharedMemoryLayout {
+                    element_byte_width: F32_ELEMENT_BYTE_WIDTH,
+                    slot_count: tile_slots,
+                    buffer_name: MATMUL_SHARED_B_BUFFER_NAME.to_owned(),
+                },
+            },
+            barriers: matmul_barrier_schedule(),
+            oob_padding: OobPaddingPolicy::ZeroFill,
         }
     }
 
@@ -679,7 +1103,7 @@ mod tests {
             workgroup_x: 256,
             partials: 4,
         };
-        let plan = CollectionKernelPlan::from_contract(&signature, &contract, MirCollectionOp::Sum)
+        let plan = CollectionKernelPlan::from_contract(&signature, &contract, MirCollectionOp::Sum, None)
             .expect("reduction contract builds a plan");
         let CollectionKernelPlan::TreeReduction(reduction) = &plan else {
             panic!("expected a tree-reduction plan");
@@ -715,7 +1139,7 @@ mod tests {
             partials: 4,
         };
         let plan =
-            CollectionKernelPlan::from_contract(&signature, &contract, MirCollectionOp::TensorMean)
+            CollectionKernelPlan::from_contract(&signature, &contract, MirCollectionOp::TensorMean, None)
                 .expect("mean contract builds a plan");
         let CollectionKernelPlan::TreeReduction(reduction) = &plan else {
             panic!("expected a tree-reduction plan");
@@ -731,7 +1155,7 @@ mod tests {
             workgroup_x: 1,
             partials: 1,
         };
-        let plan = CollectionKernelPlan::from_contract(&signature, &contract, MirCollectionOp::Sum)
+        let plan = CollectionKernelPlan::from_contract(&signature, &contract, MirCollectionOp::Sum, None)
             .expect("single-lane contract builds a plan");
         let CollectionKernelPlan::TreeReduction(reduction) = &plan else {
             panic!("expected a tree-reduction plan");
@@ -755,45 +1179,157 @@ mod tests {
             partials: 4,
         };
         assert!(
-            CollectionKernelPlan::from_contract(&signature, &contract, MirCollectionOp::Append)
+            CollectionKernelPlan::from_contract(&signature, &contract, MirCollectionOp::Append, None)
                 .is_none(),
             "a non-reduction op must not produce a reduction plan"
         );
     }
 
     #[test]
-    fn matmul_contract_returns_stubbed_plan() {
-        let signature = matmul_signature(4, 2);
+    fn matmul_plan_is_fully_populated() {
+        let shapes = matmul_fixture_shapes();
+        let signature = matmul_signature(shapes, 5, 3);
         let contract = CollectionOpContract::MatMul {
-            dispatch_x: 4,
-            dispatch_y: 2,
+            dispatch_x: 5,
+            dispatch_y: 3,
         };
         let plan = CollectionKernelPlan::from_contract(
             &signature,
             &contract,
             MirCollectionOp::TensorMatMul,
+            Some(shapes),
         )
         .expect("matmul contract builds a plan");
         let CollectionKernelPlan::TiledMatMul(matmul) = &plan else {
             panic!("expected a tiled-matmul plan");
         };
+        // Shapes come from the operand tensor types; the tile from the ABI
+        // constant.
+        assert_eq!((matmul.m, matmul.k, matmul.n), (17, 12, 33));
         assert_eq!(matmul.tile, MATMUL_TILE);
-        // m/k/n are stubbed until P2 populates them from operand shapes.
-        assert_eq!((matmul.m, matmul.k, matmul.n), (0, 0, 0));
-        plan.validate().expect("matmul stub validates");
+        assert_eq!(
+            (matmul.workgroup_x, matmul.workgroup_y),
+            (MATMUL_TILE, MATMUL_TILE)
+        );
+        // Two shared-memory operand tiles, each tile × tile f32 slots.
+        assert_eq!(matmul.shared_memory.shared_a.element_byte_width, 4);
+        assert_eq!(matmul.shared_memory.shared_a.slot_count, 64);
+        assert_eq!(matmul.shared_memory.shared_a.buffer_name, "shared_a");
+        assert_eq!(matmul.shared_memory.shared_b.element_byte_width, 4);
+        assert_eq!(matmul.shared_memory.shared_b.slot_count, 64);
+        assert_eq!(matmul.shared_memory.shared_b.buffer_name, "shared_b");
+        // Per-K-tile barrier pair: post-cooperative-load, then
+        // post-inner-product-step.
+        assert_eq!(
+            matmul.barriers,
+            vec![
+                BarrierPoint {
+                    after: BarrierPhase::SharedMemoryLoad
+                },
+                BarrierPoint {
+                    after: BarrierPhase::InnerProductStep
+                }
+            ]
+        );
+        assert_eq!(matmul.oob_padding, OobPaddingPolicy::ZeroFill);
+        plan.validate().expect("built matmul plan validates");
     }
 
     #[test]
-    fn matmul_contract_with_non_matmul_op_returns_none() {
-        let signature = matmul_signature(4, 2);
+    fn matmul_contract_without_shapes_returns_none() {
+        let shapes = MatMulShapes {
+            m: 16,
+            k: 8,
+            n: 32,
+        };
+        let signature = matmul_signature(shapes, 4, 2);
         let contract = CollectionOpContract::MatMul {
             dispatch_x: 4,
             dispatch_y: 2,
         };
         assert!(
-            CollectionKernelPlan::from_contract(&signature, &contract, MirCollectionOp::Sum)
-                .is_none(),
+            CollectionKernelPlan::from_contract(
+                &signature,
+                &contract,
+                MirCollectionOp::TensorMatMul,
+                None,
+            )
+            .is_none(),
+            "a matmul contract without operand shapes must not build a plan"
+        );
+    }
+
+    #[test]
+    fn matmul_plan_shapes_not_matching_dispatch_returns_none() {
+        // Shapes say `33×8×33` → dispatch (5, 5), but the contract dispatches
+        // (4, 2): the caller resolved shapes that disagree with the contract.
+        let signature = matmul_signature(MatMulShapes { m: 16, k: 8, n: 32 }, 4, 2);
+        let contract = CollectionOpContract::MatMul {
+            dispatch_x: 4,
+            dispatch_y: 2,
+        };
+        assert!(
+            CollectionKernelPlan::from_contract(
+                &signature,
+                &contract,
+                MirCollectionOp::TensorMatMul,
+                Some(MatMulShapes {
+                    m: 33,
+                    k: 8,
+                    n: 33
+                }),
+            )
+            .is_none(),
+            "shapes that disagree with the contract dispatch must not build a plan"
+        );
+    }
+
+    #[test]
+    fn matmul_contract_with_non_matmul_op_returns_none() {
+        let signature = matmul_signature(MatMulShapes { m: 16, k: 8, n: 32 }, 4, 2);
+        let contract = CollectionOpContract::MatMul {
+            dispatch_x: 4,
+            dispatch_y: 2,
+        };
+        assert!(
+            CollectionKernelPlan::from_contract(
+                &signature,
+                &contract,
+                MirCollectionOp::Sum,
+                Some(MatMulShapes {
+                    m: 16,
+                    k: 8,
+                    n: 32
+                }),
+            )
+            .is_none(),
             "a reduction op must not produce a matmul plan"
+        );
+    }
+
+    #[test]
+    fn matmul_signature_not_carrying_contract_returns_none() {
+        // The output element count disagrees with the shapes: the signature
+        // was not built from this contract.
+        let mut signature = matmul_signature(MatMulShapes { m: 16, k: 8, n: 32 }, 4, 2);
+        signature.output.element_count = 1;
+        let contract = CollectionOpContract::MatMul {
+            dispatch_x: 4,
+            dispatch_y: 2,
+        };
+        assert!(
+            CollectionKernelPlan::from_contract(
+                &signature,
+                &contract,
+                MirCollectionOp::TensorMatMul,
+                Some(MatMulShapes {
+                    m: 16,
+                    k: 8,
+                    n: 32
+                }),
+            )
+            .is_none(),
+            "a signature that does not carry the contract must not build a plan"
         );
     }
 
@@ -808,7 +1344,7 @@ mod tests {
             partials: 4,
         };
         assert!(
-            CollectionKernelPlan::from_contract(&signature, &contract, MirCollectionOp::Sum)
+            CollectionKernelPlan::from_contract(&signature, &contract, MirCollectionOp::Sum, None)
                 .is_none(),
             "a signature that does not carry the contract must not build a plan"
         );
@@ -870,6 +1406,32 @@ mod tests {
     }
 
     #[test]
+    fn validate_rejects_matmul_barrier_in_reduction() {
+        // A matmul-only barrier phase in a tree-reduction schedule is a
+        // cross-recipe plan (L2 closed recipe set).
+        let plan = reduction_plan_with_barriers(
+            256,
+            4,
+            vec![
+                BarrierPoint {
+                    after: BarrierPhase::SharedMemoryLoad,
+                },
+                BarrierPoint {
+                    after: BarrierPhase::InnerProductStep,
+                },
+            ],
+        );
+        assert_eq!(
+            plan_validation_error(&plan),
+            PlanValidationError::BarrierDominance {
+                phase: BarrierPhase::InnerProductStep,
+                required_count: 0,
+                present_count: 1,
+            }
+        );
+    }
+
+    #[test]
     fn validate_rejects_oversized_shared_memory() {
         // 16384 slots × 4 bytes = 64KB > the 32KB conservative limit.
         let plan = ReductionPlan {
@@ -888,6 +1450,7 @@ mod tests {
         assert_eq!(
             plan_validation_error(&plan),
             PlanValidationError::SharedMemorySizing {
+                buffer_name: REDUCTION_SHARED_BUFFER_NAME.to_owned(),
                 bytes: 65_536,
                 limit: WORKGROUP_SHARED_MEMORY_LIMIT_BYTES,
             }
@@ -936,6 +1499,173 @@ mod tests {
         assert!(policy.covers(4096, 1024));
         assert!(!policy.covers(1023, 1024));
         assert!(!policy.covers(0, 1024));
+    }
+
+    // ── Matmul deliberately-broken-plan corpus (L12) ──────────────────────
+
+    #[test]
+    fn validate_rejects_matmul_workgroup_not_matching_tile() {
+        let mut plan = matmul_plan();
+        plan.workgroup_x = MATMUL_TILE - 1;
+        assert_eq!(
+            matmul_plan_validation_error(&plan),
+            PlanValidationError::MatMulWorkgroupMismatch {
+                workgroup_x: MATMUL_TILE - 1,
+                workgroup_y: MATMUL_TILE,
+                tile: MATMUL_TILE,
+            }
+        );
+    }
+
+    #[test]
+    fn validate_rejects_matmul_shared_memory_slot_mismatch() {
+        let mut plan = matmul_plan();
+        plan.shared_memory.shared_b.slot_count = 32;
+        assert_eq!(
+            matmul_plan_validation_error(&plan),
+            PlanValidationError::MatMulSharedMemoryLayout {
+                buffer_name: MATMUL_SHARED_B_BUFFER_NAME.to_owned(),
+                slot_count: 32,
+                expected_slots: 64,
+            }
+        );
+    }
+
+    #[test]
+    fn validate_rejects_matmul_oversized_shared_memory() {
+        // tile 128 → 128×128 slots × 4 bytes = 64KB > the 32KB conservative
+        // limit (a consistent tile whose footprint cannot launch).
+        let tile = 128;
+        let tile_slots = tile * tile;
+        let mut plan = matmul_plan();
+        plan.tile = tile;
+        plan.workgroup_x = tile;
+        plan.workgroup_y = tile;
+        plan.shared_memory.shared_a.slot_count = tile_slots;
+        plan.shared_memory.shared_b.slot_count = tile_slots;
+        assert_eq!(
+            matmul_plan_validation_error(&plan),
+            PlanValidationError::SharedMemorySizing {
+                buffer_name: MATMUL_SHARED_A_BUFFER_NAME.to_owned(),
+                bytes: 65_536,
+                limit: WORKGROUP_SHARED_MEMORY_LIMIT_BYTES,
+            }
+        );
+    }
+
+    #[test]
+    fn validate_rejects_matmul_missing_load_barrier() {
+        let mut plan = matmul_plan();
+        plan.barriers = vec![BarrierPoint {
+            after: BarrierPhase::InnerProductStep,
+        }];
+        assert_eq!(
+            matmul_plan_validation_error(&plan),
+            PlanValidationError::BarrierDominance {
+                phase: BarrierPhase::SharedMemoryLoad,
+                required_count: 1,
+                present_count: 0,
+            }
+        );
+    }
+
+    #[test]
+    fn validate_rejects_matmul_missing_inner_product_barrier() {
+        let mut plan = matmul_plan();
+        plan.barriers = vec![BarrierPoint {
+            after: BarrierPhase::SharedMemoryLoad,
+        }];
+        assert_eq!(
+            matmul_plan_validation_error(&plan),
+            PlanValidationError::BarrierDominance {
+                phase: BarrierPhase::InnerProductStep,
+                required_count: 1,
+                present_count: 0,
+            }
+        );
+    }
+
+    #[test]
+    fn validate_rejects_matmul_barriers_out_of_order() {
+        // Inner product before the load barrier: the inner product would
+        // read tiles the load barrier has not yet published.
+        let mut plan = matmul_plan();
+        plan.barriers = vec![
+            BarrierPoint {
+                after: BarrierPhase::InnerProductStep,
+            },
+            BarrierPoint {
+                after: BarrierPhase::SharedMemoryLoad,
+            },
+        ];
+        assert_eq!(
+            matmul_plan_validation_error(&plan),
+            PlanValidationError::BarrierDominance {
+                phase: BarrierPhase::SharedMemoryLoad,
+                required_count: 1,
+                present_count: 1,
+            }
+        );
+    }
+
+    #[test]
+    fn validate_rejects_reduction_barrier_in_matmul() {
+        // A reduction-only barrier phase in a matmul schedule is a
+        // cross-recipe plan (L2 closed recipe set).
+        let mut plan = matmul_plan();
+        plan.barriers.push(BarrierPoint {
+            after: BarrierPhase::ReductionStep,
+        });
+        assert_eq!(
+            matmul_plan_validation_error(&plan),
+            PlanValidationError::BarrierDominance {
+                phase: BarrierPhase::ReductionStep,
+                required_count: 0,
+                present_count: 1,
+            }
+        );
+    }
+
+    #[test]
+    fn validate_rejects_matmul_zero_dimension() {
+        let mut plan = matmul_plan();
+        plan.m = 0;
+        assert_eq!(
+            matmul_plan_validation_error(&plan),
+            PlanValidationError::MatMulZeroDimension {
+                m: 0,
+                k: 12,
+                n: 33,
+                tile: MATMUL_TILE,
+            }
+        );
+    }
+
+    #[test]
+    fn validate_rejects_matmul_zero_tile() {
+        let mut plan = matmul_plan();
+        plan.tile = 0;
+        plan.workgroup_x = 0;
+        plan.workgroup_y = 0;
+        plan.shared_memory.shared_a.slot_count = 0;
+        plan.shared_memory.shared_b.slot_count = 0;
+        assert_eq!(
+            matmul_plan_validation_error(&plan),
+            PlanValidationError::MatMulZeroDimension {
+                m: 17,
+                k: 12,
+                n: 33,
+                tile: 0,
+            }
+        );
+    }
+
+    /// The first validation error a broken matmul plan raises (the corpus
+    /// asserts on the exact error, L12).
+    fn matmul_plan_validation_error(plan: &MatMulPlan) -> PlanValidationError {
+        CollectionKernelPlan::TiledMatMul(plan.clone())
+            .validate()
+            .expect_err("broken matmul plan must fail validation")
     }
 
     /// The first validation error a broken plan raises (the corpus asserts
