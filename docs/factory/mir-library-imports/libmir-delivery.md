@@ -124,3 +124,15 @@ keep the previous silent-skip. Consumer proof
 Known limitation (deferred): a library's own nested library calls are not
 recursively linked (fail closed at runtime if invoked); cross-library nominal
 type unification across separate analyses is out of scope.
+
+### Audit follow-up (2026-08-01)
+
+Independent post-land audit (general-purpose subagent) found and verified two
+real defects, both fixed in `983d6c7` with regression tests:
+- sub-companion symbol remap panic (remap now sources from the post-lowering
+  interner);
+- sub-companion synthetic-source collision across library analyses
+  (`extend_unmapped_library_sources` skips already-rewritten values).
+Deferred findings recorded: non-function library members (structs/consts)
+are not linked (fail closed); every library function is lowered whether used
+or not; companion export is fail-open if the resolver symbol is missing.
