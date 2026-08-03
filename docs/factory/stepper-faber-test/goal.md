@@ -79,7 +79,7 @@ Language / corpus proof should not pay rustc + Cargo for every case. The MIR ste
 
 ### 3. Coupled implementation debt
 
-Test selection (`TestSelection`), ignore reasons (`omitte` / `futurum`), and filters live beside **Rust codegen** (`radix-codegen-rust`, `TestSelection` in `radix::codegen::rust`). That couples language test policy to one backend crate.
+Test selection (`TestSelection`), ignore reasons (`omitte` / `futurum`), and filters live beside **Rust codegen** (`radix-hir-rust`, `TestSelection` in `radix::codegen::rust`). That couples language test policy to one backend crate.
 
 ## Goals
 
@@ -111,7 +111,7 @@ Test selection (`TestSelection`), ignore reasons (`omitte` / `futurum`), and fil
 - `faber/src/package/cargo.rs`: `invoke_cargo_test` — Cargo harness contract.
 - `faber/src/script/mod.rs` + `faber/src/commands/script.rs`: production stepper path (`run_source` / package MIR).
 - `faber/src/package/mir.rs`: package MIR linking + norma kernel bridge for interpreted packages; library-import gaps fail closed with “use compiled package execution” — test runner must inherit honest limits, not paper over them with Rust.
-- Radix: `proba` lowers to HIR items with `HirTestMetadata`; Rust codegen emits `fn proba_*` + `#[test]` / `#[ignore]` (`radix-codegen-rust`).
+- Radix: `proba` lowers to HIR items with `HirTestMetadata`; Rust codegen emits `fn proba_*` + `#[test]` / `#[ignore]` (`radix-hir-rust`).
 - Radix MIR: `adfirma` → assert runtime intrinsics (`mir/lower/runtime.rs`); stepper already runs many `adfirma` programs in `mir/stepper_test.rs`.
 - Operator decision (2026-07-30): exclusive stepper; no target lowering for tests; target neutrality of language truth is the reason.
 
@@ -130,7 +130,7 @@ Before implementing, inspect:
 | `radix` HIR lower for `Proba` / `Probandum` | Case inventory source of truth |
 | `radix` MIR lower for `adfirma` + function items with `test` metadata | Execution units |
 | `radix-mir-stepper` / `radix::mir::run_source` | Interpreter |
-| `radix-codegen-rust` test emission | **Must no longer be on `faber test` path** |
+| `radix-hir-rust` test emission | **Must no longer be on `faber test` path** |
 | `docs/factory/proba-test-sources/goal.md` | Discovery rules to keep |
 | Exempla / coreutils packages with inline `proba` | Migration validation samples |
 | `triga/src/math.proba`, `norma/exempla/caelum/*.proba` | Sparse `*.proba` samples |

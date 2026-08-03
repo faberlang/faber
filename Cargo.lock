@@ -673,14 +673,14 @@ dependencies = [
  "getrandom 0.2.17",
  "postcard",
  "radix-air",
- "radix-codegen-faber",
- "radix-codegen-go",
- "radix-codegen-rust",
  "radix-codegen-shared",
- "radix-codegen-swift",
- "radix-codegen-ts",
  "radix-diagnostics",
  "radix-hir",
+ "radix-hir-faber",
+ "radix-hir-go",
+ "radix-hir-rust",
+ "radix-hir-swift",
+ "radix-hir-ts",
  "radix-host-abi",
  "radix-lexer",
  "radix-mir",
@@ -722,77 +722,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "radix-codegen-faber"
-version = "0.79.0"
-dependencies = [
- "radix-codegen-shared",
- "radix-diagnostics",
- "radix-hir",
- "radix-lexer",
- "radix-syntax",
- "radix-types",
- "rustc-hash",
-]
-
-[[package]]
-name = "radix-codegen-go"
-version = "0.79.0"
-dependencies = [
- "radix-codegen-shared",
- "radix-diagnostics",
- "radix-hir",
- "radix-lexer",
- "radix-syntax",
- "radix-types",
- "rustc-hash",
-]
-
-[[package]]
-name = "radix-codegen-rust"
-version = "0.79.0"
-dependencies = [
- "radix-codegen-shared",
- "radix-diagnostics",
- "radix-hir",
- "radix-lexer",
- "radix-syntax",
- "radix-types",
- "rustc-hash",
-]
-
-[[package]]
 name = "radix-codegen-shared"
 version = "0.79.0"
 dependencies = [
  "radix-diagnostics",
  "radix-hir",
  "radix-lexer",
- "radix-types",
- "rustc-hash",
-]
-
-[[package]]
-name = "radix-codegen-swift"
-version = "0.79.0"
-dependencies = [
- "radix-codegen-shared",
- "radix-diagnostics",
- "radix-hir",
- "radix-lexer",
- "radix-syntax",
- "radix-types",
- "rustc-hash",
-]
-
-[[package]]
-name = "radix-codegen-ts"
-version = "0.79.0"
-dependencies = [
- "radix-codegen-shared",
- "radix-diagnostics",
- "radix-hir",
- "radix-lexer",
- "radix-syntax",
  "radix-types",
  "rustc-hash",
 ]
@@ -814,6 +749,71 @@ dependencies = [
  "radix-types",
  "rustc-hash",
  "serde",
+]
+
+[[package]]
+name = "radix-hir-faber"
+version = "0.79.0"
+dependencies = [
+ "radix-codegen-shared",
+ "radix-diagnostics",
+ "radix-hir",
+ "radix-lexer",
+ "radix-syntax",
+ "radix-types",
+ "rustc-hash",
+]
+
+[[package]]
+name = "radix-hir-go"
+version = "0.79.0"
+dependencies = [
+ "radix-codegen-shared",
+ "radix-diagnostics",
+ "radix-hir",
+ "radix-lexer",
+ "radix-syntax",
+ "radix-types",
+ "rustc-hash",
+]
+
+[[package]]
+name = "radix-hir-rust"
+version = "0.79.0"
+dependencies = [
+ "radix-codegen-shared",
+ "radix-diagnostics",
+ "radix-hir",
+ "radix-lexer",
+ "radix-syntax",
+ "radix-types",
+ "rustc-hash",
+]
+
+[[package]]
+name = "radix-hir-swift"
+version = "0.79.0"
+dependencies = [
+ "radix-codegen-shared",
+ "radix-diagnostics",
+ "radix-hir",
+ "radix-lexer",
+ "radix-syntax",
+ "radix-types",
+ "rustc-hash",
+]
+
+[[package]]
+name = "radix-hir-ts"
+version = "0.79.0"
+dependencies = [
+ "radix-codegen-shared",
+ "radix-diagnostics",
+ "radix-hir",
+ "radix-lexer",
+ "radix-syntax",
+ "radix-types",
+ "rustc-hash",
 ]
 
 [[package]]

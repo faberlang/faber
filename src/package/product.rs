@@ -1948,7 +1948,7 @@ fn build_library_ts_module_map(
 ///   specifier-looking text inside them is never rewritten.
 /// - Only `from "<spec>"` / `from '<spec>'` tokens are rewritten, and only
 ///   when `from` is a standalone token (exact-token contract). Dynamic
-///   `import("...")` calls are never touched; `radix-codegen-ts` emits only
+///   `import("...")` calls are never touched; `radix-hir-ts` emits only
 ///   static `import { ... } from "..."` declarations, pinned by test.
 fn rewrite_import_specifiers(code: String, library_imports: &BTreeMap<String, String>) -> String {
     let mut out = String::with_capacity(code.len() + 32);
