@@ -30,6 +30,7 @@
 use faber::device::{DeviceBackend, DeviceSelection};
 use faber_host_macos_arm64::composite_host::{
     resolve_device_selection, CompositeHost, CompositeHostConfig, DeviceExecutionReceipt,
+    ProgramSession,
 };
 use faber_host_macos_arm64::device_descriptor::DeviceDescriptor;
 use faber_host_macos_arm64::HostError;
@@ -146,6 +147,28 @@ pub fn execute_device_descriptor(
     outputs: &[u32],
 ) -> Result<DeviceExecutionReceipt, Diagnostic> {
     host.execute_descriptor(descriptor, inputs, outputs)
+        .map_err(|error| host_error_diagnostic(&error))
+}
+
+/// Create a program-scoped device session (S2-1).
+///
+/// The session owns the module (loaded once) and every PerProgram buffer
+/// (allocated once); it survives repeated [`ProgramSession::execute`] calls
+/// on the same session without reloading or re-allocating. The Stage 2 path
+/// uses the session directly instead of the single-run
+/// [`execute_device_descriptor`] convenience.
+///
+/// # Errors
+/// - `E_NO_DEVICE_PROGRAM` — no device session on this host;
+/// - `E_DEVICE_DESCRIPTOR` — wrong-backend or structurally bad descriptor;
+/// - typed descriptor conflicts (`E_DEVICE_ABI_MISMATCH` etc.);
+/// - session-level failures (module load, allocation) bubble through.
+#[allow(dead_code)] // S2-1 consumption seam; Stage 2 run path uses it directly.
+pub fn create_program_session<'host>(
+    host: &'host mut CompositeHost,
+    descriptor: &DeviceDescriptor,
+) -> Result<ProgramSession<'host>, Diagnostic> {
+    host.create_program_session(descriptor)
         .map_err(|error| host_error_diagnostic(&error))
 }
 
