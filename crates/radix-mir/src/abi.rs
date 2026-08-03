@@ -27,8 +27,12 @@ const ERR_KERNEL_WORKGROUP_NONZERO: &str = "kernel workgroup size must be nonzer
 const ERR_KERNEL_REFLECTION_SCALAR_ELEMENT: &str =
     "kernel reflection resource element must be scalar";
 const ERR_KERNEL_BUILTIN_SCALAR_INPUT: &str = "kernel builtin input must be scalar";
+// The return-buffer ABI is elementwise-only: every input and the return must
+// agree on element type AND element count. The count arm is what a matmul
+// author hits (input/return shapes differ), so the message names the equality
+// law and points to the indexed-view ABI that carries the matmul contract.
 const ERR_KERNEL_IO_ELEMENT_MISMATCH: &str =
-    "kernel input and output resource element types must match";
+    "kernel input and output resource element types and counts must match; the return-buffer ABI is elementwise-only — matmul and reduction kernels must use the indexed-view ABI";
 const ERR_KERNEL_INDEX_U32: &str = "kernel index parameter must be u32";
 const ERR_KERNEL_DEVICE_VIEW_ELEMENT: &str = "kernel device view element type";
 const ERR_KERNEL_VECTOR_PARAM: &str = "kernel vector param";
@@ -1365,8 +1369,11 @@ fn runtime_extent_resource(binding: u32, extent_ty: TypeId) -> MirKernelResource
 ///
 /// The count type (`numerus<u32>`, L8/L9) must already exist in the frozen
 /// type table; when it cannot be resolved the kernel keeps the static
-/// dispatch-axis fallback (pre-U2 behavior). The faber pipeline always
-/// interns the u32 count type; only hand-built unit tables may lack it.
+/// dispatch-axis fallback (pre-U2 behavior) — the guard still fires, but at
+/// the static `oob_guard_limit` instead of the host-supplied count.
+/// PRODUCTION INVARIANT: the GPU builtin registry interns `numerus<u32>`
+/// for every kernel program, so real kernels always carry the extent; only
+/// hand-built unit tables may lack it (`abi_test` pins the fallback).
 fn maybe_append_runtime_extent(
     function: &MirFunction,
     signature: &mut MirKernelSignature,

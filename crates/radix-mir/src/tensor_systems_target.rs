@@ -196,11 +196,19 @@ pub const TENSOR_SYSTEMS_TARGET_ROWS: &[TensorSystemsTargetRow] = &[
     },
     TensorSystemsTargetRow {
         family: TensorOperationFloorFamily::Rank2MatMul,
+        target: TensorSystemsTarget::MetalText,
+        rank: TensorSystemsTargetRank::Rank2,
+        layout: TensorSystemsTargetLayout::F32DeviceView,
+        status: TensorSystemsTargetStatus::NativeSupport,
+        evidence: "crates/radix-mir-metal/src/lib.rs::metal_text_emits_tiled_matmul_kernel (Metal M-mat tiled-matmul lowering landed via commit 3da583286)",
+    },
+    TensorSystemsTargetRow {
+        family: TensorOperationFloorFamily::Rank2MatMul,
         target: TensorSystemsTarget::NativeSystemsRemainder,
         rank: TensorSystemsTargetRank::Unselected,
         layout: TensorSystemsTargetLayout::Unselected,
         status: TensorSystemsTargetStatus::CheckedDebt,
-        evidence: "Rank2MatMul promoted to WgslText rank-2 f32 device-view; Metal, LLVM, Wasm, and Sexp targets remain checked debt (Stage 9 delivery :: Non-goals)",
+        evidence: "Rank2MatMul promoted to MetalText (commit 3da583286) and WgslText rank-2 f32 device-view; LLVM, Wasm, and Sexp targets remain checked debt (Stage 9 delivery :: Non-goals)",
     },
     TensorSystemsTargetRow {
         family: TensorOperationFloorFamily::GradientHandles,
