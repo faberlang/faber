@@ -15,6 +15,7 @@ mod validate;
 pub mod artifact;
 mod decode;
 mod error;
+pub mod package;
 
 #[cfg(test)]
 mod test_support;
@@ -22,3 +23,8 @@ mod test_support;
 pub use artifact::*;
 pub use decode::{decode, encode};
 pub use error::HirArtifactError;
+pub use package::{
+    decode_package, encode_package, DecodedFhirPackage, DecodedFhirPackageModule, FhirPackage,
+    FhirPackageError, FhirPackageModule, LibraryImportWire, LocalLinkWire, PackageDependencyWire,
+    PackageIdentityWire, PACKAGE_SCHEMA_VERSION,
+};
