@@ -42,9 +42,11 @@ has never been wired into Faber. It must not advertise a stage that only emits
 text or passes a superficial validator.
 
 The scope also removes `faber run --interpret`. Interpreted execution belongs
-to `faber script`; `faber run` is the build/run product command. The paired
-`--compile` override is removed in the same clean break so `run` has no hidden
-engine-selection mode.
+to `faber script`; `faber run` is the build/run product command. `faber script`
+accepts both source inputs and serialized FMIR images, so an existing `.fmir`
+or `.fmir.txt` payload can be loaded directly into the stepper without source
+rebuild. The paired `--compile` override is removed in the same clean break so
+`run` has no hidden engine-selection mode.
 
 ## Product rules
 
@@ -67,10 +69,10 @@ dispatch path. A native runner around FMIR is a packaging mode of the FMIR
 target, not evidence that the Faber program was natively compiled.
 
 `faber run` must not interpret source through `--interpret`. `faber script`
-owns single-source, package, and archive interpretation through the MIR
-stepper. The old `--compile` flag is removed with `--interpret`; target choice
-and build behavior come from `--target`, package configuration, and the
-selected product route.
+owns single-source, package, archive, and serialized FMIR-image interpretation
+through the MIR stepper. The old `--compile` flag is removed with
+`--interpret`; target choice and build behavior come from `--target`, package
+configuration, and the selected product route.
 
 ### Toolchain discovery
 
@@ -90,7 +92,7 @@ Faber behavior this goal should attempt to wire.
 | ------ | --------------- | ------------------ | ------------- |
 | `rust` | Rust source | Cargo package build and native run already work | Preserve and remap; keep native executable as the endpoint |
 | `fhir` | Serialized HIR | Package envelope build and source-free HIR → FMIR run already work | Preserve; make package/load/run semantics explicit |
-| `fmir` | FMIR image | Text image, binary image, and native FMIR runner paths already exist under split names | One FMIR target with explicit image format and optional native runner mode |
+| `fmir` | FMIR image | Text image, binary image, and native FMIR runner paths already exist under split names | One FMIR target with explicit image format; `faber script` loads existing images directly, with an optional native runner mode |
 | `faber` | Faber source | Re-emission only | Keep emit-only; no artificial build stage |
 | `go` | Go source | Emit only | Assemble package and invoke `go build` only when package/runtime/entry contracts are complete |
 | `swift` | Swift source | Emit only | Assemble package and invoke `swiftc`/Swift package tooling only when the generated layout is valid |
@@ -116,6 +118,9 @@ entrypoint, and observable run behavior must all be proven.
 - Delete the legacy `scena` target and its source-backed package-artifact
   routing. Migrate source execution to `faber script` and source-independent
   package execution to `fmir`/`fmir-bin` modes.
+- Extend `faber script` input dispatch to recognize `.fmir` and `.fmir.txt`
+  images, load them through the existing FMIR loaders, and execute them on the
+  stepper without reading or rebuilding source.
 - Remove `RunArgs.interpret` and `RunArgs.compile`, their parser/help entries,
   the `should_interpret` override branch, and direct `run --interpret`/
   `run --compile` references. Migrate interpreted tests and docs to `faber
@@ -134,6 +139,8 @@ entrypoint, and observable run behavior must all be proven.
 - Remap FMIR text/binary image and native-runner paths under one FMIR target
   without changing the semantics of the stepper or falsely calling the runner
   native user-code compilation.
+- Make the hidden `__fmir-run` command an implementation seam only; it must not
+  remain the required public way to execute a serialized FMIR payload.
 - Remove duplicated target-name translation and stale suffix references.
 
 ### Stage 2 — Build-plan and artifact boundary
@@ -197,6 +204,12 @@ The exact order may change after toolchain probes, but no target receives a
   artifacts, tests, and current documentation.
 - [ ] `faber run --interpret` and `faber run --compile` are removed rather than
   retained as aliases; interpreted tests/docs use `faber script`.
+- [ ] `faber script image.fmir` and `faber script image.fmir.txt` load and run
+  existing payloads without source access, Cargo, or payload regeneration.
+- [ ] Malformed, unsupported-version, wrong-target, and runtime-requirement
+  failures for direct FMIR script inputs fail closed with structured diagnostics.
+- [ ] The hidden `__fmir-run` command is no longer required as the public
+  payload-execution contract and can delegate to the same script loader seam.
 - [ ] `faber targets` reports separate `emit`, `build`, `package`, and `run`
   behavior with artifact and toolchain notes.
 - [ ] Rust, FHIR, and FMIR existing product paths remain green after remapping.
