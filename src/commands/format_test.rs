@@ -27,6 +27,16 @@ fn author_format_pipeline(name: &str, source: &str) -> String {
     normalize_trailing_newline(&result.output.expect("output").code)
 }
 
+/// Strip `#` comment lines so keyword-surface assertions only see emitted
+/// code. Canonical reader-locale render preserves structural trivia
+/// (comments), which may legitimately mention Latin spellings.
+fn code_only(code: &str) -> String {
+    code.lines()
+        .filter(|line| !line.trim_start().starts_with('#'))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 #[test]
 fn format_author_output_reparses_without_errors() {
     let path = exempla("incipit/salve-munde.fab");
@@ -183,7 +193,7 @@ fn format_canonical_reader_locale_thai_localizes_surface() {
     );
 
     assert!(thai_output.contains("ฟังก์ชัน ทักทาย(ข้อความ name) → ข้อความ"));
-    assert!(thai_output.contains("คงที่ ข้อความ greeting ← scriptum"));
+    assert!(thai_output.contains("คงที่ ข้อความ greeting ← \"สวัสดี, §!\"(name)"));
     assert!(thai_output.contains("คืน greeting"));
     assert!(thai_output.contains("ฟังก์ชัน ผ่าน(จำนวน score) → ตรรกะ"));
     assert!(thai_output.contains("sic จริง มิฉะนั้น score ≥ 50 sic จริง มิฉะนั้น เท็จ"));
@@ -200,16 +210,21 @@ fn format_canonical_reader_locale_thai_localizes_surface() {
     assert!(thai_output.contains("คงที่ รายการ<จำนวน> scores ← [-1, 82, 41, 60]"));
     assert!(thai_output.contains("แสดง ผ่าน(score)"));
     assert!(thai_output.contains("แสดง นับผ่าน(scores)"));
-    // The Latin keyword surface must not survive localized re-emit. `scriptum`
-    // (a builtin name) and `sic` (not a localized keyword token) stay Latin.
-    assert!(!thai_output.contains("functio"));
-    assert!(!thai_output.contains("fixum"));
-    assert!(!thai_output.contains("textus"));
-    assert!(!thai_output.contains("numerus"));
-    assert!(!thai_output.contains("bivalens"));
-    assert!(!thai_output.contains("lista<"));
-    assert!(!thai_output.contains("itera"));
-    assert!(!thai_output.contains("incipit"));
+    // The Latin keyword surface must not survive localized re-emit, and the
+    // template-application glyph `"…"(args)` must not expand to a named
+    // `scriptum(...)` call. `sic` (not a localized keyword token) stays Latin.
+    // Comments are preserved trivia and may mention Latin spellings, so the
+    // negative assertions run against code-only text.
+    let thai_code = code_only(&thai_output);
+    assert!(!thai_code.contains("scriptum"));
+    assert!(!thai_code.contains("functio"));
+    assert!(!thai_code.contains("fixum"));
+    assert!(!thai_code.contains("textus"));
+    assert!(!thai_code.contains("numerus"));
+    assert!(!thai_code.contains("bivalens"));
+    assert!(!thai_code.contains("lista<"));
+    assert!(!thai_code.contains("itera"));
+    assert!(!thai_code.contains("incipit"));
 }
 
 #[test]
@@ -235,6 +250,55 @@ fn format_reader_locale_la_without_canonical_matches_canonical_latin() {
     assert_eq!(locale_output, canonical_output);
     assert!(locale_output.contains("incipit {"));
     assert!(locale_output.contains("nota \"Salve, Munde!\""));
+}
+
+#[test]
+fn format_reader_locale_preserves_template_application_sugar() {
+    // Reader-locale packs re-render the same semantic program with different
+    // keyword spellings while retaining glyph shapes. The `"…"(args)` template-
+    // application postfix is a glyph shape: `--reader-locale llm` localizes
+    // `nota` → `print` but must keep `print "val § here"(n)` instead of
+    // expanding into `print format("val § here", n)`. `--canonical` keeps the
+    // `scriptum(...)` expansion.
+    let fixture = std::env::temp_dir().join("faber-format-rl-template-sugar.fab");
+    fs::write(
+        &fixture,
+        "functio monstra(textus n) {\n  nota \"val § here\"(n)\n}\n",
+    )
+    .expect("write rl template-sugar fixture");
+
+    let llm_output = run_faber_format_stdout_with_args(&[
+        "format",
+        "--reader-locale",
+        "llm",
+        "--stdout",
+        fixture.to_str().expect("utf8 path"),
+    ]);
+    let author_output = run_faber_format_stdout(&fixture);
+    let canonical_output = run_faber_format_stdout_with_args(&[
+        "format",
+        "--canonical",
+        "--stdout",
+        fixture.to_str().expect("utf8 path"),
+    ]);
+    let _ = fs::remove_file(&fixture);
+
+    assert!(
+        llm_output.contains("print \"val § here\"(n)"),
+        "reader-locale must localize nota→print and keep the postfix sugar:\n{llm_output}"
+    );
+    assert!(
+        !llm_output.contains("format("),
+        "reader-locale must not expand template application into a named call:\n{llm_output}"
+    );
+    assert!(
+        author_output.contains("nota \"val § here\"(n)"),
+        "author surface must keep the sugar:\n{author_output}"
+    );
+    assert!(
+        canonical_output.contains("nota scriptum(\"val § here\", n)"),
+        "canonical must keep the scriptum expansion:\n{canonical_output}"
+    );
 }
 
 #[test]
@@ -267,7 +331,7 @@ fn format_reader_locale_without_canonical_localizes() {
         "bare --reader-locale=th-TH must emit the Thai surface: {stdout}"
     );
     assert!(
-        !stdout.contains("functio"),
+        !code_only(&stdout).contains("functio"),
         "bare --reader-locale=th-TH must not emit the Latin keyword: {stdout}"
     );
 }
