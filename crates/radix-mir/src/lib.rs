@@ -9,6 +9,7 @@ pub mod ai_workbench_stage5;
 pub mod capability;
 pub mod control;
 pub mod device;
+pub mod device_program;
 pub mod dump;
 pub mod generic;
 pub mod gradient;
@@ -70,6 +71,12 @@ pub use capability::{CapabilityGap, Lowerability};
 pub use device::{
     classify_device_safe, classify_device_safe_for_target_entry, device_roles_from_hir,
     MirDeviceContext, MirDeviceRole,
+};
+pub use device_program::{
+    Binding, BufferId, BufferIdentity, BufferLifetime, BufferRegistry, BufferRole, BufferVersion,
+    DataFlowPair, DeviceProgram, DeviceProgramError, DeviceProgramLifetime, DeviceResource,
+    KernelLaunchPlan, KernelUnit, LaunchId, LaunchUnit, RegistryBuffer, RegistryVersion,
+    ResultBuffer,
 };
 pub use dump::dump_program;
 pub use generic::{
