@@ -10,6 +10,7 @@ pub mod capability;
 pub mod control;
 pub mod device;
 pub mod device_program;
+pub mod device_program_plans;
 pub mod dump;
 pub mod generic;
 pub mod gradient;
@@ -77,6 +78,10 @@ pub use device_program::{
     DataFlowPair, DeviceProgram, DeviceProgramError, DeviceProgramLifetime, DeviceResource,
     KernelLaunchPlan, KernelUnit, LaunchId, LaunchUnit, RegistryBuffer, RegistryVersion,
     ResultBuffer,
+};
+pub use device_program_plans::{
+    carried_plan_agrees, kernel_plan_for_function, launch_descriptors, plan_for_collection_op,
+    KernelLaunchDescriptor, LaunchBufferSlot, PlanMappingError, RecipeKind,
 };
 pub use dump::dump_program;
 pub use generic::{
