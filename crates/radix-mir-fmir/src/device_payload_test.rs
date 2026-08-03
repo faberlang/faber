@@ -9,15 +9,17 @@
 //! These are the additive device tests; the schema/codec inline modules still
 //! own the pre-existing surface tests (updated only for the 3→4 break).
 
-use crate::codec::{decode_binary_image, decode_text_image, encode_binary_image, encode_text_image};
+use crate::codec::{
+    decode_binary_image, decode_text_image, encode_binary_image, encode_text_image,
+};
 use crate::error::FmirImageError;
 use crate::schema::{
     device_identity_hash, fnv1a64_blob_hash, FmirBinaryImageFile, FmirDeviceArtifact,
     FmirDeviceArtifactsSection, FmirDeviceBackend, FmirDeviceProgramSection, FmirDeviceSection,
     FmirDeviceSelection, FmirTextCliRootSection, FmirTextCliSection, FmirTextImageFile,
-    FmirTextProgramSection, FmirTextRuntimeSection, FmirTextSourceIdentity,
-    FmirTextSourcesSection, FmirTextToolchainSection, FmirTextTypesSection, FMIR_TARGET_NAME,
-    FMIR_TEXT_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION,
+    FmirTextProgramSection, FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection,
+    FmirTextToolchainSection, FmirTextTypesSection, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME,
+    PACKAGE_MIR_ARTIFACT_VERSION,
 };
 use radix_mir::MirProgram;
 use radix_types::TypeTable;
@@ -148,8 +150,14 @@ fn device_section_round_trips_through_text_image() {
     assert_eq!(device.device_program.payload, STUB_CANONICAL_PAYLOAD);
     assert_eq!(device.selection, FmirDeviceSelection::Auto);
     assert_eq!(device.artifacts.artifact.len(), 2);
-    assert_eq!(device.artifacts.artifact[0].backend, FmirDeviceBackend::Metal);
-    assert_eq!(device.artifacts.artifact[1].backend, FmirDeviceBackend::Cuda);
+    assert_eq!(
+        device.artifacts.artifact[0].backend,
+        FmirDeviceBackend::Metal
+    );
+    assert_eq!(
+        device.artifacts.artifact[1].backend,
+        FmirDeviceBackend::Cuda
+    );
     assert_eq!(
         device.runtime_requirements,
         vec!["device:metal".to_owned(), "device:cuda".to_owned()]
@@ -231,9 +239,7 @@ fn decode_rejects_misplaced_host_requirement_in_device_section() {
     // entry in the device section is not a known device requirement and fails
     // admission.
     let mut section = sample_device_section();
-    section
-        .runtime_requirements
-        .push("host:fs".to_owned());
+    section.runtime_requirements.push("host:fs".to_owned());
     let image = binary_image_with_device(Some(section));
     let bytes = encode_binary_image(&image).expect("encode binary image");
     assert!(matches!(
@@ -359,7 +365,10 @@ fn decode_rejects_pre_break_version_3_image_with_device() {
     let text = encode_text_image(&image).expect("encode text image");
     assert!(matches!(
         decode_text_image(&text, TOOLCHAIN),
-        Err(FmirImageError::UnsupportedVersion { actual: 3, expected: 4 })
+        Err(FmirImageError::UnsupportedVersion {
+            actual: 3,
+            expected: 4
+        })
     ));
 }
 
@@ -389,7 +398,9 @@ fn device_identity_hash_is_canonical_format() {
     assert!(identity.starts_with("sha256:"));
     assert_eq!(identity.len(), "sha256:".len() + 64);
     assert!(
-        identity["sha256:".len()..].chars().all(|c| c.is_ascii_hexdigit()),
+        identity["sha256:".len()..]
+            .chars()
+            .all(|c| c.is_ascii_hexdigit()),
         "identity digest must be lowercase hex"
     );
 }

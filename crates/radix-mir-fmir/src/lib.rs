@@ -22,11 +22,11 @@ pub use schema::{
     device_identity_hash, fnv1a64, fnv1a64_blob_hash, is_known_device_requirement,
     is_known_host_requirement, is_known_requirement, FmirBinaryImageFile, FmirDeviceArtifact,
     FmirDeviceArtifactsSection, FmirDeviceBackend, FmirDeviceProgramSection, FmirDeviceSection,
-    FmirDeviceSelection, FmirTextCliOperand,
-    FmirTextCliRootSection, FmirTextCliSection, FmirTextCliValueType, FmirTextImageFile,
-    FmirTextProgramSection, FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection,
-    FmirTextToolchainSection, FmirTextTypesSection, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME,
-    FNV1A64_OFFSET, FNV1A64_PRIME, PACKAGE_MIR_ARTIFACT_VERSION,
+    FmirDeviceSelection, FmirTextCliOperand, FmirTextCliRootSection, FmirTextCliSection,
+    FmirTextCliValueType, FmirTextImageFile, FmirTextProgramSection, FmirTextRuntimeSection,
+    FmirTextSourceIdentity, FmirTextSourcesSection, FmirTextToolchainSection, FmirTextTypesSection,
+    FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, FNV1A64_OFFSET, FNV1A64_PRIME,
+    PACKAGE_MIR_ARTIFACT_VERSION,
 };
 
 #[cfg(test)]

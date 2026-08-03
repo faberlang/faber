@@ -394,9 +394,11 @@ pub(crate) fn check_device_requirements(
 ) -> Result<(), crate::error::FmirImageError> {
     for requirement in &device.runtime_requirements {
         if !is_known_device_requirement(requirement) {
-            return Err(crate::error::FmirImageError::UnsupportedRuntimeRequirement {
-                requirement: requirement.clone(),
-            });
+            return Err(
+                crate::error::FmirImageError::UnsupportedRuntimeRequirement {
+                    requirement: requirement.clone(),
+                },
+            );
         }
     }
     Ok(())
