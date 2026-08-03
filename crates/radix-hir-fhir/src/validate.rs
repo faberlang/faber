@@ -146,6 +146,34 @@ fn collect_def_registry(artifact: &HirArtifact) -> FxHashSet<radix_types::DefId>
         registry.insert(*pair);
     }
 
+    // Imported-nominal def sites from the resolver snapshot. The resolver
+    // allocates imported nominal types (structs, enums, interfaces) as fresh
+    // unit-local DefIds and carries each one as a file-interface export
+    // identity (`Struct` exports and `Type` exports with `Some(def_id)`); the
+    // definition site lives only in the resolver snapshot on the wire (the
+    // resolver's runtime `symbols` map is excluded per CTM E.2). Without
+    // collecting these def sites, a valid artifact whose resolver snapshot
+    // references an imported nominal def fails the membership check with a
+    // false `DanglingIndex` (U2.3, S2). The type arena references the same
+    // defs as `Type::Struct`/`Enum`/`Interface`, so the type-arena walk stays
+    // consistent; a type-table-only DefId (no export identity anywhere) still
+    // fails closed.
+    for (_, iface) in &artifact.resolver.file_interfaces {
+        for (_, export) in &iface.exports {
+            match export {
+                crate::artifact::FileExportSnapshot::Struct { def_id, .. } => {
+                    registry.insert(*def_id);
+                }
+                crate::artifact::FileExportSnapshot::Type {
+                    def_id: Some(d), ..
+                } => {
+                    registry.insert(*d);
+                }
+                _ => {}
+            }
+        }
+    }
+
     registry
 }
 
