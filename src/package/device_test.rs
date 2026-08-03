@@ -1,5 +1,6 @@
 use super::*;
 use faber::device::DeviceBackend;
+use radix_mir::device_program::DataFlowPair;
 use std::path::PathBuf;
 
 fn dev_norma_library_home() -> PathBuf {
@@ -369,4 +370,144 @@ fn descriptor_requires_declared_backend_artifact() {
         artifact_for_backend(&artifacts, DeviceBackend::Cuda).is_none(),
         "an undeclared backend artifact fails closed"
     );
+}
+
+
+/// Build the S2-5 two-kernel fixture's device program (constructor
+/// identity-unification test substrate).
+fn two_kernel_program() -> DeviceProgram {
+    let entry = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../examples/training/device-summa-recollige/src/device_summa_recollige.fab");
+    super::super::with_lowered_package_mir(
+        &radix::driver::Config::default().with_stdlib(dev_norma_library_home()),
+        &entry,
+        |lowered| {
+            device_program_for_lowered(&lowered.validated, &lowered.interner)
+                .expect("constructor succeeds")
+                .expect("fixture yields a device program")
+        },
+    )
+    .expect("fixture lowers")
+}
+
+/// S2-5 constructor identity unification: the two-kernel chain shares ONE
+/// `BufferId` for the device-resident intermediate (`medius`, InOut role,
+/// PerStep lifetime) across both kernels — produced by launch 1, consumed by
+/// launch 2 (a data-flow edge) — while the declared input stays PerProgram
+/// and the final output stays ObservationPoint.
+#[test]
+fn two_kernel_chain_unifies_intermediate_identity() {
+    let program = two_kernel_program();
+    program.validate().expect("program validates");
+
+    // Two kernels, three distinct buffers (a, medius, result).
+    assert_eq!(program.kernels.len(), 2);
+    assert_eq!(program.kernels[0].entry, "collige");
+    assert_eq!(program.kernels[1].entry, "recollige");
+
+    let buffers = program.buffer_registry();
+    assert_eq!(buffers.buffers.len(), 3);
+    let by_name = |name: &str| {
+        buffers
+            .buffers
+            .iter()
+            .find(|entry| entry.identity.name == name)
+            .unwrap_or_else(|| panic!("buffer `{name}` must exist"))
+    };
+
+    let input = by_name("a");
+    assert_eq!(input.identity.role, BufferRole::Input);
+    assert_eq!(input.identity.lifetime, BufferLifetime::PerProgram);
+
+    let intermediate = by_name("medius");
+    assert_eq!(intermediate.identity.role, BufferRole::InOut);
+    assert_eq!(intermediate.identity.lifetime, BufferLifetime::PerStep);
+
+    let output = by_name("result");
+    assert_eq!(output.identity.role, BufferRole::Output);
+    assert_eq!(output.identity.lifetime, BufferLifetime::ObservationPoint);
+
+    // The intermediate is referenced by BOTH kernels under the same id:
+    // kernel 1 writes it (Write), kernel 2 reads it (Read).
+    let medius_id = intermediate.identity.id;
+    let kernel0_medius = program.kernels[0]
+        .resources
+        .iter()
+        .find(|resource| resource.buffer.id == medius_id)
+        .expect("kernel 1 references the intermediate");
+    assert_eq!(kernel0_medius.access, MirKernelResourceAccess::Write);
+    let kernel1_medius = program.kernels[1]
+        .resources
+        .iter()
+        .find(|resource| resource.buffer.id == medius_id)
+        .expect("kernel 2 references the intermediate");
+    assert_eq!(kernel1_medius.access, MirKernelResourceAccess::Read);
+    assert_eq!(
+        kernel0_medius.version.element_count,
+        kernel1_medius.version.element_count
+    );
+
+    // Data-flow edge: launch 1 produces the intermediate, launch 2 consumes
+    // it (the schema's BufferRegistry/DataFlowPair model).
+    assert_eq!(
+        program.buffer_registry().data_flow_pairs(),
+        vec![DataFlowPair {
+            buffer: medius_id,
+            version: 1,
+            producer: LaunchId(1),
+            consumer: LaunchId(2),
+        }]
+    );
+
+    // Results name only the producing launches: the intermediate is produced
+    // by launch 1, the final output by launch 2.
+    let results: Vec<_> = program
+        .results
+        .iter()
+        .map(|result| (result.buffer.name.as_str(), result.produced_by.0))
+        .collect();
+    assert_eq!(results, vec![("medius", 1), ("result", 2)]);
+}
+
+/// The unified lifetimes ride the run-plan payload (codec v2): the
+/// intermediate's plan slots are in-out/per-step at both kernels, the final
+/// output is observation-point, and the ordinary readback set is exactly the
+/// observation point — the intermediate is never read back.
+#[test]
+fn two_kernel_run_plan_carries_unified_lifetimes() {
+    let program = two_kernel_program();
+    let plan = build_run_plan_with_ids(&program, None, &BTreeMap::new());
+    assert_eq!(plan.v, DEVICE_RUN_PLAN_VERSION);
+    assert_eq!(plan.kernels.len(), 2);
+
+    // Kernel 1: a (input/per-program) + medius (in-out/per-step).
+    let kernel0_slots = &plan.kernels[0].slots;
+    assert_eq!(kernel0_slots.len(), 2);
+    assert_eq!(kernel0_slots[0].name, "a");
+    assert_eq!(kernel0_slots[0].role, "input");
+    assert_eq!(kernel0_slots[0].lifetime, PlanSlotLifetime::PerProgram);
+    assert_eq!(kernel0_slots[1].name, "medius");
+    assert_eq!(kernel0_slots[1].role, "in-out");
+    assert_eq!(kernel0_slots[1].lifetime, PlanSlotLifetime::PerStep);
+
+    // Kernel 2: medius (in-out/per-step, same id) + result
+    // (output/observation-point).
+    let kernel1_slots = &plan.kernels[1].slots;
+    assert_eq!(kernel1_slots.len(), 2);
+    assert_eq!(kernel1_slots[0].id, kernel0_slots[1].id, "one BufferId for the intermediate");
+    assert_eq!(kernel1_slots[0].role, "in-out");
+    assert_eq!(kernel1_slots[0].lifetime, PlanSlotLifetime::PerStep);
+    assert_eq!(kernel1_slots[1].name, "result");
+    assert_eq!(kernel1_slots[1].role, "output");
+    assert_eq!(kernel1_slots[1].lifetime, PlanSlotLifetime::ObservationPoint);
+
+    // The ordinary readback set is exactly the observation point; the
+    // PerStep intermediate is never read back (no undeclared readback).
+    let readbacks = observation_buffer_ids(&plan);
+    assert_eq!(readbacks, vec![kernel1_slots[1].id]);
+
+    // The v2 payload round-trips with the unified lifetimes intact.
+    let encoded = encode_payload(&plan).expect("encodes");
+    let parsed = parse_payload(&encoded).expect("parses back");
+    assert_eq!(parsed, plan);
 }

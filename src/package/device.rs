@@ -50,7 +50,9 @@ use faber_host_macos_arm64::device_descriptor::{
 use radix::diagnostics::Diagnostic;
 use radix::lexer::Interner;
 use radix::mir::{MirFunction, MirKernelShaderStage, ValidatedMir};
-use radix_mir::abi::{MirKernelResource, MirKernelResourceKind, MirKernelSignature};
+use radix_mir::abi::{
+    MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind, MirKernelSignature,
+};
 use radix_mir::device_program::{
     Binding, BufferId, BufferIdentity, BufferLifetime, BufferRole, BufferVersion, DeviceProgram,
     DeviceProgramLifetime, DeviceResource, KernelLaunchPlan, KernelUnit, LaunchId, LaunchUnit,
@@ -58,7 +60,7 @@ use radix_mir::device_program::{
 use radix_mir::device_program_plans::kernel_plan_for_function;
 use radix_mir::kernel_plan::CollectionKernelPlan;
 use radix_mir::layout::MirTensorStorageLayout;
-use radix_mir::MirType;
+use radix_mir::{MirFunctionId, MirType};
 use radix_mir_fmir::{
     FmirDeviceArtifact, FmirDeviceArtifactsSection, FmirDeviceBackend, FmirDeviceProgramSection,
     FmirDeviceSection, FmirDeviceSelection,
@@ -117,6 +119,39 @@ fn buffer_slot_name(
     }
 }
 
+/// One buffer unified across kernel boundaries (S2-5).
+///
+/// The unification key is the **identity name + shape**: when one kernel's
+/// input buffer matches another kernel's output (same name + shape), the two
+/// share one `BufferId` as an InOut intermediate with a data-flow edge
+/// (delivery spec N2.6; the schema's `BufferRegistry`/`DataFlowPair` already
+/// model this — the constructor stops minting a fresh id per slot). The role
+/// is the merged program-level fact: like roles keep the role, an
+/// Input+Output mix (either order) is InOut.
+struct UnifiedBuffer {
+    id: BufferId,
+    name: String,
+    element_ty: MirType,
+    element_count: u64,
+    role: BufferRole,
+}
+
+impl UnifiedBuffer {
+    /// The S2-5 unification key: same identity name and same shape.
+    fn matches(&self, name: &str, element_ty: MirType, element_count: u64) -> bool {
+        self.name == name && self.element_ty == element_ty && self.element_count == element_count
+    }
+}
+
+/// Merge an ABI-derived role onto a buffer's program-level role under one id.
+fn merge_buffer_roles(previous: BufferRole, next: BufferRole) -> BufferRole {
+    match (previous, next) {
+        (BufferRole::Input, BufferRole::Input) => BufferRole::Input,
+        (BufferRole::Output, BufferRole::Output) => BufferRole::Output,
+        _ => BufferRole::InOut,
+    }
+}
+
 /// Construct the common device program for a lowered package.
 ///
 /// Scans the validated package MIR for `@ nucleum` compute kernels
@@ -125,6 +160,15 @@ fn buffer_slot_name(
 /// and derived launch plans. Every field is a program fact from the ABI
 /// signature and the shared plan pass — never inferred from emitted text
 /// (A3). A package with no compute kernels yields `None` (no device payload).
+///
+/// **Cross-kernel buffer identity unification (S2-5):** the constructor runs
+/// in two passes — first it derives every kernel's signature/plan and unifies
+/// buffer identity by (identity name, element type, element count) across
+/// kernels (one kernel's output matching another's input shares a single
+/// `BufferId` as an InOut intermediate), then it materializes the program
+/// with the merged identity facts. A slot's per-kernel access stays as the
+/// ABI derived it (the schema permits InOut buffers to be read or written at
+/// individual slots).
 ///
 /// # Errors
 /// Fail-closed [`Diagnostic`]s when a kernel's ABI signature or plan cannot
@@ -144,8 +188,29 @@ pub(crate) fn device_program_for_lowered(
         return Ok(None);
     }
 
-    let mut program = DeviceProgram::new(DeviceProgramLifetime::SingleRun);
+    /// One kernel's build: signature/plan facts plus its resource slots
+    /// (buffer ids resolved by the unification pass).
+    struct KernelBuild {
+        function: MirFunctionId,
+        entry: String,
+        plan: CollectionKernelPlan,
+        launch: KernelLaunchPlan,
+        resources: Vec<ResourceBuild>,
+    }
+    /// One storage-buffer slot: binding facts + the unified buffer id.
+    struct ResourceBuild {
+        group: u32,
+        binding: u32,
+        access: MirKernelResourceAccess,
+        buffer_id: BufferId,
+        element_ty: MirType,
+        element_count: u64,
+    }
+
+    // Pass 1: derive signatures/plans and unify cross-kernel buffer identity.
+    let mut unified: Vec<UnifiedBuffer> = Vec::new();
     let mut next_buffer_id = 1u32;
+    let mut builds: Vec<KernelBuild> = Vec::with_capacity(kernel_functions.len());
     for function in kernel_functions {
         let signature = MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
             function, validated.validation(), interner,
@@ -155,7 +220,7 @@ pub(crate) fn device_program_for_lowered(
             .map_err(|error| vec![device_diag("plan", error.message)])?
             .unwrap_or(CollectionKernelPlan::Elementwise);
 
-        let mut resources = Vec::new();
+        let mut resources: Vec<ResourceBuild> = Vec::new();
         for resource in signature
             .resources()
             .filter(|resource| resource.kind == MirKernelResourceKind::StorageBuffer)
@@ -169,12 +234,65 @@ pub(crate) fn device_program_for_lowered(
                     ),
                 )]
             })?;
-            let id = BufferId(next_buffer_id);
-            next_buffer_id += 1;
+            let name = buffer_slot_name(function, interner, &resource);
+            let buffer_id = if let Some(entry) = unified.iter_mut().find(|entry| {
+                entry.matches(&name, resource.element_ty, resource.element_count)
+            }) {
+                // Unification (S2-5): the same logical buffer appears at this
+                // kernel too. The merged role is the program-level identity
+                // fact; an Input+Output mix makes it an InOut intermediate.
+                entry.role = merge_buffer_roles(entry.role, role);
+                entry.id
+            } else {
+                let id = BufferId(next_buffer_id);
+                next_buffer_id += 1;
+                unified.push(UnifiedBuffer {
+                    id,
+                    name,
+                    element_ty: resource.element_ty,
+                    element_count: resource.element_count,
+                    role,
+                });
+                id
+            };
+            resources.push(ResourceBuild {
+                group: resource.group,
+                binding: resource.binding,
+                access: resource.access,
+                buffer_id,
+                element_ty: resource.element_ty,
+                element_count: resource.element_count,
+            });
+        }
+        // The launch binds buffers in binding order (inputs first, output
+        // last), matching the emitted kernel's buffer indices / param order.
+        resources.sort_by_key(|resource| (resource.binding, resource.group));
+
+        builds.push(KernelBuild {
+            function: function.id,
+            entry: kernel_entry_name(function, interner),
+            plan,
+            launch: KernelLaunchPlan::from_signature_and_function(&signature, function),
+            resources,
+        });
+    }
+
+    // Pass 2: materialize the program with the merged identity facts. Every
+    // reference to a unified id carries the same name/role/lifetime so the
+    // schema's cross-reference consistency checks pass.
+    let mut program = DeviceProgram::new(DeviceProgramLifetime::SingleRun);
+    for build in builds {
+        let kernel_index = program.kernels.len();
+        let mut resources: Vec<DeviceResource> = Vec::with_capacity(build.resources.len());
+        for slot in build.resources {
+            let entry = unified
+                .iter()
+                .find(|entry| entry.id == slot.buffer_id)
+                .expect("every slot buffer was registered by the unification pass");
             let identity = BufferIdentity {
-                id,
-                name: buffer_slot_name(function, interner, &resource),
-                role,
+                id: entry.id,
+                name: entry.name.clone(),
+                role: entry.role,
                 storage: MirTensorStorageLayout::DeviceHandle,
                 // S2-4 lifetime derivation (council 3): the constructor
                 // derives the typed lifetime from the program's ABI facts —
@@ -182,44 +300,45 @@ pub(crate) fn device_program_for_lowered(
                 // ObservationPoint, InOut → PerStep (delivery spec N2.4).
                 // The host receives these facts through the payload; it never
                 // re-derives a lifetime from slot role alone.
-                lifetime: lifetime_for_role(role),
-            };
-            let version = BufferVersion {
-                version: 1,
-                element_ty: resource.element_ty,
-                element_count: resource.element_count,
+                lifetime: lifetime_for_role(entry.role),
             };
             resources.push(DeviceResource {
                 buffer: identity,
-                version,
-                binding: Binding {
-                    group: resource.group,
-                    binding: resource.binding,
+                version: BufferVersion {
+                    version: 1,
+                    element_ty: slot.element_ty,
+                    element_count: slot.element_count,
                 },
-                access: resource.access,
+                binding: Binding {
+                    group: slot.group,
+                    binding: slot.binding,
+                },
+                access: slot.access,
             });
         }
-        // The launch binds buffers in binding order (inputs first, output
-        // last), matching the emitted kernel's buffer indices / param order.
-        resources.sort_by_key(|resource| (resource.binding.group, resource.binding.binding));
 
-        let entry = kernel_entry_name(function, interner);
-        let kernel_index = program.kernels.len();
-        program.kernels.push(KernelUnit {
-            function: function.id,
-            entry: entry.clone(),
-            plan,
-            resources: resources.clone(),
-            launch: KernelLaunchPlan::from_signature_and_function(&signature, function),
-        });
         let launch_id = LaunchId(u32::try_from(program.launches.len()).unwrap_or(u32::MAX) + 1);
+        program.kernels.push(KernelUnit {
+            function: build.function,
+            entry: build.entry.clone(),
+            plan: build.plan,
+            resources: resources.clone(),
+            launch: build.launch,
+        });
         program.launches.push(LaunchUnit {
             id: launch_id,
             kernel_index,
         });
         for resource in resources {
-            if resource.buffer.role == BufferRole::Output
-                || resource.buffer.role == BufferRole::InOut
+            // A result records the launch that PRODUCES the buffer version;
+            // only slots that write (Write/ReadWrite) produce. An InOut
+            // intermediate's read-only consumer slot (S2-5: the unified
+            // intermediate referenced by the next kernel) must not claim
+            // production — `DeviceProgram::validate` rejects a result whose
+            // producing launch does not write the version.
+            if (resource.buffer.role == BufferRole::Output
+                || resource.buffer.role == BufferRole::InOut)
+                && resource.access != MirKernelResourceAccess::Read
             {
                 program.results.push(radix_mir::device_program::ResultBuffer {
                     buffer: resource.buffer.clone(),
