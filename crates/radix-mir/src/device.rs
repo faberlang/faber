@@ -128,6 +128,73 @@ pub fn device_roles_from_hir(hir: &HirProgram) -> FxHashMap<DefId, MirDeviceRole
     roles_by_def
 }
 
+/// The owned companion-relation carrier (S3-A2): primal → companion device
+/// materialization facts carried from the driver onto the lowered MIR so the
+/// device-program constructor can lower generated companions into device
+/// kernels. Replaces the discarded `AirCompanionRelation` — companion names
+/// are diagnostic identity only; this typed map is the routing surface.
+#[derive(Debug, Clone, Default)]
+pub struct MirCompanionMap {
+    by_primal: FxHashMap<DefId, MirCompanionEntry>,
+}
+
+impl MirCompanionMap {
+    /// Record one primal → companion materialization fact.
+    pub fn insert(&mut self, entry: MirCompanionEntry) {
+        self.by_primal.insert(entry.primal, entry);
+    }
+
+    /// The companion fact for a primal function, if carried.
+    #[must_use]
+    pub fn companion_for(&self, primal: DefId) -> Option<&MirCompanionEntry> {
+        self.by_primal.get(&primal)
+    }
+
+    /// Iterate every carried companion fact (deterministic by primal `DefId`).
+    pub fn iter(&self) -> impl Iterator<Item = &MirCompanionEntry> {
+        let mut entries: Vec<&MirCompanionEntry> = self.by_primal.values().collect();
+        entries.sort_by_key(|entry| entry.primal.0);
+        entries.into_iter()
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.by_primal.is_empty()
+    }
+}
+
+/// One primal → companion device-materialization fact (S3-A2).
+#[derive(Debug, Clone)]
+pub struct MirCompanionEntry {
+    /// The differentiable primal function.
+    pub primal: DefId,
+    /// The generated companion function (its MIR function's `source`).
+    pub companion: DefId,
+    /// Derivative kind of the companion.
+    pub derivative: MirCompanionDerivativeKind,
+    /// The primal is an explicitly device-resident forward kernel (A5): the
+    /// driver records this from the primal's HIR device role, and the
+    /// materializer joins the companion to the same `DeviceProgram`.
+    pub device_resident: bool,
+}
+
+/// The derivative kind a companion computes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MirCompanionDerivativeKind {
+    /// Reverse-mode vector-Jacobian product.
+    ReverseModeVjp,
+}
+
+impl MirCompanionDerivativeKind {
+    /// Stable diagnostic spelling.
+    #[must_use]
+    pub fn spelling(self) -> &'static str {
+        match self {
+            Self::ReverseModeVjp => "reverse-mode-vjp",
+        }
+    }
+}
+
 #[must_use]
 pub fn classify_device_safe(
     validated: &ValidatedMir<'_>,

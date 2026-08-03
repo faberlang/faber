@@ -1613,17 +1613,23 @@ impl MirKernelSignature {
             return Err(MirAbiError::new(ERR_KERNEL_RESULT_TUPLE_REQUIRED));
         }
 
-        // Every param is a read input; output bindings start after the
+        // Every non-vacuum param becomes a read input; a vacuum "residual"
+        // param (the reverse-AD nil placeholder) carries no device storage
+        // and is skipped (S3-A2 companion shape: `backward(x, w, nil(),
+        // upstream) → (grad_x, grad_w)`). Output bindings start after the
         // inputs, so each output binds a distinct slot.
         let mut input_resources = Vec::with_capacity(inputs.len());
-        for (binding, input) in inputs.iter().enumerate() {
+        let mut next_binding = 0u32;
+        for input in inputs {
+            if is_vacuum(input.ty, validation) {
+                continue;
+            }
             let element_ty =
                 buffer_element_type(input.ty, validation, allow_host_owned_tensor_entry)?;
             let element_count = buffer_element_count(input.ty, validation)?;
             input_resources.push(MirKernelResource {
                 group: DEFAULT_KERNEL_RESOURCE_GROUP,
-                binding: u32::try_from(binding)
-                    .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?,
+                binding: next_binding,
                 kind: MirKernelResourceKind::StorageBuffer,
                 role: MirKernelResourceRole::Input,
                 access: MirKernelResourceAccess::Read,
@@ -1632,6 +1638,7 @@ impl MirKernelSignature {
                 source_local: Some(input.local),
                 source_name: param_source_name(input, interner),
             });
+            next_binding += 1;
         }
         let input = input_resources
             .first()
@@ -1648,8 +1655,9 @@ impl MirKernelSignature {
             let view_count = device_view_element_count(element_ty, validation)?;
             outputs.push(MirKernelResource {
                 group: DEFAULT_KERNEL_RESOURCE_GROUP,
-                binding: u32::try_from(inputs.len() + index)
-                    .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?,
+                binding: next_binding
+                    .checked_add(u32::try_from(index).unwrap_or(u32::MAX))
+                    .ok_or_else(|| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?,
                 kind: MirKernelResourceKind::StorageBuffer,
                 role: MirKernelResourceRole::Output,
                 access: MirKernelResourceAccess::Write,
@@ -2384,10 +2392,16 @@ fn buffer_binding_type_for_shader_access(
 }
 
 fn param_source_name(param: &MirParam, interner: Option<&Interner>) -> Option<String> {
-    param
-        .name
-        .zip(interner)
-        .map(|(name, interner)| interner.resolve(name).to_owned())
+    // A synthetic symbol outside the interner's string table (the reverse-AD
+    // residual/upstream placeholders of a generated companion, S3-A2) is
+    // treated as unnamed rather than indexing out of bounds.
+    let name = param.name?;
+    let interner = interner?;
+    if (name.0 as usize) < interner.strings().len() {
+        Some(interner.resolve(name).to_owned())
+    } else {
+        None
+    }
 }
 
 fn named_builtin_for_param(param: &MirParam, interner: &Interner) -> Option<MirKernelBuiltin> {
@@ -4148,6 +4162,9 @@ mod tests {
         let required = MirAbiError::new(ERR_KERNEL_RESULT_TUPLE_REQUIRED);
         assert_eq!(required.issue, "mir_kernel_result_tuple_required");
         let requires_input = MirAbiError::new(ERR_KERNEL_RESULT_TUPLE_REQUIRES_INPUT);
-        assert_eq!(requires_input.issue, "mir_kernel_result_tuple_requires_input");
+        assert_eq!(
+            requires_input.issue,
+            "mir_kernel_result_tuple_requires_input"
+        );
     }
 }
