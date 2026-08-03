@@ -8,13 +8,24 @@ use super::*;
 use faber::device::{DeviceBackend, DeviceSelection};
 use faber_host_macos_arm64::composite_host::{CompositeHost, CompositeHostConfig};
 use faber_host_macos_arm64::device_descriptor::{
-    DescriptorBuffer, DescriptorKernel, DeviceBufferRole, DeviceDataType, DeviceDescriptor,
+    DescriptorBuffer, DescriptorKernel, DeviceBufferLifetime, DeviceBufferRole, DeviceDataType,
+    DeviceDescriptor, DeviceProgramLifetime,
 };
 use faber_host_macos_arm64::device_host::DeviceRuntime;
 use faber_host_macos_arm64::{FakeMetalDriver, HostError, MetalHostSession};
 use std::collections::BTreeMap;
 
 const MODULE_IMAGE: &[u8] = b"// fake compiler-owned module image";
+
+/// The S2-4 lifetime mapping the faber constructor derives (Input → PerProgram,
+/// Output → ObservationPoint, InOut → PerStep); test descriptors mirror it.
+fn lifetime_for_role(role: DeviceBufferRole) -> DeviceBufferLifetime {
+    match role {
+        DeviceBufferRole::Input => DeviceBufferLifetime::PerProgram,
+        DeviceBufferRole::Output => DeviceBufferLifetime::ObservationPoint,
+        DeviceBufferRole::InOut => DeviceBufferLifetime::PerStep,
+    }
+}
 
 fn add_slot(
     id: u32,
@@ -27,6 +38,7 @@ fn add_slot(
         buffer_id: id,
         buffer_name: name.to_owned(),
         role,
+        lifetime: lifetime_for_role(role),
         binding,
         element_ty: DeviceDataType::F32,
         element_count: count,
@@ -47,6 +59,7 @@ fn elementwise_add_descriptor(backend: DeviceBackend, entry: &str, count: u64) -
             grid: [1, 1, 1],
             block: [count as u32, 1, 1],
         }],
+        program_lifetime: DeviceProgramLifetime::SingleRun,
     }
 }
 
@@ -327,6 +340,7 @@ fn conflicting_shapes_fail_as_shape_mismatch() {
                 block: [4, 1, 1],
             },
         ],
+        program_lifetime: DeviceProgramLifetime::SingleRun,
     };
     let err = execute_device_descriptor(&mut host, &descriptor, &BTreeMap::new(), &[])
         .expect_err("shape conflict must fail before launch");

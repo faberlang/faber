@@ -44,7 +44,8 @@
 
 use faber::device::{DeviceBackend, DeviceSelection};
 use faber_host_macos_arm64::device_descriptor::{
-    DescriptorBuffer, DescriptorKernel, DeviceDataType, DeviceDescriptor, DeviceBufferRole,
+    DescriptorBuffer, DescriptorKernel, DeviceBufferLifetime, DeviceDataType, DeviceDescriptor,
+    DeviceBufferRole, DeviceProgramLifetime as HostDeviceProgramLifetime,
 };
 use radix::diagnostics::Diagnostic;
 use radix::lexer::Interner;
@@ -175,7 +176,13 @@ pub(crate) fn device_program_for_lowered(
                 name: buffer_slot_name(function, interner, &resource),
                 role,
                 storage: MirTensorStorageLayout::DeviceHandle,
-                lifetime: BufferLifetime::PerProgram,
+                // S2-4 lifetime derivation (council 3): the constructor
+                // derives the typed lifetime from the program's ABI facts —
+                // default mapping Input → PerProgram, Output →
+                // ObservationPoint, InOut → PerStep (delivery spec N2.4).
+                // The host receives these facts through the payload; it never
+                // re-derives a lifetime from slot role alone.
+                lifetime: lifetime_for_role(role),
             };
             let version = BufferVersion {
                 version: 1,
@@ -239,7 +246,49 @@ pub(crate) fn device_program_for_lowered(
 
 /// Canonical payload version. Bump only with a documented representation
 /// change (the payload is the identity substrate of the same-package hash).
-const DEVICE_RUN_PLAN_VERSION: u32 = 1;
+///
+/// **v1 → v2 (S2-4, the faber-owned codec bump):** `PlanSlot` gained a typed
+/// `lifetime` field and `DeviceRunPlan` gained the program `lifetime` regime
+/// — the constructor-derived [`BufferLifetime`] facts ride the payload so the
+/// host receives them from the packaged image (it never re-derives them from
+/// slot role). Admission is fail-closed: `parse_payload` checks the `v`
+/// field before any field-level parse, so old v1 payloads fail with the
+/// structured `payload_version` diagnostic. This is a **faber-owned codec
+/// change, not an A7/FMIR bump** — `PACKAGE_MIR_ARTIFACT_VERSION` stays 4
+/// (N2.8; S2-9 forbids radix schema changes).
+const DEVICE_RUN_PLAN_VERSION: u32 = 2;
+
+/// Typed buffer-lifetime spelling carried by the canonical payload (codec v2,
+/// S2-4). Mirrors the radix [`BufferLifetime`] and hosts
+/// [`DeviceBufferLifetime`] spellings; an unknown spelling fails the payload
+/// admission closed (never a silent default).
+///
+/// [`BufferLifetime`]: radix_mir::device_program::BufferLifetime
+/// [`DeviceBufferLifetime`]: faber_host_macos_arm64::device_descriptor::DeviceBufferLifetime
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum PlanSlotLifetime {
+    /// Allocated once for the whole program; persists across executions.
+    PerProgram,
+    /// Live within one step; recycled at the step boundary.
+    PerStep,
+    /// Read back at a declared observation point; read-then-release.
+    ObservationPoint,
+}
+
+/// Program execution-lifetime regime carried by the canonical payload (codec
+/// v2, S2-4). `SingleRun` is the Stage 2 fixture regime; `RepeatingStep` is
+/// the repeating training-step regime whose per-step recycling semantics land
+/// with Stage 5.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum PlanProgramLifetime {
+    /// One-shot program run.
+    #[default]
+    SingleRun,
+    /// Repeating training step; per-step buffers recycle between iterations.
+    RepeatingStep,
+}
 
 /// One typed slot of a plan kernel (mirrors the S1-4 [`DescriptorBuffer`]
 /// facts; produced from the S1-1 [`DeviceResource`]).
@@ -251,6 +300,9 @@ pub(crate) struct PlanSlot {
     pub name: String,
     /// Slot role (`"input"` | `"output"` | `"in-out"`).
     pub role: String,
+    /// Typed buffer lifetime (codec v2; derived by the constructor from the
+    /// ABI facts, consumed by the host session's allocation/release policy).
+    pub lifetime: PlanSlotLifetime,
     /// Target-neutral binding index.
     pub binding: u32,
     /// Element type spelling (`"f32"`).
@@ -300,6 +352,8 @@ pub(crate) struct PlanInput {
 pub(crate) struct DeviceRunPlan {
     /// Canonical representation version ([`DEVICE_RUN_PLAN_VERSION`]).
     pub v: u32,
+    /// Program execution-lifetime regime (codec v2, S2-4).
+    pub lifetime: PlanProgramLifetime,
     /// Ordered kernels, in program order.
     pub kernels: Vec<PlanKernel>,
     /// CUDA logical-entry → symbol identities (empty for non-CUDA images).
@@ -327,24 +381,41 @@ fn encode_payload(plan: &DeviceRunPlan) -> Result<String, Vec<Diagnostic>> {
 
 /// Parse a canonical run-plan payload back from an FMIR device section.
 ///
+/// Fail-closed admission (S2-4): the version field is read **first**, before
+/// any field-level parse, so an old (or unknown) codec version fails with the
+/// structured `payload_version` diagnostic — never a silent default and never
+/// a generic field-level error that hides the version gate.
+///
 /// # Errors
 /// Fail-closed when the payload is not a valid run plan or carries an
 /// unsupported version.
 pub(crate) fn parse_payload(payload: &str) -> Result<DeviceRunPlan, Vec<Diagnostic>> {
-    let plan: DeviceRunPlan = serde_json::from_str(payload).map_err(|error| {
+    let value: serde_json::Value = serde_json::from_str(payload).map_err(|error| {
         vec![Diagnostic::error(format!(
             "device section payload is not a valid run plan: {error}"
         ))
         .with_arg("issue", "E_DEVICE_DESCRIPTOR")]
     })?;
-    if plan.v != DEVICE_RUN_PLAN_VERSION {
+    let Some(version) = value.get("v").and_then(serde_json::Value::as_u64) else {
+        return Err(vec![Diagnostic::error(
+            "device section payload is not a valid run plan (missing version field `v`)",
+        )
+        .with_arg("issue", "E_DEVICE_DESCRIPTOR")]);
+    };
+    if version != u64::from(DEVICE_RUN_PLAN_VERSION) {
         return Err(vec![Diagnostic::error(format!(
             "device section payload version {} is not supported (expected {})",
-            plan.v, DEVICE_RUN_PLAN_VERSION
+            version, DEVICE_RUN_PLAN_VERSION
         ))
         .with_arg("issue", "E_DEVICE_DESCRIPTOR")
-        .with_arg("payload_version", plan.v.to_string())]);
+        .with_arg("payload_version", version.to_string())]);
     }
+    let plan: DeviceRunPlan = serde_json::from_value(value).map_err(|error| {
+        vec![Diagnostic::error(format!(
+            "device section payload is not a valid run plan: {error}"
+        ))
+        .with_arg("issue", "E_DEVICE_DESCRIPTOR")]
+    })?;
     Ok(plan)
 }
 
@@ -463,6 +534,7 @@ fn build_run_plan_with_ids(
                     id: resource.buffer.id.0,
                     name: resource.buffer.name.clone(),
                     role: role_spelling(resource.buffer.role),
+                    lifetime: plan_slot_lifetime(resource.buffer.lifetime),
                     binding: resource.binding.binding,
                     ty: data_type_spelling(resource.version.element_ty),
                     count: resource.version.element_count,
@@ -489,6 +561,7 @@ fn build_run_plan_with_ids(
         .collect();
     DeviceRunPlan {
         v: DEVICE_RUN_PLAN_VERSION,
+        lifetime: plan_program_lifetime(program.lifetime),
         kernels,
         cuda_kernels,
         inputs: plan_inputs,
@@ -500,6 +573,35 @@ fn role_spelling(role: BufferRole) -> String {
         BufferRole::Input => "input".to_owned(),
         BufferRole::Output => "output".to_owned(),
         BufferRole::InOut => "in-out".to_owned(),
+    }
+}
+
+/// The S2-4 constructor mapping (delivery spec N2.4, open question 3's
+/// default): Input → PerProgram, Output → ObservationPoint, InOut → PerStep.
+/// Derived from the language/ABI facts by the constructor with the schema's
+/// `BufferLifetime` semantics as the authority; the host never re-derives it.
+fn lifetime_for_role(role: BufferRole) -> BufferLifetime {
+    match role {
+        BufferRole::Input => BufferLifetime::PerProgram,
+        BufferRole::Output => BufferLifetime::ObservationPoint,
+        BufferRole::InOut => BufferLifetime::PerStep,
+    }
+}
+
+/// Map a radix [`BufferLifetime`] onto its payload spelling (codec v2).
+fn plan_slot_lifetime(lifetime: BufferLifetime) -> PlanSlotLifetime {
+    match lifetime {
+        BufferLifetime::PerProgram => PlanSlotLifetime::PerProgram,
+        BufferLifetime::PerStep => PlanSlotLifetime::PerStep,
+        BufferLifetime::ObservationPoint => PlanSlotLifetime::ObservationPoint,
+    }
+}
+
+/// Map a radix [`DeviceProgramLifetime`] onto its payload spelling (codec v2).
+fn plan_program_lifetime(lifetime: DeviceProgramLifetime) -> PlanProgramLifetime {
+    match lifetime {
+        DeviceProgramLifetime::SingleRun => PlanProgramLifetime::SingleRun,
+        DeviceProgramLifetime::RepeatingStep => PlanProgramLifetime::RepeatingStep,
     }
 }
 
@@ -535,7 +637,10 @@ pub(crate) fn artifact_for_backend<'a>(
 /// ([`CudaKernelIdentity`]`::symbol`), never the logical entry; Metal
 /// launches by the logical entry (the emitted MSL kernel name). Slots are
 /// carried in binding order so the composite host binds buffers in the
-/// emitted kernel's buffer/param order.
+/// emitted kernel's buffer/param order. The payload's typed lifetimes (codec
+/// v2) are mapped onto the host descriptor's [`DeviceBufferLifetime`]/[`DeviceProgramLifetime`]
+/// — the host consumes the constructor-derived facts; it never re-derives a
+/// lifetime from slot role (S2-4).
 #[must_use]
 pub(crate) fn descriptor_for_backend(
     plan: &DeviceRunPlan,
@@ -562,6 +667,7 @@ pub(crate) fn descriptor_for_backend(
                     buffer_id: slot.id,
                     buffer_name: slot.name.clone(),
                     role: parse_role(&slot.role),
+                    lifetime: parse_slot_lifetime(slot.lifetime),
                     binding: slot.binding,
                     element_ty: DeviceDataType::F32,
                     element_count: slot.count,
@@ -579,6 +685,10 @@ pub(crate) fn descriptor_for_backend(
         backend,
         module_image: blob.to_vec(),
         kernels,
+        program_lifetime: match plan.lifetime {
+            PlanProgramLifetime::SingleRun => HostDeviceProgramLifetime::SingleRun,
+            PlanProgramLifetime::RepeatingStep => HostDeviceProgramLifetime::RepeatingStep,
+        },
     }
 }
 
@@ -587,6 +697,18 @@ fn parse_role(spelling: &str) -> DeviceBufferRole {
         "output" => DeviceBufferRole::Output,
         "in-out" => DeviceBufferRole::InOut,
         _ => DeviceBufferRole::Input,
+    }
+}
+
+/// Map the payload's typed lifetime onto the host descriptor's typed
+/// lifetime. The payload admission already guarantees the spelling is one of
+/// the three (an unknown variant fails the serde parse closed); this is a
+/// total function over that admitted set.
+fn parse_slot_lifetime(lifetime: PlanSlotLifetime) -> DeviceBufferLifetime {
+    match lifetime {
+        PlanSlotLifetime::PerProgram => DeviceBufferLifetime::PerProgram,
+        PlanSlotLifetime::PerStep => DeviceBufferLifetime::PerStep,
+        PlanSlotLifetime::ObservationPoint => DeviceBufferLifetime::ObservationPoint,
     }
 }
 
@@ -609,12 +731,18 @@ fn inputs_by_buffer_id(plan: &DeviceRunPlan) -> BTreeMap<u32, Vec<f32>> {
     by_id
 }
 
-/// The output buffer ids the run reads back.
-fn output_buffer_ids(plan: &DeviceRunPlan) -> Vec<u32> {
+/// The observation-point buffer ids the run reads back (S2-4).
+///
+/// The readback set is exactly the buffers whose typed lifetime is
+/// ObservationPoint — the declared observation points. InOut intermediates
+/// (PerStep lifetime under the constructor mapping) are never read back, so
+/// the ordinary `faber run` path performs no undeclared readback between
+/// kernels (campaign exit-gate bullet 1).
+fn observation_buffer_ids(plan: &DeviceRunPlan) -> Vec<u32> {
     let mut ids = Vec::new();
     for kernel in &plan.kernels {
         for slot in &kernel.slots {
-            if matches!(slot.role.as_str(), "output" | "in-out") && !ids.contains(&slot.id) {
+            if slot.lifetime == PlanSlotLifetime::ObservationPoint && !ids.contains(&slot.id) {
                 ids.push(slot.id);
             }
         }
@@ -656,7 +784,7 @@ pub(crate) fn execute_device_route(
     let mut host = super::host_factory::construct_composite_host(selection, true)
         .map_err(|diagnostic| vec![diagnostic])?;
     let inputs = inputs_by_buffer_id(&plan);
-    let outputs = output_buffer_ids(&plan);
+    let outputs = observation_buffer_ids(&plan);
     let receipt = super::host_factory::execute_device_descriptor(
         &mut host,
         &descriptor,
