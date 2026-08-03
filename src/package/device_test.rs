@@ -24,7 +24,7 @@ fn device_program_from_corpus_fixture(relative: &str) -> DeviceProgram {
         &radix::driver::Config::default().with_stdlib(dev_norma_library_home()),
         &entry,
         |lowered| {
-            device_program_for_lowered(&lowered.validated, &lowered.interner)
+            device_program_for_lowered(&lowered.validated, &lowered.interner, &lowered.companions)
                 .expect("constructor succeeds")
                 .expect("kernel fixture yields a device program")
         },
@@ -72,7 +72,7 @@ fn device_program_constructor_returns_none_without_kernels() {
         &radix::driver::Config::default().with_stdlib(dev_norma_library_home()),
         &entry,
         |lowered| {
-            device_program_for_lowered(&lowered.validated, &lowered.interner)
+            device_program_for_lowered(&lowered.validated, &lowered.interner, &lowered.companions)
                 .expect("constructor succeeds")
         },
     )
@@ -382,7 +382,7 @@ fn two_kernel_program() -> DeviceProgram {
         &radix::driver::Config::default().with_stdlib(dev_norma_library_home()),
         &entry,
         |lowered| {
-            device_program_for_lowered(&lowered.validated, &lowered.interner)
+            device_program_for_lowered(&lowered.validated, &lowered.interner, &lowered.companions)
                 .expect("constructor succeeds")
                 .expect("fixture yields a device program")
         },
@@ -533,4 +533,106 @@ fn device_repeat_count_is_fail_closed() {
         Some(value) => std::env::set_var("FABER_DEVICE_REPEAT", value),
         None => std::env::remove_var("FABER_DEVICE_REPEAT"),
     }
+}
+
+
+/// The S3-A2 materializer: a package whose primal is BOTH a nucleum forward
+/// kernel and `@ radix backward`-annotated produces a DeviceProgram whose
+/// kernel set + order is [forward loss, companion loss_backward] — the
+/// companion's tuple gradients lower into distinct output resources and its
+/// inputs unify with the forward's device-resident buffers (S2-5 identity).
+#[test]
+fn companion_forward_and_backward_kernel_set_and_order() {
+    let entry = PathBuf::from("/tmp/s3a2probe/src/probe.fab");
+    let program = super::super::with_lowered_package_mir(
+        &radix::driver::Config::default()
+            .with_stdlib(dev_norma_library_home())
+            .with_target(radix::codegen::Target::Fmir),
+        &entry,
+        |lowered| {
+            device_program_for_lowered(&lowered.validated, &lowered.interner, &lowered.companions)
+                .expect("constructor succeeds")
+                .expect("device package yields a device program")
+        },
+    )
+    .expect("fixture lowers");
+    program.validate().expect("program validates");
+
+    // Kernel set + order: the forward primal first, then the companion.
+    let entries: Vec<&str> = program.kernels.iter().map(|k| k.entry.as_str()).collect();
+    assert_eq!(entries, vec!["loss", "loss_backward"]);
+
+    // The companion carries the multi-output ABI: two gradient output
+    // resources binding distinct slots (S3-A1).
+    let companion = &program.kernels[1];
+    let grad_outputs: Vec<_> = companion
+        .resources
+        .iter()
+        .filter(|r| r.buffer.role == BufferRole::Output)
+        .collect();
+    assert_eq!(grad_outputs.len(), 2);
+    assert_ne!(
+        grad_outputs[0].binding.binding,
+        grad_outputs[1].binding.binding,
+        "two gradient outputs must bind distinct slots"
+    );
+
+    // The companion's inputs unify with the forward's device-resident
+    // buffers: x and w share ONE BufferId across both kernels.
+    let forward_x = program.kernels[0]
+        .resources
+        .iter()
+        .find(|r| r.buffer.name == "x")
+        .expect("forward reads x");
+    let companion_x = companion
+        .resources
+        .iter()
+        .find(|r| r.buffer.name == "x")
+        .expect("companion reads x");
+    assert_eq!(forward_x.buffer.id, companion_x.buffer.id, "x unifies by S2-5 identity");
+}
+
+/// The S3-A2 carrier round-trips primal → companion with the derivative kind
+/// and the device-residency placement fact; a carried companion MISSING from
+/// the lowered MIR fails construction closed with the typed diagnostic (the
+/// relation facts are the routing surface — never a name heuristic).
+#[test]
+fn companion_carrier_round_trips_and_missing_companion_fails_closed() {
+    let entry = PathBuf::from("/tmp/s3a2probe/src/probe.fab");
+    let config = radix::driver::Config::default()
+        .with_stdlib(dev_norma_library_home())
+        .with_target(radix::codegen::Target::Fmir);
+    super::super::with_lowered_package_mir(&config, &entry, |lowered| {
+        // Round-trip: exactly one carried companion, VJP derivative,
+        // device-resident (the primal is a nucleum kernel).
+        let entries: Vec<_> = lowered.companions.iter().collect();
+        assert_eq!(entries.len(), 1);
+        let carried = entries[0];
+        assert_eq!(
+            carried.derivative,
+            radix_mir::device::MirCompanionDerivativeKind::ReverseModeVjp
+        );
+        assert!(
+            carried.device_resident,
+            "the primal carries explicit device intent (@ nucleum), so its companion is device-resident"
+        );
+
+        // Fail closed: a carried companion absent from the MIR yields the
+        // typed diagnostic.
+        let mut phantom = lowered.companions.clone();
+        phantom.insert(radix_mir::device::MirCompanionEntry {
+            primal: radix::hir::DefId(9_999),
+            companion: radix::hir::DefId(9_998),
+            derivative: radix_mir::device::MirCompanionDerivativeKind::ReverseModeVjp,
+            device_resident: true,
+        });
+        let error = device_program_for_lowered(&lowered.validated, &lowered.interner, &phantom)
+            .expect_err("a carried companion missing from the MIR must fail closed");
+        assert!(
+            error.iter().any(|diagnostic| diagnostic.message.contains("missing from the lowered MIR")),
+            "the fail-closed diagnostic names the missing companion: {:?}",
+            error.iter().map(|d| d.message.clone()).collect::<Vec<_>>()
+        );
+    })
+    .expect("lower");
 }

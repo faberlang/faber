@@ -104,9 +104,9 @@ fn buffer_slot_name(
             .iter()
             .find(|param| param.local == local)
             .and_then(|param| param.name)
-            .map(|symbol| interner.resolve(symbol))
+            .and_then(|symbol| safe_interner_name(interner, symbol))
         {
-            return name.to_owned();
+            return name;
         }
     }
     match resource.role {
@@ -116,6 +116,18 @@ fn buffer_slot_name(
         radix_mir::abi::MirKernelResourceRole::Output => {
             format!("output_{}", resource.binding)
         }
+    }
+}
+
+/// Resolve a symbol name safely: an uninterned synthetic symbol (the
+/// reverse-AD residual/upstream placeholders of a generated companion)
+/// falls back to `None` instead of indexing past the interner's string
+/// table — the caller then uses the role-based fallback name (S3-A2).
+fn safe_interner_name(interner: &Interner, symbol: radix::lexer::Symbol) -> Option<String> {
+    if (symbol.0 as usize) < interner.strings().len() {
+        Some(interner.resolve(symbol).to_owned())
+    } else {
+        None
     }
 }
 
@@ -170,13 +182,26 @@ fn merge_buffer_roles(previous: BufferRole, next: BufferRole) -> BufferRole {
 /// ABI derived it (the schema permits InOut buffers to be read or written at
 /// individual slots).
 ///
+/// **Companion path (S3-A2, THE SPINE):** the constructor also selects the
+/// generated companions of device-resident primals through the owned
+/// [`MirCompanionMap`] carrier — NOT only `shader_stage == Compute`. Each
+/// carried companion's tuple gradient return lowers through the multi-output
+/// ABI (S3-A1) into distinct output resources (N gradient outputs bind to N
+/// distinct slots), its kernel is ordered AFTER the forward kernels, and its
+/// buffers join the same S2-5 unification (the companion reads the primal's
+/// device-resident buffers by identity). Placement is decided here (A5): a
+/// companion of a device-resident primal joins the same `DeviceProgram`;
+/// generated AIR stays pure (the purity ledger is untouched).
+///
 /// # Errors
 /// Fail-closed [`Diagnostic`]s when a kernel's ABI signature or plan cannot
-/// be derived, a storage buffer has no coherent program role, or the
-/// resulting program fails [`DeviceProgram::validate`].
+/// be derived, a storage buffer has no coherent program role, a carried
+/// companion is missing from the lowered MIR, or the resulting program fails
+/// [`DeviceProgram::validate`].
 pub(crate) fn device_program_for_lowered(
     validated: &ValidatedMir<'_>,
     interner: &Interner,
+    companions: &radix_mir::device::MirCompanionMap,
 ) -> Result<Option<DeviceProgram>, Vec<Diagnostic>> {
     let kernel_functions: Vec<&MirFunction> = validated
         .program()
@@ -208,73 +233,114 @@ pub(crate) fn device_program_for_lowered(
     }
 
     // Pass 1: derive signatures/plans and unify cross-kernel buffer identity.
+    // One kernel builder serves both the forward kernels and the S3-A2
+    // companion kernels — every kernel participates in the same S2-5
+    // unification, so a companion reads its primal's device-resident buffers
+    // by identity.
     let mut unified: Vec<UnifiedBuffer> = Vec::new();
     let mut next_buffer_id = 1u32;
     let mut builds: Vec<KernelBuild> = Vec::with_capacity(kernel_functions.len());
-    for function in kernel_functions {
-        let signature = MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
-            function, validated.validation(), interner,
-        )
-        .map_err(|error| vec![device_diag("signature", error.message)])?;
-        let plan = kernel_plan_for_function(function, &signature, validated.validation())
-            .map_err(|error| vec![device_diag("plan", error.message)])?
-            .unwrap_or(CollectionKernelPlan::Elementwise);
+    let mut build_kernel =
+        |function: &MirFunction| -> Result<(), Vec<Diagnostic>> {
+            let signature =
+                MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+                    function, validated.validation(), interner,
+                )
+                .map_err(|error| vec![device_diag("signature", error.message)])?;
+            let plan = kernel_plan_for_function(function, &signature, validated.validation())
+                .map_err(|error| vec![device_diag("plan", error.message)])?
+                .unwrap_or(CollectionKernelPlan::Elementwise);
 
-        let mut resources: Vec<ResourceBuild> = Vec::new();
-        for resource in signature
-            .resources()
-            .filter(|resource| resource.kind == MirKernelResourceKind::StorageBuffer)
-        {
-            let role = BufferRole::from_abi_role(resource.role, resource.access).ok_or_else(|| {
+            let mut resources: Vec<ResourceBuild> = Vec::new();
+            for resource in signature
+                .resources()
+                .filter(|resource| resource.kind == MirKernelResourceKind::StorageBuffer)
+            {
+                let role = BufferRole::from_abi_role(resource.role, resource.access)
+                    .ok_or_else(|| {
+                        vec![device_diag(
+                            "buffer role",
+                            format!(
+                                "storage buffer binding {} has no coherent program role ({:?} {:?})",
+                                resource.binding, resource.role, resource.access
+                            ),
+                        )]
+                    })?;
+                let name = buffer_slot_name(function, interner, &resource);
+                let buffer_id = if let Some(entry) = unified.iter_mut().find(|entry| {
+                    entry.matches(&name, resource.element_ty, resource.element_count)
+                }) {
+                    // Unification (S2-5): the same logical buffer appears at
+                    // this kernel too. The merged role is the program-level
+                    // identity fact; an Input+Output mix makes it an InOut
+                    // intermediate.
+                    entry.role = merge_buffer_roles(entry.role, role);
+                    entry.id
+                } else {
+                    let id = BufferId(next_buffer_id);
+                    next_buffer_id += 1;
+                    unified.push(UnifiedBuffer {
+                        id,
+                        name,
+                        element_ty: resource.element_ty,
+                        element_count: resource.element_count,
+                        role,
+                    });
+                    id
+                };
+                resources.push(ResourceBuild {
+                    group: resource.group,
+                    binding: resource.binding,
+                    access: resource.access,
+                    buffer_id,
+                    element_ty: resource.element_ty,
+                    element_count: resource.element_count,
+                });
+            }
+            // The launch binds buffers in binding order (inputs first, output
+            // last), matching the emitted kernel's buffer indices / param
+            // order.
+            resources.sort_by_key(|resource| (resource.binding, resource.group));
+
+            builds.push(KernelBuild {
+                function: function.id,
+                entry: kernel_entry_name(function, interner),
+                plan,
+                launch: KernelLaunchPlan::from_signature_and_function(&signature, function),
+                resources,
+            });
+            Ok(())
+        };
+
+    for function in kernel_functions {
+        build_kernel(function)?;
+    }
+
+    // S3-A2 companion path: the generated companions of device-resident
+    // primals, ordered AFTER the forward kernels. Each companion's tuple
+    // gradient return lowers through the multi-output ABI into distinct
+    // output resources; a carried companion missing from the lowered MIR
+    // fails construction closed (relation facts are the typed routing
+    // surface — never a name heuristic).
+    for entry in companions.iter() {
+        if !entry.device_resident {
+            continue;
+        }
+        let companion = validated
+            .program()
+            .functions
+            .iter()
+            .find(|function| function.source == Some(entry.companion))
+            .ok_or_else(|| {
                 vec![device_diag(
-                    "buffer role",
+                    "companion",
                     format!(
-                        "storage buffer binding {} has no coherent program role ({:?} {:?})",
-                        resource.binding, resource.role, resource.access
+                        "companion DefId({}) of device-resident primal DefId({}) is missing from the lowered MIR",
+                        entry.companion.0, entry.primal.0
                     ),
                 )]
             })?;
-            let name = buffer_slot_name(function, interner, &resource);
-            let buffer_id = if let Some(entry) = unified.iter_mut().find(|entry| {
-                entry.matches(&name, resource.element_ty, resource.element_count)
-            }) {
-                // Unification (S2-5): the same logical buffer appears at this
-                // kernel too. The merged role is the program-level identity
-                // fact; an Input+Output mix makes it an InOut intermediate.
-                entry.role = merge_buffer_roles(entry.role, role);
-                entry.id
-            } else {
-                let id = BufferId(next_buffer_id);
-                next_buffer_id += 1;
-                unified.push(UnifiedBuffer {
-                    id,
-                    name,
-                    element_ty: resource.element_ty,
-                    element_count: resource.element_count,
-                    role,
-                });
-                id
-            };
-            resources.push(ResourceBuild {
-                group: resource.group,
-                binding: resource.binding,
-                access: resource.access,
-                buffer_id,
-                element_ty: resource.element_ty,
-                element_count: resource.element_count,
-            });
-        }
-        // The launch binds buffers in binding order (inputs first, output
-        // last), matching the emitted kernel's buffer indices / param order.
-        resources.sort_by_key(|resource| (resource.binding, resource.group));
-
-        builds.push(KernelBuild {
-            function: function.id,
-            entry: kernel_entry_name(function, interner),
-            plan,
-            launch: KernelLaunchPlan::from_signature_and_function(&signature, function),
-            resources,
-        });
+        build_kernel(companion)?;
     }
 
     // Pass 2: materialize the program with the merged identity facts. Every

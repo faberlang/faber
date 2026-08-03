@@ -623,8 +623,11 @@ fn package_device_section(
     if !prepared.device_declared {
         return Ok(None);
     }
-    let Some(program) =
-        super::device::device_program_for_lowered(&lowered.validated, &lowered.interner)?
+    let Some(program) = super::device::device_program_for_lowered(
+        &lowered.validated,
+        &lowered.interner,
+        &lowered.companions,
+    )?
     else {
         // The selected entry lowers to no compute kernel: no device payload.
         // An explicit GPU request for this package fails closed at run time
