@@ -410,7 +410,8 @@ pub struct LaunchUnit {
 /// Multi-output results are declared explicitly: each result names the buffer
 /// identity and version to observe, the launch that produced it, and its role
 /// (output or in-out — an in-place-updated buffer read back at an observation
-/// point is a result too).
+/// point is a result too). The observation role must agree with the buffer's
+/// identity role ([`DeviceProgram::validate`] enforces the cross-check).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResultBuffer {
     /// Identity of the observed buffer.
@@ -528,7 +529,8 @@ impl DeviceProgram {
     ///    outputs are written; in-out buffers may be read or written);
     /// 3. the launch sequence: every kernel reference is in range and launch
     ///    ids are unique;
-    /// 4. results: version ≥ 1, role output or in-out, and the producing
+    /// 4. results: version ≥ 1, role output or in-out, the observation role
+    ///    agrees with the buffer's identity role, and the producing
     ///    launch exists;
     /// 5. cross-reference consistency: every reference to the same
     ///    [`BufferId`] carries the same identity facts (name, role, storage,
@@ -609,6 +611,17 @@ impl DeviceProgram {
                 return Err(DeviceProgramError::ResultRole {
                     result: result_index,
                     role: result.role,
+                });
+            }
+            // The observation role must agree with the buffer's identity role:
+            // a result declaring `InOut` on an `Output` buffer (or vice versa)
+            // is a contradictory schema fact — both roles are individually
+            // valid, so only the cross-check catches it.
+            if result.role != result.buffer.role {
+                return Err(DeviceProgramError::ResultBufferRoleMismatch {
+                    result: result_index,
+                    role: result.role,
+                    buffer_role: result.buffer.role,
                 });
             }
             if !self
@@ -771,6 +784,12 @@ pub enum DeviceProgramError {
     },
     /// A result's role is neither output nor in-out.
     ResultRole { result: usize, role: BufferRole },
+    /// A result's observation role disagrees with its buffer's identity role.
+    ResultBufferRoleMismatch {
+        result: usize,
+        role: BufferRole,
+        buffer_role: BufferRole,
+    },
     /// A result's named producing launch does not actually write the version.
     ResultNotProduced {
         result: usize,
@@ -844,6 +863,16 @@ impl fmt::Display for DeviceProgramError {
                 f,
                 "result {result} has role {}; results must be output or in-out",
                 role.spelling()
+            ),
+            Self::ResultBufferRoleMismatch {
+                result,
+                role,
+                buffer_role,
+            } => write!(
+                f,
+                "result {result} has observation role {} but its buffer's identity role is {}",
+                role.spelling(),
+                buffer_role.spelling()
             ),
             Self::ResultNotProduced {
                 result,

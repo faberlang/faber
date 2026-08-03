@@ -1077,6 +1077,43 @@ fn test_result_role_rejected() {
 }
 
 #[test]
+fn test_result_role_buffer_role_mismatch_rejected() {
+    // A result's observation role must agree with the buffer's identity role.
+    // `InOut` on an `Output` buffer (or vice versa) is a contradictory schema
+    // fact: each role is individually valid, so only the cross-check catches
+    // it.
+    for (role, buffer_role) in [
+        (BufferRole::InOut, BufferRole::Output),
+        (BufferRole::Output, BufferRole::InOut),
+    ] {
+        let mut program = reduction_program();
+        program.results.push(ResultBuffer {
+            buffer: identity(
+                1,
+                "reduction.output",
+                buffer_role,
+                BufferLifetime::ObservationPoint,
+            ),
+            version: version(1, program.kernels[0].resources[1].version.element_ty, 2),
+            role,
+            produced_by: LaunchId(0),
+        });
+        match program.validate() {
+            Err(DeviceProgramError::ResultBufferRoleMismatch {
+                result,
+                role: got_role,
+                buffer_role: got_buffer_role,
+            }) => {
+                assert_eq!(result, 0);
+                assert_eq!(got_role, role);
+                assert_eq!(got_buffer_role, buffer_role);
+            }
+            other => panic!("expected a result role/buffer-role mismatch, got {other:?}"),
+        }
+    }
+}
+
+#[test]
 fn test_unknown_producing_launch_rejected() {
     let mut program = reduction_program();
     program.results.push(ResultBuffer {
