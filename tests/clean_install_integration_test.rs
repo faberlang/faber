@@ -91,7 +91,7 @@ fn write_package(root: &Path, native: bool) -> PathBuf {
     fs::write(
         package.join("faber.toml"),
         format!(
-            "[package]\nname = \"clean-install\"\n\n[paths]\nsource = \"src\"\nentry = \"main.fab\"\n{host}"
+            "[package]\nname = \"clean-install\"\n\n[paths]\nsource = \"src\"\nentry = \"main.fab\"\n\n[build]\ntarget = \"rust\"\n{host}"
         ),
     )
     .expect("write manifest");
