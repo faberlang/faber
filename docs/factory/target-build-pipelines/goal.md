@@ -102,6 +102,9 @@ entrypoint, and observable run behavior must all be proven.
 - Consume the canonical target names and artifact kinds from the completed
   Radix goal.
 - Remove Faber-facing `-text`, `-bin`, and `-host` target identities.
+- Delete the legacy `scena` target and its source-backed package-artifact
+  routing. Migrate source execution to `faber script` and source-independent
+  package execution to `fmir`/`fmir-bin` modes.
 - Define explicit format/runner options for FMIR and any other target with
   multiple downstream artifact forms.
 - Rewrite `faber targets` so `emit`, `build`, `package`, and `run` are separate
@@ -111,6 +114,8 @@ entrypoint, and observable run behavior must all be proven.
 
 - Keep Rust → generated crate → Cargo → native executable behavior green.
 - Keep FHIR package envelope/load/run behavior green.
+- Remove `scena` build/run routing, stale help text, tests, artifact constants,
+  and manifest handling; do not preserve a hidden compatibility path.
 - Remap FMIR text/binary image and native-runner paths under one FMIR target
   without changing the semantics of the stepper or falsely calling the runner
   native user-code compilation.
@@ -171,6 +176,8 @@ The exact order may change after toolchain probes, but no target receives a
 ## Acceptance criteria
 
 - [ ] Faber uses the canonical Radix target names with no lifecycle suffixes.
+- [ ] `scena` is removed from parsing, target discovery, build/run routing,
+  artifacts, tests, and current documentation.
 - [ ] `faber targets` reports separate `emit`, `build`, `package`, and `run`
   behavior with artifact and toolchain notes.
 - [ ] Rust, FHIR, and FMIR existing product paths remain green after remapping.
