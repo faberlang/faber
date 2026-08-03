@@ -228,6 +228,37 @@ pub(crate) fn run_package_mir<H: Host + ?Sized>(
     })
 }
 
+/// Run a FHIR-loaded package in-process: reconstruct the package from the
+/// envelope, lower to FMIR, and execute with the provided host — no Rust, no
+/// source checkout. Local imports resolve from the envelope's link table.
+pub(crate) fn run_package_mir_from_loaded<H: Host + ?Sized>(
+    config: &Config,
+    package: AnalyzedPackage,
+    loaded_links: &BTreeMap<PathBuf, BTreeMap<String, PathBuf>>,
+    host: &mut H,
+) -> Result<(), Vec<Diagnostic>> {
+    let diagnostic_path = package.spec.entry.clone();
+    let argumenta = host
+        .argumenta()
+        .map_err(|e| vec![mir_diag(&diagnostic_path, e.message)])?
+        .to_vec();
+    with_prepared_package_mir_from_loaded(
+        config,
+        package,
+        loaded_links,
+        &argumenta,
+        |prepared, lowered| {
+            let image = fmir_package_image_from_lowered(
+                prepared,
+                lowered,
+                prepared.entry_path.clone(),
+                FmirPackageImageFormat::Source,
+            );
+            run_fmir_package_image(image, host)
+        },
+    )
+}
+
 pub(crate) fn build_package_mir_artifact(
     config: &Config,
     input: &Path,
@@ -530,8 +561,13 @@ fn with_prepared_package_mir_with_cli_mode_and_consumer<R>(
 
     let library_resolver = library_resolver_from_config(config);
     let mut library_cache = LibraryInterfaceCache::with_config(config);
-    let links =
-        local_namespace_call_targets(&package, consumer, &library_resolver, &mut library_cache)?;
+    let links = local_namespace_call_targets(
+        &package,
+        consumer,
+        &library_resolver,
+        &mut library_cache,
+        None,
+    )?;
     let entry_index = select_entry_unit(&package)?;
     let entry_path = package.units[entry_index].path.clone();
     let source_paths = package.units.iter().map(|unit| unit.path.clone()).collect();
@@ -557,6 +593,70 @@ fn with_prepared_package_mir_with_cli_mode_and_consumer<R>(
     if consumer == PackageMirConsumer::Interpreted {
         bridge_norma_providers_to_kernel(&mut lowered, &entry_path)?;
     }
+    let runtime_requirements = collect_package_runtime_requirements(&lowered, &cli_plan);
+    let prepared = PreparedPackageMir {
+        entry_path: entry_path.clone(),
+        source_paths,
+        runtime_requirements,
+        cli_exit_code: cli_plan.exit_code,
+        fmir_text_cli: cli_plan.fmir_text_cli.clone(),
+        _marker: std::marker::PhantomData,
+    };
+    run(&prepared, &lowered)
+}
+
+/// Loaded-package MIR driver: prepare a package reconstructed from a FHIR
+/// envelope for lowering/run. Mirrors
+/// [`with_prepared_package_mir_with_cli_mode_and_consumer`] but skips
+/// `analyze_package` (the package arrives already reconstructed) and resolves
+/// local imports from the envelope's explicit link table instead of the
+/// filesystem.
+pub(crate) fn with_prepared_package_mir_from_loaded<R>(
+    config: &Config,
+    mut package: AnalyzedPackage,
+    loaded_links: &BTreeMap<PathBuf, BTreeMap<String, PathBuf>>,
+    argumenta: &[String],
+    run: impl for<'a> FnOnce(&PreparedPackageMir<'a>, &LoweredMirUnit<'a>) -> Result<R, Vec<Diagnostic>>,
+) -> Result<R, Vec<Diagnostic>> {
+    if package
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.is_error())
+    {
+        return Err(package.diagnostics);
+    }
+    let cli_plan = plan_cli_package(&mut package, argumenta, CliPlanningMode::Parsed)?;
+    let library_resolver = library_resolver_from_config(config);
+    let mut library_cache = LibraryInterfaceCache::with_config(config);
+    let links = local_namespace_call_targets(
+        &package,
+        PackageMirConsumer::Interpreted,
+        &library_resolver,
+        &mut library_cache,
+        Some(loaded_links),
+    )?;
+    let entry_index = select_entry_unit(&package)?;
+    let entry_path = package.units[entry_index].path.clone();
+    let source_paths = package.units.iter().map(|unit| unit.path.clone()).collect();
+    for unit in &mut package.units {
+        rewrite_unit_namespace_calls(unit, &links.calls, &links.namespaces)?;
+    }
+    let mut lowered = lower_package_units(
+        &mut package,
+        entry_index,
+        &links,
+        &library_resolver,
+        &mut library_cache,
+        &cli_plan,
+        config.no_fuse,
+    )?;
+    validate_program(&lowered.program, lowered.validated.validation()).map_err(|errors| {
+        errors
+            .into_iter()
+            .map(|error| mir_lowering_diag(&entry_path, error.message))
+            .collect::<Vec<_>>()
+    })?;
+    bridge_norma_providers_to_kernel(&mut lowered, &entry_path)?;
     let runtime_requirements = collect_package_runtime_requirements(&lowered, &cli_plan);
     let prepared = PreparedPackageMir {
         entry_path: entry_path.clone(),
@@ -2974,6 +3074,7 @@ fn local_namespace_call_targets(
     consumer: PackageMirConsumer,
     library_resolver: &LibraryResolver,
     library_cache: &mut LibraryInterfaceCache,
+    loaded_links: Option<&BTreeMap<PathBuf, BTreeMap<String, PathBuf>>>,
 ) -> Result<PackageMirLinks, Vec<Diagnostic>> {
     let units_by_path = package
         .units
@@ -2994,6 +3095,49 @@ fn local_namespace_call_targets(
             let HirItemKind::Import(import) = &item.kind else {
                 continue;
             };
+            if let Some(loaded_links) = loaded_links {
+                // Loaded-package path: local imports resolve from the explicit
+                // link table (import binding → target module path) instead of
+                // the filesystem. Library imports are not linked here — the
+                // store owns library closure (Stage 5 of the package delivery).
+                let Some(unit_links) = loaded_links.get(&unit.path) else {
+                    continue;
+                };
+                for import_item in &import.items {
+                    let binding = unit
+                        .analysis
+                        .interner
+                        .resolve(import_item.alias.unwrap_or(import_item.name));
+                    let Some(target_path) = unit_links.get(binding) else {
+                        continue;
+                    };
+                    let Some(sibling) = units_by_path.get(target_path).copied() else {
+                        continue;
+                    };
+                    let exports = unit
+                        .namespace_exports
+                        .get(binding)
+                        .cloned()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .collect::<BTreeSet<_>>();
+                    namespaces.insert((unit.path.clone(), import_item.def_id), exports.clone());
+                    for function in exported_top_level_functions(sibling, &exports) {
+                        let synthetic = *source_rewrites
+                            .entry((sibling.path.clone(), function.def_id))
+                            .or_insert_with(|| {
+                                let def_id = DefId(next_synthetic);
+                                next_synthetic += 1;
+                                def_id
+                            });
+                        targets.insert(
+                            (unit.path.clone(), import_item.def_id, function.name),
+                            synthetic,
+                        );
+                    }
+                }
+                continue;
+            }
             let import_path = unit.analysis.interner.resolve(import.path);
             let resolution =
                 resolve_import(&package.spec, library_resolver, &unit.path, import_path);
