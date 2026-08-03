@@ -8,9 +8,10 @@
 //! branch. `--interpret` / `--compile` are retained until the Stage 6 clean
 //! break (see `docs/factory/faber-script-runtime/stage0-baseline.md`).
 
-use crate::cli::{FmirRunArgs, RunArgs};
+use crate::cli::{BackendSelection, FmirRunArgs, RunArgs};
 use crate::input_shape::reader_locale_without_package_error;
 use crate::package;
+use faber::device::{DeviceBackend, DeviceSelection};
 use fs2::FileExt;
 use radix::codegen::Target;
 use radix::diagnostics::Diagnostic;
@@ -51,6 +52,24 @@ pub(super) fn cmd_run(args: RunArgs) {
         eprintln!("error: --reader-locale is not supported with `faber run --interpret`");
         std::process::exit(1);
     }
+
+    // S1-5 — the one host-construction policy (N1.1/N1.5). Resolve the
+    // effective backend selection (CLI `--backend` > manifest `[device]
+    // backend` > default `auto`) and apply it before launch on every route.
+    // Source routes never carry a device program (their images are built with
+    // `device: None`), so an explicit GPU request fails closed
+    // (`E_NO_DEVICE_PROGRAM`) and `auto` keeps the CPU route unchanged. The
+    // image-runner route re-applies the same policy with the image's own
+    // device section.
+    let selection = match resolve_route_selection(&args, &input_path) {
+        Ok(selection) => selection,
+        Err(diagnostic) => {
+            super::eprint_compile_diagnostics(&[*diagnostic]);
+            std::process::exit(1);
+        }
+    };
+    resolve_route_backend_or_exit(selection, false);
+
     let target = resolve_run_target(&args, &input_path);
     match target {
         Target::Rust => {}
@@ -93,6 +112,49 @@ pub(super) fn cmd_run(args: RunArgs) {
     }
 
     cmd_run_compiled(&args);
+}
+
+/// Resolve the effective backend selection for `faber run` (N1.1): CLI
+/// `--backend` > manifest `[device] backend` > default `auto`. An invalid
+/// manifest value fails closed with a structured diagnostic (never silently
+/// ignored).
+fn resolve_route_selection(
+    args: &RunArgs,
+    input_path: &Path,
+) -> Result<DeviceSelection, Box<Diagnostic>> {
+    if let Some(backend) = args.backend {
+        return Ok(backend.selection());
+    }
+    let Ok(layout) = package::discover_build_layout(input_path) else {
+        return Ok(DeviceSelection::Auto);
+    };
+    if !layout.manifest_path.exists() {
+        return Ok(DeviceSelection::Auto);
+    }
+    let manifest = package::read_manifest(&layout.manifest_path)?;
+    let manifest_backend =
+        package::manifest_backend_selection(manifest.device.backend.as_deref(), &layout.manifest_path)?;
+    Ok(package::effective_backend_selection(None, manifest_backend))
+}
+
+/// Apply the one host-construction policy to a route before launch (N1.1/
+/// N1.5): resolve the route's backend selection against the machine's
+/// admitted backends and fail closed with a structured diagnostic before any
+/// launch when the resolution fails (N1.4). Returns `Some(backend)` when a
+/// device session must be constructed and `None` for the CPU-only route.
+fn resolve_route_backend_or_exit(
+    selection: DeviceSelection,
+    requires_device: bool,
+) -> Option<DeviceBackend> {
+    let admitted = package::admitted_backends();
+    match package::resolve_backend_selection(selection, requires_device, &admitted) {
+        Ok(backend) => backend,
+        Err(diagnostic) => {
+            super::eprint_compile_diagnostics(&[diagnostic]);
+            eprintln!("backend selection failed; aborting before launch");
+            std::process::exit(1);
+        }
+    }
 }
 
 fn run_target_name(target: Target) -> &'static str {
@@ -354,12 +416,47 @@ fn cmd_run_fmir_bin(args: &RunArgs) {
 }
 
 pub(super) fn cmd_fmir_run_image(args: FmirRunArgs) {
-    let mut host = StdioHost::with_argumenta(args.args);
-    if let Err(diagnostics) = package::run_fmir_image_path(&args.image, &mut host) {
-        super::eprint_compile_diagnostics(&diagnostics);
-        eprintln!("fmir image execution failed");
-        std::process::exit(1);
+    // The one host-construction policy on the image-runner route (N1.1/N1.5):
+    // the image's device section decides whether the route carries a device
+    // program, and the selection request is the CLI `--backend` override
+    // falling back to the image's recorded selection.
+    let decision = match package::fmir_image_route_decision(&args.image) {
+        Ok(decision) => decision,
+        Err(diagnostics) => {
+            super::eprint_compile_diagnostics(&diagnostics);
+            eprintln!("fmir image load failed");
+            std::process::exit(1);
+        }
+    };
+    let selection = args
+        .backend
+        .map(BackendSelection::selection)
+        .unwrap_or(decision.declared_selection);
+    let Some(backend) = resolve_route_backend_or_exit(selection, decision.requires_device) else {
+        let mut host = StdioHost::with_argumenta(args.args);
+        if let Err(diagnostics) = package::run_fmir_image_path(&args.image, &mut host) {
+            super::eprint_compile_diagnostics(&diagnostics);
+            eprintln!("fmir image execution failed");
+            std::process::exit(1);
+        }
+        return;
+    };
+    // Device route: the image carries a device program and the backend is
+    // admitted. Report the discovery receipt (selected device + artifact
+    // hash); descriptor construction + launch is the S1-6 consumption seam,
+    // and no executable descriptor is available yet — fail closed before any
+    // launch, never a silent CPU fallback.
+    match package::discovery_receipt(backend, &decision.declared_artifacts) {
+        Some(receipt) => receipt.print(),
+        None => {
+            super::eprint_compile_diagnostics(&[package::missing_backend_artifact(backend)]);
+            eprintln!("device program execution failed; aborting before launch");
+            std::process::exit(1);
+        }
     }
+    super::eprint_compile_diagnostics(&[package::missing_device_descriptor(backend)]);
+    eprintln!("device program execution failed; aborting before launch");
+    std::process::exit(1);
 }
 
 #[cfg(test)]

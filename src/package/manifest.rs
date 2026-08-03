@@ -25,6 +25,10 @@ pub struct FaberManifest {
     #[serde(default)]
     pub build: ManifestBuild,
 
+    /// Device settings used by the package runner (backend selection, N1.1).
+    #[serde(default)]
+    pub device: ManifestDevice,
+
     /// Product packaging recipe owned by faber, not by Radix codegen targets.
     #[serde(default)]
     pub product: Option<ManifestProduct>,
@@ -121,6 +125,20 @@ pub struct ManifestBuild {
     /// Generated Rust struct-field spelling policy.
     #[serde(default)]
     pub rust_field_names: ManifestRustFieldNames,
+}
+
+/// `[device]` metadata for package runner backend selection (N1.1).
+///
+/// Mirrors `[build] target` for `-t/--target`: the package-level default is
+/// overridden by the CLI `--backend` flag; both are overridden by the
+/// portable default `auto`.
+#[derive(Debug, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+pub struct ManifestDevice {
+    /// Backend selection default: `"auto"` | `"metal"` | `"cuda"`.
+    /// `None` selects the portable default `auto`.
+    #[serde(default)]
+    pub backend: Option<String>,
 }
 
 /// Configuration for shader artifact packaging.
@@ -324,6 +342,32 @@ pub(crate) fn manifest_build_target(
     }
 }
 
+/// Map a manifest `[device] backend` value to a backend selection request
+/// (N1.1). `None` when the key is absent — the caller applies the portable
+/// default `auto`. An unsupported spelling fails closed with a structured
+/// diagnostic (never silently ignored).
+pub(crate) fn manifest_backend_selection(
+    backend: Option<&str>,
+    path: &Path,
+) -> Result<Option<faber::device::DeviceSelection>, Box<Diagnostic>> {
+    match backend.map(str::trim) {
+        None => Ok(None),
+        Some(spelling) => {
+            match faber::device::DeviceSelection::from_spelling(spelling) {
+                Some(selection) => Ok(Some(selection)),
+                None => Err(Box::new(
+                    crate::package_diagnostic_error(format!(
+                        "faber.toml device.backend '{spelling}' is not supported; use 'auto', 'metal', or 'cuda'"
+                    ))
+                    .with_file(path.display().to_string())
+                    .with_arg("issue", "package_device_backend_unsupported")
+                    .with_arg("backend", spelling.to_owned()),
+                )),
+            }
+        }
+    }
+}
+
 /// Read and deserialize a `faber.toml` manifest.
 ///
 /// Unknown manifest fields are rejected by the manifest structs so spelling
@@ -465,6 +509,11 @@ pub(crate) fn validate_manifest(
             ));
         }
     }
+
+    // N1.1: the `[device] backend` selection default is validated at package
+    // load so an unsupported spelling fails closed early, never silently
+    // ignored.
+    manifest_backend_selection(manifest.device.backend.as_deref(), path)?;
 
     if let Some(product) = &manifest.product {
         validate_product(product, path)?;
@@ -680,3 +729,7 @@ fn validate_library_build(manifest: &FaberManifest, path: &Path) -> Result<(), B
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "manifest_test.rs"]
+mod tests;

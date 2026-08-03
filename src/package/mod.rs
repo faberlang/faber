@@ -42,6 +42,7 @@ mod fhir;
 mod file_interface;
 mod frontmatter;
 mod go_build;
+mod host_factory;
 mod import_graph;
 mod library;
 mod library_link;
@@ -113,7 +114,7 @@ pub(crate) use go_build::{emit_go_module, invoke_go_build, run_go_binary, GoBuil
 pub(crate) use library_link::emit_linked_library_crates;
 pub(crate) use manifest::validate_manifest;
 #[allow(unused_imports)] // binary commands/run resolves run targets through this crate-visible mapping.
-pub(crate) use manifest::manifest_build_target;
+pub(crate) use manifest::{manifest_backend_selection, manifest_build_target};
 #[allow(unused_imports)] // public package API; used by integration tests and external callers
 pub use manifest::{
     read_manifest, FaberManifest, ManifestBuild, ManifestDispatch, ManifestLibrary,
@@ -133,7 +134,16 @@ pub use mir::with_lowered_package_mir;
 #[allow(unused_imports)] // FMIR stages consume this crate-visible image API.
 pub(crate) use mir::{
     build_package_fmir_binary_bundle, build_package_fmir_image, build_package_fmir_text_image,
-    run_fmir_image_path, run_package_fmir_image, run_package_fmir_text_image,
+    fmir_image_route_decision, run_fmir_image_path, run_package_fmir_image,
+    run_package_fmir_text_image,
+};
+#[allow(unused_imports)] // the one host-construction policy for the run routes.
+pub(crate) use host_factory::{
+    admitted_backends, construct_composite_host, discovery_receipt, effective_backend_selection,
+    execute_device_descriptor, host_error_diagnostic, missing_backend_artifact,
+    missing_device_descriptor, resolve_backend_selection, BackendDiscoveryReceipt,
+    E_BACKEND_UNAVAILABLE, E_DEVICE_ABI_MISMATCH, E_DEVICE_DESCRIPTOR, E_DEVICE_DTYPE_MISMATCH,
+    E_DEVICE_ENTRY_MISMATCH, E_DEVICE_SHAPE_MISMATCH, E_NO_DEVICE_PROGRAM,
 };
 #[allow(unused_imports)]
 pub(crate) use mir::{build_package_mir_artifact, run_package_mir, run_package_mir_artifact};

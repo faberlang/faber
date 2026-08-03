@@ -20,6 +20,12 @@ radix-mir-fmir = { path = "../radix/crates/radix-mir-fmir" }
 # Package-store library: Faber product composition may depend on cista the same
 # way it depends on radix (docs/design/product-composition-radix-cista.md).
 cista = { path = "../cista" }
+# Differentiable-GPU campaign (S1-5): packaged device runtime types (the
+# `faber::device` surface) and the composite host. Hosts owns the native
+# Metal/CUDA sessions; faber owns the host factory that calls the composite
+# host's one host-construction decision.
+faber = { package = "faber-runtime", path = "../faber-runtime" }
+faber-host-macos-arm64 = { path = "../hosts/macos-arm64" }
 clap = { version = "4.5", features = ["derive"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1"

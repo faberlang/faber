@@ -149,6 +149,7 @@ fn run_args(
         path,
         reader_locale,
         target,
+        backend: None,
         release: false,
         interpret,
         compile,
@@ -315,4 +316,108 @@ incipit argumenta args {
     assert_eq!(host.stdout_lines, vec!["Ian".to_owned()]);
     assert!(dir.join("target/faber-mir/image.toml").exists());
     assert!(!dir.join("target/faber/Cargo.toml").exists());
+}
+
+// ── S1-5 backend selection: precedence (CLI > manifest > auto) ───────────
+
+fn run_args_with_backend(
+    path: PathBuf,
+    backend: Option<crate::cli::BackendSelection>,
+) -> RunArgs {
+    let mut args = run_args(
+        path.clone(),
+        false,
+        false,
+        None,
+        radix::tool::CliTarget::Fhir,
+    );
+    args.backend = backend;
+    args
+}
+
+fn write_manifest(dir: &Path, device_backend: Option<&str>) {
+    let backend_line = match device_backend {
+        Some(backend) => format!("backend = \"{backend}\"\n"),
+        None => String::new(),
+    };
+    std::fs::write(
+        dir.join("faber.toml"),
+        format!(
+            "[package]\nname = \"backend-precedence\"\nversion = \"0.1.0\"\nedition = \"1\"\n\n[paths]\nentry = \"main.fab\"\n\n[build]\nkind = \"bin\"\n\n[device]\n{backend_line}"
+        ),
+    )
+    .expect("write manifest");
+}
+
+#[test]
+fn route_selection_cli_flag_overrides_manifest() {
+    let dir = temp_dir("backend-cli-overrides-manifest");
+    std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
+    write_manifest(&dir, Some("metal"));
+    let args = run_args_with_backend(dir.clone(), Some(crate::cli::BackendSelection::Auto));
+    let selection = resolve_route_selection(&args, &dir).expect("resolves");
+    assert_eq!(selection, DeviceSelection::Auto);
+}
+
+#[test]
+fn route_selection_manifest_used_when_no_cli_flag() {
+    let dir = temp_dir("backend-manifest-used");
+    std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
+    write_manifest(&dir, Some("cuda"));
+    let args = run_args_with_backend(dir.clone(), None);
+    let selection = resolve_route_selection(&args, &dir).expect("resolves");
+    assert_eq!(selection, DeviceSelection::Cuda);
+}
+
+#[test]
+fn route_selection_defaults_to_auto_without_manifest_key() {
+    let dir = temp_dir("backend-default-auto");
+    std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
+    write_manifest(&dir, None);
+    let args = run_args_with_backend(dir.clone(), None);
+    let selection = resolve_route_selection(&args, &dir).expect("resolves");
+    assert_eq!(selection, DeviceSelection::Auto);
+}
+
+#[test]
+fn route_selection_defaults_to_auto_without_manifest() {
+    let dir = temp_dir("backend-no-manifest");
+    std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
+    let args = run_args_with_backend(dir.clone(), None);
+    let selection = resolve_route_selection(&args, &dir).expect("resolves");
+    assert_eq!(selection, DeviceSelection::Auto);
+}
+
+#[test]
+fn route_selection_rejects_invalid_manifest_backend() {
+    let dir = temp_dir("backend-invalid-manifest");
+    std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
+    write_manifest(&dir, Some("rocm"));
+    let args = run_args_with_backend(dir.clone(), None);
+    let err = resolve_route_selection(&args, &dir).expect_err("invalid value must fail closed");
+    assert!(err.message.contains("rocm"));
+    assert!(err.message.contains("device.backend"));
+}
+
+#[test]
+fn route_selection_invalid_manifest_with_cli_flag_is_ignored() {
+    // Precedence: the CLI flag wins, so an invalid manifest value never
+    // blocks a package run that names the backend explicitly.
+    let dir = temp_dir("backend-cli-overrides-invalid-manifest");
+    std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
+    write_manifest(&dir, Some("rocm"));
+    let args = run_args_with_backend(dir.clone(), Some(crate::cli::BackendSelection::Auto));
+    let selection = resolve_route_selection(&args, &dir).expect("CLI flag wins");
+    assert_eq!(selection, DeviceSelection::Auto);
+}
+
+// ── S1-5 route decision: CPU route stays unchanged ───────────────────────
+
+#[test]
+fn cpu_route_decision_returns_none_for_auto_without_device_program() {
+    // `auto` + no device program resolves to the CPU-only route on any
+    // machine (the admitted-list probe is irrelevant when no device program
+    // is required).
+    let backend = resolve_route_backend_or_exit(DeviceSelection::Auto, false);
+    assert_eq!(backend, None);
 }
