@@ -261,6 +261,30 @@ impl OobPaddingPolicy {
     }
 }
 
+/// Whether a kernel signature's **result-tuple contract** is coherent for
+/// plan resolution (S3-A1): every output resource (the first plus the extra
+/// tuple elements) is a write storage buffer bound to a DISTINCT slot — two
+/// gradient outputs must never alias a binding. The accumulation buffers are
+/// not outputs and are not part of this check.
+///
+/// The plan pass resolves one plan per kernel; the multi-output contract
+/// guarantees the kernel body's outputs bind to separate device slots, so a
+/// backward companion's N gradient outputs each land in their own buffer.
+#[must_use = "the result-tuple contract is either coherent or not; callers must act on it"]
+pub fn multi_output_contract_valid(signature: &MirKernelSignature) -> bool {
+    use crate::abi::{MirKernelResourceAccess, MirKernelResourceKind};
+    let mut bindings = std::collections::BTreeSet::new();
+    for output in signature.output_resources() {
+        if output.kind != MirKernelResourceKind::StorageBuffer
+            || output.access != MirKernelResourceAccess::Write
+            || !bindings.insert(output.binding)
+        {
+            return false;
+        }
+    }
+    true
+}
+
 impl CollectionKernelPlan {
     /// Build the plan from a resolved kernel signature and collection-op
     /// contract — the plan pass, a sibling of `abi::collection_op_contract`
@@ -951,6 +975,8 @@ mod tests {
                 source_local: None,
                 source_name: None,
             },
+            extra_outputs: Vec::new(),
+            accumulation_buffers: Vec::new(),
             builtin_inputs: Vec::new(),
             called_builtins: Vec::new(),
             workgroup: MirWorkgroupSize {
@@ -1012,6 +1038,8 @@ mod tests {
                 source_local: None,
                 source_name: None,
             },
+            extra_outputs: Vec::new(),
+            accumulation_buffers: Vec::new(),
             builtin_inputs: Vec::new(),
             called_builtins: Vec::new(),
             workgroup: MirWorkgroupSize {
@@ -1669,5 +1697,60 @@ mod tests {
         CollectionKernelPlan::TreeReduction(plan.clone())
             .validate()
             .expect_err("broken plan must fail validation")
+    }
+
+    #[test]
+    fn multi_output_contract_rejects_colliding_output_slots() {
+        // S3-A1: the result-tuple contract is incoherent when two outputs
+        // share a binding — two gradient outputs must never alias a slot.
+        let mut types = TypeTable::new();
+        let element_ty = f32_ty(&mut types);
+        let mut signature = MirKernelSignature {
+            function: MirFunctionId(0),
+            input: MirKernelResource {
+                group: 0,
+                binding: 0,
+                kind: MirKernelResourceKind::StorageBuffer,
+                role: MirKernelResourceRole::Input,
+                access: MirKernelResourceAccess::Read,
+                element_ty,
+                element_count: 4,
+                source_local: Some(MirLocalId(0)),
+                source_name: None,
+            },
+            extra_inputs: Vec::new(),
+            output: MirKernelResource {
+                group: 0,
+                binding: 1,
+                kind: MirKernelResourceKind::StorageBuffer,
+                role: MirKernelResourceRole::Output,
+                access: MirKernelResourceAccess::Write,
+                element_ty,
+                element_count: 4,
+                source_local: None,
+                source_name: None,
+            },
+            extra_outputs: vec![MirKernelResource {
+                group: 0,
+                binding: 1, // collides with the first output's slot
+                kind: MirKernelResourceKind::StorageBuffer,
+                role: MirKernelResourceRole::Output,
+                access: MirKernelResourceAccess::Write,
+                element_ty,
+                element_count: 4,
+                source_local: None,
+                source_name: None,
+            }],
+            accumulation_buffers: Vec::new(),
+            builtin_inputs: Vec::new(),
+            called_builtins: Vec::new(),
+            workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
+            dispatch_size: MirKernelDispatchSize { x: 4, y: 1, z: 1 },
+        };
+        assert!(!multi_output_contract_valid(&signature));
+
+        // A distinct second slot makes the contract coherent again.
+        signature.extra_outputs[0].binding = 2;
+        assert!(multi_output_contract_valid(&signature));
     }
 }

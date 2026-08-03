@@ -40,6 +40,13 @@ const ERR_KERNEL_VECTOR_PARAM: &str = "kernel vector param";
 const ERR_KERNEL_MATRIX_PARAM: &str = "kernel matrix param";
 const ERR_KERNEL_AGGREGATE_LAYOUT: &str = "kernel aggregate layout";
 const ERR_KERNEL_OPAQUE_LAYOUT: &str = "kernel opaque layout";
+/// S3-A1: the result-tuple ABI requires a non-empty tuple return of device
+/// views (the multi-output contract).
+const ERR_KERNEL_RESULT_TUPLE_REQUIRED: &str =
+    "result-tuple kernel requires a non-empty tuple return of device-view tensors";
+/// S3-A1: the result-tuple ABI requires at least one input param.
+const ERR_KERNEL_RESULT_TUPLE_REQUIRES_INPUT: &str =
+    "result-tuple kernel requires at least one input parameter";
 const ERR_KERNEL_TENSOR_STORAGE_LOCUS: &str = "kernel tensor storage/locus requires device handle";
 const ERR_KERNEL_VOID_SCALAR: &str = "void kernel scalar";
 const ERR_KERNEL_NEVER_SCALAR: &str = "never kernel scalar";
@@ -359,6 +366,17 @@ pub struct MirKernelSignature {
     pub input: MirKernelResource,
     pub extra_inputs: Vec<MirKernelResource>,
     pub output: MirKernelResource,
+    /// S3-A1: additional output resources of a **result-tuple** kernel
+    /// contract (the tuple elements after the first), in tuple order.
+    /// `output` is the first tuple element; every output binds to a DISTINCT
+    /// slot, so a backward companion's N gradient outputs each get their own
+    /// output binding. Empty for single-output kernels.
+    pub extra_outputs: Vec<MirKernelResource>,
+    /// S3-A1: accumulation-buffer resources — read-write device state a
+    /// kernel accumulates into across the grid, bound after the outputs.
+    /// Populated by the companion-aware materializer (S3-A2) when partial
+    /// gradients accumulate; empty for kernels without accumulation.
+    pub accumulation_buffers: Vec<MirKernelResource>,
     pub builtin_inputs: Vec<MirKernelBuiltinInput>,
     pub called_builtins: Vec<MirKernelBuiltin>,
     pub workgroup: MirWorkgroupSize,
@@ -1442,6 +1460,20 @@ impl MirKernelSignature {
         // fall through to the generic "one buffer parameter" message.
         reject_kernel_matrix_abi(function, validation)?;
 
+        // S3-A1: a result-tuple return (a non-empty tuple of device views) is
+        // the multi-output contract — every param is an input and the tuple
+        // elements are DISTINCT output resources. Checked before the
+        // single-output arms, which would reject the tuple as an aggregate.
+        if !function.params.is_empty() && result_tuple_count(function, validation).is_some() {
+            return Self::multi_output_return_kernel(
+                function,
+                &function.params,
+                validation,
+                interner,
+                allow_host_owned_tensor_entry,
+            );
+        }
+
         if let Some(interner) = interner {
             if let Some(signature) = Self::source_named_indexed_view_kernel(
                 function,
@@ -1551,6 +1583,98 @@ impl MirKernelSignature {
         }
     }
 
+    /// Synthesize the storage-buffer ABI for a **result-tuple** kernel
+    /// (S3-A1): a function whose return type is a non-empty tuple of device
+    /// views. Every param becomes a read input buffer; the tuple's elements
+    /// become DISTINCT output resources — one per tuple element, in tuple
+    /// order, each bound to its own slot (the first element is `output`, the
+    /// rest `extra_outputs`).
+    ///
+    /// This is the device ABI for a backward companion's `(grad_x, grad_w)`
+    /// tuple: N gradient outputs bind to N distinct output slots, and no
+    /// kernel value carries an aggregate type — the Metal aggregate
+    /// rejection is unreachable through this ABI because tuple outputs are
+    /// separate resources, never an aggregate.
+    fn multi_output_return_kernel(
+        function: &MirFunction,
+        inputs: &[MirParam],
+        validation: &MirValidationContext<'_>,
+        interner: Option<&Interner>,
+        allow_host_owned_tensor_entry: bool,
+    ) -> Result<Self, MirAbiError> {
+        let Type::Tuple(elements) = validation.types.get(function.return_ty.semantic_id()) else {
+            return Err(MirAbiError::new(ERR_KERNEL_RESULT_TUPLE_REQUIRED));
+        };
+        if elements.is_empty() {
+            return Err(MirAbiError::new(ERR_KERNEL_RESULT_TUPLE_REQUIRED));
+        }
+
+        // Every param is a read input; output bindings start after the
+        // inputs, so each output binds a distinct slot.
+        let mut input_resources = Vec::with_capacity(inputs.len());
+        for (binding, input) in inputs.iter().enumerate() {
+            let element_ty =
+                buffer_element_type(input.ty, validation, allow_host_owned_tensor_entry)?;
+            let element_count = buffer_element_count(input.ty, validation)?;
+            input_resources.push(MirKernelResource {
+                group: DEFAULT_KERNEL_RESOURCE_GROUP,
+                binding: u32::try_from(binding)
+                    .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?,
+                kind: MirKernelResourceKind::StorageBuffer,
+                role: MirKernelResourceRole::Input,
+                access: MirKernelResourceAccess::Read,
+                element_ty,
+                element_count,
+                source_local: Some(input.local),
+                source_name: param_source_name(input, interner),
+            });
+        }
+        let input = input_resources
+            .first()
+            .cloned()
+            .ok_or_else(|| MirAbiError::new(ERR_KERNEL_RESULT_TUPLE_REQUIRES_INPUT))?;
+        let extra_inputs = input_resources.into_iter().skip(1).collect();
+
+        // Tuple elements → distinct output resources (first → `output`).
+        let mut outputs = Vec::with_capacity(elements.len());
+        for (index, element) in elements.iter().enumerate() {
+            let element_ty = MirType::semantic(*element);
+            let view_ty =
+                device_view_element_type(element_ty, validation, allow_host_owned_tensor_entry)?;
+            let view_count = device_view_element_count(element_ty, validation)?;
+            outputs.push(MirKernelResource {
+                group: DEFAULT_KERNEL_RESOURCE_GROUP,
+                binding: u32::try_from(inputs.len() + index)
+                    .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?,
+                kind: MirKernelResourceKind::StorageBuffer,
+                role: MirKernelResourceRole::Output,
+                access: MirKernelResourceAccess::Write,
+                element_ty: view_ty,
+                element_count: view_count,
+                source_local: None,
+                source_name: None,
+            });
+        }
+        let output = outputs.remove(0);
+        let extra_outputs = outputs;
+        let first_output_count = output.element_count;
+
+        let mut signature = Self {
+            function: function.id,
+            input,
+            extra_inputs,
+            output,
+            extra_outputs,
+            accumulation_buffers: Vec::new(),
+            builtin_inputs: Vec::new(),
+            called_builtins: called_builtins_for_function(function),
+            workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
+            dispatch_size: dispatch_size_for_1d_elements(first_output_count),
+        };
+        maybe_append_runtime_extent(function, &mut signature, validation);
+        Ok(signature)
+    }
+
     fn return_buffer_kernel(
         function: &MirFunction,
         validation: &MirValidationContext<'_>,
@@ -1601,6 +1725,8 @@ impl MirKernelSignature {
                 source_local: None,
                 source_name: None,
             },
+            extra_outputs: Vec::new(),
+            accumulation_buffers: Vec::new(),
             builtin_inputs: Vec::new(),
             called_builtins: called_builtins_for_function(function),
             workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
@@ -1678,6 +1804,8 @@ impl MirKernelSignature {
                 source_local: None,
                 source_name: None,
             },
+            extra_outputs: Vec::new(),
+            accumulation_buffers: Vec::new(),
             builtin_inputs: Vec::new(),
             called_builtins: called_builtins_for_function(function),
             workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
@@ -1733,6 +1861,8 @@ impl MirKernelSignature {
                 source_local: Some(output.local),
                 source_name: param_source_name(output, context.interner),
             },
+            extra_outputs: Vec::new(),
+            accumulation_buffers: Vec::new(),
             builtin_inputs: context.builtin_inputs,
             called_builtins: called_builtins_for_function(function),
             workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
@@ -1807,6 +1937,8 @@ impl MirKernelSignature {
                 source_local: Some(output.local),
                 source_name: param_source_name(output, context.interner),
             },
+            extra_outputs: Vec::new(),
+            accumulation_buffers: Vec::new(),
             builtin_inputs: context.builtin_inputs,
             called_builtins: called_builtins_for_function(function),
             workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
@@ -1824,8 +1956,29 @@ impl MirKernelSignature {
         std::iter::once(&self.input).chain(self.extra_inputs.iter())
     }
 
+    /// S3-A1: attach an accumulation-buffer resource — read-write device
+    /// state the kernel accumulates into across the grid. Bound after the
+    /// outputs. The companion-aware materializer (S3-A2) attaches these when
+    /// partial gradients accumulate; the ABI carries them so the plan surface
+    /// and emitters bind them after the result-tuple outputs.
+    pub fn push_accumulation_buffer(&mut self, resource: MirKernelResource) {
+        self.accumulation_buffers.push(resource);
+    }
+
+    /// Every output resource (the first plus the extra tuple elements), in
+    /// tuple order — each binds to a distinct slot (S3-A1 result-tuple
+    /// contract).
+    pub fn output_resources(&self) -> impl Iterator<Item = &MirKernelResource> {
+        std::iter::once(&self.output).chain(self.extra_outputs.iter())
+    }
+
+    /// All storage-buffer resources in binding order: inputs, then the first
+    /// output, then the extra tuple outputs, then the accumulation buffers.
     pub fn resources(&self) -> impl Iterator<Item = &MirKernelResource> {
-        self.input_resources().chain(std::iter::once(&self.output))
+        self.input_resources()
+            .chain(std::iter::once(&self.output))
+            .chain(self.extra_outputs.iter())
+            .chain(self.accumulation_buffers.iter())
     }
 
     /// The kernel's runtime-extent count resource, when present (U2).
@@ -3269,6 +3422,19 @@ fn is_vacuum(ty: MirType, validation: &MirValidationContext<'_>) -> bool {
     )
 }
 
+/// The tuple-element count of a kernel **result-tuple** return (S3-A1), or
+/// `None` when the return type is not a non-empty tuple. The tuple elements
+/// are the multi-output contract's output resources.
+fn result_tuple_count(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+) -> Option<usize> {
+    match validation.types.get(function.return_ty.semantic_id()) {
+        Type::Tuple(elements) if !elements.is_empty() => Some(elements.len()),
+        _ => None,
+    }
+}
+
 fn require_u32_index(
     ty: MirType,
     validation: &MirValidationContext<'_>,
@@ -3636,6 +3802,8 @@ mod tests {
                 source_local: None,
                 source_name: None,
             },
+            extra_outputs: Vec::new(),
+            accumulation_buffers: Vec::new(),
             builtin_inputs: Vec::new(),
             called_builtins: Vec::new(),
             workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
@@ -3787,5 +3955,184 @@ mod tests {
             .expect_err("mismatched element counts should reject");
 
         assert_eq!(error.message, ERR_KERNEL_IO_ELEMENT_MISMATCH);
+    }
+
+    /// Result-tuple kernel function:
+    /// `functio backward(tf32[4] x, tf32[4] w) → (tf32[4] gx, tf32[4] gw)`.
+    fn result_tuple_kernel_function(input_ty: MirType, tuple_return_ty: MirType) -> MirFunction {
+        MirFunction {
+            id: MirFunctionId(11),
+            source: Some(DefId(13)),
+            name: None,
+            params: vec![
+                MirParam {
+                    local: MirLocalId(0),
+                    name: None,
+                    ty: input_ty,
+                    mode: MirParamMode::Owned,
+                    span: Span::default(),
+                },
+                MirParam {
+                    local: MirLocalId(1),
+                    name: None,
+                    ty: input_ty,
+                    mode: MirParamMode::Owned,
+                    span: Span::default(),
+                },
+            ],
+            locals: Vec::new(),
+            temps: Vec::new(),
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: Vec::new(),
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: tuple_return_ty,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }
+    }
+
+    #[test]
+    fn result_tuple_kernel_synthesizes_multi_output_signature() {
+        // S3-A1 done_when 1: a multi-output kernel signature (2+ outputs and
+        // an accumulation-buffer resource) validates through the ABI contract
+        // resolver and the plan pass.
+        let mut types = TypeTable::new();
+        let f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+        let element_ty = MirType::semantic(f32);
+        let shape = types.intern_index(IndexExpr::Literal(4));
+        let tensor_id = types.tensor_with_shape(f32, shape);
+        let tensor_ty = MirType::semantic(tensor_id);
+        let tuple_return_ty =
+            MirType::semantic(types.intern(Type::Tuple(vec![tensor_id, tensor_id])));
+        let validation = validation_with_device_tensor_layouts(&types);
+        let function = result_tuple_kernel_function(tensor_ty, tuple_return_ty);
+        let mut signature =
+            MirKernelSignature::storage_buffer_kernel(&function, &validation).expect("signature");
+
+        // Two inputs (bindings 0, 1); two DISTINCT outputs (bindings 2, 3).
+        assert_eq!(signature.input.binding, 0);
+        assert_eq!(signature.extra_inputs.len(), 1);
+        assert_eq!(signature.output.binding, 2);
+        assert_eq!(signature.output.role, MirKernelResourceRole::Output);
+        assert_eq!(signature.output.access, MirKernelResourceAccess::Write);
+        assert_eq!(signature.output.element_ty, element_ty);
+        assert_eq!(signature.output.element_count, 4);
+        assert_eq!(signature.extra_outputs.len(), 1);
+        assert_eq!(signature.extra_outputs[0].binding, 3);
+        assert_eq!(
+            signature.extra_outputs[0].role,
+            MirKernelResourceRole::Output
+        );
+        assert_eq!(
+            signature.extra_outputs[0].access,
+            MirKernelResourceAccess::Write
+        );
+        assert_eq!(signature.extra_outputs[0].element_ty, element_ty);
+        assert_eq!(signature.extra_outputs[0].element_count, 4);
+        assert_eq!(signature.output_resources().count(), 2);
+
+        // Attach an accumulation-buffer resource (S3-A1): read-write device
+        // state bound after the outputs.
+        signature.push_accumulation_buffer(MirKernelResource {
+            group: 0,
+            binding: 4,
+            kind: MirKernelResourceKind::StorageBuffer,
+            role: MirKernelResourceRole::Input,
+            access: MirKernelResourceAccess::ReadWrite,
+            element_ty,
+            element_count: 4,
+            source_local: None,
+            source_name: None,
+        });
+        assert_eq!(signature.accumulation_buffers.len(), 1);
+        assert_eq!(signature.accumulation_buffers[0].binding, 4);
+
+        // resources() sees both inputs + both outputs + the accumulation
+        // buffer (five storage buffers in binding order).
+        assert_eq!(signature.resources().count(), 5);
+
+        // The plan pass accepts the multi-output signature (elementwise body
+        // → no recipe, never an error).
+        let plan = crate::device_program_plans::kernel_plan_for_function(
+            &function,
+            &signature,
+            &validation,
+        )
+        .expect("multi-output signature validates through the plan pass");
+        assert!(plan.is_none(), "an elementwise body carries no recipe");
+
+        // The result-tuple contract is coherent (distinct output slots).
+        assert!(crate::kernel_plan::multi_output_contract_valid(&signature));
+    }
+
+    #[test]
+    fn result_tuple_gradient_outputs_bind_distinct_slots() {
+        // S3-A1 done_when 2: the two gradient outputs of a companion's
+        // (grad_x, grad_w) tuple bind to DISTINCT output slots — never a
+        // shared slot, so each gradient lands in its own device buffer.
+        let mut types = TypeTable::new();
+        let f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+        let shape = types.intern_index(IndexExpr::Literal(4));
+        let tensor_id = types.tensor_with_shape(f32, shape);
+        let tensor_ty = MirType::semantic(tensor_id);
+        let tuple_return_ty =
+            MirType::semantic(types.intern(Type::Tuple(vec![tensor_id, tensor_id])));
+        let validation = validation_with_device_tensor_layouts(&types);
+        let function = result_tuple_kernel_function(tensor_ty, tuple_return_ty);
+        let signature =
+            MirKernelSignature::storage_buffer_kernel(&function, &validation).expect("signature");
+
+        let outputs: Vec<_> = signature.output_resources().collect();
+        assert_eq!(outputs.len(), 2);
+        assert_ne!(
+            outputs[0].binding, outputs[1].binding,
+            "two gradient outputs must bind to distinct output slots"
+        );
+        assert_eq!(outputs[0].binding, 2);
+        assert_eq!(outputs[1].binding, 3);
+    }
+
+    #[test]
+    fn result_tuple_outputs_are_separate_resources_not_an_aggregate() {
+        // S3-A1 done_when 3: tuple outputs become SEPARATE output resources,
+        // so no kernel value carries an aggregate type — the Metal aggregate
+        // rejection (radix-mir-metal lib.rs:3066/:3110) is unreachable
+        // through the multi-output ABI.
+        let mut types = TypeTable::new();
+        let f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+        let element_ty = MirType::semantic(f32);
+        let shape = types.intern_index(IndexExpr::Literal(4));
+        let tensor_id = types.tensor_with_shape(f32, shape);
+        let tensor_ty = MirType::semantic(tensor_id);
+        let tuple_return_ty =
+            MirType::semantic(types.intern(Type::Tuple(vec![tensor_id, tensor_id])));
+        let validation = validation_with_device_tensor_layouts(&types);
+        let function = result_tuple_kernel_function(tensor_ty, tuple_return_ty);
+        let signature =
+            MirKernelSignature::storage_buffer_kernel(&function, &validation).expect("signature");
+
+        for output in signature.output_resources() {
+            // Each output's element type resolves to a SCALAR layout (f32),
+            // never an aggregate — the tuple return was split into separate
+            // per-slot resources at the ABI boundary.
+            assert_eq!(output.element_ty, element_ty);
+            let layout = validation
+                .layouts
+                .layout_for_type(output.element_ty)
+                .expect("output element type resolves");
+            assert!(
+                matches!(layout.kind, MirLayoutKind::Scalar(_)),
+                "an output's element type must be a scalar, not an aggregate: {layout:?}"
+            );
+        }
     }
 }

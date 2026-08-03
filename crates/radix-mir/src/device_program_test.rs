@@ -70,6 +70,8 @@ fn reduction_signature(length: u64, workgroup_x: u32, partials: u64) -> MirKerne
             source_local: None,
             source_name: None,
         },
+        extra_outputs: Vec::new(),
+        accumulation_buffers: Vec::new(),
         builtin_inputs: Vec::new(),
         called_builtins: Vec::new(),
         workgroup: MirWorkgroupSize {
@@ -115,6 +117,8 @@ fn elementwise_signature(length: u64, workgroup_x: u32) -> MirKernelSignature {
             source_local: None,
             source_name: None,
         },
+        extra_outputs: Vec::new(),
+        accumulation_buffers: Vec::new(),
         builtin_inputs: Vec::new(),
         called_builtins: Vec::new(),
         workgroup: MirWorkgroupSize {
@@ -171,6 +175,8 @@ fn matmul_signature(m: u64, k: u64, n: u64) -> MirKernelSignature {
             source_local: None,
             source_name: None,
         },
+        extra_outputs: Vec::new(),
+        accumulation_buffers: Vec::new(),
         builtin_inputs: Vec::new(),
         called_builtins: Vec::new(),
         workgroup: MirWorkgroupSize { x: 8, y: 8, z: 1 },
