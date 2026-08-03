@@ -699,11 +699,37 @@ impl TypeTable {
     }
 
     /// Compare two type values structurally, using [`equals`](Self::equals) for
-    /// child `TypeId`s so alias peeling and numeric coercion are honored. This
-    /// is the shared comparison core; [`equals`](Self::equals) delegates here
-    /// after resolving `TypeId`s to `&Type` references.
-    #[allow(clippy::too_many_lines, clippy::match_same_arms)]
+    /// child `TypeId`s so alias peeling and numeric coercion are honored. The
+    /// comparison core is [`Self::type_equal_with_seen`]; this entry point
+    /// starts a fresh alias-path guard per comparison.
+    ///
+    /// Cyclic alias chains (`typus A = B` / `typus B = A`) fail closed through
+    /// [`Self::type_equal_with_seen`] instead of overflowing the stack.
     fn type_equal(&self, a: &Type, b: &Type) -> bool {
+        let mut seen = FxHashSet::default();
+        self.type_equal_with_seen(a, b, &mut seen)
+    }
+
+    /// Structural comparison core with an alias-path cycle guard.
+    ///
+    /// `seen` tracks the interned reference pair currently on the comparison
+    /// path. Types are interned, so `&Type` identity is stable per id; a
+    /// repeated pair on one path means a cyclic alias chain and returns
+    /// `false` (fail-closed), mirroring [`Self::nullable_inner_with_seen`].
+    #[allow(clippy::too_many_lines, clippy::match_same_arms)]
+    fn type_equal_with_seen(
+        &self,
+        a: &Type,
+        b: &Type,
+        seen: &mut FxHashSet<(usize, usize)>,
+    ) -> bool {
+        let key = (
+            std::ptr::from_ref(a) as usize,
+            std::ptr::from_ref(b) as usize,
+        );
+        if !seen.insert(key) {
+            return false;
+        }
         match (a, b) {
             (Type::Primitive(pa), Type::Primitive(pb)) => pa == pb,
             (Type::SizedNumeric(pa, aw), Type::SizedNumeric(pb, bw)) => pa == pb && aw == bw,
@@ -775,8 +801,8 @@ impl TypeTable {
             (Type::Struct(a_def), Type::Struct(b_def))
             | (Type::Enum(a_def), Type::Enum(b_def))
             | (Type::Interface(a_def), Type::Interface(b_def)) => a_def == b_def,
-            (Type::Alias(_, a_inner), _) => self.type_equal(self.get(*a_inner), b),
-            (_, Type::Alias(_, b_inner)) => self.type_equal(a, self.get(*b_inner)),
+            (Type::Alias(_, a_inner), _) => self.type_equal_with_seen(self.get(*a_inner), b, seen),
+            (_, Type::Alias(_, b_inner)) => self.type_equal_with_seen(a, self.get(*b_inner), seen),
             (Type::Func(a_sig), Type::Func(b_sig)) => {
                 a_sig.type_params.len() == b_sig.type_params.len()
                     && a_sig

@@ -27,7 +27,7 @@ use std::cell::Cell;
 use super::ast::{
     ArrayElement, BindingPattern, BlockStmt, ClassMemberKind, ClausuraBody, ConversioTarget, Expr,
     ExprKind, Ident, IfBody, ImportKind, NonNullKind, OptionalChainKind, Pattern, PatternBind,
-    PraefixumBody, Program, Stmt, StmtKind, TypeExpr, TypeExprKind,
+    PraefixumBody, Program, SecusClause, Stmt, StmtKind, TypeExpr, TypeExprKind,
 };
 
 /// Maximum AST nesting depth before the walker refuses to descend further.
@@ -197,6 +197,16 @@ pub fn walk_stmt<V: Visitor>(visitor: &mut V, stmt: &Stmt) {
                     }
                     ClassMemberKind::Method(method) => {
                         visitor.visit_ident(&method.name);
+                        for param in &method.params {
+                            visitor.visit_type_expr(&param.ty);
+                            visitor.visit_ident(&param.name);
+                        }
+                        if let Some(ret) = &method.ret {
+                            visitor.visit_type_expr(ret);
+                        }
+                        if let Some(err) = &method.err {
+                            visitor.visit_type_expr(err);
+                        }
                         if let Some(body) = &method.body {
                             visitor.visit_block(body);
                         }
@@ -216,15 +226,30 @@ pub fn walk_stmt<V: Visitor>(visitor: &mut V, stmt: &Stmt) {
         StmtKind::Si(if_stmt) => {
             visitor.visit_expr(&if_stmt.cond);
             walk_if_body(visitor, &if_stmt.then);
+            if let Some(catch) = &if_stmt.catch {
+                visitor.visit_ident(&catch.binding);
+                visitor.visit_block(&catch.body);
+            }
+            if let Some(else_) = &if_stmt.else_ {
+                walk_secus_clause(visitor, else_);
+            }
         }
         StmtKind::Dum(while_stmt) => {
             visitor.visit_expr(&while_stmt.cond);
             walk_if_body(visitor, &while_stmt.body);
+            if let Some(catch) = &while_stmt.catch {
+                visitor.visit_ident(&catch.binding);
+                visitor.visit_block(&catch.body);
+            }
         }
         StmtKind::Itera(iter_stmt) => {
             visitor.visit_expr(&iter_stmt.iterable);
             visitor.visit_ident(&iter_stmt.binding);
             walk_if_body(visitor, &iter_stmt.body);
+            if let Some(catch) = &iter_stmt.catch {
+                visitor.visit_ident(&catch.binding);
+                visitor.visit_block(&catch.body);
+            }
         }
         StmtKind::Ex(extract_stmt) => {
             visitor.visit_expr(&extract_stmt.source);
@@ -678,6 +703,38 @@ fn walk_if_body<V: Visitor>(visitor: &mut V, body: &IfBody) {
     match body {
         IfBody::Block(block) => visitor.visit_block(block),
         IfBody::Ergo(stmt) => visitor.visit_stmt(stmt),
+    }
+}
+
+/// Walk a `secus` chain (an `else` subtree) so walker consumers do not miss
+/// its statements, catches, and nested `si`/`sin` conditionals.
+fn walk_secus_clause<V: Visitor>(visitor: &mut V, clause: &SecusClause) {
+    match clause {
+        SecusClause::Sin(stmt) => {
+            visitor.visit_expr(&stmt.cond);
+            walk_if_body(visitor, &stmt.then);
+            if let Some(catch) = &stmt.catch {
+                visitor.visit_ident(&catch.binding);
+                visitor.visit_block(&catch.body);
+            }
+            if let Some(else_) = &stmt.else_ {
+                walk_secus_clause(visitor, else_);
+            }
+        }
+        SecusClause::Block { body, catch } => {
+            visitor.visit_block(body);
+            if let Some(catch) = catch {
+                visitor.visit_ident(&catch.binding);
+                visitor.visit_block(&catch.body);
+            }
+        }
+        SecusClause::Stmt { stmt, catch } => {
+            visitor.visit_stmt(stmt);
+            if let Some(catch) = catch {
+                visitor.visit_ident(&catch.binding);
+                visitor.visit_block(&catch.body);
+            }
+        }
     }
 }
 
