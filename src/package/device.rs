@@ -247,9 +247,16 @@ pub(crate) fn device_program_for_lowered(
                     function, validated.validation(), interner,
                 )
                 .map_err(|error| vec![device_diag("signature", error.message)])?;
-            let plan = kernel_plan_for_function(function, &signature, validated.validation())
+            let plan = match kernel_plan_for_function(function, &signature, validated.validation())
                 .map_err(|error| vec![device_diag("plan", error.message)])?
-                .unwrap_or(CollectionKernelPlan::Elementwise);
+            {
+                Some(plan) => plan,
+                // No recipe and no unplannable op (N3.2): the function-level
+                // scan verified the body elementwise (only elementwise
+                // transforms), so the no-recipe plan is the typed decision —
+                // never a silent fallback from an unplannable op.
+                None => CollectionKernelPlan::Elementwise,
+            };
 
             let mut resources: Vec<ResourceBuild> = Vec::new();
             for resource in signature

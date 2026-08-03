@@ -1,5 +1,6 @@
 use super::*;
 use faber::device::DeviceBackend;
+use radix::mir::LoweredMirUnit;
 use radix_mir::device_program::DataFlowPair;
 use std::path::PathBuf;
 
@@ -635,4 +636,129 @@ fn companion_carrier_round_trips_and_missing_companion_fails_closed() {
         );
     })
     .expect("lower");
+}
+
+// ── S3-A3 fail-closed plan surface (N3.2) ──────────────────────────────────
+
+/// Lower an inline package entry from raw source (the corpus-fixture pattern
+/// for fixtures that do not belong in the corpus).
+fn with_inline_package<R>(
+    name: &str,
+    source: &str,
+    run: impl for<'a> FnOnce(&LoweredMirUnit<'a>) -> R,
+) -> Result<R, Vec<Diagnostic>> {
+    let root = std::env::temp_dir().join(format!("faber-s3a3-{}-{}", name, std::process::id()));
+    std::fs::create_dir_all(root.join("src")).expect("temp fixture dir");
+    let entry = root.join("src").join("probe.fab");
+    std::fs::write(&entry, source).expect("write temp fixture");
+    let config = radix::driver::Config::default()
+        .with_stdlib(dev_norma_library_home())
+        .with_target(radix::codegen::Target::Fmir);
+    super::super::with_lowered_package_mir(&config, &entry, run)
+}
+
+#[test]
+fn device_program_constructor_rejects_unplannable_op_with_typed_diagnostic() {
+    // N3.2 / D1: a device-routed kernel whose body carries TensorTranspose
+    // (no recipe, not an elementwise transform) fails construction with the
+    // typed plan diagnostic — never a silent Elementwise floor.
+    let result = with_inline_package(
+        "transpositio",
+        r#"@ nucleum
+functio transpositio(tf32[2,2] x) → tf32[2,2] {
+    redde x.transpone()
+}"#,
+        |lowered| {
+            device_program_for_lowered(&lowered.validated, &lowered.interner, &lowered.companions)
+        },
+    )
+    .expect("fixture lowers");
+    let diagnostics = result.expect_err("an unplannable op must fail construction");
+    let messages = diagnostics
+        .iter()
+        .map(|d| d.message.clone())
+        .collect::<Vec<_>>();
+    let joined = messages.join(" | ");
+    assert!(
+        joined.contains("TensorTranspose"),
+        "the typed diagnostic names the op: {joined}"
+    );
+    assert!(
+        joined.contains("no kernel plan"),
+        "the typed diagnostic says no kernel plan: {joined}"
+    );
+}
+
+#[test]
+fn device_program_constructor_derives_explicit_plans_for_companion_program() {
+    // N3.2 done_when 3: the S3-A2 companion program (elementwise mul forward
+    // with its generated backward) builds with an explicit plan for EVERY op
+    // — the function-level scan decides each kernel, never a silent fallback.
+    // The forward's mul-only body and the companion's mul VJP body are both
+    // decided Elementwise.
+    let program = with_inline_package(
+        "companion-mul",
+        r#"@ nucleum
+@ radix lane "air"
+@ radix backward "loss_backward"
+functio loss(tf32[2] x, tf32[2] w) → tf32[2] {
+    redde x.multiplica(w)
+}"#,
+        |lowered| {
+            device_program_for_lowered(&lowered.validated, &lowered.interner, &lowered.companions)
+                .expect("constructor succeeds")
+                .expect("device package yields a device program")
+        },
+    )
+    .expect("fixture lowers");
+    assert_eq!(program.kernels.len(), 2);
+    let forward = &program.kernels[0];
+    assert_eq!(forward.entry, "loss");
+    assert_eq!(
+        forward.plan,
+        radix_mir::kernel_plan::CollectionKernelPlan::Elementwise,
+        "the mul-only forward kernel is decided elementwise"
+    );
+    let companion = &program.kernels[1];
+    assert_eq!(companion.entry, "loss_backward");
+    assert_eq!(
+        companion.plan,
+        radix_mir::kernel_plan::CollectionKernelPlan::Elementwise,
+        "the companion's mul VJP body is decided elementwise"
+    );
+}
+
+#[test]
+fn device_program_constructor_multi_op_mul_mean_derives_reduction_plan() {
+    // N3.2 done_when 2: the Mul + Mean workload — the campaign's actual
+    // forward shape — is scanned across ALL statements. The body mixes an
+    // elementwise transform (mul) with a recipe op (mean); the full scan
+    // derives the reduction recipe (the old single-op scan saw only the mul
+    // and silently floored the kernel to Elementwise).
+    let program = with_inline_package(
+        "mul-mean",
+        r#"@ nucleum
+functio mean_mul(tf32[2] x, tf32[2] w, tf32[1] out, u32 id) → vacuum {
+    fixum tf32[2] t ← x.multiplica(w)
+    fixum f32 total ← t.media()
+    out[id] ← total
+}"#,
+        |lowered| {
+            device_program_for_lowered(&lowered.validated, &lowered.interner, &lowered.companions)
+                .expect("constructor succeeds")
+                .expect("device package yields a device program")
+        },
+    )
+    .expect("fixture lowers");
+    assert_eq!(program.kernels.len(), 1);
+    let forward = &program.kernels[0];
+    assert_eq!(forward.entry, "mean_mul");
+    let CollectionKernelPlan::TreeReduction(reduction) = &forward.plan else {
+        panic!(
+            "the mul+mean forward kernel must carry the reduction recipe, got {:?}",
+            forward.plan
+        );
+    };
+    assert_eq!(reduction.op, radix_mir::kernel_plan::ReduceOp::Mean);
+    assert_eq!(reduction.length, 2);
 }
