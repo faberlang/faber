@@ -107,13 +107,14 @@ pub(crate) fn build_package_fhir(
         });
     }
 
-    let fhir_package = build_package(
-        identity,
-        &entry_path,
-        entry_frontmatter,
-        inputs,
-        dependencies,
-    );
+    let fhir_package = build_package(identity, &entry_path, entry_frontmatter, inputs, dependencies)
+        .map_err(|error| {
+            vec![fhir_issue_diag(
+                input,
+                "fhir_package_invalid",
+                error.to_string(),
+            )]
+        })?;
     let bytes = encode_package(&fhir_package).map_err(|error| {
         vec![fhir_diag(
             input,
