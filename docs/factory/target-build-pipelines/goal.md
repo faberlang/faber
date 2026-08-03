@@ -25,28 +25,38 @@ execution/host selection. It must reuse Radix's emit contract rather than
 inventing target-specific source generation or treating a file emission as a
 completed build.
 
-The intended product pipeline is:
+The intended lifecycle is:
 
 ```text
-Faber source/package
-  → analyze and resolve package graph
-  → Radix immediate target emit
-  → target-specific package/compiler/link stage
-  → final artifact
-  → target-specific run/load/dispatch stage
+emit:  Faber source/package → Radix immediate target artifact
+build: Faber source/package → final target artifact
+exec:  build → execute the final target artifact
+run:   source/package/image → direct program execution
 ```
+
+`emit` and `build` are different operations even when they use the same target
+name. Radix owns `emit` and stops at the immediate target artifact. Faber owns
+`build`, including package assembly, external toolchains, linking, and final
+artifact layout. `build --exec` is the explicit build pipeline that executes
+the artifact after a successful build.
+
+`run` is execution-only. Its input determines the execution route: source or a
+source package is lowered and stepped directly; a serialized FMIR image is
+loaded and stepped directly; a FHIR package is loaded and lowered to FMIR when
+that loader is supported. `run` does not select a compiler target, release
+profile, or build mode.
 
 This goal is a remapping exercise where the downstream process already exists,
 and a toolchain-integration exercise where the local compiler/linker exists but
 has never been wired into Faber. It must not advertise a stage that only emits
 text or passes a superficial validator.
 
-The scope also removes `faber run --interpret`. Interpreted execution belongs
-to `faber script`; `faber run` is the build/run product command. `faber script`
-accepts both source inputs and serialized FMIR images, so an existing `.fmir`
-or `.fmir.txt` payload can be loaded directly into the stepper without source
-rebuild. The paired `--compile` override is removed in the same clean break so
-`run` has no hidden engine-selection mode.
+The scope also removes `faber run --interpret` and its paired `--compile`
+override. Direct execution belongs to `faber run`, including existing `.fmir`
+and `.fmir.txt` payloads. `faber script` is not a second execution semantic; it
+may remain temporarily as a compatibility alias while callers migrate, but it
+is not the canonical command and carries no build flags. The legacy hidden
+`scena` target and its source-backed artifact route are removed.
 
 ## Product rules
 
@@ -61,18 +71,35 @@ rebuild. The paired `--compile` override is removed in the same clean break so
 
 `build` must not report success merely because Radix emitted source text.
 
+`faber build <input> --target <target> --exec` is the explicit build-and-execute
+pipeline. It first completes the same build and then executes the resulting
+artifact. For `rust`, this means running the linked native executable. For
+`fmir`, this means loading the newly built FMIR payload through the stepper;
+it does not wrap Faber user code in a Rust executable unless an explicit native
+runner mode is selected by the FMIR build contract.
+
 ### `run`
 
-`faber run --target <target>` must build or locate the target artifact and then
-execute it through the correct runtime, loader, external host, or device
-dispatch path. A native runner around FMIR is a packaging mode of the FMIR
-target, not evidence that the Faber program was natively compiled.
+`faber run <input> [-- <args>...]` must execute the input through the correct
+direct runtime or loader without first compiling a target artifact. Supported
+input classes are:
 
-`faber run` must not interpret source through `--interpret`. `faber script`
-owns single-source, package, archive, and serialized FMIR-image interpretation
-through the MIR stepper. The old `--compile` flag is removed with
-`--interpret`; target choice and build behavior come from `--target`, package
-configuration, and the selected product route.
+- Faber source, a package, or a supported source archive: analyze, lower, and
+  execute through the MIR stepper;
+- `.fmir` or `.fmir.txt`: load the existing source-independent FMIR image and
+  execute it through the stepper;
+- a supported FHIR package: load it, lower it to FMIR, and execute it.
+
+`run` may retain source/runtime diagnostics such as reader-locale selection,
+but it must not expose build-selection flags such as `--target` or `--release`.
+It must not invoke Cargo or a target compiler merely because the input is a
+package. A native runner around FMIR is a packaging mode of the FMIR build,
+not evidence that the Faber program was natively compiled.
+
+`faber run` is the public execution command even when the input is commonly
+called a script. `faber script`, if retained during migration, delegates to
+the same input dispatcher and is eventually removable without changing the
+execution model.
 
 ### Toolchain discovery
 
@@ -88,20 +115,20 @@ The following is the starting contract after Radix normalization. “Current”
 describes what exists today; “goal endpoint” describes the strongest honest
 Faber behavior this goal should attempt to wire.
 
-| Target | Immediate emit | Current Faber stage | Goal endpoint |
-| ------ | --------------- | ------------------ | ------------- |
-| `rust` | Rust source | Cargo package build and native run already work | Preserve and remap; keep native executable as the endpoint |
-| `fhir` | Serialized HIR | Package envelope build and source-free HIR → FMIR run already work | Preserve; make package/load/run semantics explicit |
-| `fmir` | FMIR image | Text image, binary image, and native FMIR runner paths already exist under split names | One FMIR target with explicit image format; `faber script` loads existing images directly, with an optional native runner mode |
-| `faber` | Faber source | Re-emission only | Keep emit-only; no artificial build stage |
-| `go` | Go source | Emit only | Assemble package and invoke `go build` only when package/runtime/entry contracts are complete |
-| `swift` | Swift source | Emit only | Assemble package and invoke `swiftc`/Swift package tooling only when the generated layout is valid |
-| `ts` | TypeScript source | Emit only | Wire the appropriate TypeScript/JavaScript compiler and runtime only when package and module contracts are explicit |
-| `wasm` | Wasm module | Emit only; external host required | Build a reproducible module/package artifact; add run only through an explicit Wasm host contract |
-| `llvm` | LLVM IR text | External verify/link harness exists, but no product target | Wire `llvm-as`/`opt` as appropriate, link with `clang` and the Faber LLVM runtime, and produce a native executable for the supported subset |
-| `metal` | Metal source | Emit only | Wire Apple Metal compilation (`xcrun metal`/`metallib`) where the kernel ABI is complete; add dispatch only through an explicit host/provider contract |
-| `wgsl` | WGSL source | Emit only; external validation exists | Wire validation and any WebGPU package/host route that has a real artifact and launch contract |
-| `sexp` | Racket source | Emit only; external validation route | Keep validation distinct from Faber product build; add run only if an intentional Racket runtime contract exists |
+| Target | Immediate emit | Current Faber stage | Goal build artifact | `build --exec` / direct `run` |
+| ------ | --------------- | ------------------ | ------------------ | --------------------------- |
+| `rust` | Rust source | Cargo package build and native run already work | Linked native executable | Execute the native artifact; direct source `run` remains stepper execution |
+| `fhir` | Serialized HIR | Package envelope build and source-free HIR → FMIR run already work | FHIR package | Load, lower to FMIR, and execute; direct FHIR `run` uses the same loader |
+| `fmir` | FMIR image | Text image, binary image, and native FMIR runner paths already exist under split names | One FMIR target with an explicit image format | Load the newly built or existing image through the stepper; native runner is an explicit packaging mode |
+| `faber` | Faber source | Re-emission only | None | Keep emit-only; source inputs can still use direct `run` when the stepper supports them |
+| `go` | Go source | Emit only | Go package or executable when package/runtime/entry contracts are complete | Execute only after a real Go build and run contract exists |
+| `swift` | Swift source | Emit only | Swift package or executable when the generated layout is valid | Execute only after a real Swift build and run contract exists |
+| `ts` | TypeScript source | Emit only | JavaScript/TypeScript package or executable when module/runtime contracts are explicit | Execute only after a real compiler and runtime contract exists |
+| `wasm` | Wasm module | Emit only; external host required | Reproducible Wasm module/package | Execute only through an explicit Wasm host contract |
+| `llvm` | LLVM IR, with text/bitcode format explicit | External verify/link harness exists, but no product target | Linked native executable for the supported subset | Execute the linked artifact; direct source `run` does not silently select LLVM |
+| `metal` | Metal source, with library format explicit | Emit only | AIR/metallib when the kernel ABI is complete | Dispatch only through an explicit host/provider contract |
+| `wgsl` | WGSL source | Emit only; external validation exists | Validated/package artifact when a WebGPU host contract exists | Execute only through a real WebGPU host/launch contract |
+| `sexp` | Racket/S-expression source | Emit only; external validation route | None unless an intentional Racket package contract exists | Keep validation distinct from Faber product execution |
 
 The matrix is a plan and must be refreshed from live source before each
 implementation phase. “Local tool installed” is not sufficient evidence for a
@@ -116,15 +143,22 @@ entrypoint, and observable run behavior must all be proven.
   Radix goal.
 - Remove Faber-facing `-text`, `-bin`, and `-host` target identities.
 - Delete the legacy `scena` target and its source-backed package-artifact
-  routing. Migrate source execution to `faber script` and source-independent
-  package execution to `fmir`/`fmir-bin` modes.
-- Extend `faber script` input dispatch to recognize `.fmir` and `.fmir.txt`
+  routing. Migrate direct source and payload execution to `faber run`; keep
+  source-independent package construction under the single `fmir` target with
+  explicit format/runner options.
+- Extend `faber run` input dispatch to recognize `.fmir` and `.fmir.txt`
   images, load them through the existing FMIR loaders, and execute them on the
   stepper without reading or rebuilding source.
 - Remove `RunArgs.interpret` and `RunArgs.compile`, their parser/help entries,
   the `should_interpret` override branch, and direct `run --interpret`/
-  `run --compile` references. Migrate interpreted tests and docs to `faber
-  script` before deleting the compatibility surface.
+  `run --compile` references. Migrate interpreted tests and docs to `faber run`
+  before deleting the compatibility surface; retain `faber script` only as a
+  temporary alias if needed for migration.
+- Move compiler/build-selection options such as `--target`, `--release`,
+  output directory, and format selection off `run` and onto `build`.
+- Add `build --exec` as the sole explicit build-and-execute pipeline. Its
+  implementation must execute the final artifact produced by the selected
+  target, including loading an FMIR payload rather than rebuilding it.
 - Define explicit format/runner options for FMIR and any other target with
   multiple downstream artifact forms.
 - Rewrite `faber targets` so `emit`, `build`, `package`, and `run` are separate
@@ -139,6 +173,8 @@ entrypoint, and observable run behavior must all be proven.
 - Remap FMIR text/binary image and native-runner paths under one FMIR target
   without changing the semantics of the stepper or falsely calling the runner
   native user-code compilation.
+- Make `faber run` the direct source/package/image execution route and make
+  `faber build --exec` the build-then-run route.
 - Make the hidden `__fmir-run` command an implementation seam only; it must not
   remain the required public way to execute a serialized FMIR payload.
 - Remove duplicated target-name translation and stale suffix references.
@@ -147,7 +183,7 @@ entrypoint, and observable run behavior must all be proven.
 
 - Introduce or consolidate a target build plan that records immediate emit
   artifact, package inputs, external commands, final artifact, runtime/host,
-  and supported run mode.
+  and supported `build --exec` mode.
 - Materialize intermediates under stable target directories for diagnostics and
   reproducibility, without making intermediate source the final build result.
 - Make unsupported build stages fail closed with structured diagnostics.
@@ -176,10 +212,12 @@ The exact order may change after toolchain probes, but no target receives a
 
 ### Stage 4 — Run and host completion
 
-- Route `faber run` through the final artifact for native executables,
+- Route `faber build --exec` through the final artifact for native executables,
   portable loaders, external Wasm/Racket hosts, and GPU host/provider paths.
-- Keep interpreted execution on `faber script`; `faber run` has no
-  interpreter/compiler mode flags after the clean break.
+- Route `faber run` directly from source or an existing portable image. It has
+  no compiler, target, release, or build-mode flags after the clean break.
+- Keep any temporary `faber script` alias thin and semantically identical to
+  direct `run`; do not maintain a second runtime path.
 - Keep compile-only, validate-only, package-only, and run-capable states
   distinct in the capability table.
 - Add bounded executable/output/exit parity fixtures for each promoted target.
@@ -203,13 +241,20 @@ The exact order may change after toolchain probes, but no target receives a
 - [ ] `scena` is removed from parsing, target discovery, build/run routing,
   artifacts, tests, and current documentation.
 - [ ] `faber run --interpret` and `faber run --compile` are removed rather than
-  retained as aliases; interpreted tests/docs use `faber script`.
-- [ ] `faber script image.fmir` and `faber script image.fmir.txt` load and run
+  retained as aliases; direct-execution tests/docs use `faber run`.
+- [ ] `faber run image.fmir` and `faber run image.fmir.txt` load and run
   existing payloads without source access, Cargo, or payload regeneration.
 - [ ] Malformed, unsupported-version, wrong-target, and runtime-requirement
   failures for direct FMIR script inputs fail closed with structured diagnostics.
 - [ ] The hidden `__fmir-run` command is no longer required as the public
-  payload-execution contract and can delegate to the same script loader seam.
+  payload-execution contract and can delegate to the same direct-run loader
+  seam.
+- [ ] `faber build <input>` stops after producing its final artifact and does
+  not execute it by default.
+- [ ] `faber build <input> --exec` builds once and executes that exact artifact;
+  it does not dispatch through a second implicit build.
+- [ ] `run` no longer exposes duplicated build flags such as `--target`,
+  `--release`, `--interpret`, or `--compile`.
 - [ ] `faber targets` reports separate `emit`, `build`, `package`, and `run`
   behavior with artifact and toolchain notes.
 - [ ] Rust, FHIR, and FMIR existing product paths remain green after remapping.
@@ -252,7 +297,8 @@ cargo run --manifest-path faber/Cargo.toml -- targets
 
 # Product smoke commands are added per promoted target.
 cargo run --manifest-path faber/Cargo.toml -- build --target rust <package>
-cargo run --manifest-path faber/Cargo.toml -- run --target rust <package>
+cargo run --manifest-path faber/Cargo.toml -- build --target rust <package> --exec
+cargo run --manifest-path faber/Cargo.toml -- run <package>
 ```
 
 LLVM, Metal, Wasm, and other external-toolchain checks must capture the
@@ -266,7 +312,8 @@ run/validation result. A clean source emission is not a build or run proof.
   goal rather than hiding it behind a tool invocation.
 - Stop if the only evidence is that a compiler binary is installed locally.
 - Stop if implementation restores target suffixes to encode lifecycle stages.
-- Stop if a target's run path falls back silently to Rust, FMIR, or interpretation
-  without an explicit product contract.
+- Stop if `build --exec` falls back silently to Rust, FMIR, or another runtime
+  without an explicit product contract, or if direct `run` silently compiles a
+  target artifact.
 - Stop if the build matrix becomes a parity campaign for every language feature;
   split backend semantic burn-down into target-specific goals.

@@ -11,69 +11,85 @@ sibling radix `crates/radix/src/mir/stepper/`, `src/package/mir.rs`
 
 ## Summary
 
-Create a first-class source-execution lane for Faber scripts and packages. The
-user-facing entry point is `faber script`, backed by the MIR stepper and package
-MIR runner. Interpreted execution lives in this repo (former `scena` embed API absorbed into
-`src/script/`). Sibling radix owns the MIR stepper engine.
+> **Superseded command model (2026-08-03):** This campaign was originally
+> written around `script` as the canonical interpreted command and `run` as
+> compiled package execution. The target-build pipeline goal now owns the
+> product command contract: `build` produces artifacts, `build --exec` builds
+> and executes an artifact, and `run` directly executes source or an existing
+> FMIR image. The older Stage 1 wording below is historical implementation
+> context and must be migrated before the next command-surface phase.
 
-Stage 1 (`faber script`) and Stage 1b package-host bridging are shipped and
-covered by current CLI/package tests. This campaign remains open only for the
-explicitly planned Stage 2+ runner/timing work below; the command itself is not
+Create a first-class direct-execution lane for Faber source, packages, and
+serialized execution images. The user-facing entry point is `faber run`, backed
+by the MIR stepper and package MIR runner. Execution lives in this repo (the
+former `scena` embed API was absorbed into `src/script/`); sibling Radix owns
+the MIR stepper engine.
+
+The original Stage 1 (`faber script`) and Stage 1b package-host bridging are
+shipped and covered by current CLI/package tests. This campaign remains open
+for migrating that implementation to the direct `faber run` contract and for
+any separately selected runtime diagnostics; the command itself is not
 proposed or missing.
 
-This campaign is about interpreted execution only. The generated Rust/Cargo
-package path stays owned by `faber run`, `faber build`, and `faber test`.
+This campaign is about direct execution only. Generated Rust/Cargo package
+construction stays owned by `faber build`; `faber build --exec` is the explicit
+build pipeline that executes the resulting artifact. `faber test` remains its
+own MIR-stepper test surface.
 
 ## Problem
 
-Today, `faber run` has the right product default: package directories compile to
-Rust and run as native binaries, while single `.fab` files interpret through the
-MIR stepper. Package interpretation exists but is hidden behind
-`faber run --interpret`, which makes source execution feel like a debug backend
-override instead of a first-class workflow.
+Today, `faber run` is overloaded: package directories compile to Rust and run
+as native binaries, while single `.fab` files interpret through the MIR
+stepper. Package interpretation is hidden behind `faber run --interpret`, and
+build-selection flags are duplicated on `run`.
 
-`scena` is already the in-process script stage crate, but it is library-only.
-That leaves performance and support questions to ad hoc external timing rather
-than runtime-owned diagnostics.
+The desired contract removes that ambiguity. `faber run` directly executes
+source/package inputs or loads an existing `.fmir`/`.fmir.txt` image. `faber
+build --exec` owns the build-then-run pipeline. The legacy hidden `scena` target
+is removed rather than promoted to a separate binary product.
 
 ## Desired End State
 
-- `faber script [path]` runs source through the MIR stepper for files,
+- `faber run [path]` runs source through the MIR stepper for files,
   manifest-backed packages, manifestless package directories, and supported
   archives.
-- `faber run [path]` remains the compiled product path for packages.
-- The old `faber run --interpret` path is replaced or retired by an explicit
-  compatibility decision, not left as the canonical UX.
-- `scena` ships as a binary for script-runtime power users.
-- `scena time` reports phase timing for load, parse/analyze, package MIR link,
+- `faber run image.fmir` and `faber run image.fmir.txt` load existing
+  source-independent images and execute them without source regeneration.
+- `faber build [path]` produces the selected artifact and stops; `faber build
+  [path] --exec` executes that exact artifact after building it.
+- The old `faber run --interpret` and `--compile` flags are removed rather than
+  retained as aliases.
+- `script` may be a temporary compatibility alias for direct source execution,
+  but it is not a separate runtime semantic and is eventually removable.
+- Runtime timing, if retained, reports phase timing for load, parse/analyze, package MIR link,
   MIR lowering, validation, and execution where the implementation can measure
   those phases honestly.
-- `scena bench` provides repeated-run timing with warmup and machine-readable
-  output.
-- `scena support` explains whether a source/package is supported by the
-  interpreted package-MIR surface and why unsupported shapes fail.
-- Package sources that run through `faber script` and later ship through
-  `faber run` do not need import rewrites between lanes. Application source uses
-  canonical `norma:*` imports only; interpreted package mode supplies an
+- A future runtime diagnostics surface explains whether a source/package is
+  supported by the direct package-MIR surface and why unsupported shapes fail.
+- Package sources that run through direct `faber run` and later ship through
+  `faber build` do not need import rewrites between lanes. Application source
+  uses canonical `norma:*` imports only; direct package mode supplies an
   explicit allowlisted bridge to stepper kernels where support exists.
 - Docs and help text describe the lane split without presenting MIR stepping as
   the default application build path.
 
 ## Development Posture
 
-- **Clean UX split.** `run` means compiled package execution; `script` means
-  interpreted source execution.
-- **Implementation words stay internal.** Prefer `script` in user-facing help;
+- **Clean UX split.** `build` produces artifacts, `build --exec` runs the build
+  pipeline, and `run` directly executes a program input.
+- **Implementation words stay internal.** Prefer `run` in user-facing help;
   reserve `interpret`, `MIR`, and `stepper` for diagnostics, developer docs, or
-  `scena`.
-- **No generated-Rust fallback in script mode.** Unsupported interpreted package
+  internal implementation notes.
+- **No generated-Rust fallback in direct run mode.** Unsupported interpreted package
   shapes must fail with actionable diagnostics.
-- **Scena is a power tool, not the primary user CLI.** Ordinary users should be
-  able to use `faber script` without knowing about the `scena` binary.
+- **No Scena product.** The hidden legacy target and its source-backed artifact
+  route are removed; timing/support work belongs to Faber diagnostics if later
+  selected.
 - **Timing must be honest.** Do not report phase timings that are only inferred
   from wall-clock wrappers when in-process boundaries can be instrumented.
-- **Do not duplicate Radix.** `radix` owns compiler phase inspection; `scena`
-  owns runtime behavior, timing, benchmarking, support, and future tracing.
+- **Do not duplicate Radix.** `radix` owns compiler phase inspection; Faber
+  owns direct runtime behavior and any future timing, benchmarking, support,
+  and tracing diagnostics.
 - **One package source, two execution lanes.** Source intended to ship as a
   package should import the ship namespace (`norma:*`). `faber:*` remains the
   direct script/kernel namespace, not a second package dialect. The bridge is a
@@ -88,8 +104,8 @@ from this campaign artifact.
 1. Select the first planned, unblocked campaign stage.
 2. Create a stage delivery spec in this directory.
 3. Execute the delivery spec through `factory`.
-4. Validate with focused Cargo tests and `faber`/`scena` subprocess tests for
-   the touched command surface.
+4. Validate with focused Cargo tests and Faber subprocess tests for the touched
+   command surface.
 5. Update this campaign only when routing, invariants, gates, or stage status
    change.
 
@@ -97,13 +113,12 @@ from this campaign artifact.
 
 **In campaign**
 
-- `faber script` command shape and help text.
-- Shared interpreted-run plumbing that avoids duplicating `faber run
-  --interpret`.
-- `scena` binary target and its command grammar.
+- `faber run` direct-execution command shape and help text.
+- Shared direct-run plumbing that avoids duplicating source and FMIR loaders.
 - Script-runtime timing, benchmark, and support diagnostics.
-- Deprecation or clean removal decision for `faber run --interpret`.
-- Docs/help updates for the script/runtime lane split.
+- Clean removal of `faber run --interpret` and `--compile`.
+- Migration or removal of the temporary `faber script` alias.
+- Docs/help updates for the build/exec/run split.
 
 **Split out**
 
@@ -130,9 +145,8 @@ from this campaign artifact.
 
 ## Ground Truth Researched
 
-- `AGENTS.md`: `faber run`/`faber build` are application-lane Rust package
-  paths; MIR/scena is a systems/script lane and must not be confused with
-  package build.
+- `AGENTS.md`: `faber build` owns application artifact construction; direct
+  MIR execution must not be confused with a package build.
 - `src/cli/mod.rs`: `RunArgs` currently exposes
   `--interpret` and `--compile`; `faber` already has `run`, `repl`, `host`, and
   compiler-compatibility aliases.
@@ -162,13 +176,13 @@ from this campaign artifact.
 
 | Track | State | Next action |
 | --- | --- | --- |
-| User script UX | `faber script` added as canonical interpreted-source command; 30 `--interpret` subprocess tests migrated to `script`; `run --interpret`/`--compile` retained until Stage 6. | Lower Stage 2 (scena binary) via delivery. |
-| Scena binary | No binary target; `scena` is library-only. | Lower Stage 2 after Stage 1 command semantics are stable. |
-| Runtime timing | External wall-clock benchmarks only; no in-process phase report. | Lower Stage 3 after shared command plumbing exists. |
-| Runtime benchmark | No built-in repeated-run script benchmark. | Lower Stage 4 after timing output shape exists. |
-| Package host imports | Stage 1b complete: interpreted package execution bridges supported `norma:<manifest-module>` imports (`solum`, `processus`, `aleator`, `json`) to the stepper kernel via a post-validation link-time rewrite; unsupported verbs/modules fail closed. One `norma:*` import spelling works on both lanes. | Next: Stage 2 (scena binary) via delivery. |
-| Support diagnostics | Package-MIR unsupported cases are surfaced as normal diagnostics, but no dedicated support command explains support by shape. | Lower Stage 5 after `scena` command plumbing exists. |
-| Docs/help | Current command shape emphasizes `run --interpret`; lane split needs product wording. | Update alongside Stages 1 and 6. |
+| User direct-run UX | `faber script` exists, but the canonical endpoint is being moved to `faber run`; `run --interpret`/`--compile` remain until the clean break. | Migrate tests/docs and remove duplicated run build flags. |
+| Scena target | Retired by the target-build pipeline goal; no binary target is planned. | Remove stale target, artifact, tests, and documentation references. |
+| Runtime timing | External wall-clock benchmarks only; no in-process phase report. | Deferred; lower a Faber-owned diagnostic delivery if selected. |
+| Runtime benchmark | No built-in repeated-run direct-run benchmark. | Deferred; lower a Faber-owned diagnostic delivery if selected. |
+| Package host imports | Stage 1b complete: direct package execution bridges supported `norma:<manifest-module>` imports (`solum`, `processus`, `aleator`, `json`) to the stepper kernel via a post-validation link-time rewrite; unsupported verbs/modules fail closed. One `norma:*` import spelling works on both lanes. | Migrate the execution caller from the old compatibility route to `faber run`. |
+| Support diagnostics | Package-MIR unsupported cases are surfaced as normal diagnostics, but no dedicated support command explains support by shape. | Deferred; lower a Faber-owned diagnostic delivery if selected. |
+| Docs/help | Current command shape still describes `run --interpret` and build-then-run. | Update alongside the target-build pipeline and clean-break phase. |
 
 ## Campaign Path
 
@@ -254,69 +268,72 @@ verbs fail as package-MIR capability gaps.
   runs through interpreted package execution without a second stepper-only
   source file.
 
-### Stage 2 - Scena Binary Shell
+### Stage 2 - Scena Binary Shell (retired)
 
-**Status**: planned
+**Status**: retired (2026-08-03)
 **Lowers to**: delivery -> factory
 **Batching posture**: split-on-boundary
 
-Add a `scena` binary target with basic command dispatch and shared interpreted
-run plumbing.
+Do not add a `scena` binary. The legacy target is removed under the target-build
+pipeline goal. Shared direct-execution plumbing belongs to `faber run`; any
+temporary `faber script` alias must delegate to the same seam.
 
 **Gate**
 
-- `cargo build --release -p scena --bin scena` succeeds.
-- `scena run [path]` executes the same supported script/package/archive surface
-  as `faber script`.
-- Shared execution helpers avoid copy-pasting ``faber`` command logic where a
-  library seam is more maintainable.
+- No `scena` target, binary, or command grammar remains in the product surface.
+- `faber run [path]` executes the supported source/package/archive surface.
+- Shared execution helpers avoid copy-pasting source and FMIR loader logic.
 - `radix` phase-inspection commands are not duplicated.
 
-### Stage 3 - `scena time`
+### Stage 3 - Runtime timing (deferred)
 
-**Status**: planned
+**Status**: deferred — lower separately if selected
 **Lowers to**: delivery -> factory
 **Batching posture**: split-on-boundary
 
-Expose script-runtime phase timings.
+Expose Faber-owned direct-runtime phase timings only if a later delivery selects
+that product surface. This campaign does not create a `scena` command.
 
 **Gate**
 
-- `scena time [path]` reports human-readable total and phase timings.
-- `scena time --json [path]` reports a stable machine-readable shape.
+- A future Faber diagnostic command reports human-readable total and phase
+  timings.
+- A future machine-readable form has a stable documented shape.
 - Timed phases are measured at real code boundaries, not guessed from external
   process wrappers.
-- Timing implementation does not materially change normal `faber script` or
-  `scena run` semantics.
+- Timing implementation does not materially change normal `faber run` semantics.
 
-### Stage 4 - `scena bench`
+### Stage 4 - Runtime benchmark (deferred)
 
-**Status**: planned
+**Status**: deferred — lower separately if selected
 **Lowers to**: delivery -> factory
 **Batching posture**: split-on-boundary
 
-Provide repeated-run benchmarking for script workloads.
+Provide repeated-run benchmarking for direct-run workloads only if a later
+delivery selects it. This campaign does not create a `scena` command.
 
 **Gate**
 
-- `scena bench [path] --n <count>` runs repeated interpreted executions with a
+- A future Faber diagnostic command runs repeated direct executions with a
   configurable warmup.
 - Output includes total, mean, min/max, and enough environment metadata to make
   local comparisons meaningful.
 - `--json` output is stable for tooling.
 - Benchmark command does not hide unsupported package-MIR failures.
 
-### Stage 5 - `scena support`
+### Stage 5 - Runtime support diagnostics (deferred)
 
-**Status**: planned
+**Status**: deferred — lower separately if selected
 **Lowers to**: delivery -> factory
 **Batching posture**: discovery-first
 
-Explain whether an input is supported by the interpreted runtime and why not.
+Explain whether an input is supported by direct execution and why not, if a
+later delivery selects that surface. This campaign does not create a `scena`
+command.
 
 **Gate**
 
-- `scena support [path]` reports whether the input can run through the current
+- A future Faber diagnostic command reports whether the input can run through the current
   stepper/package-MIR surface.
 - Unsupported library imports, private namespace errors, unresolved local
   package shapes, and known package-MIR gaps produce actionable explanations.
@@ -332,23 +349,22 @@ Finalize the public command story and update docs/help.
 
 **Gate**
 
-- Decision recorded for `faber run --interpret`: remove, hide, or keep as a
-  temporary alias with deprecation wording.
-- `faber --help`, `faber run --help`, `faber script --help`, and `scena --help`
-  tell one consistent story.
+- `faber run --interpret` and `--compile` are removed, not retained as aliases.
+- `faber --help`, `faber build --help`, and `faber run --help` tell one
+  consistent build/exec/run story.
 - `README.md`, target capability docs, or relevant help docs distinguish:
-  `faber run` = compiled package execution; `faber script`/`scena` = interpreted
-  source execution.
+  `faber build` = artifact construction, `faber build --exec` = build then
+  execute, and `faber run` = direct source/image execution.
 - Focused CLI and package-MIR tests pass.
 
 ## Dependency Rules
 
 | Situation | Route |
 | --- | --- |
-| Command UX for ordinary source execution | Stage 1 (`faber script`) |
-| Package source imports host I/O and must work in both `faber script` and compiled package gates | Stage 1b package host import bridge; require `norma:*` as the package source spelling |
+| Command UX for ordinary source execution | Stage 1 migration to direct `faber run` |
+| Package source imports host I/O and must work in both direct `faber run` and compiled package gates | Stage 1b package host import bridge; require `norma:*` as the package source spelling |
 | Coreutils file-backed stepper slices need `solum`/`processus` host effects | Stage 1b here, coordinated with sibling examples `docs/factory/coreutils/CAMPAIGN.md` Stage 1b |
-| Runtime diagnostics, timing, benchmark, or support introspection | Stages 2-5 (`scena`) |
+| Runtime diagnostics, timing, benchmark, or support introspection | Deferred Faber-owned delivery; no `scena` product |
 | Compiler phase dumps or target emit inspection | `radix`, not this campaign |
 | Generated Rust, Cargo cache behavior, package build/test | Existing application-lane work, not this campaign |
 | New package-MIR language support discovered while adding commands | Stop and route through a package-MIR delivery spec unless required for the selected stage gate |
@@ -356,12 +372,12 @@ Finalize the public command story and update docs/help.
 
 ## First Useful Milestones
 
-- `faber script` exists and replaces `faber run --interpret` in help text.
+- `faber run` replaces `faber run --interpret` as the direct execution route;
+  any `script` alias is transitional only.
 - Supported package host imports use one package-source spelling (`norma:*`) in
   both the interpreted development lane and compiled ship lane.
-- `scena run` proves the new binary can execute the same interpreted surface.
-- `scena time --json` produces trustworthy phase timings for the next
-  performance discussion.
+- A future Faber-owned diagnostic surface, if selected, produces trustworthy
+  phase timings for the next performance discussion.
 
 ## Acceptance Criteria
 
@@ -379,10 +395,8 @@ Each delivery spec should choose focused validation. Likely commands:
 ```bash
 timeout 1200 cargo test run_interpret
 timeout 1200 cargo test package_mir
-timeout 1200 cargo test -p scena
 timeout 1200 cargo test --manifest-path ../radix/Cargo.toml -p radix mir::stepper
 timeout 1200 cargo build --release
-timeout 1200 cargo build --release -p scena --bin scena
 ```
 
 Docs-only campaign maintenance may validate with:
@@ -393,24 +407,20 @@ git diff --check
 
 ## Open Questions
 
-- Should `faber run --interpret` be removed immediately, hidden as an alias, or
-  kept temporarily with deprecation wording?
 - Which `norma:*` modules belong in the first package-host bridge slice:
   `solum` only, `solum` plus `processus`, or the whole currently implemented
   stepper kernel allowlist?
-- Should `faber script` accept a `--time` convenience flag, or should all timing
-  live under `scena time`?
-- Should `scena run` support stdin and `-c` one-liners, or should those remain
-  `faber` conveniences?
-- What minimum package-MIR support explanation is enough for the first
-  `scena support` stage?
+- Should timing/support diagnostics be added to `faber run` or to a separate
+  Faber-owned diagnostic command?
+- What minimum package-MIR support explanation is useful before that diagnostic
+  surface is selected?
 
 ## Stop Conditions
 
 - Stop before preserving `--interpret` as a compatibility layer if the delivery
   spec cannot prove that compatibility is required.
-- Stop before making `scena` duplicate `radix` compiler inspection commands.
-- Stop before adding generated Rust/Cargo behavior to `faber script` or `scena`.
+- Stop before reintroducing `scena` as a product target or binary.
+- Stop before adding generated Rust/Cargo behavior to direct `faber run`.
 - Stop before making `faber:*` and `norma:*` globally interchangeable instead of
   adding a narrow, explicit package-interpret bridge.
 - Stop before implementing a debugger/trace UI unless a delivery spec explicitly
