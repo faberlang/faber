@@ -1334,13 +1334,14 @@ fn apply_library_emit_fixes(mut code: String) -> String {
 
     // Radix codegen emits IIFE array-access expressions as the left-hand side
     // of assignment, which TypeScript rejects (TS2364).  Rewrite:
-    //   ((__o, __i) => { const __v = __o[__i]; ... })(arr, idx) = value;
+    //   ((__o, __i) => { ... })(arr, idx) = value;
     // → arr[idx] = value;
     //
-    // The IIFE pattern is:
-    //   ((__o, __i) => { const __v = __o[__i]; if (__v === undefined) throw new Error("index trap"); return __v; })(arr, idx)
+    // The IIFE pattern (index trap form; keeps a stored `undefined` distinct
+    // from a missing index via the `in` check):
+    //   ((__o, __i) => { if (!(__i in __o)) throw new Error("index trap"); return __o[__i]; })(arr, idx)
     // We replace it with a plain arr[idx] when it appears as LHS of `=`.
-    let iife_pattern = r#"((__o, __i) => { const __v = __o[__i]; if (__v === undefined) throw new Error("index trap"); return __v; })("#;
+    let iife_pattern = r#"((__o, __i) => { if (!(__i in __o)) throw new Error("index trap"); return __o[__i]; })("#;
     // Process line by line to handle IIFE-on-LHS.
     let mut result = String::with_capacity(code.len() + 4096);
     for line in code.lines() {
