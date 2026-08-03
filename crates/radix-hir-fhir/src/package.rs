@@ -162,7 +162,11 @@ pub enum FhirPackageError {
     /// does not support (clean break — no v0 decoder).
     UnsupportedPackageSchemaVersion { found: u32, expected: u32 },
     /// An embedded unit declares a schema version this loader rejects.
-    UnsupportedUnitSchemaVersion { module: String, found: u32, expected: u32 },
+    UnsupportedUnitSchemaVersion {
+        module: String,
+        found: u32,
+        expected: u32,
+    },
     /// An embedded unit failed its own decode/validation gates (F3, U2.3).
     MalformedUnit { module: String, detail: String },
     /// The module table contains the same canonical path twice.
@@ -177,7 +181,11 @@ pub enum FhirPackageError {
     MissingDependencyArtifact { name: String, version: String },
     /// The declared source hash does not match the unit artifact's own
     /// `SourceIdentity.content_hash`.
-    MismatchedContentHash { module: String, expected: String, actual: String },
+    MismatchedContentHash {
+        module: String,
+        expected: String,
+        actual: String,
+    },
     /// The module table or dependency list is not in canonical sorted order.
     Unsorted { what: &'static str },
 }
@@ -290,11 +298,9 @@ pub fn decode_package(bytes: &[u8]) -> Result<DecodedFhirPackage, FhirPackageErr
                 expected: SCHEMA_VERSION,
             });
         }
-        let unit = decode_unit(&module.unit).map_err(|error| {
-            FhirPackageError::MalformedUnit {
-                module: module.path.clone(),
-                detail: error.to_string(),
-            }
+        let unit = decode_unit(&module.unit).map_err(|error| FhirPackageError::MalformedUnit {
+            module: module.path.clone(),
+            detail: error.to_string(),
         })?;
         if unit.source_identity.content_hash != module.source_hash {
             return Err(FhirPackageError::MismatchedContentHash {
@@ -345,11 +351,15 @@ fn validate_module_table(
                     path: pair[0].path.clone(),
                 });
             }
-            return Err(FhirPackageError::Unsorted { what: "module table" });
+            return Err(FhirPackageError::Unsorted {
+                what: "module table",
+            });
         }
     }
 
-    let entry_index = decoded.iter().position(|module| module.path == pkg.entry_path);
+    let entry_index = decoded
+        .iter()
+        .position(|module| module.path == pkg.entry_path);
     let Some(entry_index) = entry_index else {
         return Err(FhirPackageError::MissingEntry {
             entry: pkg.entry_path.clone(),
@@ -384,7 +394,9 @@ fn validate_dependencies(pkg: &FhirPackage) -> Result<(), FhirPackageError> {
                     version: pair[0].version.clone(),
                 });
             }
-            return Err(FhirPackageError::Unsorted { what: "dependencies" });
+            return Err(FhirPackageError::Unsorted {
+                what: "dependencies",
+            });
         }
     }
     Ok(())
@@ -407,7 +419,9 @@ fn validate_local_links(pkg: &FhirPackage) -> Result<(), FhirPackageError> {
                         to: pair[0].binding.clone(),
                     });
                 }
-                return Err(FhirPackageError::Unsorted { what: "local links" });
+                return Err(FhirPackageError::Unsorted {
+                    what: "local links",
+                });
             }
         }
         for link in &module.local_links {
@@ -658,7 +672,10 @@ mod tests {
     #[test]
     fn package_rejects_duplicate_local_link_binding() {
         let mut pkg = stub_package();
-        pkg.modules = vec![stub_module("src/aux.fab", false), stub_module("src/main.fab", true)];
+        pkg.modules = vec![
+            stub_module("src/aux.fab", false),
+            stub_module("src/main.fab", true),
+        ];
         pkg.modules[1].local_links = vec![
             LocalLinkWire {
                 binding: "ut".to_owned(),
@@ -678,7 +695,10 @@ mod tests {
     #[test]
     fn package_accepts_valid_local_link() {
         let mut pkg = stub_package();
-        pkg.modules = vec![stub_module("src/aux.fab", false), stub_module("src/main.fab", true)];
+        pkg.modules = vec![
+            stub_module("src/aux.fab", false),
+            stub_module("src/main.fab", true),
+        ];
         pkg.modules[1].local_links = vec![LocalLinkWire {
             binding: "ut".to_owned(),
             target: "src/aux.fab".to_owned(),
