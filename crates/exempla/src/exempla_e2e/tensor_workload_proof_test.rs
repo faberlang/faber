@@ -212,12 +212,10 @@ fn tensor_workload_proof_empty_rows_when_no_matching_exemplar_path() {
             "row {} has empty exemplar_path",
             i
         );
-        assert!(
-            row.tier as u8 >= 0,
-            "row {} has invalid tier {:?}",
-            i,
-            row.tier
-        );
+        // Tier validity is enforced by the type itself:
+        // `TensorWorkloadProofTier` is a closed fieldless enum, so every value
+        // is a valid tier — the previous `row.tier as u8 >= 0` bound was
+        // vacuous (always true for unsigned) and tripped `unused_comparisons`.
     }
 }
 

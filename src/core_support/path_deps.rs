@@ -149,7 +149,14 @@ fn normalize_relative(path: &Path) -> Option<PathBuf> {
 }
 
 /// Check whether `target` falls within any of the `roots`.
+///
+/// Dead-code allowance (lib/bin crate bodies): this is exercised by the
+/// core-support assembler (`assembler::validate_path_dependencies`, called
+/// from `build.rs` and `core_support_test`), but the assembler module is
+/// compiled only into the build script and the test harness — never into the
+/// lib/bin bodies themselves — so no non-test caller exists inside the crate.
 #[must_use]
+#[allow(dead_code)]
 pub fn is_within_roots(target: &Path, roots: &[String]) -> bool {
     let target_str = target.to_string_lossy();
     roots.iter().any(|root| {

@@ -255,6 +255,19 @@ pub(crate) fn library_resolver_for_package(
     Ok(resolver)
 }
 
+/// Test-facing convenience wrapper around [`load_package_with_reader_pack`]
+/// (no reader pack, no proba filtering).
+///
+/// Dead-code allowance (lib/bin non-test builds): every production path calls
+/// [`load_package_with_reader_pack`] or the higher-level compile/run routes
+/// directly, while the package test suites (`package_test`,
+/// `frontmatter_integration_test`, `proba_integration_test`,
+/// `proba_stepper_test`) exercise this wrapper. The deferred FHIR package
+/// Stages 5-6 (Cista installed-library path) reconstruct packages through
+/// radix's `radix::hir::package::load_package` + faber `load_package_fhir`
+/// (see `radix/docs/factory/hir-artifact-fhir/`), not this source-tree
+/// wrapper — retained as the test-facing convenience surface.
+#[allow(dead_code)]
 pub(crate) fn load_package(
     spec: &PackageSpec,
     library_resolver: &LibraryResolver,
