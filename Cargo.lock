@@ -304,6 +304,7 @@ dependencies = [
  "hygiene-ratchet",
  "postcard",
  "radix",
+ "radix-mir",
  "radix-mir-fmir",
  "serde",
  "serde_json",
