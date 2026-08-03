@@ -333,6 +333,7 @@ dependencies = [
  "hygiene-ratchet",
  "postcard",
  "radix",
+ "radix-mir-fmir",
  "serde",
  "serde_json",
  "sha2",
@@ -677,6 +678,7 @@ dependencies = [
  "radix-diagnostics",
  "radix-hir",
  "radix-hir-faber",
+ "radix-hir-fhir",
  "radix-hir-go",
  "radix-hir-rust",
  "radix-hir-swift",
@@ -762,6 +764,18 @@ dependencies = [
  "radix-syntax",
  "radix-types",
  "rustc-hash",
+]
+
+[[package]]
+name = "radix-hir-fhir"
+version = "0.79.0"
+dependencies = [
+ "postcard",
+ "radix-hir",
+ "radix-lexer",
+ "radix-types",
+ "rustc-hash",
+ "serde",
 ]
 
 [[package]]
@@ -856,6 +870,18 @@ dependencies = [
  "radix-mir-stepper",
  "radix-mir-wasm",
  "wat",
+]
+
+[[package]]
+name = "radix-mir-fmir"
+version = "0.79.0"
+dependencies = [
+ "postcard",
+ "radix-mir",
+ "radix-types",
+ "serde",
+ "serde_json",
+ "toml",
 ]
 
 [[package]]

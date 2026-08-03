@@ -1,6 +1,7 @@
 use super::*;
 use radix::lexer::Span;
 use radix::mir::MirTempId;
+use radix_mir_fmir::{fnv1a64, FNV1A64_OFFSET, FNV1A64_PRIME};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;

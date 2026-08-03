@@ -36,7 +36,14 @@ use radix::mir::{
     MirValueKind, StepperError,
 };
 use radix::semantic::{IndexExpr, Primitive, Type, TypeId, TypeTable, TypeTableSnapshot};
-use serde::{Deserialize, Serialize};
+use radix_mir_fmir::{
+    decode_binary_image, decode_text_image, encode_binary_image, encode_text_image, fnv1a64,
+    is_known_host_requirement, FmirBinaryImageFile, FmirImageError, FmirTextCliOperand,
+    FmirTextCliRootSection, FmirTextCliSection, FmirTextCliValueType, FmirTextImageFile,
+    FmirTextProgramSection, FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection,
+    FmirTextToolchainSection, FmirTextTypesSection, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME,
+    PACKAGE_MIR_ARTIFACT_VERSION,
+};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -70,11 +77,8 @@ pub fn with_lowered_package_mir<R>(
 // linked function-source ids must live above that range or rewritten namespace
 // calls can collide with import/local bindings and lower as indirect calls.
 const PACKAGE_MIR_SYNTHETIC_DEF_BASE: u32 = 2_000_000_000;
-const PACKAGE_MIR_ARTIFACT_VERSION: u32 = 3;
 const PACKAGE_MIR_TOOLCHAIN_VERSION: &str = env!("CARGO_PKG_VERSION");
 const PACKAGE_MIR_TARGET_NAME: &str = "scena";
-const FMIR_TEXT_TARGET_NAME: &str = "fmir-text";
-const FMIR_TARGET_NAME: &str = "fmir";
 const PACKAGE_MIR_ARTIFACT_DIR: &str = "faber-mir";
 const FMIR_BIN_ARTIFACT_DIR: &str = "exe";
 const PACKAGE_MIR_MANIFEST_FILE: &str = "image.toml";
@@ -84,8 +88,6 @@ const FMIR_BIN_ENTRYPOINT_FILE: &str = "run";
 const FMIR_BIN_RUNNER_CRATE_DIR: &str = "runner";
 const FMIR_BIN_RUNNER_TARGET_DIR: &str = "runner-target";
 const FMIR_BIN_RUNNER_PACKAGE_NAME: &str = "faber-fmir-bin-runner";
-const FNV1A64_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
-const FNV1A64_PRIME: u64 = 0x0100_0000_01b3;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct PackageMirArtifact {
@@ -147,106 +149,6 @@ enum PackageMirConsumer {
     ExternalTarget,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct FmirTextImageFile {
-    version: u32,
-    target: String,
-    package_root: String,
-    entry: String,
-    entry_function: String,
-    toolchain: FmirTextToolchainSection,
-    runtime: FmirTextRuntimeSection,
-    sources: FmirTextSourcesSection,
-    cli: Option<FmirTextCliSection>,
-    exit_code: Option<i32>,
-    types: FmirTextTypesSection,
-    interner: Vec<String>,
-    program: FmirTextProgramSection,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct FmirBinaryImageFile {
-    version: u32,
-    target: String,
-    package_root: String,
-    entry: String,
-    entry_function: String,
-    toolchain: FmirTextToolchainSection,
-    runtime: FmirTextRuntimeSection,
-    sources: FmirTextSourcesSection,
-    cli: Option<FmirTextCliSection>,
-    exit_code: Option<i32>,
-    types: FmirTextTypesSection,
-    interner: Vec<String>,
-    program: MirProgram,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct FmirTextRuntimeSection {
-    requirement: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct FmirTextToolchainSection {
-    faber_cli_version: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct FmirTextSourcesSection {
-    source: Vec<FmirTextSourceIdentity>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct FmirTextSourceIdentity {
-    file: String,
-    hash: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct FmirTextTypesSection {
-    table: TypeTableSnapshot,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct FmirTextProgramSection {
-    json: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct FmirTextCliSection {
-    root: FmirTextCliRootSection,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct FmirTextCliRootSection {
-    record: String,
-    operand: Vec<FmirTextCliOperand>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct FmirTextCliOperand {
-    field: String,
-    ty: FmirTextCliValueType,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-enum FmirTextCliValueType {
-    Textus,
-    Numerus,
-    Fractus,
-    Bivalens,
-}
 
 #[derive(Default)]
 struct CliPackagePlan {
@@ -753,7 +655,7 @@ fn package_fmir_text_image(
             .unwrap_or_default(),
         program: FmirTextProgramSection { json: program_json },
     };
-    toml::to_string_pretty(&image).map_err(|error| {
+    encode_text_image(&image).map_err(|error| {
         vec![mir_diag(
             &prepared.entry_path,
             format!("could not encode fmir-text image: {error}"),
@@ -799,7 +701,7 @@ fn package_fmir_binary_image(
             .unwrap_or_default(),
         program: lowered.program.clone(),
     };
-    postcard::to_allocvec(&image).map_err(|error| {
+    encode_binary_image(&image).map_err(|error| {
         vec![mir_diag(
             &prepared.entry_path,
             format!("could not encode fmir image: {error}"),
@@ -995,14 +897,6 @@ fn source_identity(
     })
 }
 
-fn fnv1a64(bytes: &[u8]) -> u64 {
-    let mut hash = FNV1A64_OFFSET;
-    for byte in bytes {
-        hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(FNV1A64_PRIME);
-    }
-    hash
-}
 
 fn check_fmir_runtime_requirements(image: &FmirPackageImage) -> Result<(), Vec<Diagnostic>> {
     let unsupported = image
@@ -1032,11 +926,7 @@ fn check_fmir_runtime_requirements(image: &FmirPackageImage) -> Result<(), Vec<D
 }
 
 fn is_known_fmir_runtime_requirement(requirement: &str) -> bool {
-    match requirement {
-        "host:argv" | "host:exit" | "host:stdout" | "host:stderr" | "host:stdin" | "host:fs"
-        | "host:env" | "host:cwd" | "host:pid" | "host:random" | "host:process" => true,
-        _ => is_known_fmir_kernel_requirement(requirement),
-    }
+    is_known_host_requirement(requirement) || is_known_fmir_kernel_requirement(requirement)
 }
 
 fn is_known_fmir_kernel_requirement(requirement: &str) -> bool {
@@ -1204,32 +1094,28 @@ fn patch_fmir_text_cli_record_fields(
 }
 
 fn load_fmir_text_image(text: &str, path: &Path) -> Result<FmirPackageImage, Vec<Diagnostic>> {
-    let image: FmirTextImageFile = toml::from_str(text).map_err(|error| {
-        vec![mir_issue_diag(
+    let image = decode_text_image(text, PACKAGE_MIR_TOOLCHAIN_VERSION).map_err(|error| match error {
+        FmirImageError::Parse(detail) => vec![mir_issue_diag(
             path,
             "fmir_text_image_parse_failed",
-            format!("could not parse fmir-text image: {error}"),
-        )]
-    })?;
-    if image.version != PACKAGE_MIR_ARTIFACT_VERSION {
-        return Err(vec![mir_issue_diag(
+            format!("could not parse fmir-text image: {detail}"),
+        )],
+        FmirImageError::UnsupportedVersion { actual, expected } => vec![mir_issue_diag(
             path,
             "fmir_text_image_version_unsupported",
-            format!(
-                "unsupported fmir-text image version {}; expected {}",
-                image.version, PACKAGE_MIR_ARTIFACT_VERSION
-            ),
+            format!("unsupported fmir-text image version {actual}; expected {expected}"),
         )
-        .with_arg("actual", image.version.to_string())
-        .with_arg("expected", PACKAGE_MIR_ARTIFACT_VERSION.to_string())]);
-    }
-    if image.target != FMIR_TEXT_TARGET_NAME {
-        return Err(vec![mir_diag(
+        .with_arg("actual", actual.to_string())
+        .with_arg("expected", expected.to_string())],
+        FmirImageError::WrongTarget { found: _, expected } => vec![mir_diag(
             path,
-            format!("fmir-text image target must be `{FMIR_TEXT_TARGET_NAME}`"),
-        )]);
-    }
-    check_fmir_toolchain(&image.toolchain, "fmir-text", path)?;
+            format!("fmir-text image target must be `{expected}`"),
+        )],
+        FmirImageError::UnsupportedToolchain { found, expected } => vec![mir_diag(
+            path,
+            format!("unsupported fmir-text image toolchain {found}; expected {expected}"),
+        )],
+    })?;
     let program = serde_json::from_str(&image.program.json).map_err(|error| {
         vec![mir_diag(
             path,
@@ -1250,31 +1136,27 @@ fn load_fmir_text_image(text: &str, path: &Path) -> Result<FmirPackageImage, Vec
 }
 
 fn load_fmir_image(bytes: &[u8], path: &Path) -> Result<FmirPackageImage, Vec<Diagnostic>> {
-    let image: FmirBinaryImageFile = postcard::from_bytes(bytes).map_err(|error| {
-        vec![mir_diag(
-            path,
-            format!("could not decode fmir image: {error}"),
-        )]
-    })?;
-    if image.version != PACKAGE_MIR_ARTIFACT_VERSION {
-        return Err(vec![mir_issue_diag(
-            path,
-            "fmir_image_version_unsupported",
-            format!(
-                "unsupported fmir image version {}; expected {}",
-                image.version, PACKAGE_MIR_ARTIFACT_VERSION
-            ),
-        )
-        .with_arg("actual", image.version.to_string())
-        .with_arg("expected", PACKAGE_MIR_ARTIFACT_VERSION.to_string())]);
-    }
-    if image.target != FMIR_TARGET_NAME {
-        return Err(vec![mir_diag(
-            path,
-            format!("fmir image target must be `{FMIR_TARGET_NAME}`"),
-        )]);
-    }
-    check_fmir_toolchain(&image.toolchain, "fmir", path)?;
+    let image = decode_binary_image(bytes, PACKAGE_MIR_TOOLCHAIN_VERSION)
+        .map_err(|error| match error {
+            FmirImageError::Parse(detail) => {
+                vec![mir_diag(path, format!("could not decode fmir image: {detail}"))]
+            }
+            FmirImageError::UnsupportedVersion { actual, expected } => vec![mir_issue_diag(
+                path,
+                "fmir_image_version_unsupported",
+                format!("unsupported fmir image version {actual}; expected {expected}"),
+            )
+            .with_arg("actual", actual.to_string())
+            .with_arg("expected", expected.to_string())],
+            FmirImageError::WrongTarget { found: _, expected } => vec![mir_diag(
+                path,
+                format!("fmir image target must be `{expected}`"),
+            )],
+            FmirImageError::UnsupportedToolchain { found, expected } => vec![mir_diag(
+                path,
+                format!("unsupported fmir image toolchain {found}; expected {expected}"),
+            )],
+        })?;
     Ok(FmirPackageImage {
         diagnostic_path: path.to_path_buf(),
         format: FmirPackageImageFormat::Fmir,
@@ -1288,22 +1170,6 @@ fn load_fmir_image(bytes: &[u8], path: &Path) -> Result<FmirPackageImage, Vec<Di
     })
 }
 
-fn check_fmir_toolchain(
-    toolchain: &FmirTextToolchainSection,
-    label: &str,
-    path: &Path,
-) -> Result<(), Vec<Diagnostic>> {
-    if toolchain.faber_cli_version == PACKAGE_MIR_TOOLCHAIN_VERSION {
-        return Ok(());
-    }
-    Err(vec![mir_diag(
-        path,
-        format!(
-            "unsupported {label} image toolchain {}; expected {}",
-            toolchain.faber_cli_version, PACKAGE_MIR_TOOLCHAIN_VERSION
-        ),
-    )])
-}
 
 fn validate_package_mir_manifest(manifest: &str, path: &Path) -> Result<(), Vec<Diagnostic>> {
     let has_version = manifest
