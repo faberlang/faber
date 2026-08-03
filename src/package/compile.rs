@@ -62,10 +62,10 @@ pub(crate) struct AnalyzedPackageUnit {
     pub(crate) expanded_library_imports: Vec<LibraryImportBinding>,
 }
 
-struct GeneratedPackageRust {
-    entry_code: Option<String>,
-    module_tree: ModuleNode,
-    diagnostics: Vec<Diagnostic>,
+pub(crate) struct GeneratedPackageRust {
+    pub(crate) entry_code: Option<String>,
+    pub(crate) module_tree: ModuleNode,
+    pub(crate) diagnostics: Vec<Diagnostic>,
 }
 
 /// Result of a package compile that explicitly carries the Go multi-module
@@ -430,6 +430,7 @@ fn compile_package_internal(
         &library_resolver,
         effective_test_selection.as_ref(),
         field_name_policy,
+        None,
     );
     let diagnostics = generated.diagnostics;
 
@@ -861,11 +862,12 @@ fn go_import_path(segment: &str) -> Option<&str> {
 #[path = "compile_test.rs"]
 mod tests;
 
-fn generate_package_rust(
+pub(crate) fn generate_package_rust(
     package: &mut AnalyzedPackage,
     library_resolver: &crate::library::LibraryResolver,
     test_selection: Option<&RustTestSelection>,
     field_name_policy: RustFieldNamePolicy,
+    loaded_links: Option<&BTreeMap<PathBuf, BTreeMap<String, PathBuf>>>,
 ) -> GeneratedPackageRust {
     let mut entry_code = None;
     let mut module_tree = ModuleNode::default();
@@ -900,6 +902,7 @@ fn generate_package_rust(
             after,
             &package.spec,
             library_resolver,
+            loaded_links.and_then(|links| links.get(&unit.path)),
         );
         let path = unit.path.display().to_string();
         // Only the package entry owns `main` and the generated host_register
@@ -1454,8 +1457,55 @@ fn local_import_siblings_for_unit<'a>(
     after: &'a [AnalyzedPackageUnit],
     spec: &super::PackageSpec,
     library_resolver: &crate::library::LibraryResolver,
+    links: Option<&BTreeMap<String, PathBuf>>,
 ) -> Vec<SiblingModuleExports<'a>> {
     let mut siblings = Vec::new();
+    if let Some(links) = links {
+        // Loaded-package path: local imports resolve from the explicit link
+        // table (import binding → target module path), never from the
+        // filesystem. The link table was captured at analysis time, so the
+        // loaded path observes the same sibling relationships the direct path
+        // would have derived from disk.
+        let mut seen_targets = BTreeSet::new();
+        for item in &unit.analysis.hir.items {
+            let radix::hir::HirItemKind::Import(import) = &item.kind else {
+                continue;
+            };
+            let import_path = unit.analysis.interner.resolve(import.path);
+            for import_item in &import.items {
+                let binding = unit
+                    .analysis
+                    .interner
+                    .resolve(import_item.alias.unwrap_or(import_item.name));
+                let Some(target) = links.get(binding) else {
+                    continue;
+                };
+                if !seen_targets.insert(target.clone()) {
+                    continue;
+                }
+                let Some(&candidate_index) = units_by_path.get(target) else {
+                    continue;
+                };
+                if candidate_index == unit_index {
+                    continue;
+                }
+                let sibling = if candidate_index < unit_index {
+                    &before[candidate_index]
+                } else {
+                    &after[candidate_index - unit_index - 1]
+                };
+                siblings.push(SiblingModuleExports {
+                    module_key: local_import_module_key(import_path),
+                    module_path: sibling.module_segments.clone(),
+                    hir: &sibling.analysis.hir,
+                    interner: &sibling.analysis.interner,
+                    types: &sibling.analysis.types,
+                    exports: sibling.export_names.clone(),
+                });
+            }
+        }
+        return siblings;
+    }
     for item in &unit.analysis.hir.items {
         let radix::hir::HirItemKind::Import(import) = &item.kind else {
             continue;

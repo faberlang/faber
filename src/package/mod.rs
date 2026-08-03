@@ -38,6 +38,7 @@ mod codegen;
 mod compile;
 mod discovery;
 mod dispatch;
+mod fhir;
 mod file_interface;
 mod frontmatter;
 mod go_build;
