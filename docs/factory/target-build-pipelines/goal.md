@@ -41,6 +41,11 @@ and a toolchain-integration exercise where the local compiler/linker exists but
 has never been wired into Faber. It must not advertise a stage that only emits
 text or passes a superficial validator.
 
+The scope also removes `faber run --interpret`. Interpreted execution belongs
+to `faber script`; `faber run` is the build/run product command. The paired
+`--compile` override is removed in the same clean break so `run` has no hidden
+engine-selection mode.
+
 ## Product rules
 
 ### `build`
@@ -60,6 +65,12 @@ text or passes a superficial validator.
 execute it through the correct runtime, loader, external host, or device
 dispatch path. A native runner around FMIR is a packaging mode of the FMIR
 target, not evidence that the Faber program was natively compiled.
+
+`faber run` must not interpret source through `--interpret`. `faber script`
+owns single-source, package, and archive interpretation through the MIR
+stepper. The old `--compile` flag is removed with `--interpret`; target choice
+and build behavior come from `--target`, package configuration, and the
+selected product route.
 
 ### Toolchain discovery
 
@@ -105,6 +116,10 @@ entrypoint, and observable run behavior must all be proven.
 - Delete the legacy `scena` target and its source-backed package-artifact
   routing. Migrate source execution to `faber script` and source-independent
   package execution to `fmir`/`fmir-bin` modes.
+- Remove `RunArgs.interpret` and `RunArgs.compile`, their parser/help entries,
+  the `should_interpret` override branch, and direct `run --interpret`/
+  `run --compile` references. Migrate interpreted tests and docs to `faber
+  script` before deleting the compatibility surface.
 - Define explicit format/runner options for FMIR and any other target with
   multiple downstream artifact forms.
 - Rewrite `faber targets` so `emit`, `build`, `package`, and `run` are separate
@@ -156,6 +171,8 @@ The exact order may change after toolchain probes, but no target receives a
 
 - Route `faber run` through the final artifact for native executables,
   portable loaders, external Wasm/Racket hosts, and GPU host/provider paths.
+- Keep interpreted execution on `faber script`; `faber run` has no
+  interpreter/compiler mode flags after the clean break.
 - Keep compile-only, validate-only, package-only, and run-capable states
   distinct in the capability table.
 - Add bounded executable/output/exit parity fixtures for each promoted target.
@@ -178,6 +195,8 @@ The exact order may change after toolchain probes, but no target receives a
 - [ ] Faber uses the canonical Radix target names with no lifecycle suffixes.
 - [ ] `scena` is removed from parsing, target discovery, build/run routing,
   artifacts, tests, and current documentation.
+- [ ] `faber run --interpret` and `faber run --compile` are removed rather than
+  retained as aliases; interpreted tests/docs use `faber script`.
 - [ ] `faber targets` reports separate `emit`, `build`, `package`, and `run`
   behavior with artifact and toolchain notes.
 - [ ] Rust, FHIR, and FMIR existing product paths remain green after remapping.
