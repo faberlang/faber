@@ -127,7 +127,8 @@ pub struct ManifestBuild {
     pub rust_field_names: ManifestRustFieldNames,
 }
 
-/// `[device]` metadata for package runner backend selection (N1.1).
+/// `[device]` metadata for package runner backend selection (N1.1) and the
+/// S1-6 vertical-slice host inputs.
 ///
 /// Mirrors `[build] target` for `-t/--target`: the package-level default is
 /// overridden by the CLI `--backend` flag; both are overridden by the
@@ -139,6 +140,15 @@ pub struct ManifestDevice {
     /// `None` selects the portable default `auto`.
     #[serde(default)]
     pub backend: Option<String>,
+
+    /// Host input values for the package's device-program input buffers
+    /// (S1-6 vertical slice). Keys are the kernel functions' buffer names
+    /// (parameter names); values are flat f32 element lists, row-major.
+    /// Carried into the packaged FMIR image's canonical device payload so
+    /// the ordinary `faber run --backend <metal|cuda>` command can copy them
+    /// in at launch.
+    #[serde(default)]
+    pub inputs: BTreeMap<String, Vec<f64>>,
 }
 
 /// Configuration for shader artifact packaging.
@@ -366,6 +376,25 @@ pub(crate) fn manifest_backend_selection(
             }
         }
     }
+}
+
+/// Map a manifest `[device] inputs` map to typed f32 host inputs (S1-6
+/// vertical slice). `None` when the key is absent. Values are flat f32
+/// element lists; f64 manifest values are converted to f32 (the campaign
+/// dtype).
+#[must_use]
+pub(crate) fn manifest_device_inputs(
+    inputs: &BTreeMap<String, Vec<f64>>,
+) -> BTreeMap<String, Vec<f32>> {
+    inputs
+        .iter()
+        .map(|(name, values)| {
+            (
+                name.clone(),
+                values.iter().map(|value| *value as f32).collect(),
+            )
+        })
+        .collect()
 }
 
 /// Read and deserialize a `faber.toml` manifest.

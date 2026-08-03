@@ -49,6 +49,41 @@ crate from source requires the sibling Radix, Cista, `faber-runtime`, and
 
 See `faber --help` and after-help text for the full surface.
 
+## Device execution (Metal / CUDA)
+
+`faber run` selects a device backend for device-capable packages (the
+differentiable-GPU campaign, S1-6 vertical slice):
+
+```bash
+faber run --backend metal <package>   # Apple Metal (e.g. Apple M5 Max)
+faber run --backend cuda  <package>   # NVIDIA CUDA (e.g. RTX 5070)
+faber run --backend auto  <package>   # resolve: exactly one admitted backend
+```
+
+- Backend selection precedence: CLI `--backend` > manifest `[device] backend`
+  > `auto`.
+- A package carries a device program when its source has an `@ nucleum`
+  compute kernel and its manifest declares a `[device]` section
+  (`backend`, and `inputs` for the kernel's input buffers).
+- The packaged FMIR image's `device` section carries the canonical device
+  program, the Metal MSL + CUDA PTX artifacts (each with a provenance hash),
+  the selection request, and the device runtime requirements; the composite
+  host runs it through a real Metal/CUDA session (load → allocate → copy-in →
+  launch → sync → readback → release) and reports the selected device, the
+  artifact/module hash, and the observed outputs.
+- An explicit GPU request never silently falls back: unavailable backends,
+  bad descriptors, entry/dtype/shape mismatches, and payload-less packages
+  fail closed with a stable structured code (`E_BACKEND_UNAVAILABLE`,
+  `E_DEVICE_DESCRIPTOR`, `E_DEVICE_ABI_MISMATCH`, `E_DEVICE_ENTRY_MISMATCH`,
+  `E_DEVICE_DTYPE_MISMATCH`, `E_DEVICE_SHAPE_MISMATCH`, `E_NO_DEVICE_PROGRAM`).
+- The `faber targets` rows for `metal-text` / `llvm-text` report `run=yes`
+  for this device-execution surface (`package=no` until the Stage 7 archive
+  gate); `-t metal-text` / `-t llvm-text` remain emit-only.
+
+Proof fixture: `examples/training/device-summa` (one tree-reduction kernel
+through the whole pipeline on both backends, numeric-policy v1.0.0 parity
+against its pinned CPU oracle).
+
 ## Factory goals
 
 Open product-lane factory tracks for this CLI live under

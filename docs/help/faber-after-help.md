@@ -35,6 +35,19 @@ Common flows:
   Run with arguments forwarded after `--`:
     faber run . -- --flag value
 
+  Device execution (Metal/CUDA, differentiable-GPU campaign S1-6):
+    faber run --backend metal <device-package>   # Apple Metal
+    faber run --backend cuda  <device-package>   # NVIDIA CUDA
+    faber run --backend auto  <device-package>   # exactly one admitted backend
+
+    A device-capable package has an `@ nucleum` kernel and a `[device]` manifest
+    section (backend + inputs). The packaged image's `device` section carries
+    the canonical device program and the MSL/PTX artifacts; the composite host
+    runs the kernel on a real Metal/CUDA session and reports the selected
+    device + artifact hash + outputs. Explicit GPU requests never silently fall
+    back; failures carry stable codes (E_BACKEND_UNAVAILABLE, E_DEVICE_*,
+    E_NO_DEVICE_PROGRAM). See `faber targets` (metal-text/llvm-text rows).
+
   Test selection (proba cases run on the MIR stepper, not a Cargo harness):
     faber test .
     faber test path/to/file.fab

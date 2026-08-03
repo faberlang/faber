@@ -53,24 +53,31 @@ pub(super) fn cmd_run(args: RunArgs) {
         std::process::exit(1);
     }
 
-    // S1-5 — the one host-construction policy (N1.1/N1.5). Resolve the
+    // S1-5/S1-6 — the one host-construction policy (N1.1/N1.5). Resolve the
     // effective backend selection (CLI `--backend` > manifest `[device]
     // backend` > default `auto`) and apply it before launch on every route.
-    // Source routes never carry a device program (their images are built with
-    // `device: None`), so an explicit GPU request fails closed
-    // (`E_NO_DEVICE_PROGRAM`) and `auto` keeps the CPU route unchanged. The
-    // image-runner route re-applies the same policy with the image's own
-    // device section.
+    // Routes that never carry a device program (rust / go / scena / fhir)
+    // fail closed up front (`E_NO_DEVICE_PROGRAM` for an explicit GPU
+    // request; `auto` keeps the CPU route). The package-MIR routes
+    // (`fmir-text` / `fmir` / `fmir-bin`) and the image-runner route build or
+    // load their FMIR image first and resolve against its `device` section.
     let selection = match resolve_route_selection(&args, &input_path) {
         Ok(selection) => selection,
         Err(diagnostic) => {
-            super::eprint_compile_diagnostics(&[*diagnostic]);
+            eprint_route_diagnostics(&[*diagnostic]);
             std::process::exit(1);
         }
     };
-    resolve_route_backend_or_exit(selection, false);
 
     let target = resolve_run_target(&args, &input_path);
+    let device_capable_route = matches!(
+        target,
+        Target::Fmir | Target::FmirText | Target::FmirBin
+    );
+    if !device_capable_route {
+        resolve_route_backend_or_exit(selection, false);
+    }
+
     match target {
         Target::Rust => {}
         Target::Go => {
@@ -82,15 +89,15 @@ pub(super) fn cmd_run(args: RunArgs) {
             return;
         }
         Target::FmirText => {
-            cmd_run_fmir_text(args);
+            cmd_run_fmir_text(args, selection);
             return;
         }
         Target::Fmir => {
-            cmd_run_fmir(args);
+            cmd_run_fmir(args, selection);
             return;
         }
         Target::FmirBin => {
-            cmd_run_fmir_bin(&args);
+            cmd_run_fmir_bin(&args, selection);
             return;
         }
         Target::Fhir => {
@@ -150,7 +157,7 @@ fn resolve_route_backend_or_exit(
     match package::resolve_backend_selection(selection, requires_device, &admitted) {
         Ok(backend) => backend,
         Err(diagnostic) => {
-            super::eprint_compile_diagnostics(&[diagnostic]);
+            eprint_route_diagnostics(&[diagnostic]);
             eprintln!("backend selection failed; aborting before launch");
             std::process::exit(1);
         }
@@ -175,6 +182,30 @@ fn run_target_name(target: Target) -> &'static str {
         Target::FmirBin => "fmir-bin",
         Target::Swift => "swift",
         Target::Fhir => "fhir",
+    }
+}
+
+/// Render route diagnostics with their stable host codes (N1.4). The
+/// composite-host failures carry `E_DEVICE_*` / `E_BACKEND_*` / `E_NO_*`
+/// `issue` args; surfacing them in the terminal keeps the fail-before-launch
+/// receipts self-describing (the structured code + issue + named args are
+/// always present on the [`Diagnostic`] for programmatic consumers).
+fn eprint_route_diagnostics(diagnostics: &[Diagnostic]) {
+    for diag in diagnostics {
+        if diag.is_error() {
+            match diag.issue() {
+                Some(code)
+                    if code.starts_with("E_DEVICE_")
+                        || code.starts_with("E_BACKEND_")
+                        || code.starts_with("E_NO_") =>
+                {
+                    eprintln!("error: {code}: {}", diag.message);
+                }
+                _ => eprintln!("error: {}", diag.message),
+            }
+        } else {
+            eprintln!("warning: {}", diag.message);
+        }
     }
 }
 
@@ -243,7 +274,7 @@ fn cmd_run_go(args: &RunArgs) {
         warn_policy_from_args(args),
     );
     let result = package::compile_package_go(&config, &input_path);
-    super::eprint_compile_diagnostics(&result.compile_result.diagnostics);
+    eprint_route_diagnostics(&result.compile_result.diagnostics);
     let Some(output) = result.compile_result.output else {
         eprintln!("compilation failed");
         std::process::exit(1);
@@ -296,19 +327,19 @@ fn cmd_run_scena(args: RunArgs) {
     let artifact = match package::build_package_mir_artifact(&config, &input_path, &argumenta) {
         Ok(artifact) => artifact,
         Err(diagnostics) => {
-            super::eprint_compile_diagnostics(&diagnostics);
+            eprint_route_diagnostics(&diagnostics);
             eprintln!("scena artifact build failed");
             std::process::exit(1);
         }
     };
     if let Err(diagnostics) = package::run_package_mir_artifact(&config, &artifact, &mut host) {
-        super::eprint_compile_diagnostics(&diagnostics);
+        eprint_route_diagnostics(&diagnostics);
         eprintln!("scena artifact execution failed");
         std::process::exit(1);
     }
 }
 
-fn cmd_run_fmir_text(args: RunArgs) {
+fn cmd_run_fmir_text(args: RunArgs, selection: DeviceSelection) {
     let input_path = PathBuf::from(&args.path);
     let warn_policy = warn_policy_from_args(&args);
     let mut host = StdioHost::with_argumenta(args.args);
@@ -321,19 +352,25 @@ fn cmd_run_fmir_text(args: RunArgs) {
     let image = match package::build_package_fmir_text_image(&config, &input_path, &[]) {
         Ok(image) => image,
         Err(diagnostics) => {
-            super::eprint_compile_diagnostics(&diagnostics);
+            eprint_route_diagnostics(&diagnostics);
             eprintln!("fmir-text image build failed");
             std::process::exit(1);
         }
     };
-    if let Err(diagnostics) = package::run_package_fmir_text_image(&image, &mut host) {
-        super::eprint_compile_diagnostics(&diagnostics);
+    // The one host-construction policy against the built image's device
+    // section (S1-6): a device-bearing image resolves `selection` against the
+    // admitted backends and runs through the composite host's device route;
+    // anything else runs the CPU/FMIR stepper.
+    if let Err(diagnostics) =
+        package::run_package_fmir_text_image_with_selection(&image, selection, &mut host)
+    {
+        eprint_route_diagnostics(&diagnostics);
         eprintln!("fmir-text image execution failed");
         std::process::exit(1);
     }
 }
 
-fn cmd_run_fmir(args: RunArgs) {
+fn cmd_run_fmir(args: RunArgs, selection: DeviceSelection) {
     let input_path = PathBuf::from(&args.path);
     let warn_policy = warn_policy_from_args(&args);
     let mut host = StdioHost::with_argumenta(args.args);
@@ -346,13 +383,19 @@ fn cmd_run_fmir(args: RunArgs) {
     let image = match package::build_package_fmir_image(&config, &input_path, &[]) {
         Ok(image) => image,
         Err(diagnostics) => {
-            super::eprint_compile_diagnostics(&diagnostics);
+            eprint_route_diagnostics(&diagnostics);
             eprintln!("fmir image build failed");
             std::process::exit(1);
         }
     };
-    if let Err(diagnostics) = package::run_package_fmir_image(&image, &mut host) {
-        super::eprint_compile_diagnostics(&diagnostics);
+    // The one host-construction policy against the built image's device
+    // section (S1-6, resolving the S1-5 open question: source-built images
+    // now carry the device section and the route flips to check it). A
+    // device-bearing image runs through the composite host's device route.
+    if let Err(diagnostics) =
+        package::run_package_fmir_image_with_selection(&image, selection, &mut host)
+    {
+        eprint_route_diagnostics(&diagnostics);
         eprintln!("fmir image execution failed");
         std::process::exit(1);
     }
@@ -373,7 +416,7 @@ fn cmd_run_fhir(args: RunArgs) {
     let artifact = match package::build_package_fhir(&config, &input_path) {
         Ok(artifact) => artifact,
         Err(diagnostics) => {
-            super::eprint_compile_diagnostics(&diagnostics);
+            eprint_route_diagnostics(&diagnostics);
             eprintln!("fhir package build failed");
             std::process::exit(1);
         }
@@ -381,7 +424,7 @@ fn cmd_run_fhir(args: RunArgs) {
     let loaded = match package::load_package_fhir(&artifact.package_path) {
         Ok(loaded) => loaded,
         Err(diagnostics) => {
-            super::eprint_compile_diagnostics(&diagnostics);
+            eprint_route_diagnostics(&diagnostics);
             eprintln!("fhir package load failed");
             std::process::exit(1);
         }
@@ -389,13 +432,13 @@ fn cmd_run_fhir(args: RunArgs) {
     if let Err(diagnostics) =
         package::run_loaded_package_fhir(&config, loaded, &artifact.root, &mut host)
     {
-        super::eprint_compile_diagnostics(&diagnostics);
+        eprint_route_diagnostics(&diagnostics);
         eprintln!("fhir package execution failed");
         std::process::exit(1);
     }
 }
 
-fn cmd_run_fmir_bin(args: &RunArgs) {
+fn cmd_run_fmir_bin(args: &RunArgs, selection: DeviceSelection) {
     let input_path = PathBuf::from(&args.path);
     let config = run_config_or_exit(
         Target::FmirBin,
@@ -407,11 +450,25 @@ fn cmd_run_fmir_bin(args: &RunArgs) {
         match package::build_package_fmir_binary_bundle(&config, &input_path, &[], args.release) {
             Ok(bundle) => bundle,
             Err(diagnostics) => {
-                super::eprint_compile_diagnostics(&diagnostics);
+                eprint_route_diagnostics(&diagnostics);
                 eprintln!("fmir-bin bundle build failed");
                 std::process::exit(1);
             }
         };
+    // The fmir-bin runner embeds the FMIR image bytes and applies the one
+    // host-construction policy at run time (the generated runner calls
+    // `run_fmir_image_bytes_with_stdio` with the image's recorded selection;
+    // the CLI `--backend` override is resolved here against the bundle's
+    // image before the executable is launched).
+    let decision = match package::fmir_image_route_decision(&bundle.image_path) {
+        Ok(decision) => decision,
+        Err(diagnostics) => {
+            eprint_route_diagnostics(&diagnostics);
+            eprintln!("fmir-bin image load failed");
+            std::process::exit(1);
+        }
+    };
+    resolve_route_backend_or_exit(selection, decision.requires_device);
     run_executable(&bundle.entrypoint_path, &args.args);
 }
 
@@ -423,7 +480,7 @@ pub(super) fn cmd_fmir_run_image(args: FmirRunArgs) {
     let decision = match package::fmir_image_route_decision(&args.image) {
         Ok(decision) => decision,
         Err(diagnostics) => {
-            super::eprint_compile_diagnostics(&diagnostics);
+            eprint_route_diagnostics(&diagnostics);
             eprintln!("fmir image load failed");
             std::process::exit(1);
         }
@@ -432,31 +489,19 @@ pub(super) fn cmd_fmir_run_image(args: FmirRunArgs) {
         .backend
         .map(BackendSelection::selection)
         .unwrap_or(decision.declared_selection);
-    let Some(backend) = resolve_route_backend_or_exit(selection, decision.requires_device) else {
-        let mut host = StdioHost::with_argumenta(args.args);
-        if let Err(diagnostics) = package::run_fmir_image_path(&args.image, &mut host) {
-            super::eprint_compile_diagnostics(&diagnostics);
-            eprintln!("fmir image execution failed");
-            std::process::exit(1);
-        }
-        return;
-    };
-    // Device route: the image carries a device program and the backend is
-    // admitted. Report the discovery receipt (selected device + artifact
-    // hash); descriptor construction + launch is the S1-6 consumption seam,
-    // and no executable descriptor is available yet — fail closed before any
-    // launch, never a silent CPU fallback.
-    match package::discovery_receipt(backend, &decision.declared_artifacts) {
-        Some(receipt) => receipt.print(),
-        None => {
-            super::eprint_compile_diagnostics(&[package::missing_backend_artifact(backend)]);
-            eprintln!("device program execution failed; aborting before launch");
-            std::process::exit(1);
-        }
+    let mut host = StdioHost::with_argumenta(args.args);
+    // The route function applies the one host-construction policy: a
+    // device-bearing image runs through the composite host's device route
+    // (S1-6 launch seam); anything else runs the CPU/FMIR stepper.
+    if let Err(diagnostics) = package::run_fmir_image_path_with_selection(
+        &args.image,
+        Some(selection),
+        &mut host,
+    ) {
+        eprint_route_diagnostics(&diagnostics);
+        eprintln!("fmir image execution failed");
+        std::process::exit(1);
     }
-    super::eprint_compile_diagnostics(&[package::missing_device_descriptor(backend)]);
-    eprintln!("device program execution failed; aborting before launch");
-    std::process::exit(1);
 }
 
 #[cfg(test)]
@@ -519,7 +564,7 @@ fn cmd_run_compiled(args: &RunArgs) {
     );
     let result = package::compile_package(&config, &input_path);
 
-    super::eprint_compile_diagnostics(&result.diagnostics);
+    eprint_route_diagnostics(&result.diagnostics);
 
     let Some(output) = result.output else {
         eprintln!("compilation failed");
@@ -567,7 +612,7 @@ fn cmd_run_compiled(args: &RunArgs) {
     let mut runtime_plan = match package::package_rust_runtime_plan(&config, &input_path) {
         Ok(plan) => plan,
         Err(diagnostics) => {
-            super::eprint_compile_diagnostics(&diagnostics);
+            eprint_route_diagnostics(&diagnostics);
             eprintln!("runtime plan failed");
             std::process::exit(1);
         }
@@ -575,7 +620,7 @@ fn cmd_run_compiled(args: &RunArgs) {
     if let Some(diagnostic) =
         package::package_host_selection_diagnostic(&runtime_plan, &layout.manifest_path)
     {
-        super::eprint_compile_diagnostics(&[diagnostic]);
+        eprint_route_diagnostics(&[diagnostic]);
         eprintln!("runtime plan failed");
         std::process::exit(1);
     }
@@ -587,7 +632,7 @@ fn cmd_run_compiled(args: &RunArgs) {
                 .collect();
         }
         Err(diagnostics) => {
-            super::eprint_compile_diagnostics(&diagnostics);
+            eprint_route_diagnostics(&diagnostics);
             eprintln!("library dependency graph failed");
             std::process::exit(1);
         }

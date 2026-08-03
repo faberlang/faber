@@ -6,6 +6,7 @@
 #![allow(dead_code)] // Binary and library targets exercise different package runner surfaces.
 
 use super::compile::{analyze_package, AnalyzedPackage, AnalyzedPackageUnit};
+use faber::device::DeviceSelection;
 use super::import_graph::{resolve_import, ImportResolution};
 use super::library::{
     library_cached_analysis, library_cached_file_interface, with_library_cached_analysis_mut,
@@ -121,6 +122,13 @@ struct PreparedPackageMir<'a> {
     runtime_requirements: Vec<String>,
     cli_exit_code: Option<i32>,
     fmir_text_cli: Option<FmirTextCliSection>,
+    /// S1-6 vertical-slice device inputs (`[device] inputs`, mapped to f32).
+    device_inputs: BTreeMap<String, Vec<f32>>,
+    /// S1-6 device backend request (`[device] backend`), if declared.
+    device_backend: Option<faber::device::DeviceSelection>,
+    /// Whether the package declared any `[device]` surface (backend or
+    /// inputs) — the opt-in that constructs a device payload.
+    device_declared: bool,
     _marker: std::marker::PhantomData<&'a ()>,
 }
 
@@ -227,7 +235,7 @@ pub(crate) fn run_package_mir<H: Host + ?Sized>(
             lowered,
             prepared.entry_path.clone(),
             FmirPackageImageFormat::Source,
-        );
+        )?;
         run_fmir_package_image(image, host)
     })
 }
@@ -257,7 +265,7 @@ pub(crate) fn run_package_mir_from_loaded<H: Host + ?Sized>(
                 lowered,
                 prepared.entry_path.clone(),
                 FmirPackageImageFormat::Source,
-            );
+            )?;
             run_fmir_package_image(image, host)
         },
     )
@@ -409,7 +417,22 @@ pub(crate) fn run_package_fmir_text_image<H: Host + ?Sized>(
         )]
     })?;
     let loaded = load_fmir_text_image(&image_text, &image.image_path)?;
-    run_fmir_package_image(loaded, host)
+    run_loaded_fmir_image_route(loaded, host)
+}
+
+pub(crate) fn run_package_fmir_text_image_with_selection<H: Host + ?Sized>(
+    image: &PackageFmirTextImage,
+    selection: DeviceSelection,
+    host: &mut H,
+) -> Result<(), Vec<Diagnostic>> {
+    let image_text = fs::read_to_string(&image.image_path).map_err(|error| {
+        vec![mir_diag(
+            &image.image_path,
+            format!("could not read fmir-text image: {error}"),
+        )]
+    })?;
+    let loaded = load_fmir_text_image(&image_text, &image.image_path)?;
+    run_loaded_fmir_image_route_with_selection(loaded, selection, host)
 }
 
 pub(crate) fn run_package_fmir_image<H: Host + ?Sized>(
@@ -419,8 +442,65 @@ pub(crate) fn run_package_fmir_image<H: Host + ?Sized>(
     run_fmir_image_path(&image.image_path, host)
 }
 
+pub(crate) fn run_package_fmir_image_with_selection<H: Host + ?Sized>(
+    image: &PackageFmirImage,
+    selection: DeviceSelection,
+    host: &mut H,
+) -> Result<(), Vec<Diagnostic>> {
+    run_fmir_image_path_with_selection(&image.image_path, Some(selection), host)
+}
+
+/// **The one host-construction policy on the image-runner routes** (N1.1/
+/// N1.5, S1-6): resolve the loaded image's selection against the machine's
+/// admitted backends; a device-bearing image that resolves runs through the
+/// composite host's device route (S1-6 launch seam), anything else runs the
+/// CPU/FMIR stepper. Fail-closed diagnostics; an explicit GPU request never
+/// silently falls back.
+fn run_loaded_fmir_image_route<H: Host + ?Sized>(
+    image: FmirPackageImage,
+    host: &mut H,
+) -> Result<(), Vec<Diagnostic>> {
+    let selection = image.route_selection();
+    run_loaded_fmir_image_route_with_selection(image, selection, host)
+}
+
+/// The same policy with an explicit selection override (the image-runner
+/// route's `--backend` flag, N1.1 precedence: CLI > image's declared
+/// selection > `auto`).
+fn run_loaded_fmir_image_route_with_selection<H: Host + ?Sized>(
+    image: FmirPackageImage,
+    selection: faber::device::DeviceSelection,
+    host: &mut H,
+) -> Result<(), Vec<Diagnostic>> {
+    let requires_device = image.device.is_some();
+    match super::host_factory::resolve_backend_selection(
+        selection,
+        requires_device,
+        &super::host_factory::admitted_backends(),
+    ) {
+        Err(diagnostic) => Err(vec![diagnostic]),
+        Ok(None) => run_fmir_package_image(image, host),
+        Ok(Some(backend)) => {
+            let device = image.device.as_ref().ok_or_else(|| {
+                vec![super::host_factory::missing_device_descriptor(backend)]
+            })?;
+            super::device::execute_device_route(device, backend)
+        }
+    }
+}
+
 pub(crate) fn run_fmir_image_path<H: Host + ?Sized>(
     image_path: &Path,
+    host: &mut H,
+) -> Result<(), Vec<Diagnostic>> {
+    run_fmir_image_path_with_selection(image_path, None, host)
+}
+
+/// Run an FMIR image file under the one host-construction policy, with an
+/// optional selection override (the image-runner `--backend` flag).
+pub(crate) fn run_fmir_image_path_with_selection<H: Host + ?Sized>(
+    image_path: &Path,
+    selection_override: Option<faber::device::DeviceSelection>,
     host: &mut H,
 ) -> Result<(), Vec<Diagnostic>> {
     let image_bytes = fs::read(image_path).map_err(|error| {
@@ -430,7 +510,8 @@ pub(crate) fn run_fmir_image_path<H: Host + ?Sized>(
         )]
     })?;
     let loaded = load_fmir_image(&image_bytes, image_path)?;
-    run_fmir_package_image(loaded, host)
+    let selection = selection_override.unwrap_or_else(|| loaded.route_selection());
+    run_loaded_fmir_image_route_with_selection(loaded, selection, host)
 }
 
 /// S1-5 route decision for a binary FMIR image (the image-runner route of the
@@ -501,21 +582,13 @@ pub fn run_fmir_image_bytes_with_stdio(
         }
         Ok(Some(backend)) => {
             // Device route: the image carries a device program and the
-            // backend is admitted. Report the discovery receipt (selected
-            // device + artifact hash); descriptor construction + launch is
-            // the S1-6 consumption seam, and no executable descriptor is
-            // available yet — fail closed before any launch, never a silent
-            // CPU fallback.
-            let artifacts = loaded
-                .device
-                .as_ref()
-                .map(|device| device.artifacts.artifact.clone())
-                .unwrap_or_default();
-            match super::host_factory::discovery_receipt(backend, &artifacts) {
-                Some(receipt) => receipt.print(),
-                None => return Err(vec![super::host_factory::missing_backend_artifact(backend)]),
-            }
-            Err(vec![super::host_factory::missing_device_descriptor(backend)])
+            // backend is admitted. Run it through the composite host's
+            // device route (S1-6 launch seam); fail-before-launch applies
+            // inside the descriptor validation.
+            let device = loaded.device.as_ref().ok_or_else(|| {
+                vec![super::host_factory::missing_device_descriptor(backend)]
+            })?;
+            super::device::execute_device_route(device, backend)
         }
     }
 }
@@ -535,13 +608,76 @@ impl FmirPackageImage {
     }
 }
 
+/// Construct the packaged device section for a prepared package, when the
+/// package declares a `[device]` surface (S1-6): the device-program
+/// constructor scans the lowered MIR for `@ nucleum` compute kernels, emits
+/// the Metal MSL + CUDA PTX artifacts (S1-3 emitters), and assembles the
+/// canonical payload + selection + runtime requirements. `None` for packages
+/// without a device declaration (no device payload; the CPU route is
+/// unchanged).
+fn package_device_section(
+    prepared: &PreparedPackageMir<'_>,
+    lowered: &LoweredMirUnit<'_>,
+    diagnostic_path: &Path,
+) -> Result<Option<FmirDeviceSection>, Vec<Diagnostic>> {
+    if !prepared.device_declared {
+        return Ok(None);
+    }
+    let Some(program) =
+        super::device::device_program_for_lowered(&lowered.validated, &lowered.interner)?
+    else {
+        // The selected entry lowers to no compute kernel: no device payload.
+        // An explicit GPU request for this package fails closed at run time
+        // (N1.1: "package has no device program"); `auto` keeps the CPU
+        // route. (A `faber script` capture runner in the same package —
+        // e.g. a CPU oracle — legitimately has no kernel.)
+        return Ok(None);
+    };
+    // Fail closed when a declared input is missing for an input buffer.
+    for kernel in &program.kernels {
+        for resource in &kernel.resources {
+            if resource.buffer.role == radix_mir::device_program::BufferRole::Input
+                && !prepared.device_inputs.contains_key(&resource.buffer.name)
+            {
+                return Err(vec![mir_issue_diag(
+                    diagnostic_path,
+                    "package_device_input_missing",
+                    format!(
+                        "[device] inputs has no value for kernel `{}` input buffer `{}`",
+                        kernel.entry, resource.buffer.name
+                    ),
+                )
+                .with_arg("buffer", resource.buffer.name.clone())]);
+            }
+        }
+    }
+    let selection =
+        prepared
+            .device_backend
+            .unwrap_or(faber::device::DeviceSelection::Auto);
+    let section = super::device::device_section_for_program(
+        &program,
+        &lowered.validated,
+        &lowered.interner,
+        selection,
+        &prepared.device_inputs,
+        S1_6_PTX_TARGET,
+    )?;
+    Ok(Some(section))
+}
+
+/// The NVPTX target the S1-6 device images compile for (the accepted pharos
+/// hardware: NVIDIA RTX 5070, sm_120; the S1-3 PTX smoke used the same).
+const S1_6_PTX_TARGET: &str = "sm_120";
+
 fn fmir_package_image_from_lowered(
     prepared: &PreparedPackageMir<'_>,
     lowered: &LoweredMirUnit<'_>,
     diagnostic_path: PathBuf,
     format: FmirPackageImageFormat,
-) -> FmirPackageImage {
-    FmirPackageImage {
+) -> Result<FmirPackageImage, Vec<Diagnostic>> {
+    let device = package_device_section(prepared, lowered, &diagnostic_path)?;
+    Ok(FmirPackageImage {
         diagnostic_path,
         format,
         entry_function: "run_entry".to_owned(),
@@ -556,10 +692,8 @@ fn fmir_package_image_from_lowered(
             .map(|interner| interner.strings().to_vec())
             .unwrap_or_default(),
         program: lowered.program.clone(),
-        // Source-built FMIR has no device payload (no device-program
-        // constructor is wired into the source route; N1.1/N1.5).
-        device: None,
-    }
+        device,
+    })
 }
 
 fn run_fmir_package_image<H: Host + ?Sized>(
@@ -693,12 +827,16 @@ fn with_prepared_package_mir_with_cli_mode_and_consumer<R>(
         bridge_norma_providers_to_kernel(&mut lowered, &entry_path)?;
     }
     let runtime_requirements = collect_package_runtime_requirements(&lowered, &cli_plan);
+    let (device_inputs, device_backend, device_declared) = manifest_device_config(input)?;
     let prepared = PreparedPackageMir {
         entry_path: entry_path.clone(),
         source_paths,
         runtime_requirements,
         cli_exit_code: cli_plan.exit_code,
         fmir_text_cli: cli_plan.fmir_text_cli.clone(),
+        device_inputs,
+        device_backend,
+        device_declared,
         _marker: std::marker::PhantomData,
     };
     run(&prepared, &lowered)
@@ -757,12 +895,19 @@ fn with_prepared_package_mir_from_loaded<R>(
     })?;
     bridge_norma_providers_to_kernel(&mut lowered, &entry_path)?;
     let runtime_requirements = collect_package_runtime_requirements(&lowered, &cli_plan);
+    // The FHIR-loaded route reconstructs the package from an envelope; no
+    // filesystem manifest is consulted here, so no device payload is
+    // constructed on this route (N1.1: source routes reject explicit GPU
+    // requests; `auto` keeps the CPU route).
     let prepared = PreparedPackageMir {
         entry_path: entry_path.clone(),
         source_paths,
         runtime_requirements,
         cli_exit_code: cli_plan.exit_code,
         fmir_text_cli: cli_plan.fmir_text_cli.clone(),
+        device_inputs: BTreeMap::new(),
+        device_backend: None,
+        device_declared: false,
         _marker: std::marker::PhantomData,
     };
     run(&prepared, &lowered)
@@ -772,6 +917,28 @@ fn package_artifact_root(input: &Path) -> Result<PathBuf, Vec<Diagnostic>> {
     super::discover_build_layout(input)
         .map(|layout| layout.package_root)
         .map_err(|diagnostic| vec![*diagnostic])
+}
+
+/// Read the package's `[device]` surface for the S1-6 device payload:
+/// `[device] inputs` (typed f32 host inputs) and `[device] backend` (the
+/// selection request recorded in the image). Absent manifest → no device
+/// declaration.
+fn manifest_device_config(
+    input: &Path,
+) -> Result<(BTreeMap<String, Vec<f32>>, Option<faber::device::DeviceSelection>, bool), Vec<Diagnostic>>
+{
+    let layout = super::discover_build_layout(input).map_err(|diagnostic| vec![*diagnostic])?;
+    if !layout.manifest_path.exists() {
+        return Ok((BTreeMap::new(), None, false));
+    }
+    let manifest =
+        super::read_manifest(&layout.manifest_path).map_err(|diagnostic| vec![*diagnostic])?;
+    let inputs = super::manifest_device_inputs(&manifest.device.inputs);
+    let backend =
+        super::manifest_backend_selection(manifest.device.backend.as_deref(), &layout.manifest_path)
+            .map_err(|diagnostic| vec![*diagnostic])?;
+    let declared = !inputs.is_empty() || backend.is_some();
+    Ok((inputs, backend, declared))
 }
 
 fn package_mir_manifest(prepared: &PreparedPackageMir<'_>, package_root: &Path) -> String {
@@ -828,6 +995,8 @@ fn package_fmir_text_image(
         .collect::<Result<Vec<_>, _>>()?;
     sources.sort_by(|left, right| left.file.cmp(&right.file));
 
+    let device = package_device_section(prepared, lowered, &prepared.entry_path)?;
+
     let image = FmirTextImageFile {
         version: PACKAGE_MIR_ARTIFACT_VERSION,
         target: FMIR_TEXT_TARGET_NAME.to_owned(),
@@ -853,7 +1022,7 @@ fn package_fmir_text_image(
             .map(|interner| interner.strings().to_vec())
             .unwrap_or_default(),
         program: FmirTextProgramSection { json: program_json },
-        device: None,
+        device,
     };
     encode_text_image(&image).map_err(|error| {
         vec![mir_diag(
@@ -874,6 +1043,8 @@ fn package_fmir_binary_image(
         .map(|path| source_identity(path, package_root))
         .collect::<Result<Vec<_>, _>>()?;
     sources.sort_by(|left, right| left.file.cmp(&right.file));
+
+    let device = package_device_section(prepared, lowered, &prepared.entry_path)?;
 
     let image = FmirBinaryImageFile {
         version: PACKAGE_MIR_ARTIFACT_VERSION,
@@ -900,7 +1071,7 @@ fn package_fmir_binary_image(
             .map(|interner| interner.strings().to_vec())
             .unwrap_or_default(),
         program: lowered.program.clone(),
-        device: None,
+        device,
     };
     encode_binary_image(&image).map_err(|error| {
         vec![mir_diag(
