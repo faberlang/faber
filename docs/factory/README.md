@@ -51,6 +51,7 @@ docs/factory/check-state-consistency.sh
 
 | Goal | Status | Entry |
 | ---- | ------ | ----- |
+| Target build pipeline completion | proposed — follow-on to Radix target normalization; remap existing builds and wire available external toolchains without false capability claims | [`target-build-pipelines/goal.md`](target-build-pipelines/goal.md) |
 | Autograd-equivalent roadmap | roadmap — PyTorch-near autograd-equivalent milestone scoped to evidence and next units; no public PyTorch parity claim | [`autograd-equivalent-roadmap/deck.md`](autograd-equivalent-roadmap/deck.md) |
 | Inference session boundary | proposed — Faber-owned inference/session boundary, static model artifact oracle check, and session CLI contract defined; no runtime implementation or capability claim | [`inference-session-boundary/goal.md`](inference-session-boundary/goal.md) |
 | MIR library-import execution (LIB-MIR) | implemented — `faber run -t fmir` links and runs library imports; gradus consumer proof FD-matches | [`mir-library-imports/goal.md`](mir-library-imports/goal.md) |
