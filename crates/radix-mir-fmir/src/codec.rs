@@ -7,8 +7,8 @@
 
 use crate::error::FmirImageError;
 use crate::schema::{
-    check_target, check_toolchain, check_version, FmirBinaryImageFile, FmirTextImageFile,
-    FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME,
+    admit_device_section, check_target, check_toolchain, check_version, FmirBinaryImageFile,
+    FmirTextImageFile, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME,
 };
 
 /// Serialize a text image to pretty TOML.
@@ -34,6 +34,9 @@ pub fn decode_text_image(
     check_version(&image.version)?;
     check_target(&image.target, FMIR_TEXT_TARGET_NAME)?;
     check_toolchain(&image.toolchain.faber_cli_version, expected_toolchain)?;
+    if let Some(device) = &image.device {
+        admit_device_section(device)?;
+    }
     Ok(image)
 }
 
@@ -50,6 +53,9 @@ pub fn decode_binary_image(
     check_version(&image.version)?;
     check_target(&image.target, FMIR_TARGET_NAME)?;
     check_toolchain(&image.toolchain.faber_cli_version, expected_toolchain)?;
+    if let Some(device) = &image.device {
+        admit_device_section(device)?;
+    }
     Ok(image)
 }
 
@@ -97,6 +103,7 @@ mod tests {
             program: FmirTextProgramSection {
                 json: "{}".to_owned(),
             },
+            device: None,
         }
     }
 
@@ -131,6 +138,7 @@ mod tests {
             },
             interner: vec!["main".to_owned()],
             program: MirProgram::new(),
+            device: None,
         }
     }
 
@@ -158,14 +166,15 @@ mod tests {
 
     #[test]
     fn decode_rejects_unsupported_version() {
+        // A pre-break version-3 image fails closed under the 3→4 clean break.
         let mut image = text_image();
-        image.version = 2;
+        image.version = 3;
         let text = encode_text_image(&image).expect("encode text image");
         assert!(matches!(
             decode_text_image(&text, "0.79.0"),
             Err(FmirImageError::UnsupportedVersion {
-                actual: 2,
-                expected: 3
+                actual: 3,
+                expected: 4
             })
         ));
     }

@@ -30,12 +30,33 @@ pub enum FmirImageError {
     },
 
     /// The toolchain version recorded in the image does not match the
-    /// expected compiler version (faber's crate version).
+    /// expected compiler version (faber's crate version). A device payload is
+    /// admitted only from the exact producing toolchain version (N1.7).
     UnsupportedToolchain {
         /// Toolchain version recorded in the image.
         found: String,
         /// Toolchain version the loader expects.
         expected: String,
+    },
+
+    /// A device runtime requirement is not a known `device:` capability
+    /// (`device:metal`, `device:cuda`). Unknown `device:` requirements fail
+    /// admission at package load (N1.7).
+    UnsupportedRuntimeRequirement {
+        /// The rejected requirement string.
+        requirement: String,
+    },
+
+    /// A backend artifact's stored FNV-1a provenance hash does not match its
+    /// blob. Provenance is verified on admission (A9); a tampered or
+    /// miscomputed hash fails closed.
+    ArtifactHashMismatch {
+        /// Backend the mismatched artifact declares.
+        backend: crate::schema::FmirDeviceBackend,
+        /// Hash stored in the image.
+        expected: String,
+        /// Hash recomputed from the blob.
+        actual: String,
     },
 }
 
@@ -59,6 +80,24 @@ impl fmt::Display for FmirImageError {
                 write!(
                     f,
                     "unsupported FMIR image toolchain {found}; expected {expected}"
+                )
+            }
+            Self::UnsupportedRuntimeRequirement { requirement } => write!(
+                f,
+                "unsupported FMIR device runtime requirement `{requirement}` (expected `device:metal` or `device:cuda`)"
+            ),
+            Self::ArtifactHashMismatch {
+                backend,
+                expected,
+                actual,
+            } => {
+                let spelling = match backend {
+                    crate::schema::FmirDeviceBackend::Metal => "metal",
+                    crate::schema::FmirDeviceBackend::Cuda => "cuda",
+                };
+                write!(
+                    f,
+                    "FMIR device artifact hash mismatch for backend `{spelling}` (stored {expected}, recomputed {actual})"
                 )
             }
         }

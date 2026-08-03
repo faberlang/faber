@@ -1217,6 +1217,7 @@ dependencies = [
  "radix-types",
  "serde",
  "serde_json",
+ "sha2",
  "toml 1.1.4+spec-1.1.0",
 ]
 
