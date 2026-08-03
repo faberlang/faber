@@ -133,6 +133,11 @@ pub fn construct_composite_host(
 /// fail with typed diagnostics **before any launch** (N1.4). Returns an A9
 /// receipt when the lifecycle completes.
 ///
+/// Single-run convenience over the program-session seam
+/// ([`create_program_session`]): one session per call, torn down on success;
+/// a failed execution releases every handle on the error path (S2-3) before
+/// the error escapes.
+///
 /// # Errors
 /// - `E_NO_DEVICE_PROGRAM` — no device session on this host;
 /// - `E_DEVICE_DESCRIPTOR` — wrong-backend or structurally bad descriptor;
@@ -146,8 +151,14 @@ pub fn execute_device_descriptor(
     inputs: &BTreeMap<u32, Vec<f32>>,
     outputs: &[u32],
 ) -> Result<DeviceExecutionReceipt, Diagnostic> {
-    host.execute_descriptor(descriptor, inputs, outputs)
-        .map_err(|error| host_error_diagnostic(&error))
+    let mut session = create_program_session(host, descriptor)?;
+    let receipt = session
+        .execute(inputs, outputs)
+        .map_err(|error| host_error_diagnostic(&error))?;
+    session
+        .teardown()
+        .map_err(|error| host_error_diagnostic(&error))?;
+    Ok(receipt)
 }
 
 /// Create a program-scoped device session (S2-1).
@@ -163,7 +174,11 @@ pub fn execute_device_descriptor(
 /// - `E_DEVICE_DESCRIPTOR` — wrong-backend or structurally bad descriptor;
 /// - typed descriptor conflicts (`E_DEVICE_ABI_MISMATCH` etc.);
 /// - session-level failures (module load, allocation) bubble through.
-#[allow(dead_code)] // S2-1 consumption seam; Stage 2 run path uses it directly.
+///
+/// Wired through the crate-visible host-factory re-export (mod.rs), is the
+/// backing of the [`execute_device_descriptor`] single-run convenience, and
+/// is exercised by the S2-1 seam tests on fake drivers; the Stage 2 run path
+/// consumes it directly.
 pub fn create_program_session<'host>(
     host: &'host mut CompositeHost,
     descriptor: &DeviceDescriptor,

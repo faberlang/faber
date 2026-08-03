@@ -141,11 +141,11 @@ pub(crate) use mir::{
 };
 #[allow(unused_imports)] // the one host-construction policy for the run routes.
 pub(crate) use host_factory::{
-    admitted_backends, construct_composite_host, discovery_receipt, effective_backend_selection,
-    execute_device_descriptor, host_error_diagnostic, missing_backend_artifact,
-    missing_device_descriptor, resolve_backend_selection, BackendDiscoveryReceipt,
-    E_BACKEND_UNAVAILABLE, E_DEVICE_ABI_MISMATCH, E_DEVICE_DESCRIPTOR, E_DEVICE_DTYPE_MISMATCH,
-    E_DEVICE_ENTRY_MISMATCH, E_DEVICE_SHAPE_MISMATCH, E_NO_DEVICE_PROGRAM,
+    admitted_backends, construct_composite_host, create_program_session, discovery_receipt,
+    effective_backend_selection, execute_device_descriptor, host_error_diagnostic,
+    missing_backend_artifact, missing_device_descriptor, resolve_backend_selection,
+    BackendDiscoveryReceipt, E_BACKEND_UNAVAILABLE, E_DEVICE_ABI_MISMATCH, E_DEVICE_DESCRIPTOR,
+    E_DEVICE_DTYPE_MISMATCH, E_DEVICE_ENTRY_MISMATCH, E_DEVICE_SHAPE_MISMATCH, E_NO_DEVICE_PROGRAM,
 };
 #[allow(unused_imports)] // the S1-6 device-route seam (constructor + execution).
 pub(crate) use device::{

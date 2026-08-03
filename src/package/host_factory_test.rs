@@ -343,3 +343,34 @@ fn missing_declared_input_fails_before_launch() {
         .expect_err("missing declared input must fail before launch");
     assert_eq!(err.issue(), Some(E_DEVICE_SHAPE_MISMATCH));
 }
+
+// ---------------------------------------------------------------------------
+// Program-session seam (S2-1): create_program_session
+// ---------------------------------------------------------------------------
+
+#[test]
+fn create_program_session_returns_a_session_for_a_device_program() {
+    let mut host = metal_composite("add_one");
+    let descriptor = elementwise_add_descriptor(DeviceBackend::Metal, "add_one", 2);
+    let mut session = create_program_session(&mut host, &descriptor)
+        .expect("device-bearing image on a fake driver must yield a session");
+    // The session is usable: one execute() call drives the full lifecycle on
+    // the already-loaded module and the pre-allocated per-program buffers.
+    let receipt = session
+        .execute(&add_inputs(vec![1.0, 2.0], vec![3.0, 4.0]), &[3])
+        .expect("session executes without reloading or re-allocating");
+    assert_eq!(receipt.launches, 1);
+    assert_eq!(receipt.outputs.get(&3).map(Vec::as_slice), Some(&[4.0, 6.0][..]));
+}
+
+#[test]
+fn create_program_session_on_cpu_only_host_refuses_fail_closed() {
+    let mut host = CompositeHost::new(CompositeHostConfig::cpu()).expect("cpu composite");
+    let descriptor = elementwise_add_descriptor(DeviceBackend::Metal, "add_one", 2);
+    let err = match create_program_session(&mut host, &descriptor) {
+        Ok(_) => panic!("cpu-only host must refuse a device program session, not panic"),
+        Err(diagnostic) => diagnostic,
+    };
+    assert_eq!(err.issue(), Some(E_NO_DEVICE_PROGRAM));
+    assert!(err.message.contains("no device session"));
+}
