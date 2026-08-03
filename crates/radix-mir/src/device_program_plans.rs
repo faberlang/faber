@@ -13,12 +13,16 @@
 //! mapping surface the device-program pipeline consumes:
 //!
 //! - [`plan_for_collection_op`] — the direct `MirCollectionOp →
-//!   CollectionKernelPlan` mapping (elementwise ops map to the no-recipe
-//!   [`CollectionKernelPlan::Elementwise`]);
+//!   CollectionKernelPlan` mapping (fail-closed: an op with no recipe under
+//!   the resolved contract errors with a typed [`PlanMappingError`], never a
+//!   silent [`CollectionKernelPlan::Elementwise`] floor);
 //! - [`kernel_plan_for_function`] — re-derives the plan from a kernel
-//!   function's typed facts (statement scan + ABI contract + operand shapes),
-//!   used by the emitters to cross-check a device program's carried plan
-//!   against the MIR it was built from (A3: typed facts only, never text);
+//!   function's typed facts (full statement scan + ABI contract + operand
+//!   shapes), used by the emitters to cross-check a device program's carried
+//!   plan against the MIR it was built from (A3: typed facts only, never
+//!   text). The scan covers ALL statements: a multi-op body is either
+//!   verified against the carried plan or rejected with a typed diagnostic —
+//!   never guessed from the first matching statement;
 //! - [`carried_plan_agrees`] — the agreement predicate for that cross-check;
 //! - [`KernelLaunchDescriptor`] + [`launch_descriptors`] — the typed
 //!   per-kernel launch facts hosts consume (entry, recipe kind,
@@ -80,31 +84,52 @@ impl From<MirAbiError> for PlanMappingError {
 ///
 /// Maps a collection intrinsic plus the resolved dispatch contract onto the
 /// closed recipe set through the shared plan pass
-/// ([`CollectionKernelPlan::from_contract`]). Elementwise kernels map to the
-/// no-recipe [`CollectionKernelPlan::Elementwise`] — the fallback the shared
-/// plan pass documents for kernels without a recipe.
+/// ([`CollectionKernelPlan::from_contract`]).
+///
+/// **Fail-closed (N3.2):** an op that has no recipe under the resolved
+/// contract is a [`PlanMappingError`], never a silent
+/// [`CollectionKernelPlan::Elementwise`] floor. Elementwise kernels are
+/// decided by the function-level scan ([`kernel_plan_for_function`]) from
+/// the body's complete op set; this op-level mapping admits recipe ops only
+/// — an elementwise op under a recipe contract is a dispatch/op mismatch and
+/// fails closed here too.
 ///
 /// The caller must already hold the resolved [`CollectionOpContract`] (the
 /// sibling of the plan pass; `abi::collection_op_contract`) and, for a
 /// `TensorMatMul` op, the exact operand shapes `(M, K, N)`; the contract
 /// stops at the tile grid, the recipe needs the exact dims.
-#[must_use]
+///
+/// # Errors
+/// Returns [`PlanMappingError`] when the op has no recipe under the resolved
+/// contract (unplannable collection op, or an elementwise op under a recipe
+/// contract).
 pub fn plan_for_collection_op(
     signature: &MirKernelSignature,
     contract: &CollectionOpContract,
     op: MirCollectionOp,
     matmul_shapes: Option<MatMulShapes>,
-) -> CollectionKernelPlan {
+) -> Result<CollectionKernelPlan, PlanMappingError> {
     CollectionKernelPlan::from_contract(signature, contract, op, matmul_shapes)
-        .unwrap_or(CollectionKernelPlan::Elementwise)
+        .map_or_else(
+            || {
+                Err(PlanMappingError::mapping(format!(
+                    "collection op {op:?} has no kernel plan under the resolved {contract:?} contract \
+                     (no recipe; elementwise kernels are decided by the function-level scan, \
+                     never by a silent Elementwise fallback)"
+                )))
+            },
+            Ok,
+        )
 }
 
 /// Re-derive the collection-op plan from a kernel function's typed facts.
 ///
-/// Runs the same typed inputs the shared plan pass consumes — the statement
-/// scan's collection op, the ABI dispatch contract, and (for matmul) the
-/// operand dims resolved from the operands' tensor types — and returns the
-/// plan the function carries, or `None` for elementwise kernels (no recipe).
+/// Runs the same typed inputs the shared plan pass consumes — the **full**
+/// statement scan's collection-op set (never the first matching statement),
+/// the ABI dispatch contract, and (for matmul) the operand dims resolved
+/// from the operands' tensor types — and returns the plan the function
+/// carries, or `None` for a kernel whose op set is elementwise-only (no
+/// recipe).
 ///
 /// The emitters use this to cross-check a [`DeviceProgram`] kernel's **carried**
 /// plan against the MIR function it was built from: a carried recipe that
@@ -113,28 +138,75 @@ pub fn plan_for_collection_op(
 ///
 /// # Errors
 /// Returns [`PlanMappingError`] when the contract resolver cannot resolve the
-/// operand shapes (rank, static dims, inner-dimension agreement).
+/// operand shapes (rank, static dims, inner-dimension agreement), when a
+/// recipe op has no resolved contract or no plan under it, when a body mixes
+/// collection ops with conflicting recipes, or when the body carries a
+/// collection op that is neither recipe-plannable nor a known elementwise
+/// transform (e.g. `TensorTranspose` — D1): **never a silent `Elementwise`.**
 pub fn kernel_plan_for_function(
     function: &MirFunction,
     signature: &MirKernelSignature,
     validation: &MirValidationContext<'_>,
 ) -> Result<Option<CollectionKernelPlan>, PlanMappingError> {
-    let Some(contract) = collection_op_contract(function, validation)? else {
+    // Scan ALL statements: the kernel body's plan is decided by its complete
+    // collection-op set, never by the first matching statement (N3.2).
+    let ops = collection_ops_for_function(function);
+    if ops.is_empty() {
         return Ok(None);
-    };
-    let Some(op) = collection_op_for_function(function) else {
-        return Ok(None);
-    };
-    let matmul_shapes = match op {
-        MirCollectionOp::TensorMatMul => kernel_matmul_shapes(function, validation)?,
-        _ => None,
-    };
-    Ok(CollectionKernelPlan::from_contract(
-        signature,
-        &contract,
-        op,
-        matmul_shapes,
-    ))
+    }
+    // The ABI dispatch contract (reduction / matmul), when the body carries a
+    // recipe op; elementwise-only bodies resolve no contract. Matmul shapes
+    // are resolved once from the body's matmul statement scan.
+    let contract = collection_op_contract(function, validation)?;
+    let matmul_shapes = kernel_matmul_shapes(function, validation)?;
+    let mut recipe: Option<CollectionKernelPlan> = None;
+    for op in ops {
+        match op {
+            // Recipe ops must resolve under the carried contract; a second
+            // distinct recipe must agree exactly (never guessed).
+            MirCollectionOp::Sum
+            | MirCollectionOp::TensorMean
+            | MirCollectionOp::TensorMatMul => {
+                let Some(contract) = &contract else {
+                    return Err(PlanMappingError::mapping(format!(
+                        "collection op {op:?} has a recipe but no resolved dispatch contract"
+                    )));
+                };
+                let shapes = if op == MirCollectionOp::TensorMatMul {
+                    matmul_shapes
+                } else {
+                    None
+                };
+                let plan = CollectionKernelPlan::from_contract(
+                    signature, contract, op, shapes,
+                )
+                .ok_or_else(|| {
+                    PlanMappingError::mapping(format!(
+                        "collection op {op:?} has no kernel plan under the resolved {contract:?} contract"
+                    ))
+                })?;
+                if let Some(existing) = &recipe {
+                    if existing != &plan {
+                        return Err(PlanMappingError::mapping(format!(
+                            "kernel body mixes collection ops with conflicting recipes \
+                             ({op:?} resolves to {plan:?}, but the body already carries {existing:?})"
+                        )));
+                    }
+                }
+                recipe = Some(plan);
+            }
+            // Elementwise transforms contribute no recipe; the function-level
+            // scan decides them elementwise.
+            _ if is_elementwise_collection_op(op) => {}
+            _ => {
+                return Err(PlanMappingError::mapping(format!(
+                    "collection op {op:?} has no kernel plan \
+                     (no recipe and not an elementwise transform)"
+                )));
+            }
+        }
+    }
+    Ok(recipe)
 }
 
 /// Whether a device program's carried plan agrees with the plan re-derived
@@ -283,10 +355,12 @@ fn shared_memory_layout_bytes(layout: &SharedMemoryLayout) -> u64 {
         .saturating_mul(u64::try_from(layout.element_byte_width).unwrap_or(u64::MAX))
 }
 
-/// The first collection op in a kernel body's statement scan (the same scan
-/// `abi::collection_op_contract` runs; the plan pass needs the op to
-/// distinguish `Sum` from `TensorMean` and to recognize matmul).
-fn collection_op_for_function(function: &MirFunction) -> Option<MirCollectionOp> {
+/// The distinct collection ops in a kernel body's statement scan, in scan
+/// order (the same scan `abi::collection_op_contract` runs; the plan pass
+/// needs the FULL op set — never the first match only (N3.2) — to decide
+/// recipe presence and to reject unplannable ops with a typed diagnostic).
+fn collection_ops_for_function(function: &MirFunction) -> Vec<MirCollectionOp> {
+    let mut ops: Vec<MirCollectionOp> = Vec::new();
     for block in &function.blocks {
         for statement in &block.statements {
             if let MirStatementKind::RuntimeCall {
@@ -298,11 +372,35 @@ fn collection_op_for_function(function: &MirFunction) -> Option<MirCollectionOp>
                 ..
             } = &statement.kind
             {
-                return Some(*op);
+                if !ops.contains(op) {
+                    ops.push(*op);
+                }
             }
         }
     }
-    None
+    ops
+}
+
+/// Whether a collection op is a pointwise tensor transform the generic
+/// elementwise kernel body covers (no recipe). This is the closed set that
+/// decides the no-recipe plan: an op outside it has no kernel plan and fails
+/// closed with a typed diagnostic (N3.2 — never a silent `Elementwise`).
+///
+/// The set is grounded in the emitters' elementwise arms and the reverse-AD
+/// op surface the companion materializer consumes (elementwise
+/// mul/div/fill): every member is a uniform pointwise transform.
+fn is_elementwise_collection_op(op: MirCollectionOp) -> bool {
+    matches!(
+        op,
+        MirCollectionOp::TensorAdd
+            | MirCollectionOp::TensorSub
+            | MirCollectionOp::TensorMul
+            | MirCollectionOp::TensorDiv
+            | MirCollectionOp::TensorNeg
+            | MirCollectionOp::TensorFill
+            | MirCollectionOp::TensorRelu
+            | MirCollectionOp::TensorGelu
+    )
 }
 
 /// Matmul operand shapes `(M, K, N)` resolved from the `TensorMatMul`

@@ -318,9 +318,149 @@ fn elementwise_function(types: &mut TypeTable) -> MirFunction {
     }
 }
 
-// -----------------------------------------------------------------------
-// Device-program fixtures (kernel units the launch descriptors derive from).
-// -----------------------------------------------------------------------
+/// Build a kernel function whose body is exactly the given collection-op
+/// statements. All params and locals share one tensor type (`length`), so
+/// the ABI/plan operand scans resolve them; the function returns the last
+/// statement's destination local. This is the fixture builder the multi-op
+/// and fail-closed plan tests use (N3.2: a kernel body's plan is decided by
+/// its complete collection-op set, never the first matching statement).
+fn tensor_kernel_function(
+    types: &mut TypeTable,
+    length: u64,
+    param_count: u32,
+    ops: &[(MirCollectionOp, Vec<u32>, u32)],
+) -> MirFunction {
+    let tensor = tensor_ty(types, length);
+    let mut max_local = param_count;
+    let mut statements = Vec::with_capacity(ops.len());
+    let mut return_local = MirLocalId(0);
+    for (op, args, destination) in ops {
+        max_local = max_local.max(*destination + 1);
+        for &arg in args {
+            max_local = max_local.max(arg + 1);
+        }
+        return_local = MirLocalId(*destination);
+        statements.push(MirStatement {
+            kind: MirStatementKind::RuntimeCall {
+                destination: Some(MirPlace::local(MirLocalId(*destination))),
+                call: MirRuntimeCall {
+                    intrinsic: MirIntrinsic::Collection(*op),
+                    args: args
+                        .iter()
+                        .map(|&local| MirOperand::Place(MirPlace::local(MirLocalId(local))))
+                        .collect(),
+                    return_ty: tensor,
+                },
+            },
+            span: test_span(),
+        });
+    }
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: (0..param_count)
+            .map(|local| MirParam {
+                local: MirLocalId(local),
+                name: None,
+                ty: tensor,
+                mode: MirParamMode::Owned,
+                span: test_span(),
+            })
+            .collect(),
+        locals: (0..max_local)
+            .map(|id| MirLocal {
+                id: MirLocalId(id),
+                name: None,
+                ty: tensor,
+                mutable: false,
+                span: test_span(),
+            })
+            .collect(),
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements,
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    return_local,
+                )))),
+                span: test_span(),
+            },
+            span: test_span(),
+        }],
+        return_ty: tensor,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: test_span(),
+    }
+}
+
+/// `t = mul(x, w); s = sum(t)` — the S3-A2 forward shape (elementwise
+/// transform + tree reduction in one body).
+fn mul_sum_function(types: &mut TypeTable, length: u64) -> MirFunction {
+    tensor_kernel_function(
+        types,
+        length,
+        2,
+        &[
+            (MirCollectionOp::TensorMul, vec![0, 1], 2),
+            (MirCollectionOp::Sum, vec![2], 3),
+        ],
+    )
+}
+
+/// `s = sum(x); m = mean(x)` — two distinct recipe ops in one body.
+fn sum_mean_function(types: &mut TypeTable, length: u64) -> MirFunction {
+    tensor_kernel_function(
+        types,
+        length,
+        1,
+        &[
+            (MirCollectionOp::Sum, vec![0], 1),
+            (MirCollectionOp::TensorMean, vec![0], 2),
+        ],
+    )
+}
+
+/// `t = transpose(x)` — the D1 unplannable op (no recipe, not elementwise).
+fn transpose_function(types: &mut TypeTable) -> MirFunction {
+    tensor_kernel_function(
+        types,
+        4,
+        1,
+        &[(MirCollectionOp::TensorTranspose, vec![0], 1)],
+    )
+}
+
+/// `t = mul(x, w); u = transpose(t)` — elementwise op does not excuse an
+/// unplannable sibling statement.
+fn mul_transpose_function(types: &mut TypeTable) -> MirFunction {
+    tensor_kernel_function(
+        types,
+        4,
+        2,
+        &[
+            (MirCollectionOp::TensorMul, vec![0, 1], 2),
+            (MirCollectionOp::TensorTranspose, vec![2], 3),
+        ],
+    )
+}
+
+/// `t = add(x, w); u = mul(x, w)` — elementwise-only multi-op body.
+fn add_mul_function(types: &mut TypeTable) -> MirFunction {
+    tensor_kernel_function(
+        types,
+        4,
+        2,
+        &[
+            (MirCollectionOp::TensorAdd, vec![0, 1], 2),
+            (MirCollectionOp::TensorMul, vec![0, 1], 3),
+        ],
+    )
+}
 
 fn identity(id: u32, name: &str, role: BufferRole) -> BufferIdentity {
     BufferIdentity {
@@ -364,6 +504,7 @@ fn carried_reduction_plan(length: u64, workgroup_x: u32, partials: u64) -> Colle
         partials,
     };
     plan_for_collection_op(&signature, &contract, MirCollectionOp::Sum, None)
+        .expect("Sum under a reduction contract carries a plan")
 }
 
 fn elementwise_device_program() -> DeviceProgram {
@@ -423,7 +564,8 @@ fn sum_maps_to_tree_reduction() {
         workgroup_x: 256,
         partials: 4,
     };
-    let plan = plan_for_collection_op(&signature, &contract, MirCollectionOp::Sum, None);
+    let plan = plan_for_collection_op(&signature, &contract, MirCollectionOp::Sum, None)
+        .expect("Sum under a reduction contract carries a plan");
     let CollectionKernelPlan::TreeReduction(reduction) = &plan else {
         panic!("Sum must map to a tree-reduction plan, got {plan:?}");
     };
@@ -441,7 +583,8 @@ fn tensor_mean_maps_to_tree_reduction() {
         workgroup_x: 256,
         partials: 4,
     };
-    let plan = plan_for_collection_op(&signature, &contract, MirCollectionOp::TensorMean, None);
+    let plan = plan_for_collection_op(&signature, &contract, MirCollectionOp::TensorMean, None)
+        .expect("TensorMean under a reduction contract carries a plan");
     let CollectionKernelPlan::TreeReduction(reduction) = &plan else {
         panic!("TensorMean must map to a tree-reduction plan, got {plan:?}");
     };
@@ -465,7 +608,8 @@ fn matmul_maps_to_tiled_matmul() {
         &contract,
         MirCollectionOp::TensorMatMul,
         Some(shapes),
-    );
+    )
+    .expect("TensorMatMul under a matmul contract carries a plan");
     let CollectionKernelPlan::TiledMatMul(matmul) = &plan else {
         panic!("TensorMatMul must map to a tiled-matmul plan, got {plan:?}");
     };
@@ -483,17 +627,25 @@ fn matmul_maps_to_tiled_matmul() {
 }
 
 #[test]
-fn elementwise_op_maps_to_elementwise_plan() {
-    // A non-recipe op keeps the no-recipe fallback even under a reduction
-    // contract: the mapping never invents a recipe for an elementwise op.
+fn elementwise_op_under_recipe_contract_fails_closed() {
+    // N3.2: an elementwise op under a recipe (reduction) contract is a
+    // dispatch/op mismatch — the op-level mapping must never fall back to a
+    // silent Elementwise. Elementwise kernels are decided by the
+    // function-level scan ([`kernel_plan_for_function`]) from the body's
+    // complete op set instead.
     let signature = reduction_signature(1024, 256, 4);
     let contract = CollectionOpContract::Reduction {
         length: 1024,
         workgroup_x: 256,
         partials: 4,
     };
-    let plan = plan_for_collection_op(&signature, &contract, MirCollectionOp::TensorRelu, None);
-    assert_eq!(plan, CollectionKernelPlan::Elementwise);
+    let error = plan_for_collection_op(&signature, &contract, MirCollectionOp::TensorRelu, None)
+        .expect_err("elementwise op under a recipe contract must fail closed");
+    assert!(
+        error.message.contains("no kernel plan"),
+        "expected the typed plan diagnostic, got: {}",
+        error.message
+    );
 }
 
 // -----------------------------------------------------------------------
@@ -563,6 +715,106 @@ fn carried_plan_agrees_rejects_recipe_mismatch() {
     // A no-recipe carried plan on a function that carries a recipe is a
     // contradiction (and vice versa).
     assert!(!carried_plan_agrees(
+        &CollectionKernelPlan::Elementwise,
+        derived.as_ref()
+    ));
+}
+
+// -----------------------------------------------------------------------
+// Fail-closed plan surface (N3.2: no plan is an error, never Elementwise).
+// -----------------------------------------------------------------------
+
+#[test]
+fn unplannable_collection_op_fails_closed_with_typed_diagnostic() {
+    // D1: a device-routed function emitting TensorTranspose has no recipe and
+    // is not an elementwise transform — the plan pass must fail with the
+    // typed diagnostic, never a silent Elementwise.
+    let mut types = TypeTable::new();
+    let function = transpose_function(&mut types);
+    let signature = reduction_signature(1024, 256, 4);
+    let validation = MirValidationContext::new(&types);
+    let error = kernel_plan_for_function(&function, &signature, &validation)
+        .expect_err("TensorTranspose must fail the plan pass");
+    assert!(
+        error.message.contains("TensorTranspose"),
+        "diagnostic must name the op, got: {}",
+        error.message
+    );
+    assert!(
+        error.message.contains("no kernel plan"),
+        "diagnostic must say no kernel plan, got: {}",
+        error.message
+    );
+}
+
+#[test]
+fn multi_op_body_mixed_elementwise_and_recipe_derives_recipe_plan() {
+    // N3.2: a body mixing an elementwise transform (mul) with a recipe op
+    // (Sum) is scanned across ALL statements — the derived plan is the
+    // recipe. The old single-op scan saw only the first statement (mul) and
+    // silently floored the reduction to Elementwise; the full scan fixes
+    // that false floor.
+    let mut types = TypeTable::new();
+    let function = mul_sum_function(&mut types, 1024);
+    let signature = reduction_signature(1024, 256, 4);
+    let validation = MirValidationContext::new(&types);
+    let derived = kernel_plan_for_function(&function, &signature, &validation)
+        .expect("mul+sum body facts resolve")
+        .expect("mul+sum body carries the reduction recipe");
+    let CollectionKernelPlan::TreeReduction(reduction) = &derived else {
+        panic!("mul+sum body must derive a tree-reduction plan, got {derived:?}");
+    };
+    assert_eq!(reduction.op, ReduceOp::Sum);
+    assert_eq!(reduction.length, 1024);
+}
+
+#[test]
+fn multi_op_body_conflicting_recipes_fail_closed() {
+    // Two distinct recipe ops in one body cannot share one carried plan —
+    // reject with a typed diagnostic, never guessed.
+    let mut types = TypeTable::new();
+    let function = sum_mean_function(&mut types, 1024);
+    let signature = reduction_signature(1024, 256, 4);
+    let validation = MirValidationContext::new(&types);
+    let error = kernel_plan_for_function(&function, &signature, &validation)
+        .expect_err("conflicting recipes must be rejected");
+    assert!(
+        error.message.contains("conflicting recipes"),
+        "expected the conflicting-recipes diagnostic, got: {}",
+        error.message
+    );
+}
+
+#[test]
+fn multi_op_body_with_unplannable_op_fails_closed() {
+    // An elementwise sibling does not excuse an unplannable statement — the
+    // full scan still rejects it.
+    let mut types = TypeTable::new();
+    let function = mul_transpose_function(&mut types);
+    let signature = reduction_signature(1024, 256, 4);
+    let validation = MirValidationContext::new(&types);
+    let error = kernel_plan_for_function(&function, &signature, &validation)
+        .expect_err("an elementwise op does not excuse an unplannable op");
+    assert!(
+        error.message.contains("TensorTranspose"),
+        "diagnostic must name the unplannable op, got: {}",
+        error.message
+    );
+}
+
+#[test]
+fn elementwise_only_multi_op_body_is_elementwise() {
+    // A body whose ops are ALL elementwise transforms carries no recipe: the
+    // scan decides `None` (elementwise), the typed decision — not a
+    // fallback.
+    let mut types = TypeTable::new();
+    let function = add_mul_function(&mut types);
+    let signature = reduction_signature(1024, 256, 4);
+    let validation = MirValidationContext::new(&types);
+    let derived = kernel_plan_for_function(&function, &signature, &validation)
+        .expect("elementwise-only body facts resolve");
+    assert!(derived.is_none(), "an elementwise-only body carries no recipe");
+    assert!(carried_plan_agrees(
         &CollectionKernelPlan::Elementwise,
         derived.as_ref()
     ));
