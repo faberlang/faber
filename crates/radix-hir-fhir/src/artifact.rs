@@ -1,9 +1,9 @@
 //! Serializable snapshot types for HIR artifact round-trips.
 //!
-//! These types are foundation-owned (F19) and live alongside [`HirArtifact`] in
-//! `radix-hir`. Package `radix` constructs snapshots at the façade boundary
-//! via `to_snapshot()` methods and reconstructs runtime types from snapshots
-//! during loading (U2.2).
+//! These types are the portable FHIR wire contract (F19) and live in the
+//! `radix-hir-fhir` format crate. Package `radix` constructs snapshots at the
+//! façade boundary via `to_snapshot()` methods and reconstructs runtime types
+//! from snapshots during loading (U2.2).
 //!
 //! FREEZES CITED
 //! =============
@@ -359,7 +359,7 @@ pub enum GpuBuiltinWire {
 /// Schema version for the HIR artifact format.
 ///
 /// Starts at 1 and ratchets on each breaking HIR change (`F3`). Version 2
-/// adds the [`HirPresentation`](crate::nodes::HirPresentation) sidecar to
+/// adds the [`HirPresentation`](radix_hir::HirPresentation) sidecar to
 /// [`HirArtifact`]; schema-v1 artifacts are rejected by the loader (no
 /// compatibility decoder).
 pub const SCHEMA_VERSION: u32 = 2;
@@ -393,12 +393,12 @@ pub struct HirArtifact {
     pub source_identity: SourceIdentity,
 
     /// Full lowered HIR program (direct serde).
-    pub hir: crate::nodes::HirProgram,
+    pub hir: radix_hir::HirProgram,
 
     /// Presentation sidecar: trivia attachments, structural ends, and the
     /// entry-start anchor (schema v2). Inseparable from the HIR value it
-    /// annotates; never on [`HirProgram`](crate::nodes::HirProgram).
-    pub presentation: crate::nodes::HirPresentation,
+    /// annotates; never on [`HirProgram`](radix_hir::HirProgram).
+    pub presentation: radix_hir::HirPresentation,
 
     /// CLI program contract when the unit declares `incipit argumenta` (`F17`, `F18`).
     pub cli_program: Option<CliProgramWire>,
@@ -413,7 +413,7 @@ pub struct HirArtifact {
     pub resolver: ResolverSnapshot,
 
     /// Library import registry (`F15`; serde-derivable per `U0.3`).
-    pub libraries: crate::nodes::LibraryRegistry,
+    pub libraries: radix_hir::LibraryRegistry,
 
     /// Function effect and capture facts (`F20`: wire DTO).
     pub function_facts: FunctionFactTableWire,
@@ -435,91 +435,7 @@ pub struct HirArtifact {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::nodes::{HirId, HirItem, HirItemKind, HirPresentation, HirProgram, LibraryRegistry};
-    use radix_lexer::Symbol;
-
-    /// Construct a minimal valid `HirProgram` with one empty function.
-    fn stub_hir_program() -> HirProgram {
-        let def_id = DefId(0);
-        let item = HirItem {
-            id: HirId(0),
-            def_id,
-            kind: HirItemKind::Function(Box::new(crate::nodes::HirFunction {
-                name: Symbol(0),
-                type_params: Vec::new(),
-                params: Vec::new(),
-                cli_args: None,
-                ret_ty: None,
-                err_ty: None,
-                body: None,
-                posture: radix_syntax::CallablePosture::SyncFinite,
-                is_async: false,
-                is_generator: false,
-                is_kernel: false,
-                is_device: false,
-                is_vertex: false,
-                is_fragment: false,
-                test: None,
-                annotations: Vec::new(),
-            })),
-            span: radix_lexer::Span::default(),
-        };
-        HirProgram {
-            items: vec![item],
-            entry: None,
-            entry_annotations: Vec::new(),
-            entry_args_name: None,
-            entry_is_async: false,
-        }
-    }
-
-    /// Construct a minimal valid `HirPresentation` with no trivia.
-    fn stub_presentation() -> HirPresentation {
-        use crate::nodes::{HirProgramEnd, HirSourceAnchorId};
-        HirPresentation {
-            owners: Vec::new(),
-            attachments: Vec::new(),
-            block_ends: Vec::new(),
-            program_end: HirProgramEnd {
-                id: HirSourceAnchorId(0),
-                span: radix_lexer::Span::default(),
-            },
-            entry_start_anchor: None,
-        }
-    }
-
-    /// Construct a minimal valid `HirArtifact` with stub data in all required fields.
-    fn stub_artifact() -> HirArtifact {
-        use radix_types::TypeTable;
-        let types = TypeTable::new();
-        HirArtifact {
-            schema_version: SCHEMA_VERSION,
-            source_identity: SourceIdentity {
-                content_hash: "abc123".to_string(),
-                relative_path: "test.faber".to_string(),
-            },
-            hir: stub_hir_program(),
-            presentation: stub_presentation(),
-            cli_program: None,
-            types: types.snapshot(),
-            interner: vec!["main".to_string(), "test".to_string()],
-            resolver: ResolverSnapshot {
-                namespace_exports: Vec::new(),
-                file_interfaces: Vec::new(),
-                used_namespaces: Vec::new(),
-                imported_nominal_types: Vec::new(),
-                ambiguous_imported_nominal_types: Vec::new(),
-            },
-            libraries: LibraryRegistry::default(),
-            function_facts: FunctionFactTableWire {
-                entries: Vec::new(),
-                entry: None,
-            },
-            resolved_uses: Vec::new(),
-            analysis_stamp: 42,
-            gpu_builtins: Vec::new(),
-        }
-    }
+    use crate::test_support::stub_artifact;
 
     #[test]
     fn hir_artifact_round_trip() {

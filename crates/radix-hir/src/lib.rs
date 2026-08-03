@@ -8,12 +8,10 @@
 //! [`DefId`] is defined in `radix-types` and re-exported here so existing
 //! `hir::DefId` paths keep working.
 
-pub mod artifact;
 mod nodes;
 #[cfg(test)]
 mod presentation_test;
 pub mod visit;
 
-pub use artifact::*;
 pub use nodes::*;
 pub use radix_types::DefId;

@@ -10,6 +10,7 @@ members = [
     "crates/radix-runtime-contract",
     "crates/radix-diagnostics",
     "crates/radix-hir",
+    "crates/radix-hir-fhir",
     "crates/radix-lexer",
     "crates/radix-syntax",
     "crates/radix-types",
