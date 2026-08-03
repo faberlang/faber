@@ -9,7 +9,7 @@
 //! `crate::codegen::frame_shim` for every target backend.
 //!
 //! KEEP IN SYNC: `radix::builtins::frame_types::STATUS_VARIANTS` and the text emissions in
-//! `radix_codegen_rust::frame_shim` (verified by `#[cfg(test)] mod tests` in this file).
+//! `radix_hir_rust::frame_shim` (verified by `#[cfg(test)] mod tests` in this file).
 
 /// Frame lifecycle status for stream `ad` conversations.
 ///

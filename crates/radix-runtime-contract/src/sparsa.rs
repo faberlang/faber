@@ -5,7 +5,7 @@
 //! expected to become a generated/committed artifact in a later phase. Copied
 //! faithfully so compile-time and runtime emit byte-identical error text.
 //!
-//! KEEP IN SYNC: `radix-codegen-rust/src/runtime_contract_sparsa.rs`
+//! KEEP IN SYNC: `radix-hir-rust/src/runtime_contract_sparsa.rs`
 //! (verified by `#[cfg(test)] mod tests` in this file).
 
 /// Shape dimension must be non-negative.
@@ -32,34 +32,34 @@ pub const ERR_PONDE_INVALID_INDEX: &str = "sparsa ponde invalid index";
 mod tests {
     use super::*;
 
-    /// All `ERR_*` constants match the `radix-codegen-rust` third copy.
+    /// All `ERR_*` constants match the `radix-hir-rust` third copy.
     #[test]
     fn err_constants_match_codegen_copy() {
-        let codegen = radix_codegen_rust::runtime_contract_sparsa::ERR_NEGATIVE_DIM;
+        let codegen = radix_hir_rust::runtime_contract_sparsa::ERR_NEGATIVE_DIM;
         assert_eq!(ERR_NEGATIVE_DIM, codegen);
 
-        let codegen = radix_codegen_rust::runtime_contract_sparsa::ERR_NEGATIVE_INDEX;
+        let codegen = radix_hir_rust::runtime_contract_sparsa::ERR_NEGATIVE_INDEX;
         assert_eq!(ERR_NEGATIVE_INDEX, codegen);
 
-        let codegen = radix_codegen_rust::runtime_contract_sparsa::ERR_INDEX_OUT_OF_BOUNDS;
+        let codegen = radix_hir_rust::runtime_contract_sparsa::ERR_INDEX_OUT_OF_BOUNDS;
         assert_eq!(ERR_INDEX_OUT_OF_BOUNDS, codegen);
 
-        let codegen = radix_codegen_rust::runtime_contract_sparsa::ERR_RANK_MISMATCH;
+        let codegen = radix_hir_rust::runtime_contract_sparsa::ERR_RANK_MISMATCH;
         assert_eq!(ERR_RANK_MISMATCH, codegen);
 
-        let codegen = radix_codegen_rust::runtime_contract_sparsa::ERR_NONNIHIL_COUNT_OVERFLOW;
+        let codegen = radix_hir_rust::runtime_contract_sparsa::ERR_NONNIHIL_COUNT_OVERFLOW;
         assert_eq!(ERR_NONNIHIL_COUNT_OVERFLOW, codegen);
 
-        let codegen = radix_codegen_rust::runtime_contract_sparsa::ERR_ELEMENT_COUNT_OVERFLOW;
+        let codegen = radix_hir_rust::runtime_contract_sparsa::ERR_ELEMENT_COUNT_OVERFLOW;
         assert_eq!(ERR_ELEMENT_COUNT_OVERFLOW, codegen);
 
-        let codegen = radix_codegen_rust::runtime_contract_sparsa::ERR_CONVERSIO_RANK_MISMATCH;
+        let codegen = radix_hir_rust::runtime_contract_sparsa::ERR_CONVERSIO_RANK_MISMATCH;
         assert_eq!(ERR_CONVERSIO_RANK_MISMATCH, codegen);
 
-        let codegen = radix_codegen_rust::runtime_contract_sparsa::ERR_ACCIPE_INVALID_INDEX;
+        let codegen = radix_hir_rust::runtime_contract_sparsa::ERR_ACCIPE_INVALID_INDEX;
         assert_eq!(ERR_ACCIPE_INVALID_INDEX, codegen);
 
-        let codegen = radix_codegen_rust::runtime_contract_sparsa::ERR_PONDE_INVALID_INDEX;
+        let codegen = radix_hir_rust::runtime_contract_sparsa::ERR_PONDE_INVALID_INDEX;
         assert_eq!(ERR_PONDE_INVALID_INDEX, codegen);
     }
 

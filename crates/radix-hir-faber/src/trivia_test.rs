@@ -1,0 +1,900 @@
+//! Leaf tests for presentation-trivia placement in canonical Faber emission
+//! (goal Stage 5, unit U-5).
+//!
+//! These tests drive `emit(hir, presentation, types, interner, surface)` with
+//! synthetic HIR + presentation data so the render-slot contract is provable
+//! without lowering or FHIR loading (which land in U-3/U-4):
+//! - statement, block-end, and program-end comments land at their structural
+//!   positions;
+//! - comments before annotations render before the annotation sequence;
+//! - comment-bearing candidate blocks stay braced while trivia-free eligible
+//!   blocks keep compact `ergo` / `sic … secus …` output;
+//! - boundary-newline normalization never manufactures blank lines;
+//! - explicit `tacet` prints while implicit structural ends print nothing;
+//! - rendering is deterministic for the same inputs.
+
+use crate::surface::TypeBindingKind;
+use crate::{emit, KeywordSurface};
+use radix_hir::{
+    DefId, HirAnnotation, HirBlock, HirBlockEnd, HirExpression, HirExpressionKind, HirField,
+    HirFunction, HirId, HirItem, HirItemKind, HirLiteral, HirMethod, HirOwnerRef, HirPresentation,
+    HirProgram, HirProgramEnd, HirReceiver, HirSourceAnchorId, HirStatement, HirStatementKind,
+    HirStruct, HirTrivia, HirTriviaAttachment, HirTriviaOwner, HirTriviaOwnerKind,
+};
+use radix_lexer::{Interner, Span, TokenKind};
+use radix_syntax::CallablePosture;
+use radix_types::TypeTable;
+use radix_types::USER_DEF_ID_BASE;
+
+/// Minimal Latin surface for leaf tests (no reader-pack machinery).
+struct TestSurface;
+
+impl KeywordSurface for TestSurface {
+    fn keyword(&self, kind: TokenKind) -> &str {
+        match kind {
+            TokenKind::Incipit => "incipit",
+            TokenKind::Functio => "functio",
+            TokenKind::Redde => "redde",
+            TokenKind::Sic => "sic",
+            TokenKind::Secus => "secus",
+            TokenKind::Si => "si",
+            TokenKind::Ergo => "ergo",
+            TokenKind::Fixum => "fixum",
+            TokenKind::Tacet => "tacet",
+            TokenKind::Rumpe => "rumpe",
+            TokenKind::Perge => "perge",
+            TokenKind::Custodi => "custodi",
+            TokenKind::Varia => "varia",
+            TokenKind::Cape => "cape",
+            TokenKind::Fac => "fac",
+            TokenKind::Dum => "dum",
+            TokenKind::Discerne => "discerne",
+            TokenKind::Casu => "casu",
+            TokenKind::Genus => "genus",
+            TokenKind::Implendum => "implendum",
+            TokenKind::Itera => "itera",
+            TokenKind::Ex => "ex",
+            TokenKind::De => "de",
+            TokenKind::Nihil => "nihil",
+            _ => "?",
+        }
+    }
+
+    fn type_surface(&self, kind: TypeBindingKind) -> &str {
+        match kind {
+            TypeBindingKind::Primitive(radix_types::Primitive::Textus) => "textus",
+            TypeBindingKind::Primitive(radix_types::Primitive::Numerus) => "numerus",
+            _ => "?",
+        }
+    }
+}
+
+/// Half-open span helper so tests avoid raw byte literals.
+fn span() -> Span {
+    Span::default()
+}
+
+/// One line-start comment with the given raw payload.
+fn comment(interner: &mut Interner, text: &str) -> HirTrivia {
+    HirTrivia::CommentLine {
+        text: interner.intern(text),
+        span: span(),
+    }
+}
+
+/// One boundary newline.
+fn newline() -> HirTrivia {
+    HirTrivia::Newline { span: span() }
+}
+
+/// A comment run with its terminating newline.
+fn comment_run(interner: &mut Interner, text: &str) -> Vec<HirTrivia> {
+    vec![comment(interner, text), newline()]
+}
+
+fn anchor(id: u32) -> HirSourceAnchorId {
+    HirSourceAnchorId(id)
+}
+
+fn owner(id: u32, kind: HirTriviaOwnerKind, semantic: Option<HirOwnerRef>) -> HirTriviaOwner {
+    HirTriviaOwner {
+        id: anchor(id),
+        kind,
+        semantic,
+    }
+}
+
+fn attachment(id: u32, leading: Vec<HirTrivia>) -> HirTriviaAttachment {
+    HirTriviaAttachment {
+        anchor: anchor(id),
+        leading,
+    }
+}
+
+/// Empty presentation with a structural program end at anchor 999.
+fn empty_presentation() -> HirPresentation {
+    HirPresentation {
+        owners: Vec::new(),
+        attachments: Vec::new(),
+        block_ends: Vec::new(),
+        program_end: HirProgramEnd {
+            id: anchor(999),
+            span: span(),
+        },
+        entry_start_anchor: None,
+    }
+}
+
+fn literal_int(id: u32, value: u64) -> HirExpression {
+    HirExpression {
+        id: HirId(id),
+        kind: HirExpressionKind::Literal(HirLiteral::Int(value)),
+        ty: None,
+        span: span(),
+    }
+}
+
+fn redde_stmt(id: u32, expr_id: u32, value: u64) -> HirStatement {
+    HirStatement {
+        id: HirId(id),
+        kind: HirStatementKind::Redde(Some(literal_int(expr_id, value))),
+        span: span(),
+    }
+}
+
+/// A body block that carries an authored structural end.
+fn authored_block(statements: Vec<HirStatement>, end_anchor: u32) -> HirBlock {
+    HirBlock {
+        statements,
+        expr: None,
+        span: span(),
+        breakable: None,
+        end: Some(HirBlockEnd {
+            id: anchor(end_anchor),
+            span: span(),
+        }),
+    }
+}
+
+fn function_item(
+    interner: &mut Interner,
+    id: u32,
+    def_id: u32,
+    name: &str,
+    body: Option<HirBlock>,
+    annotations: Vec<HirAnnotation>,
+) -> HirItem {
+    HirItem {
+        id: HirId(id),
+        def_id: DefId(def_id),
+        kind: HirItemKind::Function(Box::new(HirFunction {
+            name: interner.intern(name),
+            type_params: Vec::new(),
+            params: Vec::new(),
+            cli_args: None,
+            ret_ty: None,
+            err_ty: None,
+            body,
+            posture: CallablePosture::SyncFinite,
+            is_async: false,
+            is_generator: false,
+            is_kernel: false,
+            is_device: false,
+            is_vertex: false,
+            is_fragment: false,
+            test: None,
+            annotations,
+        })),
+        span: span(),
+    }
+}
+
+fn program(items: Vec<HirItem>, entry: Option<HirBlock>) -> HirProgram {
+    HirProgram {
+        items,
+        entry,
+        entry_annotations: Vec::new(),
+        entry_args_name: None,
+        entry_is_async: false,
+    }
+}
+
+fn render(hir: &HirProgram, presentation: &HirPresentation, interner: &Interner) -> String {
+    let types = TypeTable::new();
+    emit(hir, presentation, &types, interner, &TestSurface)
+        .expect("emit should succeed")
+        .code
+}
+
+// ── Render slots ──
+
+#[test]
+fn emits_statement_trivia_before_each_statement() {
+    let mut interner = Interner::new();
+    let body = HirBlock::simple(
+        vec![redde_stmt(1, 10, 1), redde_stmt(2, 11, 2)],
+        None,
+        span(),
+    );
+    let hir = program(
+        vec![function_item(
+            &mut interner,
+            100,
+            USER_DEF_ID_BASE,
+            "noop",
+            Some(body),
+            vec![],
+        )],
+        None,
+    );
+    let presentation = HirPresentation {
+        owners: vec![
+            owner(
+                1,
+                HirTriviaOwnerKind::Statement,
+                Some(HirOwnerRef::Hir(HirId(1))),
+            ),
+            owner(
+                2,
+                HirTriviaOwnerKind::Statement,
+                Some(HirOwnerRef::Hir(HirId(2))),
+            ),
+        ],
+        attachments: vec![
+            attachment(1, comment_run(&mut interner, " first comment")),
+            attachment(2, comment_run(&mut interner, " second comment")),
+        ],
+        block_ends: Vec::new(),
+        program_end: HirProgramEnd {
+            id: anchor(999),
+            span: span(),
+        },
+        entry_start_anchor: None,
+    };
+
+    let code = render(&hir, &presentation, &interner);
+    assert!(
+        code.contains("# first comment\n    redde 1"),
+        "statement trivia must precede its statement:\n{code}"
+    );
+    assert!(
+        code.contains("# second comment\n    redde 2"),
+        "second statement trivia must precede its statement:\n{code}"
+    );
+}
+
+#[test]
+fn emits_block_end_trivia_before_closing_brace() {
+    let mut interner = Interner::new();
+    let body = authored_block(vec![redde_stmt(1, 10, 1)], 20);
+    let hir = program(
+        vec![function_item(
+            &mut interner,
+            100,
+            USER_DEF_ID_BASE,
+            "noop",
+            Some(body),
+            vec![],
+        )],
+        None,
+    );
+    let presentation = HirPresentation {
+        owners: vec![owner(20, HirTriviaOwnerKind::BlockEnd, None)],
+        attachments: vec![attachment(20, comment_run(&mut interner, " end of block"))],
+        block_ends: vec![HirBlockEnd {
+            id: anchor(20),
+            span: span(),
+        }],
+        program_end: HirProgramEnd {
+            id: anchor(999),
+            span: span(),
+        },
+        entry_start_anchor: None,
+    };
+
+    let code = render(&hir, &presentation, &interner);
+    assert!(
+        code.contains("    redde 1\n    # end of block\n}"),
+        "block-end trivia must render before the closing brace:\n{code}"
+    );
+}
+
+#[test]
+fn emits_program_end_trivia_before_eof() {
+    let mut interner = Interner::new();
+    let hir = program(
+        vec![function_item(
+            &mut interner,
+            100,
+            USER_DEF_ID_BASE,
+            "noop",
+            None,
+            vec![],
+        )],
+        None,
+    );
+    let presentation = HirPresentation {
+        owners: vec![owner(30, HirTriviaOwnerKind::ProgramEnd, None)],
+        attachments: vec![attachment(
+            30,
+            comment_run(&mut interner, " trailing comment"),
+        )],
+        block_ends: Vec::new(),
+        program_end: HirProgramEnd {
+            id: anchor(30),
+            span: span(),
+        },
+        entry_start_anchor: None,
+    };
+
+    let code = render(&hir, &presentation, &interner);
+    assert!(
+        code.trim_end().ends_with("# trailing comment"),
+        "program-end trivia must render before EOF:\n{code}"
+    );
+}
+
+#[test]
+fn emits_item_trivia_before_item() {
+    let mut interner = Interner::new();
+    let hir = program(
+        vec![function_item(
+            &mut interner,
+            100,
+            USER_DEF_ID_BASE,
+            "noop",
+            None,
+            vec![],
+        )],
+        None,
+    );
+    let presentation = HirPresentation {
+        owners: vec![owner(
+            1,
+            HirTriviaOwnerKind::Item,
+            Some(HirOwnerRef::Hir(HirId(100))),
+        )],
+        attachments: vec![attachment(1, comment_run(&mut interner, " item comment"))],
+        block_ends: Vec::new(),
+        program_end: HirProgramEnd {
+            id: anchor(999),
+            span: span(),
+        },
+        entry_start_anchor: None,
+    };
+
+    let code = render(&hir, &presentation, &interner);
+    assert!(
+        code.starts_with("# item comment\nfunctio"),
+        "item trivia must render before the item:\n{code}"
+    );
+}
+
+#[test]
+fn emits_entry_trivia_before_incipit_keyword() {
+    let mut interner = Interner::new();
+    let entry = HirBlock::simple(vec![redde_stmt(1, 10, 1)], None, span());
+    let hir = program(Vec::new(), Some(entry));
+    let presentation = HirPresentation {
+        owners: vec![owner(1, HirTriviaOwnerKind::Entry, None)],
+        attachments: vec![attachment(1, comment_run(&mut interner, " entry comment"))],
+        block_ends: Vec::new(),
+        program_end: HirProgramEnd {
+            id: anchor(999),
+            span: span(),
+        },
+        entry_start_anchor: Some(anchor(1)),
+    };
+
+    let code = render(&hir, &presentation, &interner);
+    assert!(
+        code.contains("# entry comment\nincipit"),
+        "entry trivia must render before the incipit keyword:\n{code}"
+    );
+}
+
+#[test]
+fn emits_member_trivia_for_struct_fields_and_methods() {
+    let mut interner = Interner::new();
+    let types = TypeTable::new();
+    let textus = types.primitive(radix_types::Primitive::Textus);
+    let field = HirField {
+        def_id: DefId(100),
+        name: interner.intern("name"),
+        ty: textus,
+        is_static: false,
+        sponte: false,
+        annotations: Vec::new(),
+        init: None,
+        span: span(),
+    };
+    let method_body = HirBlock::simple(vec![redde_stmt(5, 50, 7)], None, span());
+    let method = HirMethod {
+        def_id: DefId(101),
+        func: HirFunction {
+            name: interner.intern("greet"),
+            type_params: Vec::new(),
+            params: Vec::new(),
+            cli_args: None,
+            ret_ty: None,
+            err_ty: None,
+            body: Some(method_body),
+            posture: CallablePosture::SyncFinite,
+            is_async: false,
+            is_generator: false,
+            is_kernel: false,
+            is_device: false,
+            is_vertex: false,
+            is_fragment: false,
+            test: None,
+            annotations: Vec::new(),
+        },
+        receiver: HirReceiver::None,
+        span: span(),
+    };
+    let s = HirStruct {
+        name: interner.intern("Person"),
+        type_params: Vec::new(),
+        annotations: Vec::new(),
+        fields: vec![field],
+        methods: vec![method],
+        extends: None,
+        implements: Vec::new(),
+    };
+    let hir = program(
+        vec![HirItem {
+            id: HirId(1),
+            def_id: DefId(USER_DEF_ID_BASE),
+            kind: HirItemKind::Struct(s),
+            span: span(),
+        }],
+        None,
+    );
+    let presentation = HirPresentation {
+        owners: vec![
+            owner(
+                1,
+                HirTriviaOwnerKind::Member,
+                Some(HirOwnerRef::Def(DefId(100))),
+            ),
+            owner(
+                2,
+                HirTriviaOwnerKind::Member,
+                Some(HirOwnerRef::Def(DefId(101))),
+            ),
+        ],
+        attachments: vec![
+            attachment(1, comment_run(&mut interner, " field comment")),
+            attachment(2, comment_run(&mut interner, " method comment")),
+        ],
+        block_ends: Vec::new(),
+        program_end: HirProgramEnd {
+            id: anchor(999),
+            span: span(),
+        },
+        entry_start_anchor: None,
+    };
+
+    let code = emit(&hir, &presentation, &types, &interner, &TestSurface)
+        .expect("emit should succeed")
+        .code;
+    assert!(
+        code.contains("# field comment\n    textus name"),
+        "field trivia must render before the field:\n{code}"
+    );
+    assert!(
+        code.contains("# method comment\n    functio greet"),
+        "method trivia must render before the method:\n{code}"
+    );
+}
+
+#[test]
+fn emits_trivia_before_annotation_sequence() {
+    let mut interner = Interner::new();
+    let annotations = vec![HirAnnotation::with_fields(
+        interner.intern("futura"),
+        Vec::new(),
+        span(),
+    )];
+    let hir = program(
+        vec![function_item(
+            &mut interner,
+            100,
+            USER_DEF_ID_BASE,
+            "noop",
+            None,
+            annotations,
+        )],
+        None,
+    );
+    let presentation = HirPresentation {
+        owners: vec![owner(
+            1,
+            HirTriviaOwnerKind::Item,
+            Some(HirOwnerRef::Hir(HirId(100))),
+        )],
+        attachments: vec![attachment(
+            1,
+            comment_run(&mut interner, " before annotation"),
+        )],
+        block_ends: Vec::new(),
+        program_end: HirProgramEnd {
+            id: anchor(999),
+            span: span(),
+        },
+        entry_start_anchor: None,
+    };
+
+    let code = render(&hir, &presentation, &interner);
+    assert!(
+        code.starts_with("# before annotation\n@ futura { }\nfunctio"),
+        "item trivia must render before the annotation sequence:\n{code}"
+    );
+}
+
+// ── Compact-joint gating ──
+
+fn si_stmt(
+    stmt_id: u32,
+    expr_id: u32,
+    cond_id: u32,
+    cond_value: u64,
+    then_block: HirBlock,
+) -> HirStatement {
+    HirStatement {
+        id: HirId(stmt_id),
+        kind: HirStatementKind::Expr(HirExpression {
+            id: HirId(expr_id),
+            kind: HirExpressionKind::Si {
+                cond: Box::new(literal_int(cond_id, cond_value)),
+                then_block,
+                then_catch: None,
+                else_block: None,
+            },
+            ty: None,
+            span: span(),
+        }),
+        span: span(),
+    }
+}
+
+/// A comment-bearing single-return branch stays braced — never `ergo`.
+#[test]
+fn comment_bearing_branch_stays_braced_not_ergo() {
+    let mut interner = Interner::new();
+    let then_block = HirBlock::simple(vec![redde_stmt(2, 20, 5)], None, span());
+    let body = HirBlock::simple(vec![si_stmt(1, 1, 0, 1, then_block)], None, span());
+    let hir = program(
+        vec![function_item(
+            &mut interner,
+            100,
+            USER_DEF_ID_BASE,
+            "noop",
+            Some(body),
+            vec![],
+        )],
+        None,
+    );
+    let presentation = HirPresentation {
+        owners: vec![owner(
+            2,
+            HirTriviaOwnerKind::Statement,
+            Some(HirOwnerRef::Hir(HirId(2))),
+        )],
+        attachments: vec![attachment(2, comment_run(&mut interner, " keep braced"))],
+        block_ends: Vec::new(),
+        program_end: HirProgramEnd {
+            id: anchor(999),
+            span: span(),
+        },
+        entry_start_anchor: None,
+    };
+
+    let code = render(&hir, &presentation, &interner);
+    assert!(
+        code.contains("si 1 {\n        # keep braced\n        redde 5\n    }"),
+        "comment-bearing branch must stay braced:\n{code}"
+    );
+    assert!(
+        !code.contains("ergo"),
+        "compact ergo must not absorb a comment-bearing branch:\n{code}"
+    );
+}
+
+/// A trivia-free eligible single-return branch keeps the compact `ergo` form.
+#[test]
+fn trivia_free_eligible_block_keeps_compact_ergo() {
+    let mut interner = Interner::new();
+    let then_block = HirBlock::simple(vec![redde_stmt(2, 20, 5)], None, span());
+    let body = HirBlock::simple(vec![si_stmt(1, 1, 0, 1, then_block)], None, span());
+    let hir = program(
+        vec![function_item(
+            &mut interner,
+            100,
+            USER_DEF_ID_BASE,
+            "noop",
+            Some(body),
+            vec![],
+        )],
+        None,
+    );
+
+    let code = render(&hir, &empty_presentation(), &interner);
+    assert!(
+        code.contains("si 1 ergo redde 5"),
+        "trivia-free eligible block must stay compact:\n{code}"
+    );
+}
+
+fn si_else_stmt(
+    stmt_id: u32,
+    expr_id: u32,
+    cond_id: u32,
+    cond_value: u64,
+    then_block: HirBlock,
+    else_block: HirBlock,
+) -> HirStatement {
+    HirStatement {
+        id: HirId(stmt_id),
+        kind: HirStatementKind::Expr(HirExpression {
+            id: HirId(expr_id),
+            kind: HirExpressionKind::Si {
+                cond: Box::new(literal_int(cond_id, cond_value)),
+                then_block,
+                then_catch: None,
+                else_block: Some(else_block),
+            },
+            ty: None,
+            span: span(),
+        }),
+        span: span(),
+    }
+}
+
+/// A comment-bearing branch prevents `sic … secus …` compaction.
+#[test]
+fn comment_bearing_branch_prevents_sic_secus_compaction() {
+    let mut interner = Interner::new();
+    let then_block = HirBlock::simple(vec![redde_stmt(2, 20, 5)], None, span());
+    let else_block = HirBlock::simple(vec![redde_stmt(3, 30, 6)], None, span());
+    let body = HirBlock::simple(
+        vec![si_else_stmt(1, 1, 0, 1, then_block, else_block)],
+        None,
+        span(),
+    );
+    let hir = program(
+        vec![function_item(
+            &mut interner,
+            100,
+            USER_DEF_ID_BASE,
+            "noop",
+            Some(body),
+            vec![],
+        )],
+        None,
+    );
+    let presentation = HirPresentation {
+        owners: vec![owner(
+            2,
+            HirTriviaOwnerKind::Statement,
+            Some(HirOwnerRef::Hir(HirId(2))),
+        )],
+        attachments: vec![attachment(2, comment_run(&mut interner, " keep braced"))],
+        block_ends: Vec::new(),
+        program_end: HirProgramEnd {
+            id: anchor(999),
+            span: span(),
+        },
+        entry_start_anchor: None,
+    };
+
+    let code = render(&hir, &presentation, &interner);
+    assert!(
+        code.contains("si 1 {\n        # keep braced\n        redde 5\n    }\n    secus"),
+        "comment-bearing branch must render as a braced si/secus chain:\n{code}"
+    );
+    assert!(
+        !code.contains("sic"),
+        "compact sic/secus must not absorb a comment-bearing branch:\n{code}"
+    );
+}
+
+/// Trivia-free branches keep the compact `sic … secus …` expression form.
+#[test]
+fn trivia_free_blocks_keep_sic_secus_compact() {
+    let mut interner = Interner::new();
+    let then_block = HirBlock::simple(vec![redde_stmt(2, 20, 5)], None, span());
+    let else_block = HirBlock::simple(vec![redde_stmt(3, 30, 6)], None, span());
+    let body = HirBlock::simple(
+        vec![si_else_stmt(1, 1, 0, 1, then_block, else_block)],
+        None,
+        span(),
+    );
+    let hir = program(
+        vec![function_item(
+            &mut interner,
+            100,
+            USER_DEF_ID_BASE,
+            "noop",
+            Some(body),
+            vec![],
+        )],
+        None,
+    );
+
+    let code = render(&hir, &empty_presentation(), &interner);
+    assert!(
+        code.contains("1 sic 5 secus 6"),
+        "trivia-free branches must keep the compact sic/secus form:\n{code}"
+    );
+}
+
+// ── Boundary-newline normalization ──
+
+/// The emitter's own statement newline plus the first stored leading newline
+/// must not manufacture a blank line; intentional blank lines are preserved.
+#[test]
+fn boundary_newline_normalization_does_not_manufacture_blank_lines() {
+    let mut interner = Interner::new();
+    let body = HirBlock::simple(
+        vec![redde_stmt(1, 10, 1), redde_stmt(2, 11, 2)],
+        None,
+        span(),
+    );
+    let hir = program(
+        vec![function_item(
+            &mut interner,
+            100,
+            USER_DEF_ID_BASE,
+            "noop",
+            Some(body),
+            vec![],
+        )],
+        None,
+    );
+    let presentation = HirPresentation {
+        owners: vec![
+            owner(
+                1,
+                HirTriviaOwnerKind::Statement,
+                Some(HirOwnerRef::Hir(HirId(1))),
+            ),
+            owner(
+                2,
+                HirTriviaOwnerKind::Statement,
+                Some(HirOwnerRef::Hir(HirId(2))),
+            ),
+        ],
+        // First statement: boundary newline + comment (no blank line).
+        // Second statement: boundary newline + one intentional blank line + comment.
+        attachments: vec![
+            attachment(
+                1,
+                vec![newline(), comment(&mut interner, " first"), newline()],
+            ),
+            attachment(
+                2,
+                vec![
+                    newline(),
+                    newline(),
+                    comment(&mut interner, " second"),
+                    newline(),
+                ],
+            ),
+        ],
+        block_ends: Vec::new(),
+        program_end: HirProgramEnd {
+            id: anchor(999),
+            span: span(),
+        },
+        entry_start_anchor: None,
+    };
+
+    let code = render(&hir, &presentation, &interner);
+    assert!(
+        code.contains("    # first\n    redde 1"),
+        "boundary newline must not become a blank line:\n{code}"
+    );
+    assert!(
+        code.contains("    # first\n    redde 1\n\n    # second"),
+        "one intentional blank line before the second comment must survive:\n{code}"
+    );
+}
+
+// ── tacet vs structural ends ──
+
+/// Explicit source `tacet` prints; an implicit structural end prints nothing.
+#[test]
+fn explicit_tacet_prints_implicit_ends_do_not() {
+    let mut interner = Interner::new();
+    let body = authored_block(
+        vec![HirStatement {
+            id: HirId(1),
+            kind: HirStatementKind::Tacet,
+            span: span(),
+        }],
+        20,
+    );
+    let hir = program(
+        vec![function_item(
+            &mut interner,
+            100,
+            USER_DEF_ID_BASE,
+            "noop",
+            Some(body),
+            vec![],
+        )],
+        None,
+    );
+    // The block end anchor has NO attachment: the structural end is silent.
+    let presentation = HirPresentation {
+        owners: vec![owner(20, HirTriviaOwnerKind::BlockEnd, None)],
+        attachments: Vec::new(),
+        block_ends: vec![HirBlockEnd {
+            id: anchor(20),
+            span: span(),
+        }],
+        program_end: HirProgramEnd {
+            id: anchor(999),
+            span: span(),
+        },
+        entry_start_anchor: None,
+    };
+
+    let code = render(&hir, &presentation, &interner);
+    assert_eq!(
+        code.matches("tacet").count(),
+        1,
+        "explicit tacet must print exactly once; structural ends print nothing:\n{code}"
+    );
+    assert!(
+        code.contains("    tacet\n}"),
+        "the braced block must close after the tacet statement:\n{code}"
+    );
+}
+
+// ── Determinism ──
+
+#[test]
+fn rendering_is_deterministic() {
+    let mut interner = Interner::new();
+    let body = authored_block(vec![redde_stmt(1, 10, 1)], 20);
+    let hir = program(
+        vec![function_item(
+            &mut interner,
+            100,
+            USER_DEF_ID_BASE,
+            "noop",
+            Some(body),
+            vec![],
+        )],
+        None,
+    );
+    let presentation = HirPresentation {
+        owners: vec![
+            owner(
+                1,
+                HirTriviaOwnerKind::Statement,
+                Some(HirOwnerRef::Hir(HirId(1))),
+            ),
+            owner(20, HirTriviaOwnerKind::BlockEnd, None),
+        ],
+        attachments: vec![
+            attachment(1, comment_run(&mut interner, " statement comment")),
+            attachment(20, comment_run(&mut interner, " block end comment")),
+        ],
+        block_ends: vec![HirBlockEnd {
+            id: anchor(20),
+            span: span(),
+        }],
+        program_end: HirProgramEnd {
+            id: anchor(999),
+            span: span(),
+        },
+        entry_start_anchor: None,
+    };
+
+    let first = render(&hir, &presentation, &interner);
+    let second = render(&hir, &presentation, &interner);
+    assert_eq!(first, second, "same inputs must render deterministically");
+}

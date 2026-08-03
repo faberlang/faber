@@ -20,7 +20,7 @@ pub use def_id::DefId;
 /// value are user declarations allocated via `fresh_def_id()`.
 ///
 /// The constant lives here (not in `radix`) so that leaf crates such as
-/// `radix-codegen-faber` can import it without depending on the main
+/// `radix-hir-faber` can import it without depending on the main
 /// compiler crate.
 pub const USER_DEF_ID_BASE: u32 = 0x0000_1000;
 pub use index::{

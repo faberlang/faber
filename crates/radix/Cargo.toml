@@ -57,6 +57,7 @@ vec_init_then_push = "allow"
 
 [dependencies]
 radix-codegen-shared = { path = "../radix-codegen-shared" }
+radix-hir-faber = { path = "../radix-hir-faber" }
 radix-mir = { path = "../radix-mir" }
 radix-host-abi = { path = "../radix-host-abi" }
 radix-runtime-contract = { path = "../radix-runtime-contract" }

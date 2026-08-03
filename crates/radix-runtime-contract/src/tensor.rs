@@ -7,7 +7,7 @@
 //! compile-time (stepper) and runtime emit byte-identical error text and agree
 //! on shape math.
 //!
-//! KEEP IN SYNC: `radix-codegen-rust/src/runtime_contract_tensor.rs`
+//! KEEP IN SYNC: `radix-hir-rust/src/runtime_contract_tensor.rs`
 //! (verified by `#[cfg(test)] mod tests` in this file).
 
 /// Dimension must be non-negative.
@@ -102,32 +102,32 @@ pub fn tensor_flat_offset(shape: &[i64], index: &[i64]) -> Option<usize> {
 mod tests {
     use super::*;
 
-    /// All `ERR_*` constants match the `radix-codegen-rust` third copy.
+    /// All `ERR_*` constants match the `radix-hir-rust` third copy.
     #[test]
     fn err_shape_constants_match_codegen_copy() {
         assert_eq!(
             ERR_NEGATIVE_DIM,
-            radix_codegen_rust::runtime_contract_tensor::ERR_NEGATIVE_DIM
+            radix_hir_rust::runtime_contract_tensor::ERR_NEGATIVE_DIM
         );
         assert_eq!(
             ERR_NEGATIVE_INDEX,
-            radix_codegen_rust::runtime_contract_tensor::ERR_NEGATIVE_INDEX
+            radix_hir_rust::runtime_contract_tensor::ERR_NEGATIVE_INDEX
         );
         assert_eq!(
             ERR_NEGATIVE_SLICE,
-            radix_codegen_rust::runtime_contract_tensor::ERR_NEGATIVE_SLICE
+            radix_hir_rust::runtime_contract_tensor::ERR_NEGATIVE_SLICE
         );
         assert_eq!(
             ERR_INVALID_SLICE_RANGE,
-            radix_codegen_rust::runtime_contract_tensor::ERR_INVALID_SLICE_RANGE
+            radix_hir_rust::runtime_contract_tensor::ERR_INVALID_SLICE_RANGE
         );
         assert_eq!(
             ERR_INDEX_OUT_OF_BOUNDS,
-            radix_codegen_rust::runtime_contract_tensor::ERR_INDEX_OUT_OF_BOUNDS
+            radix_hir_rust::runtime_contract_tensor::ERR_INDEX_OUT_OF_BOUNDS
         );
         assert_eq!(
             ERR_ELEMENT_COUNT_OVERFLOW,
-            radix_codegen_rust::runtime_contract_tensor::ERR_ELEMENT_COUNT_OVERFLOW
+            radix_hir_rust::runtime_contract_tensor::ERR_ELEMENT_COUNT_OVERFLOW
         );
     }
 
@@ -135,27 +135,27 @@ mod tests {
     fn err_forma_constants_match_codegen_copy() {
         assert_eq!(
             ERR_FORMA_RESHAPE_COUNT,
-            radix_codegen_rust::runtime_contract_tensor::ERR_FORMA_RESHAPE_COUNT
+            radix_hir_rust::runtime_contract_tensor::ERR_FORMA_RESHAPE_COUNT
         );
         assert_eq!(
             ERR_FORMA_ELEMENT_COUNT,
-            radix_codegen_rust::runtime_contract_tensor::ERR_FORMA_ELEMENT_COUNT
+            radix_hir_rust::runtime_contract_tensor::ERR_FORMA_ELEMENT_COUNT
         );
         assert_eq!(
             ERR_ACCIPE_INVALID_INDEX,
-            radix_codegen_rust::runtime_contract_tensor::ERR_ACCIPE_INVALID_INDEX
+            radix_hir_rust::runtime_contract_tensor::ERR_ACCIPE_INVALID_INDEX
         );
         assert_eq!(
             ERR_PONDE_INVALID_INDEX,
-            radix_codegen_rust::runtime_contract_tensor::ERR_PONDE_INVALID_INDEX
+            radix_hir_rust::runtime_contract_tensor::ERR_PONDE_INVALID_INDEX
         );
         assert_eq!(
             ERR_CREA_INVALID_SHAPE,
-            radix_codegen_rust::runtime_contract_tensor::ERR_CREA_INVALID_SHAPE
+            radix_hir_rust::runtime_contract_tensor::ERR_CREA_INVALID_SHAPE
         );
         assert_eq!(
             ERR_SECTIO_INVALID_SLICE_BOUNDS,
-            radix_codegen_rust::runtime_contract_tensor::ERR_SECTIO_INVALID_SLICE_BOUNDS
+            radix_hir_rust::runtime_contract_tensor::ERR_SECTIO_INVALID_SLICE_BOUNDS
         );
     }
 
@@ -163,23 +163,23 @@ mod tests {
     fn err_broadcast_and_matmul_constants_match_codegen_copy() {
         assert_eq!(
             ERR_BROADCAST_SHAPE,
-            radix_codegen_rust::runtime_contract_tensor::ERR_BROADCAST_SHAPE
+            radix_hir_rust::runtime_contract_tensor::ERR_BROADCAST_SHAPE
         );
         assert_eq!(
             ERR_MATMUL_RECEIVER_RANK,
-            radix_codegen_rust::runtime_contract_tensor::ERR_MATMUL_RECEIVER_RANK
+            radix_hir_rust::runtime_contract_tensor::ERR_MATMUL_RECEIVER_RANK
         );
         assert_eq!(
             ERR_MATMUL_ARGUMENT_RANK,
-            radix_codegen_rust::runtime_contract_tensor::ERR_MATMUL_ARGUMENT_RANK
+            radix_hir_rust::runtime_contract_tensor::ERR_MATMUL_ARGUMENT_RANK
         );
         assert_eq!(
             ERR_MATMUL_INNER_DIMENSION,
-            radix_codegen_rust::runtime_contract_tensor::ERR_MATMUL_INNER_DIMENSION
+            radix_hir_rust::runtime_contract_tensor::ERR_MATMUL_INNER_DIMENSION
         );
         assert_eq!(
             ERR_TRANSPOSE_RANK,
-            radix_codegen_rust::runtime_contract_tensor::ERR_TRANSPOSE_RANK
+            radix_hir_rust::runtime_contract_tensor::ERR_TRANSPOSE_RANK
         );
     }
 
@@ -187,23 +187,23 @@ mod tests {
     fn err_permute_constants_match_codegen_copy() {
         assert_eq!(
             ERR_PERMUTE_RANK,
-            radix_codegen_rust::runtime_contract_tensor::ERR_PERMUTE_RANK
+            radix_hir_rust::runtime_contract_tensor::ERR_PERMUTE_RANK
         );
         assert_eq!(
             ERR_PERMUTE_NEGATIVE_AXIS,
-            radix_codegen_rust::runtime_contract_tensor::ERR_PERMUTE_NEGATIVE_AXIS
+            radix_hir_rust::runtime_contract_tensor::ERR_PERMUTE_NEGATIVE_AXIS
         );
         assert_eq!(
             ERR_PERMUTE_AXIS_OUT_OF_RANGE,
-            radix_codegen_rust::runtime_contract_tensor::ERR_PERMUTE_AXIS_OUT_OF_RANGE
+            radix_hir_rust::runtime_contract_tensor::ERR_PERMUTE_AXIS_OUT_OF_RANGE
         );
         assert_eq!(
             ERR_PERMUTE_DUPLICATE_AXIS,
-            radix_codegen_rust::runtime_contract_tensor::ERR_PERMUTE_DUPLICATE_AXIS
+            radix_hir_rust::runtime_contract_tensor::ERR_PERMUTE_DUPLICATE_AXIS
         );
         assert_eq!(
             ERR_MEDIA_EMPTY,
-            radix_codegen_rust::runtime_contract_tensor::ERR_MEDIA_EMPTY
+            radix_hir_rust::runtime_contract_tensor::ERR_MEDIA_EMPTY
         );
     }
 
@@ -211,15 +211,15 @@ mod tests {
     fn err_divide_constants_match_codegen_copy() {
         assert_eq!(
             ERR_DIVIDE_NON_FINITE_INPUT,
-            radix_codegen_rust::runtime_contract_tensor::ERR_DIVIDE_NON_FINITE_INPUT
+            radix_hir_rust::runtime_contract_tensor::ERR_DIVIDE_NON_FINITE_INPUT
         );
         assert_eq!(
             ERR_DIVIDE_ZERO_DENOMINATOR,
-            radix_codegen_rust::runtime_contract_tensor::ERR_DIVIDE_ZERO_DENOMINATOR
+            radix_hir_rust::runtime_contract_tensor::ERR_DIVIDE_ZERO_DENOMINATOR
         );
         assert_eq!(
             ERR_DIVIDE_NON_FINITE_RESULT,
-            radix_codegen_rust::runtime_contract_tensor::ERR_DIVIDE_NON_FINITE_RESULT
+            radix_hir_rust::runtime_contract_tensor::ERR_DIVIDE_NON_FINITE_RESULT
         );
     }
 
@@ -229,7 +229,7 @@ mod tests {
         let shapes: &[&[i64]] = &[&[2, 3], &[1], &[5, 4, 3], &[0], &[1, 0, 1]];
         for shape in shapes {
             let a = tensor_shape_element_count(shape);
-            let b = radix_codegen_rust::runtime_contract_tensor::tensor_shape_element_count(shape);
+            let b = radix_hir_rust::runtime_contract_tensor::tensor_shape_element_count(shape);
             assert_eq!(
                 a, b,
                 "tensor_shape_element_count mismatch for shape {shape:?}"
@@ -247,7 +247,7 @@ mod tests {
         ];
         for (shape, index) in cases {
             let a = tensor_flat_offset(shape, index);
-            let b = radix_codegen_rust::runtime_contract_tensor::tensor_flat_offset(shape, index);
+            let b = radix_hir_rust::runtime_contract_tensor::tensor_flat_offset(shape, index);
             assert_eq!(
                 a, b,
                 "tensor_flat_offset mismatch for shape {shape:?}, index {index:?}"
@@ -260,17 +260,17 @@ mod tests {
         // Rank mismatch
         assert_eq!(
             tensor_flat_offset(&[2, 3], &[0]),
-            radix_codegen_rust::runtime_contract_tensor::tensor_flat_offset(&[2, 3], &[0])
+            radix_hir_rust::runtime_contract_tensor::tensor_flat_offset(&[2, 3], &[0])
         );
         // Negative dimension
         assert_eq!(
             tensor_flat_offset(&[-1, 3], &[0, 0]),
-            radix_codegen_rust::runtime_contract_tensor::tensor_flat_offset(&[-1, 3], &[0, 0])
+            radix_hir_rust::runtime_contract_tensor::tensor_flat_offset(&[-1, 3], &[0, 0])
         );
         // Index out of bounds
         assert_eq!(
             tensor_flat_offset(&[2, 3], &[2, 0]),
-            radix_codegen_rust::runtime_contract_tensor::tensor_flat_offset(&[2, 3], &[2, 0])
+            radix_hir_rust::runtime_contract_tensor::tensor_flat_offset(&[2, 3], &[2, 0])
         );
     }
 
@@ -381,7 +381,7 @@ mod tests {
         for value in [-1, 0, 1, 42] {
             assert_eq!(
                 tensor_dim_non_negative(value),
-                radix_codegen_rust::runtime_contract_tensor::tensor_dim_non_negative(value),
+                radix_hir_rust::runtime_contract_tensor::tensor_dim_non_negative(value),
                 "tensor_dim_non_negative mismatch for {value}"
             );
         }

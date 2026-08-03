@@ -3,6 +3,7 @@ members = [
     "crates/hygiene-ratchet",
     "crates/radix",
     "crates/radix-codegen-shared",
+    "crates/radix-hir-faber",
     "crates/radix-mir",
     "crates/radix-parser",
     "crates/radix-host-abi",

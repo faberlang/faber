@@ -1096,6 +1096,7 @@ dependencies = [
  "radix-codegen-shared",
  "radix-diagnostics",
  "radix-hir",
+ "radix-hir-faber",
  "radix-host-abi",
  "radix-lexer",
  "radix-mir",
@@ -1148,6 +1149,19 @@ dependencies = [
  "radix-types",
  "rustc-hash",
  "serde",
+]
+
+[[package]]
+name = "radix-hir-faber"
+version = "0.79.0"
+dependencies = [
+ "radix-codegen-shared",
+ "radix-diagnostics",
+ "radix-hir",
+ "radix-lexer",
+ "radix-syntax",
+ "radix-types",
+ "rustc-hash",
 ]
 
 [[package]]
