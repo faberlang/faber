@@ -139,6 +139,10 @@ fn abi_issue(message: &str) -> &'static str {
         "mir_indexed_kernel_resource_not_device_view"
     } else if message == ERR_KERNEL_RESOURCE_BINDING_OVERFLOW {
         "mir_kernel_resource_binding_overflow"
+    } else if message == ERR_KERNEL_RESULT_TUPLE_REQUIRED {
+        "mir_kernel_result_tuple_required"
+    } else if message == ERR_KERNEL_RESULT_TUPLE_REQUIRES_INPUT {
+        "mir_kernel_result_tuple_requires_input"
     } else if message.starts_with("kernel atomic parameters are not supported for ") {
         "mir_kernel_atomic_parameters_unsupported"
     } else if message.starts_with("kernel atomic reflection resources are not supported for ") {
@@ -4134,5 +4138,16 @@ mod tests {
                 "an output's element type must be a scalar, not an aggregate: {layout:?}"
             );
         }
+    }
+
+    #[test]
+    fn result_tuple_errors_classify_to_specific_issue_tags() {
+        // S3-A1 residual N1: the two result-tuple ABI errors classify to
+        // their own issue tags instead of falling through to generic
+        // `mir_abi_error`.
+        let required = MirAbiError::new(ERR_KERNEL_RESULT_TUPLE_REQUIRED);
+        assert_eq!(required.issue, "mir_kernel_result_tuple_required");
+        let requires_input = MirAbiError::new(ERR_KERNEL_RESULT_TUPLE_REQUIRES_INPUT);
+        assert_eq!(requires_input.issue, "mir_kernel_result_tuple_requires_input");
     }
 }
