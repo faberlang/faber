@@ -309,9 +309,11 @@ pub struct RunArgs {
     #[arg(long = "reader-locale", value_name = "LOCALE")]
     pub reader_locale: Option<String>,
 
-    /// Runtime target to build and execute.
-    #[arg(short = 't', long = "target", value_enum, default_value_t = radix::tool::CliTarget::Rust)]
-    pub target: radix::tool::CliTarget,
+    /// Runtime target to build and execute. When omitted, the manifest
+    /// `[build] target` wins; otherwise the implicit portable default
+    /// (FHIR package → FMIR run) applies.
+    #[arg(short = 't', long = "target", value_enum)]
+    pub target: Option<radix::tool::CliTarget>,
 
     /// Run the release binary
     #[arg(long)]

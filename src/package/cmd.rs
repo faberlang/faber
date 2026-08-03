@@ -11,6 +11,7 @@ use super::cargo::{
 };
 use super::go_build::{emit_go_module, invoke_go_build, GoBuildLayout};
 use super::manifest::manifest_build_target;
+use super::build_package_fhir;
 use super::{
     build_package_fmir_binary_bundle, build_package_fmir_image, build_package_fmir_text_image,
     build_package_mir_artifact, check_package, compile_package, compile_package_go,
@@ -128,6 +129,23 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
                 }
             };
         println!("{}", bundle.entrypoint_path.display());
+        return;
+    }
+
+    if is_package && target == Target::Fhir {
+        let artifact = match build_package_fhir(&config, &input_path) {
+            Ok(artifact) => artifact,
+            Err(diagnostics) => {
+                radix::tool::print_diagnostics(
+                    &diagnostics,
+                    DiagnosticMode::Normal,
+                    reader_pack.as_ref(),
+                );
+                eprintln!("fhir package build failed");
+                std::process::exit(1);
+            }
+        };
+        println!("{}", artifact.package_path.display());
         return;
     }
 
@@ -442,10 +460,11 @@ fn resolve_build_target(command: &radix::tool::BuildCommand, input_path: &Path) 
         eprintln!("error: {}", diag.message);
         std::process::exit(1);
     });
-    manifest_build_target(&manifest.build.target, &layout.manifest_path).unwrap_or_else(|diag| {
-        eprintln!("error: {}", diag.message);
-        std::process::exit(1);
-    })
+    manifest_build_target(manifest.build.target.as_deref(), &layout.manifest_path)
+        .unwrap_or_else(|diag| {
+            eprintln!("error: {}", diag.message);
+            std::process::exit(1);
+        })
 }
 
 /// Resolve the target for `faber check` from the package manifest.
@@ -462,7 +481,8 @@ fn resolve_check_target(input_path: &Path) -> Target {
     let Ok(manifest) = read_manifest(&layout.manifest_path) else {
         return Target::Rust;
     };
-    manifest_build_target(&manifest.build.target, &layout.manifest_path).unwrap_or(Target::Rust)
+    manifest_build_target(manifest.build.target.as_deref(), &layout.manifest_path)
+        .unwrap_or(Target::Rust)
 }
 
 /// Decide whether an input path should enter package-mode command handling.
@@ -493,7 +513,12 @@ pub fn use_package_compiler(target: Target, path: &std::path::Path, force_packag
     if path.extension().is_some_and(|ext| ext == "fab") {
         return matches!(
             target,
-            Target::Rust | Target::Scena | Target::FmirText | Target::Fmir | Target::FmirBin
+            Target::Rust
+                | Target::Scena
+                | Target::FmirText
+                | Target::Fmir
+                | Target::FmirBin
+                | Target::Fhir
         );
     }
     false

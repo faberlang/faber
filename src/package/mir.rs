@@ -611,7 +611,7 @@ fn with_prepared_package_mir_with_cli_mode_and_consumer<R>(
 /// `analyze_package` (the package arrives already reconstructed) and resolves
 /// local imports from the envelope's explicit link table instead of the
 /// filesystem.
-pub(crate) fn with_prepared_package_mir_from_loaded<R>(
+fn with_prepared_package_mir_from_loaded<R>(
     config: &Config,
     mut package: AnalyzedPackage,
     loaded_links: &BTreeMap<PathBuf, BTreeMap<String, PathBuf>>,

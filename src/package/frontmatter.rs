@@ -50,14 +50,18 @@ pub(super) fn validate_frontmatter_against_manifest(
     let file = path.display().to_string();
 
     if let Some(target) = frontmatter.build_target() {
-        if let Some(diag) = frontmatter_manifest_conflict(
-            &file,
-            "[build].target",
-            target,
-            "target",
-            &manifest.build.target,
-        ) {
-            return Some(diag);
+        // An unset manifest target is the implicit portable default; a
+        // frontmatter target then applies without conflict.
+        if let Some(manifest_target) = manifest.build.target.as_deref() {
+            if let Some(diag) = frontmatter_manifest_conflict(
+                &file,
+                "[build].target",
+                target,
+                "target",
+                manifest_target,
+            ) {
+                return Some(diag);
+            }
         }
     }
     if let Some(kind) = frontmatter.build_kind() {

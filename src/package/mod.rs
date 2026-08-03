@@ -84,6 +84,10 @@ pub use cmd::{
     cmd_build, cmd_check_package, cmd_emit_package, should_treat_as_package_from_args,
     use_package_compiler_from_args,
 };
+#[allow(unused_imports)] // binary commands/run consumes load/run + PackageFhir; lib uses build_package_fhir.
+pub(crate) use fhir::{
+    build_package_fhir, load_package_fhir, run_loaded_package_fhir, PackageFhir,
+};
 pub(crate) use compile::package_rust_runtime_plan;
 #[allow(unused_imports)] // binary build/run paths consume this crate-visible Go entry.
 pub(crate) use compile::compile_package_go;
@@ -108,6 +112,8 @@ pub(crate) use go_build::{emit_go_module, invoke_go_build, run_go_binary, GoBuil
 #[allow(unused_imports)] // binary `commands/run` + `commands/test` G4 linkage
 pub(crate) use library_link::emit_linked_library_crates;
 pub(crate) use manifest::validate_manifest;
+#[allow(unused_imports)] // binary commands/run resolves run targets through this crate-visible mapping.
+pub(crate) use manifest::manifest_build_target;
 #[allow(unused_imports)] // public package API; used by integration tests and external callers
 pub use manifest::{
     read_manifest, FaberManifest, ManifestBuild, ManifestDispatch, ManifestLibrary,

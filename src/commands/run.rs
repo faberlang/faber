@@ -23,7 +23,7 @@ fn should_interpret(args: &RunArgs, path: &Path) -> bool {
     if args.reader_locale.is_some() {
         return false;
     }
-    if Target::from(args.target) != Target::Rust {
+    if resolve_run_target(args, path) != Target::Rust {
         return false;
     }
     if args.compile {
@@ -51,7 +51,8 @@ pub(super) fn cmd_run(args: RunArgs) {
         eprintln!("error: --reader-locale is not supported with `faber run --interpret`");
         std::process::exit(1);
     }
-    match Target::from(args.target) {
+    let target = resolve_run_target(&args, &input_path);
+    match target {
         Target::Rust => {}
         Target::Go => {
             cmd_run_go(&args);
@@ -73,9 +74,13 @@ pub(super) fn cmd_run(args: RunArgs) {
             cmd_run_fmir_bin(&args);
             return;
         }
+        Target::Fhir => {
+            cmd_run_fhir(args);
+            return;
+        }
         target => {
             eprintln!(
-                "error: faber run does not support target `{}`; use `rust`, `go`, `scena`, `fmir-text`, `fmir`, or `fmir-bin`",
+                "error: faber run does not support target `{}`; use `rust`, `go`, `scena`, `fhir`, `fmir-text`, `fmir`, or `fmir-bin`",
                 run_target_name(target)
             );
             std::process::exit(1);
@@ -109,6 +114,29 @@ fn run_target_name(target: Target) -> &'static str {
         Target::Swift => "swift",
         Target::Fhir => "fhir",
     }
+}
+
+/// Resolve the run target for `faber run`: an explicit `--target` wins; else
+/// the manifest `[build] target`; else the implicit portable default (FHIR →
+/// FMIR). Never probes Cargo for an un-targeted package (portable default).
+fn resolve_run_target(args: &RunArgs, input_path: &Path) -> Target {
+    if let Some(target) = args.target {
+        return Target::from(target);
+    }
+    let Ok(layout) = crate::package::discover_build_layout(input_path) else {
+        return Target::Fhir;
+    };
+    if !layout.manifest_path.exists() {
+        return Target::Fhir;
+    }
+    let Ok(manifest) = crate::package::read_manifest(&layout.manifest_path) else {
+        return Target::Fhir;
+    };
+    crate::package::manifest_build_target(
+        manifest.build.target.as_deref(),
+        &layout.manifest_path,
+    )
+    .unwrap_or(Target::Fhir)
 }
 
 fn warn_policy_from_args(args: &RunArgs) -> radix::driver::WarnPolicy {
@@ -264,6 +292,43 @@ fn cmd_run_fmir(args: RunArgs) {
     if let Err(diagnostics) = package::run_package_fmir_image(&image, &mut host) {
         super::eprint_compile_diagnostics(&diagnostics);
         eprintln!("fmir image execution failed");
+        std::process::exit(1);
+    }
+}
+
+/// Build the FHIR package envelope, load it source-free, lower to FMIR, and
+/// run in-process — no Rust, no Cargo (portable default route).
+fn cmd_run_fhir(args: RunArgs) {
+    let input_path = PathBuf::from(&args.path);
+    let warn_policy = warn_policy_from_args(&args);
+    let mut host = StdioHost::with_argumenta(args.args);
+    let config = run_config_or_exit(
+        Target::Fhir,
+        &input_path,
+        args.reader_locale.as_deref(),
+        warn_policy,
+    );
+    let artifact = match package::build_package_fhir(&config, &input_path) {
+        Ok(artifact) => artifact,
+        Err(diagnostics) => {
+            super::eprint_compile_diagnostics(&diagnostics);
+            eprintln!("fhir package build failed");
+            std::process::exit(1);
+        }
+    };
+    let loaded = match package::load_package_fhir(&artifact.package_path) {
+        Ok(loaded) => loaded,
+        Err(diagnostics) => {
+            super::eprint_compile_diagnostics(&diagnostics);
+            eprintln!("fhir package load failed");
+            std::process::exit(1);
+        }
+    };
+    if let Err(diagnostics) =
+        package::run_loaded_package_fhir(&config, loaded, &artifact.root, &mut host)
+    {
+        super::eprint_compile_diagnostics(&diagnostics);
+        eprintln!("fhir package execution failed");
         std::process::exit(1);
     }
 }

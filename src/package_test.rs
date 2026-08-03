@@ -6156,7 +6156,8 @@ name = "defaults"
     assert_eq!(manifest.paths.source, "src");
     assert_eq!(manifest.paths.entry, None);
     assert!(manifest.library.is_none());
-    assert_eq!(manifest.build.target, "rust");
+    // Implicit portable default: no explicit [build] target in the manifest.
+    assert_eq!(manifest.build.target, None);
     assert!(manifest.build.targets.is_empty());
     assert_eq!(manifest.build.kind, "bin");
     assert!(manifest.product.is_none());
@@ -6204,7 +6205,7 @@ controllers_json = "controllers.json"
 
     let manifest = read_manifest(&manifest).expect("read manifest");
     validate_manifest(&manifest, &dir.join("faber.toml")).expect("product recipe validates");
-    assert_eq!(manifest.build.target, "ts");
+    assert_eq!(manifest.build.target.as_deref(), Some("ts"));
     let product = manifest.product.expect("product table");
     assert_eq!(product.kind, ManifestProductKind::BrowserApp);
     assert_eq!(product.emit, ManifestProductEmit::TypeScript);
@@ -8046,6 +8047,9 @@ name = "runtime-plan-unknown-provider"
 source = "src"
 entry = "main.fab"
 
+[build]
+target = "rust"
+
 [target.rust]
 host = "native"
 
@@ -9244,6 +9248,7 @@ fn use_package_compiler_keeps_rust_fab_on_package_path() {
     assert!(use_package_compiler(Target::FmirText, fab, false));
     assert!(use_package_compiler(Target::Fmir, fab, false));
     assert!(use_package_compiler(Target::FmirBin, fab, false));
+    assert!(use_package_compiler(Target::Fhir, fab, false));
     assert!(!use_package_compiler(Target::WgslText, fab, false));
     assert!(!use_package_compiler(Target::LlvmText, fab, false));
     assert!(!use_package_compiler(Target::TypeScript, fab, false));

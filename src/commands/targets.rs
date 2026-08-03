@@ -4,6 +4,7 @@ use radix::tool::{target_capabilities_for_surface, TargetCommandSurface};
 
 const FABER_TARGET_ROWS: &[(radix::codegen::Target, &str)] = &[
     (radix::codegen::Target::Rust, "rust"),
+    (radix::codegen::Target::Fhir, "fhir"),
     (radix::codegen::Target::FmirText, "fmir-text"),
     (radix::codegen::Target::Fmir, "fmir"),
     (radix::codegen::Target::FmirBin, "fmir-bin"),

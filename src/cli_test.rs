@@ -242,19 +242,21 @@ fn cli_parses_scena_target_for_run() {
     let Some(crate::cli::Command::Run(args)) = run.command else {
         panic!("expected run subcommand");
     };
-    assert_eq!(args.target, radix::tool::CliTarget::Scena);
+    assert_eq!(args.target, Some(radix::tool::CliTarget::Scena));
     assert_eq!(args.path, std::path::PathBuf::from("pkg"));
     assert_eq!(args.args, vec!["Ian".to_owned()]);
 }
 
 #[test]
-fn cli_run_defaults_to_current_directory_and_rust_target() {
+fn cli_run_defaults_to_current_directory_and_implicit_target() {
     let run = Cli::try_parse_from(["faber", "run"]).expect("parse run defaults");
     let Some(crate::cli::Command::Run(args)) = run.command else {
         panic!("expected run subcommand");
     };
     assert_eq!(args.path, std::path::PathBuf::from("."));
-    assert_eq!(args.target, radix::tool::CliTarget::Rust);
+    // Unset target = implicit portable default (FHIR → FMIR), resolved from
+    // the manifest at run time.
+    assert_eq!(args.target, None);
     assert!(!args.release);
     assert!(!args.interpret);
     assert!(!args.compile);

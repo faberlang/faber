@@ -102,9 +102,13 @@ pub struct ManifestLibrary {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ManifestBuild {
-    /// Backend target requested by the package.
-    #[serde(default = "default_build_target")]
-    pub target: String,
+    /// Backend target requested by the package. `None` selects the implicit
+    /// portable default (FHIR package + derived FMIR run) per the FHIR
+    /// package delivery; `Some("rust")` keeps the explicit Rust/Cargo route.
+    /// `faber init` intentionally leaves this unset so fresh packages are
+    /// portable by default.
+    #[serde(default)]
+    pub target: Option<String>,
 
     /// Backend targets supported by a library package.
     #[serde(default)]
@@ -246,7 +250,7 @@ impl Default for ManifestPaths {
 impl Default for ManifestBuild {
     fn default() -> Self {
         Self {
-            target: default_build_target(),
+            target: None,
             targets: Vec::new(),
             kind: default_build_kind(),
             rust_field_names: ManifestRustFieldNames::Preserve,
@@ -264,10 +268,6 @@ fn default_edition() -> String {
 
 fn default_source_path() -> String {
     "src".to_owned()
-}
-
-fn default_build_target() -> String {
-    "rust".to_owned()
 }
 
 fn default_build_kind() -> String {
@@ -298,15 +298,22 @@ fn default_product_controllers_json() -> String {
     "controllers.json".to_owned()
 }
 
-pub(super) fn manifest_build_target(target: &str, path: &Path) -> Result<Target, Box<Diagnostic>> {
-    match target.trim() {
-        "rust" => Ok(Target::Rust),
-        "ts" | "typescript" => Ok(Target::TypeScript),
-        "scena" => Ok(Target::Scena),
-        "fmir-text" => Ok(Target::FmirText),
-        "fmir" => Ok(Target::Fmir),
-        "fmir-bin" => Ok(Target::FmirBin),
-        unsupported => Err(Box::new(
+/// Map a manifest `[build] target` value (or `None` for the implicit portable
+/// default) to a compiler [`Target`].
+pub(crate) fn manifest_build_target(
+    target: Option<&str>,
+    path: &Path,
+) -> Result<Target, Box<Diagnostic>> {
+    match target.map(str::trim) {
+        None => Ok(Target::Fhir),
+        Some("rust") => Ok(Target::Rust),
+        Some("fhir") => Ok(Target::Fhir),
+        Some("ts") | Some("typescript") => Ok(Target::TypeScript),
+        Some("scena") => Ok(Target::Scena),
+        Some("fmir-text") => Ok(Target::FmirText),
+        Some("fmir") => Ok(Target::Fmir),
+        Some("fmir-bin") => Ok(Target::FmirBin),
+        Some(unsupported) => Err(Box::new(
             crate::package_diagnostic_error(format!(
                 "faber.toml build.target '{unsupported}' is not supported for package builds"
             ))
@@ -516,7 +523,7 @@ pub(crate) fn validate_manifest(
         }
     }
 
-    if !manifest.dispatch.providers.is_empty() && manifest.build.target != "rust" {
+    if !manifest.dispatch.providers.is_empty() && manifest.build.target.as_deref() != Some("rust") {
         return Err(Box::new(
             crate::package_diagnostic_error(
                 "faber.toml [dispatch] is only supported for the Rust package target",
@@ -627,7 +634,7 @@ fn validate_binary_build(manifest: &FaberManifest, path: &Path) -> Result<(), Bo
             .with_arg("issue", "missing_binary_entry"),
         ));
     }
-    manifest_build_target(&manifest.build.target, path)?;
+    manifest_build_target(manifest.build.target.as_deref(), path)?;
     if !manifest.build.targets.is_empty() {
         return Err(Box::new(
             crate::package_diagnostic_error(
@@ -669,7 +676,7 @@ fn validate_library_build(manifest: &FaberManifest, path: &Path) -> Result<(), B
                 .with_arg("issue", "empty_library_target"),
             ));
         }
-        manifest_build_target(target, path)?;
+        manifest_build_target(Some(target), path)?;
     }
     Ok(())
 }

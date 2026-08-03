@@ -16,6 +16,7 @@
 //!
 //! The format crate (`radix-hir-fhir`) owns the wire types and codec; this
 //! module reaches them through `radix::hir::package`.
+#![allow(dead_code)] // Binary build/run and lib tests exercise different surfaces.
 
 use super::compile::{analyze_package, AnalyzedPackage, AnalyzedPackageUnit};
 use super::import_graph::{resolve_import, ImportResolution};

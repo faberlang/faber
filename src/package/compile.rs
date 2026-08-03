@@ -1449,6 +1449,7 @@ fn visit_package_analysis_file<'a>(
     ordered.push(file);
 }
 
+#[allow(clippy::too_many_arguments)]
 fn local_import_siblings_for_unit<'a>(
     unit: &AnalyzedPackageUnit,
     unit_index: usize,

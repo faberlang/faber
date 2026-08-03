@@ -5,3 +5,7 @@ edition = "2024"
 
 [dependencies]
 tensor = "*"
+
+[build]
+target = "rust"
+kind = "bin"
