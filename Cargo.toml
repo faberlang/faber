@@ -12,6 +12,7 @@ path = "src/lib.rs"
 [dependencies]
 # Private compiler workspace (local org layout). Not published with this crate.
 radix = { path = "../radix/crates/radix" }
+radix-mir-fmir = { path = "../radix/crates/radix-mir-fmir" }
 # Package-store library: Faber product composition may depend on cista the same
 # way it depends on radix (docs/design/product-composition-radix-cista.md).
 clap = { version = "4.5", features = ["derive"] }
