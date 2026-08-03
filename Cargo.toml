@@ -5,6 +5,7 @@ members = [
     "crates/radix-codegen-shared",
     "crates/radix-hir-faber",
     "crates/radix-mir",
+    "crates/radix-mir-fmir",
     "crates/radix-parser",
     "crates/radix-host-abi",
     "crates/radix-runtime-contract",

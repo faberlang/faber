@@ -1209,6 +1209,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "radix-mir-fmir"
+version = "0.79.0"
+dependencies = [
+ "postcard",
+ "radix-mir",
+ "radix-types",
+ "serde",
+ "serde_json",
+ "toml 1.1.4+spec-1.1.0",
+]
+
+[[package]]
 name = "radix-parser"
 version = "0.79.0"
 dependencies = [
