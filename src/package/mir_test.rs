@@ -603,13 +603,14 @@ fn record_field_string(
     })
 }
 
-// R0 red artifact contract: adding `MirConstant::UInt(u64)` to the serialized
-// MIR schema is an approved clean break, so the package MIR artifact version
-// moves 2 → 3 (no dual-format reader). Fails until R2 lands the bump.
+// R0 red artifact contract: adding the optional `device` payload
+// (FmirDeviceSection, N1.7) to the serialized MIR schema is an approved clean
+// break, so the package MIR artifact version moves 3 → 4 (no dual-format
+// reader). Fails until S1-5 lands the bump.
 #[test]
-fn package_mir_artifact_version_is_3_for_unsigned_constant_schema() {
+fn package_mir_artifact_version_is_4_for_device_payload_schema() {
     assert_eq!(
-        PACKAGE_MIR_ARTIFACT_VERSION, 3,
-        "MirConstant::UInt requires the FMIR artifact version 3 clean break"
+        PACKAGE_MIR_ARTIFACT_VERSION, 4,
+        "device payload requires the FMIR artifact version 4 clean break"
     );
 }

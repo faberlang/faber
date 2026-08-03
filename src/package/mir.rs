@@ -38,11 +38,11 @@ use radix::mir::{
 use radix::semantic::{IndexExpr, Primitive, Type, TypeId, TypeTable, TypeTableSnapshot};
 use radix_mir_fmir::{
     decode_binary_image, decode_text_image, encode_binary_image, encode_text_image, fnv1a64,
-    is_known_host_requirement, FmirBinaryImageFile, FmirImageError, FmirTextCliOperand,
-    FmirTextCliRootSection, FmirTextCliSection, FmirTextCliValueType, FmirTextImageFile,
-    FmirTextProgramSection, FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection,
-    FmirTextToolchainSection, FmirTextTypesSection, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME,
-    PACKAGE_MIR_ARTIFACT_VERSION,
+    is_known_host_requirement, FmirBinaryImageFile, FmirDeviceBackend, FmirImageError,
+    FmirTextCliOperand, FmirTextCliRootSection, FmirTextCliSection, FmirTextCliValueType,
+    FmirTextImageFile, FmirTextProgramSection, FmirTextRuntimeSection, FmirTextSourceIdentity,
+    FmirTextSourcesSection, FmirTextToolchainSection, FmirTextTypesSection, FMIR_TARGET_NAME,
+    FMIR_TEXT_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION,
 };
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
@@ -754,6 +754,7 @@ fn package_fmir_text_image(
             .map(|interner| interner.strings().to_vec())
             .unwrap_or_default(),
         program: FmirTextProgramSection { json: program_json },
+        device: None,
     };
     encode_text_image(&image).map_err(|error| {
         vec![mir_diag(
@@ -800,6 +801,7 @@ fn package_fmir_binary_image(
             .map(|interner| interner.strings().to_vec())
             .unwrap_or_default(),
         program: lowered.program.clone(),
+        device: None,
     };
     encode_binary_image(&image).map_err(|error| {
         vec![mir_diag(
@@ -1215,6 +1217,24 @@ fn load_fmir_text_image(text: &str, path: &Path) -> Result<FmirPackageImage, Vec
             path,
             format!("unsupported fmir-text image toolchain {found}; expected {expected}"),
         )],
+        FmirImageError::UnsupportedRuntimeRequirement { requirement } => vec![mir_diag(
+            path,
+            format!(
+                "unsupported fmir-text image device runtime requirement `{requirement}` (expected `device:metal` or `device:cuda`)"
+            ),
+        )],
+        FmirImageError::ArtifactHashMismatch { backend, expected, actual } => {
+            let backend = match backend {
+                FmirDeviceBackend::Metal => "metal",
+                FmirDeviceBackend::Cuda => "cuda",
+            };
+            vec![mir_diag(
+                path,
+                format!(
+                    "fmir-text image device artifact hash mismatch for backend `{backend}` (stored {expected}, recomputed {actual})"
+                ),
+            )]
+        }
     })?;
     let program = serde_json::from_str(&image.program.json).map_err(|error| {
         vec![mir_diag(
@@ -1256,6 +1276,24 @@ fn load_fmir_image(bytes: &[u8], path: &Path) -> Result<FmirPackageImage, Vec<Di
                 path,
                 format!("unsupported fmir image toolchain {found}; expected {expected}"),
             )],
+            FmirImageError::UnsupportedRuntimeRequirement { requirement } => vec![mir_diag(
+                path,
+                format!(
+                    "unsupported fmir image device runtime requirement `{requirement}` (expected `device:metal` or `device:cuda`)"
+                ),
+            )],
+            FmirImageError::ArtifactHashMismatch { backend, expected, actual } => {
+                let backend = match backend {
+                    FmirDeviceBackend::Metal => "metal",
+                    FmirDeviceBackend::Cuda => "cuda",
+                };
+                vec![mir_diag(
+                    path,
+                    format!(
+                        "fmir image device artifact hash mismatch for backend `{backend}` (stored {expected}, recomputed {actual})"
+                    ),
+                )]
+            }
         })?;
     Ok(FmirPackageImage {
         diagnostic_path: path.to_path_buf(),
