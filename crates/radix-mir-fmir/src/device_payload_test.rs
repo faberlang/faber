@@ -373,6 +373,37 @@ fn decode_rejects_pre_break_version_3_image_with_device() {
 }
 
 #[test]
+fn decode_rejects_genuine_v3_layout_binary_image() {
+    // The 3→4 clean break (N1.7) added the optional device section. A genuine
+    // version-3 binary image is the v4 layout without that trailing field:
+    // postcard encodes `device: None` as a single 0x00 marker, so dropping it
+    // yields a real v3-layout byte image (not a v4 image with a rewritten
+    // version byte). The version pre-scan must report UnsupportedVersion, not
+    // a structural Parse error.
+    let image = binary_image_with_device(None);
+    let mut bytes = encode_binary_image(&image).expect("encode binary image");
+    assert_eq!(
+        u32::from(bytes[0]),
+        PACKAGE_MIR_ARTIFACT_VERSION,
+        "version is the first postcard varint byte"
+    );
+    assert_eq!(
+        bytes.last(),
+        Some(&0x00),
+        "device: None is a trailing 0x00 marker in the v4 layout"
+    );
+    bytes[0] = 3;
+    bytes.truncate(bytes.len() - 1);
+    assert!(matches!(
+        decode_binary_image(&bytes, TOOLCHAIN),
+        Err(FmirImageError::UnsupportedVersion {
+            actual: 3,
+            expected: 4
+        })
+    ));
+}
+
+#[test]
 fn decode_rejects_device_payload_from_wrong_toolchain() {
     // A device payload is admitted only from the exact producing toolchain
     // version (N1.7): mismatched toolchain fails before device admission.

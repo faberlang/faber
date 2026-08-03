@@ -8,7 +8,7 @@
 use crate::error::FmirImageError;
 use crate::schema::{
     admit_device_section, check_target, check_toolchain, check_version, FmirBinaryImageFile,
-    FmirTextImageFile, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME,
+    FmirTextImageFile, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION,
 };
 
 /// Serialize a text image to pretty TOML.
@@ -40,7 +40,40 @@ pub fn decode_text_image(
     Ok(image)
 }
 
+/// Pre-scan the first wire field of a postcard image as a `u32` varint.
+///
+/// `version` is the first serialized field in both image formats. A full
+/// struct parse cannot report [`FmirImageError::UnsupportedVersion`] for a
+/// legacy-layout image (the layout diverges before the parse completes), so
+/// [`decode_binary_image`] pre-scans the varint to gate on the version first.
+///
+/// Returns `None` when the prefix is not a well-formed `u32` varint (empty
+/// input, an unterminated continuation, or a fifth byte carrying more than
+/// the top four bits); the full decode is then still attempted and fails
+/// closed with [`FmirImageError::Parse`].
+fn read_version_varint(bytes: &[u8]) -> Option<u32> {
+    let mut value: u32 = 0;
+    for (shift, &byte) in bytes.iter().take(5).enumerate() {
+        let payload = u32::from(byte & 0x7f);
+        if shift == 4 && payload > 0x0f {
+            // The fifth byte carries only bits 28..=31; more overflows u32.
+            return None;
+        }
+        value |= payload << (shift * 7);
+        if byte & 0x80 == 0 {
+            return Some(value);
+        }
+    }
+    // Continuation bit never cleared within the five-byte u32 varint bound.
+    None
+}
+
 /// Decode and validate a binary image.
+///
+/// The first wire field (`version`) is pre-scanned as a postcard varint so a
+/// legacy-layout image (e.g. version 3 without the device section, N1.7)
+/// fails with [`FmirImageError::UnsupportedVersion`] instead of a structural
+/// `Parse` error.
 ///
 /// The `expected_toolchain` is the compiler crate version the image must have
 /// been produced with (faber passes its own `CARGO_PKG_VERSION`).
@@ -48,6 +81,17 @@ pub fn decode_binary_image(
     bytes: &[u8],
     expected_toolchain: &str,
 ) -> Result<FmirBinaryImageFile, FmirImageError> {
+    // Gate on the version before the structural decode: a legacy image whose
+    // layout predates the optional device section (3→4 clean break, N1.7)
+    // must report UnsupportedVersion, not a generic Parse error.
+    if let Some(actual) = read_version_varint(bytes) {
+        if actual != PACKAGE_MIR_ARTIFACT_VERSION {
+            return Err(FmirImageError::UnsupportedVersion {
+                actual,
+                expected: PACKAGE_MIR_ARTIFACT_VERSION,
+            });
+        }
+    }
     let image: FmirBinaryImageFile =
         postcard::from_bytes(bytes).map_err(|error| FmirImageError::Parse(error.to_string()))?;
     check_version(&image.version)?;
@@ -207,8 +251,10 @@ mod tests {
             decode_text_image("not toml at all {{{", "0.79.0"),
             Err(FmirImageError::Parse(_))
         ));
+        // Leading byte has the continuation bit set, so the first varint is
+        // malformed; neither the pre-scan nor the full decode can read it.
         assert!(matches!(
-            decode_binary_image(b"\x00\xff\xfe\xfd", "0.79.0"),
+            decode_binary_image(b"\x80\xff\xfe\xfd", "0.79.0"),
             Err(FmirImageError::Parse(_))
         ));
     }

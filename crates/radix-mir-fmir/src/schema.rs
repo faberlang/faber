@@ -45,8 +45,13 @@ pub const FNV1A64_PRIME: u64 = 0x0100_0000_01b3;
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FmirTextImageFile {
-    /// First wire field in both formats; decode gates on it before any
-    /// payload interpretation.
+    /// First wire field in both formats. Both decoders gate on it before any
+    /// payload interpretation: the text decoder checks it after the TOML
+    /// parse and before the target/toolchain/device admission checks; the
+    /// binary decoder pre-scans the first postcard varint so a version
+    /// mismatch fails with
+    /// [`UnsupportedVersion`](crate::error::FmirImageError::UnsupportedVersion)
+    /// before any structural decode.
     pub version: u32,
     pub target: String,
     pub package_root: String,
@@ -69,7 +74,11 @@ pub struct FmirTextImageFile {
 /// (`version` first) and must not be reordered — a silent byte break.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FmirBinaryImageFile {
-    /// First wire field (postcard varint); decode gates on it first.
+    /// First wire field (postcard varint). [`decode_binary_image`](crate::decode_binary_image)
+    /// pre-scans this varint so a legacy-layout image (e.g. version 3
+    /// without the device field, N1.7) fails with
+    /// [`UnsupportedVersion`](crate::error::FmirImageError::UnsupportedVersion)
+    /// instead of a structural `Parse` error.
     pub version: u32,
     pub target: String,
     pub package_root: String,
