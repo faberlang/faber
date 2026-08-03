@@ -666,9 +666,15 @@ fn package_device_section(
     Ok(Some(section))
 }
 
-/// The NVPTX target the S1-6 device images compile for (the accepted pharos
-/// hardware: NVIDIA RTX 5070, sm_120; the S1-3 PTX smoke used the same).
-const S1_6_PTX_TARGET: &str = "sm_120";
+/// The NVPTX target the S1-6 device images compile for.
+///
+/// `sm_90` is the highest arch the pinned pharos build-time compiler
+/// (Ubuntu clang 18.1.3, N1.10) supports — `sm_120` (the RTX 5070's native
+/// arch) is rejected by that clang. PTX is loaded via `cuModuleLoadData` and
+/// JIT-compiled by the driver at module load (N1.3 §3.1), so the `.target`
+/// is a minimum-arch declaration: `sm_90` PTX runs on sm_120 exactly as the
+/// G4/G5 pharos receipt's default-target PTX did.
+const S1_6_PTX_TARGET: &str = "sm_90";
 
 fn fmir_package_image_from_lowered(
     prepared: &PreparedPackageMir<'_>,
