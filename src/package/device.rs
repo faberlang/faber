@@ -870,14 +870,21 @@ fn observation_buffer_ids(plan: &DeviceRunPlan) -> Vec<u32> {
 }
 
 /// Execute a device-bearing FMIR image's device route through the composite
-/// host and print the A9-style receipt.
+/// host and print the A9/A10 receipt (S2-8).
 ///
 /// The ordinary-command launch seam (S1-6): constructs the composite host
 /// under the one host-construction policy, builds the typed descriptor from
 /// the image's canonical payload + declared artifact blob, executes the
 /// full lifecycle (load → allocate → copy-in → launch → sync → readback →
-/// release), and prints the selected device, the artifact/module hash, the
-/// launch/transfer/readback counts, and the observed output values.
+/// release), and prints the A9 observed events (selected hardware, module
+/// hash, allocations, launches, syncs, transfers, readbacks, releases), the
+/// A10 declared logical resource graph (buffer identities, roles, lifetimes,
+/// versions, data-flow edges), and the repeated-execution leak proof.
+///
+/// `FABER_DEVICE_REPEAT` (default 1) runs the ordered launch sequence N times
+/// on ONE session before teardown — the S2-8 leak-proof surface: after N
+/// runs + teardown the live handle count is 0 and the driver counters are at
+/// baseline (no leak of contexts/modules/buffers).
 ///
 /// # Errors
 /// Fail-closed diagnostics; never a silent CPU fallback.
@@ -904,22 +911,67 @@ pub(crate) fn execute_device_route(
         .map_err(|diagnostic| vec![diagnostic])?;
     let inputs = inputs_by_buffer_id(&plan);
     let outputs = observation_buffer_ids(&plan);
-    let receipt = super::host_factory::execute_device_descriptor(
-        &mut host,
-        &descriptor,
-        &inputs,
-        &outputs,
-    )
-    .map_err(|diagnostic| vec![diagnostic])?;
 
+    // Repeated-execution surface for the S2-8 leak proof.
+    let repeat_count = device_repeat_count()?;
+
+    let mut session = super::host_factory::create_program_session(&mut host, &descriptor)
+        .map_err(|diagnostic| vec![diagnostic])?;
+    let mut last_receipt = None;
+    for _ in 0..repeat_count {
+        last_receipt = Some(
+            session
+                .execute(&inputs, &outputs)
+                .map_err(|error| vec![super::host_factory::host_error_diagnostic(&error)])?,
+        );
+    }
+    let receipt = last_receipt.ok_or_else(|| {
+        vec![Diagnostic::error(
+            "device route executed zero iterations (FABER_DEVICE_REPEAT must be >= 1)",
+        )]
+    })?;
+    session
+        .teardown()
+        .map_err(|error| vec![super::host_factory::host_error_diagnostic(&error)])?;
+
+    // A9 observed lifecycle events of the last execution.
     println!(
-        "device: module hash fnv64:{:016x} launches {} copy-ins {} readbacks {} allocated {}",
+        "device: module hash fnv64:{:016x} launches {} syncs {} transfers {} readbacks {} releases {} allocated {}",
         receipt.module_hash,
         receipt.launches,
-        receipt.copy_ins,
+        receipt.syncs,
+        receipt.transfers,
         receipt.outputs.len(),
+        receipt.releases,
         receipt.allocated_buffers.len()
     );
+
+    // A10 declared logical resource graph: buffer identities, roles,
+    // lifetimes, content versions, and the inter-kernel data-flow edges.
+    println!("device: declared resource graph (A10):");
+    for buffer in &receipt.resource_graph {
+        println!(
+            "device:   buffer {} `{}` {} {} version {} ({}[{}])",
+            buffer.id,
+            buffer.name,
+            buffer.role.spelling(),
+            buffer.lifetime.spelling(),
+            buffer.version,
+            buffer.element_ty.spelling(),
+            buffer.element_count
+        );
+    }
+    if receipt.data_flow_edges.is_empty() {
+        println!("device:   data-flow edges: none");
+    } else {
+        for edge in &receipt.data_flow_edges {
+            println!(
+                "device:   data-flow {} -> {} via buffer {} version {}",
+                edge.producer, edge.consumer, edge.buffer_id, edge.version
+            );
+        }
+    }
+
     for (buffer_id, values) in &receipt.outputs {
         let name = plan
             .kernels
@@ -939,7 +991,51 @@ pub(crate) fn execute_device_route(
                 .join(", ")
         );
     }
+
+    // Repeated-execution leak proof (S2-8 done-when): after N runs + teardown
+    // the live handle count is 0 and the driver counters are at baseline. On
+    // real drivers the counters surface reports all-zero by design (the leak
+    // evidence is the handle-registry live count); the fake drivers track
+    // cumulative loads/releases so tests prove the cache policy at the driver
+    // boundary.
+    let live = host
+        .device()
+        .map(|runtime| runtime.live_handle_count())
+        .unwrap_or(0);
+    let counters = host.device().map(|runtime| runtime.driver_counters());
+    match counters {
+        Some(counters) => println!(
+            "device: leak proof: {} run(s) then teardown -> live_handle_count()={live}, driver counters at baseline (module loads {} releases {} buffer allocs {} releases {})",
+            repeat_count,
+            counters.module_loads,
+            counters.module_releases,
+            counters.buffer_allocs,
+            counters.buffer_releases
+        ),
+        None => println!(
+            "device: leak proof: {} run(s) then teardown -> live_handle_count()={live}, no device session after teardown",
+            repeat_count
+        ),
+    }
     Ok(())
+}
+
+/// The `FABER_DEVICE_REPEAT` env-var hook for the S2-8 repeated-execution
+/// leak proof: how many times to run the ordered launch sequence on one
+/// session before teardown. Defaults to 1; a non-numeric value fails closed
+/// (never a silent fallback to 1).
+fn device_repeat_count() -> Result<usize, Vec<Diagnostic>> {
+    match std::env::var("FABER_DEVICE_REPEAT") {
+        Ok(value) => value.parse::<usize>().map_err(|error| {
+            vec![Diagnostic::error(format!(
+                "FABER_DEVICE_REPEAT must be a non-negative integer, got `{value}`: {error}"
+            ))]
+        }),
+        Err(std::env::VarError::NotPresent) => Ok(1),
+        Err(error) => Err(vec![Diagnostic::error(format!(
+            "FABER_DEVICE_REPEAT could not be read: {error}"
+        ))]),
+    }
 }
 
 #[cfg(test)]

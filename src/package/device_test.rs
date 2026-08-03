@@ -511,3 +511,26 @@ fn two_kernel_run_plan_carries_unified_lifetimes() {
     let parsed = parse_payload(&encoded).expect("parses back");
     assert_eq!(parsed, plan);
 }
+
+/// The `FABER_DEVICE_REPEAT` leak-proof hook: absent → 1, valid number →
+/// that count, garbage → fail closed (never a silent fallback to 1).
+#[test]
+fn device_repeat_count_is_fail_closed() {
+    let previous = std::env::var("FABER_DEVICE_REPEAT").ok();
+    std::env::remove_var("FABER_DEVICE_REPEAT");
+    assert_eq!(device_repeat_count().expect("defaults to one"), 1);
+
+    std::env::set_var("FABER_DEVICE_REPEAT", "5");
+    assert_eq!(device_repeat_count().expect("parses"), 5);
+
+    std::env::set_var("FABER_DEVICE_REPEAT", "lots");
+    assert!(
+        device_repeat_count().is_err(),
+        "a non-numeric repeat count must fail closed"
+    );
+
+    match previous {
+        Some(value) => std::env::set_var("FABER_DEVICE_REPEAT", value),
+        None => std::env::remove_var("FABER_DEVICE_REPEAT"),
+    }
+}
