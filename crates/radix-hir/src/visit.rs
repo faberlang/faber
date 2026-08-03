@@ -1227,4 +1227,48 @@ mod tests {
         );
         assert_eq!(counter.blocks, 1, "the entry block is visited once");
     }
+
+    // Traversal symmetry contract: `Praefixum` wraps a real inner expression
+    // subtree, so both walkers must recurse into it. The artifact
+    // collector/validator mirrors this shape (artifact collector↔validator↔
+    // visitor symmetry).
+    fn praefixum_expr(inner_id: HirId) -> HirExpression {
+        HirExpression {
+            id: HirId(0),
+            kind: HirExpressionKind::Praefixum(Box::new(HirExpression {
+                id: inner_id,
+                kind: HirExpressionKind::Literal(HirLiteral::Int(7)),
+                ty: None,
+                span: Span::default(),
+            })),
+            ty: None,
+            span: Span::default(),
+        }
+    }
+
+    #[test]
+    fn visitor_recurses_into_praefixum_operand() {
+        let expr = praefixum_expr(HirId(5));
+        let mut collector = ExprCollector { seen: Vec::new() };
+        collector.visit_expr(&expr);
+        assert_eq!(
+            collector.seen,
+            vec![7],
+            "visit_expr must recurse into the Praefixum operand"
+        );
+    }
+
+    #[test]
+    fn mut_visitor_recurses_into_praefixum_operand() {
+        let mut expr = praefixum_expr(HirId(5));
+        let mut marker = ExprMarker;
+        marker.visit_expr_mut(&mut expr);
+        let HirExpressionKind::Praefixum(inner) = &expr.kind else {
+            panic!("expected praefixum");
+        };
+        let HirExpressionKind::Literal(HirLiteral::Int(n)) = &inner.kind else {
+            panic!("expected literal");
+        };
+        assert_eq!(*n, 99, "visit_expr_mut must reach the Praefixum operand");
+    }
 }
