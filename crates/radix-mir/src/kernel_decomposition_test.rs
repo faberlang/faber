@@ -1,7 +1,9 @@
 use super::*;
+use crate::validate::ValidatedMir;
 use crate::{
     MirBinOp, MirBlock, MirBlockId, MirCallee, MirFunctionId, MirLocal, MirLocalId, MirOperand,
-    MirParam, MirPlace, MirStatement, MirTerminator, MirValue, MirValueId, MirValueKind,
+    MirParam, MirPlace, MirProgram, MirStatement, MirTerminator, MirValue, MirValueId,
+    MirValueKind,
 };
 use radix_lexer::Span;
 use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeTable};
@@ -811,4 +813,97 @@ fn plain_fixture_outputs_are_the_recipe_results() {
         vec![vec![MirLocalId(2)], vec![MirLocalId(3)]],
         "the VJP subchains expose xt and the dw return local"
     );
+}
+
+// -----------------------------------------------------------------------
+// D-2b-1: the synthetic subchain function's return carries its output set.
+// -----------------------------------------------------------------------
+
+/// The mlp_loss GELU-lane shape with the GELU as an ELEMENTWISE collection
+/// op (a `TensorGelu` runtime call) instead of the plain Call: `h1 =
+/// matmul(x, w1); h1b = h1 + h1; a1 = gelu(h1b); h2 = matmul(a1, w2);
+/// loss = mean(h2)` — subchain 0 folds the Add + TensorGelu and exposes `a1`
+/// as an additional output, and the whole body VALIDATES (the plain-Call
+/// variant's callee has no resolvable signature in the isolated fixture, and
+/// tensor addition is a collection op, not a binary arithmetic value).
+fn mlp_loss_gelu_collection_function(types: &mut TypeTable) -> MirFunction {
+    let r2 = rank2_tensor_ty(types, [4, 4]);
+    let scalar = scalar_f32_ty(types);
+    device_function(
+        &[(0, r2), (1, r2), (5, r2)],
+        vec![
+            collection_statement(MirCollectionOp::TensorMatMul, &[0, 1], 2, r2),
+            collection_statement(MirCollectionOp::TensorAdd, &[2, 2], 3, r2),
+            collection_statement(MirCollectionOp::TensorGelu, &[3], 4, r2),
+            collection_statement(MirCollectionOp::TensorMatMul, &[4, 5], 6, r2),
+            collection_statement(MirCollectionOp::TensorMean, &[6], 7, scalar),
+        ],
+        Some(7),
+        scalar,
+    )
+}
+
+#[test]
+fn tuple_return_of_multi_output_subchain_validates_and_is_recognized() {
+    // D-2b-1: an intermediate subchain with additional consumed outputs
+    // returns a TUPLE of its output set (`[primary, extra_outputs...]` in
+    // `outputs` order). The tuple element types come from the source
+    // function's locals (the synthetic keeps the source local tables); the
+    // tuple TYPE must be pre-interned — the seam holds only `&TypeTable`,
+    // mirroring the reverse-AD `find_tuple` pattern.
+    let mut types = TypeTable::new();
+    let function = mlp_loss_gelu_collection_function(&mut types);
+    // The tuple type is interned from the SOURCE LOCALS' types (the ids the
+    // synthetic's `find_tuple` resolves — each `rank2_tensor_ty` call makes a
+    // fresh tensor id, so the fixture's locals are the source of truth).
+    let local2_ty = source_local_ty(&function, MirLocalId(2));
+    let local4_ty = source_local_ty(&function, MirLocalId(4));
+    let scalar = scalar_f32_ty(&mut types);
+    types.tuple(vec![local2_ty.semantic_id(), local4_ty.semantic_id()]);
+    let validation = MirValidationContext::new(&types);
+    let decomposition =
+        decompose_kernel_function(&function, &validation).expect("gelu-lane body decomposes");
+    assert_eq!(
+        decomposition.subchains[0].outputs,
+        vec![MirLocalId(2), MirLocalId(4)],
+        "subchain 0 exposes the recipe result h1 and the gelu destination a1"
+    );
+
+    let synthetic = decomposition.subchain_function(&function, 0, &types);
+    // The tuple form matches the ABI's multi-output contract exactly as the
+    // signature layer recognizes it (result_tuple_count).
+    assert_eq!(
+        crate::abi::result_tuple_count(&synthetic, &validation),
+        Some(2),
+        "result_tuple_count must recognize the tuple return of the output set"
+    );
+    // The tuple is constructed into a fresh temp and returned.
+    assert!(matches!(
+        synthetic.blocks[0].terminator.kind,
+        MirTerminatorKind::Return(Some(MirOperand::Temp(_)))
+    ));
+    let tuple_id = types
+        .find_tuple(&[local2_ty.semantic_id(), local4_ty.semantic_id()])
+        .expect("the tuple type is interned");
+    assert_eq!(synthetic.temps.len(), 1, "one tuple temp is added");
+    assert_eq!(synthetic.temps[0].ty, MirType::semantic(tuple_id));
+
+    // The tuple-return synthetic validates as MIR.
+    let program = MirProgram {
+        functions: vec![synthetic],
+    };
+    let validated = ValidatedMir::new(program, MirValidationContext::new(&types))
+        .expect("the tuple-return subchain synthetic validates");
+    assert_eq!(validated.program().functions.len(), 1);
+
+    // The last subchain keeps the source return shape (scalar reduction);
+    // single-output intermediates return nothing (unchanged shapes).
+    let last = decomposition.subchain_function(&function, 2, &types);
+    assert_eq!(last.return_ty, scalar);
+    assert_eq!(last.temps.len(), 0);
+    let second = decomposition.subchain_function(&function, 1, &types);
+    assert!(matches!(
+        second.blocks[0].terminator.kind,
+        MirTerminatorKind::Return(None)
+    ));
 }

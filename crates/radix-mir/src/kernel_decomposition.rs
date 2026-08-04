@@ -49,11 +49,12 @@ use crate::device_program_plans::{
 };
 use crate::kernel_plan::CollectionKernelPlan;
 use crate::{
-    MirAggregateFields, MirAggregateItem, MirBlock, MirCollectionOp, MirFunction, MirIntrinsic,
-    MirLocalId, MirOperand, MirParam, MirParamMode, MirPlaceBase, MirRuntimeCall, MirStatement,
-    MirStatementKind, MirTerminator, MirTerminatorKind, MirType, MirValidationContext, MirValue,
-    MirValueKind,
+    MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlock,
+    MirCollectionOp, MirFunction, MirIntrinsic, MirLocalId, MirOperand, MirParam, MirParamMode,
+    MirPlace, MirPlaceBase, MirRuntimeCall, MirStatement, MirStatementKind, MirTemp, MirTempId,
+    MirTerminator, MirTerminatorKind, MirType, MirValidationContext, MirValue, MirValueKind,
 };
+use radix_types::{TypeId, TypeTable};
 use std::collections::BTreeSet;
 
 /// One decomposed kernel subchain: a contiguous statement slice of the
@@ -79,6 +80,12 @@ pub struct KernelSubchain {
     /// The last subchain's output set is the function's return local
     /// (unchanged). Deterministic order: primary first, then the additional
     /// consumed locals by ascending local id.
+    ///
+    /// D-2b-1 materializes this set on the synthetic subchain function: an
+    /// intermediate subchain with additional outputs returns a TUPLE of
+    /// `outputs` (`[primary, extra_outputs...]`), which the emission
+    /// signature carries as `extra_outputs` and the emitters' multi-output
+    /// tuple-tail paths lower.
     pub outputs: Vec<MirLocalId>,
 }
 
@@ -170,7 +177,7 @@ pub fn decompose_kernel_function(
     let mut recipe_results: Vec<Option<MirLocalId>> = Vec::new();
     for (position, indices) in slices.iter().enumerate() {
         let is_last = position + 1 == slices.len();
-        let synthetic = build_subchain_function(function, indices, is_last);
+        let synthetic = build_subchain_function(function, indices, &[], is_last, validation.types);
         // The S3-A5 dead filter resolves reads against the SOURCE function
         // (the subchain's produced local is consumed by a later subchain,
         // invisible inside the slice itself).
@@ -268,16 +275,35 @@ impl KernelDecomposition {
     /// inputs — exactly the function the pass resolved the subchain's plan
     /// from — so the emitters can lower a decomposed kernel from the same
     /// typed facts. The last subchain keeps the source return terminator
-    /// (the scalar-return reduction shape survives the slice); intermediate
-    /// subchains are buffer-producing kernels and return nothing.
+    /// (the scalar-return reduction shape survives the slice). An
+    /// intermediate subchain is a buffer-producing kernel: a single-output
+    /// subchain returns nothing, and a subchain with additional consumed
+    /// outputs (D-2b-1) returns a TUPLE of its output set
+    /// (`[primary, extra_outputs...]`) so the emitters' multi-output
+    /// tuple-tail paths can materialize them as extra kernel outputs.
     ///
     /// # Panics
     /// Panics when `index` is out of range (callers validate against
-    /// [`Self::subchains`]).
+    /// [`Self::subchains`]), or when a multi-output subchain's tuple return
+    /// type is not interned in `types` (the caller must intern
+    /// `Type::Tuple([...])` of the output element types before building the
+    /// synthetic — the tuple element types come from the source function's
+    /// locals, which the synthetic keeps).
     #[must_use]
-    pub fn subchain_function(&self, source: &MirFunction, index: usize) -> MirFunction {
+    pub fn subchain_function(
+        &self,
+        source: &MirFunction,
+        index: usize,
+        types: &TypeTable,
+    ) -> MirFunction {
         let is_last = index + 1 == self.subchains.len();
-        build_subchain_function(source, &self.subchains[index].statements, is_last)
+        build_subchain_function(
+            source,
+            &self.subchains[index].statements,
+            &self.subchains[index].outputs,
+            is_last,
+            types,
+        )
     }
 }
 
@@ -290,9 +316,21 @@ impl KernelDecomposition {
 /// every typed lookup (`operand_local_ty`, the contract resolver's shape
 /// scan) resolves exactly as it does in the source body. The last subchain
 /// returns the source function's return local (preserving the scalar-return
-/// reduction shape); intermediate subchains are buffer-producing kernels and
-/// return nothing.
-fn build_subchain_function(source: &MirFunction, indices: &[usize], is_last: bool) -> MirFunction {
+/// reduction shape); an intermediate subchain returns nothing when its
+/// output set is the single recipe result, and a TUPLE of its output set
+/// (`[primary, extra_outputs...]` in `outputs` order) when it carries
+/// additional consumed outputs (D-2b-1).
+///
+/// # Panics
+/// Panics when an intermediate subchain carries additional outputs but the
+/// caller has not interned the tuple return type in `types`.
+fn build_subchain_function(
+    source: &MirFunction,
+    indices: &[usize],
+    outputs: &[MirLocalId],
+    is_last: bool,
+    types: &TypeTable,
+) -> MirFunction {
     let block = &source.blocks[0];
     let mut written: BTreeSet<MirLocalId> = BTreeSet::new();
     let mut read_order: Vec<MirLocalId> = Vec::new();
@@ -319,18 +357,77 @@ fn build_subchain_function(source: &MirFunction, indices: &[usize], is_last: boo
         })
         .collect();
 
-    let statements: Vec<MirStatement> = indices
+    let mut statements: Vec<MirStatement> = indices
         .iter()
         .map(|&index| block.statements[index].clone())
         .collect();
-    let terminator = if is_last {
-        source_terminator_return(source)
+
+    // D-2b-1: the return carries the subchain's consumed-output set. The
+    // last subchain keeps the source return; a single-output intermediate
+    // subchain is a buffer-producing kernel that returns nothing. An
+    // intermediate subchain with ADDITIONAL consumed outputs returns a
+    // TUPLE of the output locals (`[primary, extra_outputs...]` in the
+    // subchain's `outputs` order) — the multi-output contract the ABI
+    // recognizes via `result_tuple_count` (`abi.rs`). The tuple element
+    // types come from the source function's locals (the synthetic keeps the
+    // source local tables); the tuple TYPE must already be interned in
+    // `types` (mirroring the reverse-AD `find_tuple` pattern, where the
+    // gradient-tuple walk holds only `&TypeTable`).
+    let terminator;
+    let return_ty;
+    let mut temps = source.temps.clone();
+    if is_last {
+        terminator = source_terminator_return(source);
+        return_ty = source.return_ty;
+    } else if outputs.len() > 1 {
+        let element_ids: Vec<TypeId> = outputs
+            .iter()
+            .map(|&local| source_local_ty(source, local).semantic_id())
+            .collect();
+        let tuple_id = types.find_tuple(&element_ids).unwrap_or_else(|| {
+            panic!(
+                "subchain output set {outputs:?} has no interned tuple return type for \
+                 elements {element_ids:?}; the caller must intern \
+                 `Type::Tuple(elements)` before building the subchain synthetic"
+            )
+        });
+        let tuple_ty = MirType::semantic(tuple_id);
+        let tuple_temp = MirTempId(u32::try_from(temps.len()).unwrap_or(u32::MAX));
+        temps.push(MirTemp {
+            id: tuple_temp,
+            ty: tuple_ty,
+            span,
+        });
+        statements.push(MirStatement {
+            kind: MirStatementKind::Construct {
+                destination: MirPlace::temp(tuple_temp),
+                aggregate: MirAggregate {
+                    kind: MirAggregateKind::Tuple,
+                    ty: tuple_ty,
+                    fields: MirAggregateFields::Ordered(
+                        outputs
+                            .iter()
+                            .map(|&local| {
+                                MirAggregateItem::Operand(MirOperand::Place(MirPlace::local(local)))
+                            })
+                            .collect(),
+                    ),
+                },
+            },
+            span,
+        });
+        terminator = MirTerminator {
+            kind: MirTerminatorKind::Return(Some(MirOperand::Temp(tuple_temp))),
+            span,
+        };
+        return_ty = tuple_ty;
     } else {
-        MirTerminator {
+        terminator = MirTerminator {
             kind: MirTerminatorKind::Return(None),
             span,
-        }
-    };
+        };
+        return_ty = source.return_ty;
+    }
 
     MirFunction {
         id: source.id,
@@ -338,14 +435,14 @@ fn build_subchain_function(source: &MirFunction, indices: &[usize], is_last: boo
         name: source.name,
         params,
         locals: source.locals.clone(),
-        temps: source.temps.clone(),
+        temps,
         blocks: vec![MirBlock {
             id: block.id,
             statements,
             terminator,
             span: block.span,
         }],
-        return_ty: source.return_ty,
+        return_ty,
         error_ty: source.error_ty,
         is_async: source.is_async,
         is_generator: source.is_generator,

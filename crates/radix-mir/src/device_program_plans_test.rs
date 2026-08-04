@@ -1421,7 +1421,7 @@ fn f32_scalar_data_flow_param_resolves_in_subchain_emission_signature() {
         dispatch_y: 1,
     };
 
-    let signature = subchain_signature_for_emission(&function, &contract, &validation)
+    let signature = subchain_signature_for_emission(&function, &contract, &validation, &[])
         .expect("a scalar f32 data-flow param resolves in the emission signature");
 
     // Recipe operands bind first (input 0 = x, extra input 1 = w).
@@ -1464,11 +1464,176 @@ fn f64_scalar_data_flow_param_fails_closed_in_subchain_emission_signature() {
         dispatch_y: 1,
     };
 
-    let error = subchain_signature_for_emission(&function, &contract, &validation)
+    let error = subchain_signature_for_emission(&function, &contract, &validation, &[])
         .expect_err("an f64 scalar data-flow param must fail closed");
     assert!(
         error.message.contains("kernel scalar layout f64"),
         "the diagnostic must name the unsupported scalar layout, got: {}",
         error.message
     );
+}
+
+// -----------------------------------------------------------------------
+// D-2b-1: a subchain's additional consumed outputs carry as `extra_outputs`
+// in the emission signature.
+// -----------------------------------------------------------------------
+
+/// The D-2b-1 lane: `h1 = matmul(x, w1); t = h1 + h1; h2 = matmul(t, w2)`
+/// over 4×4 tensors — subchain 0 folds the elementwise Add and its
+/// destination `t` is read by subchain 1, so subchain 0's output set is
+/// `[h1, t]` (the recipe result plus the consumed elementwise destination).
+fn matmul_with_consumed_elementwise_destination(types: &mut TypeTable) -> MirFunction {
+    let r2 = rank2_tensor_ty(types, [4, 4]);
+    let span = test_span();
+    let collection = |op: MirCollectionOp, args: &[u32], destination: u32| MirStatement {
+        kind: MirStatementKind::RuntimeCall {
+            destination: Some(MirPlace::local(MirLocalId(destination))),
+            call: MirRuntimeCall {
+                intrinsic: MirIntrinsic::Collection(op),
+                args: args
+                    .iter()
+                    .map(|&local| MirOperand::Place(MirPlace::local(MirLocalId(local))))
+                    .collect(),
+                return_ty: r2,
+            },
+        },
+        span,
+    };
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: [0u32, 1, 5]
+            .into_iter()
+            .map(|id| MirParam {
+                local: MirLocalId(id),
+                name: None,
+                ty: r2,
+                mode: MirParamMode::Owned,
+                span,
+            })
+            .collect(),
+        locals: [2u32, 3, 6]
+            .into_iter()
+            .map(|id| MirLocal {
+                id: MirLocalId(id),
+                name: None,
+                ty: r2,
+                mutable: false,
+                span,
+            })
+            .collect(),
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![
+                collection(MirCollectionOp::TensorMatMul, &[0, 1], 2),
+                MirStatement {
+                    kind: MirStatementKind::Assign {
+                        place: MirPlace::local(MirLocalId(3)),
+                        value: MirValue {
+                            id: MirValueId(0),
+                            kind: MirValueKind::Binary {
+                                op: MirBinOp::Add,
+                                lhs: MirOperand::Place(MirPlace::local(MirLocalId(2))),
+                                rhs: MirOperand::Place(MirPlace::local(MirLocalId(2))),
+                            },
+                            ty: r2,
+                            span,
+                        },
+                    },
+                    span,
+                },
+                collection(MirCollectionOp::TensorMatMul, &[3, 5], 6),
+            ],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(6),
+                )))),
+                span,
+            },
+            span,
+        }],
+        return_ty: r2,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    }
+}
+
+#[test]
+fn subchain_additional_outputs_resolve_in_emission_signature() {
+    // D-2b-1: a subchain with `outputs = [primary, extra]` resolves an
+    // emission signature whose `extra_outputs` carry the extra local's
+    // device-view element type and element count — the tuple-return surface
+    // the emitters' multi-output tuple-tail paths consume in D-2b-2.
+    let mut types = TypeTable::new();
+    let function = matmul_with_consumed_elementwise_destination(&mut types);
+    // The tuple type is interned from the SOURCE LOCALS' types (the ids the
+    // synthetic's `find_tuple` resolves — each `rank2_tensor_ty` call makes a
+    // fresh tensor id, so the fixture's locals are the source of truth).
+    let local2_ty = function_local_ty(&function, MirLocalId(2)).expect("h1 is typed");
+    let local3_ty = function_local_ty(&function, MirLocalId(3)).expect("t is typed");
+    let element_ty = {
+        let Type::Tensor(element, _) = types.get(local3_ty.semantic_id()) else {
+            panic!("t is a tensor");
+        };
+        MirType::semantic(*element)
+    };
+    // The synthetic's tuple return type must be interned before the
+    // synthetic is built (the decomposition seam holds only `&TypeTable`,
+    // mirroring the reverse-AD `find_tuple` pattern).
+    types.tuple(vec![local2_ty.semantic_id(), local3_ty.semantic_id()]);
+    let validation = MirValidationContext::new(&types);
+    let decomposition =
+        crate::kernel_decomposition::decompose_kernel_function(&function, &validation)
+            .expect("matmul lane with a consumed elementwise destination decomposes");
+    assert_eq!(
+        decomposition.subchains[0].outputs,
+        vec![MirLocalId(2), MirLocalId(3)],
+        "subchain 0 exposes the recipe result h1 and the consumed add destination t"
+    );
+
+    let synthetic = decomposition.subchain_function(&function, 0, &types);
+    let contract = crate::abi::collection_op_contract(&synthetic, &validation)
+        .expect("subchain contract resolves")
+        .expect("subchain 0 carries a recipe contract");
+    let signature = subchain_signature_for_emission(
+        &synthetic,
+        &contract,
+        &validation,
+        &decomposition.subchains[0].outputs,
+    )
+    .expect("the additional output resolves in the emission signature");
+
+    // The primary output stays the contract-shaped recipe output (h1).
+    assert_eq!(signature.output.source_local, Some(MirLocalId(2)));
+    assert_eq!(signature.output.binding, 2);
+    // The consumed elementwise destination binds as the single extra output.
+    assert_eq!(signature.extra_outputs.len(), 1);
+    let extra = &signature.extra_outputs[0];
+    assert_eq!(extra.source_local, Some(MirLocalId(3)));
+    assert_eq!(
+        extra.binding, 3,
+        "the extra output binds after the recipe inputs and the primary output"
+    );
+    assert_eq!(extra.role, MirKernelResourceRole::Output);
+    assert_eq!(extra.access, MirKernelResourceAccess::Write);
+    assert_eq!(
+        extra.element_ty, element_ty,
+        "the extra output carries the tensor's device-view element type"
+    );
+    assert_eq!(
+        extra.element_count, 16,
+        "the 4×4 tensor output is 16 elements"
+    );
+
+    // `outputs.len() == 1` keeps the existing single-output shape.
+    let single =
+        subchain_signature_for_emission(&synthetic, &contract, &validation, &[MirLocalId(2)])
+            .expect("a single-output subchain keeps the existing shape");
+    assert!(single.extra_outputs.is_empty());
+    assert_eq!(single.output.binding, 2);
 }

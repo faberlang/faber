@@ -3650,8 +3650,10 @@ fn is_vacuum(ty: MirType, validation: &MirValidationContext<'_>) -> bool {
 
 /// The tuple-element count of a kernel **result-tuple** return (S3-A1), or
 /// `None` when the return type is not a non-empty tuple. The tuple elements
-/// are the multi-output contract's output resources.
-fn result_tuple_count(
+/// are the multi-output contract's output resources. `pub(crate)` so the
+/// decomposition seam's D-2b-1 tuple-return tests can assert the ABI
+/// recognizes the synthetic's tuple form.
+pub(crate) fn result_tuple_count(
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
 ) -> Option<usize> {

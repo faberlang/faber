@@ -800,9 +800,7 @@ pub fn contract_shape_signature(
 /// (input at 0, matmul's right operand at 1), then each remaining data-flow
 /// input (a local read from an earlier subchain, e.g. the elementwise
 /// operand folded into a reduction subchain's load) as a read input at the
-/// next binding, and the contract output buffer last. The recipe operands'
-/// source locals are patched from the recipe statement's operand scan (the
-/// contract-shaped seam leaves them `None`).
+/// next binding, and the contract output buffer last.
 ///
 /// Data-flow inputs bind after the recipe operands: tensor-typed params at
 /// their device-view element type and literal dim product, and scalar-typed
@@ -813,14 +811,25 @@ pub fn contract_shape_signature(
 /// the ABI rejects it; other non-scalar, non-tensor layouts stay fail-closed
 /// with a typed diagnostic.
 ///
+/// D-2b-1: `outputs` is the subchain's consumed-output set (D-2a), the
+/// locals the synthetic exposes as kernel outputs. The first element is the
+/// primary (the contract-shaped [`MirKernelSignature::output`]); each
+/// ADDITIONAL output (`outputs[1..]`, the consumed elementwise destinations
+/// a later subchain reads) binds as an [`MirKernelSignature::extra_output`]
+/// after the primary, sized from its local's type exactly like the input
+/// data-flow resolution (device-view element type + literal dim product).
+/// `outputs.len() == 1` keeps the existing single-output shape.
+///
 /// # Errors
 /// Returns [`PlanMappingError`] when the recipe operand's tensor type, a
-/// data-flow input's tensor type, or a scalar data-flow input's kernel
-/// layout cannot be resolved from the subchain body.
+/// data-flow input's tensor type, a scalar data-flow input's kernel layout,
+/// or an additional output local's type cannot be resolved from the subchain
+/// body.
 pub fn subchain_signature_for_emission(
     function: &MirFunction,
     contract: &CollectionOpContract,
     validation: &MirValidationContext<'_>,
+    outputs: &[MirLocalId],
 ) -> Result<MirKernelSignature, PlanMappingError> {
     let mut signature = contract_shape_signature(function, contract, validation)?;
     let operands = recipe_operand_locals(function)?;
@@ -857,7 +866,22 @@ pub fn subchain_signature_for_emission(
         ));
         next_binding = next_binding.saturating_add(1);
     }
+    // The primary output (the contract-shaped recipe output) binds after the
+    // inputs; each ADDITIONAL consumed output binds its own storage-buffer
+    // output after it (D-2b-1).
     signature.output.binding = next_binding;
+    next_binding = next_binding.saturating_add(1);
+    for &output in outputs.iter().skip(1) {
+        let local_ty = function_local_ty(function, output)?;
+        let (element_ty, count) = data_flow_element_ty_and_count(local_ty, validation)?;
+        signature.extra_outputs.push(storage_output_with_local(
+            next_binding,
+            element_ty,
+            count,
+            output,
+        ));
+        next_binding = next_binding.saturating_add(1);
+    }
     Ok(signature)
 }
 
@@ -953,6 +977,50 @@ fn storage_input_with_local(
     let mut resource = storage_input(binding, element_ty, count);
     resource.source_local = Some(local);
     resource
+}
+
+/// A write output resource carrying a source local (the subchain's
+/// ADDITIONAL consumed outputs the emission signature binds after the
+/// primary output — D-2b-1).
+fn storage_output_with_local(
+    binding: u32,
+    element_ty: MirType,
+    count: u64,
+    local: MirLocalId,
+) -> MirKernelResource {
+    let mut resource = storage_output(binding, element_ty, count);
+    resource.source_local = Some(local);
+    resource
+}
+
+/// The MIR type of a local in the subchain function (params, then locals) —
+/// the additional-output sizing source (mirrors `abi::operand_local_ty` and
+/// the decomposition's local-type resolution for the signature seam).
+///
+/// # Errors
+/// Returns [`PlanMappingError`] when the local is neither a param nor a
+/// declared local of the subchain body.
+fn function_local_ty(
+    function: &MirFunction,
+    local: MirLocalId,
+) -> Result<MirType, PlanMappingError> {
+    function
+        .params
+        .iter()
+        .find(|param| param.local == local)
+        .map(|param| param.ty)
+        .or_else(|| {
+            function
+                .locals
+                .iter()
+                .find(|entry| entry.id == local)
+                .map(|entry| entry.ty)
+        })
+        .ok_or_else(|| {
+            PlanMappingError::mapping(format!(
+                "subchain output local {local:?} has no type in the subchain body"
+            ))
+        })
 }
 
 /// Whether the body's op-set scan carries the given recipe op (the
