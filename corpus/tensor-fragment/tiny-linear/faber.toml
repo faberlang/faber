@@ -13,3 +13,6 @@ kind = "bin"
 
 [dependencies]
 tensor = "*"
+
+[reader]
+locale = "la"
