@@ -6,6 +6,7 @@ canonical = true
 summary = "Captured backtick templates for bound payloads."
 syntax = "`template`(args)"
 related = ["scriptum", "textus", "valor"]
+locale = "la"
 +++
 
 # =============================================================================

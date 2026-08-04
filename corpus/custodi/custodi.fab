@@ -7,6 +7,7 @@ summary = "Groups early-exit guard checks before the main body of a function."
 syntax = "custodi <block>"
 aliases = ["guard"]
 related = ["si", "redde"]
+locale = "la"
 +++
 
 # =============================================================================

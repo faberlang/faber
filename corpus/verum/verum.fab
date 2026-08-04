@@ -6,6 +6,7 @@ canonical = true
 summary = "Represents the true boolean value and can prefix a truthiness check."
 syntax = "verum [<expression>]"
 related = ["falsum", "nihil"]
+locale = "la"
 +++
 
 # =============================================================================

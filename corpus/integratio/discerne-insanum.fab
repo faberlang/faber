@@ -5,6 +5,7 @@ category = "integration"
 summary = "Multi-feature smoke: discretio, finge, discerne omnia, and per-field ut aliases."
 syntax = "discerne omnia <subject> <block>"
 related = ["discretio", "finge", "ut", "casu"]
+locale = "la"
 +++
 # =============================================================================
 # discerne — Multi-feature smoke: discretio, finge, discerne omnia, and per-field ut aliases

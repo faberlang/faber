@@ -6,6 +6,7 @@ canonical = true
 summary = "Compile textus patterns to regex via ↦ regex."
 syntax = "<textus> ↦ regex"
 related = ["lege", "conversio", "scriptum"]
+locale = "la"
 +++
 
 # =============================================================================

@@ -7,6 +7,7 @@ summary = "Promise-like result type associated with async finite functions."
 syntax = "promissum<T> | promissum<T ⇥ E>"
 aliases = ["promise"]
 related = ["fiet", "futura", "figendum", "tacebit"]
+locale = "la"
 +++
 
 # =============================================================================

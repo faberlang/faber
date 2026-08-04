@@ -7,6 +7,7 @@ summary = "Breaks out of the innermost loop."
 syntax = "rumpe"
 aliases = ["break"]
 related = ["perge", "dum"]
+locale = "la"
 +++
 
 # =============================================================================

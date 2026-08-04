@@ -5,6 +5,7 @@ category = "range"
 canonical = true
 summary = "Interval algebra: intersection, union, and span count."
 related = ["inter", "union", "longitudo", "nihil"]
+locale = "la"
 +++
 # =============================================================================
 # intervallum — Interval algebra: intersection, union, and span count

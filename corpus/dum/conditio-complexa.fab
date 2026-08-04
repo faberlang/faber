@@ -6,6 +6,7 @@ canonical = false
 summary = "While loops with compound et/aut conditions."
 syntax = "dum <condition> <block>"
 related = ["dum", "et", "aut"]
+locale = "la"
 +++
 
 # =============================================================================

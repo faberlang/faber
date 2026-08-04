@@ -6,6 +6,7 @@ canonical = true
 summary = "Braced canonical @ radix lane routing record for the Rust HIR-direct lane."
 syntax = "@ radix { lane = \"hir-direct\" }"
 related = ["radix", "annotation-sugar"]
+locale = "la"
 +++
 
 # =============================================================================

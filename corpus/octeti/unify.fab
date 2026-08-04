@@ -6,6 +6,7 @@ canonical = false
 summary = "octeti unifies with lista<numerus<u8>> — every lista method works on octeti."
 syntax = "octeti"
 related = ["octeti", "lista", "numerus"]
+locale = "la"
 +++
 
 # =============================================================================

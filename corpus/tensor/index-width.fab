@@ -6,6 +6,7 @@ canonical = false
 summary = "Tensor index intrinsics accept integer-width index lists that fit the i64 runtime boundary (lista<u32>, lista<numerus<i32>>, …)."
 syntax = "tensor.accipe(lista<i64-fit integer>) | tensor.ponde(lista<i64-fit integer>, value)"
 related = ["tensor", "lista", "accipe", "ponde"]
+locale = "la"
 +++
 
 # =============================================================================

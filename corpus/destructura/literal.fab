@@ -7,6 +7,7 @@ summary = "JSON-shaped dynamic value literal for open object-shaped data."
 syntax = "valor"
 aliases = ["json", "object"]
 related = ["genus", "∷", "ignotum", "tabula"]
+locale = "la"
 +++
 
 # =============================================================================

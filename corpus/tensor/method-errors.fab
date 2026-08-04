@@ -6,6 +6,7 @@ canonical = false
 summary = "Tensor method hard-error policy for structa count mismatch."
 syntax = "tensor.strue(flat, shape)"
 related = ["tensor", "structa"]
+locale = "la"
 +++
 
 # =============================================================================

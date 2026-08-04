@@ -7,6 +7,7 @@ summary = "Declares a direct superclass or base type."
 syntax = "genus <name> sub <parent> <block>"
 aliases = ["extends"]
 related = ["genus", "implet"]
+locale = "la"
 +++
 
 # =============================================================================

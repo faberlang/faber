@@ -5,6 +5,7 @@ category = "numeric"
 summary = "bf16 remains deferred; f16 is the only half-width marker today."
 syntax = "f16"
 related = ["fractus"]
+locale = "la"
 +++
 # =============================================================================
 # f16 — bf16 remains deferred; f16 is the only half-width marker today

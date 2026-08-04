@@ -6,6 +6,7 @@ canonical = true
 summary = "Braced canonical @ optio CLI option record."
 syntax = "@ optio { binding = NAME, brevis = \"x\", longum = \"name\", typus = TYPE, descriptio = \"...\", ubique = verum }"
 related = ["optio", "cli", "annotation-sugar"]
+locale = "la"
 +++
 
 # =============================================================================

@@ -7,6 +7,7 @@ summary = "Canonical braced import record with private binding inferred from the
 syntax = "importa { ex = \"norma:chorda\" }"
 aliases = ["import"]
 related = ["ex", "privata", "annotation-sugar"]
+locale = "la"
 +++
 # =============================================================================
 # importa — Canonical braced import record with private binding inferred from the path

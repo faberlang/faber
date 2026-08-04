@@ -7,6 +7,7 @@ summary = "Declares a concrete type with fields and methods."
 syntax = "genus <name> [<type-params>] <block>"
 aliases = ["class", "struct"]
 related = ["implendum", "abstractus", "implet", "sub"]
+locale = "la"
 +++
 # =============================================================================
 # genus — Declares a concrete type with fields and methods

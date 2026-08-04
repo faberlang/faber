@@ -7,6 +7,7 @@ summary = "Functions returning boolean literals via redde verum and redde falsum
 syntax = "redde <bool-literal>"
 aliases = ["return"]
 related = ["verum", "falsum", "bivalens", "functio"]
+locale = "la"
 +++
 
 # =============================================================================

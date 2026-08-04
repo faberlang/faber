@@ -6,6 +6,7 @@ canonical = true
 summary = "Sparse tensor width sugar mirrors dense tensor sugar with an s prefix."
 syntax = "sf32[2, 3] | si64[N] | su32[4]"
 related = ["tensor", "numeric type sugar"]
+locale = "la"
 +++
 
 # =============================================================================

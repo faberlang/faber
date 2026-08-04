@@ -6,6 +6,7 @@ canonical = true
 summary = "Binds CLI options metadata to a function declaration."
 syntax = "functio <name>(...) optiones <ident> → <type>"
 related = ["argumenta", "ad"]
+locale = "la"
 +++
 
 # =============================================================================

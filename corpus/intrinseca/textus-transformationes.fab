@@ -7,6 +7,7 @@ summary = "Primitive string/text type."
 syntax = "textus"
 aliases = ["string"]
 related = ["string", "scriptum", "↦"]
+locale = "la"
 +++
 # =============================================================================
 # textus — Primitive string/text type

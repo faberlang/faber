@@ -6,6 +6,7 @@ canonical = false
 summary = "Cross-collection conversio between lista, copia, tabula, tensor, and cursor."
 syntax = "<expression> ↦ <collection-type>"
 related = ["↦", "lista", "copia", "tabula", "tensor"]
+locale = "la"
 +++
 
 # =============================================================================

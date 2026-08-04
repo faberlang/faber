@@ -6,6 +6,7 @@ canonical = false
 summary = "Tensor bridges and element-width conversio."
 syntax = "<tensor> ↦ <tensor-type> | <lista> ↦ tensor | tensor ↦ lista"
 related = ["↦", "tensor", "lista"]
+locale = "la"
 +++
 
 # =============================================================================

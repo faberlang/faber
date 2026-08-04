@@ -3,6 +3,7 @@ term = "vector"
 kind = "kernel"
 category = "gpu"
 summary = "vector constructor and dot product lower for GPU text emit"
+locale = "la"
 +++
 
 # =============================================================================

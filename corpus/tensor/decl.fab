@@ -6,6 +6,7 @@ canonical = true
 summary = "tensor<T, Figura> declaration shell with rank-0 vacua."
 syntax = "tensor<T, Figura> | tensor<T, []>"
 related = ["tensor", "lista"]
+locale = "la"
 +++
 
 # =============================================================================

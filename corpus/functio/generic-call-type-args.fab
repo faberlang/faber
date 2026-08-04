@@ -6,6 +6,7 @@ canonical = true
 summary = "Explicit type arguments at function and namespaced call sites."
 syntax = "callee<type, ...>(args) — id<textus>(...), module.f<T>(...), tensor.creata<T>(...)"
 related = ["functio", "tensor", "typi-parametri"]
+locale = "la"
 +++
 # =============================================================================
 # generic-call-type-args — Explicit type arguments at function and namespaced call sites

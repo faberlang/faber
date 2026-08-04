@@ -6,6 +6,7 @@ canonical = true
 summary = "Sets the step for a range."
 syntax = "<range> per <expression>"
 related = ["ante", "usque"]
+locale = "la"
 +++
 
 

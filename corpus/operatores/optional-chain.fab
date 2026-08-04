@@ -6,6 +6,7 @@ canonical = true
 summary = "Null-safe member, index, and call access."
 syntax = "<expression>?.<name> | <expression>?[<expression>] | <expression>?(<args>)"
 related = ["?.", "?[", "?(", "vel", "sponte"]
+locale = "la"
 +++
 
 # =============================================================================

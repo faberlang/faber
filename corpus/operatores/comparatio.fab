@@ -6,6 +6,7 @@ canonical = true
 summary = "Equality and ordering comparisons returning bivalens."
 syntax = "<expression> ≡ <expression> | <expression> ≠ <expression> | <expression> ≤ <expression> | <expression> ≥ <expression>"
 related = ["≠", "≤", "≥", "est", "adfirma"]
+locale = "la"
 +++
 
 # =============================================================================

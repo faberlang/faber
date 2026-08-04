@@ -6,6 +6,7 @@ canonical = true
 summary = "Braced canonical @ nondum availability record."
 syntax = "@ nondum { target = rs, ratio = \"…\" }"
 related = ["nondum", "annotation-sugar"]
+locale = "la"
 +++
 
 # =============================================================================

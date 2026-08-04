@@ -6,6 +6,7 @@ canonical = true
 summary = "valor ↦ genus extraction with missing-field defaults and mandatory-field failure via ⇥ recovery."
 syntax = "<valor-expression> ↦ <genus-type> [⇥ <recovery>]"
 related = ["↦", "⇥"]
+locale = "la"
 +++
 
 # =============================================================================

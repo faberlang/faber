@@ -7,6 +7,7 @@ summary = "Declares a mutable binding."
 syntax = "varia <type|_> <pattern> [← <expression>]"
 aliases = ["let", "mutable"]
 related = ["fixum", "←", "⊕"]
+locale = "la"
 +++
 
 # =============================================================================

@@ -7,6 +7,7 @@ summary = "Starts a scoped do-while style loop."
 syntax = "fac <block> [cape <name> <block>] [dum <condition>]"
 aliases = ["do"]
 related = ["dum", "cape", "clausura", "perge"]
+locale = "la"
 +++
 # =============================================================================
 # fac — Starts a scoped do-while style loop

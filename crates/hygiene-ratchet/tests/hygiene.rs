@@ -246,7 +246,7 @@ fn contains_diagnostic_prose_word(line: &str) -> bool {
 
 fn contains_diagnostic_code_token(line: &str) -> bool {
     [
-        "LEX", "PARSE", "SEM", "WARN", "READER", "PKG", "CODEGEN", "MIR", "AIR", "ABI",
+        "LEX", "PARSE", "SEM", "WARN", "LOCALE", "PKG", "CODEGEN", "MIR", "AIR", "ABI",
     ]
     .iter()
     .any(|prefix| line.contains(prefix) && line.contains(|ch: char| ch.is_ascii_digit()))
@@ -323,7 +323,7 @@ fn diagnostic_text_assertion_allowlisted(root: &Path, path: &Path) -> bool {
     rel == "crates/hygiene-ratchet/tests/hygiene.rs"
         || rel == "crates/radix/src/diagnostics/render_test.rs"
         || rel == "crates/radix/src/diagnostics/diagnostic_test.rs"
-        || rel == "crates/radix/src/reader_locale_test.rs"
+        || rel == "crates/radix/src/locale_test.rs"
         || rel == "crates/faber-cli/src/diagnostic_explain_test.rs"
         || rel == "crates/faber-cli/src/explain_test.rs"
         || rel == "crates/faber-cli/src/reference_test.rs"

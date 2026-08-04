@@ -7,6 +7,7 @@ summary = "Declares a tagged union with variant payloads."
 syntax = "discretio <name> [<type-params>] <block>"
 aliases = ["union", "sum type"]
 related = ["ordo", "discerne", "finge"]
+locale = "la"
 +++
 
 # =============================================================================

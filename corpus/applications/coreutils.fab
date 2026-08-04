@@ -5,6 +5,7 @@ category = "application"
 canonical = true
 summary = "Points to the coreutils application exempla workspace."
 related = ["cli", "argumenta", "operandus", "exitus"]
+locale = "la"
 +++
 
 # =============================================================================

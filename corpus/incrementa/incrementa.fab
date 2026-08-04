@@ -7,6 +7,7 @@ summary = "Postfix increment statement for a mutable numerus place."
 syntax = "<place> ⊕"
 aliases = ["postfix increment", "increment statement"]
 related = ["⊖", "varia", "←", "numerus"]
+locale = "la"
 +++
 # =============================================================================
 # ⊕ — Postfix increment statement for a mutable numerus place

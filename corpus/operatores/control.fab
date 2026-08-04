@@ -7,6 +7,7 @@ summary = "Compact consequent after si/dum heads via ergo, with ∴ reserved for
 syntax = "<head> ergo <statement>"
 aliases = ["ergo", "therefore"]
 related = ["si", "redde", "clausura", "ergo"]
+locale = "la"
 +++
 
 # =============================================================================

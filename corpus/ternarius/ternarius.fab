@@ -6,6 +6,7 @@ canonical = false
 summary = "Ternary conditional expressions with sic and secus."
 syntax = "<condition> sic <then-expr> secus <else-expr>"
 related = ["sic", "secus", "si"]
+locale = "la"
 +++
 
 # =============================================================================

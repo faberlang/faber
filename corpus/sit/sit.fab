@@ -7,6 +7,7 @@ summary = "Declares an inferred immutable local."
 syntax = "sit <name> [← <expression>]"
 aliases = []
 related = ["fixum", "varia", "←"]
+locale = "la"
 +++
 
 # =============================================================================

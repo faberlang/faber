@@ -1163,6 +1163,57 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Contextual(ANNOTATION_MODIFIER),
         category: KeywordCategory::Annotation,
     },
+    // Compiler-owned annotation families that previously lived only as bare
+    // identifiers after `@`. Registered so packs can re-spell them (en: kernel,
+    // device, …) while HIR keeps Latin family ids.
+    KeywordSpec {
+        text: "nucleum",
+        token_kind: None,
+        scope: KeywordScope::Annotation,
+        category: KeywordCategory::Annotation,
+    },
+    KeywordSpec {
+        text: "machina",
+        token_kind: None,
+        scope: KeywordScope::Annotation,
+        category: KeywordCategory::Annotation,
+    },
+    KeywordSpec {
+        text: "vertex",
+        token_kind: None,
+        scope: KeywordScope::Annotation,
+        category: KeywordCategory::Annotation,
+    },
+    KeywordSpec {
+        text: "fragment",
+        token_kind: None,
+        scope: KeywordScope::Annotation,
+        category: KeywordCategory::Annotation,
+    },
+    KeywordSpec {
+        text: "nondum",
+        token_kind: None,
+        scope: KeywordScope::Annotation,
+        category: KeywordCategory::Annotation,
+    },
+    KeywordSpec {
+        text: "verte",
+        token_kind: None,
+        scope: KeywordScope::Annotation,
+        category: KeywordCategory::Annotation,
+    },
+    KeywordSpec {
+        text: "nomen",
+        token_kind: None,
+        scope: KeywordScope::Contextual(ANNOTATION_MODIFIER),
+        category: KeywordCategory::Annotation,
+    },
+    KeywordSpec {
+        text: "radix",
+        token_kind: None,
+        scope: KeywordScope::Annotation,
+        category: KeywordCategory::Annotation,
+    },
 ];
 
 /// Return the keyword spelling registry in deterministic declaration order.

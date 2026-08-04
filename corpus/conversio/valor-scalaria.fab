@@ -6,6 +6,7 @@ canonical = true
 summary = "Scalar valor ↦ T extraction via FromValor (variant match, fractus widen, textus|instans wire)."
 syntax = "<valor-expression> ↦ numerus | fractus | bivalens | textus | ascii | nihil"
 related = ["↦", "⇥", "instans", "textus"]
+locale = "la"
 +++
 
 # =============================================================================

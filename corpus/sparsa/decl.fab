@@ -6,6 +6,7 @@ canonical = true
 summary = "sparsa<T, Figura> declaration shell with all-zero vacua."
 syntax = "sparsa<T, Figura> | sparsa<T, []>"
 related = ["sparsa", "tensor", "vacua"]
+locale = "la"
 +++
 
 # =============================================================================

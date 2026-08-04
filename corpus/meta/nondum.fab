@@ -6,6 +6,7 @@ canonical = true
 summary = "Marks an interface method as planned but unavailable for a target."
 syntax = "@ nondum [target] [reason]"
 related = ["implendum", "@"]
+locale = "la"
 +++
 
 # =============================================================================

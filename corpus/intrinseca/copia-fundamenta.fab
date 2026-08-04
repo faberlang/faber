@@ -7,6 +7,7 @@ summary = "Generic set collection type."
 syntax = "copia<T>"
 aliases = ["set"]
 related = ["lista", "tabula", "inter"]
+locale = "la"
 +++
 # =============================================================================
 # copia — Generic set collection type

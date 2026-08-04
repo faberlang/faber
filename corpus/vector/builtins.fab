@@ -3,6 +3,7 @@ term = "vector"
 kind = "kernel"
 category = "gpu"
 summary = "global_invocation_id returns vector<u32, 3>"
+locale = "la"
 +++
 
 # =============================================================================

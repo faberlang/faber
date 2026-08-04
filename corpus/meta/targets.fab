@@ -7,6 +7,7 @@ summary = "Compilation backends listed by faber targets or radix targets."
 syntax = "faber targets"
 aliases = ["target compatibility", "backends"]
 related = ["manifest", "cli", "∷", "↦"]
+locale = "la"
 +++
 
 # =============================================================================

@@ -4,6 +4,7 @@ kind = "exemplum"
 category = "tensor"
 summary = "Minimal exemplar: rank-1 f32 placement execution — copy-in → kernel → readback."
 related = ["tensor", "placement", "gpu", "spine"]
+locale = "la"
 +++
 
 # =============================================================================

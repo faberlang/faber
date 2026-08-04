@@ -6,6 +6,7 @@ canonical = true
 summary = "Marks a function as non-mutating."
 syntax = "functio <name>(...) immutata → <type>"
 related = ["curata", "iacit"]
+locale = "la"
 +++
 # =============================================================================
 # immutata — Marks a function as non-mutating

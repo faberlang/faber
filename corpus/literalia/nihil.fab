@@ -6,6 +6,7 @@ canonical = true
 summary = "Null literal and nullable union bindings."
 syntax = "nihil"
 related = ["∪", "sponte", "nihil"]
+locale = "la"
 +++
 
 # =============================================================================

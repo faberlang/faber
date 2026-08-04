@@ -6,6 +6,7 @@ canonical = true
 summary = "Numeric value equality after promotion join — not fuzzy float."
 syntax = "<expression> ≈ <expression> | <expression> ≉ <expression>"
 related = ["≡", "≠", "↦", "adfirma"]
+locale = "la"
 +++
 
 # =============================================================================

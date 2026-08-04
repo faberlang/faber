@@ -7,6 +7,7 @@ summary = "Function returning a string literal via redde \"textus\"."
 syntax = "redde <string-literal>"
 aliases = ["return"]
 related = ["textus", "functio"]
+locale = "la"
 +++
 
 # =============================================================================

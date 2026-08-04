@@ -6,6 +6,7 @@ canonical = true
 summary = "Bitwise or and est-negation operators."
 syntax = "<expression> ∨ <expression> | <expression> non est <expression>"
 related = ["∧", "⊻", "¬", "et", "aut", "vel", "non est", "est"]
+locale = "la"
 +++
 
 # =============================================================================

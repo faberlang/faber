@@ -7,6 +7,7 @@ summary = "Marks an explicit no-op statement."
 syntax = "tacet"
 aliases = ["silent noop"]
 related = ["ergo", "redde"]
+locale = "la"
 +++
 
 # =============================================================================

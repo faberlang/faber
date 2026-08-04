@@ -4,6 +4,7 @@ kind = "type"
 category = "register"
 summary = "vector type declarations: long form and vf32 sugar"
 syntax = "vector<T, N> | vf32[N]"
+locale = "la"
 +++
 
 # =============================================================================

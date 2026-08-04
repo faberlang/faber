@@ -7,6 +7,7 @@ summary = "Runs the fallback branch when preceding conditional branches do not m
 syntax = "secus <block>"
 aliases = ["else", "otherwise"]
 related = ["si", "sin"]
+locale = "la"
 +++
 
 # =============================================================================

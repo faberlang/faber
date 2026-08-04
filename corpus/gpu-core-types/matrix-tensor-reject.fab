@@ -5,6 +5,7 @@ category = "register"
 summary = "matrix<T, [R, C]> is not a tensor<T, [R, C]> alias."
 syntax = "matrix<T, [R, C]> != tensor<T, [R, C]>"
 related = ["tensor"]
+locale = "la"
 +++
 # =============================================================================
 # matrix — matrix<T, [R, C]> is not a tensor<T, [R, C]> alias

@@ -7,6 +7,7 @@ summary = "Marks a named declaration slot (parameter or genus field) as voluntar
 syntax = "<type> <name> sponte [= default | vel default]"
 aliases = ["optional", "voluntary"]
 related = ["vel", "nihil", "∪", "functio", "genus"]
+locale = "la"
 +++
 
 # =============================================================================

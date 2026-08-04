@@ -7,6 +7,7 @@ summary = "Groups related test cases into a named suite."
 syntax = "probandum <name> [modifiers] <block>"
 aliases = ["describe", "suite"]
 related = ["proba", "adfirma"]
+locale = "la"
 +++
 
 # =============================================================================

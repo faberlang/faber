@@ -6,6 +6,7 @@ canonical = false
 summary = "One native SHA-512 compression round using modulus<u64>."
 syntax = "modulus<u64>"
 related = ["numerus", "⇐", "⇒", "∧", "∨", "⊻", "¬"]
+locale = "la"
 +++
 
 # =============================================================================

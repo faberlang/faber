@@ -7,6 +7,7 @@ summary = "Introduces an alias name."
 syntax = "<name> ut <alias>"
 aliases = ["as"]
 related = ["ex", "argumenta"]
+locale = "la"
 +++
 
 # =============================================================================

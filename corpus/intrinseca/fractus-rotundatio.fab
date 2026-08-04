@@ -6,6 +6,7 @@ canonical = false
 summary = "Compiler-owned fractus rounding methodi."
 syntax = "valor.rotunda | pavimentum | tectum | trunca"
 related = ["fractus", "intrinseca"]
+locale = "la"
 +++
 # =============================================================================
 # fractus — Compiler-owned fractus rounding methodi

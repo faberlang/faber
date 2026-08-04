@@ -6,6 +6,7 @@ canonical = true
 summary = "Constructs a tagged union variant."
 syntax = "finge <variant> [{ <field> = <expr>, ... }] [∷ <type>]"
 related = ["discretio"]
+locale = "la"
 +++
 # =============================================================================
 # finge — Constructs a tagged union variant

@@ -6,6 +6,7 @@ canonical = false
 summary = "Genus methods using ego for field access."
 syntax = "genus <name> { functio <method>(<params>) → <type> { … ego.<field> … } }"
 related = ["genus", "ego", "functio"]
+locale = "la"
 +++
 # =============================================================================
 # genus — Genus methods using ego for field access

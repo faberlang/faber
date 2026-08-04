@@ -6,6 +6,7 @@ canonical = true
 summary = "Marks a test as fragile."
 syntax = "fragilis <number>"
 related = ["requirit"]
+locale = "la"
 +++
 # =============================================================================
 # fragilis — Marks a test as fragile

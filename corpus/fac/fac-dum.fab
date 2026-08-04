@@ -6,6 +6,7 @@ canonical = false
 summary = "Postfix dum loop attached to a fac block."
 syntax = "fac <block> dum <condition>"
 related = ["fac", "dum"]
+locale = "la"
 +++
 # =============================================================================
 # fac — Postfix dum loop attached to a fac block

@@ -7,6 +7,7 @@ summary = "Marks an import as re-exported from the current module."
 syntax = "importa ex <source> publica <name>"
 aliases = ["public"]
 related = ["privata", "importa"]
+locale = "la"
 +++
 
 # =============================================================================

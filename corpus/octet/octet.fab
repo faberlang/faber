@@ -6,6 +6,7 @@ canonical = false
 summary = "octet is the byte scalar, a builtin spelling for numerus<u8>, the element type of octeti."
 syntax = "octet"
 related = ["octeti", "numerus", "lista"]
+locale = "la"
 +++
 
 # =============================================================================

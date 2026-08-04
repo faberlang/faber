@@ -6,6 +6,7 @@ canonical = false
 summary = "Sparse tensor codegen smoke for longitudo and nonnihil calls."
 syntax = "sparsa<T, Figura>.longitudo() | sparsa<T, Figura>.nonnihil()"
 related = ["sparsa", "tensor", "vacua"]
+locale = "la"
 +++
 
 # =============================================================================

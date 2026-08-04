@@ -6,6 +6,7 @@ canonical = false
 summary = "Compiler-owned copia set-algebra methodi."
 syntax = "copia.unio | intersectio | differentia | symmetrica | subcopia | supercopia"
 related = ["copia", "intrinseca"]
+locale = "la"
 +++
 # =============================================================================
 # copia — Compiler-owned copia set-algebra methodi

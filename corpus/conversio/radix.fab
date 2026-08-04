@@ -6,6 +6,7 @@ canonical = false
 summary = "Radix-parameterized integer parsing from textus."
 syntax = "<textus> ↦ numerus<W, Radix>"
 related = ["↦", "numerus", "textus"]
+locale = "la"
 +++
 
 # =============================================================================

@@ -6,6 +6,7 @@ canonical = true
 summary = "Marks a type or member as abstract."
 syntax = "abstractus genus <name> <block>"
 related = ["genus", "implendum"]
+locale = "la"
 +++
 
 

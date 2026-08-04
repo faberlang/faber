@@ -6,6 +6,7 @@ canonical = true
 summary = "Unsigned 8-bit modular-word arithmetic and bit-pattern edges."
 syntax = "modulus<u8>"
 related = ["numerus", "¬", "⇐", "⇒"]
+locale = "la"
 +++
 
 # =============================================================================

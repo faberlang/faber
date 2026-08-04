@@ -6,6 +6,7 @@ canonical = true
 summary = "Checked numerus arithmetic traps instead of wrapping on overflow."
 syntax = "<numerus> + <numerus>"
 related = ["+", "numerus"]
+locale = "la"
 +++
 
 # =============================================================================

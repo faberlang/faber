@@ -7,6 +7,7 @@ summary = "Adds an else-if branch after a previous si branch."
 syntax = "sin <condition> <block>"
 aliases = ["else if"]
 related = ["si", "secus"]
+locale = "la"
 +++
 
 # =============================================================================

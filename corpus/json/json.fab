@@ -3,6 +3,7 @@ term = "json"
 kind = "type"
 category = "type"
 canonical = true
+locale = "la"
 +++
 
 # =============================================================================

@@ -6,6 +6,7 @@ canonical = true
 summary = "Primitive types bivalens, vacuum, and ignotum."
 syntax = "bivalens | vacuum | ignotum"
 related = ["verum", "falsum", "functio", "∷", "vacuum"]
+locale = "la"
 +++
 # =============================================================================
 # bivalens — Primitive types bivalens, vacuum, and ignotum

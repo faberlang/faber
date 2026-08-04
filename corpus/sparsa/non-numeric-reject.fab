@@ -6,6 +6,7 @@ canonical = false
 summary = "sparsa rejects non-numeric element types in v1."
 syntax = "sparsa<textus, [N]> — rejected"
 related = ["sparsa", "tensor"]
+locale = "la"
 +++
 
 # =============================================================================

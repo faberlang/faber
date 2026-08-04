@@ -7,6 +7,7 @@ summary = "Declares that a type implements one or more implendum contracts."
 syntax = "genus <name> implet <interface-list> <block>"
 aliases = ["implements"]
 related = ["genus", "implendum"]
+locale = "la"
 +++
 # =============================================================================
 # implet — Declares that a type implements one or more implendum contracts

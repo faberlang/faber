@@ -5,6 +5,7 @@ category = "transfer"
 canonical = false
 summary = "rumpe exits fac from nested si without entering cape"
 related = ["fac", "si", "cape"]
+locale = "la"
 +++
 
 # =============================================================================

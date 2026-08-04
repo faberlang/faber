@@ -6,6 +6,7 @@ canonical = false
 summary = "Sibling module consumed by importa ex … privata."
 syntax = "importa ex \"<path>\" privata (<name> [ut <alias>] | *)"
 related = ["importa", "privata", "ex"]
+locale = "la"
 +++
 # =============================================================================
 # importa — Sibling module consumed by importa ex … privata

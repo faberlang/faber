@@ -7,6 +7,7 @@ summary = "Angle-bracket generic parameters on functions and declarations."
 syntax = "functio name<T>(...) | genus Name<T, magnitudo N>"
 aliases = ["type parameters", "magnitudo"]
 related = ["typus", "functio"]
+locale = "la"
 +++
 
 # =============================================================================

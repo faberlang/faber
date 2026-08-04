@@ -5,6 +5,7 @@ category = "range"
 canonical = true
 summary = "Clamp, materialize, and contain via conversio and continet."
 related = ["intra", "↦", "lista"]
+locale = "la"
 +++
 # =============================================================================
 # intervallum — Clamp, materialize, and contain via conversio and continet

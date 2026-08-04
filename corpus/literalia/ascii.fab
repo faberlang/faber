@@ -7,6 +7,7 @@ summary = "Single-quoted ASCII machine-text literals."
 syntax = "'<text>'"
 aliases = ["'...'"]
 related = ["textus", "string"]
+locale = "la"
 +++
 
 # =============================================================================

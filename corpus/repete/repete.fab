@@ -6,6 +6,7 @@ canonical = true
 summary = "Repeats a test a fixed number of times."
 syntax = "repete <number>"
 related = ["fragilis"]
+locale = "la"
 +++
 
 # =============================================================================

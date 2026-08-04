@@ -6,6 +6,7 @@ canonical = false
 summary = "Sparse tensor accipe/ponde access and zero-removal semantics."
 syntax = "sparsa.accipe(indices) | sparsa.ponde(indices, value)"
 related = ["sparsa", "accipe", "ponde"]
+locale = "la"
 +++
 
 # =============================================================================

@@ -5,6 +5,7 @@ category = "comptime"
 canonical = true
 summary = "Forces compile-time evaluation of an expression."
 syntax = "praefixum(<expression>)"
+locale = "la"
 +++
 
 

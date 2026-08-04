@@ -7,6 +7,7 @@ summary = "Collects remaining parameters, operands, or extracted fields."
 syntax = "ceteri <type> <name>"
 aliases = ["rest"]
 related = ["functio", "operandus", "ex"]
+locale = "la"
 +++
 
 

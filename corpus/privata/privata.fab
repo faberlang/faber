@@ -7,6 +7,7 @@ summary = "Marks an import as local to the current module."
 syntax = "importa ex <source> privata <name>"
 aliases = ["private"]
 related = ["publica", "importa"]
+locale = "la"
 +++
 
 # =============================================================================

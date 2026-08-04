@@ -7,6 +7,7 @@ summary = "Converts a value with explicit runtime parsing or coercion semantics.
 syntax = "<expression> ↦ <type> [⇥ <recovery>]"
 aliases = ["convert", "conversio"]
 related = ["∷", "⇥"]
+locale = "la"
 +++
 
 # =============================================================================

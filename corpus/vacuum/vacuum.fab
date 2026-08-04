@@ -7,6 +7,7 @@ summary = "Primitive no-value return type."
 syntax = "vacuum"
 aliases = ["void", "unit"]
 related = ["functio", "redde"]
+locale = "la"
 +++
 
 # =============================================================================

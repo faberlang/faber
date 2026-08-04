@@ -6,6 +6,7 @@ canonical = true
 summary = "Async solum.leget<T> uses the same solum:lege route as sync solum.lege<T>."
 syntax = "solum.leget<textus>(via)"
 related = ["ad", "solum", "futura", "sermo"]
+locale = "la"
 +++
 
 # =============================================================================
