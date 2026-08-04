@@ -3048,3 +3048,121 @@ fn library_backed_train_step_materializes_into_device_program() {
         "the carried companion relation rides the semantics"
     );
 }
+
+// ── S5-U1 decomposed-local identity ────────────────────────────────────────
+
+/// A companion-shaped decomposed body: a matmul+add forward whose generated
+/// backward recomputes the forward's intermediates as reverse-AD synthetic
+/// locals (unnamed — `buffer_slot_name` falls back to role-based names). The
+/// backward decomposes into five recipe subchains, and the recomputed
+/// upstream value is read by two DIFFERENT subchains at DIFFERENT bindings —
+/// so the same carried local would get DIFFERENT role-based fallback names
+/// (`input_0` vs `input_1`) if the name+shape wiring decided identity.
+const DECOMPOSED_COMPANION_FIXTURE: &str = r#"@ nucleum
+@ radix lane "air"
+@ radix backward "loss_backward"
+functio loss(tensor<f32,[2,2]> x, tensor<f32,[2,2]> w, tensor<f32,[2,2]> b) → tensor<f32,[2,2]> {
+    fixum tensor<f32,[2,2]> t1 ← x.matmul(w)
+    redde t1.addita(b)
+}
+"#;
+
+/// A decomposed companion's recomputed forward-save identity: the S5-U1
+/// subchain kernels of a multi-recipe backward RECOMPUTE the forward's
+/// intermediates as internal locals. Those reverse-AD synthetic locals carry
+/// no interner name, so the constructor falls back to role-based names
+/// (`input_{binding}` / `output_{binding}`) — the SAME carried local gets
+/// DIFFERENT fallback names at different subchain bindings. The constructor
+/// must join the reads by the carried (function, source-local) origin fact,
+/// never by the (different) fallback names: one unified buffer for the value,
+/// not one per binding.
+#[test]
+fn decomposed_companion_unifies_recomputed_forward_save_by_local_identity() {
+    let (program, _semantics) = with_inline_package(
+        "s5u1-local-identity",
+        DECOMPOSED_COMPANION_FIXTURE,
+        |lowered| {
+            device_program_for_lowered(
+                &lowered.validated,
+                &lowered.interner,
+                &lowered.companions,
+                DEFAULT_TRAINING_STEPS,
+            )
+            .expect("constructor succeeds")
+            .map(|(program, semantics, _step_count)| (program, semantics))
+            .expect("companion fixture yields a device program")
+        },
+    )
+    .expect("fixture lowers");
+
+    program.validate().expect("constructed program validates");
+
+    // The backward decomposes into recipe subchains: the forward-save
+    // recompute + add VJP, the two transpose VJPs, and the two matmul VJPs.
+    let entries: Vec<&str> = program
+        .kernels
+        .iter()
+        .map(|kernel| kernel.entry.as_str())
+        .collect();
+    assert_eq!(
+        entries,
+        vec![
+            "loss",
+            "loss_backward__0",
+            "loss_backward__1",
+            "loss_backward__2",
+            "loss_backward__3",
+            "loss_backward__4",
+        ],
+        "forward + decomposed companion subchains"
+    );
+
+    // The recomputed upstream value (a reverse-AD synthetic local, no
+    // interner name) is read at binding 0 of loss_backward__2 and binding 1
+    // of loss_backward__4 — different role-based fallback names (input_0 vs
+    // input_1) for the SAME carried local. The (function, source-local)
+    // origin identity unifies them onto ONE buffer; the name+shape wiring
+    // alone would mint two (or alias an unrelated value).
+    fn binding_slot<'a>(
+        kernel: &'a radix_mir::device_program::KernelUnit,
+        binding: u32,
+    ) -> &'a radix_mir::device_program::DeviceResource {
+        kernel
+            .resources
+            .iter()
+            .find(|resource| resource.binding.binding == binding)
+            .expect("the subchain binds a slot at the requested binding")
+    }
+    let reader_at_0 = binding_slot(
+        program
+            .kernels
+            .iter()
+            .find(|kernel| kernel.entry == "loss_backward__2")
+            .expect("the add VJP subchain"),
+        0,
+    );
+    let reader_at_1 = binding_slot(
+        program
+            .kernels
+            .iter()
+            .find(|kernel| kernel.entry == "loss_backward__4")
+            .expect("the matmul VJP subchain"),
+        1,
+    );
+    assert_eq!(
+        reader_at_0.buffer.id, reader_at_1.buffer.id,
+        "the same recomputed local unifies onto ONE buffer across different subchain bindings"
+    );
+    // The unified buffer carries the role-based fallback name — the source
+    // local is unnamed (reverse-AD synthetic), so the two reads' own
+    // fallback names (input_0, input_1) differ and the origin identity was
+    // what carried the join.
+    assert_eq!(
+        reader_at_0.buffer.name, "input_0",
+        "the recomputed local's buffer is role-named (the local is unnamed)"
+    );
+    assert_eq!(
+        reader_at_1.buffer.name, "input_0",
+        "the second reader joins the same role-named buffer, not its own input_1"
+    );
+}

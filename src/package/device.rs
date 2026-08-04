@@ -311,6 +311,31 @@ fn merge_buffer_roles(previous: BufferRole, next: BufferRole) -> BufferRole {
     }
 }
 
+/// Merge a slot's facts onto an existing unified buffer under one id: the
+/// role merge (a trainable-parameter slot forces InOut), the independent
+/// resource-state axes (`written` / `consumed` / `readwrite`), and the param
+/// flag. Shared by the carried local-identity wiring (S5-U1) and the
+/// name+shape wiring — the two joins must never drift apart.
+fn merge_slot_facts(
+    entry: &mut ProgramBuffer,
+    role: BufferRole,
+    resource: &MirKernelResource,
+    is_param_input: bool,
+) {
+    entry.role = if is_param_input {
+        BufferRole::InOut
+    } else {
+        merge_buffer_roles(entry.role, role)
+    };
+    entry.written |= matches!(
+        resource.access,
+        MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
+    );
+    entry.consumed |= resource.access == MirKernelResourceAccess::Read;
+    entry.readwrite |= resource.access == MirKernelResourceAccess::ReadWrite;
+    entry.param |= is_param_input;
+}
+
 /// Order the launch sequence to follow the carried producer/consumer
 /// dependency graph (F3) — never kernel declaration order. Producers always
 /// precede their consumers; the launch ids are carried facts and do not
@@ -1605,27 +1630,39 @@ pub(crate) fn device_program_for_lowered(
                     }
                     alias
                 } else if let Some(entry) = buffers.iter_mut().find(|entry| {
+                    // S5-U1 forward-save identity: when the slot carries a
+                    // source local, the (function, local) origin fact joins
+                    // the producing and consuming decomposition subchains
+                    // (they share the source function's local tables) even
+                    // when the role-based fallback names differ (`input_N`
+                    // vs `output_M`). The role guard ([`unify_roles`]) keeps
+                    // the join honest exactly as it guards the name+shape
+                    // wiring — two independent writers of the same local
+                    // never alias.
+                    let same_local_identity = resource.source_local.is_some_and(|local| {
+                        matches!(
+                            entry.origin,
+                            SemanticValueOrigin::MirLocal {
+                                function: origin_function,
+                                local: origin_local,
+                            } if origin_function == kernel_source.id && origin_local == local.0
+                        )
+                    });
+                    same_local_identity && unify_roles(entry.role, role)
+                }) {
+                    // A trainable parameter's program role is InOut regardless
+                    // of the merged slot roles (the param identity is a
+                    // carried fact, never derived from one slot's ABI role).
+                    merge_slot_facts(entry, role, resource, is_param_input);
+                    entry.id
+                } else if let Some(entry) = buffers.iter_mut().find(|entry| {
                     entry.matches(&name, resource.element_ty, resource.element_count)
                         && unify_roles(entry.role, role)
                 }) {
                     // A trainable parameter's program role is InOut regardless
                     // of the merged slot roles (the param identity is a
                     // carried fact, never derived from one slot's ABI role).
-                    entry.role = if is_param_input {
-                        BufferRole::InOut
-                    } else {
-                        merge_buffer_roles(entry.role, role)
-                    };
-                    entry.written |= matches!(
-                        resource.access,
-                        MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
-                    );
-                    entry.consumed |= resource.access == MirKernelResourceAccess::Read;
-                    entry.readwrite |= resource.access == MirKernelResourceAccess::ReadWrite;
-                    // The param identity is a carried fact: whichever kernel
-                    // first registers the buffer, a trainable-parameter slot
-                    // makes it persistent HostProvided state.
-                    entry.param |= is_param_input;
+                    merge_slot_facts(entry, role, resource, is_param_input);
                     entry.id
                 } else {
                     let id = BufferId(next_buffer_id);
