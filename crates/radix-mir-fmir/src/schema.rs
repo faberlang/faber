@@ -647,6 +647,24 @@ pub enum WireCollectionKernelPlan {
     TiledMatMul(WireMatMulPlan),
     /// Sequential tree-reduction recipe.
     TreeReduction(WireReductionPlan),
+    /// Rank-2 transpose recipe (S5-U1).
+    Transpose(WireTransposePlan),
+}
+
+/// Rank-2 transpose recipe (`[M,N] → [N,M]`), the wire mirror of
+/// `kernel_plan::TransposePlan` (S5-U1): one thread per output element with
+/// a column-major index remap, no shared memory, no barriers.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireTransposePlan {
+    /// Source rows `M` (output columns).
+    pub m: u64,
+    /// Source columns `N` (output rows).
+    pub n: u64,
+    /// Workgroup lane count on `x` (the elementwise-style 1D contract).
+    pub workgroup_x: u32,
+    /// Dispatch extent on `x` (`M·N` output elements).
+    pub dispatch_x: u64,
 }
 
 /// Tiled-matmul recipe.

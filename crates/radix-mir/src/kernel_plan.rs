@@ -44,6 +44,15 @@ pub const F32_ELEMENT_BYTE_WIDTH: usize = 4;
 /// the tile as a named constant so a backend never hardcodes it (L6).
 pub const MATMUL_TILE: u32 = 8;
 
+/// Elementwise-style workgroup lane count for the rank-2 transpose recipe
+/// (S5-U1): one thread per output element, no shared memory, no barriers —
+/// the recipe is a copy with a column-major index remap, so any positive
+/// lane count is correct and the conservative 64-thread default keeps the
+/// dispatch portable. The [`CollectionOpContract::Transpose`] contract
+/// applies this workgroup; [`CollectionKernelPlan::from_contract`] requires
+/// the signature to carry it (the A3 typed cross-check).
+pub const TRANSPOSE_WORKGROUP_X: u32 = 64;
+
 /// Logical shared-memory buffer name for the tree-reduction recipe.
 ///
 /// Named `wg_shared`, not `shared`: `shared` is a WGSL reserved identifier —
@@ -81,6 +90,9 @@ pub enum CollectionKernelPlan {
     /// Sequential tree-reduction recipe (grid-stride partial + power-of-2
     /// halving + mean divisor).
     TreeReduction(ReductionPlan),
+    /// Rank-2 transpose recipe (`[M,N] → [N,M]`): one thread per output
+    /// element with a column-major index remap (S5-U1). See [`TransposePlan`].
+    Transpose(TransposePlan),
 }
 
 /// Matmul operand shapes `(M, K, N)`, resolved from the rank-2 tensor types
@@ -198,6 +210,35 @@ pub enum ReduceOp {
     Sum,
     /// Accumulation divided by the true tensor length.
     Mean,
+}
+
+/// Rank-2 transpose recipe (`[M,N] → [N,M]`, S5-U1).
+///
+/// The recipe is a copy with a column-major index remap: the output element
+/// at flat index `k` (row `j = k / M`, col `i = k % M`) reads
+/// `input[i * N + j]` — the matmul-VJP product (`wᵀ @ grad`) and the MLP
+/// 4×4 transpose both lower to this shape. One thread per output element
+/// under the elementwise-style 1D contract: no shared memory, no barriers,
+/// no OOB reads (every thread reads exactly one in-bounds input element).
+///
+/// The contract ([`CollectionOpContract::Transpose`]) resolves the literal
+/// rank-2 dims from the operand tensor type; the plan carries the dims
+/// plus the dispatch facts the contract applied (workgroup lane count and
+/// `M·N` dispatch extent), so an emitter lowers the recipe without
+/// re-deriving the shape and the A3 cross-check can verify the signature
+/// carries the contract.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransposePlan {
+    /// Source rows `M` (output columns).
+    pub m: u64,
+    /// Source columns `N` (output rows).
+    pub n: u64,
+    /// Workgroup lane count on `x` (the elementwise-style 1D contract
+    /// applied by [`CollectionOpContract::Transpose`]).
+    pub workgroup_x: u32,
+    /// Dispatch extent on `x` (`M·N` output elements, one thread per
+    /// output element).
+    pub dispatch_x: u64,
 }
 
 /// Shared-memory buffer layout for a recipe.
@@ -412,6 +453,20 @@ impl CollectionKernelPlan {
                     oob_padding: OobPaddingPolicy::ZeroFill,
                 }))
             }
+            CollectionOpContract::Transpose { m, n } => {
+                if op != MirCollectionOp::TensorTranspose {
+                    return None;
+                }
+                if !signature_matches_transpose(signature, m, n) {
+                    return None;
+                }
+                Some(CollectionKernelPlan::Transpose(TransposePlan {
+                    m,
+                    n,
+                    workgroup_x: signature.workgroup.x,
+                    dispatch_x: signature.dispatch_size.x,
+                }))
+            }
         }
     }
 
@@ -440,6 +495,7 @@ impl CollectionKernelPlan {
             CollectionKernelPlan::Elementwise => Ok(()),
             CollectionKernelPlan::TreeReduction(plan) => validate_reduction_plan(plan),
             CollectionKernelPlan::TiledMatMul(plan) => validate_matmul_plan(plan),
+            CollectionKernelPlan::Transpose(plan) => validate_transpose_plan(plan),
         }
     }
 }
@@ -529,6 +585,23 @@ fn signature_matches_matmul(
         && signature.output.element_count == shapes.m.saturating_mul(shapes.n)
         && signature.extra_inputs.len() == 1
         && signature.extra_inputs[0].element_count == shapes.k.saturating_mul(shapes.n)
+}
+
+/// The transpose signature must already carry the contract it was built
+/// from: `apply_collection_op_contract` sets workgroup
+/// `(TRANSPOSE_WORKGROUP_X, 1, 1)`, dispatch `(M·N, 1, 1)`, and the input and
+/// output buffers each hold the flat `M·N` element count (the transposed
+/// `[N,M]` tensor has the same element count as the `[M,N]` source).
+fn signature_matches_transpose(signature: &MirKernelSignature, m: u64, n: u64) -> bool {
+    let count = m.saturating_mul(n);
+    signature.workgroup.x == TRANSPOSE_WORKGROUP_X
+        && signature.workgroup.y == 1
+        && signature.workgroup.z == 1
+        && signature.dispatch_size.x == count
+        && signature.dispatch_size.y == 1
+        && signature.dispatch_size.z == 1
+        && signature.input.element_count == count
+        && signature.output.element_count == count
 }
 
 fn validate_reduction_plan(plan: &ReductionPlan) -> Result<(), PlanValidationError> {
@@ -675,6 +748,34 @@ fn validate_matmul_plan(plan: &MatMulPlan) -> Result<(), PlanValidationError> {
     validate_matmul_shared_memory(plan)?;
     validate_matmul_barrier_coverage(plan)?;
     validate_matmul_oob_padding_coverage(plan)?;
+    Ok(())
+}
+
+/// Transpose recipe validation (S5-U1): positive source dims (a zero dim
+/// dispatches an empty grid and the remap arithmetic would divide by zero
+/// when `M` or `N` is zero), a positive workgroup lane count, and a dispatch
+/// extent that tiles exactly `M·N` output elements — one thread per output
+/// element under the elementwise-style 1D contract. The recipe has no shared
+/// memory or barriers, so those checks do not apply.
+fn validate_transpose_plan(plan: &TransposePlan) -> Result<(), PlanValidationError> {
+    if plan.m == 0 || plan.n == 0 {
+        return Err(PlanValidationError::TransposeZeroDimension {
+            m: plan.m,
+            n: plan.n,
+        });
+    }
+    if plan.workgroup_x == 0 {
+        return Err(PlanValidationError::TransposeZeroWorkgroup {
+            workgroup_x: plan.workgroup_x,
+        });
+    }
+    if plan.dispatch_x != plan.m.saturating_mul(plan.n) {
+        return Err(PlanValidationError::TransposeDispatchMismatch {
+            m: plan.m,
+            n: plan.n,
+            dispatch_x: plan.dispatch_x,
+        });
+    }
     Ok(())
 }
 
@@ -884,6 +985,14 @@ pub enum PlanValidationError {
         length: u64,
         covered_until: u64,
     },
+    /// Transpose requires positive source dims (a zero `M` or `N` dispatches
+    /// an empty grid and the column-major remap would divide by zero).
+    TransposeZeroDimension { m: u64, n: u64 },
+    /// Transpose requires a positive workgroup lane count.
+    TransposeZeroWorkgroup { workgroup_x: u32 },
+    /// The transpose dispatch extent must tile exactly `M·N` output
+    /// elements (one thread per output element).
+    TransposeDispatchMismatch { m: u64, n: u64, dispatch_x: u64 },
 }
 
 impl fmt::Display for PlanValidationError {
@@ -951,6 +1060,23 @@ impl fmt::Display for PlanValidationError {
             } => write!(
                 f,
                 "matmul OOB padding coverage: {buffer_name} tail up to {covered_until} is not zero-filled against length {length}"
+            ),
+            Self::TransposeZeroDimension { m, n } => write!(
+                f,
+                "transpose requires positive source dims, got M={m}, N={n}"
+            ),
+            Self::TransposeZeroWorkgroup { workgroup_x } => write!(
+                f,
+                "transpose requires a positive workgroup lane count, got {workgroup_x}"
+            ),
+            Self::TransposeDispatchMismatch {
+                m,
+                n,
+                dispatch_x,
+            } => write!(
+                f,
+                "transpose dispatch extent {dispatch_x} must tile exactly {m}×{n} = {} output elements",
+                m.saturating_mul(*n)
             ),
         }
     }
@@ -1091,6 +1217,56 @@ mod tests {
             m: 17,
             k: 12,
             n: 33,
+        }
+    }
+
+    /// A post-contract transpose signature: workgroup
+    /// `(TRANSPOSE_WORKGROUP_X, 1, 1)`, dispatch `(M·N, 1, 1)`, input and
+    /// output each `M·N` elements — the shape
+    /// `apply_collection_op_contract` produces for a rank-2 `[M,N] → [N,M]`
+    /// transpose kernel.
+    fn transpose_signature(m: u64, n: u64) -> MirKernelSignature {
+        let mut types = TypeTable::new();
+        let element_ty = f32_ty(&mut types);
+        MirKernelSignature {
+            function: MirFunctionId(0),
+            input: MirKernelResource {
+                group: 0,
+                binding: 0,
+                kind: MirKernelResourceKind::StorageBuffer,
+                role: MirKernelResourceRole::Input,
+                access: MirKernelResourceAccess::Read,
+                element_ty,
+                element_count: m * n,
+                source_local: Some(MirLocalId(0)),
+                source_name: None,
+            },
+            extra_inputs: Vec::new(),
+            output: MirKernelResource {
+                group: 0,
+                binding: 1,
+                kind: MirKernelResourceKind::StorageBuffer,
+                role: MirKernelResourceRole::Output,
+                access: MirKernelResourceAccess::Write,
+                element_ty,
+                element_count: m * n,
+                source_local: None,
+                source_name: None,
+            },
+            extra_outputs: Vec::new(),
+            accumulation_buffers: Vec::new(),
+            builtin_inputs: Vec::new(),
+            called_builtins: Vec::new(),
+            workgroup: MirWorkgroupSize {
+                x: TRANSPOSE_WORKGROUP_X,
+                y: 1,
+                z: 1,
+            },
+            dispatch_size: MirKernelDispatchSize {
+                x: m * n,
+                y: 1,
+                z: 1,
+            },
         }
     }
 
@@ -1359,6 +1535,133 @@ mod tests {
             )
             .is_none(),
             "a reduction op must not produce a matmul plan"
+        );
+    }
+
+    // ── Transpose recipe (S5-U1) ──────────────────────────────────────────
+
+    #[test]
+    fn transpose_plan_is_fully_populated_for_mlp_4x4() {
+        // The MLP 4×4 shape: `[4,4] → [4,4]` — the matmul-VJP transpose.
+        let signature = transpose_signature(4, 4);
+        let contract = CollectionOpContract::Transpose { m: 4, n: 4 };
+        let plan = CollectionKernelPlan::from_contract(
+            &signature,
+            &contract,
+            MirCollectionOp::TensorTranspose,
+            None,
+        )
+        .expect("transpose contract builds a plan");
+        let CollectionKernelPlan::Transpose(transpose) = &plan else {
+            panic!("expected a transpose plan, got {plan:?}");
+        };
+        assert_eq!((transpose.m, transpose.n), (4, 4));
+        assert_eq!(transpose.workgroup_x, TRANSPOSE_WORKGROUP_X);
+        assert_eq!(transpose.dispatch_x, 16);
+        // One thread per output element: dispatch == element count.
+        assert_eq!(transpose.dispatch_x, transpose.m * transpose.n);
+        plan.validate().expect("built transpose plan validates");
+    }
+
+    #[test]
+    fn transpose_plan_resolves_rectangular_shape() {
+        // A rectangular `[M,N] → [N,M]`: the left-operand matmul VJP
+        // (`xᵀ @ grad` needs `[K,M]` from a `[M,K]` input).
+        let signature = transpose_signature(3, 4);
+        let contract = CollectionOpContract::Transpose { m: 3, n: 4 };
+        let plan = CollectionKernelPlan::from_contract(
+            &signature,
+            &contract,
+            MirCollectionOp::TensorTranspose,
+            None,
+        )
+        .expect("rectangular transpose contract builds a plan");
+        let CollectionKernelPlan::Transpose(transpose) = &plan else {
+            panic!("expected a transpose plan, got {plan:?}");
+        };
+        assert_eq!((transpose.m, transpose.n), (3, 4));
+        assert_eq!(transpose.dispatch_x, 12);
+        plan.validate()
+            .expect("rectangular transpose plan validates");
+    }
+
+    #[test]
+    fn transpose_contract_with_non_transpose_op_returns_none() {
+        let signature = transpose_signature(4, 4);
+        let contract = CollectionOpContract::Transpose { m: 4, n: 4 };
+        assert!(
+            CollectionKernelPlan::from_contract(
+                &signature,
+                &contract,
+                MirCollectionOp::TensorMatMul,
+                Some(MatMulShapes { m: 4, k: 4, n: 4 }),
+            )
+            .is_none(),
+            "a matmul op must not produce a transpose plan"
+        );
+    }
+
+    #[test]
+    fn transpose_signature_not_carrying_contract_returns_none() {
+        // Dispatch disagrees with the contract dims: the signature was not
+        // built from this contract.
+        let signature = transpose_signature(4, 4);
+        let contract = CollectionOpContract::Transpose { m: 4, n: 8 };
+        assert!(
+            CollectionKernelPlan::from_contract(
+                &signature,
+                &contract,
+                MirCollectionOp::TensorTranspose,
+                None,
+            )
+            .is_none(),
+            "a signature that does not carry the contract must not build a plan"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_transpose_zero_dimension() {
+        let plan = CollectionKernelPlan::Transpose(TransposePlan {
+            m: 0,
+            n: 4,
+            workgroup_x: TRANSPOSE_WORKGROUP_X,
+            dispatch_x: 0,
+        });
+        assert_eq!(
+            plan.validate().expect_err("zero-dim transpose must fail"),
+            PlanValidationError::TransposeZeroDimension { m: 0, n: 4 }
+        );
+    }
+
+    #[test]
+    fn validate_rejects_transpose_zero_workgroup() {
+        let plan = CollectionKernelPlan::Transpose(TransposePlan {
+            m: 4,
+            n: 4,
+            workgroup_x: 0,
+            dispatch_x: 16,
+        });
+        assert_eq!(
+            plan.validate().expect_err("zero workgroup must fail"),
+            PlanValidationError::TransposeZeroWorkgroup { workgroup_x: 0 }
+        );
+    }
+
+    #[test]
+    fn validate_rejects_transpose_dispatch_mismatch() {
+        let plan = CollectionKernelPlan::Transpose(TransposePlan {
+            m: 4,
+            n: 4,
+            workgroup_x: TRANSPOSE_WORKGROUP_X,
+            dispatch_x: 15,
+        });
+        assert_eq!(
+            plan.validate().expect_err("dispatch mismatch must fail"),
+            PlanValidationError::TransposeDispatchMismatch {
+                m: 4,
+                n: 4,
+                dispatch_x: 15,
+            }
         );
     }
 

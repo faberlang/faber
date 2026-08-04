@@ -148,6 +148,55 @@ fn matmul_signature(shapes: MatMulShapes, dispatch_x: u64, dispatch_y: u64) -> M
     }
 }
 
+/// A post-contract transpose signature: workgroup
+/// `(TRANSPOSE_WORKGROUP_X, 1, 1)`, dispatch `(M·N, 1, 1)`, input and output
+/// each `M·N` elements — the shape `apply_collection_op_contract` produces
+/// for a rank-2 `[M,N] → [N,M]` transpose kernel (S5-U1).
+fn transpose_signature(m: u64, n: u64) -> MirKernelSignature {
+    let mut types = TypeTable::new();
+    let element_ty = f32_ty(&mut types);
+    MirKernelSignature {
+        function: MirFunctionId(0),
+        input: MirKernelResource {
+            group: 0,
+            binding: 0,
+            kind: MirKernelResourceKind::StorageBuffer,
+            role: MirKernelResourceRole::Input,
+            access: MirKernelResourceAccess::Read,
+            element_ty,
+            element_count: m * n,
+            source_local: Some(MirLocalId(0)),
+            source_name: None,
+        },
+        extra_inputs: Vec::new(),
+        output: MirKernelResource {
+            group: 0,
+            binding: 1,
+            kind: MirKernelResourceKind::StorageBuffer,
+            role: MirKernelResourceRole::Output,
+            access: MirKernelResourceAccess::Write,
+            element_ty,
+            element_count: m * n,
+            source_local: None,
+            source_name: None,
+        },
+        extra_outputs: Vec::new(),
+        accumulation_buffers: Vec::new(),
+        builtin_inputs: Vec::new(),
+        called_builtins: Vec::new(),
+        workgroup: MirWorkgroupSize {
+            x: crate::kernel_plan::TRANSPOSE_WORKGROUP_X,
+            y: 1,
+            z: 1,
+        },
+        dispatch_size: MirKernelDispatchSize {
+            x: m * n,
+            y: 1,
+            z: 1,
+        },
+    }
+}
+
 // -----------------------------------------------------------------------
 // Function fixtures (kernel bodies the typed plan mapping scans).
 // -----------------------------------------------------------------------
@@ -459,28 +508,87 @@ fn sum_mean_function(types: &mut TypeTable, length: u64) -> MirFunction {
     function
 }
 
-/// `t = transpose(x)` — the D1 unplannable op (no recipe, not elementwise).
-fn transpose_function(types: &mut TypeTable) -> MirFunction {
-    tensor_kernel_function(
-        types,
-        4,
-        1,
-        &[(MirCollectionOp::TensorTranspose, vec![0], 1)],
-    )
+/// `t = softmax(x)` — a genuinely unplannable op (no recipe, not an
+/// elementwise transform). `TensorTranspose` is now a recipe op (S5-U1);
+/// `TensorSoftmax` stays outside the closed plan surface.
+fn softmax_function(types: &mut TypeTable) -> MirFunction {
+    tensor_kernel_function(types, 4, 1, &[(MirCollectionOp::TensorSoftmax, vec![0], 1)])
 }
 
-/// `t = mul(x, w); u = transpose(t)` — elementwise op does not excuse an
+/// `t = mul(x, w); u = softmax(t)` — an elementwise op does not excuse an
 /// unplannable sibling statement.
-fn mul_transpose_function(types: &mut TypeTable) -> MirFunction {
+fn mul_softmax_function(types: &mut TypeTable) -> MirFunction {
     tensor_kernel_function(
         types,
         4,
         2,
         &[
             (MirCollectionOp::TensorMul, vec![0, 1], 2),
-            (MirCollectionOp::TensorTranspose, vec![2], 3),
+            (MirCollectionOp::TensorSoftmax, vec![2], 3),
         ],
     )
+}
+
+/// `t = transpose(x)` — the S5-U1 transpose-bearing kernel shape over a
+/// rank-2 `[4,4]` operand (the MLP 4×4 matmul-VJP transpose).
+fn transpose_rank2_function(types: &mut TypeTable) -> MirFunction {
+    let tensor = rank2_tensor_ty(types, [4, 4]);
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![MirParam {
+            local: MirLocalId(0),
+            name: None,
+            ty: tensor,
+            mode: MirParamMode::Owned,
+            span: test_span(),
+        }],
+        locals: vec![
+            MirLocal {
+                id: MirLocalId(0),
+                name: None,
+                ty: tensor,
+                mutable: false,
+                span: test_span(),
+            },
+            MirLocal {
+                id: MirLocalId(1),
+                name: None,
+                ty: tensor,
+                mutable: false,
+                span: test_span(),
+            },
+        ],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::RuntimeCall {
+                    destination: Some(MirPlace::local(MirLocalId(1))),
+                    call: MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorTranspose),
+                        args: vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+                        return_ty: tensor,
+                    },
+                },
+                span: test_span(),
+            }],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(1),
+                )))),
+                span: test_span(),
+            },
+            span: test_span(),
+        }],
+        return_ty: tensor,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: test_span(),
+    }
 }
 
 /// `t = add(x, w); u = mul(x, w)` — elementwise-only multi-op body.
@@ -760,17 +868,18 @@ fn carried_plan_agrees_rejects_recipe_mismatch() {
 
 #[test]
 fn unplannable_collection_op_fails_closed_with_typed_diagnostic() {
-    // D1: a device-routed function emitting TensorTranspose has no recipe and
-    // is not an elementwise transform — the plan pass must fail with the
-    // typed diagnostic, never a silent Elementwise.
+    // A device-routed function emitting TensorSoftmax has no recipe and is
+    // not an elementwise transform — the plan pass must fail with the typed
+    // diagnostic, never a silent Elementwise. (The former D1 fixture used
+    // TensorTranspose, which S5-U1 promotes to a recipe op.)
     let mut types = TypeTable::new();
-    let function = transpose_function(&mut types);
+    let function = softmax_function(&mut types);
     let signature = reduction_signature(1024, 256, 4);
     let validation = MirValidationContext::new(&types);
     let error = kernel_plan_for_function(&function, &signature, &validation)
-        .expect_err("TensorTranspose must fail the plan pass");
+        .expect_err("TensorSoftmax must fail the plan pass");
     assert!(
-        error.message.contains("TensorTranspose"),
+        error.message.contains("TensorSoftmax"),
         "diagnostic must name the op, got: {}",
         error.message
     );
@@ -779,6 +888,47 @@ fn unplannable_collection_op_fails_closed_with_typed_diagnostic() {
         "diagnostic must say no kernel plan, got: {}",
         error.message
     );
+}
+
+#[test]
+fn kernel_plan_for_function_derives_transpose_plan() {
+    // S5-U1 admission: a transpose-bearing body resolves the rank-2
+    // Transpose recipe over the contract-shaped signature.
+    let mut types = TypeTable::new();
+    let function = transpose_rank2_function(&mut types);
+    let signature = transpose_signature(4, 4);
+    let validation = MirValidationContext::new(&types);
+    let derived = kernel_plan_for_function(&function, &signature, &validation)
+        .expect("transpose function facts resolve")
+        .expect("transpose function carries a recipe plan");
+    let CollectionKernelPlan::Transpose(plan) = &derived else {
+        panic!("transpose body must derive a transpose plan, got {derived:?}");
+    };
+    assert_eq!((plan.m, plan.n), (4, 4));
+    assert_eq!(plan.dispatch_x, 16);
+    derived.validate().expect("transpose plan validates");
+    // A carried transpose plan built by the same typed mapping agrees.
+    let carried = CollectionKernelPlan::Transpose(crate::kernel_plan::TransposePlan {
+        m: 4,
+        n: 4,
+        workgroup_x: crate::kernel_plan::TRANSPOSE_WORKGROUP_X,
+        dispatch_x: 16,
+    });
+    assert!(carried_plan_agrees(&carried, Some(&derived)));
+}
+
+#[test]
+fn transpose_plan_is_recipe_kind_transpose() {
+    // The RecipeKind tag mirrors the new plan variant (hosts and backends
+    // switch on the tag for launch semantics).
+    let mut types = TypeTable::new();
+    let function = transpose_rank2_function(&mut types);
+    let signature = transpose_signature(4, 4);
+    let validation = MirValidationContext::new(&types);
+    let derived = kernel_plan_for_function(&function, &signature, &validation)
+        .expect("transpose facts resolve")
+        .expect("transpose carries a recipe plan");
+    assert_eq!(RecipeKind::from_plan(&derived), RecipeKind::Transpose);
 }
 
 #[test]
@@ -822,15 +972,16 @@ fn multi_op_body_conflicting_recipes_fail_closed() {
 #[test]
 fn multi_op_body_with_unplannable_op_fails_closed() {
     // An elementwise sibling does not excuse an unplannable statement — the
-    // full scan still rejects it.
+    // full scan still rejects it. (The former fixture used
+    // mul+transpose, which S5-U1 now admits as a transpose-bearing kernel.)
     let mut types = TypeTable::new();
-    let function = mul_transpose_function(&mut types);
+    let function = mul_softmax_function(&mut types);
     let signature = reduction_signature(1024, 256, 4);
     let validation = MirValidationContext::new(&types);
     let error = kernel_plan_for_function(&function, &signature, &validation)
         .expect_err("an elementwise op does not excuse an unplannable op");
     assert!(
-        error.message.contains("TensorTranspose"),
+        error.message.contains("TensorSoftmax"),
         "diagnostic must name the unplannable op, got: {}",
         error.message
     );

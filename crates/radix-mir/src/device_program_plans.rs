@@ -37,7 +37,10 @@
 //! surfaces only; the emitters (and, later, the device-program materializer)
 //! drive their output from these typed facts.
 
-use crate::abi::{collection_op_contract, CollectionOpContract, MirAbiError, MirKernelSignature};
+use crate::abi::{
+    collection_op_contract, CollectionOpContract, MirAbiError, MirKernelResource,
+    MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature,
+};
 use crate::device_program::{Binding, BufferRole, DeviceProgram, DeviceResource, KernelUnit};
 use crate::kernel_plan::{CollectionKernelPlan, MatMulShapes, SharedMemoryLayout};
 use crate::layout::MirTensorStorageLayout;
@@ -47,7 +50,7 @@ use crate::{
     MirRuntimeCall, MirStatement, MirStatementKind, MirTerminatorKind, MirType,
     MirValidationContext, MirValue, MirValueKind, MirWorkgroupSize,
 };
-use radix_types::{IndexExpr, Type};
+use radix_types::{IndexExpr, Type, TypeId};
 use std::fmt;
 
 /// A typed plan-mapping failure (contract resolution, operand shapes, or a
@@ -60,7 +63,7 @@ pub struct PlanMappingError {
 }
 
 impl PlanMappingError {
-    fn mapping(shape: impl Into<String>) -> Self {
+    pub(crate) fn mapping(shape: impl Into<String>) -> Self {
         Self {
             message: shape.into(),
         }
@@ -142,7 +145,14 @@ pub fn plan_for_collection_op(
 /// recipe op has no resolved contract or no plan under it, when a body mixes
 /// collection ops with conflicting recipes, or when the body carries a
 /// collection op that is neither recipe-plannable nor a known elementwise
-/// transform (e.g. `TensorTranspose` — D1): **never a silent `Elementwise`.**
+/// transform (e.g. `TensorSoftmax`): **never a silent `Elementwise`.**
+///
+/// `TensorTranspose` is a recipe op (S5-U1): a transpose-bearing body
+/// resolves the rank-2 [`CollectionKernelPlan::Transpose`] recipe. A body
+/// whose complete op set MIXES distinct recipes cannot carry one plan and
+/// fails here with a typed diagnostic — the decomposition pass
+/// ([`crate::kernel_decomposition::decompose_kernel_function`]) is the path
+/// that splits such bodies into single-recipe subchain kernels.
 pub fn kernel_plan_for_function(
     function: &MirFunction,
     signature: &MirKernelSignature,
@@ -164,7 +174,10 @@ pub fn kernel_plan_for_function(
         match op {
             // Recipe ops must resolve under the carried contract; a second
             // distinct recipe must agree exactly (never guessed).
-            MirCollectionOp::Sum | MirCollectionOp::TensorMean | MirCollectionOp::TensorMatMul => {
+            MirCollectionOp::Sum
+            | MirCollectionOp::TensorMean
+            | MirCollectionOp::TensorMatMul
+            | MirCollectionOp::TensorTranspose => {
                 let Some(contract) = &contract else {
                     return Err(PlanMappingError::mapping(format!(
                         "collection op {op:?} has a recipe but no resolved dispatch contract"
@@ -237,6 +250,8 @@ pub enum RecipeKind {
     TiledMatMul,
     /// Tree-reduction recipe.
     TreeReduction,
+    /// Rank-2 transpose recipe (S5-U1).
+    Transpose,
 }
 
 impl RecipeKind {
@@ -245,6 +260,7 @@ impl RecipeKind {
             CollectionKernelPlan::Elementwise => Self::Elementwise,
             CollectionKernelPlan::TiledMatMul(_) => Self::TiledMatMul,
             CollectionKernelPlan::TreeReduction(_) => Self::TreeReduction,
+            CollectionKernelPlan::Transpose(_) => Self::Transpose,
         }
     }
 }
@@ -337,7 +353,7 @@ fn launch_buffer_slot(resource: &DeviceResource) -> LaunchBufferSlot {
 /// workgroup-memory budget from this; 0 for elementwise kernels).
 fn plan_shared_memory_bytes(plan: &CollectionKernelPlan) -> u64 {
     match plan {
-        CollectionKernelPlan::Elementwise => 0,
+        CollectionKernelPlan::Elementwise | CollectionKernelPlan::Transpose(_) => 0,
         CollectionKernelPlan::TreeReduction(plan) => {
             shared_memory_layout_bytes(&plan.shared_memory)
         }
@@ -362,7 +378,16 @@ fn shared_memory_layout_bytes(layout: &SharedMemoryLayout) -> u64 {
 /// recomputes the forward's mean without using it) — it is not part of the
 /// kernel's semantics and must not drive the plan (a dead reduction must not
 /// force a reduction contract on an elementwise kernel).
-fn collection_ops_for_function(function: &MirFunction) -> Vec<MirCollectionOp> {
+///
+/// The dead filter resolves reads against `read_context` — the function the
+/// op set is scanned from when that is the live context, or the SOURCE
+/// function when the scan runs over a decomposition subchain (the
+/// subchain's produced local is read by a LATER subchain, invisible inside
+/// the subchain slice itself).
+fn collection_ops_with_read_context(
+    function: &MirFunction,
+    read_context: &MirFunction,
+) -> Vec<MirCollectionOp> {
     let mut ops: Vec<MirCollectionOp> = Vec::new();
     for block in &function.blocks {
         for statement in &block.statements {
@@ -378,7 +403,7 @@ fn collection_ops_for_function(function: &MirFunction) -> Vec<MirCollectionOp> {
             {
                 if destination
                     .as_ref()
-                    .is_some_and(|dest| !place_is_read(function, dest))
+                    .is_some_and(|dest| !place_is_read(read_context, dest))
                 {
                     continue;
                 }
@@ -389,6 +414,10 @@ fn collection_ops_for_function(function: &MirFunction) -> Vec<MirCollectionOp> {
         }
     }
     ops
+}
+
+fn collection_ops_for_function(function: &MirFunction) -> Vec<MirCollectionOp> {
+    collection_ops_with_read_context(function, function)
 }
 
 /// Whether a place's base local is read anywhere in the function (the
@@ -476,7 +505,7 @@ fn operand_reads_local(operand: &MirOperand, local: MirLocalId) -> bool {
 /// The set is grounded in the emitters' elementwise arms and the reverse-AD
 /// op surface the companion materializer consumes (elementwise
 /// mul/div/fill): every member is a uniform pointwise transform.
-fn is_elementwise_collection_op(op: MirCollectionOp) -> bool {
+pub(crate) fn is_elementwise_collection_op(op: MirCollectionOp) -> bool {
     matches!(
         op,
         MirCollectionOp::TensorAdd
@@ -488,6 +517,308 @@ fn is_elementwise_collection_op(op: MirCollectionOp) -> bool {
             | MirCollectionOp::TensorRelu
             | MirCollectionOp::TensorGelu
     )
+}
+
+/// Whether a collection op is a recipe-bearing op — the closed recipe-op
+/// set the plan pass resolves a single [`CollectionKernelPlan`] for under
+/// its dispatch contract (S5-U1: reduction, matmul, and the new transpose).
+///
+/// This is the shared boundary predicate for the single-plan scan
+/// ([`kernel_plan_for_function`]) and the decomposition slice
+/// ([`crate::kernel_decomposition::decompose_kernel_function`]): every op
+/// outside it is either an elementwise transform
+/// ([`is_elementwise_collection_op`]) or unplannable (a typed diagnostic).
+#[must_use]
+pub fn is_recipe_op(op: MirCollectionOp) -> bool {
+    matches!(
+        op,
+        MirCollectionOp::Sum
+            | MirCollectionOp::TensorMean
+            | MirCollectionOp::TensorMatMul
+            | MirCollectionOp::TensorTranspose
+    )
+}
+
+/// The element type of a tensor-typed MIR type — the buffer element type the
+/// contract-shaped subchain signature needs (mirrors the ABI's
+/// `buffer_element_type` for the decomposition seam; typed facts only).
+fn tensor_element_ty(
+    ty: MirType,
+    validation: &MirValidationContext<'_>,
+) -> Result<MirType, PlanMappingError> {
+    let Type::Tensor(element, _) = validation.types.get(ty.semantic_id()) else {
+        return Err(PlanMappingError::mapping(
+            "recipe operand requires a tensor type",
+        ));
+    };
+    Ok(MirType::semantic(*element))
+}
+
+/// The local type of a recipe-op statement's first operand (the tensor the
+/// reduction/transpose recipe reads) — resolved from the subchain body's
+/// typed statement scan.
+fn recipe_operand_ty(
+    function: &MirFunction,
+    op: MirCollectionOp,
+) -> Result<MirType, PlanMappingError> {
+    for block in &function.blocks {
+        for statement in &block.statements {
+            let MirStatementKind::RuntimeCall {
+                call:
+                    MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Collection(statement_op),
+                        args,
+                        ..
+                    },
+                ..
+            } = &statement.kind
+            else {
+                continue;
+            };
+            if *statement_op != op {
+                continue;
+            }
+            return args
+                .first()
+                .and_then(|arg| operand_local_ty(function, arg))
+                .map_or_else(
+                    || {
+                        Err(PlanMappingError::mapping(format!(
+                            "{op:?} recipe operand has no local type"
+                        )))
+                    },
+                    Ok,
+                );
+        }
+    }
+    Err(PlanMappingError::mapping(format!(
+        "recipe op {op:?} statement not found in the subchain body"
+    )))
+}
+
+fn storage_input(binding: u32, element_ty: MirType, count: u64) -> MirKernelResource {
+    MirKernelResource {
+        group: 0,
+        binding,
+        kind: MirKernelResourceKind::StorageBuffer,
+        role: MirKernelResourceRole::Input,
+        access: MirKernelResourceAccess::Read,
+        element_ty,
+        element_count: count,
+        source_local: None,
+        source_name: None,
+    }
+}
+
+fn storage_output(binding: u32, element_ty: MirType, count: u64) -> MirKernelResource {
+    MirKernelResource {
+        group: 0,
+        binding,
+        kind: MirKernelResourceKind::StorageBuffer,
+        role: MirKernelResourceRole::Output,
+        access: MirKernelResourceAccess::Write,
+        element_ty,
+        element_count: count,
+        source_local: None,
+        source_name: None,
+    }
+}
+
+/// Build the contract-shaped storage-buffer signature a recipe subchain
+/// carries (S5-U1 decomposition driver seam).
+///
+/// The full ABI synthesis (`MirKernelSignature::storage_buffer_kernel`)
+/// cannot build a signature for an arbitrary subchain slice — a rectangular
+/// transpose kernel whose `[M,N] → [N,M]` return is not semantically equal
+/// to its param, or a matmul subchain whose operands are locals produced by
+/// an earlier subchain — so the seam reconstructs exactly the contract facts
+/// the plan pass requires: the recipe operands as read inputs at their
+/// device-view element counts and the output buffer sized from the resolved
+/// dispatch contract (reduction partials / matmul M·N / transpose M·N),
+/// with the corrected workgroup/dispatch [`CollectionOpContract`] applies.
+/// [`CollectionKernelPlan::from_contract`]'s signature-matching checks then
+/// pass for the subchain exactly as they do for a whole-function kernel.
+///
+/// Extra data-flow inputs (locals read from earlier subchains) are NOT part
+/// of this signature: they are a device-program buffer concern, not a plan
+/// concern — the plan is decided by the recipe op and its operands alone.
+///
+/// # Errors
+/// Returns [`PlanMappingError`] when the recipe operand types cannot be
+/// resolved from the subchain body.
+pub fn contract_shape_signature(
+    function: &MirFunction,
+    contract: &CollectionOpContract,
+    validation: &MirValidationContext<'_>,
+) -> Result<MirKernelSignature, PlanMappingError> {
+    let mut signature = MirKernelSignature {
+        function: function.id,
+        input: storage_input(0, MirType::semantic(TypeId(0)), 0),
+        extra_inputs: Vec::new(),
+        output: storage_output(1, MirType::semantic(TypeId(0)), 0),
+        extra_outputs: Vec::new(),
+        accumulation_buffers: Vec::new(),
+        builtin_inputs: Vec::new(),
+        called_builtins: Vec::new(),
+        workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
+        dispatch_size: MirKernelDispatchSize { x: 0, y: 1, z: 1 },
+    };
+    match *contract {
+        CollectionOpContract::Reduction {
+            length,
+            workgroup_x,
+            partials,
+        } => {
+            let reduce_op = if is_recipe_op_scan(function, MirCollectionOp::TensorMean) {
+                MirCollectionOp::TensorMean
+            } else {
+                MirCollectionOp::Sum
+            };
+            let operand_ty = recipe_operand_ty(function, reduce_op)?;
+            let element_ty = tensor_element_ty(operand_ty, validation)?;
+            signature.input = storage_input(0, element_ty, length);
+            signature.output = storage_output(1, element_ty, partials);
+            signature.workgroup = MirWorkgroupSize {
+                x: workgroup_x,
+                y: 1,
+                z: 1,
+            };
+            signature.dispatch_size = MirKernelDispatchSize {
+                x: length,
+                y: 1,
+                z: 1,
+            };
+        }
+        CollectionOpContract::MatMul {
+            dispatch_x,
+            dispatch_y,
+        } => {
+            let shapes = kernel_matmul_shapes(function, validation)?.ok_or_else(|| {
+                PlanMappingError::mapping("matmul subchain has no operand shapes")
+            })?;
+            let left_ty = recipe_operand_ty(function, MirCollectionOp::TensorMatMul)?;
+            let element_ty = tensor_element_ty(left_ty, validation)?;
+            signature.input = storage_input(0, element_ty, shapes.m.saturating_mul(shapes.k));
+            signature.extra_inputs.push(storage_input(
+                1,
+                element_ty,
+                shapes.k.saturating_mul(shapes.n),
+            ));
+            signature.output = storage_output(2, element_ty, shapes.m.saturating_mul(shapes.n));
+            signature.workgroup = MirWorkgroupSize {
+                x: crate::kernel_plan::MATMUL_TILE,
+                y: crate::kernel_plan::MATMUL_TILE,
+                z: 1,
+            };
+            signature.dispatch_size = MirKernelDispatchSize {
+                x: dispatch_x,
+                y: dispatch_y,
+                z: 1,
+            };
+        }
+        CollectionOpContract::Transpose { m, n } => {
+            let operand_ty = recipe_operand_ty(function, MirCollectionOp::TensorTranspose)?;
+            let element_ty = tensor_element_ty(operand_ty, validation)?;
+            signature.input = storage_input(0, element_ty, m.saturating_mul(n));
+            signature.output = storage_output(1, element_ty, m.saturating_mul(n));
+            signature.workgroup = MirWorkgroupSize {
+                x: crate::kernel_plan::TRANSPOSE_WORKGROUP_X,
+                y: 1,
+                z: 1,
+            };
+            signature.dispatch_size = MirKernelDispatchSize {
+                x: m.saturating_mul(n),
+                y: 1,
+                z: 1,
+            };
+        }
+    }
+    Ok(signature)
+}
+
+/// Whether the body's op-set scan carries the given recipe op (the
+/// reduction-operator disambiguation for [`contract_shape_signature`]).
+fn is_recipe_op_scan(function: &MirFunction, op: MirCollectionOp) -> bool {
+    for block in &function.blocks {
+        for statement in &block.statements {
+            if let MirStatementKind::RuntimeCall {
+                call:
+                    MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Collection(statement_op),
+                        ..
+                    },
+                ..
+            } = &statement.kind
+            {
+                if *statement_op == op {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+/// Resolve the single plan a subchain kernel carries (S5-U1 decomposition
+/// driver seam).
+///
+/// Consumes the same typed facts the whole-function plan pass consumes —
+/// the complete (dead-filtered) op set, the dispatch contract, and the
+/// contract-shaped signature ([`contract_shape_signature`]) — so the
+/// subchain's plan is decided exactly as a whole-function kernel's is, and
+/// a carried plan can be A3 cross-checked against it later. The S3-A5 dead
+/// filter resolves reads against `read_context` (the SOURCE function when
+/// the plan is resolved for a decomposition subchain: the subchain's
+/// produced local is read by a later subchain, which the slice itself does
+/// not contain).
+///
+/// Fail-closed: an unplannable op in the subchain (neither recipe nor
+/// elementwise), a recipe op without a resolvable contract or plan, or a
+/// subchain whose op set mixes distinct recipes is a typed
+/// [`PlanMappingError`] — never a silent `Elementwise`.
+///
+/// # Errors
+/// Returns [`PlanMappingError`] on any of the fail-closed conditions above.
+pub fn resolve_subchain_plan(
+    function: &MirFunction,
+    read_context: &MirFunction,
+    validation: &MirValidationContext<'_>,
+) -> Result<CollectionKernelPlan, PlanMappingError> {
+    let ops = collection_ops_with_read_context(function, read_context);
+    let mut recipe_op: Option<MirCollectionOp> = None;
+    for op in ops {
+        if is_recipe_op(op) {
+            if let Some(existing) = recipe_op {
+                if existing != op {
+                    return Err(PlanMappingError::mapping(format!(
+                        "subchain op set mixes distinct recipes ({existing:?} and {op:?}); \
+                         the decomposition must split them into separate kernels"
+                    )));
+                }
+            }
+            recipe_op = Some(op);
+        } else if !is_elementwise_collection_op(op) {
+            return Err(PlanMappingError::mapping(format!(
+                "collection op {op:?} has no kernel plan \
+                 (no recipe and not an elementwise transform)"
+            )));
+        }
+    }
+    let Some(recipe_op) = recipe_op else {
+        return Ok(CollectionKernelPlan::Elementwise);
+    };
+    let contract = collection_op_contract(function, validation)?.ok_or_else(|| {
+        PlanMappingError::mapping(format!(
+            "collection op {recipe_op:?} has a recipe but no resolved dispatch contract"
+        ))
+    })?;
+    let signature = contract_shape_signature(function, &contract, validation)?;
+    let shapes = if recipe_op == MirCollectionOp::TensorMatMul {
+        kernel_matmul_shapes(function, validation)?
+    } else {
+        None
+    };
+    plan_for_collection_op(&signature, &contract, recipe_op, shapes)
 }
 
 /// Matmul operand shapes `(M, K, N)` resolved from the `TensorMatMul`

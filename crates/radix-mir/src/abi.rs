@@ -2250,12 +2250,16 @@ fn push_unique_builtin(builtins: &mut Vec<MirKernelBuiltin>, builtin: MirKernelB
 ///   buffer sized to `workgroup_count = ceil(n/ws)` partial slots (one
 ///   per-workgroup partial; the host combines);
 /// - **matmul (`TensorMatMul`)**: `workgroup (8,8,1)` (the emitted tile),
-///   `dispatch (ceil(N/8), ceil(M/8), 1)` — one workgroup per output tile.
+///   `dispatch (ceil(N/8), ceil(M/8), 1)` — one workgroup per output tile;
+/// - **transpose (`TensorTranspose`, S5-U1)**: `workgroup
+///   (TRANSPOSE_WORKGROUP_X, 1, 1)` (elementwise-style 1D lanes),
+///   `dispatch (M·N, 1, 1)` — one thread per output element of the rank-2
+///   `[M,N] → [N,M]` remap.
 ///
 /// Consumed by the kernel plan module
 /// (`kernel_plan::CollectionKernelPlan::from_contract`) as the dispatch half
 /// of the collection-op recipe (council L5: plan and contract stay separate).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CollectionOpContract {
     Reduction {
         /// True flat tensor length `n`.
@@ -2269,6 +2273,12 @@ pub enum CollectionOpContract {
         /// Output tile grid `(ceil(N/8), ceil(M/8))`.
         dispatch_x: u64,
         dispatch_y: u64,
+    },
+    Transpose {
+        /// Source rows `M` of the rank-2 operand (output columns).
+        m: u64,
+        /// Source columns `N` of the rank-2 operand (output rows).
+        n: u64,
     },
 }
 
@@ -2313,6 +2323,20 @@ fn apply_collection_op_contract(
                 z: 1,
             };
         }
+        CollectionOpContract::Transpose { m, n } => {
+            // Elementwise-style 1D contract: one thread per output element
+            // of the rank-2 remap (S5-U1).
+            signature.workgroup = MirWorkgroupSize {
+                x: crate::kernel_plan::TRANSPOSE_WORKGROUP_X,
+                y: 1,
+                z: 1,
+            };
+            signature.dispatch_size = MirKernelDispatchSize {
+                x: m.saturating_mul(n),
+                y: 1,
+                z: 1,
+            };
+        }
     }
     Ok(())
 }
@@ -2327,8 +2351,9 @@ fn apply_collection_op_contract(
 ///
 /// # Errors
 /// Returns [`MirAbiError`] when an operand type cannot be resolved to a
-/// static device-view shape, when the reduction tensor length is zero, or
-/// when matmul operands are not rank-2 with matching inner dimensions.
+/// static device-view shape, when the reduction tensor length is zero, when
+/// matmul operands are not rank-2 with matching inner dimensions, or when
+/// transpose operands are not rank-2 with non-zero dimensions.
 pub fn collection_op_contract(
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
@@ -2391,6 +2416,28 @@ pub fn collection_op_contract(
                     return Ok(Some(CollectionOpContract::MatMul {
                         dispatch_x: right_dims[1].div_ceil(tile),
                         dispatch_y: left_dims[0].div_ceil(tile),
+                    }));
+                }
+                MirCollectionOp::TensorTranspose => {
+                    let Some(operand_ty) =
+                        args.first().and_then(|arg| operand_local_ty(function, arg))
+                    else {
+                        continue;
+                    };
+                    let dims = tensor_literal_dims(operand_ty, validation)?;
+                    if dims.len() != 2 {
+                        return Err(MirAbiError::new(
+                            "transpose dispatch contract requires a rank-2 tensor operand",
+                        ));
+                    }
+                    if dims[0] == 0 || dims[1] == 0 {
+                        return Err(MirAbiError::new(
+                            "transpose dispatch contract requires non-zero dimensions",
+                        ));
+                    }
+                    return Ok(Some(CollectionOpContract::Transpose {
+                        m: dims[0],
+                        n: dims[1],
                     }));
                 }
                 _ => {}
@@ -4520,5 +4567,247 @@ mod tests {
             requires_input.issue,
             "mir_kernel_result_tuple_requires_input"
         );
+    }
+
+    /// Rank-2 transpose kernel shape (S5-U1):
+    /// `functio transpono(tf32[M,N] x) → tf32[N,M] {
+    ///    fixum tensor<f32,[N,M]> t ← transponi(x); redde t }`.
+    fn transpose_rank2_function(types: &mut TypeTable, dims: [u64; 2]) -> MirFunction {
+        let f32_id = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+        let dim_ids = dims
+            .iter()
+            .map(|&dim| types.intern_index(IndexExpr::Literal(dim)))
+            .collect::<Vec<_>>();
+        let shape = types.intern_index(IndexExpr::Tuple(dim_ids));
+        let tensor_ty = MirType::semantic(types.intern(Type::Tensor(f32_id, shape)));
+
+        // The transposed `[N,M]` type (the destination / return).
+        let out_dims = dims
+            .iter()
+            .rev()
+            .map(|&dim| types.intern_index(IndexExpr::Literal(dim)))
+            .collect::<Vec<_>>();
+        let out_shape = types.intern_index(IndexExpr::Tuple(out_dims));
+        let out_ty = MirType::semantic(types.intern(Type::Tensor(f32_id, out_shape)));
+
+        let span = Span::default();
+        MirFunction {
+            id: MirFunctionId(0),
+            source: Some(DefId(12)),
+            name: None,
+            params: vec![MirParam {
+                local: MirLocalId(0),
+                name: None,
+                ty: tensor_ty,
+                mode: MirParamMode::Owned,
+                span,
+            }],
+            locals: vec![
+                MirLocal {
+                    id: MirLocalId(0),
+                    name: None,
+                    ty: tensor_ty,
+                    mutable: false,
+                    span,
+                },
+                MirLocal {
+                    id: MirLocalId(1),
+                    name: None,
+                    ty: out_ty,
+                    mutable: false,
+                    span,
+                },
+            ],
+            temps: Vec::new(),
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: Some(MirPlace::local(MirLocalId(1))),
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorTranspose),
+                            args: vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+                            return_ty: out_ty,
+                        },
+                    },
+                    span,
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                        MirLocalId(1),
+                    )))),
+                    span,
+                },
+                span,
+            }],
+            return_ty: out_ty,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span,
+        }
+    }
+
+    #[test]
+    fn transpose_contract_resolves_rank2_dims() {
+        // S5-U1 dispatch contract facts: the resolver reads the literal
+        // rank-2 operand dims `[M,N]` off the tensor type.
+        let mut types = TypeTable::new();
+        let function = transpose_rank2_function(&mut types, [4, 4]);
+        let validation = MirValidationContext::new(&types);
+        let contract = collection_op_contract(&function, &validation)
+            .expect("transpose facts resolve")
+            .expect("transpose body carries a dispatch contract");
+        assert_eq!(
+            contract,
+            CollectionOpContract::Transpose { m: 4, n: 4 },
+            "the rank-2 transpose must resolve the M×N dispatch contract"
+        );
+    }
+
+    #[test]
+    fn transpose_contract_rejects_rank1_operand() {
+        // A rank-1 operand has no `[M,N] → [N,M]` remap — typed diagnostic,
+        // never a silent contract.
+        let mut types = TypeTable::new();
+        let f32_id = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+        let shape = types.intern_index(IndexExpr::Literal(4));
+        let tensor_ty = MirType::semantic(types.intern(Type::Tensor(f32_id, shape)));
+        let span = Span::default();
+        let function = MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![MirParam {
+                local: MirLocalId(0),
+                name: None,
+                ty: tensor_ty,
+                mode: MirParamMode::Owned,
+                span,
+            }],
+            locals: Vec::new(),
+            temps: Vec::new(),
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: Some(MirPlace::local(MirLocalId(1))),
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorTranspose),
+                            args: vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+                            return_ty: tensor_ty,
+                        },
+                    },
+                    span,
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span,
+                },
+                span,
+            }],
+            return_ty: tensor_ty,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span,
+        };
+        let validation = MirValidationContext::new(&types);
+        let error = collection_op_contract(&function, &validation)
+            .expect_err("rank-1 transpose must fail the contract resolver");
+        assert!(
+            error.message.contains("rank-2"),
+            "diagnostic must demand a rank-2 operand, got: {}",
+            error.message
+        );
+    }
+
+    #[test]
+    fn transpose_signature_applies_elementwise_style_dispatch() {
+        // S5-U1 apply arm: a square MLP 4×4 transpose kernel carries the
+        // elementwise-style 1D contract — workgroup (64,1,1), dispatch
+        // (M·N,1,1), input/output sized M·N. The generic return-buffer ABI
+        // synthesis seeds the 1D shape; the contract correction applies the
+        // transpose dispatch on top.
+        let mut types = TypeTable::new();
+        let element_ty =
+            MirType::semantic(types.sized_numeric(Primitive::Fractus, NumericWidth::F32));
+        let function = transpose_rank2_function(&mut types, [4, 4]);
+        let validation = validation_with_device_tensor_layouts(&types);
+
+        // The generic base signature the return-buffer ABI seeds (workgroup
+        // (1,1,1), 1D dispatch over the output element count).
+        let mut signature = MirKernelSignature {
+            function: function.id,
+            input: MirKernelResource {
+                group: 0,
+                binding: 0,
+                kind: MirKernelResourceKind::StorageBuffer,
+                role: MirKernelResourceRole::Input,
+                access: MirKernelResourceAccess::Read,
+                element_ty,
+                element_count: 16,
+                source_local: Some(MirLocalId(0)),
+                source_name: None,
+            },
+            extra_inputs: Vec::new(),
+            output: MirKernelResource {
+                group: 0,
+                binding: 1,
+                kind: MirKernelResourceKind::StorageBuffer,
+                role: MirKernelResourceRole::Output,
+                access: MirKernelResourceAccess::Write,
+                element_ty,
+                element_count: 16,
+                source_local: None,
+                source_name: None,
+            },
+            extra_outputs: Vec::new(),
+            accumulation_buffers: Vec::new(),
+            builtin_inputs: Vec::new(),
+            called_builtins: Vec::new(),
+            workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
+            dispatch_size: MirKernelDispatchSize { x: 16, y: 1, z: 1 },
+        };
+
+        // `apply_collection_op_contract` corrects the generic 1D dispatch to
+        // the transpose contract facts.
+        apply_collection_op_contract(&function, &mut signature, &validation)
+            .expect("transpose contract applies");
+        assert_eq!(
+            signature.workgroup,
+            MirWorkgroupSize {
+                x: crate::kernel_plan::TRANSPOSE_WORKGROUP_X,
+                y: 1,
+                z: 1,
+            }
+        );
+        assert_eq!(
+            signature.dispatch_size,
+            MirKernelDispatchSize { x: 16, y: 1, z: 1 }
+        );
+        assert_eq!(signature.input.element_count, 16);
+        assert_eq!(signature.output.element_count, 16);
+        assert!(signature.extra_inputs.is_empty());
+
+        // The typed plan pass admits the transpose kernel: the body resolves
+        // the rank-2 Transpose recipe over the contract-shaped signature.
+        let derived = crate::device_program_plans::kernel_plan_for_function(
+            &function,
+            &signature,
+            &validation,
+        )
+        .expect("transpose facts resolve")
+        .expect("transpose body carries the transpose recipe");
+        assert!(
+            matches!(
+                derived,
+                crate::kernel_plan::CollectionKernelPlan::Transpose(_)
+            ),
+            "the transpose body must carry a transpose plan, got {derived:?}"
+        );
+        derived.validate().expect("transpose plan validates");
     }
 }

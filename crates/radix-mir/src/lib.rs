@@ -16,6 +16,7 @@ pub mod dump;
 pub mod generic;
 pub mod gradient;
 pub mod inference_blocker_matrix;
+pub mod kernel_decomposition;
 pub mod kernel_module;
 pub mod kernel_plan;
 pub mod layout;
@@ -93,10 +94,12 @@ pub use inference_blocker_matrix::{
     inference_blocker_rows, inference_non_claims, InferenceBlockerCategory, InferenceBlockerRow,
     InferenceBlockerStatus, InferenceNonClaim, InferenceNonClaimKind,
 };
+pub use kernel_decomposition::{decompose_kernel_function, KernelDecomposition, KernelSubchain};
 pub use kernel_module::KernelModule;
 pub use kernel_plan::{
     BarrierPhase, BarrierPoint, CollectionKernelPlan, MatMulPlan, OobPaddingPolicy,
-    PlanValidationError, ReduceOp, ReductionPlan, SharedMemoryLayout,
+    PlanValidationError, ReduceOp, ReductionPlan, SharedMemoryLayout, TransposePlan,
+    TRANSPOSE_WORKGROUP_X,
 };
 pub use layout::{
     MirAggregateCarrier, MirAggregateFamily, MirAggregateLayout, MirAtomicLayout,
