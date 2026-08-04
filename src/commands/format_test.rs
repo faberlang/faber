@@ -256,7 +256,7 @@ fn format_reader_locale_la_without_canonical_matches_canonical_latin() {
 fn format_reader_locale_preserves_template_application_sugar() {
     // Reader-locale packs re-render the same semantic program with different
     // keyword spellings while retaining glyph shapes. The `"…"(args)` template-
-    // application postfix is a glyph shape: `--reader-locale llm` localizes
+    // application postfix is a glyph shape: `--reader-locale en` localizes
     // `nota` → `print` but must keep `print "val § here"(n)` instead of
     // expanding into `print format("val § here", n)`. `--canonical` keeps the
     // `scriptum(...)` expansion.
@@ -270,7 +270,7 @@ fn format_reader_locale_preserves_template_application_sugar() {
     let llm_output = run_faber_format_stdout_with_args(&[
         "format",
         "--reader-locale",
-        "llm",
+        "en",
         "--stdout",
         fixture.to_str().expect("utf8 path"),
     ]);
