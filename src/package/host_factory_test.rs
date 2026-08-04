@@ -42,6 +42,7 @@ fn add_slot(
         binding,
         element_ty: DeviceDataType::F32,
         element_count: count,
+        version: 1,
     }
 }
 
@@ -60,6 +61,7 @@ fn elementwise_add_descriptor(backend: DeviceBackend, entry: &str, count: u64) -
             block: [count as u32, 1, 1],
         }],
         program_lifetime: DeviceProgramLifetime::SingleRun,
+        data_flow: Vec::new(),
     }
 }
 
@@ -344,6 +346,7 @@ fn conflicting_shapes_fail_as_shape_mismatch() {
             },
         ],
         program_lifetime: DeviceProgramLifetime::SingleRun,
+        data_flow: Vec::new(),
     };
     let err = execute_device_descriptor(&mut host, &descriptor, &BTreeMap::new(), &[])
         .expect_err("shape conflict must fail before launch");

@@ -47,8 +47,9 @@
 
 use faber::device::{DeviceBackend, DeviceSelection};
 use faber_host_macos_arm64::device_descriptor::{
-    DescriptorBuffer, DescriptorKernel, DeviceBufferLifetime, DeviceDataType, DeviceDescriptor,
-    DeviceBufferRole, DeviceProgramLifetime as HostDeviceProgramLifetime,
+    DescriptorBuffer, DescriptorDataFlow as HostDescriptorDataFlow, DescriptorKernel,
+    DeviceBufferLifetime, DeviceDataType, DeviceDescriptor, DeviceBufferRole,
+    DeviceProgramLifetime as HostDeviceProgramLifetime,
 };
 use radix::diagnostics::Diagnostic;
 use radix::lexer::Interner;
@@ -895,6 +896,9 @@ pub(crate) fn descriptor_for_backend(
                 binding: resource.binding.binding,
                 element_ty,
                 element_count: resource.version.element_count,
+                // R2: the host consumes the wire's carried content version —
+                // it never re-derives or hardcodes `1` for the A10 graph.
+                version: resource.version.version,
             });
         }
         kernels.push(DescriptorKernel {
@@ -920,6 +924,19 @@ pub(crate) fn descriptor_for_backend(
             WireProgramLifetime::SingleRun => HostDeviceProgramLifetime::SingleRun,
             WireProgramLifetime::RepeatingStep => HostDeviceProgramLifetime::RepeatingStep,
         },
+        // R2: the host consumes the wire's carried data-flow edges (real
+        // versions, producer/consumer per buffer version) — the receipt's
+        // A10 graph is never re-derived from launch order.
+        data_flow: wire_resource_graph(device)
+            .1
+            .into_iter()
+            .map(|edge| HostDescriptorDataFlow {
+                buffer_id: edge.buffer_id,
+                version: edge.version,
+                producer: edge.producer,
+                consumer: edge.consumer,
+            })
+            .collect(),
     })
 }
 

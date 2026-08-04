@@ -286,6 +286,24 @@ fn descriptor_maps_wire_lifetimes_onto_host_descriptor() {
     let kernel1_slots = &descriptor.kernels[1].buffers;
     assert_eq!(kernel1_slots[0].lifetime, DeviceBufferLifetime::PerStep);
     assert_eq!(kernel1_slots[1].lifetime, DeviceBufferLifetime::ObservationPoint);
+
+    // R2: the host descriptor carries the wire's content versions and
+    // data-flow edges — the A10 graph consumes real facts, never a
+    // hardcoded `version: 1` or a first-writer coincidence derivation.
+    assert_eq!(
+        slots[1].version, 1,
+        "the medius intermediate carries its wire content version"
+    );
+    assert!(
+        descriptor.data_flow.contains(&HostDescriptorDataFlow {
+            buffer_id: 2,
+            version: 1,
+            producer: 1,
+            consumer: 2,
+        }),
+        "the carried producer/consumer edge must ride the descriptor: {:?}",
+        descriptor.data_flow
+    );
 }
 
 #[test]
