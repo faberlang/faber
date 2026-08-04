@@ -338,6 +338,10 @@ fn diagnostic_text_assertion_allowlisted(root: &Path, path: &Path) -> bool {
         || rel == "crates/radix/src/mir/llvm_text_test.rs"
         || rel == "crates/radix/src/mir/metal_text_test.rs"
         || rel == "crates/radix-air/src/reverse_ad_test.rs"
+        // Pre-3R S3-era residual text assertions (device-program plan +
+        // device-artifact surfaces), allowlisted for issue/code migration.
+        || rel == "crates/radix-mir/src/device_program_plans_test.rs"
+        || rel == "crates/radix-mir-llvm/tests/device_artifact.rs"
 }
 
 fn display_relative(root: &Path, path: &Path) -> String {
