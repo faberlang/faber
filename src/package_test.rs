@@ -4207,6 +4207,112 @@ host = "native"
 }
 
 #[test]
+fn manifest_device_steps_zero_fails_closed() {
+    // S5-U5b: `[device] steps = 0` is a contradiction (a RepeatingStep
+    // program must drive at least one step) — the manifest validation rejects
+    // it at package load, never silently treated as absent.
+    let dir = test_temp_dir("device-steps-zero");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "device-steps-zero"
+
+[paths]
+entry = "main.fab"
+
+[device]
+steps = 0
+"#,
+    )
+    .expect("write manifest");
+    let manifest_path = dir.join("faber.toml");
+    let manifest = read_manifest(&manifest_path).expect("read manifest");
+    let err = validate_manifest(&manifest, &manifest_path)
+        .expect_err("a zero declared step count must fail closed");
+    assert!(diagnostic_has_issue(&err, "package_device_steps_zero"));
+}
+
+#[test]
+fn manifest_device_steps_parses_and_validates() {
+    // S5-U5b: a positive `[device] steps` parses into the manifest device
+    // surface and validates cleanly at package load.
+    let dir = test_temp_dir("device-steps-valid");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "device-steps-valid"
+
+[paths]
+entry = "main.fab"
+
+[device]
+backend = "auto"
+steps = 250
+"#,
+    )
+    .expect("write manifest");
+    let manifest_path = dir.join("faber.toml");
+    let manifest = read_manifest(&manifest_path).expect("read manifest");
+    validate_manifest(&manifest, &manifest_path).expect("a positive step count validates");
+    assert_eq!(manifest.device.steps, Some(250));
+}
+
+#[test]
+fn package_fmir_image_rejects_device_steps_on_single_run_program() {
+    // S5-U5b fail-closed policy: the `[device] steps` channel applies only
+    // to a RepeatingStep training program. A SingleRun device package
+    // (compute kernels, no training loop) that declares a step count fails
+    // package construction closed — never a silently dropped count.
+    let dir = test_temp_dir("package-device-steps-single");
+    fs::create_dir_all(dir.join("src")).expect("src dir");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "device-steps-single"
+version = "0.1.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+target = "fmir"
+kind = "bin"
+
+[device]
+backend = "auto"
+steps = 250
+"#,
+    )
+    .expect("write manifest");
+    fs::write(
+        dir.join("src").join("main.fab"),
+        r#"@ nucleum
+functio summa(tf32[2] x) → f32 {
+    redde x.summa()
+}
+"#,
+    )
+    .expect("write entry");
+    let entry = dir.join("src").join("main.fab");
+    let result = build_package_fmir_image(
+        &Config::default()
+            .with_stdlib(dev_norma_library_home())
+            .with_target(Target::Fmir),
+        &entry,
+        &[],
+    );
+    let diagnostics = result.expect_err("steps on a SingleRun device program must fail closed");
+    assert!(diagnostics
+        .iter()
+        .any(|diag| { diagnostic_has_issue(diag, "package_device_steps_not_repeating") }));
+}
+
+#[test]
 fn compile_package_resolves_builtin_norma_chorda_native_body() {
     let dir = test_temp_dir("norma-chorda-import");
     let entry = dir.join("main.fab");

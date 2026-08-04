@@ -39,9 +39,15 @@ fn device_program_and_semantics_from_corpus_fixture(
         &radix::driver::Config::default().with_stdlib(dev_norma_library_home()),
         &entry,
         |lowered| {
-            device_program_for_lowered(&lowered.validated, &lowered.interner, &lowered.companions)
-                .expect("constructor succeeds")
-                .expect("kernel fixture yields a device program")
+            device_program_for_lowered(
+                &lowered.validated,
+                &lowered.interner,
+                &lowered.companions,
+                DEFAULT_TRAINING_STEPS,
+            )
+            .expect("constructor succeeds")
+            .map(|(program, semantics, _step_count)| (program, semantics))
+            .expect("kernel fixture yields a device program")
         },
     )
     .expect("fixture lowers")
@@ -88,7 +94,12 @@ fn device_program_constructor_returns_none_without_kernels() {
         &radix::driver::Config::default().with_stdlib(dev_norma_library_home()),
         &entry,
         |lowered| {
-            device_program_for_lowered(&lowered.validated, &lowered.interner, &lowered.companions)
+            device_program_for_lowered(
+                &lowered.validated,
+                &lowered.interner,
+                &lowered.companions,
+                DEFAULT_TRAINING_STEPS,
+            )
                 .expect("constructor succeeds")
         },
     )
@@ -102,7 +113,7 @@ fn section_for_program(program: &DeviceProgram, semantics: &DeviceSemantics) -> 
     FmirDeviceSection {
         device_program: FmirDeviceProgramSection {
             v: DEVICE_RUN_PLAN_VERSION,
-            program: wire_program_for_program(program, semantics),
+            program: wire_program_for_program(program, semantics, DEFAULT_TRAINING_STEPS),
         },
         selection: FmirDeviceSelection::Auto,
         artifacts: FmirDeviceArtifactsSection {
@@ -122,9 +133,15 @@ fn two_kernel_fixture() -> (DeviceProgram, DeviceSemantics) {
         &radix::driver::Config::default().with_stdlib(dev_norma_library_home()),
         &entry,
         |lowered| {
-            device_program_for_lowered(&lowered.validated, &lowered.interner, &lowered.companions)
-                .expect("constructor succeeds")
-                .expect("fixture yields a device program")
+            device_program_for_lowered(
+                &lowered.validated,
+                &lowered.interner,
+                &lowered.companions,
+                DEFAULT_TRAINING_STEPS,
+            )
+            .expect("constructor succeeds")
+            .map(|(program, semantics, _step_count)| (program, semantics))
+            .expect("fixture yields a device program")
         },
     )
     .expect("fixture lowers")
@@ -144,7 +161,7 @@ fn two_kernel_program() -> DeviceProgram {
 fn wire_carries_the_complete_program() {
     let (program, semantics) =
         device_program_and_semantics_from_corpus_fixture("cuda/summa-proof.fab");
-    let wire = wire_program_for_program(&program, &semantics);
+    let wire = wire_program_for_program(&program, &semantics, DEFAULT_TRAINING_STEPS);
 
     // Kernels: function id + entry + plan + typed resources + launch.
     assert_eq!(wire.kernels.len(), program.kernels.len());
@@ -185,7 +202,7 @@ fn wire_carries_the_complete_program() {
 fn constructor_derived_lifetimes_ride_the_typed_wire() {
     let (program, semantics) =
         device_program_and_semantics_from_corpus_fixture("cuda/summa-proof.fab");
-    let wire = wire_program_for_program(&program, &semantics);
+    let wire = wire_program_for_program(&program, &semantics, DEFAULT_TRAINING_STEPS);
     let resources = &wire.kernels[0].resources;
     assert_eq!(resources[0].buffer.role, WireBufferRole::Input);
     assert_eq!(resources[0].buffer.lifetime, WireBufferLifetime::PerProgram);
@@ -203,8 +220,8 @@ fn constructor_derived_lifetimes_ride_the_typed_wire() {
 fn wire_round_trips_deterministically() {
     let (program, semantics) =
         device_program_and_semantics_from_corpus_fixture("cuda/summa-proof.fab");
-    let first = wire_program_for_program(&program, &semantics);
-    let second = wire_program_for_program(&program, &semantics);
+    let first = wire_program_for_program(&program, &semantics, DEFAULT_TRAINING_STEPS);
+    let second = wire_program_for_program(&program, &semantics, DEFAULT_TRAINING_STEPS);
     assert_eq!(
         radix_mir_fmir::canonical_program_bytes(&first),
         radix_mir_fmir::canonical_program_bytes(&second),
@@ -1033,7 +1050,7 @@ fn two_kernel_wire_carries_unified_lifetimes() {
     // intact (canonical bytes stable).
     assert_eq!(
         radix_mir_fmir::canonical_program_bytes(wire),
-        radix_mir_fmir::canonical_program_bytes(&wire_program_for_program(&program, &semantics))
+        radix_mir_fmir::canonical_program_bytes(&wire_program_for_program(&program, &semantics, DEFAULT_TRAINING_STEPS))
     );
 }
 
@@ -1106,9 +1123,15 @@ fn companion_forward_and_backward_kernel_set_and_order() {
             .with_target(radix::codegen::Target::Fmir),
         &entry,
         |lowered| {
-            device_program_for_lowered(&lowered.validated, &lowered.interner, &lowered.companions)
-                .expect("constructor succeeds")
-                .expect("device package yields a device program")
+            device_program_for_lowered(
+                &lowered.validated,
+                &lowered.interner,
+                &lowered.companions,
+                DEFAULT_TRAINING_STEPS,
+            )
+            .expect("constructor succeeds")
+            .map(|(program, semantics, _step_count)| (program, semantics))
+            .expect("device package yields a device program")
         },
     )
     .expect("fixture lowers");
@@ -1194,7 +1217,12 @@ fn companion_carrier_round_trips_and_missing_companion_fails_closed() {
             derivative: radix_mir::device::MirCompanionDerivativeKind::ReverseModeVjp,
             device_resident: true,
         });
-        let error = device_program_for_lowered(&lowered.validated, &lowered.interner, &phantom)
+        let error = device_program_for_lowered(
+            &lowered.validated,
+            &lowered.interner,
+            &phantom,
+            DEFAULT_TRAINING_STEPS,
+        )
             .expect_err("a carried companion missing from the MIR must fail closed");
         assert!(
             error.iter().any(|diagnostic| diagnostic.message.contains("missing from the lowered MIR")),
@@ -1236,7 +1264,12 @@ functio softmaxio(tf32[2,2] x) → tf32[2,2] {
     redde x.activatio_softmax()
 }"#,
         |lowered| {
-            device_program_for_lowered(&lowered.validated, &lowered.interner, &lowered.companions)
+            device_program_for_lowered(
+                &lowered.validated,
+                &lowered.interner,
+                &lowered.companions,
+                DEFAULT_TRAINING_STEPS,
+            )
         },
     )
     .expect("fixture lowers");
@@ -1272,9 +1305,15 @@ functio loss(tf32[2] x, tf32[2] w) → tf32[2] {
     redde x.multiplica(w)
 }"#,
         |lowered| {
-            device_program_for_lowered(&lowered.validated, &lowered.interner, &lowered.companions)
-                .expect("constructor succeeds")
-                .expect("device package yields a device program")
+            device_program_for_lowered(
+                &lowered.validated,
+                &lowered.interner,
+                &lowered.companions,
+                DEFAULT_TRAINING_STEPS,
+            )
+            .expect("constructor succeeds")
+            .map(|(program, semantics, _step_count)| (program, semantics))
+            .expect("device package yields a device program")
         },
     )
     .expect("fixture lowers");
@@ -1311,9 +1350,15 @@ functio mean_mul(tf32[2] x, tf32[2] w, tf32[1] out, u32 id) → vacuum {
     out[id] ← total
 }"#,
         |lowered| {
-            device_program_for_lowered(&lowered.validated, &lowered.interner, &lowered.companions)
-                .expect("constructor succeeds")
-                .expect("device package yields a device program")
+            device_program_for_lowered(
+                &lowered.validated,
+                &lowered.interner,
+                &lowered.companions,
+                DEFAULT_TRAINING_STEPS,
+            )
+            .expect("constructor succeeds")
+            .map(|(program, semantics, _step_count)| (program, semantics))
+            .expect("device package yields a device program")
         },
     )
     .expect("fixture lowers");
@@ -1341,7 +1386,7 @@ functio mean_mul(tf32[2] x, tf32[2] w, tf32[1] out, u32 id) → vacuum {
 #[test]
 fn constructor_projects_independent_axes_onto_the_wire() {
     let (program, semantics) = two_kernel_fixture();
-    let wire = wire_program_for_program(&program, &semantics);
+    let wire = wire_program_for_program(&program, &semantics, DEFAULT_TRAINING_STEPS);
 
     // F1: one semantic value per buffer, minted from the carried MIR-local
     // facts (a, medius, result all flow from kernel-slot locals) with
@@ -1447,7 +1492,7 @@ fn constructor_projects_independent_axes_onto_the_wire() {
 #[test]
 fn wire_axes_vary_independently() {
     let (program, semantics) = two_kernel_fixture();
-    let mut wire = wire_program_for_program(&program, &semantics);
+    let mut wire = wire_program_for_program(&program, &semantics, DEFAULT_TRAINING_STEPS);
 
     let generations = |wire: &WireDeviceProgram| -> Vec<u32> {
         wire.kernels
@@ -1698,9 +1743,15 @@ functio produco_b(tf32[2] y, tf32[2] out, u32 id) → vacuum {
     out[id] ← total
 }"#,
         |lowered| {
-            device_program_for_lowered(&lowered.validated, &lowered.interner, &lowered.companions)
-                .expect("constructor succeeds")
-                .expect("fixture yields a device program")
+            device_program_for_lowered(
+                &lowered.validated,
+                &lowered.interner,
+                &lowered.companions,
+                DEFAULT_TRAINING_STEPS,
+            )
+            .expect("constructor succeeds")
+            .map(|(program, semantics, _step_count)| (program, semantics))
+            .expect("fixture yields a device program")
         },
     )
     .expect("fixture lowers");
@@ -1768,9 +1819,15 @@ functio recollige(tf32[4] {intermediate}, tf32[1] result, u32 id) → vacuum {{
     };
     let lower = |name: &str, intermediate: &str| {
         with_inline_package(name, &source(intermediate), |lowered| {
-            device_program_for_lowered(&lowered.validated, &lowered.interner, &lowered.companions)
-                .expect("constructor succeeds")
-                .expect("fixture yields a device program")
+            device_program_for_lowered(
+                &lowered.validated,
+                &lowered.interner,
+                &lowered.companions,
+                DEFAULT_TRAINING_STEPS,
+            )
+            .expect("constructor succeeds")
+            .map(|(program, semantics, _step_count)| (program, semantics))
+            .expect("fixture yields a device program")
         })
         .expect("fixture lowers")
     };
@@ -1936,7 +1993,7 @@ fn double_write_carries_two_explicit_generations() {
     // The wire carries the two explicit generations: each write slot names
     // its own generation — never a universal `1` and never a second producer
     // of the same generation.
-    let wire = wire_program_for_program(&program, &semantics);
+    let wire = wire_program_for_program(&program, &semantics, DEFAULT_TRAINING_STEPS);
     assert_eq!(wire.kernels[0].resources[0].generation, 1);
     assert_eq!(wire.kernels[1].resources[0].generation, 2);
     assert_eq!(wire.semantic_values.len(), 1);
@@ -1965,7 +2022,7 @@ fn two_kernel_chain_generations_and_producers_are_correct() {
         vec![(2, 1, 1), (3, 1, 2)],
         "medius generation 1 produced by launch 1; result generation 1 by launch 2"
     );
-    let wire = wire_program_for_program(&program, &semantics);
+    let wire = wire_program_for_program(&program, &semantics, DEFAULT_TRAINING_STEPS);
     // collige: a-read consumes gen 1 (initial state), medius-write produces
     // gen 1; recollige: medius-read consumes gen 1, result-write produces
     // gen 1.
@@ -1993,9 +2050,15 @@ functio collige(tf32[1024] a, tf32[4] medius, u32 id) → vacuum {
     medius[id] ← total
 }"#,
         |lowered| {
-            device_program_for_lowered(&lowered.validated, &lowered.interner, &lowered.companions)
-                .expect("constructor succeeds")
-                .expect("fixture yields a device program")
+            device_program_for_lowered(
+                &lowered.validated,
+                &lowered.interner,
+                &lowered.companions,
+                DEFAULT_TRAINING_STEPS,
+            )
+            .expect("constructor succeeds")
+            .map(|(program, semantics, _step_count)| (program, semantics))
+            .expect("fixture yields a device program")
         },
     )
     .expect("fixture lowers");
@@ -2050,16 +2113,22 @@ fn companion_relation_projected_onto_the_wire() {
             .with_target(radix::codegen::Target::Fmir),
         &entry,
         |lowered| {
-            device_program_for_lowered(&lowered.validated, &lowered.interner, &lowered.companions)
-                .expect("constructor succeeds")
-                .expect("device package yields a device program")
+            device_program_for_lowered(
+                &lowered.validated,
+                &lowered.interner,
+                &lowered.companions,
+                DEFAULT_TRAINING_STEPS,
+            )
+            .expect("constructor succeeds")
+            .map(|(program, semantics, _step_count)| (program, semantics))
+            .expect("device package yields a device program")
         },
     )
     .expect("fixture lowers");
 
     // The lossless row rides the carried semantics (F4).
     assert_eq!(semantics.relations.len(), 1);
-    let wire = wire_program_for_program(&program, &semantics);
+    let wire = wire_program_for_program(&program, &semantics, DEFAULT_TRAINING_STEPS);
     assert_eq!(wire.relations.len(), 1);
     let relation = &wire.relations[0];
     assert!(relation.device_resident);
@@ -2176,10 +2245,26 @@ incipit {
 /// Build the training fixture's RepeatingStep device program through the
 /// ordinary constructor.
 fn training_fixture_program(source: &str, name: &str) -> (DeviceProgram, DeviceSemantics) {
+    training_fixture_program_with_steps(source, name, DEFAULT_TRAINING_STEPS)
+}
+
+/// Build the training fixture's RepeatingStep device program with an explicit
+/// declared step count.
+fn training_fixture_program_with_steps(
+    source: &str,
+    name: &str,
+    declared_steps: u32,
+) -> (DeviceProgram, DeviceSemantics) {
     with_inline_package(name, source, |lowered| {
-        device_program_for_lowered(&lowered.validated, &lowered.interner, &lowered.companions)
-            .expect("constructor succeeds")
-            .expect("training fixture yields a device program")
+        device_program_for_lowered(
+            &lowered.validated,
+            &lowered.interner,
+            &lowered.companions,
+            declared_steps,
+        )
+        .expect("constructor succeeds")
+        .map(|(program, semantics, _step_count)| (program, semantics))
+        .expect("training fixture yields a device program")
     })
     .expect("fixture lowers")
 }
@@ -2307,9 +2392,14 @@ fn repeating_step_constructor_materializes_training_program() {
 #[test]
 fn training_plan_facts_derives_trainable_param_identity() {
     with_inline_package("s5u5-facts", TRAINING_LOOP_FIXTURE_100, |lowered| {
-        let facts = training_plan_facts(&lowered.validated, &lowered.interner, &lowered.companions)
-            .expect("training facts resolve")
-            .expect("a training loop is detected");
+        let facts = training_plan_facts(
+            &lowered.validated,
+            &lowered.interner,
+            &lowered.companions,
+            Some(DEFAULT_TRAINING_STEPS),
+        )
+        .expect("training facts resolve")
+        .expect("a training loop is detected");
 
         assert_eq!(facts.step_count, DEFAULT_TRAINING_STEPS);
         assert_eq!(facts.source_loop_bound, Some(100));
@@ -2345,7 +2435,12 @@ fn repeating_step_step_count_mismatch_fails_closed() {
     // Constructor: the 8-step training loop cannot build a RepeatingStep
     // image under the default declared 100.
     let result = with_inline_package("s5u5-train-8", TRAINING_LOOP_FIXTURE_MISMATCH, |lowered| {
-        device_program_for_lowered(&lowered.validated, &lowered.interner, &lowered.companions)
+        device_program_for_lowered(
+            &lowered.validated,
+            &lowered.interner,
+            &lowered.companions,
+            DEFAULT_TRAINING_STEPS,
+        )
     })
     .expect("fixture lowers");
     let diagnostics = result.expect_err("a declared/source step-count mismatch fails construction");
@@ -2388,7 +2483,10 @@ fn repeating_step_wire_and_descriptor_project_params_and_observation() {
     ];
 
     let wire = &section.device_program.program;
-    assert_eq!(wire.lifetime, WireProgramLifetime::RepeatingStep);
+    assert_eq!(
+        wire.lifetime,
+        WireProgramLifetime::RepeatingStep(DEFAULT_TRAINING_STEPS)
+    );
 
     // The params ride the wire as InOut + PerProgram + HostProvided.
     let mut param_slots: Vec<&WireDeviceResource> = Vec::new();
@@ -2601,21 +2699,101 @@ fn repeating_step_route_runs_steps_once_init_loss_trace_convergence() {
     assert_eq!(host.device().map(|runtime| runtime.live_handle_count()).unwrap_or(0), 0);
 }
 
-/// `FABER_DEVICE_STEPS` drives the repeating step count fail-closed: a
-/// non-numeric value is rejected; the default is [`DEFAULT_TRAINING_STEPS`].
+/// The `FABER_DEVICE_STEPS` env-var override (S5-U5b): absent → the image's
+/// declared count is the authority; an agreeing override passes; a
+/// contradicting override or a non-numeric value fails closed (never a
+/// silent override of the wire's declared count).
 #[test]
-fn device_step_count_defaults_and_fails_closed() {
+fn device_step_count_agrees_with_the_image_declared_count() {
     std::env::remove_var("FABER_DEVICE_STEPS");
     assert_eq!(
-        device_step_count().expect("default"),
-        DEFAULT_TRAINING_STEPS
+        device_step_count(250).expect("absent env → the image's declared count"),
+        250
     );
     std::env::set_var("FABER_DEVICE_STEPS", "250");
-    assert_eq!(device_step_count().expect("explicit"), 250);
+    assert_eq!(
+        device_step_count(250).expect("agreeing override passes"),
+        250
+    );
+    std::env::set_var("FABER_DEVICE_STEPS", "100");
+    let error = device_step_count(250)
+        .expect_err("a contradicting override fails closed against the image count");
+    assert!(error[0].message.contains("FABER_DEVICE_STEPS"));
+    assert!(error[0].message.contains("250"));
     std::env::set_var("FABER_DEVICE_STEPS", "not-a-number");
-    let error = device_step_count().expect_err("non-numeric value fails closed");
+    let error = device_step_count(250).expect_err("non-numeric value fails closed");
     assert!(error[0].message.contains("FABER_DEVICE_STEPS"));
     std::env::remove_var("FABER_DEVICE_STEPS");
+}
+
+// ── S5-U5b: the declared step count rides the wire ────────────────────────
+
+/// The manifest `[device] steps` channel (a declared count of 8, over the
+/// 100 default) is admitted against the 8-step source loop bound, rides the
+/// wire's `RepeatingStep(count)` variant, and an image round-trip through the
+/// radix decode boundary recovers it — an image-loaded route never needs an
+/// env-var authority.
+#[test]
+fn declared_step_count_rides_the_wire_and_survives_image_round_trip() {
+    let (program, semantics) = training_fixture_program_with_steps(
+        TRAINING_LOOP_FIXTURE_MISMATCH,
+        "s5u5b-wire-8",
+        8,
+    );
+    program.validate().expect("constructed program validates");
+    let wire = wire_program_for_program(&program, &semantics, 8);
+    assert_eq!(
+        wire.lifetime,
+        WireProgramLifetime::RepeatingStep(8),
+        "the declared count rides the wire's RepeatingStep variant"
+    );
+    // The image round-trips through the radix decode boundary with the count
+    // intact (the wire admission admits RepeatingStep(8), count >= 1).
+    let mut section = section_for_program(&program, &semantics);
+    section.device_program.program = wire;
+    let admitted = wire_admits_through_radix_decode(section);
+    assert_eq!(
+        admitted.lifetime,
+        WireProgramLifetime::RepeatingStep(8),
+        "an image-loaded route recovers the declared count from the wire"
+    );
+}
+
+/// A manifest `[device] steps` declared count that contradicts the source
+/// loop bound fails construction closed — the count channel is never a
+/// silent override of the source contract.
+#[test]
+fn manifest_declared_step_count_contradiction_fails_construction() {
+    let result = with_inline_package("s5u5b-steps-250", TRAINING_LOOP_FIXTURE_100, |lowered| {
+        device_program_for_lowered(
+            &lowered.validated,
+            &lowered.interner,
+            &lowered.companions,
+            250,
+        )
+    })
+    .expect("fixture lowers");
+    let diagnostics = result.expect_err("declared 250 vs source bound 100 must fail construction");
+    assert!(
+        diagnostics
+            .iter()
+            .any(|d| d.message.contains("contradicts the source training loop bound")),
+        "the fail-closed diagnostic names the contradiction: {:?}",
+        diagnostics.iter().map(|d| d.message.clone()).collect::<Vec<_>>()
+    );
+}
+
+/// The faber boundary admission rejects a `RepeatingStep` wire declaring a
+/// zero step count fail-closed — a count the route could never drive never
+/// reaches host construction.
+#[test]
+fn admit_device_program_section_rejects_zero_step_count() {
+    let (program, semantics) = training_fixture_program(TRAINING_LOOP_FIXTURE_100, "s5u5b-zero");
+    let mut section = section_for_program(&program, &semantics);
+    section.device_program.program.lifetime = WireProgramLifetime::RepeatingStep(0);
+    let error = admit_device_program_section(&section.device_program)
+        .expect_err("a zero declared step count fails the faber boundary admission");
+    assert!(error[0].message.contains("step count 0"));
 }
 /// The constructor's RepeatingStep param materialization is
 /// emitter-compatible: the forward kernel (PerProgram InOut HostProvided
@@ -2627,10 +2805,11 @@ fn device_step_count_defaults_and_fails_closed() {
 #[test]
 fn repeating_step_forward_kernel_emits_metal_artifact() {
     with_inline_package("s5u5-emit", TRAINING_LOOP_FIXTURE_100, |lowered| {
-        let (program, _semantics) = device_program_for_lowered(
+        let (program, _semantics, _step_count) = device_program_for_lowered(
             &lowered.validated,
             &lowered.interner,
             &lowered.companions,
+            DEFAULT_TRAINING_STEPS,
         )
         .expect("constructor succeeds")
         .expect("training fixture yields a device program");

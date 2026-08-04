@@ -127,8 +127,9 @@ pub struct ManifestBuild {
     pub rust_field_names: ManifestRustFieldNames,
 }
 
-/// `[device]` metadata for package runner backend selection (N1.1) and the
-/// S1-6 vertical-slice host inputs.
+/// `[device]` metadata for package runner backend selection (N1.1), the
+/// S1-6 vertical-slice host inputs, and the S5-U5b declared training step
+/// count.
 ///
 /// Mirrors `[build] target` for `-t/--target`: the package-level default is
 /// overridden by the CLI `--backend` flag; both are overridden by the
@@ -149,6 +150,13 @@ pub struct ManifestDevice {
     /// in at launch.
     #[serde(default)]
     pub inputs: BTreeMap<String, Vec<f64>>,
+
+    /// Declared training step count of the package's RepeatingStep device
+    /// program (S5-U5b). Defaults to 100 when absent; validated against the
+    /// source training loop's constant bound at construction (a mismatch
+    /// fails closed). `None` selects the portable default.
+    #[serde(default)]
+    pub steps: Option<u32>,
 }
 
 /// Configuration for shader artifact packaging.
@@ -543,6 +551,21 @@ pub(crate) fn validate_manifest(
     // load so an unsupported spelling fails closed early, never silently
     // ignored.
     manifest_backend_selection(manifest.device.backend.as_deref(), path)?;
+
+    // S5-U5b: the `[device] steps` declared training step count is validated
+    // at package load — a zero count is a contradiction (a RepeatingStep
+    // program must drive at least one step) and fails closed early, never
+    // silently ignored.
+    if let Some(steps) = manifest.device.steps {
+        if steps == 0 {
+            return Err(Box::new(
+                crate::package_diagnostic_error("faber.toml device.steps must be at least 1")
+                    .with_file(path.display().to_string())
+                    .with_arg("issue", "package_device_steps_zero")
+                    .with_arg("steps", steps.to_string()),
+            ));
+        }
+    }
 
     if let Some(product) = &manifest.product {
         validate_product(product, path)?;

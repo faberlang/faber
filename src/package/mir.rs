@@ -127,6 +127,9 @@ struct PreparedPackageMir<'a> {
     device_inputs: BTreeMap<String, Vec<f32>>,
     /// S1-6 device backend request (`[device] backend`), if declared.
     device_backend: Option<faber::device::DeviceSelection>,
+    /// S5-U5b declared training step count (`[device] steps`), if declared.
+    /// Absent selects the portable default [`DEFAULT_TRAINING_STEPS`].
+    device_steps: Option<u32>,
     /// Whether the package declared any `[device]` surface (backend or
     /// inputs) — the opt-in that constructs a device payload.
     device_declared: bool,
@@ -628,10 +631,18 @@ fn package_device_section(
     if !prepared.device_declared {
         return Ok(None);
     }
-    let Some((program, semantics)) = super::device::device_program_for_lowered(
+    // S5-U5b: the manifest `[device] steps` channel (or the portable default)
+    // is the declared repeating step count the constructor admits against the
+    // source loop bound and the wire carries.
+    let declared_steps =
+        prepared
+            .device_steps
+            .unwrap_or(super::device::DEFAULT_TRAINING_STEPS);
+    let Some((program, semantics, step_count)) = super::device::device_program_for_lowered(
         &lowered.validated,
         &lowered.interner,
         &lowered.companions,
+        declared_steps,
     )?
     else {
         // The selected entry lowers to no compute kernel: no device payload.
@@ -641,6 +652,20 @@ fn package_device_section(
         // e.g. a CPU oracle — legitimately has no kernel.)
         return Ok(None);
     };
+    // S5-U5b: the `[device] steps` channel applies only to a RepeatingStep
+    // training program. A declared count on a device program the constructor
+    // materialized as SingleRun is a contradiction — fail closed, never a
+    // silently dropped count.
+    if prepared.device_steps.is_some()
+        && program.lifetime
+            != radix_mir::device_program::DeviceProgramLifetime::RepeatingStep
+    {
+        return Err(vec![crate::package_diagnostic_error(
+            "faber.toml device.steps applies only to a training-loop package; this package's device program is not a RepeatingStep training program",
+        )
+        .with_file(diagnostic_path.display().to_string())
+        .with_arg("issue", "package_device_steps_not_repeating")]);
+    }
     // Fail closed when a declared input is missing for an input buffer. The
     // ONE exemption (S3-A5): the companion's reverse-AD upstream seed — a
     // synthetic 1-element input whose source param carries no source name
@@ -722,6 +747,7 @@ fn package_device_section(
         selection,
         &device_inputs,
         S1_6_PTX_TARGET,
+        step_count,
     )?;
     Ok(Some(section))
 }
@@ -914,7 +940,8 @@ fn with_prepared_package_mir_with_cli_mode_and_consumer<R>(
         bridge_norma_providers_to_kernel(&mut lowered, &entry_path)?;
     }
     let runtime_requirements = collect_package_runtime_requirements(&lowered, &cli_plan);
-    let (device_inputs, device_backend, device_declared) = manifest_device_config(input)?;
+    let (device_inputs, device_backend, device_steps, device_declared) =
+        manifest_device_config(input)?;
     let prepared = PreparedPackageMir {
         entry_path: entry_path.clone(),
         source_paths,
@@ -923,6 +950,7 @@ fn with_prepared_package_mir_with_cli_mode_and_consumer<R>(
         fmir_text_cli: cli_plan.fmir_text_cli.clone(),
         device_inputs,
         device_backend,
+        device_steps,
         device_declared,
         _marker: std::marker::PhantomData,
     };
@@ -994,6 +1022,7 @@ fn with_prepared_package_mir_from_loaded<R>(
         fmir_text_cli: cli_plan.fmir_text_cli.clone(),
         device_inputs: BTreeMap::new(),
         device_backend: None,
+        device_steps: None,
         device_declared: false,
         _marker: std::marker::PhantomData,
     };
@@ -1007,8 +1036,9 @@ fn package_artifact_root(input: &Path) -> Result<PathBuf, Vec<Diagnostic>> {
 }
 
 /// Read the package's `[device]` surface for the S1-6 device payload:
-/// `[device] inputs` (typed f32 host inputs) and `[device] backend` (the
-/// selection request recorded in the image). Absent manifest → no device
+/// `[device] inputs` (typed f32 host inputs), `[device] backend` (the
+/// selection request recorded in the image), and `[device] steps` (the
+/// S5-U5b declared training step count). Absent manifest → no device
 /// declaration.
 fn manifest_device_config(
     input: &Path,
@@ -1016,13 +1046,14 @@ fn manifest_device_config(
     (
         BTreeMap<String, Vec<f32>>,
         Option<faber::device::DeviceSelection>,
+        Option<u32>,
         bool,
     ),
     Vec<Diagnostic>,
 > {
     let layout = super::discover_build_layout(input).map_err(|diagnostic| vec![*diagnostic])?;
     if !layout.manifest_path.exists() {
-        return Ok((BTreeMap::new(), None, false));
+        return Ok((BTreeMap::new(), None, None, false));
     }
     let manifest =
         super::read_manifest(&layout.manifest_path).map_err(|diagnostic| vec![*diagnostic])?;
@@ -1032,8 +1063,19 @@ fn manifest_device_config(
         &layout.manifest_path,
     )
     .map_err(|diagnostic| vec![*diagnostic])?;
+    // S5-U5b: a zero declared step count is a contradiction (a RepeatingStep
+    // program must drive at least one step) — fail closed at the point of
+    // use, never treated as "absent".
+    let steps = manifest.device.steps;
+    if let Some(0) = steps {
+        return Err(vec![crate::package_diagnostic_error(
+            "faber.toml device.steps must be at least 1",
+        )
+        .with_file(layout.manifest_path.display().to_string())
+        .with_arg("issue", "package_device_steps_zero")]);
+    }
     let declared = !inputs.is_empty() || backend.is_some();
-    Ok((inputs, backend, declared))
+    Ok((inputs, backend, steps, declared))
 }
 
 fn package_mir_manifest(prepared: &PreparedPackageMir<'_>, package_root: &Path) -> String {

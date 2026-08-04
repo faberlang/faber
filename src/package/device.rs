@@ -505,8 +505,10 @@ fn semantic_facts(
 /// the device section carries `RepeatingStep` + a declared step count; the
 /// U5 default is 100 steps, and the constructor's step-count admission
 /// validates it against the source loop bound when the entry loop carries a
-/// constant bound. A later manifest `[device] steps` channel overrides the
-/// default (filed need — the serialized wire currently carries no count).
+/// constant bound. The manifest `[device] steps` channel (S5-U5b) overrides
+/// the default, and the effective count rides the wire's
+/// `RepeatingStep(count)` lifetime variant so an image-loaded route recovers
+/// it.
 pub(crate) const DEFAULT_TRAINING_STEPS: u32 = 100;
 
 /// One trainable parameter of a RepeatingStep training program (S5-U5 +
@@ -917,6 +919,7 @@ pub(crate) fn training_plan_facts(
     validated: &ValidatedMir<'_>,
     interner: &Interner,
     companions: &radix_mir::device::MirCompanionMap,
+    declared_steps: Option<u32>,
 ) -> Result<Option<TrainingPlanFacts>, Vec<Diagnostic>> {
     let program = validated.program();
     let Some(entry) = entry_function(validated, interner) else {
@@ -1151,7 +1154,7 @@ pub(crate) fn training_plan_facts(
     }
 
     let source_loop_bound = source_loop_bound(entry);
-    let step_count = admit_step_count(DEFAULT_TRAINING_STEPS, source_loop_bound)?;
+    let step_count = admit_step_count(declared_steps.unwrap_or(DEFAULT_TRAINING_STEPS), source_loop_bound)?;
     Ok(Some(TrainingPlanFacts {
         step_count,
         source_loop_bound,
@@ -1365,9 +1368,11 @@ pub(crate) fn device_program_for_lowered(
     validated: &ValidatedMir<'_>,
     interner: &Interner,
     companions: &radix_mir::device::MirCompanionMap,
-) -> Result<Option<(DeviceProgram, DeviceSemantics)>, Vec<Diagnostic>> {
+    declared_steps: u32,
+) -> Result<Option<(DeviceProgram, DeviceSemantics, u32)>, Vec<Diagnostic>> {
     let program = validated.program();
-    let training = training_plan_facts(validated, interner, companions)?;
+    let training =
+        training_plan_facts(validated, interner, companions, Some(declared_steps))?;
 
     let kernel_functions: Vec<&MirFunction> = program
         .functions
@@ -1854,7 +1859,15 @@ pub(crate) fn device_program_for_lowered(
                 format!("constructed device program is inconsistent: {error}"),
             )]
         })?;
-    Ok(Some((program, semantics)))
+    // The effective declared step count (S5-U5b): the admitted training-plan
+    // count when the program is a RepeatingStep training program; otherwise
+    // the caller's declared value (ignored — the wire only carries the count
+    // for RepeatingStep).
+    let effective_steps = training
+        .as_ref()
+        .map(|facts| facts.step_count)
+        .unwrap_or(declared_steps);
+    Ok(Some((program, semantics, effective_steps)))
 }
 
 /// The output-slot tuple index of a multi-output ABI output resource: the
@@ -1897,16 +1910,26 @@ fn output_slot_index(signature: &MirKernelSignature, output: &MirKernelResource)
 /// Bumped in lockstep with [`radix_mir_fmir::WIRE_DEVICE_PROGRAM_VERSION`];
 /// the radix decode boundary rejects any other value before field-level
 /// interpretation (S8/F7).
-const DEVICE_RUN_PLAN_VERSION: u32 = 4;
+///
+/// **v4 → v5 (S5-U5b, the declared-step-count clean break):** the
+/// `RepeatingStep` lifetime variant carries the declared training step
+/// count (a count the wire admits fail-closed at decode — zero is
+/// rejected). Bumped in lockstep with
+/// [`radix_mir_fmir::WIRE_DEVICE_PROGRAM_VERSION`].
+const DEVICE_RUN_PLAN_VERSION: u32 = 5;
 
 /// Fail-closed wire admission (S3-A4): the wire version is read FIRST,
 /// before any field-level interpretation, so an old (or unknown) codec
 /// version fails with the structured `payload_version` diagnostic — never a
 /// silent default and never a generic field-level error that hides the
-/// version gate.
+/// version gate. After the version gate, the S5-U5b declared step count is
+/// admitted: a `RepeatingStep` program must declare at least one step (a
+/// count the route could never drive fails closed here and at the radix
+/// decode boundary).
 ///
 /// # Errors
-/// Fail-closed when the wire carries an unsupported version.
+/// Fail-closed when the wire carries an unsupported version, or a
+/// `RepeatingStep` program declares a zero step count.
 pub(crate) fn admit_device_program_section(
     section: &FmirDeviceProgramSection,
 ) -> Result<(), Vec<Diagnostic>> {
@@ -1917,6 +1940,16 @@ pub(crate) fn admit_device_program_section(
         ))
         .with_arg("issue", "E_DEVICE_DESCRIPTOR")
         .with_arg("payload_version", section.v.to_string())]);
+    }
+    // S5-U5b: the declared RepeatingStep count is admitted fail-closed at
+    // the faber boundary too — a zero count is a contradiction, never a
+    // silently-defaulted step loop.
+    if let WireProgramLifetime::RepeatingStep(declared) = section.program.lifetime {
+        if declared == 0 {
+            return Err(vec![Diagnostic::error(
+                "device image declares a RepeatingStep program with step count 0; a training program must declare at least one step",
+            )]);
+        }
     }
     Ok(())
 }
@@ -1932,11 +1965,13 @@ pub(crate) fn admit_device_program_section(
 /// relation (F4), per-buffer initialization policies and explicit
 /// observation facts on every result row (F5/F6). CUDA symbols and host
 /// input values are NOT program semantics — they never enter the canonical
-/// bytes.
+/// bytes. A RepeatingStep program carries its declared training step count
+/// (S5-U5b) in the `RepeatingStep(count)` lifetime variant.
 #[must_use]
 fn wire_program_for_program(
     program: &DeviceProgram,
     semantics: &DeviceSemantics,
+    repeating_steps: u32,
 ) -> WireDeviceProgram {
     WireDeviceProgram {
         kernels: program
@@ -2004,7 +2039,9 @@ fn wire_program_for_program(
             .collect(),
         lifetime: match program.lifetime {
             DeviceProgramLifetime::SingleRun => WireProgramLifetime::SingleRun,
-            DeviceProgramLifetime::RepeatingStep => WireProgramLifetime::RepeatingStep,
+            DeviceProgramLifetime::RepeatingStep => {
+                WireProgramLifetime::RepeatingStep(repeating_steps)
+            }
         },
         results: program
             .results
@@ -2352,6 +2389,7 @@ pub(crate) fn device_section_for_program(
     selection: DeviceSelection,
     inputs: &BTreeMap<String, Vec<f32>>,
     ptx_target: &str,
+    repeating_steps: u32,
 ) -> Result<FmirDeviceSection, Vec<Diagnostic>> {
     let metal_artifact = radix_mir_metal::emit_metal_device_artifact(program, validated, interner)
         .map_err(|error| vec![device_diag("metal artifact", error.to_string())])?;
@@ -2420,7 +2458,7 @@ pub(crate) fn device_section_for_program(
         }
     }
 
-    let wire = wire_program_for_program(program, semantics);
+    let wire = wire_program_for_program(program, semantics, repeating_steps);
     let declared_inputs = inputs
         .iter()
         .map(|(name, values)| FmirDeviceInput {
@@ -2639,7 +2677,7 @@ pub(crate) fn descriptor_for_backend(
         buffer_versions,
         program_lifetime: match wire.lifetime {
             WireProgramLifetime::SingleRun => HostDeviceProgramLifetime::SingleRun,
-            WireProgramLifetime::RepeatingStep => HostDeviceProgramLifetime::RepeatingStep,
+            WireProgramLifetime::RepeatingStep(_) => HostDeviceProgramLifetime::RepeatingStep,
         },
         // R2/F3: the host consumes the WIRE'S CARRIED dependency edges
         // (real versions, producer/consumer per buffer version) verbatim —
@@ -3178,18 +3216,27 @@ fn execute_session_receipts(
     }
 }
 
-/// The `FABER_DEVICE_STEPS` env-var hook (S5-U5): how many training steps a
-/// RepeatingStep device route executes on ONE session before teardown.
-/// Defaults to [`DEFAULT_TRAINING_STEPS`] (100); a non-numeric value fails
-/// closed (never a silent fallback).
-fn device_step_count() -> Result<u32, Vec<Diagnostic>> {
+/// The `FABER_DEVICE_STEPS` env-var override (S5-U5b): when set, the value
+/// must agree with the image's **declared** RepeatingStep step count
+/// (recovered from the wire) — a contradiction fails closed, never a silent
+/// override. When absent, the image's declared count is the authority; the
+/// env var is never the sole authority for an image-loaded route.
+fn device_step_count(declared: u32) -> Result<u32, Vec<Diagnostic>> {
     match std::env::var("FABER_DEVICE_STEPS") {
-        Ok(value) => value.parse::<u32>().map_err(|error| {
-            vec![Diagnostic::error(format!(
-                "FABER_DEVICE_STEPS must be a non-negative integer, got `{value}`: {error}"
-            ))]
-        }),
-        Err(std::env::VarError::NotPresent) => Ok(DEFAULT_TRAINING_STEPS),
+        Ok(value) => {
+            let parsed = value.parse::<u32>().map_err(|error| {
+                vec![Diagnostic::error(format!(
+                    "FABER_DEVICE_STEPS must be a non-negative integer, got `{value}`: {error}"
+                ))]
+            })?;
+            if parsed != declared {
+                return Err(vec![Diagnostic::error(format!(
+                    "FABER_DEVICE_STEPS={parsed} contradicts the image's declared RepeatingStep step count {declared}; the route's override must agree with the device image"
+                ))]);
+            }
+            Ok(parsed)
+        }
+        Err(std::env::VarError::NotPresent) => Ok(declared),
         Err(error) => Err(vec![Diagnostic::error(format!(
             "FABER_DEVICE_STEPS could not be read: {error}"
         ))]),
@@ -3257,9 +3304,14 @@ pub(crate) fn execute_device_route(
     let identity = radix_mir_fmir::device_identity_hash(&source_refs, &canonical);
     println!("device: identity {identity} (A10, complete program)");
 
-    // The step count a RepeatingStep route drives (S5-U5); SingleRun routes
-    // keep the S2-8 repeat surface.
-    let steps = device_step_count()?;
+    // The step count a RepeatingStep route drives (S5-U5b): the image's
+    // DECLARED count is recovered from the wire — the route never falls back
+    // to an env-var default. `FABER_DEVICE_STEPS`, when set, must agree
+    // (fail-closed). SingleRun routes keep the S2-8 repeat surface.
+    let steps = match device.device_program.program.lifetime {
+        WireProgramLifetime::RepeatingStep(declared) => device_step_count(declared)?,
+        WireProgramLifetime::SingleRun => DEFAULT_TRAINING_STEPS,
+    };
 
     let mut session = super::host_factory::create_program_session(&mut host, &descriptor)
         .map_err(|diagnostic| vec![diagnostic])?;
