@@ -1,5 +1,10 @@
 use super::*;
 use faber::device::DeviceBackend;
+use faber_host_macos_arm64::composite_host::{DataFlowEdge, ReceiptBuffer};
+use faber_host_macos_arm64::device_descriptor::{
+    DescriptorBufferVersion, DescriptorLaunch, DeviceBufferLifetime, DeviceBufferRole,
+    DeviceDataType,
+};
 use radix::mir::LoweredMirUnit;
 use radix_mir::device_program::DataFlowPair;
 use std::path::PathBuf;
@@ -304,6 +309,165 @@ fn descriptor_maps_wire_lifetimes_onto_host_descriptor() {
         "the carried producer/consumer edge must ride the descriptor: {:?}",
         descriptor.data_flow
     );
+}
+
+#[test]
+fn descriptor_preserves_wire_launch_order_and_version_keys() {
+    let program = two_kernel_program();
+    let mut section = section_for_program(&program);
+    section.artifacts.artifact = vec![FmirDeviceArtifact {
+        backend: FmirDeviceBackend::Metal,
+        blob: "msl".to_owned(),
+        hash: "fnv64:0000000000000000".to_owned(),
+        symbols: Vec::new(),
+    }];
+
+    {
+        let wire = &mut section.device_program.program;
+        wire.launches = vec![
+            WireLaunchUnit {
+                id: 11,
+                kernel_index: 1,
+            },
+            WireLaunchUnit {
+                id: 12,
+                kernel_index: 0,
+            },
+            WireLaunchUnit {
+                id: 13,
+                kernel_index: 1,
+            },
+        ];
+    }
+    let medius_id = section.device_program.program.kernels[0].resources[1]
+        .buffer
+        .id;
+    let (_, initial_edges) = wire_resource_graph(&section);
+    assert_eq!(
+        initial_edges,
+        vec![
+            WireGraphEdge {
+                buffer_id: medius_id,
+                version: 1,
+                producer: 12,
+                consumer: 11,
+            },
+            WireGraphEdge {
+                buffer_id: medius_id,
+                version: 1,
+                producer: 12,
+                consumer: 13,
+            },
+        ],
+        "the graph follows the ordered launch identities, including repetition"
+    );
+    {
+        let wire = &mut section.device_program.program;
+        wire.kernels[0].resources[1].version.version = 1;
+        wire.kernels[1].resources[0].version.version = 2;
+        wire.kernels[1].resources[0].version.element_count = 64;
+    }
+    let (versioned_graph, versioned_edges) = wire_resource_graph(&section);
+    assert_eq!(
+        versioned_graph
+            .iter()
+            .filter(|buffer| buffer.id == medius_id)
+            .map(|buffer| (buffer.id, buffer.version, buffer.element_count))
+            .collect::<Vec<_>>(),
+        vec![(medius_id, 1, 256), (medius_id, 2, 64)]
+    );
+    assert!(versioned_edges.is_empty());
+
+    let descriptor = descriptor_for_backend(&section, DeviceBackend::Metal, b"msl blob")
+        .expect("complete wire projects into the host descriptor");
+    assert_eq!(
+        descriptor.launches,
+        vec![
+            DescriptorLaunch {
+                id: 11,
+                kernel_index: 1,
+            },
+            DescriptorLaunch {
+                id: 12,
+                kernel_index: 0,
+            },
+            DescriptorLaunch {
+                id: 13,
+                kernel_index: 1,
+            },
+        ]
+    );
+    assert_eq!(
+        descriptor
+            .kernels
+            .iter()
+            .flat_map(|kernel| kernel.buffers.iter())
+            .filter(|slot| slot.buffer_id == medius_id)
+            .map(|slot| (slot.buffer_id, slot.version, slot.element_count))
+            .collect::<Vec<_>>(),
+        vec![(medius_id, 1, 256), (medius_id, 2, 64)]
+    );
+    assert!(descriptor.buffer_versions.contains(&DescriptorBufferVersion {
+        buffer_id: medius_id,
+        version: 1,
+        element_ty: DeviceDataType::F32,
+        element_count: 256,
+    }));
+    assert!(descriptor.buffer_versions.contains(&DescriptorBufferVersion {
+        buffer_id: medius_id,
+        version: 2,
+        element_ty: DeviceDataType::F32,
+        element_count: 64,
+    }));
+    assert!(descriptor.data_flow.is_empty());
+}
+
+#[test]
+fn descriptor_missing_keyed_version_metadata_fails_closed() {
+    let program = two_kernel_program();
+    let mut section = section_for_program(&program);
+    section.artifacts.artifact = vec![FmirDeviceArtifact {
+        backend: FmirDeviceBackend::Metal,
+        blob: "msl".to_owned(),
+        hash: "fnv64:0000000000000000".to_owned(),
+        symbols: Vec::new(),
+    }];
+    let mut descriptor = descriptor_for_backend(&section, DeviceBackend::Metal, b"msl blob")
+        .expect("baseline descriptor is valid");
+    descriptor.buffer_versions.clear();
+
+    let error = descriptor
+        .validate()
+        .expect_err("a slot without keyed metadata must fail closed");
+    assert!(error.message.contains("no version-keyed buffer metadata"));
+}
+
+#[test]
+fn receipt_rendering_uses_host_carried_graph_facts() {
+    let resource_graph = vec![ReceiptBuffer {
+        id: 9,
+        name: "acc".to_owned(),
+        role: DeviceBufferRole::InOut,
+        lifetime: DeviceBufferLifetime::PerStep,
+        element_ty: DeviceDataType::F32,
+        element_count: 64,
+        version: 2,
+    }];
+    let data_flow_edges = vec![DataFlowEdge {
+        buffer_id: 9,
+        version: 2,
+        producer: 12,
+        consumer: 13,
+    }];
+
+    let lines = host_receipt_graph_lines(&resource_graph, &data_flow_edges);
+    assert!(lines.iter().any(|line| {
+        line.contains("buffer 9 `acc` in-out per-step version 2 (f32[64])")
+    }));
+    assert!(lines
+        .iter()
+        .any(|line| line.contains("data-flow 12 -> 13 via buffer 9 version 2")));
+    assert!(lines[0].contains("host receipt"));
 }
 
 #[test]

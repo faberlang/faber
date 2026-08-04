@@ -47,9 +47,9 @@
 
 use faber::device::{DeviceBackend, DeviceSelection};
 use faber_host_macos_arm64::device_descriptor::{
-    DescriptorBuffer, DescriptorDataFlow as HostDescriptorDataFlow, DescriptorKernel,
-    DeviceBufferLifetime, DeviceDataType, DeviceDescriptor, DeviceBufferRole,
-    DeviceProgramLifetime as HostDeviceProgramLifetime,
+    DescriptorBuffer, DescriptorBufferVersion, DescriptorDataFlow as HostDescriptorDataFlow,
+    DescriptorKernel, DescriptorLaunch, DeviceBufferLifetime, DeviceDataType, DeviceDescriptor,
+    DeviceBufferRole, DeviceProgramLifetime as HostDeviceProgramLifetime,
 };
 use radix::diagnostics::Diagnostic;
 use radix::lexer::Interner;
@@ -868,6 +868,7 @@ pub(crate) fn descriptor_for_backend(
 ) -> Result<DeviceDescriptor, Vec<Diagnostic>> {
     let wire = &device.device_program.program;
     let mut kernels = Vec::with_capacity(wire.kernels.len());
+    let mut buffer_versions = Vec::new();
     for kernel in &wire.kernels {
         let entry = match backend {
             DeviceBackend::Cuda => device
@@ -888,6 +889,13 @@ pub(crate) fn descriptor_for_backend(
         let mut buffers = Vec::with_capacity(kernel.resources.len());
         for resource in &kernel.resources {
             let element_ty = wire_element_ty_to_host(&resource.version.element_ty)?;
+            add_descriptor_buffer_version(
+                &mut buffer_versions,
+                resource.buffer.id,
+                resource.version.version,
+                element_ty,
+                resource.version.element_count,
+            )?;
             buffers.push(DescriptorBuffer {
                 buffer_id: resource.buffer.id,
                 buffer_name: resource.buffer.name.clone(),
@@ -916,10 +924,30 @@ pub(crate) fn descriptor_for_backend(
             ],
         });
     }
-    Ok(DeviceDescriptor {
+    for result in &wire.results {
+        let element_ty = wire_element_ty_to_host(&result.version.element_ty)?;
+        add_descriptor_buffer_version(
+            &mut buffer_versions,
+            result.buffer.id,
+            result.version.version,
+            element_ty,
+            result.version.element_count,
+        )?;
+    }
+
+    let descriptor = DeviceDescriptor {
         backend,
         module_image: blob.to_vec(),
         kernels,
+        launches: wire
+            .launches
+            .iter()
+            .map(|launch| DescriptorLaunch {
+                id: launch.id,
+                kernel_index: launch.kernel_index,
+            })
+            .collect(),
+        buffer_versions,
         program_lifetime: match wire.lifetime {
             WireProgramLifetime::SingleRun => HostDeviceProgramLifetime::SingleRun,
             WireProgramLifetime::RepeatingStep => HostDeviceProgramLifetime::RepeatingStep,
@@ -937,7 +965,43 @@ pub(crate) fn descriptor_for_backend(
                 consumer: edge.consumer,
             })
             .collect(),
-    })
+    };
+
+    descriptor
+        .validate()
+        .map_err(|error| vec![super::host_factory::host_error_diagnostic(&error)])?;
+    Ok(descriptor)
+}
+
+fn add_descriptor_buffer_version(
+    versions: &mut Vec<DescriptorBufferVersion>,
+    buffer_id: u32,
+    version: u32,
+    element_ty: DeviceDataType,
+    element_count: u64,
+) -> Result<(), Vec<Diagnostic>> {
+    if let Some(existing) = versions
+        .iter()
+        .find(|existing| existing.buffer_id == buffer_id && existing.version == version)
+    {
+        if existing.element_ty != element_ty || existing.element_count != element_count {
+            return Err(vec![device_diag(
+                "buffer version",
+                format!(
+                    "buffer {buffer_id} version {version} carries conflicting shape facts"
+                ),
+            )]);
+        }
+        return Ok(());
+    }
+
+    versions.push(DescriptorBufferVersion {
+        buffer_id,
+        version,
+        element_ty,
+        element_count,
+    });
+    Ok(())
 }
 
 fn wire_role_to_host(role: WireBufferRole) -> DeviceBufferRole {
@@ -1020,6 +1084,7 @@ fn observation_buffer_ids(device: &FmirDeviceSection) -> Vec<u32> {
 // ---------------------------------------------------------------------------
 
 /// One wire-derived A10 graph buffer (identity + content version).
+#[allow(dead_code)] // the graph rows are asserted in the Faber projection tests.
 struct WireGraphBuffer {
     id: u32,
     name: String,
@@ -1057,7 +1122,10 @@ fn wire_resource_graph(device: &FmirDeviceSection) -> (Vec<WireGraphBuffer>, Vec
         };
         for resource in &kernel.resources {
             let id = resource.buffer.id;
-            if !buffers.iter().any(|buffer| buffer.id == id) {
+            if !buffers
+                .iter()
+                .any(|buffer| buffer.id == id && buffer.version == resource.version.version)
+            {
                 buffers.push(WireGraphBuffer {
                     id,
                     name: resource.buffer.name.clone(),
@@ -1084,7 +1152,9 @@ fn wire_resource_graph(device: &FmirDeviceSection) -> (Vec<WireGraphBuffer>, Vec
     }
     // Results contribute the observed versions to the chain.
     for result in &wire.results {
-        if !buffers.iter().any(|buffer| buffer.id == result.buffer.id) {
+        if !buffers.iter().any(|buffer| {
+            buffer.id == result.buffer.id && buffer.version == result.version.version
+        }) {
             buffers.push(WireGraphBuffer {
                 id: result.buffer.id,
                 name: result.buffer.name.clone(),
@@ -1223,33 +1293,11 @@ pub(crate) fn execute_device_route(
         receipt.allocated_buffers.len()
     );
 
-    // A10 declared logical resource graph: derived from the wire's COMPLETE
-    // facts — buffer identities, roles, lifetimes, content versions, and the
-    // data-flow edges from the carried access + launches (the host never
-    // re-derives topology from launch order or a slot-role string).
-    let (graph, edges) = wire_resource_graph(device);
-    println!("device: declared resource graph (A10):");
-    for buffer in &graph {
-        println!(
-            "device:   buffer {} `{}` {} {} version {} ({}[{}])",
-            buffer.id,
-            buffer.name,
-            buffer.role.spelling(),
-            buffer.lifetime.spelling(),
-            buffer.version,
-            buffer.element_ty,
-            buffer.element_count
-        );
-    }
-    if edges.is_empty() {
-        println!("device:   data-flow edges: none");
-    } else {
-        for edge in &edges {
-            println!(
-                "device:   data-flow {} -> {} via buffer {} version {}",
-                edge.producer, edge.consumer, edge.buffer_id, edge.version
-            );
-        }
+    // A10 declared logical resource graph: render the host's receipt facts
+    // verbatim. Faber must not print a duplicate graph derived from the wire
+    // after execution, because the host receipt is the observable seam.
+    for line in host_receipt_graph_lines(&receipt.resource_graph, &receipt.data_flow_edges) {
+        println!("{line}");
     }
 
     for (buffer_id, values) in &receipt.outputs {
@@ -1292,6 +1340,36 @@ pub(crate) fn execute_device_route(
         ),
     }
     Ok(())
+}
+
+fn host_receipt_graph_lines(
+    resource_graph: &[faber_host_macos_arm64::composite_host::ReceiptBuffer],
+    data_flow_edges: &[faber_host_macos_arm64::composite_host::DataFlowEdge],
+) -> Vec<String> {
+    let mut lines = vec!["device: declared resource graph (A10, host receipt):".to_owned()];
+    for buffer in resource_graph {
+        lines.push(format!(
+            "device:   buffer {} `{}` {} {} version {} ({}[{}])",
+            buffer.id,
+            buffer.name,
+            buffer.role.spelling(),
+            buffer.lifetime.spelling(),
+            buffer.version,
+            buffer.element_ty.spelling(),
+            buffer.element_count
+        ));
+    }
+    if data_flow_edges.is_empty() {
+        lines.push("device:   data-flow edges: none".to_owned());
+    } else {
+        for edge in data_flow_edges {
+            lines.push(format!(
+                "device:   data-flow {} -> {} via buffer {} version {}",
+                edge.producer, edge.consumer, edge.buffer_id, edge.version
+            ));
+        }
+    }
+    lines
 }
 
 /// The `FABER_DEVICE_REPEAT` env-var hook for the S2-8 repeated-execution
