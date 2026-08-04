@@ -1,10 +1,13 @@
 use super::*;
 use faber::device::DeviceBackend;
-use faber_host_macos_arm64::composite_host::{DataFlowEdge, ReceiptBuffer};
+use faber_host_macos_arm64::composite_host::{CompositeHost, DataFlowEdge, ReceiptBuffer};
 use faber_host_macos_arm64::device_descriptor::{
-    DescriptorBufferVersion, DescriptorLaunch, DeviceBufferInitialization, DeviceBufferLifetime,
-    DeviceBufferRole, DeviceDataType,
+    DescriptorBuffer, DescriptorBufferVersion, DescriptorKernel, DescriptorLaunch,
+    DescriptorResult, DeviceBufferInitialization, DeviceBufferLifetime, DeviceBufferRole,
+    DeviceDataType,
 };
+use faber_host_macos_arm64::device_host::DeviceRuntime;
+use faber_host_macos_arm64::MetalHostSession;
 use radix::mir::LoweredMirUnit;
 use radix_mir::device_program::DataFlowPair;
 use std::path::PathBuf;
@@ -1223,14 +1226,14 @@ fn with_inline_package<R>(
 
 #[test]
 fn device_program_constructor_rejects_unplannable_op_with_typed_diagnostic() {
-    // N3.2 / D1: a device-routed kernel whose body carries TensorTranspose
+    // N3.2 / D1: a device-routed kernel whose body carries TensorSoftmax
     // (no recipe, not an elementwise transform) fails construction with the
     // typed plan diagnostic — never a silent Elementwise floor.
     let result = with_inline_package(
-        "transpositio",
+        "softmaxio",
         r#"@ nucleum
-functio transpositio(tf32[2,2] x) → tf32[2,2] {
-    redde x.transpone()
+functio softmaxio(tf32[2,2] x) → tf32[2,2] {
+    redde x.activatio_softmax()
 }"#,
         |lowered| {
             device_program_for_lowered(&lowered.validated, &lowered.interner, &lowered.companions)
@@ -1244,7 +1247,7 @@ functio transpositio(tf32[2,2] x) → tf32[2,2] {
         .collect::<Vec<_>>();
     let joined = messages.join(" | ");
     assert!(
-        joined.contains("TensorTranspose"),
+        joined.contains("TensorSoftmax"),
         "the typed diagnostic names the op: {joined}"
     );
     assert!(
@@ -2075,4 +2078,593 @@ fn companion_relation_projected_onto_the_wire() {
     // intact (F4 + F7).
     let admitted = wire_admits_through_radix_decode(section_for_program(&program, &semantics));
     assert_eq!(admitted.relations.len(), 1);
+}
+
+// ── S5-U5: RepeatingStep constructor materialization + route step-driving ──
+
+/// The S5-U5 training-loop fixture: a device-resident forward (mul + add),
+/// its generated companion, a package-local train_step (SGD update:
+/// param' = param − grad) called from a constant-bounded entry loop, and the
+/// loop's re-bindings. The declared source loop bound (100) matches the
+/// default declared RepeatingStep step count, so the constructor admits it.
+///
+/// The forward returns a TENSOR (not `fractus`): a scalar-return primal's
+/// companion carries an f64-typed upstream gradient, outside the current
+/// kernel scalar layout surface (the campaign dtype is f32) — a tensor
+/// forward keeps every companion param an f32 device view.
+const TRAINING_LOOP_FIXTURE_100: &str = r#"@ nucleum
+@ radix lane "air"
+@ radix backward "loss_backward"
+functio loss(tf32[2] x, tf32[2] w, tf32[2] b) → tf32[2] {
+    fixum tf32[2] product ← x.multiplica(w)
+    redde product.addita(b)
+}
+
+functio train_step(tf32[2] w, tf32[2] b, tf32[2] gw, tf32[2] gb) → iuncta<tf32[2], tf32[2]> {
+    fixum tf32[2] nw ← w.subtrahe(gw)
+    fixum tf32[2] nb ← b.subtrahe(gb)
+    redde iuncta<tf32[2], tf32[2]> [nw, nb]
+}
+
+functio nil() → vacuum {
+    tacet
+}
+
+incipit {
+    fixum lista<f32> data_x ← [1.0, 2.0]
+    fixum lista<f32> data_w ← [0.5, 0.5]
+    fixum lista<f32> data_b ← [0.1, 0.1]
+    fixum lista<f32> data_u ← [1.0, 1.0]
+    fixum tensor<f32, []> seed ← vacua
+    fixum tensor<f32, [2]> x ← seed.strue(data_x, [2])
+    varia tensor<f32, [2]> w ← seed.strue(data_w, [2])
+    varia tensor<f32, [2]> b ← seed.strue(data_b, [2])
+    fixum tensor<f32, [2]> upstream ← seed.strue(data_u, [2])
+    fixum numerus steps ← 100
+    itera ab 0‥steps fixum step {
+        fixum _ grads ← loss_backward(x, w, b, nil(), upstream)
+        fixum [_, gw, gb] ← grads
+        fixum [nw, nb] ← train_step(w, b, gw, gb)
+        w ← nw
+        b ← nb
+    }
+}
+"#;
+
+/// The same training loop with a source bound (8) that contradicts the
+/// default declared RepeatingStep step count (100) — the step-count
+/// admission must fail closed.
+const TRAINING_LOOP_FIXTURE_MISMATCH: &str = r#"@ nucleum
+@ radix lane "air"
+@ radix backward "loss_backward"
+functio loss(tf32[2] x, tf32[2] w, tf32[2] b) → tf32[2] {
+    fixum tf32[2] product ← x.multiplica(w)
+    redde product.addita(b)
+}
+
+functio train_step(tf32[2] w, tf32[2] b, tf32[2] gw, tf32[2] gb) → iuncta<tf32[2], tf32[2]> {
+    fixum tf32[2] nw ← w.subtrahe(gw)
+    fixum tf32[2] nb ← b.subtrahe(gb)
+    redde iuncta<tf32[2], tf32[2]> [nw, nb]
+}
+
+functio nil() → vacuum {
+    tacet
+}
+
+incipit {
+    fixum lista<f32> data_x ← [1.0, 2.0]
+    fixum lista<f32> data_w ← [0.5, 0.5]
+    fixum lista<f32> data_b ← [0.1, 0.1]
+    fixum lista<f32> data_u ← [1.0, 1.0]
+    fixum tensor<f32, []> seed ← vacua
+    fixum tensor<f32, [2]> x ← seed.strue(data_x, [2])
+    varia tensor<f32, [2]> w ← seed.strue(data_w, [2])
+    varia tensor<f32, [2]> b ← seed.strue(data_b, [2])
+    fixum tensor<f32, [2]> upstream ← seed.strue(data_u, [2])
+    fixum numerus steps ← 8
+    itera ab 0‥steps fixum step {
+        fixum _ grads ← loss_backward(x, w, b, nil(), upstream)
+        fixum [_, gw, gb] ← grads
+        fixum [nw, nb] ← train_step(w, b, gw, gb)
+        w ← nw
+        b ← nb
+    }
+}
+"#;
+
+/// Build the training fixture's RepeatingStep device program through the
+/// ordinary constructor.
+fn training_fixture_program(source: &str, name: &str) -> (DeviceProgram, DeviceSemantics) {
+    with_inline_package(name, source, |lowered| {
+        device_program_for_lowered(&lowered.validated, &lowered.interner, &lowered.companions)
+            .expect("constructor succeeds")
+            .expect("training fixture yields a device program")
+    })
+    .expect("fixture lowers")
+}
+
+/// The S5-U5 constructor materializes the MLP-shaped training program: the
+/// decomposed forward + backward + train_step kernel set on a RepeatingStep
+/// lifetime, with the trainable params projected to PerProgram InOut buffers
+/// with HostProvided init, and the loss observation as the single declared
+/// result.
+#[test]
+fn repeating_step_constructor_materializes_training_program() {
+    let (program, semantics) = training_fixture_program(TRAINING_LOOP_FIXTURE_100, "s5u5-train-100");
+
+    program.validate().expect("constructed program validates");
+    assert_eq!(
+        program.lifetime,
+        DeviceProgramLifetime::RepeatingStep,
+        "a training loop materializes a RepeatingStep program"
+    );
+
+    // Kernel set, in materialization order: forward, companion, train_step.
+    let entries: Vec<&str> = program.kernels.iter().map(|kernel| kernel.entry.as_str()).collect();
+    assert_eq!(
+        entries,
+        vec!["loss", "loss_backward", "train_step"],
+        "forward + companion + optimizer-step kernels"
+    );
+
+    // The trainable params w/b project to PerProgram InOut buffers.
+    let param_ids: Vec<BufferId> = program
+        .kernels
+        .iter()
+        .flat_map(|kernel| kernel.resources.iter())
+        .filter(|resource| resource.buffer.name == "w" || resource.buffer.name == "b")
+        .map(|resource| resource.buffer.id)
+        .collect();
+    let mut seen = Vec::new();
+    for id in &param_ids {
+        if !seen.contains(id) {
+            seen.push(*id);
+        }
+    }
+    assert_eq!(seen.len(), 2, "w and b are distinct buffers");
+
+    // The train_step kernel binds each param as an InOut slot AND aliases its
+    // update output slot to the same buffer (the in-place update).
+    let step = &program.kernels[2];
+    for id in &seen {
+        let slots: Vec<&radix_mir::device_program::DeviceResource> =
+            step.resources.iter().filter(|resource| resource.buffer.id == *id).collect();
+        assert_eq!(
+            slots.len(),
+            2,
+            "the train_step kernel reads and writes buffer {id:?} (in-place update)"
+        );
+        for slot in &slots {
+            assert_eq!(slot.buffer.role, BufferRole::InOut);
+            assert_eq!(slot.buffer.lifetime, BufferLifetime::PerProgram);
+        }
+        assert!(
+            slots.iter().any(|slot| slot.access == MirKernelResourceAccess::Read)
+                && slots.iter().any(|slot| slot.access == MirKernelResourceAccess::Write),
+            "the param buffer has a read slot and a write slot in the step kernel"
+        );
+    }
+
+    // The forward kernels read the params as plain reads of the same buffers.
+    let forward = &program.kernels[0];
+    for id in &seen {
+        let read_slots: Vec<_> = forward
+            .resources
+            .iter()
+            .filter(|resource| resource.buffer.id == *id)
+            .collect();
+        assert!(
+            !read_slots.is_empty(),
+            "the forward kernel reads param buffer {id:?}"
+        );
+        assert!(
+            read_slots
+                .iter()
+                .all(|slot| slot.access == MirKernelResourceAccess::Read),
+            "the forward reads the param without writing it"
+        );
+    }
+
+    // F6: the ONLY declared observation is the loss result (the forward's
+    // final output); the gradient intermediates and the param aliases are
+    // never results merely because they are writable.
+    assert_eq!(program.results.len(), 1, "one loss observation point");
+    assert_eq!(program.results[0].buffer.role, BufferRole::Output);
+
+    // The semantics mint HostProvided init for the params (never ZeroFill
+    // despite the InOut access) and carry no param dependency edge (the
+    // persistent-state exclusion keeps the single-step graph acyclic).
+    for fact in &semantics.initializations {
+        let buffer = seen.iter().find(|id| **id == fact.buffer);
+        if let Some(id) = buffer {
+            assert_eq!(
+                fact.policy,
+                InitializationPolicy::HostProvided,
+                "param buffer {id:?} is HostProvided, copied in exactly once"
+            );
+        }
+    }
+    let param_edges: Vec<_> = semantics
+        .dependencies
+        .iter()
+        .filter(|edge| seen.contains(&edge.buffer))
+        .collect();
+    assert!(
+        param_edges.is_empty(),
+        "no param edge rides the dependency graph (persistent state)"
+    );
+
+    // F3: the launch sequence is acyclic and covers every kernel.
+    let launches: Vec<u32> = program.launches.iter().map(|launch| launch.id.0).collect();
+    assert_eq!(launches, vec![1, 2, 3]);
+}
+
+/// The training-plan analysis derives the trainable-param identity rows from
+/// the entry loop's value graph (param-identity.md): w at param position 0
+/// updates result-tuple slot 0; b at position 1 updates slot 1. The step
+/// count is the default declared 100 and the source loop bound is 100.
+#[test]
+fn training_plan_facts_derives_trainable_param_identity() {
+    with_inline_package("s5u5-facts", TRAINING_LOOP_FIXTURE_100, |lowered| {
+        let facts = training_plan_facts(&lowered.validated, &lowered.interner, &lowered.companions)
+            .expect("training facts resolve")
+            .expect("a training loop is detected");
+
+        assert_eq!(facts.step_count, DEFAULT_TRAINING_STEPS);
+        assert_eq!(facts.source_loop_bound, Some(100));
+
+        assert_eq!(facts.trainable.len(), 2, "w and b are the trainable params");
+        let first = &facts.trainable[0];
+        assert_eq!(first.param_position, 0, "w is the first step param");
+        assert_eq!(first.update_output, 0, "w's update is tuple slot 0");
+        let second = &facts.trainable[1];
+        assert_eq!(second.param_position, 1, "b is the second step param");
+        assert_eq!(second.update_output, 1, "b's update is tuple slot 1");
+    })
+    .expect("fixture lowers");
+}
+
+/// Step-count admission fails closed: a declared count that contradicts the
+/// source loop bound (when present) is rejected — both at the pure
+/// admission function and through the constructor (a training loop bounded
+/// at 8 steps contradicts the default declared 100).
+#[test]
+fn repeating_step_step_count_mismatch_fails_closed() {
+    // Pure admission: declared 100 vs source bound 8.
+    let error = admit_step_count(100, Some(8)).expect_err("declared vs source mismatch fails");
+    assert!(
+        error[0].message.contains("contradicts the source training loop bound"),
+        "the typed diagnostic names the contradiction: {}",
+        error[0].message
+    );
+    // Agreement is admitted.
+    admit_step_count(100, Some(100)).expect("agreement is admitted");
+    admit_step_count(100, None).expect("no source bound → the declared count applies");
+
+    // Constructor: the 8-step training loop cannot build a RepeatingStep
+    // image under the default declared 100.
+    let result = with_inline_package("s5u5-train-8", TRAINING_LOOP_FIXTURE_MISMATCH, |lowered| {
+        device_program_for_lowered(&lowered.validated, &lowered.interner, &lowered.companions)
+    })
+    .expect("fixture lowers");
+    let diagnostics = result.expect_err("a declared/source step-count mismatch fails construction");
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("step count")),
+        "the fail-closed diagnostic names the step-count contradiction: {:?}",
+        diagnostics.iter().map(|d| d.message.clone()).collect::<Vec<_>>()
+    );
+}
+
+/// The RepeatingStep wire + host descriptor projection (the image/host agree
+/// surface): the wire carries the RepeatingStep lifetime, the params as
+/// InOut + PerProgram + HostProvided, and the descriptor admits through
+/// `descriptor_for_backend` with the same facts and the loss observation.
+#[test]
+fn repeating_step_wire_and_descriptor_project_params_and_observation() {
+    let (program, semantics) = training_fixture_program(TRAINING_LOOP_FIXTURE_100, "s5u5-wire");
+    let mut section = section_for_program(&program, &semantics);
+    section.artifacts.artifact = vec![FmirDeviceArtifact {
+        backend: FmirDeviceBackend::Metal,
+        blob: "msl".to_owned(),
+        hash: "fnv64:0000000000000000".to_owned(),
+        symbols: Vec::new(),
+    }];
+    section.declared_inputs = vec![
+        FmirDeviceInput {
+            name: "x".to_owned(),
+            values: vec![1.0, 2.0],
+        },
+        FmirDeviceInput {
+            name: "w".to_owned(),
+            values: vec![0.5, 0.5],
+        },
+        FmirDeviceInput {
+            name: "b".to_owned(),
+            values: vec![0.1, 0.1],
+        },
+    ];
+
+    let wire = &section.device_program.program;
+    assert_eq!(wire.lifetime, WireProgramLifetime::RepeatingStep);
+
+    // The params ride the wire as InOut + PerProgram + HostProvided.
+    let mut param_slots: Vec<&WireDeviceResource> = Vec::new();
+    for kernel in &wire.kernels {
+        for resource in &kernel.resources {
+            if resource.buffer.name == "w" || resource.buffer.name == "b" {
+                if !param_slots
+                    .iter()
+                    .any(|slot| slot.buffer.id == resource.buffer.id && slot.access == WireResourceAccess::Write)
+                {
+                    param_slots.push(resource);
+                }
+            }
+        }
+    }
+    for slot in &param_slots {
+        assert_eq!(slot.buffer.role, WireBufferRole::InOut);
+        assert_eq!(slot.buffer.lifetime, WireBufferLifetime::PerProgram);
+        assert_eq!(slot.initialization, WireInitializationPolicy::HostProvided);
+    }
+
+    // The descriptor admits with the same facts + the loss observation.
+    let descriptor = descriptor_for_backend(&section, DeviceBackend::Metal, b"msl blob")
+        .expect("the RepeatingStep wire constructs an admissible host descriptor");
+    descriptor
+        .validate()
+        .expect("constructor and host admission agree on the RepeatingStep program");
+    assert_eq!(
+        descriptor.program_lifetime,
+        HostDeviceProgramLifetime::RepeatingStep
+    );
+    let param_versions: Vec<_> = descriptor
+        .buffer_versions
+        .iter()
+        .filter(|version| {
+            descriptor.kernels.iter().any(|kernel| {
+                kernel.buffers.iter().any(|slot| {
+                    slot.buffer_id == version.buffer_id
+                        && (slot.buffer_name == "w" || slot.buffer_name == "b")
+                        && slot.lifetime == DeviceBufferLifetime::PerProgram
+                        && slot.initialization == DeviceBufferInitialization::HostProvided
+                })
+            })
+        })
+        .collect();
+    assert_eq!(param_versions.len(), 2, "w and b params project to the descriptor");
+    assert_eq!(descriptor.results.len(), 1, "the loss observation is the readback set");
+}
+
+/// The route step-driving core (S5-U5): a RepeatingStep session once-inits
+/// its HostProvided params, executes N steps on ONE session, collects the
+/// per-step loss trace, and reports the convergence verdict. Driven on the
+/// fake Metal driver — no real device required.
+#[test]
+fn repeating_step_route_runs_steps_once_init_loss_trace_convergence() {
+    // A RepeatingStep descriptor the fake driver can simulate:
+    //   launch 1 `accumulate`: inc (PerProgram HostProvided) += param p
+    //   launch 2 `observa`:    loss (ObservationPoint) = copy(p)
+    // p starts at 1.0, inc = -0.01 → p decreases toward 0; loss = p.
+    let descriptor = DeviceDescriptor {
+        backend: DeviceBackend::Metal,
+        module_image: b"fake msl".to_vec(),
+        kernels: vec![
+            DescriptorKernel {
+                entry: "accumulate".to_owned(),
+                buffers: vec![
+                    DescriptorBuffer {
+                        buffer_id: 1,
+                        buffer_name: "inc".to_owned(),
+                        semantic_value: 1,
+                        role: DeviceBufferRole::Input,
+                        lifetime: DeviceBufferLifetime::PerProgram,
+                        initialization: DeviceBufferInitialization::HostProvided,
+                        binding: 0,
+                        element_ty: DeviceDataType::F32,
+                        element_count: 1,
+                        version: 1,
+                    },
+                    DescriptorBuffer {
+                        buffer_id: 2,
+                        buffer_name: "p".to_owned(),
+                        semantic_value: 2,
+                        role: DeviceBufferRole::InOut,
+                        lifetime: DeviceBufferLifetime::PerProgram,
+                        initialization: DeviceBufferInitialization::HostProvided,
+                        binding: 1,
+                        element_ty: DeviceDataType::F32,
+                        element_count: 1,
+                        version: 1,
+                    },
+                ],
+                grid: [1, 1, 1],
+                block: [1, 1, 1],
+            },
+            DescriptorKernel {
+                entry: "observa".to_owned(),
+                buffers: vec![
+                    DescriptorBuffer {
+                        buffer_id: 2,
+                        buffer_name: "p".to_owned(),
+                        semantic_value: 2,
+                        role: DeviceBufferRole::Input,
+                        lifetime: DeviceBufferLifetime::PerProgram,
+                        initialization: DeviceBufferInitialization::HostProvided,
+                        binding: 0,
+                        element_ty: DeviceDataType::F32,
+                        element_count: 1,
+                        version: 1,
+                    },
+                    DescriptorBuffer {
+                        buffer_id: 3,
+                        buffer_name: "loss".to_owned(),
+                        semantic_value: 3,
+                        role: DeviceBufferRole::Output,
+                        lifetime: DeviceBufferLifetime::ObservationPoint,
+                        initialization: DeviceBufferInitialization::KernelInitialized,
+                        binding: 1,
+                        element_ty: DeviceDataType::F32,
+                        element_count: 1,
+                        version: 1,
+                    },
+                ],
+                grid: [1, 1, 1],
+                block: [1, 1, 1],
+            },
+        ],
+        launches: vec![
+            DescriptorLaunch { id: 1, kernel_index: 0 },
+            DescriptorLaunch { id: 2, kernel_index: 1 },
+        ],
+        buffer_versions: vec![
+            DescriptorBufferVersion {
+                buffer_id: 1,
+                version: 1,
+                element_ty: DeviceDataType::F32,
+                element_count: 1,
+            },
+            DescriptorBufferVersion {
+                buffer_id: 2,
+                version: 1,
+                element_ty: DeviceDataType::F32,
+                element_count: 1,
+            },
+            DescriptorBufferVersion {
+                buffer_id: 3,
+                version: 1,
+                element_ty: DeviceDataType::F32,
+                element_count: 1,
+            },
+        ],
+        program_lifetime: HostDeviceProgramLifetime::RepeatingStep,
+        data_flow: Vec::new(),
+        roots: vec![1, 2],
+        results: vec![DescriptorResult {
+            buffer_id: 3,
+            version: 1,
+            produced_by: 2,
+            at_launch: 2,
+        }],
+    };
+    descriptor.validate().expect("hand-built descriptor validates");
+
+    let mut host = CompositeHost::with_device(
+        DeviceRuntime::Metal(
+            MetalHostSession::with_driver(Box::new(
+                faber_host_macos_arm64::FakeMetalDriver::default()
+                    .with_known_entry("accumulate")
+                    .with_known_entry("observa"),
+            ))
+            .expect("fake metal admit"),
+        ),
+        "fake-metal-device",
+    )
+    .expect("fake host");
+
+    // The once-init params: inc = -0.01 (each step p += inc), p = 1.0.
+    let mut params = BTreeMap::new();
+    params.insert(1, vec![-0.01]);
+    params.insert(2, vec![1.0]);
+
+    let mut session = super::super::host_factory::create_program_session(&mut host, &descriptor)
+        .expect("fake session");
+
+    let steps = 100u32;
+    let receipts =
+        execute_session_receipts(&mut session, &descriptor, &params, steps).expect("steps execute");
+    session.teardown().expect("teardown");
+
+    assert_eq!(receipts.len(), 100, "exactly 100 steps on ONE session");
+    // The loss trace strictly decreases: loss_k = 1.0 − 0.01·(k+1).
+    let report = step_run_report(&receipts);
+    assert_eq!(report.step_count, 100);
+    assert_eq!(report.loss_trace.len(), 100);
+    let first = report.loss_trace[0].get(&3).expect("loss observed").first().copied().unwrap();
+    let last = report
+        .loss_trace
+        .last()
+        .and_then(|observed| observed.get(&3))
+        .and_then(|values| values.first())
+        .copied()
+        .unwrap();
+    assert!((first - 0.99).abs() < 1e-6, "first loss = 1.0 − 0.01");
+    assert!(last < 0.1 * first, "the loss decreased below 10% of the initial");
+    assert!(
+        report.converged,
+        "final loss < 0.1 * initial loss → converged"
+    );
+
+    // Leak-free: teardown returns the live handle count to 0.
+    assert_eq!(host.device().map(|runtime| runtime.live_handle_count()).unwrap_or(0), 0);
+}
+
+/// `FABER_DEVICE_STEPS` drives the repeating step count fail-closed: a
+/// non-numeric value is rejected; the default is [`DEFAULT_TRAINING_STEPS`].
+#[test]
+fn device_step_count_defaults_and_fails_closed() {
+    std::env::remove_var("FABER_DEVICE_STEPS");
+    assert_eq!(
+        device_step_count().expect("default"),
+        DEFAULT_TRAINING_STEPS
+    );
+    std::env::set_var("FABER_DEVICE_STEPS", "250");
+    assert_eq!(device_step_count().expect("explicit"), 250);
+    std::env::set_var("FABER_DEVICE_STEPS", "not-a-number");
+    let error = device_step_count().expect_err("non-numeric value fails closed");
+    assert!(error[0].message.contains("FABER_DEVICE_STEPS"));
+    std::env::remove_var("FABER_DEVICE_STEPS");
+}
+/// The constructor's RepeatingStep param materialization is
+/// emitter-compatible: the forward kernel (PerProgram InOut HostProvided
+/// param bindings) emits through the S5-U1b decomposition-aware Metal
+/// emitter — the carried subchain plan and the InOut param bindings are
+/// consumed without a real device. (The full training image's multi-output
+/// elementwise train_step + companion chains exceed the current emitter
+/// elementwise surface — a filed radix-mir-metal gap, S5-U7 blocker.)
+#[test]
+fn repeating_step_forward_kernel_emits_metal_artifact() {
+    with_inline_package("s5u5-emit", TRAINING_LOOP_FIXTURE_100, |lowered| {
+        let (program, _semantics) = device_program_for_lowered(
+            &lowered.validated,
+            &lowered.interner,
+            &lowered.companions,
+        )
+        .expect("constructor succeeds")
+        .expect("training fixture yields a device program");
+
+        // The forward kernel alone: the constructor's kernel resources must
+        // agree with the carried plan and the ABI signature (`carried_resources_agree`).
+        let forward = program
+            .kernels
+            .iter()
+            .find(|kernel| kernel.entry == "loss")
+            .expect("the forward kernel");
+        let mut one = radix_mir::device_program::DeviceProgram::new(
+            radix_mir::device_program::DeviceProgramLifetime::SingleRun,
+        );
+        one.kernels.push(forward.clone());
+        one.launches.push(radix_mir::device_program::LaunchUnit {
+            id: radix_mir::device_program::LaunchId(1),
+            kernel_index: 0,
+        });
+        let artifact = radix_mir_metal::emit_metal_device_artifact(
+            &one,
+            &lowered.validated,
+            &lowered.interner,
+        )
+        .expect("the forward kernel emits MSL");
+        assert!(artifact.source.contains("kernel void loss("), "the MSL declares the forward kernel");
+        // The params bind as typed device buffers (the InOut program role on
+        // the forward's read slots is compatible with the ABI's (Input, Read)
+        // pair — carried_resources_agree).
+        assert!(
+            artifact.source.contains("device const float* w_in [[buffer(1)]]"),
+            "the forward's param binds as a typed device buffer:\n{}",
+            artifact.source
+        );
+    })
+    .expect("fixture lowers");
 }
