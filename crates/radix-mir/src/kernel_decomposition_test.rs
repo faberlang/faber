@@ -1,7 +1,7 @@
 use super::*;
 use crate::{
-    MirBinOp, MirBlock, MirBlockId, MirFunctionId, MirLocal, MirLocalId, MirOperand, MirParam,
-    MirPlace, MirStatement, MirTerminator, MirValue, MirValueId, MirValueKind,
+    MirBinOp, MirBlock, MirBlockId, MirCallee, MirFunctionId, MirLocal, MirLocalId, MirOperand,
+    MirParam, MirPlace, MirStatement, MirTerminator, MirValue, MirValueId, MirValueKind,
 };
 use radix_lexer::Span;
 use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeTable};
@@ -74,6 +74,24 @@ fn assign_statement(destination: u32, lhs: u32, rhs: u32, ty: MirType) -> MirSta
                 ty,
                 span: test_span(),
             },
+        },
+        span: test_span(),
+    }
+}
+
+/// A plain (non-collection) function call statement — e.g. the GELU in the
+/// diagnosed mlp_loss lane. Call destinations carry no statement-level
+/// type; callers type the destination local in the locals table explicitly
+/// (the plan resolver reads operand types from the preserved local tables).
+fn call_statement(destination: u32, args: &[u32]) -> MirStatement {
+    MirStatement {
+        kind: MirStatementKind::Call {
+            destination: Some(MirPlace::local(MirLocalId(destination))),
+            callee: MirCallee::Function(MirFunctionId(0)),
+            args: args
+                .iter()
+                .map(|&local| MirOperand::Place(MirPlace::local(MirLocalId(local))))
+                .collect(),
         },
         span: test_span(),
     }
@@ -253,6 +271,39 @@ fn elementwise_mul_function(types: &mut TypeTable) -> MirFunction {
         Some(2),
         r1,
     )
+}
+
+/// The mlp_loss GELU-lane shape (D-2a): `h1 = matmul(x, w1);
+/// h1b = h1 + h1; a1 = gelu(h1b); h2 = matmul(a1, w2); loss = mean(h2)` —
+/// subchain 0 folds the elementwise Add + GELU (plain Call) after its
+/// matmul, and the GELU destination `a1` (NOT `h1b`) is read by the second
+/// matmul's subchain.
+fn mlp_loss_gelu_function(types: &mut TypeTable) -> MirFunction {
+    let r2 = rank2_tensor_ty(types, [4, 4]);
+    let scalar = scalar_f32_ty(types);
+    let mut function = device_function(
+        &[(0, r2), (1, r2), (5, r2)],
+        vec![
+            collection_statement(MirCollectionOp::TensorMatMul, &[0, 1], 2, r2),
+            assign_statement(3, 2, 2, r2),
+            call_statement(4, &[3]),
+            collection_statement(MirCollectionOp::TensorMatMul, &[4, 5], 6, r2),
+            collection_statement(MirCollectionOp::TensorMean, &[6], 7, scalar),
+        ],
+        Some(7),
+        scalar,
+    );
+    // The plain Call's destination is not typed by the statement; type it in
+    // the locals table (the plan resolver reads operand types from the
+    // preserved source local tables).
+    function.locals.push(MirLocal {
+        id: MirLocalId(4),
+        name: None,
+        ty: r2,
+        mutable: false,
+        span: test_span(),
+    });
+    function
 }
 
 // -----------------------------------------------------------------------
@@ -608,4 +659,156 @@ fn dead_recipe_op_is_dropped_not_a_boundary() {
         decomposition.subchains[0].plan
     );
     assert_eq!(decomposition.subchains[0].statements, vec![1]);
+}
+
+// -----------------------------------------------------------------------
+// Consumed-output sets (D-2a): locals a subchain writes that a later
+// subchain of the same function reads (or the function returns) must be
+// exposed as additional kernel outputs beside the recipe result.
+// -----------------------------------------------------------------------
+
+#[test]
+fn folded_elementwise_destination_consumed_by_later_subchain_is_exposed() {
+    // The GELU-lane shape: subchain 0 folds [MatMul → h1, Add → h1b,
+    // GELU → a1]; the second matmul reads a1, NOT h1b. Subchain 0's output
+    // set must expose a1 IN ADDITION to the recipe result h1 — the contract
+    // output alone (h1) leaves a1 with no kernel producer for the later
+    // subchain's input buffer.
+    let mut types = TypeTable::new();
+    let function = mlp_loss_gelu_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let decomposition =
+        decompose_kernel_function(&function, &validation).expect("gelu-lane body decomposes");
+
+    assert_eq!(
+        decomposition.subchains.len(),
+        3,
+        "MatMul + Add + GELU, MatMul, Mean must split into three subchains, got {:?}",
+        decomposition.subchains
+    );
+
+    // Subchain 0: the matmul with its folded elementwise tail.
+    let first = &decomposition.subchains[0];
+    assert_eq!(first.statements, vec![0, 1, 2]);
+    assert!(
+        matches!(first.plan, CollectionKernelPlan::TiledMatMul(_)),
+        "subchain 0 must carry the tiled-matmul plan, got {:?}",
+        first.plan
+    );
+    assert_eq!(
+        first.outputs,
+        vec![MirLocalId(2), MirLocalId(4)],
+        "subchain 0 must expose the recipe result h1 (primary) and the gelu \
+         destination a1 (read by subchain 1), in that deterministic order"
+    );
+    assert!(
+        !first.outputs.contains(&MirLocalId(3)),
+        "h1b is consumed only inside subchain 0 and must NOT be exposed"
+    );
+
+    // Subchain 1: the second matmul reads a1 (local 4), so its recipe
+    // result h2 is its only consumed output.
+    let second = &decomposition.subchains[1];
+    assert_eq!(second.statements, vec![3]);
+    assert_eq!(
+        second.outputs,
+        vec![MirLocalId(6)],
+        "subchain 1 exposes its recipe result h2"
+    );
+
+    // Subchain 2 (last): the output set is the function's return local,
+    // unchanged.
+    let third = &decomposition.subchains[2];
+    assert_eq!(third.statements, vec![4]);
+    assert_eq!(
+        third.outputs,
+        vec![MirLocalId(7)],
+        "the last subchain's output set is the function's return local"
+    );
+}
+
+#[test]
+fn unconsumed_elementwise_destination_is_not_exposed() {
+    // Same lane, but the second matmul reads h1 instead of a1: neither a1
+    // nor h1b is read by a later subchain, so subchain 0 exposes ONLY its
+    // recipe result h1.
+    let mut types = TypeTable::new();
+    let r2 = rank2_tensor_ty(&mut types, [4, 4]);
+    let scalar = scalar_f32_ty(&mut types);
+    let mut function = device_function(
+        &[(0, r2), (1, r2), (5, r2)],
+        vec![
+            collection_statement(MirCollectionOp::TensorMatMul, &[0, 1], 2, r2),
+            assign_statement(3, 2, 2, r2),
+            call_statement(4, &[3]),
+            collection_statement(MirCollectionOp::TensorMatMul, &[2, 5], 6, r2),
+            collection_statement(MirCollectionOp::TensorMean, &[6], 7, scalar),
+        ],
+        Some(7),
+        scalar,
+    );
+    function.locals.push(MirLocal {
+        id: MirLocalId(4),
+        name: None,
+        ty: r2,
+        mutable: false,
+        span: test_span(),
+    });
+    let validation = MirValidationContext::new(&types);
+    let decomposition = decompose_kernel_function(&function, &validation).expect("body decomposes");
+
+    assert_eq!(decomposition.subchains.len(), 3);
+    assert_eq!(
+        decomposition.subchains[0].outputs,
+        vec![MirLocalId(2)],
+        "a1 and h1b are consumed only inside subchain 0 and must NOT be exposed; \
+         only the recipe result h1 (read by the later matmul) is"
+    );
+    assert_eq!(
+        decomposition.subchains[2].outputs,
+        vec![MirLocalId(7)],
+        "the last subchain still exposes the function's return local"
+    );
+}
+
+#[test]
+fn plain_fixture_outputs_are_the_recipe_results() {
+    // The recipe-only fixtures fold no elementwise destinations, so every
+    // intermediate subchain's output set is its recipe result and the last
+    // subchain exposes the return local.
+    let mut types = TypeTable::new();
+    let mlp = mlp_loss_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let decomposition =
+        decompose_kernel_function(&mlp, &validation).expect("mlp_loss body decomposes");
+    let outputs: Vec<Vec<MirLocalId>> = decomposition
+        .subchains
+        .iter()
+        .map(|subchain| subchain.outputs.clone())
+        .collect();
+    assert_eq!(
+        outputs,
+        vec![
+            vec![MirLocalId(2)],
+            vec![MirLocalId(4)],
+            vec![MirLocalId(5)]
+        ],
+        "mlp_loss subchains expose t1, t2, and the loss return local"
+    );
+
+    let mut types = TypeTable::new();
+    let vjp = matmul_vjp_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let decomposition =
+        decompose_kernel_function(&vjp, &validation).expect("matmul-VJP body decomposes");
+    let outputs: Vec<Vec<MirLocalId>> = decomposition
+        .subchains
+        .iter()
+        .map(|subchain| subchain.outputs.clone())
+        .collect();
+    assert_eq!(
+        outputs,
+        vec![vec![MirLocalId(2)], vec![MirLocalId(3)]],
+        "the VJP subchains expose xt and the dw return local"
+    );
 }

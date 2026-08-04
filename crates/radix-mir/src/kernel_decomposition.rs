@@ -73,6 +73,13 @@ pub struct KernelSubchain {
     /// The local this subchain produces (the destination of its last
     /// statement), when a later subchain consumes it.
     pub produced: Option<MirLocalId>,
+    /// The locals this subchain must expose as kernel outputs (D-2a): the
+    /// recipe result (the subchain's primary/current output) plus every
+    /// local it writes that a LATER subchain of the same function reads.
+    /// The last subchain's output set is the function's return local
+    /// (unchanged). Deterministic order: primary first, then the additional
+    /// consumed locals by ascending local id.
+    pub outputs: Vec<MirLocalId>,
 }
 
 /// The ordered subchain kernels of one decomposed device-resident function.
@@ -153,9 +160,14 @@ pub fn decompose_kernel_function(
     }
 
     // Build the subchains. `written` records each subchain's produced
-    // locals so the data-flow edges can be derived.
+    // locals so the data-flow edges can be derived. The subchains preserve
+    // the source local tables, so `inputs` (each subchain's external reads,
+    // its synthetic params) and `recipe_results` (each subchain's recipe
+    // destination) can be derived for the consumed-output pass below.
     let mut subchains: Vec<KernelSubchain> = Vec::new();
     let mut written_by: Vec<BTreeSet<MirLocalId>> = Vec::new();
+    let mut inputs_by: Vec<BTreeSet<MirLocalId>> = Vec::new();
+    let mut recipe_results: Vec<Option<MirLocalId>> = Vec::new();
     for (position, indices) in slices.iter().enumerate() {
         let is_last = position + 1 == slices.len();
         let synthetic = build_subchain_function(function, indices, is_last);
@@ -171,6 +183,17 @@ pub fn decompose_kernel_function(
             .iter()
             .filter_map(|&index| statement_destination(&block.statements[index]))
             .collect();
+        let inputs: BTreeSet<MirLocalId> =
+            synthetic.params.iter().map(|param| param.local).collect();
+        // The recipe that opened this subchain (the plan's result local).
+        let recipe_result = indices.iter().find_map(|&index| {
+            let statement = &block.statements[index];
+            if matches!(statement_collection_op(statement), Some(op) if is_recipe_op(op)) {
+                statement_destination(statement)
+            } else {
+                None
+            }
+        });
 
         // Data-flow: subchains whose produced local this subchain reads.
         let mut consumes = Vec::new();
@@ -185,12 +208,52 @@ pub fn decompose_kernel_function(
         }
 
         written_by.push(written);
+        inputs_by.push(inputs);
+        recipe_results.push(recipe_result);
         subchains.push(KernelSubchain {
             statements: indices.clone(),
             plan,
             consumes,
             produced,
+            outputs: Vec::new(),
         });
+    }
+
+    // The consumed-output sets (D-2a): each subchain must expose every local
+    // it writes that a LATER subchain of the same function reads (or the
+    // function returns). The recipe result stays the primary output; the
+    // consumed elementwise destinations are the additional outputs. The last
+    // subchain's output set is the function's return local (unchanged).
+    // Walk backwards accumulating each later subchain's external inputs
+    // (its synthetic params) — exactly the locals a later subchain reads
+    // from outside itself.
+    let mut later_inputs: BTreeSet<MirLocalId> = BTreeSet::new();
+    for position in (0..subchains.len()).rev() {
+        let written = &written_by[position];
+        let mut outputs: Vec<MirLocalId> = Vec::new();
+        if position + 1 == subchains.len() {
+            if let Some(return_local) = terminator_return_local(&block.terminator.kind) {
+                if written.contains(&return_local) {
+                    outputs.push(return_local);
+                }
+            }
+        } else {
+            // Primary: the recipe result stays the subchain's output even
+            // when a later subchain never reads it (the contract output).
+            if let Some(primary) = recipe_results[position] {
+                outputs.push(primary);
+            }
+            // Additional: written locals a later subchain reads, by
+            // ascending local id (deterministic; the recipe result, when
+            // also consumed later, is already the primary).
+            for &local in written {
+                if later_inputs.contains(&local) && !outputs.contains(&local) {
+                    outputs.push(local);
+                }
+            }
+        }
+        subchains[position].outputs = outputs;
+        later_inputs.extend(inputs_by[position].iter().copied());
     }
 
     Ok(KernelDecomposition { subchains })
@@ -460,6 +523,18 @@ fn terminator_reads_local(terminator: &MirTerminatorKind, local: MirLocalId) -> 
             value: condition, ..
         } => operand_local(condition) == Some(local),
         _ => false,
+    }
+}
+
+/// The plain-local operand a function return terminator returns, when it
+/// returns one (the D-2a last-subchain output set). Temps and constants are
+/// not subchain outputs.
+fn terminator_return_local(terminator: &MirTerminatorKind) -> Option<MirLocalId> {
+    match terminator {
+        MirTerminatorKind::Return(Some(operand)) | MirTerminatorKind::ReturnError(operand) => {
+            operand_local(operand)
+        }
+        _ => None,
     }
 }
 
