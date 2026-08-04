@@ -305,6 +305,28 @@ impl KernelDecomposition {
             types,
         )
     }
+
+    /// Pre-intern the tuple return types of every multi-output intermediate
+    /// subchain into `types` (D-2b-2). `subchain_function` holds only
+    /// `&TypeTable` and fails closed when a multi-output subchain's tuple
+    /// type is missing, so callers run this (idempotent — interning is
+    /// hash-consed, and the element types come from the source function's
+    /// locals, which the synthetics keep) on the mutable table the subchain
+    /// derivation uses before building any synthetic.
+    pub fn intern_output_tuple_types(&self, source: &MirFunction, types: &mut TypeTable) {
+        for (position, subchain) in self.subchains.iter().enumerate() {
+            let is_last = position + 1 == self.subchains.len();
+            if is_last || subchain.outputs.len() <= 1 {
+                continue;
+            }
+            let element_ids: Vec<TypeId> = subchain
+                .outputs
+                .iter()
+                .map(|&local| source_local_ty(source, local).semantic_id())
+                .collect();
+            types.tuple(element_ids);
+        }
+    }
 }
 
 /// Build the synthetic kernel function for one subchain slice.

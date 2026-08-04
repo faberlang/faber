@@ -907,3 +907,53 @@ fn tuple_return_of_multi_output_subchain_validates_and_is_recognized() {
         MirTerminatorKind::Return(None)
     ));
 }
+
+#[test]
+fn intern_output_tuple_types_pre_interns_multi_output_subchain_returns() {
+    // D-2b-2: `intern_output_tuple_types` pre-interns the tuple return of
+    // every multi-output intermediate subchain into the mutable table, so
+    // the emission call sites can satisfy `subchain_function`'s `&TypeTable`
+    // seam without manually interning per subchain. Idempotent (interning is
+    // hash-consed), a no-op for single-output and last subchains.
+    let mut types = TypeTable::new();
+    let function = mlp_loss_gelu_collection_function(&mut types);
+    let local2_ty = source_local_ty(&function, MirLocalId(2));
+    let local4_ty = source_local_ty(&function, MirLocalId(4));
+    let validation = MirValidationContext::new(&types);
+    let decomposition =
+        decompose_kernel_function(&function, &validation).expect("gelu-lane body decomposes");
+    assert_eq!(
+        decomposition.subchains[0].outputs,
+        vec![MirLocalId(2), MirLocalId(4)],
+        "subchain 0 exposes the recipe result h1 and the gelu destination a1"
+    );
+
+    let mut subchain_types =
+        TypeTable::from_snapshot(types.snapshot()).expect("a live table always restores");
+    assert_eq!(
+        subchain_types.find_tuple(&[local2_ty.semantic_id(), local4_ty.semantic_id()]),
+        None,
+        "the tuple is not interned before the helper runs"
+    );
+    decomposition.intern_output_tuple_types(&function, &mut subchain_types);
+    decomposition.intern_output_tuple_types(&function, &mut subchain_types);
+
+    let tuple_id = subchain_types
+        .find_tuple(&[local2_ty.semantic_id(), local4_ty.semantic_id()])
+        .expect("the helper interns the multi-output subchain's tuple return");
+    assert_eq!(
+        subchain_types
+            .find_tuple(&[local2_ty.semantic_id(), local4_ty.semantic_id()])
+            .expect("the tuple stays interned"),
+        tuple_id,
+        "re-running the helper is idempotent (same interned id)"
+    );
+
+    let synthetic = decomposition.subchain_function(&function, 0, &subchain_types);
+    assert_eq!(
+        synthetic.temps.len(),
+        1,
+        "one tuple temp is added once the tuple type is interned"
+    );
+    assert_eq!(synthetic.temps[0].ty, MirType::semantic(tuple_id));
+}

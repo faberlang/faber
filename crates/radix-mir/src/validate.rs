@@ -225,6 +225,39 @@ impl<'a> MirValidationContext<'a> {
         }
     }
 
+    /// Clone this context's metadata onto a NEW type-table reference.
+    ///
+    /// Callers that must intern additional types (e.g. the D-2b-2 subchain
+    /// output-tuple returns) while keeping every other typed fact identical
+    /// clone the table, intern into the clone, and rebuild the context on it.
+    /// The caller owns `types` and must keep it alive for the returned
+    /// context; layouts are rebuilt against the new table, so freshly
+    /// interned types resolve exactly like the originals.
+    #[must_use]
+    pub fn with_types<'b>(&self, types: &'b TypeTable) -> MirValidationContext<'b>
+    where
+        'a: 'b,
+    {
+        let mut context = MirValidationContext::<'b>::new(types);
+        context.interner = self.interner;
+        context.functions = self.functions.clone();
+        context.external_function_identities = self.external_function_identities.clone();
+        context.struct_fields = self.struct_fields.clone();
+        context.struct_type_params = self.struct_type_params.clone();
+        context.enum_type_params = self.enum_type_params.clone();
+        context.optional_struct_fields = self.optional_struct_fields.clone();
+        context.nullable_struct_fields = self.nullable_struct_fields.clone();
+        context.opaque_structs = self.opaque_structs.clone();
+        context.json_struct_field_keys = self.json_struct_field_keys.clone();
+        context.variant_parents = self.variant_parents.clone();
+        context.enum_variants = self.enum_variants.clone();
+        context.variant_positions = self.variant_positions.clone();
+        context.variant_fields = self.variant_fields.clone();
+        context.scalar_value_domains = self.scalar_value_domains.clone();
+        context.closure_environments = self.closure_environments.clone();
+        context
+    }
+
     #[must_use]
     pub fn enum_representation(&self, enum_def: DefId) -> Option<MirEnumRepresentation> {
         let variants = self.enum_variants.get(&enum_def)?;
