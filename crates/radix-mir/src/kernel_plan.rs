@@ -285,6 +285,34 @@ pub fn multi_output_contract_valid(signature: &MirKernelSignature) -> bool {
     true
 }
 
+/// R6/P1: per-output write extents for a result-tuple (multi-output)
+/// signature, in binding order (the first output resource, then the extra
+/// tuple elements). The plan pass records one extent per output resource; the
+/// emitters guard each output's write with its own extent, so a smaller
+/// buffer is never overrun and a larger one is never left partial under the
+/// union dispatch.
+#[must_use]
+pub fn multi_output_output_extents(signature: &MirKernelSignature) -> Vec<u64> {
+    signature
+        .output_resources()
+        .map(|output| output.element_count)
+        .collect()
+}
+
+/// R6/P1: the dispatch extent for a result-tuple (multi-output) kernel — the
+/// max (union) of every output resource's element count, so one launch covers
+/// ALL output buffers. Never derive the dispatch from the first output's
+/// count alone (the P1 shortcut): with unequal extents that either overruns a
+/// smaller buffer or leaves a larger one incomplete. Each output's write is
+/// still guarded by its own per-output extent in the emitters.
+#[must_use]
+pub fn multi_output_dispatch_extent(signature: &MirKernelSignature) -> u64 {
+    multi_output_output_extents(signature)
+        .into_iter()
+        .max()
+        .unwrap_or(0)
+}
+
 impl CollectionKernelPlan {
     /// Build the plan from a resolved kernel signature and collection-op
     /// contract — the plan pass, a sibling of `abi::collection_op_contract`

@@ -1686,7 +1686,16 @@ impl MirKernelSignature {
         }
         let output = outputs.remove(0);
         let extra_outputs = outputs;
-        let first_output_count = output.element_count;
+        // R6 (P1): the dispatch must cover EVERY output's extent — the union
+        // (max) over the per-output extents, never the first output's count
+        // alone. A first-output-only dispatch either overruns a smaller
+        // buffer or leaves a larger one incomplete; each output's write is
+        // guarded by its own extent under the union (kernel_plan).
+        let dispatch_count = extra_outputs
+            .iter()
+            .fold(output.element_count, |union, extra| {
+                union.max(extra.element_count)
+            });
 
         let mut signature = Self {
             function: function.id,
@@ -1698,7 +1707,7 @@ impl MirKernelSignature {
             builtin_inputs: Vec::new(),
             called_builtins: called_builtins_for_function(function),
             workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
-            dispatch_size: dispatch_size_for_1d_elements(first_output_count),
+            dispatch_size: dispatch_size_for_1d_elements(dispatch_count),
         };
         maybe_append_runtime_extent(function, &mut signature, validation);
         Ok(signature)
@@ -4277,6 +4286,76 @@ mod tests {
                 "an output's element type must be a scalar, not an aggregate: {layout:?}"
             );
         }
+    }
+
+    /// R6 (P1): heterogeneous result-tuple outputs `[2]` and `[4]` — the
+    /// dispatch is the UNION (max = 4) of the per-output extents, never the
+    /// first output's count (2) alone; per-output extents are recorded in
+    /// binding order for the emitters' per-output guards.
+    #[test]
+    fn result_tuple_unequal_extents_dispatch_is_union_not_first_output() {
+        let mut types = TypeTable::new();
+        let f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+        let shape2 = types.intern_index(IndexExpr::Literal(2));
+        let shape4 = types.intern_index(IndexExpr::Literal(4));
+        let tensor2 = MirType::semantic(types.tensor_with_shape(f32, shape2));
+        let tensor4 = MirType::semantic(types.tensor_with_shape(f32, shape4));
+        let tuple_return_ty = MirType::semantic(types.intern(Type::Tuple(vec![
+            tensor2.semantic_id(),
+            tensor4.semantic_id(),
+        ])));
+        let validation = validation_with_device_tensor_layouts(&types);
+        let function = result_tuple_kernel_function(tensor2, tuple_return_ty);
+        let signature =
+            MirKernelSignature::storage_buffer_kernel(&function, &validation).expect("signature");
+
+        // The dispatch covers BOTH outputs — 4, not the first output's 2.
+        assert_eq!(
+            signature.dispatch_size.x, 4,
+            "dispatch must cover every output extent, not the first output's count alone"
+        );
+        // Per-output extent facts, in binding order.
+        assert_eq!(
+            crate::kernel_plan::multi_output_output_extents(&signature),
+            vec![2, 4]
+        );
+        assert_eq!(
+            crate::kernel_plan::multi_output_dispatch_extent(&signature),
+            4
+        );
+    }
+
+    /// R6 (P1): reversed order `[4]` then `[2]` — dispatch is still the
+    /// union (4); the per-output extents `[4, 2]` are what the emitters guard
+    /// with (threads 2..4 must not overrun the smaller buffer).
+    #[test]
+    fn result_tuple_unequal_extents_reverse_order_records_per_output_extents() {
+        let mut types = TypeTable::new();
+        let f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+        let shape2 = types.intern_index(IndexExpr::Literal(2));
+        let shape4 = types.intern_index(IndexExpr::Literal(4));
+        let tensor2 = MirType::semantic(types.tensor_with_shape(f32, shape2));
+        let tensor4 = MirType::semantic(types.tensor_with_shape(f32, shape4));
+        let tuple_return_ty = MirType::semantic(types.intern(Type::Tuple(vec![
+            tensor4.semantic_id(),
+            tensor2.semantic_id(),
+        ])));
+        let validation = validation_with_device_tensor_layouts(&types);
+        let function = result_tuple_kernel_function(tensor4, tuple_return_ty);
+        let signature =
+            MirKernelSignature::storage_buffer_kernel(&function, &validation).expect("signature");
+
+        assert_eq!(signature.dispatch_size.x, 4);
+        assert_eq!(signature.output.element_count, 4);
+        assert_eq!(signature.extra_outputs[0].element_count, 2);
+        assert_eq!(
+            crate::kernel_plan::multi_output_output_extents(&signature),
+            vec![4, 2]
+        );
+        assert_eq!(
+            crate::kernel_plan::multi_output_dispatch_extent(&signature),
+            4
+        );
     }
 
     /// S3-A5: the scalar-return reduction signature (the S3-B1 forward shape
