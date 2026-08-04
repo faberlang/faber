@@ -871,6 +871,185 @@ fn two_kernel_chain_program_admits_cleanly() {
     );
 }
 
+/// The exact wire shape the faber constructor projects after Stage 3R U2:
+/// a three-buffer two-kernel chain (`a` → `medius` → `result`) carrying the
+/// independent axes — one semantic value per buffer (F1), explicit
+/// generations (F2), carried roots + a producer/consumer dependency (F3),
+/// per-buffer initialization policies (F5), and explicit observation facts
+/// on every result row (F6). This is the ordinary `device-summa-recollige`
+/// projection's canonical form.
+fn faber_projected_two_kernel_wire() -> WireDeviceProgram {
+    let a = WireBufferIdentity {
+        id: 1,
+        name: "a".to_owned(),
+        role: WireBufferRole::Input,
+        storage: WireStorageLayout::DeviceHandle,
+        lifetime: WireBufferLifetime::PerProgram,
+        semantic_value: 1,
+    };
+    let medius = WireBufferIdentity {
+        id: 2,
+        name: "medius".to_owned(),
+        role: WireBufferRole::InOut,
+        storage: WireStorageLayout::DeviceHandle,
+        lifetime: WireBufferLifetime::PerStep,
+        semantic_value: 2,
+    };
+    let result = WireBufferIdentity {
+        id: 3,
+        name: "result".to_owned(),
+        role: WireBufferRole::Output,
+        storage: WireStorageLayout::DeviceHandle,
+        lifetime: WireBufferLifetime::ObservationPoint,
+        semantic_value: 3,
+    };
+    let version = WireBufferVersion {
+        version: 1,
+        element_ty: "f32".to_owned(),
+        element_count: 4,
+    };
+    WireDeviceProgram {
+        kernels: vec![
+            WireKernelUnit {
+                function: 0,
+                entry: "collige".to_owned(),
+                plan: WireCollectionKernelPlan::Elementwise,
+                resources: vec![
+                    WireDeviceResource {
+                        buffer: a.clone(),
+                        version: version.clone(),
+                        binding: WireBinding {
+                            group: 0,
+                            binding: 0,
+                        },
+                        access: WireResourceAccess::Read,
+                        generation: 1,
+                        initialization: WireInitializationPolicy::HostProvided,
+                    },
+                    WireDeviceResource {
+                        buffer: medius.clone(),
+                        version: version.clone(),
+                        binding: WireBinding {
+                            group: 0,
+                            binding: 1,
+                        },
+                        access: WireResourceAccess::Write,
+                        generation: 1,
+                        initialization: WireInitializationPolicy::KernelInitialized,
+                    },
+                ],
+                launch: WireKernelLaunchPlan {
+                    workgroup: WireWorkgroupSize { x: 8, y: 1, z: 1 },
+                    dispatch_size: WireDispatchSize { x: 4, y: 1, z: 1 },
+                    workgroup_count: WireWorkgroupCount { x: 1, y: 1, z: 1 },
+                },
+            },
+            WireKernelUnit {
+                function: 1,
+                entry: "recollige".to_owned(),
+                plan: WireCollectionKernelPlan::Elementwise,
+                resources: vec![
+                    WireDeviceResource {
+                        buffer: medius.clone(),
+                        version: version.clone(),
+                        binding: WireBinding {
+                            group: 0,
+                            binding: 0,
+                        },
+                        access: WireResourceAccess::Read,
+                        generation: 1,
+                        initialization: WireInitializationPolicy::KernelInitialized,
+                    },
+                    WireDeviceResource {
+                        buffer: result.clone(),
+                        version: version.clone(),
+                        binding: WireBinding {
+                            group: 0,
+                            binding: 1,
+                        },
+                        access: WireResourceAccess::Write,
+                        generation: 1,
+                        initialization: WireInitializationPolicy::KernelInitialized,
+                    },
+                ],
+                launch: WireKernelLaunchPlan {
+                    workgroup: WireWorkgroupSize { x: 8, y: 1, z: 1 },
+                    dispatch_size: WireDispatchSize { x: 4, y: 1, z: 1 },
+                    workgroup_count: WireWorkgroupCount { x: 1, y: 1, z: 1 },
+                },
+            },
+        ],
+        launches: vec![
+            WireLaunchUnit {
+                id: 1,
+                kernel_index: 0,
+            },
+            WireLaunchUnit {
+                id: 2,
+                kernel_index: 1,
+            },
+        ],
+        lifetime: WireProgramLifetime::SingleRun,
+        results: vec![
+            WireResultBuffer {
+                buffer: medius.clone(),
+                version: version.clone(),
+                role: WireBufferRole::InOut,
+                produced_by: 1,
+                observation: WireObservationFact { at_launch: 1 },
+            },
+            WireResultBuffer {
+                buffer: result.clone(),
+                version: version.clone(),
+                role: WireBufferRole::Output,
+                produced_by: 2,
+                observation: WireObservationFact { at_launch: 2 },
+            },
+        ],
+        semantic_values: vec![
+            WireSemanticValue {
+                id: 1,
+                name: "a".to_owned(),
+                origin: WireSemanticValueOrigin::HostInput,
+            },
+            WireSemanticValue {
+                id: 2,
+                name: "medius".to_owned(),
+                origin: WireSemanticValueOrigin::Synthetic {
+                    label: "buffer-2".to_owned(),
+                },
+            },
+            WireSemanticValue {
+                id: 3,
+                name: "result".to_owned(),
+                origin: WireSemanticValueOrigin::Synthetic {
+                    label: "buffer-3".to_owned(),
+                },
+            },
+        ],
+        roots: vec![1],
+        dependencies: vec![WireDependencyEdge {
+            producer: 1,
+            consumer: 2,
+            buffer: 2,
+            version: 1,
+        }],
+        relations: Vec::new(),
+    }
+}
+
+#[test]
+fn faber_projected_two_kernel_wire_admits_cleanly() {
+    // The ordinary two-kernel constructor projection (Stage 3R U2 axes) must
+    // pass the radix F1–F7 wire admission as-is — the decode boundary is the
+    // agreement point between the constructor and the hosts.
+    let mut section = sample_device_section();
+    section.device_program.program = faber_projected_two_kernel_wire();
+    let image = text_image_with_device(Some(section));
+    decode_text_image(&encode_text_image(&image).unwrap(), TOOLCHAIN)
+        .expect("the faber two-kernel projection admits cleanly");
+}
+
 // ---------------------------------------------------------------------------
 // Stage 3R F1–F7 wire admission negatives (fail-closed validators)
 // ---------------------------------------------------------------------------
@@ -986,6 +1165,27 @@ fn decode_rejects_illegal_root_on_wire() {
         result,
         Err(FmirImageError::WireProgramInvalid { detail })
             if detail.contains("root 9 is not a declared launch")
+    ));
+}
+
+#[test]
+fn decode_rejects_result_without_explicit_observation_fact_on_wire() {
+    // F6 red test (U2): a writable intermediate exposed as a result whose
+    // explicit observation fact contradicts its producing launch is "without
+    // an explicit observation fact" — rejected at the decode boundary, before
+    // host construction.
+    let result = wire_admission_error(|program| {
+        *program = two_kernel_chain_program();
+        // The chain's only result names producing launch 2; its observation
+        // fact must name the same boundary — naming launch 1 instead is a
+        // contradictory observation fact.
+        program.results[0].observation.at_launch = 1;
+    });
+    assert!(matches!(
+        result,
+        Err(FmirImageError::WireProgramInvalid { detail })
+            if detail.contains("observation fact")
+                && detail.contains("producing launch")
     ));
 }
 

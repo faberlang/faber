@@ -4,6 +4,10 @@ use crate::abi::{
     MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature, MirKernelWorkgroupCount,
     MirWorkgroupSize,
 };
+use crate::device_semantics::{
+    InitializationFact, InitializationPolicy, ObservationFact, SemanticValue, SemanticValueOrigin,
+    ValueBinding, ValueGeneration,
+};
 use crate::kernel_plan::ReduceOp;
 use crate::layout::MirTensorStorageLayout;
 use crate::{
@@ -1296,5 +1300,188 @@ fn test_registry_chain_and_data_flow_pairs() {
             producer: LaunchId(0),
             consumer: LaunchId(1),
         }]
+    );
+}
+
+// -----------------------------------------------------------------------
+// Stage 3R F5/F6: independent resource-state axes + the F6 coupling
+// (DeviceProgram::validate_with_semantics)
+// -----------------------------------------------------------------------
+
+/// The standard reduction program plus a declared result row for its output,
+/// paired with the carried semantics that make the result an explicit
+/// observation point (F6).
+fn reduction_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
+    let mut program = reduction_program();
+    let signature = reduction_signature(16, 8, 2);
+    program.results.push(ResultBuffer {
+        buffer: identity(
+            1,
+            "reduction.output",
+            BufferRole::Output,
+            BufferLifetime::ObservationPoint,
+        ),
+        version: version(
+            1,
+            signature.output.element_ty,
+            signature.output.element_count,
+        ),
+        role: BufferRole::Output,
+        produced_by: LaunchId(0),
+    });
+    let mut types = TypeTable::new();
+    let element_ty = f32_ty(&mut types);
+    let semantics = DeviceSemantics {
+        values: vec![
+            SemanticValue {
+                id: SemanticValueId(1),
+                name: "reduction.input".to_owned(),
+                element_ty,
+                element_count: 16,
+                origin: SemanticValueOrigin::HostInput,
+            },
+            SemanticValue {
+                id: SemanticValueId(2),
+                name: "reduction.output".to_owned(),
+                element_ty,
+                element_count: 2,
+                origin: SemanticValueOrigin::Synthetic {
+                    label: "reduction-output".to_owned(),
+                },
+            },
+        ],
+        bindings: vec![
+            ValueBinding {
+                value: SemanticValueId(1),
+                buffer: BufferId(0),
+            },
+            ValueBinding {
+                value: SemanticValueId(2),
+                buffer: BufferId(1),
+            },
+        ],
+        generations: vec![ValueGeneration {
+            value: SemanticValueId(2),
+            generation: 1,
+            element_ty,
+            element_count: 2,
+            produced_by: LaunchId(0),
+        }],
+        roots: vec![LaunchId(0)],
+        observations: vec![ObservationFact {
+            buffer: BufferId(1),
+            version: 1,
+            at_launch: LaunchId(0),
+        }],
+        ..DeviceSemantics::default()
+    };
+    (program, semantics)
+}
+
+/// F6 positive: the frozen program and its carried semantics validate
+/// together when the result IS the declared observation point.
+#[test]
+fn program_and_semantics_validate_together() {
+    let (program, semantics) = reduction_program_with_semantics();
+    program
+        .validate_with_semantics(&semantics)
+        .expect("an explicit observation fact backs the result (F6)");
+}
+
+/// F6 red test: a writable intermediate exposed as a result WITHOUT an
+/// explicit observation fact is rejected — results name declared observation
+/// points only, never buffers merely because they are writable.
+#[test]
+fn writable_intermediate_as_result_without_observation_fact_fails_closed() {
+    let (program, mut semantics) = reduction_program_with_semantics();
+    semantics.observations.clear();
+    assert!(matches!(
+        program.validate_with_semantics(&semantics),
+        Err(DeviceProgramError::ResultWithoutObservationFact {
+            result: 0,
+            buffer: BufferId(1),
+            version: 1,
+        })
+    ));
+}
+
+/// F6 red test: an observation fact the host would never be told to read
+/// back (no declared result row) fails closed.
+#[test]
+fn observation_fact_without_declared_result_fails_closed() {
+    let (mut program, semantics) = reduction_program_with_semantics();
+    program.results.clear();
+    assert!(matches!(
+        program.validate_with_semantics(&semantics),
+        Err(DeviceProgramError::UndeclaredObservationFact {
+            buffer: BufferId(1),
+            version: 1,
+            at_launch: LaunchId(0),
+        })
+    ));
+}
+
+/// F5 coupling proof: initialization, allocation lifetime, observation, and
+/// value generation are independent facts — each can change alone without
+/// silently rewriting the others and without invalidating the pair.
+#[test]
+fn axes_vary_independently_without_cross_rewrite() {
+    let (program, mut semantics) = reduction_program_with_semantics();
+    program
+        .validate_with_semantics(&semantics)
+        .expect("baseline pair validates");
+
+    // 1. Initialization axis: a host-provided init fact for the input buffer
+    // rides alongside the existing lifetime / observation / generation facts
+    // — no axis rewrites another.
+    semantics.initializations = vec![InitializationFact {
+        buffer: BufferId(0),
+        policy: InitializationPolicy::HostProvided,
+    }];
+    program
+        .validate_with_semantics(&semantics)
+        .expect("init fact is an independent axis (F5)");
+    assert_eq!(
+        semantics.observations,
+        vec![ObservationFact {
+            buffer: BufferId(1),
+            version: 1,
+            at_launch: LaunchId(0),
+        }],
+        "adding an init fact must not rewrite the observation fact"
+    );
+    assert_eq!(
+        semantics.generations[0].generation, 1,
+        "adding an init fact must not rewrite the generation"
+    );
+
+    // 2. Generation axis: advancing a generation is a new logical write and
+    // must not touch init or observation.
+    semantics.generations[0].generation = 2;
+    program
+        .validate_with_semantics(&semantics)
+        .expect("a new generation is an independent axis (F2/F5)");
+    assert_eq!(
+        semantics.initializations[0].policy,
+        InitializationPolicy::HostProvided,
+        "advancing a generation must not rewrite the init policy"
+    );
+
+    // 3. Allocation-lifetime axis: relabeling a buffer's storage lifetime on
+    // the program side is independent of the carried init/observation facts.
+    let mut lifetime_relabeled = program.clone();
+    let input = &mut lifetime_relabeled.kernels[0].resources[0].buffer.lifetime;
+    *input = BufferLifetime::PerProgram;
+    lifetime_relabeled
+        .validate_with_semantics(&semantics)
+        .expect("lifetime is an independent axis (F5)");
+    assert_eq!(
+        semantics.observations[0].at_launch,
+        LaunchId(0),
+        "relabeling a lifetime must not rewrite the observation boundary"
+    );
+    assert_eq!(
+        semantics.generations[0].generation, 2,
+        "relabeling a lifetime must not rewrite the generation"
     );
 }

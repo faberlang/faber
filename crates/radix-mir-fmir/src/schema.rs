@@ -1428,7 +1428,9 @@ fn validate_wire_relations(wire: &WireDeviceProgram) -> Result<(), crate::error:
 
 /// Rule F5/F6: initialization facts agree per buffer (independent axis);
 /// every observation names a real launch; results are declared observation
-/// points.
+/// points — every result row carries an explicit observation fact whose
+/// boundary is the producing launch (a result whose observation contradicts
+/// its producer is "without an explicit observation fact" and fails closed).
 fn validate_wire_axes(
     wire: &WireDeviceProgram,
     launches: &[u32],
@@ -1453,6 +1455,16 @@ fn validate_wire_axes(
             return Err(wire_invalid(format!(
                 "result on buffer {} names observation launch {}, which does not exist",
                 result.buffer.id, result.observation.at_launch
+            )));
+        }
+        // F6: the observation fact is the result's explicit declaration —
+        // its completion boundary must be the producing launch. A result
+        // whose observation contradicts its producer is a writable
+        // intermediate exposed without an explicit observation fact.
+        if result.observation.at_launch != result.produced_by {
+            return Err(wire_invalid(format!(
+                "result on buffer {} names producing launch {}, but its observation fact names launch {}; a result is a declared observation point at its producing launch",
+                result.buffer.id, result.produced_by, result.observation.at_launch
             )));
         }
     }

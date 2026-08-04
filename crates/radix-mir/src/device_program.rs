@@ -114,7 +114,7 @@ use crate::abi::{
     MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature,
     MirKernelWorkgroupCount, MirWorkgroupSize,
 };
-use crate::device_semantics::{DependencyEdge, SemanticValueId};
+use crate::device_semantics::{DependencyEdge, DeviceSemantics, SemanticValueId};
 use crate::kernel_plan::{CollectionKernelPlan, PlanValidationError};
 use crate::layout::MirTensorStorageLayout;
 use crate::{MirFunction, MirFunctionId, MirType};
@@ -661,6 +661,68 @@ impl DeviceProgram {
 
         Ok(())
     }
+
+    /// Validate the frozen program together with its carried semantic facts
+    /// (Stage 3R F1–F7).
+    ///
+    /// Runs the program rules ([`DeviceProgram::validate`]) and the semantic
+    /// rules ([`DeviceSemantics::validate`]), then the **F6 coupling** that
+    /// makes results declare observation points only:
+    ///
+    /// - every [`ResultBuffer`] must be backed by an explicit
+    ///   [`ObservationFact`](crate::device_semantics::ObservationFact) for the
+    ///   same buffer, content version, and producing launch — a writable
+    ///   intermediate exposed as a result without being declared observed is
+    ///   rejected (`ResultWithoutObservationFact`);
+    /// - every observation fact must be backed by a declared result row —
+    ///   a readback the host would never be told to perform is rejected
+    ///   (`UndeclaredObservationFact`).
+    ///
+    /// The axes stay **independent** (F5): initialization, lifetime, access,
+    /// observation, and generation each ride their own carried facts; this
+    /// cross-check is the one declared coupling — that a result IS an
+    /// explicit observation point (F6).
+    ///
+    /// # Errors
+    /// Returns the first [`DeviceProgramError`] the program or its carried
+    /// facts violate.
+    pub fn validate_with_semantics(
+        &self,
+        semantics: &DeviceSemantics,
+    ) -> Result<(), DeviceProgramError> {
+        self.validate()?;
+        let launches: Vec<LaunchId> = self.launches.iter().map(|launch| launch.id).collect();
+        semantics.validate(&launches)?;
+        for (result_index, result) in self.results.iter().enumerate() {
+            let declared = semantics.observations.iter().any(|observation| {
+                observation.buffer == result.buffer.id
+                    && observation.version == result.version.version
+                    && observation.at_launch == result.produced_by
+            });
+            if !declared {
+                return Err(DeviceProgramError::ResultWithoutObservationFact {
+                    result: result_index,
+                    buffer: result.buffer.id,
+                    version: result.version.version,
+                });
+            }
+        }
+        for observation in &semantics.observations {
+            let backed = self.results.iter().any(|result| {
+                result.buffer.id == observation.buffer
+                    && result.version.version == observation.version
+                    && result.produced_by == observation.at_launch
+            });
+            if !backed {
+                return Err(DeviceProgramError::UndeclaredObservationFact {
+                    buffer: observation.buffer,
+                    version: observation.version,
+                    at_launch: observation.at_launch,
+                });
+            }
+        }
+        Ok(())
+    }
 }
 
 /// The derived registry of every buffer, version, and data-flow edge in a
@@ -893,6 +955,21 @@ pub enum DeviceProgramError {
     ObservationOutOfRange { launch: LaunchId },
     /// An observation names a buffer no value is bound to (F6).
     UnknownObservationBuffer { buffer: BufferId },
+    /// A result row has no explicit observation fact in the carried
+    /// semantics — a writable intermediate exposed as a result without being
+    /// declared observed (F6).
+    ResultWithoutObservationFact {
+        result: usize,
+        buffer: BufferId,
+        version: u32,
+    },
+    /// An observation fact has no declared result row — a readback the host
+    /// would never be told to perform (F6).
+    UndeclaredObservationFact {
+        buffer: BufferId,
+        version: u32,
+        at_launch: LaunchId,
+    },
 }
 
 impl fmt::Display for DeviceProgramError {
@@ -1089,6 +1166,22 @@ impl fmt::Display for DeviceProgramError {
             Self::UnknownObservationBuffer { buffer } => write!(
                 f,
                 "observation names buffer {buffer}, which no semantic value is bound to"
+            ),
+            Self::ResultWithoutObservationFact {
+                result,
+                buffer,
+                version,
+            } => write!(
+                f,
+                "result {result} exposes buffer {buffer} version {version} as a readback, but the carried semantics declare no observation fact for it; a writable intermediate or persistent state is a result only through an explicit observation fact (F6)"
+            ),
+            Self::UndeclaredObservationFact {
+                buffer,
+                version,
+                at_launch,
+            } => write!(
+                f,
+                "observation fact declares buffer {buffer} version {version} read back at launch {at_launch}, but no result row declares it (F6)"
             ),
         }
     }
