@@ -861,7 +861,7 @@ pub(crate) fn artifact_for_backend<'a>(
 /// # Errors
 /// Fail-closed when a carried element-type spelling is outside the campaign
 /// dtype surface (never a silent default), or when a result record does not
-/// match a writable resource of its producing launch.
+/// match a writable, observation-point resource of its producing launch.
 pub(crate) fn descriptor_for_backend(
     device: &FmirDeviceSection,
     backend: DeviceBackend,
@@ -979,7 +979,11 @@ pub(crate) fn descriptor_for_backend(
 /// launch before projecting the program into a host descriptor. The host
 /// descriptor has no result surface, so a result-only or contradictory record
 /// would otherwise be able to add metadata without proving a real producer.
+/// Result rows are the authoritative readback set, but the host can only read
+/// back `ObservationPoint` buffers and its receipt is keyed by buffer id; an
+/// unsupported lifetime or repeated id therefore fails before host creation.
 fn validate_wire_results(wire: &WireDeviceProgram) -> Result<(), Vec<Diagnostic>> {
+    let mut result_buffers = BTreeMap::new();
     for (result_index, result) in wire.results.iter().enumerate() {
         if !matches!(result.role, WireBufferRole::Output | WireBufferRole::InOut) {
             return Err(vec![device_diag(
@@ -1077,12 +1081,34 @@ fn validate_wire_results(wire: &WireDeviceProgram) -> Result<(), Vec<Diagnostic>
                 ),
             )]);
         }
-        if !matches!(resource.access, WireResourceAccess::Write | WireResourceAccess::ReadWrite) {
+        if resource.buffer.lifetime != WireBufferLifetime::ObservationPoint {
+            return Err(vec![device_diag(
+                "result",
+                format!(
+                    "result {result_index} names buffer {} with lifetime {}; only observation-point results are supported by the host readback contract",
+                    result.buffer.id,
+                    resource.buffer.lifetime.spelling()
+                ),
+            )]);
+        }
+        if !matches!(
+            resource.access,
+            WireResourceAccess::Write | WireResourceAccess::ReadWrite
+        ) {
             return Err(vec![device_diag(
                 "result",
                 format!(
                     "result {result_index} names launch {} as producer, but its matching resource is read-only",
                     result.produced_by
+                ),
+            )]);
+        }
+        if let Some(first_index) = result_buffers.insert(result.buffer.id, result_index) {
+            return Err(vec![device_diag(
+                "result",
+                format!(
+                    "result {result_index} repeats observation buffer {} already named by result {first_index}; result buffers must be unique in the host receipt",
+                    result.buffer.id
                 ),
             )]);
         }
@@ -1175,22 +1201,17 @@ fn inputs_by_buffer_id(device: &FmirDeviceSection) -> BTreeMap<u32, Vec<f32>> {
     by_id
 }
 
-/// The observation-point buffer ids the run reads back (S2-4).
+/// The explicit result buffer ids the run reads back (S2-4).
 ///
-/// The readback set is exactly the buffers whose carried lifetime is
-/// ObservationPoint — the declared observation points on the wire. InOut
-/// intermediates (PerStep lifetime under the constructor mapping) are never
-/// read back, so the ordinary `faber run` path performs no undeclared
-/// readback between kernels (campaign exit-gate bullet 1).
+/// Result rows are the authoritative readback set. `validate_wire_results`
+/// proves that each row names a unique `ObservationPoint` resource before this
+/// function is used, so no valid result can disappear through a role/lifetime
+/// re-derivation.
 fn observation_buffer_ids(device: &FmirDeviceSection) -> Vec<u32> {
     let mut ids = Vec::new();
-    for kernel in &device.device_program.program.kernels {
-        for resource in &kernel.resources {
-            if resource.buffer.lifetime == WireBufferLifetime::ObservationPoint
-                && !ids.contains(&resource.buffer.id)
-            {
-                ids.push(resource.buffer.id);
-            }
+    for result in &device.device_program.program.results {
+        if !ids.contains(&result.buffer.id) {
+            ids.push(result.buffer.id);
         }
     }
     ids
@@ -1365,6 +1386,8 @@ pub(crate) fn execute_device_route(
     let mut host = super::host_factory::construct_composite_host(selection, true)
         .map_err(|diagnostic| vec![diagnostic])?;
     let inputs = inputs_by_buffer_id(device);
+    // The explicit result rows, already validated by descriptor construction,
+    // are the sole authority for host readback selection.
     let outputs = observation_buffer_ids(device);
 
     // A10 identity over the COMPLETE program (S3-A4): the canonical bytes of

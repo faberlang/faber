@@ -277,6 +277,13 @@ fn descriptor_maps_wire_lifetimes_onto_host_descriptor() {
         hash: "fnv64:0000000000000000".to_owned(),
         symbols: Vec::new(),
     }];
+    // The intermediate remains present in the descriptor as an InOut slot,
+    // but this projection test supplies only the supported final observation.
+    section
+        .device_program
+        .program
+        .results
+        .retain(|result| result.role == WireBufferRole::Output);
 
     let descriptor = descriptor_for_backend(&section, DeviceBackend::Metal, b"msl blob")
         .expect("admitted wire builds the descriptor");
@@ -340,6 +347,16 @@ fn descriptor_preserves_wire_launch_order_and_version_keys() {
         ];
         wire.results[0].produced_by = 12;
         wire.results[1].produced_by = 11;
+        // Make the InOut result an observation-point form supported by the
+        // existing host contract so this test can exercise ordered projection.
+        for kernel in &mut wire.kernels {
+            for resource in &mut kernel.resources {
+                if resource.buffer.id == 2 {
+                    resource.buffer.lifetime = WireBufferLifetime::ObservationPoint;
+                }
+            }
+        }
+        wire.results[0].buffer.lifetime = WireBufferLifetime::ObservationPoint;
     }
     let medius_id = section.device_program.program.kernels[0].resources[1]
         .buffer
@@ -439,6 +456,11 @@ fn descriptor_missing_keyed_version_metadata_fails_closed() {
         hash: "fnv64:0000000000000000".to_owned(),
         symbols: Vec::new(),
     }];
+    section
+        .device_program
+        .program
+        .results
+        .retain(|result| result.role == WireBufferRole::Output);
     let mut descriptor = descriptor_for_backend(&section, DeviceBackend::Metal, b"msl blob")
         .expect("baseline descriptor is valid");
     descriptor.buffer_versions.clear();
@@ -494,6 +516,11 @@ fn descriptor_rejects_result_with_contradictory_producer() {
         hash: "fnv64:0000000000000000".to_owned(),
         symbols: Vec::new(),
     }];
+    section
+        .device_program
+        .program
+        .results
+        .retain(|result| result.role == WireBufferRole::Output);
     let first_launch = section.device_program.program.launches[0].id;
     section
         .device_program
@@ -519,6 +546,11 @@ fn descriptor_rejects_result_with_contradictory_version_shape() {
         hash: "fnv64:0000000000000000".to_owned(),
         symbols: Vec::new(),
     }];
+    section
+        .device_program
+        .program
+        .results
+        .retain(|result| result.role == WireBufferRole::Output);
     let result = section
         .device_program
         .program
@@ -543,6 +575,11 @@ fn descriptor_rejects_result_with_contradictory_version_number() {
         hash: "fnv64:0000000000000000".to_owned(),
         symbols: Vec::new(),
     }];
+    section
+        .device_program
+        .program
+        .results
+        .retain(|result| result.role == WireBufferRole::Output);
     section
         .device_program
         .program
@@ -624,6 +661,47 @@ fn descriptor_rejects_unknown_element_type_spelling() {
     );
 }
 
+#[test]
+fn descriptor_rejects_inout_result_before_host_projection() {
+    let program = two_kernel_program();
+    let mut section = section_for_program(&program);
+    section.artifacts.artifact = vec![FmirDeviceArtifact {
+        backend: FmirDeviceBackend::Metal,
+        blob: "msl".to_owned(),
+        hash: "fnv64:0000000000000000".to_owned(),
+        symbols: Vec::new(),
+    }];
+
+    let error = descriptor_for_backend(&section, DeviceBackend::Metal, b"msl blob")
+        .expect_err("a PerStep InOut result must fail before host construction");
+    assert!(error[0].message.contains("result 0"));
+    assert!(error[0].message.contains("per-step"));
+    assert!(error[0].message.contains("observation-point"));
+}
+
+#[test]
+fn descriptor_rejects_duplicate_result_buffer_before_host_projection() {
+    let program = device_program_from_corpus_fixture("cuda/summa-proof.fab");
+    let mut section = section_for_program(&program);
+    section.artifacts.artifact = vec![FmirDeviceArtifact {
+        backend: FmirDeviceBackend::Metal,
+        blob: "msl".to_owned(),
+        hash: "fnv64:0000000000000000".to_owned(),
+        symbols: Vec::new(),
+    }];
+    let duplicate = section
+        .device_program
+        .program
+        .results
+        .first()
+        .cloned()
+        .expect("summa fixture has one result");
+    section.device_program.program.results.push(duplicate);
+
+    let error = descriptor_for_backend(&section, DeviceBackend::Metal, b"msl blob")
+        .expect_err("duplicate result buffers must fail before host construction");
+    assert!(error[0].message.contains("repeats observation buffer"));
+}
 
 /// Build the S2-5 two-kernel fixture's device program (constructor
 /// identity-unification test substrate).
@@ -768,10 +846,17 @@ fn two_kernel_wire_carries_unified_lifetimes() {
         WireBufferLifetime::ObservationPoint
     );
 
-    // The ordinary readback set is exactly the observation point; the
-    // PerStep intermediate is never read back (no undeclared readback).
+    // The explicit result rows are the readback set, including the InOut
+    // result. The ordinary host route rejects this PerStep form before host
+    // construction; it must never silently omit the result.
     let readbacks = observation_buffer_ids(&section);
-    assert_eq!(readbacks, vec![kernel1_resources[1].buffer.id]);
+    assert_eq!(
+        readbacks,
+        vec![
+            kernel0_resources[1].buffer.id,
+            kernel1_resources[1].buffer.id
+        ]
+    );
 
     // The wire round-trips deterministically with the unified lifetimes
     // intact (canonical bytes stable).
