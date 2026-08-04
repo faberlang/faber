@@ -54,7 +54,7 @@ mod mir;
 mod modules;
 mod paths;
 mod product;
-mod reader;
+mod locale;
 mod runtime_dependency;
 mod source_files;
 mod test_source_filter;
@@ -188,8 +188,8 @@ pub(crate) use library::{
     library_interface_export_names, library_interface_has_module, library_module_segments,
     program_export_names, with_library_cached_analysis_mut, LibraryInterfaceCache,
 };
-pub use reader::locale_pack_for_emit;
-pub(crate) use reader::{config_with_locale, load_locale_pack_for_input};
+pub use locale::locale_pack_for_emit;
+pub(crate) use locale::{config_with_locale, load_locale_pack_for_input};
 
 pub(super) const MANIFEST_FILE: &str = "faber.toml";
 
