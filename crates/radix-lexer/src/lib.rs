@@ -77,7 +77,7 @@ pub fn lex_with_reader_pack(source: &str, pack: &dyn KeywordPack) -> LexResult {
 
 /// Keyword surface used by pack-aware lexing.
 ///
-/// Implemented by `ReaderLocalePack` in the `radix` package so this crate does
+/// Implemented by `LocalePack` in the `radix` package so this crate does
 /// not depend on reader-locale loading or semantic type tables.
 pub trait KeywordPack {
     /// Stable pack id for diagnostics.

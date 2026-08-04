@@ -22,7 +22,7 @@ pub use diagnostic::{
 };
 pub use span::Span;
 pub use spec::{
-    reader_locale_fallback_spec, reader_locale_suggestion_spec, reader_locale_unknown_spec,
+    locale_fallback_spec, locale_suggestion_spec, locale_unknown_spec,
     DiagnosticSpec,
 };
 

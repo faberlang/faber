@@ -19,7 +19,7 @@ pub struct DiagnosticSpec {
 
 /// Return the stable diagnostic spec for visible reader-locale fallback.
 #[must_use]
-pub fn reader_locale_fallback_spec() -> DiagnosticSpec {
+pub fn locale_fallback_spec() -> DiagnosticSpec {
     DiagnosticSpec {
         code: "LOCALE001",
         help: Some(
@@ -30,7 +30,7 @@ pub fn reader_locale_fallback_spec() -> DiagnosticSpec {
 
 /// Return the stable diagnostic spec for reader-locale spelling suggestions.
 #[must_use]
-pub fn reader_locale_suggestion_spec() -> DiagnosticSpec {
+pub fn locale_suggestion_spec() -> DiagnosticSpec {
     DiagnosticSpec {
         code: "LOCALE002",
         help: Some(
@@ -41,7 +41,7 @@ pub fn reader_locale_suggestion_spec() -> DiagnosticSpec {
 
 /// Return the stable diagnostic spec for an unknown or invalid reader locale.
 #[must_use]
-pub fn reader_locale_unknown_spec() -> DiagnosticSpec {
+pub fn locale_unknown_spec() -> DiagnosticSpec {
     DiagnosticSpec {
         code: "LOCALE003",
         help: Some(
