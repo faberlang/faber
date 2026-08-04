@@ -11,7 +11,7 @@ pub fn cmd_emit_faber(command: EmitCommand) {
 
     // Faber owns reader-locale → pack resolution (install layout + package
     // manifests live here, not in radix). Resolve once and hand the pack to the
-    // shared emit path so `-t faber --reader-locale=<X>` emits localized Faber.
+    // shared emit path so `-t faber --locale=<X>` emits localized Faber.
     let reader_pack = match crate::package::reader_pack_for_emit(
         &command.input,
         command.reader_locale.as_deref(),

@@ -39,6 +39,6 @@ pub(crate) fn reader_locale_without_package_error(
         return None;
     }
     Some(format!(
-        "--reader-locale {locale} requires a package path or .fab entry file"
+        "--locale {locale} requires a package path or .fab entry file"
     ))
 }

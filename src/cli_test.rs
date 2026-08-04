@@ -354,7 +354,7 @@ fn cli_parses_fmir_bin_target_for_run() {
 
 #[test]
 fn cli_parses_reader_locale_on_check() {
-    let check = Cli::try_parse_from(["faber", "check", "--reader-locale", "zh-Hans", "main.fab"])
+    let check = Cli::try_parse_from(["faber", "check", "--locale", "zh-Hans", "main.fab"])
         .expect("parse check reader locale");
     let Some(crate::cli::Command::Check(args)) = check.command else {
         panic!("expected check subcommand");
@@ -367,7 +367,7 @@ fn cli_parses_reader_locale_on_emit() {
     let emit = Cli::try_parse_from([
         "faber",
         "emit",
-        "--reader-locale",
+        "--locale",
         "zh-Hans",
         "-t",
         "rust",
@@ -382,7 +382,7 @@ fn cli_parses_reader_locale_on_emit() {
 
 #[test]
 fn cli_parses_reader_locale_on_build() {
-    let build = Cli::try_parse_from(["faber", "build", "--reader-locale", "zh-Hans", "main.fab"])
+    let build = Cli::try_parse_from(["faber", "build", "--locale", "zh-Hans", "main.fab"])
         .expect("parse build reader locale");
     let Some(crate::cli::Command::Build(args)) = build.command else {
         panic!("expected build subcommand");
@@ -392,7 +392,7 @@ fn cli_parses_reader_locale_on_build() {
 
 #[test]
 fn cli_parses_reader_locale_on_run() {
-    let run = Cli::try_parse_from(["faber", "run", "--reader-locale", "zh-Hans", "main.fab"])
+    let run = Cli::try_parse_from(["faber", "run", "--locale", "zh-Hans", "main.fab"])
         .expect("parse run reader locale");
     let Some(crate::cli::Command::Run(args)) = run.command else {
         panic!("expected run subcommand");
@@ -402,7 +402,7 @@ fn cli_parses_reader_locale_on_run() {
 
 #[test]
 fn cli_parses_reader_locale_on_test() {
-    let test = Cli::try_parse_from(["faber", "test", "--reader-locale", "zh-Hans", "main.fab"])
+    let test = Cli::try_parse_from(["faber", "test", "--locale", "zh-Hans", "main.fab"])
         .expect("parse test reader locale");
     let Some(crate::cli::Command::Test(args)) = test.command else {
         panic!("expected test subcommand");
@@ -416,7 +416,7 @@ fn cli_parses_reader_locale_on_format() {
         "faber",
         "format",
         "--canonical",
-        "--reader-locale",
+        "--locale",
         "zh-Hans",
         "main.fab",
     ])
@@ -480,7 +480,7 @@ fn cli_parses_reader_locale_on_explain() {
     let explain = Cli::try_parse_from([
         "faber",
         "explain",
-        "--reader-locale",
+        "--locale",
         "zh-Hans",
         "SEM010.initializer_annotation_mismatch",
     ])
@@ -574,11 +574,11 @@ fn cli_rejects_explain_search_and_category() {
 #[test]
 fn cli_rejects_explain_list_and_reader_locale() {
     let list_reader_locale =
-        Cli::try_parse_from(["faber", "explain", "--list", "--reader-locale", "la"])
+        Cli::try_parse_from(["faber", "explain", "--list", "--locale", "la"])
             .expect_err("list and reader locale should conflict");
     let list_reader_locale_rendered = list_reader_locale.to_string();
     assert!(list_reader_locale_rendered.contains("--list"));
-    assert!(list_reader_locale_rendered.contains("--reader-locale"));
+    assert!(list_reader_locale_rendered.contains("--locale"));
 }
 
 #[test]
@@ -588,13 +588,13 @@ fn cli_rejects_explain_search_and_reader_locale() {
         "explain",
         "--search",
         "host",
-        "--reader-locale",
+        "--locale",
         "la",
     ])
     .expect_err("search and reader locale should conflict");
     let search_reader_locale_rendered = search_reader_locale.to_string();
     assert!(search_reader_locale_rendered.contains("--search"));
-    assert!(search_reader_locale_rendered.contains("--reader-locale"));
+    assert!(search_reader_locale_rendered.contains("--locale"));
 }
 
 #[test]
@@ -604,13 +604,13 @@ fn cli_rejects_explain_category_and_reader_locale() {
         "explain",
         "--category",
         "diagnostics",
-        "--reader-locale",
+        "--locale",
         "la",
     ])
     .expect_err("category and reader locale should conflict");
     let category_reader_locale_rendered = category_reader_locale.to_string();
     assert!(category_reader_locale_rendered.contains("--category"));
-    assert!(category_reader_locale_rendered.contains("--reader-locale"));
+    assert!(category_reader_locale_rendered.contains("--locale"));
 }
 
 #[test]
@@ -624,7 +624,7 @@ fn cli_rejects_explain_json_without_term() {
 
 #[test]
 fn cli_rejects_explain_reader_locale_without_term() {
-    let error = Cli::try_parse_from(["faber", "explain", "--reader-locale", "la"])
+    let error = Cli::try_parse_from(["faber", "explain", "--locale", "la"])
         .expect_err("reader locale requires a term");
     let rendered = error.to_string();
     assert!(rendered.contains("required arguments were not provided"));

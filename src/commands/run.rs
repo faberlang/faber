@@ -49,7 +49,7 @@ pub(super) fn cmd_run(args: RunArgs) {
         std::process::exit(1);
     }
     if args.interpret && args.reader_locale.is_some() {
-        eprintln!("error: --reader-locale is not supported with `faber run --interpret`");
+        eprintln!("error: --locale is not supported with `faber run --interpret`");
         std::process::exit(1);
     }
 

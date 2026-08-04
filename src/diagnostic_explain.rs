@@ -149,7 +149,7 @@ pub fn render_json(explanation: &DiagnosticExplanation) -> Result<String, Explai
 
 fn load_installed_reader_pack(locale: &str) -> Result<ReaderLocalePack, ExplainError> {
     if locale.trim().is_empty() {
-        return Err(ExplainError::new("--reader-locale must not be empty"));
+        return Err(ExplainError::new("--locale must not be empty"));
     }
     let path = installed_reader_pack_path(locale.trim());
     let pack = ReaderLocalePack::from_toml_path(&path).map_err(|err| {

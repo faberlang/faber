@@ -75,7 +75,7 @@ fn selected_locale<'a>(
         let trimmed = locale.trim();
         if trimmed.is_empty() {
             return Err(Box::new(crate::package_diagnostic_error(
-                "--reader-locale must not be empty",
+                "--locale must not be empty",
             )));
         }
         return Ok(Some(trimmed.to_owned()));

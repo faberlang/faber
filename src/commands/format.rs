@@ -22,7 +22,7 @@ pub fn cmd_format(command: &FormatCommand) {
         eprintln!("warning: --config is not implemented yet (forma.toml deferred)");
     }
 
-    // --canonical is the la alias; --reader-locale=<X> drives the emitter
+    // --canonical is the la alias; --locale=<X> drives the emitter
     // surface. Either selects the canonical re-emit path (localizing via the
     // reader pack); no flags keeps author mode.
     let use_canonical = command.canonical || command.reader_locale.is_some();

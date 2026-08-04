@@ -118,7 +118,7 @@ pub struct FormatArgs {
     pub canonical: bool,
 
     /// Reader locale used to select a package-local reader pack.
-    #[arg(long = "reader-locale", value_name = "LOCALE")]
+    #[arg(long = "locale", value_name = "LOCALE")]
     pub reader_locale: Option<String>,
 
     /// Check formatting without writing; exit 1 if any file would change
@@ -171,7 +171,7 @@ pub struct BuildArgs {
     pub deny: Vec<String>,
 
     /// Reader locale used to select a package-local reader pack.
-    #[arg(long = "reader-locale", value_name = "LOCALE")]
+    #[arg(long = "locale", value_name = "LOCALE")]
     pub reader_locale: Option<String>,
 
     /// Input file or package path
@@ -187,7 +187,7 @@ pub struct CheckArgs {
     pub diagnostics: bool,
 
     /// Reader locale used to select a package-local reader pack.
-    #[arg(long = "reader-locale", value_name = "LOCALE")]
+    #[arg(long = "locale", value_name = "LOCALE")]
     pub reader_locale: Option<String>,
 
     /// Downgrade unresolved/import-driven semantic errors to warnings
@@ -266,7 +266,7 @@ pub struct ExplainArgs {
 
     /// Reader locale used to select diagnostic explanation text
     #[arg(
-        long = "reader-locale",
+        long = "locale",
         value_name = "LOCALE",
         requires = "term",
         conflicts_with_all = ["search", "list", "category"]
@@ -306,7 +306,7 @@ pub struct RunArgs {
     pub path: PathBuf,
 
     /// Reader locale used to select a package-local reader pack.
-    #[arg(long = "reader-locale", value_name = "LOCALE")]
+    #[arg(long = "locale", value_name = "LOCALE")]
     pub reader_locale: Option<String>,
 
     /// Runtime target to build and execute. When omitted, the manifest
@@ -419,7 +419,7 @@ pub struct TestArgs {
     pub path: PathBuf,
 
     /// Reader locale used to select a package-local reader pack.
-    #[arg(long = "reader-locale", value_name = "LOCALE")]
+    #[arg(long = "locale", value_name = "LOCALE")]
     pub reader_locale: Option<String>,
 
     /// Promote all warning diagnostics to errors

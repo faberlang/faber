@@ -140,7 +140,7 @@ fn reader_locale_rejects_multiple_inputs() {
     ));
 }
 
-const READER_LOCALE_ERROR: &str = "--reader-locale la requires a package path or .fab entry file";
+const READER_LOCALE_ERROR: &str = "--locale la requires a package path or .fab entry file";
 
 #[test]
 fn reader_locale_with_package_accepts_fab_entry() {

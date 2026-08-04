@@ -11,7 +11,7 @@ pub struct EmitArgs {
     pub diagnostics: bool,
 
     /// Reader locale used to select a package-local reader pack.
-    #[arg(long = "reader-locale", value_name = "LOCALE")]
+    #[arg(long = "locale", value_name = "LOCALE")]
     pub reader_locale: Option<String>,
 
     /// Output target language

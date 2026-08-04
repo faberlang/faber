@@ -172,13 +172,13 @@ fn format_canonical_reader_locale_thai_localizes_surface() {
     let thai_output = run_faber_format_stdout_with_args(&[
         "format",
         "--canonical",
-        "--reader-locale",
+        "--locale",
         "th-TH",
         "--stdout",
         thai.to_str().expect("utf8 thai path"),
     ]);
 
-    // Phase 2: --reader-locale drives the emitter surface, so the canonical
+    // Phase 2: --locale drives the emitter surface, so the canonical
     // re-emit localizes reader-locale keywords and types into Thai and no longer
     // matches the Latin twin.
     assert_ne!(
@@ -233,7 +233,7 @@ fn format_reader_locale_la_without_canonical_matches_canonical_latin() {
 
     let locale_output = run_faber_format_stdout_with_args(&[
         "format",
-        "--reader-locale",
+        "--locale",
         "la",
         "--stdout",
         path.to_str().expect("utf8 path"),
@@ -241,7 +241,7 @@ fn format_reader_locale_la_without_canonical_matches_canonical_latin() {
     let canonical_output = run_faber_format_stdout_with_args(&[
         "format",
         "--canonical",
-        "--reader-locale",
+        "--locale",
         "la",
         "--stdout",
         path.to_str().expect("utf8 path"),
@@ -256,7 +256,7 @@ fn format_reader_locale_la_without_canonical_matches_canonical_latin() {
 fn format_reader_locale_preserves_template_application_sugar() {
     // Reader-locale packs re-render the same semantic program with different
     // keyword spellings while retaining glyph shapes. The `"…"(args)` template-
-    // application postfix is a glyph shape: `--reader-locale en` localizes
+    // application postfix is a glyph shape: `--locale en` localizes
     // `nota` → `print` but must keep `print "val § here"(n)` instead of
     // expanding into `print format("val § here", n)`. `--canonical` keeps the
     // `scriptum(...)` expansion.
@@ -269,7 +269,7 @@ fn format_reader_locale_preserves_template_application_sugar() {
 
     let llm_output = run_faber_format_stdout_with_args(&[
         "format",
-        "--reader-locale",
+        "--locale",
         "en",
         "--stdout",
         fixture.to_str().expect("utf8 path"),
@@ -303,16 +303,16 @@ fn format_reader_locale_preserves_template_application_sugar() {
 
 #[test]
 fn format_reader_locale_without_canonical_localizes() {
-    // Phase 2 removed the "--reader-locale requires --canonical" gate. A bare
-    // --reader-locale=<X> now selects the canonical re-emit path with the
-    // localized surface (Latin default when --reader-locale is absent).
+    // Phase 2 removed the "--locale requires --canonical" gate. A bare
+    // --locale=<X> now selects the canonical re-emit path with the
+    // localized surface (Latin default when --locale is absent).
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale/th-TH");
     let thai = root.join("src/main.fab");
 
     let output = Command::new(faber_binary())
         .args([
             "format",
-            "--reader-locale",
+            "--locale",
             "th-TH",
             "--stdout",
             thai.to_str().expect("utf8 thai path"),
@@ -328,11 +328,11 @@ fn format_reader_locale_without_canonical_localizes() {
     let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
     assert!(
         stdout.contains("ฟังก์ชัน"),
-        "bare --reader-locale=th-TH must emit the Thai surface: {stdout}"
+        "bare --locale=th-TH must emit the Thai surface: {stdout}"
     );
     assert!(
         !code_only(&stdout).contains("functio"),
-        "bare --reader-locale=th-TH must not emit the Latin keyword: {stdout}"
+        "bare --locale=th-TH must not emit the Latin keyword: {stdout}"
     );
 }
 
