@@ -55,16 +55,27 @@ use radix::diagnostics::Diagnostic;
 use radix::lexer::Interner;
 use radix::mir::{MirFunction, MirKernelShaderStage, ValidatedMir};
 use radix_mir::abi::{
-    MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind, MirKernelSignature,
+    MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole,
+    MirKernelSignature,
 };
+use radix_mir::device::MirCompanionDerivativeKind;
 use radix_mir::device_program::{
     Binding, BufferId, BufferIdentity, BufferLifetime, BufferRole, BufferVersion, DeviceProgram,
     DeviceProgramLifetime, DeviceResource, KernelLaunchPlan, KernelUnit, LaunchId, LaunchUnit,
 };
 use radix_mir::device_program_plans::kernel_plan_for_function;
+use radix_mir::device_semantics::{
+    DependencyEdge, DeviceSemantics, InitializationFact, InitializationPolicy,
+    LosslessMirCompanionEntry, ObservationFact, SemanticValue, SemanticValueId,
+    SemanticValueOrigin, ValueBinding, ValueGeneration,
+};
 use radix_mir::kernel_plan::CollectionKernelPlan;
 use radix_mir::layout::MirTensorStorageLayout;
 use radix_mir::{MirFunctionId, MirType};
+use radix_mir_fmir::schema::{
+    WireCompanionDerivativeKind, WireCompanionRelation, WireCompanionSelectedInput,
+    WireCompanionSelectedOutput,
+};
 use radix_mir_fmir::{
     FmirDeviceArtifact, FmirDeviceArtifactsSection, FmirDeviceBackend, FmirDeviceInput,
     FmirDeviceProgramSection, FmirDeviceSection, FmirDeviceSelection, FmirDeviceSymbol,
@@ -77,7 +88,7 @@ use radix_mir_fmir::{
     WireSemanticValueOrigin, WireSharedMemoryLayout, WireStorageLayout, WireWorkgroupCount,
     WireWorkgroupSize,
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap, VecDeque};
 
 /// Stable fail-closed diagnostic for a device-program construction failure.
 fn device_diag(context: &str, message: impl Into<String>) -> Diagnostic {
@@ -142,21 +153,24 @@ fn safe_interner_name(interner: &Interner, symbol: radix::lexer::Symbol) -> Opti
     }
 }
 
-/// One buffer unified across kernel boundaries (S2-5).
+/// One unified buffer's program-level identity facts plus the carried
+/// semantic-value fact it is minted from (F1).
 ///
-/// The unification key is the **identity name + shape**: when one kernel's
-/// input buffer matches another kernel's output (same name + shape), the two
-/// share one `BufferId` as an InOut intermediate with a data-flow edge
-/// (delivery spec N2.6; the schema's `BufferRegistry`/`DataFlowPair` already
-/// model this — the constructor stops minting a fresh id per slot). The role
-/// is the merged program-level fact: like roles keep the role, an
-/// Input+Output mix (either order) is InOut.
+/// The S2-5 cross-kernel wiring still unifies one kernel's output with
+/// another kernel's input by the declared logical identity (name + shape) —
+/// that wiring is the only carried fact connecting independent kernels — but
+/// the unification is now guarded by [`unify_roles`]: two independent
+/// producers of the same named output never alias (F1). The buffer's
+/// semantic VALUE identity is minted from the carried MIR fact of the slot
+/// that first references it (a MIR local, a host input, or a distinct
+/// synthetic label) — never from the buffer id, binding position, or
+/// declaration coincidence.
 ///
 /// The resource-state axes (F5) ride here as **independent facts** gathered
 /// from the slot access pattern across the whole program: `written` and
 /// `consumed` feed the allocation-lifetime and initialization decisions in
 /// pass 2 — no axis is derived from the role or from another axis.
-struct UnifiedBuffer {
+struct ProgramBuffer {
     id: BufferId,
     name: String,
     element_ty: MirType,
@@ -168,12 +182,59 @@ struct UnifiedBuffer {
     /// Any kernel slot reads the buffer (Read) — the independent fact that
     /// distinguishes a step-local intermediate from a final observation.
     consumed: bool,
+    /// Any kernel slot accesses the buffer in place (ReadWrite).
+    readwrite: bool,
+    /// The carried MIR/value fact the buffer's semantic value identity is
+    /// minted from (F1).
+    origin: SemanticValueOrigin,
 }
 
-impl UnifiedBuffer {
-    /// The S2-5 unification key: same identity name and same shape.
+impl ProgramBuffer {
+    /// The S2-5 wiring key: same declared logical name and same shape. The
+    /// caller additionally guards on [`unify_roles`] before unifying, so a
+    /// name/shape coincidence alone never aliases two unrelated values.
     fn matches(&self, name: &str, element_ty: MirType, element_count: u64) -> bool {
         self.name == name && self.element_ty == element_ty && self.element_count == element_count
+    }
+}
+
+/// Whether a slot with program role `next` may join an existing buffer with
+/// role `existing` under the S2-5 wiring (same logical name + shape).
+///
+/// The wiring is a data-flow continuation — a shared input, a
+/// producer→consumer intermediate, or an in-place accumulation slot. Two
+/// independent producers of the same named output NEVER unify (F1: two
+/// unrelated same-name/same-shape values are distinct, never aliased).
+fn unify_roles(existing: BufferRole, next: BufferRole) -> bool {
+    match (existing, next) {
+        (BufferRole::Input, BufferRole::Input) => true,
+        (BufferRole::InOut, _) | (_, BufferRole::InOut) => true,
+        (BufferRole::Output, BufferRole::Input) | (BufferRole::Input, BufferRole::Output) => true,
+        (BufferRole::Output, BufferRole::Output) => false,
+    }
+}
+
+/// The carried fact a buffer's semantic value identity is minted from (F1):
+/// the MIR local the slot's value flows from when the slot names one (stable
+/// under rename — the identity never follows the diagnostic name), a
+/// host-provided input for an anonymous read slot, or a distinct synthetic
+/// label for an anonymous writer slot (a tuple-output gradient).
+fn value_origin(
+    function: &MirFunction,
+    resource: &MirKernelResource,
+    buffer_id: BufferId,
+) -> SemanticValueOrigin {
+    if let Some(local) = resource.source_local {
+        SemanticValueOrigin::MirLocal {
+            function: function.id,
+            local: local.0,
+        }
+    } else if resource.role == MirKernelResourceRole::Input {
+        SemanticValueOrigin::HostInput
+    } else {
+        SemanticValueOrigin::Synthetic {
+            label: format!("buffer-{}", buffer_id.0),
+        }
     }
 }
 
@@ -186,45 +247,243 @@ fn merge_buffer_roles(previous: BufferRole, next: BufferRole) -> BufferRole {
     }
 }
 
+/// Order the launch sequence to follow the carried producer/consumer
+/// dependency graph (F3) — never kernel declaration order. Producers always
+/// precede their consumers; the launch ids are carried facts and do not
+/// change, only their position in the execution sequence does.
+///
+/// # Errors
+/// Fail-closed when the dependency graph contains a cycle (a launch sequence
+/// that follows it would never terminate).
+fn dependency_ordered_launches(
+    program: &DeviceProgram,
+) -> Result<Vec<LaunchUnit>, Vec<Diagnostic>> {
+    let edges = program.buffer_registry().data_flow_pairs();
+    let mut indegree: HashMap<LaunchId, usize> = HashMap::new();
+    let mut dependents: HashMap<LaunchId, Vec<LaunchId>> = HashMap::new();
+    for launch in &program.launches {
+        indegree.insert(launch.id, 0);
+    }
+    for edge in &edges {
+        if edge.producer == edge.consumer {
+            continue;
+        }
+        *indegree.entry(edge.consumer).or_insert(0) += 1;
+        dependents
+            .entry(edge.producer)
+            .or_default()
+            .push(edge.consumer);
+    }
+    // Kahn's algorithm seeded in declaration order: independent launches keep
+    // their declaration order, and any launch that depends on another is
+    // emitted only after every producer has run.
+    let mut ready: VecDeque<LaunchId> = program
+        .launches
+        .iter()
+        .filter(|launch| indegree.get(&launch.id).copied().unwrap_or(0) == 0)
+        .map(|launch| launch.id)
+        .collect();
+    let mut ordered: Vec<LaunchId> = Vec::with_capacity(program.launches.len());
+    while let Some(id) = ready.pop_front() {
+        ordered.push(id);
+        if let Some(consumers) = dependents.get(&id) {
+            for &consumer in consumers {
+                if let Some(count) = indegree.get_mut(&consumer) {
+                    *count -= 1;
+                    if *count == 0 {
+                        ready.push_back(consumer);
+                    }
+                }
+            }
+        }
+    }
+    if ordered.len() != program.launches.len() {
+        return Err(vec![device_diag(
+            "launch order",
+            "the carried producer/consumer dependency graph contains a cycle; the launch sequence cannot follow it",
+        )]);
+    }
+    // Reorder the launch units by their position in the carried topological
+    // order (launch ids are carried facts; only their sequence position
+    // changes).
+    let mut position: HashMap<LaunchId, usize> = HashMap::new();
+    for (index, id) in ordered.iter().enumerate() {
+        position.insert(*id, index);
+    }
+    let mut sorted: Vec<LaunchUnit> = program.launches.to_vec();
+    sorted.sort_by_key(|launch| position.get(&launch.id).copied().unwrap_or(usize::MAX));
+    Ok(sorted)
+}
+
+/// Mint the carried semantic facts (F1–F6) of a materialized program, in
+/// execution order.
+///
+/// - values + bindings: one semantic value per unified buffer, minted from
+///   the carried origin facts (F1);
+/// - generations: every logical write in the ordered launch sequence is an
+///   explicit new generation; a read consumes the current generation (F2);
+/// - roots + dependencies: the carried graph the host schedules from (F3);
+/// - relations: the lossless primal/companion rows from the carrier (F4);
+/// - initializations + observations: the independent axis facts (F5/F6).
+fn semantic_facts(
+    program: &DeviceProgram,
+    buffers: &[ProgramBuffer],
+    companions: &radix_mir::device::MirCompanionMap,
+) -> DeviceSemantics {
+    let values: Vec<SemanticValue> = buffers
+        .iter()
+        .map(|buffer| SemanticValue {
+            id: SemanticValueId(buffer.id.0),
+            name: buffer.name.clone(),
+            element_ty: buffer.element_ty,
+            element_count: buffer.element_count,
+            origin: buffer.origin.clone(),
+        })
+        .collect();
+    let bindings: Vec<ValueBinding> = buffers
+        .iter()
+        .map(|buffer| ValueBinding {
+            value: SemanticValueId(buffer.id.0),
+            buffer: buffer.id,
+        })
+        .collect();
+
+    // Generations in EXECUTION order: a later write is a new generation,
+    // never another producer of the same one (F2). A read-only buffer's
+    // reads consume its initial (host-provided) state generation 1.
+    let mut produced: HashMap<BufferId, u32> =
+        buffers.iter().map(|buffer| (buffer.id, 0)).collect();
+    let mut generations: Vec<ValueGeneration> = Vec::new();
+    for launch in &program.launches {
+        let Some(kernel) = program.kernels.get(launch.kernel_index) else {
+            continue;
+        };
+        for resource in &kernel.resources {
+            let buffer = resource.buffer.id;
+            match resource.access {
+                MirKernelResourceAccess::Read => {}
+                MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite => {
+                    let next = produced.get(&buffer).copied().unwrap_or(0) + 1;
+                    produced.insert(buffer, next);
+                    generations.push(ValueGeneration {
+                        value: SemanticValueId(buffer.0),
+                        generation: next,
+                        element_ty: resource.version.element_ty,
+                        element_count: resource.version.element_count,
+                        produced_by: launch.id,
+                    });
+                }
+            }
+        }
+    }
+
+    let dependencies: Vec<DependencyEdge> = program
+        .buffer_registry()
+        .data_flow_pairs()
+        .into_iter()
+        .map(|pair| DependencyEdge {
+            producer: pair.producer,
+            consumer: pair.consumer,
+            buffer: pair.buffer,
+            version: pair.version,
+        })
+        .collect();
+    let roots: Vec<LaunchId> = program
+        .launches
+        .iter()
+        .filter(|launch| !dependencies.iter().any(|edge| edge.consumer == launch.id))
+        .map(|launch| launch.id)
+        .collect();
+    let relations: Vec<LosslessMirCompanionEntry> = companions.iter().cloned().collect();
+    let initializations: Vec<InitializationFact> = buffers
+        .iter()
+        .map(|buffer| {
+            let policy = if buffer.readwrite {
+                InitializationPolicy::ZeroFill
+            } else if !buffer.written {
+                InitializationPolicy::HostProvided
+            } else {
+                InitializationPolicy::KernelInitialized
+            };
+            InitializationFact {
+                buffer: buffer.id,
+                policy,
+            }
+        })
+        .collect();
+    let observations: Vec<ObservationFact> = program
+        .results
+        .iter()
+        .map(|result| ObservationFact {
+            buffer: result.buffer.id,
+            version: result.version.version,
+            at_launch: result.produced_by,
+        })
+        .collect();
+
+    DeviceSemantics {
+        values,
+        bindings,
+        generations,
+        roots,
+        dependencies,
+        relations,
+        initializations,
+        observations,
+    }
+}
+
 /// Construct the common device program for a lowered package.
 ///
 /// Scans the validated package MIR for `@ nucleum` compute kernels
 /// (`shader_stage == Compute`) and composes one ordered [`DeviceProgram`]
 /// whose kernel units carry the typed plan, typed storage-buffer resources,
-/// and derived launch plans. Every field is a program fact from the ABI
+/// and derived launch plans, plus the frozen [`DeviceSemantics`] that rides
+/// alongside it (Stage 3R F1–F7). Every field is a program fact from the ABI
 /// signature and the shared plan pass — never inferred from emitted text
 /// (A3). A package with no compute kernels yields `None` (no device payload).
 ///
-/// **Cross-kernel buffer identity unification (S2-5):** the constructor runs
-/// in two passes — first it derives every kernel's signature/plan and unifies
-/// buffer identity by (identity name, element type, element count) across
-/// kernels (one kernel's output matching another's input shares a single
-/// `BufferId` as an InOut intermediate), then it materializes the program
-/// with the merged identity facts. A slot's per-kernel access stays as the
-/// ABI derived it (the schema permits InOut buffers to be read or written at
-/// individual slots).
+/// **Faithful materialization (U4):**
+/// - semantic VALUE identity (F1) is minted from carried MIR facts —
+///   [`SemanticValueOrigin::MirLocal`] from the slot's source local (stable
+///   under rename), `HostInput` for anonymous host-provided reads, or a
+///   distinct `Synthetic` label for anonymous writer slots. Two unrelated
+///   same-name/same-shape values never alias (the unification guard
+///   [`unify_roles`] rejects a second independent producer of a named
+///   output);
+/// - every logical write advances an explicit value generation (F2) in the
+///   ordered launch sequence;
+/// - the launch SEQUENCE follows the carried producer/consumer dependency
+///   graph (F3), never kernel declaration order;
+/// - results name declared observation points only (F6): the program's
+///   Output-role buffers. Writable intermediates and persistent state are
+///   never results merely because they are writable;
+/// - the lossless primal/companion relation (F4) rides from the owned
+///   [`radix_mir::device::MirCompanionMap`] carrier into the semantics.
 ///
 /// **Companion path (S3-A2, THE SPINE):** the constructor also selects the
 /// generated companions of device-resident primals through the owned
-/// [`MirCompanionMap`] carrier — NOT only `shader_stage == Compute`. Each
-/// carried companion's tuple gradient return lowers through the multi-output
-/// ABI (S3-A1) into distinct output resources (N gradient outputs bind to N
-/// distinct slots), its kernel is ordered AFTER the forward kernels, and its
-/// buffers join the same S2-5 unification (the companion reads the primal's
-/// device-resident buffers by identity). Placement is decided here (A5): a
-/// companion of a device-resident primal joins the same `DeviceProgram`;
-/// generated AIR stays pure (the purity ledger is untouched).
+/// [`radix_mir::device::MirCompanionMap`] carrier — NOT only
+/// `shader_stage == Compute`. Each carried companion's tuple gradient return
+/// lowers through the multi-output ABI (S3-A1) into distinct output
+/// resources (N gradient outputs bind to N distinct slots), its kernel is
+/// ordered AFTER the forward kernels, and its buffers join the same S2-5
+/// unification (the companion reads the primal's device-resident buffers by
+/// identity). Placement is decided here (A5): a companion of a
+/// device-resident primal joins the same `DeviceProgram`; generated AIR
+/// stays pure (the purity ledger is untouched).
 ///
 /// # Errors
 /// Fail-closed [`Diagnostic`]s when a kernel's ABI signature or plan cannot
 /// be derived, a storage buffer has no coherent program role, a carried
-/// companion is missing from the lowered MIR, or the resulting program fails
-/// [`DeviceProgram::validate`].
+/// companion is missing from the lowered MIR, the launch sequence cannot
+/// follow the carried dependency graph, or the resulting program + carried
+/// semantics fail [`DeviceProgram::validate_with_semantics`].
 pub(crate) fn device_program_for_lowered(
     validated: &ValidatedMir<'_>,
     interner: &Interner,
     companions: &radix_mir::device::MirCompanionMap,
-) -> Result<Option<DeviceProgram>, Vec<Diagnostic>> {
+) -> Result<Option<(DeviceProgram, DeviceSemantics)>, Vec<Diagnostic>> {
     let kernel_functions: Vec<&MirFunction> = validated
         .program()
         .functions
@@ -259,7 +518,7 @@ pub(crate) fn device_program_for_lowered(
     // companion kernels — every kernel participates in the same S2-5
     // unification, so a companion reads its primal's device-resident buffers
     // by identity.
-    let mut unified: Vec<UnifiedBuffer> = Vec::new();
+    let mut buffers: Vec<ProgramBuffer> = Vec::new();
     let mut next_buffer_id = 1u32;
     let mut builds: Vec<KernelBuild> = Vec::with_capacity(kernel_functions.len());
     let mut build_kernel = |function: &MirFunction| -> Result<(), Vec<Diagnostic>> {
@@ -296,25 +555,27 @@ pub(crate) fn device_program_for_lowered(
                     )]
                 })?;
             let name = buffer_slot_name(function, interner, resource);
-            let buffer_id = if let Some(entry) = unified
-                .iter_mut()
-                .find(|entry| entry.matches(&name, resource.element_ty, resource.element_count))
-            {
-                // Unification (S2-5): the same logical buffer appears at
-                // this kernel too. The merged role is the program-level
-                // identity fact; an Input+Output mix makes it an InOut
-                // intermediate.
+            // S2-5 wiring: the same logical buffer appears at this kernel
+            // too. The role guard ([`unify_roles`]) keeps a name/shape
+            // coincidence from aliasing two unrelated values — a second
+            // independent producer of a named output mints a distinct buffer
+            // and a distinct semantic value (F1).
+            let buffer_id = if let Some(entry) = buffers.iter_mut().find(|entry| {
+                entry.matches(&name, resource.element_ty, resource.element_count)
+                    && unify_roles(entry.role, role)
+            }) {
                 entry.role = merge_buffer_roles(entry.role, role);
                 entry.written |= matches!(
                     resource.access,
                     MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
                 );
                 entry.consumed |= resource.access == MirKernelResourceAccess::Read;
+                entry.readwrite |= resource.access == MirKernelResourceAccess::ReadWrite;
                 entry.id
             } else {
                 let id = BufferId(next_buffer_id);
                 next_buffer_id += 1;
-                unified.push(UnifiedBuffer {
+                buffers.push(ProgramBuffer {
                     id,
                     name,
                     element_ty: resource.element_ty,
@@ -325,6 +586,8 @@ pub(crate) fn device_program_for_lowered(
                         MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
                     ),
                     consumed: resource.access == MirKernelResourceAccess::Read,
+                    readwrite: resource.access == MirKernelResourceAccess::ReadWrite,
+                    origin: value_origin(function, resource, id),
                 });
                 id
             };
@@ -385,13 +648,16 @@ pub(crate) fn device_program_for_lowered(
 
     // Pass 2: materialize the program with the merged identity facts. Every
     // reference to a unified id carries the same name/role/lifetime so the
-    // schema's cross-reference consistency checks pass.
+    // schema's cross-reference consistency checks pass. The launch ids are
+    // assigned in declaration order; the launch SEQUENCE is re-ordered
+    // afterwards to follow the carried dependency graph (F3) — declaration
+    // order is never an execution authority.
     let mut program = DeviceProgram::new(DeviceProgramLifetime::SingleRun);
     for build in builds {
         let kernel_index = program.kernels.len();
         let mut resources: Vec<DeviceResource> = Vec::with_capacity(build.resources.len());
         for slot in build.resources {
-            let entry = unified
+            let entry = buffers
                 .iter()
                 .find(|entry| entry.id == slot.buffer_id)
                 .expect("every slot buffer was registered by the unification pass");
@@ -435,16 +701,12 @@ pub(crate) fn device_program_for_lowered(
             kernel_index,
         });
         for resource in resources {
-            // A result records the launch that PRODUCES the buffer version;
-            // only slots that write (Write/ReadWrite) produce. An InOut
-            // intermediate's read-only consumer slot (S2-5: the unified
-            // intermediate referenced by the next kernel) must not claim
-            // production — `DeviceProgram::validate` rejects a result whose
-            // producing launch does not write the version.
-            if (resource.buffer.role == BufferRole::Output
-                || resource.buffer.role == BufferRole::InOut)
-                && resource.access != MirKernelResourceAccess::Read
-            {
+            // F6: a result names a DECLARED observation point — only the
+            // program's Output-role buffers (the declared readback surface).
+            // Writable intermediates (InOut) and persistent state are never
+            // results merely because they are writable; a later stage adds an
+            // explicit observation declaration for them.
+            if resource.buffer.role == BufferRole::Output {
                 program
                     .results
                     .push(radix_mir::device_program::ResultBuffer {
@@ -457,13 +719,22 @@ pub(crate) fn device_program_for_lowered(
         }
     }
 
-    program.validate().map_err(|error| {
-        vec![device_diag(
-            "validation",
-            format!("constructed device program is inconsistent: {error}"),
-        )]
-    })?;
-    Ok(Some(program))
+    // The launch sequence follows the carried dependency graph (F3), never
+    // kernel declaration order.
+    program.launches = dependency_ordered_launches(&program)?;
+
+    // Pass 3: mint the carried semantic facts (F1–F6) and validate the
+    // program together with them fail-closed.
+    let semantics = semantic_facts(&program, &buffers, companions);
+    program
+        .validate_with_semantics(&semantics)
+        .map_err(|error| {
+            vec![device_diag(
+                "validation",
+                format!("constructed device program is inconsistent: {error}"),
+            )]
+        })?;
+    Ok(Some((program, semantics)))
 }
 
 // ---------------------------------------------------------------------------
@@ -516,24 +787,28 @@ pub(crate) fn admit_device_program_section(
 }
 
 /// Build the typed complete-program wire from a constructed device program
-/// (S3-A4). Every program fact the constructor materialized is carried
-/// field-for-field: kernels (function id, entry, plan, typed resources with
-/// access + version, launch), the ordered launch sequence, the program
-/// lifetime, and the explicit result buffers — plus the independent
-/// resource-state axes (F5, Stage 3R): one semantic value per buffer (F1),
-/// explicit value generations per slot (F2), carried roots + producer/
-/// consumer dependencies (F3), per-buffer initialization policies and
-/// explicit observation facts on every result row (F5/F6). CUDA symbols and
-/// host input values are NOT program semantics — they never enter the
-/// canonical bytes.
+/// and its carried semantic facts (S3-A4). Every program fact the constructor
+/// materialized is carried field-for-field: kernels (function id, entry,
+/// plan, typed resources with access + version, launch), the ordered launch
+/// sequence, the program lifetime, and the explicit result buffers — plus
+/// the frozen semantic contract (Stage 3R F1–F7): the semantic-value table
+/// (F1), explicit value generations per slot (F2), carried roots +
+/// producer/consumer dependencies (F3), the lossless primal/companion
+/// relation (F4), per-buffer initialization policies and explicit
+/// observation facts on every result row (F5/F6). CUDA symbols and host
+/// input values are NOT program semantics — they never enter the canonical
+/// bytes.
 #[must_use]
-fn wire_program_for_program(program: &DeviceProgram) -> WireDeviceProgram {
-    let dependencies = carried_dependencies(program);
+fn wire_program_for_program(
+    program: &DeviceProgram,
+    semantics: &DeviceSemantics,
+) -> WireDeviceProgram {
     WireDeviceProgram {
         kernels: program
             .kernels
             .iter()
-            .map(|kernel| WireKernelUnit {
+            .enumerate()
+            .map(|(kernel_index, kernel)| WireKernelUnit {
                 function: kernel.function.0,
                 entry: kernel.entry.clone(),
                 plan: wire_plan(&kernel.plan),
@@ -548,14 +823,21 @@ fn wire_program_for_program(program: &DeviceProgram) -> WireDeviceProgram {
                             binding: resource.binding.binding,
                         },
                         access: wire_access(resource.access),
-                        // Explicit value generation (F2, first projection):
-                        // the slot produces/consumes its carried content
-                        // version — never a universal `1`.
-                        generation: resource.version.version,
+                        // Explicit value generation (F2): the slot's carried
+                        // generation fact — a write/read-write slot carries
+                        // the generation its launch produces; a read slot
+                        // carries the generation it consumes. Never a
+                        // universal `1`.
+                        generation: wire_slot_generation(
+                            program,
+                            semantics,
+                            kernel_index,
+                            resource,
+                        ),
                         // Independent initialization axis (F5): how the
                         // buffer's storage is brought to its first defined
                         // state, decided from access facts, never from role.
-                        initialization: wire_initialization_policy(program, resource.buffer.id),
+                        initialization: wire_initialization_policy(semantics, resource.buffer.id),
                     })
                     .collect(),
                 launch: WireKernelLaunchPlan {
@@ -605,118 +887,169 @@ fn wire_program_for_program(program: &DeviceProgram) -> WireDeviceProgram {
                 },
             })
             .collect(),
-        semantic_values: program_semantic_values(program),
-        roots: carried_roots(program, &dependencies),
-        dependencies,
-        relations: Vec::new(),
-    }
-}
-
-/// The distinct buffer identities of a program, in first-reference order
-/// (kernel resources, then results).
-fn program_buffer_identities(program: &DeviceProgram) -> Vec<&BufferIdentity> {
-    let mut identities: Vec<&BufferIdentity> = Vec::new();
-    for kernel in &program.kernels {
-        for resource in &kernel.resources {
-            if !identities
-                .iter()
-                .any(|identity| identity.id == resource.buffer.id)
-            {
-                identities.push(&resource.buffer);
-            }
-        }
-    }
-    for result in &program.results {
-        if !identities
+        // The carried semantic-value table (F1): every value minted from its
+        // carried MIR/value origin.
+        semantic_values: semantics
+            .values
             .iter()
-            .any(|identity| identity.id == result.buffer.id)
-        {
-            identities.push(&result.buffer);
+            .map(|value| WireSemanticValue {
+                id: value.id.0,
+                name: value.name.clone(),
+                origin: wire_origin(&value.origin),
+            })
+            .collect(),
+        // Declared legal execution roots (F3): the launches no dependency
+        // edge feeds — the minimal set a host may start from.
+        roots: semantics.roots.iter().map(|root| root.0).collect(),
+        // Carried producer/consumer dependency edges (F3): hosts schedule the
+        // validated graph from these facts, never from kernel declaration
+        // order.
+        dependencies: semantics
+            .dependencies
+            .iter()
+            .map(|edge| WireDependencyEdge {
+                producer: edge.producer.0,
+                consumer: edge.consumer.0,
+                buffer: edge.buffer.0,
+                version: edge.version,
+            })
+            .collect(),
+        // Lossless primal/companion relation rows (F4) projected from the
+        // carried carrier.
+        relations: semantics.relations.iter().map(wire_relation).collect(),
+    }
+}
+
+/// The explicit value generation (F2) a kernel slot carries on the wire,
+/// projected from the carried generation facts (the semantic
+/// [`ValueGeneration`] list) — never reconstructed from declaration order or
+/// a universal `1`. A write/read-write slot carries the generation its
+/// launch produces; a read slot carries the generation its launch consumes
+/// (the latest produced before it, or the buffer's initial state).
+fn wire_slot_generation(
+    program: &DeviceProgram,
+    semantics: &DeviceSemantics,
+    kernel_index: usize,
+    resource: &DeviceResource,
+) -> u32 {
+    let value = semantics
+        .bindings
+        .iter()
+        .find(|binding| binding.buffer == resource.buffer.id)
+        .map(|binding| binding.value);
+    let Some(value) = value else {
+        return 1;
+    };
+    let Some(launch) = program
+        .launches
+        .iter()
+        .find(|launch| launch.kernel_index == kernel_index)
+    else {
+        return 1;
+    };
+    match resource.access {
+        MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite => semantics
+            .generations
+            .iter()
+            .find(|generation| generation.value == value && generation.produced_by == launch.id)
+            .map(|generation| generation.generation)
+            .unwrap_or(1),
+        MirKernelResourceAccess::Read => {
+            let position = launch_position(program, launch.id);
+            semantics
+                .generations
+                .iter()
+                .filter(|generation| {
+                    generation.value == value
+                        && launch_position(program, generation.produced_by) < position
+                })
+                .map(|generation| generation.generation)
+                .max()
+                .unwrap_or(1)
         }
     }
-    identities
 }
 
-/// One provisional semantic value per buffer (F1, first projection): each
-/// buffer is its own stable value identity, minted from the buffer identity
-/// itself with a distinct synthetic origin (two values never alias). The
-/// origin-based minting from carried MIR/value facts is the U4 constructor
-/// rework; this projection keeps the wire fact present and fail-closed.
-fn program_semantic_values(program: &DeviceProgram) -> Vec<WireSemanticValue> {
-    program_buffer_identities(program)
-        .iter()
-        .map(|identity| WireSemanticValue {
-            id: identity.id.0,
-            name: identity.name.clone(),
-            origin: WireSemanticValueOrigin::Synthetic {
-                label: format!("buffer-{}", identity.id.0),
-            },
-        })
-        .collect()
-}
-
-/// Carried producer/consumer dependency edges (F3) derived from the
-/// program's typed resources + launches — the same derivation as the
-/// radix-mir `BufferRegistry::data_flow_pairs`: hosts schedule the validated
-/// graph from these edges, never from kernel declaration order.
-fn carried_dependencies(program: &DeviceProgram) -> Vec<WireDependencyEdge> {
-    program
-        .buffer_registry()
-        .data_flow_pairs()
-        .into_iter()
-        .map(|pair| WireDependencyEdge {
-            producer: pair.producer.0,
-            consumer: pair.consumer.0,
-            buffer: pair.buffer.0,
-            version: pair.version,
-        })
-        .collect()
-}
-
-/// Declared legal execution roots (F3): the launches no dependency edge
-/// feeds — the minimal set a host may start from. Never inferred from
-/// kernel declaration order.
-fn carried_roots(program: &DeviceProgram, dependencies: &[WireDependencyEdge]) -> Vec<u32> {
+/// The position of a launch in the ordered execution sequence.
+fn launch_position(program: &DeviceProgram, launch: LaunchId) -> usize {
     program
         .launches
         .iter()
-        .filter(|launch| !dependencies.iter().any(|edge| edge.consumer == launch.id.0))
-        .map(|launch| launch.id.0)
-        .collect()
+        .position(|candidate| candidate.id == launch)
+        .unwrap_or(usize::MAX)
+}
+
+/// Map a carried [`SemanticValueOrigin`] onto its typed wire mirror (F1).
+fn wire_origin(origin: &SemanticValueOrigin) -> WireSemanticValueOrigin {
+    match origin {
+        SemanticValueOrigin::MirLocal { function, local } => WireSemanticValueOrigin::MirLocal {
+            function: function.0,
+            local: *local,
+        },
+        SemanticValueOrigin::HostInput => WireSemanticValueOrigin::HostInput,
+        SemanticValueOrigin::Synthetic { label } => WireSemanticValueOrigin::Synthetic {
+            label: label.clone(),
+        },
+    }
+}
+
+/// Map a carried lossless companion-relation row onto its typed wire mirror
+/// (F4): the gradient-to-primal identity survives onto the serialized
+/// package.
+fn wire_relation(entry: &LosslessMirCompanionEntry) -> WireCompanionRelation {
+    WireCompanionRelation {
+        primal: entry.primal.0,
+        companion: entry.companion.0,
+        derivative: match entry.derivative {
+            MirCompanionDerivativeKind::ReverseModeVjp => {
+                WireCompanionDerivativeKind::ReverseModeVjp
+            }
+        },
+        device_resident: entry.device_resident,
+        selected_inputs: entry
+            .selected_inputs
+            .iter()
+            .map(|selected| WireCompanionSelectedInput {
+                param: selected.param.0,
+                position: selected.position,
+                ty: selected.ty.0,
+                gradient_slot: selected.gradient_slot,
+            })
+            .collect(),
+        selected_outputs: entry
+            .selected_outputs
+            .iter()
+            .map(|selected| WireCompanionSelectedOutput {
+                position: selected.position,
+                ty: selected.ty.0,
+                upstream_gradient_ty: selected.upstream_gradient_ty.0,
+            })
+            .collect(),
+    }
 }
 
 /// The independent initialization axis (F5) of a buffer, projected onto the
-/// wire: how its storage is brought to its first defined state — decided
-/// from the buffer's aggregate access facts, never from its role or
-/// lifetime. A read-only host-provided buffer is uploaded (HostProvided); a
-/// buffer any slot writes in place is zero-filled at allocation
-/// (ZeroFill — its first generation is defined at allocation); a
+/// wire from the carried facts: how its storage is brought to its first
+/// defined state — decided from the buffer's aggregate access facts, never
+/// from its role or lifetime. A read-only host-provided buffer is uploaded
+/// (HostProvided); a buffer any slot writes in place is zero-filled at
+/// allocation (ZeroFill — its first generation is defined at allocation); a
 /// kernel-written buffer is fully defined by the kernel before any read
 /// (KernelInitialized).
 fn wire_initialization_policy(
-    program: &DeviceProgram,
+    semantics: &DeviceSemantics,
     buffer: BufferId,
 ) -> WireInitializationPolicy {
-    let mut readwrite = false;
-    let mut written = false;
-    for kernel in &program.kernels {
-        for resource in &kernel.resources {
-            if resource.buffer.id == buffer {
-                readwrite |= resource.access == MirKernelResourceAccess::ReadWrite;
-                written |= matches!(
-                    resource.access,
-                    MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
-                );
-            }
-        }
-    }
-    if readwrite {
-        WireInitializationPolicy::ZeroFill
-    } else if !written {
-        WireInitializationPolicy::HostProvided
-    } else {
-        WireInitializationPolicy::KernelInitialized
-    }
+    semantics
+        .initializations
+        .iter()
+        .find(|fact| fact.buffer == buffer)
+        .map(|fact| match fact.policy {
+            InitializationPolicy::ZeroFill => WireInitializationPolicy::ZeroFill,
+            InitializationPolicy::HostProvided => WireInitializationPolicy::HostProvided,
+            InitializationPolicy::KernelInitialized => WireInitializationPolicy::KernelInitialized,
+        })
+        .unwrap_or(WireInitializationPolicy::KernelInitialized)
 }
 
 fn wire_buffer_identity(identity: &BufferIdentity) -> WireBufferIdentity {
@@ -868,6 +1201,7 @@ fn wire_oob_padding(padding: radix_mir::kernel_plan::OobPaddingPolicy) -> WireOo
 /// contradicts the typed function facts fails closed, A3).
 pub(crate) fn device_section_for_program(
     program: &DeviceProgram,
+    semantics: &DeviceSemantics,
     validated: &ValidatedMir<'_>,
     interner: &Interner,
     selection: DeviceSelection,
@@ -941,7 +1275,7 @@ pub(crate) fn device_section_for_program(
         }
     }
 
-    let wire = wire_program_for_program(program);
+    let wire = wire_program_for_program(program, semantics);
     let declared_inputs = inputs
         .iter()
         .map(|(name, values)| FmirDeviceInput {
@@ -984,7 +1318,7 @@ pub(crate) fn device_section_for_program(
 /// - a kernel-written buffer another kernel consumes is a step-local
 ///   intermediate (per-step);
 /// - a kernel-written final is read back at an observation point.
-fn unified_lifetime(entry: &UnifiedBuffer) -> BufferLifetime {
+fn unified_lifetime(entry: &ProgramBuffer) -> BufferLifetime {
     if !entry.written {
         BufferLifetime::PerProgram
     } else if entry.consumed {

@@ -628,7 +628,7 @@ fn package_device_section(
     if !prepared.device_declared {
         return Ok(None);
     }
-    let Some(program) = super::device::device_program_for_lowered(
+    let Some((program, semantics)) = super::device::device_program_for_lowered(
         &lowered.validated,
         &lowered.interner,
         &lowered.companions,
@@ -716,6 +716,7 @@ fn package_device_section(
         .unwrap_or(faber::device::DeviceSelection::Auto);
     let section = super::device::device_section_for_program(
         &program,
+        &semantics,
         &lowered.validated,
         &lowered.interner,
         selection,
