@@ -9,8 +9,8 @@ use faber::device::{DeviceBackend, DeviceSelection};
 use faber_host_macos_arm64::composite_host::{CompositeHost, CompositeHostConfig};
 use faber_host_macos_arm64::device_descriptor::{
     DescriptorBuffer, DescriptorBufferVersion, DescriptorKernel, DescriptorLaunch,
-    DescriptorResult, DeviceBufferLifetime, DeviceBufferRole, DeviceDataType, DeviceDescriptor,
-    DeviceProgramLifetime,
+    DescriptorResult, DeviceBufferInitialization, DeviceBufferLifetime, DeviceBufferRole,
+    DeviceDataType, DeviceDescriptor, DeviceProgramLifetime,
 };
 use faber_host_macos_arm64::device_host::DeviceRuntime;
 use faber_host_macos_arm64::{FakeMetalDriver, HostError, MetalHostSession};
@@ -42,6 +42,13 @@ fn add_slot(
         semantic_value: id,
         role,
         lifetime: lifetime_for_role(role),
+        // F5: the initialization axis rides the descriptor (HostProvided
+        // inputs, ZeroFill InOut state, KernelInitialized outputs).
+        initialization: match role {
+            DeviceBufferRole::Input => DeviceBufferInitialization::HostProvided,
+            DeviceBufferRole::InOut => DeviceBufferInitialization::ZeroFill,
+            DeviceBufferRole::Output => DeviceBufferInitialization::KernelInitialized,
+        },
         binding,
         element_ty: DeviceDataType::F32,
         element_count: count,

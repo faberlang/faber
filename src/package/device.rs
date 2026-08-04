@@ -48,8 +48,9 @@
 use faber::device::{DeviceBackend, DeviceSelection};
 use faber_host_macos_arm64::device_descriptor::{
     DescriptorBuffer, DescriptorBufferVersion, DescriptorDataFlow as HostDescriptorDataFlow,
-    DescriptorKernel, DescriptorLaunch, DescriptorResult, DeviceBufferLifetime, DeviceBufferRole,
-    DeviceDataType, DeviceDescriptor, DeviceProgramLifetime as HostDeviceProgramLifetime,
+    DescriptorKernel, DescriptorLaunch, DescriptorResult, DeviceBufferInitialization,
+    DeviceBufferLifetime, DeviceBufferRole, DeviceDataType, DeviceDescriptor,
+    DeviceProgramLifetime as HostDeviceProgramLifetime,
 };
 use radix::diagnostics::Diagnostic;
 use radix::lexer::Interner;
@@ -1319,6 +1320,15 @@ pub(crate) fn device_section_for_program(
 ///   intermediate (per-step);
 /// - a kernel-written final is read back at an observation point.
 fn unified_lifetime(entry: &ProgramBuffer) -> BufferLifetime {
+    // G4 (F5): an in-place ReadWrite slot is PERSISTENT writable state — an
+    // accumulation/optimizer-state buffer — not a per-step intermediate.
+    // Its storage is allocated once (per-program), zero-filled at allocation
+    // (the readwrite→ZeroFill initialization axis), and updated in place at
+    // every generation: the accumulator/optimizer-state lifecycle G4
+    // requires. No axis is derived from the role; the access facts decide.
+    if entry.readwrite {
+        return BufferLifetime::PerProgram;
+    }
     if !entry.written {
         BufferLifetime::PerProgram
     } else if entry.consumed {
@@ -1417,6 +1427,11 @@ pub(crate) fn descriptor_for_backend(
                 semantic_value: resource.buffer.semantic_value,
                 role: wire_role_to_host(resource.buffer.role),
                 lifetime: wire_lifetime_to_host(resource.buffer.lifetime),
+                // F5 (G4): the wire's carried initialization axis is
+                // projected verbatim — the host honors it (zero-fill
+                // persistent accumulation state at allocation); it never
+                // re-derives initialization from role or lifetime.
+                initialization: wire_initialization_to_host(resource.initialization),
                 binding: resource.binding.binding,
                 element_ty,
                 element_count: resource.version.element_count,
@@ -1706,6 +1721,22 @@ fn wire_lifetime_to_host(lifetime: WireBufferLifetime) -> DeviceBufferLifetime {
         WireBufferLifetime::PerProgram => DeviceBufferLifetime::PerProgram,
         WireBufferLifetime::PerStep => DeviceBufferLifetime::PerStep,
         WireBufferLifetime::ObservationPoint => DeviceBufferLifetime::ObservationPoint,
+    }
+}
+
+/// Map the wire's typed initialization policy (F5) onto the host descriptor's
+/// typed initialization axis. Total over the three-class enum; the host
+/// honors it at allocation (zero-fill persistent state), never re-deriving it
+/// from role or lifetime.
+fn wire_initialization_to_host(
+    initialization: WireInitializationPolicy,
+) -> DeviceBufferInitialization {
+    match initialization {
+        WireInitializationPolicy::ZeroFill => DeviceBufferInitialization::ZeroFill,
+        WireInitializationPolicy::HostProvided => DeviceBufferInitialization::HostProvided,
+        WireInitializationPolicy::KernelInitialized => {
+            DeviceBufferInitialization::KernelInitialized
+        }
     }
 }
 

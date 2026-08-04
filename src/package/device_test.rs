@@ -2,8 +2,8 @@ use super::*;
 use faber::device::DeviceBackend;
 use faber_host_macos_arm64::composite_host::{DataFlowEdge, ReceiptBuffer};
 use faber_host_macos_arm64::device_descriptor::{
-    DescriptorBufferVersion, DescriptorLaunch, DeviceBufferLifetime, DeviceBufferRole,
-    DeviceDataType,
+    DescriptorBufferVersion, DescriptorLaunch, DeviceBufferInitialization, DeviceBufferLifetime,
+    DeviceBufferRole, DeviceDataType,
 };
 use radix::mir::LoweredMirUnit;
 use radix_mir::device_program::DataFlowPair;
@@ -335,6 +335,28 @@ fn descriptor_maps_wire_lifetimes_onto_host_descriptor() {
     assert_eq!(
         kernel1_slots[1].lifetime,
         DeviceBufferLifetime::ObservationPoint
+    );
+
+    // G4 (F5): the wire's carried initialization axis is projected onto the
+    // descriptor verbatim — the host honors it at allocation; it never
+    // re-derives initialization from role or lifetime. The two-kernel
+    // fixture: the input is HostProvided, the S2-5 intermediate is
+    // kernel-initialized (written before read), the output is
+    // kernel-initialized.
+    assert_eq!(
+        slots[0].initialization,
+        DeviceBufferInitialization::HostProvided,
+        "a read-only host input is host-provided"
+    );
+    assert_eq!(
+        slots[1].initialization,
+        DeviceBufferInitialization::KernelInitialized,
+        "the S2-5 intermediate is kernel-initialized"
+    );
+    assert_eq!(
+        kernel1_slots[1].initialization,
+        DeviceBufferInitialization::KernelInitialized,
+        "the output is kernel-initialized"
     );
 
     // R2: the host descriptor carries the wire's content versions and
