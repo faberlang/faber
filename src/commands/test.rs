@@ -61,6 +61,7 @@ pub(super) fn cmd_test(args: &TestArgs) {
         radix::Target::TypeScript,
         &input_path,
         args.locale.as_deref(),
+        args.diagnostic_locale.as_deref(),
     ) {
         Ok((config, _locale_pack)) => config.with_warn_policy(warn_policy),
         Err(diag) => {

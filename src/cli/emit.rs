@@ -10,9 +10,13 @@ pub struct EmitArgs {
     #[arg(long)]
     pub diagnostics: bool,
 
-    /// Reader locale used to select a package-local reader pack.
+    /// Code locale used to select a package-local locale pack.
     #[arg(long = "locale", value_name = "LOCALE")]
     pub locale: Option<String>,
+
+    /// Message language for diagnostics (independent of code locale).
+    #[arg(long = "diagnostic-locale", value_name = "LOCALE")]
+    pub diagnostic_locale: Option<String>,
 
     /// Output target language
     #[arg(short = 't', long = "target", value_enum, default_value_t = FaberCliTarget::Rust)]

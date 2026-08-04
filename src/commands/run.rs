@@ -239,9 +239,10 @@ fn run_config(
     target: Target,
     input_path: &Path,
     locale: Option<&str>,
+    diagnostic_locale: Option<&str>,
     warn_policy: radix::driver::WarnPolicy,
 ) -> Result<radix::driver::Config, Box<Diagnostic>> {
-    package::config_with_locale(target, input_path, locale)
+    package::config_with_locale(target, input_path, locale, diagnostic_locale)
         .map(|(config, _locale_pack)| config.with_warn_policy(warn_policy))
 }
 
@@ -249,9 +250,10 @@ fn run_config_or_exit(
     target: Target,
     input_path: &Path,
     locale: Option<&str>,
+    diagnostic_locale: Option<&str>,
     warn_policy: radix::driver::WarnPolicy,
 ) -> radix::driver::Config {
-    match run_config(target, input_path, locale, warn_policy) {
+    match run_config(target, input_path, locale, diagnostic_locale, warn_policy) {
         Ok(config) => config,
         Err(diag) => {
             eprintln!("error: {}", diag.message);
@@ -267,6 +269,7 @@ fn cmd_run_go(args: &RunArgs) {
         Target::Go,
         &input_path,
         args.locale.as_deref(),
+        args.diagnostic_locale.as_deref(),
         warn_policy_from_args(args),
     );
     let result = package::compile_package_go(&config, &input_path);
@@ -318,6 +321,7 @@ fn cmd_run_scena(args: RunArgs) {
         Target::Scena,
         &input_path,
         args.locale.as_deref(),
+        args.diagnostic_locale.as_deref(),
         warn_policy,
     );
     let artifact = match package::build_package_mir_artifact(&config, &input_path, &argumenta) {
@@ -343,6 +347,7 @@ fn cmd_run_fmir_text(args: RunArgs, selection: DeviceSelection) {
         Target::FmirText,
         &input_path,
         args.locale.as_deref(),
+        args.diagnostic_locale.as_deref(),
         warn_policy,
     );
     let image = match package::build_package_fmir_text_image(&config, &input_path, &[]) {
@@ -374,6 +379,7 @@ fn cmd_run_fmir(args: RunArgs, selection: DeviceSelection) {
         Target::Fmir,
         &input_path,
         args.locale.as_deref(),
+        args.diagnostic_locale.as_deref(),
         warn_policy,
     );
     let image = match package::build_package_fmir_image(&config, &input_path, &[]) {
@@ -407,6 +413,7 @@ fn cmd_run_fhir(args: RunArgs) {
         Target::Fhir,
         &input_path,
         args.locale.as_deref(),
+        args.diagnostic_locale.as_deref(),
         warn_policy,
     );
     let artifact = match package::build_package_fhir(&config, &input_path) {
@@ -440,6 +447,7 @@ fn cmd_run_fmir_bin(args: &RunArgs, selection: DeviceSelection) {
         Target::FmirBin,
         &input_path,
         args.locale.as_deref(),
+        args.diagnostic_locale.as_deref(),
         warn_policy_from_args(args),
     );
     let bundle =
@@ -554,6 +562,7 @@ fn cmd_run_compiled(args: &RunArgs) {
         Target::Rust,
         &input_path,
         args.locale.as_deref(),
+        args.diagnostic_locale.as_deref(),
         warn_policy_from_args(args),
     );
     let result = package::compile_package(&config, &input_path);

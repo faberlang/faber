@@ -105,6 +105,7 @@ fn dispatch(command: Command) {
                 deny_warnings: args.deny_warnings,
                 deny_codes: args.deny,
                 locale: args.locale,
+                diagnostic_locale: args.diagnostic_locale,
             });
         }
         Command::Targets => cmd_targets(),
@@ -125,6 +126,7 @@ fn dispatch(command: Command) {
                     diagnostic_mode: diagnostic_mode(args.diagnostics),
                     locale_pack: None,
                     locale: args.locale,
+                    diagnostic_locale: args.diagnostic_locale,
                 });
             } else {
                 tool::cmd_check(CheckCommand {
@@ -136,6 +138,7 @@ fn dispatch(command: Command) {
                     diagnostic_mode: diagnostic_mode(args.diagnostics),
                     locale_pack: None,
                     locale: None,
+                    diagnostic_locale: args.diagnostic_locale,
                 });
             }
         }
@@ -177,6 +180,7 @@ fn dispatch(command: Command) {
                 diagnostic_mode: diagnostic_mode(args.diagnostics),
                 locale_pack: None,
                 locale: args.locale,
+                diagnostic_locale: args.diagnostic_locale,
                 output_mode: radix::codegen::OutputMode::Application,
                 module_name: None,
                 cuda_descriptor: None,

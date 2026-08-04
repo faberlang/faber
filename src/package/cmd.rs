@@ -46,7 +46,12 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
         deny_codes: command.deny_codes,
     };
     let (config, locale_pack) = if is_package {
-        match config_with_locale(target, &input_path, command.locale.as_deref()) {
+        match config_with_locale(
+            target,
+            &input_path,
+            command.locale.as_deref(),
+            command.diagnostic_locale.as_deref(),
+        ) {
             Ok((config, pack)) => (config.with_warn_policy(warn_policy), pack),
             Err(diag) => {
                 eprintln!("error: {}", diag.message);
@@ -577,6 +582,7 @@ pub fn cmd_check_package(command: radix::tool::CheckCommand) {
         check_target,
         &input_path,
         command.locale.as_deref(),
+        command.diagnostic_locale.as_deref(),
     ) {
         Ok((config, pack)) => (
             config.with_warn_policy(radix::driver::WarnPolicy {
@@ -660,6 +666,7 @@ pub fn cmd_emit_package(command: radix::tool::EmitCommand) {
         command.package,
         command.target,
         command.locale.as_deref(),
+        command.diagnostic_locale.as_deref(),
     );
 
     radix::tool::print_diagnostics(
@@ -718,6 +725,7 @@ fn compile_package_input(
     force_package: bool,
     target: Target,
     locale: Option<&str>,
+    diagnostic_locale: Option<&str>,
 ) -> (
     CompileResult,
     Option<radix::locale::LocalePack>,
@@ -734,13 +742,14 @@ fn compile_package_input(
         std::process::exit(1);
     }
 
-    let (config, locale_pack) = match config_with_locale(target, &path, locale) {
-        Ok(selection) => selection,
-        Err(diag) => {
-            eprintln!("error: {}", diag.message);
-            std::process::exit(1);
-        }
-    };
+    let (config, locale_pack) =
+        match config_with_locale(target, &path, locale, diagnostic_locale) {
+            Ok(selection) => selection,
+            Err(diag) => {
+                eprintln!("error: {}", diag.message);
+                std::process::exit(1);
+            }
+        };
     (compile_package(&config, &path), locale_pack)
 }
 

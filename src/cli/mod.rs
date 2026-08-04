@@ -117,7 +117,7 @@ pub struct FormatArgs {
     #[arg(long)]
     pub canonical: bool,
 
-    /// Reader locale used to select a package-local reader pack.
+    /// Code locale used to select a package-local locale pack.
     #[arg(long = "locale", value_name = "LOCALE")]
     pub locale: Option<String>,
 
@@ -170,9 +170,13 @@ pub struct BuildArgs {
     #[arg(long = "deny", value_name = "CODE")]
     pub deny: Vec<String>,
 
-    /// Reader locale used to select a package-local reader pack.
+    /// Code locale used to select a package-local locale pack.
     #[arg(long = "locale", value_name = "LOCALE")]
     pub locale: Option<String>,
+
+    /// Message language for diagnostics (independent of code locale).
+    #[arg(long = "diagnostic-locale", value_name = "LOCALE")]
+    pub diagnostic_locale: Option<String>,
 
     /// Input file or package path
     #[arg(value_name = "INPUT")]
@@ -186,9 +190,13 @@ pub struct CheckArgs {
     #[arg(long)]
     pub diagnostics: bool,
 
-    /// Reader locale used to select a package-local reader pack.
+    /// Code locale used to select a package-local locale pack.
     #[arg(long = "locale", value_name = "LOCALE")]
     pub locale: Option<String>,
+
+    /// Message language for diagnostics (independent of code locale).
+    #[arg(long = "diagnostic-locale", value_name = "LOCALE")]
+    pub diagnostic_locale: Option<String>,
 
     /// Downgrade unresolved/import-driven semantic errors to warnings
     #[arg(long)]
@@ -264,14 +272,14 @@ pub struct ExplainArgs {
     #[arg(long, requires = "term")]
     pub json: bool,
 
-    /// Reader locale used to select diagnostic explanation text
+    /// Message language for diagnostic explanation text
     #[arg(
-        long = "locale",
+        long = "diagnostic-locale",
         value_name = "LOCALE",
         requires = "term",
         conflicts_with_all = ["search", "list", "category"]
     )]
-    pub locale: Option<String>,
+    pub diagnostic_locale: Option<String>,
 
     /// Search across explain entries and show ranked matches
     #[arg(long, conflicts_with_all = ["list", "category", "term", "json"])]
@@ -305,9 +313,13 @@ pub struct RunArgs {
     #[arg(default_value = ".")]
     pub path: PathBuf,
 
-    /// Reader locale used to select a package-local reader pack.
+    /// Code locale used to select a package-local locale pack.
     #[arg(long = "locale", value_name = "LOCALE")]
     pub locale: Option<String>,
+
+    /// Message language for diagnostics (independent of code locale).
+    #[arg(long = "diagnostic-locale", value_name = "LOCALE")]
+    pub diagnostic_locale: Option<String>,
 
     /// Runtime target to build and execute. When omitted, the manifest
     /// `[build] target` wins; otherwise the implicit portable default
@@ -418,9 +430,13 @@ pub struct TestArgs {
     #[arg(default_value = ".")]
     pub path: PathBuf,
 
-    /// Reader locale used to select a package-local reader pack.
+    /// Code locale used to select a package-local locale pack.
     #[arg(long = "locale", value_name = "LOCALE")]
     pub locale: Option<String>,
+
+    /// Message language for diagnostics (independent of code locale).
+    #[arg(long = "diagnostic-locale", value_name = "LOCALE")]
+    pub diagnostic_locale: Option<String>,
 
     /// Promote all warning diagnostics to errors
     #[arg(long)]

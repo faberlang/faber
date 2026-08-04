@@ -141,7 +141,7 @@ fn format_session(path: &Path, locale: Option<&str>) -> Result<Session, String> 
         return Ok(Session::new(Config::default().with_dev_stdlib()));
     }
 
-    crate::package::config_with_locale(Target::Faber, path, locale)
+    crate::package::config_with_locale(Target::Faber, path, locale, None)
         .map(|(config, _)| Session::new(config))
         .map_err(|diag| diag.message)
 }

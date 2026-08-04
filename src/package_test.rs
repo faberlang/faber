@@ -6817,7 +6817,7 @@ locale = "th-TH"
     .expect("write manifest");
 
     let (config, pack) =
-        config_with_locale(Target::Rust, &dir, Some("zh-Hans")).expect("reader config");
+        config_with_locale(Target::Rust, &dir, Some("zh-Hans"), None).expect("reader config");
     let pack = pack.expect("reader pack");
 
     assert_eq!(pack.metadata.id, "zh-Hans");
