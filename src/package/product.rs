@@ -937,10 +937,7 @@ fn unique_product_quarantine(target: &Path) -> Result<PathBuf, Box<Diagnostic>> 
 
 /// Best-effort cleanup that must never mask the caller's result.
 fn ignore_io(result: std::io::Result<()>) {
-    match result {
-        Ok(()) => {}
-        Err(_) => {}
-    }
+    if let Ok(()) = result {}
 }
 
 fn remove_product_temp(temp: &Path) -> Result<(), Box<Diagnostic>> {
@@ -1496,7 +1493,7 @@ fn emit_library_typescript_modules(
 
             let output = std::process::Command::new(&faber_bin)
                 .args(["emit", "-t", "ts"])
-                .arg(&fab_path)
+                .arg(fab_path)
                 .output();
             let output = match output {
                 Ok(output) => output,
@@ -2137,7 +2134,7 @@ fn import_clause_specifier(from_part: &str) -> Option<&str> {
     let bytes = from.as_bytes();
     if bytes
         .first()
-        .map_or(true, |first| *first != b'"' && *first != b'\'')
+        .is_none_or(|first| *first != b'"' && *first != b'\'')
     {
         return None;
     }

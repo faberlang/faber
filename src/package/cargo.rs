@@ -545,10 +545,7 @@ fn publish_directory(temp: &Path, target: &Path) -> Result<(), Box<Diagnostic>> 
 /// Best-effort removal of a quarantined or failed-snapshot directory. The
 /// publish outcome is never masked by cleanup failures.
 fn remove_quarantine(path: &Path) {
-    match fs::remove_dir_all(path) {
-        Ok(()) => {}
-        Err(_) => {}
-    }
+    if let Ok(()) = fs::remove_dir_all(path) {}
 }
 
 fn remove_temp_tree(temp: &Path) -> Result<(), Box<Diagnostic>> {

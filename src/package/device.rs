@@ -282,7 +282,7 @@ pub(crate) fn device_program_for_lowered(
                         ),
                     )]
                 })?;
-            let name = buffer_slot_name(function, interner, &resource);
+            let name = buffer_slot_name(function, interner, resource);
             let buffer_id = if let Some(entry) = unified
                 .iter_mut()
                 .find(|entry| entry.matches(&name, resource.element_ty, resource.element_count))
@@ -838,10 +838,10 @@ fn data_type_spelling(_ty: MirType) -> String {
 
 /// The declared backend artifact for a resolved backend, from the image's
 /// artifacts section.
-pub(crate) fn artifact_for_backend<'a>(
-    artifacts: &'a [FmirDeviceArtifact],
+pub(crate) fn artifact_for_backend(
+    artifacts: &[FmirDeviceArtifact],
     backend: DeviceBackend,
-) -> Option<&'a FmirDeviceArtifact> {
+) -> Option<&FmirDeviceArtifact> {
     artifacts.iter().find(|artifact| match backend {
         DeviceBackend::Metal => artifact.backend == FmirDeviceBackend::Metal,
         DeviceBackend::Cuda => artifact.backend == FmirDeviceBackend::Cuda,

@@ -133,9 +133,7 @@ fn normalize_relative(path: &Path) -> Option<PathBuf> {
         match component {
             std::path::Component::Normal(name) => stack.push(std::path::Component::Normal(name)),
             std::path::Component::ParentDir => {
-                if stack.pop().is_none() {
-                    return None;
-                }
+                stack.pop()?;
             }
             std::path::Component::CurDir => {}
             _ => return None,

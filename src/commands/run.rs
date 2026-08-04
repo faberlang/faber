@@ -440,7 +440,7 @@ fn cmd_run_fmir_bin(args: &RunArgs, selection: DeviceSelection) {
         Target::FmirBin,
         &input_path,
         args.reader_locale.as_deref(),
-        warn_policy_from_args(&args),
+        warn_policy_from_args(args),
     );
     let bundle =
         match package::build_package_fmir_binary_bundle(&config, &input_path, &[], args.release) {
