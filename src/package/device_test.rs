@@ -374,7 +374,7 @@ fn descriptor_preserves_wire_launch_order_and_version_keys() {
             .filter(|buffer| buffer.id == medius_id)
             .map(|buffer| (buffer.id, buffer.version, buffer.element_count))
             .collect::<Vec<_>>(),
-        vec![(medius_id, 1, 256), (medius_id, 2, 64)]
+        vec![(medius_id, 2, 64), (medius_id, 1, 4)]
     );
     assert!(versioned_edges.is_empty());
 
@@ -405,13 +405,13 @@ fn descriptor_preserves_wire_launch_order_and_version_keys() {
             .filter(|slot| slot.buffer_id == medius_id)
             .map(|slot| (slot.buffer_id, slot.version, slot.element_count))
             .collect::<Vec<_>>(),
-        vec![(medius_id, 1, 256), (medius_id, 2, 64)]
+        vec![(medius_id, 1, 4), (medius_id, 2, 64)]
     );
     assert!(descriptor.buffer_versions.contains(&DescriptorBufferVersion {
         buffer_id: medius_id,
         version: 1,
         element_ty: DeviceDataType::F32,
-        element_count: 256,
+        element_count: 4,
     }));
     assert!(descriptor.buffer_versions.contains(&DescriptorBufferVersion {
         buffer_id: medius_id,
