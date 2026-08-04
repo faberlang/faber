@@ -29,6 +29,10 @@ fn f32_ty(types: &mut TypeTable) -> MirType {
     MirType::semantic(types.sized_numeric(Primitive::Fractus, NumericWidth::F32))
 }
 
+fn f64_ty(types: &mut TypeTable) -> MirType {
+    MirType::semantic(types.sized_numeric(Primitive::Fractus, NumericWidth::F64))
+}
+
 fn tensor_ty(types: &mut TypeTable, count: u64) -> MirType {
     let f32_ty = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
     let len = types.intern_index(IndexExpr::Literal(count));
@@ -604,6 +608,119 @@ fn add_mul_function(types: &mut TypeTable) -> MirFunction {
     )
 }
 
+/// The `mlp_backward` companion shape (S5-W-A1): `t = x @ w; out = t / s`
+/// — a TiledMatMul recipe whose data-flow set carries a SCALAR upstream
+/// seed (`s`) beyond the two recipe operands (`x`, `w`). The seed's type is
+/// the parameter: the generated companion types the seed from the primal's
+/// scalar return type (f32 in the fixed MLP fixture, f64 in the latent
+/// `fractus` variant), so the emission signature must admit the kernel
+/// scalar surface and fail closed outside it.
+fn matmul_scalar_seed_function(types: &mut TypeTable, seed_ty: MirType) -> MirFunction {
+    let tensor = rank2_tensor_ty(types, [4, 4]);
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![
+            MirParam {
+                local: MirLocalId(0),
+                name: None,
+                ty: tensor,
+                mode: MirParamMode::Owned,
+                span: test_span(),
+            },
+            MirParam {
+                local: MirLocalId(1),
+                name: None,
+                ty: tensor,
+                mode: MirParamMode::Owned,
+                span: test_span(),
+            },
+            MirParam {
+                local: MirLocalId(2),
+                name: None,
+                ty: seed_ty,
+                mode: MirParamMode::Owned,
+                span: test_span(),
+            },
+        ],
+        locals: vec![
+            MirLocal {
+                id: MirLocalId(0),
+                name: None,
+                ty: tensor,
+                mutable: false,
+                span: test_span(),
+            },
+            MirLocal {
+                id: MirLocalId(1),
+                name: None,
+                ty: tensor,
+                mutable: false,
+                span: test_span(),
+            },
+            MirLocal {
+                id: MirLocalId(2),
+                name: None,
+                ty: seed_ty,
+                mutable: false,
+                span: test_span(),
+            },
+        ],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![
+                // t = x @ w — the recipe statement whose operand locals bind
+                // the contract-shaped inputs (0 and 1).
+                MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: Some(MirPlace::local(MirLocalId(3))),
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorMatMul),
+                            args: vec![
+                                MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                                MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                            ],
+                            return_ty: tensor,
+                        },
+                    },
+                    span: test_span(),
+                },
+                // out = t / s — the scalar seed flows into the elementwise
+                // div as the subchain's data-flow input.
+                MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: Some(MirPlace::local(MirLocalId(4))),
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorDiv),
+                            args: vec![
+                                MirOperand::Place(MirPlace::local(MirLocalId(3))),
+                                MirOperand::Place(MirPlace::local(MirLocalId(2))),
+                            ],
+                            return_ty: tensor,
+                        },
+                    },
+                    span: test_span(),
+                },
+            ],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(4),
+                )))),
+                span: test_span(),
+            },
+            span: test_span(),
+        }],
+        return_ty: tensor,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: test_span(),
+    }
+}
+
 fn identity(id: u32, name: &str, role: BufferRole) -> BufferIdentity {
     BufferIdentity {
         id: BufferId(id),
@@ -1162,4 +1279,77 @@ fn matmul_kernel_descriptor_reports_tiled_matmul_recipe() {
     // Two `tile × tile` operand tiles: 2 × (64 slots × 4 bytes).
     assert_eq!(descriptor.shared_memory_bytes, 2 * 64 * 4);
     assert_eq!(descriptor.slots.len(), 3);
+}
+
+// -----------------------------------------------------------------------
+// Subchain emission signatures (S5-W-A1: scalar data-flow admission).
+// -----------------------------------------------------------------------
+
+#[test]
+fn f32_scalar_data_flow_param_resolves_in_subchain_emission_signature() {
+    // S5-W-A1: the `mlp_backward` companion's recipe subchains carry a
+    // SCALAR upstream seed (typed from the primal's f32 return) as a
+    // data-flow param beyond the recipe operands. The emission signature
+    // must bind it as a 1-element read input at the scalar's own type —
+    // the pre-A1 blocker was `recipe operand requires a tensor type` on
+    // EVERY non-operand param.
+    let mut types = TypeTable::new();
+    let seed_ty = f32_ty(&mut types);
+    let function = matmul_scalar_seed_function(&mut types, seed_ty);
+    let validation = MirValidationContext::new(&types);
+    let contract = CollectionOpContract::MatMul {
+        dispatch_x: 1,
+        dispatch_y: 1,
+    };
+
+    let signature = subchain_signature_for_emission(&function, &contract, &validation)
+        .expect("a scalar f32 data-flow param resolves in the emission signature");
+
+    // Recipe operands bind first (input 0 = x, extra input 1 = w).
+    assert_eq!(signature.input.source_local, Some(MirLocalId(0)));
+    assert_eq!(signature.extra_inputs.len(), 2, "w plus the scalar seed");
+    assert_eq!(signature.extra_inputs[0].source_local, Some(MirLocalId(1)));
+    // The f32 scalar seed binds as a 1-element read input at binding 2.
+    let seed = &signature.extra_inputs[1];
+    assert_eq!(seed.source_local, Some(MirLocalId(2)));
+    assert_eq!(seed.binding, 2);
+    assert_eq!(
+        seed.element_ty,
+        f32_ty(&mut types),
+        "the scalar binds at its own f32 type"
+    );
+    assert_eq!(
+        seed.element_count, 1,
+        "a scalar data-flow input is 1 element"
+    );
+    assert_eq!(seed.role, MirKernelResourceRole::Input);
+    assert_eq!(seed.access, MirKernelResourceAccess::Read);
+    assert_eq!(
+        signature.output.binding, 3,
+        "the output binds after the recipe inputs and the scalar seed"
+    );
+}
+
+#[test]
+fn f64_scalar_data_flow_param_fails_closed_in_subchain_emission_signature() {
+    // The latent `fractus` variant: the companion's scalar seed is f64,
+    // outside the ABI kernel scalar surface (F32/I32/U32). The emission
+    // signature must fail closed with the ABI's own typed diagnostic, never
+    // silently narrow — the fixture's `→ f32` change is a separate unit.
+    let mut types = TypeTable::new();
+    let seed_ty = f64_ty(&mut types);
+    let function = matmul_scalar_seed_function(&mut types, seed_ty);
+    let validation = MirValidationContext::new(&types);
+    let contract = CollectionOpContract::MatMul {
+        dispatch_x: 1,
+        dispatch_y: 1,
+    };
+
+    let error = subchain_signature_for_emission(&function, &contract, &validation)
+        .expect_err("an f64 scalar data-flow param must fail closed");
+    assert!(
+        error.message.contains("kernel scalar layout f64"),
+        "the diagnostic must name the unsupported scalar layout, got: {}",
+        error.message
+    );
 }

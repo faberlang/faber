@@ -25,15 +25,16 @@ pub use crate::device_semantics::{
 };
 use crate::visit::MirVisitor;
 use crate::{
-    MirAggregate, MirAggregateKind, MirCollectionOp, MirFunction, MirFunctionId, MirIntrinsic,
-    MirLayoutKind, MirLayoutTable, MirLocal, MirParam, MirPlace, MirProgram, MirProjection,
-    MirRuntimeCall, MirScalarLayout, MirStatement, MirStatementKind, MirTemp, MirTensorLocusLayout,
+    MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirCollectionOp,
+    MirFunction, MirFunctionId, MirIntrinsic, MirLayoutKind, MirLayoutTable, MirLocal, MirLocalId,
+    MirOperand, MirParam, MirPlace, MirPlaceBase, MirProgram, MirProjection, MirRuntimeCall,
+    MirScalarLayout, MirStatement, MirStatementKind, MirTemp, MirTempId, MirTensorLocusLayout,
     MirTensorStorageLayout, MirTerminator, MirTerminatorKind, MirType, MirValidationContext,
-    MirValue, ValidatedMir,
+    MirValue, MirValueKind, ValidatedMir,
 };
 use radix_hir::{DefId, HirFunction, HirItemKind, HirProgram};
 use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 const SLUG_ABI: &str = "missing-abi-fact";
 const SLUG_LAYOUT: &str = "missing-layout-fact";
@@ -365,6 +366,318 @@ pub fn classify_device_safe_for_target_entry(
     classifier.finish()
 }
 
+/// The dead fold-artifact slots of one function (S5-W-A1): the local and
+/// temp destinations of `Array`/`Tensor` constructs that no statement or
+/// terminator reads — the static-shape fold's shape-list / vacua artifacts
+/// the emitters skip (S5-U2c).
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct FoldArtifactSlots {
+    locals: FxHashSet<MirLocalId>,
+    temps: FxHashSet<MirTempId>,
+}
+
+impl FoldArtifactSlots {
+    /// Whether a place base is one of the dead fold-artifact slots.
+    fn contains(&self, base: &MirPlaceBase) -> bool {
+        match base {
+            MirPlaceBase::Local(local) => self.locals.contains(local),
+            MirPlaceBase::Temp(temp) => self.temps.contains(temp),
+        }
+    }
+}
+
+/// The dead fold-artifact slots of a function (S5-W-A1) — the S5-U2c
+/// liveness scan the gate shares with the emitters.
+///
+/// A slot is collected when it is a fold-artifact slot shape
+/// (`Array`/`Tensor` — the static-shape fold's shape-list / vacua types)
+/// and DEAD: no statement or terminator reads it, and a local slot is not a
+/// function param (a param is a side effect — always live). A temp slot
+/// traces through the lowered body's forward copy (`Local(l) ← Temp(t)`):
+/// the temp is dead exactly when the local it forwards into (or a direct
+/// operand consumer) is never read — mirrors the Metal/CUDA
+/// `destination_is_read` (S5-U2c). The forward-copy target local is
+/// collected too (the fold keeps the untraceable `temp→local` forward, so
+/// the shape-list local reaches the gate as a declaration even though no
+/// statement reads it). The emitters skip exactly these slots; a live
+/// `Array`/`Tensor` construct or slot stays fail-closed with the aggregate
+/// diagnostics.
+fn dead_fold_artifact_slots(function: &MirFunction, types: &TypeTable) -> FoldArtifactSlots {
+    let read_locals = function_read_locals(function);
+    let mut dead = FoldArtifactSlots::default();
+    for local in &function.locals {
+        if is_fold_artifact_type(types, local.ty)
+            && !function.params.iter().any(|param| param.local == local.id)
+            && !read_locals.contains(&local.id)
+        {
+            dead.locals.insert(local.id);
+        }
+    }
+    for temp in &function.temps {
+        if !is_fold_artifact_type(types, temp.ty) || temp_directly_read(function, temp.id) {
+            continue;
+        }
+        match temp_forward_local(function, temp.id) {
+            None => {
+                dead.temps.insert(temp.id);
+            }
+            Some(local)
+                if !function.params.iter().any(|param| param.local == local)
+                    && !read_locals.contains(&local) =>
+            {
+                dead.temps.insert(temp.id);
+            }
+            Some(_) => {}
+        }
+    }
+    dead
+}
+
+/// Whether a slot type is a fold-artifact slot shape (`Array`/`Tensor` —
+/// the static-shape fold's shape-list and vacua-seed types). Only these
+/// types may be dead-skipped at the gate, mirroring the emitters' S5-U2c
+/// skip surface; they are structurally non-scalar, satisfying the narrowed
+/// "non-scalar only" dead-skip rule (radix-mir-metal 78e4440e7).
+fn is_fold_artifact_type(types: &TypeTable, ty: MirType) -> bool {
+    matches!(
+        types.get(ty.semantic_id()),
+        Type::Array(_) | Type::Tensor(_, _)
+    )
+}
+
+/// Every local read anywhere in the function (statements and terminators,
+/// across all blocks). Destinations are writes, never reads; an operand's
+/// base slot is read whether or not the place carries projections.
+fn function_read_locals(function: &MirFunction) -> FxHashSet<MirLocalId> {
+    let mut read = FxHashSet::default();
+    for block in &function.blocks {
+        for statement in &block.statements {
+            statement_read_locals(statement, &mut read);
+        }
+        terminator_read_locals(&block.terminator.kind, &mut read);
+    }
+    read
+}
+
+/// Collect the locals a statement reads into `out`.
+fn statement_read_locals(statement: &MirStatement, out: &mut FxHashSet<MirLocalId>) {
+    match &statement.kind {
+        MirStatementKind::Assign { value, .. } => value_read_locals(value, out),
+        MirStatementKind::RuntimeCall { call, .. } => {
+            for operand in &call.args {
+                operand_read_local(operand, out);
+            }
+        }
+        MirStatementKind::Call { args, .. } => {
+            for operand in args {
+                operand_read_local(operand, out);
+            }
+        }
+        MirStatementKind::Construct { aggregate, .. } => aggregate_read_locals(aggregate, out),
+    }
+}
+
+/// Collect the locals a terminator reads into `out`.
+fn terminator_read_locals(terminator: &MirTerminatorKind, out: &mut FxHashSet<MirLocalId>) {
+    match terminator {
+        MirTerminatorKind::Return(Some(operand)) | MirTerminatorKind::ReturnError(operand) => {
+            operand_read_local(operand, out);
+        }
+        MirTerminatorKind::Branch { condition, .. }
+        | MirTerminatorKind::Switch {
+            value: condition, ..
+        } => operand_read_local(condition, out),
+        MirTerminatorKind::TryCall { args, .. } => {
+            for operand in args {
+                operand_read_local(operand, out);
+            }
+        }
+        MirTerminatorKind::Return(None)
+        | MirTerminatorKind::Goto(_)
+        | MirTerminatorKind::Unreachable => {}
+    }
+}
+
+/// Collect the local an operand reads into `out`, when it is a local place.
+fn operand_read_local(operand: &MirOperand, out: &mut FxHashSet<MirLocalId>) {
+    if let MirOperand::Place(place) = operand {
+        if let MirPlaceBase::Local(local) = place.base {
+            out.insert(local);
+        }
+    }
+}
+
+/// Collect the locals a value reads into `out`.
+fn value_read_locals(value: &MirValue, out: &mut FxHashSet<MirLocalId>) {
+    match &value.kind {
+        MirValueKind::Operand(operand) | MirValueKind::Unary { operand, .. } => {
+            operand_read_local(operand, out);
+        }
+        MirValueKind::Binary { lhs, rhs, .. } => {
+            operand_read_local(lhs, out);
+            operand_read_local(rhs, out);
+        }
+        MirValueKind::Option(op) => option_read_locals(op, out),
+        MirValueKind::Closure(closure) => operand_read_local(&closure.environment, out),
+    }
+}
+
+/// Collect the locals an option operation reads into `out`.
+fn option_read_locals(op: &crate::MirOptionOp, out: &mut FxHashSet<MirLocalId>) {
+    match op {
+        crate::MirOptionOp::Some(operand)
+        | crate::MirOptionOp::IsNil(operand)
+        | crate::MirOptionOp::IsNotNil(operand) => operand_read_local(operand, out),
+        crate::MirOptionOp::Unwrap { value, .. } => operand_read_local(value, out),
+        crate::MirOptionOp::Coalesce { value, fallback } => {
+            operand_read_local(value, out);
+            operand_read_local(fallback, out);
+        }
+        crate::MirOptionOp::Chain { base, .. } => operand_read_local(base, out),
+        crate::MirOptionOp::None => {}
+    }
+}
+
+/// Collect the locals an aggregate construct reads into `out` (its field
+/// operands; the destination is a write).
+fn aggregate_read_locals(aggregate: &MirAggregate, out: &mut FxHashSet<MirLocalId>) {
+    match &aggregate.fields {
+        MirAggregateFields::Ordered(items) => {
+            for item in items {
+                let (MirAggregateItem::Operand(operand) | MirAggregateItem::Spread(operand)) = item;
+                operand_read_local(operand, out);
+            }
+        }
+        MirAggregateFields::Named(fields) => {
+            for field in fields {
+                operand_read_local(&field.value, out);
+            }
+        }
+        MirAggregateFields::Keyed(fields) => {
+            for field in fields {
+                operand_read_local(&field.key, out);
+                operand_read_local(&field.value, out);
+            }
+        }
+    }
+}
+
+/// Whether a statement is the lowered pure forward copy `Local(l) ←
+/// Temp(t)` of the given temp — the only reader [`temp_forward_local`]
+/// traces.
+fn is_pure_temp_forward(statement: &MirStatement, temp: MirTempId) -> bool {
+    let MirStatementKind::Assign { place, value } = &statement.kind else {
+        return false;
+    };
+    if !matches!(place.base, MirPlaceBase::Local(_)) || !place.projections.is_empty() {
+        return false;
+    }
+    matches!(&value.kind, MirValueKind::Operand(MirOperand::Temp(t)) if *t == temp)
+}
+
+/// The local a temp's value forwards into through the lowered body's copy
+/// (`Local(l) ← Temp(t)`), when exactly one such forward exists.
+fn temp_forward_local(function: &MirFunction, temp: MirTempId) -> Option<MirLocalId> {
+    let mut found: Option<MirLocalId> = None;
+    for block in &function.blocks {
+        for statement in &block.statements {
+            let MirStatementKind::Assign { place, value } = &statement.kind else {
+                continue;
+            };
+            let MirPlaceBase::Local(local) = place.base else {
+                continue;
+            };
+            if !place.projections.is_empty() {
+                continue;
+            }
+            let MirValueKind::Operand(MirOperand::Temp(forwarded)) = &value.kind else {
+                continue;
+            };
+            if *forwarded != temp {
+                continue;
+            }
+            if found.is_some() {
+                return None;
+            }
+            found = Some(local);
+        }
+    }
+    found
+}
+
+/// Whether any statement or terminator reads the temp OUTSIDE the lowered
+/// forward copy — a direct operand consumer that is not the pure
+/// `Local(l) ← Temp(t)` forward (which [`temp_forward_local`] traces).
+fn temp_directly_read(function: &MirFunction, temp: MirTempId) -> bool {
+    for block in &function.blocks {
+        for statement in &block.statements {
+            if is_pure_temp_forward(statement, temp) {
+                continue;
+            }
+            if statement_reads_temp(statement, temp) {
+                return true;
+            }
+        }
+        if terminator_reads_temp(&block.terminator.kind, temp) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Whether a statement reads the given temp in any operand or value position
+/// (the statement's own destination is a write, never a read).
+fn statement_reads_temp(statement: &MirStatement, temp: MirTempId) -> bool {
+    match &statement.kind {
+        MirStatementKind::Assign { value, .. } => value_reads_temp(value, temp),
+        MirStatementKind::RuntimeCall { call, .. } => call
+            .args
+            .iter()
+            .any(|operand| operand_reads_temp(operand, temp)),
+        MirStatementKind::Construct { aggregate, .. } => matches!(
+            &aggregate.fields,
+            MirAggregateFields::Ordered(fields)
+                if fields.iter().any(|field| matches!(
+                    field,
+                    MirAggregateItem::Operand(operand) if operand_reads_temp(operand, temp)
+                ))
+        ),
+        MirStatementKind::Call { .. } => false,
+    }
+}
+
+/// Whether a value reads the given temp.
+fn value_reads_temp(value: &MirValue, temp: MirTempId) -> bool {
+    match &value.kind {
+        MirValueKind::Operand(operand) | MirValueKind::Unary { operand, .. } => {
+            operand_reads_temp(operand, temp)
+        }
+        MirValueKind::Binary { lhs, rhs, .. } => {
+            operand_reads_temp(lhs, temp) || operand_reads_temp(rhs, temp)
+        }
+        _ => false,
+    }
+}
+
+/// Whether a terminator reads the given temp.
+fn terminator_reads_temp(terminator: &MirTerminatorKind, temp: MirTempId) -> bool {
+    match terminator {
+        MirTerminatorKind::Return(Some(operand)) => operand_reads_temp(operand, temp),
+        MirTerminatorKind::Branch { condition, .. } => operand_reads_temp(condition, temp),
+        MirTerminatorKind::Switch { value, .. } => operand_reads_temp(value, temp),
+        _ => false,
+    }
+}
+
+/// Whether an operand reads the given temp as a plain base slot.
+fn operand_reads_temp(operand: &MirOperand, temp: MirTempId) -> bool {
+    match operand {
+        MirOperand::Temp(t) => *t == temp,
+        MirOperand::Place(place) => matches!(place.base, MirPlaceBase::Temp(t) if t == temp),
+        _ => false,
+    }
+}
+
 struct DeviceSafeClassifier<'a> {
     types: &'a TypeTable,
     layouts: &'a MirLayoutTable,
@@ -393,6 +706,15 @@ struct DeviceSafeClassifier<'a> {
     /// the multi-output kernel contract. Tuple values (the result
     /// aggregation) are then classified per element instead of as aggregate.
     multi_output_result: bool,
+    /// S5-W-A1: the dead fold-artifact slots of the function under visit —
+    /// the destinations of `Array`/`Tensor` constructs (the static-shape
+    /// fold's shape-list / vacua artifacts) that no statement or terminator
+    /// reads. Both emitters skip exactly these constructs (S5-U2c), so the
+    /// gate admits them: the statement, its aggregate type, and the
+    /// artifact's own local/temp declarations are not device values. A live
+    /// `Array`/`Tensor` construct stays fail-closed with the aggregate
+    /// diagnostics.
+    dead_fold_artifact_slots: FoldArtifactSlots,
     gaps: Vec<CapabilityGap>,
 }
 
@@ -423,6 +745,7 @@ impl<'a> DeviceSafeClassifier<'a> {
             allows_structured_nested_indexed_write_loop_continue: false,
             allow_host_owned_tensor_entry: false,
             multi_output_result: false,
+            dead_fold_artifact_slots: FoldArtifactSlots::default(),
             gaps: Vec::new(),
         }
     }
@@ -778,10 +1101,16 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             if let Some(error_ty) = function.error_ty {
                 self.check_device_type(error_ty);
             }
+            // S5-W-A1: the dead fold-artifact slots (shape-list / vacua
+            // `Array`/`Tensor` slots nothing reads) are precomputed so the
+            // local, temp, and construct checks admit them exactly as the
+            // emitters' S5-U2c skip does.
+            self.dead_fold_artifact_slots = dead_fold_artifact_slots(function, self.types);
             crate::visit::walk_function(self, function);
         }
 
         self.multi_output_result = false;
+        self.dead_fold_artifact_slots = FoldArtifactSlots::default();
         self.in_device_function = was_in_device_function;
         self.allows_structured_return_branch = previous_allows_structured_return_branch;
         self.allows_structured_indexed_write_branch =
@@ -822,13 +1151,14 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
     fn visit_local(&mut self, local: &MirLocal) {
         if self.in_device_function
             && !(self.multi_output_result && is_result_tuple_type(self.types, local.ty))
+            && !self.dead_fold_artifact_slots.locals.contains(&local.id)
         {
             self.check_device_type(local.ty);
         }
     }
 
     fn visit_temp(&mut self, temp: &MirTemp) {
-        if self.in_device_function {
+        if self.in_device_function && !self.dead_fold_artifact_slots.temps.contains(&temp.id) {
             self.check_device_type(temp.ty);
         }
     }
@@ -838,7 +1168,22 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             return;
         }
         match &stmt.kind {
-            MirStatementKind::Assign { .. } => crate::visit::walk_stmt(self, stmt),
+            MirStatementKind::Assign { place, value } => {
+                // S5-W-A1: a dead fold-artifact store — a shape-list/vacua
+                // value written into a dead fold-artifact slot (the fold's
+                // temp→local forward, `Local(l) ← Temp(t)`, whose local
+                // nothing reads). The emitters skip the dead store (S5-U2c),
+                // so the gate walks only the destination place, not the
+                // artifact value (whose Array/Tensor type would otherwise
+                // record the aggregate diagnostic).
+                if is_fold_artifact_type(self.types, value.ty)
+                    && self.dead_fold_artifact_slots.contains(&place.base)
+                {
+                    self.visit_place(place);
+                } else {
+                    crate::visit::walk_stmt(self, stmt);
+                }
+            }
             MirStatementKind::Call { .. } => self.record_policy(SHAPE_DEVICE_FUNCTION_CALL),
             MirStatementKind::RuntimeCall { call, .. }
                 if matches!(call.intrinsic, MirIntrinsic::GpuBuiltin(_)) =>
@@ -926,17 +1271,46 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                 crate::visit::walk_stmt(self, stmt);
             }
             MirStatementKind::RuntimeCall { .. } => self.record_policy(SHAPE_KERNEL_RUNTIME_CALL),
-            MirStatementKind::Construct { aggregate, .. } => {
+            MirStatementKind::Construct {
+                aggregate,
+                destination,
+            } => {
                 // S3-A1: a Tuple construct is the multi-output result
                 // aggregation — the ABI lowers it to DISTINCT output
                 // resources; the container is not a device value.
-                if !matches!(
-                    aggregate.kind,
-                    MirAggregateKind::Vector | MirAggregateKind::Matrix | MirAggregateKind::Tuple
-                ) {
+                //
+                // S5-W-A1: a DEAD fold-artifact Array/Tensor construct —
+                // the static-shape fold's shape-list (`Array`) / vacua
+                // (`Tensor`) artifacts, written to a destination nothing
+                // reads — is skipped by both emitters (S5-U2c) and must
+                // pass the gate; a LIVE Array/Tensor construct is a true
+                // unplannable kernel aggregate and stays fail-closed with
+                // the aggregate diagnostics (the statement and its
+                // aggregate type are both skipped from classification).
+                let dead_fold_artifact = self.dead_fold_artifact_slots.contains(&destination.base)
+                    && matches!(
+                        aggregate.kind,
+                        MirAggregateKind::Array | MirAggregateKind::Tensor
+                    );
+                if !dead_fold_artifact
+                    && !matches!(
+                        aggregate.kind,
+                        MirAggregateKind::Vector
+                            | MirAggregateKind::Matrix
+                            | MirAggregateKind::Tuple
+                    )
+                {
                     self.record_policy(SHAPE_KERNEL_AGGREGATE_CONSTRUCT);
                 }
-                crate::visit::walk_stmt(self, stmt);
+                if dead_fold_artifact {
+                    // The destination place is still walked (a write to a
+                    // plain slot); the aggregate — and its non-scalar type —
+                    // is not classified, matching the emitters' whole-
+                    // construct skip.
+                    self.visit_place(destination);
+                } else {
+                    crate::visit::walk_stmt(self, stmt);
+                }
             }
         }
     }
@@ -1090,5 +1464,324 @@ pub fn device_role_for_hir_function(func: &HirFunction) -> Option<MirDeviceRole>
         Some(MirDeviceRole::Device)
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate::ValidatedMir;
+    use crate::{
+        MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlock, MirBlockId,
+        MirConstant, MirFunction, MirFunctionId, MirIntrinsic, MirLocal, MirLocalId, MirOperand,
+        MirParam, MirParamMode, MirPlace, MirRuntimeCall, MirStatement, MirStatementKind, MirTemp,
+        MirTempId, MirTerminator, MirTerminatorKind, MirType, MirValue, MirValueId, MirValueKind,
+    };
+    use radix_lexer::Span;
+    use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeTable};
+
+    fn test_span() -> Span {
+        Span::default()
+    }
+
+    fn f32_ty(types: &mut TypeTable) -> MirType {
+        MirType::semantic(types.sized_numeric(Primitive::Fractus, NumericWidth::F32))
+    }
+
+    /// A rank-2 `tf32[M, N]` tensor type with static literal dims (the MLP
+    /// operand shape the device path folds).
+    fn rank2_tensor_ty(types: &mut TypeTable, dims: [u64; 2]) -> MirType {
+        let f32 = f32_ty(types).semantic_id();
+        let dim_ids = dims
+            .iter()
+            .map(|&dim| types.intern_index(IndexExpr::Literal(dim)))
+            .collect::<Vec<_>>();
+        let shape = types.intern_index(IndexExpr::Tuple(dim_ids));
+        MirType::semantic(types.intern(Type::Tensor(f32, shape)))
+    }
+
+    /// The `lista<numerus>` shape-list type `magnitudines()` returns.
+    fn shape_lista_ty(types: &mut TypeTable) -> MirType {
+        MirType::semantic(types.array(types.primitive(Primitive::Numerus)))
+    }
+
+    /// A single-element tuple of one tensor type (the multi-output result
+    /// contract).
+    fn tuple_of_one_ty(types: &mut TypeTable, element: MirType) -> MirType {
+        MirType::semantic(types.intern(Type::Tuple(vec![element.semantic_id()])))
+    }
+
+    /// A device context marking `MirFunctionId(0)` as a device kernel (the
+    /// target-entry gate's routing surface).
+    fn kernel_device_context() -> MirDeviceContext {
+        MirDeviceContext {
+            by_function_id: FxHashMap::from_iter([(MirFunctionId(0), MirDeviceRole::Kernel)]),
+            ..MirDeviceContext::default()
+        }
+    }
+
+    /// The S5-U2c train_step artifact shape the emitters see AFTER the
+    /// static-shape fold: a DEAD `Array` shape-list construct whose temp
+    /// destination forwards into an unread `lista` local (the fold's
+    /// untraceable `temp→local` artifact), plus a live tensor body
+    /// (`t = x @ w`) returning a result tuple.
+    ///
+    /// Locals: 0-1 tensor params, 2 `t`, 3 dead shape-list forward target,
+    /// 4 result tuple. Temp: 0 dead shape-list artifact destination.
+    fn dead_fold_artifact_train_step(types: &mut TypeTable) -> MirFunction {
+        let r2 = rank2_tensor_ty(types, [4, 4]);
+        let lista = shape_lista_ty(types);
+        let tuple = tuple_of_one_ty(types, r2);
+        let span = test_span();
+        MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![
+                MirParam {
+                    local: MirLocalId(0),
+                    name: None,
+                    ty: r2,
+                    mode: MirParamMode::Owned,
+                    span,
+                },
+                MirParam {
+                    local: MirLocalId(1),
+                    name: None,
+                    ty: r2,
+                    mode: MirParamMode::Owned,
+                    span,
+                },
+            ],
+            locals: vec![
+                MirLocal {
+                    id: MirLocalId(0),
+                    name: None,
+                    ty: r2,
+                    mutable: false,
+                    span,
+                },
+                MirLocal {
+                    id: MirLocalId(1),
+                    name: None,
+                    ty: r2,
+                    mutable: false,
+                    span,
+                },
+                MirLocal {
+                    id: MirLocalId(2),
+                    name: None,
+                    ty: r2,
+                    mutable: false,
+                    span,
+                },
+                MirLocal {
+                    id: MirLocalId(3),
+                    name: None,
+                    ty: lista,
+                    mutable: false,
+                    span,
+                },
+                MirLocal {
+                    id: MirLocalId(4),
+                    name: None,
+                    ty: tuple,
+                    mutable: false,
+                    span,
+                },
+            ],
+            temps: vec![MirTemp {
+                id: MirTempId(0),
+                ty: lista,
+                span,
+            }],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![
+                    // shape_list ← construct lista[4, 4] — the dead fold
+                    // artifact (S5-U2c).
+                    MirStatement {
+                        kind: MirStatementKind::Construct {
+                            destination: MirPlace::temp(MirTempId(0)),
+                            aggregate: MirAggregate {
+                                kind: MirAggregateKind::Array,
+                                ty: lista,
+                                fields: MirAggregateFields::Ordered(vec![
+                                    MirAggregateItem::Operand(MirOperand::Constant(
+                                        MirConstant::Int(4),
+                                    )),
+                                    MirAggregateItem::Operand(MirOperand::Constant(
+                                        MirConstant::Int(4),
+                                    )),
+                                ]),
+                            },
+                        },
+                        span,
+                    },
+                    // Local(3) ← Temp(0) — the fold's temp→local forward;
+                    // nothing reads Local(3).
+                    MirStatement {
+                        kind: MirStatementKind::Assign {
+                            place: MirPlace::local(MirLocalId(3)),
+                            value: MirValue {
+                                id: MirValueId(0),
+                                kind: MirValueKind::Operand(MirOperand::Temp(MirTempId(0))),
+                                ty: lista,
+                                span,
+                            },
+                        },
+                        span,
+                    },
+                    // t = x @ w — the live tensor body.
+                    MirStatement {
+                        kind: MirStatementKind::RuntimeCall {
+                            destination: Some(MirPlace::local(MirLocalId(2))),
+                            call: MirRuntimeCall {
+                                intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorMatMul),
+                                args: vec![
+                                    MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                                    MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                                ],
+                                return_ty: r2,
+                            },
+                        },
+                        span,
+                    },
+                    // result ← construct tuple(t) — the multi-output result.
+                    MirStatement {
+                        kind: MirStatementKind::Construct {
+                            destination: MirPlace::local(MirLocalId(4)),
+                            aggregate: MirAggregate {
+                                kind: MirAggregateKind::Tuple,
+                                ty: tuple,
+                                fields: MirAggregateFields::Ordered(vec![
+                                    MirAggregateItem::Operand(MirOperand::Place(MirPlace::local(
+                                        MirLocalId(2),
+                                    ))),
+                                ]),
+                            },
+                        },
+                        span,
+                    },
+                ],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                        MirLocalId(4),
+                    )))),
+                    span,
+                },
+                span,
+            }],
+            return_ty: tuple,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span,
+        }
+    }
+
+    /// A device function whose `Array` shape-list construct destination is
+    /// LIVE — returned by the terminator — the fail-closed counterpart of
+    /// the dead artifact.
+    fn live_array_construct_function(types: &mut TypeTable) -> MirFunction {
+        let lista = shape_lista_ty(types);
+        let span = test_span();
+        MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: Vec::new(),
+            locals: vec![MirLocal {
+                id: MirLocalId(1),
+                name: None,
+                ty: lista,
+                mutable: false,
+                span,
+            }],
+            temps: Vec::new(),
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Construct {
+                        destination: MirPlace::local(MirLocalId(1)),
+                        aggregate: MirAggregate {
+                            kind: MirAggregateKind::Array,
+                            ty: lista,
+                            fields: MirAggregateFields::Ordered(vec![MirAggregateItem::Operand(
+                                MirOperand::Constant(MirConstant::Int(4)),
+                            )]),
+                        },
+                    },
+                    span,
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                        MirLocalId(1),
+                    )))),
+                    span,
+                },
+                span,
+            }],
+            return_ty: lista,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span,
+        }
+    }
+
+    #[test]
+    fn dead_fold_artifact_construct_passes_target_entry_gate() {
+        // S5-W-A1 (Part 2): a train_step body carrying the static-shape
+        // fold's DEAD `Array` shape-list artifact (a temp destination
+        // traced through the `temp→local` forward into an unread `lista`
+        // local) must pass the target-entry gate — the emitters' S5-U2c
+        // dead-artifact skip requires the gate to agree. Pre-A1 this body
+        // failed with `device aggregate value type Array(...)` at the local,
+        // temp, and construct checks.
+        let mut types = TypeTable::new();
+        let function = dead_fold_artifact_train_step(&mut types);
+        let program = crate::MirProgram {
+            functions: vec![function],
+        };
+        let validated = ValidatedMir::new(program, MirValidationContext::new(&types))
+            .expect("the dead-artifact body must remain well-formed MIR");
+        let device = kernel_device_context();
+
+        let verdict = classify_device_safe_for_target_entry(&validated, &device);
+        assert!(
+            verdict.is_capable(),
+            "dead fold-artifact Array/Tensor constructs must pass the gate, got: {:?}",
+            verdict
+        );
+    }
+
+    #[test]
+    fn live_array_construct_still_fails_target_entry_gate() {
+        // The same gate keeps a LIVE `Array` construct fail-closed with the
+        // existing aggregate diagnostic — the emitters fail on a live
+        // aggregate construct, so the gate must too.
+        let mut types = TypeTable::new();
+        let function = live_array_construct_function(&mut types);
+        let program = crate::MirProgram {
+            functions: vec![function],
+        };
+        let validated = ValidatedMir::new(program, MirValidationContext::new(&types))
+            .expect("the live-construct body must remain well-formed MIR");
+        let device = kernel_device_context();
+
+        let verdict = classify_device_safe_for_target_entry(&validated, &device);
+        let gaps = verdict.gaps();
+        assert!(
+            !gaps.is_empty(),
+            "a live Array construct must fail the target-entry gate"
+        );
+        assert!(
+            gaps.iter()
+                .any(|gap| gap.shape().contains("device aggregate value type Array")),
+            "the live Array construct must fail with the aggregate diagnostic, got: {gaps:?}"
+        );
     }
 }

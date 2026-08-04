@@ -43,12 +43,12 @@ use crate::abi::{
 };
 use crate::device_program::{Binding, BufferRole, DeviceProgram, DeviceResource, KernelUnit};
 use crate::kernel_plan::{CollectionKernelPlan, MatMulShapes, SharedMemoryLayout};
-use crate::layout::MirTensorStorageLayout;
+use crate::layout::{MirScalarLayout, MirTensorStorageLayout};
 use crate::{
     MirAggregateFields, MirAggregateItem, MirCollectionOp, MirFunction, MirIntrinsic,
-    MirKernelDispatchSize, MirKernelWorkgroupCount, MirLocalId, MirOperand, MirPlace, MirPlaceBase,
-    MirRuntimeCall, MirStatement, MirStatementKind, MirTerminatorKind, MirType,
-    MirValidationContext, MirValue, MirValueKind, MirWorkgroupSize,
+    MirKernelDispatchSize, MirKernelWorkgroupCount, MirLayoutKind, MirLocalId, MirOperand,
+    MirPlace, MirPlaceBase, MirRuntimeCall, MirStatement, MirStatementKind, MirTerminatorKind,
+    MirType, MirValidationContext, MirValue, MirValueKind, MirWorkgroupSize,
 };
 use radix_types::{IndexExpr, Type, TypeId};
 use std::fmt;
@@ -554,6 +554,55 @@ fn tensor_element_ty(
     Ok(MirType::semantic(*element))
 }
 
+/// The buffer element type and element count for a data-flow input bound by
+/// [`subchain_signature_for_emission`] — a subchain param beyond the recipe
+/// operands (a local read from an earlier subchain).
+///
+/// Tensors bind at their device-view element type and literal dim product
+/// ([`tensor_element_ty`] / [`tensor_literal_dims`]); a scalar data-flow
+/// param (S5-W-A1: the companion's scalar upstream seed) binds as a
+/// 1-element input at the scalar's own type — mirroring how the ABI scalar
+/// kernel path treats `F32`/`I32`/`U32` (`abi::is_kernel_element_layout`).
+/// A scalar outside that surface (e.g. f64) stays fail-closed with the
+/// ABI's own typed diagnostic; non-scalar, non-tensor layouts stay
+/// fail-closed with a typed diagnostic.
+fn data_flow_element_ty_and_count(
+    ty: MirType,
+    validation: &MirValidationContext<'_>,
+) -> Result<(MirType, u64), PlanMappingError> {
+    let layout = validation
+        .layouts
+        .layout_for_type(ty)
+        .map_err(|error| PlanMappingError::mapping(error.message))?;
+    match layout.kind {
+        MirLayoutKind::Scalar(scalar) if is_kernel_element_layout(scalar) => Ok((ty, 1)),
+        MirLayoutKind::Scalar(scalar) => Err(PlanMappingError::mapping(format!(
+            "kernel scalar layout {}",
+            scalar.spelling()
+        ))),
+        MirLayoutKind::DeviceView(_) => {
+            let element_ty = tensor_element_ty(ty, validation)?;
+            let count = tensor_literal_dims(ty, validation)?
+                .into_iter()
+                .fold(1u64, u64::saturating_mul);
+            Ok((element_ty, count))
+        }
+        _ => Err(PlanMappingError::mapping(
+            "data-flow input requires a tensor or kernel-scalar type",
+        )),
+    }
+}
+
+/// Whether a scalar layout is a kernel buffer element — the ABI's
+/// `is_kernel_element_layout` surface (the only scalar layouts a kernel
+/// storage buffer can carry).
+fn is_kernel_element_layout(scalar: MirScalarLayout) -> bool {
+    matches!(
+        scalar,
+        MirScalarLayout::F32 | MirScalarLayout::I32 | MirScalarLayout::U32
+    )
+}
+
 /// The local type of a recipe-op statement's first operand (the tensor the
 /// reduction/transpose recipe reads) — resolved from the subchain body's
 /// typed statement scan.
@@ -752,9 +801,19 @@ pub fn contract_shape_signature(
 /// source locals are patched from the recipe statement's operand scan (the
 /// contract-shaped seam leaves them `None`).
 ///
+/// Data-flow inputs bind after the recipe operands: tensor-typed params at
+/// their device-view element type and literal dim product, and scalar-typed
+/// params (S5-W-A1: the companion's scalar upstream seed, e.g. the MLP
+/// backward's f32 seed flowing into a Fill/Div) as 1-element inputs at the
+/// scalar's own type — mirroring the ABI kernel scalar surface
+/// (`F32`/`I32`/`U32`). An f64-class scalar stays fail-closed exactly as
+/// the ABI rejects it; other non-scalar, non-tensor layouts stay fail-closed
+/// with a typed diagnostic.
+///
 /// # Errors
-/// Returns [`PlanMappingError`] when the recipe operand or a data-flow
-/// input's tensor type cannot be resolved from the subchain body.
+/// Returns [`PlanMappingError`] when the recipe operand's tensor type, a
+/// data-flow input's tensor type, or a scalar data-flow input's kernel
+/// layout cannot be resolved from the subchain body.
 pub fn subchain_signature_for_emission(
     function: &MirFunction,
     contract: &CollectionOpContract,
@@ -786,10 +845,7 @@ pub fn subchain_signature_for_emission(
         if bound.contains(&param.local) {
             continue;
         }
-        let element_ty = tensor_element_ty(param.ty, validation)?;
-        let count = tensor_literal_dims(param.ty, validation)?
-            .into_iter()
-            .fold(1u64, u64::saturating_mul);
+        let (element_ty, count) = data_flow_element_ty_and_count(param.ty, validation)?;
         signature.extra_inputs.push(storage_input_with_local(
             next_binding,
             element_ty,

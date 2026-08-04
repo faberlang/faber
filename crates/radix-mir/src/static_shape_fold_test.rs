@@ -847,15 +847,22 @@ fn lowered_temp_destination_create_folds_through_the_local_copy() {
             let MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
                 return None;
             };
-            matches!(call.intrinsic, MirIntrinsic::Collection(MirCollectionOp::TensorFill))
-                .then_some(call)
+            matches!(
+                call.intrinsic,
+                MirIntrinsic::Collection(MirCollectionOp::TensorFill)
+            )
+            .then_some(call)
         })
         .expect("the temp-destination create folded to a fill");
     assert_eq!(fill.args.len(), 2, "fill carries (receiver, scalar)");
     let MirOperand::Place(receiver) = &fill.args[0] else {
         panic!("fill receiver must be a place");
     };
-    assert_eq!(receiver.base, MirPlaceBase::Local(MirLocalId(0)), "fill broadcasts over the shape-source tensor");
+    assert_eq!(
+        receiver.base,
+        MirPlaceBase::Local(MirLocalId(0)),
+        "fill broadcasts over the shape-source tensor"
+    );
 
     // The folded create's destination stayed the TEMP; the copy into local 4
     // remains in the body (the fill result flows through it).
@@ -897,7 +904,11 @@ fn lowered_temp_destination_create_folds_through_the_local_copy() {
         .filter(|fact| fact.source == ShapeFactSource::Crea)
         .collect();
     assert_eq!(crea_facts.len(), 1);
-    assert_eq!(crea_facts[0].local, MirLocalId(4), "fact names the copied local");
+    assert_eq!(
+        crea_facts[0].local,
+        MirLocalId(4),
+        "fact names the copied local"
+    );
     assert_eq!(crea_facts[0].dims, vec![2, 2]);
     assert_eq!(crea_facts[0].element_count, 4);
 }

@@ -216,9 +216,7 @@ pub fn fold_static_shapes(
             let MirStatementKind::RuntimeCall { destination, call } = &statement.kind else {
                 continue;
             };
-            let Some(local) =
-                destination_local_traced(destination.as_ref(), &temp_to_local)
-            else {
+            let Some(local) = destination_local_traced(destination.as_ref(), &temp_to_local) else {
                 continue;
             };
             match call.intrinsic {
@@ -401,8 +399,7 @@ fn fold_statement(
             // The folded fill keeps the ORIGINAL destination (a temp is
             // fine — the lowered body's copy into the traced local follows);
             // the traced local is the value identity the fold fact names.
-            let traced_local =
-                destination_local_traced(destination.as_ref(), &temp_to_local);
+            let traced_local = destination_local_traced(destination.as_ref(), &temp_to_local);
             let Some(local) = traced_local else {
                 return Err(ShapeFoldError::new(
                     ShapeFoldErrorKind::NonStaticShapeDestination,
@@ -446,9 +443,7 @@ fn fold_statement(
             })
         }
         MirCollectionOp::TensorFromFlat => {
-            let Some(local) =
-                destination_local_traced(destination.as_ref(), &temp_to_local)
-            else {
+            let Some(local) = destination_local_traced(destination.as_ref(), &temp_to_local) else {
                 return Err(ShapeFoldError::new(
                     ShapeFoldErrorKind::NonStaticShapeDestination,
                     "tensor_from_flat destination is not a local; cannot fold its shape",
