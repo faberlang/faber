@@ -48,8 +48,8 @@
 use faber::device::{DeviceBackend, DeviceSelection};
 use faber_host_macos_arm64::device_descriptor::{
     DescriptorBuffer, DescriptorBufferVersion, DescriptorDataFlow as HostDescriptorDataFlow,
-    DescriptorKernel, DescriptorLaunch, DeviceBufferLifetime, DeviceBufferRole, DeviceDataType,
-    DeviceDescriptor, DeviceProgramLifetime as HostDeviceProgramLifetime,
+    DescriptorKernel, DescriptorLaunch, DescriptorResult, DeviceBufferLifetime, DeviceBufferRole,
+    DeviceDataType, DeviceDescriptor, DeviceProgramLifetime as HostDeviceProgramLifetime,
 };
 use radix::diagnostics::Diagnostic;
 use radix::lexer::Interner;
@@ -1411,6 +1411,10 @@ pub(crate) fn descriptor_for_backend(
             buffers.push(DescriptorBuffer {
                 buffer_id: resource.buffer.id,
                 buffer_name: resource.buffer.name.clone(),
+                // F1: the wire's carried stable semantic value identity —
+                // the host consumes it; it never derives identity from
+                // names, shapes, binding positions, or declaration order.
+                semantic_value: resource.buffer.semantic_value,
                 role: wire_role_to_host(resource.buffer.role),
                 lifetime: wire_lifetime_to_host(resource.buffer.lifetime),
                 binding: resource.binding.binding,
@@ -1464,17 +1468,34 @@ pub(crate) fn descriptor_for_backend(
             WireProgramLifetime::SingleRun => HostDeviceProgramLifetime::SingleRun,
             WireProgramLifetime::RepeatingStep => HostDeviceProgramLifetime::RepeatingStep,
         },
-        // R2: the host consumes the wire's carried data-flow edges (real
-        // versions, producer/consumer per buffer version) — the receipt's
-        // A10 graph is never re-derived from launch order.
-        data_flow: wire_resource_graph(device)
-            .1
-            .into_iter()
+        // R2/F3: the host consumes the WIRE'S CARRIED dependency edges
+        // (real versions, producer/consumer per buffer version) verbatim —
+        // the A10 graph is never re-derived from launch order or access
+        // facts. The wire's `dependencies` are the materializer's frozen
+        // producer/consumer facts (F3).
+        data_flow: wire
+            .dependencies
+            .iter()
             .map(|edge| HostDescriptorDataFlow {
-                buffer_id: edge.buffer_id,
+                buffer_id: edge.buffer,
                 version: edge.version,
                 producer: edge.producer,
                 consumer: edge.consumer,
+            })
+            .collect(),
+        // F3: the declared legal execution roots — the launches the graph may
+        // start from, carried verbatim.
+        roots: wire.roots.clone(),
+        // F6: the declared observation points — the explicit result rows the
+        // host reads back, projected from the wire's observation facts.
+        results: wire
+            .results
+            .iter()
+            .map(|result| DescriptorResult {
+                buffer_id: result.buffer.id,
+                version: result.version.version,
+                produced_by: result.produced_by,
+                at_launch: result.observation.at_launch,
             })
             .collect(),
     };
@@ -1726,7 +1747,10 @@ fn inputs_by_buffer_id(device: &FmirDeviceSection) -> BTreeMap<u32, Vec<f32>> {
 /// Result rows are the authoritative readback set. `validate_wire_results`
 /// proves that each row names a unique `ObservationPoint` resource before this
 /// function is used, so no valid result can disappear through a role/lifetime
-/// re-derivation.
+/// re-derivation. Test-only since U5: the host projects readbacks from the
+/// descriptor's carried observation facts, so the route no longer selects
+/// outputs itself.
+#[cfg(test)]
 fn observation_buffer_ids(device: &FmirDeviceSection) -> Vec<u32> {
     let mut ids = Vec::new();
     for result in &device.device_program.program.results {
@@ -1742,18 +1766,16 @@ fn observation_buffer_ids(device: &FmirDeviceSection) -> Vec<u32> {
 // ---------------------------------------------------------------------------
 
 /// One wire-derived A10 graph buffer (identity + content version).
-#[allow(dead_code)] // the graph rows are asserted in the Faber projection tests.
+#[cfg(test)]
 struct WireGraphBuffer {
     id: u32,
     name: String,
-    role: WireBufferRole,
-    lifetime: WireBufferLifetime,
     version: u32,
-    element_ty: String,
     element_count: u64,
 }
 
 /// One wire-derived inter-kernel data-flow edge.
+#[cfg(test)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct WireGraphEdge {
     buffer_id: u32,
@@ -1768,7 +1790,9 @@ struct WireGraphEdge {
 /// as the radix-mir `BufferRegistry` over the program — the host consumes
 /// the carried facts instead of re-deriving topology from launch order or a
 /// slot-role string (no coincidence-based first-writer rule, no hardcoded
-/// version).
+/// version). Test-only since U5: the descriptor consumes the wire's CARRIED
+/// `dependencies` verbatim.
+#[cfg(test)]
 fn wire_resource_graph(device: &FmirDeviceSection) -> (Vec<WireGraphBuffer>, Vec<WireGraphEdge>) {
     let wire = &device.device_program.program;
     let mut buffers: Vec<WireGraphBuffer> = Vec::new();
@@ -1787,10 +1811,7 @@ fn wire_resource_graph(device: &FmirDeviceSection) -> (Vec<WireGraphBuffer>, Vec
                 buffers.push(WireGraphBuffer {
                     id,
                     name: resource.buffer.name.clone(),
-                    role: resource.buffer.role,
-                    lifetime: resource.buffer.lifetime,
                     version: resource.version.version,
-                    element_ty: resource.version.element_ty.clone(),
                     element_count: resource.version.element_count,
                 });
             }
@@ -1817,10 +1838,7 @@ fn wire_resource_graph(device: &FmirDeviceSection) -> (Vec<WireGraphBuffer>, Vec
             buffers.push(WireGraphBuffer {
                 id: result.buffer.id,
                 name: result.buffer.name.clone(),
-                role: result.buffer.role,
-                lifetime: result.buffer.lifetime,
                 version: result.version.version,
-                element_ty: result.version.element_ty.clone(),
                 element_count: result.version.element_count,
             });
         }
@@ -1903,9 +1921,9 @@ pub(crate) fn execute_device_route(
     let mut host = super::host_factory::construct_composite_host(selection, true)
         .map_err(|diagnostic| vec![diagnostic])?;
     let inputs = inputs_by_buffer_id(device);
-    // The explicit result rows, already validated by descriptor construction,
-    // are the sole authority for host readback selection.
-    let outputs = observation_buffer_ids(device);
+    // The explicit observation facts, already validated by descriptor
+    // construction, are the sole authority for host readback selection (F6):
+    // the host projects results from the descriptor's carried result rows.
 
     // A10 identity over the COMPLETE program (S3-A4): the canonical bytes of
     // the typed wire (semantics-only — CUDA symbols and declared inputs are
@@ -1925,7 +1943,7 @@ pub(crate) fn execute_device_route(
     for _ in 0..repeat_count {
         last_receipt = Some(
             session
-                .execute(&inputs, &outputs)
+                .execute(&inputs)
                 .map_err(|error| vec![super::host_factory::host_error_diagnostic(&error)])?,
         );
     }
@@ -1938,17 +1956,21 @@ pub(crate) fn execute_device_route(
         .teardown()
         .map_err(|error| vec![super::host_factory::host_error_diagnostic(&error)])?;
 
-    // A9 observed lifecycle events of the last execution.
+    // A9 observed lifecycle events of the last execution (R9): real
+    // synchronization operations, the exact readback count, and the
+    // completion boundary the receipt states.
     println!(
-        "device: module hash fnv64:{:016x} launches {} syncs {} transfers {} readbacks {} releases {} allocated {}",
+        "device: module hash fnv64:{:016x} semantic graph hash fnv64:{:016x} launches {} syncs {} transfers {} readbacks {} releases {} allocated {}",
         receipt.module_hash,
+        receipt.semantic_graph_hash,
         receipt.launches,
         receipt.syncs,
         receipt.transfers,
-        receipt.outputs.len(),
+        receipt.readbacks,
         receipt.releases,
         receipt.allocated_buffers.len()
     );
+    println!("device: {}", receipt.completion_boundary.spelling());
     println!("{}", host_receipt_launch_order_line(&descriptor));
 
     // A10 declared logical resource graph: render the host's receipt facts

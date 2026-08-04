@@ -9,7 +9,7 @@ use faber::device::{DeviceBackend, DeviceSelection};
 use faber_host_macos_arm64::composite_host::{CompositeHost, CompositeHostConfig};
 use faber_host_macos_arm64::device_descriptor::{
     DescriptorBuffer, DescriptorBufferVersion, DescriptorKernel, DescriptorLaunch,
-    DeviceBufferLifetime, DeviceBufferRole, DeviceDataType, DeviceDescriptor,
+    DescriptorResult, DeviceBufferLifetime, DeviceBufferRole, DeviceDataType, DeviceDescriptor,
     DeviceProgramLifetime,
 };
 use faber_host_macos_arm64::device_host::DeviceRuntime;
@@ -38,12 +38,25 @@ fn add_slot(
     DescriptorBuffer {
         buffer_id: id,
         buffer_name: name.to_owned(),
+        // F1: one distinct semantic value per buffer identity.
+        semantic_value: id,
         role,
         lifetime: lifetime_for_role(role),
         binding,
         element_ty: DeviceDataType::F32,
         element_count: count,
         version: 1,
+    }
+}
+
+/// One declared observation point (F6): the buffer the host reads back at
+/// its producing launch's completion boundary.
+fn result(id: u32) -> DescriptorResult {
+    DescriptorResult {
+        buffer_id: id,
+        version: 1,
+        produced_by: 1,
+        at_launch: 1,
     }
 }
 
@@ -87,6 +100,10 @@ fn elementwise_add_descriptor(backend: DeviceBackend, entry: &str, count: u64) -
         ],
         program_lifetime: DeviceProgramLifetime::SingleRun,
         data_flow: Vec::new(),
+        // F3/F6: the single launch is the legal root and its output the only
+        // declared observation point.
+        roots: vec![1],
+        results: vec![result(3)],
     }
 }
 
@@ -274,7 +291,7 @@ fn discovery_receipt_without_matching_artifact_is_missing_descriptor() {
 fn cpu_only_host_rejects_descriptor_execution() {
     let mut host = CompositeHost::new(CompositeHostConfig::cpu()).expect("cpu composite");
     let descriptor = elementwise_add_descriptor(DeviceBackend::Metal, "add_one", 2);
-    let err = execute_device_descriptor(&mut host, &descriptor, &BTreeMap::new(), &[])
+    let err = execute_device_descriptor(&mut host, &descriptor, &BTreeMap::new())
         .expect_err("cpu-only host must refuse device execution");
     assert_eq!(err.issue(), Some(E_NO_DEVICE_PROGRAM));
 }
@@ -284,7 +301,7 @@ fn empty_module_image_is_a_bad_descriptor() {
     let mut host = metal_composite("add_one");
     let mut descriptor = elementwise_add_descriptor(DeviceBackend::Metal, "add_one", 2);
     descriptor.module_image.clear();
-    let err = execute_device_descriptor(&mut host, &descriptor, &BTreeMap::new(), &[])
+    let err = execute_device_descriptor(&mut host, &descriptor, &BTreeMap::new())
         .expect_err("empty module image must fail before launch");
     assert_eq!(err.issue(), Some(E_DEVICE_DESCRIPTOR));
 }
@@ -294,7 +311,7 @@ fn duplicate_binding_fails_as_abi_mismatch() {
     let mut host = metal_composite("add_one");
     let mut descriptor = elementwise_add_descriptor(DeviceBackend::Metal, "add_one", 2);
     descriptor.kernels[0].buffers[2].binding = 0; // collides with slot `a`
-    let err = execute_device_descriptor(&mut host, &descriptor, &BTreeMap::new(), &[])
+    let err = execute_device_descriptor(&mut host, &descriptor, &BTreeMap::new())
         .expect_err("duplicate binding must fail as an ABI mismatch");
     assert_eq!(err.issue(), Some(E_DEVICE_ABI_MISMATCH));
 }
@@ -307,7 +324,6 @@ fn unknown_kernel_entry_fails_before_launch() {
         &mut host,
         &descriptor,
         &add_inputs(vec![1.0, 2.0], vec![3.0, 4.0]),
-        &[3],
     )
     .expect_err("unknown entry must fail before launch");
     assert_eq!(err.issue(), Some(E_DEVICE_ENTRY_MISMATCH));
@@ -338,7 +354,7 @@ fn conflicting_dtypes_fail_as_dtype_mismatch() {
         grid: [1, 1, 1],
         block: [2, 1, 1],
     });
-    let err = execute_device_descriptor(&mut host, &descriptor, &BTreeMap::new(), &[])
+    let err = execute_device_descriptor(&mut host, &descriptor, &BTreeMap::new())
         .expect_err("dtype conflict must fail before launch");
     assert_eq!(err.issue(), Some(E_DEVICE_DTYPE_MISMATCH));
 }
@@ -415,8 +431,10 @@ fn conflicting_shapes_fail_as_shape_mismatch() {
         ],
         program_lifetime: DeviceProgramLifetime::SingleRun,
         data_flow: Vec::new(),
+        roots: vec![1, 2],
+        results: Vec::new(),
     };
-    let err = execute_device_descriptor(&mut host, &descriptor, &BTreeMap::new(), &[])
+    let err = execute_device_descriptor(&mut host, &descriptor, &BTreeMap::new())
         .expect_err("shape conflict must fail before launch");
     assert_eq!(err.issue(), Some(E_DEVICE_SHAPE_MISMATCH));
 }
@@ -427,7 +445,7 @@ fn missing_declared_input_fails_before_launch() {
     let descriptor = elementwise_add_descriptor(DeviceBackend::Metal, "add_one", 2);
     let mut inputs = BTreeMap::new();
     inputs.insert(1, vec![1.0, 2.0]); // buffer 2 missing
-    let err = execute_device_descriptor(&mut host, &descriptor, &inputs, &[3])
+    let err = execute_device_descriptor(&mut host, &descriptor, &inputs)
         .expect_err("missing declared input must fail before launch");
     assert_eq!(err.issue(), Some(E_DEVICE_SHAPE_MISMATCH));
 }
@@ -445,7 +463,7 @@ fn create_program_session_returns_a_session_for_a_device_program() {
     // The session is usable: one execute() call drives the full lifecycle on
     // the already-loaded module and the pre-allocated per-program buffers.
     let receipt = session
-        .execute(&add_inputs(vec![1.0, 2.0], vec![3.0, 4.0]), &[3])
+        .execute(&add_inputs(vec![1.0, 2.0], vec![3.0, 4.0]))
         .expect("session executes without reloading or re-allocating");
     assert_eq!(receipt.launches, 1);
     assert_eq!(

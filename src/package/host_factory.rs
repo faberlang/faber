@@ -133,6 +133,10 @@ pub fn construct_composite_host(
 /// fail with typed diagnostics **before any launch** (N1.4). Returns an A9
 /// receipt when the lifecycle completes.
 ///
+/// Readbacks are projected from the descriptor's carried observation facts
+/// (F6): the host reads back exactly the declared observation points — the
+/// caller does not select outputs.
+///
 /// Single-run convenience over the program-session seam
 /// ([`create_program_session`]): one session per call, torn down on success;
 /// a failed execution releases every handle on the error path (S2-3) before
@@ -149,11 +153,10 @@ pub fn execute_device_descriptor(
     host: &mut CompositeHost,
     descriptor: &DeviceDescriptor,
     inputs: &BTreeMap<u32, Vec<f32>>,
-    outputs: &[u32],
 ) -> Result<DeviceExecutionReceipt, Diagnostic> {
     let mut session = create_program_session(host, descriptor)?;
     let receipt = session
-        .execute(inputs, outputs)
+        .execute(inputs)
         .map_err(|error| host_error_diagnostic(&error))?;
     session
         .teardown()

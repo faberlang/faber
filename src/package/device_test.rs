@@ -460,6 +460,16 @@ fn descriptor_preserves_wire_launch_order_and_version_keys() {
     );
     assert!(versioned_edges.is_empty());
 
+    // F3 (U5): the host consumes the wire's CARRIED graph facts verbatim, so
+    // the mutated wire must carry a consistent root set and dependency set —
+    // the roots name the mutated launch sequence, and the version-diverged
+    // intermediate carries no dependency edge.
+    {
+        let wire = &mut section.device_program.program;
+        wire.roots = vec![11, 12, 13];
+        wire.dependencies.clear();
+    }
+
     let descriptor = descriptor_for_backend(&section, DeviceBackend::Metal, b"msl blob")
         .expect("complete wire projects into the host descriptor");
     assert_eq!(
@@ -511,6 +521,71 @@ fn descriptor_preserves_wire_launch_order_and_version_keys() {
         host_receipt_launch_order_line(&descriptor),
         "device: launch order: [#0 id=11 kernel_index=1 backend_entry=`recollige`, #1 id=12 kernel_index=0 backend_entry=`collige`, #2 id=13 kernel_index=1 backend_entry=`recollige`]"
     );
+}
+
+/// U5 done-when (E_DEVICE_DESCRIPTOR gone): the ordinary two-kernel package
+/// (the device-summa-recollige shape — a dependent chain) projects onto a
+/// host descriptor that ADMITS at the host. The old P1-4 contradiction —
+/// the constructor exposing every writable Output/InOut as a result while
+/// the host admits only declared observation points — is gone: constructor
+/// and host admission agree on one readback rule (F6). The descriptor also
+/// carries the frozen graph facts (F1/F3): semantic value identities per
+/// buffer, the declared roots, the carried dependency edge, and the explicit
+/// observation point.
+#[test]
+fn two_kernel_descriptor_admits_on_host_with_carried_graph() {
+    let (program, semantics) = two_kernel_fixture();
+    let mut section = section_for_program(&program, &semantics);
+    section.artifacts.artifact = vec![FmirDeviceArtifact {
+        backend: FmirDeviceBackend::Metal,
+        blob: "msl".to_owned(),
+        hash: "fnv64:0000000000000000".to_owned(),
+        symbols: Vec::new(),
+    }];
+
+    let descriptor = descriptor_for_backend(&section, DeviceBackend::Metal, b"msl blob")
+        .expect("the ordinary two-kernel package must construct an admissible host descriptor");
+    descriptor
+        .validate()
+        .expect("constructor and host admission agree — no E_DEVICE_DESCRIPTOR contradiction");
+
+    // F3: the carried graph rides the descriptor — the declared root (launch
+    // 1) and the intermediate's producer/consumer edge, verbatim from the
+    // wire's `dependencies`.
+    assert_eq!(descriptor.roots, vec![1]);
+    assert_eq!(
+        descriptor.data_flow,
+        vec![HostDescriptorDataFlow {
+            buffer_id: 2,
+            version: 1,
+            producer: 1,
+            consumer: 2,
+        }]
+    );
+
+    // F6: the single declared observation point is the readback set; the
+    // writable intermediate is never a result merely because it is writable.
+    assert_eq!(descriptor.results.len(), 1);
+    assert_eq!(descriptor.results[0].buffer_id, 3);
+    assert_eq!(descriptor.results[0].version, 1);
+    assert_eq!(descriptor.results[0].produced_by, 2);
+    assert_eq!(descriptor.results[0].at_launch, 2);
+
+    // F1: every buffer carries its wire semantic value identity (non-zero and
+    // one distinct value per buffer).
+    let mut semantic_ids: Vec<u32> = descriptor
+        .kernels
+        .iter()
+        .flat_map(|kernel| kernel.buffers.iter())
+        .map(|slot| slot.semantic_value)
+        .collect();
+    semantic_ids.dedup();
+    assert_eq!(
+        semantic_ids.len(),
+        3,
+        "one stable semantic value per buffer (a, medius, result)"
+    );
+    assert!(semantic_ids.iter().all(|value| *value != 0));
 }
 
 #[test]
