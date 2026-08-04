@@ -82,7 +82,7 @@ fn selected_locale<'a>(
     }
 
     Ok(manifest
-        .and_then(|manifest| manifest.reader.locale.as_deref())
+        .and_then(|manifest| manifest.locale.locale.as_deref())
         .map(str::trim)
         .map(str::to_owned))
 }
@@ -94,9 +94,9 @@ fn reader_pack_path(
     manifest: Option<&FaberManifest>,
 ) -> PathBuf {
     let manifest_pack = manifest.and_then(|manifest| {
-        let manifest_locale = manifest.reader.locale.as_deref();
+        let manifest_locale = manifest.locale.locale.as_deref();
         if cli_locale.is_none() || manifest_locale == Some(locale) {
-            manifest.reader.pack.as_deref().map(str::trim)
+            manifest.locale.pack.as_deref().map(str::trim)
         } else {
             None
         }

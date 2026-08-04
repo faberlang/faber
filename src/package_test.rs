@@ -202,7 +202,7 @@ incipit = "入口"
 nota = "输出"
 functio = "函数"
 
-[diagnostics.READER001]
+[diagnostics.LOCALE001]
 message = "{pack} used Latin {keyword}; prefer {localized}"
 help = "use {localized}"
 
@@ -6161,8 +6161,8 @@ name = "defaults"
     assert!(manifest.build.targets.is_empty());
     assert_eq!(manifest.build.kind, "bin");
     assert!(manifest.product.is_none());
-    assert!(manifest.reader.locale.is_none());
-    assert!(manifest.reader.pack.is_none());
+    assert!(manifest.locale.locale.is_none());
+    assert!(manifest.locale.pack.is_none());
 }
 
 #[test]
@@ -6677,7 +6677,7 @@ locale = "zh-Hans"
         result
             .diagnostics
             .iter()
-            .map(|diag| (diag.code, diag.issue()))
+            .map(|diag| (diag.code.clone(), diag.message.clone()))
             .collect::<Vec<_>>()
     );
 }
@@ -6727,7 +6727,7 @@ fn installed_reader_locale_reference_examples_compile_from_installed_packs() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale");
 
     // zh-Hant, ar, hi, vi removed: reader locale changes now
-    // produce READER002 lexer warnings before semantic analysis.
+    // produce LOCALE002 lexer warnings before semantic analysis.
     // Only zh-Hans still compiles cleanly.
     let (locale, path, function, binding, greeting) = (
         "zh-Hans",
@@ -6853,7 +6853,7 @@ locale = "zh-Hans"
     assert!(result
         .diagnostics
         .iter()
-        .any(|diagnostic| diagnostic.code == Some("READER001")));
+        .any(|diagnostic| diagnostic.code == Some("LOCALE001")));
 }
 
 #[test]

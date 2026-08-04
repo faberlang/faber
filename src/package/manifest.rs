@@ -33,9 +33,12 @@ pub struct FaberManifest {
     #[serde(default)]
     pub product: Option<ManifestProduct>,
 
-    /// Reader-locale settings used to select a source and diagnostic surface.
-    #[serde(default)]
-    pub reader: ManifestReader,
+    /// Code-locale settings used to select a source and diagnostic surface.
+    ///
+    /// TOML section is `[locale]`; legacy `[reader]` is still accepted via
+    /// serde alias until the clean-break window closes.
+    #[serde(default, alias = "reader")]
+    pub locale: ManifestReader,
 
     /// Target-specific build and binding metadata, e.g. `[target.rust]`.
     #[serde(default)]
@@ -208,14 +211,14 @@ pub enum ManifestProductEmit {
     TypeScript,
 }
 
-/// `[reader]` metadata used to select a package-local reader pack.
+/// `[locale]` (or legacy `[reader]`) metadata for package code-locale selection.
 #[derive(Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ManifestReader {
-    /// Locale id such as `th-TH` or `zh-Hans`.
+    /// Locale id such as `en`, `la`, `th-TH`, or `zh-Hans`.
     pub locale: Option<String>,
 
-    /// Optional reader-pack path relative to the package root.
+    /// Optional locale-pack path relative to the package root.
     pub pack: Option<String>,
 }
 
@@ -548,26 +551,28 @@ pub(crate) fn validate_manifest(
         validate_product(product, path)?;
     }
 
-    if let Some(locale) = manifest.reader.locale.as_deref() {
+    if let Some(locale) = manifest.locale.locale.as_deref() {
         if locale.trim().is_empty() {
             return Err(Box::new(
-                crate::package_diagnostic_error("faber.toml reader.locale must not be empty")
+                crate::package_diagnostic_error("faber.toml locale must not be empty")
                     .with_file(path.display().to_string()),
             ));
         }
     }
 
-    if let Some(pack) = manifest.reader.pack.as_deref() {
+    if let Some(pack) = manifest.locale.pack.as_deref() {
         if pack.trim().is_empty() {
             return Err(Box::new(
-                crate::package_diagnostic_error("faber.toml reader.pack must not be empty")
+                crate::package_diagnostic_error("faber.toml locale.pack must not be empty")
                     .with_file(path.display().to_string()),
             ));
         }
-        if manifest.reader.locale.is_none() {
+        if manifest.locale.locale.is_none() {
             return Err(Box::new(
-                crate::package_diagnostic_error("faber.toml reader.pack requires reader.locale")
-                    .with_file(path.display().to_string()),
+                crate::package_diagnostic_error(
+                    "faber.toml locale.pack requires locale (section [locale] or legacy [reader])",
+                )
+                .with_file(path.display().to_string()),
             ));
         }
     }
