@@ -84,7 +84,8 @@ pub use device_program::{
 };
 pub use device_program_plans::{
     carried_plan_agrees, kernel_plan_for_function, launch_descriptors, plan_for_collection_op,
-    KernelLaunchDescriptor, LaunchBufferSlot, PlanMappingError, RecipeKind,
+    subchain_signature_for_emission, KernelLaunchDescriptor, LaunchBufferSlot, PlanMappingError,
+    RecipeKind,
 };
 pub use dump::dump_program;
 pub use generic::{

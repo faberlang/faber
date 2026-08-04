@@ -196,6 +196,28 @@ pub fn decompose_kernel_function(
     Ok(KernelDecomposition { subchains })
 }
 
+impl KernelDecomposition {
+    /// Build the synthetic single-recipe function the subchain at `index`
+    /// emits from (S5-U1b emitter seam).
+    ///
+    /// Slices the source function's statement stream to the subchain's
+    /// statements and rebuilds the params from the subchain's data-flow
+    /// inputs — exactly the function the pass resolved the subchain's plan
+    /// from — so the emitters can lower a decomposed kernel from the same
+    /// typed facts. The last subchain keeps the source return terminator
+    /// (the scalar-return reduction shape survives the slice); intermediate
+    /// subchains are buffer-producing kernels and return nothing.
+    ///
+    /// # Panics
+    /// Panics when `index` is out of range (callers validate against
+    /// [`Self::subchains`]).
+    #[must_use]
+    pub fn subchain_function(&self, source: &MirFunction, index: usize) -> MirFunction {
+        let is_last = index + 1 == self.subchains.len();
+        build_subchain_function(source, &self.subchains[index].statements, is_last)
+    }
+}
+
 /// Build the synthetic kernel function for one subchain slice.
 ///
 /// Params = the subchain's external inputs in read order: every local the

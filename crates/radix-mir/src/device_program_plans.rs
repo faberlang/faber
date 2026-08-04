@@ -736,6 +736,129 @@ pub fn contract_shape_signature(
     Ok(signature)
 }
 
+/// The emission signature for a decomposition subchain kernel (S5-U1b
+/// emitter seam): the contract-shaped recipe resources plus the subchain's
+/// data-flow inputs as read inputs, with the recipe operands' source locals
+/// patched so the emitters' input-buffer wiring resolves.
+///
+/// The plan pass resolves a subchain's plan from the contract-shaped
+/// signature alone ([`contract_shape_signature`] — extra data-flow inputs
+/// are a buffer concern, not a plan concern). The emitters additionally need
+/// every read input bound: the recipe operands at the contract bindings
+/// (input at 0, matmul's right operand at 1), then each remaining data-flow
+/// input (a local read from an earlier subchain, e.g. the elementwise
+/// operand folded into a reduction subchain's load) as a read input at the
+/// next binding, and the contract output buffer last. The recipe operands'
+/// source locals are patched from the recipe statement's operand scan (the
+/// contract-shaped seam leaves them `None`).
+///
+/// # Errors
+/// Returns [`PlanMappingError`] when the recipe operand or a data-flow
+/// input's tensor type cannot be resolved from the subchain body.
+pub fn subchain_signature_for_emission(
+    function: &MirFunction,
+    contract: &CollectionOpContract,
+    validation: &MirValidationContext<'_>,
+) -> Result<MirKernelSignature, PlanMappingError> {
+    let mut signature = contract_shape_signature(function, contract, validation)?;
+    let operands = recipe_operand_locals(function)?;
+    let mut bound: Vec<MirLocalId> = Vec::new();
+    if let Some(first) = operands.first() {
+        signature.input.source_local = Some(*first);
+        bound.push(*first);
+    }
+    // Matmul binds its right operand as the contract-shaped signature's first
+    // extra input (binding 1).
+    if let Some(second) = operands.get(1) {
+        if let Some(right) = signature.extra_inputs.first_mut() {
+            right.source_local = Some(*second);
+        }
+        bound.push(*second);
+    }
+    // Data-flow inputs: params beyond the recipe operands — locals read from
+    // earlier subchains. They bind after the recipe inputs, before the
+    // output, mirroring the whole-function ABI's inputs-then-output layout.
+    let mut next_binding = 1u32
+        + u32::try_from(signature.extra_inputs.len()).map_err(|_| {
+            PlanMappingError::mapping("subchain signature has too many extra inputs")
+        })?;
+    for param in &function.params {
+        if bound.contains(&param.local) {
+            continue;
+        }
+        let element_ty = tensor_element_ty(param.ty, validation)?;
+        let count = tensor_literal_dims(param.ty, validation)?
+            .into_iter()
+            .fold(1u64, u64::saturating_mul);
+        signature.extra_inputs.push(storage_input_with_local(
+            next_binding,
+            element_ty,
+            count,
+            param.local,
+        ));
+        next_binding = next_binding.saturating_add(1);
+    }
+    signature.output.binding = next_binding;
+    Ok(signature)
+}
+
+/// The recipe statement's operand locals, in operand order (the read inputs
+/// the contract-shaped signature binds at 0..).
+fn recipe_operand_locals(function: &MirFunction) -> Result<Vec<MirLocalId>, PlanMappingError> {
+    for block in &function.blocks {
+        for statement in &block.statements {
+            let MirStatementKind::RuntimeCall {
+                call:
+                    MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Collection(_),
+                        args,
+                        ..
+                    },
+                ..
+            } = &statement.kind
+            else {
+                continue;
+            };
+            return args
+                .iter()
+                .map(|arg| {
+                    operand_local_id(arg).ok_or_else(|| {
+                        PlanMappingError::mapping("recipe operand must reference a tensor local")
+                    })
+                })
+                .collect();
+        }
+    }
+    Err(PlanMappingError::mapping(
+        "subchain body has no collection-op statement",
+    ))
+}
+
+/// The local a plain place operand references, if any (the subchain operand
+/// scan's local extractor).
+fn operand_local_id(operand: &MirOperand) -> Option<MirLocalId> {
+    let MirOperand::Place(place) = operand else {
+        return None;
+    };
+    let MirPlaceBase::Local(local) = place.base else {
+        return None;
+    };
+    Some(local)
+}
+
+/// A read input resource carrying a source local (the data-flow inputs the
+/// subchain emission signature binds after the recipe operands).
+fn storage_input_with_local(
+    binding: u32,
+    element_ty: MirType,
+    count: u64,
+    local: MirLocalId,
+) -> MirKernelResource {
+    let mut resource = storage_input(binding, element_ty, count);
+    resource.source_local = Some(local);
+    resource
+}
+
 /// Whether the body's op-set scan carries the given recipe op (the
 /// reduction-operator disambiguation for [`contract_shape_signature`]).
 fn is_recipe_op_scan(function: &MirFunction, op: MirCollectionOp) -> bool {
