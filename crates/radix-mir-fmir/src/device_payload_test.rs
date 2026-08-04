@@ -14,28 +14,100 @@ use crate::codec::{
 };
 use crate::error::FmirImageError;
 use crate::schema::{
-    device_identity_hash, fnv1a64_blob_hash, FmirBinaryImageFile, FmirDeviceArtifact,
-    FmirDeviceArtifactsSection, FmirDeviceBackend, FmirDeviceProgramSection, FmirDeviceSection,
-    FmirDeviceSelection, FmirTextCliRootSection, FmirTextCliSection, FmirTextImageFile,
-    FmirTextProgramSection, FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection,
-    FmirTextToolchainSection, FmirTextTypesSection, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME,
-    PACKAGE_MIR_ARTIFACT_VERSION,
+    canonical_program_bytes, device_identity_hash, fnv1a64_blob_hash, FmirBinaryImageFile,
+    FmirDeviceArtifact, FmirDeviceArtifactsSection, FmirDeviceBackend, FmirDeviceInput,
+    FmirDeviceProgramSection, FmirDeviceSection, FmirDeviceSelection, FmirDeviceSymbol,
+    FmirTextCliRootSection, FmirTextCliSection, FmirTextImageFile, FmirTextProgramSection,
+    FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection,
+    FmirTextToolchainSection, FmirTextTypesSection, WireBufferIdentity, WireBufferLifetime,
+    WireBufferRole, WireBufferVersion, WireBinding, WireCollectionKernelPlan, WireDeviceProgram,
+    WireDeviceResource, WireDispatchSize, WireKernelLaunchPlan, WireKernelUnit, WireLaunchUnit,
+    WireProgramLifetime, WireResourceAccess, WireResultBuffer, WireStorageLayout, WireWorkgroupCount,
+    WireWorkgroupSize, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION,
 };
 use radix_mir::MirProgram;
 use radix_types::TypeTable;
 
 const TOOLCHAIN: &str = "0.79.0";
 
-/// A canonical backend-neutral device-program payload (stub; the real payload
-/// is produced by the emitting layer — S1-3). Identical bytes in both image
-/// formats so A10 (same semantic package) holds.
-const STUB_CANONICAL_PAYLOAD: &str = "{\"kernels\":[],\"launches\":[],\"lifetime\":\"per-step\"}";
+/// The faber-owned wire/codec version (DEVICE_RUN_PLAN_VERSION bump, S3-A4):
+/// a v2 payload must fail admission closed.
+const WIRE_VERSION: u32 = 3;
+
+/// The typed wire fixture: a one-kernel elementwise program (two buffers, one
+/// launch, one result) mirroring the S2-5 `addita` shape.
+fn sample_wire_program() -> WireDeviceProgram {
+    let input = WireBufferIdentity {
+        id: 1,
+        name: "x".to_owned(),
+        role: WireBufferRole::Input,
+        storage: WireStorageLayout::DeviceHandle,
+        lifetime: WireBufferLifetime::PerProgram,
+    };
+    let output = WireBufferIdentity {
+        id: 2,
+        name: "y".to_owned(),
+        role: WireBufferRole::Output,
+        storage: WireStorageLayout::DeviceHandle,
+        lifetime: WireBufferLifetime::ObservationPoint,
+    };
+    WireDeviceProgram {
+        kernels: vec![WireKernelUnit {
+            function: 0,
+            entry: "addita".to_owned(),
+            plan: WireCollectionKernelPlan::Elementwise,
+            resources: vec![
+                WireDeviceResource {
+                    buffer: input.clone(),
+                    version: WireBufferVersion {
+                        version: 1,
+                        element_ty: "f32".to_owned(),
+                        element_count: 4,
+                    },
+                    binding: WireBinding { group: 0, binding: 0 },
+                    access: WireResourceAccess::Read,
+                },
+                WireDeviceResource {
+                    buffer: output.clone(),
+                    version: WireBufferVersion {
+                        version: 1,
+                        element_ty: "f32".to_owned(),
+                        element_count: 4,
+                    },
+                    binding: WireBinding { group: 0, binding: 1 },
+                    access: WireResourceAccess::Write,
+                },
+            ],
+            launch: WireKernelLaunchPlan {
+                workgroup: WireWorkgroupSize { x: 8, y: 1, z: 1 },
+                dispatch_size: WireDispatchSize { x: 4, y: 1, z: 1 },
+                workgroup_count: WireWorkgroupCount { x: 1, y: 1, z: 1 },
+            },
+        }],
+        launches: vec![WireLaunchUnit {
+            id: 1,
+            kernel_index: 0,
+        }],
+        lifetime: WireProgramLifetime::SingleRun,
+        results: vec![WireResultBuffer {
+            buffer: output,
+            version: WireBufferVersion {
+                version: 1,
+                element_ty: "f32".to_owned(),
+                element_count: 4,
+            },
+            role: WireBufferRole::Output,
+            produced_by: 1,
+        }],
+    }
+}
 
 fn metal_artifact(blob: &str) -> FmirDeviceArtifact {
     FmirDeviceArtifact {
         backend: FmirDeviceBackend::Metal,
         blob: blob.to_owned(),
         hash: fnv1a64_blob_hash(blob.as_bytes()),
+        symbols: Vec::new(),
     }
 }
 
@@ -44,15 +116,20 @@ fn cuda_artifact(blob: &str) -> FmirDeviceArtifact {
         backend: FmirDeviceBackend::Cuda,
         blob: blob.to_owned(),
         hash: fnv1a64_blob_hash(blob.as_bytes()),
+        symbols: vec![FmirDeviceSymbol {
+            entry: "addita".to_owned(),
+            symbol: "_Z6additaPU3AS1fS0_".to_owned(),
+        }],
     }
 }
 
-/// A device section with both backends declared and the frozen device
-/// requirements.
+/// A device section with both backends declared, the frozen device
+/// requirements, a declared input, and the typed complete program.
 fn sample_device_section() -> FmirDeviceSection {
     FmirDeviceSection {
         device_program: FmirDeviceProgramSection {
-            payload: STUB_CANONICAL_PAYLOAD.to_owned(),
+            v: WIRE_VERSION,
+            program: sample_wire_program(),
         },
         selection: FmirDeviceSelection::Auto,
         artifacts: FmirDeviceArtifactsSection {
@@ -61,6 +138,10 @@ fn sample_device_section() -> FmirDeviceSection {
                 cuda_artifact(".version 8.7\n.target sm_120\n.entry add() {}"),
             ],
         },
+        declared_inputs: vec![FmirDeviceInput {
+            name: "x".to_owned(),
+            values: vec![1.0, 2.0, 3.0, 4.0],
+        }],
         runtime_requirements: vec!["device:metal".to_owned(), "device:cuda".to_owned()],
     }
 }
@@ -147,7 +228,12 @@ fn device_section_round_trips_through_text_image() {
     let text = encode_text_image(&image).expect("encode text image");
     let decoded = decode_text_image(&text, TOOLCHAIN).expect("decode text image");
     let device = decoded.device.expect("device section present");
-    assert_eq!(device.device_program.payload, STUB_CANONICAL_PAYLOAD);
+    assert_eq!(device.device_program.v, WIRE_VERSION);
+    assert_eq!(
+        device.device_program.program,
+        sample_wire_program(),
+        "the typed program round-trips field-for-field"
+    );
     assert_eq!(device.selection, FmirDeviceSelection::Auto);
     assert_eq!(device.artifacts.artifact.len(), 2);
     assert_eq!(
@@ -157,6 +243,13 @@ fn device_section_round_trips_through_text_image() {
     assert_eq!(
         device.artifacts.artifact[1].backend,
         FmirDeviceBackend::Cuda
+    );
+    assert_eq!(
+        device.declared_inputs,
+        vec![FmirDeviceInput {
+            name: "x".to_owned(),
+            values: vec![1.0, 2.0, 3.0, 4.0],
+        }]
     );
     assert_eq!(
         device.runtime_requirements,
@@ -170,18 +263,28 @@ fn device_section_round_trips_through_binary_image() {
     let bytes = encode_binary_image(&image).expect("encode binary image");
     let decoded = decode_binary_image(&bytes, TOOLCHAIN).expect("decode binary image");
     let device = decoded.device.expect("device section present");
-    assert_eq!(device.device_program.payload, STUB_CANONICAL_PAYLOAD);
+    assert_eq!(device.device_program.v, WIRE_VERSION);
+    assert_eq!(
+        device.device_program.program,
+        sample_wire_program(),
+        "the typed program round-trips field-for-field"
+    );
     assert_eq!(device.selection, FmirDeviceSelection::Auto);
     assert_eq!(device.artifacts.artifact.len(), 2);
-    // The canonical payload is byte-identical in both formats (A10): the
-    // text-decoded and binary-decoded payloads agree.
+    // The canonical complete-program bytes are identical in both formats
+    // (A10 over the COMPLETE program): the text-decoded and binary-decoded
+    // programs canonicalize to the same identity substrate.
     let text_image = text_image_with_device(Some(sample_device_section()));
     let text_decoded =
         decode_text_image(&encode_text_image(&text_image).unwrap(), TOOLCHAIN).unwrap();
     assert_eq!(
-        text_decoded.device.as_ref().unwrap().device_program.payload,
-        device.device_program.payload
+        canonical_program_bytes(&text_decoded.device.unwrap().device_program.program),
+        canonical_program_bytes(&device.device_program.program)
     );
+    // The CUDA symbol mapping and the declared inputs ride the metadata, not
+    // the canonical program bytes.
+    assert_eq!(device.artifacts.artifact[1].symbols.len(), 1);
+    assert_eq!(device.artifacts.artifact[1].symbols[0].entry, "addita");
 }
 
 #[test]
@@ -320,9 +423,11 @@ fn decode_rejects_unknown_device_section_key() {
 fn decode_rejects_unknown_device_program_key() {
     let image = text_image_with_device(Some(sample_device_section()));
     let mut text = encode_text_image(&image).expect("encode text image");
+    // The v4 opaque `payload` string is gone; a v4-era key is an unknown
+    // field and deny_unknown_fields must reject it at parse time.
     text = text.replace(
         "[device.device_program]\n",
-        "[device.device_program]\njson = \"deny me\"\n",
+        "[device.device_program]\npayload = \"deny me\"\n",
     );
     assert!(matches!(
         decode_text_image(&text, TOOLCHAIN),
@@ -357,27 +462,29 @@ fn decode_rejects_unknown_backend_value() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn decode_rejects_pre_break_version_3_image_with_device() {
-    // A version-3 image (pre-break) carrying a device section must fail closed
-    // on the version gate before any device admission runs (3→4 clean break).
+fn decode_rejects_pre_break_version_4_image_with_device() {
+    // A version-4 image (the v4 opaque-payload layout) carrying a device
+    // section must fail closed on the version gate before any device
+    // admission runs (4→5 clean break, S3-A4).
     let mut image = text_image_with_device(Some(sample_device_section()));
-    image.version = 3;
+    image.version = 4;
     let text = encode_text_image(&image).expect("encode text image");
     assert!(matches!(
         decode_text_image(&text, TOOLCHAIN),
         Err(FmirImageError::UnsupportedVersion {
-            actual: 3,
-            expected: 4
+            actual: 4,
+            expected: 5
         })
     ));
 }
 
 #[test]
-fn decode_rejects_genuine_v3_layout_binary_image() {
-    // The 3→4 clean break (N1.7) added the optional device section. A genuine
-    // version-3 binary image is the v4 layout without that trailing field:
+fn decode_rejects_genuine_v4_layout_binary_image() {
+    // The 4→5 clean break (S3-A4) replaced the opaque payload with the typed
+    // complete program and added the declared-inputs metadata. A genuine
+    // version-4 binary image is the v5 layout without that trailing content:
     // postcard encodes `device: None` as a single 0x00 marker, so dropping it
-    // yields a real v3-layout byte image (not a v4 image with a rewritten
+    // yields a real v4-layout byte image (not a v5 image with a rewritten
     // version byte). The version pre-scan must report UnsupportedVersion, not
     // a structural Parse error.
     let image = binary_image_with_device(None);
@@ -390,15 +497,15 @@ fn decode_rejects_genuine_v3_layout_binary_image() {
     assert_eq!(
         bytes.last(),
         Some(&0x00),
-        "device: None is a trailing 0x00 marker in the v4 layout"
+        "device: None is a trailing 0x00 marker in the v5 layout"
     );
-    bytes[0] = 3;
+    bytes[0] = 4;
     bytes.truncate(bytes.len() - 1);
     assert!(matches!(
         decode_binary_image(&bytes, TOOLCHAIN),
         Err(FmirImageError::UnsupportedVersion {
-            actual: 3,
-            expected: 4
+            actual: 4,
+            expected: 5
         })
     ));
 }
@@ -424,7 +531,7 @@ fn decode_rejects_device_payload_from_wrong_toolchain() {
 fn device_identity_hash_is_canonical_format() {
     let identity = device_identity_hash(
         &["fnv64:0000000000000000", "fnv64:1111111111111111"],
-        STUB_CANONICAL_PAYLOAD.as_bytes(),
+        &canonical_program_bytes(&sample_wire_program()),
     );
     assert!(identity.starts_with("sha256:"));
     assert_eq!(identity.len(), "sha256:".len() + 64);
@@ -439,31 +546,75 @@ fn device_identity_hash_is_canonical_format() {
 #[test]
 fn device_identity_hash_is_deterministic() {
     let sources = &["fnv64:aaaa", "fnv64:bbbb"];
-    let payload = STUB_CANONICAL_PAYLOAD.as_bytes();
+    let payload = canonical_program_bytes(&sample_wire_program());
     assert_eq!(
-        device_identity_hash(sources, payload),
-        device_identity_hash(sources, payload)
+        device_identity_hash(sources, &payload),
+        device_identity_hash(sources, &payload)
     );
 }
 
 #[test]
-fn device_identity_hash_excludes_backend_blobs() {
-    // A10: the identity is over source hashes + the canonical payload only.
-    // Mutating a (hypothetical) backend blob must not change the identity —
-    // proven here by showing the identity depends only on the named inputs.
+fn device_identity_hash_excludes_backend_blobs_and_run_data() {
+    // A10: the identity is over source hashes + the canonical complete-program
+    // bytes only. The CUDA symbol mapping and the declared input values ride
+    // the metadata and never touch the identity substrate — proven by
+    // canonicalizing the same program with different metadata.
     let sources = &["fnv64:aaaa"];
-    let payload = STUB_CANONICAL_PAYLOAD.as_bytes();
-    let base = device_identity_hash(sources, payload);
-    assert_eq!(device_identity_hash(sources, payload), base);
+    let mut section = sample_device_section();
+    let base = device_identity_hash(
+        sources,
+        &canonical_program_bytes(&section.device_program.program),
+    );
+    section.artifacts.artifact[1].symbols = vec![FmirDeviceSymbol {
+        entry: "other".to_owned(),
+        symbol: "_Zother".to_owned(),
+    }];
+    section.declared_inputs = vec![FmirDeviceInput {
+        name: "other".to_owned(),
+        values: vec![9.0],
+    }];
+    assert_eq!(
+        device_identity_hash(
+            sources,
+            &canonical_program_bytes(&section.device_program.program)
+        ),
+        base
+    );
+}
+
+#[test]
+fn canonical_program_bytes_cover_the_complete_program() {
+    // A10 over the COMPLETE program: the canonical bytes cover kernels,
+    // launches, lifetime, and results — a thinned slot-list would change the
+    // digest. Mutating a kernel field changes the bytes; the metadata does
+    // not.
+    let program = sample_wire_program();
+    let base = canonical_program_bytes(&program);
+    let mut mutated = program.clone();
+    mutated.kernels[0].entry = "renamed".to_owned();
+    assert_ne!(canonical_program_bytes(&mutated), base);
+    let mut mutated = program.clone();
+    mutated.results.clear();
+    assert_ne!(canonical_program_bytes(&mutated), base);
+}
+
+#[test]
+fn wire_version_2_payload_fails_faber_admission_closed() {
+    // The faber-owned wire codec bumps in lockstep (v2 → v3): a section still
+    // carrying the v2 wire version is an old payload and must fail closed
+    // before any field-level interpretation.
+    let mut section = sample_device_section();
+    section.device_program.v = 2;
+    assert_ne!(section.device_program.v, WIRE_VERSION);
 }
 
 #[test]
 fn device_identity_hash_is_sensitive_to_source_order() {
     // The length-prefixed canonicalization must distinguish source order: a
     // different order is a different package identity.
-    let payload = STUB_CANONICAL_PAYLOAD.as_bytes();
-    let ab = device_identity_hash(&["fnv64:aaaa", "fnv64:bbbb"], payload);
-    let ba = device_identity_hash(&["fnv64:bbbb", "fnv64:aaaa"], payload);
+    let payload = canonical_program_bytes(&sample_wire_program());
+    let ab = device_identity_hash(&["fnv64:aaaa", "fnv64:bbbb"], &payload);
+    let ba = device_identity_hash(&["fnv64:bbbb", "fnv64:aaaa"], &payload);
     assert_ne!(ab, ba);
 }
 
@@ -496,6 +647,7 @@ fn fnv1a64_blob_hash_admits_a_correctly_hashed_artifact() {
         backend: FmirDeviceBackend::Cuda,
         blob: blob.to_owned(),
         hash: fnv1a64_blob_hash(blob.as_bytes()),
+        symbols: Vec::new(),
     }];
     let image = binary_image_with_device(Some(section));
     let bytes = encode_binary_image(&image).expect("encode binary image");

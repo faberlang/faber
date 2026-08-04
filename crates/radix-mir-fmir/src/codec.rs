@@ -210,15 +210,16 @@ mod tests {
 
     #[test]
     fn decode_rejects_unsupported_version() {
-        // A pre-break version-3 image fails closed under the 3→4 clean break.
+        // A pre-break version-4 image fails closed under the 4→5 clean break
+        // (S3-A4: the opaque payload becomes the typed complete program).
         let mut image = text_image();
-        image.version = 3;
+        image.version = 4;
         let text = encode_text_image(&image).expect("encode text image");
         assert!(matches!(
             decode_text_image(&text, "0.79.0"),
             Err(FmirImageError::UnsupportedVersion {
-                actual: 3,
-                expected: 4
+                actual: 4,
+                expected: 5
             })
         ));
     }

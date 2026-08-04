@@ -10,8 +10,13 @@
 //!
 //! A `3 → 4` clean break adds the optional `device` section to
 //! [`FmirTextImageFile`] / [`FmirBinaryImageFile`] for the differentiable-GPU
-//! campaign. The section carries the canonical backend-neutral device-program
-//! payload, the backend selection request, the declared backend artifacts
+//! campaign. A `4 → 5` clean break (operator-authorized package-seam break,
+//! S3-A4 / N3.3) replaces the section's opaque payload string with the
+//! **typed complete device program** (kernels, launches, results,
+//! per-resource access + version, lifetime) and moves CUDA symbols + host
+//! input values to per-artifact / declared-inputs metadata, so the canonical
+//! program bytes (the A10 identity substrate) are semantics-only. The section
+//! carries the backend selection request, the declared backend artifacts
 //! (Metal MSL + CUDA PTX) each with its own FNV-1a provenance hash, and the
 //! device runtime requirements (`device:metal`, `device:cuda`). A device
 //! payload is admitted only from the exact producing toolchain version, and
@@ -24,9 +29,12 @@ use serde::{Deserialize, Serialize};
 /// Image schema version. Ratchets as clean breaks; there is no compatibility
 /// decoder (A7). `3 → 4` clean break adds the optional `device` section
 /// (canonical device-program payload, selection, backend artifacts, device
-/// runtime requirements) for the differentiable-GPU campaign (N1.7). Old
-/// version-3 images fail closed with [`UnsupportedVersion`](crate::error::FmirImageError::UnsupportedVersion).
-pub const PACKAGE_MIR_ARTIFACT_VERSION: u32 = 4;
+/// runtime requirements) for the differentiable-GPU campaign (N1.7). `4 → 5`
+/// clean break (operator memo; S3-A4) makes the device section a
+/// TYPED complete program (the opaque payload string is replaced) and moves
+/// CUDA symbols + host inputs to metadata. Old version-4 images fail closed
+/// with [`UnsupportedVersion`](crate::error::FmirImageError::UnsupportedVersion).
+pub const PACKAGE_MIR_ARTIFACT_VERSION: u32 = 5;
 
 /// Text image `target` tag.
 pub const FMIR_TEXT_TARGET_NAME: &str = "fmir-text";
@@ -147,23 +155,23 @@ pub struct FmirTextProgramSection {
 /// binary (`fmir`, postcard) images so Metal and CUDA routes derive identical
 /// semantic bytes (A10). `deny_unknown_fields` is part of the contract: an
 /// unknown key fails closed at parse time.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FmirDeviceSection {
-    /// Canonical backend-neutral device-program payload (§6, the S1-1
-    /// `DeviceProgram`). Carried as canonical bytes whose representation is
-    /// producer-owned and identical in both image formats (A10). The FMIR
-    /// schema treats the payload as opaque identity substrate: it does not
-    /// parse or re-validate the device program (that is the S1-1 schema and
-    /// the producer's responsibility), it is the byte substrate for the
-    /// SHA-256 same-package identity ([`device_identity_hash`]).
+    /// Canonical backend-neutral device-program wire (N3.3): the typed
+    /// COMPLETE device program, identical in both image formats (A10).
     pub device_program: FmirDeviceProgramSection,
     /// Backend selection request (from `--backend` / manifest / `auto`).
     pub selection: FmirDeviceSelection,
     /// Declared backend artifacts (Metal MSL, CUDA PTX) + per-blob FNV-1a
-    /// provenance hashes (§3.4). Blobs are **excluded** from the same-package
-    /// identity; each carries its own provenance hash for A9 receipts.
+    /// provenance hashes (§3.4). The CUDA artifact carries its
+    /// logical-entry → symbol mapping as per-artifact metadata. Blobs are
+    /// **excluded** from the same-package identity; each carries its own
+    /// provenance hash for A9 receipts.
     pub artifacts: FmirDeviceArtifactsSection,
+    /// Declared host input values for the program's input buffers (run data,
+    /// NOT program semantics — excluded from the canonical program bytes).
+    pub declared_inputs: Vec<FmirDeviceInput>,
     /// Device runtime requirements. Extends the
     /// [`is_known_host_requirement`] allowlist with `device:metal`,
     /// `device:cuda`. Unknown `device:` requirements fail admission at
@@ -171,14 +179,401 @@ pub struct FmirDeviceSection {
     pub runtime_requirements: Vec<String>,
 }
 
-/// Canonical backend-neutral device-program payload (opaque to the FMIR
-/// schema; see [`FmirDeviceSection::device_program`]).
+/// The typed device-program section (S3-A4 / N3.3): the opaque payload string
+/// of v4 is replaced by the typed complete program with `deny_unknown_fields`
+/// admission. CUDA symbols and host input values are absent here — they are
+/// not program semantics; they ride the per-artifact metadata and the
+/// declared-inputs section, so the canonical program bytes are semantics-only
+/// (A10 identity becomes honest).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FmirDeviceProgramSection {
-    /// Canonical payload, identical in both image formats. The producer owns
-    /// canonicalization; these bytes are the SHA-256 identity substrate.
-    pub payload: String,
+    /// Wire/codec version — the faber-owned codec ratchet, bumped in
+    /// lockstep with [`PACKAGE_MIR_ARTIFACT_VERSION`]. Fail-closed admission:
+    /// checked before any field-level interpretation, so an old payload
+    /// fails with a structured version diagnostic (never a silent default).
+    pub v: u32,
+    /// The complete device program: kernels, launches, lifetime, results.
+    pub program: WireDeviceProgram,
+}
+
+/// One declared host input for an input buffer (run data, not program
+/// semantics — absent from the canonical program bytes).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FmirDeviceInput {
+    /// Buffer name this input targets (the program's input-buffer identity).
+    pub name: String,
+    /// Flat f32 values (row-major).
+    pub values: Vec<f32>,
+}
+
+/// One logical-entry → backend-symbol identity for the CUDA artifact
+/// (per-artifact metadata, NOT a program semantic). Metal artifacts carry no
+/// mapping: the logical entry IS the launch name.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FmirDeviceSymbol {
+    /// Logical entry (a kernel-unit fact of the program).
+    pub entry: String,
+    /// Emitted NVVM/PTX `.entry` symbol the host launches by.
+    pub symbol: String,
+}
+
+// ---------------------------------------------------------------------------
+// The typed complete device program (S3-A4 / N3.3)
+// ---------------------------------------------------------------------------
+//
+// Mirrors the radix-mir `device_program::DeviceProgram` schema field-for-field
+// (the S1-1 shared-schema authority) so the wire carries the COMPLETE program:
+// kernels (function id, entry, plan, typed resources, launch), launches
+// (ordered; may be >1 per kernel), the program lifetime, and the explicit
+// result buffers. Per-resource access and the content version are distinct
+// fields (the 4-axis separation, N3.4); data-flow edges derive
+// deterministically from the complete access + launches (the source facts are
+// on the wire), so the host never re-derives topology from launch order or a
+// slot-role string.
+
+/// The complete device program (wire form).
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireDeviceProgram {
+    /// Ordered kernel declarations.
+    pub kernels: Vec<WireKernelUnit>,
+    /// Ordered launch sequence (a kernel may be launched more than once).
+    pub launches: Vec<WireLaunchUnit>,
+    /// Program execution-lifetime regime.
+    pub lifetime: WireProgramLifetime,
+    /// Explicit multi-output result buffers.
+    pub results: Vec<WireResultBuffer>,
+}
+
+/// One ordered kernel declaration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireKernelUnit {
+    /// MIR function id this kernel is lowered from.
+    pub function: u32,
+    /// Target-neutral logical entry name.
+    pub entry: String,
+    /// Shared algorithmic recipe (elementwise, matmul, reduction).
+    pub plan: WireCollectionKernelPlan,
+    /// Typed buffer slots bound by this kernel.
+    pub resources: Vec<WireDeviceResource>,
+    /// Workgroup / dispatch / launch plan.
+    pub launch: WireKernelLaunchPlan,
+}
+
+/// A typed buffer slot bound to a kernel: identity + content version +
+/// binding + slot access (the 4-axis separation keeps access a distinct
+/// field from role/lifetime, N3.4).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireDeviceResource {
+    /// The buffer's program-level identity facts.
+    pub buffer: WireBufferIdentity,
+    /// The content version (and shape) this slot binds.
+    pub version: WireBufferVersion,
+    /// Target-neutral binding indices.
+    pub binding: WireBinding,
+    /// Slot read/write access.
+    pub access: WireResourceAccess,
+}
+
+/// Stable identity facts of one device buffer.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireBufferIdentity {
+    /// Program-unique identity key.
+    pub id: u32,
+    /// Logical name (diagnostics; target-neutral — never a backend binding).
+    pub name: String,
+    /// Program-level role (input / output / in-out).
+    pub role: WireBufferRole,
+    /// Where the storage lives (`DeviceHandle` / `HostOwned`).
+    pub storage: WireStorageLayout,
+    /// How long the storage lives.
+    pub lifetime: WireBufferLifetime,
+}
+
+/// One content version of a buffer (a shape snapshot; version ≥ 1).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireBufferVersion {
+    /// Monotonic version number within the buffer (≥ 1).
+    pub version: u32,
+    /// Element-type spelling of this version's shape (the campaign dtype
+    /// surface; "f32" for this delivery).
+    pub element_ty: String,
+    /// Element count of this version's shape.
+    pub element_count: u64,
+}
+
+/// Target-neutral binding indices.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireBinding {
+    /// First-level binding index.
+    pub group: u32,
+    /// Second-level binding index within the group.
+    pub binding: u32,
+}
+
+/// The workgroup / dispatch / launch plan of one kernel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireKernelLaunchPlan {
+    /// Threads per workgroup.
+    pub workgroup: WireWorkgroupSize,
+    /// Dispatch extent in workgroups for each axis.
+    pub dispatch_size: WireDispatchSize,
+    /// Derived workgroup count the host launches.
+    pub workgroup_count: WireWorkgroupCount,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireWorkgroupSize {
+    pub x: u32,
+    pub y: u32,
+    pub z: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireDispatchSize {
+    pub x: u64,
+    pub y: u64,
+    pub z: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireWorkgroupCount {
+    pub x: u64,
+    pub y: u64,
+    pub z: u64,
+}
+
+/// One entry in the ordered launch sequence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireLaunchUnit {
+    /// Program-unique launch id.
+    pub id: u32,
+    /// Index into `kernels`.
+    pub kernel_index: u32,
+}
+
+/// An explicit result buffer (multi-output readback).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireResultBuffer {
+    /// Identity of the observed buffer.
+    pub buffer: WireBufferIdentity,
+    /// Observed content version and shape.
+    pub version: WireBufferVersion,
+    /// Role of the observation (output or in-out).
+    pub role: WireBufferRole,
+    /// The launch that produced the observed version.
+    pub produced_by: u32,
+}
+
+/// Program-level buffer role.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireBufferRole {
+    /// Host-provided input; every slot accesses it read-only.
+    Input,
+    /// Device-produced result; read back at an observation point.
+    Output,
+    /// Device-resident intermediate shared across kernels.
+    InOut,
+}
+
+impl WireBufferRole {
+    /// Short diagnostic spelling.
+    #[must_use]
+    pub fn spelling(self) -> &'static str {
+        match self {
+            Self::Input => "input",
+            Self::Output => "output",
+            Self::InOut => "in-out",
+        }
+    }
+}
+
+/// Storage-lifetime class (the frozen three-class enum, N3.4 — no fourth
+/// class by convenience).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireBufferLifetime {
+    /// Allocated once for the whole program; persists across steps.
+    PerProgram,
+    /// Live within one training step; recycled between iterations.
+    PerStep,
+    /// Read back at a declared observation point.
+    ObservationPoint,
+}
+
+impl WireBufferLifetime {
+    /// Short diagnostic spelling.
+    #[must_use]
+    pub fn spelling(self) -> &'static str {
+        match self {
+            Self::PerProgram => "per-program",
+            Self::PerStep => "per-step",
+            Self::ObservationPoint => "observation-point",
+        }
+    }
+}
+
+/// Slot read/write access.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireResourceAccess {
+    Read,
+    Write,
+    ReadWrite,
+}
+
+/// Where the storage lives.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireStorageLayout {
+    HostOwned,
+    DeviceHandle,
+}
+
+/// Program execution-lifetime regime.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireProgramLifetime {
+    /// One-shot program run.
+    #[default]
+    SingleRun,
+    /// Repeating training step; per-step buffers recycle between iterations.
+    RepeatingStep,
+}
+
+/// The shared algorithmic recipe set (mirror of `CollectionKernelPlan`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub enum WireCollectionKernelPlan {
+    /// No collection-op recipe (elementwise kernel).
+    Elementwise,
+    /// Tiled-matmul recipe.
+    TiledMatMul(WireMatMulPlan),
+    /// Sequential tree-reduction recipe.
+    TreeReduction(WireReductionPlan),
+}
+
+/// Tiled-matmul recipe.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireMatMulPlan {
+    /// Left matrix rows `M`.
+    pub m: u64,
+    /// Contracted inner dimension `K`.
+    pub k: u64,
+    /// Right matrix columns `N`.
+    pub n: u64,
+    /// Square tile edge.
+    pub tile: u32,
+    /// Workgroup lane count on `x`.
+    pub workgroup_x: u32,
+    /// Workgroup lane count on `y`.
+    pub workgroup_y: u32,
+    /// The two shared-memory operand tiles.
+    pub shared_memory: WireMatMulSharedMemory,
+    /// Per-K-tile barrier schedule.
+    pub barriers: Vec<WireBarrierPoint>,
+    /// Zero-fill policy for the operand tail tiles.
+    pub oob_padding: WireOobPaddingPolicy,
+}
+
+/// The two shared-memory operand tiles of the tiled-matmul recipe.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireMatMulSharedMemory {
+    /// Left-matrix tile.
+    pub shared_a: WireSharedMemoryLayout,
+    /// Right-matrix tile.
+    pub shared_b: WireSharedMemoryLayout,
+}
+
+/// Tree-reduction recipe.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireReductionPlan {
+    /// Sum or mean (mean divides by the true tensor length).
+    pub op: WireReduceOp,
+    /// True flat tensor length `n`.
+    pub length: u64,
+    /// Power-of-two workgroup lane count.
+    pub workgroup_x: u32,
+    /// Per-workgroup partial slot count.
+    pub partials: u64,
+    /// Shared-memory buffer the tree reduces through.
+    pub shared_memory: WireSharedMemoryLayout,
+    /// Ordered barrier schedule.
+    pub barriers: Vec<WireBarrierPoint>,
+    /// Zero-fill policy for tail elements beyond `length`.
+    pub oob_padding: WireOobPaddingPolicy,
+}
+
+/// One shared-memory buffer layout.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireSharedMemoryLayout {
+    /// Byte width of one element.
+    pub element_byte_width: u32,
+    /// Number of slots.
+    pub slot_count: u32,
+    /// Logical buffer name (backends map to target syntax).
+    pub buffer_name: String,
+}
+
+/// A barrier program point in a recipe.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireBarrierPoint {
+    /// The phase whose writes this barrier publishes.
+    pub after: WireBarrierPhase,
+}
+
+/// What shared-memory writes a barrier publishes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireBarrierPhase {
+    SharedMemoryLoad,
+    ReductionStep,
+    InnerProductStep,
+}
+
+/// Out-of-bounds padding policy for collection-op recipes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireOobPaddingPolicy {
+    ZeroFill,
+}
+
+/// Reduction combination operator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireReduceOp {
+    Sum,
+    Mean,
+}
+
+/// Deterministic canonical bytes of the COMPLETE device program — the A10
+/// identity substrate. Both image routes carry the identical typed program
+/// (Metal and CUDA images derive the same `WireDeviceProgram`), so both
+/// derive identical bytes. Postcard serialization is deterministic for a
+/// fixed struct shape and infallible for these scalar/string/enum fields.
+#[must_use]
+pub fn canonical_program_bytes(program: &WireDeviceProgram) -> Vec<u8> {
+    postcard::to_allocvec(program).expect("wire program serialization is infallible")
 }
 
 /// Backend selection request recorded in the image (N1.1). Fail-closed: an
@@ -214,6 +609,12 @@ pub struct FmirDeviceArtifact {
     /// FNV-1a 64-bit provenance hash of `blob`, canonical `fnv64:<16-hex>`
     /// spelling (computed by [`fnv1a64_blob_hash`]). Verified on admission.
     pub hash: String,
+    /// Per-artifact logical-entry → symbol mapping (N3.3 / S3-A4): the CUDA
+    /// artifact's `.entry` symbol identities the host launches by. Empty for
+    /// Metal (the logical entry IS the launch name). This is artifact
+    /// metadata, NOT program semantics — absent from the canonical program
+    /// bytes.
+    pub symbols: Vec<FmirDeviceSymbol>,
 }
 
 /// Backend a declared artifact targets (N1.3). `auto` is a selection, not a
@@ -448,8 +849,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn artifact_version_is_4_for_device_payload_schema() {
-        assert_eq!(PACKAGE_MIR_ARTIFACT_VERSION, 4);
+    fn artifact_version_is_5_for_typed_device_program_schema() {
+        assert_eq!(PACKAGE_MIR_ARTIFACT_VERSION, 5);
     }
 
     #[test]
