@@ -31,8 +31,8 @@ pub use schema::{
     WireDeviceResource, WireDispatchSize, WireKernelLaunchPlan, WireKernelUnit, WireLaunchUnit,
     WireMatMulPlan, WireMatMulSharedMemory, WireOobPaddingPolicy, WireProgramLifetime,
     WireReduceOp, WireReductionPlan, WireResourceAccess, WireResultBuffer, WireSharedMemoryLayout,
-    WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME,
-    FNV1A64_OFFSET, FNV1A64_PRIME, PACKAGE_MIR_ARTIFACT_VERSION,
+    WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize, FMIR_TARGET_NAME,
+    FMIR_TEXT_TARGET_NAME, FNV1A64_OFFSET, FNV1A64_PRIME, PACKAGE_MIR_ARTIFACT_VERSION,
 };
 
 #[cfg(test)]

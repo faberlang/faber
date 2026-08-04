@@ -240,6 +240,10 @@ struct DeviceSafeClassifier<'a> {
     allows_structured_nested_indexed_write_loop_break: bool,
     allows_structured_nested_indexed_write_loop_continue: bool,
     allow_host_owned_tensor_entry: bool,
+    /// S3-A1: whether the function under visit returns a non-empty tuple —
+    /// the multi-output kernel contract. Tuple values (the result
+    /// aggregation) are then classified per element instead of as aggregate.
+    multi_output_result: bool,
     gaps: Vec<CapabilityGap>,
 }
 
@@ -269,6 +273,7 @@ impl<'a> DeviceSafeClassifier<'a> {
             allows_structured_nested_indexed_write_loop_break: false,
             allows_structured_nested_indexed_write_loop_continue: false,
             allow_host_owned_tensor_entry: false,
+            multi_output_result: false,
             gaps: Vec::new(),
         }
     }
@@ -607,13 +612,27 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             if function.error_ty.is_some() {
                 self.record_abi(SHAPE_FAILABLE_DEVICE_FN);
             }
-            self.check_device_type(function.return_ty);
+            // S3-A1: a result-tuple return is the multi-output kernel contract —
+            // the tuple elements are DISTINCT device output resources (the ABI
+            // lowers them via `multi_output_return_kernel`). Classify each
+            // element instead of the aggregate tuple, which would otherwise
+            // record a "device aggregate value type" gap on a valid contract.
+            match self.types.get(function.return_ty.semantic_id()) {
+                Type::Tuple(elements) if !elements.is_empty() => {
+                    self.multi_output_result = true;
+                    for element in elements {
+                        self.check_device_type(MirType::semantic(*element));
+                    }
+                }
+                _ => self.check_device_type(function.return_ty),
+            }
             if let Some(error_ty) = function.error_ty {
                 self.check_device_type(error_ty);
             }
             crate::visit::walk_function(self, function);
         }
 
+        self.multi_output_result = false;
         self.in_device_function = was_in_device_function;
         self.allows_structured_return_branch = previous_allows_structured_return_branch;
         self.allows_structured_indexed_write_branch =
@@ -652,7 +671,9 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
     }
 
     fn visit_local(&mut self, local: &MirLocal) {
-        if self.in_device_function {
+        if self.in_device_function
+            && !(self.multi_output_result && is_result_tuple_type(self.types, local.ty))
+        {
             self.check_device_type(local.ty);
         }
     }
@@ -715,32 +736,37 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             MirStatementKind::RuntimeCall {
                 call:
                     MirRuntimeCall {
-                        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorAdd),
+                        intrinsic:
+                            MirIntrinsic::Collection(
+                                op @ (MirCollectionOp::TensorAdd
+                                | MirCollectionOp::TensorSub
+                                | MirCollectionOp::TensorMul
+                                | MirCollectionOp::TensorDiv
+                                | MirCollectionOp::TensorNeg
+                                | MirCollectionOp::TensorFill
+                                | MirCollectionOp::TensorRelu
+                                | MirCollectionOp::TensorGelu),
+                            ),
                         ..
                     },
                 ..
             } => {
-                crate::visit::walk_stmt(self, stmt);
-            }
-            // D-W6-B1 U2: `activatio_relu` lowers to a Collection(TensorRelu)
-            // runtime call — a device-safe elementwise op (max(0.0, x) per
-            // element), mirroring TensorAdd. The WGSL emitter arm (radix-mir-wgsl
-            // lib.rs) has the matching statement arm.
-            MirStatementKind::RuntimeCall {
-                call:
-                    MirRuntimeCall {
-                        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorRelu),
-                        ..
-                    },
-                ..
-            } => {
+                // S3-A5: the elementwise tensor set is device-safe — the
+                // Metal emitter lowers each op to a per-element tensor
+                // expression (the companion's missing mul/div/fill arms, plus
+                // the pointwise family; TensorAdd/TensorRelu predate S3-A5).
+                // The WGSL emitter keeps its per-op fail-closed emit gate.
+                let _ = op;
                 crate::visit::walk_stmt(self, stmt);
             }
             MirStatementKind::RuntimeCall { .. } => self.record_policy(SHAPE_KERNEL_RUNTIME_CALL),
             MirStatementKind::Construct { aggregate, .. } => {
+                // S3-A1: a Tuple construct is the multi-output result
+                // aggregation — the ABI lowers it to DISTINCT output
+                // resources; the container is not a device value.
                 if !matches!(
                     aggregate.kind,
-                    MirAggregateKind::Vector | MirAggregateKind::Matrix
+                    MirAggregateKind::Vector | MirAggregateKind::Matrix | MirAggregateKind::Tuple
                 ) {
                     self.record_policy(SHAPE_KERNEL_AGGREGATE_CONSTRUCT);
                 }
@@ -820,7 +846,9 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
 
     fn visit_value(&mut self, value: &MirValue) {
         if self.in_device_function {
-            self.check_device_type(value.ty);
+            if !(self.multi_output_result && is_result_tuple_type(self.types, value.ty)) {
+                self.check_device_type(value.ty);
+            }
             crate::visit::walk_value(self, value);
         }
     }
@@ -834,10 +862,25 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
 
     fn visit_aggregate(&mut self, aggregate: &MirAggregate) {
         if self.in_device_function {
-            self.check_device_type(aggregate.ty);
+            // S3-A1: a Tuple aggregate is the multi-output result contract —
+            // its element types (checked through the field walk) are the
+            // DISTINCT device output resources; the tuple container itself is
+            // not a device value. Other aggregates (record/map/… containers)
+            // stay reject-as-aggregate.
+            if !matches!(aggregate.kind, MirAggregateKind::Tuple) {
+                self.check_device_type(aggregate.ty);
+            }
             crate::visit::walk_aggregate(self, aggregate);
         }
     }
+}
+
+/// Whether a type is a non-empty tuple (the S3-A1 result-tuple contract).
+fn is_result_tuple_type(types: &TypeTable, ty: MirType) -> bool {
+    matches!(
+        types.get(ty.semantic_id()),
+        Type::Tuple(elements) if !elements.is_empty()
+    )
 }
 
 fn is_device_vector_element(element: MirScalarLayout) -> bool {

@@ -1489,6 +1489,23 @@ impl MirKernelSignature {
             }
         }
 
+        // S3-A5: a kernel whose body carries a Reduction contract and whose
+        // return is a scalar (the mean/sum result) synthesizes the
+        // indexed-view reduction signature WITHOUT explicit output/index
+        // parameters: every tensor param becomes a read input and the output
+        // is the per-workgroup partials buffer from the resolved contract.
+        // The scalar return is the host-combined reduction result; the
+        // emitter's reduction arm writes the per-workgroup partials (the
+        // S3-B1 mul-mean forward `simple_loss(x, w) → f32` shape).
+        if let Some(signature) = Self::reduction_scalar_return_kernel(
+            function,
+            validation,
+            interner,
+            allow_host_owned_tensor_entry,
+        )? {
+            return Ok(signature);
+        }
+
         match function.params.as_slice() {
             [param] => Self::return_buffer_kernel(
                 function,
@@ -1685,6 +1702,114 @@ impl MirKernelSignature {
         };
         maybe_append_runtime_extent(function, &mut signature, validation);
         Ok(signature)
+    }
+
+    /// S3-A5: synthesize the indexed-view reduction signature for a kernel
+    /// whose body carries a Reduction contract and whose return is a scalar
+    /// (the mean/sum result — the S3-B1 forward shape
+    /// `simple_loss(x, w) → f32` with `mean(mul(x, w))`).
+    ///
+    /// Every non-vacuum tensor param becomes a read input; the output is the
+    /// per-workgroup partials buffer from the resolved contract (count =
+    /// `partials`), and the workgroup/dispatch come from the contract. The
+    /// emitter's reduction arm writes each workgroup's partial there; the
+    /// scalar return is the host-combined reduction result. `None` when the
+    /// body carries no Reduction contract or the return is not a scalar.
+    fn reduction_scalar_return_kernel(
+        function: &MirFunction,
+        validation: &MirValidationContext<'_>,
+        interner: Option<&Interner>,
+        allow_host_owned_tensor_entry: bool,
+    ) -> Result<Option<Self>, MirAbiError> {
+        let Some(contract) = collection_op_contract(function, validation)? else {
+            return Ok(None);
+        };
+        let CollectionOpContract::Reduction {
+            length,
+            workgroup_x,
+            partials,
+        } = contract
+        else {
+            return Ok(None);
+        };
+        // The return must be a scalar (the reduction result) — tensor and
+        // tuple returns have their own signature arms.
+        if !matches!(
+            validation.layouts.layout_for_type(function.return_ty),
+            Ok(layout) if matches!(layout.kind, MirLayoutKind::Scalar(_))
+        ) {
+            return Ok(None);
+        }
+
+        let mut input_resources = Vec::with_capacity(function.params.len());
+        let mut next_binding = 0u32;
+        for input in &function.params {
+            if is_vacuum(input.ty, validation) {
+                continue;
+            }
+            let element_ty =
+                device_view_element_type(input.ty, validation, allow_host_owned_tensor_entry)?;
+            let element_count = device_view_element_count(input.ty, validation)?;
+            input_resources.push(MirKernelResource {
+                group: DEFAULT_KERNEL_RESOURCE_GROUP,
+                binding: next_binding,
+                kind: MirKernelResourceKind::StorageBuffer,
+                role: MirKernelResourceRole::Input,
+                access: MirKernelResourceAccess::Read,
+                element_ty,
+                element_count,
+                source_local: Some(input.local),
+                source_name: param_source_name(input, interner),
+            });
+            next_binding += 1;
+        }
+        let input = input_resources
+            .first()
+            .cloned()
+            .ok_or_else(|| MirAbiError::new(ERR_INDEXED_VIEW_REQUIRES_INPUT))?;
+        let extra_inputs = input_resources.into_iter().skip(1).collect();
+        let reduction_element_ty = input.element_ty;
+
+        let mut signature = Self {
+            function: function.id,
+            input,
+            extra_inputs,
+            output: MirKernelResource {
+                group: DEFAULT_KERNEL_RESOURCE_GROUP,
+                binding: next_binding,
+                kind: MirKernelResourceKind::StorageBuffer,
+                role: MirKernelResourceRole::Output,
+                access: MirKernelResourceAccess::Write,
+                element_ty: reduction_element_ty,
+                element_count: partials,
+                source_local: None,
+                source_name: None,
+            },
+            extra_outputs: Vec::new(),
+            accumulation_buffers: Vec::new(),
+            builtin_inputs: Vec::new(),
+            // The reduction recipe's grid-stride loop starts from the GLOBAL
+            // thread index (the header's first builtin selects the index
+            // expression); the tree + partial write add `local_id.x`/
+            // `workgroup_id.x` via the emitter's C5 builtins.
+            called_builtins: {
+                let mut builtins = vec![MirKernelBuiltin::GlobalInvocationX];
+                builtins.extend(called_builtins_for_function(function));
+                builtins
+            },
+            workgroup: MirWorkgroupSize {
+                x: workgroup_x,
+                y: 1,
+                z: 1,
+            },
+            dispatch_size: MirKernelDispatchSize {
+                x: length,
+                y: 1,
+                z: 1,
+            },
+        };
+        maybe_append_runtime_extent(function, &mut signature, validation);
+        Ok(Some(signature))
     }
 
     fn return_buffer_kernel(
@@ -3690,8 +3815,8 @@ fn kernel_element_byte_width(layout: MirScalarLayout) -> Result<u16, MirAbiError
 mod tests {
     use super::*;
     use crate::{
-        MirBlock, MirBlockId, MirOperand, MirParam, MirParamMode, MirPlace, MirTerminator,
-        MirTerminatorKind,
+        MirBlock, MirBlockId, MirIntrinsic, MirLocal, MirOperand, MirParam, MirParamMode, MirPlace,
+        MirRuntimeCall, MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind,
     };
     use radix_lexer::Span;
     use radix_types::TypeTable;
@@ -4151,6 +4276,156 @@ mod tests {
                 matches!(layout.kind, MirLayoutKind::Scalar(_)),
                 "an output's element type must be a scalar, not an aggregate: {layout:?}"
             );
+        }
+    }
+
+    /// S3-A5: the scalar-return reduction signature (the S3-B1 forward shape
+    /// `simple_loss(x, w) → f32` with `mean(mul(x, w))`) synthesizes the
+    /// indexed-view reduction contract: inputs x + w, output = the 4 partial
+    /// slots, workgroup 256, dispatch 1000 — and the plan pass derives the
+    /// tree-reduction recipe over that signature (the S3-A3 fail-closed
+    /// surface).
+    #[test]
+    fn reduction_scalar_return_kernel_synthesizes_indexed_view_signature() {
+        let mut types = TypeTable::new();
+        let function = mul_mean_scalar_return_function(&mut types);
+        let validation = validation_with_device_tensor_layouts(&types);
+        let signature = MirKernelSignature::storage_buffer_kernel(&function, &validation)
+            .expect("scalar-return reduction derives a signature");
+
+        assert_eq!(signature.input.element_count, 1000);
+        assert_eq!(signature.extra_inputs.len(), 1);
+        assert_eq!(signature.extra_inputs[0].element_count, 1000);
+        // Reduction contract: partials output, corrected workgroup/dispatch.
+        assert_eq!(signature.workgroup.x, 256);
+        assert_eq!(signature.workgroup.y, 1);
+        assert_eq!(signature.dispatch_size.x, 1000);
+        assert_eq!(signature.output.element_count, 4);
+
+        // The S3-A3 fail-closed plan surface accepts the signature: the
+        // mul+mean forward carries the tree-reduction recipe.
+        let derived = crate::device_program_plans::kernel_plan_for_function(
+            &function,
+            &signature,
+            &validation,
+        )
+        .expect("plan facts resolve")
+        .expect("mul+mean forward carries the reduction recipe");
+        assert!(
+            matches!(
+                derived,
+                crate::kernel_plan::CollectionKernelPlan::TreeReduction(_)
+            ),
+            "the mul+mean forward must carry a tree-reduction plan, got {derived:?}"
+        );
+    }
+
+    /// S3-B1 forward shape:
+    /// `functio simple_loss(tf32[1000] x, tf32[1000] w) → f32 {
+    ///    fixum tensor<f32,[1000]> product ← x.multiplica(w); redde product.media() }`.
+    fn mul_mean_scalar_return_function(types: &mut TypeTable) -> MirFunction {
+        let f32_id = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+        let shape = types.intern_index(IndexExpr::Literal(1000));
+        let tensor_id = types.tensor_with_shape(f32_id, shape);
+        let tensor_ty = MirType::semantic(tensor_id);
+        let f32_ty = MirType::semantic(f32_id);
+        let span = Span::default();
+        MirFunction {
+            id: MirFunctionId(0),
+            source: Some(DefId(12)),
+            name: None,
+            params: vec![
+                MirParam {
+                    local: MirLocalId(0),
+                    name: None,
+                    ty: tensor_ty,
+                    mode: MirParamMode::Owned,
+                    span,
+                },
+                MirParam {
+                    local: MirLocalId(1),
+                    name: None,
+                    ty: tensor_ty,
+                    mode: MirParamMode::Owned,
+                    span,
+                },
+            ],
+            locals: vec![
+                MirLocal {
+                    id: MirLocalId(0),
+                    name: None,
+                    ty: tensor_ty,
+                    mutable: false,
+                    span,
+                },
+                MirLocal {
+                    id: MirLocalId(1),
+                    name: None,
+                    ty: tensor_ty,
+                    mutable: false,
+                    span,
+                },
+                MirLocal {
+                    id: MirLocalId(2),
+                    name: None,
+                    ty: tensor_ty,
+                    mutable: false,
+                    span,
+                },
+                MirLocal {
+                    id: MirLocalId(3),
+                    name: None,
+                    ty: f32_ty,
+                    mutable: false,
+                    span,
+                },
+            ],
+            temps: Vec::new(),
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![
+                    // product = mul(x, w)
+                    MirStatement {
+                        kind: MirStatementKind::RuntimeCall {
+                            destination: Some(MirPlace::local(MirLocalId(2))),
+                            call: MirRuntimeCall {
+                                intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorMul),
+                                args: vec![
+                                    MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                                    MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                                ],
+                                return_ty: tensor_ty,
+                            },
+                        },
+                        span,
+                    },
+                    // result = mean(product)
+                    MirStatement {
+                        kind: MirStatementKind::RuntimeCall {
+                            destination: Some(MirPlace::local(MirLocalId(3))),
+                            call: MirRuntimeCall {
+                                intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorMean),
+                                args: vec![MirOperand::Place(MirPlace::local(MirLocalId(2)))],
+                                return_ty: f32_ty,
+                            },
+                        },
+                        span,
+                    },
+                ],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                        MirLocalId(3),
+                    )))),
+                    span,
+                },
+                span,
+            }],
+            return_ty: f32_ty,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span,
         }
     }
 

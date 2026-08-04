@@ -19,11 +19,12 @@ use crate::schema::{
     FmirDeviceProgramSection, FmirDeviceSection, FmirDeviceSelection, FmirDeviceSymbol,
     FmirTextCliRootSection, FmirTextCliSection, FmirTextImageFile, FmirTextProgramSection,
     FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection,
-    FmirTextToolchainSection, FmirTextTypesSection, WireBufferIdentity, WireBufferLifetime,
-    WireBufferRole, WireBufferVersion, WireBinding, WireCollectionKernelPlan, WireDeviceProgram,
-    WireDeviceResource, WireDispatchSize, WireKernelLaunchPlan, WireKernelUnit, WireLaunchUnit,
-    WireProgramLifetime, WireResourceAccess, WireResultBuffer, WireStorageLayout, WireWorkgroupCount,
-    WireWorkgroupSize, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION,
+    FmirTextToolchainSection, FmirTextTypesSection, WireBinding, WireBufferIdentity,
+    WireBufferLifetime, WireBufferRole, WireBufferVersion, WireCollectionKernelPlan,
+    WireDeviceProgram, WireDeviceResource, WireDispatchSize, WireKernelLaunchPlan, WireKernelUnit,
+    WireLaunchUnit, WireProgramLifetime, WireResourceAccess, WireResultBuffer, WireStorageLayout,
+    WireWorkgroupCount, WireWorkgroupSize, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME,
+    PACKAGE_MIR_ARTIFACT_VERSION,
 };
 use radix_mir::MirProgram;
 use radix_types::TypeTable;
@@ -64,7 +65,10 @@ fn sample_wire_program() -> WireDeviceProgram {
                         element_ty: "f32".to_owned(),
                         element_count: 4,
                     },
-                    binding: WireBinding { group: 0, binding: 0 },
+                    binding: WireBinding {
+                        group: 0,
+                        binding: 0,
+                    },
                     access: WireResourceAccess::Read,
                 },
                 WireDeviceResource {
@@ -74,7 +78,10 @@ fn sample_wire_program() -> WireDeviceProgram {
                         element_ty: "f32".to_owned(),
                         element_count: 4,
                     },
-                    binding: WireBinding { group: 0, binding: 1 },
+                    binding: WireBinding {
+                        group: 0,
+                        binding: 1,
+                    },
                     access: WireResourceAccess::Write,
                 },
             ],

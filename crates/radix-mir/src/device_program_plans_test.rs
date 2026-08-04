@@ -14,9 +14,9 @@ use crate::kernel_plan::{
 };
 use crate::layout::MirTensorStorageLayout;
 use crate::{
-    MirBlock, MirBlockId, MirFunction, MirFunctionId, MirIntrinsic, MirLocal, MirLocalId,
+    MirBinOp, MirBlock, MirBlockId, MirFunction, MirFunctionId, MirIntrinsic, MirLocal, MirLocalId,
     MirOperand, MirParam, MirParamMode, MirPlace, MirRuntimeCall, MirStatement, MirStatementKind,
-    MirTerminator, MirTerminatorKind, MirType,
+    MirTerminator, MirTerminatorKind, MirType, MirValue, MirValueId, MirValueKind,
 };
 use radix_lexer::Span;
 use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeTable};
@@ -412,9 +412,12 @@ fn mul_sum_function(types: &mut TypeTable, length: u64) -> MirFunction {
     )
 }
 
-/// `s = sum(x); m = mean(x)` — two distinct recipe ops in one body.
+/// `s = sum(x); m = mean(x); t = s + m; return t` — two DISTINCT live recipe
+/// ops in one body (both results are consumed by the trailing add, so
+/// neither is dead-code-filtered by the S3-A5 plan scan).
 fn sum_mean_function(types: &mut TypeTable, length: u64) -> MirFunction {
-    tensor_kernel_function(
+    let tensor = tensor_ty(types, length);
+    let mut function = tensor_kernel_function(
         types,
         length,
         1,
@@ -422,7 +425,38 @@ fn sum_mean_function(types: &mut TypeTable, length: u64) -> MirFunction {
             (MirCollectionOp::Sum, vec![0], 1),
             (MirCollectionOp::TensorMean, vec![0], 2),
         ],
-    )
+    );
+    // `t = s + m` — both recipe results become live; return `t`.
+    let add = MirValue {
+        id: MirValueId(0),
+        kind: MirValueKind::Binary {
+            op: MirBinOp::Add,
+            lhs: MirOperand::Place(MirPlace::local(MirLocalId(1))),
+            rhs: MirOperand::Place(MirPlace::local(MirLocalId(2))),
+        },
+        ty: tensor,
+        span: test_span(),
+    };
+    function.locals.push(MirLocal {
+        id: MirLocalId(3),
+        name: None,
+        ty: tensor,
+        mutable: false,
+        span: test_span(),
+    });
+    let block = &mut function.blocks[0];
+    block.statements.push(MirStatement {
+        kind: MirStatementKind::Assign {
+            place: MirPlace::local(MirLocalId(3)),
+            value: add,
+        },
+        span: test_span(),
+    });
+    block.terminator = MirTerminator {
+        kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(MirLocalId(3))))),
+        span: test_span(),
+    };
+    function
 }
 
 /// `t = transpose(x)` — the D1 unplannable op (no recipe, not elementwise).
@@ -813,7 +847,10 @@ fn elementwise_only_multi_op_body_is_elementwise() {
     let validation = MirValidationContext::new(&types);
     let derived = kernel_plan_for_function(&function, &signature, &validation)
         .expect("elementwise-only body facts resolve");
-    assert!(derived.is_none(), "an elementwise-only body carries no recipe");
+    assert!(
+        derived.is_none(),
+        "an elementwise-only body carries no recipe"
+    );
     assert!(carried_plan_agrees(
         &CollectionKernelPlan::Elementwise,
         derived.as_ref()
