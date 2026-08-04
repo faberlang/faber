@@ -2,10 +2,10 @@ use crate::diagnostic_explain::{
     is_diagnostic_query, lookup_diagnostic_in_pack, lookup_installed_diagnostic, render_json,
     render_plain,
 };
-use radix::reader_locale::ReaderLocalePack;
+use radix::locale::LocalePack;
 
-fn synthetic_pack() -> ReaderLocalePack {
-    ReaderLocalePack::from_toml_str(
+fn synthetic_pack() -> LocalePack {
+    LocalePack::from_toml_str(
         r#"
 [pack]
 id = "la-test"

@@ -362,8 +362,8 @@ fn loaded_package_canonical_faber_parity() {
         })
         .collect::<BTreeMap<_, _>>();
 
-    let latin = radix::reader_locale::latin_reader_pack();
-    let surface = radix::reader_locale::KeywordSurface::new(&latin);
+    let latin = radix::locale::latin_locale_pack();
+    let surface = radix::locale::KeywordSurface::new(&latin);
     for loaded_module in &loaded.modules {
         let direct_unit = direct_by_path
             .get(&loaded_module.relative_path)
@@ -433,8 +433,8 @@ fn loaded_package_library_import_unit_parity() {
     // Per-unit codegen parity (Rust + canonical Faber) with the library
     // import intact. Full crate assembly inlines library module bodies, which
     // is the store-backed Stage 5 path; the unit surface is source-free here.
-    let latin = radix::reader_locale::latin_reader_pack();
-    let surface = radix::reader_locale::KeywordSurface::new(&latin);
+    let latin = radix::locale::latin_locale_pack();
+    let surface = radix::locale::KeywordSurface::new(&latin);
     for target in [Target::Rust, Target::Faber] {
         let direct_code = output_code(
             &generate_from_analyzed(target, &direct.units[0].analysis, &surface)

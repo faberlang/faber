@@ -8,7 +8,7 @@
 use super::{check_package, config_with_reader_locale};
 use radix::codegen::Target;
 use radix::diagnostics::{Diagnostic, DiagnosticArg};
-use radix::reader_locale::ReaderLocalePack;
+use radix::locale::LocalePack;
 use std::path::{Path, PathBuf};
 
 const ISSUE_INITIALIZER_ANNOTATION_MISMATCH: &str = "initializer_annotation_mismatch";
@@ -31,7 +31,7 @@ fn diagnostics_with_issue<'a>(diagnostics: &[&'a Diagnostic], issue: &str) -> Ve
         .collect()
 }
 
-fn render_plain(diag: &Diagnostic, pack: &ReaderLocalePack) -> String {
+fn render_plain(diag: &Diagnostic, pack: &LocalePack) -> String {
     radix::diagnostics::render_plain_with_pack(diag, pack).expect("render diagnostic")
 }
 

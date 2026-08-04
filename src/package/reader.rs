@@ -1,7 +1,7 @@
 use radix::codegen::Target;
 use radix::diagnostics::Diagnostic;
 use radix::driver::Config;
-use radix::reader_locale::ReaderLocalePack;
+use radix::locale::LocalePack;
 use std::path::{Path, PathBuf};
 
 use super::discovery::discover_package;
@@ -14,7 +14,7 @@ pub(crate) fn config_with_reader_locale(
     target: Target,
     input: &Path,
     cli_locale: Option<&str>,
-) -> Result<(Config, Option<ReaderLocalePack>), Box<Diagnostic>> {
+) -> Result<(Config, Option<LocalePack>), Box<Diagnostic>> {
     let pack = load_reader_pack_for_input(input, cli_locale)?;
     let config = match pack.as_ref() {
         Some(pack) => Config::default()
@@ -29,7 +29,7 @@ pub(crate) fn config_with_reader_locale(
 pub(crate) fn load_reader_pack_for_input(
     input: &Path,
     cli_locale: Option<&str>,
-) -> Result<Option<ReaderLocalePack>, Box<Diagnostic>> {
+) -> Result<Option<LocalePack>, Box<Diagnostic>> {
     let spec = discover_package(input)?;
     // A validated manifest that disappeared is a diagnostic (FBR-P1-001);
     // legacy manifestless inputs legitimately have none.
@@ -43,7 +43,7 @@ pub(crate) fn load_reader_pack_for_input(
         return Ok(None);
     };
     let pack_path = reader_pack_path(&package_root, &locale, cli_locale, manifest.as_ref());
-    let pack = ReaderLocalePack::from_toml_path(&pack_path).map_err(|err| {
+    let pack = LocalePack::from_toml_path(&pack_path).map_err(|err| {
         Box::new(
             crate::package_diagnostic_error(format!(
                 "failed to load reader locale '{locale}' pack '{}': {err}",
@@ -129,7 +129,7 @@ fn package_root_for_selection(spec: &PackageSpec, manifest_path: Option<&Path>) 
 pub fn reader_pack_for_emit(
     input: &[String],
     cli_locale: Option<&str>,
-) -> Result<Option<ReaderLocalePack>, String> {
+) -> Result<Option<LocalePack>, String> {
     let Some(locale) = cli_locale
         .map(str::trim)
         .filter(|locale| !locale.is_empty())
@@ -144,7 +144,7 @@ pub fn reader_pack_for_emit(
 
     // Stdin: no package context, use the installed pack for the locale.
     let pack_path = installed_reader_pack_path(locale);
-    ReaderLocalePack::from_toml_path(&pack_path)
+    LocalePack::from_toml_path(&pack_path)
         .map(Some)
         .map_err(|err| {
             format!(

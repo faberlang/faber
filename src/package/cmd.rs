@@ -720,7 +720,7 @@ fn compile_package_input(
     reader_locale: Option<&str>,
 ) -> (
     CompileResult,
-    Option<radix::reader_locale::ReaderLocalePack>,
+    Option<radix::locale::LocalePack>,
 ) {
     if input.is_empty() || input[0] == "-" {
         eprintln!("error: package compilation requires a path input");

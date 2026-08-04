@@ -299,7 +299,7 @@ pub(crate) fn load_package(
 pub(crate) fn load_package_with_reader_pack(
     spec: &PackageSpec,
     library_resolver: &LibraryResolver,
-    reader_pack: Option<&radix::reader_locale::ReaderLocalePack>,
+    reader_pack: Option<&radix::locale::LocalePack>,
     include_proba: bool,
     proba_filter: Option<&TestSourceFilter>,
 ) -> Result<Vec<PackageFile>, Vec<Diagnostic>> {

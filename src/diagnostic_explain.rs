@@ -6,7 +6,7 @@
 
 use crate::explain::ExplainError;
 use crate::io_buf::writeln_buf;
-use radix::reader_locale::{DiagnosticTemplate, ReaderLocalePack};
+use radix::locale::{DiagnosticTemplate, LocalePack};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 
@@ -47,7 +47,7 @@ impl DiagnosticExplanation {
     fn from_template(
         query: &str,
         key: DiagnosticLookupKey,
-        pack: &ReaderLocalePack,
+        pack: &LocalePack,
         template: &DiagnosticTemplate,
     ) -> Self {
         Self {
@@ -89,7 +89,7 @@ pub fn lookup_installed_diagnostic(
 /// Resolve a diagnostic explanation from an already loaded reader pack.
 pub fn lookup_diagnostic_in_pack(
     query: &str,
-    pack: &ReaderLocalePack,
+    pack: &LocalePack,
 ) -> Option<DiagnosticExplanation> {
     let key = DiagnosticLookupKey::parse(query)?;
     resolve_diagnostic_in_pack(query, pack, key)
@@ -97,7 +97,7 @@ pub fn lookup_diagnostic_in_pack(
 
 fn resolve_diagnostic_in_pack(
     query: &str,
-    pack: &ReaderLocalePack,
+    pack: &LocalePack,
     key: DiagnosticLookupKey,
 ) -> Option<DiagnosticExplanation> {
     let code_template = pack.diagnostics.get(&key.code)?;
@@ -147,12 +147,12 @@ pub fn render_json(explanation: &DiagnosticExplanation) -> Result<String, Explai
         .map_err(|err| ExplainError::new(format!("failed to render diagnostic JSON: {err}")))
 }
 
-fn load_installed_reader_pack(locale: &str) -> Result<ReaderLocalePack, ExplainError> {
+fn load_installed_reader_pack(locale: &str) -> Result<LocalePack, ExplainError> {
     if locale.trim().is_empty() {
         return Err(ExplainError::new("--locale must not be empty"));
     }
     let path = installed_reader_pack_path(locale.trim());
-    let pack = ReaderLocalePack::from_toml_path(&path).map_err(|err| {
+    let pack = LocalePack::from_toml_path(&path).map_err(|err| {
         ExplainError::new(format!(
             "failed to load reader locale '{}' pack '{}': {err}",
             locale,

@@ -1256,8 +1256,8 @@ fn emit_typescript_modules(
     controllers: &[BrowserController],
     library_imports: &BTreeMap<String, String>,
 ) -> Result<(), Box<Diagnostic>> {
-    let latin = radix::reader_locale::latin_reader_pack();
-    let surface = radix::reader_locale::KeywordSurface::new(&latin);
+    let latin = radix::locale::latin_locale_pack();
+    let surface = radix::locale::KeywordSurface::new(&latin);
     for unit in &package.units {
         let code = match radix::codegen::generate_from_analyzed(
             radix::codegen::Target::TypeScript,

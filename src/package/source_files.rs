@@ -104,7 +104,7 @@ mod source_files_test;
 pub(super) fn load_package_source(
     path: &Path,
     manifest: Option<&FaberManifest>,
-    reader_pack: Option<&radix::reader_locale::ReaderLocalePack>,
+    reader_pack: Option<&radix::locale::LocalePack>,
     diagnostics: &mut Vec<Diagnostic>,
 ) -> Option<LoadedPackageSource> {
     let raw_source = match fs::read_to_string(path) {
@@ -142,11 +142,11 @@ pub(super) fn load_package_source(
     };
     diagnostics.extend(
         lex_result.reader_fallbacks.iter().map(|fallback| {
-            Diagnostic::from_reader_locale_fallback(&display_name, &body, fallback)
+            Diagnostic::from_locale_fallback(&display_name, &body, fallback)
         }),
     );
     diagnostics.extend(lex_result.reader_suggestions.iter().map(|suggestion| {
-        Diagnostic::from_reader_locale_suggestion(&display_name, &body, suggestion)
+        Diagnostic::from_locale_suggestion(&display_name, &body, suggestion)
     }));
     if !lex_result.success() {
         diagnostics.extend(

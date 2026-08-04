@@ -482,8 +482,8 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Packag
 
     // Go is not a localized target; the surface is unused but required by the
     // shared dispatch seam after reader-locale emit threading.
-    let go_surface_latin = radix::reader_locale::latin_reader_pack();
-    let go_surface = radix::reader_locale::KeywordSurface::new(&go_surface_latin);
+    let go_surface_latin = radix::locale::latin_locale_pack();
+    let go_surface = radix::locale::KeywordSurface::new(&go_surface_latin);
     for unit in &package.units {
         if unit.is_entry {
             continue;
