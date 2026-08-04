@@ -7,6 +7,7 @@ summary = "Starts a value-based branch statement."
 syntax = "elige <expression> <block>"
 aliases = ["switch", "choose"]
 related = ["casu", "ceterum"]
+locale = "la"
 +++
 
 # =============================================================================

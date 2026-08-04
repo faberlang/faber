@@ -6,6 +6,7 @@ canonical = true
 summary = "Minimal multi-feature happy path across functio, fixum, si, and nota."
 syntax = "integratio — multi-feature happy path"
 related = ["functio", "fixum", "si", "nota"]
+locale = "la"
 +++
 # =============================================================================
 # integratio — Minimal multi-feature happy path across functio, fixum, si, and nota

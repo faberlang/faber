@@ -6,6 +6,7 @@ canonical = true
 summary = "Unary negation, logical not, sign comparisons, and optional presence tests."
 syntax = "-<expr> | non <expr> | <expr> > 0 | <expr> est nihil"
 related = ["non", "est", "non est"]
+locale = "la"
 +++
 
 # =============================================================================

@@ -6,6 +6,7 @@ canonical = false
 summary = "Dense syntax tour: genus, closures, ranges, and optional chaining."
 syntax = "integratio — multi-feature happy path"
 related = ["genus", "clausa", "?.", "itera"]
+locale = "la"
 +++
 # =============================================================================
 # integratio — Dense syntax tour: genus, closures, ranges, and optional chaining

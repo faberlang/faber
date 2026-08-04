@@ -6,6 +6,7 @@ canonical = false
 summary = "Canonical hello-world smoke with module-scope nota output."
 syntax = "nota <textus-literal>"
 related = ["incipit", "nota"]
+locale = "la"
 +++
 # =============================================================================
 # incipit — Canonical hello-world smoke with module-scope nota output

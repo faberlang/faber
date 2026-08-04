@@ -6,6 +6,7 @@ canonical = true
 summary = "Inline value unions and discerne on discretio variants."
 syntax = "typus <name> = <type> ∪ <type>"
 related = ["typus", "discerne", "discretio"]
+locale = "la"
 +++
 
 # =============================================================================

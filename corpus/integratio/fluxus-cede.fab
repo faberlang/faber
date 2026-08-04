@@ -6,6 +6,7 @@ canonical = false
 summary = "Async await-bind and stream yield in one program."
 syntax = "integratio — multi-feature happy path"
 related = ["fiet", "fiunt", "cede", "incipiet"]
+locale = "la"
 +++
 # =============================================================================
 # integratio — Async await-bind and stream yield in one program

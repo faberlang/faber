@@ -7,6 +7,7 @@ summary = "Assigns a value to a binding, field, or assignable expression."
 syntax = "<place> ← <expression>"
 aliases = ["assignment", "assign"]
 related = ["=", "fixum", "varia", "⊕", "⊖"]
+locale = "la"
 +++
 
 

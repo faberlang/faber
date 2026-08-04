@@ -7,6 +7,7 @@ summary = "Starts a conditional branch that runs when its condition is true."
 syntax = "si <condition> <block>"
 aliases = ["if"]
 related = ["sin", "secus", "ergo"]
+locale = "la"
 +++
 
 # =============================================================================

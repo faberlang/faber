@@ -6,6 +6,7 @@ canonical = false
 summary = "Failable function returns with ⇥ error channel and fac/cape recovery."
 syntax = "functio <name>(<params>) → <type> ⇥ <error-type> <block>"
 related = ["functio", "⇥", "fac", "cape"]
+locale = "la"
 +++
 # =============================================================================
 # functio — Failable function returns with ⇥ error channel and fac/cape recovery

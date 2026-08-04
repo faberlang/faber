@@ -6,6 +6,7 @@ canonical = false
 summary = "Generic discretio and implendum declarations."
 syntax = "discretio <name><T> { … } | implendum <name><T> { … }"
 related = ["generic", "discretio", "implendum"]
+locale = "la"
 +++
 # =============================================================================
 # generic — Generic discretio and implendum declarations

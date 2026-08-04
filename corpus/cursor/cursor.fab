@@ -6,6 +6,7 @@ canonical = true
 summary = "Compatibility annotation for stream/generator posture."
 syntax = "@ cursor"
 related = ["fiunt", "fient", "cede"]
+locale = "la"
 +++
 
 # =============================================================================

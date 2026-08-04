@@ -6,6 +6,7 @@ canonical = true
 summary = "solum.lege<T> admits only supported materialization target types."
 syntax = "solum.lege<textus>(via) | solum.lege<lista<textus>>(via) | solum.lege<octeti>(via)"
 related = ["ad", "solum", "generic"]
+locale = "la"
 +++
 
 # =============================================================================

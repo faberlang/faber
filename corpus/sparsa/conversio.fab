@@ -6,6 +6,7 @@ canonical = false
 summary = "Same-shape tensor ↔ sparsa representation conversio."
 syntax = "tensor<T, F> ↦ sparsa<T, F> | sparsa<T, F> ↦ tensor<T, F>"
 related = ["sparsa", "tensor", "↦"]
+locale = "la"
 +++
 
 # =============================================================================

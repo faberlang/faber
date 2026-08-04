@@ -6,6 +6,7 @@ canonical = false
 summary = "Tensor reduction methods for summa and media."
 syntax = "tensor.summa() | tensor.media()"
 related = ["tensor", "fractus", "lista"]
+locale = "la"
 +++
 
 # =============================================================================

@@ -6,6 +6,7 @@ canonical = true
 summary = "Checks whether a value lies within a range."
 syntax = "<expression> intra <range>"
 related = ["inter"]
+locale = "la"
 +++
 # =============================================================================
 # intra — Checks whether a value lies within a range

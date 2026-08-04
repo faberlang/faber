@@ -6,6 +6,7 @@ canonical = false
 summary = "Compiler-owned textus query methodi."
 syntax = "s.longitudo | continet | initium | finis"
 related = ["textus", "intrinseca"]
+locale = "la"
 +++
 # =============================================================================
 # textus — Compiler-owned textus query methodi

@@ -6,6 +6,7 @@ canonical = false
 summary = "Tensor elementwise arithmetic with addita, subtrahe, and multiplica."
 syntax = "tensor.addita(other) | tensor.subtrahe(other) | tensor.multiplica(other)"
 related = ["tensor", "fractus", "lista"]
+locale = "la"
 +++
 
 # =============================================================================

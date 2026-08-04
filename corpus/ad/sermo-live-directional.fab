@@ -5,6 +5,7 @@ category = "endpoint"
 canonical = true
 summary = "live outbound and inbound sermo directional views"
 related = ["ad", "sermo", "tuus", "scrinium", "cursor", "accipe"]
+locale = "la"
 +++
 
 # =============================================================================

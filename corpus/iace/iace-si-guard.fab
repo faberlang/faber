@@ -6,6 +6,7 @@ canonical = true
 summary = "Conditional throw with si guard."
 syntax = "iace <expression> si <condition>"
 related = ["cape", "mori", "si", "⇥"]
+locale = "la"
 +++
 # =============================================================================
 # iace — Conditional throw with si guard

@@ -7,6 +7,7 @@ summary = "Marks a test case as pending future work with a reason."
 syntax = "proba <name> futurum <reason> <block>"
 aliases = ["todo", "pending"]
 related = ["proba", "omitte"]
+locale = "la"
 +++
 # =============================================================================
 # futurum — Marks a test case as pending future work with a reason

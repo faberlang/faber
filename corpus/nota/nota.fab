@@ -6,6 +6,7 @@ canonical = true
 summary = "Writes a value to standard output."
 syntax = "scribe <expression>"
 related = ["vide", "mone"]
+locale = "la"
 +++
 
 

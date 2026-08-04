@@ -6,6 +6,7 @@ canonical = false
 summary = "Failable call propagation: a ⇥-declaring function re-throws a callee error without fac/cape."
 syntax = "functio <name>(<params>) → <type> ⇥ <error-type> <block>"
 related = ["functio", "⇥", "iace", "↦", "fac", "cape"]
+locale = "la"
 +++
 # =============================================================================
 # functio — Failable call propagation: a ⇥-declaring function re-throws a callee error without fac/cape

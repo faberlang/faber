@@ -5,6 +5,7 @@ category = "numeric"
 summary = "f16 and fractus<f16> type-position width markers."
 syntax = "f16 | fractus<f16>"
 related = ["fractus", "matrix"]
+locale = "la"
 +++
 # =============================================================================
 # f16 — f16 and fractus<f16> type-position width markers

@@ -6,6 +6,7 @@ canonical = true
 summary = "Declares a CLI operand annotation."
 syntax = "@ operandus [ceteri] <type> <binding> [descriptio \"...\"] [ubique] [vel <default>]"
 related = ["optio", "cli", "imperium", "ceteri", "ubique"]
+locale = "la"
 +++
 
 # =============================================================================

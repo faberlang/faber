@@ -6,6 +6,7 @@ canonical = true
 summary = "Declares the asynchronous program entry point."
 syntax = "incipiet <block>"
 related = ["incipit", "figendum", "tacebit"]
+locale = "la"
 +++
 # =============================================================================
 # incipiet — Declares the asynchronous program entry point

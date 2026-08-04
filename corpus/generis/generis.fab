@@ -6,6 +6,7 @@ canonical = true
 summary = "Marks a class member as belonging to the type itself."
 syntax = "generis <type> <name> [= <expression>]"
 related = ["genus", "nexum"]
+locale = "la"
 +++
 # =============================================================================
 # generis — Marks a class member as belonging to the type itself

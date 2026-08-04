@@ -6,6 +6,7 @@ canonical = true
 summary = "Async tempus.dormiet and sync tempus.expectet share the tempus:dormiet route."
 syntax = "tempus.expectet(ms) | tacebit tempus.dormiet(ms)"
 related = ["ad", "tempus", "futura", "sermo"]
+locale = "la"
 +++
 
 # =============================================================================

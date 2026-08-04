@@ -7,6 +7,7 @@ summary = "Introduces a compact statement consequent."
 syntax = "<head> ergo <statement>"
 aliases = ["ergo", "therefore"]
 related = ["si", "dum", "clausura", "redde", "tacet", "ergo"]
+locale = "la"
 +++
 
 # =============================================================================

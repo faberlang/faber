@@ -6,6 +6,7 @@ canonical = true
 summary = "Bitwise and, or, xor, not, and shifts on numerus operands."
 syntax = "<expression> ∧ <expression> | <expression> ⊻ <expression> | ¬ <expression> | <expression> ⇐ <expression> | <expression> ⇒ <expression>"
 related = ["∨", "⊻", "¬", "⇐", "⇒"]
+locale = "la"
 +++
 
 # =============================================================================

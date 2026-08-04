@@ -6,6 +6,7 @@ canonical = false
 summary = "Entry point that calls module-level functio declarations."
 syntax = "incipit { <callee>(<args>) }"
 related = ["incipit", "functio"]
+locale = "la"
 +++
 # =============================================================================
 # incipit — Entry point that calls module-level functio declarations

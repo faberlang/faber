@@ -6,6 +6,7 @@ canonical = true
 summary = "Dot, bracket, chained, and optional member access expressions."
 syntax = "<expr>.<field> | <expr>[<index>] | <expr>?.<field>"
 related = ["?.", "lista", "tabula", "genus"]
+locale = "la"
 +++
 
 # =============================================================================

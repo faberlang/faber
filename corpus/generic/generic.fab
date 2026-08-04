@@ -6,6 +6,7 @@ canonical = true
 summary = "Generic functions with angle-bracket type and magnitudo parameters."
 syntax = "functio <name><T, magnitudo N>(<params>) → <type> <block>"
 related = ["functio", "genus", "magnitudo"]
+locale = "la"
 +++
 # =============================================================================
 # generic — Generic functions with angle-bracket type and magnitudo parameters

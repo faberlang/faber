@@ -6,6 +6,7 @@ canonical = false
 summary = "DEFER-036 tolerance compare on fractus receiver (not ≈)."
 syntax = "x.approximata(aliud, toleratio)"
 related = ["fractus", "approximata", "DEFER-036"]
+locale = "la"
 +++
 # =============================================================================
 # fractus-approximata — DEFER-036 tolerance compare on fractus receiver (not ≈)

@@ -6,6 +6,7 @@ canonical = false
 summary = "Text and byte conversio between textus, ascii, and octeti."
 syntax = "<expression> ↦ octeti | <expression> ↦ textus | <expression> ↦ ascii"
 related = ["↦", "octeti", "textus", "chorda"]
+locale = "la"
 +++
 
 # =============================================================================

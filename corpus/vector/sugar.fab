@@ -3,6 +3,7 @@ term = "vector"
 kind = "type"
 category = "register"
 summary = "vf32[4] width sugar in type position"
+locale = "la"
 +++
 
 # =============================================================================

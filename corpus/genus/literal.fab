@@ -6,6 +6,7 @@ canonical = false
 summary = "Genus literal instantiation with field overrides."
 syntax = "<Genus> { <field> = <expr>, … }"
 related = ["genus", "valor"]
+locale = "la"
 +++
 # =============================================================================
 # genus — Genus literal instantiation with field overrides

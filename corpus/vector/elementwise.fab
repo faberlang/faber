@@ -3,6 +3,7 @@ term = "vector"
 kind = "kernel"
 category = "gpu"
 summary = "vector elementwise arithmetic lowers for GPU text emit"
+locale = "la"
 +++
 
 # =============================================================================

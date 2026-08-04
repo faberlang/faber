@@ -7,6 +7,7 @@ summary = "Provides a default when the left side is null."
 syntax = "<expression> vel <expression>"
 aliases = ["nullish coalescing"]
 related = ["nihil"]
+locale = "la"
 +++
 
 # =============================================================================

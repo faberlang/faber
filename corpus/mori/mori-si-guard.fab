@@ -6,6 +6,7 @@ canonical = true
 summary = "Conditional fatal abort with si guard."
 syntax = "mori <expression> si <condition>"
 related = ["iace", "ergo", "si"]
+locale = "la"
 +++
 
 # =============================================================================

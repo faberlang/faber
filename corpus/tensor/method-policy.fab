@@ -6,6 +6,7 @@ canonical = false
 summary = "Tensor method policy parity for accipe, out-of-bounds reads, and ponde."
 syntax = "tensor.accipe(indices) | tensor.ponde(indices, value)"
 related = ["tensor", "accipe", "ponde", "lista"]
+locale = "la"
 +++
 
 # =============================================================================

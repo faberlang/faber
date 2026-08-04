@@ -5,6 +5,7 @@ category = "storage"
 summary = "atomic<i32> operations are storage-sensitive compiler-owned methods."
 syntax = "atomic<i32> | atomic<u32>"
 related = ["numerus"]
+locale = "la"
 +++
 # =============================================================================
 # atomic — atomic<i32> operations are storage-sensitive compiler-owned methods

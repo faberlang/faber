@@ -6,6 +6,7 @@ canonical = false
 summary = "Valor datetime carriers to instans through runtime extraction."
 syntax = "valor ↦ instans | instans<ms> [⇥ fallback]"
 related = ["↦", "⇥", "valor"]
+locale = "la"
 +++
 
 # =============================================================================

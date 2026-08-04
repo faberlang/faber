@@ -6,6 +6,7 @@ canonical = true
 summary = "ad opens a sermo endpoint and materializes the stream with an explicit conversio target."
 syntax = "ad 'runtime:echo' (payload) ↦ textus"
 related = ["conversio"]
+locale = "la"
 +++
 
 # =============================================================================

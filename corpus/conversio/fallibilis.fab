@@ -6,6 +6,7 @@ canonical = true
 summary = "Three recovery postures for fallible conversio: inline ⇥, ⇥ propagation, and fac/cape."
 syntax = "<expression> ↦ <type> | functio … → T ⇥ E | fac { … } cape err { … }"
 related = ["↦", "⇥", "fac", "cape", "iace"]
+locale = "la"
 +++
 
 # =============================================================================

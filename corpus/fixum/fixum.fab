@@ -7,6 +7,7 @@ summary = "Declares an immutable binding."
 syntax = "fixum <type|_> <pattern> [← <expression>]"
 aliases = ["const", "immutable"]
 related = ["varia", "sit", "←"]
+locale = "la"
 +++
 # =============================================================================
 # fixum — Declares an immutable binding

@@ -5,6 +5,7 @@ category = "endpoint"
 canonical = true
 summary = "typed inbound sermo stream view"
 related = ["ad", "sermo", "scrinium", "cursor"]
+locale = "la"
 +++
 
 # =============================================================================

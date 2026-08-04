@@ -6,6 +6,7 @@ canonical = true
 summary = "Represents the false boolean value and can prefix a falsity check."
 syntax = "falsum [<expression>]"
 related = ["verum", "nihil"]
+locale = "la"
 +++
 # =============================================================================
 # falsum — Represents the false boolean value and can prefix a falsity check

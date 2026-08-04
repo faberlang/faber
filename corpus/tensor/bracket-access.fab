@@ -6,6 +6,7 @@ canonical = false
 summary = "Tensor bracket access lowers to accipe and ponde."
 syntax = "tensor[index] | tensor[index] ← value"
 related = ["tensor", "accipe", "ponde", "lista"]
+locale = "la"
 +++
 
 # =============================================================================

@@ -6,6 +6,7 @@ canonical = true
 summary = "Marks a function as requiring an allocator binding."
 syntax = "functio <name>(...) curata <required> [ut <local>] → <type>"
 related = ["cura", "arena"]
+locale = "la"
 +++
 
 # =============================================================================

@@ -7,6 +7,7 @@ summary = "Returns a value from a function."
 syntax = "redde <expression>"
 aliases = ["return"]
 related = ["→", "⇥", "ergo", "iace", "tacet"]
+locale = "la"
 +++
 
 # =============================================================================

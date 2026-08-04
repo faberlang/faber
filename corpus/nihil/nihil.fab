@@ -6,6 +6,7 @@ canonical = true
 summary = "Represents the null value and can prefix a null check."
 syntax = "nihil [<expression>]"
 related = ["∪", "sponte"]
+locale = "la"
 +++
 
 # =============================================================================

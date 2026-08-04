@@ -6,6 +6,7 @@ canonical = false
 summary = "Sized primitive family violation (expect type error)."
 syntax = "numerus<f32> — rejected; use fractus<f32>"
 related = ["numerus", "fractus"]
+locale = "la"
 +++
 
 # =============================================================================

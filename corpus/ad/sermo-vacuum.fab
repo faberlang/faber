@@ -6,6 +6,7 @@ canonical = false
 summary = "ad sermo materialization can drain a stream as vacuum."
 syntax = "ad 'runtime:echo' (payload) ↦ vacuum"
 related = ["ad", "sermo", "vacuum"]
+locale = "la"
 +++
 
 # =============================================================================

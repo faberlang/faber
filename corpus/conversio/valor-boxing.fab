@@ -6,6 +6,7 @@ canonical = true
 summary = "T ↦ valor boxing for scalar, byte, collection, genus, and tensor carriers."
 syntax = "<typed-expression> ↦ valor"
 related = ["↦", "valor", "octeti", "lista", "tabula", "genus", "tensor"]
+locale = "la"
 +++
 
 # =============================================================================

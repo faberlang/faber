@@ -6,6 +6,7 @@ canonical = true
 summary = "Registers an async before-each test hook."
 syntax = "praeparabit <block>"
 related = ["praepara", "postparabit"]
+locale = "la"
 +++
 
 # =============================================================================

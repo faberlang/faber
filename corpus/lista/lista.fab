@@ -7,6 +7,7 @@ summary = "Generic ordered collection type."
 syntax = "lista<T>"
 aliases = ["array", "list"]
 related = ["tabula", "copia", "∷", "itera"]
+locale = "la"
 +++
 
 # =============================================================================

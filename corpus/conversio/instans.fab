@@ -6,6 +6,7 @@ canonical = true
 summary = "Conversio arms for instans precision family and textus datetime provenance."
 syntax = "<expression> ↦ instans | instans<ms> | instans<us> | instans<ns>"
 related = ["↦", "⇥", "textus"]
+locale = "la"
 +++
 
 # =============================================================================

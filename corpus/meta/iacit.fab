@@ -6,6 +6,7 @@ canonical = true
 summary = "Marks a function as able to throw along a recoverable channel."
 syntax = "functio <name>(...) iacit → <type> [⇥ <error-type>]"
 related = ["iace", "cape", "⇥", "errata", "immutata"]
+locale = "la"
 +++
 
 # =============================================================================

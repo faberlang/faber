@@ -6,6 +6,7 @@ canonical = false
 summary = "tensor<textus, [N]> as a universal container with non-numeric elements."
 syntax = "tensor<textus, [N]>"
 related = ["tensor", "textus"]
+locale = "la"
 +++
 
 # =============================================================================

@@ -6,6 +6,7 @@ canonical = true
 summary = "Checks whether a value appears in a collection."
 syntax = "<expression> inter <collection>"
 related = ["intra"]
+locale = "la"
 +++
 # =============================================================================
 # inter — Checks whether a value appears in a collection

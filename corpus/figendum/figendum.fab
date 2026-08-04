@@ -7,6 +7,7 @@ summary = "Awaits a promissum and binds an immutable name."
 syntax = "figendum T name ← future"
 aliases = ["await_const"]
 related = ["variandum", "tacebit", "reddet", "fiet", "promissum"]
+locale = "la"
 +++
 
 # =============================================================================

@@ -6,6 +6,7 @@ canonical = true
 summary = "Marks a function parameter or binding as carrying an error value."
 syntax = "functio <name>(...) errata <ident> → <type>"
 related = ["⇥", "cape", "iace"]
+locale = "la"
 +++
 
 # =============================================================================

@@ -6,6 +6,7 @@ canonical = false
 summary = "Tensor rank-2 matrix multiplication with static shape checking."
 syntax = "tensor.matmul(other)"
 related = ["tensor", "fractus", "lista"]
+locale = "la"
 +++
 
 # =============================================================================

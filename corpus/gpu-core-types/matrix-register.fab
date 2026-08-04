@@ -5,6 +5,7 @@ category = "register"
 summary = "matrix<T, [R, C]> is a register-class type distinct from tensor."
 syntax = "matrix<T, [R, C]> | mf32[R, C]"
 related = ["tensor", "vector", "f16"]
+locale = "la"
 +++
 # =============================================================================
 # matrix — matrix<T, [R, C]> is a register-class type distinct from tensor

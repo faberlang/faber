@@ -6,6 +6,7 @@ canonical = false
 summary = "Value branch with a default ceterum clause."
 syntax = "elige <expression> { casu … ceterum { … } }"
 related = ["elige", "casu", "ceterum"]
+locale = "la"
 +++
 
 # =============================================================================

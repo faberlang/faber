@@ -6,6 +6,7 @@ canonical = true
 summary = "Writes a warning message."
 syntax = "mone <expression>"
 related = ["scribe", "vide"]
+locale = "la"
 +++
 
 # =============================================================================

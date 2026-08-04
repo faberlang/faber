@@ -8,6 +8,7 @@ summary = "Introduces an annotation for the following declaration or statement."
 syntax = "@ <name>"
 aliases = ["annotation"]
 related = ["nondum", "cli", "futura"]
+locale = "la"
 +++
 
 # =============================================================================

@@ -6,6 +6,7 @@ canonical = false
 summary = "While loops inside function bodies."
 syntax = "dum <condition> <block>"
 related = ["dum", "functio"]
+locale = "la"
 +++
 
 # =============================================================================

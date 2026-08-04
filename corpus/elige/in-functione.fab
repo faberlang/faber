@@ -6,6 +6,7 @@ canonical = false
 summary = "Early returns from elige inside functions."
 syntax = "elige <expression> { casu … redde … }"
 related = ["elige", "redde", "functio"]
+locale = "la"
 +++
 
 # =============================================================================

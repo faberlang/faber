@@ -3,6 +3,7 @@ term = "vector"
 kind = "kernel"
 category = "gpu"
 summary = "vector cross product lowers for GPU text emit"
+locale = "la"
 +++
 
 # =============================================================================

@@ -6,6 +6,7 @@ canonical = false
 summary = "Typed empty collection construction with vacua."
 syntax = "varia <collection-type> <name> ← vacua"
 related = ["vacua", "lista", "tabula", "copia"]
+locale = "la"
 +++
 # =============================================================================
 # vacua — Typed empty collection construction with vacua

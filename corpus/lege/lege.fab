@@ -6,6 +6,7 @@ canonical = true
 summary = "Reads input from the active input stream."
 syntax = "lege [lineam]"
 related = ["lineam", "scribe"]
+locale = "la"
 +++
 
 # =============================================================================

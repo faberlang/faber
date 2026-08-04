@@ -6,6 +6,7 @@ canonical = false
 summary = "Vector width inference placeholder for generic vector return syntax."
 syntax = "vector<elem, _>"
 related = ["vector", "generic", "magnitudo"]
+locale = "la"
 +++
 
 # =============================================================================

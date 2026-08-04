@@ -6,6 +6,7 @@ canonical = false
 summary = "Destructuring, sparge, and lista methodi in one program."
 syntax = "integratio — multi-feature happy path"
 related = ["ex", "sparge", "lista"]
+locale = "la"
 +++
 # =============================================================================
 # integratio — Destructuring, sparge, and lista methodi in one program

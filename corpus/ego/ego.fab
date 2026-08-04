@@ -7,6 +7,7 @@ summary = "Refers to the current instance inside a method."
 syntax = "ego.<member>"
 aliases = ["self", "this"]
 related = ["generis", "nexum"]
+locale = "la"
 +++
 
 # =============================================================================

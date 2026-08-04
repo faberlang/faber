@@ -7,6 +7,7 @@ summary = "Throws a recoverable error."
 syntax = "iace <expression>"
 aliases = ["throw"]
 related = ["⇥", "cape", "mori", "redde"]
+locale = "la"
 +++
 # =============================================================================
 # iace — Throws a recoverable error

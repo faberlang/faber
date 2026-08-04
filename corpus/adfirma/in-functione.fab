@@ -6,6 +6,7 @@ canonical = false
 summary = "Asserts conditions inside function bodies."
 syntax = "adfirma <expression> [, <message>]"
 related = ["adfirma", "functio"]
+locale = "la"
 +++
 
 

@@ -6,6 +6,7 @@ canonical = true
 summary = "Asserted member, index, and call access on known-present values."
 syntax = "<expression>!.<name> | <expression>![<expression>] | <expression>!(<args>)"
 related = ["!.", "![", "!("]
+locale = "la"
 +++
 
 # =============================================================================

@@ -6,6 +6,7 @@ canonical = true
 summary = "Boolean literals verum and falsum with bivalens bindings."
 syntax = "verum | falsum"
 related = ["falsum", "bivalens", "verum"]
+locale = "la"
 +++
 incipit {
     fixum bivalens enabled ← verum

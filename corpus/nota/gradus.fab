@@ -6,6 +6,7 @@ canonical = false
 summary = "Diagnostic output severities: nota, vide, and mone."
 syntax = "nota <expr> | vide <expr> | mone <expr>"
 related = ["nota", "vide", "mone", "scribe"]
+locale = "la"
 +++
 
 

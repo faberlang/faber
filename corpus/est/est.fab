@@ -6,6 +6,7 @@ canonical = true
 summary = "Tests whether a value is or matches a type-like target."
 syntax = "<expression> est <expression>"
 related = ["non est"]
+locale = "la"
 +++
 
 # =============================================================================

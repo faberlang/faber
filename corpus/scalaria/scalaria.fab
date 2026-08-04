@@ -6,6 +6,7 @@ canonical = true
 summary = "Scalar operations on numerus, fractus, and bivalens in function signatures."
 syntax = "functio <name>(<scalar-params>) → <scalar-type> <block>"
 related = ["numerus", "fractus", "bivalens"]
+locale = "la"
 +++
 
 # =============================================================================
