@@ -603,14 +603,16 @@ fn record_field_string(
     })
 }
 
-// R0 red artifact contract: the operator-authorized package-seam break
-// (S3-A4) replaced the opaque device payload with the typed complete-program
-// wire, so the package MIR artifact version moves 4 → 5 (no dual-format
-// reader; v4 images fail admission closed).
+// R0 red artifact contract: the operator-authorized package-seam breaks
+// moved the package MIR artifact version 4 → 5 (typed complete-program wire,
+// S3-A4) and 5 → 6 (the Stage 3R F1–F7 frozen contract: semantic identities,
+// generations, roots/dependencies, relations, and the independent
+// initialization/observation axes, S2). No dual-format reader exists; v5
+// images fail admission closed.
 #[test]
-fn package_mir_artifact_version_is_5_for_typed_device_program_schema() {
+fn package_mir_artifact_version_is_6_for_carried_semantics_schema() {
     assert_eq!(
-        PACKAGE_MIR_ARTIFACT_VERSION, 5,
-        "the typed device-program wire requires the FMIR artifact version 5 clean break"
+        PACKAGE_MIR_ARTIFACT_VERSION, 6,
+        "the carried F1–F7 semantics require the FMIR artifact version 6 clean break"
     );
 }

@@ -69,11 +69,13 @@ use radix_mir_fmir::{
     FmirDeviceArtifact, FmirDeviceArtifactsSection, FmirDeviceBackend, FmirDeviceInput,
     FmirDeviceProgramSection, FmirDeviceSection, FmirDeviceSelection, FmirDeviceSymbol,
     WireBarrierPhase, WireBarrierPoint, WireBinding, WireBufferIdentity, WireBufferLifetime,
-    WireBufferRole, WireBufferVersion, WireCollectionKernelPlan, WireDeviceProgram,
-    WireDeviceResource, WireDispatchSize, WireKernelLaunchPlan, WireKernelUnit, WireLaunchUnit,
-    WireMatMulPlan, WireMatMulSharedMemory, WireOobPaddingPolicy, WireProgramLifetime,
-    WireReduceOp, WireReductionPlan, WireResourceAccess, WireResultBuffer, WireSharedMemoryLayout,
-    WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize,
+    WireBufferRole, WireBufferVersion, WireCollectionKernelPlan, WireDependencyEdge,
+    WireDeviceProgram, WireDeviceResource, WireDispatchSize, WireInitializationPolicy,
+    WireKernelLaunchPlan, WireKernelUnit, WireLaunchUnit, WireMatMulPlan, WireMatMulSharedMemory,
+    WireObservationFact, WireOobPaddingPolicy, WireProgramLifetime, WireReduceOp,
+    WireReductionPlan, WireResourceAccess, WireResultBuffer, WireSemanticValue,
+    WireSemanticValueOrigin, WireSharedMemoryLayout, WireStorageLayout, WireWorkgroupCount,
+    WireWorkgroupSize,
 };
 use std::collections::BTreeMap;
 
@@ -149,12 +151,23 @@ fn safe_interner_name(interner: &Interner, symbol: radix::lexer::Symbol) -> Opti
 /// model this — the constructor stops minting a fresh id per slot). The role
 /// is the merged program-level fact: like roles keep the role, an
 /// Input+Output mix (either order) is InOut.
+///
+/// The resource-state axes (F5) ride here as **independent facts** gathered
+/// from the slot access pattern across the whole program: `written` and
+/// `consumed` feed the allocation-lifetime and initialization decisions in
+/// pass 2 — no axis is derived from the role or from another axis.
 struct UnifiedBuffer {
     id: BufferId,
     name: String,
     element_ty: MirType,
     element_count: u64,
     role: BufferRole,
+    /// Any kernel slot writes the buffer (Write/ReadWrite) — the independent
+    /// fact behind the lifetime and initialization axes.
+    written: bool,
+    /// Any kernel slot reads the buffer (Read) — the independent fact that
+    /// distinguishes a step-local intermediate from a final observation.
+    consumed: bool,
 }
 
 impl UnifiedBuffer {
@@ -292,6 +305,11 @@ pub(crate) fn device_program_for_lowered(
                 // identity fact; an Input+Output mix makes it an InOut
                 // intermediate.
                 entry.role = merge_buffer_roles(entry.role, role);
+                entry.written |= matches!(
+                    resource.access,
+                    MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
+                );
+                entry.consumed |= resource.access == MirKernelResourceAccess::Read;
                 entry.id
             } else {
                 let id = BufferId(next_buffer_id);
@@ -302,6 +320,11 @@ pub(crate) fn device_program_for_lowered(
                     element_ty: resource.element_ty,
                     element_count: resource.element_count,
                     role,
+                    written: matches!(
+                        resource.access,
+                        MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
+                    ),
+                    consumed: resource.access == MirKernelResourceAccess::Read,
                 });
                 id
             };
@@ -377,13 +400,12 @@ pub(crate) fn device_program_for_lowered(
                 name: entry.name.clone(),
                 role: entry.role,
                 storage: MirTensorStorageLayout::DeviceHandle,
-                // S2-4 lifetime derivation (council 3): the constructor
-                // derives the typed lifetime from the program's ABI facts —
-                // default mapping Input → PerProgram, Output →
-                // ObservationPoint, InOut → PerStep (delivery spec N2.4).
-                // The host receives these facts through the payload; it never
-                // re-derives a lifetime from slot role alone.
-                lifetime: lifetime_for_role(entry.role),
+                // Independent allocation-lifetime axis (F5): decided from the
+                // buffer's aggregate access facts (written / consumed),
+                // never derived from the role. The host receives these facts
+                // through the payload; it never re-derives a lifetime from
+                // slot role alone.
+                lifetime: unified_lifetime(entry),
             };
             resources.push(DeviceResource {
                 buffer: identity,
@@ -461,7 +483,15 @@ pub(crate) fn device_program_for_lowered(
 /// [`admit_device_program_section`] checks the wire version before any
 /// field-level interpretation, so an old wire payload fails with the
 /// structured `payload_version` diagnostic.
-const DEVICE_RUN_PLAN_VERSION: u32 = 3;
+///
+/// **v3 → v4 (Stage 3R U1, the F1–F7 frozen-contract clean break, S1):**
+/// the wire gains the carried semantic-value identities (F1), explicit
+/// value generations per slot (F2), roots + producer/consumer dependencies
+/// (F3), and the independent initialization / observation axes (F5/F6).
+/// Bumped in lockstep with [`radix_mir_fmir::WIRE_DEVICE_PROGRAM_VERSION`];
+/// the radix decode boundary rejects any other value before field-level
+/// interpretation (S8/F7).
+const DEVICE_RUN_PLAN_VERSION: u32 = 4;
 
 /// Fail-closed wire admission (S3-A4): the wire version is read FIRST,
 /// before any field-level interpretation, so an old (or unknown) codec
@@ -489,10 +519,16 @@ pub(crate) fn admit_device_program_section(
 /// (S3-A4). Every program fact the constructor materialized is carried
 /// field-for-field: kernels (function id, entry, plan, typed resources with
 /// access + version, launch), the ordered launch sequence, the program
-/// lifetime, and the explicit result buffers. CUDA symbols and host input
-/// values are NOT program semantics — they never enter the canonical bytes.
+/// lifetime, and the explicit result buffers — plus the independent
+/// resource-state axes (F5, Stage 3R): one semantic value per buffer (F1),
+/// explicit value generations per slot (F2), carried roots + producer/
+/// consumer dependencies (F3), per-buffer initialization policies and
+/// explicit observation facts on every result row (F5/F6). CUDA symbols and
+/// host input values are NOT program semantics — they never enter the
+/// canonical bytes.
 #[must_use]
 fn wire_program_for_program(program: &DeviceProgram) -> WireDeviceProgram {
+    let dependencies = carried_dependencies(program);
     WireDeviceProgram {
         kernels: program
             .kernels
@@ -512,6 +548,14 @@ fn wire_program_for_program(program: &DeviceProgram) -> WireDeviceProgram {
                             binding: resource.binding.binding,
                         },
                         access: wire_access(resource.access),
+                        // Explicit value generation (F2, first projection):
+                        // the slot produces/consumes its carried content
+                        // version — never a universal `1`.
+                        generation: resource.version.version,
+                        // Independent initialization axis (F5): how the
+                        // buffer's storage is brought to its first defined
+                        // state, decided from access facts, never from role.
+                        initialization: wire_initialization_policy(program, resource.buffer.id),
                     })
                     .collect(),
                 launch: WireKernelLaunchPlan {
@@ -553,8 +597,125 @@ fn wire_program_for_program(program: &DeviceProgram) -> WireDeviceProgram {
                 version: wire_buffer_version(&result.version),
                 role: wire_role(result.role),
                 produced_by: result.produced_by.0,
+                // Explicit observation fact (F5/F6): the result row IS a
+                // declared observation point at the producing launch's
+                // completion boundary.
+                observation: WireObservationFact {
+                    at_launch: result.produced_by.0,
+                },
             })
             .collect(),
+        semantic_values: program_semantic_values(program),
+        roots: carried_roots(program, &dependencies),
+        dependencies,
+        relations: Vec::new(),
+    }
+}
+
+/// The distinct buffer identities of a program, in first-reference order
+/// (kernel resources, then results).
+fn program_buffer_identities(program: &DeviceProgram) -> Vec<&BufferIdentity> {
+    let mut identities: Vec<&BufferIdentity> = Vec::new();
+    for kernel in &program.kernels {
+        for resource in &kernel.resources {
+            if !identities
+                .iter()
+                .any(|identity| identity.id == resource.buffer.id)
+            {
+                identities.push(&resource.buffer);
+            }
+        }
+    }
+    for result in &program.results {
+        if !identities
+            .iter()
+            .any(|identity| identity.id == result.buffer.id)
+        {
+            identities.push(&result.buffer);
+        }
+    }
+    identities
+}
+
+/// One provisional semantic value per buffer (F1, first projection): each
+/// buffer is its own stable value identity, minted from the buffer identity
+/// itself with a distinct synthetic origin (two values never alias). The
+/// origin-based minting from carried MIR/value facts is the U4 constructor
+/// rework; this projection keeps the wire fact present and fail-closed.
+fn program_semantic_values(program: &DeviceProgram) -> Vec<WireSemanticValue> {
+    program_buffer_identities(program)
+        .iter()
+        .map(|identity| WireSemanticValue {
+            id: identity.id.0,
+            name: identity.name.clone(),
+            origin: WireSemanticValueOrigin::Synthetic {
+                label: format!("buffer-{}", identity.id.0),
+            },
+        })
+        .collect()
+}
+
+/// Carried producer/consumer dependency edges (F3) derived from the
+/// program's typed resources + launches — the same derivation as the
+/// radix-mir `BufferRegistry::data_flow_pairs`: hosts schedule the validated
+/// graph from these edges, never from kernel declaration order.
+fn carried_dependencies(program: &DeviceProgram) -> Vec<WireDependencyEdge> {
+    program
+        .buffer_registry()
+        .data_flow_pairs()
+        .into_iter()
+        .map(|pair| WireDependencyEdge {
+            producer: pair.producer.0,
+            consumer: pair.consumer.0,
+            buffer: pair.buffer.0,
+            version: pair.version,
+        })
+        .collect()
+}
+
+/// Declared legal execution roots (F3): the launches no dependency edge
+/// feeds — the minimal set a host may start from. Never inferred from
+/// kernel declaration order.
+fn carried_roots(program: &DeviceProgram, dependencies: &[WireDependencyEdge]) -> Vec<u32> {
+    program
+        .launches
+        .iter()
+        .filter(|launch| !dependencies.iter().any(|edge| edge.consumer == launch.id.0))
+        .map(|launch| launch.id.0)
+        .collect()
+}
+
+/// The independent initialization axis (F5) of a buffer, projected onto the
+/// wire: how its storage is brought to its first defined state — decided
+/// from the buffer's aggregate access facts, never from its role or
+/// lifetime. A read-only host-provided buffer is uploaded (HostProvided); a
+/// buffer any slot writes in place is zero-filled at allocation
+/// (ZeroFill — its first generation is defined at allocation); a
+/// kernel-written buffer is fully defined by the kernel before any read
+/// (KernelInitialized).
+fn wire_initialization_policy(
+    program: &DeviceProgram,
+    buffer: BufferId,
+) -> WireInitializationPolicy {
+    let mut readwrite = false;
+    let mut written = false;
+    for kernel in &program.kernels {
+        for resource in &kernel.resources {
+            if resource.buffer.id == buffer {
+                readwrite |= resource.access == MirKernelResourceAccess::ReadWrite;
+                written |= matches!(
+                    resource.access,
+                    MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
+                );
+            }
+        }
+    }
+    if readwrite {
+        WireInitializationPolicy::ZeroFill
+    } else if !written {
+        WireInitializationPolicy::HostProvided
+    } else {
+        WireInitializationPolicy::KernelInitialized
     }
 }
 
@@ -572,6 +733,10 @@ fn wire_buffer_identity(identity: &BufferIdentity) -> WireBufferIdentity {
             BufferLifetime::PerStep => WireBufferLifetime::PerStep,
             BufferLifetime::ObservationPoint => WireBufferLifetime::ObservationPoint,
         },
+        // The stable semantic value identity (F1): every buffer reference
+        // carries the value it holds (first projection — one value per
+        // buffer, minted above).
+        semantic_value: identity.id.0,
     }
 }
 
@@ -811,15 +976,21 @@ pub(crate) fn device_section_for_program(
     })
 }
 
-/// The S2-4 constructor mapping (delivery spec N2.4, open question 3's
-/// default): Input → PerProgram, Output → ObservationPoint, InOut → PerStep.
-/// Derived from the language/ABI facts by the constructor with the schema's
-/// `BufferLifetime` semantics as the authority; the host never re-derives it.
-fn lifetime_for_role(role: BufferRole) -> BufferLifetime {
-    match role {
-        BufferRole::Input => BufferLifetime::PerProgram,
-        BufferRole::Output => BufferLifetime::ObservationPoint,
-        BufferRole::InOut => BufferLifetime::PerStep,
+/// The independent allocation-lifetime axis (F5) of a unified buffer,
+/// decided from its aggregate access facts — never from the role:
+///
+/// - a buffer no kernel ever writes is host-provided persistent state
+///   (per-program);
+/// - a kernel-written buffer another kernel consumes is a step-local
+///   intermediate (per-step);
+/// - a kernel-written final is read back at an observation point.
+fn unified_lifetime(entry: &UnifiedBuffer) -> BufferLifetime {
+    if !entry.written {
+        BufferLifetime::PerProgram
+    } else if entry.consumed {
+        BufferLifetime::PerStep
+    } else {
+        BufferLifetime::ObservationPoint
     }
 }
 
@@ -1083,6 +1254,20 @@ fn validate_wire_results(wire: &WireDeviceProgram) -> Result<(), Vec<Diagnostic>
                     result.produced_by,
                     resource.version.element_ty,
                     resource.version.element_count
+                ),
+            )]);
+        }
+        // F6 (Stage 3R): the result row's explicit observation fact must
+        // name the producing launch's completion boundary. A result whose
+        // observation contradicts its producer is a writable intermediate
+        // exposed without an explicit observation fact — rejected before
+        // host construction (the same rule the radix decode boundary runs).
+        if result.observation.at_launch != result.produced_by {
+            return Err(vec![device_diag(
+                "result",
+                format!(
+                    "result {result_index} names producing launch {}, but its explicit observation fact names launch {}; a result is a declared observation point at its producing launch",
+                    result.produced_by, result.observation.at_launch
                 ),
             )]);
         }

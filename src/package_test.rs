@@ -894,7 +894,7 @@ functio text() → textus {
     assert_eq!(first_manifest, second_manifest);
     assert_eq!(
         first_manifest,
-        r#"version = 5
+        r#"version = 6
 target = "scena"
 entry = "main.fab"
 entry_function = "run_entry"
@@ -1338,7 +1338,7 @@ fn package_fmir_text_image_rejects_bad_version_without_source_fallback() {
     assert!(diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "fmir_text_image_version_unsupported")
             && diagnostic_has_arg(diag, "actual", "999")
-            && diagnostic_has_arg(diag, "expected", "5")
+            && diagnostic_has_arg(diag, "expected", "6")
     }));
     assert!(host.stdout_lines.is_empty());
 }
@@ -1655,7 +1655,7 @@ fn package_fmir_image_rejects_bad_version_without_source_fallback() {
     assert!(diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "fmir_image_version_unsupported")
             && diagnostic_has_arg(diag, "actual", "99")
-            && diagnostic_has_arg(diag, "expected", "5")
+            && diagnostic_has_arg(diag, "expected", "6")
     }));
     assert!(host.stdout_lines.is_empty());
 }
@@ -12182,7 +12182,13 @@ incipit {{
 // ---------------------------------------------------------------------------
 
 fn rewrite_text_image_version(text: &str, version: u32) -> String {
-    for current in ["version = 2", "version = 3", "version = 4", "version = 5"] {
+    for current in [
+        "version = 2",
+        "version = 3",
+        "version = 4",
+        "version = 5",
+        "version = 6",
+    ] {
         if text.contains(current) {
             return text.replacen(current, &format!("version = {version}"), 1);
         }
@@ -12192,17 +12198,20 @@ fn rewrite_text_image_version(text: &str, version: u32) -> String {
 
 fn rewrite_binary_image_version(bytes: &mut [u8], version: u8) {
     assert!(
-        matches!(bytes.first(), Some(2) | Some(3) | Some(4) | Some(5)),
+        matches!(
+            bytes.first(),
+            Some(2) | Some(3) | Some(4) | Some(5) | Some(6)
+        ),
         "binary image must start with a recognizable artifact version varint"
     );
     bytes[0] = version;
 }
 
 #[test]
-fn package_fmir_text_image_is_artifact_version_5() {
-    let dir = test_temp_dir("package-fmir-text-v5");
+fn package_fmir_text_image_is_artifact_version_6() {
+    let dir = test_temp_dir("package-fmir-text-v6");
     let entry = dir.join("main.fab");
-    fs::write(&entry, "incipit { nota \"v5\" }").expect("write entry");
+    fs::write(&entry, "incipit { nota \"v6\" }").expect("write entry");
 
     let image = build_package_fmir_text_image(
         &Config::default().with_target(Target::FmirText),
@@ -12213,16 +12222,16 @@ fn package_fmir_text_image_is_artifact_version_5() {
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
 
     assert!(
-        image_text.contains("version = 5"),
-        "fmir-text image must declare artifact version 5:\n{image_text}"
+        image_text.contains("version = 6"),
+        "fmir-text image must declare artifact version 6:\n{image_text}"
     );
 }
 
 #[test]
-fn package_fmir_image_is_artifact_version_5() {
-    let dir = test_temp_dir("package-fmir-v5");
+fn package_fmir_image_is_artifact_version_6() {
+    let dir = test_temp_dir("package-fmir-v6");
     let entry = dir.join("main.fab");
-    fs::write(&entry, "incipit { nota \"v5\" }").expect("write entry");
+    fs::write(&entry, "incipit { nota \"v6\" }").expect("write entry");
 
     let image = build_package_fmir_image(&Config::default().with_target(Target::Fmir), &entry, &[])
         .expect("build fmir image");
@@ -12230,8 +12239,8 @@ fn package_fmir_image_is_artifact_version_5() {
     let summary = fmir_image_test_summary(&bytes, &image.image_path).expect("summarize fmir image");
 
     assert_eq!(
-        summary.version, 5,
-        "fmir image must declare artifact version 5"
+        summary.version, 6,
+        "fmir image must declare artifact version 6"
     );
 }
 
@@ -12257,12 +12266,12 @@ fn package_fmir_text_image_rejects_version_2_images() {
 
     let mut host = BufferHost::default();
     let diagnostics = run_package_fmir_text_image(&image, &mut host)
-        .expect_err("version-2 fmir-text images must fail closed under the version-4 schema");
+        .expect_err("version-2 fmir-text images must fail closed under the version-6 schema");
 
     assert!(diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "fmir_text_image_version_unsupported")
             && diagnostic_has_arg(diag, "actual", "2")
-            && diagnostic_has_arg(diag, "expected", "5")
+            && diagnostic_has_arg(diag, "expected", "6")
     }));
     assert!(host.stdout_lines.is_empty());
 }
@@ -12294,7 +12303,7 @@ fn package_fmir_text_image_rejects_future_versions() {
     assert!(diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "fmir_text_image_version_unsupported")
             && diagnostic_has_arg(diag, "actual", "999")
-            && diagnostic_has_arg(diag, "expected", "5")
+            && diagnostic_has_arg(diag, "expected", "6")
     }));
     assert!(host.stdout_lines.is_empty());
 }
@@ -12314,12 +12323,12 @@ fn package_fmir_image_rejects_version_2_images() {
 
     let mut host = BufferHost::default();
     let diagnostics = run_package_fmir_image(&image, &mut host)
-        .expect_err("version-2 fmir images must fail closed under the version-4 schema");
+        .expect_err("version-2 fmir images must fail closed under the version-6 schema");
 
     assert!(diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "fmir_image_version_unsupported")
             && diagnostic_has_arg(diag, "actual", "2")
-            && diagnostic_has_arg(diag, "expected", "5")
+            && diagnostic_has_arg(diag, "expected", "6")
     }));
     assert!(host.stdout_lines.is_empty());
 }
@@ -12344,7 +12353,7 @@ fn package_fmir_image_rejects_future_versions() {
     assert!(diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "fmir_image_version_unsupported")
             && diagnostic_has_arg(diag, "actual", "99")
-            && diagnostic_has_arg(diag, "expected", "5")
+            && diagnostic_has_arg(diag, "expected", "6")
     }));
     assert!(host.stdout_lines.is_empty());
 }

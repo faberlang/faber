@@ -1598,6 +1598,22 @@ fn load_fmir_text_image(text: &str, path: &Path) -> Result<FmirPackageImage, Vec
                 ),
             )]
         }
+        FmirImageError::UnsupportedDeviceProgramVersion { actual, expected } => vec![
+            mir_issue_diag(
+                path,
+                "fmir_image_device_program_version_unsupported",
+                format!(
+                    "unsupported device-program wire version {actual}; expected {expected}"
+                ),
+            )
+            .with_arg("actual", actual.to_string())
+            .with_arg("expected", expected.to_string()),
+        ],
+        FmirImageError::WireProgramInvalid { detail } => vec![mir_issue_diag(
+            path,
+            "fmir_image_device_program_invalid",
+            format!("invalid device program in image: {detail}"),
+        )],
     })?;
     let program = serde_json::from_str(&image.program.json).map_err(|error| {
         vec![mir_diag(
@@ -1664,6 +1680,22 @@ fn load_fmir_image(bytes: &[u8], path: &Path) -> Result<FmirPackageImage, Vec<Di
                     ),
                 )]
             }
+            FmirImageError::UnsupportedDeviceProgramVersion { actual, expected } => vec![
+                mir_issue_diag(
+                    path,
+                    "fmir_image_device_program_version_unsupported",
+                    format!(
+                        "unsupported device-program wire version {actual}; expected {expected}"
+                    ),
+                )
+                .with_arg("actual", actual.to_string())
+                .with_arg("expected", expected.to_string()),
+            ],
+            FmirImageError::WireProgramInvalid { detail } => vec![mir_issue_diag(
+                path,
+                "fmir_image_device_program_invalid",
+                format!("invalid device program in image: {detail}"),
+            )],
         })?;
     Ok(FmirPackageImage {
         diagnostic_path: path.to_path_buf(),

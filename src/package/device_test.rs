@@ -351,6 +351,11 @@ fn descriptor_preserves_wire_launch_order_and_version_keys() {
         ];
         wire.results[0].produced_by = 12;
         wire.results[1].produced_by = 11;
+        // F6: each result row's explicit observation fact must name its
+        // producing launch's completion boundary (validated before host
+        // projection).
+        wire.results[0].observation.at_launch = 12;
+        wire.results[1].observation.at_launch = 11;
         // Make the InOut result an observation-point form supported by the
         // existing host contract so this test can exercise ordered projection.
         for kernel in &mut wire.kernels {
@@ -1157,4 +1162,290 @@ functio mean_mul(tf32[2] x, tf32[2] w, tf32[1] out, u32 id) → vacuum {
     };
     assert_eq!(reduction.op, radix_mir::kernel_plan::ReduceOp::Mean);
     assert_eq!(reduction.length, 2);
+}
+
+// ── Stage 3R U2: independent resource-state axes (F5) ─────────────────────
+
+/// The faber constructor's first projection carries every resource-state
+/// axis on the wire as an independent fact: one semantic value per buffer
+/// (F1), explicit generations (F2), per-buffer initialization policies and
+/// allocation lifetimes decided from access facts (F5), carried roots +
+/// producer/consumer dependencies (F3), and an explicit observation fact on
+/// every result row (F6).
+#[test]
+fn constructor_projects_independent_axes_onto_the_wire() {
+    let program = two_kernel_program();
+    let wire = wire_program_for_program(&program);
+
+    // F1: one provisional semantic value per buffer, with distinct origins
+    // (two values never alias), and every buffer reference carrying the
+    // value it holds.
+    assert_eq!(wire.semantic_values.len(), 3);
+    let names: Vec<&str> = wire
+        .semantic_values
+        .iter()
+        .map(|v| v.name.as_str())
+        .collect();
+    assert_eq!(names, vec!["a", "medius", "result"]);
+    for left in &wire.semantic_values {
+        for right in &wire.semantic_values {
+            if left.id != right.id {
+                assert_ne!(
+                    left.origin, right.origin,
+                    "distinct values must carry distinct origins (F1)"
+                );
+            }
+        }
+    }
+    for kernel in &wire.kernels {
+        for resource in &kernel.resources {
+            assert!(
+                wire.semantic_values
+                    .iter()
+                    .any(|value| value.id == resource.buffer.semantic_value),
+                "buffer {} references a declared semantic value",
+                resource.buffer.id
+            );
+        }
+    }
+
+    // F2: every slot carries an explicit generation (never the unset 0).
+    for kernel in &wire.kernels {
+        for resource in &kernel.resources {
+            assert!(
+                resource.generation >= 1,
+                "slot on buffer {} carries generation {}",
+                resource.buffer.id,
+                resource.generation
+            );
+        }
+    }
+
+    // F5: the initialization axis is decided from access facts (host-provided
+    // read-only input vs kernel-written), never from role.
+    let init_by_buffer: Vec<(u32, WireInitializationPolicy)> = wire
+        .kernels
+        .iter()
+        .flat_map(|kernel| kernel.resources.iter())
+        .map(|resource| (resource.buffer.id, resource.initialization))
+        .collect();
+    assert!(
+        init_by_buffer
+            .iter()
+            .all(|(id, policy)| (*id != 1)
+                == (*policy == WireInitializationPolicy::KernelInitialized))
+    );
+    assert!(init_by_buffer
+        .iter()
+        .any(|(id, policy)| *id == 1 && *policy == WireInitializationPolicy::HostProvided));
+
+    // F3: carried roots + the producer/consumer dependency (launch 1 writes
+    // medius, launch 2 reads it) — the host schedules from these facts.
+    assert_eq!(wire.roots, vec![1]);
+    assert_eq!(
+        wire.dependencies,
+        vec![WireDependencyEdge {
+            producer: 1,
+            consumer: 2,
+            buffer: 2,
+            version: 1,
+        }]
+    );
+    assert!(wire.relations.is_empty());
+
+    // F6: every result row is a declared observation point at its producing
+    // launch's completion boundary.
+    assert_eq!(wire.results.len(), 2);
+    for result in &wire.results {
+        assert_eq!(
+            result.observation.at_launch, result.produced_by,
+            "result on buffer {} must carry an explicit observation fact",
+            result.buffer.id
+        );
+    }
+}
+
+/// F5 coupling proof on the wire: the initialization, lifetime, generation,
+/// and observation axes are independent facts — changing one axis alone
+/// never silently rewrites another.
+#[test]
+fn wire_axes_vary_independently() {
+    let program = two_kernel_program();
+    let mut wire = wire_program_for_program(&program);
+
+    let generations = |wire: &WireDeviceProgram| -> Vec<u32> {
+        wire.kernels
+            .iter()
+            .flat_map(|kernel| kernel.resources.iter())
+            .map(|resource| resource.generation)
+            .collect()
+    };
+    let lifetimes = |wire: &WireDeviceProgram| -> Vec<WireBufferLifetime> {
+        wire.kernels
+            .iter()
+            .flat_map(|kernel| kernel.resources.iter())
+            .map(|resource| resource.buffer.lifetime)
+            .collect()
+    };
+    let observations = |wire: &WireDeviceProgram| -> Vec<u32> {
+        wire.results
+            .iter()
+            .map(|result| result.observation.at_launch)
+            .collect()
+    };
+    let base_generations = generations(&wire);
+    let base_lifetimes = lifetimes(&wire);
+    let base_observations = observations(&wire);
+
+    // 1. Initialization changes alone (input buffer → ZeroFill): no other
+    // axis is touched.
+    for kernel in &mut wire.kernels {
+        for resource in &mut kernel.resources {
+            if resource.buffer.id == 1 {
+                resource.initialization = WireInitializationPolicy::ZeroFill;
+            }
+        }
+    }
+    assert_eq!(generations(&wire), base_generations);
+    assert_eq!(lifetimes(&wire), base_lifetimes);
+    assert_eq!(observations(&wire), base_observations);
+
+    // 2. Lifetime changes alone (result → per-step): init/generation/
+    // observation untouched.
+    for kernel in &mut wire.kernels {
+        for resource in &mut kernel.resources {
+            if resource.buffer.name == "result" {
+                resource.buffer.lifetime = WireBufferLifetime::PerStep;
+            }
+        }
+    }
+    assert_eq!(generations(&wire), base_generations);
+    assert_eq!(observations(&wire), base_observations);
+    let after_lifetime_change = lifetimes(&wire);
+    assert!(wire
+        .kernels
+        .iter()
+        .flat_map(|kernel| kernel.resources.iter())
+        .any(|resource| {
+            resource.buffer.name == "result"
+                && resource.buffer.lifetime == WireBufferLifetime::PerStep
+                && resource.initialization == WireInitializationPolicy::KernelInitialized
+        }));
+
+    // 3. Generation changes alone (a later write is a new generation): the
+    // lifetimes as set in step 2 and the observations are untouched.
+    for kernel in &mut wire.kernels {
+        for resource in &mut kernel.resources {
+            if resource.buffer.id == 2 && resource.access == WireResourceAccess::Read {
+                resource.generation = 2;
+            }
+        }
+    }
+    assert_eq!(lifetimes(&wire), after_lifetime_change);
+    assert_eq!(observations(&wire), base_observations);
+    assert!(generations(&wire).contains(&2));
+
+    // 4. Observation changes alone: init/lifetime/generation untouched.
+    wire.results[0].observation.at_launch = 9;
+    assert_eq!(
+        generations(&wire)
+            .iter()
+            .filter(|generation| **generation >= 1)
+            .count(),
+        4
+    );
+    assert_eq!(lifetimes(&wire), after_lifetime_change);
+    assert!(wire
+        .results
+        .iter()
+        .any(|result| result.observation.at_launch == 9));
+    assert!(wire
+        .kernels
+        .iter()
+        .flat_map(|kernel| kernel.resources.iter())
+        .any(|resource| resource.buffer.id == 1
+            && resource.initialization == WireInitializationPolicy::ZeroFill));
+}
+
+/// F6 red test: a writable intermediate (or final) exposed as a result whose
+/// explicit observation fact contradicts its producing launch is rejected
+/// before host construction — the constructor and host admission agree.
+#[test]
+fn result_without_explicit_observation_fact_is_rejected() {
+    let program = two_kernel_program();
+    let mut section = section_for_program(&program);
+    section.artifacts.artifact = vec![FmirDeviceArtifact {
+        backend: FmirDeviceBackend::Metal,
+        blob: "msl".to_owned(),
+        hash: "fnv64:0000000000000000".to_owned(),
+        symbols: Vec::new(),
+    }];
+    section
+        .device_program
+        .program
+        .results
+        .retain(|result| result.role == WireBufferRole::Output);
+    let first_launch = section.device_program.program.launches[0].id;
+    section
+        .device_program
+        .program
+        .results
+        .last_mut()
+        .expect("two-kernel fixture has a final result")
+        .observation
+        .at_launch = first_launch;
+
+    let error = descriptor_for_backend(&section, DeviceBackend::Metal, b"msl blob")
+        .expect_err("a result without an explicit observation fact must fail closed");
+    assert!(
+        error[0].message.contains("observation fact"),
+        "the fail-closed diagnostic names the observation fact: {}",
+        error[0].message
+    );
+    assert!(error[0].message.contains("producing launch"));
+}
+
+/// The constructor's projected wire round-trips through the radix decode
+/// boundary: the F1–F7 admission rules run on the faber-produced wire at
+/// package load, so the axes the constructor carries are exactly the facts
+/// the hosts admit (U2 done-when: wire round-trip carries all axes).
+#[test]
+fn constructor_wire_admits_through_radix_decode() {
+    let program = two_kernel_program();
+    let section = section_for_program(&program);
+    let image = radix_mir_fmir::FmirBinaryImageFile {
+        version: radix_mir_fmir::PACKAGE_MIR_ARTIFACT_VERSION,
+        target: radix_mir_fmir::FMIR_TARGET_NAME.to_owned(),
+        package_root: ".".to_owned(),
+        entry: "main.fab".to_owned(),
+        entry_function: "run_entry".to_owned(),
+        toolchain: radix_mir_fmir::FmirTextToolchainSection {
+            faber_cli_version: env!("CARGO_PKG_VERSION").to_owned(),
+        },
+        runtime: radix_mir_fmir::FmirTextRuntimeSection {
+            requirement: vec!["host:argv".to_owned()],
+        },
+        sources: radix_mir_fmir::FmirTextSourcesSection { source: Vec::new() },
+        cli: None,
+        exit_code: None,
+        types: radix_mir_fmir::FmirTextTypesSection {
+            table: radix::semantic::TypeTable::new().snapshot(),
+        },
+        interner: Vec::new(),
+        program: radix::mir::MirProgram::new(),
+        device: Some(section),
+    };
+    let bytes = radix_mir_fmir::encode_binary_image(&image).expect("encode binary image");
+    let decoded = radix_mir_fmir::decode_binary_image(&bytes, env!("CARGO_PKG_VERSION"))
+        .expect("the faber-projected wire admits at the radix decode boundary");
+    let wire = &decoded
+        .device
+        .expect("device section present")
+        .device_program
+        .program;
+    assert_eq!(wire.kernels.len(), 2);
+    assert_eq!(wire.results.len(), 2);
+    assert_eq!(wire.semantic_values.len(), 3);
+    assert_eq!(wire.roots, vec![1]);
+    assert_eq!(wire.dependencies.len(), 1);
 }
