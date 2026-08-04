@@ -979,6 +979,125 @@ fn carried_plan_agrees_rejects_recipe_mismatch() {
     ));
 }
 
+#[test]
+fn contract_shape_signature_output_carries_produced_local() {
+    // A2-2b: a recipe subchain's contract output records the local its
+    // recipe statement produces. Decomposition subchains share the source
+    // function's local tables, so the producer's `MirLocal` origin joins the
+    // companion consumer (same function, same local) by semantic identity —
+    // the forward-save value the companion reads comes from an EARLIER
+    // subchain of the same decomposed function.
+    let mut types = TypeTable::new();
+    let reduction = reduction_function(&mut types, 1024);
+    let matmul = matmul_function(&mut types);
+    let transpose = transpose_rank2_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+
+    let reduction_contract = CollectionOpContract::Reduction {
+        length: 1024,
+        workgroup_x: 256,
+        partials: 4,
+    };
+    let reduction_signature =
+        contract_shape_signature(&reduction, &reduction_contract, &validation)
+            .expect("reduction contract shape resolves");
+    assert_eq!(
+        reduction_signature.output.source_local,
+        Some(MirLocalId(1)),
+        "reduction output must carry the recipe statement's destination local"
+    );
+
+    let matmul_contract = CollectionOpContract::MatMul {
+        dispatch_x: 5,
+        dispatch_y: 3,
+    };
+    let matmul_signature = contract_shape_signature(&matmul, &matmul_contract, &validation)
+        .expect("matmul contract shape resolves");
+    assert_eq!(
+        matmul_signature.output.source_local,
+        Some(MirLocalId(2)),
+        "matmul output must carry the recipe statement's destination local"
+    );
+
+    let transpose_contract = CollectionOpContract::Transpose { m: 4, n: 4 };
+    let transpose_signature =
+        contract_shape_signature(&transpose, &transpose_contract, &validation)
+            .expect("transpose contract shape resolves");
+    assert_eq!(
+        transpose_signature.output.source_local,
+        Some(MirLocalId(1)),
+        "transpose output must carry the recipe statement's destination local"
+    );
+}
+
+#[test]
+fn contract_shape_signature_output_stays_synthetic_without_local_destination() {
+    // A2-2b fallback: when the recipe statement's destination is not a plain
+    // local (a temp), the contract output keeps `source_local: None` and the
+    // Synthetic origin fallback stays honest.
+    let mut types = TypeTable::new();
+    let tensor = tensor_ty(&mut types, 1024);
+    let validation = MirValidationContext::new(&types);
+    let function = MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![MirParam {
+            local: MirLocalId(0),
+            name: None,
+            ty: tensor,
+            mode: MirParamMode::Owned,
+            span: test_span(),
+        }],
+        locals: vec![MirLocal {
+            id: MirLocalId(0),
+            name: None,
+            ty: tensor,
+            mutable: false,
+            span: test_span(),
+        }],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::RuntimeCall {
+                    destination: Some(MirPlace::temp(crate::MirTempId(0))),
+                    call: MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Collection(MirCollectionOp::Sum),
+                        args: vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+                        return_ty: tensor,
+                    },
+                },
+                span: test_span(),
+            }],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(0),
+                )))),
+                span: test_span(),
+            },
+            span: test_span(),
+        }],
+        return_ty: tensor,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: test_span(),
+    };
+    let contract = CollectionOpContract::Reduction {
+        length: 1024,
+        workgroup_x: 256,
+        partials: 4,
+    };
+    let signature = contract_shape_signature(&function, &contract, &validation)
+        .expect("reduction contract shape resolves");
+    assert_eq!(
+        signature.output.source_local, None,
+        "a non-local destination must leave the Synthetic origin fallback intact"
+    );
+}
+
 // -----------------------------------------------------------------------
 // Fail-closed plan surface (N3.2: no plan is an error, never Elementwise).
 // -----------------------------------------------------------------------

@@ -727,6 +727,7 @@ pub fn contract_shape_signature(
             let element_ty = tensor_element_ty(operand_ty, validation)?;
             signature.input = storage_input(0, element_ty, length);
             signature.output = storage_output(1, element_ty, partials);
+            signature.output.source_local = recipe_destination_local(function);
             signature.workgroup = MirWorkgroupSize {
                 x: workgroup_x,
                 y: 1,
@@ -754,6 +755,7 @@ pub fn contract_shape_signature(
                 shapes.k.saturating_mul(shapes.n),
             ));
             signature.output = storage_output(2, element_ty, shapes.m.saturating_mul(shapes.n));
+            signature.output.source_local = recipe_destination_local(function);
             signature.workgroup = MirWorkgroupSize {
                 x: crate::kernel_plan::MATMUL_TILE,
                 y: crate::kernel_plan::MATMUL_TILE,
@@ -770,6 +772,7 @@ pub fn contract_shape_signature(
             let element_ty = tensor_element_ty(operand_ty, validation)?;
             signature.input = storage_input(0, element_ty, m.saturating_mul(n));
             signature.output = storage_output(1, element_ty, m.saturating_mul(n));
+            signature.output.source_local = recipe_destination_local(function);
             signature.workgroup = MirWorkgroupSize {
                 x: crate::kernel_plan::TRANSPOSE_WORKGROUP_X,
                 y: 1,
@@ -856,6 +859,43 @@ pub fn subchain_signature_for_emission(
     }
     signature.output.binding = next_binding;
     Ok(signature)
+}
+
+/// The local a recipe statement produces (its destination place's base
+/// local), if the destination is a plain local (A2-2b).
+///
+/// The forward-save value a companion subchain reads is produced by an
+/// EARLIER subchain of the same decomposed function, and decomposition
+/// subchains share the source function's local tables — so recording the
+/// produced local on the contract output gives the producer a
+/// `MirLocal` origin the consumer (same function, same local) joins by
+/// semantic identity. Non-local destinations (temps, or no destination)
+/// yield `None` and the Synthetic origin fallback stays honest.
+fn recipe_destination_local(function: &MirFunction) -> Option<MirLocalId> {
+    for block in &function.blocks {
+        for statement in &block.statements {
+            let MirStatementKind::RuntimeCall {
+                destination,
+                call:
+                    MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Collection(_),
+                        ..
+                    },
+                ..
+            } = &statement.kind
+            else {
+                continue;
+            };
+            let Some(place) = destination else {
+                return None;
+            };
+            let MirPlaceBase::Local(local) = place.base else {
+                return None;
+            };
+            return Some(local);
+        }
+    }
+    None
 }
 
 /// The recipe statement's operand locals, in operand order (the read inputs
