@@ -18,14 +18,17 @@
 //!   ([`kernel_plan_for_function`] — the typed
 //!   `MirCollectionOp → CollectionKernelPlan` bridge), the typed storage
 //!   buffers, and the derived launch plan.
-//! - [`DeviceRunPlan`] + [`encode_payload`]/[`parse_payload`] — the
-//!   producer-owned canonical payload the FMIR `device_program.payload`
-//!   field carries (N1.7 §7.1): the typed per-kernel launch-descriptor facts
-//!   plus the host input values for the input buffers. The serialization is
-//!   deterministic (named-field JSON), so Metal and CUDA routes derive
-//!   identical semantic bytes (A10). The S1-3 typed logical-entry → NVVM
-//!   symbol mapping ([`CudaKernelIdentity`]) is carried in the payload and
-//!   consumed by the host when it constructs the CUDA descriptor.
+//! - [`wire_program_for_program`] / [`admit_device_program_section`] — the
+//!   codec-v3 (S3-A4) canonical wire: the former serializes the complete
+//!   typed program (kernels, launches, results, per-resource access +
+//!   version) into the typed [`FmirDeviceProgramSection`] wire of the FMIR
+//!   `device` section; the latter admits it fail-closed, gating on the
+//!   `payload_version` check before any field-level interpretation. CUDA
+//!   symbols and host input values are not program semantics — they never
+//!   enter the canonical bytes. The S1-3 typed logical-entry → NVVM symbol
+//!   mapping ([`CudaKernelIdentity`]) now rides the per-artifact symbols
+//!   metadata and is consumed by [`descriptor_for_backend`] when it
+//!   constructs the CUDA descriptor.
 //! - [`descriptor_for_backend`] — maps a parsed run plan + a declared backend
 //!   artifact blob onto the S1-4 host [`DeviceDescriptor`], and
 //!   [`execute_device_route`] — the ordinary-command launch seam that
