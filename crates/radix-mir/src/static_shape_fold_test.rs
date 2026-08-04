@@ -8,7 +8,8 @@ use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlock, MirBlockId,
     MirConstant, MirFunction, MirFunctionId, MirIntrinsic, MirLocal, MirLocalId, MirOperand,
     MirParam, MirParamMode, MirPlace, MirPlaceBase, MirRuntimeCall, MirStatement, MirStatementKind,
-    MirTerminator, MirTerminatorKind, MirType,
+    MirTemp, MirTempId, MirTerminator, MirTerminatorKind, MirType, MirValue, MirValueId,
+    MirValueKind,
 };
 use radix_lexer::Span;
 use radix_types::{IndexExpr, IndexVar, NumericWidth, Primitive, Type, TypeTable};
@@ -707,4 +708,196 @@ fn from_flat_on_static_destination_keeps_data_movement_and_records_shape() {
     assert_eq!(from_flat_facts.len(), 1);
     assert_eq!(from_flat_facts[0].dims, vec![4, 4]);
     assert_eq!(from_flat_facts[0].element_count, 16);
+}
+
+/// The LOWERED shape-construction pattern (S5-U5c): the package lowering
+/// lands every runtime call's result in a TEMP with a following copy into
+/// the local (`Local(l) ← Temp(t)`) — shape construction is no exception
+/// (`lr_fill ← seed.crea(lr, shape)`). The fold must trace the temp
+/// destination through the copy so a lowered library `train_step` body
+/// (gradus) folds exactly like the hand-written local-destination body.
+#[test]
+fn lowered_temp_destination_create_folds_through_the_local_copy() {
+    let mut types = TypeTable::new();
+    let r2 = rank2_tensor_ty(&mut types, [2, 2]);
+    let r0 = rank0_tensor_ty(&mut types);
+    let lista = shape_lista_ty(&mut types);
+    let f32 = f32_ty(&mut types);
+
+    let params = vec![
+        MirParam {
+            local: MirLocalId(0),
+            name: None,
+            ty: r2,
+            mode: MirParamMode::Owned,
+            span: test_span(),
+        },
+        MirParam {
+            local: MirLocalId(1),
+            name: None,
+            ty: f32,
+            mode: MirParamMode::Owned,
+            span: test_span(),
+        },
+    ];
+    let locals = vec![
+        MirLocal {
+            id: MirLocalId(2),
+            name: None,
+            ty: r0,
+            mutable: false,
+            span: test_span(),
+        },
+        MirLocal {
+            id: MirLocalId(3),
+            name: None,
+            ty: lista,
+            mutable: false,
+            span: test_span(),
+        },
+        MirLocal {
+            id: MirLocalId(4),
+            name: None,
+            ty: r2,
+            mutable: false,
+            span: test_span(),
+        },
+    ];
+
+    let create_to_temp = MirStatement {
+        kind: MirStatementKind::RuntimeCall {
+            destination: Some(MirPlace {
+                base: MirPlaceBase::Temp(MirTempId(0)),
+                projections: Vec::new(),
+            }),
+            call: MirRuntimeCall {
+                intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorCreate),
+                args: vec![
+                    MirOperand::Place(MirPlace::local(MirLocalId(2))),
+                    MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                    MirOperand::Place(MirPlace::local(MirLocalId(3))),
+                ],
+                return_ty: r2,
+            },
+        },
+        span: test_span(),
+    };
+    let temp_to_local = MirStatement {
+        kind: MirStatementKind::Assign {
+            place: MirPlace::local(MirLocalId(4)),
+            value: MirValue {
+                id: MirValueId(0),
+                kind: MirValueKind::Operand(MirOperand::Temp(MirTempId(0))),
+                ty: r2,
+                span: test_span(),
+            },
+        },
+        span: test_span(),
+    };
+
+    let statements = vec![
+        // shape ← weight.magnitudines()
+        collection_statement(MirCollectionOp::TensorShape, &[0], 3, lista),
+        // seed ← vacua
+        construct_statement(2, r0, MirAggregateKind::Tensor, Vec::new()),
+        create_to_temp,
+        temp_to_local,
+    ];
+    let function = MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params,
+        locals,
+        temps: vec![MirTemp {
+            id: MirTempId(0),
+            ty: r2,
+            span: test_span(),
+        }],
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements,
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span: test_span(),
+            },
+            span: test_span(),
+        }],
+        return_ty: r2,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: test_span(),
+    };
+
+    let validation = MirValidationContext::new(&types);
+    let outcome = fold_static_shapes(&function, &validation).expect("fold succeeds");
+
+    // The create folded to a fill whose receiver is the SHAPE-SOURCE tensor
+    // (param 0 — the dims agree) and whose value is the scalar lr (param 1).
+    let ops: Vec<&MirStatement> = outcome.function.blocks[0]
+        .statements
+        .iter()
+        .filter(|statement| matches!(statement.kind, MirStatementKind::RuntimeCall { .. }))
+        .collect();
+    let fill = ops
+        .iter()
+        .find_map(|statement| {
+            let MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
+                return None;
+            };
+            matches!(call.intrinsic, MirIntrinsic::Collection(MirCollectionOp::TensorFill))
+                .then_some(call)
+        })
+        .expect("the temp-destination create folded to a fill");
+    assert_eq!(fill.args.len(), 2, "fill carries (receiver, scalar)");
+    let MirOperand::Place(receiver) = &fill.args[0] else {
+        panic!("fill receiver must be a place");
+    };
+    assert_eq!(receiver.base, MirPlaceBase::Local(MirLocalId(0)), "fill broadcasts over the shape-source tensor");
+
+    // The folded create's destination stayed the TEMP; the copy into local 4
+    // remains in the body (the fill result flows through it).
+    assert!(
+        outcome.function.blocks[0]
+            .statements
+            .iter()
+            .any(|statement| matches!(
+                &statement.kind,
+                MirStatementKind::Assign { place, value }
+                    if matches!(place.base, MirPlaceBase::Local(MirLocalId(4)))
+                        && matches!(&value.kind, MirValueKind::Operand(MirOperand::Temp(MirTempId(0))))
+            )),
+        "the copy Local(4) ← Temp(0) survives the fold"
+    );
+
+    // No TensorShape/TensorCreate op remains in the folded body.
+    for statement in &outcome.function.blocks[0].statements {
+        let MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
+            continue;
+        };
+        assert!(
+            !matches!(
+                call.intrinsic,
+                MirIntrinsic::Collection(
+                    MirCollectionOp::TensorShape | MirCollectionOp::TensorCreate
+                )
+            ),
+            "shape construction folded away"
+        );
+    }
+
+    // The fact records under the traced local (the value identity), not the
+    // temp.
+    let crea_facts: Vec<&FoldedShapeFact> = outcome
+        .report
+        .facts
+        .iter()
+        .filter(|fact| fact.source == ShapeFactSource::Crea)
+        .collect();
+    assert_eq!(crea_facts.len(), 1);
+    assert_eq!(crea_facts[0].local, MirLocalId(4), "fact names the copied local");
+    assert_eq!(crea_facts[0].dims, vec![2, 2]);
+    assert_eq!(crea_facts[0].element_count, 4);
 }

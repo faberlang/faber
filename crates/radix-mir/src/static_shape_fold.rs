@@ -42,7 +42,7 @@ use crate::kernel_plan::CollectionKernelPlan;
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirCollectionOp,
     MirConstant, MirFunction, MirIntrinsic, MirLocalId, MirOperand, MirPlace, MirPlaceBase,
-    MirRuntimeCall, MirStatement, MirStatementKind, MirTerminatorKind, MirType,
+    MirRuntimeCall, MirStatement, MirStatementKind, MirTempId, MirTerminatorKind, MirType,
     MirValidationContext, MirValue, MirValueKind,
 };
 use radix_types::Type;
@@ -183,6 +183,30 @@ pub fn fold_static_shapes(
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
 ) -> Result<ShapeFoldOutcome, ShapeFoldError> {
+    // The lowered body's call-result copies: a runtime call lands in a temp
+    // and the next statement copies it into a local (`Local(l) ← Temp(t)`).
+    // Shape construction is no exception (`shape_w ← weight.magnitudines()`,
+    // `lr_fill ← seed.crea(...)`), so the fold traces a temp destination
+    // through the copy to the local that carries the value.
+    let mut temp_to_local: BTreeMap<MirTempId, MirLocalId> = BTreeMap::new();
+    for block in &function.blocks {
+        for statement in &block.statements {
+            let MirStatementKind::Assign { place, value } = &statement.kind else {
+                continue;
+            };
+            let MirPlaceBase::Local(local) = place.base else {
+                continue;
+            };
+            if !place.projections.is_empty() {
+                continue;
+            }
+            let MirValueKind::Operand(MirOperand::Temp(temp)) = &value.kind else {
+                continue;
+            };
+            temp_to_local.insert(*temp, local);
+        }
+    }
+
     // Pass 1: resolve every shape op's literal shape and trace
     // `magnitudines()` results to their shape-source tensor. Any unfoldable
     // shape stops the fold with a typed diagnostic.
@@ -192,7 +216,9 @@ pub fn fold_static_shapes(
             let MirStatementKind::RuntimeCall { destination, call } = &statement.kind else {
                 continue;
             };
-            let Some(local) = destination_local(destination.as_ref()) else {
+            let Some(local) =
+                destination_local_traced(destination.as_ref(), &temp_to_local)
+            else {
                 continue;
             };
             match call.intrinsic {
@@ -242,7 +268,14 @@ pub fn fold_static_shapes(
             .statements
             .iter()
             .map(|statement| {
-                fold_statement(statement, &shape_sources, function, validation, &mut facts)
+                fold_statement(
+                    statement,
+                    &shape_sources,
+                    &temp_to_local,
+                    function,
+                    validation,
+                    &mut facts,
+                )
             })
             .collect::<Result<Vec<_>, _>>()?;
         blocks.push(folded_block);
@@ -323,6 +356,7 @@ pub fn admit_device_shape_materialization(
 fn fold_statement(
     statement: &MirStatement,
     shape_sources: &BTreeMap<MirLocalId, ShapeSource>,
+    temp_to_local: &BTreeMap<MirTempId, MirLocalId>,
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
     facts: &mut Vec<FoldedShapeFact>,
@@ -335,7 +369,7 @@ fn fold_statement(
     };
     match op {
         MirCollectionOp::TensorShape => {
-            let traced = destination_local(destination.as_ref())
+            let traced = destination_local_traced(destination.as_ref(), &temp_to_local)
                 .and_then(|local| shape_sources.get(&local).map(|source| source.dims.clone()));
             let dims = match traced {
                 Some(dims) => dims,
@@ -346,7 +380,7 @@ fn fold_statement(
             let Some(place) = destination else {
                 return Ok(statement.clone());
             };
-            if let Some(local) = destination_local(destination.as_ref()) {
+            if let Some(local) = destination_local_traced(destination.as_ref(), &temp_to_local) {
                 facts.push(FoldedShapeFact {
                     local,
                     dims: dims.clone(),
@@ -364,7 +398,12 @@ fn fold_statement(
             })
         }
         MirCollectionOp::TensorCreate => {
-            let Some(local) = destination_local(destination.as_ref()) else {
+            // The folded fill keeps the ORIGINAL destination (a temp is
+            // fine — the lowered body's copy into the traced local follows);
+            // the traced local is the value identity the fold fact names.
+            let traced_local =
+                destination_local_traced(destination.as_ref(), &temp_to_local);
+            let Some(local) = traced_local else {
                 return Err(ShapeFoldError::new(
                     ShapeFoldErrorKind::NonStaticShapeDestination,
                     "tensor_create destination is not a local; cannot fold to a fill kernel",
@@ -407,7 +446,9 @@ fn fold_statement(
             })
         }
         MirCollectionOp::TensorFromFlat => {
-            let Some(local) = destination_local(destination.as_ref()) else {
+            let Some(local) =
+                destination_local_traced(destination.as_ref(), &temp_to_local)
+            else {
                 return Err(ShapeFoldError::new(
                     ShapeFoldErrorKind::NonStaticShapeDestination,
                     "tensor_from_flat destination is not a local; cannot fold its shape",
@@ -726,6 +767,25 @@ fn destination_local(destination: Option<&MirPlace>) -> Option<MirLocalId> {
         MirPlaceBase::Local(local) => Some(local),
         MirPlaceBase::Temp(_) => None,
     }
+}
+
+/// The destination local of a place, traced through the lowered body's
+/// temp→local copy: a runtime call's result lands in a temp and the next
+/// statement copies it into a local (`Local(l) ← Temp(t)`). The fold treats
+/// the copied local as the value's identity — shape construction is lowered
+/// the same way, so a temp destination with a traced copy is equivalent to a
+/// direct local destination.
+fn destination_local_traced(
+    destination: Option<&MirPlace>,
+    temp_to_local: &BTreeMap<MirTempId, MirLocalId>,
+) -> Option<MirLocalId> {
+    if let Some(local) = destination_local(destination) {
+        return Some(local);
+    }
+    let MirPlaceBase::Temp(temp) = destination?.base else {
+        return None;
+    };
+    temp_to_local.get(&temp).copied()
 }
 
 /// The MIR type of a local (params first, then locals).
