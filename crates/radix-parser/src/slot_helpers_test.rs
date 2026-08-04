@@ -8,7 +8,7 @@
 
 use super::{ParseOptions, Parser};
 use radix_lexer::{
-    lex, lex_with_reader_pack, KeywordPack, LatinKeywordFallback, LexResult, TokenKind,
+    lex, lex_with_locale_pack, KeywordPack, LatinKeywordFallback, LexResult, TokenKind,
 };
 
 /// Minimal reader pack: localizes `iuncta` to `本地` and `tacebit` to `await`
@@ -56,7 +56,7 @@ fn parser_over_with_pack(source: &str) -> Parser {
         reader_type_latin_keys,
         interner,
         ..
-    } = lex_with_reader_pack(source, &SlotTestPack);
+    } = lex_with_locale_pack(source, &SlotTestPack);
     Parser::new_with_reader_identities(
         tokens,
         interner,

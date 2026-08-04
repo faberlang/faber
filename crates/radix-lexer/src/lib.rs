@@ -71,8 +71,8 @@ pub fn lex(source: &str) -> LexResult {
 ///
 /// This is an explicit opt-in path for reader-locale activation. The default
 /// [`lex`] function remains the canonical Latin source surface.
-pub fn lex_with_reader_pack(source: &str, pack: &dyn KeywordPack) -> LexResult {
-    Lexer::new(source).with_reader_pack(pack).lex()
+pub fn lex_with_locale_pack(source: &str, pack: &dyn KeywordPack) -> LexResult {
+    Lexer::new(source).with_locale_pack(pack).lex()
 }
 
 /// Keyword surface used by pack-aware lexing.
@@ -140,10 +140,10 @@ pub struct LexResult {
     pub errors: Vec<LexError>,
 
     /// Non-fatal reader-locale fallback events collected while scanning.
-    pub reader_fallbacks: Vec<ReaderLocaleFallback>,
+    pub locale_fallbacks: Vec<LocaleFallback>,
 
     /// Non-fatal reader-locale spelling suggestions collected while scanning.
-    pub reader_suggestions: Vec<ReaderLocaleSuggestion>,
+    pub locale_suggestions: Vec<LocaleSuggestion>,
 
     /// Exact source spelling → Latin contextual keyword identity, for parser-owned slots.
     pub reader_keyword_latin_keys: HashMap<String, String>,
@@ -193,7 +193,7 @@ pub struct LexError {
 
 /// One visible fallback from a reader-locale source spelling to Latin.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ReaderLocaleFallback {
+pub struct LocaleFallback {
     /// Reader pack id active when fallback occurred.
     pub pack_id: String,
 
@@ -209,7 +209,7 @@ pub struct ReaderLocaleFallback {
 
 /// One reader-locale spelling suggestion for an unaccepted keyword-like token.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ReaderLocaleSuggestion {
+pub struct LocaleSuggestion {
     /// Reader pack id active when the suggestion occurred.
     pub pack_id: String,
 

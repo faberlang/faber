@@ -30,7 +30,7 @@
 use super::cursor::Cursor;
 use super::keywords::keyword_token_kind;
 use super::token::{Span, Symbol, Token, TokenKind};
-use super::{LexError, LexErrorKind, LexResult, ReaderLocaleFallback, ReaderLocaleSuggestion};
+use super::{LexError, LexErrorKind, LexResult, LocaleFallback, LocaleSuggestion};
 use crate::KeywordPack;
 use radix_diagnostics::DiagnosticArg;
 use rustc_hash::FxHashMap;
@@ -191,12 +191,12 @@ impl Default for Interner {
 /// fresh lexer per source buffer.
 pub struct Lexer<'a> {
     cursor: Cursor<'a>,
-    reader_pack: Option<&'a dyn KeywordPack>,
+    locale_pack: Option<&'a dyn KeywordPack>,
     interner: Interner,
     tokens: Vec<Token>,
     errors: Vec<LexError>,
-    reader_fallbacks: Vec<ReaderLocaleFallback>,
-    reader_suggestions: Vec<ReaderLocaleSuggestion>,
+    locale_fallbacks: Vec<LocaleFallback>,
+    locale_suggestions: Vec<LocaleSuggestion>,
     reader_keyword_latin_keys: HashMap<String, String>,
     reader_type_latin_keys: HashMap<String, String>,
     current_line: usize,
@@ -210,12 +210,12 @@ impl<'a> Lexer<'a> {
     pub fn new(source: &'a str) -> Self {
         Self {
             cursor: Cursor::new(source),
-            reader_pack: None,
+            locale_pack: None,
             interner: Interner::new(),
             tokens: Vec::new(),
             errors: Vec::new(),
-            reader_fallbacks: Vec::new(),
-            reader_suggestions: Vec::new(),
+            locale_fallbacks: Vec::new(),
+            locale_suggestions: Vec::new(),
             reader_keyword_latin_keys: HashMap::new(),
             reader_type_latin_keys: HashMap::new(),
             current_line: 1,
@@ -225,8 +225,8 @@ impl<'a> Lexer<'a> {
 
     /// Activate reader-pack keyword recognition for this lexer instance.
     #[must_use]
-    pub fn with_reader_pack(mut self, pack: &'a dyn KeywordPack) -> Self {
-        self.reader_pack = Some(pack);
+    pub fn with_locale_pack(mut self, pack: &'a dyn KeywordPack) -> Self {
+        self.locale_pack = Some(pack);
         self
     }
 
@@ -245,8 +245,8 @@ impl<'a> Lexer<'a> {
         LexResult {
             tokens: self.tokens,
             errors: self.errors,
-            reader_fallbacks: self.reader_fallbacks,
-            reader_suggestions: self.reader_suggestions,
+            locale_fallbacks: self.locale_fallbacks,
+            locale_suggestions: self.locale_suggestions,
             reader_keyword_latin_keys: self.reader_keyword_latin_keys,
             reader_type_latin_keys: self.reader_type_latin_keys,
             interner: self.interner,
@@ -927,7 +927,7 @@ impl<'a> Lexer<'a> {
             return TokenKind::Underscore(self.interner.intern_normalized(text));
         }
 
-        let Some(pack) = self.reader_pack else {
+        let Some(pack) = self.locale_pack else {
             return keyword_token_kind(text)
                 .unwrap_or_else(|| TokenKind::Ident(self.interner.intern_normalized(text)));
         };
@@ -958,7 +958,7 @@ impl<'a> Lexer<'a> {
         }
 
         if let Some(fallback) = pack.latin_keyword_fallback(text) {
-            self.reader_fallbacks.push(ReaderLocaleFallback {
+            self.locale_fallbacks.push(LocaleFallback {
                 pack_id: pack.pack_id().to_owned(),
                 keyword: fallback.keyword,
                 localized: fallback.localized,
@@ -974,7 +974,7 @@ impl<'a> Lexer<'a> {
         }
 
         if let Some(suggestion) = pack.keyword_suggestion(text) {
-            self.reader_suggestions.push(ReaderLocaleSuggestion {
+            self.locale_suggestions.push(LocaleSuggestion {
                 pack_id: pack.pack_id().to_owned(),
                 spelling: text.to_string(),
                 suggestion,
