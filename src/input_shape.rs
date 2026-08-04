@@ -11,7 +11,7 @@ pub(crate) fn verify_input_is_package_shaped(input: &[String], _force_package: b
         || (!path.exists() && path.extension().is_none())
 }
 
-pub(crate) fn reader_locale_supports_input(input: &[String], force_package: bool) -> bool {
+pub(crate) fn locale_supports_input(input: &[String], force_package: bool) -> bool {
     if input.len() != 1 {
         return false;
     }
@@ -29,13 +29,13 @@ pub(crate) fn reader_locale_supports_input(input: &[String], force_package: bool
         .is_some_and(|ext| ext == "fab")
 }
 
-pub(crate) fn reader_locale_without_package_error(
-    reader_locale: Option<&str>,
+pub(crate) fn locale_without_package_error(
+    locale: Option<&str>,
     input: &[String],
     force_package: bool,
 ) -> Option<String> {
-    let locale = reader_locale?;
-    if reader_locale_supports_input(input, force_package) {
+    let locale = locale?;
+    if locale_supports_input(input, force_package) {
         return None;
     }
     Some(format!(

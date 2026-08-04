@@ -119,7 +119,7 @@ pub struct FormatArgs {
 
     /// Reader locale used to select a package-local reader pack.
     #[arg(long = "locale", value_name = "LOCALE")]
-    pub reader_locale: Option<String>,
+    pub locale: Option<String>,
 
     /// Check formatting without writing; exit 1 if any file would change
     #[arg(long)]
@@ -172,7 +172,7 @@ pub struct BuildArgs {
 
     /// Reader locale used to select a package-local reader pack.
     #[arg(long = "locale", value_name = "LOCALE")]
-    pub reader_locale: Option<String>,
+    pub locale: Option<String>,
 
     /// Input file or package path
     #[arg(value_name = "INPUT")]
@@ -188,7 +188,7 @@ pub struct CheckArgs {
 
     /// Reader locale used to select a package-local reader pack.
     #[arg(long = "locale", value_name = "LOCALE")]
-    pub reader_locale: Option<String>,
+    pub locale: Option<String>,
 
     /// Downgrade unresolved/import-driven semantic errors to warnings
     #[arg(long)]
@@ -271,7 +271,7 @@ pub struct ExplainArgs {
         requires = "term",
         conflicts_with_all = ["search", "list", "category"]
     )]
-    pub reader_locale: Option<String>,
+    pub locale: Option<String>,
 
     /// Search across explain entries and show ranked matches
     #[arg(long, conflicts_with_all = ["list", "category", "term", "json"])]
@@ -307,7 +307,7 @@ pub struct RunArgs {
 
     /// Reader locale used to select a package-local reader pack.
     #[arg(long = "locale", value_name = "LOCALE")]
-    pub reader_locale: Option<String>,
+    pub locale: Option<String>,
 
     /// Runtime target to build and execute. When omitted, the manifest
     /// `[build] target` wins; otherwise the implicit portable default
@@ -420,7 +420,7 @@ pub struct TestArgs {
 
     /// Reader locale used to select a package-local reader pack.
     #[arg(long = "locale", value_name = "LOCALE")]
-    pub reader_locale: Option<String>,
+    pub locale: Option<String>,
 
     /// Promote all warning diagnostics to errors
     #[arg(long)]

@@ -1,12 +1,12 @@
 //! End-to-end package-path tests for `.proba` discovery, filters, and import boundary.
 //!
-//! Drives the real `load_package_with_reader_pack` / `compile_package*` surfaces
+//! Drives the real `load_package_with_locale_pack` / `compile_package*` surfaces
 //! (not a reimplemented mini-harness).
 
 use super::test_support::{diagnostic_has_issue, test_temp_dir};
 use super::{
     compile_package, compile_package_with_test_options, discover_package,
-    library_resolver_from_config, load_package, load_package_with_reader_pack, PackageSpec,
+    library_resolver_from_config, load_package, load_package_with_locale_pack, PackageSpec,
     TestSourceFilter,
 };
 use radix::driver::Config;
@@ -83,7 +83,7 @@ probandum "helpers" {
 
     let spec = discover_package(dir.path()).expect("discover");
     let resolver = library_resolver_from_config(&Config::default());
-    let files = load_package_with_reader_pack(&spec, &resolver, None, true, None).expect("load");
+    let files = load_package_with_locale_pack(&spec, &resolver, None, true, None).expect("load");
     let names: Vec<_> = files
         .iter()
         .map(|f| f.path.file_name().unwrap().to_string_lossy().into_owned())
@@ -147,7 +147,7 @@ fn single_file_proba_entry_fails_closed_outside_test_path() {
         manifest_backed: false,
     };
     let resolver = library_resolver_from_config(&Config::default());
-    let Err(err) = load_package_with_reader_pack(&spec, &resolver, None, false, None) else {
+    let Err(err) = load_package_with_locale_pack(&spec, &resolver, None, false, None) else {
         panic!("non-test load of .proba must fail");
     };
     assert!(
@@ -179,7 +179,7 @@ fn product_fab_cannot_import_proba() {
 
     let spec = discover_package(dir.path()).expect("discover");
     let resolver = library_resolver_from_config(&Config::default());
-    let Err(err) = load_package_with_reader_pack(&spec, &resolver, None, true, None) else {
+    let Err(err) = load_package_with_locale_pack(&spec, &resolver, None, true, None) else {
         panic!("import of .proba must fail");
     };
     assert!(
@@ -218,7 +218,7 @@ probandum "b" { proba "use a" { adfirma a.shared() ≡ 1 } }
 
     let spec = discover_package(dir.path()).expect("discover");
     let resolver = library_resolver_from_config(&Config::default());
-    let Err(err) = load_package_with_reader_pack(&spec, &resolver, None, true, None) else {
+    let Err(err) = load_package_with_locale_pack(&spec, &resolver, None, true, None) else {
         panic!("proba→proba import must fail");
     };
     assert!(
@@ -251,7 +251,7 @@ probandum "helpers" {
 
     let spec = discover_package(dir.path()).expect("discover");
     let resolver = library_resolver_from_config(&Config::default());
-    let files = load_package_with_reader_pack(&spec, &resolver, None, true, None).expect("load");
+    let files = load_package_with_locale_pack(&spec, &resolver, None, true, None).expect("load");
     assert!(
         files
             .iter()
@@ -290,7 +290,7 @@ fn proba_filter_include_selects_only_matching_proba() {
     let spec = discover_package(dir.path()).expect("discover");
     let resolver = library_resolver_from_config(&Config::default());
     let files =
-        load_package_with_reader_pack(&spec, &resolver, None, true, Some(&filter)).expect("load");
+        load_package_with_locale_pack(&spec, &resolver, None, true, Some(&filter)).expect("load");
     let proba_names: Vec<_> = files
         .iter()
         .filter_map(|f| {

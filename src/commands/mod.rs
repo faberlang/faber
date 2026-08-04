@@ -23,7 +23,7 @@ mod targets;
 mod test;
 
 use crate::cli::Command;
-use crate::input_shape::{reader_locale_without_package_error, verify_input_is_package_shaped};
+use crate::input_shape::{locale_without_package_error, verify_input_is_package_shaped};
 use crate::package;
 use clap::Parser;
 use radix::tool::{self, BuildCommand, CheckCommand, DiagnosticMode, EmitCommand, VerifyCommand};
@@ -87,7 +87,7 @@ fn dispatch(command: Command) {
     match command {
         Command::Build(args) => {
             reject_reader_locale_without_package(
-                args.reader_locale.as_deref(),
+                args.locale.as_deref(),
                 std::slice::from_ref(&args.input),
                 args.package,
             );
@@ -104,13 +104,13 @@ fn dispatch(command: Command) {
                 linter: args.linter,
                 deny_warnings: args.deny_warnings,
                 deny_codes: args.deny,
-                reader_locale: args.reader_locale,
+                locale: args.locale,
             });
         }
         Command::Targets => cmd_targets(),
         Command::Check(args) => {
             reject_reader_locale_without_package(
-                args.reader_locale.as_deref(),
+                args.locale.as_deref(),
                 &args.input,
                 args.package,
             );
@@ -123,8 +123,8 @@ fn dispatch(command: Command) {
                     deny_warnings: args.deny_warnings,
                     deny_codes: args.deny,
                     diagnostic_mode: diagnostic_mode(args.diagnostics),
-                    reader_pack: None,
-                    reader_locale: args.reader_locale,
+                    locale_pack: None,
+                    locale: args.locale,
                 });
             } else {
                 tool::cmd_check(CheckCommand {
@@ -134,8 +134,8 @@ fn dispatch(command: Command) {
                     deny_warnings: args.deny_warnings,
                     deny_codes: args.deny,
                     diagnostic_mode: diagnostic_mode(args.diagnostics),
-                    reader_pack: None,
-                    reader_locale: None,
+                    locale_pack: None,
+                    locale: None,
                 });
             }
         }
@@ -175,8 +175,8 @@ fn dispatch(command: Command) {
                 reflection: args.reflection,
                 output: args.output,
                 diagnostic_mode: diagnostic_mode(args.diagnostics),
-                reader_pack: None,
-                reader_locale: args.reader_locale,
+                locale_pack: None,
+                locale: args.locale,
                 output_mode: radix::codegen::OutputMode::Application,
                 module_name: None,
                 cuda_descriptor: None,
@@ -189,14 +189,14 @@ fn dispatch(command: Command) {
                 args.package,
             ) {
                 reject_reader_locale_without_package(
-                    emit_command.reader_locale.as_deref(),
+                    emit_command.locale.as_deref(),
                     &emit_command.input,
                     emit_command.package,
                 );
                 package::cmd_emit_package(emit_command);
             } else {
                 reject_reader_locale_without_package(
-                    emit_command.reader_locale.as_deref(),
+                    emit_command.locale.as_deref(),
                     &emit_command.input,
                     emit_command.package,
                 );
@@ -206,7 +206,7 @@ fn dispatch(command: Command) {
         Command::Format(args) => cmd_format(&format::FormatCommand {
             paths: args.paths,
             canonical: args.canonical,
-            reader_locale: args.reader_locale,
+            locale: args.locale,
             check: args.check,
             stdout: args.stdout,
             config: args.config,
@@ -244,11 +244,11 @@ fn cmd_verify_library(args: crate::cli::VerifyLibraryArgs) {
 }
 
 fn reject_reader_locale_without_package(
-    reader_locale: Option<&str>,
+    locale: Option<&str>,
     input: &[String],
     force_package: bool,
 ) {
-    if let Some(message) = reader_locale_without_package_error(reader_locale, input, force_package)
+    if let Some(message) = locale_without_package_error(locale, input, force_package)
     {
         eprintln!("error: {message}");
         std::process::exit(1);

@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 pub struct FormatCommand {
     pub paths: Vec<PathBuf>,
     pub canonical: bool,
-    pub reader_locale: Option<String>,
+    pub locale: Option<String>,
     pub check: bool,
     pub stdout: bool,
     pub config: Option<PathBuf>,
@@ -25,7 +25,7 @@ pub fn cmd_format(command: &FormatCommand) {
     // --canonical is the la alias; --locale=<X> drives the emitter
     // surface. Either selects the canonical re-emit path (localizing via the
     // reader pack); no flags keeps author mode.
-    let use_canonical = command.canonical || command.reader_locale.is_some();
+    let use_canonical = command.canonical || command.locale.is_some();
 
     let files = match resolve_format_paths(&command.paths) {
         Ok(files) => files,
@@ -55,7 +55,7 @@ pub fn cmd_format(command: &FormatCommand) {
 
         let name = path.display().to_string();
         let result = if use_canonical {
-            let session = match format_session(path, command.reader_locale.as_deref()) {
+            let session = match format_session(path, command.locale.as_deref()) {
                 Ok(session) => session,
                 Err(message) => {
                     eprintln!("error: {message}");
@@ -136,12 +136,12 @@ pub fn cmd_format(command: &FormatCommand) {
     }
 }
 
-fn format_session(path: &Path, reader_locale: Option<&str>) -> Result<Session, String> {
-    if reader_locale.is_none() {
+fn format_session(path: &Path, locale: Option<&str>) -> Result<Session, String> {
+    if locale.is_none() {
         return Ok(Session::new(Config::default().with_dev_stdlib()));
     }
 
-    crate::package::config_with_reader_locale(Target::Faber, path, reader_locale)
+    crate::package::config_with_locale(Target::Faber, path, locale)
         .map(|(config, _)| Session::new(config))
         .map_err(|diag| diag.message)
 }

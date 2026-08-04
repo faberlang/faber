@@ -10,23 +10,23 @@ use super::paths::normalize_path;
 use super::PackageSpec;
 
 /// Build a driver config and the pack used for package diagnostic rendering.
-pub(crate) fn config_with_reader_locale(
+pub(crate) fn config_with_locale(
     target: Target,
     input: &Path,
     cli_locale: Option<&str>,
 ) -> Result<(Config, Option<LocalePack>), Box<Diagnostic>> {
-    let pack = load_reader_pack_for_input(input, cli_locale)?;
+    let pack = load_locale_pack_for_input(input, cli_locale)?;
     let config = match pack.as_ref() {
         Some(pack) => Config::default()
             .with_target(target)
-            .with_reader_pack(pack.clone()),
+            .with_locale_pack(pack.clone()),
         None => Config::default().with_target(target),
     };
     Ok((config, pack))
 }
 
 /// Load the reader pack selected by CLI locale or package manifest.
-pub(crate) fn load_reader_pack_for_input(
+pub(crate) fn load_locale_pack_for_input(
     input: &Path,
     cli_locale: Option<&str>,
 ) -> Result<Option<LocalePack>, Box<Diagnostic>> {
@@ -42,7 +42,7 @@ pub(crate) fn load_reader_pack_for_input(
     let Some(locale) = selected_locale(cli_locale, manifest.as_ref())? else {
         return Ok(None);
     };
-    let pack_path = reader_pack_path(&package_root, &locale, cli_locale, manifest.as_ref());
+    let pack_path = locale_pack_path(&package_root, &locale, cli_locale, manifest.as_ref());
     let pack = LocalePack::from_toml_path(&pack_path).map_err(|err| {
         Box::new(
             crate::package_diagnostic_error(format!(
@@ -87,7 +87,7 @@ fn selected_locale<'a>(
         .map(str::to_owned))
 }
 
-fn reader_pack_path(
+fn locale_pack_path(
     package_root: &Path,
     locale: &str,
     cli_locale: Option<&str>,
@@ -111,7 +111,7 @@ fn reader_pack_path(
         return package_pack;
     }
 
-    installed_reader_pack_path(locale)
+    installed_locale_pack_path(locale)
 }
 
 fn package_root_for_selection(spec: &PackageSpec, manifest_path: Option<&Path>) -> PathBuf {
@@ -126,7 +126,7 @@ fn package_root_for_selection(spec: &PackageSpec, manifest_path: Option<&Path>) 
 /// File input uses the package-aware resolver (package-local pack, else the
 /// installed pack); stdin falls back to the installed pack directly, since
 /// there is no package context to consult. `None` locale yields `None`.
-pub fn reader_pack_for_emit(
+pub fn locale_pack_for_emit(
     input: &[String],
     cli_locale: Option<&str>,
 ) -> Result<Option<LocalePack>, String> {
@@ -138,12 +138,12 @@ pub fn reader_pack_for_emit(
     };
 
     if let Some(path) = input.iter().find(|s| !s.is_empty() && s.as_str() != "-") {
-        return load_reader_pack_for_input(Path::new(path), Some(locale))
+        return load_locale_pack_for_input(Path::new(path), Some(locale))
             .map_err(|diag| diag.message.clone());
     }
 
     // Stdin: no package context, use the installed pack for the locale.
-    let pack_path = installed_reader_pack_path(locale);
+    let pack_path = installed_locale_pack_path(locale);
     LocalePack::from_toml_path(&pack_path)
         .map(Some)
         .map_err(|err| {
@@ -154,7 +154,7 @@ pub fn reader_pack_for_emit(
         })
 }
 
-fn installed_reader_pack_path(locale: &str) -> PathBuf {
+fn installed_locale_pack_path(locale: &str) -> PathBuf {
     normalize_path(
         &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../radix/stdlib")

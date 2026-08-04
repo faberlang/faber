@@ -4,7 +4,7 @@ use radix::tool::DiagnosticMode;
 use radix::{CompileResult, Output};
 use std::path::Path;
 
-use crate::input_shape::reader_locale_without_package_error;
+use crate::input_shape::locale_without_package_error;
 
 use super::build_package_fhir;
 use super::cargo::{
@@ -15,7 +15,7 @@ use super::manifest::manifest_build_target;
 use super::{
     build_package_fmir_binary_bundle, build_package_fmir_image, build_package_fmir_text_image,
     build_package_mir_artifact, check_package, compile_package, compile_package_go,
-    config_with_reader_locale, discover_build_layout, package_host_selection_diagnostic,
+    config_with_locale, discover_build_layout, package_host_selection_diagnostic,
     package_rust_runtime_plan, read_manifest, BuildLayout, MANIFEST_FILE,
 };
 
@@ -29,8 +29,8 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
     use std::fs;
     use std::path::PathBuf;
 
-    if let Some(message) = reader_locale_without_package_error(
-        command.reader_locale.as_deref(),
+    if let Some(message) = locale_without_package_error(
+        command.locale.as_deref(),
         std::slice::from_ref(&command.input),
         command.package,
     ) {
@@ -45,8 +45,8 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
         deny_all_warnings: command.deny_warnings,
         deny_codes: command.deny_codes,
     };
-    let (config, reader_pack) = if is_package {
-        match config_with_reader_locale(target, &input_path, command.reader_locale.as_deref()) {
+    let (config, locale_pack) = if is_package {
+        match config_with_locale(target, &input_path, command.locale.as_deref()) {
             Ok((config, pack)) => (config.with_warn_policy(warn_policy), pack),
             Err(diag) => {
                 eprintln!("error: {}", diag.message);
@@ -70,7 +70,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
                 radix::tool::print_diagnostics(
                     &diagnostics,
                     DiagnosticMode::Normal,
-                    reader_pack.as_ref(),
+                    locale_pack.as_ref(),
                 );
                 eprintln!("scena artifact build failed");
                 std::process::exit(1);
@@ -87,7 +87,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
                 radix::tool::print_diagnostics(
                     &diagnostics,
                     DiagnosticMode::Normal,
-                    reader_pack.as_ref(),
+                    locale_pack.as_ref(),
                 );
                 eprintln!("fmir-text image build failed");
                 std::process::exit(1);
@@ -104,7 +104,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
                 radix::tool::print_diagnostics(
                     &diagnostics,
                     DiagnosticMode::Normal,
-                    reader_pack.as_ref(),
+                    locale_pack.as_ref(),
                 );
                 eprintln!("fmir image build failed");
                 std::process::exit(1);
@@ -122,7 +122,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
                     radix::tool::print_diagnostics(
                         &diagnostics,
                         DiagnosticMode::Normal,
-                        reader_pack.as_ref(),
+                        locale_pack.as_ref(),
                     );
                     eprintln!("fmir-bin bundle build failed");
                     std::process::exit(1);
@@ -139,7 +139,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
                 radix::tool::print_diagnostics(
                     &diagnostics,
                     DiagnosticMode::Normal,
-                    reader_pack.as_ref(),
+                    locale_pack.as_ref(),
                 );
                 eprintln!("fhir package build failed");
                 std::process::exit(1);
@@ -185,7 +185,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
         radix::tool::print_diagnostics(
             &go_result.compile_result.diagnostics,
             DiagnosticMode::Normal,
-            reader_pack.as_ref(),
+            locale_pack.as_ref(),
         );
         let Some(output) = go_result.compile_result.output else {
             eprintln!("compilation failed");
@@ -226,7 +226,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
     radix::tool::print_diagnostics(
         &result.diagnostics,
         DiagnosticMode::Normal,
-        reader_pack.as_ref(),
+        locale_pack.as_ref(),
     );
 
     let Some(output) = result.output else {
@@ -266,7 +266,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
                 radix::tool::print_diagnostics(
                     &diagnostics,
                     DiagnosticMode::Normal,
-                    reader_pack.as_ref(),
+                    locale_pack.as_ref(),
                 );
                 eprintln!("runtime plan failed");
                 std::process::exit(1);
@@ -278,7 +278,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
             radix::tool::print_diagnostics(
                 &[diagnostic],
                 DiagnosticMode::Normal,
-                reader_pack.as_ref(),
+                locale_pack.as_ref(),
             );
             eprintln!("runtime plan failed");
             std::process::exit(1);
@@ -295,7 +295,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
                 radix::tool::print_diagnostics(
                     &diagnostics,
                     DiagnosticMode::Normal,
-                    reader_pack.as_ref(),
+                    locale_pack.as_ref(),
                 );
                 eprintln!("library dependency graph failed");
                 std::process::exit(1);
@@ -371,7 +371,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
                 radix::tool::print_diagnostics(
                     &diagnostics,
                     DiagnosticMode::Normal,
-                    reader_pack.as_ref(),
+                    locale_pack.as_ref(),
                 );
                 eprintln!("runtime plan failed");
                 std::process::exit(1);
@@ -573,10 +573,10 @@ pub fn cmd_check_package(command: radix::tool::CheckCommand) {
     // targets (e.g. fmir-text) do not trigger TARGETLANE001.
     let check_target = resolve_check_target(&input_path);
 
-    let (config, reader_pack) = match config_with_reader_locale(
+    let (config, locale_pack) = match config_with_locale(
         check_target,
         &input_path,
-        command.reader_locale.as_deref(),
+        command.locale.as_deref(),
     ) {
         Ok((config, pack)) => (
             config.with_warn_policy(radix::driver::WarnPolicy {
@@ -596,7 +596,7 @@ pub fn cmd_check_package(command: radix::tool::CheckCommand) {
     let mut fatal_errors = 0usize;
     let mut downgraded = 0usize;
     if command.diagnostic_mode == DiagnosticMode::Diagnostics && !diagnostics.is_empty() {
-        match reader_pack.as_ref() {
+        match locale_pack.as_ref() {
             Some(pack) => {
                 match radix::diagnostics::render_expanded_diagnostics_with_pack(&diagnostics, pack)
                 {
@@ -655,17 +655,17 @@ pub fn cmd_check_package(command: radix::tool::CheckCommand) {
 /// Unlike `cmd_build`, this command does not materialize the generated Cargo
 /// crate. It is a compiler-inspection surface for the assembled backend output.
 pub fn cmd_emit_package(command: radix::tool::EmitCommand) {
-    let (result, reader_pack) = compile_package_input(
+    let (result, locale_pack) = compile_package_input(
         &command.input,
         command.package,
         command.target,
-        command.reader_locale.as_deref(),
+        command.locale.as_deref(),
     );
 
     radix::tool::print_diagnostics(
         &result.diagnostics,
         command.diagnostic_mode,
-        reader_pack.as_ref(),
+        locale_pack.as_ref(),
     );
 
     let Some(output) = result.output else {
@@ -717,7 +717,7 @@ fn compile_package_input(
     input: &[String],
     force_package: bool,
     target: Target,
-    reader_locale: Option<&str>,
+    locale: Option<&str>,
 ) -> (
     CompileResult,
     Option<radix::locale::LocalePack>,
@@ -734,14 +734,14 @@ fn compile_package_input(
         std::process::exit(1);
     }
 
-    let (config, reader_pack) = match config_with_reader_locale(target, &path, reader_locale) {
+    let (config, locale_pack) = match config_with_locale(target, &path, locale) {
         Ok(selection) => selection,
         Err(diag) => {
             eprintln!("error: {}", diag.message);
             std::process::exit(1);
         }
     };
-    (compile_package(&config, &path), reader_pack)
+    (compile_package(&config, &path), locale_pack)
 }
 
 fn is_permissive_check_code(code: Option<&'static str>) -> bool {

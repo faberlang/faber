@@ -12,7 +12,7 @@ pub struct EmitArgs {
 
     /// Reader locale used to select a package-local reader pack.
     #[arg(long = "locale", value_name = "LOCALE")]
-    pub reader_locale: Option<String>,
+    pub locale: Option<String>,
 
     /// Output target language
     #[arg(short = 't', long = "target", value_enum, default_value_t = FaberCliTarget::Rust)]

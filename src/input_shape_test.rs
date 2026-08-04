@@ -1,5 +1,5 @@
 use crate::input_shape::{
-    reader_locale_supports_input, reader_locale_without_package_error,
+    locale_supports_input, locale_without_package_error,
     verify_input_is_package_shaped,
 };
 use std::path::PathBuf;
@@ -75,7 +75,7 @@ fn verify_input_is_package_shaped_accepts_missing_extensionless_package_paths() 
 
 #[test]
 fn reader_locale_accepts_cargo_manifest_dir() {
-    assert!(reader_locale_supports_input(
+    assert!(locale_supports_input(
         &[env!("CARGO_MANIFEST_DIR").to_owned()],
         false
     ));
@@ -83,7 +83,7 @@ fn reader_locale_accepts_cargo_manifest_dir() {
 
 #[test]
 fn reader_locale_accepts_faber_toml() {
-    assert!(reader_locale_supports_input(
+    assert!(locale_supports_input(
         &["faber.toml".to_owned()],
         false
     ));
@@ -91,7 +91,7 @@ fn reader_locale_accepts_faber_toml() {
 
 #[test]
 fn reader_locale_accepts_nested_faber_toml() {
-    assert!(reader_locale_supports_input(
+    assert!(locale_supports_input(
         &["pkg/faber.toml".to_owned()],
         false
     ));
@@ -99,7 +99,7 @@ fn reader_locale_accepts_nested_faber_toml() {
 
 #[test]
 fn reader_locale_accepts_missing_package() {
-    assert!(reader_locale_supports_input(
+    assert!(locale_supports_input(
         &["missing-package".to_owned()],
         false
     ));
@@ -107,7 +107,7 @@ fn reader_locale_accepts_missing_package() {
 
 #[test]
 fn reader_locale_accepts_fab_entry() {
-    assert!(reader_locale_supports_input(
+    assert!(locale_supports_input(
         &["main.fab".to_owned()],
         false
     ));
@@ -115,12 +115,12 @@ fn reader_locale_accepts_fab_entry() {
 
 #[test]
 fn reader_locale_rejects_stdin() {
-    assert!(!reader_locale_supports_input(&["-".to_owned()], false));
+    assert!(!locale_supports_input(&["-".to_owned()], false));
 }
 
 #[test]
 fn reader_locale_rejects_txt() {
-    assert!(!reader_locale_supports_input(
+    assert!(!locale_supports_input(
         &["main.txt".to_owned()],
         false
     ));
@@ -129,12 +129,12 @@ fn reader_locale_rejects_txt() {
 #[test]
 fn reader_locale_rejects_plain_file() {
     let file = TempPlainFile::new();
-    assert!(!reader_locale_supports_input(&[file.input()], false));
+    assert!(!locale_supports_input(&[file.input()], false));
 }
 
 #[test]
 fn reader_locale_rejects_multiple_inputs() {
-    assert!(!reader_locale_supports_input(
+    assert!(!locale_supports_input(
         &["main.fab".to_owned(), "other.fab".to_owned()],
         false
     ));
@@ -145,7 +145,7 @@ const READER_LOCALE_ERROR: &str = "--locale la requires a package path or .fab e
 #[test]
 fn reader_locale_with_package_accepts_fab_entry() {
     assert_eq!(
-        reader_locale_without_package_error(Some("la"), &["main.fab".to_owned()], false),
+        locale_without_package_error(Some("la"), &["main.fab".to_owned()], false),
         None
     );
 }
@@ -153,7 +153,7 @@ fn reader_locale_with_package_accepts_fab_entry() {
 #[test]
 fn reader_locale_with_package_accepts_faber_toml() {
     assert_eq!(
-        reader_locale_without_package_error(Some("la"), &["faber.toml".to_owned()], false),
+        locale_without_package_error(Some("la"), &["faber.toml".to_owned()], false),
         None
     );
 }
@@ -161,7 +161,7 @@ fn reader_locale_with_package_accepts_faber_toml() {
 #[test]
 fn reader_locale_with_package_accepts_nested_toml() {
     assert_eq!(
-        reader_locale_without_package_error(Some("la"), &["pkg/faber.toml".to_owned()], false),
+        locale_without_package_error(Some("la"), &["pkg/faber.toml".to_owned()], false),
         None
     );
 }
@@ -169,7 +169,7 @@ fn reader_locale_with_package_accepts_nested_toml() {
 #[test]
 fn reader_locale_with_package_accepts_missing_package() {
     assert_eq!(
-        reader_locale_without_package_error(Some("la"), &["missing-package".to_owned()], false),
+        locale_without_package_error(Some("la"), &["missing-package".to_owned()], false),
         None
     );
 }
@@ -177,7 +177,7 @@ fn reader_locale_with_package_accepts_missing_package() {
 #[test]
 fn reader_locale_without_package_rejects_txt() {
     assert_eq!(
-        reader_locale_without_package_error(Some("la"), &["main.txt".to_owned()], false),
+        locale_without_package_error(Some("la"), &["main.txt".to_owned()], false),
         Some(READER_LOCALE_ERROR.to_owned())
     );
 }
@@ -186,7 +186,7 @@ fn reader_locale_without_package_rejects_txt() {
 fn reader_locale_without_package_rejects_plain_file() {
     let file = TempPlainFile::new();
     assert_eq!(
-        reader_locale_without_package_error(Some("la"), &[file.input()], false),
+        locale_without_package_error(Some("la"), &[file.input()], false),
         Some(READER_LOCALE_ERROR.to_owned())
     );
 }
@@ -194,7 +194,7 @@ fn reader_locale_without_package_rejects_plain_file() {
 #[test]
 fn reader_locale_without_package_rejects_stdin() {
     assert_eq!(
-        reader_locale_without_package_error(Some("la"), &["-".to_owned()], true),
+        locale_without_package_error(Some("la"), &["-".to_owned()], true),
         Some(READER_LOCALE_ERROR.to_owned())
     );
 }
@@ -202,7 +202,7 @@ fn reader_locale_without_package_rejects_stdin() {
 #[test]
 fn reader_locale_without_package_rejects_multiple_inputs() {
     assert_eq!(
-        reader_locale_without_package_error(
+        locale_without_package_error(
             Some("la"),
             &["main.fab".to_owned(), "other.fab".to_owned()],
             false
@@ -214,7 +214,7 @@ fn reader_locale_without_package_rejects_multiple_inputs() {
 #[test]
 fn reader_locale_none_returns_none() {
     assert_eq!(
-        reader_locale_without_package_error(None, &["main.fab".to_owned()], false),
+        locale_without_package_error(None, &["main.fab".to_owned()], false),
         None
     );
 }

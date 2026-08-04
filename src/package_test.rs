@@ -7,10 +7,10 @@
 use super::{
     analyze_package, build_browser_product, build_browser_product_static_assets,
     build_package_fmir_image, build_package_fmir_text_image, build_package_mir_artifact,
-    check_package, compile_package, compile_package_go, config_with_reader_locale,
+    check_package, compile_package, compile_package_go, config_with_locale,
     discover_build_layout, discover_package, emit_generated_crate,
     emit_generated_crate_with_runtime_plan, invoke_cargo_build, library_cached_file_interface,
-    library_resolver_from_config, load_package, load_package_with_reader_pack,
+    library_resolver_from_config, load_package, load_package_with_locale_pack,
     package_host_selection_diagnostic, package_rust_runtime_plan, read_manifest,
     run_package_fmir_image, run_package_fmir_text_image, run_package_mir, run_package_mir_artifact,
     sanitize_crate_name, use_package_compiler, use_package_compiler_from_args, validate_manifest,
@@ -180,7 +180,7 @@ fn library_item_by_export<'a>(
         .expect("library item")
 }
 
-fn write_zh_reader_pack(root: &Path, name: &str) -> PathBuf {
+fn write_zh_locale_pack(root: &Path, name: &str) -> PathBuf {
     let reader = root.join("locale");
     let exemplars = reader.join("exemplars");
     fs::create_dir_all(&exemplars).expect("create reader exemplars");
@@ -6469,7 +6469,7 @@ entry = "main.fab"
 }
 
 #[test]
-fn load_package_with_reader_pack_surfaces_missing_manifest_after_validation() {
+fn load_package_with_locale_pack_surfaces_missing_manifest_after_validation() {
     let dir = test_temp_dir("manifest-missing-after-validation");
     fs::create_dir_all(dir.join("src")).expect("create src");
     fs::write(
@@ -6491,7 +6491,7 @@ entry = "main.fab"
     fs::remove_file(dir.join("faber.toml")).expect("delete manifest after discovery");
 
     let resolver = library_resolver_from_config(&Config::default());
-    let Err(err) = load_package_with_reader_pack(&spec, &resolver, None, false, None) else {
+    let Err(err) = load_package_with_locale_pack(&spec, &resolver, None, false, None) else {
         panic!("missing manifest after validation must be a diagnostic, not a silent default");
     };
     assert!(err
@@ -6500,7 +6500,7 @@ entry = "main.fab"
 }
 
 #[test]
-fn load_package_with_reader_pack_rejects_malformed_manifest() {
+fn load_package_with_locale_pack_rejects_malformed_manifest() {
     let dir = test_temp_dir("manifest-malformed-load");
     fs::create_dir_all(dir.join("src")).expect("create src");
     fs::write(dir.join("faber.toml"), "this is not toml [").expect("write malformed manifest");
@@ -6519,7 +6519,7 @@ fn load_package_with_reader_pack_rejects_malformed_manifest() {
         manifest_backed: true,
     };
     let resolver = library_resolver_from_config(&Config::default());
-    let Err(err) = load_package_with_reader_pack(&spec, &resolver, None, false, None) else {
+    let Err(err) = load_package_with_locale_pack(&spec, &resolver, None, false, None) else {
         panic!("malformed manifest must fail loudly on load, not be swallowed");
     };
     assert!(err
@@ -6537,7 +6537,7 @@ fn manifestless_legacy_spec_loads_without_manifest() {
     assert!(!spec.manifest_backed);
 
     let resolver = library_resolver_from_config(&Config::default());
-    let files = load_package_with_reader_pack(&spec, &resolver, None, false, None)
+    let files = load_package_with_locale_pack(&spec, &resolver, None, false, None)
         .expect("legacy manifestless load keeps working");
     assert_eq!(files.len(), 1);
 }
@@ -6652,7 +6652,7 @@ fn compile_package_uses_manifest_reader_locale_default_pack() {
     let src = dir.join("src");
     fs::create_dir_all(&src).expect("create src");
     fs::write(src.join("main.fab"), "入口 { 输出 \"ok\" }").expect("write package entry");
-    write_zh_reader_pack(&dir, "zh-Hans.toml");
+    write_zh_locale_pack(&dir, "zh-Hans.toml");
     fs::write(
         dir.join("faber.toml"),
         r#"
@@ -6765,12 +6765,12 @@ fn installed_reader_locale_reference_examples_compile_from_installed_packs() {
 }
 
 #[test]
-fn compile_package_uses_manifest_reader_pack_path() {
+fn compile_package_uses_manifest_locale_pack_path() {
     let dir = test_temp_dir("manifest-reader-pack");
     let src = dir.join("src");
     fs::create_dir_all(&src).expect("create src");
     fs::write(src.join("main.fab"), "入口 { 输出 \"ok\" }").expect("write package entry");
-    write_zh_reader_pack(&dir, "custom.toml");
+    write_zh_locale_pack(&dir, "custom.toml");
     fs::write(
         dir.join("faber.toml"),
         r#"
@@ -6799,7 +6799,7 @@ fn package_reader_locale_cli_selection_overrides_manifest_locale() {
     let src = dir.join("src");
     fs::create_dir_all(&src).expect("create src");
     fs::write(src.join("main.fab"), "入口 { 输出 \"ok\" }").expect("write package entry");
-    write_zh_reader_pack(&dir, "zh-Hans.toml");
+    write_zh_locale_pack(&dir, "zh-Hans.toml");
     fs::write(
         dir.join("faber.toml"),
         r#"
@@ -6817,11 +6817,11 @@ locale = "th-TH"
     .expect("write manifest");
 
     let (config, pack) =
-        config_with_reader_locale(Target::Rust, &dir, Some("zh-Hans")).expect("reader config");
+        config_with_locale(Target::Rust, &dir, Some("zh-Hans")).expect("reader config");
     let pack = pack.expect("reader pack");
 
     assert_eq!(pack.metadata.id, "zh-Hans");
-    assert!(config.reader_pack.is_some());
+    assert!(config.locale_pack.is_some());
 }
 
 #[test]
@@ -6830,7 +6830,7 @@ fn compile_package_reports_manifest_reader_locale_latin_fallback_warning() {
     let src = dir.join("src");
     fs::create_dir_all(&src).expect("create src");
     fs::write(src.join("main.fab"), "incipit { nota \"ok\" }").expect("write package entry");
-    write_zh_reader_pack(&dir, "zh-Hans.toml");
+    write_zh_locale_pack(&dir, "zh-Hans.toml");
     fs::write(
         dir.join("faber.toml"),
         r#"

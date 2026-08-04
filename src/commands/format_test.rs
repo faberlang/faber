@@ -164,7 +164,7 @@ fn format_cli_comment_fixture_reparses() {
 }
 
 #[test]
-fn format_canonical_reader_locale_thai_localizes_surface() {
+fn format_canonical_locale_thai_localizes_surface() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale/th-TH");
     let thai = root.join("src/main.fab");
     let latin = root.join("twins/main.la.fab");
@@ -228,7 +228,7 @@ fn format_canonical_reader_locale_thai_localizes_surface() {
 }
 
 #[test]
-fn format_reader_locale_la_without_canonical_matches_canonical_latin() {
+fn format_locale_la_without_canonical_matches_canonical_latin() {
     let path = exempla("incipit/salve-munde.fab");
 
     let locale_output = run_faber_format_stdout_with_args(&[
@@ -253,7 +253,7 @@ fn format_reader_locale_la_without_canonical_matches_canonical_latin() {
 }
 
 #[test]
-fn format_reader_locale_preserves_template_application_sugar() {
+fn format_locale_preserves_template_application_sugar() {
     // Reader-locale packs re-render the same semantic program with different
     // keyword spellings while retaining glyph shapes. The `"…"(args)` template-
     // application postfix is a glyph shape: `--locale en` localizes
@@ -302,7 +302,7 @@ fn format_reader_locale_preserves_template_application_sugar() {
 }
 
 #[test]
-fn format_reader_locale_without_canonical_localizes() {
+fn format_locale_without_canonical_localizes() {
     // Phase 2 removed the "--locale requires --canonical" gate. A bare
     // --locale=<X> now selects the canonical re-emit path with the
     // localized surface (Latin default when --locale is absent).

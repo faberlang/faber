@@ -101,7 +101,7 @@ fn compile_flag_takes_precedence_over_interpret_flag() {
 }
 
 #[test]
-fn reader_locale_takes_precedence_over_interpret_flag() {
+fn locale_takes_precedence_over_interpret_flag() {
     let fab = PathBuf::from("script.fab");
     let args = run_args(
         fab.clone(),
@@ -110,7 +110,7 @@ fn reader_locale_takes_precedence_over_interpret_flag() {
         Some("zh-Hans".to_owned()),
         radix::tool::CliTarget::Rust,
     );
-    // reader_locale gate at line 23 returns false before `--interpret` is checked.
+    // locale gate at line 23 returns false before `--interpret` is checked.
     assert!(!should_interpret(&args, &fab));
 }
 
@@ -142,12 +142,12 @@ fn run_args(
     path: PathBuf,
     interpret: bool,
     compile: bool,
-    reader_locale: Option<String>,
+    locale: Option<String>,
     target: radix::tool::CliTarget,
 ) -> RunArgs {
     RunArgs {
         path,
-        reader_locale,
+        locale,
         target: Some(target),
         backend: None,
         release: false,
@@ -237,7 +237,7 @@ fn scena_target_never_uses_script_interpret_policy() {
 }
 
 #[test]
-fn reader_locale_forces_compiled_run_policy_for_single_fab_file() {
+fn locale_forces_compiled_run_policy_for_single_fab_file() {
     let fab = PathBuf::from("script.fab");
     let args = run_args(
         fab.clone(),
@@ -251,7 +251,7 @@ fn reader_locale_forces_compiled_run_policy_for_single_fab_file() {
 }
 
 #[test]
-fn run_config_loads_reader_locale_pack_for_go_targets() {
+fn run_config_loads_locale_pack_for_go_targets() {
     let example = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale/th-TH");
 
     let config =
@@ -260,7 +260,7 @@ fn run_config_loads_reader_locale_pack_for_go_targets() {
     assert_eq!(config.target, Target::Go);
     assert_eq!(
         config
-            .reader_pack
+            .locale_pack
             .as_ref()
             .map(|pack| pack.metadata.id.as_str()),
         Some("th-TH")
@@ -268,7 +268,7 @@ fn run_config_loads_reader_locale_pack_for_go_targets() {
 }
 
 #[test]
-fn run_config_uses_manifest_reader_locale_for_non_rust_targets() {
+fn run_config_uses_manifest_locale_for_non_rust_targets() {
     let example = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale/th-TH");
 
     let config =
@@ -277,7 +277,7 @@ fn run_config_uses_manifest_reader_locale_for_non_rust_targets() {
     assert_eq!(config.target, Target::FmirText);
     assert_eq!(
         config
-            .reader_pack
+            .locale_pack
             .as_ref()
             .map(|pack| pack.metadata.id.as_str()),
         Some("th-TH")
