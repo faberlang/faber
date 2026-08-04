@@ -75,6 +75,28 @@ pub fn with_lowered_package_mir<R>(
     )
 }
 
+/// Analyze, link, and validate a package as MIR under the INTERPRETED
+/// consumer (S5-U5c): the consumer that links library imports into the
+/// merged program (the `faber run` path), so a test can probe the merged
+/// MIR — and the device constructor — with a library-backed body such as the
+/// gradus `train_step_*` surface. External-target probes ([`with_lowered_package_mir`])
+/// keep the previous behavior: library calls stay provider-backed.
+#[cfg(test)]
+pub(crate) fn with_interpreted_lowered_package_mir<R>(
+    config: &Config,
+    input: &Path,
+    run: impl for<'a> FnOnce(&LoweredMirUnit<'a>) -> R,
+) -> Result<R, Vec<Diagnostic>> {
+    with_prepared_package_mir_with_cli_mode_and_consumer(
+        config,
+        input,
+        &[],
+        CliPlanningMode::Parsed,
+        PackageMirConsumer::Interpreted,
+        |_, lowered| Ok(run(lowered)),
+    )
+}
+
 // HIR lowering allocates generated DefIds starting at 1_000_000. Package MIR
 // linked function-source ids must live above that range or rewritten namespace
 // calls can collide with import/local bindings and lower as indirect calls.
@@ -4778,13 +4800,42 @@ fn is_explicit_entry_function(function: &MirFunction, types: &radix::semantic::T
         )
 }
 
+/// Remap a name symbol from the lowering interner into the merged interner.
+/// A symbol outside the source interner's string table is a GENERATED
+/// identity token (the HIR-lowering synthetic range), not a text name —
+/// it stays as-is (the value carries no text meaning either interner).
+fn remap_optional_symbol(
+    name: Option<Symbol>,
+    source: &Interner,
+    target: &mut Interner,
+) -> Option<Symbol> {
+    name.and_then(|symbol| {
+        if (symbol.0 as usize) < source.strings().len() {
+            Some(target.intern(source.resolve(symbol)))
+        } else {
+            Some(symbol)
+        }
+    })
+}
+
 fn remap_program_text_symbols(program: &mut MirProgram, source: &Interner, target: &mut Interner) {
     for function in &mut program.functions {
         // Function names are symbols from the lowering interner; they must be
         // remapped too or `MirNames` (built against the merged interner)
         // resolves a foreign symbol value.
-        if let Some(name) = function.name {
-            function.name = Some(target.intern(source.resolve(name)));
+        function.name = remap_optional_symbol(function.name, source, target);
+        // Param and local names are the same kind of lowering-interner
+        // symbols: without remapping they resolve to UNRELATED strings in the
+        // merged interner (the entry's symbol space), garbling the
+        // device-constructor's buffer names — the library-backed train_step
+        // slots then alias the entry's locals (`vacua`/`strue` instead of
+        // `weight`/`bias`). S5-U5c: remap them so the merged library body
+        // keeps its declared names.
+        for param in &mut function.params {
+            param.name = remap_optional_symbol(param.name, source, target);
+        }
+        for local in &mut function.locals {
+            local.name = remap_optional_symbol(local.name, source, target);
         }
         for block in &mut function.blocks {
             for statement in &mut block.statements {

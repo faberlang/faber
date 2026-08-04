@@ -2847,3 +2847,204 @@ fn repeating_step_forward_kernel_emits_metal_artifact() {
     })
     .expect("fixture lowers");
 }
+
+// ---------------------------------------------------------------------------
+// S5-U5c: library-backed train_step materializes into the device program
+// ---------------------------------------------------------------------------
+
+/// The focused S5-U5c fixture: the S5-U5 training-loop shape (elementwise
+/// forward + companion + constant-bounded loop), but the optimizer step is
+/// the GRADUS LIBRARY `train.train_step_2x2` — a provider import whose body
+/// (magnitudines → crea → mul → sub) lives in the merged package MIR only
+/// when the interpreted consumer links library imports. The constructor
+/// must materialize that library body as the step kernel.
+const LIBRARY_TRAIN_STEP_LOOP_FIXTURE: &str = r#"importa ex "gradus:train" privata train
+
+@ nucleum
+@ radix lane "air"
+@ radix backward "loss_backward"
+functio loss(tensor<f32, [2,2]> x, tensor<f32, [2,2]> w, tensor<f32, [2,2]> b) → tensor<f32, [2,2]> {
+    fixum tensor<f32, [2,2]> product ← x.multiplica(w)
+    redde product.addita(b)
+}
+
+functio nil() → vacuum {
+    tacet
+}
+
+incipit {
+    fixum lista<f32> data ← [1.0, 2.0, 3.0, 4.0]
+    fixum tensor<f32, []> seed ← vacua
+    fixum tensor<f32, [2,2]> x ← seed.strue(data, [2, 2])
+    varia tensor<f32, [2,2]> w ← seed.strue(data, [2, 2])
+    varia tensor<f32, [2,2]> b ← seed.strue(data, [2, 2])
+    fixum tensor<f32, [2,2]> upstream ← seed.strue(data, [2, 2])
+    fixum f32 lr ← 0.01
+    fixum numerus steps ← 100
+    itera ab 0‥steps fixum step {
+        fixum _ grads ← loss_backward(x, w, b, nil(), upstream)
+        fixum [_, gw, gb] ← grads
+        fixum [nw, nb] ← train.train_step_2x2(w, b, gw, gb, lr)
+        w ← nw
+        b ← nb
+    }
+}
+"#;
+
+/// Build a fixture under the INTERPRETED consumer with the workspace library
+/// home (the `faber run` consumer — the one that links library imports into
+/// the merged package MIR, `gradus:*` included).
+fn with_interpreted_workspace_package<R>(
+    name: &str,
+    source: &str,
+    run: impl for<'a> FnOnce(&LoweredMirUnit<'a>) -> R,
+) -> Result<R, Vec<Diagnostic>> {
+    let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+    let root = std::env::temp_dir().join(format!("faber-u5c-{}-{}", name, std::process::id()));
+    std::fs::create_dir_all(root.join("src")).expect("temp fixture dir");
+    let entry = root.join("src").join("probe.fab");
+    std::fs::write(&entry, source).expect("write temp fixture");
+    let config = radix::driver::Config::default()
+        .with_stdlib(workspace)
+        .with_target(radix::codegen::Target::Fmir);
+    super::super::mir::with_interpreted_lowered_package_mir(&config, &entry, run)
+}
+
+/// S5-U5c: the gradus library `train_step_2x2` body — a provider import, not
+/// a package-local function — enters the package MIR through the interpreted
+/// consumer's library merge, folds (magnitudines/crea → elementwise fills),
+/// and materializes as the RepeatingStep program's optimizer-step kernel,
+/// exactly like a package-local step: params PerProgram InOut HostProvided,
+/// gradients wired from the companion, and the train_step kernel carrying
+/// the library's entry name.
+#[test]
+fn library_backed_train_step_materializes_into_device_program() {
+    let (program, semantics) = with_interpreted_workspace_package(
+        "s5u5c-gradus-step",
+        LIBRARY_TRAIN_STEP_LOOP_FIXTURE,
+        |lowered| {
+            let result = device_program_for_lowered(
+                &lowered.validated,
+                &lowered.interner,
+                &lowered.companions,
+                DEFAULT_TRAINING_STEPS,
+            )
+            .expect("constructor succeeds")
+            .map(|(program, semantics, _step_count)| (program, semantics))
+            .expect("library-backed training fixture yields a device program");
+            result
+        },
+    )
+    .expect("fixture lowers");
+
+    program.validate().expect("constructed program validates");
+    assert_eq!(
+        program.lifetime,
+        DeviceProgramLifetime::RepeatingStep,
+        "a library-backed training loop materializes a RepeatingStep program"
+    );
+
+    // Kernel set, in materialization order: forward, companion, train_step —
+    // the step kernel carries the GRADUS LIBRARY entry name (the merged
+    // library function body, not a package-local step).
+    let entries: Vec<&str> = program
+        .kernels
+        .iter()
+        .map(|kernel| kernel.entry.as_str())
+        .collect();
+    assert_eq!(
+        entries,
+        vec!["loss", "loss_backward", "train_step_2x2"],
+        "forward + companion + LIBRARY optimizer-step kernel"
+    );
+
+    // The library train_step kernel carries an elementwise plan (the folded
+    // shape construction → fill → mul → sub body) — no recipe, no
+    // decomposition subchains.
+    let step = &program.kernels[2];
+    assert_eq!(
+        step.plan,
+        CollectionKernelPlan::Elementwise,
+        "the folded library train_step resolves to an elementwise kernel"
+    );
+
+    // The trainable params (the library's `weight`/`bias` — the buffer names
+    // follow the library body's declared names after the merged-symbol
+    // remap) project to PerProgram InOut buffers. The discriminator is the
+    // in-place WRITE: the params are the buffers the step kernel updates
+    // (the gradient inputs are read-only in the step kernel — the companion
+    // writes them).
+    let mut param_ids: Vec<BufferId> = Vec::new();
+    for resource in &step.resources {
+        if resource.access == MirKernelResourceAccess::Write
+            && !param_ids.contains(&resource.buffer.id)
+        {
+            param_ids.push(resource.buffer.id);
+        }
+    }
+    assert_eq!(
+        param_ids.len(),
+        2,
+        "the library train_step updates two trainable params (weight, bias)"
+    );
+
+    // The library step kernel binds each param as InOut with PerProgram
+    // lifetime AND aliases its update output slot to the same buffer (the
+    // in-place update) — identical to the package-local step contract.
+    for id in &param_ids {
+        let slots: Vec<&radix_mir::device_program::DeviceResource> = step
+            .resources
+            .iter()
+            .filter(|resource| resource.buffer.id == *id)
+            .collect();
+        assert_eq!(
+            slots.len(),
+            2,
+            "the library train_step reads and writes buffer {id:?} (in-place update)"
+        );
+        for slot in &slots {
+            assert_eq!(slot.buffer.role, BufferRole::InOut);
+            assert_eq!(slot.buffer.lifetime, BufferLifetime::PerProgram);
+        }
+        assert!(
+            slots.iter().any(|slot| slot.access == MirKernelResourceAccess::Read)
+                && slots.iter().any(|slot| slot.access == MirKernelResourceAccess::Write),
+            "the param buffer has a read slot and a write slot in the step kernel"
+        );
+    }
+
+    // The library step's gradient inputs alias the COMPANION's gradient
+    // output buffers (the backward → train_step data-flow, never a name):
+    // every buffer the companion kernel writes (beyond its loss output) is
+    // read by the step kernel.
+    let companion_gradient_ids: Vec<BufferId> = program.kernels[1]
+        .resources
+        .iter()
+        .filter(|resource| {
+            resource.access == MirKernelResourceAccess::Write
+                && resource.buffer.role == BufferRole::InOut
+        })
+        .map(|resource| resource.buffer.id)
+        .collect();
+    assert_eq!(
+        companion_gradient_ids.len(),
+        2,
+        "the companion writes two gradient buffers"
+    );
+    for id in &companion_gradient_ids {
+        assert!(
+            step.resources
+                .iter()
+                .any(|resource| resource.buffer.id == *id
+                    && resource.access == MirKernelResourceAccess::Read),
+            "the library train_step reads the companion's gradient buffer {id:?}"
+        );
+    }
+
+    // The loss observation is the single declared result.
+    assert_eq!(program.results.len(), 1, "the loss is the single observation");
+    assert!(
+        semantics.relations.iter().any(|relation| relation.device_resident),
+        "the carried companion relation rides the semantics"
+    );
+}

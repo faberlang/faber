@@ -80,8 +80,9 @@ use radix_mir::kernel_plan::CollectionKernelPlan;
 use radix_mir::layout::MirTensorStorageLayout;
 use radix_mir::names::MirNames;
 use radix_mir::{
-    MirCallee, MirConstant, MirFunctionId, MirLocalId, MirOperand, MirPlace, MirPlaceBase,
-    MirProjection, MirStatementKind, MirTempId, MirTerminatorKind, MirType, MirValueKind,
+    MirCallee, MirCollectionOp, MirConstant, MirFunctionId, MirIntrinsic, MirLocalId, MirOperand,
+    MirPlace, MirPlaceBase, MirProjection, MirStatementKind, MirTempId, MirTerminatorKind,
+    MirType, MirValueKind,
 };
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use radix_mir_fmir::schema::{
@@ -122,6 +123,32 @@ fn kernel_entry_name(function: &MirFunction, interner: &Interner) -> String {
         .map(|symbol| interner.resolve(symbol))
         .map(str::to_owned)
         .unwrap_or_else(|| format!("kernel{}", function.id.0))
+}
+
+/// Whether a device-resident function's body CONSTRUCTS tensor shapes
+/// (`magnitudines()` shape lists and `crea` fills over a vacua seed) — the
+/// exact surface the S5-U4 static-shape fold
+/// ([`radix_mir::static_shape_fold::fold_static_shapes`]) rewrites to
+/// constant dims + scalar-broadcast elementwise fills. A library-backed
+/// `train_step` body (the gradus `train_step_2x2`/`train_step_4x4` surface)
+/// is the first consumer: without the fold the shape ops carry no kernel
+/// plan and the constructor fails the decomposition closed.
+fn function_has_shape_construction(function: &MirFunction) -> bool {
+    function
+        .blocks
+        .iter()
+        .flat_map(|block| block.statements.iter())
+        .any(|statement| {
+            let MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
+                return false;
+            };
+            matches!(
+                call.intrinsic,
+                MirIntrinsic::Collection(
+                    MirCollectionOp::TensorShape | MirCollectionOp::TensorCreate
+                )
+            )
+        })
 }
 
 /// The param-name for a buffer slot, when the kernel function names the
@@ -1463,7 +1490,29 @@ pub(crate) fn device_program_for_lowered(
         // with a `__N` suffix when a multi-recipe body decomposes into
         // several subchain kernels (distinct Metal entries / CUDA logical
         // entries per kernel).
-        let base_entry = kernel_entry_name(function, interner);
+        //
+        // S5-U4 static-shape fold: a device-resident body that CONSTRUCTS
+        // shapes (`magnitudines()` / `crea`) folds to constant dims +
+        // scalar-broadcast fills BEFORE any plan/signature derivation —
+        // the shape ops carry no kernel plan and would otherwise fail the
+        // decomposition closed. The first consumer is the library-backed
+        // `train_step` body (gradus `train_step_2x2`/`train_step_4x4`) the
+        // S5-U5 training-plan path materializes; the fold is a pure rewrite
+        // (same function id, params, and semantic types), so bodies without
+        // shape construction pass through unchanged.
+        let folded: Option<MirFunction>;
+        let kernel_source: &MirFunction = if function_has_shape_construction(function) {
+            let outcome =
+                radix_mir::static_shape_fold::fold_static_shapes(function, validated.validation())
+                    .map_err(|error| vec![device_diag("shape fold", error.message)])?;
+            folded = Some(outcome.function);
+            folded.as_ref().ok_or_else(|| {
+                vec![device_diag("shape fold", "folded function missing after fold admission")]
+            })?
+        } else {
+            function
+        };
+        let base_entry = kernel_entry_name(kernel_source, interner);
         let mut emit_subchain = |synthetic: &MirFunction,
                                  signature: &MirKernelSignature,
                                  plan: CollectionKernelPlan,
@@ -1493,7 +1542,7 @@ pub(crate) fn device_program_for_lowered(
                 // the program role is InOut regardless of the slot's ABI role.
                 let is_param_input = resource.role == MirKernelResourceRole::Input
                     && resource.source_local.is_some_and(|local| {
-                        param_updates.contains_key(&(function.id, local))
+                        param_updates.contains_key(&(kernel_source.id, local))
                     });
                 // The output-slot tuple index (the ABI's first output is
                 // element 0, each extra output follows).
@@ -1520,14 +1569,14 @@ pub(crate) fn device_program_for_lowered(
                 // identity rides the companion relation, never a name).
                 let gradient_alias = if resource.role == MirKernelResourceRole::Input {
                     resource.source_local.and_then(|local| {
-                        let position = function
+                        let position = kernel_source
                             .params
                             .iter()
                             .position(|param| param.local == local);
                         position.and_then(|position| {
                             gradient_links
                                 .get(&(
-                                    function.id,
+                                    kernel_source.id,
                                     u32::try_from(position).unwrap_or(u32::MAX),
                                 ))
                                 .and_then(|(companion, slot)| {
@@ -1538,7 +1587,7 @@ pub(crate) fn device_program_for_lowered(
                 } else {
                     None
                 };
-                let name = buffer_slot_name(function, interner, resource);
+                let name = buffer_slot_name(kernel_source, interner, resource);
                 // S2-5 wiring: the same logical buffer appears at this kernel
                 // too. The role guard ([`unify_roles`]) keeps a name/shape
                 // coincidence from aliasing two unrelated values — a second
@@ -1600,7 +1649,7 @@ pub(crate) fn device_program_for_lowered(
                         readwrite: resource.access == MirKernelResourceAccess::ReadWrite,
                         param: is_param_input,
                         gradient: false,
-                        origin: value_origin(function, resource, id),
+                        origin: value_origin(kernel_source, resource, id),
                     });
                     id
                 };
@@ -1614,7 +1663,7 @@ pub(crate) fn device_program_for_lowered(
                 // a companion gradient slot is a per-step scratch value,
                 // never an observation point.
                 if let (Some(source), Some(output_index)) =
-                    (function.source, output_index)
+                    (kernel_source.source, output_index)
                 {
                     if companion_gradient_slots
                         .get(&source.0)
@@ -1641,7 +1690,7 @@ pub(crate) fn device_program_for_lowered(
             // order.
             resources.sort_by_key(|resource| (resource.binding, resource.group));
             builds.push(KernelBuild {
-                function: function.id,
+                function: kernel_source.id,
                 entry,
                 plan,
                 launch: KernelLaunchPlan::from_signature_and_function(signature, synthetic),
@@ -1656,16 +1705,18 @@ pub(crate) fn device_program_for_lowered(
         // contract) falls through to the subchain path.
         let whole_signature =
             MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
-                function,
+                kernel_source,
                 validated.validation(),
                 interner,
             );
         if let Ok(whole_signature) = &whole_signature {
-            if let Ok(Some(plan)) =
-                kernel_plan_for_function(function, whole_signature, validated.validation())
-            {
+            if let Ok(Some(plan)) = kernel_plan_for_function(
+                kernel_source,
+                whole_signature,
+                validated.validation(),
+            ) {
                 return emit_subchain(
-                    function,
+                    kernel_source,
                     whole_signature,
                     plan,
                     base_entry,
@@ -1679,10 +1730,10 @@ pub(crate) fn device_program_for_lowered(
         // elementwise-only body), with the shared contract-shaped emission
         // signature for recipe subchains and the full ABI synthesis for
         // elementwise-only subchains.
-        let decomposition = decompose_kernel_function(function, validated.validation())
+        let decomposition = decompose_kernel_function(kernel_source, validated.validation())
             .map_err(|error| vec![device_diag("decomposition", error.message)])?;
         for (subchain_index, subchain) in decomposition.subchains.iter().enumerate() {
-            let synthetic = decomposition.subchain_function(function, subchain_index);
+            let synthetic = decomposition.subchain_function(kernel_source, subchain_index);
             let contract = collection_op_contract(&synthetic, validated.validation())
                 .map_err(|error| vec![device_diag("plan", error.message)])?;
             let signature = match &contract {
@@ -2391,16 +2442,51 @@ pub(crate) fn device_section_for_program(
     ptx_target: &str,
     repeating_steps: u32,
 ) -> Result<FmirDeviceSection, Vec<Diagnostic>> {
-    let metal_artifact = radix_mir_metal::emit_metal_device_artifact(program, validated, interner)
-        .map_err(|error| vec![device_diag("metal artifact", error.to_string())])?;
+    // S5-U5c: the emitters re-derive each kernel's body from the validated
+    // MIR, so the shape-folded bodies the constructor planned must reach
+    // them too — a kernel's function id still references the ORIGINAL
+    // (unfolded) body in `validated`. Build a folded validated token: the
+    // SAME fold the constructor applied, applied to the program's
+    // kernel-referenced functions in a cloned program (a shape-bearing
+    // kernel the constructor admitted folds here with identical inputs;
+    // unfoldable shapes were already rejected closed there).
+    let mut emitter_program = validated.program().clone();
+    let kernel_ids: BTreeSet<MirFunctionId> =
+        program.kernels.iter().map(|kernel| kernel.function).collect();
+    for function in &mut emitter_program.functions {
+        if !kernel_ids.contains(&function.id) || !function_has_shape_construction(function) {
+            continue;
+        }
+        let outcome = radix_mir::static_shape_fold::fold_static_shapes(
+            function,
+            validated.validation(),
+        )
+        .map_err(|error| vec![device_diag("shape fold", error.message)])?;
+        *function = outcome.function;
+    }
+    let emitter_context = validated.validation().clone();
+    let emitter_validated =
+        ValidatedMir::new(emitter_program, emitter_context).map_err(|errors| {
+            errors
+                .into_iter()
+                .map(|error| device_diag("shape fold", error.message))
+                .collect::<Vec<_>>()
+        })?;
+
+    let metal_artifact =
+        radix_mir_metal::emit_metal_device_artifact(program, &emitter_validated, interner)
+            .map_err(|error| vec![device_diag("metal artifact", error.to_string())])?;
     // S3-A5 (Metal lane): the CUDA artifact emission is best-effort — an
     // emitter op the CUDA lane does not support yet (the companion's
     // elementwise surface lands in S3-A7) leaves the image Metal-only, and a
     // later `--backend cuda` request fails closed as a missing declared
     // artifact (the same seam the PTX-compile-unavailable path uses). The
     // Metal artifact is the S3-A5 proof surface.
-    let cuda_artifact =
-        match radix_mir_llvm::emit_cuda_device_artifact(program, validated, interner) {
+    let cuda_artifact = match radix_mir_llvm::emit_cuda_device_artifact(
+        program,
+        &emitter_validated,
+        interner,
+    ) {
             Ok(artifact) => Some(artifact),
             Err(error) => {
                 eprintln!(
@@ -3256,9 +3342,10 @@ fn device_step_count(declared: u32) -> Result<u32, Vec<Diagnostic>> {
 /// versions, data-flow edges), and the repeated-execution leak proof.
 ///
 /// A `RepeatingStep` program (S5-U5, the training-loop route) once-inits its
-/// HostProvided params at session creation, executes `FABER_DEVICE_STEPS`
-/// (default 100) steps on ONE session, prints the per-step loss trace, and
-/// runs the convergence check. `FABER_DEVICE_REPEAT` (default 1) runs a
+/// HostProvided params at session creation, executes the image's DECLARED
+/// step count (recovered from the wire, S5-U5b — `FABER_DEVICE_STEPS`, when
+/// set, must agree) on ONE session, prints the per-step loss trace, and runs
+/// the convergence check. `FABER_DEVICE_REPEAT` (default 1) runs a
 /// `SingleRun` program's ordered launch sequence N times before teardown —
 /// the S2-8 leak-proof surface.
 ///
