@@ -52,11 +52,13 @@ pub const PACKAGE_MIR_ARTIFACT_VERSION: u32 = 6;
 /// The faber-owned wire/codec version of the typed device-program section
 /// (the nested `v` field of [`FmirDeviceProgramSection`]). Bumped in lockstep
 /// with the `DEVICE_RUN_PLAN_VERSION` constructor ratchet; bumped `3 → 4` by
-/// the Stage 3R U1 clean break (F7/S8). Admitted independently of the outer
-/// image version: [`admit_device_section`] rejects a mismatched nested
-/// version before any field-level interpretation, with a focused diagnostic
+/// the Stage 3R U1 clean break (F7/S8) and `4 → 5` by the S5-U5b clean break
+/// (the declared RepeatingStep step count rides the lifetime variant). Admitted
+/// independently of the outer image version: [`admit_device_section`] rejects
+/// a mismatched nested version before any field-level interpretation, with a
+/// focused diagnostic
 /// ([`UnsupportedDeviceProgramVersion`](crate::error::FmirImageError::UnsupportedDeviceProgramVersion)).
-pub const WIRE_DEVICE_PROGRAM_VERSION: u32 = 4;
+pub const WIRE_DEVICE_PROGRAM_VERSION: u32 = 5;
 
 /// Text image `target` tag.
 pub const FMIR_TEXT_TARGET_NAME: &str = "fmir-text";
@@ -626,15 +628,19 @@ pub enum WireStorageLayout {
     DeviceHandle,
 }
 
-/// Program execution-lifetime regime.
+/// Program execution-lifetime regime. A `RepeatingStep` program carries its
+/// **declared step count** (the S5-U5b wire carriage): the number of training
+/// steps the route drives on one session, admitted fail-closed at decode (a
+/// zero count is rejected by [`validate_wire_program`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum WireProgramLifetime {
     /// One-shot program run.
     #[default]
     SingleRun,
-    /// Repeating training step; per-step buffers recycle between iterations.
-    RepeatingStep,
+    /// Repeating training step with the declared step count; per-step buffers
+    /// recycle between iterations.
+    RepeatingStep(u32),
 }
 
 /// The shared algorithmic recipe set (mirror of `CollectionKernelPlan`).
@@ -1069,7 +1075,8 @@ pub(crate) fn admit_device_section(
 // initialization/observation axes (F5/F6). Fail-closed: the first violation
 // fails admission before host construction or launch.
 
-/// Validate the carried wire facts fail-closed (F1–F7).
+/// Validate the carried wire facts fail-closed (F1–F7 + the S5-U5b declared
+/// step count).
 pub(crate) fn validate_wire_program(
     wire: &WireDeviceProgram,
 ) -> Result<(), crate::error::FmirImageError> {
@@ -1079,6 +1086,22 @@ pub(crate) fn validate_wire_program(
     validate_wire_graph(wire, &launches)?;
     validate_wire_relations(wire)?;
     validate_wire_axes(wire, &launches)?;
+    validate_wire_step_count(wire)?;
+    Ok(())
+}
+
+/// Rule S5-U5b: a `RepeatingStep` program must carry a declared step count
+/// of at least 1 — a zero-count training program is a contradiction and fails
+/// admission closed (the image's step count is the route's authority; a count
+/// the route could never drive is rejected before host construction).
+fn validate_wire_step_count(wire: &WireDeviceProgram) -> Result<(), crate::error::FmirImageError> {
+    if let WireProgramLifetime::RepeatingStep(declared) = wire.lifetime {
+        if declared == 0 {
+            return Err(wire_invalid(
+                "RepeatingStep program declares step count 0; a training program must declare at least one step".to_owned(),
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -1534,10 +1557,12 @@ mod tests {
     }
 
     #[test]
-    fn device_program_wire_version_is_4_after_the_u1_break() {
-        // Stage 3R U1 bumps the nested device-program wire version 3 → 4
-        // (S1) and admits it independently of the outer FMIR version (S8).
-        assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 4);
+    fn device_program_wire_version_is_5_after_the_step_count_break() {
+        // Stage 3R U1 bumped the nested device-program wire version 3 → 4
+        // (S1); S5-U5b bumps it 4 → 5 (the declared RepeatingStep step count
+        // rides the lifetime variant). Admitted independently of the outer
+        // FMIR version (S8).
+        assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 5);
         assert_ne!(WIRE_DEVICE_PROGRAM_VERSION, PACKAGE_MIR_ARTIFACT_VERSION);
     }
 

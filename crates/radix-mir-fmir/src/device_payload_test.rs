@@ -871,6 +871,62 @@ fn two_kernel_chain_program_admits_cleanly() {
     );
 }
 
+// ---------------------------------------------------------------------------
+// S5-U5b: the declared RepeatingStep step count rides the wire
+// ---------------------------------------------------------------------------
+
+#[test]
+fn repeating_step_declared_count_round_trips_on_the_wire() {
+    // The versioned step-count carriage: a RepeatingStep program carries its
+    // declared count in the lifetime variant, and the count survives the
+    // text codec round-trip — an image-loaded route recovers it without any
+    // env-var authority.
+    let mut program = sample_wire_program();
+    program.lifetime = WireProgramLifetime::RepeatingStep(250);
+    let mut section = sample_device_section();
+    section.device_program.program = program;
+    let image = text_image_with_device(Some(section));
+    let decoded = decode_text_image(&encode_text_image(&image).unwrap(), TOOLCHAIN)
+        .expect("a RepeatingStep program with a declared count admits cleanly");
+    assert_eq!(
+        decoded.device.unwrap().device_program.program.lifetime,
+        WireProgramLifetime::RepeatingStep(250),
+        "the declared step count survives the wire round-trip"
+    );
+}
+
+#[test]
+fn repeating_step_zero_count_fails_admission_closed() {
+    // Fail-closed admission: a RepeatingStep program that declares zero steps
+    // is a contradiction (a count the route could never drive) and fails at
+    // the decode boundary before host construction.
+    let error = wire_admission_error(|program| {
+        program.lifetime = WireProgramLifetime::RepeatingStep(0);
+    })
+    .expect_err("a zero-step RepeatingStep program must fail admission");
+    assert!(
+        matches!(error, FmirImageError::WireProgramInvalid { .. }),
+        "the zero-step count fails with the focused wire-admission diagnostic: {error:?}"
+    );
+}
+
+#[test]
+fn repeating_step_count_rides_the_canonical_identity_bytes() {
+    // The declared count is a semantic fact: it is part of the canonical
+    // program bytes (A10) — two programs differing only in the declared count
+    // derive different identity substrates.
+    let mut program = sample_wire_program();
+    program.lifetime = WireProgramLifetime::RepeatingStep(100);
+    let base = canonical_program_bytes(&program);
+    let mut mutated = program.clone();
+    mutated.lifetime = WireProgramLifetime::RepeatingStep(250);
+    assert_ne!(
+        canonical_program_bytes(&mutated),
+        base,
+        "the declared step count changes the canonical program bytes"
+    );
+}
+
 /// The exact wire shape the faber constructor projects after Stage 3R U2:
 /// a three-buffer two-kernel chain (`a` → `medius` → `result`) carrying the
 /// independent axes — one semantic value per buffer (F1), explicit
