@@ -420,6 +420,11 @@ fn descriptor_preserves_wire_launch_order_and_version_keys() {
         element_count: 64,
     }));
     assert!(descriptor.data_flow.is_empty());
+
+    assert_eq!(
+        host_receipt_launch_order_line(&descriptor),
+        "device: launch order: [#0 id=11 kernel_index=1 backend_entry=`recollige`, #1 id=12 kernel_index=0 backend_entry=`collige`, #2 id=13 kernel_index=1 backend_entry=`recollige`]"
+    );
 }
 
 #[test]

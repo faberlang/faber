@@ -1292,6 +1292,7 @@ pub(crate) fn execute_device_route(
         receipt.releases,
         receipt.allocated_buffers.len()
     );
+    println!("{}", host_receipt_launch_order_line(&descriptor));
 
     // A10 declared logical resource graph: render the host's receipt facts
     // verbatim. Faber must not print a duplicate graph derived from the wire
@@ -1340,6 +1341,31 @@ pub(crate) fn execute_device_route(
         ),
     }
     Ok(())
+}
+
+/// Render the exact ordered launch records that the host will execute.
+///
+/// The descriptor's launch sequence, not the kernel declaration order or the
+/// aggregate receipt count, is the observable program order. A kernel index
+/// may therefore repeat or appear out of declaration order.
+fn host_receipt_launch_order_line(descriptor: &DeviceDescriptor) -> String {
+    let launches = descriptor
+        .launches
+        .iter()
+        .enumerate()
+        .map(|(position, launch)| {
+            let backend_entry = descriptor
+                .kernels
+                .get(launch.kernel_index as usize)
+                .map(|kernel| kernel.entry.as_str())
+                .unwrap_or("<invalid>");
+            format!(
+                "#{} id={} kernel_index={} backend_entry=`{}`",
+                position, launch.id, launch.kernel_index, backend_entry
+            )
+        })
+        .collect::<Vec<_>>();
+    format!("device: launch order: [{}]", launches.join(", "))
 }
 
 fn host_receipt_graph_lines(
