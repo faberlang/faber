@@ -3072,10 +3072,12 @@ functio loss(tensor<f32,[2,2]> x, tensor<f32,[2,2]> w, tensor<f32,[2,2]> b) → 
 /// intermediates as internal locals. Those reverse-AD synthetic locals carry
 /// no interner name, so the constructor falls back to role-based names
 /// (`input_{binding}` / `output_{binding}`) — the SAME carried local gets
-/// DIFFERENT fallback names at different subchain bindings. The constructor
-/// must join the reads by the carried (function, source-local) origin fact,
-/// never by the (different) fallback names: one unified buffer for the value,
-/// not one per binding.
+/// DIFFERENT fallback names at different subchain bindings. With D-2b-1 the
+/// recompute subchain EXPOSES the value as an extra output (the producer's
+/// output slot mints the buffer), and the later readers consume it as
+/// data-flow inputs. The constructor must join the reads by the carried
+/// (function, source-local) origin fact, never by the (different) fallback
+/// names: one unified buffer for the value, not one per binding.
 #[test]
 fn decomposed_companion_unifies_recomputed_forward_save_by_local_identity() {
     let (program, _semantics) = with_inline_package(
@@ -3153,16 +3155,18 @@ fn decomposed_companion_unifies_recomputed_forward_save_by_local_identity() {
         reader_at_0.buffer.id, reader_at_1.buffer.id,
         "the same recomputed local unifies onto ONE buffer across different subchain bindings"
     );
-    // The unified buffer carries the role-based fallback name — the source
-    // local is unnamed (reverse-AD synthetic), so the two reads' own
-    // fallback names (input_0, input_1) differ and the origin identity was
-    // what carried the join.
+    // The unified buffer carries the role-based fallback name of the slot
+    // that FIRST references it: with D-2b-1 the recompute subchain exposes
+    // the value as an extra OUTPUT, so its output slot (binding 5) mints the
+    // buffer (`output_5`) — not the readers' own fallback names (`input_0`
+    // and `input_1`, which differ). The origin identity carried the join,
+    // never the names.
     assert_eq!(
-        reader_at_0.buffer.name, "input_0",
-        "the recomputed local's buffer is role-named (the local is unnamed)"
+        reader_at_0.buffer.name, "output_5",
+        "the recomputed local's buffer is role-named from the producing subchain's extra output"
     );
     assert_eq!(
-        reader_at_1.buffer.name, "input_0",
-        "the second reader joins the same role-named buffer, not its own input_1"
+        reader_at_1.buffer.name, "output_5",
+        "the second reader joins the same producer-minted buffer, not its own input_1"
     );
 }

@@ -58,6 +58,7 @@ use radix::hir::DefId;
 use radix::lexer::Interner;
 use radix::mir::{MirFunction, MirKernelShaderStage, ValidatedMir};
 use radix::semantic::Type;
+use radix::semantic::TypeTable;
 use radix_mir::abi::{
     collection_op_contract, MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind,
     MirKernelResourceRole, MirKernelSignature,
@@ -1768,20 +1769,36 @@ pub(crate) fn device_program_for_lowered(
         // elementwise-only subchains.
         let decomposition = decompose_kernel_function(kernel_source, validated.validation())
             .map_err(|error| vec![device_diag("decomposition", error.message)])?;
+        // D-2b-2: pre-intern the subchain output-tuple return types (D-2b-1)
+        // in the table the subchain derivation uses — `subchain_function`
+        // holds only `&TypeTable` and fails closed when a multi-output
+        // subchain's tuple type is missing. A restored superset table (the
+        // tuple element types come from the source function's locals, shared
+        // with the original table) resolves every other typed fact
+        // identically.
+        let mut subchain_types = TypeTable::from_snapshot(validated.validation().types.snapshot())
+            .map_err(|error| vec![device_diag("subchain types", error)])?;
+        decomposition.intern_output_tuple_types(kernel_source, &mut subchain_types);
+        let subchain_validation = validated.validation().with_types(&subchain_types);
         for (subchain_index, subchain) in decomposition.subchains.iter().enumerate() {
-            let synthetic = decomposition.subchain_function(kernel_source, subchain_index);
-            let contract = collection_op_contract(&synthetic, validated.validation())
+            let synthetic = decomposition.subchain_function(
+                kernel_source,
+                subchain_index,
+                subchain_validation.types,
+            );
+            let contract = collection_op_contract(&synthetic, &subchain_validation)
                 .map_err(|error| vec![device_diag("plan", error.message)])?;
             let signature = match &contract {
                 Some(contract) => subchain_signature_for_emission(
                     &synthetic,
                     contract,
-                    validated.validation(),
+                    &subchain_validation,
+                    &subchain.outputs,
                 )
                 .map_err(|error| vec![device_diag("signature", error.message)])?,
                 None => MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
                     &synthetic,
-                    validated.validation(),
+                    &subchain_validation,
                     interner,
                 )
                 .map_err(|error| vec![device_diag("signature", error.message)])?,
