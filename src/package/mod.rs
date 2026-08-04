@@ -54,7 +54,7 @@ mod mir;
 mod modules;
 mod paths;
 mod product;
-mod reader;
+mod locale;
 mod runtime_dependency;
 mod source_files;
 mod test_source_filter;
@@ -188,8 +188,8 @@ pub(crate) use library::{
     library_interface_export_names, library_interface_has_module, library_module_segments,
     program_export_names, with_library_cached_analysis_mut, LibraryInterfaceCache,
 };
-pub use reader::reader_pack_for_emit;
-pub(crate) use reader::{config_with_reader_locale, load_reader_pack_for_input};
+pub use locale::locale_pack_for_emit;
+pub(crate) use locale::{config_with_locale, load_locale_pack_for_input};
 
 pub(super) const MANIFEST_FILE: &str = "faber.toml";
 
@@ -276,11 +276,11 @@ pub(crate) fn library_resolver_for_package(
     Ok(resolver)
 }
 
-/// Test-facing convenience wrapper around [`load_package_with_reader_pack`]
+/// Test-facing convenience wrapper around [`load_package_with_locale_pack`]
 /// (no reader pack, no proba filtering).
 ///
 /// Dead-code allowance (lib/bin non-test builds): every production path calls
-/// [`load_package_with_reader_pack`] or the higher-level compile/run routes
+/// [`load_package_with_locale_pack`] or the higher-level compile/run routes
 /// directly, while the package test suites (`package_test`,
 /// `frontmatter_integration_test`, `proba_integration_test`,
 /// `proba_stepper_test`) exercise this wrapper. The deferred FHIR package
@@ -293,13 +293,13 @@ pub(crate) fn load_package(
     spec: &PackageSpec,
     library_resolver: &LibraryResolver,
 ) -> Result<Vec<PackageFile>, Vec<Diagnostic>> {
-    load_package_with_reader_pack(spec, library_resolver, None, false, None)
+    load_package_with_locale_pack(spec, library_resolver, None, false, None)
 }
 
-pub(crate) fn load_package_with_reader_pack(
+pub(crate) fn load_package_with_locale_pack(
     spec: &PackageSpec,
     library_resolver: &LibraryResolver,
-    reader_pack: Option<&radix::reader_locale::ReaderLocalePack>,
+    locale_pack: Option<&radix::locale::LocalePack>,
     include_proba: bool,
     proba_filter: Option<&TestSourceFilter>,
 ) -> Result<Vec<PackageFile>, Vec<Diagnostic>> {
@@ -374,7 +374,7 @@ pub(crate) fn load_package_with_reader_pack(
         }
 
         let Some(loaded) =
-            load_package_source(&canonical, manifest.as_ref(), reader_pack, &mut diagnostics)
+            load_package_source(&canonical, manifest.as_ref(), locale_pack, &mut diagnostics)
         else {
             continue;
         };

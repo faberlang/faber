@@ -1,7 +1,7 @@
 //! `faber test` — interpret proba cases on the MIR stepper (not a Cargo harness).
 
 use crate::cli::TestArgs;
-use crate::input_shape::reader_locale_without_package_error;
+use crate::input_shape::locale_without_package_error;
 use crate::package::{self, TestSourceFilter};
 use radix::driver::{Config, Session};
 use radix::proba::{
@@ -14,8 +14,8 @@ use std::path::{Path, PathBuf};
 pub(super) fn cmd_test(args: &TestArgs) {
     crate::commands::validate_deny_codes(&args.deny);
     let input_path = PathBuf::from(&args.path);
-    if let Some(message) = reader_locale_without_package_error(
-        args.reader_locale.as_deref(),
+    if let Some(message) = locale_without_package_error(
+        args.locale.as_deref(),
         &[args.path.display().to_string()],
         false,
     ) {
@@ -57,12 +57,13 @@ pub(super) fn cmd_test(args: &TestArgs) {
 
     // Target-neutral analysis config. The stepper never emits product targets;
     // any Target variant is only used for session/policy construction.
-    let config = match package::config_with_reader_locale(
+    let config = match package::config_with_locale(
         radix::Target::TypeScript,
         &input_path,
-        args.reader_locale.as_deref(),
+        args.locale.as_deref(),
+        args.diagnostic_locale.as_deref(),
     ) {
-        Ok((config, _reader_pack)) => config.with_warn_policy(warn_policy),
+        Ok((config, _locale_pack)) => config.with_warn_policy(warn_policy),
         Err(diag) => {
             eprintln!("error: {}", diag.message);
             std::process::exit(1);

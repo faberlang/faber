@@ -9,7 +9,7 @@
 //! break (see `docs/factory/faber-script-runtime/stage0-baseline.md`).
 
 use crate::cli::{BackendSelection, FmirRunArgs, RunArgs};
-use crate::input_shape::reader_locale_without_package_error;
+use crate::input_shape::locale_without_package_error;
 use crate::package;
 use faber::device::{DeviceBackend, DeviceSelection};
 use fs2::FileExt;
@@ -21,7 +21,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 fn should_interpret(args: &RunArgs, path: &Path) -> bool {
-    if args.reader_locale.is_some() {
+    if args.locale.is_some() {
         return false;
     }
     if resolve_run_target(args, path) != Target::Rust {
@@ -40,16 +40,16 @@ fn should_interpret(args: &RunArgs, path: &Path) -> bool {
 pub(super) fn cmd_run(args: RunArgs) {
     crate::commands::validate_deny_codes(&args.deny);
     let input_path = PathBuf::from(&args.path);
-    if let Some(message) = reader_locale_without_package_error(
-        args.reader_locale.as_deref(),
+    if let Some(message) = locale_without_package_error(
+        args.locale.as_deref(),
         &[args.path.display().to_string()],
         false,
     ) {
         eprintln!("error: {message}");
         std::process::exit(1);
     }
-    if args.interpret && args.reader_locale.is_some() {
-        eprintln!("error: --reader-locale is not supported with `faber run --interpret`");
+    if args.interpret && args.locale.is_some() {
+        eprintln!("error: --locale is not supported with `faber run --interpret`");
         std::process::exit(1);
     }
 
@@ -238,20 +238,22 @@ fn warn_policy_from_args(args: &RunArgs) -> radix::driver::WarnPolicy {
 fn run_config(
     target: Target,
     input_path: &Path,
-    reader_locale: Option<&str>,
+    locale: Option<&str>,
+    diagnostic_locale: Option<&str>,
     warn_policy: radix::driver::WarnPolicy,
 ) -> Result<radix::driver::Config, Box<Diagnostic>> {
-    package::config_with_reader_locale(target, input_path, reader_locale)
-        .map(|(config, _reader_pack)| config.with_warn_policy(warn_policy))
+    package::config_with_locale(target, input_path, locale, diagnostic_locale)
+        .map(|(config, _locale_pack)| config.with_warn_policy(warn_policy))
 }
 
 fn run_config_or_exit(
     target: Target,
     input_path: &Path,
-    reader_locale: Option<&str>,
+    locale: Option<&str>,
+    diagnostic_locale: Option<&str>,
     warn_policy: radix::driver::WarnPolicy,
 ) -> radix::driver::Config {
-    match run_config(target, input_path, reader_locale, warn_policy) {
+    match run_config(target, input_path, locale, diagnostic_locale, warn_policy) {
         Ok(config) => config,
         Err(diag) => {
             eprintln!("error: {}", diag.message);
@@ -266,7 +268,8 @@ fn cmd_run_go(args: &RunArgs) {
     let config = run_config_or_exit(
         Target::Go,
         &input_path,
-        args.reader_locale.as_deref(),
+        args.locale.as_deref(),
+        args.diagnostic_locale.as_deref(),
         warn_policy_from_args(args),
     );
     let result = package::compile_package_go(&config, &input_path);
@@ -317,7 +320,8 @@ fn cmd_run_scena(args: RunArgs) {
     let config = run_config_or_exit(
         Target::Scena,
         &input_path,
-        args.reader_locale.as_deref(),
+        args.locale.as_deref(),
+        args.diagnostic_locale.as_deref(),
         warn_policy,
     );
     let artifact = match package::build_package_mir_artifact(&config, &input_path, &argumenta) {
@@ -342,7 +346,8 @@ fn cmd_run_fmir_text(args: RunArgs, selection: DeviceSelection) {
     let config = run_config_or_exit(
         Target::FmirText,
         &input_path,
-        args.reader_locale.as_deref(),
+        args.locale.as_deref(),
+        args.diagnostic_locale.as_deref(),
         warn_policy,
     );
     let image = match package::build_package_fmir_text_image(&config, &input_path, &[]) {
@@ -373,7 +378,8 @@ fn cmd_run_fmir(args: RunArgs, selection: DeviceSelection) {
     let config = run_config_or_exit(
         Target::Fmir,
         &input_path,
-        args.reader_locale.as_deref(),
+        args.locale.as_deref(),
+        args.diagnostic_locale.as_deref(),
         warn_policy,
     );
     let image = match package::build_package_fmir_image(&config, &input_path, &[]) {
@@ -406,7 +412,8 @@ fn cmd_run_fhir(args: RunArgs) {
     let config = run_config_or_exit(
         Target::Fhir,
         &input_path,
-        args.reader_locale.as_deref(),
+        args.locale.as_deref(),
+        args.diagnostic_locale.as_deref(),
         warn_policy,
     );
     let artifact = match package::build_package_fhir(&config, &input_path) {
@@ -439,7 +446,8 @@ fn cmd_run_fmir_bin(args: &RunArgs, selection: DeviceSelection) {
     let config = run_config_or_exit(
         Target::FmirBin,
         &input_path,
-        args.reader_locale.as_deref(),
+        args.locale.as_deref(),
+        args.diagnostic_locale.as_deref(),
         warn_policy_from_args(args),
     );
     let bundle =
@@ -553,7 +561,8 @@ fn cmd_run_compiled(args: &RunArgs) {
     let config = run_config_or_exit(
         Target::Rust,
         &input_path,
-        args.reader_locale.as_deref(),
+        args.locale.as_deref(),
+        args.diagnostic_locale.as_deref(),
         warn_policy_from_args(args),
     );
     let result = package::compile_package(&config, &input_path);

@@ -6,7 +6,7 @@
 
 use crate::explain::ExplainError;
 use crate::io_buf::writeln_buf;
-use radix::reader_locale::{DiagnosticTemplate, ReaderLocalePack};
+use radix::locale::{DiagnosticTemplate, LocalePack};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 
@@ -32,7 +32,7 @@ pub struct DiagnosticExplanation {
     pub issue: Option<String>,
 
     /// Reader locale pack that supplied this explanation.
-    pub reader_locale: String,
+    pub locale: String,
 
     /// Pack-owned message template. Placeholder braces are kept when the
     /// explanation is not tied to a concrete diagnostic instance.
@@ -47,14 +47,14 @@ impl DiagnosticExplanation {
     fn from_template(
         query: &str,
         key: DiagnosticLookupKey,
-        pack: &ReaderLocalePack,
+        pack: &LocalePack,
         template: &DiagnosticTemplate,
     ) -> Self {
         Self {
             query: query.to_owned(),
             code: key.code,
             issue: key.issue,
-            reader_locale: pack.metadata.id.clone(),
+            locale: pack.metadata.id.clone(),
             message: template.message.clone(),
             help: template.help.clone(),
         }
@@ -76,20 +76,20 @@ pub fn is_diagnostic_query(query: &str) -> bool {
 /// Resolve a diagnostic explanation from an installed reader pack.
 pub fn lookup_installed_diagnostic(
     query: &str,
-    reader_locale: Option<&str>,
+    locale: Option<&str>,
 ) -> Result<Option<DiagnosticExplanation>, ExplainError> {
     let Some(key) = DiagnosticLookupKey::parse(query) else {
         return Ok(None);
     };
-    let locale = reader_locale.unwrap_or(DEFAULT_READER_LOCALE);
-    let pack = load_installed_reader_pack(locale)?;
+    let locale = locale.unwrap_or(DEFAULT_READER_LOCALE);
+    let pack = load_installed_locale_pack(locale)?;
     Ok(resolve_diagnostic_in_pack(query, &pack, key))
 }
 
 /// Resolve a diagnostic explanation from an already loaded reader pack.
 pub fn lookup_diagnostic_in_pack(
     query: &str,
-    pack: &ReaderLocalePack,
+    pack: &LocalePack,
 ) -> Option<DiagnosticExplanation> {
     let key = DiagnosticLookupKey::parse(query)?;
     resolve_diagnostic_in_pack(query, pack, key)
@@ -97,7 +97,7 @@ pub fn lookup_diagnostic_in_pack(
 
 fn resolve_diagnostic_in_pack(
     query: &str,
-    pack: &ReaderLocalePack,
+    pack: &LocalePack,
     key: DiagnosticLookupKey,
 ) -> Option<DiagnosticExplanation> {
     let code_template = pack.diagnostics.get(&key.code)?;
@@ -124,7 +124,7 @@ pub fn render_plain(explanation: &DiagnosticExplanation) -> String {
     section(
         &mut out,
         "READER LOCALE",
-        [explanation.reader_locale.as_str()],
+        [explanation.locale.as_str()],
     );
     section(&mut out, "MESSAGE", [explanation.message.as_str()]);
 
@@ -147,12 +147,12 @@ pub fn render_json(explanation: &DiagnosticExplanation) -> Result<String, Explai
         .map_err(|err| ExplainError::new(format!("failed to render diagnostic JSON: {err}")))
 }
 
-fn load_installed_reader_pack(locale: &str) -> Result<ReaderLocalePack, ExplainError> {
+fn load_installed_locale_pack(locale: &str) -> Result<LocalePack, ExplainError> {
     if locale.trim().is_empty() {
-        return Err(ExplainError::new("--reader-locale must not be empty"));
+        return Err(ExplainError::new("--locale must not be empty"));
     }
-    let path = installed_reader_pack_path(locale.trim());
-    let pack = ReaderLocalePack::from_toml_path(&path).map_err(|err| {
+    let path = installed_locale_pack_path(locale.trim());
+    let pack = LocalePack::from_toml_path(&path).map_err(|err| {
         ExplainError::new(format!(
             "failed to load reader locale '{}' pack '{}': {err}",
             locale,
@@ -170,11 +170,11 @@ fn load_installed_reader_pack(locale: &str) -> Result<ReaderLocalePack, ExplainE
     Ok(pack)
 }
 
-fn installed_reader_pack_path(locale: &str) -> PathBuf {
+fn installed_locale_pack_path(locale: &str) -> PathBuf {
     normalize_path(
         &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../radix/stdlib")
-            .join("reader")
+            .join("locale")
             .join(locale)
             .join("pack.toml"),
     )

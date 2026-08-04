@@ -27,8 +27,8 @@ use super::{
     analysis_source_for_file, discover_build_layout, discover_package, library_cached_analysis,
     library_cached_expanded_imports, library_cached_file_interface, library_generates_rust_module,
     library_imported_function_params, library_interface_export_names, library_interface_has_module,
-    library_module_segments, library_resolver_for_package, load_package_with_reader_pack,
-    load_provider_manifests, load_reader_pack_for_input, program_export_names, read_manifest,
+    library_module_segments, library_resolver_for_package, load_package_with_locale_pack,
+    load_provider_manifests, load_locale_pack_for_input, program_export_names, read_manifest,
     selected_providers_for_routes, with_library_cached_analysis_mut, LibraryImportBinding,
     LibraryInterfaceCache, PackageFile, RustRuntimePlan,
 };
@@ -482,8 +482,8 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Packag
 
     // Go is not a localized target; the surface is unused but required by the
     // shared dispatch seam after reader-locale emit threading.
-    let go_surface_latin = radix::reader_locale::latin_reader_pack();
-    let go_surface = radix::reader_locale::KeywordSurface::new(&go_surface_latin);
+    let go_surface_latin = radix::locale::latin_locale_pack();
+    let go_surface = radix::locale::KeywordSurface::new(&go_surface_latin);
     for unit in &package.units {
         if unit.is_entry {
             continue;
@@ -973,11 +973,11 @@ pub(crate) fn generate_package_rust(
 }
 
 fn effective_package_config(config: &Config, input: &Path) -> Result<Config, Vec<Diagnostic>> {
-    if config.reader_pack.is_some() {
+    if config.locale_pack.is_some() {
         return Ok(config.clone());
     }
-    match load_reader_pack_for_input(input, None) {
-        Ok(Some(pack)) => Ok(config.clone().with_reader_pack(pack)),
+    match load_locale_pack_for_input(input, None) {
+        Ok(Some(pack)) => Ok(config.clone().with_locale_pack(pack)),
         Ok(None) => Ok(config.clone()),
         Err(diag) => Err(vec![*diag]),
     }
@@ -1195,15 +1195,15 @@ fn analyze_package_spec(
     include_proba: bool,
     proba_filter: Option<&super::TestSourceFilter>,
 ) -> Result<AnalyzedPackage, Vec<Diagnostic>> {
-    let files = match config.reader_pack.as_ref() {
-        Some(pack) => load_package_with_reader_pack(
+    let files = match config.locale_pack.as_ref() {
+        Some(pack) => load_package_with_locale_pack(
             &spec,
             library_resolver,
             Some(pack),
             include_proba,
             proba_filter,
         )?,
-        None => load_package_with_reader_pack(
+        None => load_package_with_locale_pack(
             &spec,
             library_resolver,
             None,

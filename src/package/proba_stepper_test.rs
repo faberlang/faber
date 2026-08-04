@@ -4,7 +4,7 @@
 
 use super::test_support::test_temp_dir;
 use super::{
-    analyze_package, analyze_package_for_tests, load_package, load_package_with_reader_pack,
+    analyze_package, analyze_package_for_tests, load_package, load_package_with_locale_pack,
 };
 use super::{discover_package, library_resolver_from_config};
 use radix::driver::{Config, Session};
@@ -126,7 +126,7 @@ proba "math ok" {
         .iter()
         .all(|f| f.path.extension().and_then(|e| e.to_str()) != Some("proba")));
     let test_files =
-        load_package_with_reader_pack(&spec, &resolver, None, true, None).expect("load tests");
+        load_package_with_locale_pack(&spec, &resolver, None, true, None).expect("load tests");
     assert!(test_files
         .iter()
         .any(|f| f.path.extension().and_then(|e| e.to_str()) == Some("proba")));

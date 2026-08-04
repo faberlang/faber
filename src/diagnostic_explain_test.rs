@@ -2,10 +2,10 @@ use crate::diagnostic_explain::{
     is_diagnostic_query, lookup_diagnostic_in_pack, lookup_installed_diagnostic, render_json,
     render_plain,
 };
-use radix::reader_locale::ReaderLocalePack;
+use radix::locale::LocalePack;
 
-fn synthetic_pack() -> ReaderLocalePack {
-    ReaderLocalePack::from_toml_str(
+fn synthetic_pack() -> LocalePack {
+    LocalePack::from_toml_str(
         r#"
 [pack]
 id = "la-test"
@@ -52,7 +52,7 @@ fn diagnostic_lookup_selects_issue_row_before_code_row() {
         explanation.issue.as_deref(),
         Some("initializer_annotation_mismatch")
     );
-    assert_eq!(explanation.reader_locale, "la-test");
+    assert_eq!(explanation.locale, "la-test");
     assert_eq!(explanation.message, "ISSUE_MSG");
     assert_eq!(explanation.help.as_deref(), Some("ISSUE_HELP"));
 }
@@ -85,7 +85,7 @@ fn installed_default_pack_resolves_diagnostic_issue_structurally() {
         explanation.issue.as_deref(),
         Some("initializer_annotation_mismatch")
     );
-    assert_eq!(explanation.reader_locale, "la");
+    assert_eq!(explanation.locale, "la");
     assert!(!explanation.message.is_empty());
     assert!(explanation
         .help
@@ -105,7 +105,7 @@ fn installed_nonlatin_pack_resolves_diagnostic_issue_structurally() {
         explanation.issue.as_deref(),
         Some("initializer_annotation_mismatch")
     );
-    assert_eq!(explanation.reader_locale, "zh-Hans");
+    assert_eq!(explanation.locale, "zh-Hans");
     assert!(!explanation.message.is_empty());
 }
 
@@ -135,7 +135,7 @@ fn diagnostic_json_render_preserves_code_issue_and_locale() {
 
     assert_eq!(json["code"], "SEM010");
     assert_eq!(json["issue"], "initializer_annotation_mismatch");
-    assert_eq!(json["reader_locale"], "la-test");
+    assert_eq!(json["locale"], "la-test");
     assert_eq!(json["message"], "ISSUE_MSG");
 }
 
@@ -175,7 +175,7 @@ fn diagnostic_json_render_for_code_only_includes_all_fields() {
 
     assert_eq!(json["code"], "SEM010");
     assert!(json["issue"].is_null());
-    assert_eq!(json["reader_locale"], "la-test");
+    assert_eq!(json["locale"], "la-test");
     assert_eq!(json["message"], "CODE_MSG");
     assert_eq!(json["help"], "CODE_HELP");
 }

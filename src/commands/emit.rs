@@ -9,12 +9,12 @@ pub fn cmd_emit_faber(command: EmitCommand) {
         std::process::exit(1);
     }
 
-    // Faber owns reader-locale → pack resolution (install layout + package
-    // manifests live here, not in radix). Resolve once and hand the pack to the
-    // shared emit path so `-t faber --reader-locale=<X>` emits localized Faber.
-    let reader_pack = match crate::package::reader_pack_for_emit(
+    // Faber owns locale → pack resolution (install layout + package manifests
+    // live here, not in radix). Code pack drives emit surface; diagnostic pack
+    // drives message rendering (`--diagnostic-locale` when set).
+    let code_pack = match crate::package::locale_pack_for_emit(
         &command.input,
-        command.reader_locale.as_deref(),
+        command.locale.as_deref(),
     ) {
         Ok(pack) => pack,
         Err(message) => {
@@ -22,8 +22,22 @@ pub fn cmd_emit_faber(command: EmitCommand) {
             std::process::exit(1);
         }
     };
+    let diagnostic_pack = match command.diagnostic_locale.as_deref() {
+        Some(locale) => match crate::package::locale_pack_for_emit(&command.input, Some(locale)) {
+            Ok(pack) => pack,
+            Err(message) => {
+                eprintln!("error: {message}");
+                std::process::exit(1);
+            }
+        },
+        None => code_pack.clone(),
+    };
 
-    radix::tool::cmd_emit_with_reader_pack(command, reader_pack.as_ref());
+    radix::tool::cmd_emit_with_locale_packs(
+        command,
+        code_pack.as_ref(),
+        diagnostic_pack.as_ref(),
+    );
 }
 
 pub fn is_faber_emit(target: FaberCliTarget) -> bool {
