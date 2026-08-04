@@ -106,7 +106,7 @@ fn reader_pack_path(
         return normalize_path(&package_root.join(pack));
     }
 
-    let package_pack = normalize_path(&package_root.join("reader").join(format!("{locale}.toml")));
+    let package_pack = normalize_path(&package_root.join("locale").join(format!("{locale}.toml")));
     if package_pack.exists() {
         return package_pack;
     }
@@ -158,7 +158,7 @@ fn installed_reader_pack_path(locale: &str) -> PathBuf {
     normalize_path(
         &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../radix/stdlib")
-            .join("reader")
+            .join("locale")
             .join(locale)
             .join("pack.toml"),
     )

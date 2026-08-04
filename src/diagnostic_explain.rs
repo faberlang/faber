@@ -174,7 +174,7 @@ fn installed_reader_pack_path(locale: &str) -> PathBuf {
     normalize_path(
         &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../radix/stdlib")
-            .join("reader")
+            .join("locale")
             .join(locale)
             .join("pack.toml"),
     )

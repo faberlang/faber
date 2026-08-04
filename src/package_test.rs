@@ -181,7 +181,7 @@ fn library_item_by_export<'a>(
 }
 
 fn write_zh_reader_pack(root: &Path, name: &str) -> PathBuf {
-    let reader = root.join("reader");
+    let reader = root.join("locale");
     let exemplars = reader.join("exemplars");
     fs::create_dir_all(&exemplars).expect("create reader exemplars");
     fs::write(
@@ -6783,7 +6783,7 @@ entry = "main.fab"
 
 [reader]
 locale = "zh-Hans"
-pack = "./reader/custom.toml"
+pack = "./locale/custom.toml"
 "#,
     )
     .expect("write manifest");
