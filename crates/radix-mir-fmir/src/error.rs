@@ -58,6 +58,27 @@ pub enum FmirImageError {
         /// Hash recomputed from the blob.
         actual: String,
     },
+
+    /// The nested device-program wire version is unsupported. The nested
+    /// version is admitted independently of the outer FMIR image version
+    /// (Stage 3R S8/F7), before any field-level interpretation of the device
+    /// section.
+    UnsupportedDeviceProgramVersion {
+        /// Version encoded in the device section.
+        actual: u32,
+        /// Version this loader accepts.
+        expected: u32,
+    },
+
+    /// The device program's carried semantic facts violate a fail-closed
+    /// rule (Stage 3R F1–F7): identity aliasing, generation errors, graph
+    /// cycles, illegal roots, missing dependencies, or duplicate/
+    /// contradictory relation rows. The detail carries the focused
+    /// diagnostic.
+    WireProgramInvalid {
+        /// The focused rule violation.
+        detail: String,
+    },
 }
 
 impl fmt::Display for FmirImageError {
@@ -99,6 +120,15 @@ impl fmt::Display for FmirImageError {
                     f,
                     "FMIR device artifact hash mismatch for backend `{spelling}` (stored {expected}, recomputed {actual})"
                 )
+            }
+            Self::UnsupportedDeviceProgramVersion { actual, expected } => {
+                write!(
+                    f,
+                    "unsupported device-program wire version {actual}; expected {expected}"
+                )
+            }
+            Self::WireProgramInvalid { detail } => {
+                write!(f, "invalid device program: {detail}")
             }
         }
     }

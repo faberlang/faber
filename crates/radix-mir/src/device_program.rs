@@ -114,9 +114,11 @@ use crate::abi::{
     MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature,
     MirKernelWorkgroupCount, MirWorkgroupSize,
 };
+use crate::device_semantics::{DependencyEdge, SemanticValueId};
 use crate::kernel_plan::{CollectionKernelPlan, PlanValidationError};
 use crate::layout::MirTensorStorageLayout;
 use crate::{MirFunction, MirFunctionId, MirType};
+use radix_hir::DefId;
 use std::fmt;
 
 /// Program-unique identity of one device-resident buffer.
@@ -812,6 +814,85 @@ pub enum DeviceProgramError {
         first: String,
         second: String,
     },
+    // ── Stage 3R carried-semantics contract (F1–F7) ────────────────────────
+    /// A semantic value repeats with conflicting carried facts (F1).
+    SemanticIdentityConflict {
+        value: SemanticValueId,
+        field: &'static str,
+        first: String,
+        second: String,
+    },
+    /// Two distinct semantic values are minted from the same carried origin —
+    /// they would silently alias (F1).
+    SemanticOriginAliased {
+        first: SemanticValueId,
+        second: SemanticValueId,
+        origin: String,
+    },
+    /// A value id is referenced that no [`SemanticValue`](crate::device_semantics::SemanticValue)
+    /// declares (F1).
+    UnknownSemanticValue { value: SemanticValueId },
+    /// A semantic value is bound to more than one buffer (F1).
+    DuplicateValueBinding {
+        value: SemanticValueId,
+        buffer: BufferId,
+    },
+    /// Two different values claim the same buffer (F1).
+    BufferHoldsMultipleValues {
+        buffer: BufferId,
+        first: SemanticValueId,
+        second: SemanticValueId,
+    },
+    /// A write carries generation 0 — the reserved unset sentinel (F2).
+    UnsetValueGeneration { value: SemanticValueId },
+    /// A second producer claims an existing (value, generation) (F2).
+    DuplicateGenerationProducer {
+        value: SemanticValueId,
+        generation: u32,
+    },
+    /// A root names a launch that does not exist (F3).
+    IllegalRoot { root: LaunchId },
+    /// A root appears more than once (F3).
+    DuplicateRoot { root: LaunchId },
+    /// A dependency edge runs from a launch to itself (F3).
+    SelfDependency { launch: LaunchId },
+    /// A dependency edge names a launch that does not exist (F3).
+    UnknownDependencyEndpoint { launch: LaunchId },
+    /// The same dependency edge is declared twice (F3).
+    DuplicateDependencyEdge {
+        producer: LaunchId,
+        consumer: LaunchId,
+    },
+    /// The carried dependency graph contains a cycle (F3).
+    DependencyCycle { edge: DependencyEdge },
+    /// A generation producer is not reachable from any root — a missing
+    /// dependency (F3).
+    MissingDependency {
+        launch: LaunchId,
+        value: SemanticValueId,
+    },
+    /// A relation row is malformed (primal equals companion, duplicate
+    /// selected positions, …) (F4).
+    IllegalRelationRow { primal: DefId, reason: &'static str },
+    /// Two relation rows name the same primal with identical facts (F4).
+    DuplicateRelationRow { primal: DefId },
+    /// Two relation rows for the same primal disagree on a fact (F4).
+    ContradictoryRelationRow {
+        primal: DefId,
+        field: &'static str,
+        first: String,
+        second: String,
+    },
+    /// Two initialization facts for the same buffer disagree (F5).
+    ContradictoryInitialization {
+        buffer: BufferId,
+        first: String,
+        second: String,
+    },
+    /// An observation names a launch that does not exist (F5/F6).
+    ObservationOutOfRange { launch: LaunchId },
+    /// An observation names a buffer no value is bound to (F6).
+    UnknownObservationBuffer { buffer: BufferId },
 }
 
 impl fmt::Display for DeviceProgramError {
@@ -900,6 +981,114 @@ impl fmt::Display for DeviceProgramError {
             } => write!(
                 f,
                 "buffer {buffer} version {version} has conflicting shapes: first {first}, second {second}"
+            ),
+            Self::SemanticIdentityConflict {
+                value,
+                field,
+                first,
+                second,
+            } => write!(
+                f,
+                "semantic value {value} declares conflicting {field}: first {first}, second {second}"
+            ),
+            Self::SemanticOriginAliased {
+                first,
+                second,
+                origin,
+            } => write!(
+                f,
+                "semantic values {first} and {second} both derive from origin {origin}; distinct values must derive from distinct carried facts"
+            ),
+            Self::UnknownSemanticValue { value } => {
+                write!(f, "semantic value {value} is referenced but never declared")
+            }
+            Self::DuplicateValueBinding { value, buffer } => write!(
+                f,
+                "semantic value {value} is bound to more than one buffer (including {buffer})"
+            ),
+            Self::BufferHoldsMultipleValues {
+                buffer,
+                first,
+                second,
+            } => write!(
+                f,
+                "buffer {buffer} holds semantic values {first} and {second}; one buffer holds one value"
+            ),
+            Self::UnsetValueGeneration { value } => write!(
+                f,
+                "a write of semantic value {value} carries generation 0 (the reserved unset sentinel)"
+            ),
+            Self::DuplicateGenerationProducer { value, generation } => write!(
+                f,
+                "semantic value {value} generation {generation} has a second producer; a later write is a new generation"
+            ),
+            Self::IllegalRoot { root } => {
+                write!(f, "root {root} is not a declared launch")
+            }
+            Self::DuplicateRoot { root } => {
+                write!(f, "root {root} is declared more than once")
+            }
+            Self::SelfDependency { launch } => write!(
+                f,
+                "dependency edge runs from launch {launch} to itself"
+            ),
+            Self::UnknownDependencyEndpoint { launch } => write!(
+                f,
+                "dependency edge names launch {launch}, which does not exist"
+            ),
+            Self::DuplicateDependencyEdge {
+                producer,
+                consumer,
+            } => write!(
+                f,
+                "dependency edge {producer} → {consumer} is declared more than once"
+            ),
+            Self::DependencyCycle { edge } => write!(
+                f,
+                "dependency graph contains a cycle through launch {} (edge {producer} → {consumer})",
+                edge.consumer,
+                producer = edge.producer,
+                consumer = edge.consumer,
+            ),
+            Self::MissingDependency { launch, value } => write!(
+                f,
+                "launch {launch} produces semantic value {value} but is not reachable from any root (missing dependency)"
+            ),
+            Self::IllegalRelationRow { primal, reason } => write!(
+                f,
+                "relation row for primal DefId({}) is illegal: {reason}",
+                primal.0
+            ),
+            Self::DuplicateRelationRow { primal } => write!(
+                f,
+                "duplicate relation rows for primal DefId({}); duplicate or contradictory rows fail closed",
+                primal.0
+            ),
+            Self::ContradictoryRelationRow {
+                primal,
+                field,
+                first,
+                second,
+            } => write!(
+                f,
+                "relation rows for primal DefId({}) contradict on {field}: first {first}, second {second}",
+                primal.0
+            ),
+            Self::ContradictoryInitialization {
+                buffer,
+                first,
+                second,
+            } => write!(
+                f,
+                "buffer {buffer} declares conflicting initialization policies: first {first}, second {second}"
+            ),
+            Self::ObservationOutOfRange { launch } => write!(
+                f,
+                "observation names launch {launch}, which does not exist"
+            ),
+            Self::UnknownObservationBuffer { buffer } => write!(
+                f,
+                "observation names buffer {buffer}, which no semantic value is bound to"
             ),
         }
     }

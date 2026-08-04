@@ -21,22 +21,26 @@ use crate::schema::{
     FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection,
     FmirTextToolchainSection, FmirTextTypesSection, WireBinding, WireBufferIdentity,
     WireBufferLifetime, WireBufferRole, WireBufferVersion, WireCollectionKernelPlan,
-    WireDeviceProgram, WireDeviceResource, WireDispatchSize, WireKernelLaunchPlan, WireKernelUnit,
-    WireLaunchUnit, WireProgramLifetime, WireResourceAccess, WireResultBuffer, WireStorageLayout,
-    WireWorkgroupCount, WireWorkgroupSize, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME,
-    PACKAGE_MIR_ARTIFACT_VERSION,
+    WireCompanionDerivativeKind, WireCompanionRelation, WireCompanionSelectedInput,
+    WireCompanionSelectedOutput, WireDependencyEdge, WireDeviceProgram, WireDeviceResource,
+    WireDispatchSize, WireInitializationPolicy, WireKernelLaunchPlan, WireKernelUnit,
+    WireLaunchUnit, WireObservationFact, WireProgramLifetime, WireResourceAccess, WireResultBuffer,
+    WireSemanticValue, WireSemanticValueOrigin, WireStorageLayout, WireWorkgroupCount,
+    WireWorkgroupSize, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION,
+    WIRE_DEVICE_PROGRAM_VERSION,
 };
 use radix_mir::MirProgram;
 use radix_types::TypeTable;
 
 const TOOLCHAIN: &str = "0.79.0";
 
-/// The faber-owned wire/codec version (DEVICE_RUN_PLAN_VERSION bump, S3-A4):
-/// a v2 payload must fail admission closed.
-const WIRE_VERSION: u32 = 3;
+/// The faber-owned wire/codec version (DEVICE_RUN_PLAN_VERSION bump, Stage 3R
+/// U1 S1): a pre-break v3 payload must fail the nested admission closed.
+const WIRE_VERSION: u32 = WIRE_DEVICE_PROGRAM_VERSION;
 
 /// The typed wire fixture: a one-kernel elementwise program (two buffers, one
-/// launch, one result) mirroring the S2-5 `addita` shape.
+/// launch, one result) mirroring the S2-5 `addita` shape, now carrying the
+/// F1–F7 semantic facts (semantic values, generations, root, axes).
 fn sample_wire_program() -> WireDeviceProgram {
     let input = WireBufferIdentity {
         id: 1,
@@ -44,6 +48,7 @@ fn sample_wire_program() -> WireDeviceProgram {
         role: WireBufferRole::Input,
         storage: WireStorageLayout::DeviceHandle,
         lifetime: WireBufferLifetime::PerProgram,
+        semantic_value: 1,
     };
     let output = WireBufferIdentity {
         id: 2,
@@ -51,6 +56,7 @@ fn sample_wire_program() -> WireDeviceProgram {
         role: WireBufferRole::Output,
         storage: WireStorageLayout::DeviceHandle,
         lifetime: WireBufferLifetime::ObservationPoint,
+        semantic_value: 2,
     };
     WireDeviceProgram {
         kernels: vec![WireKernelUnit {
@@ -70,6 +76,8 @@ fn sample_wire_program() -> WireDeviceProgram {
                         binding: 0,
                     },
                     access: WireResourceAccess::Read,
+                    generation: 1,
+                    initialization: WireInitializationPolicy::HostProvided,
                 },
                 WireDeviceResource {
                     buffer: output.clone(),
@@ -83,6 +91,8 @@ fn sample_wire_program() -> WireDeviceProgram {
                         binding: 1,
                     },
                     access: WireResourceAccess::Write,
+                    generation: 1,
+                    initialization: WireInitializationPolicy::KernelInitialized,
                 },
             ],
             launch: WireKernelLaunchPlan {
@@ -105,7 +115,25 @@ fn sample_wire_program() -> WireDeviceProgram {
             },
             role: WireBufferRole::Output,
             produced_by: 1,
+            observation: WireObservationFact { at_launch: 1 },
         }],
+        semantic_values: vec![
+            WireSemanticValue {
+                id: 1,
+                name: "x".to_owned(),
+                origin: WireSemanticValueOrigin::HostInput,
+            },
+            WireSemanticValue {
+                id: 2,
+                name: "y".to_owned(),
+                origin: WireSemanticValueOrigin::Synthetic {
+                    label: "addita-output".to_owned(),
+                },
+            },
+        ],
+        roots: vec![1],
+        dependencies: Vec::new(),
+        relations: Vec::new(),
     }
 }
 
@@ -469,31 +497,28 @@ fn decode_rejects_unknown_backend_value() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn decode_rejects_pre_break_version_4_image_with_device() {
-    // A version-4 image (the v4 opaque-payload layout) carrying a device
-    // section must fail closed on the version gate before any device
-    // admission runs (4→5 clean break, S3-A4).
+fn decode_rejects_pre_break_version_5_image_with_device() {
+    // A version-5 image (the pre-3R layout without the F1–F7 wire sections)
+    // carrying a device section must fail closed on the outer version gate
+    // before any device admission runs (5→6 clean break, Stage 3R U1).
     let mut image = text_image_with_device(Some(sample_device_section()));
-    image.version = 4;
+    image.version = 5;
     let text = encode_text_image(&image).expect("encode text image");
     assert!(matches!(
         decode_text_image(&text, TOOLCHAIN),
         Err(FmirImageError::UnsupportedVersion {
-            actual: 4,
-            expected: 5
+            actual: 5,
+            expected: 6
         })
     ));
 }
 
 #[test]
-fn decode_rejects_genuine_v4_layout_binary_image() {
-    // The 4→5 clean break (S3-A4) replaced the opaque payload with the typed
-    // complete program and added the declared-inputs metadata. A genuine
-    // version-4 binary image is the v5 layout without that trailing content:
-    // postcard encodes `device: None` as a single 0x00 marker, so dropping it
-    // yields a real v4-layout byte image (not a v5 image with a rewritten
-    // version byte). The version pre-scan must report UnsupportedVersion, not
-    // a structural Parse error.
+fn decode_rejects_genuine_v5_layout_binary_image() {
+    // The 5→6 clean break (Stage 3R U1) adds the F1–F7 semantic sections to
+    // the typed device program. A legacy image is any image whose first wire
+    // varint is 5: the version pre-scan must report UnsupportedVersion, not a
+    // structural Parse error.
     let image = binary_image_with_device(None);
     let mut bytes = encode_binary_image(&image).expect("encode binary image");
     assert_eq!(
@@ -501,18 +526,66 @@ fn decode_rejects_genuine_v4_layout_binary_image() {
         PACKAGE_MIR_ARTIFACT_VERSION,
         "version is the first postcard varint byte"
     );
-    assert_eq!(
-        bytes.last(),
-        Some(&0x00),
-        "device: None is a trailing 0x00 marker in the v5 layout"
-    );
-    bytes[0] = 4;
-    bytes.truncate(bytes.len() - 1);
+    bytes[0] = 5;
     assert!(matches!(
         decode_binary_image(&bytes, TOOLCHAIN),
         Err(FmirImageError::UnsupportedVersion {
-            actual: 4,
-            expected: 5
+            actual: 5,
+            expected: 6
+        })
+    ));
+}
+
+// ---------------------------------------------------------------------------
+// Stage 3R S8: nested device-program version admission (independent of the
+// outer FMIR version)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn decode_rejects_old_wire_version_in_device_section() {
+    // The nested device-program wire version is admitted INDEPENDENTLY of the
+    // outer FMIR version: a v6 image (outer version current) carrying a
+    // pre-break v3 device-program section fails closed with the focused
+    // nested diagnostic, before host construction or launch (S8/F7).
+    let mut section = sample_device_section();
+    section.device_program.v = 3;
+    let image = text_image_with_device(Some(section));
+    let text = encode_text_image(&image).expect("encode text image");
+    match decode_text_image(&text, TOOLCHAIN) {
+        Err(FmirImageError::UnsupportedDeviceProgramVersion { actual, expected }) => {
+            assert_eq!(actual, 3);
+            assert_eq!(expected, WIRE_DEVICE_PROGRAM_VERSION);
+        }
+        other => panic!("expected UnsupportedDeviceProgramVersion, got {other:?}"),
+    }
+}
+
+#[test]
+fn decode_rejects_old_wire_version_in_binary_image() {
+    let mut section = sample_device_section();
+    section.device_program.v = 3;
+    let image = binary_image_with_device(Some(section));
+    let bytes = encode_binary_image(&image).expect("encode binary image");
+    assert!(matches!(
+        decode_binary_image(&bytes, TOOLCHAIN),
+        Err(FmirImageError::UnsupportedDeviceProgramVersion { actual, expected })
+            if actual == 3 && expected == WIRE_DEVICE_PROGRAM_VERSION
+    ));
+}
+
+#[test]
+fn decode_rejects_outer_version_independently_of_nested_version() {
+    // The outer gate is also independent: a v5 image whose nested device
+    // program is already the current v4 still fails on the OUTER version
+    // first — the two versions never gate through each other (F7).
+    let mut image = text_image_with_device(Some(sample_device_section()));
+    image.version = 5;
+    let text = encode_text_image(&image).expect("encode text image");
+    assert!(matches!(
+        decode_text_image(&text, TOOLCHAIN),
+        Err(FmirImageError::UnsupportedVersion {
+            actual: 5,
+            expected: 6
         })
     ));
 }
@@ -605,14 +678,378 @@ fn canonical_program_bytes_cover_the_complete_program() {
     assert_ne!(canonical_program_bytes(&mutated), base);
 }
 
+/// Encode a text image carrying a mutated device program and attempt decode.
+/// Returns the decode outcome (admission verdict).
+fn wire_admission_error(
+    mutate: impl FnOnce(&mut WireDeviceProgram),
+) -> Result<FmirTextImageFile, FmirImageError> {
+    let mut program = sample_wire_program();
+    mutate(&mut program);
+    let mut section = sample_device_section();
+    section.device_program.program = program;
+    let image = text_image_with_device(Some(section));
+    let text = encode_text_image(&image).expect("encode text image");
+    decode_text_image(&text, TOOLCHAIN)
+}
+
+/// A valid two-kernel chain program: kernel 0 writes value 1 (buffer 1),
+/// kernel 1 consumes it and writes value 2 (buffer 2); launch 1 → launch 2.
+fn two_kernel_chain_program() -> WireDeviceProgram {
+    let value_one = WireBufferIdentity {
+        id: 1,
+        name: "a".to_owned(),
+        role: WireBufferRole::InOut,
+        storage: WireStorageLayout::DeviceHandle,
+        lifetime: WireBufferLifetime::PerStep,
+        semantic_value: 1,
+    };
+    let value_two = WireBufferIdentity {
+        id: 2,
+        name: "b".to_owned(),
+        role: WireBufferRole::Output,
+        storage: WireStorageLayout::DeviceHandle,
+        lifetime: WireBufferLifetime::ObservationPoint,
+        semantic_value: 2,
+    };
+    WireDeviceProgram {
+        kernels: vec![
+            WireKernelUnit {
+                function: 0,
+                entry: "first".to_owned(),
+                plan: WireCollectionKernelPlan::Elementwise,
+                resources: vec![WireDeviceResource {
+                    buffer: value_one.clone(),
+                    version: WireBufferVersion {
+                        version: 1,
+                        element_ty: "f32".to_owned(),
+                        element_count: 4,
+                    },
+                    binding: WireBinding {
+                        group: 0,
+                        binding: 0,
+                    },
+                    access: WireResourceAccess::Write,
+                    generation: 1,
+                    initialization: WireInitializationPolicy::KernelInitialized,
+                }],
+                launch: WireKernelLaunchPlan {
+                    workgroup: WireWorkgroupSize { x: 8, y: 1, z: 1 },
+                    dispatch_size: WireDispatchSize { x: 4, y: 1, z: 1 },
+                    workgroup_count: WireWorkgroupCount { x: 1, y: 1, z: 1 },
+                },
+            },
+            WireKernelUnit {
+                function: 1,
+                entry: "second".to_owned(),
+                plan: WireCollectionKernelPlan::Elementwise,
+                resources: vec![
+                    WireDeviceResource {
+                        buffer: value_one.clone(),
+                        version: WireBufferVersion {
+                            version: 1,
+                            element_ty: "f32".to_owned(),
+                            element_count: 4,
+                        },
+                        binding: WireBinding {
+                            group: 0,
+                            binding: 0,
+                        },
+                        access: WireResourceAccess::Read,
+                        generation: 1,
+                        initialization: WireInitializationPolicy::KernelInitialized,
+                    },
+                    WireDeviceResource {
+                        buffer: value_two.clone(),
+                        version: WireBufferVersion {
+                            version: 1,
+                            element_ty: "f32".to_owned(),
+                            element_count: 4,
+                        },
+                        binding: WireBinding {
+                            group: 0,
+                            binding: 1,
+                        },
+                        access: WireResourceAccess::Write,
+                        generation: 1,
+                        initialization: WireInitializationPolicy::KernelInitialized,
+                    },
+                ],
+                launch: WireKernelLaunchPlan {
+                    workgroup: WireWorkgroupSize { x: 8, y: 1, z: 1 },
+                    dispatch_size: WireDispatchSize { x: 4, y: 1, z: 1 },
+                    workgroup_count: WireWorkgroupCount { x: 1, y: 1, z: 1 },
+                },
+            },
+        ],
+        launches: vec![
+            WireLaunchUnit {
+                id: 1,
+                kernel_index: 0,
+            },
+            WireLaunchUnit {
+                id: 2,
+                kernel_index: 1,
+            },
+        ],
+        lifetime: WireProgramLifetime::SingleRun,
+        results: vec![WireResultBuffer {
+            buffer: value_two,
+            version: WireBufferVersion {
+                version: 1,
+                element_ty: "f32".to_owned(),
+                element_count: 4,
+            },
+            role: WireBufferRole::Output,
+            produced_by: 2,
+            observation: WireObservationFact { at_launch: 2 },
+        }],
+        semantic_values: vec![
+            WireSemanticValue {
+                id: 1,
+                name: "a".to_owned(),
+                origin: WireSemanticValueOrigin::Synthetic {
+                    label: "first-output".to_owned(),
+                },
+            },
+            WireSemanticValue {
+                id: 2,
+                name: "b".to_owned(),
+                origin: WireSemanticValueOrigin::Synthetic {
+                    label: "second-output".to_owned(),
+                },
+            },
+        ],
+        roots: vec![1],
+        dependencies: vec![WireDependencyEdge {
+            producer: 1,
+            consumer: 2,
+            buffer: 1,
+            version: 1,
+        }],
+        relations: Vec::new(),
+    }
+}
+
+fn sample_relation() -> WireCompanionRelation {
+    WireCompanionRelation {
+        primal: 1,
+        companion: 2,
+        derivative: WireCompanionDerivativeKind::ReverseModeVjp,
+        device_resident: true,
+        selected_inputs: vec![WireCompanionSelectedInput {
+            param: 1,
+            position: 0,
+            ty: 1,
+            gradient_slot: 0,
+        }],
+        selected_outputs: vec![WireCompanionSelectedOutput {
+            position: 0,
+            ty: 1,
+            upstream_gradient_ty: 1,
+        }],
+    }
+}
+
+#[test]
+fn two_kernel_chain_program_admits_cleanly() {
+    // Sanity: the two-kernel chain fixture (used to probe the graph rules) is
+    // itself valid — decode admits it.
+    let mut section = sample_device_section();
+    section.device_program.program = two_kernel_chain_program();
+    let image = text_image_with_device(Some(section));
+    let decoded = decode_text_image(&encode_text_image(&image).unwrap(), TOOLCHAIN)
+        .expect("the two-kernel chain admits cleanly");
+    assert_eq!(
+        decoded
+            .device
+            .unwrap()
+            .device_program
+            .program
+            .launches
+            .len(),
+        2
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Stage 3R F1–F7 wire admission negatives (fail-closed validators)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn decode_rejects_duplicate_relation_rows_on_wire() {
+    // F4/S7: duplicate or contradictory relation rows fail closed at the
+    // radix decode boundary.
+    let result = wire_admission_error(|program| {
+        let relation = sample_relation();
+        program.relations = vec![relation.clone(), relation];
+    });
+    assert!(matches!(
+        result,
+        Err(FmirImageError::WireProgramInvalid { detail })
+            if detail.contains("duplicate or contradictory")
+    ));
+}
+
+#[test]
+fn decode_rejects_contradictory_relation_rows_on_wire() {
+    let result = wire_admission_error(|program| {
+        let contradictory = sample_relation();
+        let mut relation = sample_relation();
+        relation.companion = 3;
+        program.relations = vec![relation, contradictory];
+    });
+    assert!(matches!(
+        result,
+        Err(FmirImageError::WireProgramInvalid { detail })
+            if detail.contains("duplicate or contradictory")
+    ));
+}
+
+#[test]
+fn decode_rejects_second_generation_producer_on_wire() {
+    // F2: "another producer of generation 1" is rejected — a later write is a
+    // new generation.
+    let result = wire_admission_error(|program| {
+        let duplicate_slot = program.kernels[0].resources[1].clone();
+        program.kernels[0].resources.push(duplicate_slot);
+    });
+    assert!(matches!(
+        result,
+        Err(FmirImageError::WireProgramInvalid { detail })
+            if detail.contains("second producer")
+    ));
+}
+
+#[test]
+fn decode_rejects_zero_generation_on_wire() {
+    // F2: generation 0 is the reserved unset sentinel; an unset generation is
+    // rejected.
+    let result = wire_admission_error(|program| {
+        program.kernels[0].resources[1].generation = 0;
+    });
+    assert!(matches!(
+        result,
+        Err(FmirImageError::WireProgramInvalid { detail })
+            if detail.contains("generation 0")
+    ));
+}
+
+#[test]
+fn decode_rejects_dependency_cycle_on_wire() {
+    // F3: validators enforce acyclicity before launch.
+    let result = wire_admission_error(|program| {
+        *program = two_kernel_chain_program();
+        program.dependencies = vec![
+            WireDependencyEdge {
+                producer: 1,
+                consumer: 2,
+                buffer: 1,
+                version: 1,
+            },
+            WireDependencyEdge {
+                producer: 2,
+                consumer: 1,
+                buffer: 2,
+                version: 1,
+            },
+        ];
+    });
+    assert!(matches!(
+        result,
+        Err(FmirImageError::WireProgramInvalid { detail })
+            if detail.contains("cycle")
+    ));
+}
+
+#[test]
+fn decode_rejects_missing_dependency_on_wire() {
+    // F3: a generation producer not reachable from any root is a missing
+    // dependency — it could never be scheduled.
+    let result = wire_admission_error(|program| {
+        *program = two_kernel_chain_program();
+        program.dependencies.clear();
+    });
+    assert!(matches!(
+        result,
+        Err(FmirImageError::WireProgramInvalid { detail })
+            if detail.contains("not reachable from any root")
+    ));
+}
+
+#[test]
+fn decode_rejects_illegal_root_on_wire() {
+    // F3: roots are carried launch ids; a root naming no launch is illegal.
+    let result = wire_admission_error(|program| {
+        program.roots = vec![9];
+    });
+    assert!(matches!(
+        result,
+        Err(FmirImageError::WireProgramInvalid { detail })
+            if detail.contains("root 9 is not a declared launch")
+    ));
+}
+
+#[test]
+fn decode_rejects_aliased_semantic_origins_on_wire() {
+    // F1: two distinct value ids minted from one carried origin would alias.
+    let result = wire_admission_error(|program| {
+        program.semantic_values.push(WireSemanticValue {
+            id: 3,
+            name: "x-again".to_owned(),
+            origin: WireSemanticValueOrigin::HostInput,
+        });
+    });
+    assert!(matches!(
+        result,
+        Err(FmirImageError::WireProgramInvalid { detail })
+            if detail.contains("both derive from origin")
+    ));
+}
+
+#[test]
+fn same_name_same_shape_values_with_distinct_origins_admit_on_wire() {
+    // F1: two unrelated same-name values with distinct origins are distinct
+    // and admit — never aliased.
+    let result = wire_admission_error(|program| {
+        program.semantic_values[1] = WireSemanticValue {
+            id: 2,
+            name: "x".to_owned(),
+            origin: WireSemanticValueOrigin::MirLocal {
+                function: 0,
+                local: 1,
+            },
+        };
+        program.semantic_values[0] = WireSemanticValue {
+            id: 1,
+            name: "x".to_owned(),
+            origin: WireSemanticValueOrigin::MirLocal {
+                function: 0,
+                local: 0,
+            },
+        };
+    });
+    assert!(
+        result.is_ok(),
+        "distinct origins must never alias on the wire: {result:?}"
+    );
+}
+
 #[test]
 fn wire_version_2_payload_fails_faber_admission_closed() {
-    // The faber-owned wire codec bumps in lockstep (v2 → v3): a section still
-    // carrying the v2 wire version is an old payload and must fail closed
-    // before any field-level interpretation.
+    // The faber-owned wire codec bumps in lockstep (v3 → v4, Stage 3R U1): a
+    // section still carrying the pre-break v3 wire version is an old payload
+    // and must fail the nested admission closed. (The v2 spelling from the
+    // pre-3R era is covered by the same gate: any value ≠ 4 rejects.)
     let mut section = sample_device_section();
     section.device_program.v = 2;
     assert_ne!(section.device_program.v, WIRE_VERSION);
+    let image = text_image_with_device(Some(section));
+    let text = encode_text_image(&image).expect("encode text image");
+    assert!(matches!(
+        decode_text_image(&text, TOOLCHAIN),
+        Err(FmirImageError::UnsupportedDeviceProgramVersion { actual, expected })
+            if actual == 2 && expected == WIRE_DEVICE_PROGRAM_VERSION
+    ));
 }
 
 #[test]

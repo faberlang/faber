@@ -21,6 +21,16 @@
 //! device runtime requirements (`device:metal`, `device:cuda`). A device
 //! payload is admitted only from the exact producing toolchain version, and
 //! unknown `device:` requirements fail admission at package load.
+//!
+//! A `5 → 6` clean break (Stage 3R U1, the F1–F7 frozen contract) carries the
+//! repaired semantic facts on the wire: a **semantic value identity** per
+//! buffer (F1), explicit **value generations** per write slot (F2), carried
+//! **roots + producer/consumer dependencies** (F3), the lossless
+//! **primal/companion relation** (F4), and independent **initialization +
+//! observation axes** (F5/F6). The nested device-program wire version
+//! ([`WIRE_DEVICE_PROGRAM_VERSION`]) and the outer image version
+//! ([`PACKAGE_MIR_ARTIFACT_VERSION`]) fail closed **independently** at the
+//! radix decode boundary (F7/S8), before host construction or launch.
 
 use radix_mir::MirProgram;
 use radix_types::TypeTableSnapshot;
@@ -32,9 +42,21 @@ use serde::{Deserialize, Serialize};
 /// runtime requirements) for the differentiable-GPU campaign (N1.7). `4 → 5`
 /// clean break (operator memo; S3-A4) makes the device section a
 /// TYPED complete program (the opaque payload string is replaced) and moves
-/// CUDA symbols + host inputs to metadata. Old version-4 images fail closed
-/// with [`UnsupportedVersion`](crate::error::FmirImageError::UnsupportedVersion).
-pub const PACKAGE_MIR_ARTIFACT_VERSION: u32 = 5;
+/// CUDA symbols + host inputs to metadata. `5 → 6` clean break (Stage 3R U1)
+/// carries the F1–F7 semantic facts (semantic value identity, generations,
+/// roots, dependencies, lossless relation, initialization/observation axes).
+/// Old version-5 images fail closed with
+/// [`UnsupportedVersion`](crate::error::FmirImageError::UnsupportedVersion).
+pub const PACKAGE_MIR_ARTIFACT_VERSION: u32 = 6;
+
+/// The faber-owned wire/codec version of the typed device-program section
+/// (the nested `v` field of [`FmirDeviceProgramSection`]). Bumped in lockstep
+/// with the `DEVICE_RUN_PLAN_VERSION` constructor ratchet; bumped `3 → 4` by
+/// the Stage 3R U1 clean break (F7/S8). Admitted independently of the outer
+/// image version: [`admit_device_section`] rejects a mismatched nested
+/// version before any field-level interpretation, with a focused diagnostic
+/// ([`UnsupportedDeviceProgramVersion`](crate::error::FmirImageError::UnsupportedDeviceProgramVersion)).
+pub const WIRE_DEVICE_PROGRAM_VERSION: u32 = 4;
 
 /// Text image `target` tag.
 pub const FMIR_TEXT_TARGET_NAME: &str = "fmir-text";
@@ -233,6 +255,13 @@ pub struct FmirDeviceSymbol {
 // deterministically from the complete access + launches (the source facts are
 // on the wire), so the host never re-derives topology from launch order or a
 // slot-role string.
+//
+// Stage 3R (U1, S3–S7) extends the typed program with the F1–F7 carried
+// facts: a semantic-value table + per-buffer identity (F1), explicit value
+// generations per slot (F2), carried roots + dependency edges (F3), the
+// lossless companion relation (F4), and the initialization / observation axes
+// (F5/F6). `deny_unknown_fields` admission means an old consumer never
+// silently ignores these sections.
 
 /// The complete device program (wire form).
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -246,6 +275,110 @@ pub struct WireDeviceProgram {
     pub lifetime: WireProgramLifetime,
     /// Explicit multi-output result buffers.
     pub results: Vec<WireResultBuffer>,
+    /// Carried semantic-value table (F1): one row per stable value identity.
+    pub semantic_values: Vec<WireSemanticValue>,
+    /// Declared legal execution roots — launch ids the host may start from
+    /// (F3). Never inferred from kernel declaration order.
+    pub roots: Vec<u32>,
+    /// Carried producer/consumer dependency edges (F3).
+    pub dependencies: Vec<WireDependencyEdge>,
+    /// Lossless primal/companion relation rows (F4/S7).
+    pub relations: Vec<WireCompanionRelation>,
+}
+
+/// One carried semantic value (F1): the stable identity plus the origin fact
+/// it is derived from. Two unrelated same-name/same-shape values are distinct
+/// rows; two rows minted from one origin would alias and fail admission.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireSemanticValue {
+    /// Program-unique stable identity.
+    pub id: u32,
+    /// Diagnostic name (never an identity fact).
+    pub name: String,
+    /// The carried fact this identity is derived from.
+    pub origin: WireSemanticValueOrigin,
+}
+
+/// The carried MIR/value fact a [`WireSemanticValue`] identity derives from.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireSemanticValueOrigin {
+    /// The value flows from a specific MIR local of a specific function.
+    MirLocal { function: u32, local: u32 },
+    /// A host-provided input value.
+    HostInput,
+    /// A synthetic value minted by the materializer (e.g. a gradient slot);
+    /// the label discriminates distinct synthetic values.
+    Synthetic { label: String },
+}
+
+/// One carried producer/consumer dependency edge (F3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireDependencyEdge {
+    /// The launch that produces the value consumed downstream.
+    pub producer: u32,
+    /// The launch that consumes it.
+    pub consumer: u32,
+    /// The buffer whose content flows across the edge.
+    pub buffer: u32,
+    /// The content version that flows.
+    pub version: u32,
+}
+
+/// One lossless primal/companion relation row (F4/S7): selected inputs with
+/// the gradient-to-primal identity, selected outputs, and device-residency.
+/// Duplicate or contradictory rows fail admission.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireCompanionRelation {
+    /// Primal function id.
+    pub primal: u32,
+    /// Companion function id.
+    pub companion: u32,
+    /// Derivative kind.
+    pub derivative: WireCompanionDerivativeKind,
+    /// The primal is an explicitly device-resident forward kernel.
+    pub device_resident: bool,
+    /// The selected differentiable inputs.
+    pub selected_inputs: Vec<WireCompanionSelectedInput>,
+    /// The selected primal outputs.
+    pub selected_outputs: Vec<WireCompanionSelectedOutput>,
+}
+
+/// The derivative kind a companion computes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireCompanionDerivativeKind {
+    /// Reverse-mode vector-Jacobian product.
+    ReverseModeVjp,
+}
+
+/// One selected differentiable input (F4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireCompanionSelectedInput {
+    /// The primal parameter this input is.
+    pub param: u32,
+    /// Parameter position in the primal signature.
+    pub position: u32,
+    /// The primal parameter's type id.
+    pub ty: u32,
+    /// The companion result-tuple slot carrying this input's gradient.
+    pub gradient_slot: u32,
+}
+
+/// One selected primal output (F4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireCompanionSelectedOutput {
+    /// Output position in the primal result tuple.
+    pub position: u32,
+    /// The output's type id.
+    pub ty: u32,
+    /// The upstream gradient's type id.
+    pub upstream_gradient_ty: u32,
 }
 
 /// One ordered kernel declaration.
@@ -266,7 +399,9 @@ pub struct WireKernelUnit {
 
 /// A typed buffer slot bound to a kernel: identity + content version +
 /// binding + slot access (the 4-axis separation keeps access a distinct
-/// field from role/lifetime, N3.4).
+/// field from role/lifetime, N3.4), plus the F2 generation this slot
+/// consumes/produces and the F5 initialization policy that governs the
+/// buffer's storage.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WireDeviceResource {
@@ -278,6 +413,13 @@ pub struct WireDeviceResource {
     pub binding: WireBinding,
     /// Slot read/write access.
     pub access: WireResourceAccess,
+    /// Explicit value generation (F2): a write slot produces this generation;
+    /// a read slot consumes it; a read-write slot produces it and consumes
+    /// the previous one. Generation 0 (unset) is rejected.
+    pub generation: u32,
+    /// Independent initialization axis (F5): how the buffer's storage is
+    /// brought to its first defined state — never derived from role/lifetime.
+    pub initialization: WireInitializationPolicy,
 }
 
 /// Stable identity facts of one device buffer.
@@ -294,6 +436,8 @@ pub struct WireBufferIdentity {
     pub storage: WireStorageLayout,
     /// How long the storage lives.
     pub lifetime: WireBufferLifetime,
+    /// The stable semantic value identity this buffer holds (F1).
+    pub semantic_value: u32,
 }
 
 /// One content version of a buffer (a shape snapshot; version ≥ 1).
@@ -377,6 +521,43 @@ pub struct WireResultBuffer {
     pub role: WireBufferRole,
     /// The launch that produced the observed version.
     pub produced_by: u32,
+    /// The explicit observation fact (F5/F6): this row is a DECLARED
+    /// observation point. A writable intermediate or persistent state is a
+    /// result only through this fact — never because it is writable.
+    pub observation: WireObservationFact,
+}
+
+/// The explicit observation fact of a result row (F5/F6): the value is read
+/// back at a declared completion boundary, decoupled from role and lifetime.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireObservationFact {
+    /// The launch whose completion boundary makes the observation valid.
+    pub at_launch: u32,
+}
+
+/// Independent initialization axis (F5).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireInitializationPolicy {
+    /// Storage is zero-filled at allocation.
+    ZeroFill,
+    /// Storage is uploaded from host-provided values.
+    HostProvided,
+    /// Storage is fully written by a device kernel before any read.
+    KernelInitialized,
+}
+
+impl WireInitializationPolicy {
+    /// Short diagnostic spelling.
+    #[must_use]
+    pub fn spelling(self) -> &'static str {
+        match self {
+            Self::ZeroFill => "zero-fill",
+            Self::HostProvided => "host-provided",
+            Self::KernelInitialized => "kernel-initialized",
+        }
+    }
 }
 
 /// Program-level buffer role.
@@ -836,12 +1017,481 @@ pub(crate) fn check_artifact_hashes(
 /// Combined device-section admission. Run after the version / target /
 /// toolchain gates (a device payload is admitted only from the exact producing
 /// toolchain version — N1.7).
+///
+/// Order (Stage 3R F7/S8): the **nested** device-program wire version is
+/// admitted independently of the outer image version and before any field
+/// interpretation; then the carried F1–F7 semantic facts are validated
+/// fail-closed; then the runtime requirements and artifact provenance.
 pub(crate) fn admit_device_section(
     device: &FmirDeviceSection,
 ) -> Result<(), crate::error::FmirImageError> {
+    // S8: the nested device-program version fails closed independently of the
+    // outer FMIR version, with a focused diagnostic.
+    if device.device_program.v != WIRE_DEVICE_PROGRAM_VERSION {
+        return Err(
+            crate::error::FmirImageError::UnsupportedDeviceProgramVersion {
+                actual: device.device_program.v,
+                expected: WIRE_DEVICE_PROGRAM_VERSION,
+            },
+        );
+    }
+    validate_wire_program(&device.device_program.program)?;
     check_device_requirements(device)?;
     check_artifact_hashes(device)?;
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Wire-level semantic admission (Stage 3R F1–F7)
+// ---------------------------------------------------------------------------
+//
+// The radix-mir `DeviceSemantics` rules, run on the serialized wire form at
+// the decode boundary: semantic identity (F1), generations (F2), roots +
+// dependencies (F3), the lossless relation (F4), and the independent
+// initialization/observation axes (F5/F6). Fail-closed: the first violation
+// fails admission before host construction or launch.
+
+/// Validate the carried wire facts fail-closed (F1–F7).
+pub(crate) fn validate_wire_program(
+    wire: &WireDeviceProgram,
+) -> Result<(), crate::error::FmirImageError> {
+    let launches: Vec<u32> = wire.launches.iter().map(|launch| launch.id).collect();
+    validate_wire_semantic_values(wire)?;
+    validate_wire_generations(wire)?;
+    validate_wire_graph(wire, &launches)?;
+    validate_wire_relations(wire)?;
+    validate_wire_axes(wire, &launches)?;
+    Ok(())
+}
+
+/// Rule F1: unique semantic-value identities; never two origins for one id,
+/// never two ids for one origin; every buffer reference names a declared
+/// value; one buffer holds one value.
+fn validate_wire_semantic_values(
+    wire: &WireDeviceProgram,
+) -> Result<(), crate::error::FmirImageError> {
+    for left in &wire.semantic_values {
+        for right in &wire.semantic_values {
+            if left.id == right.id && left != right {
+                return Err(wire_invalid(format!(
+                    "semantic value id {} is declared with conflicting facts ({} vs {})",
+                    left.id, left.name, right.name
+                )));
+            }
+            if left.id != right.id && left.origin == right.origin {
+                return Err(wire_invalid(format!(
+                    "semantic values {} and {} both derive from origin {left:?}; distinct values must derive from distinct carried facts",
+                    left.id, right.id
+                )));
+            }
+        }
+    }
+    for buffer in wire_buffers(wire) {
+        let value = buffer.semantic_value;
+        if !wire.semantic_values.iter().any(|row| row.id == value) {
+            return Err(wire_invalid(format!(
+                "buffer {} references semantic value {value}, which is never declared",
+                buffer.id
+            )));
+        }
+    }
+    for left in wire_buffers(wire) {
+        for right in wire_buffers(wire) {
+            if left.id == right.id && left.semantic_value != right.semantic_value {
+                return Err(wire_invalid(format!(
+                    "buffer {} holds semantic values {} and {}; one buffer holds one value",
+                    left.id, left.semantic_value, right.semantic_value
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Rule F2: every slot carries an explicit generation (0 is the reserved
+/// unset sentinel); a (value, generation) has exactly one producer; every
+/// generation a slot consumes is produced elsewhere or covered by an
+/// initialization fact (complete inputs).
+fn validate_wire_generations(wire: &WireDeviceProgram) -> Result<(), crate::error::FmirImageError> {
+    for kernel in &wire.kernels {
+        for resource in &kernel.resources {
+            if resource.generation == 0 {
+                return Err(wire_invalid(format!(
+                    "a slot on buffer {} carries generation 0 (the reserved unset sentinel)",
+                    resource.buffer.id
+                )));
+            }
+        }
+    }
+    // Single definition per value generation: two DISTINCT write/read-write
+    // slots may not claim the same (value, generation).
+    let producers: Vec<(u32, u32, usize, usize)> = wire
+        .kernels
+        .iter()
+        .enumerate()
+        .flat_map(|(kernel_index, kernel)| {
+            kernel
+                .resources
+                .iter()
+                .enumerate()
+                .filter_map(move |(slot_index, resource)| {
+                    if matches!(
+                        resource.access,
+                        WireResourceAccess::Write | WireResourceAccess::ReadWrite
+                    ) {
+                        Some((
+                            resource.buffer.semantic_value,
+                            resource.generation,
+                            kernel_index,
+                            slot_index,
+                        ))
+                    } else {
+                        None
+                    }
+                })
+        })
+        .collect();
+    for (index, (value, generation, kernel, slot)) in producers.iter().enumerate() {
+        for (other_index, (other_value, other_generation, other_kernel, other_slot)) in
+            producers.iter().enumerate()
+        {
+            if index < other_index && value == other_value && generation == other_generation {
+                return Err(wire_invalid(format!(
+                    "semantic value {value} generation {generation} has a second producer (kernels {kernel}/{other_kernel}, slots {slot}/{other_slot}); a later write is a new generation"
+                )));
+            }
+        }
+    }
+    // Complete inputs: a read consumes its generation; a read-write consumes
+    // the previous generation and produces its own. Every consumed generation
+    // is produced by a DIFFERENT slot, or is the buffer's initial state
+    // covered by its initialization policy.
+    for (kernel_index, kernel) in wire.kernels.iter().enumerate() {
+        for (slot_index, resource) in kernel.resources.iter().enumerate() {
+            let value = resource.buffer.semantic_value;
+            let consumed: Option<u32> = match resource.access {
+                WireResourceAccess::Read => Some(resource.generation),
+                WireResourceAccess::ReadWrite => Some(resource.generation - 1),
+                WireResourceAccess::Write => None,
+            };
+            let Some(consumed) = consumed else {
+                continue;
+            };
+            let produced_elsewhere = wire
+                .kernels
+                .iter()
+                .enumerate()
+                .flat_map(|(other_kernel, other_unit)| {
+                    other_unit.resources.iter().enumerate().filter_map(
+                        move |(other_slot, other)| {
+                            if (other_kernel != kernel_index || other_slot != slot_index)
+                                && other.buffer.semantic_value == value
+                                && other.generation == consumed
+                                && matches!(
+                                    other.access,
+                                    WireResourceAccess::Write | WireResourceAccess::ReadWrite
+                                )
+                            {
+                                Some(())
+                            } else {
+                                None
+                            }
+                        },
+                    )
+                })
+                .next()
+                .is_some();
+            if produced_elsewhere {
+                continue;
+            }
+            let init_defined = consumed <= 1
+                && wire_buffer_init_policy(wire, resource.buffer.id).is_some_and(|policy| {
+                    matches!(
+                        policy,
+                        WireInitializationPolicy::HostProvided | WireInitializationPolicy::ZeroFill
+                    )
+                });
+            if !init_defined {
+                return Err(wire_invalid(format!(
+                    "buffer {} reads semantic value {value} generation {consumed}, which no launch produces and no initialization defines (incomplete input)",
+                    resource.buffer.id
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Rule F3: legal, unique, non-empty roots; well-formed, duplicate-free,
+/// acyclic dependencies; every generation producer reachable from a root.
+fn validate_wire_graph(
+    wire: &WireDeviceProgram,
+    launches: &[u32],
+) -> Result<(), crate::error::FmirImageError> {
+    if wire.roots.is_empty() && !wire.launches.is_empty() {
+        return Err(wire_invalid(
+            "the program declares launches but no execution root (F3: roots are carried, never inferred)"
+                .to_owned(),
+        ));
+    }
+    for root in &wire.roots {
+        if !launches.contains(root) {
+            return Err(wire_invalid(format!(
+                "root {root} is not a declared launch"
+            )));
+        }
+        if wire
+            .roots
+            .iter()
+            .filter(|candidate| *candidate == root)
+            .count()
+            > 1
+        {
+            return Err(wire_invalid(format!(
+                "root {root} is declared more than once"
+            )));
+        }
+    }
+    for edge in &wire.dependencies {
+        if edge.producer == edge.consumer {
+            return Err(wire_invalid(format!(
+                "dependency edge runs from launch {} to itself",
+                edge.producer
+            )));
+        }
+        if !launches.contains(&edge.producer) {
+            return Err(wire_invalid(format!(
+                "dependency edge names producer launch {}, which does not exist",
+                edge.producer
+            )));
+        }
+        if !launches.contains(&edge.consumer) {
+            return Err(wire_invalid(format!(
+                "dependency edge names consumer launch {}, which does not exist",
+                edge.consumer
+            )));
+        }
+        if wire
+            .dependencies
+            .iter()
+            .filter(|candidate| {
+                candidate.producer == edge.producer
+                    && candidate.consumer == edge.consumer
+                    && candidate.buffer == edge.buffer
+                    && candidate.version == edge.version
+            })
+            .count()
+            > 1
+        {
+            return Err(wire_invalid(format!(
+                "dependency edge {} → {} is declared more than once",
+                edge.producer, edge.consumer
+            )));
+        }
+    }
+    reject_wire_dependency_cycles(wire)?;
+    // Missing dependency: every generation producer must be reachable from a
+    // root; a producer hanging off the graph could never be scheduled.
+    let producers: Vec<u32> = wire
+        .launches
+        .iter()
+        .filter(|launch| {
+            wire.kernels
+                .get(launch.kernel_index as usize)
+                .is_some_and(|kernel| {
+                    kernel.resources.iter().any(|resource| {
+                        matches!(
+                            resource.access,
+                            WireResourceAccess::Write | WireResourceAccess::ReadWrite
+                        )
+                    })
+                })
+        })
+        .map(|launch| launch.id)
+        .collect();
+    for producer in &producers {
+        if !wire_reachable_from_root(wire, *producer) {
+            return Err(wire_invalid(format!(
+                "launch {producer} produces a value but is not reachable from any root (missing dependency)"
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Whether a launch is reachable from a declared root via the dependency
+/// edges.
+fn wire_reachable_from_root(wire: &WireDeviceProgram, launch: u32) -> bool {
+    let mut seen = wire.roots.clone();
+    let mut frontier = wire.roots.clone();
+    while let Some(current) = frontier.pop() {
+        if current == launch {
+            return true;
+        }
+        for edge in &wire.dependencies {
+            if edge.producer == current && !seen.contains(&edge.consumer) {
+                seen.push(edge.consumer);
+                frontier.push(edge.consumer);
+            }
+        }
+    }
+    false
+}
+
+/// Reject a dependency cycle (F3) — depth-first back-edge detection.
+fn reject_wire_dependency_cycles(
+    wire: &WireDeviceProgram,
+) -> Result<(), crate::error::FmirImageError> {
+    let mut visited: Vec<u32> = Vec::new();
+    let mut on_stack: Vec<u32> = Vec::new();
+    for edge in &wire.dependencies {
+        if wire_cycle_through(wire, edge.producer, &mut visited, &mut on_stack) {
+            return Err(wire_invalid(format!(
+                "dependency graph contains a cycle through launch {}",
+                edge.producer
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn wire_cycle_through(
+    wire: &WireDeviceProgram,
+    launch: u32,
+    visited: &mut Vec<u32>,
+    on_stack: &mut Vec<u32>,
+) -> bool {
+    if on_stack.contains(&launch) {
+        return true;
+    }
+    if visited.contains(&launch) {
+        return false;
+    }
+    visited.push(launch);
+    on_stack.push(launch);
+    for edge in &wire.dependencies {
+        if edge.producer == launch && wire_cycle_through(wire, edge.consumer, visited, on_stack) {
+            return true;
+        }
+    }
+    on_stack.retain(|seen| *seen != launch);
+    false
+}
+
+/// Rule F4: relation rows are unique per primal and internally well-formed;
+/// duplicate or contradictory rows fail admission.
+fn validate_wire_relations(wire: &WireDeviceProgram) -> Result<(), crate::error::FmirImageError> {
+    for relation in &wire.relations {
+        if relation.primal == relation.companion {
+            return Err(wire_invalid(format!(
+                "relation row for primal {} declares the same function as companion",
+                relation.primal
+            )));
+        }
+        let mut positions: Vec<u32> = Vec::new();
+        for selected in &relation.selected_inputs {
+            if positions.contains(&selected.position) {
+                return Err(wire_invalid(format!(
+                    "relation row for primal {} repeats selected-input position {}",
+                    relation.primal, selected.position
+                )));
+            }
+            positions.push(selected.position);
+        }
+        let mut output_positions: Vec<u32> = Vec::new();
+        for selected in &relation.selected_outputs {
+            if output_positions.contains(&selected.position) {
+                return Err(wire_invalid(format!(
+                    "relation row for primal {} repeats selected-output position {}",
+                    relation.primal, selected.position
+                )));
+            }
+            output_positions.push(selected.position);
+        }
+    }
+    for relation in &wire.relations {
+        if wire
+            .relations
+            .iter()
+            .filter(|candidate| candidate.primal == relation.primal)
+            .count()
+            > 1
+        {
+            return Err(wire_invalid(format!(
+                "relation rows for primal {} are duplicate or contradictory",
+                relation.primal
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Rule F5/F6: initialization facts agree per buffer (independent axis);
+/// every observation names a real launch; results are declared observation
+/// points.
+fn validate_wire_axes(
+    wire: &WireDeviceProgram,
+    launches: &[u32],
+) -> Result<(), crate::error::FmirImageError> {
+    // Init policies per buffer must agree (F5: the axis is a single fact,
+    // never derived from role/lifetime).
+    for resource in wire
+        .kernels
+        .iter()
+        .flat_map(|kernel| kernel.resources.iter())
+    {
+        let policy = resource.initialization;
+        if wire_buffer_init_policy(wire, resource.buffer.id).is_some_and(|first| first != policy) {
+            return Err(wire_invalid(format!(
+                "buffer {} declares conflicting initialization policies",
+                resource.buffer.id
+            )));
+        }
+    }
+    for result in &wire.results {
+        if !launches.contains(&result.observation.at_launch) {
+            return Err(wire_invalid(format!(
+                "result on buffer {} names observation launch {}, which does not exist",
+                result.buffer.id, result.observation.at_launch
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// The distinct buffers referenced by the program, in first-reference order.
+fn wire_buffers(wire: &WireDeviceProgram) -> Vec<WireBufferIdentity> {
+    let mut buffers: Vec<WireBufferIdentity> = Vec::new();
+    for kernel in &wire.kernels {
+        for resource in &kernel.resources {
+            if !buffers.iter().any(|buffer| buffer.id == resource.buffer.id) {
+                buffers.push(resource.buffer.clone());
+            }
+        }
+    }
+    for result in &wire.results {
+        if !buffers.iter().any(|buffer| buffer.id == result.buffer.id) {
+            buffers.push(result.buffer.clone());
+        }
+    }
+    buffers
+}
+
+/// The first initialization policy declared for a buffer, if any.
+fn wire_buffer_init_policy(
+    wire: &WireDeviceProgram,
+    buffer: u32,
+) -> Option<WireInitializationPolicy> {
+    wire.kernels
+        .iter()
+        .flat_map(|kernel| kernel.resources.iter())
+        .find(|resource| resource.buffer.id == buffer)
+        .map(|resource| resource.initialization)
+}
+
+/// A focused `WireProgramInvalid` admission error.
+fn wire_invalid(detail: String) -> crate::error::FmirImageError {
+    crate::error::FmirImageError::WireProgramInvalid { detail }
 }
 
 #[cfg(test)]
@@ -849,8 +1499,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn artifact_version_is_5_for_typed_device_program_schema() {
-        assert_eq!(PACKAGE_MIR_ARTIFACT_VERSION, 5);
+    fn artifact_version_is_6_for_the_carried_semantics_schema() {
+        assert_eq!(PACKAGE_MIR_ARTIFACT_VERSION, 6);
+    }
+
+    #[test]
+    fn device_program_wire_version_is_4_after_the_u1_break() {
+        // Stage 3R U1 bumps the nested device-program wire version 3 → 4
+        // (S1) and admits it independently of the outer FMIR version (S8).
+        assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 4);
+        assert_ne!(WIRE_DEVICE_PROGRAM_VERSION, PACKAGE_MIR_ARTIFACT_VERSION);
     }
 
     #[test]
