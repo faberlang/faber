@@ -35,8 +35,11 @@ pub struct FaberManifest {
 
     /// Code-locale settings used to select a source and diagnostic surface.
     ///
-    /// TOML section is `[locale]`; legacy `[reader]` is still accepted via
-    /// serde alias until the clean-break window closes.
+    /// Canonical TOML section is `[locale]`.
+    ///
+    /// TODO(locale-rename): LEGACY — drop `alias = "reader"` after examples and
+    /// sibling packages are retagged to `[locale]` (default-en Stage 2 / clean
+    /// break). Sweep marker: `LEGACY_READER_MANIFEST_ALIAS`.
     #[serde(default, alias = "reader")]
     pub locale: ManifestReader,
 
@@ -211,7 +214,11 @@ pub enum ManifestProductEmit {
     TypeScript,
 }
 
-/// `[locale]` (or legacy `[reader]`) metadata for package code-locale selection.
+/// `[locale]` metadata for package code-locale selection.
+///
+/// TODO(locale-rename): LEGACY — type name `ManifestReader` and any remaining
+/// `[reader]` prose should go with `LEGACY_READER_MANIFEST_ALIAS` (see field
+/// alias on [`FaberManifest::locale`]).
 #[derive(Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ManifestReader {
@@ -568,6 +575,8 @@ pub(crate) fn validate_manifest(
             ));
         }
         if manifest.locale.locale.is_none() {
+            // TODO(locale-rename): LEGACY_READER_MANIFEST_ALIAS — drop "legacy
+            // [reader]" from this diagnostic when the serde alias is removed.
             return Err(Box::new(
                 crate::package_diagnostic_error(
                     "faber.toml locale.pack requires locale (section [locale] or legacy [reader])",
