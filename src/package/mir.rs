@@ -689,13 +689,29 @@ fn package_device_section(
         .with_arg("issue", "package_device_steps_not_repeating")]);
     }
     // Fail closed when a declared input is missing for an input buffer. The
-    // ONE exemption (S3-A5): the companion's reverse-AD upstream seed — a
-    // synthetic 1-element input whose source param carries no source name
-    // (the S3-B3 evidence: the upstream is a non-storage ABI fact, not a
-    // user-declared device input). The materializer provisions it with the
-    // reverse-AD seed value 1.0.
+    // TWO exemptions (S3-A5 + S5-U1): the companion's reverse-AD upstream
+    // seed — a synthetic 1-element input whose source param carries no
+    // source name — is provisioned with 1.0; and a DECOMPOSED kernel's
+    // data-flow input that another kernel in the program produces (a forward
+    // intermediate) needs no external value. The materializer provisions
+    // the seed; the program unifies the intermediates.
     let mut device_inputs = prepared.device_inputs.clone();
     let mut upstream_seeds: Vec<(String, Vec<f32>)> = Vec::new();
+    // Buffers any kernel writes: produced-by-the-program intermediates (and
+    // the InOut trainable params, which stay declared inputs with initial
+    // values from the manifest).
+    let produced: std::collections::BTreeSet<String> = program
+        .kernels
+        .iter()
+        .flat_map(|kernel| kernel.resources.iter())
+        .filter(|resource| {
+            matches!(
+                resource.buffer.role,
+                radix_mir::device_program::BufferRole::Output
+            )
+        })
+        .map(|resource| resource.buffer.name.clone())
+        .collect();
     for kernel in &program.kernels {
         let Some(function) = lowered
             .validated
@@ -706,10 +722,19 @@ fn package_device_section(
         else {
             continue;
         };
-        let signature = radix_mir::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+        // The whole-function ABI signature is derived ONLY to scan the
+        // reverse-AD upstream seed inputs. A decomposed kernel (S5-U1) whose
+        // source function mixes recipes — e.g. the scalar-return lane, whose
+        // whole signature legitimately fails the return-buffer equality law
+        // — has no whole-function signature to scan; its subchain signatures
+        // were already validated by the constructor, so skip it. The
+        // upstream seed lives in the companion's kernels, whose whole
+        // signature (tuple return) still derives.
+        let Ok(signature) = radix_mir::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
             function, lowered.validated.validation(), &lowered.interner,
-        )
-        .map_err(|error| vec![mir_issue_diag(diagnostic_path, "device_signature", error.message)])?;
+        ) else {
+            continue;
+        };
         for (resource, program_name) in signature
             .resources()
             .filter(|resource| {
@@ -743,6 +768,11 @@ fn package_device_section(
                 continue;
             }
             if !device_inputs.contains_key(&program_name.buffer.name) {
+                // A produced-by-the-program data-flow input (S5-U1 forward
+                // intermediate) needs no external value — skip, don't fail.
+                if produced.contains(&program_name.buffer.name) {
+                    continue;
+                }
                 return Err(vec![mir_issue_diag(
                     diagnostic_path,
                     "package_device_input_missing",
