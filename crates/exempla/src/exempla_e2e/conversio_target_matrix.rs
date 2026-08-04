@@ -476,7 +476,9 @@ fn effective_verdict(cell: &CellMeasurement, target: ConversioCoverageTarget) ->
 #[test]
 #[ignore = "maintenance conversio matrix emit; run: cargo test -p exempla --lib emit_conversio_target_matrix -- --ignored --nocapture"]
 fn emit_conversio_target_matrix() {
-    let session = Session::new(Config::default());
+    // The fixtures carry `+++ locale = "la" +++` frontmatter; resolving it
+    // needs the stdlib reader packs (`radix/stdlib/reader/<locale>/pack.toml`).
+    let session = Session::new(Config::default().with_stdlib(crate::paths::radix_stdlib_dir()));
     let cells = measure_all_cells(&session);
 
     // Fixture authoring integrity: a lex/parse rejection in a fixture-backed

@@ -167,6 +167,26 @@ pub fn faber_runtime_crate_path() -> PathBuf {
         .unwrap_or_else(|_| Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../faber-runtime"))
 }
 
+/// Env override for the radix stdlib root (`…/radix/stdlib`).
+pub const RADIX_STDLIB_ENV: &str = "FABER_RADIX_STDLIB";
+
+/// Monorepo `radix/stdlib` (reader locale packs, library sources).
+///
+/// Prefer `FABER_RADIX_STDLIB`, then the faberlang container
+/// `radix/stdlib`, then a relative fallback under this crate.
+pub fn radix_stdlib_dir() -> PathBuf {
+    if let Ok(path) = std::env::var(RADIX_STDLIB_ENV) {
+        return PathBuf::from(path);
+    }
+    if let Some(home) = faberlang_home() {
+        let dir = home.join("radix").join("stdlib");
+        if dir.is_dir() {
+            return dir;
+        }
+    }
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../radix/stdlib")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
