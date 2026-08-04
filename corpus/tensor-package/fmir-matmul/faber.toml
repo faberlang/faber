@@ -10,3 +10,6 @@ entry = "main.fab"
 [build]
 target = "fmir-text"
 kind = "bin"
+
+[reader]
+locale = "la"

@@ -23,3 +23,6 @@ tokio = "{ version = \"1\", features = [\"rt-multi-thread\", \"sync\", \"time\"]
 
 # Binding probe injects `faber-runtime` automatically when absent (see binding_probe.rs).
 # App link path-deps come from G4 library_link, not this table.
+
+[reader]
+locale = "la"

@@ -9,3 +9,6 @@ tensor = "*"
 [build]
 target = "rust"
 kind = "bin"
+
+[reader]
+locale = "la"
