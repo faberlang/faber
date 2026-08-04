@@ -882,6 +882,23 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             } => {
                 crate::visit::walk_stmt(self, stmt);
             }
+            // S5-U2: rank-2 `TensorTranspose` is a recipe op — the plan pass
+            // admits it (`CollectionKernelPlan::Transpose`, kernel_plan.rs),
+            // the ABI resolves its dispatch contract (workgroup 64, dispatch
+            // M·N), and the Metal emitter lowers the column-major remap
+            // body. The device-safe gate admits the statement the same way
+            // it admits the other recipe ops (the operand layouts are still
+            // walked and checked).
+            MirStatementKind::RuntimeCall {
+                call:
+                    MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorTranspose),
+                        ..
+                    },
+                ..
+            } => {
+                crate::visit::walk_stmt(self, stmt);
+            }
             MirStatementKind::RuntimeCall {
                 call:
                     MirRuntimeCall {
