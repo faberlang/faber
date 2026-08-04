@@ -9,7 +9,8 @@ use faber::device::{DeviceBackend, DeviceSelection};
 use faber_host_macos_arm64::composite_host::{CompositeHost, CompositeHostConfig};
 use faber_host_macos_arm64::device_descriptor::{
     DescriptorBuffer, DescriptorBufferVersion, DescriptorKernel, DescriptorLaunch,
-    DeviceBufferLifetime, DeviceBufferRole, DeviceDataType, DeviceDescriptor, DeviceProgramLifetime,
+    DeviceBufferLifetime, DeviceBufferRole, DeviceDataType, DeviceDescriptor,
+    DeviceProgramLifetime,
 };
 use faber_host_macos_arm64::device_host::DeviceRuntime;
 use faber_host_macos_arm64::{FakeMetalDriver, HostError, MetalHostSession};
@@ -110,10 +111,8 @@ fn add_inputs(a: Vec<f32>, b: Vec<f32>) -> BTreeMap<u32, Vec<f32>> {
 
 #[test]
 fn effective_selection_cli_overrides_manifest() {
-    let selection = effective_backend_selection(
-        Some(DeviceSelection::Metal),
-        Some(DeviceSelection::Auto),
-    );
+    let selection =
+        effective_backend_selection(Some(DeviceSelection::Metal), Some(DeviceSelection::Auto));
     assert_eq!(selection, DeviceSelection::Metal);
 }
 
@@ -204,7 +203,10 @@ fn host_error_diagnostic_keeps_the_stable_host_code() {
     };
     let diagnostic = host_error_diagnostic(&error);
     assert_eq!(diagnostic.issue(), Some(E_BACKEND_UNAVAILABLE));
-    assert_eq!(diagnostic.message, "requested backend `cuda` is not admitted");
+    assert_eq!(
+        diagnostic.message,
+        "requested backend `cuda` is not admitted"
+    );
 }
 
 #[test]
@@ -446,7 +448,10 @@ fn create_program_session_returns_a_session_for_a_device_program() {
         .execute(&add_inputs(vec![1.0, 2.0], vec![3.0, 4.0]), &[3])
         .expect("session executes without reloading or re-allocating");
     assert_eq!(receipt.launches, 1);
-    assert_eq!(receipt.outputs.get(&3).map(Vec::as_slice), Some(&[4.0, 6.0][..]));
+    assert_eq!(
+        receipt.outputs.get(&3).map(Vec::as_slice),
+        Some(&[4.0, 6.0][..])
+    );
 }
 
 #[test]

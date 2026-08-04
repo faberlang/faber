@@ -422,7 +422,8 @@ pub(crate) fn lock_generated_crate_build(
     layout: &BuildLayout,
 ) -> Result<GeneratedCrateLock, Box<Diagnostic>> {
     let target_dir = layout.cargo_target_dir.clone();
-    fs::create_dir_all(&target_dir).map_err(|err| Box::new(Diagnostic::io_error(&target_dir, &err)))?;
+    fs::create_dir_all(&target_dir)
+        .map_err(|err| Box::new(Diagnostic::io_error(&target_dir, &err)))?;
     let lock_path = target_dir.join(GENERATED_CRATE_LOCK_FILE);
     let file = OpenOptions::new()
         .read(true)
@@ -489,10 +490,7 @@ fn unique_quarantine_sibling(parent: &Path) -> Result<PathBuf, Box<Diagnostic>> 
                 ))
             })?
             .as_nanos();
-        let path = parent.join(format!(
-            ".old.tmp-{}-{nonce}-{attempt}",
-            std::process::id()
-        ));
+        let path = parent.join(format!(".old.tmp-{}-{nonce}-{attempt}", std::process::id()));
         if fs::symlink_metadata(&path).is_err() {
             return Ok(path);
         }
@@ -513,7 +511,8 @@ fn unique_quarantine_sibling(parent: &Path) -> Result<PathBuf, Box<Diagnostic>> 
 /// republish fail there. A non-created path keeps the swap portable.
 fn publish_directory(temp: &Path, target: &Path) -> Result<(), Box<Diagnostic>> {
     if fs::symlink_metadata(target).is_err() {
-        return fs::rename(temp, target).map_err(|err| Box::new(Diagnostic::io_error(target, &err)));
+        return fs::rename(temp, target)
+            .map_err(|err| Box::new(Diagnostic::io_error(target, &err)));
     }
     let parent = target.parent().ok_or_else(|| {
         Box::new(crate::package_diagnostic_error(
@@ -521,8 +520,7 @@ fn publish_directory(temp: &Path, target: &Path) -> Result<(), Box<Diagnostic>> 
         ))
     })?;
     let quarantine = unique_quarantine_sibling(parent)?;
-    fs::rename(target, &quarantine)
-        .map_err(|err| Box::new(Diagnostic::io_error(target, &err)))?;
+    fs::rename(target, &quarantine).map_err(|err| Box::new(Diagnostic::io_error(target, &err)))?;
     match fs::rename(temp, target) {
         Ok(()) => {
             remove_quarantine(&quarantine);

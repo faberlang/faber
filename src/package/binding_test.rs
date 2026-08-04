@@ -219,7 +219,10 @@ fn parent_escaping_source_path_is_rejected() {
     // member-path containment guards can run.
     let diagnostics =
         verify_library_bindings(root.path(), "rust").expect_err("escaping source rejected");
-    assert!(has_issue(&diagnostics, "package_member_unsupported_source_root"));
+    assert!(has_issue(
+        &diagnostics,
+        "package_member_unsupported_source_root"
+    ));
 }
 
 #[test]
@@ -360,7 +363,10 @@ fn missing_source_below_symlinked_parent_is_rejected() {
     // member-path containment guards run.
     let diagnostics =
         verify_library_bindings(root.path(), "rust").expect_err("missing symlink child rejected");
-    assert!(has_issue(&diagnostics, "package_member_unsupported_source_root"));
+    assert!(has_issue(
+        &diagnostics,
+        "package_member_unsupported_source_root"
+    ));
 }
 
 #[cfg(unix)]

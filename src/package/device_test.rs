@@ -73,7 +73,8 @@ fn device_program_constructor_finds_compute_kernel() {
 
 #[test]
 fn device_program_constructor_returns_none_without_kernels() {
-    let entry = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../radix/corpus/literalia/ascii.fab");
+    let entry =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../radix/corpus/literalia/ascii.fab");
     let program = super::super::with_lowered_package_mir(
         &radix::driver::Config::default().with_stdlib(dev_norma_library_home()),
         &entry,
@@ -136,7 +137,10 @@ fn wire_carries_the_complete_program() {
 
     // Results carry produced_by.
     assert_eq!(wire.results.len(), program.results.len());
-    assert_eq!(wire.results[0].produced_by, program.results[0].produced_by.0);
+    assert_eq!(
+        wire.results[0].produced_by,
+        program.results[0].produced_by.0
+    );
 
     // Lifetime regime.
     assert_eq!(wire.lifetime, WireProgramLifetime::SingleRun);
@@ -150,10 +154,7 @@ fn constructor_derived_lifetimes_ride_the_typed_wire() {
     let wire = wire_program_for_program(&program);
     let resources = &wire.kernels[0].resources;
     assert_eq!(resources[0].buffer.role, WireBufferRole::Input);
-    assert_eq!(
-        resources[0].buffer.lifetime,
-        WireBufferLifetime::PerProgram
-    );
+    assert_eq!(resources[0].buffer.lifetime, WireBufferLifetime::PerProgram);
     assert_eq!(resources[1].buffer.role, WireBufferRole::Output);
     assert_eq!(
         resources[1].buffer.lifetime,
@@ -206,8 +207,8 @@ fn wire_v2_fails_closed_with_payload_version_diagnostic() {
     let program = device_program_from_corpus_fixture("cuda/summa-proof.fab");
     let mut section = section_for_program(&program);
     section.device_program.v = 2;
-    let error =
-        admit_device_program_section(&section.device_program).expect_err("v2 wire must fail closed");
+    let error = admit_device_program_section(&section.device_program)
+        .expect_err("v2 wire must fail closed");
     let message = &error[0].message;
     assert!(
         message.contains("version 2 is not supported"),
@@ -297,7 +298,10 @@ fn descriptor_maps_wire_lifetimes_onto_host_descriptor() {
     assert_eq!(slots[1].lifetime, DeviceBufferLifetime::PerStep);
     let kernel1_slots = &descriptor.kernels[1].buffers;
     assert_eq!(kernel1_slots[0].lifetime, DeviceBufferLifetime::PerStep);
-    assert_eq!(kernel1_slots[1].lifetime, DeviceBufferLifetime::ObservationPoint);
+    assert_eq!(
+        kernel1_slots[1].lifetime,
+        DeviceBufferLifetime::ObservationPoint
+    );
 
     // R2: the host descriptor carries the wire's content versions and
     // data-flow edges — the A10 graph consumes real facts, never a
@@ -426,18 +430,22 @@ fn descriptor_preserves_wire_launch_order_and_version_keys() {
             .collect::<Vec<_>>(),
         vec![(medius_id, 1, 4), (medius_id, 2, 64)]
     );
-    assert!(descriptor.buffer_versions.contains(&DescriptorBufferVersion {
-        buffer_id: medius_id,
-        version: 1,
-        element_ty: DeviceDataType::F32,
-        element_count: 4,
-    }));
-    assert!(descriptor.buffer_versions.contains(&DescriptorBufferVersion {
-        buffer_id: medius_id,
-        version: 2,
-        element_ty: DeviceDataType::F32,
-        element_count: 64,
-    }));
+    assert!(descriptor
+        .buffer_versions
+        .contains(&DescriptorBufferVersion {
+            buffer_id: medius_id,
+            version: 1,
+            element_ty: DeviceDataType::F32,
+            element_count: 4,
+        }));
+    assert!(descriptor
+        .buffer_versions
+        .contains(&DescriptorBufferVersion {
+            buffer_id: medius_id,
+            version: 2,
+            element_ty: DeviceDataType::F32,
+            element_count: 64,
+        }));
     assert!(descriptor.data_flow.is_empty());
 
     assert_eq!(
@@ -614,9 +622,9 @@ fn receipt_rendering_uses_host_carried_graph_facts() {
     }];
 
     let lines = host_receipt_graph_lines(&resource_graph, &data_flow_edges);
-    assert!(lines.iter().any(|line| {
-        line.contains("buffer 9 `acc` in-out per-step version 2 (f32[64])")
-    }));
+    assert!(lines
+        .iter()
+        .any(|line| { line.contains("buffer 9 `acc` in-out per-step version 2 (f32[64])") }));
     assert!(lines
         .iter()
         .any(|line| line.contains("data-flow 12 -> 13 via buffer 9 version 2")));
@@ -645,7 +653,9 @@ fn descriptor_requires_declared_backend_artifact() {
 fn descriptor_rejects_unknown_element_type_spelling() {
     let program = device_program_from_corpus_fixture("cuda/summa-proof.fab");
     let mut section = section_for_program(&program);
-    section.device_program.program.kernels[0].resources[0].version.element_ty = "f64".to_owned();
+    section.device_program.program.kernels[0].resources[0]
+        .version
+        .element_ty = "f64".to_owned();
     section.artifacts.artifact = vec![FmirDeviceArtifact {
         backend: FmirDeviceBackend::Metal,
         blob: "msl".to_owned(),
@@ -921,7 +931,6 @@ fn device_repeat_count_is_fail_closed() {
     }
 }
 
-
 /// The S3-A2 materializer: a package whose primal is BOTH a nucleum forward
 /// kernel and `@ radix backward`-annotated produces a DeviceProgram whose
 /// kernel set + order is [forward loss, companion loss_backward] — the
@@ -958,8 +967,7 @@ fn companion_forward_and_backward_kernel_set_and_order() {
         .collect();
     assert_eq!(grad_outputs.len(), 2);
     assert_ne!(
-        grad_outputs[0].binding.binding,
-        grad_outputs[1].binding.binding,
+        grad_outputs[0].binding.binding, grad_outputs[1].binding.binding,
         "two gradient outputs must bind distinct slots"
     );
 
@@ -975,7 +983,10 @@ fn companion_forward_and_backward_kernel_set_and_order() {
         .iter()
         .find(|r| r.buffer.name == "x")
         .expect("companion reads x");
-    assert_eq!(forward_x.buffer.id, companion_x.buffer.id, "x unifies by S2-5 identity");
+    assert_eq!(
+        forward_x.buffer.id, companion_x.buffer.id,
+        "x unifies by S2-5 identity"
+    );
 }
 
 /// The S3-A2 carrier round-trips primal → companion with the derivative kind

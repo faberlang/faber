@@ -185,10 +185,7 @@ faber = {{ package = "faber-runtime", path = "{}" }}
 
 fn assert_no_staging_temps(layout: &BuildLayout) {
     let target_dir = &layout.cargo_target_dir;
-    for entry in fs::read_dir(target_dir)
-        .expect("read target dir")
-        .flatten()
-    {
+    for entry in fs::read_dir(target_dir).expect("read target dir").flatten() {
         let name = entry.file_name().to_string_lossy().to_string();
         assert!(
             !(name.starts_with(".crate.tmp-") || name.starts_with(".old.tmp-")),
@@ -213,9 +210,7 @@ fn interleaved_emit_sequences_never_publish_a_mixed_crate() {
                 .push((format!("lib-{i}"), root.join(format!("lib-{i}"))));
             (
                 plan,
-                format!(
-                    "// marker-plan-{i}\nfn main() {{ println!(\"plan-{i}\"); }}\n"
-                ),
+                format!("// marker-plan-{i}\nfn main() {{ println!(\"plan-{i}\"); }}\n"),
             )
         })
         .collect();
@@ -230,8 +225,7 @@ fn interleaved_emit_sequences_never_publish_a_mixed_crate() {
             scope.spawn(move || {
                 let (plan, code) = &plans[round % plans.len()];
                 let _lock = lock_generated_crate_build(layout).expect("lock");
-                emit_generated_crate_with_runtime_plan(layout, code, None, plan)
-                    .expect("emit");
+                emit_generated_crate_with_runtime_plan(layout, code, None, plan).expect("emit");
             });
         }
     });
@@ -322,13 +316,8 @@ fn failed_generation_preserves_last_known_good_crate() {
 
     // A clean generation after the injected failures publishes the new plan.
     inject_crate_snapshot_failure_at(0);
-    emit_generated_crate_with_runtime_plan(
-        &layout,
-        "// marker-bad\nfn main() {}\n",
-        None,
-        &plan_b,
-    )
-    .expect("emit succeeds after reset");
+    emit_generated_crate_with_runtime_plan(&layout, "// marker-bad\nfn main() {}\n", None, &plan_b)
+        .expect("emit succeeds after reset");
     let main = fs::read_to_string(&layout.generated_rust_entry).expect("main");
     assert!(main.contains("marker-bad"));
     assert!(!main.contains("marker-good"));
@@ -352,10 +341,7 @@ fn republished_crate_preserves_library_dependency_tree() {
     };
     // Simulate the library crates that `emit_linked_library_crates` writes
     // into `target/faber/deps/` before the application snapshot is published.
-    let lib_root = layout
-        .generated_crate_root
-        .join("deps")
-        .join("native-lib");
+    let lib_root = layout.generated_crate_root.join("deps").join("native-lib");
     fs::create_dir_all(lib_root.join("src")).expect("lib src");
     fs::write(
         lib_root.join("Cargo.toml"),
@@ -410,13 +396,8 @@ fn republished_crate_preserves_go_module_tree() {
     // `target/faber/go/` before a later Rust publish (GO3/GO4 layout).
     let go_root = layout.generated_crate_root.join("go");
     fs::create_dir_all(go_root.join("bin")).expect("go bin dir");
-    fs::write(go_root.join("main.go"), "package main\n\nfunc main() {}\n")
-        .expect("go entry");
-    fs::write(
-        go_root.join("go.mod"),
-        "module faber/go-pkg\n\ngo 1.21\n",
-    )
-    .expect("go module file");
+    fs::write(go_root.join("main.go"), "package main\n\nfunc main() {}\n").expect("go entry");
+    fs::write(go_root.join("go.mod"), "module faber/go-pkg\n\ngo 1.21\n").expect("go module file");
     fs::write(go_root.join("bin/go-pkg"), "binary-stub").expect("go binary");
 
     emit_generated_crate_with_runtime_plan(&layout, "fn main() {}", None, &plan)

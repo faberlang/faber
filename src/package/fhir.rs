@@ -93,8 +93,7 @@ pub(crate) fn build_package_fhir(
                 format!("could not read source for FHIR package: {error}"),
             )]
         })?;
-        let local_links =
-            local_links_for_unit(&package, unit, &library_resolver, &package_root)?;
+        let local_links = local_links_for_unit(&package, unit, &library_resolver, &package_root)?;
         inputs.push(PackageUnitInput {
             relative_path,
             module_segments: unit.module_segments.clone(),
@@ -107,14 +106,20 @@ pub(crate) fn build_package_fhir(
         });
     }
 
-    let fhir_package = build_package(identity, &entry_path, entry_frontmatter, inputs, dependencies)
-        .map_err(|error| {
-            vec![fhir_issue_diag(
-                input,
-                "fhir_package_invalid",
-                error.to_string(),
-            )]
-        })?;
+    let fhir_package = build_package(
+        identity,
+        &entry_path,
+        entry_frontmatter,
+        inputs,
+        dependencies,
+    )
+    .map_err(|error| {
+        vec![fhir_issue_diag(
+            input,
+            "fhir_package_invalid",
+            error.to_string(),
+        )]
+    })?;
     let bytes = encode_package(&fhir_package).map_err(|error| {
         vec![fhir_diag(
             input,
@@ -126,8 +131,7 @@ pub(crate) fn build_package_fhir(
     fs::create_dir_all(&artifact_root)
         .map_err(|error| vec![fhir_diag(input, error.to_string())])?;
     let package_path = artifact_root.join(FHIR_PACKAGE_FILE);
-    fs::write(&package_path, &bytes)
-        .map_err(|error| vec![fhir_diag(input, error.to_string())])?;
+    fs::write(&package_path, &bytes).map_err(|error| vec![fhir_diag(input, error.to_string())])?;
     Ok(PackageFhir {
         root: artifact_root,
         package_path,

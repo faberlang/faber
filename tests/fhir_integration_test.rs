@@ -157,7 +157,10 @@ entry = "main.fab"
         package.to_str().expect("utf8 package path"),
     ]);
     assert!(ok, "fhir run failed:\n{stderr}");
-    assert_eq!(stdout, "salve\n", "FMIR run from loaded FHIR must print the program output");
+    assert_eq!(
+        stdout, "salve\n",
+        "FMIR run from loaded FHIR must print the program output"
+    );
 }
 
 #[test]

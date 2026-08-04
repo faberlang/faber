@@ -6,7 +6,6 @@
 #![allow(dead_code)] // Binary and library targets exercise different package runner surfaces.
 
 use super::compile::{analyze_package, AnalyzedPackage, AnalyzedPackageUnit};
-use faber::device::DeviceSelection;
 use super::import_graph::{resolve_import, ImportResolution};
 use super::library::{
     library_cached_analysis, library_cached_file_interface, with_library_cached_analysis_mut,
@@ -15,6 +14,7 @@ use super::library::{
 use super::library_resolver_from_config;
 use super::LibraryImportBinding;
 use crate::library::LibraryResolver;
+use faber::device::DeviceSelection;
 use radix::cli::{
     CliCommand, CliDefault, CliExit, CliMode, CliOperand, CliOption, CliProgram, CliType,
 };
@@ -42,8 +42,9 @@ use radix_mir_fmir::{
     is_known_host_requirement, FmirBinaryImageFile, FmirDeviceBackend, FmirDeviceSection,
     FmirDeviceSelection, FmirImageError, FmirTextCliOperand, FmirTextCliRootSection,
     FmirTextCliSection, FmirTextCliValueType, FmirTextImageFile, FmirTextProgramSection,
-    FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection, FmirTextToolchainSection,
-    FmirTextTypesSection, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION,
+    FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection,
+    FmirTextToolchainSection, FmirTextTypesSection, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME,
+    PACKAGE_MIR_ARTIFACT_VERSION,
 };
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
@@ -163,7 +164,6 @@ enum PackageMirConsumer {
     Interpreted,
     ExternalTarget,
 }
-
 
 #[derive(Default)]
 struct CliPackagePlan {
@@ -484,9 +484,10 @@ fn run_loaded_fmir_image_route_with_selection<H: Host + ?Sized>(
         Err(diagnostic) => Err(vec![diagnostic]),
         Ok(None) => run_fmir_package_image(image, host),
         Ok(Some(backend)) => {
-            let device = image.device.as_ref().ok_or_else(|| {
-                vec![super::host_factory::missing_device_descriptor(backend)]
-            })?;
+            let device = image
+                .device
+                .as_ref()
+                .ok_or_else(|| vec![super::host_factory::missing_device_descriptor(backend)])?;
             super::device::execute_device_route(device, backend, &image.source_hashes)
         }
     }
@@ -588,9 +589,10 @@ pub fn run_fmir_image_bytes_with_stdio(
             // backend is admitted. Run it through the composite host's
             // device route (S1-6 launch seam); fail-before-launch applies
             // inside the descriptor validation.
-            let device = loaded.device.as_ref().ok_or_else(|| {
-                vec![super::host_factory::missing_device_descriptor(backend)]
-            })?;
+            let device = loaded
+                .device
+                .as_ref()
+                .ok_or_else(|| vec![super::host_factory::missing_device_descriptor(backend)])?;
             super::device::execute_device_route(device, backend, &loaded.source_hashes)
         }
     }
@@ -709,10 +711,9 @@ fn package_device_section(
     for (name, values) in upstream_seeds {
         device_inputs.insert(name, values);
     }
-    let selection =
-        prepared
-            .device_backend
-            .unwrap_or(faber::device::DeviceSelection::Auto);
+    let selection = prepared
+        .device_backend
+        .unwrap_or(faber::device::DeviceSelection::Auto);
     let section = super::device::device_section_for_program(
         &program,
         &lowered.validated,
@@ -750,9 +751,7 @@ fn fmir_package_image_from_lowered(
         prepared
             .source_paths
             .iter()
-            .map(|path| {
-                fs::read(path).map(|bytes| format!("fnv64:{:016x}", fnv1a64(&bytes)))
-            })
+            .map(|path| fs::read(path).map(|bytes| format!("fnv64:{:016x}", fnv1a64(&bytes))))
             .collect::<Result<Vec<_>, _>>()
             .map_err(|error| {
                 vec![mir_diag(
@@ -1012,8 +1011,14 @@ fn package_artifact_root(input: &Path) -> Result<PathBuf, Vec<Diagnostic>> {
 /// declaration.
 fn manifest_device_config(
     input: &Path,
-) -> Result<(BTreeMap<String, Vec<f32>>, Option<faber::device::DeviceSelection>, bool), Vec<Diagnostic>>
-{
+) -> Result<
+    (
+        BTreeMap<String, Vec<f32>>,
+        Option<faber::device::DeviceSelection>,
+        bool,
+    ),
+    Vec<Diagnostic>,
+> {
     let layout = super::discover_build_layout(input).map_err(|diagnostic| vec![*diagnostic])?;
     if !layout.manifest_path.exists() {
         return Ok((BTreeMap::new(), None, false));
@@ -1021,9 +1026,11 @@ fn manifest_device_config(
     let manifest =
         super::read_manifest(&layout.manifest_path).map_err(|diagnostic| vec![*diagnostic])?;
     let inputs = super::manifest_device_inputs(&manifest.device.inputs);
-    let backend =
-        super::manifest_backend_selection(manifest.device.backend.as_deref(), &layout.manifest_path)
-            .map_err(|diagnostic| vec![*diagnostic])?;
+    let backend = super::manifest_backend_selection(
+        manifest.device.backend.as_deref(),
+        &layout.manifest_path,
+    )
+    .map_err(|diagnostic| vec![*diagnostic])?;
     let declared = !inputs.is_empty() || backend.is_some();
     Ok((inputs, backend, declared))
 }
@@ -1356,7 +1363,6 @@ fn source_identity(
     })
 }
 
-
 fn check_fmir_runtime_requirements(image: &FmirPackageImage) -> Result<(), Vec<Diagnostic>> {
     let unsupported = image
         .runtime_requirements
@@ -1678,7 +1684,6 @@ fn load_fmir_image(bytes: &[u8], path: &Path) -> Result<FmirPackageImage, Vec<Di
             .collect(),
     })
 }
-
 
 fn validate_package_mir_manifest(manifest: &str, path: &Path) -> Result<(), Vec<Diagnostic>> {
     let has_version = manifest

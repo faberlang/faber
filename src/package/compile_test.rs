@@ -26,12 +26,10 @@ entry = "main.fab"
     let Err(diag) = rust_runtime_plan_for_package(&package, &resolver) else {
         panic!("missing manifest after validation must be a diagnostic, not a silent default");
     };
-    assert!(diag
-        .args
-        .contains(&radix::diagnostics::DiagnosticArg::new(
-            "issue",
-            "package_manifest_missing_after_validation"
-        )));
+    assert!(diag.args.contains(&radix::diagnostics::DiagnosticArg::new(
+        "issue",
+        "package_manifest_missing_after_validation"
+    )));
 }
 
 #[test]
@@ -368,7 +366,10 @@ functio answer() → numerus {
     )
     .expect("write lib");
 
-    let result = compile_package(&Config::new().with_target(Target::Go), &dir.join("main.fab"));
+    let result = compile_package(
+        &Config::new().with_target(Target::Go),
+        &dir.join("main.fab"),
+    );
     assert!(
         result.success(),
         "expected Go multi-unit compile success, got {:?}",

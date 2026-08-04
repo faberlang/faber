@@ -6,12 +6,12 @@ use std::path::Path;
 
 use crate::input_shape::reader_locale_without_package_error;
 
+use super::build_package_fhir;
 use super::cargo::{
     emit_generated_crate_with_runtime_plan, invoke_cargo_build, lock_generated_crate_build,
 };
 use super::go_build::{emit_go_module, invoke_go_build, GoBuildLayout};
 use super::manifest::manifest_build_target;
-use super::build_package_fhir;
 use super::{
     build_package_fmir_binary_bundle, build_package_fmir_image, build_package_fmir_text_image,
     build_package_mir_artifact, check_package, compile_package, compile_package_go,
@@ -460,11 +460,12 @@ fn resolve_build_target(command: &radix::tool::BuildCommand, input_path: &Path) 
         eprintln!("error: {}", diag.message);
         std::process::exit(1);
     });
-    manifest_build_target(manifest.build.target.as_deref(), &layout.manifest_path)
-        .unwrap_or_else(|diag| {
+    manifest_build_target(manifest.build.target.as_deref(), &layout.manifest_path).unwrap_or_else(
+        |diag| {
             eprintln!("error: {}", diag.message);
             std::process::exit(1);
-        })
+        },
+    )
 }
 
 /// Resolve the target for `faber check` from the package manifest.

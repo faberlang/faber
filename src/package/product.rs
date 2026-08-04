@@ -1846,9 +1846,7 @@ fn ts_lib_module_naming(
         .with_extension("")
         .components()
         .filter_map(|component| match component {
-            std::path::Component::Normal(segment) => {
-                Some(segment.to_string_lossy().into_owned())
-            }
+            std::path::Component::Normal(segment) => Some(segment.to_string_lossy().into_owned()),
             _ => None,
         })
         .collect();
@@ -2137,7 +2135,10 @@ fn normalize_library_namespace_bindings(
 fn import_clause_specifier(from_part: &str) -> Option<&str> {
     let from = from_part.trim();
     let bytes = from.as_bytes();
-    if bytes.first().map_or(true, |first| *first != b'"' && *first != b'\'') {
+    if bytes
+        .first()
+        .map_or(true, |first| *first != b'"' && *first != b'\'')
+    {
         return None;
     }
     let quote = char::from(bytes[0]);

@@ -86,16 +86,17 @@ pub use cmd::{
     cmd_build, cmd_check_package, cmd_emit_package, should_treat_as_package_from_args,
     use_package_compiler_from_args,
 };
-#[allow(unused_imports)] // binary commands/run consumes load/run + PackageFhir; lib uses build_package_fhir.
-pub(crate) use fhir::{
-    build_package_fhir, load_package_fhir, run_loaded_package_fhir, PackageFhir,
-};
-pub(crate) use compile::package_rust_runtime_plan;
 #[allow(unused_imports)] // binary build/run paths consume this crate-visible Go entry.
 pub(crate) use compile::compile_package_go;
+pub(crate) use compile::package_rust_runtime_plan;
 #[allow(unused_imports)] // package MIR stages consume this crate-visible analysis API.
 pub(crate) use compile::{
     analyze_package, analyze_package_for_tests, AnalyzedPackage, AnalyzedPackageUnit,
+};
+#[allow(unused_imports)]
+// binary commands/run consumes load/run + PackageFhir; lib uses build_package_fhir.
+pub(crate) use fhir::{
+    build_package_fhir, load_package_fhir, run_loaded_package_fhir, PackageFhir,
 };
 // `compile_package_with_test_*` remain public for lib tests / tooling; the
 // binary `faber test` path no longer emits Rust tests (stepper-only).
@@ -114,8 +115,11 @@ pub(crate) use go_build::{emit_go_module, invoke_go_build, run_go_binary, GoBuil
 #[allow(unused_imports)] // binary `commands/run` + `commands/test` G4 linkage
 pub(crate) use library_link::emit_linked_library_crates;
 pub(crate) use manifest::validate_manifest;
-#[allow(unused_imports)] // binary commands/run resolves run targets through this crate-visible mapping.
-pub(crate) use manifest::{manifest_backend_selection, manifest_build_target, manifest_device_inputs};
+#[allow(unused_imports)]
+// binary commands/run resolves run targets through this crate-visible mapping.
+pub(crate) use manifest::{
+    manifest_backend_selection, manifest_build_target, manifest_device_inputs,
+};
 #[allow(unused_imports)] // public package API; used by integration tests and external callers
 pub use manifest::{
     read_manifest, FaberManifest, ManifestBuild, ManifestDispatch, ManifestLibrary,
@@ -126,6 +130,19 @@ pub(crate) use product::build_browser_product;
 #[cfg(test)]
 pub(crate) use product::build_browser_product_static_assets;
 // binary-only package interpretation route consumes this through `commands`.
+#[allow(unused_imports)] // the S1-6 device-route seam (constructor + execution).
+pub(crate) use device::{
+    admit_device_program_section, device_program_for_lowered, device_section_for_program,
+    execute_device_route,
+};
+#[allow(unused_imports)] // the one host-construction policy for the run routes.
+pub(crate) use host_factory::{
+    admitted_backends, construct_composite_host, create_program_session, discovery_receipt,
+    effective_backend_selection, execute_device_descriptor, host_error_diagnostic,
+    missing_backend_artifact, missing_device_descriptor, resolve_backend_selection,
+    BackendDiscoveryReceipt, E_BACKEND_UNAVAILABLE, E_DEVICE_ABI_MISMATCH, E_DEVICE_DESCRIPTOR,
+    E_DEVICE_DTYPE_MISMATCH, E_DEVICE_ENTRY_MISMATCH, E_DEVICE_SHAPE_MISMATCH, E_NO_DEVICE_PROGRAM,
+};
 #[allow(unused_imports)] // generated fmir-bin runner crates consume this public API.
 pub use mir::run_fmir_image_bytes_with_stdio;
 #[cfg(test)]
@@ -136,21 +153,8 @@ pub use mir::with_lowered_package_mir;
 pub(crate) use mir::{
     build_package_fmir_binary_bundle, build_package_fmir_image, build_package_fmir_text_image,
     fmir_image_route_decision, run_fmir_image_path, run_fmir_image_path_with_selection,
-    run_package_fmir_image, run_package_fmir_image_with_selection,
-    run_package_fmir_text_image, run_package_fmir_text_image_with_selection,
-};
-#[allow(unused_imports)] // the one host-construction policy for the run routes.
-pub(crate) use host_factory::{
-    admitted_backends, construct_composite_host, create_program_session, discovery_receipt,
-    effective_backend_selection, execute_device_descriptor, host_error_diagnostic,
-    missing_backend_artifact, missing_device_descriptor, resolve_backend_selection,
-    BackendDiscoveryReceipt, E_BACKEND_UNAVAILABLE, E_DEVICE_ABI_MISMATCH, E_DEVICE_DESCRIPTOR,
-    E_DEVICE_DTYPE_MISMATCH, E_DEVICE_ENTRY_MISMATCH, E_DEVICE_SHAPE_MISMATCH, E_NO_DEVICE_PROGRAM,
-};
-#[allow(unused_imports)] // the S1-6 device-route seam (constructor + execution).
-pub(crate) use device::{
-    admit_device_program_section, device_program_for_lowered, device_section_for_program,
-    execute_device_route,
+    run_package_fmir_image, run_package_fmir_image_with_selection, run_package_fmir_text_image,
+    run_package_fmir_text_image_with_selection,
 };
 #[allow(unused_imports)]
 pub(crate) use mir::{build_package_mir_artifact, run_package_mir, run_package_mir_artifact};

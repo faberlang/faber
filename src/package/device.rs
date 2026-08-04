@@ -48,8 +48,8 @@
 use faber::device::{DeviceBackend, DeviceSelection};
 use faber_host_macos_arm64::device_descriptor::{
     DescriptorBuffer, DescriptorBufferVersion, DescriptorDataFlow as HostDescriptorDataFlow,
-    DescriptorKernel, DescriptorLaunch, DeviceBufferLifetime, DeviceDataType, DeviceDescriptor,
-    DeviceBufferRole, DeviceProgramLifetime as HostDeviceProgramLifetime,
+    DescriptorKernel, DescriptorLaunch, DeviceBufferLifetime, DeviceBufferRole, DeviceDataType,
+    DeviceDescriptor, DeviceProgramLifetime as HostDeviceProgramLifetime,
 };
 use radix::diagnostics::Diagnostic;
 use radix::lexer::Interner;
@@ -249,84 +249,85 @@ pub(crate) fn device_program_for_lowered(
     let mut unified: Vec<UnifiedBuffer> = Vec::new();
     let mut next_buffer_id = 1u32;
     let mut builds: Vec<KernelBuild> = Vec::with_capacity(kernel_functions.len());
-    let mut build_kernel =
-        |function: &MirFunction| -> Result<(), Vec<Diagnostic>> {
-            let signature =
-                MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
-                    function, validated.validation(), interner,
-                )
-                .map_err(|error| vec![device_diag("signature", error.message)])?;
-            let plan = match kernel_plan_for_function(function, &signature, validated.validation())
-                .map_err(|error| vec![device_diag("plan", error.message)])?
-            {
-                Some(plan) => plan,
-                // No recipe and no unplannable op (N3.2): the function-level
-                // scan verified the body elementwise (only elementwise
-                // transforms), so the no-recipe plan is the typed decision —
-                // never a silent fallback from an unplannable op.
-                None => CollectionKernelPlan::Elementwise,
-            };
+    let mut build_kernel = |function: &MirFunction| -> Result<(), Vec<Diagnostic>> {
+        let signature = MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+            function,
+            validated.validation(),
+            interner,
+        )
+        .map_err(|error| vec![device_diag("signature", error.message)])?;
+        let plan = match kernel_plan_for_function(function, &signature, validated.validation())
+            .map_err(|error| vec![device_diag("plan", error.message)])?
+        {
+            Some(plan) => plan,
+            // No recipe and no unplannable op (N3.2): the function-level
+            // scan verified the body elementwise (only elementwise
+            // transforms), so the no-recipe plan is the typed decision —
+            // never a silent fallback from an unplannable op.
+            None => CollectionKernelPlan::Elementwise,
+        };
 
-            let mut resources: Vec<ResourceBuild> = Vec::new();
-            for resource in signature
-                .resources()
-                .filter(|resource| resource.kind == MirKernelResourceKind::StorageBuffer)
+        let mut resources: Vec<ResourceBuild> = Vec::new();
+        for resource in signature
+            .resources()
+            .filter(|resource| resource.kind == MirKernelResourceKind::StorageBuffer)
+        {
+            let role =
+                BufferRole::from_abi_role(resource.role, resource.access).ok_or_else(|| {
+                    vec![device_diag(
+                        "buffer role",
+                        format!(
+                            "storage buffer binding {} has no coherent program role ({:?} {:?})",
+                            resource.binding, resource.role, resource.access
+                        ),
+                    )]
+                })?;
+            let name = buffer_slot_name(function, interner, &resource);
+            let buffer_id = if let Some(entry) = unified
+                .iter_mut()
+                .find(|entry| entry.matches(&name, resource.element_ty, resource.element_count))
             {
-                let role = BufferRole::from_abi_role(resource.role, resource.access)
-                    .ok_or_else(|| {
-                        vec![device_diag(
-                            "buffer role",
-                            format!(
-                                "storage buffer binding {} has no coherent program role ({:?} {:?})",
-                                resource.binding, resource.role, resource.access
-                            ),
-                        )]
-                    })?;
-                let name = buffer_slot_name(function, interner, &resource);
-                let buffer_id = if let Some(entry) = unified.iter_mut().find(|entry| {
-                    entry.matches(&name, resource.element_ty, resource.element_count)
-                }) {
-                    // Unification (S2-5): the same logical buffer appears at
-                    // this kernel too. The merged role is the program-level
-                    // identity fact; an Input+Output mix makes it an InOut
-                    // intermediate.
-                    entry.role = merge_buffer_roles(entry.role, role);
-                    entry.id
-                } else {
-                    let id = BufferId(next_buffer_id);
-                    next_buffer_id += 1;
-                    unified.push(UnifiedBuffer {
-                        id,
-                        name,
-                        element_ty: resource.element_ty,
-                        element_count: resource.element_count,
-                        role,
-                    });
-                    id
-                };
-                resources.push(ResourceBuild {
-                    group: resource.group,
-                    binding: resource.binding,
-                    access: resource.access,
-                    buffer_id,
+                // Unification (S2-5): the same logical buffer appears at
+                // this kernel too. The merged role is the program-level
+                // identity fact; an Input+Output mix makes it an InOut
+                // intermediate.
+                entry.role = merge_buffer_roles(entry.role, role);
+                entry.id
+            } else {
+                let id = BufferId(next_buffer_id);
+                next_buffer_id += 1;
+                unified.push(UnifiedBuffer {
+                    id,
+                    name,
                     element_ty: resource.element_ty,
                     element_count: resource.element_count,
+                    role,
                 });
-            }
-            // The launch binds buffers in binding order (inputs first, output
-            // last), matching the emitted kernel's buffer indices / param
-            // order.
-            resources.sort_by_key(|resource| (resource.binding, resource.group));
-
-            builds.push(KernelBuild {
-                function: function.id,
-                entry: kernel_entry_name(function, interner),
-                plan,
-                launch: KernelLaunchPlan::from_signature_and_function(&signature, function),
-                resources,
+                id
+            };
+            resources.push(ResourceBuild {
+                group: resource.group,
+                binding: resource.binding,
+                access: resource.access,
+                buffer_id,
+                element_ty: resource.element_ty,
+                element_count: resource.element_count,
             });
-            Ok(())
-        };
+        }
+        // The launch binds buffers in binding order (inputs first, output
+        // last), matching the emitted kernel's buffer indices / param
+        // order.
+        resources.sort_by_key(|resource| (resource.binding, resource.group));
+
+        builds.push(KernelBuild {
+            function: function.id,
+            entry: kernel_entry_name(function, interner),
+            plan,
+            launch: KernelLaunchPlan::from_signature_and_function(&signature, function),
+            resources,
+        });
+        Ok(())
+    };
 
     for function in kernel_functions {
         build_kernel(function)?;
@@ -422,12 +423,14 @@ pub(crate) fn device_program_for_lowered(
                 || resource.buffer.role == BufferRole::InOut)
                 && resource.access != MirKernelResourceAccess::Read
             {
-                program.results.push(radix_mir::device_program::ResultBuffer {
-                    buffer: resource.buffer.clone(),
-                    version: resource.version.clone(),
-                    role: resource.buffer.role,
-                    produced_by: launch_id,
-                });
+                program
+                    .results
+                    .push(radix_mir::device_program::ResultBuffer {
+                        buffer: resource.buffer.clone(),
+                        version: resource.version.clone(),
+                        role: resource.buffer.role,
+                        produced_by: launch_id,
+                    });
             }
         }
     }
@@ -666,7 +669,9 @@ fn wire_plan(plan: &CollectionKernelPlan) -> WireCollectionKernelPlan {
     }
 }
 
-fn wire_shared_layout(layout: &radix_mir::kernel_plan::SharedMemoryLayout) -> WireSharedMemoryLayout {
+fn wire_shared_layout(
+    layout: &radix_mir::kernel_plan::SharedMemoryLayout,
+) -> WireSharedMemoryLayout {
     WireSharedMemoryLayout {
         element_byte_width: u32::try_from(layout.element_byte_width).unwrap_or(u32::MAX),
         slot_count: layout.slot_count,
@@ -712,17 +717,17 @@ pub(crate) fn device_section_for_program(
     // later `--backend cuda` request fails closed as a missing declared
     // artifact (the same seam the PTX-compile-unavailable path uses). The
     // Metal artifact is the S3-A5 proof surface.
-    let cuda_artifact = match radix_mir_llvm::emit_cuda_device_artifact(program, validated, interner)
-    {
-        Ok(artifact) => Some(artifact),
-        Err(error) => {
-            eprintln!(
-                "faber: CUDA artifact not emitted (S3-A7 emitter surface): {}",
-                error
-            );
-            None
-        }
-    };
+    let cuda_artifact =
+        match radix_mir_llvm::emit_cuda_device_artifact(program, validated, interner) {
+            Ok(artifact) => Some(artifact),
+            Err(error) => {
+                eprintln!(
+                    "faber: CUDA artifact not emitted (S3-A7 emitter surface): {}",
+                    error
+                );
+                None
+            }
+        };
 
     // The CUDA logical-entry → symbol mapping rides the artifact as
     // per-artifact metadata (N3.3): it is an artifact fact, not a program
@@ -1130,9 +1135,7 @@ fn add_descriptor_buffer_version(
         if existing.element_ty != element_ty || existing.element_count != element_count {
             return Err(vec![device_diag(
                 "buffer version",
-                format!(
-                    "buffer {buffer_id} version {version} carries conflicting shape facts"
-                ),
+                format!("buffer {buffer_id} version {version} carries conflicting shape facts"),
             )]);
         }
         return Ok(());
@@ -1174,9 +1177,7 @@ fn wire_element_ty_to_host(spelling: &str) -> Result<DeviceDataType, Vec<Diagnos
         "f32" => Ok(DeviceDataType::F32),
         other => Err(vec![device_diag(
             "element type",
-            format!(
-                "device program element type `{other}` is outside the campaign dtype surface"
-            ),
+            format!("device program element type `{other}` is outside the campaign dtype surface"),
         )]),
     }
 }
@@ -1290,9 +1291,10 @@ fn wire_resource_graph(device: &FmirDeviceSection) -> (Vec<WireGraphBuffer>, Vec
     }
     // Results contribute the observed versions to the chain.
     for result in &wire.results {
-        if !buffers.iter().any(|buffer| {
-            buffer.id == result.buffer.id && buffer.version == result.version.version
-        }) {
+        if !buffers
+            .iter()
+            .any(|buffer| buffer.id == result.buffer.id && buffer.version == result.version.version)
+        {
             buffers.push(WireGraphBuffer {
                 id: result.buffer.id,
                 name: result.buffer.name.clone(),
@@ -1310,10 +1312,7 @@ fn wire_resource_graph(device: &FmirDeviceSection) -> (Vec<WireGraphBuffer>, Vec
     let mut edges: Vec<WireGraphEdge> = Vec::new();
     for (buffer_id, version, producer) in &producers {
         for (consumer_id, consumer_version, consumer) in &consumers {
-            if consumer_id == buffer_id
-                && consumer_version == version
-                && consumer != producer
-            {
+            if consumer_id == buffer_id && consumer_version == version && consumer != producer {
                 edges.push(WireGraphEdge {
                     buffer_id: *buffer_id,
                     version: *version,
@@ -1367,9 +1366,8 @@ pub(crate) fn execute_device_route(
     // gated before any field-level interpretation (old v2 payloads fail
     // closed with the structured `payload_version` diagnostic).
     admit_device_program_section(&device.device_program)?;
-    let artifact = artifact_for_backend(&device.artifacts.artifact, backend).ok_or_else(|| {
-        vec![super::host_factory::missing_backend_artifact(backend)]
-    })?;
+    let artifact = artifact_for_backend(&device.artifacts.artifact, backend)
+        .ok_or_else(|| vec![super::host_factory::missing_backend_artifact(backend)])?;
     // A9 discovery receipt: selected device + declared artifact hash.
     let discovery = super::host_factory::discovery_receipt(backend, &device.artifacts.artifact)
         .ok_or_else(|| vec![super::host_factory::missing_backend_artifact(backend)])?;

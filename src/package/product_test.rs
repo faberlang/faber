@@ -121,7 +121,10 @@ fn library_ts_module_map_default_src_is_deterministic() {
         ("web:api".to_owned(), "./web-api.js".to_owned()),
         ("web:geo".to_owned(), "./web-geo.js".to_owned()),
         ("web:light".to_owned(), "./web-light.js".to_owned()),
-        ("web:lighting/light".to_owned(), "./web-lighting-light.js".to_owned()),
+        (
+            "web:lighting/light".to_owned(),
+            "./web-lighting-light.js".to_owned(),
+        ),
     ]);
     assert_eq!(map, expected);
 }
@@ -208,7 +211,10 @@ fn library_ts_module_map_nested_read_dir_failure_is_diagnostic() {
             // permission drop; when the walk succeeds the nested leaf must
             // still be present (never silently dropped).
             eprintln!("skipped: permission-based read-dir failure not effective");
-            assert_eq!(map.get("web:lighting/light"), Some(&"./web-lighting-light.js".to_owned()));
+            assert_eq!(
+                map.get("web:lighting/light"),
+                Some(&"./web-lighting-light.js".to_owned())
+            );
         }
     }
 }
@@ -237,7 +243,10 @@ fn library_ts_module_map_name_collision_is_diagnostic() {
 
     let result = build_library_ts_module_map(app.path());
     let diagnostic = result.expect_err("collision rejected loudly");
-    assert_eq!(diagnostic.issue(), Some("product_library_ts_module_name_collision"));
+    assert_eq!(
+        diagnostic.issue(),
+        Some("product_library_ts_module_name_collision")
+    );
     assert!(
         diagnostic.message.contains("web-lighting-light.ts"),
         "expected the colliding emitted file name in the diagnostic, got: {}",
@@ -251,7 +260,10 @@ fn library_ts_module_map_name_collision_is_diagnostic() {
 fn library_import_map() -> BTreeMap<String, String> {
     let mut map = BTreeMap::new();
     map.insert("triga:triga".to_owned(), "./triga-triga.js".to_owned());
-    map.insert("triga:geometry".to_owned(), "./triga-geometry.js".to_owned());
+    map.insert(
+        "triga:geometry".to_owned(),
+        "./triga-geometry.js".to_owned(),
+    );
     map
 }
 
@@ -344,8 +356,14 @@ fn normalize_library_namespace_bindings_aliases_non_stem_privata_names() {
     // emitted as an `as` alias or tsc fails with TS2305. Stem-matching
     // bindings, relative imports, and already-aliased imports are untouched.
     let map = BTreeMap::from([
-        ("triga:lighting/light".to_owned(), "./triga-lighting-light.js".to_owned()),
-        ("triga:geometry/data".to_owned(), "./triga-geometry-data.js".to_owned()),
+        (
+            "triga:lighting/light".to_owned(),
+            "./triga-lighting-light.js".to_owned(),
+        ),
+        (
+            "triga:geometry/data".to_owned(),
+            "./triga-geometry-data.js".to_owned(),
+        ),
     ]);
     let code = r#"import { lighting } from "triga:lighting/light";
 import { data } from "triga:geometry/data";
@@ -363,9 +381,10 @@ import { city } from "./city";
 fn normalize_library_namespace_bindings_skips_multi_binding_and_unknown_specifiers() {
     // Multi-binding imports (post-augmentation style) and specifiers absent
     // from the library map are never rewritten.
-    let map = BTreeMap::from([
-        ("triga:lighting/light".to_owned(), "./triga-lighting-light.js".to_owned()),
-    ]);
+    let map = BTreeMap::from([(
+        "triga:lighting/light".to_owned(),
+        "./triga-lighting-light.js".to_owned(),
+    )]);
     let code = r#"import { Light, lighting } from "triga:lighting/light";
 import { mystery } from "triga:mystery";
 "#;

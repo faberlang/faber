@@ -227,8 +227,10 @@ pub fn discovery_receipt(
     let artifact = artifacts.iter().find(|artifact| {
         matches!(
             (&artifact.backend, backend),
-            (radix_mir_fmir::FmirDeviceBackend::Metal, DeviceBackend::Metal)
-                | (radix_mir_fmir::FmirDeviceBackend::Cuda, DeviceBackend::Cuda)
+            (
+                radix_mir_fmir::FmirDeviceBackend::Metal,
+                DeviceBackend::Metal
+            ) | (radix_mir_fmir::FmirDeviceBackend::Cuda, DeviceBackend::Cuda)
         )
     })?;
     Some(BackendDiscoveryReceipt {
@@ -242,11 +244,9 @@ pub fn discovery_receipt(
 #[must_use]
 pub fn backend_device_name(backend: DeviceBackend) -> String {
     match backend {
-        DeviceBackend::Metal => {
-            faber_host_macos_arm64::probe_metal_environment()
-                .mtl_device
-                .unwrap_or_else(|| "metal".to_owned())
-        }
+        DeviceBackend::Metal => faber_host_macos_arm64::probe_metal_environment()
+            .mtl_device
+            .unwrap_or_else(|| "metal".to_owned()),
         DeviceBackend::Cuda => faber_host_macos_arm64::probe_cuda_environment()
             .nvidia_smi
             .unwrap_or_else(|| "cuda".to_owned()),

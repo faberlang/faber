@@ -320,10 +320,7 @@ incipit argumenta args {
 
 // ── S1-5 backend selection: precedence (CLI > manifest > auto) ───────────
 
-fn run_args_with_backend(
-    path: PathBuf,
-    backend: Option<crate::cli::BackendSelection>,
-) -> RunArgs {
+fn run_args_with_backend(path: PathBuf, backend: Option<crate::cli::BackendSelection>) -> RunArgs {
     let mut args = run_args(
         path.clone(),
         false,

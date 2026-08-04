@@ -204,7 +204,10 @@ fn build_is_deterministic_byte_identical() {
     let first_bytes = fs::read(&first.package_path).expect("read first artifact");
     let second = build_package_fhir(&Config::default(), &entry).expect("second build");
     let second_bytes = fs::read(&second.package_path).expect("read second artifact");
-    assert_eq!(first_bytes, second_bytes, "repeated builds must be byte-identical");
+    assert_eq!(
+        first_bytes, second_bytes,
+        "repeated builds must be byte-identical"
+    );
 }
 
 #[test]
@@ -443,7 +446,10 @@ fn loaded_package_library_import_unit_parity() {
                 .expect("loaded emit"),
         )
         .to_owned();
-        assert_eq!(loaded_code, direct_code, "library-import parity for {target}");
+        assert_eq!(
+            loaded_code, direct_code,
+            "library-import parity for {target}"
+        );
     }
 }
 

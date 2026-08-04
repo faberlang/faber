@@ -70,10 +70,7 @@ pub(super) fn cmd_run(args: RunArgs) {
     };
 
     let target = resolve_run_target(&args, &input_path);
-    let device_capable_route = matches!(
-        target,
-        Target::Fmir | Target::FmirText | Target::FmirBin
-    );
+    let device_capable_route = matches!(target, Target::Fmir | Target::FmirText | Target::FmirBin);
     if !device_capable_route {
         resolve_route_backend_or_exit(selection, false);
     }
@@ -139,8 +136,10 @@ fn resolve_route_selection(
         return Ok(DeviceSelection::Auto);
     }
     let manifest = package::read_manifest(&layout.manifest_path)?;
-    let manifest_backend =
-        package::manifest_backend_selection(manifest.device.backend.as_deref(), &layout.manifest_path)?;
+    let manifest_backend = package::manifest_backend_selection(
+        manifest.device.backend.as_deref(),
+        &layout.manifest_path,
+    )?;
     Ok(package::effective_backend_selection(None, manifest_backend))
 }
 
@@ -225,11 +224,8 @@ fn resolve_run_target(args: &RunArgs, input_path: &Path) -> Target {
     let Ok(manifest) = crate::package::read_manifest(&layout.manifest_path) else {
         return Target::Fhir;
     };
-    crate::package::manifest_build_target(
-        manifest.build.target.as_deref(),
-        &layout.manifest_path,
-    )
-    .unwrap_or(Target::Fhir)
+    crate::package::manifest_build_target(manifest.build.target.as_deref(), &layout.manifest_path)
+        .unwrap_or(Target::Fhir)
 }
 
 fn warn_policy_from_args(args: &RunArgs) -> radix::driver::WarnPolicy {
@@ -493,11 +489,9 @@ pub(super) fn cmd_fmir_run_image(args: FmirRunArgs) {
     // The route function applies the one host-construction policy: a
     // device-bearing image runs through the composite host's device route
     // (S1-6 launch seam); anything else runs the CPU/FMIR stepper.
-    if let Err(diagnostics) = package::run_fmir_image_path_with_selection(
-        &args.image,
-        Some(selection),
-        &mut host,
-    ) {
+    if let Err(diagnostics) =
+        package::run_fmir_image_path_with_selection(&args.image, Some(selection), &mut host)
+    {
         eprint_route_diagnostics(&diagnostics);
         eprintln!("fmir image execution failed");
         std::process::exit(1);
