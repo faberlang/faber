@@ -21,7 +21,7 @@ pub struct DiagnosticSpec {
 #[must_use]
 pub fn reader_locale_fallback_spec() -> DiagnosticSpec {
     DiagnosticSpec {
-        code: "READER001",
+        code: "LOCALE001",
         help: Some(
             "use the pack spelling or add the Latin spelling as an explicit alias if the bridge is intentional",
         ),
@@ -32,7 +32,7 @@ pub fn reader_locale_fallback_spec() -> DiagnosticSpec {
 #[must_use]
 pub fn reader_locale_suggestion_spec() -> DiagnosticSpec {
     DiagnosticSpec {
-        code: "READER002",
+        code: "LOCALE002",
         help: Some(
             "use the suggested pack spelling or add the spelling as an explicit alias if it is intentional",
         ),
@@ -43,7 +43,7 @@ pub fn reader_locale_suggestion_spec() -> DiagnosticSpec {
 #[must_use]
 pub fn reader_locale_unknown_spec() -> DiagnosticSpec {
     DiagnosticSpec {
-        code: "READER003",
+        code: "LOCALE003",
         help: Some(
             "check the locale id is a valid reader locale directory name under the standard library reader path",
         ),

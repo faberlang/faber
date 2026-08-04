@@ -246,7 +246,7 @@ fn contains_diagnostic_prose_word(line: &str) -> bool {
 
 fn contains_diagnostic_code_token(line: &str) -> bool {
     [
-        "LEX", "PARSE", "SEM", "WARN", "READER", "PKG", "CODEGEN", "MIR", "AIR", "ABI",
+        "LEX", "PARSE", "SEM", "WARN", "LOCALE", "PKG", "CODEGEN", "MIR", "AIR", "ABI",
     ]
     .iter()
     .any(|prefix| line.contains(prefix) && line.contains(|ch: char| ch.is_ascii_digit()))
