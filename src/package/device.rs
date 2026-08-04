@@ -853,7 +853,6 @@ fn companion_calls(
     companions: &radix_mir::device::MirCompanionMap,
 ) -> CompanionCalls {
     let trace = build_tuple_trace(entry);
-    eprintln!("CCDBG plain={:?} extract={:?}", trace.plain_copy, trace.extract);
     let mut selected_locals: BTreeSet<MirLocalId> = BTreeSet::new();
     let mut selected_gradient_slots: BTreeMap<MirLocalId, (u32, u32)> = BTreeMap::new();
     let mut tuple_locals: BTreeMap<(u32, u32), MirLocalId> = BTreeMap::new();
