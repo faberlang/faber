@@ -400,6 +400,20 @@ fn dependency_ordered_launches(
         }
     }
     if ordered.len() != program.launches.len() {
+        let remaining: Vec<LaunchId> = program
+            .launches
+            .iter()
+            .map(|launch| launch.id)
+            .filter(|id| !ordered.contains(id))
+            .collect();
+        let leftover_edges: Vec<&radix_mir::device_program::DataFlowPair> = edges
+            .iter()
+            .filter(|edge| remaining.contains(&edge.producer) && remaining.contains(&edge.consumer))
+            .collect();
+        eprintln!(
+            "DBG launch-order cycle: remaining launches {:?}; edges {:?}",
+            remaining, leftover_edges
+        );
         return Err(vec![device_diag(
             "launch order",
             "the carried producer/consumer dependency graph contains a cycle; the launch sequence cannot follow it",
@@ -1657,8 +1671,23 @@ pub(crate) fn device_program_for_lowered(
                     merge_slot_facts(entry, role, resource, is_param_input);
                     entry.id
                 } else if let Some(entry) = buffers.iter_mut().find(|entry| {
+                    // A2-3 (D-5): the name+shape wiring is a data-flow
+                    // continuation, never a second independent writer. A
+                    // consumer slot joins any same-name/same-shape buffer; a
+                    // producer slot joins only a buffer with NO writer yet
+                    // (the reverse-declared producer→consumer chain, whose
+                    // initial state is host-provided — e.g. the collige/
+                    // recollige `medius` chain). Once a buffer has a writer, a
+                    // producer must join by semantic identity (the branch
+                    // above), a param alias, or a gradient alias; a name+shape
+                    // producer join would alias two independent values whenever
+                    // fallback names (`output_N` / `input_N`) and shapes
+                    // coincide (the square MLP makes every shape equal) — the
+                    // false second writer records write-after-write producers
+                    // and backward launch edges (the D-4 launch-order cycle).
                     entry.matches(&name, resource.element_ty, resource.element_count)
                         && unify_roles(entry.role, role)
+                        && (resource.access == MirKernelResourceAccess::Read || !entry.written)
                 }) {
                     // A trainable parameter's program role is InOut regardless
                     // of the merged slot roles (the param identity is a
