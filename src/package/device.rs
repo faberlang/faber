@@ -62,10 +62,15 @@ use radix_mir::kernel_plan::CollectionKernelPlan;
 use radix_mir::layout::MirTensorStorageLayout;
 use radix_mir::{MirFunctionId, MirType};
 use radix_mir_fmir::{
-    FmirDeviceArtifact, FmirDeviceArtifactsSection, FmirDeviceBackend, FmirDeviceProgramSection,
-    FmirDeviceSection, FmirDeviceSelection,
+    FmirDeviceArtifact, FmirDeviceArtifactsSection, FmirDeviceBackend, FmirDeviceInput,
+    FmirDeviceProgramSection, FmirDeviceSection, FmirDeviceSelection, FmirDeviceSymbol,
+    WireBarrierPhase, WireBarrierPoint, WireBinding, WireBufferIdentity, WireBufferLifetime,
+    WireBufferRole, WireBufferVersion, WireCollectionKernelPlan, WireDeviceProgram,
+    WireDeviceResource, WireDispatchSize, WireKernelLaunchPlan, WireKernelUnit, WireLaunchUnit,
+    WireMatMulPlan, WireMatMulSharedMemory, WireOobPaddingPolicy, WireProgramLifetime,
+    WireReduceOp, WireReductionPlan, WireResourceAccess, WireResultBuffer, WireSharedMemoryLayout,
+    WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize,
 };
-use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 /// Stable fail-closed diagnostic for a device-program construction failure.
@@ -433,182 +438,242 @@ pub(crate) fn device_program_for_lowered(
 }
 
 // ---------------------------------------------------------------------------
-// Packaged payload codec (producer-owned canonical form)
+// Typed device-program wire (S3-A4 / N3.3, the operator-authorized seam break)
 // ---------------------------------------------------------------------------
 
-/// Canonical payload version. Bump only with a documented representation
-/// change (the payload is the identity substrate of the same-package hash).
+/// Wire/codec version. Bump only with a documented representation change
+/// (the wire is the identity substrate of the same-package hash).
 ///
-/// **v1 → v2 (S2-4, the faber-owned codec bump):** `PlanSlot` gained a typed
-/// `lifetime` field and `DeviceRunPlan` gained the program `lifetime` regime
-/// — the constructor-derived [`BufferLifetime`] facts ride the payload so the
-/// host receives them from the packaged image (it never re-derives them from
-/// slot role). Admission is fail-closed: `parse_payload` checks the `v`
-/// field before any field-level parse, so old v1 payloads fail with the
-/// structured `payload_version` diagnostic. This is a **faber-owned codec
-/// change, not an A7/FMIR bump** — `PACKAGE_MIR_ARTIFACT_VERSION` stays 4
-/// (N2.8; S2-9 forbids radix schema changes).
-const DEVICE_RUN_PLAN_VERSION: u32 = 2;
+/// **v2 → v3 (S3-A4, the faber-owned codec bump in lockstep with the FMIR
+/// 4 → 5 ratchet):** the thinned `DeviceRunPlan` slot list is REPLACED by
+/// the serialized COMPLETE program — the typed
+/// [`FmirDeviceProgramSection`] wire (kernels, launches, results,
+/// per-resource access + version). CUDA symbols and host input values are
+/// no longer part of the canonical program bytes: they ride the per-artifact
+/// symbol mapping and the declared-inputs section. Admission is fail-closed:
+/// [`admit_device_program_section`] checks the wire version before any
+/// field-level interpretation, so an old wire payload fails with the
+/// structured `payload_version` diagnostic.
+const DEVICE_RUN_PLAN_VERSION: u32 = 3;
 
-/// Typed buffer-lifetime spelling carried by the canonical payload (codec v2,
-/// S2-4). Mirrors the radix [`BufferLifetime`] and hosts
-/// [`DeviceBufferLifetime`] spellings; an unknown spelling fails the payload
-/// admission closed (never a silent default).
-///
-/// [`BufferLifetime`]: radix_mir::device_program::BufferLifetime
-/// [`DeviceBufferLifetime`]: faber_host_macos_arm64::device_descriptor::DeviceBufferLifetime
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub(crate) enum PlanSlotLifetime {
-    /// Allocated once for the whole program; persists across executions.
-    PerProgram,
-    /// Live within one step; recycled at the step boundary.
-    PerStep,
-    /// Read back at a declared observation point; read-then-release.
-    ObservationPoint,
-}
-
-/// Program execution-lifetime regime carried by the canonical payload (codec
-/// v2, S2-4). `SingleRun` is the Stage 2 fixture regime; `RepeatingStep` is
-/// the repeating training-step regime whose per-step recycling semantics land
-/// with Stage 5.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub(crate) enum PlanProgramLifetime {
-    /// One-shot program run.
-    #[default]
-    SingleRun,
-    /// Repeating training step; per-step buffers recycle between iterations.
-    RepeatingStep,
-}
-
-/// One typed slot of a plan kernel (mirrors the S1-4 [`DescriptorBuffer`]
-/// facts; produced from the S1-1 [`DeviceResource`]).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct PlanSlot {
-    /// Program-level buffer identity key.
-    pub id: u32,
-    /// Logical buffer name (diagnostics + input mapping).
-    pub name: String,
-    /// Slot role (`"input"` | `"output"` | `"in-out"`).
-    pub role: String,
-    /// Typed buffer lifetime (codec v2; derived by the constructor from the
-    /// ABI facts, consumed by the host session's allocation/release policy).
-    pub lifetime: PlanSlotLifetime,
-    /// Target-neutral binding index.
-    pub binding: u32,
-    /// Element type spelling (`"f32"`).
-    pub ty: String,
-    /// Element count of this version's shape.
-    pub count: u64,
-}
-
-/// One ordered kernel of the run plan.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct PlanKernel {
-    /// Target-neutral logical entry.
-    pub entry: String,
-    /// Typed buffer slots in binding order.
-    pub slots: Vec<PlanSlot>,
-    /// 3D workgroup-count grid the host launches.
-    pub grid: [u32; 3],
-    /// 3D workgroup (block) shape per axis.
-    pub block: [u32; 3],
-}
-
-/// One CUDA logical-entry → NVVM-symbol identity (S1-3 [`CudaKernelIdentity`]).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct PlanCudaKernel {
-    /// Logical entry (a [`DeviceProgram`] kernel-unit fact).
-    pub entry: String,
-    /// Emitted NVVM/PTX `.entry` symbol the host launches by.
-    pub symbol: String,
-}
-
-/// One host input for an input buffer (by buffer name).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct PlanInput {
-    /// Buffer name this input targets.
-    pub name: String,
-    /// Flat f32 values (row-major).
-    pub values: Vec<f32>,
-}
-
-/// The producer-owned canonical run plan carried in the FMIR
-/// `device_program.payload` field (N1.7 §7.1).
-///
-/// The representation is backend-neutral (the logical entry is the program
-/// fact; the CUDA symbol mapping rides beside it) and deterministic, so the
-/// same package derives identical payload bytes on both routes (A10).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct DeviceRunPlan {
-    /// Canonical representation version ([`DEVICE_RUN_PLAN_VERSION`]).
-    pub v: u32,
-    /// Program execution-lifetime regime (codec v2, S2-4).
-    pub lifetime: PlanProgramLifetime,
-    /// Ordered kernels, in program order.
-    pub kernels: Vec<PlanKernel>,
-    /// CUDA logical-entry → symbol identities (empty for non-CUDA images).
-    pub cuda_kernels: Vec<PlanCudaKernel>,
-    /// Host input values for the program's input buffers.
-    pub inputs: Vec<PlanInput>,
-}
-
-/// Encode the canonical run plan to its deterministic JSON payload.
-///
-/// Named-field serde JSON is deterministic for a fixed struct shape; the
-/// identity substrate of the same-package hash must be byte-stable.
+/// Fail-closed wire admission (S3-A4): the wire version is read FIRST,
+/// before any field-level interpretation, so an old (or unknown) codec
+/// version fails with the structured `payload_version` diagnostic — never a
+/// silent default and never a generic field-level error that hides the
+/// version gate.
 ///
 /// # Errors
-/// Fail-closed when the plan cannot be serialized (never in practice — every
-/// field is a plain JSON value).
-fn encode_payload(plan: &DeviceRunPlan) -> Result<String, Vec<Diagnostic>> {
-    serde_json::to_string(plan).map_err(|error| {
-        vec![device_diag(
-            "payload",
-            format!("canonical run plan serialization failed: {error}"),
-        )]
-    })
-}
-
-/// Parse a canonical run-plan payload back from an FMIR device section.
-///
-/// Fail-closed admission (S2-4): the version field is read **first**, before
-/// any field-level parse, so an old (or unknown) codec version fails with the
-/// structured `payload_version` diagnostic — never a silent default and never
-/// a generic field-level error that hides the version gate.
-///
-/// # Errors
-/// Fail-closed when the payload is not a valid run plan or carries an
-/// unsupported version.
-pub(crate) fn parse_payload(payload: &str) -> Result<DeviceRunPlan, Vec<Diagnostic>> {
-    let value: serde_json::Value = serde_json::from_str(payload).map_err(|error| {
-        vec![Diagnostic::error(format!(
-            "device section payload is not a valid run plan: {error}"
-        ))
-        .with_arg("issue", "E_DEVICE_DESCRIPTOR")]
-    })?;
-    let Some(version) = value.get("v").and_then(serde_json::Value::as_u64) else {
-        return Err(vec![Diagnostic::error(
-            "device section payload is not a valid run plan (missing version field `v`)",
-        )
-        .with_arg("issue", "E_DEVICE_DESCRIPTOR")]);
-    };
-    if version != u64::from(DEVICE_RUN_PLAN_VERSION) {
+/// Fail-closed when the wire carries an unsupported version.
+pub(crate) fn admit_device_program_section(
+    section: &FmirDeviceProgramSection,
+) -> Result<(), Vec<Diagnostic>> {
+    if section.v != DEVICE_RUN_PLAN_VERSION {
         return Err(vec![Diagnostic::error(format!(
-            "device section payload version {} is not supported (expected {})",
-            version, DEVICE_RUN_PLAN_VERSION
+            "device section wire version {} is not supported (expected {})",
+            section.v, DEVICE_RUN_PLAN_VERSION
         ))
         .with_arg("issue", "E_DEVICE_DESCRIPTOR")
-        .with_arg("payload_version", version.to_string())]);
+        .with_arg("payload_version", section.v.to_string())]);
     }
-    let plan: DeviceRunPlan = serde_json::from_value(value).map_err(|error| {
-        vec![Diagnostic::error(format!(
-            "device section payload is not a valid run plan: {error}"
-        ))
-        .with_arg("issue", "E_DEVICE_DESCRIPTOR")]
-    })?;
-    Ok(plan)
+    Ok(())
+}
+
+/// Build the typed complete-program wire from a constructed device program
+/// (S3-A4). Every program fact the constructor materialized is carried
+/// field-for-field: kernels (function id, entry, plan, typed resources with
+/// access + version, launch), the ordered launch sequence, the program
+/// lifetime, and the explicit result buffers. CUDA symbols and host input
+/// values are NOT program semantics — they never enter the canonical bytes.
+#[must_use]
+fn wire_program_for_program(program: &DeviceProgram) -> WireDeviceProgram {
+    WireDeviceProgram {
+        kernels: program
+            .kernels
+            .iter()
+            .map(|kernel| WireKernelUnit {
+                function: kernel.function.0,
+                entry: kernel.entry.clone(),
+                plan: wire_plan(&kernel.plan),
+                resources: kernel
+                    .resources
+                    .iter()
+                    .map(|resource| WireDeviceResource {
+                        buffer: wire_buffer_identity(&resource.buffer),
+                        version: wire_buffer_version(&resource.version),
+                        binding: WireBinding {
+                            group: resource.binding.group,
+                            binding: resource.binding.binding,
+                        },
+                        access: wire_access(resource.access),
+                    })
+                    .collect(),
+                launch: WireKernelLaunchPlan {
+                    workgroup: WireWorkgroupSize {
+                        x: kernel.launch.workgroup.x,
+                        y: kernel.launch.workgroup.y,
+                        z: kernel.launch.workgroup.z,
+                    },
+                    dispatch_size: WireDispatchSize {
+                        x: kernel.launch.dispatch_size.x,
+                        y: kernel.launch.dispatch_size.y,
+                        z: kernel.launch.dispatch_size.z,
+                    },
+                    workgroup_count: WireWorkgroupCount {
+                        x: kernel.launch.workgroup_count.x,
+                        y: kernel.launch.workgroup_count.y,
+                        z: kernel.launch.workgroup_count.z,
+                    },
+                },
+            })
+            .collect(),
+        launches: program
+            .launches
+            .iter()
+            .map(|launch| WireLaunchUnit {
+                id: launch.id.0,
+                kernel_index: u32::try_from(launch.kernel_index).unwrap_or(u32::MAX),
+            })
+            .collect(),
+        lifetime: match program.lifetime {
+            DeviceProgramLifetime::SingleRun => WireProgramLifetime::SingleRun,
+            DeviceProgramLifetime::RepeatingStep => WireProgramLifetime::RepeatingStep,
+        },
+        results: program
+            .results
+            .iter()
+            .map(|result| WireResultBuffer {
+                buffer: wire_buffer_identity(&result.buffer),
+                version: wire_buffer_version(&result.version),
+                role: wire_role(result.role),
+                produced_by: result.produced_by.0,
+            })
+            .collect(),
+    }
+}
+
+fn wire_buffer_identity(identity: &BufferIdentity) -> WireBufferIdentity {
+    WireBufferIdentity {
+        id: identity.id.0,
+        name: identity.name.clone(),
+        role: wire_role(identity.role),
+        storage: match identity.storage {
+            MirTensorStorageLayout::DeviceHandle => WireStorageLayout::DeviceHandle,
+            MirTensorStorageLayout::HostOwned => WireStorageLayout::HostOwned,
+        },
+        lifetime: match identity.lifetime {
+            BufferLifetime::PerProgram => WireBufferLifetime::PerProgram,
+            BufferLifetime::PerStep => WireBufferLifetime::PerStep,
+            BufferLifetime::ObservationPoint => WireBufferLifetime::ObservationPoint,
+        },
+    }
+}
+
+fn wire_buffer_version(version: &BufferVersion) -> WireBufferVersion {
+    WireBufferVersion {
+        version: version.version,
+        element_ty: data_type_spelling(version.element_ty),
+        element_count: version.element_count,
+    }
+}
+
+fn wire_role(role: BufferRole) -> WireBufferRole {
+    match role {
+        BufferRole::Input => WireBufferRole::Input,
+        BufferRole::Output => WireBufferRole::Output,
+        BufferRole::InOut => WireBufferRole::InOut,
+    }
+}
+
+fn wire_access(access: MirKernelResourceAccess) -> WireResourceAccess {
+    match access {
+        MirKernelResourceAccess::Read => WireResourceAccess::Read,
+        MirKernelResourceAccess::Write => WireResourceAccess::Write,
+        MirKernelResourceAccess::ReadWrite => WireResourceAccess::ReadWrite,
+    }
+}
+
+/// Map a radix [`CollectionKernelPlan`] onto its typed wire mirror (the
+/// complete plan is a program fact — never dropped on the wire).
+fn wire_plan(plan: &CollectionKernelPlan) -> WireCollectionKernelPlan {
+    match plan {
+        CollectionKernelPlan::Elementwise => WireCollectionKernelPlan::Elementwise,
+        CollectionKernelPlan::TiledMatMul(matmul) => {
+            WireCollectionKernelPlan::TiledMatMul(WireMatMulPlan {
+                m: matmul.m,
+                k: matmul.k,
+                n: matmul.n,
+                tile: matmul.tile,
+                workgroup_x: matmul.workgroup_x,
+                workgroup_y: matmul.workgroup_y,
+                shared_memory: WireMatMulSharedMemory {
+                    shared_a: wire_shared_layout(&matmul.shared_memory.shared_a),
+                    shared_b: wire_shared_layout(&matmul.shared_memory.shared_b),
+                },
+                barriers: matmul
+                    .barriers
+                    .iter()
+                    .map(|barrier| WireBarrierPoint {
+                        after: match barrier.after {
+                            radix_mir::kernel_plan::BarrierPhase::SharedMemoryLoad => {
+                                WireBarrierPhase::SharedMemoryLoad
+                            }
+                            radix_mir::kernel_plan::BarrierPhase::ReductionStep => {
+                                WireBarrierPhase::ReductionStep
+                            }
+                            radix_mir::kernel_plan::BarrierPhase::InnerProductStep => {
+                                WireBarrierPhase::InnerProductStep
+                            }
+                        },
+                    })
+                    .collect(),
+                oob_padding: wire_oob_padding(matmul.oob_padding),
+            })
+        }
+        CollectionKernelPlan::TreeReduction(reduction) => {
+            WireCollectionKernelPlan::TreeReduction(WireReductionPlan {
+                op: match reduction.op {
+                    radix_mir::kernel_plan::ReduceOp::Sum => WireReduceOp::Sum,
+                    radix_mir::kernel_plan::ReduceOp::Mean => WireReduceOp::Mean,
+                },
+                length: reduction.length,
+                workgroup_x: reduction.workgroup_x,
+                partials: reduction.partials,
+                shared_memory: wire_shared_layout(&reduction.shared_memory),
+                barriers: reduction
+                    .barriers
+                    .iter()
+                    .map(|barrier| WireBarrierPoint {
+                        after: match barrier.after {
+                            radix_mir::kernel_plan::BarrierPhase::SharedMemoryLoad => {
+                                WireBarrierPhase::SharedMemoryLoad
+                            }
+                            radix_mir::kernel_plan::BarrierPhase::ReductionStep => {
+                                WireBarrierPhase::ReductionStep
+                            }
+                            radix_mir::kernel_plan::BarrierPhase::InnerProductStep => {
+                                WireBarrierPhase::InnerProductStep
+                            }
+                        },
+                    })
+                    .collect(),
+                oob_padding: wire_oob_padding(reduction.oob_padding),
+            })
+        }
+    }
+}
+
+fn wire_shared_layout(layout: &radix_mir::kernel_plan::SharedMemoryLayout) -> WireSharedMemoryLayout {
+    WireSharedMemoryLayout {
+        element_byte_width: u32::try_from(layout.element_byte_width).unwrap_or(u32::MAX),
+        slot_count: layout.slot_count,
+        buffer_name: layout.buffer_name.clone(),
+    }
+}
+
+fn wire_oob_padding(padding: radix_mir::kernel_plan::OobPaddingPolicy) -> WireOobPaddingPolicy {
+    match padding {
+        radix_mir::kernel_plan::OobPaddingPolicy::ZeroFill => WireOobPaddingPolicy::ZeroFill,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -642,10 +707,23 @@ pub(crate) fn device_section_for_program(
             vec![device_diag("cuda artifact", error.to_string())]
         })?;
 
+    // The CUDA logical-entry → symbol mapping rides the artifact as
+    // per-artifact metadata (N3.3): it is an artifact fact, not a program
+    // semantic, so it never enters the canonical program bytes.
+    let cuda_symbols = cuda_artifact
+        .kernels
+        .iter()
+        .map(|identity| FmirDeviceSymbol {
+            entry: identity.entry.clone(),
+            symbol: identity.symbol.clone(),
+        })
+        .collect::<Vec<_>>();
+
     let mut artifact = vec![FmirDeviceArtifact {
         backend: FmirDeviceBackend::Metal,
         blob: metal_artifact.source,
         hash: metal_artifact.hash,
+        symbols: Vec::new(),
     }];
     match radix_mir_llvm::compile_nvvm_to_ptx(&cuda_artifact.source, ptx_target) {
         Ok(ptx) => {
@@ -656,6 +734,7 @@ pub(crate) fn device_section_for_program(
                 backend: FmirDeviceBackend::Cuda,
                 blob: ptx,
                 hash: ptx_hash,
+                symbols: cuda_symbols,
             });
         }
         Err(error) => {
@@ -668,8 +747,14 @@ pub(crate) fn device_section_for_program(
         }
     }
 
-    let plan = build_run_plan_with_ids(program, Some(&cuda_artifact), inputs);
-    let payload = encode_payload(&plan)?;
+    let wire = wire_program_for_program(program);
+    let declared_inputs = inputs
+        .iter()
+        .map(|(name, values)| FmirDeviceInput {
+            name: name.clone(),
+            values: values.clone(),
+        })
+        .collect();
 
     let mut runtime_requirements = Vec::new();
     for artifact_entry in &artifact {
@@ -682,90 +767,19 @@ pub(crate) fn device_section_for_program(
     runtime_requirements.dedup();
 
     Ok(FmirDeviceSection {
-        device_program: FmirDeviceProgramSection { payload },
+        device_program: FmirDeviceProgramSection {
+            v: DEVICE_RUN_PLAN_VERSION,
+            program: wire,
+        },
         selection: match selection {
             DeviceSelection::Auto => FmirDeviceSelection::Auto,
             DeviceSelection::Metal => FmirDeviceSelection::Metal,
             DeviceSelection::Cuda => FmirDeviceSelection::Cuda,
         },
         artifacts: FmirDeviceArtifactsSection { artifact },
+        declared_inputs,
         runtime_requirements,
     })
-}
-
-/// Build the run plan directly from the device program's typed facts: one
-/// plan kernel per kernel unit, with program-level buffer ids/names, the
-/// derived launch grid/block, the CUDA symbol mapping, and the host inputs.
-#[must_use]
-fn build_run_plan_with_ids(
-    program: &DeviceProgram,
-    cuda_artifact: Option<&radix_mir_llvm::CudaDeviceArtifact>,
-    inputs: &BTreeMap<String, Vec<f32>>,
-) -> DeviceRunPlan {
-    let cuda_kernels = cuda_artifact
-        .map(|artifact| {
-            artifact
-                .kernels
-                .iter()
-                .map(|identity| PlanCudaKernel {
-                    entry: identity.entry.clone(),
-                    symbol: identity.symbol.clone(),
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-    let kernels = program
-        .kernels
-        .iter()
-        .map(|kernel| PlanKernel {
-            entry: kernel.entry.clone(),
-            slots: kernel
-                .resources
-                .iter()
-                .map(|resource| PlanSlot {
-                    id: resource.buffer.id.0,
-                    name: resource.buffer.name.clone(),
-                    role: role_spelling(resource.buffer.role),
-                    lifetime: plan_slot_lifetime(resource.buffer.lifetime),
-                    binding: resource.binding.binding,
-                    ty: data_type_spelling(resource.version.element_ty),
-                    count: resource.version.element_count,
-                })
-                .collect(),
-            grid: [
-                u32::try_from(kernel.launch.workgroup_count.x).unwrap_or(u32::MAX),
-                u32::try_from(kernel.launch.workgroup_count.y).unwrap_or(u32::MAX),
-                u32::try_from(kernel.launch.workgroup_count.z).unwrap_or(u32::MAX),
-            ],
-            block: [
-                kernel.launch.workgroup.x,
-                kernel.launch.workgroup.y,
-                kernel.launch.workgroup.z,
-            ],
-        })
-        .collect();
-    let plan_inputs = inputs
-        .iter()
-        .map(|(name, values)| PlanInput {
-            name: name.clone(),
-            values: values.clone(),
-        })
-        .collect();
-    DeviceRunPlan {
-        v: DEVICE_RUN_PLAN_VERSION,
-        lifetime: plan_program_lifetime(program.lifetime),
-        kernels,
-        cuda_kernels,
-        inputs: plan_inputs,
-    }
-}
-
-fn role_spelling(role: BufferRole) -> String {
-    match role {
-        BufferRole::Input => "input".to_owned(),
-        BufferRole::Output => "output".to_owned(),
-        BufferRole::InOut => "in-out".to_owned(),
-    }
 }
 
 /// The S2-4 constructor mapping (delivery spec N2.4, open question 3's
@@ -777,23 +791,6 @@ fn lifetime_for_role(role: BufferRole) -> BufferLifetime {
         BufferRole::Input => BufferLifetime::PerProgram,
         BufferRole::Output => BufferLifetime::ObservationPoint,
         BufferRole::InOut => BufferLifetime::PerStep,
-    }
-}
-
-/// Map a radix [`BufferLifetime`] onto its payload spelling (codec v2).
-fn plan_slot_lifetime(lifetime: BufferLifetime) -> PlanSlotLifetime {
-    match lifetime {
-        BufferLifetime::PerProgram => PlanSlotLifetime::PerProgram,
-        BufferLifetime::PerStep => PlanSlotLifetime::PerStep,
-        BufferLifetime::ObservationPoint => PlanSlotLifetime::ObservationPoint,
-    }
-}
-
-/// Map a radix [`DeviceProgramLifetime`] onto its payload spelling (codec v2).
-fn plan_program_lifetime(lifetime: DeviceProgramLifetime) -> PlanProgramLifetime {
-    match lifetime {
-        DeviceProgramLifetime::SingleRun => PlanProgramLifetime::SingleRun,
-        DeviceProgramLifetime::RepeatingStep => PlanProgramLifetime::RepeatingStep,
     }
 }
 
@@ -822,100 +819,134 @@ pub(crate) fn artifact_for_backend<'a>(
     })
 }
 
-/// Build the typed host descriptor for a run plan + backend artifact blob.
+/// Build the typed host descriptor from the image's WIRE + backend artifact
+/// blob (S3-A4: the host consumes the wire — the descriptor is derived
+/// exclusively from the carried program facts, never from a thinned slot
+/// list).
 ///
-/// The S1-3 typed logical-entry → NVVM-symbol mapping is **consumed here**:
-/// the CUDA descriptor's kernel entry is the emitted PTX `.entry` symbol
-/// ([`CudaKernelIdentity`]`::symbol`), never the logical entry; Metal
+/// The S1-3 typed logical-entry → NVVM-symbol mapping is **consumed here**
+/// from the artifact's per-artifact metadata: the CUDA descriptor's kernel
+/// entry is the emitted PTX `.entry` symbol, never the logical entry; Metal
 /// launches by the logical entry (the emitted MSL kernel name). Slots are
 /// carried in binding order so the composite host binds buffers in the
-/// emitted kernel's buffer/param order. The payload's typed lifetimes (codec
-/// v2) are mapped onto the host descriptor's [`DeviceBufferLifetime`]/[`DeviceProgramLifetime`]
-/// — the host consumes the constructor-derived facts; it never re-derives a
-/// lifetime from slot role (S2-4).
-#[must_use]
+/// emitted kernel's buffer/param order. The wire's typed lifetimes and
+/// program regime are mapped onto the host descriptor's
+/// [`DeviceBufferLifetime`]/[`DeviceProgramLifetime`] — the host consumes
+/// the carried facts; it never re-derives a lifetime from slot role (S2-4).
+///
+/// # Errors
+/// Fail-closed when a carried element-type spelling is outside the campaign
+/// dtype surface (never a silent default).
 pub(crate) fn descriptor_for_backend(
-    plan: &DeviceRunPlan,
+    device: &FmirDeviceSection,
     backend: DeviceBackend,
     blob: &[u8],
-) -> DeviceDescriptor {
-    let kernels = plan
-        .kernels
-        .iter()
-        .map(|kernel| {
-            let entry = match backend {
-                DeviceBackend::Cuda => plan
-                    .cuda_kernels
-                    .iter()
-                    .find(|identity| identity.entry == kernel.entry)
-                    .map(|identity| identity.symbol.clone())
-                    .unwrap_or_else(|| kernel.entry.clone()),
-                DeviceBackend::Metal => kernel.entry.clone(),
-            };
-            let buffers = kernel
-                .slots
+) -> Result<DeviceDescriptor, Vec<Diagnostic>> {
+    let wire = &device.device_program.program;
+    let mut kernels = Vec::with_capacity(wire.kernels.len());
+    for kernel in &wire.kernels {
+        let entry = match backend {
+            DeviceBackend::Cuda => device
+                .artifacts
+                .artifact
                 .iter()
-                .map(|slot| DescriptorBuffer {
-                    buffer_id: slot.id,
-                    buffer_name: slot.name.clone(),
-                    role: parse_role(&slot.role),
-                    lifetime: parse_slot_lifetime(slot.lifetime),
-                    binding: slot.binding,
-                    element_ty: DeviceDataType::F32,
-                    element_count: slot.count,
+                .find(|artifact| artifact.backend == FmirDeviceBackend::Cuda)
+                .and_then(|artifact| {
+                    artifact
+                        .symbols
+                        .iter()
+                        .find(|identity| identity.entry == kernel.entry)
+                        .map(|identity| identity.symbol.clone())
                 })
-                .collect();
-            DescriptorKernel {
-                entry,
-                buffers,
-                grid: kernel.grid,
-                block: kernel.block,
-            }
-        })
-        .collect();
-    DeviceDescriptor {
+                .unwrap_or_else(|| kernel.entry.clone()),
+            DeviceBackend::Metal => kernel.entry.clone(),
+        };
+        let mut buffers = Vec::with_capacity(kernel.resources.len());
+        for resource in &kernel.resources {
+            let element_ty = wire_element_ty_to_host(&resource.version.element_ty)?;
+            buffers.push(DescriptorBuffer {
+                buffer_id: resource.buffer.id,
+                buffer_name: resource.buffer.name.clone(),
+                role: wire_role_to_host(resource.buffer.role),
+                lifetime: wire_lifetime_to_host(resource.buffer.lifetime),
+                binding: resource.binding.binding,
+                element_ty,
+                element_count: resource.version.element_count,
+            });
+        }
+        kernels.push(DescriptorKernel {
+            entry,
+            buffers,
+            grid: [
+                u32::try_from(kernel.launch.workgroup_count.x).unwrap_or(u32::MAX),
+                u32::try_from(kernel.launch.workgroup_count.y).unwrap_or(u32::MAX),
+                u32::try_from(kernel.launch.workgroup_count.z).unwrap_or(u32::MAX),
+            ],
+            block: [
+                kernel.launch.workgroup.x,
+                kernel.launch.workgroup.y,
+                kernel.launch.workgroup.z,
+            ],
+        });
+    }
+    Ok(DeviceDescriptor {
         backend,
         module_image: blob.to_vec(),
         kernels,
-        program_lifetime: match plan.lifetime {
-            PlanProgramLifetime::SingleRun => HostDeviceProgramLifetime::SingleRun,
-            PlanProgramLifetime::RepeatingStep => HostDeviceProgramLifetime::RepeatingStep,
+        program_lifetime: match wire.lifetime {
+            WireProgramLifetime::SingleRun => HostDeviceProgramLifetime::SingleRun,
+            WireProgramLifetime::RepeatingStep => HostDeviceProgramLifetime::RepeatingStep,
         },
+    })
+}
+
+fn wire_role_to_host(role: WireBufferRole) -> DeviceBufferRole {
+    match role {
+        WireBufferRole::Input => DeviceBufferRole::Input,
+        WireBufferRole::Output => DeviceBufferRole::Output,
+        WireBufferRole::InOut => DeviceBufferRole::InOut,
     }
 }
 
-fn parse_role(spelling: &str) -> DeviceBufferRole {
-    match spelling {
-        "output" => DeviceBufferRole::Output,
-        "in-out" => DeviceBufferRole::InOut,
-        _ => DeviceBufferRole::Input,
-    }
-}
-
-/// Map the payload's typed lifetime onto the host descriptor's typed
-/// lifetime. The payload admission already guarantees the spelling is one of
-/// the three (an unknown variant fails the serde parse closed); this is a
-/// total function over that admitted set.
-fn parse_slot_lifetime(lifetime: PlanSlotLifetime) -> DeviceBufferLifetime {
+/// Map the wire's typed lifetime onto the host descriptor's typed lifetime.
+/// The wire is the typed section (deny_unknown_fields admission), so the
+/// mapping is a total function over the three-class enum (N3.4).
+fn wire_lifetime_to_host(lifetime: WireBufferLifetime) -> DeviceBufferLifetime {
     match lifetime {
-        PlanSlotLifetime::PerProgram => DeviceBufferLifetime::PerProgram,
-        PlanSlotLifetime::PerStep => DeviceBufferLifetime::PerStep,
-        PlanSlotLifetime::ObservationPoint => DeviceBufferLifetime::ObservationPoint,
+        WireBufferLifetime::PerProgram => DeviceBufferLifetime::PerProgram,
+        WireBufferLifetime::PerStep => DeviceBufferLifetime::PerStep,
+        WireBufferLifetime::ObservationPoint => DeviceBufferLifetime::ObservationPoint,
     }
 }
 
-/// Map the plan's named inputs onto buffer ids (via the plan slots).
-fn inputs_by_buffer_id(plan: &DeviceRunPlan) -> BTreeMap<u32, Vec<f32>> {
+/// Map the wire's element-type spelling onto the host's typed element type.
+/// The campaign dtype surface pins f32 (the S1-1 schema); an unknown spelling
+/// fails closed — never a silent default and never an unreachable arm.
+fn wire_element_ty_to_host(spelling: &str) -> Result<DeviceDataType, Vec<Diagnostic>> {
+    match spelling {
+        "f32" => Ok(DeviceDataType::F32),
+        other => Err(vec![device_diag(
+            "element type",
+            format!(
+                "device program element type `{other}` is outside the campaign dtype surface"
+            ),
+        )]),
+    }
+}
+
+/// Map the wire's named declared inputs onto buffer ids (via the wire's
+/// input-buffer identities).
+fn inputs_by_buffer_id(device: &FmirDeviceSection) -> BTreeMap<u32, Vec<f32>> {
     let mut by_name: BTreeMap<String, Vec<f32>> = BTreeMap::new();
-    for input in &plan.inputs {
+    for input in &device.declared_inputs {
         by_name.insert(input.name.clone(), input.values.clone());
     }
     let mut by_id: BTreeMap<u32, Vec<f32>> = BTreeMap::new();
-    for kernel in &plan.kernels {
-        for slot in &kernel.slots {
-            if slot.role == "input" {
-                if let Some(values) = by_name.get(&slot.name) {
-                    by_id.insert(slot.id, values.clone());
+    for kernel in &device.device_program.program.kernels {
+        for resource in &kernel.resources {
+            if resource.buffer.role == WireBufferRole::Input {
+                if let Some(values) = by_name.get(&resource.buffer.name) {
+                    by_id.insert(resource.buffer.id, values.clone());
                 }
             }
         }
@@ -925,21 +956,139 @@ fn inputs_by_buffer_id(plan: &DeviceRunPlan) -> BTreeMap<u32, Vec<f32>> {
 
 /// The observation-point buffer ids the run reads back (S2-4).
 ///
-/// The readback set is exactly the buffers whose typed lifetime is
-/// ObservationPoint — the declared observation points. InOut intermediates
-/// (PerStep lifetime under the constructor mapping) are never read back, so
-/// the ordinary `faber run` path performs no undeclared readback between
-/// kernels (campaign exit-gate bullet 1).
-fn observation_buffer_ids(plan: &DeviceRunPlan) -> Vec<u32> {
+/// The readback set is exactly the buffers whose carried lifetime is
+/// ObservationPoint — the declared observation points on the wire. InOut
+/// intermediates (PerStep lifetime under the constructor mapping) are never
+/// read back, so the ordinary `faber run` path performs no undeclared
+/// readback between kernels (campaign exit-gate bullet 1).
+fn observation_buffer_ids(device: &FmirDeviceSection) -> Vec<u32> {
     let mut ids = Vec::new();
-    for kernel in &plan.kernels {
-        for slot in &kernel.slots {
-            if slot.lifetime == PlanSlotLifetime::ObservationPoint && !ids.contains(&slot.id) {
-                ids.push(slot.id);
+    for kernel in &device.device_program.program.kernels {
+        for resource in &kernel.resources {
+            if resource.buffer.lifetime == WireBufferLifetime::ObservationPoint
+                && !ids.contains(&resource.buffer.id)
+            {
+                ids.push(resource.buffer.id);
             }
         }
     }
     ids
+}
+
+// ---------------------------------------------------------------------------
+// Wire-derived A10 resource graph (S3-A4)
+// ---------------------------------------------------------------------------
+
+/// One wire-derived A10 graph buffer (identity + content version).
+struct WireGraphBuffer {
+    id: u32,
+    name: String,
+    role: WireBufferRole,
+    lifetime: WireBufferLifetime,
+    version: u32,
+    element_ty: String,
+    element_count: u64,
+}
+
+/// One wire-derived inter-kernel data-flow edge.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct WireGraphEdge {
+    buffer_id: u32,
+    version: u32,
+    producer: u32,
+    consumer: u32,
+}
+
+/// Derive the A10 resource graph from the wire's COMPLETE facts (N3.3): the
+/// per-buffer identity + content version, and the producer/consumer edges
+/// from the carried ordered access + launches. This is the same derivation
+/// as the radix-mir `BufferRegistry` over the program — the host consumes
+/// the carried facts instead of re-deriving topology from launch order or a
+/// slot-role string (no coincidence-based first-writer rule, no hardcoded
+/// version).
+fn wire_resource_graph(device: &FmirDeviceSection) -> (Vec<WireGraphBuffer>, Vec<WireGraphEdge>) {
+    let wire = &device.device_program.program;
+    let mut buffers: Vec<WireGraphBuffer> = Vec::new();
+    let mut producers: Vec<(u32, u32, u32)> = Vec::new();
+    let mut consumers: Vec<(u32, u32, u32)> = Vec::new();
+    for launch in &wire.launches {
+        let Some(kernel) = wire.kernels.get(launch.kernel_index as usize) else {
+            continue;
+        };
+        for resource in &kernel.resources {
+            let id = resource.buffer.id;
+            if !buffers.iter().any(|buffer| buffer.id == id) {
+                buffers.push(WireGraphBuffer {
+                    id,
+                    name: resource.buffer.name.clone(),
+                    role: resource.buffer.role,
+                    lifetime: resource.buffer.lifetime,
+                    version: resource.version.version,
+                    element_ty: resource.version.element_ty.clone(),
+                    element_count: resource.version.element_count,
+                });
+            }
+            match resource.access {
+                WireResourceAccess::Read => {
+                    consumers.push((id, resource.version.version, launch.id));
+                }
+                WireResourceAccess::Write => {
+                    producers.push((id, resource.version.version, launch.id));
+                }
+                WireResourceAccess::ReadWrite => {
+                    consumers.push((id, resource.version.version, launch.id));
+                    producers.push((id, resource.version.version, launch.id));
+                }
+            }
+        }
+    }
+    // Results contribute the observed versions to the chain.
+    for result in &wire.results {
+        if !buffers.iter().any(|buffer| buffer.id == result.buffer.id) {
+            buffers.push(WireGraphBuffer {
+                id: result.buffer.id,
+                name: result.buffer.name.clone(),
+                role: result.buffer.role,
+                lifetime: result.buffer.lifetime,
+                version: result.version.version,
+                element_ty: result.version.element_ty.clone(),
+                element_count: result.version.element_count,
+            });
+        }
+    }
+    // Data-flow edges (mirrors `BufferRegistry::data_flow_pairs`): every
+    // producer/consumer launch pair per (buffer, version), excluding
+    // self-edges.
+    let mut edges: Vec<WireGraphEdge> = Vec::new();
+    for (buffer_id, version, producer) in &producers {
+        for (consumer_id, consumer_version, consumer) in &consumers {
+            if consumer_id == buffer_id
+                && consumer_version == version
+                && consumer != producer
+            {
+                edges.push(WireGraphEdge {
+                    buffer_id: *buffer_id,
+                    version: *version,
+                    producer: *producer,
+                    consumer: *consumer,
+                });
+            }
+        }
+    }
+    (buffers, edges)
+}
+
+/// The wire's logical name for a buffer id (diagnostics).
+fn wire_buffer_name(device: &FmirDeviceSection, id: u32) -> String {
+    device
+        .device_program
+        .program
+        .kernels
+        .iter()
+        .flat_map(|kernel| kernel.resources.iter())
+        .find(|resource| resource.buffer.id == id)
+        .map(|resource| resource.buffer.name.clone())
+        .unwrap_or_else(|| "<unknown>".to_owned())
 }
 
 /// Execute a device-bearing FMIR image's device route through the composite
@@ -964,8 +1113,12 @@ fn observation_buffer_ids(plan: &DeviceRunPlan) -> Vec<u32> {
 pub(crate) fn execute_device_route(
     device: &FmirDeviceSection,
     backend: DeviceBackend,
+    source_hashes: &[String],
 ) -> Result<(), Vec<Diagnostic>> {
-    let plan = parse_payload(&device.device_program.payload)?;
+    // Fail-closed wire admission (S3-A4): the typed-section wire version is
+    // gated before any field-level interpretation (old v2 payloads fail
+    // closed with the structured `payload_version` diagnostic).
+    admit_device_program_section(&device.device_program)?;
     let artifact = artifact_for_backend(&device.artifacts.artifact, backend).ok_or_else(|| {
         vec![super::host_factory::missing_backend_artifact(backend)]
     })?;
@@ -973,7 +1126,9 @@ pub(crate) fn execute_device_route(
     let discovery = super::host_factory::discovery_receipt(backend, &device.artifacts.artifact)
         .ok_or_else(|| vec![super::host_factory::missing_backend_artifact(backend)])?;
     discovery.print();
-    let descriptor = descriptor_for_backend(&plan, backend, artifact.blob.as_bytes());
+    // The host consumes the WIRE: the descriptor is derived exclusively from
+    // the carried program facts (never a thinned slot list).
+    let descriptor = descriptor_for_backend(device, backend, artifact.blob.as_bytes())?;
     // Fail-before-launch: the descriptor is validated by the composite host
     // before any kernel is dispatched.
     let selection = match backend {
@@ -982,8 +1137,17 @@ pub(crate) fn execute_device_route(
     };
     let mut host = super::host_factory::construct_composite_host(selection, true)
         .map_err(|diagnostic| vec![diagnostic])?;
-    let inputs = inputs_by_buffer_id(&plan);
-    let outputs = observation_buffer_ids(&plan);
+    let inputs = inputs_by_buffer_id(device);
+    let outputs = observation_buffer_ids(device);
+
+    // A10 identity over the COMPLETE program (S3-A4): the canonical bytes of
+    // the typed wire (semantics-only — CUDA symbols and declared inputs are
+    // absent by construction), hashed with the source identities. Both image
+    // routes carry the identical wire, so the identity is route-independent.
+    let source_refs = source_hashes.iter().map(String::as_str).collect::<Vec<_>>();
+    let canonical = radix_mir_fmir::canonical_program_bytes(&device.device_program.program);
+    let identity = radix_mir_fmir::device_identity_hash(&source_refs, &canonical);
+    println!("device: identity {identity} (A10, complete program)");
 
     // Repeated-execution surface for the S2-8 leak proof.
     let repeat_count = device_repeat_count()?;
@@ -1019,10 +1183,13 @@ pub(crate) fn execute_device_route(
         receipt.allocated_buffers.len()
     );
 
-    // A10 declared logical resource graph: buffer identities, roles,
-    // lifetimes, content versions, and the inter-kernel data-flow edges.
+    // A10 declared logical resource graph: derived from the wire's COMPLETE
+    // facts — buffer identities, roles, lifetimes, content versions, and the
+    // data-flow edges from the carried access + launches (the host never
+    // re-derives topology from launch order or a slot-role string).
+    let (graph, edges) = wire_resource_graph(device);
     println!("device: declared resource graph (A10):");
-    for buffer in &receipt.resource_graph {
+    for buffer in &graph {
         println!(
             "device:   buffer {} `{}` {} {} version {} ({}[{}])",
             buffer.id,
@@ -1030,14 +1197,14 @@ pub(crate) fn execute_device_route(
             buffer.role.spelling(),
             buffer.lifetime.spelling(),
             buffer.version,
-            buffer.element_ty.spelling(),
+            buffer.element_ty,
             buffer.element_count
         );
     }
-    if receipt.data_flow_edges.is_empty() {
+    if edges.is_empty() {
         println!("device:   data-flow edges: none");
     } else {
-        for edge in &receipt.data_flow_edges {
+        for edge in &edges {
             println!(
                 "device:   data-flow {} -> {} via buffer {} version {}",
                 edge.producer, edge.consumer, edge.buffer_id, edge.version
@@ -1046,13 +1213,7 @@ pub(crate) fn execute_device_route(
     }
 
     for (buffer_id, values) in &receipt.outputs {
-        let name = plan
-            .kernels
-            .iter()
-            .flat_map(|kernel| kernel.slots.iter())
-            .find(|slot| slot.id == *buffer_id)
-            .map(|slot| slot.name.as_str())
-            .unwrap_or("<unknown>");
+        let name = wire_buffer_name(device, *buffer_id);
         println!(
             "device: output buffer {} `{}` = [{}]",
             buffer_id,

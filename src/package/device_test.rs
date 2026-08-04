@@ -81,282 +81,211 @@ fn device_program_constructor_returns_none_without_kernels() {
     assert!(program.is_none(), "no kernel → no device program");
 }
 
-/// The constructor-derived lifetimes ride the packaged payload (S2-4):
-/// `build_run_plan_with_ids` maps each buffer's radix `BufferLifetime` onto
-/// the payload slot lifetime and the plan round-trips through the v2 codec —
-/// the host receives the typed facts from the image, never re-deriving them.
-#[test]
-fn constructor_derived_lifetimes_ride_the_packaged_payload() {
-    let program = device_program_from_corpus_fixture("cuda/summa-proof.fab");
-    let plan = build_run_plan_with_ids(&program, None, &BTreeMap::new());
-    assert_eq!(plan.v, DEVICE_RUN_PLAN_VERSION);
-    assert_eq!(plan.lifetime, PlanProgramLifetime::SingleRun);
-    let slots = &plan.kernels[0].slots;
-    assert_eq!(slots.len(), 2);
-    assert_eq!(slots[0].role, "input");
-    assert_eq!(slots[0].lifetime, PlanSlotLifetime::PerProgram);
-    assert_eq!(slots[1].role, "output");
-    assert_eq!(slots[1].lifetime, PlanSlotLifetime::ObservationPoint);
-    // The v2 payload round-trips with the derived lifetimes intact.
-    let encoded = encode_payload(&plan).expect("encodes");
-    let parsed = parse_payload(&encoded).expect("parses back");
-    assert_eq!(parsed, plan);
+/// Build a minimal device section carrying a program's typed wire (no
+/// artifacts / inputs) for the codec, admission, and descriptor tests.
+fn section_for_program(program: &DeviceProgram) -> FmirDeviceSection {
+    FmirDeviceSection {
+        device_program: FmirDeviceProgramSection {
+            v: DEVICE_RUN_PLAN_VERSION,
+            program: wire_program_for_program(program),
+        },
+        selection: FmirDeviceSelection::Auto,
+        artifacts: FmirDeviceArtifactsSection {
+            artifact: Vec::new(),
+        },
+        declared_inputs: Vec::new(),
+        runtime_requirements: Vec::new(),
+    }
 }
 
-// ── Payload codec ──────────────────────────────────────────────────────────
-
+/// The typed wire carries the COMPLETE program (S3-A4): kernels (function id,
+/// entry, plan, typed resources with access + content version, launch), the
+/// ordered launches, the program lifetime, and the explicit result buffers —
+/// nothing thinned, nothing dropped.
 #[test]
-fn payload_round_trips_deterministically() {
-    let plan = DeviceRunPlan {
-        v: DEVICE_RUN_PLAN_VERSION,
-        lifetime: PlanProgramLifetime::SingleRun,
-        kernels: vec![PlanKernel {
-            entry: "summa".to_owned(),
-            slots: vec![
-                PlanSlot {
-                    id: 1,
-                    name: "a".to_owned(),
-                    role: "input".to_owned(),
-                    lifetime: PlanSlotLifetime::PerProgram,
-                    binding: 0,
-                    ty: "f32".to_owned(),
-                    count: 256,
-                },
-                PlanSlot {
-                    id: 2,
-                    name: "out".to_owned(),
-                    role: "output".to_owned(),
-                    lifetime: PlanSlotLifetime::ObservationPoint,
-                    binding: 1,
-                    ty: "f32".to_owned(),
-                    count: 1,
-                },
-            ],
-            grid: [1, 1, 1],
-            block: [256, 1, 1],
-        }],
-        cuda_kernels: vec![PlanCudaKernel {
+fn wire_carries_the_complete_program() {
+    let program = device_program_from_corpus_fixture("cuda/summa-proof.fab");
+    let wire = wire_program_for_program(&program);
+
+    // Kernels: function id + entry + plan + typed resources + launch.
+    assert_eq!(wire.kernels.len(), program.kernels.len());
+    let kernel = &wire.kernels[0];
+    assert_eq!(kernel.function, program.kernels[0].function.0);
+    assert_eq!(kernel.entry, "summa");
+    // The reduction kernel carries its tree-reduction plan (a program fact,
+    // never dropped on the wire).
+    assert!(matches!(
+        kernel.plan,
+        WireCollectionKernelPlan::TreeReduction(_)
+    ));
+    // Per-resource access + version are distinct fields (N3.4).
+    assert_eq!(kernel.resources.len(), 2);
+    assert_eq!(kernel.resources[0].access, WireResourceAccess::Read);
+    assert_eq!(kernel.resources[0].version.version, 1);
+    assert_eq!(kernel.resources[0].version.element_ty, "f32");
+    assert_eq!(kernel.launch.workgroup.x, 256);
+
+    // Launches (ordered, may be >1 per kernel).
+    assert_eq!(wire.launches.len(), program.launches.len());
+    assert_eq!(wire.launches[0].kernel_index, 0);
+
+    // Results carry produced_by.
+    assert_eq!(wire.results.len(), program.results.len());
+    assert_eq!(wire.results[0].produced_by, program.results[0].produced_by.0);
+
+    // Lifetime regime.
+    assert_eq!(wire.lifetime, WireProgramLifetime::SingleRun);
+}
+
+/// The constructor-derived lifetimes ride the typed wire (S2-4 + S3-A4): the
+/// host receives the carried facts from the image, never re-deriving them.
+#[test]
+fn constructor_derived_lifetimes_ride_the_typed_wire() {
+    let program = device_program_from_corpus_fixture("cuda/summa-proof.fab");
+    let wire = wire_program_for_program(&program);
+    let resources = &wire.kernels[0].resources;
+    assert_eq!(resources[0].buffer.role, WireBufferRole::Input);
+    assert_eq!(
+        resources[0].buffer.lifetime,
+        WireBufferLifetime::PerProgram
+    );
+    assert_eq!(resources[1].buffer.role, WireBufferRole::Output);
+    assert_eq!(
+        resources[1].buffer.lifetime,
+        WireBufferLifetime::ObservationPoint
+    );
+}
+
+/// The wire round-trips deterministically: the same program derives the same
+/// canonical complete-program bytes every time (the A10 identity substrate),
+/// and CUDA symbols + declared inputs never touch those bytes.
+#[test]
+fn wire_round_trips_deterministically() {
+    let program = device_program_from_corpus_fixture("cuda/summa-proof.fab");
+    let first = wire_program_for_program(&program);
+    let second = wire_program_for_program(&program);
+    assert_eq!(
+        radix_mir_fmir::canonical_program_bytes(&first),
+        radix_mir_fmir::canonical_program_bytes(&second),
+        "identical program → identical complete-program bytes"
+    );
+
+    // A section whose metadata differs (symbols + inputs) still derives the
+    // same canonical bytes — the identity is over the complete program only.
+    let mut section = section_for_program(&program);
+    section.declared_inputs = vec![FmirDeviceInput {
+        name: "a".to_owned(),
+        values: vec![1.0],
+    }];
+    section.artifacts.artifact = vec![FmirDeviceArtifact {
+        backend: FmirDeviceBackend::Cuda,
+        blob: "ptx".to_owned(),
+        hash: "fnv64:0000000000000000".to_owned(),
+        symbols: vec![FmirDeviceSymbol {
             entry: "summa".to_owned(),
             symbol: "f0".to_owned(),
         }],
-        inputs: vec![PlanInput {
-            name: "a".to_owned(),
-            values: (0..256).map(|i| i as f32).collect(),
-        }],
-    };
-
-    let first = encode_payload(&plan).expect("encodes");
-    let second = encode_payload(&plan).expect("encodes deterministically");
-    assert_eq!(first, second, "identical plan → identical payload bytes");
-    let parsed = parse_payload(&first).expect("parses back");
-    assert_eq!(parsed, plan, "round-trip preserves the plan");
+    }];
+    assert_eq!(
+        radix_mir_fmir::canonical_program_bytes(&section.device_program.program),
+        radix_mir_fmir::canonical_program_bytes(&first),
+        "metadata rides beside the canonical bytes, never inside them"
+    );
 }
 
-/// Codec v2 admission: the payload carries the typed per-buffer lifetimes and
-/// the program lifetime (S2-4), and the serialized spelling is stable.
+/// Old wire versions fail closed with the structured `payload_version`
+/// diagnostic (S3-A4 done-when): the wire-version gate runs before any
+/// field-level interpretation.
 #[test]
-fn payload_v2_carries_typed_lifetimes() {
-    let plan = DeviceRunPlan {
-        v: DEVICE_RUN_PLAN_VERSION,
-        lifetime: PlanProgramLifetime::RepeatingStep,
-        kernels: vec![PlanKernel {
-            entry: "chain".to_owned(),
-            slots: vec![
-                PlanSlot {
-                    id: 1,
-                    name: "a".to_owned(),
-                    role: "input".to_owned(),
-                    lifetime: PlanSlotLifetime::PerProgram,
-                    binding: 0,
-                    ty: "f32".to_owned(),
-                    count: 4,
-                },
-                PlanSlot {
-                    id: 2,
-                    name: "acc".to_owned(),
-                    role: "in-out".to_owned(),
-                    lifetime: PlanSlotLifetime::PerStep,
-                    binding: 1,
-                    ty: "f32".to_owned(),
-                    count: 4,
-                },
-                PlanSlot {
-                    id: 3,
-                    name: "out".to_owned(),
-                    role: "output".to_owned(),
-                    lifetime: PlanSlotLifetime::ObservationPoint,
-                    binding: 2,
-                    ty: "f32".to_owned(),
-                    count: 1,
-                },
-            ],
-            grid: [1, 1, 1],
-            block: [4, 1, 1],
-        }],
-        cuda_kernels: Vec::new(),
-        inputs: Vec::new(),
-    };
-    let encoded = encode_payload(&plan).expect("encodes");
-    assert!(encoded.contains("\"lifetime\":\"per-program\""));
-    assert!(encoded.contains("\"lifetime\":\"per-step\""));
-    assert!(encoded.contains("\"lifetime\":\"observation-point\""));
-    assert!(encoded.contains("\"lifetime\":\"repeating-step\""));
-    let parsed = parse_payload(&encoded).expect("parses back");
-    assert_eq!(parsed, plan);
-}
-
-/// Old v1 payloads fail closed with the structured `payload_version`
-/// diagnostic (S2-4 done-when): the version gate runs before any field-level
-/// parse, so a v1 payload is rejected by version, not by a missing `lifetime`
-/// field, and never silently defaulted.
-#[test]
-fn payload_v1_fails_closed_with_payload_version_diagnostic() {
-    // A payload with `v: 1` and NO `lifetime` fields — exactly the pre-S2-4
-    // v1 representation. The admission gate must reject it by version with
-    // the structured diagnostic, never attempt a field-level parse.
-    let v1_payload = r#"{"v":1,"kernels":[{"entry":"summa","slots":[{"id":1,"name":"a","role":"input","binding":0,"ty":"f32","count":256}],"grid":[1,1,1],"block":[256,1,1]}],"cuda_kernels":[],"inputs":[]}"#;
-    let error = parse_payload(v1_payload).expect_err("v1 payload must fail closed");
+fn wire_v2_fails_closed_with_payload_version_diagnostic() {
+    let program = device_program_from_corpus_fixture("cuda/summa-proof.fab");
+    let mut section = section_for_program(&program);
+    section.device_program.v = 2;
+    let error =
+        admit_device_program_section(&section.device_program).expect_err("v2 wire must fail closed");
     let message = &error[0].message;
     assert!(
-        message.contains("version 1 is not supported"),
-        "old payloads are rejected by the version gate: {message}"
+        message.contains("version 2 is not supported"),
+        "old wires are rejected by the version gate: {message}"
     );
     assert!(
         error[0]
             .args
             .iter()
-            .any(|arg| arg.name == "payload_version" && arg.value == "1"),
+            .any(|arg| arg.name == "payload_version" && arg.value == "2"),
         "the structured `payload_version` diagnostic names the offending version"
     );
 }
 
+/// The CUDA logical-entry → symbol mapping rides the artifact metadata (not
+/// the canonical program bytes); the descriptor consumes it per-artifact.
 #[test]
-fn payload_unsupported_version_fails_closed() {
-    let plan = DeviceRunPlan {
-        v: 99,
-        lifetime: PlanProgramLifetime::SingleRun,
-        kernels: Vec::new(),
-        cuda_kernels: Vec::new(),
-        inputs: Vec::new(),
-    };
-    let encoded = encode_payload(&plan).expect("encodes");
-    let error = parse_payload(&encoded).expect_err("unsupported version must fail closed");
-    assert!(error[0].message.contains("version 99 is not supported"));
-}
-
-#[test]
-fn payload_garbage_fails_closed() {
-    let error = parse_payload("not json").expect_err("garbage payload must fail closed");
-    assert!(error[0].message.contains("not a valid run plan"));
-}
-
-// ── Descriptor construction (CudaKernelIdentity consumption) ───────────────
-
-#[test]
-fn cuda_descriptor_consumes_nvvm_symbol_mapping() {
-    let plan = DeviceRunPlan {
-        v: DEVICE_RUN_PLAN_VERSION,
-        lifetime: PlanProgramLifetime::SingleRun,
-        kernels: vec![PlanKernel {
-            entry: "summa".to_owned(),
-            slots: vec![PlanSlot {
-                id: 1,
-                name: "a".to_owned(),
-                role: "input".to_owned(),
-                lifetime: PlanSlotLifetime::PerProgram,
-                binding: 0,
-                ty: "f32".to_owned(),
-                count: 256,
+fn cuda_descriptor_consumes_artifact_symbol_mapping() {
+    let program = device_program_from_corpus_fixture("cuda/summa-proof.fab");
+    let mut section = section_for_program(&program);
+    section.artifacts.artifact = vec![
+        FmirDeviceArtifact {
+            backend: FmirDeviceBackend::Metal,
+            blob: "msl".to_owned(),
+            hash: "fnv64:0000000000000000".to_owned(),
+            symbols: Vec::new(),
+        },
+        FmirDeviceArtifact {
+            backend: FmirDeviceBackend::Cuda,
+            blob: "ptx".to_owned(),
+            hash: "fnv64:0000000000000000".to_owned(),
+            symbols: vec![FmirDeviceSymbol {
+                entry: "summa".to_owned(),
+                symbol: "f0".to_owned(),
             }],
-            grid: [1, 1, 1],
-            block: [256, 1, 1],
-        }],
-        cuda_kernels: vec![PlanCudaKernel {
-            entry: "summa".to_owned(),
-            symbol: "f0".to_owned(),
-        }],
-        inputs: Vec::new(),
-    };
+        },
+    ];
 
-    let metal = descriptor_for_backend(&plan, DeviceBackend::Metal, b"msl blob");
-    assert_eq!(metal.kernels[0].entry, "summa", "Metal launches by the logical entry");
+    let metal = descriptor_for_backend(&section, DeviceBackend::Metal, b"msl blob")
+        .expect("admitted wire builds the metal descriptor");
+    assert_eq!(
+        metal.kernels[0].entry, "summa",
+        "Metal launches by the logical entry"
+    );
 
-    let cuda = descriptor_for_backend(&plan, DeviceBackend::Cuda, b"ptx blob");
+    let cuda = descriptor_for_backend(&section, DeviceBackend::Cuda, b"ptx blob")
+        .expect("admitted wire builds the cuda descriptor");
     assert_eq!(
         cuda.kernels[0].entry, "f0",
-        "the CUDA descriptor consumes the S1-3 CudaKernelIdentity symbol"
+        "the CUDA descriptor consumes the artifact's symbol mapping"
     );
     assert_eq!(cuda.module_image, b"ptx blob");
     assert_eq!(cuda.kernels[0].buffers[0].buffer_id, 1);
-    assert_eq!(cuda.kernels[0].grid, [1, 1, 1]);
     assert_eq!(cuda.kernels[0].block, [256, 1, 1]);
 }
 
-/// The payload's typed lifetimes (codec v2) are mapped onto the host
-/// descriptor — the host receives the constructor-derived facts and never
-/// re-derives a lifetime from slot role (S2-4).
+/// The wire's typed lifetimes are mapped onto the host descriptor — the host
+/// receives the carried facts and never re-derives a lifetime from slot role
+/// (S2-4, now over the typed wire).
 #[test]
-fn descriptor_maps_payload_lifetimes_onto_host_descriptor() {
-    let plan = DeviceRunPlan {
-        v: DEVICE_RUN_PLAN_VERSION,
-        lifetime: PlanProgramLifetime::RepeatingStep,
-        kernels: vec![PlanKernel {
-            entry: "chain".to_owned(),
-            slots: vec![
-                PlanSlot {
-                    id: 1,
-                    name: "a".to_owned(),
-                    role: "input".to_owned(),
-                    lifetime: PlanSlotLifetime::PerProgram,
-                    binding: 0,
-                    ty: "f32".to_owned(),
-                    count: 4,
-                },
-                PlanSlot {
-                    id: 2,
-                    name: "acc".to_owned(),
-                    role: "in-out".to_owned(),
-                    lifetime: PlanSlotLifetime::PerStep,
-                    binding: 1,
-                    ty: "f32".to_owned(),
-                    count: 4,
-                },
-                PlanSlot {
-                    id: 3,
-                    name: "out".to_owned(),
-                    role: "output".to_owned(),
-                    lifetime: PlanSlotLifetime::ObservationPoint,
-                    binding: 2,
-                    ty: "f32".to_owned(),
-                    count: 1,
-                },
-            ],
-            grid: [1, 1, 1],
-            block: [4, 1, 1],
-        }],
-        cuda_kernels: Vec::new(),
-        inputs: Vec::new(),
-    };
+fn descriptor_maps_wire_lifetimes_onto_host_descriptor() {
+    let program = two_kernel_program();
+    let mut section = section_for_program(&program);
+    section.artifacts.artifact = vec![FmirDeviceArtifact {
+        backend: FmirDeviceBackend::Metal,
+        blob: "msl".to_owned(),
+        hash: "fnv64:0000000000000000".to_owned(),
+        symbols: Vec::new(),
+    }];
 
-    let descriptor = descriptor_for_backend(&plan, DeviceBackend::Metal, b"msl blob");
+    let descriptor = descriptor_for_backend(&section, DeviceBackend::Metal, b"msl blob")
+        .expect("admitted wire builds the descriptor");
     assert_eq!(
         descriptor.program_lifetime,
-        HostDeviceProgramLifetime::RepeatingStep,
-        "the program regime rides the payload into the host descriptor"
+        HostDeviceProgramLifetime::SingleRun,
+        "the program regime rides the wire into the host descriptor"
     );
     let slots = &descriptor.kernels[0].buffers;
     assert_eq!(slots[0].lifetime, DeviceBufferLifetime::PerProgram);
     assert_eq!(slots[1].lifetime, DeviceBufferLifetime::PerStep);
-    assert_eq!(slots[2].lifetime, DeviceBufferLifetime::ObservationPoint);
-}
-
-/// A v2 payload whose slot carries an unknown lifetime spelling fails closed
-/// at admission (never a silent default to a role-derived lifetime).
-#[test]
-fn payload_unknown_lifetime_spelling_fails_closed() {
-    let v2_payload = r#"{"v":2,"lifetime":"single-run","kernels":[{"entry":"summa","slots":[{"id":1,"name":"a","role":"input","lifetime":"forever","binding":0,"ty":"f32","count":256}],"grid":[1,1,1],"block":[256,1,1]}],"cuda_kernels":[],"inputs":[]}"#;
-    let error = parse_payload(v2_payload).expect_err("unknown lifetime spelling must fail closed");
-    assert!(error[0].message.contains("not a valid run plan"));
+    let kernel1_slots = &descriptor.kernels[1].buffers;
+    assert_eq!(kernel1_slots[0].lifetime, DeviceBufferLifetime::PerStep);
+    assert_eq!(kernel1_slots[1].lifetime, DeviceBufferLifetime::ObservationPoint);
 }
 
 #[test]
@@ -365,11 +294,35 @@ fn descriptor_requires_declared_backend_artifact() {
         backend: FmirDeviceBackend::Metal,
         blob: "msl".to_owned(),
         hash: "fnv64:0000000000000000".to_owned(),
+        symbols: Vec::new(),
     }];
     assert!(artifact_for_backend(&artifacts, DeviceBackend::Metal).is_some());
     assert!(
         artifact_for_backend(&artifacts, DeviceBackend::Cuda).is_none(),
         "an undeclared backend artifact fails closed"
+    );
+}
+
+/// A carried element-type spelling outside the campaign dtype surface fails
+/// the descriptor construction closed — never a silent default, never an
+/// unreachable arm.
+#[test]
+fn descriptor_rejects_unknown_element_type_spelling() {
+    let program = device_program_from_corpus_fixture("cuda/summa-proof.fab");
+    let mut section = section_for_program(&program);
+    section.device_program.program.kernels[0].resources[0].version.element_ty = "f64".to_owned();
+    section.artifacts.artifact = vec![FmirDeviceArtifact {
+        backend: FmirDeviceBackend::Metal,
+        blob: "msl".to_owned(),
+        hash: "fnv64:0000000000000000".to_owned(),
+        symbols: Vec::new(),
+    }];
+    let error = descriptor_for_backend(&section, DeviceBackend::Metal, b"msl blob")
+        .expect_err("unknown element type must fail closed");
+    assert!(
+        error[0].message.contains("f64"),
+        "the diagnostic names the offending spelling: {}",
+        error[0].message
     );
 }
 
@@ -470,47 +423,96 @@ fn two_kernel_chain_unifies_intermediate_identity() {
     assert_eq!(results, vec![("medius", 1), ("result", 2)]);
 }
 
-/// The unified lifetimes ride the run-plan payload (codec v2): the
-/// intermediate's plan slots are in-out/per-step at both kernels, the final
-/// output is observation-point, and the ordinary readback set is exactly the
-/// observation point — the intermediate is never read back.
+/// The unified lifetimes ride the typed wire (S3-A4): the intermediate's
+/// resources are in-out/per-step at both kernels under ONE buffer id, the
+/// final output is observation-point, and the ordinary readback set is
+/// exactly the observation point — the intermediate is never read back.
 #[test]
-fn two_kernel_run_plan_carries_unified_lifetimes() {
+fn two_kernel_wire_carries_unified_lifetimes() {
     let program = two_kernel_program();
-    let plan = build_run_plan_with_ids(&program, None, &BTreeMap::new());
-    assert_eq!(plan.v, DEVICE_RUN_PLAN_VERSION);
-    assert_eq!(plan.kernels.len(), 2);
+    let section = section_for_program(&program);
+    let wire = &section.device_program.program;
+    assert_eq!(wire.kernels.len(), 2);
 
     // Kernel 1: a (input/per-program) + medius (in-out/per-step).
-    let kernel0_slots = &plan.kernels[0].slots;
-    assert_eq!(kernel0_slots.len(), 2);
-    assert_eq!(kernel0_slots[0].name, "a");
-    assert_eq!(kernel0_slots[0].role, "input");
-    assert_eq!(kernel0_slots[0].lifetime, PlanSlotLifetime::PerProgram);
-    assert_eq!(kernel0_slots[1].name, "medius");
-    assert_eq!(kernel0_slots[1].role, "in-out");
-    assert_eq!(kernel0_slots[1].lifetime, PlanSlotLifetime::PerStep);
+    let kernel0_resources = &wire.kernels[0].resources;
+    assert_eq!(kernel0_resources.len(), 2);
+    assert_eq!(kernel0_resources[0].buffer.name, "a");
+    assert_eq!(kernel0_resources[0].buffer.role, WireBufferRole::Input);
+    assert_eq!(
+        kernel0_resources[0].buffer.lifetime,
+        WireBufferLifetime::PerProgram
+    );
+    assert_eq!(kernel0_resources[1].buffer.name, "medius");
+    assert_eq!(kernel0_resources[1].buffer.role, WireBufferRole::InOut);
+    assert_eq!(
+        kernel0_resources[1].buffer.lifetime,
+        WireBufferLifetime::PerStep
+    );
 
     // Kernel 2: medius (in-out/per-step, same id) + result
     // (output/observation-point).
-    let kernel1_slots = &plan.kernels[1].slots;
-    assert_eq!(kernel1_slots.len(), 2);
-    assert_eq!(kernel1_slots[0].id, kernel0_slots[1].id, "one BufferId for the intermediate");
-    assert_eq!(kernel1_slots[0].role, "in-out");
-    assert_eq!(kernel1_slots[0].lifetime, PlanSlotLifetime::PerStep);
-    assert_eq!(kernel1_slots[1].name, "result");
-    assert_eq!(kernel1_slots[1].role, "output");
-    assert_eq!(kernel1_slots[1].lifetime, PlanSlotLifetime::ObservationPoint);
+    let kernel1_resources = &wire.kernels[1].resources;
+    assert_eq!(kernel1_resources.len(), 2);
+    assert_eq!(
+        kernel1_resources[0].buffer.id, kernel0_resources[1].buffer.id,
+        "one BufferId for the intermediate"
+    );
+    assert_eq!(kernel1_resources[0].buffer.role, WireBufferRole::InOut);
+    assert_eq!(
+        kernel1_resources[0].buffer.lifetime,
+        WireBufferLifetime::PerStep
+    );
+    assert_eq!(kernel1_resources[1].buffer.name, "result");
+    assert_eq!(kernel1_resources[1].buffer.role, WireBufferRole::Output);
+    assert_eq!(
+        kernel1_resources[1].buffer.lifetime,
+        WireBufferLifetime::ObservationPoint
+    );
 
     // The ordinary readback set is exactly the observation point; the
     // PerStep intermediate is never read back (no undeclared readback).
-    let readbacks = observation_buffer_ids(&plan);
-    assert_eq!(readbacks, vec![kernel1_slots[1].id]);
+    let readbacks = observation_buffer_ids(&section);
+    assert_eq!(readbacks, vec![kernel1_resources[1].buffer.id]);
 
-    // The v2 payload round-trips with the unified lifetimes intact.
-    let encoded = encode_payload(&plan).expect("encodes");
-    let parsed = parse_payload(&encoded).expect("parses back");
-    assert_eq!(parsed, plan);
+    // The wire round-trips deterministically with the unified lifetimes
+    // intact (canonical bytes stable).
+    assert_eq!(
+        radix_mir_fmir::canonical_program_bytes(wire),
+        radix_mir_fmir::canonical_program_bytes(&wire_program_for_program(&program))
+    );
+}
+
+/// The wire-derived A10 resource graph (S3-A4) matches the radix-mir
+/// registry's declared facts for the two-kernel chain: the intermediate's
+/// version-1 edge is launch 1 → launch 2 (no coincidence-based re-derivation
+/// — the edge comes from the carried access + launches).
+#[test]
+fn wire_resource_graph_matches_registry_facts() {
+    let program = two_kernel_program();
+    let section = section_for_program(&program);
+    let (graph, edges) = wire_resource_graph(&section);
+
+    // Three buffers in first-reference order.
+    let names: Vec<&str> = graph.iter().map(|buffer| buffer.name.as_str()).collect();
+    assert_eq!(names, vec!["a", "medius", "result"]);
+
+    // The intermediate's version-1 edge: launch 1 produces, launch 2
+    // consumes (the same fact `DeviceProgram::buffer_registry` derives).
+    let medius = graph
+        .iter()
+        .find(|buffer| buffer.name == "medius")
+        .expect("intermediate is on the wire");
+    assert_eq!(medius.version, 1);
+    assert_eq!(
+        edges,
+        vec![WireGraphEdge {
+            buffer_id: medius.id,
+            version: 1,
+            producer: 1,
+            consumer: 2,
+        }]
+    );
 }
 
 /// The `FABER_DEVICE_REPEAT` leak-proof hook: absent → 1, valid number →

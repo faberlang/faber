@@ -212,11 +212,13 @@ fn discovery_receipt_picks_the_matching_artifact_hash() {
             backend: radix_mir_fmir::FmirDeviceBackend::Metal,
             blob: "msl source".to_owned(),
             hash: "fnv64:1111".to_owned(),
+            symbols: Vec::new(),
         },
         radix_mir_fmir::FmirDeviceArtifact {
             backend: radix_mir_fmir::FmirDeviceBackend::Cuda,
             blob: "ptx text".to_owned(),
             hash: "fnv64:2222".to_owned(),
+            symbols: Vec::new(),
         },
     ];
     let receipt = discovery_receipt(DeviceBackend::Cuda, &artifacts).expect("cuda artifact");
@@ -230,6 +232,7 @@ fn discovery_receipt_without_matching_artifact_is_missing_descriptor() {
         backend: radix_mir_fmir::FmirDeviceBackend::Metal,
         blob: "msl source".to_owned(),
         hash: "fnv64:1111".to_owned(),
+        symbols: Vec::new(),
     }];
     let receipt = discovery_receipt(DeviceBackend::Cuda, &artifacts);
     assert!(receipt.is_none());

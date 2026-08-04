@@ -603,14 +603,14 @@ fn record_field_string(
     })
 }
 
-// R0 red artifact contract: adding the optional `device` payload
-// (FmirDeviceSection, N1.7) to the serialized MIR schema is an approved clean
-// break, so the package MIR artifact version moves 3 → 4 (no dual-format
-// reader). Fails until S1-5 lands the bump.
+// R0 red artifact contract: the operator-authorized package-seam break
+// (S3-A4) replaced the opaque device payload with the typed complete-program
+// wire, so the package MIR artifact version moves 4 → 5 (no dual-format
+// reader; v4 images fail admission closed).
 #[test]
-fn package_mir_artifact_version_is_4_for_device_payload_schema() {
+fn package_mir_artifact_version_is_5_for_typed_device_program_schema() {
     assert_eq!(
-        PACKAGE_MIR_ARTIFACT_VERSION, 4,
-        "device payload requires the FMIR artifact version 4 clean break"
+        PACKAGE_MIR_ARTIFACT_VERSION, 5,
+        "the typed device-program wire requires the FMIR artifact version 5 clean break"
     );
 }

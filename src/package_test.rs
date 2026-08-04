@@ -894,7 +894,7 @@ functio text() → textus {
     assert_eq!(first_manifest, second_manifest);
     assert_eq!(
         first_manifest,
-        r#"version = 4
+        r#"version = 5
 target = "scena"
 entry = "main.fab"
 entry_function = "run_entry"
@@ -1338,7 +1338,7 @@ fn package_fmir_text_image_rejects_bad_version_without_source_fallback() {
     assert!(diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "fmir_text_image_version_unsupported")
             && diagnostic_has_arg(diag, "actual", "999")
-            && diagnostic_has_arg(diag, "expected", "4")
+            && diagnostic_has_arg(diag, "expected", "5")
     }));
     assert!(host.stdout_lines.is_empty());
 }
@@ -1655,7 +1655,7 @@ fn package_fmir_image_rejects_bad_version_without_source_fallback() {
     assert!(diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "fmir_image_version_unsupported")
             && diagnostic_has_arg(diag, "actual", "99")
-            && diagnostic_has_arg(diag, "expected", "4")
+            && diagnostic_has_arg(diag, "expected", "5")
     }));
     assert!(host.stdout_lines.is_empty());
 }
@@ -12182,7 +12182,7 @@ incipit {{
 // ---------------------------------------------------------------------------
 
 fn rewrite_text_image_version(text: &str, version: u32) -> String {
-    for current in ["version = 2", "version = 3", "version = 4"] {
+    for current in ["version = 2", "version = 3", "version = 4", "version = 5"] {
         if text.contains(current) {
             return text.replacen(current, &format!("version = {version}"), 1);
         }
@@ -12192,17 +12192,17 @@ fn rewrite_text_image_version(text: &str, version: u32) -> String {
 
 fn rewrite_binary_image_version(bytes: &mut [u8], version: u8) {
     assert!(
-        matches!(bytes.first(), Some(2) | Some(3) | Some(4)),
+        matches!(bytes.first(), Some(2) | Some(3) | Some(4) | Some(5)),
         "binary image must start with a recognizable artifact version varint"
     );
     bytes[0] = version;
 }
 
 #[test]
-fn package_fmir_text_image_is_artifact_version_4() {
-    let dir = test_temp_dir("package-fmir-text-v4");
+fn package_fmir_text_image_is_artifact_version_5() {
+    let dir = test_temp_dir("package-fmir-text-v5");
     let entry = dir.join("main.fab");
-    fs::write(&entry, "incipit { nota \"v4\" }").expect("write entry");
+    fs::write(&entry, "incipit { nota \"v5\" }").expect("write entry");
 
     let image = build_package_fmir_text_image(
         &Config::default().with_target(Target::FmirText),
@@ -12213,16 +12213,16 @@ fn package_fmir_text_image_is_artifact_version_4() {
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
 
     assert!(
-        image_text.contains("version = 4"),
-        "fmir-text image must declare artifact version 4:\n{image_text}"
+        image_text.contains("version = 5"),
+        "fmir-text image must declare artifact version 5:\n{image_text}"
     );
 }
 
 #[test]
-fn package_fmir_image_is_artifact_version_4() {
-    let dir = test_temp_dir("package-fmir-v4");
+fn package_fmir_image_is_artifact_version_5() {
+    let dir = test_temp_dir("package-fmir-v5");
     let entry = dir.join("main.fab");
-    fs::write(&entry, "incipit { nota \"v4\" }").expect("write entry");
+    fs::write(&entry, "incipit { nota \"v5\" }").expect("write entry");
 
     let image = build_package_fmir_image(&Config::default().with_target(Target::Fmir), &entry, &[])
         .expect("build fmir image");
@@ -12230,8 +12230,8 @@ fn package_fmir_image_is_artifact_version_4() {
     let summary = fmir_image_test_summary(&bytes, &image.image_path).expect("summarize fmir image");
 
     assert_eq!(
-        summary.version, 4,
-        "fmir image must declare artifact version 4"
+        summary.version, 5,
+        "fmir image must declare artifact version 5"
     );
 }
 
@@ -12262,7 +12262,7 @@ fn package_fmir_text_image_rejects_version_2_images() {
     assert!(diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "fmir_text_image_version_unsupported")
             && diagnostic_has_arg(diag, "actual", "2")
-            && diagnostic_has_arg(diag, "expected", "4")
+            && diagnostic_has_arg(diag, "expected", "5")
     }));
     assert!(host.stdout_lines.is_empty());
 }
@@ -12294,7 +12294,7 @@ fn package_fmir_text_image_rejects_future_versions() {
     assert!(diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "fmir_text_image_version_unsupported")
             && diagnostic_has_arg(diag, "actual", "999")
-            && diagnostic_has_arg(diag, "expected", "4")
+            && diagnostic_has_arg(diag, "expected", "5")
     }));
     assert!(host.stdout_lines.is_empty());
 }
@@ -12319,7 +12319,7 @@ fn package_fmir_image_rejects_version_2_images() {
     assert!(diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "fmir_image_version_unsupported")
             && diagnostic_has_arg(diag, "actual", "2")
-            && diagnostic_has_arg(diag, "expected", "4")
+            && diagnostic_has_arg(diag, "expected", "5")
     }));
     assert!(host.stdout_lines.is_empty());
 }
@@ -12344,7 +12344,7 @@ fn package_fmir_image_rejects_future_versions() {
     assert!(diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "fmir_image_version_unsupported")
             && diagnostic_has_arg(diag, "actual", "99")
-            && diagnostic_has_arg(diag, "expected", "4")
+            && diagnostic_has_arg(diag, "expected", "5")
     }));
     assert!(host.stdout_lines.is_empty());
 }

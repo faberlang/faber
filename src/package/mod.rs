@@ -149,8 +149,8 @@ pub(crate) use host_factory::{
 };
 #[allow(unused_imports)] // the S1-6 device-route seam (constructor + execution).
 pub(crate) use device::{
-    device_program_for_lowered, device_section_for_program, execute_device_route,
-    parse_payload, DeviceRunPlan,
+    admit_device_program_section, device_program_for_lowered, device_section_for_program,
+    execute_device_route,
 };
 #[allow(unused_imports)]
 pub(crate) use mir::{build_package_mir_artifact, run_package_mir, run_package_mir_artifact};

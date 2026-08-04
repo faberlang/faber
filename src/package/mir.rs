@@ -146,6 +146,9 @@ struct FmirPackageImage {
     /// carries a device program. Drives the route's `requires_device` decision
     /// in the S1-5 host factory.
     device: Option<FmirDeviceSection>,
+    /// Source-identity hashes (the A10 identity's source half; consumed by
+    /// the device route's complete-program identity).
+    source_hashes: Vec<String>,
 }
 
 #[derive(Clone, Copy)]
@@ -484,7 +487,7 @@ fn run_loaded_fmir_image_route_with_selection<H: Host + ?Sized>(
             let device = image.device.as_ref().ok_or_else(|| {
                 vec![super::host_factory::missing_device_descriptor(backend)]
             })?;
-            super::device::execute_device_route(device, backend)
+            super::device::execute_device_route(device, backend, &image.source_hashes)
         }
     }
 }
@@ -588,7 +591,7 @@ pub fn run_fmir_image_bytes_with_stdio(
             let device = loaded.device.as_ref().ok_or_else(|| {
                 vec![super::host_factory::missing_device_descriptor(backend)]
             })?;
-            super::device::execute_device_route(device, backend)
+            super::device::execute_device_route(device, backend, &loaded.source_hashes)
         }
     }
 }
@@ -686,6 +689,28 @@ fn fmir_package_image_from_lowered(
     format: FmirPackageImageFormat,
 ) -> Result<FmirPackageImage, Vec<Diagnostic>> {
     let device = package_device_section(prepared, lowered, &diagnostic_path)?;
+    // Source identities ride the image when the package carries a device
+    // payload (the A10 identity's source half): the source-format route has
+    // the real package files on disk. The FHIR-loaded route reconstructs a
+    // package from an envelope and never constructs a device payload, so its
+    // (non-existent on disk) source paths are never read here.
+    let source_hashes = if device.is_some() {
+        prepared
+            .source_paths
+            .iter()
+            .map(|path| {
+                fs::read(path).map(|bytes| format!("fnv64:{:016x}", fnv1a64(&bytes)))
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|error| {
+                vec![mir_diag(
+                    &prepared.entry_path,
+                    format!("could not read source identity: {error}"),
+                )]
+            })?
+    } else {
+        Vec::new()
+    };
     Ok(FmirPackageImage {
         diagnostic_path,
         format,
@@ -702,6 +727,7 @@ fn fmir_package_image_from_lowered(
             .unwrap_or_default(),
         program: lowered.program.clone(),
         device,
+        source_hashes,
     })
 }
 
@@ -1532,6 +1558,12 @@ fn load_fmir_text_image(text: &str, path: &Path) -> Result<FmirPackageImage, Vec
         types: image.types.table,
         program,
         device: image.device,
+        source_hashes: image
+            .sources
+            .source
+            .iter()
+            .map(|identity| identity.hash.clone())
+            .collect(),
     })
 }
 
@@ -1586,6 +1618,12 @@ fn load_fmir_image(bytes: &[u8], path: &Path) -> Result<FmirPackageImage, Vec<Di
         types: image.types.table,
         program: image.program,
         device: image.device,
+        source_hashes: image
+            .sources
+            .source
+            .iter()
+            .map(|identity| identity.hash.clone())
+            .collect(),
     })
 }
 
