@@ -338,6 +338,8 @@ fn descriptor_preserves_wire_launch_order_and_version_keys() {
                 kernel_index: 1,
             },
         ];
+        wire.results[0].produced_by = 12;
+        wire.results[1].produced_by = 11;
     }
     let medius_id = section.device_program.program.kernels[0].resources[1]
         .buffer
@@ -445,6 +447,115 @@ fn descriptor_missing_keyed_version_metadata_fails_closed() {
         .validate()
         .expect_err("a slot without keyed metadata must fail closed");
     assert!(error.message.contains("no version-keyed buffer metadata"));
+}
+
+#[test]
+fn descriptor_rejects_result_only_wire_record() {
+    let program = device_program_from_corpus_fixture("cuda/summa-proof.fab");
+    let mut section = section_for_program(&program);
+    section.artifacts.artifact = vec![FmirDeviceArtifact {
+        backend: FmirDeviceBackend::Metal,
+        blob: "msl".to_owned(),
+        hash: "fnv64:0000000000000000".to_owned(),
+        symbols: Vec::new(),
+    }];
+    section.device_program.program.results[0].buffer.id = 99;
+
+    let error = descriptor_for_backend(&section, DeviceBackend::Metal, b"msl blob")
+        .expect_err("a result with no launched resource must fail closed");
+    assert!(error[0].message.contains("no matching resource"));
+    assert!(error[0].message.contains("buffer 99"));
+}
+
+#[test]
+fn descriptor_rejects_result_with_contradictory_role() {
+    let program = device_program_from_corpus_fixture("cuda/summa-proof.fab");
+    let mut section = section_for_program(&program);
+    section.artifacts.artifact = vec![FmirDeviceArtifact {
+        backend: FmirDeviceBackend::Metal,
+        blob: "msl".to_owned(),
+        hash: "fnv64:0000000000000000".to_owned(),
+        symbols: Vec::new(),
+    }];
+    section.device_program.program.results[0].role = WireBufferRole::Input;
+
+    let error = descriptor_for_backend(&section, DeviceBackend::Metal, b"msl blob")
+        .expect_err("a result with an input observation role must fail closed");
+    assert!(error[0].message.contains("invalid observation role input"));
+}
+
+#[test]
+fn descriptor_rejects_result_with_contradictory_producer() {
+    let program = two_kernel_program();
+    let mut section = section_for_program(&program);
+    section.artifacts.artifact = vec![FmirDeviceArtifact {
+        backend: FmirDeviceBackend::Metal,
+        blob: "msl".to_owned(),
+        hash: "fnv64:0000000000000000".to_owned(),
+        symbols: Vec::new(),
+    }];
+    let first_launch = section.device_program.program.launches[0].id;
+    section
+        .device_program
+        .program
+        .results
+        .last_mut()
+        .expect("two-kernel fixture has a final result")
+        .produced_by = first_launch;
+
+    let error = descriptor_for_backend(&section, DeviceBackend::Metal, b"msl blob")
+        .expect_err("a result named by the wrong producer must fail closed");
+    assert!(error[0].message.contains("producing launch"));
+    assert!(error[0].message.contains("no matching resource"));
+}
+
+#[test]
+fn descriptor_rejects_result_with_contradictory_version_shape() {
+    let program = two_kernel_program();
+    let mut section = section_for_program(&program);
+    section.artifacts.artifact = vec![FmirDeviceArtifact {
+        backend: FmirDeviceBackend::Metal,
+        blob: "msl".to_owned(),
+        hash: "fnv64:0000000000000000".to_owned(),
+        symbols: Vec::new(),
+    }];
+    let result = section
+        .device_program
+        .program
+        .results
+        .last_mut()
+        .expect("two-kernel fixture has a final result");
+    result.version.element_count += 1;
+
+    let error = descriptor_for_backend(&section, DeviceBackend::Metal, b"msl blob")
+        .expect_err("a result with contradictory producer shape must fail closed");
+    assert!(error[0].message.contains("carries shape"));
+    assert!(error[0].message.contains("producing launch"));
+}
+
+#[test]
+fn descriptor_rejects_result_with_contradictory_version_number() {
+    let program = two_kernel_program();
+    let mut section = section_for_program(&program);
+    section.artifacts.artifact = vec![FmirDeviceArtifact {
+        backend: FmirDeviceBackend::Metal,
+        blob: "msl".to_owned(),
+        hash: "fnv64:0000000000000000".to_owned(),
+        symbols: Vec::new(),
+    }];
+    section
+        .device_program
+        .program
+        .results
+        .last_mut()
+        .expect("two-kernel fixture has a final result")
+        .version
+        .version += 1;
+
+    let error = descriptor_for_backend(&section, DeviceBackend::Metal, b"msl blob")
+        .expect_err("a result with a contradictory version must fail closed");
+    assert!(error[0].message.contains("declares version"));
+    assert!(error[0].message.contains("producing launch"));
 }
 
 #[test]

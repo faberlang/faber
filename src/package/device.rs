@@ -860,13 +860,15 @@ pub(crate) fn artifact_for_backend<'a>(
 ///
 /// # Errors
 /// Fail-closed when a carried element-type spelling is outside the campaign
-/// dtype surface (never a silent default).
+/// dtype surface (never a silent default), or when a result record does not
+/// match a writable resource of its producing launch.
 pub(crate) fn descriptor_for_backend(
     device: &FmirDeviceSection,
     backend: DeviceBackend,
     blob: &[u8],
 ) -> Result<DeviceDescriptor, Vec<Diagnostic>> {
     let wire = &device.device_program.program;
+    validate_wire_results(wire)?;
     let mut kernels = Vec::with_capacity(wire.kernels.len());
     let mut buffer_versions = Vec::new();
     for kernel in &wire.kernels {
@@ -971,6 +973,121 @@ pub(crate) fn descriptor_for_backend(
         .validate()
         .map_err(|error| vec![super::host_factory::host_error_diagnostic(&error)])?;
     Ok(descriptor)
+}
+
+/// Validate each wire result against the resource facts of its producing
+/// launch before projecting the program into a host descriptor. The host
+/// descriptor has no result surface, so a result-only or contradictory record
+/// would otherwise be able to add metadata without proving a real producer.
+fn validate_wire_results(wire: &WireDeviceProgram) -> Result<(), Vec<Diagnostic>> {
+    for (result_index, result) in wire.results.iter().enumerate() {
+        if !matches!(result.role, WireBufferRole::Output | WireBufferRole::InOut) {
+            return Err(vec![device_diag(
+                "result",
+                format!(
+                    "result {result_index} has invalid observation role {}",
+                    result.role.spelling()
+                ),
+            )]);
+        }
+        if result.role != result.buffer.role {
+            return Err(vec![device_diag(
+                "result",
+                format!(
+                    "result {result_index} has observation role {} but buffer {} is {}",
+                    result.role.spelling(),
+                    result.buffer.id,
+                    result.buffer.role.spelling()
+                ),
+            )]);
+        }
+
+        let Some(launch) = wire
+            .launches
+            .iter()
+            .find(|launch| launch.id == result.produced_by)
+        else {
+            return Err(vec![device_diag(
+                "result",
+                format!(
+                    "result {result_index} names unknown producing launch {}",
+                    result.produced_by
+                ),
+            )]);
+        };
+        let Some(kernel) = wire.kernels.get(launch.kernel_index as usize) else {
+            return Err(vec![device_diag(
+                "result",
+                format!(
+                    "result {result_index} names producing launch {}, whose kernel index {} is unknown",
+                    result.produced_by, launch.kernel_index
+                ),
+            )]);
+        };
+
+        let Some(resource) = kernel
+            .resources
+            .iter()
+            .find(|resource| resource.buffer.id == result.buffer.id)
+        else {
+            return Err(vec![device_diag(
+                "result",
+                format!(
+                    "result {result_index} names buffer {} version {} from producing launch {}, but that launch has no matching resource",
+                    result.buffer.id, result.version.version, result.produced_by
+                ),
+            )]);
+        };
+        if resource.buffer != result.buffer {
+            return Err(vec![device_diag(
+                "result",
+                format!(
+                    "result {result_index} buffer {} has identity facts that contradict its producing launch {}",
+                    result.buffer.id, result.produced_by
+                ),
+            )]);
+        }
+
+        if resource.version.version != result.version.version {
+            return Err(vec![device_diag(
+                "result",
+                format!(
+                    "result {result_index} buffer {} declares version {}, but producing launch {} uses version {}",
+                    result.buffer.id,
+                    result.version.version,
+                    result.produced_by,
+                    resource.version.version
+                ),
+            )]);
+        }
+        if resource.version.element_ty != result.version.element_ty
+            || resource.version.element_count != result.version.element_count
+        {
+            return Err(vec![device_diag(
+                "result",
+                format!(
+                    "result {result_index} buffer {} version {} carries shape {}[{}], but producing launch {} carries {}[{}]",
+                    result.buffer.id,
+                    result.version.version,
+                    result.version.element_ty,
+                    result.version.element_count,
+                    result.produced_by,
+                    resource.version.element_ty,
+                    resource.version.element_count
+                ),
+            )]);
+        }
+        if !matches!(resource.access, WireResourceAccess::Write | WireResourceAccess::ReadWrite) {
+            return Err(vec![device_diag(
+                "result",
+                format!(
+                    "result {result_index} names launch {} as producer, but its matching resource is read-only",
+                    result.produced_by
+                ),
+            )]);
+        }
+    }
+    Ok(())
 }
 
 fn add_descriptor_buffer_version(
