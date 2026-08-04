@@ -639,23 +639,75 @@ fn package_device_section(
         // e.g. a CPU oracle — legitimately has no kernel.)
         return Ok(None);
     };
-    // Fail closed when a declared input is missing for an input buffer.
+    // Fail closed when a declared input is missing for an input buffer. The
+    // ONE exemption (S3-A5): the companion's reverse-AD upstream seed — a
+    // synthetic 1-element input whose source param carries no source name
+    // (the S3-B3 evidence: the upstream is a non-storage ABI fact, not a
+    // user-declared device input). The materializer provisions it with the
+    // reverse-AD seed value 1.0.
+    let mut device_inputs = prepared.device_inputs.clone();
+    let mut upstream_seeds: Vec<(String, Vec<f32>)> = Vec::new();
     for kernel in &program.kernels {
-        for resource in &kernel.resources {
-            if resource.buffer.role == radix_mir::device_program::BufferRole::Input
-                && !prepared.device_inputs.contains_key(&resource.buffer.name)
-            {
+        let Some(function) = lowered
+            .validated
+            .program()
+            .functions
+            .iter()
+            .find(|function| function.id == kernel.function)
+        else {
+            continue;
+        };
+        let signature = radix_mir::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+            function, lowered.validated.validation(), &lowered.interner,
+        )
+        .map_err(|error| vec![mir_issue_diag(diagnostic_path, "device_signature", error.message)])?;
+        for (resource, program_name) in signature
+            .resources()
+            .filter(|resource| {
+                resource.kind == radix_mir::abi::MirKernelResourceKind::StorageBuffer
+                    && resource.role == radix_mir::abi::MirKernelResourceRole::Input
+            })
+            .zip(kernel.resources.iter().filter(|resource| {
+                resource.buffer.role == radix_mir::device_program::BufferRole::Input
+            }))
+        {
+            let upstream = resource.element_count == 1
+                && resource.source_local.is_some_and(|local| {
+                    function
+                        .params
+                        .iter()
+                        .find(|param| param.local == local)
+                        .is_none_or(|param| {
+                            // The reverse-AD seed param carries no source
+                            // name, or a synthetic (uninternable) symbol.
+                            param.name.is_none()
+                                || param.name.is_some_and(|symbol| {
+                                    (symbol.0 as usize) >= lowered.interner.strings().len()
+                                })
+                        })
+                });
+            if upstream {
+                let name = program_name.buffer.name.clone();
+                if !device_inputs.contains_key(&name) {
+                    upstream_seeds.push((name, vec![1.0]));
+                }
+                continue;
+            }
+            if !device_inputs.contains_key(&program_name.buffer.name) {
                 return Err(vec![mir_issue_diag(
                     diagnostic_path,
                     "package_device_input_missing",
                     format!(
                         "[device] inputs has no value for kernel `{}` input buffer `{}`",
-                        kernel.entry, resource.buffer.name
+                        kernel.entry, program_name.buffer.name
                     ),
                 )
-                .with_arg("buffer", resource.buffer.name.clone())]);
+                .with_arg("buffer", program_name.buffer.name.clone())]);
             }
         }
+    }
+    for (name, values) in upstream_seeds {
+        device_inputs.insert(name, values);
     }
     let selection =
         prepared
@@ -666,7 +718,7 @@ fn package_device_section(
         &lowered.validated,
         &lowered.interner,
         selection,
-        &prepared.device_inputs,
+        &device_inputs,
         S1_6_PTX_TARGET,
     )?;
     Ok(Some(section))

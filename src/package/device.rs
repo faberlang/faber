@@ -705,22 +705,40 @@ pub(crate) fn device_section_for_program(
 ) -> Result<FmirDeviceSection, Vec<Diagnostic>> {
     let metal_artifact = radix_mir_metal::emit_metal_device_artifact(program, validated, interner)
         .map_err(|error| vec![device_diag("metal artifact", error.to_string())])?;
-    let cuda_artifact =
-        radix_mir_llvm::emit_cuda_device_artifact(program, validated, interner).map_err(|error| {
-            vec![device_diag("cuda artifact", error.to_string())]
-        })?;
+    // S3-A5 (Metal lane): the CUDA artifact emission is best-effort — an
+    // emitter op the CUDA lane does not support yet (the companion's
+    // elementwise surface lands in S3-A7) leaves the image Metal-only, and a
+    // later `--backend cuda` request fails closed as a missing declared
+    // artifact (the same seam the PTX-compile-unavailable path uses). The
+    // Metal artifact is the S3-A5 proof surface.
+    let cuda_artifact = match radix_mir_llvm::emit_cuda_device_artifact(program, validated, interner)
+    {
+        Ok(artifact) => Some(artifact),
+        Err(error) => {
+            eprintln!(
+                "faber: CUDA artifact not emitted (S3-A7 emitter surface): {}",
+                error
+            );
+            None
+        }
+    };
 
     // The CUDA logical-entry → symbol mapping rides the artifact as
     // per-artifact metadata (N3.3): it is an artifact fact, not a program
     // semantic, so it never enters the canonical program bytes.
     let cuda_symbols = cuda_artifact
-        .kernels
-        .iter()
-        .map(|identity| FmirDeviceSymbol {
-            entry: identity.entry.clone(),
-            symbol: identity.symbol.clone(),
+        .as_ref()
+        .map(|artifact| {
+            artifact
+                .kernels
+                .iter()
+                .map(|identity| FmirDeviceSymbol {
+                    entry: identity.entry.clone(),
+                    symbol: identity.symbol.clone(),
+                })
+                .collect::<Vec<_>>()
         })
-        .collect::<Vec<_>>();
+        .unwrap_or_default();
 
     let mut artifact = vec![FmirDeviceArtifact {
         backend: FmirDeviceBackend::Metal,
@@ -728,25 +746,27 @@ pub(crate) fn device_section_for_program(
         hash: metal_artifact.hash,
         symbols: Vec::new(),
     }];
-    match radix_mir_llvm::compile_nvvm_to_ptx(&cuda_artifact.source, ptx_target) {
-        Ok(ptx) => {
-            // The packaged CUDA artifact is PTX (N1.3 §3.1); its provenance
-            // hash covers the PTX blob, not the NVVM source.
-            let ptx_hash = radix_mir_fmir::fnv1a64_blob_hash(ptx.as_bytes());
-            artifact.push(FmirDeviceArtifact {
-                backend: FmirDeviceBackend::Cuda,
-                blob: ptx,
-                hash: ptx_hash,
-                symbols: cuda_symbols,
-            });
-        }
-        Err(error) => {
-            // Build-time PTX compile unavailable (clang NVPTX missing): the
-            // image carries the Metal artifact only and a later `--backend
-            // cuda` request fails closed as a missing declared artifact.
-            eprintln!(
-                "faber: CUDA PTX artifact not emitted (build-time clang NVPTX unavailable): {error}"
-            );
+    if let Some(cuda_artifact) = &cuda_artifact {
+        match radix_mir_llvm::compile_nvvm_to_ptx(&cuda_artifact.source, ptx_target) {
+            Ok(ptx) => {
+                // The packaged CUDA artifact is PTX (N1.3 §3.1); its provenance
+                // hash covers the PTX blob, not the NVVM source.
+                let ptx_hash = radix_mir_fmir::fnv1a64_blob_hash(ptx.as_bytes());
+                artifact.push(FmirDeviceArtifact {
+                    backend: FmirDeviceBackend::Cuda,
+                    blob: ptx,
+                    hash: ptx_hash,
+                    symbols: cuda_symbols,
+                });
+            }
+            Err(error) => {
+                // Build-time PTX compile unavailable (clang NVPTX missing): the
+                // image carries the Metal artifact only and a later `--backend
+                // cuda` request fails closed as a missing declared artifact.
+                eprintln!(
+                    "faber: CUDA PTX artifact not emitted (build-time clang NVPTX unavailable): {error}"
+                );
+            }
         }
     }
 
