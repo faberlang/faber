@@ -1828,9 +1828,15 @@ impl MirKernelSignature {
         interner: Option<&Interner>,
         allow_host_owned_tensor_entry: bool,
     ) -> Result<Self, MirAbiError> {
-        if !validation
-            .types
-            .equals(param.ty.semantic_id(), function.return_ty.semantic_id())
+        // The strict semantic-type match is the plain-elementwise law. A
+        // collection-op kernel remaps the shape by contract (Transpose
+        // `[M,N] → [N,M]`), so for those the flat element-count equality
+        // below carries the binding shape and
+        // `apply_collection_op_contract` supplies the dispatch facts.
+        if !kernel_has_collection_op(function, |_| true)
+            && !validation
+                .types
+                .equals(param.ty.semantic_id(), function.return_ty.semantic_id())
         {
             return Err(MirAbiError::new(ERR_KERNEL_PARAM_RETURN_MISMATCH));
         }
@@ -1845,6 +1851,15 @@ impl MirKernelSignature {
         require_same_element_type(param_element_ty, return_element_ty, validation)?;
         let param_element_count = buffer_element_count(param.ty, validation)?;
         let return_element_count = buffer_element_count(function.return_ty, validation)?;
+        // The return-buffer equality law (shared with the multi-input arm):
+        // the input and output buffers are flat views of the same element
+        // count, so a host can assume one elementwise shape across bindings.
+        // A rectangular transpose's `[M,N]` and `[N,M]` shapes both hold the
+        // flat `M·N` count, so it passes here; genuinely size-changing
+        // kernels fail closed with the elementwise-only diagnostic.
+        if param_element_count != return_element_count {
+            return Err(MirAbiError::new(ERR_KERNEL_IO_ELEMENT_MISMATCH));
+        }
 
         let mut signature = Self {
             function: function.id,
@@ -1879,6 +1894,13 @@ impl MirKernelSignature {
             dispatch_size: dispatch_size_for_1d_elements(return_element_count),
         };
         maybe_append_runtime_extent(function, &mut signature, validation);
+        // PRP-004 U3 (D1-A): collection-op kernels (Transpose, Reduction,
+        // MatMul) carry their dispatch/workgroup/output-buffer contract even
+        // through the single-input return-buffer arm (shared ABI law, all
+        // compute targets). A rank-2 transpose `[M,N] → [N,M]` keeps the
+        // flat `M·N` element counts but must advertise the transpose
+        // workgroup/dispatch contract, not the generic 1D one.
+        apply_collection_op_contract(function, &mut signature, validation)?;
         Ok(signature)
     }
 
@@ -1958,6 +1980,11 @@ impl MirKernelSignature {
             dispatch_size: dispatch_size_for_1d_elements(return_element_count),
         };
         maybe_append_runtime_extent(function, &mut signature, validation);
+        // PRP-004 U3 (D1-A): collection-op kernels carry their contract
+        // through this arm too — the dispatch/workgroup/output-buffer shape
+        // is a property of the resolved collection op, not of the arity that
+        // picked the ABI arm (shared ABI law, all compute targets).
+        apply_collection_op_contract(function, &mut signature, validation)?;
         Ok(signature)
     }
 
@@ -4809,5 +4836,85 @@ mod tests {
             "the transpose body must carry a transpose plan, got {derived:?}"
         );
         derived.validate().expect("transpose plan validates");
+    }
+
+    #[test]
+    fn return_buffer_kernel_applies_transpose_contract_for_rectangular_dims() {
+        // S5-U1c: the single-input return-buffer ABI arm calls
+        // `apply_collection_op_contract` itself, so a rectangular rank-2
+        // transpose `[M,N] → [N,M]` (M ≠ N) synthesized through the full
+        // `storage_buffer_kernel` path carries the transpose dispatch
+        // contract (workgroup TRANSPOSE_WORKGROUP_X, dispatch M·N) instead of
+        // the generic 1D contract — with input/output element counts equal to
+        // the flat M·N.
+        let mut types = TypeTable::new();
+        let function = transpose_rank2_function(&mut types, [2, 3]);
+        let validation = validation_with_device_tensor_layouts(&types);
+        let signature =
+            MirKernelSignature::storage_buffer_kernel(&function, &validation).expect("signature");
+
+        assert_eq!(
+            signature.workgroup,
+            MirWorkgroupSize {
+                x: crate::kernel_plan::TRANSPOSE_WORKGROUP_X,
+                y: 1,
+                z: 1,
+            },
+            "the ABI must apply the transpose workgroup contract automatically"
+        );
+        assert_eq!(
+            signature.dispatch_size,
+            MirKernelDispatchSize { x: 6, y: 1, z: 1 },
+            "the rectangular transpose [2,3] → [3,2] dispatches over M·N elements"
+        );
+        assert_eq!(signature.input.element_count, 6);
+        assert_eq!(signature.output.element_count, 6);
+
+        // The typed plan pass admits the contract-shaped transpose kernel.
+        let derived = crate::device_program_plans::kernel_plan_for_function(
+            &function,
+            &signature,
+            &validation,
+        )
+        .expect("transpose facts resolve")
+        .expect("transpose body carries the transpose recipe");
+        assert!(
+            matches!(
+                derived,
+                crate::kernel_plan::CollectionKernelPlan::Transpose(_)
+            ),
+            "the transpose body must carry a transpose plan, got {derived:?}"
+        );
+        derived.validate().expect("transpose plan validates");
+    }
+
+    #[test]
+    fn multi_input_return_buffer_kernel_keeps_plain_elementwise_contract() {
+        // S5-U1c: a plain elementwise multi-input kernel (no collection op in
+        // its body) is untouched by the contract application — the generic 1D
+        // dispatch and (1,1,1) workgroup remain, and the extra-input count
+        // still holds one per param.
+        let mut types = TypeTable::new();
+        let f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+        let shape = types.intern_index(IndexExpr::Literal(4));
+        let tensor_ty = MirType::semantic(types.tensor_with_shape(f32, shape));
+        let validation = validation_with_device_tensor_layouts(&types);
+        let function = multi_input_return_kernel_function(tensor_ty, tensor_ty, tensor_ty);
+        let signature =
+            MirKernelSignature::storage_buffer_kernel(&function, &validation).expect("signature");
+
+        assert_eq!(
+            signature.workgroup,
+            MirWorkgroupSize { x: 1, y: 1, z: 1 },
+            "an elementwise multi-input kernel keeps the default workgroup"
+        );
+        assert_eq!(
+            signature.dispatch_size,
+            MirKernelDispatchSize { x: 4, y: 1, z: 1 },
+            "an elementwise multi-input kernel keeps the generic 1D dispatch"
+        );
+        assert_eq!(signature.extra_inputs.len(), 1);
+        assert_eq!(signature.extra_inputs[0].element_count, 4);
+        assert_eq!(signature.output.element_count, 4);
     }
 }
