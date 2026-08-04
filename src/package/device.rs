@@ -86,8 +86,8 @@ use radix_mir_fmir::{
     WireKernelLaunchPlan, WireKernelUnit, WireLaunchUnit, WireMatMulPlan, WireMatMulSharedMemory,
     WireObservationFact, WireOobPaddingPolicy, WireProgramLifetime, WireReduceOp,
     WireReductionPlan, WireResourceAccess, WireResultBuffer, WireSemanticValue,
-    WireSemanticValueOrigin, WireSharedMemoryLayout, WireStorageLayout, WireWorkgroupCount,
-    WireWorkgroupSize,
+    WireSemanticValueOrigin, WireSharedMemoryLayout, WireStorageLayout, WireTransposePlan,
+    WireWorkgroupCount, WireWorkgroupSize,
 };
 use std::collections::{BTreeMap, HashMap, VecDeque};
 
@@ -1163,6 +1163,16 @@ fn wire_plan(plan: &CollectionKernelPlan) -> WireCollectionKernelPlan {
                     })
                     .collect(),
                 oob_padding: wire_oob_padding(reduction.oob_padding),
+            })
+        }
+        // S5-U1: the rank-2 transpose recipe is a complete program fact —
+        // never dropped on the wire (the mirror must carry it).
+        CollectionKernelPlan::Transpose(transpose) => {
+            WireCollectionKernelPlan::Transpose(WireTransposePlan {
+                m: transpose.m,
+                n: transpose.n,
+                workgroup_x: transpose.workgroup_x,
+                dispatch_x: transpose.dispatch_x,
             })
         }
     }
