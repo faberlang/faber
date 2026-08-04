@@ -25,6 +25,7 @@ pub mod nodes;
 pub mod placement;
 pub mod rank2_reduction_readiness;
 pub mod shader_contract;
+pub mod static_shape_fold;
 pub mod tensor_operation_floor;
 pub mod tensor_operation_parity;
 pub mod tensor_placement;
@@ -130,6 +131,10 @@ pub use shader_contract::{
     vertex_format_from_code, vertex_input_reflection_from_shader_contract, ContractProvenance,
     ShaderFragmentOutput, ShaderPipelineState, ShaderResourceBinding, ShaderStageIoRole,
     ShaderVarying, ShaderVertexAttribute,
+};
+pub use static_shape_fold::{
+    admit_device_shape_materialization, fold_static_shapes, FoldedShapeFact, ShapeFactSource,
+    ShapeFoldError, ShapeFoldErrorKind, ShapeFoldOutcome, ShapeFoldReport, ShapeFoldedAdmission,
 };
 pub use tensor_operation_floor::{
     required_tensor_operation_floor_families, tensor_operation_floor_rows,
