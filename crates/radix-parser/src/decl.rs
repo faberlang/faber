@@ -1700,7 +1700,12 @@ impl Parser {
         let token = self.advance();
         let span = token.span;
         match token.kind {
-            TokenKind::Ident(sym) | TokenKind::Underscore(sym) => Ok(Ident { name: sym, span }),
+            TokenKind::Ident(sym) | TokenKind::Underscore(sym) => {
+                // Surface → Latin so braced field keys accept pack spellings
+                // (`short` → `brevis`) while HIR keeps Latin field names.
+                let latin = self.identifier_text_or_keyword_latin_key(sym).to_owned();
+                Ok(self.keyword_ident(&latin, span))
+            }
             TokenKind::Ceteri => Ok(self.keyword_ident("ceteri", span)),
             TokenKind::In => Ok(self.keyword_ident("in", span)),
             _ => Err(ParseError::structured(ParseErrorKind::Expected, span)
@@ -1713,7 +1718,12 @@ impl Parser {
         let token = self.advance();
         let span = token.span;
         match token.kind {
-            TokenKind::Ident(sym) | TokenKind::Underscore(sym) => Ok(Ident { name: sym, span }),
+            TokenKind::Ident(sym) | TokenKind::Underscore(sym) => {
+                // Surface → Latin family identity (`kernel` → `nucleum`). Unknown
+                // / user contract names stay as authored spellings.
+                let latin = self.identifier_text_or_keyword_latin_key(sym).to_owned();
+                Ok(self.keyword_ident(&latin, span))
+            }
             TokenKind::Publica => Ok(self.keyword_ident("publica", span)),
             TokenKind::Protecta => Ok(self.keyword_ident("protecta", span)),
             TokenKind::Privata => Ok(self.keyword_ident("privata", span)),
@@ -1738,14 +1748,20 @@ impl Parser {
     }
 
     fn next_annotation_ident_is(&self, expected: &str) -> bool {
-        matches!(self.peek().kind, TokenKind::Ident(sym) if self.interner.resolve(sym) == expected)
-            || match expected {
+        // `expected` is always the Latin identity. Accept pack surface spellings
+        // via the same latin-key map grammar slots use.
+        match &self.peek().kind {
+            TokenKind::Ident(sym) | TokenKind::Underscore(sym) => {
+                self.identifier_text_or_keyword_latin_key(*sym) == expected
+            }
+            _ => match expected {
                 "in" => self.check(&TokenKind::In),
                 "ceteri" => self.check(&TokenKind::Ceteri),
                 "typus" => self.check_keyword_in_slot("typus"),
                 "vel" => self.check_keyword_in_slot("vel"),
-                _ => false,
-            }
+                other => self.check_keyword_in_slot(other),
+            },
+        }
     }
 
     fn expect_annotation_ident(&mut self, expected: &str, message: &str) -> Result<(), ParseError> {

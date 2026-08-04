@@ -41,7 +41,7 @@ impl super::FaberCodegen {
         writer: &mut CodeWriter,
     ) {
         writer.write("@ ");
-        writer.write(&self.symbol_to_string(annotation.family, interner));
+        writer.write(&self.annotation_surface_spelling(annotation.family, interner, surface));
 
         if annotation.fields.is_empty() && annotation.raw_args.is_empty() {
             writer.write(" { }");
@@ -70,6 +70,24 @@ impl super::FaberCodegen {
         }
     }
 
+    /// Project a Latin annotation family/field symbol through the active pack.
+    ///
+    /// Registered keyword identities use [`KeywordSurface::contextual_keyword`];
+    /// unknown / user contract names pass through unchanged.
+    fn annotation_surface_spelling(
+        &self,
+        symbol: Symbol,
+        interner: &Interner,
+        surface: &impl KeywordSurface,
+    ) -> String {
+        let spelling = self.symbol_to_string(symbol, interner);
+        if let Some(spec) = lookup_keyword_spec(&spelling) {
+            surface.contextual_keyword(spec.text).to_owned()
+        } else {
+            spelling
+        }
+    }
+
     fn write_hir_annotation_field(
         &self,
         field: &HirAnnotationField,
@@ -79,7 +97,7 @@ impl super::FaberCodegen {
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
-        writer.write(&self.symbol_to_string(field.name, interner));
+        writer.write(&self.annotation_surface_spelling(field.name, interner, surface));
         writer.write(" = ");
         self.write_hir_annotation_value(&field.value, types, names, interner, surface, writer);
     }
