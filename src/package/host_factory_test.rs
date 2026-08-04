@@ -8,8 +8,8 @@ use super::*;
 use faber::device::{DeviceBackend, DeviceSelection};
 use faber_host_macos_arm64::composite_host::{CompositeHost, CompositeHostConfig};
 use faber_host_macos_arm64::device_descriptor::{
-    DescriptorBuffer, DescriptorKernel, DeviceBufferLifetime, DeviceBufferRole, DeviceDataType,
-    DeviceDescriptor, DeviceProgramLifetime,
+    DescriptorBuffer, DescriptorBufferVersion, DescriptorKernel, DescriptorLaunch,
+    DeviceBufferLifetime, DeviceBufferRole, DeviceDataType, DeviceDescriptor, DeviceProgramLifetime,
 };
 use faber_host_macos_arm64::device_host::DeviceRuntime;
 use faber_host_macos_arm64::{FakeMetalDriver, HostError, MetalHostSession};
@@ -60,6 +60,30 @@ fn elementwise_add_descriptor(backend: DeviceBackend, entry: &str, count: u64) -
             grid: [1, 1, 1],
             block: [count as u32, 1, 1],
         }],
+        launches: vec![DescriptorLaunch {
+            id: 1,
+            kernel_index: 0,
+        }],
+        buffer_versions: vec![
+            DescriptorBufferVersion {
+                buffer_id: 1,
+                version: 1,
+                element_ty: DeviceDataType::F32,
+                element_count: count,
+            },
+            DescriptorBufferVersion {
+                buffer_id: 2,
+                version: 1,
+                element_ty: DeviceDataType::F32,
+                element_count: count,
+            },
+            DescriptorBufferVersion {
+                buffer_id: 3,
+                version: 1,
+                element_ty: DeviceDataType::F32,
+                element_count: count,
+            },
+        ],
         program_lifetime: DeviceProgramLifetime::SingleRun,
         data_flow: Vec::new(),
     }
@@ -343,6 +367,48 @@ fn conflicting_shapes_fail_as_shape_mismatch() {
                 ],
                 grid: [1, 1, 1],
                 block: [4, 1, 1],
+            },
+        ],
+        launches: vec![
+            DescriptorLaunch {
+                id: 1,
+                kernel_index: 0,
+            },
+            DescriptorLaunch {
+                id: 2,
+                kernel_index: 1,
+            },
+        ],
+        buffer_versions: vec![
+            DescriptorBufferVersion {
+                buffer_id: 1,
+                version: 1,
+                element_ty: DeviceDataType::F32,
+                element_count: 2,
+            },
+            DescriptorBufferVersion {
+                buffer_id: 2,
+                version: 1,
+                element_ty: DeviceDataType::F32,
+                element_count: 2,
+            },
+            DescriptorBufferVersion {
+                buffer_id: 3,
+                version: 1,
+                element_ty: DeviceDataType::F32,
+                element_count: 2,
+            },
+            DescriptorBufferVersion {
+                buffer_id: 4,
+                version: 1,
+                element_ty: DeviceDataType::F32,
+                element_count: 4,
+            },
+            DescriptorBufferVersion {
+                buffer_id: 5,
+                version: 1,
+                element_ty: DeviceDataType::F32,
+                element_count: 4,
             },
         ],
         program_lifetime: DeviceProgramLifetime::SingleRun,
