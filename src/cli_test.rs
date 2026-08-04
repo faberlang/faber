@@ -347,7 +347,7 @@ fn cli_parses_fmir_bin_target_for_run() {
     let Some(crate::cli::Command::Run(args)) = run.command else {
         panic!("expected run subcommand");
     };
-    assert_eq!(args.target, radix::tool::CliTarget::FmirBin);
+    assert_eq!(args.target, Some(radix::tool::CliTarget::FmirBin));
     assert_eq!(args.path, std::path::PathBuf::from("pkg"));
     assert_eq!(args.args, vec!["Ian".to_owned()]);
 }

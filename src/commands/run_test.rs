@@ -148,7 +148,7 @@ fn run_args(
     RunArgs {
         path,
         reader_locale,
-        target,
+        target: Some(target),
         backend: None,
         release: false,
         interpret,
