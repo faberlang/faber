@@ -47,7 +47,7 @@ use radix::mir::{
     classify_mir_coverage, device_roles_from_hir, lower_analyzed_unit_with_context, Lowerability,
     LoweredMirUnit, MirCoverageTarget, MirDeviceContext,
 };
-use radix::reader_locale::{latin_reader_pack, KeywordSurface};
+use radix::locale::{latin_locale_pack, KeywordSurface};
 use rustc_hash::FxHashMap;
 use std::path::PathBuf;
 
@@ -358,7 +358,7 @@ fn measure_hir_target(
                 ConversioCoverageTarget::Faber => Target::Faber,
                 _ => unreachable!(),
             };
-            let latin_pack = latin_reader_pack();
+            let latin_pack = latin_locale_pack();
             let surface = KeywordSurface::new(&latin_pack);
             conversio_arm_clear();
             let result = generate_from_analyzed_with_options(

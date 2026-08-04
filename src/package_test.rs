@@ -6980,7 +6980,7 @@ fn thai_reader_locale_example_compiles_from_manifest() {
     assert!(rust.contains("return true;"));
     assert!(rust.contains("return false;"));
     assert!(rust.contains("fn นับผ่าน(scores: Vec<i64>) -> i64"));
-    assert!(rust.contains("for i1000005 in &(scores)"));
+    assert!(rust.contains("for score in 0..((scores).len() as i64)"));
     assert!(rust.contains("continue;"));
     assert!(rust.contains("break;"));
     assert!(rust.contains("fn นับถอยหลัง(start: i64) -> i64"));
