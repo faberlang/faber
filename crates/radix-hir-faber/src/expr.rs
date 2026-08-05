@@ -306,8 +306,10 @@ impl super::FaberCodegen {
                 writer.write(match mode {
                     radix_hir::HirIteraMode::Ex => surface.keyword(TokenKind::Ex),
                     radix_hir::HirIteraMode::De => surface.keyword(TokenKind::De),
-                    // `ab` is not a reader-locale keyword; it stays canonical.
-                    radix_hir::HirIteraMode::Ab => "ab",
+                    // `ab` is a contextual keyword (tokenless); localize it
+                    // through the reader pack like `iuncta`, with Latin
+                    // fallback when a pack has no row.
+                    radix_hir::HirIteraMode::Ab => surface.contextual_keyword("ab"),
                 });
                 writer.write(" ");
                 self.write_expr(iter, types, names, interner, surface, writer);
@@ -382,15 +384,31 @@ impl super::FaberCodegen {
                 }
                 writer.write("}");
             }
-            HirExpressionKind::Tuple(items, _) => {
-                writer.write("(");
+            HirExpressionKind::Tuple(items, type_args) => {
+                // Tuples are constructed with an explicit `iuncta<A, B>` prefix
+                // so the bracket literal parses back as a tuple rather than an
+                // array (bare `[...]` is an array literal in expression
+                // position). The prefix is dropped only for internal
+                // placeholders that never reach emission.
+                if let Some(type_args) = type_args {
+                    writer.write(surface.contextual_keyword("iuncta"));
+                    writer.write("<");
+                    for (idx, ty) in type_args.iter().enumerate() {
+                        if idx > 0 {
+                            writer.write(", ");
+                        }
+                        writer.write(&self.type_to_faber(*ty, types, names, interner, surface));
+                    }
+                    writer.write("> ");
+                }
+                writer.write("[");
                 for (idx, item) in items.iter().enumerate() {
                     if idx > 0 {
                         writer.write(", ");
                     }
                     self.write_expr(item, types, names, interner, surface, writer);
                 }
-                writer.write(")");
+                writer.write("]");
             }
             HirExpressionKind::Scribe(kind, args) => {
                 writer.write(match kind {
