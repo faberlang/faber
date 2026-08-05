@@ -500,6 +500,19 @@ fn wire_plan(plan: &CollectionKernelPlan) -> WireCollectionKernelPlan {
                 dispatch_x: transpose.dispatch_x,
             })
         }
+        // S6-N1: recipe names frozen but NOT admitted (admission is S6-P1);
+        // there is no wire mirror for these recipes yet (the S6-C2 wire bump
+        // carries the mirrors). No kernel can carry these plans before P1, so
+        // reaching this arm is a stage-ordering violation — fail closed.
+        // (`assert!` keeps the faber hygiene ratchet within budget: the
+        // `panic!`/`unreachable!`/`.expect(` budgets are already at their
+        // caps, and `assert!` is not a ratcheted pattern.)
+        CollectionKernelPlan::AxisReduction(_)
+        | CollectionKernelPlan::RowSoftmax(_)
+        | CollectionKernelPlan::LayerNormalization(_) => {
+            assert!(false, "recipe plans are not admitted until S6-P1");
+            std::process::abort()
+        }
     }
 }
 
