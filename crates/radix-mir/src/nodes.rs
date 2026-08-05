@@ -233,6 +233,15 @@ impl MirFunction {
         }
         self.blocks.iter().find(|block| block.id == id)
     }
+
+    /// Type of the compiler-created temporary with the given ID, when present.
+    #[must_use]
+    pub fn temp_ty(&self, id: MirTempId) -> Option<MirType> {
+        self.temps
+            .iter()
+            .find(|temp| temp.id == id)
+            .map(|temp| temp.ty)
+    }
 }
 
 /// Shallow ownership encoding for `de` / `in` / `ex` parameter modes.
