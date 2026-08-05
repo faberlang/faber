@@ -17,8 +17,8 @@ use crate::device_program::{BufferId, DeviceProgram, LaunchId, LaunchUnit};
 use crate::distributed::types::{
     BarrierId, BarrierOperation, CollectiveId, CollectiveOperation, DeviceProgramPartition,
     DistributedExecutionGraph, ExecutionCommitBoundary, ExecutionOperation, LaunchOperation,
-    LogicalPlacement, PartitionId, PlacementContract, PlacementFact, ResultRef,
-    TransferDirection, TransferId, TransferOperation, TransportPath,
+    LogicalPlacement, PartitionId, PlacementContract, PlacementFact, ResultRef, TransferDirection,
+    TransferId, TransferOperation, TransportPath,
 };
 use crate::layout::MirTensorStorageLayout;
 use crate::MirType;
@@ -412,16 +412,22 @@ fn launch_partition(
 
 /// The launch that produces a `(buffer, version)` (first producer wins).
 fn producing_launch(program: &DeviceProgram, buffer: BufferId, version: u32) -> Option<LaunchId> {
-    program.launches.iter().find(|launch| {
-        launch_resources(program, launch).iter().any(|(referenced, v, _, access)| {
-            *referenced == buffer
-                && *v == version
-                && matches!(
-                    access,
-                    MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
-                )
+    program
+        .launches
+        .iter()
+        .find(|launch| {
+            launch_resources(program, launch)
+                .iter()
+                .any(|(referenced, v, _, access)| {
+                    *referenced == buffer
+                        && *v == version
+                        && matches!(
+                            access,
+                            MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
+                        )
+                })
         })
-    }).map(|launch| launch.id)
+        .map(|launch| launch.id)
 }
 
 /// The barrier ids declared at the commit boundary of a `(buffer, version)`.

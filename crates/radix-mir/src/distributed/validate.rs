@@ -61,8 +61,8 @@ use crate::device_program::LaunchId;
 use crate::device_semantics::SemanticValueId;
 use crate::distributed::types::{
     BarrierId, CollectiveId, CollectiveKind, CollectiveOperation, DistributedExecutionPlan,
-    ExecutionOperation, LOGICAL_PLAN_VERSION, LogicalPlacement, PartitionId,
-    PlacementConstraint, PlacementContract, PlanVersion, TransferId, TransferOperation,
+    ExecutionOperation, LogicalPlacement, PartitionId, PlacementConstraint, PlacementContract,
+    PlanVersion, TransferId, TransferOperation, LOGICAL_PLAN_VERSION,
 };
 
 // -----------------------------------------------------------------------
@@ -720,7 +720,10 @@ fn validate_plan(plan: &DistributedExecutionPlan) -> Result<(), ValidateError> {
 
 /// The plan's partition ids, in plan order.
 fn partition_ids(plan: &DistributedExecutionPlan) -> Vec<PartitionId> {
-    plan.partitions.iter().map(|partition| partition.id).collect()
+    plan.partitions
+        .iter()
+        .map(|partition| partition.id)
+        .collect()
 }
 
 /// Every launch id placed on a partition (deduplicated).
@@ -976,7 +979,10 @@ fn check_declared_placements(plan: &DistributedExecutionPlan) -> Result<(), Vali
                 });
             }
             for (position, replica) in replicas.iter().enumerate() {
-                if replicas[position + 1..].iter().any(|later| later == replica) {
+                if replicas[position + 1..]
+                    .iter()
+                    .any(|later| later == replica)
+                {
                     return Err(ValidateError::DuplicateReplica {
                         value: placement.value,
                         partition: *replica,
@@ -1012,7 +1018,10 @@ fn check_partition_placements(plan: &DistributedExecutionPlan) -> Result<(), Val
 fn check_shared_launches(plan: &DistributedExecutionPlan) -> Result<(), ValidateError> {
     for (index, partition) in plan.partitions.iter().enumerate() {
         for (position, launch) in partition.launches.iter().enumerate() {
-            if partition.launches[position + 1..].iter().any(|later| later == launch) {
+            if partition.launches[position + 1..]
+                .iter()
+                .any(|later| later == launch)
+            {
                 return Err(ValidateError::SharedLaunch {
                     launch: *launch,
                     first: partition.id,
@@ -1139,9 +1148,10 @@ fn check_transfer_completeness(
     }
 
     // consumer — the destination holds a copy or runs a launch.
-    let destination_runs_launches = plan.partitions.iter().any(|partition| {
-        partition.id == transfer.destination && !partition.launches.is_empty()
-    });
+    let destination_runs_launches = plan
+        .partitions
+        .iter()
+        .any(|partition| partition.id == transfer.destination && !partition.launches.is_empty());
     if !copy_holder(&placement.contract, transfer.destination) && !destination_runs_launches {
         return Err(ValidateError::MissingConsumer {
             value: transfer.value,
@@ -1195,8 +1205,7 @@ fn check_mover_agreement(plan: &DistributedExecutionPlan) -> Result<(), Validate
                     second: later_reference,
                 });
             }
-            if let (OpRef::Transfer(first), OpRef::Transfer(second)) =
-                (reference, later_reference)
+            if let (OpRef::Transfer(first), OpRef::Transfer(second)) = (reference, later_reference)
             {
                 if identical_move(plan, first, second) {
                     return Err(ValidateError::DuplicateMove {
@@ -1214,9 +1223,11 @@ fn check_mover_agreement(plan: &DistributedExecutionPlan) -> Result<(), Validate
 /// The (value, byte count, reference) of a value-moving operation.
 fn mover(operation: &ExecutionOperation) -> Option<(SemanticValueId, u64, OpRef)> {
     match operation {
-        ExecutionOperation::Transfer(transfer) => {
-            Some((transfer.value, transfer.byte_count, OpRef::Transfer(transfer.id)))
-        }
+        ExecutionOperation::Transfer(transfer) => Some((
+            transfer.value,
+            transfer.byte_count,
+            OpRef::Transfer(transfer.id),
+        )),
         ExecutionOperation::Collective(collective) => Some((
             collective.value,
             collective.byte_count,
@@ -1227,11 +1238,7 @@ fn mover(operation: &ExecutionOperation) -> Option<(SemanticValueId, u64, OpRef)
 }
 
 /// Whether two transfers declare the identical move of one value.
-fn identical_move(
-    plan: &DistributedExecutionPlan,
-    first: TransferId,
-    second: TransferId,
-) -> bool {
+fn identical_move(plan: &DistributedExecutionPlan, first: TransferId, second: TransferId) -> bool {
     let first_transfer = find_transfer(plan, first);
     let second_transfer = find_transfer(plan, second);
     match (first_transfer, second_transfer) {
@@ -1245,14 +1252,14 @@ fn identical_move(
     }
 }
 
-fn find_transfer(
-    plan: &DistributedExecutionPlan,
-    id: TransferId,
-) -> Option<&TransferOperation> {
-    plan.graph.operations.iter().find_map(|operation| match operation {
-        ExecutionOperation::Transfer(transfer) if transfer.id == id => Some(transfer),
-        _ => None,
-    })
+fn find_transfer(plan: &DistributedExecutionPlan, id: TransferId) -> Option<&TransferOperation> {
+    plan.graph
+        .operations
+        .iter()
+        .find_map(|operation| match operation {
+            ExecutionOperation::Transfer(transfer) if transfer.id == id => Some(transfer),
+            _ => None,
+        })
 }
 
 // (b) cycles
@@ -1291,7 +1298,11 @@ fn check_cycles(plan: &DistributedExecutionPlan) -> Result<(), ValidateError> {
             .copied()
             .collect();
         if let Some((first, second)) = directed_cycle(&group) {
-            return Err(ValidateError::ValueMoveCycle { value, first, second });
+            return Err(ValidateError::ValueMoveCycle {
+                value,
+                first,
+                second,
+            });
         }
     }
     Ok(())
@@ -1375,8 +1386,8 @@ fn check_collectives(plan: &DistributedExecutionPlan) -> Result<(), ValidateErro
                         },
                     });
                 }
-                if let Some(owner) =
-                    declared_owner(plan, collective.value).filter(|owner| *owner != collective.source)
+                if let Some(owner) = declared_owner(plan, collective.value)
+                    .filter(|owner| *owner != collective.source)
                 {
                     return Err(ValidateError::UnsupportedCollective {
                         value: collective.value,

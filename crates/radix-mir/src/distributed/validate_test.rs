@@ -29,9 +29,9 @@ use crate::distributed::derive;
 use crate::distributed::types::{
     BarrierId, CollectiveId, CollectiveOperation, DeclaredPlacement, DeviceProgramPartition,
     DistributedExecutionGraph, DistributedExecutionPlan, ExecutionCommitBoundary,
-    ExecutionOperation, LOGICAL_PLAN_VERSION, LogicalPlacement, PartitionId, PlacementConstraint,
-    PlacementContract, PlacementFact, PlacementObjective, PlanVersion, TransferDirection,
-    TransferId, TransferOperation, TransportPath,
+    ExecutionOperation, LogicalPlacement, PartitionId, PlacementConstraint, PlacementContract,
+    PlacementFact, PlacementObjective, PlanVersion, TransferDirection, TransferId,
+    TransferOperation, TransportPath, LOGICAL_PLAN_VERSION,
 };
 use crate::kernel_plan::CollectionKernelPlan;
 use crate::layout::MirTensorStorageLayout;
@@ -186,7 +186,13 @@ fn cs1_program() -> (TypeTable, DeviceProgram) {
 
     let mut program = DeviceProgram::new(DeviceProgramLifetime::SingleRun);
     program.kernels = vec![k0, k1, k2, k3, k4];
-    program.launches = vec![launch(1, 0), launch(2, 1), launch(3, 2), launch(4, 3), launch(5, 4)];
+    program.launches = vec![
+        launch(1, 0),
+        launch(2, 1),
+        launch(3, 2),
+        launch(4, 3),
+        launch(5, 4),
+    ];
     program.results = vec![ResultBuffer {
         buffer: out.clone(),
         version: v_o.clone(),
@@ -366,7 +372,8 @@ fn collective_mut(plan: &mut DistributedExecutionPlan) -> &mut CollectiveOperati
 #[test]
 fn complete_cs1_plan_validates() {
     let plan = cs1();
-    plan.validate().expect("the complete CS-1 plan must pass every gate");
+    plan.validate()
+        .expect("the complete CS-1 plan must pass every gate");
 }
 
 // -----------------------------------------------------------------------
@@ -392,7 +399,9 @@ fn stale_plan_version_fails() {
 fn unknown_future_plan_version_fails() {
     let mut plan = cs1();
     plan.version = PlanVersion(2);
-    let error = plan.validate().expect_err("an unknown plan version must fail");
+    let error = plan
+        .validate()
+        .expect_err("an unknown plan version must fail");
     assert_eq!(error.class(), ValidateClass::StaleVersion);
     assert!(matches!(
         error,
@@ -407,11 +416,15 @@ fn unknown_future_plan_version_fails() {
 #[test]
 fn constraint_on_undeclared_partition_fails_topology() {
     let mut plan = cs1();
-    plan.declared_placement.constraints.push(PlacementConstraint::PartitionBudgetBytes {
-        partition: PartitionId(9),
-        budget_bytes: 1_024,
-    });
-    let error = plan.validate().expect_err("a constraint on an undeclared partition must fail");
+    plan.declared_placement
+        .constraints
+        .push(PlacementConstraint::PartitionBudgetBytes {
+            partition: PartitionId(9),
+            budget_bytes: 1_024,
+        });
+    let error = plan
+        .validate()
+        .expect_err("a constraint on an undeclared partition must fail");
     assert_eq!(error.class(), ValidateClass::TopologyMismatch);
     assert!(matches!(
         error,
@@ -426,7 +439,9 @@ fn constraint_on_undeclared_partition_fails_topology() {
 fn duplicate_partition_id_fails_topology() {
     let mut plan = cs1();
     plan.partitions.push(plan.partitions[0].clone());
-    let error = plan.validate().expect_err("a duplicate partition id must fail");
+    let error = plan
+        .validate()
+        .expect_err("a duplicate partition id must fail");
     assert_eq!(error.class(), ValidateClass::TopologyMismatch);
     assert_eq!(
         error,
@@ -439,11 +454,15 @@ fn duplicate_partition_id_fails_topology() {
 #[test]
 fn zero_partition_budget_fails_topology() {
     let mut plan = cs1();
-    plan.declared_placement.constraints.push(PlacementConstraint::PartitionBudgetBytes {
-        partition: PartitionId(0),
-        budget_bytes: 0,
-    });
-    let error = plan.validate().expect_err("a zero partition budget must fail");
+    plan.declared_placement
+        .constraints
+        .push(PlacementConstraint::PartitionBudgetBytes {
+            partition: PartitionId(0),
+            budget_bytes: 0,
+        });
+    let error = plan
+        .validate()
+        .expect_err("a zero partition budget must fail");
     assert_eq!(error.class(), ValidateClass::TopologyMismatch);
     assert_eq!(
         error,
@@ -456,11 +475,15 @@ fn zero_partition_budget_fails_topology() {
 #[test]
 fn require_owner_disagreeing_with_declared_owner_fails_topology() {
     let mut plan = cs1();
-    plan.declared_placement.constraints.push(PlacementConstraint::RequireOwner {
-        value: SemanticValueId(3),
-        partition: PartitionId(1),
-    });
-    let error = plan.validate().expect_err("a disagreeing RequireOwner constraint must fail");
+    plan.declared_placement
+        .constraints
+        .push(PlacementConstraint::RequireOwner {
+            value: SemanticValueId(3),
+            partition: PartitionId(1),
+        });
+    let error = plan
+        .validate()
+        .expect_err("a disagreeing RequireOwner constraint must fail");
     assert_eq!(error.class(), ValidateClass::TopologyMismatch);
     assert_eq!(
         error,
@@ -480,7 +503,9 @@ fn require_owner_disagreeing_with_declared_owner_fails_topology() {
 fn transfer_of_undeclared_value_fails_missing_owner() {
     let mut plan = cs1();
     transfer_mut(&mut plan, 0).value = SemanticValueId(99);
-    let error = plan.validate().expect_err("a transfer of an undeclared value must fail");
+    let error = plan
+        .validate()
+        .expect_err("a transfer of an undeclared value must fail");
     assert_eq!(error.class(), ValidateClass::MissingOwner);
     assert!(matches!(
         error,
@@ -504,7 +529,9 @@ fn replicated_primary_outside_replica_set_fails_missing_owner() {
         primary: PartitionId(0),
         replicas: vec![PartitionId(1)],
     };
-    let error = plan.validate().expect_err("a primary outside its replica set must fail");
+    let error = plan
+        .validate()
+        .expect_err("a primary outside its replica set must fail");
     assert_eq!(error.class(), ValidateClass::MissingOwner);
     assert_eq!(
         error,
@@ -528,7 +555,9 @@ fn duplicate_value_contracts_fail_conflicting() {
             owner: PartitionId(1),
         },
     });
-    let error = plan.validate().expect_err("a doubly-declared value must fail");
+    let error = plan
+        .validate()
+        .expect_err("a doubly-declared value must fail");
     assert_eq!(error.class(), ValidateClass::ConflictingReplicas);
     assert_eq!(
         error,
@@ -577,7 +606,9 @@ fn partition_placement_disagreeing_with_plan_fails_conflicting() {
             owner: PartitionId(1),
         },
     });
-    let error = plan.validate().expect_err("a disagreeing partition placement must fail");
+    let error = plan
+        .validate()
+        .expect_err("a disagreeing partition placement must fail");
     assert_eq!(error.class(), ValidateClass::ConflictingReplicas);
     assert_eq!(
         error,
@@ -592,7 +623,9 @@ fn partition_placement_disagreeing_with_plan_fails_conflicting() {
 fn shared_launch_fails_conflicting() {
     let mut plan = cs1();
     plan.partitions[0].launches.push(LaunchId(3));
-    let error = plan.validate().expect_err("a launch on two partitions must fail");
+    let error = plan
+        .validate()
+        .expect_err("a launch on two partitions must fail");
     assert_eq!(error.class(), ValidateClass::ConflictingReplicas);
     assert_eq!(
         error,
@@ -611,14 +644,18 @@ fn conflicting_byte_contract_fails_conflicting() {
     let facts = cs1_facts();
     let (partitions, graph) = derive(&program, &facts);
     let mut plan = fixture_plan(&facts, partitions, graph);
-    plan.graph.operations.push(ExecutionOperation::Transfer(o_transfer(
-        2,
-        PartitionId(1),
-        PartitionId(0),
-        4_096,
-        f32,
-    )));
-    let error = plan.validate().expect_err("disagreeing byte contracts must fail");
+    plan.graph
+        .operations
+        .push(ExecutionOperation::Transfer(o_transfer(
+            2,
+            PartitionId(1),
+            PartitionId(0),
+            4_096,
+            f32,
+        )));
+    let error = plan
+        .validate()
+        .expect_err("disagreeing byte contracts must fail");
     assert_eq!(error.class(), ValidateClass::ConflictingReplicas);
     assert_eq!(
         error,
@@ -638,13 +675,15 @@ fn duplicate_move_fails_conflicting() {
     let facts = cs1_facts();
     let (partitions, graph) = derive(&program, &facts);
     let mut plan = fixture_plan(&facts, partitions, graph);
-    plan.graph.operations.push(ExecutionOperation::Transfer(o_transfer(
-        2,
-        PartitionId(1),
-        PartitionId(0),
-        2_048,
-        f32,
-    )));
+    plan.graph
+        .operations
+        .push(ExecutionOperation::Transfer(o_transfer(
+            2,
+            PartitionId(1),
+            PartitionId(0),
+            2_048,
+            f32,
+        )));
     let error = plan.validate().expect_err("a duplicate move must fail");
     assert_eq!(error.class(), ValidateClass::ConflictingReplicas);
     assert_eq!(
@@ -665,7 +704,9 @@ fn duplicate_move_fails_conflicting() {
 fn missing_generation_fails() {
     let mut plan = cs1();
     transfer_mut(&mut plan, 0).producer_generation = 0;
-    let error = plan.validate().expect_err("a transfer without a generation must fail");
+    let error = plan
+        .validate()
+        .expect_err("a transfer without a generation must fail");
     assert_eq!(error.class(), ValidateClass::Completeness);
     assert!(matches!(
         error,
@@ -684,7 +725,9 @@ fn consumer_generation_before_producer_fails() {
     let m = transfer_mut(&mut plan, 0);
     m.producer_generation = 2;
     m.consumer_generation = 1;
-    let error = plan.validate().expect_err("a consumer before its producer must fail");
+    let error = plan
+        .validate()
+        .expect_err("a consumer before its producer must fail");
     assert_eq!(error.class(), ValidateClass::Completeness);
     assert!(matches!(
         error,
@@ -716,8 +759,13 @@ fn missing_byte_contract_fails() {
 #[test]
 fn missing_producer_fails() {
     let mut plan = cs1();
-    transfer_mut(&mut plan, 1).completion_boundary.launches.clear();
-    let error = plan.validate().expect_err("a transfer without a producing launch must fail");
+    transfer_mut(&mut plan, 1)
+        .completion_boundary
+        .launches
+        .clear();
+    let error = plan
+        .validate()
+        .expect_err("a transfer without a producing launch must fail");
     assert_eq!(error.class(), ValidateClass::Completeness);
     assert!(matches!(
         error,
@@ -734,7 +782,9 @@ fn missing_completion_boundary_fails() {
     let m = transfer_mut(&mut plan, 0);
     m.completion_boundary.barriers.clear();
     m.completion_boundary.launches.clear();
-    let error = plan.validate().expect_err("a transfer without a completion boundary must fail");
+    let error = plan
+        .validate()
+        .expect_err("a transfer without a completion boundary must fail");
     assert_eq!(error.class(), ValidateClass::Completeness);
     assert!(matches!(
         error,
@@ -754,24 +804,28 @@ fn missing_consumer_fails() {
     let mut plan = fixture_plan(&facts, partitions, graph);
     // Deliver A (owned by P0) to P1 — P1 holds no copy of A and runs no
     // launch, so the move has no consumer.
-    plan.graph.operations.push(ExecutionOperation::Transfer(TransferOperation {
-        id: TransferId(1),
-        value: SemanticValueId(1),
-        source: PartitionId(0),
-        destination: PartitionId(1),
-        byte_count: 4_096,
-        direction: TransferDirection::BIDI,
-        element_ty: f32,
-        layout: MirTensorStorageLayout::DeviceHandle,
-        path_label: TransportPath::HostStaged,
-        producer_generation: 1,
-        consumer_generation: 1,
-        completion_boundary: ExecutionCommitBoundary {
-            barriers: Vec::new(),
-            launches: vec![LaunchId(1)],
-        },
-    }));
-    let error = plan.validate().expect_err("a move with no consumer must fail");
+    plan.graph
+        .operations
+        .push(ExecutionOperation::Transfer(TransferOperation {
+            id: TransferId(1),
+            value: SemanticValueId(1),
+            source: PartitionId(0),
+            destination: PartitionId(1),
+            byte_count: 4_096,
+            direction: TransferDirection::BIDI,
+            element_ty: f32,
+            layout: MirTensorStorageLayout::DeviceHandle,
+            path_label: TransportPath::HostStaged,
+            producer_generation: 1,
+            consumer_generation: 1,
+            completion_boundary: ExecutionCommitBoundary {
+                barriers: Vec::new(),
+                launches: vec![LaunchId(1)],
+            },
+        }));
+    let error = plan
+        .validate()
+        .expect_err("a move with no consumer must fail");
     assert_eq!(error.class(), ValidateClass::Completeness);
     assert!(matches!(
         error,
@@ -787,8 +841,13 @@ fn missing_consumer_fails() {
 #[test]
 fn dangling_boundary_barrier_fails() {
     let mut plan = cs1();
-    transfer_mut(&mut plan, 0).completion_boundary.barriers.push(BarrierId(99));
-    let error = plan.validate().expect_err("a dangling boundary barrier must fail");
+    transfer_mut(&mut plan, 0)
+        .completion_boundary
+        .barriers
+        .push(BarrierId(99));
+    let error = plan
+        .validate()
+        .expect_err("a dangling boundary barrier must fail");
     assert_eq!(error.class(), ValidateClass::Completeness);
     assert_eq!(
         error,
@@ -802,8 +861,13 @@ fn dangling_boundary_barrier_fails() {
 #[test]
 fn dangling_boundary_launch_fails() {
     let mut plan = cs1();
-    transfer_mut(&mut plan, 0).completion_boundary.launches.push(LaunchId(99));
-    let error = plan.validate().expect_err("a dangling boundary launch must fail");
+    transfer_mut(&mut plan, 0)
+        .completion_boundary
+        .launches
+        .push(LaunchId(99));
+    let error = plan
+        .validate()
+        .expect_err("a dangling boundary launch must fail");
     assert_eq!(error.class(), ValidateClass::Completeness);
     assert_eq!(
         error,
@@ -827,13 +891,15 @@ fn bidirectional_value_move_cycle_fails() {
     let mut plan = fixture_plan(&facts, partitions, graph);
     // Add the reverse move of O (P1 → P0 exists; add P0 → P1 at the same
     // generation): the value flows in a directed cycle.
-    plan.graph.operations.push(ExecutionOperation::Transfer(o_transfer(
-        2,
-        PartitionId(0),
-        PartitionId(1),
-        2_048,
-        f32,
-    )));
+    plan.graph
+        .operations
+        .push(ExecutionOperation::Transfer(o_transfer(
+            2,
+            PartitionId(0),
+            PartitionId(1),
+            2_048,
+            f32,
+        )));
     let error = plan.validate().expect_err("a value-move cycle must fail");
     assert_eq!(error.class(), ValidateClass::Cycle);
     assert!(matches!(
@@ -868,7 +934,9 @@ fn self_move_cycle_fails() {
 fn collective_source_not_participant_fails_unsupported() {
     let mut plan = cs1();
     collective_mut(&mut plan).participants = vec![PartitionId(1)];
-    let error = plan.validate().expect_err("a broadcast from a non-participant must fail");
+    let error = plan
+        .validate()
+        .expect_err("a broadcast from a non-participant must fail");
     assert_eq!(error.class(), ValidateClass::UnsupportedCollective);
     assert_eq!(
         error,
@@ -886,7 +954,9 @@ fn collective_source_not_participant_fails_unsupported() {
 fn collective_not_owner_originated_fails_unsupported() {
     let mut plan = cs1();
     collective_mut(&mut plan).source = PartitionId(1);
-    let error = plan.validate().expect_err("a broadcast not from the owner must fail");
+    let error = plan
+        .validate()
+        .expect_err("a broadcast not from the owner must fail");
     assert_eq!(error.class(), ValidateClass::UnsupportedCollective);
     assert_eq!(
         error,
@@ -1008,7 +1078,10 @@ fn collection_kernel_plan_carries_no_communication_variant() {
     // Every kernel plan a program can carry is a recipe plan — the frozen
     // seven-variant set (D1 FC6), no communication variant.
     let (_types, program) = cs1_program();
-    assert!(program.kernels.iter().all(|kernel| is_recipe_plan(&kernel.plan)));
+    assert!(program
+        .kernels
+        .iter()
+        .all(|kernel| is_recipe_plan(&kernel.plan)));
 
     // The communication seam is the upper execution graph, not the kernel
     // plan: the derived plan carries transfers/collectives/barriers as

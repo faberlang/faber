@@ -177,7 +177,13 @@ fn cs1_program() -> (TypeTable, DeviceProgram) {
 
     let mut program = DeviceProgram::new(DeviceProgramLifetime::SingleRun);
     program.kernels = vec![k0, k1, k2, k3, k4];
-    program.launches = vec![launch(1, 0), launch(2, 1), launch(3, 2), launch(4, 3), launch(5, 4)];
+    program.launches = vec![
+        launch(1, 0),
+        launch(2, 1),
+        launch(3, 2),
+        launch(4, 3),
+        launch(5, 4),
+    ];
     program.results = vec![ResultBuffer {
         buffer: o.clone(),
         version: v_o.clone(),
@@ -201,12 +207,7 @@ fn cs1_facts() -> Vec<PlacementFact> {
         fact(2, 2, PlacementContract::Owned { owner: p0 }, 2_048),
         fact(3, 3, PlacementContract::Owned { owner: p0 }, 8_192),
         fact(4, 4, PlacementContract::Owned { owner: p0 }, 4_096),
-        fact(
-            5,
-            5,
-            PlacementContract::Owned { owner: p1 },
-            8_192,
-        ),
+        fact(5, 5, PlacementContract::Owned { owner: p1 }, 8_192),
         fact(
             6,
             6,
@@ -277,7 +278,14 @@ fn cs1_derives_two_partitions_and_an_explicit_graph() {
     );
     assert_eq!(
         partitions[0].buffers,
-        vec![BufferId(1), BufferId(2), BufferId(3), BufferId(4), BufferId(6), BufferId(8)]
+        vec![
+            BufferId(1),
+            BufferId(2),
+            BufferId(3),
+            BufferId(4),
+            BufferId(6),
+            BufferId(8)
+        ]
     );
     assert!(partitions[0].results.is_empty());
     let p0_values: Vec<u32> = partitions[0].placements.iter().map(|p| p.value.0).collect();
@@ -377,10 +385,7 @@ fn collective_broadcast_is_the_only_admitted_kind() {
     assert_eq!(broadcast.value, SemanticValueId(6));
     assert!(matches!(broadcast.kind, CollectiveKind::Broadcast));
     assert_eq!(broadcast.source, PartitionId(0));
-    assert_eq!(
-        broadcast.participants,
-        vec![PartitionId(0), PartitionId(1)]
-    );
+    assert_eq!(broadcast.participants, vec![PartitionId(0), PartitionId(1)]);
     assert_eq!(broadcast.byte_count, 16_384);
 
     // The graph API rejects any other kind: `broadcast` is the only
@@ -409,10 +414,7 @@ fn result_barrier_marks_the_declared_commit_boundary() {
     let barriers = graph.barriers();
     assert_eq!(barriers.len(), 1);
     assert_eq!(barriers[0].id, BarrierId(0));
-    assert_eq!(
-        barriers[0].partitions,
-        vec![PartitionId(0), PartitionId(1)]
-    );
+    assert_eq!(barriers[0].partitions, vec![PartitionId(0), PartitionId(1)]);
 
     // The graph-level declared commit boundary references the O barrier and
     // O's producing launch — never "execution generation".
@@ -594,10 +596,7 @@ fn cross_partition_write_emits_a_writeback_transfer() {
     assert_eq!(transfers[0].direction, TransferDirection::BIDI);
     assert_eq!(transfers[0].producer_generation, 1);
     assert_eq!(transfers[0].consumer_generation, 1);
-    assert_eq!(
-        transfers[0].completion_boundary.launches,
-        vec![LaunchId(1)]
-    );
+    assert_eq!(transfers[0].completion_boundary.launches, vec![LaunchId(1)]);
 }
 
 // -----------------------------------------------------------------------

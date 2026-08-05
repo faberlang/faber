@@ -78,8 +78,14 @@ pub fn encode_logical_plan(plan: &DistributedExecutionPlan) -> Vec<u8> {
         for kernel in &partition.kernels {
             write_u64(&mut bytes, *kernel as u64);
         }
-        write_u32_list(&mut bytes, &partition.launches.iter().map(|id| id.0).collect::<Vec<_>>());
-        write_u32_list(&mut bytes, &partition.buffers.iter().map(|id| id.0).collect::<Vec<_>>());
+        write_u32_list(
+            &mut bytes,
+            &partition.launches.iter().map(|id| id.0).collect::<Vec<_>>(),
+        );
+        write_u32_list(
+            &mut bytes,
+            &partition.buffers.iter().map(|id| id.0).collect::<Vec<_>>(),
+        );
         write_count(&mut bytes, partition.results.len());
         for result in &partition.results {
             write_u32(&mut bytes, result.buffer.0);
@@ -133,7 +139,11 @@ pub fn encode_logical_plan(plan: &DistributedExecutionPlan) -> Vec<u8> {
                 write_u32(&mut bytes, collective.source.0);
                 write_u32_list(
                     &mut bytes,
-                    &collective.participants.iter().map(|id| id.0).collect::<Vec<_>>(),
+                    &collective
+                        .participants
+                        .iter()
+                        .map(|id| id.0)
+                        .collect::<Vec<_>>(),
                 );
                 write_u64(&mut bytes, collective.byte_count);
             }
@@ -164,18 +174,21 @@ fn write_contract(bytes: &mut Vec<u8>, contract: &PlacementContract) {
         PlacementContract::Replicated { primary, replicas } => {
             bytes.push(0x01);
             write_u32(bytes, primary.0);
-            write_u32_list(
-                bytes,
-                &replicas.iter().map(|id| id.0).collect::<Vec<_>>(),
-            );
+            write_u32_list(bytes, &replicas.iter().map(|id| id.0).collect::<Vec<_>>());
         }
     }
 }
 
 /// Write an execution commit boundary (barriers, then launches).
 fn write_boundary(bytes: &mut Vec<u8>, boundary: &ExecutionCommitBoundary) {
-    write_u32_list(bytes, &boundary.barriers.iter().map(|id| id.0).collect::<Vec<_>>());
-    write_u32_list(bytes, &boundary.launches.iter().map(|id| id.0).collect::<Vec<_>>());
+    write_u32_list(
+        bytes,
+        &boundary.barriers.iter().map(|id| id.0).collect::<Vec<_>>(),
+    );
+    write_u32_list(
+        bytes,
+        &boundary.launches.iter().map(|id| id.0).collect::<Vec<_>>(),
+    );
 }
 
 /// Write a MIR type as its stable semantic id plus an optional layout id.
