@@ -644,6 +644,39 @@ pub(super) fn fmir_image_decode_error(
             "fmir_image_device_program_invalid",
             format!("invalid device program in image: {detail}"),
         )],
+        // MD2-W1: the distributed execution section is admitted fail-closed
+        // at load; each failure class maps to a focused diagnostic.
+        FmirImageError::UnsupportedDistributedSectionVersion { actual, expected } => vec![
+            mir_issue_diag(
+                path,
+                "fmir_image_distributed_section_version_unsupported",
+                format!(
+                    "unsupported distributed-section version {actual}; expected {expected}"
+                ),
+            )
+            .with_arg("actual", actual.to_string())
+            .with_arg("expected", expected.to_string()),
+        ],
+        FmirImageError::DistributedSectionInvalid { detail } => vec![mir_issue_diag(
+            path,
+            "fmir_image_distributed_section_invalid",
+            format!("invalid distributed section in image: {detail}"),
+        )],
+        FmirImageError::DistributedSectionEquivalenceMismatch { detail } => vec![mir_issue_diag(
+            path,
+            "fmir_image_distributed_section_equivalence_mismatch",
+            format!("distributed plan mismatch in image: {detail}"),
+        )],
+        FmirImageError::DistributedSectionHashMismatch {
+            expected,
+            recomputed,
+        } => vec![mir_issue_diag(
+            path,
+            "fmir_image_distributed_section_hash_mismatch",
+            format!(
+                "distributed section logical-plan hash {expected} does not match the delivered plan (recomputed {recomputed})"
+            ),
+        )],
     }
 }
 

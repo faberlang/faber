@@ -184,6 +184,16 @@ pub(crate) fn execute_device_route(
     backend: DeviceBackend,
     source_hashes: &[String],
 ) -> Result<(), Vec<Diagnostic>> {
+    // MD2-W1 (FC16): a distributed image is ADMITTED at load (the shared
+    // schema admission runs at decode) but the single-device run route
+    // rejects it fail-closed — the capability is not claimed before it
+    // exists (campaign posture; bound-plan execution is MD3).
+    if device.distributed.is_some() {
+        return Err(vec![Diagnostic::error(
+            "this image declares a distributed execution section; distributed execution requires MD3 — the single-device run route cannot execute it",
+        )
+        .with_arg("issue", "E_DEVICE_DISTRIBUTED_REQUIRES_MD3")]);
+    }
     // Fail-closed wire admission (S3-A4): the typed-section wire version is
     // gated before any field-level interpretation (old v2 payloads fail
     // closed with the structured `payload_version` diagnostic).

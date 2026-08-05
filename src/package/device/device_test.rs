@@ -132,7 +132,40 @@ fn section_for_program(program: &DeviceProgram, semantics: &DeviceSemantics) -> 
         },
         declared_inputs: Vec::new(),
         runtime_requirements: Vec::new(),
+        // MD2-W1: the single-device constructor passes the optional
+        // distributed section through as `None` (MD-A15).
+        distributed: None,
     }
+}
+
+/// MD2-W1 (FC16): a distributed image is admitted at load but the
+/// single-device run route rejects it fail-closed with the focused
+/// "distributed execution requires MD3" diagnostic — the capability is not
+/// claimed before it exists (bound-plan execution is MD3).
+#[test]
+fn distributed_image_is_rejected_at_the_single_device_run_route() {
+    let (program, semantics) = two_kernel_fixture();
+    let mut section = section_for_program(&program, &semantics);
+    section.distributed = Some(radix_mir_fmir::schema::FmirDistributedExecutionSection {
+        v: radix_mir_fmir::schema::WIRE_DISTRIBUTED_SECTION_VERSION,
+        logical_plan: radix_mir_fmir::schema::WireDistributedExecutionPlan {
+            declared_placement: radix_mir_fmir::schema::WireDeclaredPlacement::default(),
+            partitions: Vec::new(),
+            graph: radix_mir_fmir::schema::WireDistributedExecutionGraph::default(),
+            version: 1,
+        },
+        declared_placement: Vec::new(),
+        logical_distributed_plan_hash: format!("sha256:{}", "0".repeat(64)),
+    });
+
+    let error = execute_device_route(&section, DeviceBackend::Metal, &[])
+        .expect_err("a distributed image must be rejected at the single-device run route");
+    assert!(
+        error.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("distributed execution requires MD3")),
+        "expected the focused distributed-execution diagnostic, got {error:?}"
+    );
 }
 
 /// Build the complete two-kernel fixture (`a` → `medius` → `result`), the

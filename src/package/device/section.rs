@@ -176,6 +176,12 @@ pub(crate) fn device_section_for_program(
         artifacts: FmirDeviceArtifactsSection { artifact },
         declared_inputs,
         runtime_requirements,
+        // MD2-W1 (FC16): the single-device constructor passes the optional
+        // distributed section through as `None` — single-device packages
+        // never require the multi-device section (MD-A15). Distributed-image
+        // construction is a later campaign unit (MD3 bound-plan wiring); the
+        // codec decode side is the shared schema types.
+        distributed: None,
     })
 }
 
