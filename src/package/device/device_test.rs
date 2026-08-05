@@ -1277,15 +1277,53 @@ fn with_inline_package<R>(
 }
 
 #[test]
-fn device_program_constructor_rejects_unplannable_op_with_typed_diagnostic() {
-    // N3.2 / D1: a device-routed kernel whose body carries TensorSoftmax
-    // (no recipe, not an elementwise transform) fails construction with the
-    // typed plan diagnostic — never a silent Elementwise floor.
-    let result = with_inline_package(
+fn device_program_constructor_admits_softmax_with_row_softmax_plan() {
+    // S6-P1 admission: TensorSoftmax is now a transformer recipe op — the
+    // device constructor admits it and carries the RowSoftmax recipe plan
+    // (axis = the tensor's last axis) instead of failing construction.
+    let (program, _semantics) = with_inline_package(
         "softmaxio",
         r#"@ nucleum
 functio softmaxio(tf32[2,2] x) → tf32[2,2] {
     redde x.activatio_softmax()
+}"#,
+        |lowered| {
+            device_program_for_lowered(
+                &lowered.validated,
+                &lowered.interner,
+                &lowered.companions,
+                DEFAULT_TRAINING_STEPS,
+            )
+            .expect("constructor succeeds")
+            .map(|(program, semantics, _step_count)| (program, semantics))
+            .expect("device package yields a device program")
+        },
+    )
+    .expect("fixture lowers");
+    assert_eq!(program.kernels.len(), 1);
+    let kernel = &program.kernels[0];
+    assert_eq!(kernel.entry, "softmaxio");
+    let CollectionKernelPlan::RowSoftmax(plan) = &kernel.plan else {
+        panic!(
+            "the softmax kernel must carry the RowSoftmax recipe plan, got {:?}",
+            kernel.plan
+        );
+    };
+    assert_eq!(plan.axis, 1, "tf32[2,2] softmax reduces over the last axis");
+}
+
+#[test]
+fn device_program_constructor_rejects_unplannable_op_with_typed_diagnostic() {
+    // N3.2 / D1 (S6-P1 boundary): the transformer admission is a CLOSED set.
+    // TensorSoftmax now plans (RowSoftmax), but TensorCruxEntropia — no
+    // recipe and not an elementwise transform — must still fail construction
+    // with the typed plan diagnostic, never a silent Elementwise floor.
+    let result = with_inline_package(
+        "cruxio",
+        r#"@ nucleum
+functio cruxio(tf32[2,2] logits, tf32[2,2] targets, tf32[1] out, u32 id) → vacuum {
+    fixum f32 total ← logits.crux_entropia(targets)
+    out[id] ← total
 }"#,
         |lowered| {
             device_program_for_lowered(
@@ -1304,7 +1342,7 @@ functio softmaxio(tf32[2,2] x) → tf32[2,2] {
         .collect::<Vec<_>>();
     let joined = messages.join(" | ");
     assert!(
-        joined.contains("TensorSoftmax"),
+        joined.contains("TensorCruxEntropia"),
         "the typed diagnostic names the op: {joined}"
     );
     assert!(
