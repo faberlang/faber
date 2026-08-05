@@ -62,11 +62,7 @@ fn reduction_signature(length: u64, workgroup_x: u32, partials: u64) -> MirKerne
 /// dispatch, left/right operand buffers sized to the flat `M·K` / `K·N`
 /// element counts and an `M·N` output — the shape the kernel ABI
 /// produces for a two-tensor-param matmul kernel.
-fn matmul_signature(
-    shapes: MatMulShapes,
-    dispatch_x: u64,
-    dispatch_y: u64,
-) -> MirKernelSignature {
+fn matmul_signature(shapes: MatMulShapes, dispatch_x: u64, dispatch_y: u64) -> MirKernelSignature {
     let mut types = TypeTable::new();
     let element_ty = f32_ty(&mut types);
     MirKernelSignature {
@@ -329,13 +325,8 @@ fn elementwise_op_returns_none() {
         partials: 4,
     };
     assert!(
-        CollectionKernelPlan::from_contract(
-            &signature,
-            &contract,
-            MirCollectionOp::Append,
-            None
-        )
-        .is_none(),
+        CollectionKernelPlan::from_contract(&signature, &contract, MirCollectionOp::Append, None)
+            .is_none(),
         "a non-reduction op must not produce a reduction plan"
     );
 }

@@ -446,7 +446,6 @@ fn is_fold_artifact_type(types: &TypeTable, ty: MirType) -> bool {
     )
 }
 
-
 struct DeviceSafeClassifier<'a> {
     types: &'a TypeTable,
     layouts: &'a MirLayoutTable,

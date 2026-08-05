@@ -132,8 +132,7 @@ fn depth_compare_from_code_rejects_unknown_rather_than_never() {
     let error = depth_compare_function_from_code(0).expect_err("unknown depth code must error");
     assert_eq!(error.issue, "mir_shader_depth_compare_code_unsupported");
     assert_eq!(error.detail.as_deref(), Some("0"));
-    let error =
-        depth_compare_function_from_code(99).expect_err("unknown depth code must error");
+    let error = depth_compare_function_from_code(99).expect_err("unknown depth code must error");
     assert_eq!(error.detail.as_deref(), Some("99"));
 }
 
@@ -168,8 +167,7 @@ fn varying_interpolation_from_code_accepts_known_codes() {
 
 #[test]
 fn varying_interpolation_from_code_rejects_unknown() {
-    let error =
-        varying_interpolation_from_code(4).expect_err("unknown interpolation must error");
+    let error = varying_interpolation_from_code(4).expect_err("unknown interpolation must error");
     assert_eq!(error.issue, "mir_shader_interpolation_code_unsupported");
     assert_eq!(error.detail.as_deref(), Some("4"));
 }
