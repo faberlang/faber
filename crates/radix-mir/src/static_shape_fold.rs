@@ -41,9 +41,9 @@ use crate::figura::literal_index_i64s;
 use crate::kernel_plan::CollectionKernelPlan;
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirCollectionOp,
-    MirConstant, MirFunction, MirIntrinsic, MirLocalId, MirOperand, MirPlace, MirPlaceBase,
-    MirRuntimeCall, MirStatement, MirStatementKind, MirTempId, MirTerminatorKind, MirType,
-    MirValidationContext, MirValue, MirValueKind,
+    MirConstant, MirFunction, MirIntrinsic, MirLocalId, MirOperand, MirOptionOp, MirPlace,
+    MirPlaceBase, MirRuntimeCall, MirStatement, MirStatementKind, MirTempId, MirTerminatorKind,
+    MirType, MirValidationContext, MirValue, MirValueKind,
 };
 use radix_types::Type;
 use std::collections::{BTreeMap, BTreeSet};
@@ -472,13 +472,12 @@ fn fold_statement(
     }
 }
 
-/// The literal dims of a `TensorShape` receiver, or a typed
+/// The MIR tensor type of a `magnitudines()` receiver, or a typed
 /// `UnfoldableMagnitudines` diagnostic.
-fn shape_receiver_dims(
+fn magnitudines_receiver_ty(
     call: &MirRuntimeCall,
     function: &MirFunction,
-    validation: &MirValidationContext<'_>,
-) -> Result<Vec<i64>, ShapeFoldError> {
+) -> Result<MirType, ShapeFoldError> {
     let Some(receiver) = call.args.first() else {
         return Err(ShapeFoldError::new(
             ShapeFoldErrorKind::UnfoldableMagnitudines,
@@ -491,6 +490,17 @@ fn shape_receiver_dims(
             "magnitudines() receiver has no resolvable MIR type",
         ));
     };
+    Ok(ty)
+}
+
+/// The literal dims of a `TensorShape` receiver, or a typed
+/// `UnfoldableMagnitudines` diagnostic.
+fn shape_receiver_dims(
+    call: &MirRuntimeCall,
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+) -> Result<Vec<i64>, ShapeFoldError> {
+    let ty = magnitudines_receiver_ty(call, function)?;
     let Some(dims) = tensor_literal_dims(ty, validation) else {
         return Err(ShapeFoldError::new(
             ShapeFoldErrorKind::UnfoldableMagnitudines,
@@ -507,19 +517,7 @@ fn receiver_tensor_element_ty(
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
 ) -> Result<MirType, ShapeFoldError> {
-    let Some(receiver) = call.args.first() else {
-        return Err(ShapeFoldError::new(
-            ShapeFoldErrorKind::UnfoldableMagnitudines,
-            "magnitudines() has no receiver operand",
-        ));
-    };
-    let Some(ty) = operand_local_ty(receiver, function) else {
-        return Err(ShapeFoldError::new(
-            ShapeFoldErrorKind::UnfoldableMagnitudines,
-            "magnitudines() receiver has no resolvable MIR type",
-        ));
-    };
-    tensor_element_ty(ty, validation)
+    tensor_element_ty(magnitudines_receiver_ty(call, function)?, validation)
 }
 
 /// The fill receiver for a folded `TensorCreate`: the shape-source tensor
@@ -685,18 +683,18 @@ fn value_read_locals(value: &MirValue, out: &mut BTreeSet<MirLocalId>) {
 }
 
 /// Collect the locals an option operation reads into `out`.
-fn option_read_locals(op: &crate::MirOptionOp, out: &mut BTreeSet<MirLocalId>) {
+fn option_read_locals(op: &MirOptionOp, out: &mut BTreeSet<MirLocalId>) {
     match op {
-        crate::MirOptionOp::Some(operand)
-        | crate::MirOptionOp::IsNil(operand)
-        | crate::MirOptionOp::IsNotNil(operand) => operand_read_local(operand, out),
-        crate::MirOptionOp::Unwrap { value, .. } => operand_read_local(value, out),
-        crate::MirOptionOp::Coalesce { value, fallback } => {
+        MirOptionOp::Some(operand)
+        | MirOptionOp::IsNil(operand)
+        | MirOptionOp::IsNotNil(operand) => operand_read_local(operand, out),
+        MirOptionOp::Unwrap { value, .. } => operand_read_local(value, out),
+        MirOptionOp::Coalesce { value, fallback } => {
             operand_read_local(value, out);
             operand_read_local(fallback, out);
         }
-        crate::MirOptionOp::Chain { base, .. } => operand_read_local(base, out),
-        crate::MirOptionOp::None => {}
+        MirOptionOp::Chain { base, .. } => operand_read_local(base, out),
+        MirOptionOp::None => {}
     }
 }
 
