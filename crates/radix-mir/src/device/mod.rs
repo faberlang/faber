@@ -28,8 +28,8 @@ mod tests {
         MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlock, MirBlockId,
         MirCollectionOp, MirConstant, MirFunction, MirFunctionId, MirIntrinsic, MirLocal,
         MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace, MirRuntimeCall, MirStatement,
-        MirStatementKind, MirTemp, MirTempId, MirTerminator, MirTerminatorKind, MirType,
-        MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind,
+        MirStatementKind, MirTemp, MirTempId, MirTerminator, MirTerminatorKind, MirType, MirUnOp,
+        MirValidationContext, MirValue, MirValueId, MirValueKind,
     };
     use radix_lexer::Span;
     use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeTable};
@@ -960,11 +960,11 @@ mod tests {
     /// A transformer-bearing device body (S6-P2): the three S6-P1
     /// transformer recipe ops (`TensorSoftmax` / `TensorSumAxis` /
     /// `TensorLayerNorm`) plus the Exp/Sqrt TENSOR unary assigns (the
-    /// softmax exp and the LayerNorm sqrt lanes). Each recipe runtime call
+    /// softmax exp and the `LayerNorm` sqrt lanes). Each recipe runtime call
     /// reads a prior tensor local and writes a tensor local; the unary
     /// assigns apply the admitted elementwise tensor unaries (`MirUnOp::Exp`
     /// / `MirUnOp::Sqrt` — `is_admitted_tensor_unary`,
-    /// device_program_plans.rs).
+    /// `device_program_plans.rs`).
     ///
     /// Locals: 0 input tensor param, 1 `s` softmax result, 2 `e` exp
     /// result, 3 `q` sqrt result, 4 `r` sum-axis result, 5 `l` layernorm
@@ -1060,7 +1060,9 @@ mod tests {
                         kind: MirStatementKind::RuntimeCall {
                             destination: Some(MirPlace::local(MirLocalId(5))),
                             call: MirRuntimeCall {
-                                intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorLayerNorm),
+                                intrinsic: MirIntrinsic::Collection(
+                                    MirCollectionOp::TensorLayerNorm,
+                                ),
                                 args: vec![
                                     MirOperand::Place(MirPlace::local(MirLocalId(1))),
                                     MirOperand::Constant(MirConstant::Int(1)),
@@ -1163,7 +1165,9 @@ mod tests {
                     kind: MirStatementKind::RuntimeCall {
                         destination: Some(MirPlace::local(MirLocalId(2))),
                         call: MirRuntimeCall {
-                            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorCruxEntropia),
+                            intrinsic: MirIntrinsic::Collection(
+                                MirCollectionOp::TensorCruxEntropia,
+                            ),
                             args: vec![
                                 MirOperand::Place(MirPlace::local(MirLocalId(0))),
                                 MirOperand::Place(MirPlace::local(MirLocalId(1))),
