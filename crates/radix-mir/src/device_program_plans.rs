@@ -50,6 +50,7 @@ use crate::{
     MirType, MirValidationContext, MirWorkgroupSize,
 };
 use radix_types::{IndexExpr, Type, TypeId};
+use rustc_hash::FxHashMap;
 use std::fmt;
 
 /// A typed plan-mapping failure (contract resolution, operand shapes, or a
@@ -227,6 +228,49 @@ pub fn carried_plan_agrees(
         None => matches!(carried, CollectionKernelPlan::Elementwise),
         Some(derived) => derived == carried,
     }
+}
+
+/// Whether a device program's carried resource list agrees with the
+/// signature re-derived from the kernel function's typed facts.
+///
+/// The ABI role/access pair must be compatible with the carried program
+/// role. Exact agreement holds for per-kernel roles; a **unified**
+/// intermediate (S2-5) carries the program role InOut on slots whose own
+/// ABI is (Output, Write) or (Input, Read) — the program role is a
+/// cross-kernel identity fact (N2.6 data-flow identity), not a per-slot
+/// derivation. InOut accepts any coherent ABI pair; incoherent pairs (e.g.
+/// writing an input) still fail closed because `from_abi_role` yields
+/// `None` for them.
+#[must_use]
+pub fn carried_resources_agree(carried: &[DeviceResource], signature: &MirKernelSignature) -> bool {
+    let mut expected: FxHashMap<(u32, u32), &MirKernelResource> = FxHashMap::default();
+    for resource in signature
+        .resources()
+        .filter(|resource| resource.kind == MirKernelResourceKind::StorageBuffer)
+    {
+        expected.insert((resource.group, resource.binding), resource);
+    }
+    if carried.len() != expected.len() {
+        return false;
+    }
+    for resource in carried {
+        let key = (resource.binding.group, resource.binding.binding);
+        let Some(signature_resource) = expected.remove(&key) else {
+            return false;
+        };
+        let derived = BufferRole::from_abi_role(signature_resource.role, signature_resource.access);
+        let compatible =
+            derived == Some(resource.buffer.role) || (resource.buffer.role == BufferRole::InOut);
+        if !compatible {
+            return false;
+        }
+        if signature_resource.element_ty != resource.version.element_ty
+            || signature_resource.element_count != resource.version.element_count
+        {
+            return false;
+        }
+    }
+    true
 }
 
 /// The recipe family of a kernel, as a typed tag.
