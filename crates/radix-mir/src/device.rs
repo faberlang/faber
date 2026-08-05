@@ -25,12 +25,11 @@ pub use crate::device_semantics::{
 };
 use crate::visit::MirVisitor;
 use crate::{
-    MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirCollectionOp,
-    MirFunction, MirFunctionId, MirIntrinsic, MirLayoutKind, MirLayoutTable, MirLocal, MirLocalId,
-    MirOperand, MirParam, MirPlace, MirPlaceBase, MirProgram, MirProjection, MirRuntimeCall,
-    MirScalarLayout, MirStatement, MirStatementKind, MirTemp, MirTempId, MirTensorLocusLayout,
-    MirTensorStorageLayout, MirTerminator, MirTerminatorKind, MirType, MirValidationContext,
-    MirValue, MirValueKind, ValidatedMir,
+    MirAggregate, MirAggregateKind, MirCollectionOp, MirFunction, MirFunctionId, MirIntrinsic,
+    MirLayoutKind, MirLayoutTable, MirLocal, MirLocalId, MirParam, MirPlace, MirPlaceBase,
+    MirProgram, MirProjection, MirRuntimeCall, MirScalarLayout, MirStatement, MirStatementKind,
+    MirTemp, MirTempId, MirTensorLocusLayout, MirTensorStorageLayout, MirTerminator,
+    MirTerminatorKind, MirType, MirValidationContext, MirValue, ValidatedMir,
 };
 use radix_hir::{DefId, HirFunction, HirItemKind, HirProgram};
 use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable};
@@ -403,7 +402,7 @@ impl FoldArtifactSlots {
 /// `Array`/`Tensor` construct or slot stays fail-closed with the aggregate
 /// diagnostics.
 fn dead_fold_artifact_slots(function: &MirFunction, types: &TypeTable) -> FoldArtifactSlots {
-    let read_locals = function_read_locals(function);
+    let read_locals = crate::read_analysis::function_read_locals(function);
     let mut dead = FoldArtifactSlots::default();
     for local in &function.locals {
         if is_fold_artifact_type(types, local.ty)
@@ -414,10 +413,12 @@ fn dead_fold_artifact_slots(function: &MirFunction, types: &TypeTable) -> FoldAr
         }
     }
     for temp in &function.temps {
-        if !is_fold_artifact_type(types, temp.ty) || temp_directly_read(function, temp.id) {
+        if !is_fold_artifact_type(types, temp.ty)
+            || crate::read_analysis::temp_directly_read(function, temp.id)
+        {
             continue;
         }
-        match temp_forward_local(function, temp.id) {
+        match crate::read_analysis::temp_forward_local(function, temp.id) {
             None => {
                 dead.temps.insert(temp.id);
             }
@@ -445,238 +446,6 @@ fn is_fold_artifact_type(types: &TypeTable, ty: MirType) -> bool {
     )
 }
 
-/// Every local read anywhere in the function (statements and terminators,
-/// across all blocks). Destinations are writes, never reads; an operand's
-/// base slot is read whether or not the place carries projections.
-fn function_read_locals(function: &MirFunction) -> FxHashSet<MirLocalId> {
-    let mut read = FxHashSet::default();
-    for block in &function.blocks {
-        for statement in &block.statements {
-            statement_read_locals(statement, &mut read);
-        }
-        terminator_read_locals(&block.terminator.kind, &mut read);
-    }
-    read
-}
-
-/// Collect the locals a statement reads into `out`.
-fn statement_read_locals(statement: &MirStatement, out: &mut FxHashSet<MirLocalId>) {
-    match &statement.kind {
-        MirStatementKind::Assign { value, .. } => value_read_locals(value, out),
-        MirStatementKind::RuntimeCall { call, .. } => {
-            for operand in &call.args {
-                operand_read_local(operand, out);
-            }
-        }
-        MirStatementKind::Call { args, .. } => {
-            for operand in args {
-                operand_read_local(operand, out);
-            }
-        }
-        MirStatementKind::Construct { aggregate, .. } => aggregate_read_locals(aggregate, out),
-    }
-}
-
-/// Collect the locals a terminator reads into `out`.
-fn terminator_read_locals(terminator: &MirTerminatorKind, out: &mut FxHashSet<MirLocalId>) {
-    match terminator {
-        MirTerminatorKind::Return(Some(operand)) | MirTerminatorKind::ReturnError(operand) => {
-            operand_read_local(operand, out);
-        }
-        MirTerminatorKind::Branch { condition, .. }
-        | MirTerminatorKind::Switch {
-            value: condition, ..
-        } => operand_read_local(condition, out),
-        MirTerminatorKind::TryCall { args, .. } => {
-            for operand in args {
-                operand_read_local(operand, out);
-            }
-        }
-        MirTerminatorKind::Return(None)
-        | MirTerminatorKind::Goto(_)
-        | MirTerminatorKind::Unreachable => {}
-    }
-}
-
-/// Collect the local an operand reads into `out`, when it is a local place.
-fn operand_read_local(operand: &MirOperand, out: &mut FxHashSet<MirLocalId>) {
-    if let MirOperand::Place(place) = operand {
-        if let MirPlaceBase::Local(local) = place.base {
-            out.insert(local);
-        }
-    }
-}
-
-/// Collect the locals a value reads into `out`.
-fn value_read_locals(value: &MirValue, out: &mut FxHashSet<MirLocalId>) {
-    match &value.kind {
-        MirValueKind::Operand(operand) | MirValueKind::Unary { operand, .. } => {
-            operand_read_local(operand, out);
-        }
-        MirValueKind::Binary { lhs, rhs, .. } => {
-            operand_read_local(lhs, out);
-            operand_read_local(rhs, out);
-        }
-        MirValueKind::Option(op) => option_read_locals(op, out),
-        MirValueKind::Closure(closure) => operand_read_local(&closure.environment, out),
-    }
-}
-
-/// Collect the locals an option operation reads into `out`.
-fn option_read_locals(op: &crate::MirOptionOp, out: &mut FxHashSet<MirLocalId>) {
-    match op {
-        crate::MirOptionOp::Some(operand)
-        | crate::MirOptionOp::IsNil(operand)
-        | crate::MirOptionOp::IsNotNil(operand) => operand_read_local(operand, out),
-        crate::MirOptionOp::Unwrap { value, .. } => operand_read_local(value, out),
-        crate::MirOptionOp::Coalesce { value, fallback } => {
-            operand_read_local(value, out);
-            operand_read_local(fallback, out);
-        }
-        crate::MirOptionOp::Chain { base, .. } => operand_read_local(base, out),
-        crate::MirOptionOp::None => {}
-    }
-}
-
-/// Collect the locals an aggregate construct reads into `out` (its field
-/// operands; the destination is a write).
-fn aggregate_read_locals(aggregate: &MirAggregate, out: &mut FxHashSet<MirLocalId>) {
-    match &aggregate.fields {
-        MirAggregateFields::Ordered(items) => {
-            for item in items {
-                let (MirAggregateItem::Operand(operand) | MirAggregateItem::Spread(operand)) = item;
-                operand_read_local(operand, out);
-            }
-        }
-        MirAggregateFields::Named(fields) => {
-            for field in fields {
-                operand_read_local(&field.value, out);
-            }
-        }
-        MirAggregateFields::Keyed(fields) => {
-            for field in fields {
-                operand_read_local(&field.key, out);
-                operand_read_local(&field.value, out);
-            }
-        }
-    }
-}
-
-/// Whether a statement is the lowered pure forward copy `Local(l) ←
-/// Temp(t)` of the given temp — the only reader [`temp_forward_local`]
-/// traces.
-fn is_pure_temp_forward(statement: &MirStatement, temp: MirTempId) -> bool {
-    let MirStatementKind::Assign { place, value } = &statement.kind else {
-        return false;
-    };
-    if !matches!(place.base, MirPlaceBase::Local(_)) || !place.projections.is_empty() {
-        return false;
-    }
-    matches!(&value.kind, MirValueKind::Operand(MirOperand::Temp(t)) if *t == temp)
-}
-
-/// The local a temp's value forwards into through the lowered body's copy
-/// (`Local(l) ← Temp(t)`), when exactly one such forward exists.
-fn temp_forward_local(function: &MirFunction, temp: MirTempId) -> Option<MirLocalId> {
-    let mut found: Option<MirLocalId> = None;
-    for block in &function.blocks {
-        for statement in &block.statements {
-            let MirStatementKind::Assign { place, value } = &statement.kind else {
-                continue;
-            };
-            let MirPlaceBase::Local(local) = place.base else {
-                continue;
-            };
-            if !place.projections.is_empty() {
-                continue;
-            }
-            let MirValueKind::Operand(MirOperand::Temp(forwarded)) = &value.kind else {
-                continue;
-            };
-            if *forwarded != temp {
-                continue;
-            }
-            if found.is_some() {
-                return None;
-            }
-            found = Some(local);
-        }
-    }
-    found
-}
-
-/// Whether any statement or terminator reads the temp OUTSIDE the lowered
-/// forward copy — a direct operand consumer that is not the pure
-/// `Local(l) ← Temp(t)` forward (which [`temp_forward_local`] traces).
-fn temp_directly_read(function: &MirFunction, temp: MirTempId) -> bool {
-    for block in &function.blocks {
-        for statement in &block.statements {
-            if is_pure_temp_forward(statement, temp) {
-                continue;
-            }
-            if statement_reads_temp(statement, temp) {
-                return true;
-            }
-        }
-        if terminator_reads_temp(&block.terminator.kind, temp) {
-            return true;
-        }
-    }
-    false
-}
-
-/// Whether a statement reads the given temp in any operand or value position
-/// (the statement's own destination is a write, never a read).
-fn statement_reads_temp(statement: &MirStatement, temp: MirTempId) -> bool {
-    match &statement.kind {
-        MirStatementKind::Assign { value, .. } => value_reads_temp(value, temp),
-        MirStatementKind::RuntimeCall { call, .. } => call
-            .args
-            .iter()
-            .any(|operand| operand_reads_temp(operand, temp)),
-        MirStatementKind::Construct { aggregate, .. } => matches!(
-            &aggregate.fields,
-            MirAggregateFields::Ordered(fields)
-                if fields.iter().any(|field| matches!(
-                    field,
-                    MirAggregateItem::Operand(operand) if operand_reads_temp(operand, temp)
-                ))
-        ),
-        MirStatementKind::Call { .. } => false,
-    }
-}
-
-/// Whether a value reads the given temp.
-fn value_reads_temp(value: &MirValue, temp: MirTempId) -> bool {
-    match &value.kind {
-        MirValueKind::Operand(operand) | MirValueKind::Unary { operand, .. } => {
-            operand_reads_temp(operand, temp)
-        }
-        MirValueKind::Binary { lhs, rhs, .. } => {
-            operand_reads_temp(lhs, temp) || operand_reads_temp(rhs, temp)
-        }
-        _ => false,
-    }
-}
-
-/// Whether a terminator reads the given temp.
-fn terminator_reads_temp(terminator: &MirTerminatorKind, temp: MirTempId) -> bool {
-    match terminator {
-        MirTerminatorKind::Return(Some(operand)) => operand_reads_temp(operand, temp),
-        MirTerminatorKind::Branch { condition, .. } => operand_reads_temp(condition, temp),
-        MirTerminatorKind::Switch { value, .. } => operand_reads_temp(value, temp),
-        _ => false,
-    }
-}
-
-/// Whether an operand reads the given temp as a plain base slot.
-fn operand_reads_temp(operand: &MirOperand, temp: MirTempId) -> bool {
-    match operand {
-        MirOperand::Temp(t) => *t == temp,
-        MirOperand::Place(place) => matches!(place.base, MirPlaceBase::Temp(t) if t == temp),
-        _ => false,
-    }
-}
 
 struct DeviceSafeClassifier<'a> {
     types: &'a TypeTable,

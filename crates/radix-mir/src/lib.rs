@@ -38,6 +38,8 @@ pub mod visit;
 mod figura;
 #[allow(dead_code)]
 mod tensor_bracket;
+/// Shared statement/value read analysis for device-program lowering.
+mod read_analysis;
 
 /// Shared lista→tensor shape helpers used by validation and the MIR stepper.
 pub mod lista_tensor_conversio;

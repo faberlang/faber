@@ -45,10 +45,9 @@ use crate::device_program::{Binding, BufferRole, DeviceProgram, DeviceResource, 
 use crate::kernel_plan::{CollectionKernelPlan, MatMulShapes, SharedMemoryLayout};
 use crate::layout::{MirScalarLayout, MirTensorStorageLayout};
 use crate::{
-    MirAggregateFields, MirAggregateItem, MirCollectionOp, MirFunction, MirIntrinsic,
-    MirKernelDispatchSize, MirKernelWorkgroupCount, MirLayoutKind, MirLocalId, MirOperand,
-    MirPlace, MirPlaceBase, MirRuntimeCall, MirStatement, MirStatementKind, MirTerminatorKind,
-    MirType, MirValidationContext, MirValue, MirValueKind, MirWorkgroupSize,
+    MirCollectionOp, MirFunction, MirIntrinsic, MirKernelDispatchSize, MirKernelWorkgroupCount,
+    MirLayoutKind, MirLocalId, MirOperand, MirPlaceBase, MirRuntimeCall, MirStatementKind,
+    MirType, MirValidationContext, MirWorkgroupSize,
 };
 use radix_types::{IndexExpr, Type, TypeId};
 use std::fmt;
@@ -396,7 +395,7 @@ fn collection_ops_with_read_context(
             {
                 if destination
                     .as_ref()
-                    .is_some_and(|dest| !place_is_read(read_context, dest))
+                    .is_some_and(|dest| !crate::read_analysis::place_is_read(read_context, dest))
                 {
                     continue;
                 }
@@ -413,82 +412,6 @@ fn collection_ops_for_function(function: &MirFunction) -> Vec<MirCollectionOp> {
     collection_ops_with_read_context(function, function)
 }
 
-/// Whether a place's base local is read anywhere in the function (the
-/// S3-A5 dead-op filter's read set). A destination that IS a function param
-/// (e.g. a matmul writing its output-buffer param) is a side effect — always
-/// live.
-fn place_is_read(function: &MirFunction, place: &MirPlace) -> bool {
-    let MirPlaceBase::Local(local) = place.base else {
-        return true;
-    };
-    if function.params.iter().any(|param| param.local == local) {
-        return true;
-    }
-    for block in &function.blocks {
-        for statement in &block.statements {
-            if statement_reads_local(statement, local) {
-                return true;
-            }
-        }
-        if terminator_reads_local(&block.terminator.kind, local) {
-            return true;
-        }
-    }
-    false
-}
-
-/// Whether a statement reads the given local in any operand or value
-/// position (the statement's own destination is a write, never a read).
-fn statement_reads_local(statement: &MirStatement, local: MirLocalId) -> bool {
-    match &statement.kind {
-        MirStatementKind::Assign { value, .. } => value_reads_local(value, local),
-        MirStatementKind::RuntimeCall { call, .. } => call
-            .args
-            .iter()
-            .any(|operand| operand_reads_local(operand, local)),
-        MirStatementKind::Construct { aggregate, .. } => matches!(
-            &aggregate.fields,
-            MirAggregateFields::Ordered(fields)
-                if fields.iter().any(|field| matches!(
-                    field,
-                    MirAggregateItem::Operand(operand) if operand_reads_local(operand, local)
-                ))
-        ),
-        MirStatementKind::Call { .. } => false,
-    }
-}
-
-/// Whether a value reads the given local.
-fn value_reads_local(value: &MirValue, local: MirLocalId) -> bool {
-    match &value.kind {
-        MirValueKind::Operand(operand) | MirValueKind::Unary { operand, .. } => {
-            operand_reads_local(operand, local)
-        }
-        MirValueKind::Binary { lhs, rhs, .. } => {
-            operand_reads_local(lhs, local) || operand_reads_local(rhs, local)
-        }
-        _ => false,
-    }
-}
-
-/// Whether a terminator reads the given local.
-fn terminator_reads_local(terminator: &MirTerminatorKind, local: MirLocalId) -> bool {
-    match terminator {
-        MirTerminatorKind::Return(Some(operand)) => operand_reads_local(operand, local),
-        MirTerminatorKind::Branch { condition, .. } => operand_reads_local(condition, local),
-        MirTerminatorKind::Switch { value, .. } => operand_reads_local(value, local),
-        _ => false,
-    }
-}
-
-/// Whether an operand reads the given local as a plain place.
-fn operand_reads_local(operand: &MirOperand, local: MirLocalId) -> bool {
-    matches!(
-        operand,
-        MirOperand::Place(place)
-            if place.base == MirPlaceBase::Local(local) && place.projections.is_empty()
-    )
-}
 
 /// Whether a collection op is a pointwise tensor transform the generic
 /// elementwise kernel body covers (no recipe). This is the closed set that
@@ -935,7 +858,7 @@ fn recipe_operand_locals(function: &MirFunction) -> Result<Vec<MirLocalId>, Plan
             return args
                 .iter()
                 .map(|arg| {
-                    operand_local_id(arg).ok_or_else(|| {
+                    crate::read_analysis::operand_local(arg).ok_or_else(|| {
                         PlanMappingError::mapping("recipe operand must reference a tensor local")
                     })
                 })
@@ -945,18 +868,6 @@ fn recipe_operand_locals(function: &MirFunction) -> Result<Vec<MirLocalId>, Plan
     Err(PlanMappingError::mapping(
         "subchain body has no collection-op statement",
     ))
-}
-
-/// The local a plain place operand references, if any (the subchain operand
-/// scan's local extractor).
-fn operand_local_id(operand: &MirOperand) -> Option<MirLocalId> {
-    let MirOperand::Place(place) = operand else {
-        return None;
-    };
-    let MirPlaceBase::Local(local) = place.base else {
-        return None;
-    };
-    Some(local)
 }
 
 /// A read input resource carrying a source local (the data-flow inputs the

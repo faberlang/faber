@@ -41,12 +41,12 @@ use crate::figura::literal_index_i64s;
 use crate::kernel_plan::CollectionKernelPlan;
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirCollectionOp,
-    MirConstant, MirFunction, MirIntrinsic, MirLocalId, MirOperand, MirOptionOp, MirPlace,
-    MirPlaceBase, MirRuntimeCall, MirStatement, MirStatementKind, MirTempId, MirTerminatorKind,
-    MirType, MirValidationContext, MirValue, MirValueKind,
+    MirConstant, MirFunction, MirIntrinsic, MirLocalId, MirOperand, MirPlace, MirPlaceBase,
+    MirRuntimeCall, MirStatement, MirStatementKind, MirTempId, MirType, MirValidationContext,
+    MirValueKind,
 };
 use radix_types::Type;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::fmt;
 
 /// Stable category of a shape-fold failure (S5-U4).
@@ -226,7 +226,10 @@ pub fn fold_static_shapes(
                         local,
                         ShapeSource {
                             dims,
-                            source_receiver: operand_local(call.args.first()),
+                            source_receiver: call
+                                .args
+                                .first()
+                                .and_then(crate::read_analysis::operand_local),
                         },
                     );
                 }
@@ -286,13 +289,13 @@ pub fn fold_static_shapes(
     // the device pipeline fails closed on it there).
     let mut folded = function.clone();
     folded.blocks = blocks;
-    let read_set = local_read_set(&folded);
+    let read_set = crate::read_analysis::function_read_locals(&folded);
     for block in &mut folded.blocks {
         block.statements.retain(|statement| {
             if !is_fold_artifact(statement) {
                 return true;
             }
-            match statement_destination_local(statement) {
+            match crate::read_analysis::statement_destination(statement) {
                 // A fold artifact stays only while its value is still read
                 // (a shape list consumed outside the folded creates, or a
                 // vacua template still referenced by an unfolded create).
@@ -532,7 +535,7 @@ fn fill_receiver_for_create(
     let traced = call
         .args
         .get(2)
-        .and_then(|operand| operand_local(Some(operand)))
+        .and_then(crate::read_analysis::operand_local)
         .and_then(|local| shape_sources.get(&local))
         .and_then(|source| {
             if source.dims == destination_dims {
@@ -612,156 +615,6 @@ fn is_fold_artifact(statement: &MirStatement) -> bool {
     )
 }
 
-/// Every local read anywhere in the function (statements and terminators,
-/// across all blocks). Destinations are writes, never reads.
-fn local_read_set(function: &MirFunction) -> BTreeSet<MirLocalId> {
-    let mut read = BTreeSet::new();
-    for block in &function.blocks {
-        for statement in &block.statements {
-            statement_read_locals(statement, &mut read);
-        }
-        terminator_read_locals(&block.terminator.kind, &mut read);
-    }
-    read
-}
-
-/// Collect the locals a statement reads into `out`.
-fn statement_read_locals(statement: &MirStatement, out: &mut BTreeSet<MirLocalId>) {
-    match &statement.kind {
-        MirStatementKind::Assign { value, .. } => value_read_locals(value, out),
-        MirStatementKind::RuntimeCall { call, .. } => operand_read_locals(&call.args, out),
-        MirStatementKind::Call { args, .. } => operand_read_locals(args, out),
-        MirStatementKind::Construct { aggregate, .. } => aggregate_read_locals(aggregate, out),
-    }
-}
-
-/// Collect the locals a terminator reads into `out`.
-fn terminator_read_locals(terminator: &MirTerminatorKind, out: &mut BTreeSet<MirLocalId>) {
-    match terminator {
-        MirTerminatorKind::Return(Some(operand)) | MirTerminatorKind::ReturnError(operand) => {
-            operand_read_local(operand, out);
-        }
-        MirTerminatorKind::Branch { condition, .. }
-        | MirTerminatorKind::Switch {
-            value: condition, ..
-        } => operand_read_local(condition, out),
-        MirTerminatorKind::TryCall { args, .. } => operand_read_locals(args, out),
-        MirTerminatorKind::Return(None)
-        | MirTerminatorKind::Goto(_)
-        | MirTerminatorKind::Unreachable => {}
-    }
-}
-
-/// Collect the locals an operand slice reads into `out`.
-fn operand_read_locals(operands: &[MirOperand], out: &mut BTreeSet<MirLocalId>) {
-    for operand in operands {
-        operand_read_local(operand, out);
-    }
-}
-
-/// Collect the local a single operand reads into `out`, when it is a local
-/// place.
-fn operand_read_local(operand: &MirOperand, out: &mut BTreeSet<MirLocalId>) {
-    if let Some(local) = operand_local(Some(operand)) {
-        out.insert(local);
-    }
-}
-
-/// Collect the locals a value reads into `out`.
-fn value_read_locals(value: &MirValue, out: &mut BTreeSet<MirLocalId>) {
-    match &value.kind {
-        MirValueKind::Operand(operand) | MirValueKind::Unary { operand, .. } => {
-            operand_read_local(operand, out);
-        }
-        MirValueKind::Binary { lhs, rhs, .. } => {
-            operand_read_local(lhs, out);
-            operand_read_local(rhs, out);
-        }
-        MirValueKind::Option(op) => option_read_locals(op, out),
-        MirValueKind::Closure(closure) => operand_read_local(&closure.environment, out),
-    }
-}
-
-/// Collect the locals an option operation reads into `out`.
-fn option_read_locals(op: &MirOptionOp, out: &mut BTreeSet<MirLocalId>) {
-    match op {
-        MirOptionOp::Some(operand)
-        | MirOptionOp::IsNil(operand)
-        | MirOptionOp::IsNotNil(operand) => operand_read_local(operand, out),
-        MirOptionOp::Unwrap { value, .. } => operand_read_local(value, out),
-        MirOptionOp::Coalesce { value, fallback } => {
-            operand_read_local(value, out);
-            operand_read_local(fallback, out);
-        }
-        MirOptionOp::Chain { base, .. } => operand_read_local(base, out),
-        MirOptionOp::None => {}
-    }
-}
-
-/// Collect the locals an aggregate construct reads into `out` (its field
-/// operands; the destination is a write).
-fn aggregate_read_locals(aggregate: &MirAggregate, out: &mut BTreeSet<MirLocalId>) {
-    match &aggregate.fields {
-        MirAggregateFields::Ordered(items) => {
-            for item in items {
-                let (MirAggregateItem::Operand(operand) | MirAggregateItem::Spread(operand)) = item;
-                operand_read_local(operand, out);
-            }
-        }
-        MirAggregateFields::Named(fields) => {
-            for field in fields {
-                operand_read_local(&field.value, out);
-            }
-        }
-        MirAggregateFields::Keyed(fields) => {
-            for field in fields {
-                operand_read_local(&field.key, out);
-                operand_read_local(&field.value, out);
-            }
-        }
-    }
-}
-
-/// The destination local of a statement, when it writes a local place.
-fn statement_destination_local(statement: &MirStatement) -> Option<MirLocalId> {
-    let destination: Option<&MirPlace> = match &statement.kind {
-        MirStatementKind::Assign { place, .. }
-        | MirStatementKind::Construct {
-            destination: place, ..
-        } => Some(place),
-        MirStatementKind::RuntimeCall { destination, .. }
-        | MirStatementKind::Call {
-            destination,
-            callee: _,
-            args: _,
-        } => destination.as_ref(),
-    };
-    destination.and_then(|place| match place.base {
-        MirPlaceBase::Local(local) => Some(local),
-        MirPlaceBase::Temp(_) => None,
-    })
-}
-
-/// The local base of a place operand, when it is a local place.
-fn operand_local(operand: Option<&MirOperand>) -> Option<MirLocalId> {
-    let MirOperand::Place(place) = operand? else {
-        return None;
-    };
-    match place.base {
-        MirPlaceBase::Local(local) => Some(local),
-        MirPlaceBase::Temp(_) => None,
-    }
-}
-
-/// The destination local of a place, when it is a local place.
-fn destination_local(destination: Option<&MirPlace>) -> Option<MirLocalId> {
-    let place = destination?;
-    match place.base {
-        MirPlaceBase::Local(local) => Some(local),
-        MirPlaceBase::Temp(_) => None,
-    }
-}
-
 /// The destination local of a place, traced through the lowered body's
 /// temp→local copy: a runtime call's result lands in a temp and the next
 /// statement copies it into a local (`Local(l) ← Temp(t)`). The fold treats
@@ -772,7 +625,7 @@ fn destination_local_traced(
     destination: Option<&MirPlace>,
     temp_to_local: &BTreeMap<MirTempId, MirLocalId>,
 ) -> Option<MirLocalId> {
-    if let Some(local) = destination_local(destination) {
+    if let Some(local) = destination.and_then(crate::read_analysis::place_local_base) {
         return Some(local);
     }
     let MirPlaceBase::Temp(temp) = destination?.base else {
@@ -783,7 +636,7 @@ fn destination_local_traced(
 
 /// The MIR type of a local (params first, then locals).
 fn operand_local_ty(operand: &MirOperand, function: &MirFunction) -> Option<MirType> {
-    let local = operand_local(Some(operand))?;
+    let local = crate::read_analysis::operand_local(operand)?;
     function
         .params
         .iter()

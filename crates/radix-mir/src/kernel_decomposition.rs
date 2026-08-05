@@ -51,8 +51,8 @@ use crate::kernel_plan::CollectionKernelPlan;
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlock,
     MirCollectionOp, MirFunction, MirIntrinsic, MirLocalId, MirOperand, MirParam, MirParamMode,
-    MirPlace, MirPlaceBase, MirRuntimeCall, MirStatement, MirStatementKind, MirTemp, MirTempId,
-    MirTerminator, MirTerminatorKind, MirType, MirValidationContext, MirValue, MirValueKind,
+    MirPlace, MirRuntimeCall, MirStatement, MirStatementKind, MirTemp, MirTempId, MirTerminator,
+    MirTerminatorKind, MirType, MirValidationContext,
 };
 use radix_types::{TypeId, TypeTable};
 use std::collections::BTreeSet;
@@ -186,10 +186,10 @@ pub fn decompose_kernel_function(
         let produced = indices
             .iter()
             .rev()
-            .find_map(|&index| statement_destination(&block.statements[index]));
+            .find_map(|&index| crate::read_analysis::statement_destination(&block.statements[index]));
         let written: BTreeSet<MirLocalId> = indices
             .iter()
-            .filter_map(|&index| statement_destination(&block.statements[index]))
+            .filter_map(|&index| crate::read_analysis::statement_destination(&block.statements[index]))
             .collect();
         let inputs: BTreeSet<MirLocalId> =
             synthetic.params.iter().map(|param| param.local).collect();
@@ -197,7 +197,7 @@ pub fn decompose_kernel_function(
         let recipe_result = indices.iter().find_map(|&index| {
             let statement = &block.statements[index];
             if matches!(statement_collection_op(statement), Some(op) if is_recipe_op(op)) {
-                statement_destination(statement)
+                crate::read_analysis::statement_destination(statement)
             } else {
                 None
             }
@@ -236,7 +236,7 @@ pub fn decompose_kernel_function(
         let written = &written_by[position];
         let mut outputs: Vec<MirLocalId> = Vec::new();
         if position + 1 == subchains.len() {
-            if let Some(return_local) = terminator_return_local(&block.terminator.kind) {
+            if let Some(return_local) = crate::read_analysis::terminator_return_local(&block.terminator.kind) {
                 if written.contains(&return_local) {
                     outputs.push(return_local);
                 }
@@ -355,10 +355,10 @@ fn build_subchain_function(
     let mut read_order: Vec<MirLocalId> = Vec::new();
     for &index in indices {
         let statement = &block.statements[index];
-        if let Some(destination) = statement_destination(statement) {
+        if let Some(destination) = crate::read_analysis::statement_destination(statement) {
             written.insert(destination);
         }
-        for local in statement_read_locals(statement) {
+        for local in crate::read_analysis::statement_read_locals(statement) {
             if !written.contains(&local) && !read_order.contains(&local) {
                 read_order.push(local);
             }
@@ -510,34 +510,13 @@ fn statement_collection_op(statement: &MirStatement) -> Option<MirCollectionOp> 
     Some(*op)
 }
 
-/// The destination local a statement writes, when it has one.
-fn statement_destination(statement: &MirStatement) -> Option<MirLocalId> {
-    let destination = match &statement.kind {
-        MirStatementKind::Assign { place, .. }
-        | MirStatementKind::Construct {
-            destination: place, ..
-        } => Some(place),
-        MirStatementKind::RuntimeCall { destination, .. }
-        | MirStatementKind::Call {
-            destination,
-            callee: _,
-            args: _,
-        } => destination.as_ref(),
-    };
-    destination.and_then(|place| match place.base {
-        MirPlaceBase::Local(local) => Some(local),
-        // Temps are not plain local destinations (the decomposition's
-        // read/write analysis tracks [`MirPlaceBase::Local`] only).
-        MirPlaceBase::Temp(_) => None,
-    })
-}
 
 /// Whether a statement's destination is never read anywhere in the source
 /// function (the S3-A5 dead-op filter). A destination that IS a function
 /// param (a side-effect write, e.g. a matmul writing its output-buffer
 /// param) is always live.
 fn statement_destination_is_dead(function: &MirFunction, statement: &MirStatement) -> bool {
-    let Some(destination) = statement_destination(statement) else {
+    let Some(destination) = crate::read_analysis::statement_destination(statement) else {
         return false;
     };
     if function
@@ -549,104 +528,16 @@ fn statement_destination_is_dead(function: &MirFunction, statement: &MirStatemen
     }
     for block in &function.blocks {
         for other in &block.statements {
-            if statement_reads_local(other, destination) {
+            if crate::read_analysis::statement_reads_local(other, destination) {
                 return false;
             }
         }
-        if terminator_reads_local(&block.terminator.kind, destination) {
+        if crate::read_analysis::terminator_reads_local(&block.terminator.kind, destination) {
             return false;
         }
     }
     true
 }
-
-/// The locals a statement reads (the statement's own destination is a
-/// write, never a read).
-fn statement_read_locals(statement: &MirStatement) -> Vec<MirLocalId> {
-    match &statement.kind {
-        MirStatementKind::Assign { value, .. } => value_read_locals(value),
-        MirStatementKind::RuntimeCall { call, .. } => {
-            call.args.iter().filter_map(operand_local).collect()
-        }
-        MirStatementKind::Call { args, .. } => args.iter().filter_map(operand_local).collect(),
-        MirStatementKind::Construct { aggregate, .. } => match &aggregate.fields {
-            MirAggregateFields::Ordered(fields) => fields
-                .iter()
-                .filter_map(|field| match field {
-                    MirAggregateItem::Operand(operand) | MirAggregateItem::Spread(operand) => {
-                        operand_local(operand)
-                    }
-                })
-                .collect(),
-            MirAggregateFields::Named(fields) => fields
-                .iter()
-                .filter_map(|field| operand_local(&field.value))
-                .collect(),
-            MirAggregateFields::Keyed(fields) => fields
-                .iter()
-                .filter_map(|field| operand_local(&field.value))
-                .collect(),
-        },
-    }
-}
-
-/// The locals a value reads.
-fn value_read_locals(value: &MirValue) -> Vec<MirLocalId> {
-    match &value.kind {
-        MirValueKind::Operand(operand) | MirValueKind::Unary { operand, .. } => {
-            operand_local(operand).into_iter().collect()
-        }
-        MirValueKind::Binary { lhs, rhs, .. } => operand_local(lhs)
-            .into_iter()
-            .chain(operand_local(rhs))
-            .collect(),
-        _ => Vec::new(),
-    }
-}
-
-/// The local a plain place operand references, if any.
-fn operand_local(operand: &MirOperand) -> Option<MirLocalId> {
-    let MirOperand::Place(place) = operand else {
-        return None;
-    };
-    let MirPlaceBase::Local(local) = place.base else {
-        return None;
-    };
-    Some(local)
-}
-
-/// Whether a statement reads the given local in any operand or value
-/// position (the statement's own destination is a write, never a read).
-fn statement_reads_local(statement: &MirStatement, local: MirLocalId) -> bool {
-    statement_read_locals(statement).contains(&local)
-}
-
-/// Whether a terminator reads the given local.
-fn terminator_reads_local(terminator: &MirTerminatorKind, local: MirLocalId) -> bool {
-    match terminator {
-        MirTerminatorKind::Return(Some(operand)) | MirTerminatorKind::ReturnError(operand) => {
-            operand_local(operand) == Some(local)
-        }
-        MirTerminatorKind::Branch { condition, .. }
-        | MirTerminatorKind::Switch {
-            value: condition, ..
-        } => operand_local(condition) == Some(local),
-        _ => false,
-    }
-}
-
-/// The plain-local operand a function return terminator returns, when it
-/// returns one (the D-2a last-subchain output set). Temps and constants are
-/// not subchain outputs.
-fn terminator_return_local(terminator: &MirTerminatorKind) -> Option<MirLocalId> {
-    match terminator {
-        MirTerminatorKind::Return(Some(operand)) | MirTerminatorKind::ReturnError(operand) => {
-            operand_local(operand)
-        }
-        _ => None,
-    }
-}
-
 #[cfg(test)]
 #[path = "kernel_decomposition_test.rs"]
 mod tests;

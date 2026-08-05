@@ -124,7 +124,10 @@ fn device_function(
             MirStatementKind::Assign { value, .. } => Some(value.ty),
             _ => None,
         };
-        if let (Some(local), Some(ty)) = (statement_destination(statement), produced_ty) {
+        if let (Some(local), Some(ty)) = (
+            crate::read_analysis::statement_destination(statement),
+            produced_ty,
+        ) {
             type_by_local.insert(local.0, ty);
         }
     }
