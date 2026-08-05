@@ -9,9 +9,7 @@
 use crate::surface::{KeywordSurface, TypeBindingKind};
 use radix_hir::DefId;
 use radix_lexer::{Interner, Symbol};
-use radix_types::{
-    CollectionKind, Primitive, SemanticMutability, Type, TypeId, TypeTable,
-};
+use radix_types::{CollectionKind, Primitive, SemanticMutability, Type, TypeId, TypeTable};
 use rustc_hash::FxHashMap;
 
 fn primitive_marker(prim: Primitive, surface: &impl KeywordSurface) -> &str {
