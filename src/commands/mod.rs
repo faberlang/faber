@@ -205,7 +205,6 @@ fn dispatch(command: Command) {
         }
         Command::Format(args) => cmd_format(&format::FormatCommand {
             paths: args.paths,
-            canonical: args.canonical,
             locale: args.locale,
             check: args.check,
             stdout: args.stdout,

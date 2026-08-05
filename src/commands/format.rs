@@ -1,4 +1,4 @@
-//! `faber format` — author-mode formatter (default) with canonical/check/stdout.
+//! `faber format` — author-mode formatter (default) with locale/check/stdout.
 
 use radix::codegen::Target;
 use radix::driver::{split_frontmatter, Config, Session};
@@ -10,7 +10,6 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone)]
 pub struct FormatCommand {
     pub paths: Vec<PathBuf>,
-    pub canonical: bool,
     pub locale: Option<String>,
     pub check: bool,
     pub stdout: bool,
@@ -22,10 +21,10 @@ pub fn cmd_format(command: &FormatCommand) {
         eprintln!("warning: --config is not implemented yet (forma.toml deferred)");
     }
 
-    // --canonical is the la alias; --locale=<X> drives the emitter
-    // surface. Either selects the canonical re-emit path (localizing via the
-    // reader pack); no flags keeps author mode.
-    let use_canonical = command.canonical || command.locale.is_some();
+    // --locale=<X> selects the HIR-backed re-emit path with the localized
+    // reader surface (the former `--canonical` surface is `--locale la`);
+    // no flags keeps author mode.
+    let use_reemit = command.locale.is_some();
 
     let files = match resolve_format_paths(&command.paths) {
         Ok(files) => files,
@@ -54,7 +53,7 @@ pub fn cmd_format(command: &FormatCommand) {
         };
 
         let name = path.display().to_string();
-        let result = if use_canonical {
+        let result = if use_reemit {
             let session = match format_session(path, command.locale.as_deref()) {
                 Ok(session) => session,
                 Err(message) => {
@@ -141,8 +140,11 @@ fn format_session(path: &Path, locale: Option<&str>) -> Result<Session, String> 
         return Ok(Session::new(Config::default().with_dev_stdlib()));
     }
 
+    // Locale-mode sessions also need the dev stdlib path: files with
+    // `+++ locale = "…" +++` frontmatter resolve their reader pack through
+    // `Config::stdlib_path` (READER003 otherwise).
     crate::package::config_with_locale(Target::Faber, path, locale, None)
-        .map(|(config, _)| Session::new(config))
+        .map(|(config, _)| Session::new(config.with_dev_stdlib()))
         .map_err(|diag| diag.message)
 }
 

@@ -164,28 +164,28 @@ fn format_cli_comment_fixture_reparses() {
 }
 
 #[test]
-fn format_canonical_locale_thai_localizes_surface() {
+fn format_locale_thai_localizes_surface() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale/th-TH");
     let thai = root.join("src/main.fab");
     let latin = root.join("twins/main.la.fab");
 
     let thai_output = run_faber_format_stdout_with_args(&[
         "format",
-        "--canonical",
         "--locale",
         "th-TH",
         "--stdout",
         thai.to_str().expect("utf8 thai path"),
     ]);
 
-    // Phase 2: --locale drives the emitter surface, so the canonical
-    // re-emit localizes reader-locale keywords and types into Thai and no longer
-    // matches the Latin twin.
+    // --locale drives the emitter surface: the re-emit localizes
+    // reader-locale keywords and types into Thai and no longer matches the
+    // Latin twin (which re-emits as `--locale la`).
     assert_ne!(
         thai_output,
         run_faber_format_stdout_with_args(&[
             "format",
-            "--canonical",
+            "--locale",
+            "la",
             "--stdout",
             latin.to_str().expect("utf8 latin path"),
         ]),
@@ -196,25 +196,24 @@ fn format_canonical_locale_thai_localizes_surface() {
     assert!(thai_output.contains("คงที่ ข้อความ greeting ← \"สวัสดี, §!\"(name)"));
     assert!(thai_output.contains("คืน greeting"));
     assert!(thai_output.contains("ฟังก์ชัน ผ่าน(จำนวน score) → ตรรกะ"));
-    assert!(thai_output.contains("sic จริง มิฉะนั้น score ≥ 50 sic จริง มิฉะนั้น เท็จ"));
+    assert!(thai_output.contains("เช่นนั้น จริง มิฉะนั้น score ≥ 50 เช่นนั้น จริง มิฉะนั้น เท็จ"));
     assert!(thai_output.contains("ฟังก์ชัน นับผ่าน(รายการ<จำนวน> scores) → จำนวน"));
     assert!(thai_output.contains("แปร จำนวน total ← 0"));
     assert!(thai_output.contains("วน จาก scores คงที่ score"));
     assert!(thai_output.contains("ถ้า score < 0 {"));
-    assert!(thai_output.contains("ข้าม"));
+    assert!(thai_output.contains("ไปต่อ"));
     assert!(thai_output.contains("หยุด"));
     assert!(thai_output.contains("ฟังก์ชัน นับถอยหลัง(จำนวน start) → จำนวน"));
     assert!(thai_output.contains("ขณะ current > 0"));
     assert!(thai_output.contains("เริ่ม {"));
     assert!(thai_output.contains("คงที่ จำนวน score ← 82"));
     assert!(thai_output.contains("คงที่ รายการ<จำนวน> scores ← [-1, 82, 41, 60]"));
-    assert!(thai_output.contains("แสดง ผ่าน(score)"));
-    assert!(thai_output.contains("แสดง นับผ่าน(scores)"));
+    assert!(thai_output.contains("บันทึก ผ่าน(score)"));
+    assert!(thai_output.contains("บันทึก นับผ่าน(scores)"));
     // The Latin keyword surface must not survive localized re-emit, and the
     // template-application glyph `"…"(args)` must not expand to a named
-    // `scriptum(...)` call. `sic` (not a localized keyword token) stays Latin.
-    // Comments are preserved trivia and may mention Latin spellings, so the
-    // negative assertions run against code-only text.
+    // `scriptum(...)` call. Comments are preserved trivia and may mention
+    // Latin spellings, so the negative assertions run against code-only text.
     let thai_code = code_only(&thai_output);
     assert!(!thai_code.contains("scriptum"));
     assert!(!thai_code.contains("functio"));
@@ -228,7 +227,7 @@ fn format_canonical_locale_thai_localizes_surface() {
 }
 
 #[test]
-fn format_locale_la_without_canonical_matches_canonical_latin() {
+fn format_locale_la_emits_latin_surface() {
     let path = exempla("incipit/salve-munde.fab");
 
     let locale_output = run_faber_format_stdout_with_args(&[
@@ -238,16 +237,7 @@ fn format_locale_la_without_canonical_matches_canonical_latin() {
         "--stdout",
         path.to_str().expect("utf8 path"),
     ]);
-    let canonical_output = run_faber_format_stdout_with_args(&[
-        "format",
-        "--canonical",
-        "--locale",
-        "la",
-        "--stdout",
-        path.to_str().expect("utf8 path"),
-    ]);
 
-    assert_eq!(locale_output, canonical_output);
     assert!(locale_output.contains("incipit {"));
     assert!(locale_output.contains("nota \"Salve, Munde!\""));
 }
@@ -258,8 +248,7 @@ fn format_locale_preserves_template_application_sugar() {
     // keyword spellings while retaining glyph shapes. The `"…"(args)` template-
     // application postfix is a glyph shape: `--locale en` localizes
     // `nota` → `print` but must keep `print "val § here"(n)` instead of
-    // expanding into `print format("val § here", n)`. `--canonical` keeps the
-    // `scriptum(...)` expansion.
+    // expanding into `print format("val § here", n)`.
     let fixture = std::env::temp_dir().join("faber-format-rl-template-sugar.fab");
     fs::write(
         &fixture,
@@ -275,12 +264,6 @@ fn format_locale_preserves_template_application_sugar() {
         fixture.to_str().expect("utf8 path"),
     ]);
     let author_output = run_faber_format_stdout(&fixture);
-    let canonical_output = run_faber_format_stdout_with_args(&[
-        "format",
-        "--canonical",
-        "--stdout",
-        fixture.to_str().expect("utf8 path"),
-    ]);
     let _ = fs::remove_file(&fixture);
 
     assert!(
@@ -295,17 +278,12 @@ fn format_locale_preserves_template_application_sugar() {
         author_output.contains("nota \"val § here\"(n)"),
         "author surface must keep the sugar:\n{author_output}"
     );
-    assert!(
-        canonical_output.contains("nota scriptum(\"val § here\", n)"),
-        "canonical must keep the scriptum expansion:\n{canonical_output}"
-    );
 }
 
 #[test]
-fn format_locale_without_canonical_localizes() {
-    // Phase 2 removed the "--locale requires --canonical" gate. A bare
-    // --locale=<X> now selects the canonical re-emit path with the
-    // localized surface (Latin default when --locale is absent).
+fn format_locale_localizes() {
+    // A bare --locale=<X> selects the HIR-backed re-emit path with the
+    // localized surface (author mode when --locale is absent).
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale/th-TH");
     let thai = root.join("src/main.fab");
 
@@ -322,7 +300,7 @@ fn format_locale_without_canonical_localizes() {
 
     assert!(
         output.status.success(),
-        "reader-locale formatting must succeed without --canonical: {}",
+        "reader-locale formatting must succeed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
@@ -337,19 +315,20 @@ fn format_locale_without_canonical_localizes() {
 }
 
 #[test]
-fn format_canonical_check_passes_on_braced_futura_exempla() {
+fn format_locale_check_passes_on_braced_futura_exempla() {
     let path = exempla("annotation-sugar/futura-braced.fab");
     let mut child = Command::new(faber_binary())
         .args([
             "format",
             "--check",
-            "--canonical",
+            "--locale",
+            "la",
             path.to_str().expect("utf8 path"),
         ])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn faber format --check --canonical");
+        .expect("spawn faber format --check --locale la");
     let status = child.wait().expect("wait");
     let mut stderr = String::new();
     if let Some(mut err) = child.stderr.take() {
@@ -357,7 +336,7 @@ fn format_canonical_check_passes_on_braced_futura_exempla() {
     }
     assert!(
         status.success(),
-        "canonical check must pass on braced futura exempla: {stderr}"
+        "locale check must pass on braced futura exempla: {stderr}"
     );
 }
 
