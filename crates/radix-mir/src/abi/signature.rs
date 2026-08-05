@@ -316,13 +316,9 @@ impl MirKernelSignature {
             if is_vacuum(input.ty, validation) {
                 continue;
             }
-            let element_ty = buffer_element_type(
-                function,
-                input.ty,
-                validation,
-                allow_host_owned_tensor_entry,
-            )?;
-            let element_count = buffer_element_count(function, input.ty, validation)?;
+            let element_ty =
+                buffer_element_type(input.ty, validation, allow_host_owned_tensor_entry)?;
+            let element_count = buffer_element_count(input.ty, validation)?;
             input_resources.push(MirKernelResource {
                 group: DEFAULT_KERNEL_RESOURCE_GROUP,
                 binding: next_binding,
@@ -520,21 +516,16 @@ impl MirKernelSignature {
             return Err(MirAbiError::new(ERR_KERNEL_PARAM_RETURN_MISMATCH));
         }
 
-        let param_element_ty = buffer_element_type(
-            function,
-            param.ty,
-            validation,
-            allow_host_owned_tensor_entry,
-        )?;
+        let param_element_ty =
+            buffer_element_type(param.ty, validation, allow_host_owned_tensor_entry)?;
         let return_element_ty = buffer_element_type(
-            function,
             function.return_ty,
             validation,
             allow_host_owned_tensor_entry,
         )?;
         require_same_element_type(param_element_ty, return_element_ty, validation)?;
-        let param_element_count = buffer_element_count(function, param.ty, validation)?;
-        let return_element_count = buffer_element_count(function, function.return_ty, validation)?;
+        let param_element_count = buffer_element_count(param.ty, validation)?;
+        let return_element_count = buffer_element_count(function.return_ty, validation)?;
         // The return-buffer equality law (shared with the multi-input arm):
         // the input and output buffers are flat views of the same element
         // count, so a host can assume one elementwise shape across bindings.
@@ -605,23 +596,18 @@ impl MirKernelSignature {
         allow_host_owned_tensor_entry: bool,
     ) -> Result<Self, MirAbiError> {
         let return_element_ty = buffer_element_type(
-            function,
             function.return_ty,
             validation,
             allow_host_owned_tensor_entry,
         )?;
-        let return_element_count = buffer_element_count(function, function.return_ty, validation)?;
+        let return_element_count = buffer_element_count(function.return_ty, validation)?;
 
         let mut input_resources = Vec::with_capacity(inputs.len());
         for (binding, input) in inputs.iter().enumerate() {
-            let input_element_ty = buffer_element_type(
-                function,
-                input.ty,
-                validation,
-                allow_host_owned_tensor_entry,
-            )?;
+            let input_element_ty =
+                buffer_element_type(input.ty, validation, allow_host_owned_tensor_entry)?;
             require_same_element_type(input_element_ty, return_element_ty, validation)?;
-            let input_element_count = buffer_element_count(function, input.ty, validation)?;
+            let input_element_count = buffer_element_count(input.ty, validation)?;
             if input_element_count != return_element_count {
                 return Err(MirAbiError::new(ERR_KERNEL_IO_ELEMENT_MISMATCH));
             }

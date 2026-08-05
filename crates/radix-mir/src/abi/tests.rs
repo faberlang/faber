@@ -1007,13 +1007,15 @@ fn multi_input_return_buffer_kernel_keeps_plain_elementwise_contract() {
 }
 
 #[test]
-fn kernel_abi_narrows_f64_scalar_param_over_f32_safe_graph() {
-    // D-6a (residual-doc option (b)): the whole-function ABI scalar surface
-    // admits the MLP companion shape — an f64 upstream seed param over an
-    // f32-safe operator graph (every tensor element type F32) narrows to a
-    // 1-element F32 input by the explicit typed rule, never a truncation.
-    // The companion is `backward(x, w, nil(), upstream: fractus) →
-    // (grad_x, grad_w)` — the S3-A2 tuple-return shape with an f64 seed.
+fn kernel_abi_keeps_f64_scalar_fail_closed_over_f32_tensor_graph() {
+    // S5A-U2 (CTO correction): the whole-function ABI scalar surface keeps an
+    // f64 scalar FAIL CLOSED even over an f32 tensor graph — the former
+    // graph-wide "all tensors are f32" narrowing (D-6a) is gone, because
+    // graph shape proves nothing about an individual f64 scalar's value. The
+    // companion is `backward(x, w, nil(), upstream: fractus) →
+    // (grad_x, grad_w)` — the S3-A2 tuple-return shape with an f64 seed over
+    // f32 tensor params: the exact shape the old rule admitted, now rejected
+    // with the typed `mir_kernel_scalar_layout_unsupported` diagnostic.
     let mut types = TypeTable::new();
     let f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
     let f64 = types.sized_numeric(Primitive::Fractus, NumericWidth::F64);
@@ -1100,30 +1102,19 @@ fn kernel_abi_narrows_f64_scalar_param_over_f32_safe_graph() {
         span: Span::default(),
     };
 
-    let signature = MirKernelSignature::storage_buffer_kernel(&function, &validation)
-        .expect("companion resolves");
+    let error = MirKernelSignature::storage_buffer_kernel(&function, &validation)
+        .expect_err("an f64 scalar over an f32 tensor graph must fail closed");
 
-    // The f64 upstream seed binds as a 1-element read input at the NARROWED
-    // f32 type (the operator graph is f32-safe).
-    let seed = signature
-        .extra_inputs
-        .iter()
-        .find(|resource| resource.source_local == Some(MirLocalId(3)))
-        .expect("the f64 upstream seed binds as an extra input");
-    assert_eq!(
-        seed.element_ty,
-        MirType::semantic(f32),
-        "the f64 seed narrows to the f32 kernel-scalar type"
-    );
-    assert_eq!(seed.element_count, 1);
+    assert_eq!(error.issue, "mir_kernel_scalar_layout_unsupported");
+    assert_eq!(error.detail.as_deref(), Some("f64"));
 }
 
 #[test]
 fn kernel_abi_keeps_f64_scalar_fail_closed_for_pure_scalar_kernel() {
-    // The typed rule's fail-closed boundary on the whole-function scalar
-    // surface: a PURE-scalar f64 kernel (no tensor graph at all) is not
-    // f32-safe and keeps the existing typed diagnostic — `add_one(fractus x)
-    // → fractus` stays a kernel scalar layout f64 rejection.
+    // S5A-U2: the whole-function scalar surface rejects a PURE-scalar f64
+    // kernel (no tensor graph at all) with the same typed diagnostic —
+    // `add_one(fractus x) → fractus` stays a kernel scalar layout f64
+    // rejection, exactly as before the D-6a rule existed.
     let mut types = TypeTable::new();
     let f64 = types.sized_numeric(Primitive::Fractus, NumericWidth::F64);
     let f64_ty = MirType::semantic(f64);

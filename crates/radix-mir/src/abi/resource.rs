@@ -483,7 +483,6 @@ pub(crate) fn require_u32_index(
 }
 
 pub(crate) fn buffer_element_type(
-    function: &MirFunction,
     ty: MirType,
     validation: &MirValidationContext<'_>,
     allow_host_owned_tensor_entry: bool,
@@ -495,16 +494,6 @@ pub(crate) fn buffer_element_type(
     match layout.kind {
         MirLayoutKind::Scalar(scalar) if crate::tensor_type::is_kernel_element_layout(scalar) => {
             Ok(ty)
-        }
-        MirLayoutKind::Scalar(MirScalarLayout::F64)
-            if crate::tensor_type::operator_graph_is_f32_safe(function, validation) =>
-        {
-            let f32_ty = crate::tensor_type::f32_scalar_type(validation).ok_or_else(|| {
-                MirAbiError::new(
-                    "f32 scalar type unavailable for the typed f64→f32 kernel-scalar narrowing",
-                )
-            })?;
-            Ok(f32_ty)
         }
         MirLayoutKind::Scalar(scalar) => Err(MirAbiError::with_detail(
             format!("kernel scalar layout {}", scalar.spelling()),
@@ -583,7 +572,6 @@ pub(crate) fn require_kernel_device_view(
 }
 
 pub(crate) fn buffer_element_count(
-    function: &MirFunction,
     ty: MirType,
     validation: &MirValidationContext<'_>,
 ) -> Result<u64, MirAbiError> {
@@ -593,11 +581,6 @@ pub(crate) fn buffer_element_count(
         .map_err(|error| MirAbiError::new(error.message))?;
     match layout.kind {
         MirLayoutKind::Scalar(scalar) if crate::tensor_type::is_kernel_element_layout(scalar) => {
-            Ok(1)
-        }
-        MirLayoutKind::Scalar(MirScalarLayout::F64)
-            if crate::tensor_type::operator_graph_is_f32_safe(function, validation) =>
-        {
             Ok(1)
         }
         MirLayoutKind::Scalar(scalar) => Err(MirAbiError::new(format!(
