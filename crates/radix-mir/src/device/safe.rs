@@ -751,6 +751,31 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             } => {
                 crate::visit::walk_stmt(self, stmt);
             }
+            // S6-P2: the transformer recipe ops (`TensorSumAxis` /
+            // `TensorSoftmax` / `TensorLayerNorm`) are device-materialization
+            // admissions — the S6-P1 plan surface resolves each to a single
+            // `CollectionKernelPlan` recipe (`AxisReduction` / `RowSoftmax`
+            // / `LayerNormalization`, kernel_plan/build.rs
+            // `from_transformer_op`; the authoritative closed set is
+            // `is_transformer_recipe_op`, device_program_plans.rs) and the
+            // emitters lower the recipe bodies (the S6-P2 Metal arms). The
+            // gate admits the statement the same way it admits the other
+            // recipe ops; the operand layouts are still walked and checked.
+            MirStatementKind::RuntimeCall {
+                call:
+                    MirRuntimeCall {
+                        intrinsic:
+                            MirIntrinsic::Collection(
+                                MirCollectionOp::TensorSumAxis
+                                | MirCollectionOp::TensorSoftmax
+                                | MirCollectionOp::TensorLayerNorm,
+                            ),
+                        ..
+                    },
+                ..
+            } => {
+                crate::visit::walk_stmt(self, stmt);
+            }
             MirStatementKind::RuntimeCall {
                 call:
                     MirRuntimeCall {
@@ -906,7 +931,18 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                 }
                 _ => false,
             };
-            if !is_result_aggregation {
+            // S6-P2: an admitted TENSOR unary assign (`MirUnOp::Exp` /
+            // `Sqrt` — the softmax exp and the LayerNorm sqrt lanes, plus
+            // the pre-existing Tanh/Relu/Gelu) skips the value-type check
+            // the same way the elementwise tensor ops do: the P1 seam
+            // (`is_admitted_tensor_unary`, device_program_plans.rs) is
+            // exactly the set the elementwise emitters dispatch per-element,
+            // and the unary's tensor operand layouts are still walked and
+            // checked below. A unary on a non-tensor value, or an op outside
+            // the admitted set, stays fail-closed with the value-type
+            // diagnostics.
+            let admitted_tensor_unary = is_admitted_tensor_unary_value(self.types, value);
+            if !is_result_aggregation && !admitted_tensor_unary {
                 self.check_device_type(value.ty);
             }
             crate::visit::walk_value(self, value);
@@ -947,6 +983,22 @@ fn is_device_vector_element(element: MirScalarLayout) -> bool {
             | MirScalarLayout::U32
             | MirScalarLayout::F32
     )
+}
+
+/// Whether a value is an admitted TENSOR unary assign (S6-P2): a
+/// `MirValueKind::Unary` whose op is in the P1-admitted unary set
+/// (`is_admitted_tensor_unary`, device_program_plans.rs — `Exp`/`Sqrt` are
+/// the S6-P1 transformer additions, the softmax exp and the LayerNorm sqrt
+/// lanes) applied to a TENSOR-typed result. The tensor restriction mirrors
+/// the elementwise emitters' tensor-expr surface: a scalar (or otherwise
+/// non-tensor) unary is not admitted by this seam and keeps its value-type
+/// diagnostics.
+fn is_admitted_tensor_unary_value(types: &TypeTable, value: &MirValue) -> bool {
+    let MirValueKind::Unary { op, .. } = &value.kind else {
+        return false;
+    };
+    crate::device_program_plans::is_admitted_tensor_unary(*op)
+        && matches!(types.get(value.ty.semantic_id()), Type::Tensor(_, _))
 }
 
 /// WGSL `matCxR` is f32/f16 only; Stage1 admits f32 register matrices.
