@@ -162,8 +162,10 @@ impl ParityHarness {
             corpus: crate::paths::corpus_dir(),
             shared_target: shared_target_dir(&temp_root),
             temp_root,
-            session: Session::new(Config::default()),
-            compiler: Compiler::new(Config::default()),
+            session: Session::new(Config::default().with_stdlib(crate::paths::radix_stdlib_dir())),
+            compiler: Compiler::new(
+                Config::default().with_stdlib(crate::paths::radix_stdlib_dir()),
+            ),
         })
     }
 }
