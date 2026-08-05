@@ -342,28 +342,6 @@ impl MirRuntimeAbi {
     }
 }
 
-impl MirRuntimeAbiFamily {
-    #[must_use]
-    pub fn spelling(self) -> &'static str {
-        match self {
-            Self::RuntimeDiagnostic => "runtime-diagnostic",
-            Self::RuntimeAssert => "runtime-assert",
-            Self::RuntimeFormat => "runtime-format",
-            Self::RuntimeConvert => "runtime-convert",
-            Self::RuntimeCollection => "runtime-collection",
-            Self::RuntimeAtomic => "runtime-atomic",
-            Self::RuntimePanic => "runtime-panic",
-            Self::RuntimeProvider => "runtime-provider",
-            Self::RuntimeSermo => "runtime-sermo",
-            Self::RuntimeReadLine => "runtime-read_line",
-            Self::RuntimeCede => "runtime-cede",
-            Self::RuntimeGpuBuiltin => "runtime-gpu_builtin",
-            Self::RuntimeCursorStream => "runtime-cursor_stream",
-            Self::RuntimeGradient => "runtime-gradient",
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MirKernelSignature {
     pub function: MirFunctionId,
@@ -517,17 +495,6 @@ pub enum MirVaryingInterpolation {
     Perspective,
     Linear,
     Flat,
-}
-
-impl MirVaryingInterpolation {
-    #[must_use]
-    pub fn spelling(self) -> &'static str {
-        match self {
-            Self::Perspective => "perspective",
-            Self::Linear => "linear",
-            Self::Flat => "flat",
-        }
-    }
 }
 
 /// Fragment render-target output.
@@ -3555,12 +3522,7 @@ fn ceil_div_dimension(dispatch: u64, workgroup: u32) -> Result<u64, MirAbiError>
     if workgroup == 0 {
         return Err(MirAbiError::new(ERR_KERNEL_WORKGROUP_NONZERO));
     }
-    let workgroup = u64::from(workgroup);
-    Ok(if dispatch == 0 {
-        0
-    } else {
-        ((dispatch - 1) / workgroup) + 1
-    })
+    Ok(effective_ceil_dimension(dispatch, workgroup))
 }
 
 fn reflect_kernel_resource(
