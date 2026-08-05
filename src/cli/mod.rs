@@ -113,11 +113,9 @@ pub struct FormatArgs {
     #[arg(value_name = "PATH")]
     pub paths: Vec<PathBuf>,
 
-    /// Emit canonical HIR-backed surface (trivia-free round-trip tooling)
-    #[arg(long)]
-    pub canonical: bool,
-
-    /// Code locale used to select a package-local locale pack.
+    /// Re-emit in the given reader-locale surface (HIR-backed round-trip;
+    /// `la` reproduces the former `--canonical` surface). No flag keeps
+    /// author mode.
     #[arg(long = "locale", value_name = "LOCALE")]
     pub locale: Option<String>,
 

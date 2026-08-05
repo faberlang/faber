@@ -473,15 +473,8 @@ fn cli_parses_locale_on_test() {
 
 #[test]
 fn cli_parses_locale_on_format() {
-    let format = Cli::try_parse_from([
-        "faber",
-        "format",
-        "--canonical",
-        "--locale",
-        "zh-Hans",
-        "main.fab",
-    ])
-    .expect("parse format reader locale");
+    let format = Cli::try_parse_from(["faber", "format", "--locale", "zh-Hans", "main.fab"])
+        .expect("parse format reader locale");
     let Some(crate::cli::Command::Format(args)) = format.command else {
         panic!("expected format subcommand");
     };
