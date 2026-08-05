@@ -367,7 +367,7 @@ fn fold_statement(
     };
     match op {
         MirCollectionOp::TensorShape => {
-            let traced = destination_local_traced(destination.as_ref(), &temp_to_local)
+            let traced = destination_local_traced(destination.as_ref(), temp_to_local)
                 .and_then(|local| shape_sources.get(&local).map(|source| source.dims.clone()));
             let dims = match traced {
                 Some(dims) => dims,
@@ -378,7 +378,7 @@ fn fold_statement(
             let Some(place) = destination else {
                 return Ok(statement.clone());
             };
-            if let Some(local) = destination_local_traced(destination.as_ref(), &temp_to_local) {
+            if let Some(local) = destination_local_traced(destination.as_ref(), temp_to_local) {
                 facts.push(FoldedShapeFact {
                     local,
                     dims: dims.clone(),
@@ -399,7 +399,7 @@ fn fold_statement(
             // The folded fill keeps the ORIGINAL destination (a temp is
             // fine — the lowered body's copy into the traced local follows);
             // the traced local is the value identity the fold fact names.
-            let traced_local = destination_local_traced(destination.as_ref(), &temp_to_local);
+            let traced_local = destination_local_traced(destination.as_ref(), temp_to_local);
             let Some(local) = traced_local else {
                 return Err(ShapeFoldError::new(
                     ShapeFoldErrorKind::NonStaticShapeDestination,
@@ -443,7 +443,7 @@ fn fold_statement(
             })
         }
         MirCollectionOp::TensorFromFlat => {
-            let Some(local) = destination_local_traced(destination.as_ref(), &temp_to_local) else {
+            let Some(local) = destination_local_traced(destination.as_ref(), temp_to_local) else {
                 return Err(ShapeFoldError::new(
                     ShapeFoldErrorKind::NonStaticShapeDestination,
                     "tensor_from_flat destination is not a local; cannot fold its shape",
