@@ -84,8 +84,8 @@ pub use device::{
 pub use device_program::{
     Binding, BufferId, BufferIdentity, BufferLifetime, BufferRegistry, BufferRole, BufferVersion,
     DataFlowPair, DeviceProgram, DeviceProgramError, DeviceProgramLifetime, DeviceResource,
-    KernelLaunchPlan, KernelUnit, LaunchId, LaunchUnit, RegistryBuffer, RegistryVersion,
-    ResultBuffer,
+    KernelLaunchPlan, KernelUnit, LaunchId, LaunchUnit, ObservationCadence, RegistryBuffer,
+    RegistryVersion, ResultBuffer,
 };
 pub use device_program_plans::{
     carried_plan_agrees, kernel_plan_for_function, launch_descriptors, plan_for_collection_op,

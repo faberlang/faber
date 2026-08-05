@@ -1,6 +1,6 @@
 use super::wire::{
-    WireBufferIdentity, WireDeviceProgram, WireInitializationPolicy, WireProgramLifetime,
-    WireResourceAccess,
+    WireBufferIdentity, WireBufferLifetime, WireDeviceProgram, WireInitializationPolicy,
+    WireObservationCadence, WireProgramLifetime, WireResourceAccess,
 };
 
 // ---------------------------------------------------------------------------
@@ -445,6 +445,38 @@ fn validate_wire_axes(
                 "result on buffer {} names producing launch {}, but its observation fact names launch {}; a result is a declared observation point at its producing launch",
                 result.buffer.id, result.produced_by, result.observation.at_launch
             )));
+        }
+        // S5A-U1 (A7): the declared observation cadence must be consistent
+        // with the buffer's lifetime class — a PerStep readback names an
+        // ObservationPoint buffer (read back every step, read-then-release);
+        // an EndOfRun readback names a PerStep or PerProgram buffer (kept
+        // live through the final step). A cadence that contradicts the
+        // lifetime is rejected before host construction — the wire's
+        // declared cadence is the only authority for readback timing, never
+        // a shape/role coincidence.
+        match result.observation.cadence {
+            WireObservationCadence::PerStep
+                if result.buffer.lifetime != WireBufferLifetime::ObservationPoint =>
+            {
+                return Err(wire_invalid(format!(
+                    "result on buffer {} declares a per-step observation cadence, but the buffer's lifetime class is {}; a per-step readback names an observation-point buffer",
+                    result.buffer.id,
+                    result.buffer.lifetime.spelling()
+                )));
+            }
+            WireObservationCadence::EndOfRun
+                if !matches!(
+                    result.buffer.lifetime,
+                    WireBufferLifetime::PerStep | WireBufferLifetime::PerProgram
+                ) =>
+            {
+                return Err(wire_invalid(format!(
+                    "result on buffer {} declares an end-of-run observation cadence, but the buffer's lifetime class is {}; an end-of-run readback names a per-step or per-program buffer",
+                    result.buffer.id,
+                    result.buffer.lifetime.spelling()
+                )));
+            }
+            _ => {}
         }
     }
     Ok(())

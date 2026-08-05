@@ -664,6 +664,7 @@ fn test_multi_output_results() {
         version: version(1, program.kernels[0].resources[1].version.element_ty, 2),
         role: BufferRole::Output,
         produced_by: LaunchId(0),
+        cadence: ObservationCadence::PerStep,
     });
     program.results.push(ResultBuffer {
         buffer: identity(
@@ -675,6 +676,7 @@ fn test_multi_output_results() {
         version: version(1, program.kernels[1].resources[1].version.element_ty, 4),
         role: BufferRole::Output,
         produced_by: LaunchId(1),
+        cadence: ObservationCadence::PerStep,
     });
 
     assert_eq!(program.validate(), Ok(()));
@@ -1076,6 +1078,7 @@ fn test_result_role_rejected() {
         version: version(1, program.kernels[0].resources[1].version.element_ty, 2),
         role: BufferRole::Input,
         produced_by: LaunchId(0),
+        cadence: ObservationCadence::PerStep,
     });
     assert!(matches!(
         program.validate(),
@@ -1107,6 +1110,7 @@ fn test_result_role_buffer_role_mismatch_rejected() {
             version: version(1, program.kernels[0].resources[1].version.element_ty, 2),
             role,
             produced_by: LaunchId(0),
+            cadence: ObservationCadence::PerStep,
         });
         match program.validate() {
             Err(DeviceProgramError::ResultBufferRoleMismatch {
@@ -1136,6 +1140,7 @@ fn test_unknown_producing_launch_rejected() {
         version: version(1, program.kernels[0].resources[1].version.element_ty, 2),
         role: BufferRole::Output,
         produced_by: LaunchId(9),
+        cadence: ObservationCadence::PerStep,
     });
     assert!(matches!(
         program.validate(),
@@ -1160,6 +1165,7 @@ fn test_result_not_produced_rejected() {
         version: version(1, program.kernels[0].resources[1].version.element_ty, 2),
         role: BufferRole::Output,
         produced_by: LaunchId(0),
+        cadence: ObservationCadence::PerStep,
     });
     match program.validate() {
         Err(DeviceProgramError::ResultNotProduced {
@@ -1174,6 +1180,120 @@ fn test_result_not_produced_rejected() {
             assert_eq!(version, 1);
         }
         other => panic!("expected a result-not-produced error, got {other:?}"),
+    }
+}
+
+/// S5A-U1: the observation cadence is a declared fact consistent with the
+/// buffer's lifetime class. A `PerStep` readback names an `ObservationPoint`
+/// buffer; an `EndOfRun` readback names a `PerStep` or `PerProgram` buffer. A
+/// cadence that contradicts the lifetime (a per-step readback of a per-step
+/// final, or an end-of-run readback of an observation point) fails closed.
+#[test]
+fn test_result_cadence_must_match_buffer_lifetime() {
+    // A one-kernel program whose output buffer carries the requested
+    // lifetime; validating it with the requested cadence exercises exactly
+    // the cadence/lifetime coupling (the kernel slot and the result row
+    // share one identity, so only the cadence can contradict).
+    fn validate_with(
+        lifetime: BufferLifetime,
+        cadence: ObservationCadence,
+    ) -> Result<(), DeviceProgramError> {
+        let mut types = TypeTable::new();
+        let element_ty = f32_ty(&mut types);
+        let output = identity(2, "y", BufferRole::Output, lifetime);
+        let mut program = DeviceProgram::new(DeviceProgramLifetime::SingleRun);
+        program.kernels.push(KernelUnit {
+            function: MirFunctionId(0),
+            entry: "addita".to_owned(),
+            plan: CollectionKernelPlan::Elementwise,
+            resources: vec![
+                DeviceResource {
+                    buffer: identity(1, "x", BufferRole::Input, BufferLifetime::PerProgram),
+                    version: version(1, element_ty, 4),
+                    binding: Binding {
+                        group: 0,
+                        binding: 0,
+                    },
+                    access: MirKernelResourceAccess::Read,
+                },
+                DeviceResource {
+                    buffer: output,
+                    version: version(1, element_ty, 4),
+                    binding: Binding {
+                        group: 0,
+                        binding: 1,
+                    },
+                    access: MirKernelResourceAccess::Write,
+                },
+            ],
+            launch: KernelLaunchPlan {
+                workgroup: MirWorkgroupSize { x: 8, y: 1, z: 1 },
+                dispatch_size: MirKernelDispatchSize { x: 4, y: 1, z: 1 },
+                workgroup_count: MirKernelWorkgroupCount { x: 1, y: 1, z: 1 },
+            },
+        });
+        program.launches.push(LaunchUnit {
+            id: LaunchId(1),
+            kernel_index: 0,
+        });
+        program.results.push(ResultBuffer {
+            buffer: identity(2, "y", BufferRole::Output, lifetime),
+            version: version(1, element_ty, 4),
+            role: BufferRole::Output,
+            produced_by: LaunchId(1),
+            cadence,
+        });
+        program.validate()
+    }
+
+    for (lifetime, cadence, rejected) in [
+        // Consistent pairings admitted.
+        (
+            BufferLifetime::ObservationPoint,
+            ObservationCadence::PerStep,
+            false,
+        ),
+        (BufferLifetime::PerStep, ObservationCadence::EndOfRun, false),
+        (
+            BufferLifetime::PerProgram,
+            ObservationCadence::EndOfRun,
+            false,
+        ),
+        // Contradictory pairings rejected.
+        (BufferLifetime::PerStep, ObservationCadence::PerStep, true),
+        (
+            BufferLifetime::PerProgram,
+            ObservationCadence::PerStep,
+            true,
+        ),
+        (
+            BufferLifetime::ObservationPoint,
+            ObservationCadence::EndOfRun,
+            true,
+        ),
+    ] {
+        match validate_with(lifetime, cadence) {
+            Ok(()) => assert!(
+                !rejected,
+                "cadence {cadence:?} with lifetime {lifetime:?} must be rejected"
+            ),
+            Err(DeviceProgramError::ResultCadenceMismatch {
+                result,
+                buffer,
+                cadence: got_cadence,
+                lifetime: got_lifetime,
+            }) => {
+                assert!(
+                    rejected,
+                    "cadence {cadence:?} with lifetime {lifetime:?} must be admitted"
+                );
+                assert_eq!(result, 0);
+                assert_eq!(buffer, BufferId(2));
+                assert_eq!(got_cadence, cadence);
+                assert_eq!(got_lifetime, lifetime);
+            }
+            other => panic!("expected a cadence/lifetime mismatch, got {other:?}"),
+        }
     }
 }
 
@@ -1276,6 +1396,7 @@ fn test_registry_chain_and_data_flow_pairs() {
         version: version(1, element_ty, 8),
         role: BufferRole::Output,
         produced_by: LaunchId(1),
+        cadence: ObservationCadence::PerStep,
     });
 
     assert_eq!(program.validate(), Ok(()));
@@ -1328,6 +1449,7 @@ fn reduction_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
         ),
         role: BufferRole::Output,
         produced_by: LaunchId(0),
+        cadence: ObservationCadence::PerStep,
     });
     let mut types = TypeTable::new();
     let element_ty = f32_ty(&mut types);

@@ -6,7 +6,8 @@ use crate::abi::{
 };
 use crate::device_program::{
     BufferId, BufferIdentity, BufferLifetime, BufferVersion, DeviceProgram, DeviceProgramLifetime,
-    DeviceResource, KernelLaunchPlan, KernelUnit, LaunchId, LaunchUnit, ResultBuffer,
+    DeviceResource, KernelLaunchPlan, KernelUnit, LaunchId, LaunchUnit, ObservationCadence,
+    ResultBuffer,
 };
 use crate::kernel_plan::{
     MatMulShapes, MatMulSharedMemory, OobPaddingPolicy, ReduceOp, SharedMemoryLayout,
@@ -819,6 +820,7 @@ fn elementwise_device_program() -> DeviceProgram {
             version: version(1, element_ty, 4),
             role: BufferRole::Output,
             produced_by: LaunchId(1),
+            cadence: ObservationCadence::EndOfRun,
         }],
     }
 }

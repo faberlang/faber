@@ -287,11 +287,43 @@ pub struct WireResultBuffer {
 
 /// The explicit observation fact of a result row (F5/F6): the value is read
 /// back at a declared completion boundary, decoupled from role and lifetime.
+/// The fact also carries the **observation cadence** (S5A-U1): whether the
+/// declared observation is read back every step ([`PerStep`](WireObservationCadence::`PerStep`)
+/// — e.g. the loss) or once after the step loop
+/// ([`EndOfRun`](WireObservationCadence::`EndOfRun`) — e.g. the final forward,
+/// gradients, params).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WireObservationFact {
     /// The launch whose completion boundary makes the observation valid.
     pub at_launch: u32,
+    /// The declared observation cadence (S5A-U1): `PerStep` or `EndOfRun`.
+    pub cadence: WireObservationCadence,
+}
+
+/// The declared observation cadence of a result row (S5A-U1): WHEN a
+/// declared observation is read back — an explicit wire fact, never derived
+/// from the buffer's shape, role, or lifetime.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireObservationCadence {
+    /// Read back at the producing launch's completion boundary within EVERY
+    /// step of a `RepeatingStep` program (e.g. the loss trace).
+    PerStep,
+    /// Read back ONCE after the step loop at the final step's completion
+    /// boundary (e.g. the final forward, final gradients, final params).
+    EndOfRun,
+}
+
+impl WireObservationCadence {
+    /// Short diagnostic spelling.
+    #[must_use]
+    pub fn spelling(self) -> &'static str {
+        match self {
+            Self::PerStep => "per-step",
+            Self::EndOfRun => "end-of-run",
+        }
+    }
 }
 
 /// Independent initialization axis (F5).

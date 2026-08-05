@@ -5,7 +5,8 @@ use super::helpers::{
 };
 use super::registry::{BufferRegistry, RegistryBuffer};
 use super::types::{
-    Binding, BufferId, BufferIdentity, BufferRole, DeviceProgram, DeviceProgramLifetime, LaunchId,
+    Binding, BufferId, BufferIdentity, BufferLifetime, BufferRole, DeviceProgram,
+    DeviceProgramLifetime, LaunchId, ObservationCadence,
 };
 use crate::abi::MirKernelResourceAccess;
 use crate::device_semantics::DeviceSemantics;
@@ -166,6 +167,38 @@ impl DeviceProgram {
                     role: result.role,
                     buffer_role: result.buffer.role,
                 });
+            }
+            // The observation cadence must be consistent with the buffer's
+            // lifetime class (S5A-U1): a PerStep readback is valid only for an
+            // ObservationPoint buffer (read back every step, read-then-release);
+            // an EndOfRun readback is valid only for PerStep or PerProgram
+            // buffers (kept live through the final step — never a read-only
+            // host input and never per-step state read both ways).
+            match result.cadence {
+                ObservationCadence::PerStep
+                    if result.buffer.lifetime != BufferLifetime::ObservationPoint =>
+                {
+                    return Err(DeviceProgramError::ResultCadenceMismatch {
+                        result: result_index,
+                        buffer: result.buffer.id,
+                        cadence: result.cadence,
+                        lifetime: result.buffer.lifetime,
+                    });
+                }
+                ObservationCadence::EndOfRun
+                    if !matches!(
+                        result.buffer.lifetime,
+                        BufferLifetime::PerStep | BufferLifetime::PerProgram
+                    ) =>
+                {
+                    return Err(DeviceProgramError::ResultCadenceMismatch {
+                        result: result_index,
+                        buffer: result.buffer.id,
+                        cadence: result.cadence,
+                        lifetime: result.buffer.lifetime,
+                    });
+                }
+                _ => {}
             }
             if !self
                 .launches

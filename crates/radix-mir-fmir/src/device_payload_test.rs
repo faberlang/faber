@@ -24,10 +24,10 @@ use crate::schema::{
     WireCompanionDerivativeKind, WireCompanionRelation, WireCompanionSelectedInput,
     WireCompanionSelectedOutput, WireDependencyEdge, WireDeviceProgram, WireDeviceResource,
     WireDispatchSize, WireInitializationPolicy, WireKernelLaunchPlan, WireKernelUnit,
-    WireLaunchUnit, WireObservationFact, WireProgramLifetime, WireResourceAccess, WireResultBuffer,
-    WireSemanticValue, WireSemanticValueOrigin, WireStorageLayout, WireWorkgroupCount,
-    WireWorkgroupSize, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION,
-    WIRE_DEVICE_PROGRAM_VERSION,
+    WireLaunchUnit, WireObservationCadence, WireObservationFact, WireProgramLifetime,
+    WireResourceAccess, WireResultBuffer, WireSemanticValue, WireSemanticValueOrigin,
+    WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize, FMIR_TARGET_NAME,
+    FMIR_TEXT_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION, WIRE_DEVICE_PROGRAM_VERSION,
 };
 use radix_mir::MirProgram;
 use radix_types::TypeTable;
@@ -115,7 +115,10 @@ fn sample_wire_program() -> WireDeviceProgram {
             },
             role: WireBufferRole::Output,
             produced_by: 1,
-            observation: WireObservationFact { at_launch: 1 },
+            observation: WireObservationFact {
+                at_launch: 1,
+                cadence: WireObservationCadence::PerStep,
+            },
         }],
         semantic_values: vec![
             WireSemanticValue {
@@ -678,6 +681,48 @@ fn canonical_program_bytes_cover_the_complete_program() {
     assert_ne!(canonical_program_bytes(&mutated), base);
 }
 
+/// S5A-U1 (A7): the observation cadence is part of the canonical wire — a
+/// cadence edit produces different wire bytes (the readback timing is a
+/// carried fact, never derived), and a cadence that contradicts the buffer's
+/// lifetime class fails closed at the decode boundary.
+#[test]
+fn observation_cadence_rides_the_wire_and_fails_closed_on_contradiction() {
+    // The canonical bytes change when the cadence changes.
+    let program = sample_wire_program();
+    let base = canonical_program_bytes(&program);
+    let mut re_declared = program.clone();
+    re_declared.results[0].observation.cadence = WireObservationCadence::EndOfRun;
+    assert_ne!(
+        canonical_program_bytes(&re_declared),
+        base,
+        "the canonical wire bytes change when the observation cadence changes (A7)"
+    );
+
+    // A PerStep cadence on a PerStep-lifetime buffer is a contradiction and
+    // fails admission (a per-step readback names an observation-point buffer).
+    let err = wire_admission_error(|program| {
+        program.results[0].buffer.lifetime = WireBufferLifetime::PerStep;
+        program.results[0].observation.cadence = WireObservationCadence::PerStep;
+    })
+    .expect_err("a per-step cadence on a per-step buffer fails closed");
+    assert!(
+        err.to_string().contains("cadence"),
+        "the rejection names the cadence contradiction: {err}"
+    );
+
+    // An EndOfRun cadence on an ObservationPoint buffer fails closed (an
+    // end-of-run readback names a per-step or per-program buffer — the
+    // observation-point buffer is the per-step readback).
+    let err = wire_admission_error(|program| {
+        program.results[0].observation.cadence = WireObservationCadence::EndOfRun;
+    })
+    .expect_err("an end-of-run cadence on an observation-point buffer fails closed");
+    assert!(
+        err.to_string().contains("cadence"),
+        "the rejection names the cadence contradiction: {err}"
+    );
+}
+
 /// Encode a text image carrying a mutated device program and attempt decode.
 /// Returns the decode outcome (admission verdict).
 fn wire_admission_error(
@@ -801,7 +846,10 @@ fn two_kernel_chain_program() -> WireDeviceProgram {
             },
             role: WireBufferRole::Output,
             produced_by: 2,
-            observation: WireObservationFact { at_launch: 2 },
+            observation: WireObservationFact {
+                at_launch: 2,
+                cadence: WireObservationCadence::PerStep,
+            },
         }],
         semantic_values: vec![
             WireSemanticValue {
@@ -1052,14 +1100,20 @@ fn faber_projected_two_kernel_wire() -> WireDeviceProgram {
                 version: version.clone(),
                 role: WireBufferRole::InOut,
                 produced_by: 1,
-                observation: WireObservationFact { at_launch: 1 },
+                observation: WireObservationFact {
+                    at_launch: 1,
+                    cadence: WireObservationCadence::EndOfRun,
+                },
             },
             WireResultBuffer {
                 buffer: result.clone(),
                 version: version.clone(),
                 role: WireBufferRole::Output,
                 produced_by: 2,
-                observation: WireObservationFact { at_launch: 2 },
+                observation: WireObservationFact {
+                    at_launch: 2,
+                    cadence: WireObservationCadence::PerStep,
+                },
             },
         ],
         semantic_values: vec![

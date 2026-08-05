@@ -293,13 +293,43 @@ pub struct LaunchUnit {
     pub kernel_index: usize,
 }
 
+/// The observation cadence of a result row (S5A-U1): WHEN a declared
+/// observation is read back. The cadence is an explicit carried fact of the
+/// observation — never derived from the buffer's shape, role, or lifetime.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ObservationCadence {
+    /// Read back at the producing launch's completion boundary within EVERY
+    /// step of a `RepeatingStep` program (e.g. the loss trace).
+    PerStep,
+    /// Read back ONCE after the step loop at the final step's completion
+    /// boundary (e.g. the final forward, final gradients, final params).
+    EndOfRun,
+}
+
+impl ObservationCadence {
+    /// Short diagnostic spelling.
+    #[must_use]
+    pub fn spelling(self) -> &'static str {
+        match self {
+            Self::PerStep => "per-step",
+            Self::EndOfRun => "end-of-run",
+        }
+    }
+}
+
 /// An explicit result buffer (multi-output readback).
 ///
 /// Multi-output results are declared explicitly: each result names the buffer
-/// identity and version to observe, the launch that produced it, and its role
+/// identity and version to observe, the launch that produced it, its role
 /// (output or in-out — an in-place-updated buffer read back at an observation
-/// point is a result too). The observation role must agree with the buffer's
-/// identity role ([`DeviceProgram::validate`] enforces the cross-check).
+/// point is a result too), and the **observation cadence** (S5A-U1): whether
+/// the declared observation is read back every step (`PerStep` — e.g. the loss)
+/// or once after the step loop (`EndOfRun` — e.g. the final forward, gradients,
+/// params). The observation role must agree with the buffer's identity role
+/// ([`DeviceProgram::validate`] enforces the cross-check), and the cadence
+/// must be consistent with the buffer's lifetime class: a `PerStep` result
+/// names an `ObservationPoint` buffer; an `EndOfRun` result names a `PerStep` or
+/// `PerProgram` buffer — never read-only input state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResultBuffer {
     /// Identity of the observed buffer.
@@ -310,6 +340,9 @@ pub struct ResultBuffer {
     pub role: BufferRole,
     /// The launch that produced the observed version.
     pub produced_by: LaunchId,
+    /// The declared observation cadence (S5A-U1): `PerStep` (read back every
+    /// step) or `EndOfRun` (read back once after the step loop).
+    pub cadence: ObservationCadence,
 }
 
 /// The execution-lifetime regime of the whole program.

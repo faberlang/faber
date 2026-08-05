@@ -1,4 +1,4 @@
-use super::types::{BufferId, BufferRole, LaunchId};
+use super::types::{BufferId, BufferLifetime, BufferRole, LaunchId, ObservationCadence};
 use crate::abi::MirKernelResourceAccess;
 use crate::device_semantics::{DependencyEdge, SemanticValueId};
 use crate::kernel_plan::PlanValidationError;
@@ -53,6 +53,15 @@ pub enum DeviceProgramError {
         result: usize,
         role: BufferRole,
         buffer_role: BufferRole,
+    },
+    /// A result's observation cadence contradicts its buffer's lifetime class
+    /// (S5A-U1): a `PerStep` readback is valid only for an `ObservationPoint`
+    /// buffer; an `EndOfRun` readback only for `PerStep` or `PerProgram` buffers.
+    ResultCadenceMismatch {
+        result: usize,
+        buffer: BufferId,
+        cadence: ObservationCadence,
+        lifetime: BufferLifetime,
     },
     /// A result's named producing launch does not actually write the version.
     ResultNotProduced {
@@ -231,6 +240,17 @@ impl fmt::Display for DeviceProgramError {
                 "result {result} has observation role {} but its buffer's identity role is {}",
                 role.spelling(),
                 buffer_role.spelling()
+            ),
+            Self::ResultCadenceMismatch {
+                result,
+                buffer,
+                cadence,
+                lifetime,
+            } => write!(
+                f,
+                "result {result} declares buffer {buffer} with a {} observation cadence, but the buffer's lifetime class is {}; a per-step readback names an observation-point buffer, an end-of-run readback names a per-step or per-program buffer",
+                cadence.spelling(),
+                lifetime.spelling()
             ),
             Self::ResultNotProduced {
                 result,
