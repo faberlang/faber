@@ -161,6 +161,8 @@ abi_string_family! {
         SYMBOL_TEXT_I1 = "__faber_rt_v1_text_i1",
         SYMBOL_ASCII_TRUTHY = "__faber_rt_v1_ascii_truthy",
         SYMBOL_SOLUM_READ_TEXT = "__faber_rt_v1_solum_read_text",
+        SYMBOL_SOLUM_READ_LINES = "__faber_rt_v1_solum_read_lines",
+        SYMBOL_SOLUM_READ_BYTES = "__faber_rt_v1_solum_read_bytes",
         SYMBOL_SOLUM_WRITE_TEXT = "__faber_rt_v1_solum_write_text",
         SYMBOL_VALOR_I64 = "__faber_rt_v1_valor_i64",
         SYMBOL_VALOR_F64 = "__faber_rt_v1_valor_f64",
