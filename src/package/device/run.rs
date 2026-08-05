@@ -6,14 +6,9 @@ use super::{
     admit_device_program_section, artifact_for_backend, descriptor_for_backend,
     inputs_by_buffer_id, wire_buffer_name, BTreeMap, DeviceBackend, DeviceDescriptor,
     DeviceSelection, Diagnostic, FmirDeviceSection, HostDeviceProgramLifetime, ProgramSession,
-    WireBufferLifetime, WireBufferRole, WireDeviceProgram, WireInitializationPolicy,
-    WireProgramLifetime, WireResourceAccess, DEFAULT_TRAINING_STEPS,
+    WireBufferLifetime, WireBufferRole, WireDeviceProgram, WireObservationCadence,
+    WireProgramLifetime, DEFAULT_TRAINING_STEPS,
 };
-// U8/U9 repair: the end-of-run observation rows (distinct from the per-step
-// results) are derived from the wire here and declared on the host session,
-// so the composite host reads the set back ONCE after the step loop. The
-// host type is consumed by the seam directly, like the session types.
-use faber_host_macos_arm64::device_descriptor::DescriptorEndOfRunResult;
 
 /// The ordered step-run result of a program session (S5-U5): the per-step
 /// observed values (the loss trace) and the convergence verdict.
@@ -21,7 +16,7 @@ pub(crate) struct StepRunReport {
     /// How many ordered launches / training steps executed.
     pub(crate) step_count: u32,
     /// The per-execution observed readbacks, in execution order (the loss
-    /// trace for a RepeatingStep run).
+    /// trace for a `RepeatingStep` run).
     pub(crate) loss_trace: Vec<BTreeMap<u32, Vec<f32>>>,
     /// The first observed value of the first execution (initial loss).
     pub(crate) initial_loss: Option<f32>,
@@ -34,32 +29,37 @@ pub(crate) struct StepRunReport {
 }
 
 /// The per-step loss observation value of one execution's readbacks: the
-/// declared SCALAR observation (the loss — the only readback a RepeatingStep
-/// step performs, a one-element buffer). Never `outputs.iter().next()`
-/// (deterministic BTreeMap order by buffer id would pick the first forward
-/// tensor of a multi-observation receipt — the U8 G1 divergence).
-fn loss_observed(outputs: &BTreeMap<u32, Vec<f32>>) -> Option<f32> {
+/// DECLARED per-step observation buffer (the wire's `PerStep` result row —
+/// the loss). Never `outputs.iter().next()` (deterministic BTreeMap order
+/// by buffer id would pick the first forward tensor of a multi-observation
+/// receipt — the U8 G1 divergence) and never a shape/name selection: the
+/// declared cadence is the sole authority for which readback is the loss.
+fn loss_observed(outputs: &BTreeMap<u32, Vec<f32>>, per_step_observation: u32) -> Option<f32> {
     outputs
-        .values()
-        .find(|values| values.len() == 1)
+        .get(&per_step_observation)
         .and_then(|values| values.first())
         .copied()
 }
 
 /// Reduce an ordered execution receipt list to the step-run report (S5-U5):
 /// the loss trace (every observed readback per execution), the initial/final
-/// loss, and the convergence verdict. Pure — the route prints it; the tests
-/// assert on it.
+/// loss of the DECLARED per-step observation buffer, and the convergence
+/// verdict. Pure — the route prints it; the tests assert on it.
 #[must_use]
 pub(crate) fn step_run_report(
     receipts: &[faber_host_macos_arm64::composite_host::DeviceExecutionReceipt],
+    per_step_observation: u32,
 ) -> StepRunReport {
     let loss_trace: Vec<BTreeMap<u32, Vec<f32>>> = receipts
         .iter()
         .map(|receipt| receipt.outputs.clone())
         .collect();
-    let initial_loss = loss_trace.first().and_then(loss_observed);
-    let final_loss = loss_trace.last().and_then(loss_observed);
+    let initial_loss = loss_trace
+        .first()
+        .and_then(|observed| loss_observed(observed, per_step_observation));
+    let final_loss = loss_trace
+        .last()
+        .and_then(|observed| loss_observed(observed, per_step_observation));
     let converged = match (initial_loss, final_loss) {
         (Some(initial), Some(last)) if initial > 0.0 => last < 0.1 * initial,
         (Some(initial), Some(last)) => last < initial,
@@ -120,11 +120,9 @@ pub(crate) fn execute_session_receipts(
             let repeat_count = device_repeat_count()?;
             let mut receipts = Vec::with_capacity(repeat_count);
             for _ in 0..repeat_count {
-                receipts.push(
-                    session.execute(inputs).map_err(|error| {
-                        vec![super::super::host_factory::host_error_diagnostic(&error)]
-                    })?,
-                );
+                receipts.push(session.execute(inputs).map_err(|error| {
+                    vec![super::super::host_factory::host_error_diagnostic(&error)]
+                })?);
             }
             Ok(receipts)
         }
@@ -132,7 +130,7 @@ pub(crate) fn execute_session_receipts(
 }
 
 /// The `FABER_DEVICE_STEPS` env-var override (S5-U5b): when set, the value
-/// must agree with the image's **declared** RepeatingStep step count
+/// must agree with the image's **declared** `RepeatingStep` step count
 /// (recovered from the wire) — a contradiction fails closed, never a silent
 /// override. When absent, the image's declared count is the authority; the
 /// env var is never the sole authority for an image-loaded route.
@@ -189,11 +187,19 @@ pub(crate) fn execute_device_route(
     // gated before any field-level interpretation (old v2 payloads fail
     // closed with the structured `payload_version` diagnostic).
     admit_device_program_section(&device.device_program)?;
-    let artifact = artifact_for_backend(&device.artifacts.artifact, backend)
-        .ok_or_else(|| vec![super::super::host_factory::missing_backend_artifact(backend)])?;
+    let artifact = artifact_for_backend(&device.artifacts.artifact, backend).ok_or_else(|| {
+        vec![super::super::host_factory::missing_backend_artifact(
+            backend,
+        )]
+    })?;
     // A9 discovery receipt: selected device + declared artifact hash.
-    let discovery = super::super::host_factory::discovery_receipt(backend, &device.artifacts.artifact)
-        .ok_or_else(|| vec![super::super::host_factory::missing_backend_artifact(backend)])?;
+    let discovery =
+        super::super::host_factory::discovery_receipt(backend, &device.artifacts.artifact)
+            .ok_or_else(|| {
+                vec![super::super::host_factory::missing_backend_artifact(
+                    backend,
+                )]
+            })?;
     discovery.print();
     // The host consumes the WIRE: the descriptor is derived exclusively from
     // the carried program facts (never a thinned slot list).
@@ -231,16 +237,15 @@ pub(crate) fn execute_device_route(
 
     let mut session = super::super::host_factory::create_program_session(&mut host, &descriptor)
         .map_err(|diagnostic| vec![diagnostic])?;
-    // U8/U9 repair: declare the wire-derived end-of-run observation set (the
-    // final forward, the final gradients, the final params) on the host
-    // session before the step loop — validated fail-closed before any
-    // launch. The final step keeps the declared PerStep end-of-run buffers
-    // live and the route reads the whole set back ONCE at the declared
-    // completion boundary; per-step readbacks stay loss-only.
-    let end_of_run_rows = declared_end_of_run_rows(&descriptor, &device.device_program.program)?;
-    session
-        .declare_end_of_run(&end_of_run_rows)
-        .map_err(|error| vec![super::super::host_factory::host_error_diagnostic(&error)])?;
+    // S5A-U1: the host session carries the DECLARED cadence sets directly
+    // from the descriptor — the wire's `PerStep` result rows (read back
+    // every step) and the wire's `EndOfRun` result rows (the final forward,
+    // final gradients, final params — read back once after the step loop).
+    // The descriptor is validated fail-closed before any launch; there is no
+    // route-side derivation and no runtime declaration seam. The final step
+    // keeps the declared EndOfRun PerStep buffers live and the route reads
+    // the whole set back ONCE at the declared completion boundary; per-step
+    // readbacks stay loss-only.
     let receipts = execute_session_receipts(&mut session, &descriptor, &inputs, steps)?;
     let receipt = receipts.last().ok_or_else(|| {
         vec![Diagnostic::error(
@@ -255,11 +260,9 @@ pub(crate) fn execute_device_route(
     let end_of_run_readback: Option<faber_host_macos_arm64::composite_host::EndOfRunReadback> =
         if descriptor.program_lifetime == HostDeviceProgramLifetime::RepeatingStep {
             Some(
-                session
-                    .read_end_of_run()
-                    .map_err(|error| {
-                        vec![super::super::host_factory::host_error_diagnostic(&error)]
-                    })?,
+                session.read_end_of_run().map_err(|error| {
+                    vec![super::super::host_factory::host_error_diagnostic(&error)]
+                })?,
             )
         } else {
             None
@@ -307,13 +310,22 @@ pub(crate) fn execute_device_route(
     }
 
     // S5-U5 training report: a RepeatingStep run prints the per-step loss
-    // trace and the convergence verdict (the done-when surface).
+    // trace and the convergence verdict (the done-when surface). The loss is
+    // the DECLARED per-step observation buffer (the wire's PerStep result
+    // row) — never a shape/name selection.
     if descriptor.program_lifetime == HostDeviceProgramLifetime::RepeatingStep {
-        let report = step_run_report(&receipts);
+        let per_step = declared_per_step_observations(&device.device_program.program);
+        let per_step_observation = per_step.first().copied().ok_or_else(|| {
+            vec![Diagnostic::error(
+                "a RepeatingStep program must declare a per-step observation (the loss); the wire declares no PerStep result row",
+            )]
+        })?;
+        let report = step_run_report(&receipts, per_step_observation);
         print_training_report(&report);
-        // U8-repair G2/G3: the end-of-run observations — read back once at
-        // the declared completion boundary — print the real VALUES (final
-        // forward, final gradients, final params), not a declaration.
+        // S5A-U1: the end-of-run observations — read back once at the
+        // declared completion boundary — print the real VALUES (final
+        // forward, final gradients, final params) from the DECLARED
+        // EndOfRun result rows, not a declaration.
         if let Some(readback) = &end_of_run_readback {
             print_end_of_run_values(readback, &device.device_program.program);
         }
@@ -379,125 +391,56 @@ fn print_training_report(report: &StepRunReport) {
     }
 }
 
-/// The declared end-of-run observation set of a RepeatingStep training
-/// program (U8-repair G2/G3): the buffers whose FINAL values the exit-gate
-/// rows observe once at the end — the final forward outputs, the final
-/// gradient buffers, and the trainable params. Declared so the exit-gate
-/// rows are observable WITHOUT per-step readback: within each step the only
-/// readback is the loss observation; the end-of-run set is read back once
-/// after the last step.
+/// The DECLARED end-of-run observation set of a `RepeatingStep` training
+/// program (S5A-U1): the buffers whose FINAL values the exit-gate rows
+/// observe once at the end — the final forward outputs, the final gradient
+/// buffers, and the trainable params. The SET is declared on the wire (the
+/// `EndOfRun` result rows); the route consumes it verbatim — there is no
+/// derivation. Within each step the only readback is the loss observation;
+/// the end-of-run set is read back once after the last step.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub(crate) struct EndOfRunObservationSet {
-    /// The final forward outputs: the PerStep Output-role finals no launch
-    /// consumes (the decomposition's re-exposed activation tensors).
+    /// The final forward outputs: the declared `EndOfRun` rows on `PerStep`
+    /// Output-role buffers (the decomposition's forward tensors).
     pub(crate) forward: Vec<(u32, String)>,
-    /// The final gradient buffers: written by a device-resident companion
-    /// kernel (the F4 relation rows), never per-step observations.
+    /// The final gradient buffers: the declared `EndOfRun` rows on `PerStep`
+    /// InOut buffers (written by a device-resident companion kernel).
     pub(crate) gradients: Vec<(u32, String)>,
-    /// The trainable params: PerProgram InOut buffers with HostProvided
-    /// init (device-resident across all steps).
+    /// The trainable params: the declared `EndOfRun` rows on `PerProgram`
+    /// InOut buffers (device-resident across all steps).
     pub(crate) params: Vec<(u32, String)>,
 }
 
-/// Derive the declared end-of-run observation set from the carried wire
-/// facts (never a name/shape coincidence): the params are the PerProgram
-/// InOut HostProvided buffers; the gradients are the PerStep buffers the
-/// train-step kernels READ (the train-step kernels are the kernels that
-/// WRITE the params — the in-place optimizer update); the forward outputs
-/// are the PerStep Output-role finals that are written and never consumed.
-/// The per-step observation (the loss) is excluded by construction (it is an
-/// ObservationPoint buffer, not a PerStep final).
+/// Consume the DECLARED end-of-run observation set from the wire (S5A-U1):
+/// exactly the result rows whose observation cadence is `EndOfRun`. The set
+/// is the constructor's declared fact — this function only groups it for the
+/// receipt, reusing each row's declared buffer facts (role + lifetime); it
+/// never scans kernels or derives which buffers are observed.
 #[must_use]
 pub(crate) fn declared_end_of_run_observations(wire: &WireDeviceProgram) -> EndOfRunObservationSet {
-    // Aggregate per-buffer access facts + identity over the wire.
-    let mut written: std::collections::BTreeSet<u32> = std::collections::BTreeSet::new();
-    let mut consumed: std::collections::BTreeSet<u32> = std::collections::BTreeSet::new();
-    let mut identity: BTreeMap<
-        u32,
-        (String, WireBufferRole, WireBufferLifetime, WireInitializationPolicy),
-    > = BTreeMap::new();
-    for kernel in &wire.kernels {
-        for resource in &kernel.resources {
-            let id = resource.buffer.id;
-            identity
-                .entry(id)
-                .or_insert_with(|| {
-                    (
-                        resource.buffer.name.clone(),
-                        resource.buffer.role,
-                        resource.buffer.lifetime,
-                        resource.initialization,
-                    )
-                });
-            match resource.access {
-                WireResourceAccess::Read => {
-                    consumed.insert(id);
-                }
-                WireResourceAccess::Write | WireResourceAccess::ReadWrite => {
-                    written.insert(id);
-                }
-            }
-        }
-    }
-
-    // The trainable params: PerProgram InOut buffers with HostProvided init
-    // (device-resident across all steps).
-    let params: Vec<(u32, String)> = identity
-        .iter()
-        .filter(|(_, (_, role, lifetime, initialization))| {
-            *role == WireBufferRole::InOut
-                && *lifetime == WireBufferLifetime::PerProgram
-                && *initialization == WireInitializationPolicy::HostProvided
-        })
-        .map(|(id, (name, _, _, _))| (*id, name.clone()))
-        .collect();
-    let param_ids: std::collections::BTreeSet<u32> = params.iter().map(|(id, _)| *id).collect();
-
-    // The train-step kernels: the kernels that WRITE a param buffer (the
-    // in-place optimizer update — the forward and companion kernels only
-    // read the params). The gradients are the PerStep buffers those kernels
-    // READ (the backward → train_step data-flow).
-    let mut gradients: std::collections::BTreeSet<u32> = std::collections::BTreeSet::new();
-    for kernel in &wire.kernels {
-        let writes_param = kernel.resources.iter().any(|resource| {
-            param_ids.contains(&resource.buffer.id)
-                && matches!(
-                    resource.access,
-                    WireResourceAccess::Write | WireResourceAccess::ReadWrite
-                )
-        });
-        if !writes_param {
+    let mut forward: Vec<(u32, String)> = Vec::new();
+    let mut gradients: Vec<(u32, String)> = Vec::new();
+    let mut params: Vec<(u32, String)> = Vec::new();
+    for result in &wire.results {
+        if result.observation.cadence != WireObservationCadence::EndOfRun {
             continue;
         }
-        for resource in &kernel.resources {
-            if resource.access == WireResourceAccess::Read
-                && resource.buffer.lifetime == WireBufferLifetime::PerStep
-                && !param_ids.contains(&resource.buffer.id)
-            {
-                gradients.insert(resource.buffer.id);
-            }
-        }
-    }
-
-    // The final forward outputs: the PerStep Output-role finals that are
-    // written and never consumed (the decomposition's forward tensors).
-    let mut forward: Vec<(u32, String)> = Vec::new();
-    for (id, (name, role, lifetime, _)) in &identity {
-        if *role == WireBufferRole::Output
-            && *lifetime == WireBufferLifetime::PerStep
-            && written.contains(id)
-            && !consumed.contains(id)
-        {
-            forward.push((*id, name.clone()));
+        let id = result.buffer.id;
+        let name = result.buffer.name.clone();
+        match (result.buffer.role, result.buffer.lifetime) {
+            // The trainable params: PerProgram InOut buffers, read back once
+            // at the end (HostProvided once-init persistence).
+            (WireBufferRole::InOut, WireBufferLifetime::PerProgram) => params.push((id, name)),
+            // The final gradient buffers: PerStep InOut, written by a
+            // device-resident companion, never per-step observations.
+            (WireBufferRole::InOut, WireBufferLifetime::PerStep) => gradients.push((id, name)),
+            // The final forward outputs: PerStep Output finals.
+            (WireBufferRole::Output, WireBufferLifetime::PerStep) => forward.push((id, name)),
+            _ => {}
         }
     }
     forward.sort_by_key(|(id, _)| *id);
-    let mut gradients: Vec<(u32, String)> = gradients
-        .into_iter()
-        .filter_map(|id| identity.get(&id).map(|(name, _, _, _)| (id, name.clone())))
-        .collect();
     gradients.sort_by_key(|(id, _)| *id);
-    let mut params = params;
     params.sort_by_key(|(id, _)| *id);
     EndOfRunObservationSet {
         forward,
@@ -506,11 +449,24 @@ pub(crate) fn declared_end_of_run_observations(wire: &WireDeviceProgram) -> EndO
     }
 }
 
-/// Print the READ-BACK end-of-run observation VALUES (U8/U9 repair): the
-/// final forward, the final gradients, and the final params as observed once
-/// at the declared completion boundary — the exit-gate rows now show the
-/// real device values, not a declaration. The values came from the host's
-/// one-shot end-of-run readback; the names ride the wire's declared set.
+/// The DECLARED per-step observation set of a program (S5A-U1): the result
+/// rows whose observation cadence is `PerStep` — for a `RepeatingStep`
+/// training program the loss, read back within every step. The route consumes
+/// this declared set; it never re-derives which buffer is read back per step.
+#[must_use]
+pub(crate) fn declared_per_step_observations(wire: &WireDeviceProgram) -> Vec<u32> {
+    wire.results
+        .iter()
+        .filter(|result| result.observation.cadence == WireObservationCadence::PerStep)
+        .map(|result| result.buffer.id)
+        .collect()
+}
+
+/// Print the READ-BACK end-of-run observation VALUES: the final forward, the
+/// final gradients, and the final params as observed once at the declared
+/// completion boundary — the exit-gate rows show the real device values, not
+/// a declaration. The values came from the host's one-shot end-of-run
+/// readback; the names ride the wire's DECLARED `EndOfRun` rows.
 fn print_end_of_run_values(
     readback: &faber_host_macos_arm64::composite_host::EndOfRunReadback,
     wire: &WireDeviceProgram,
@@ -523,9 +479,7 @@ fn print_end_of_run_values(
         .chain(&declared.params)
         .map(|(id, name)| (*id, name.clone()))
         .collect();
-    println!(
-        "device: end-of-run observations (final forward, final gradients, final params):"
-    );
+    println!("device: end-of-run observations (final forward, final gradients, final params):");
     for (label, category) in [
         ("final forward", &declared.forward),
         ("final gradients", &declared.gradients),
@@ -534,7 +488,10 @@ fn print_end_of_run_values(
         let rows = category
             .iter()
             .map(|(id, _)| {
-                let name = name_by_id.get(id).map(String::as_str).unwrap_or("<unnamed>");
+                let name = name_by_id
+                    .get(id)
+                    .map(String::as_str)
+                    .unwrap_or("<unnamed>");
                 match readback.values.get(id) {
                     Some(values) => format!(
                         "{id} `{name}` = [{}]",
@@ -551,52 +508,6 @@ fn print_end_of_run_values(
             .join(", ");
         println!("device:   {label}: {rows}");
     }
-}
-
-/// U8/U9 seam: derive the declared end-of-run observation set (the final
-/// forward, the final gradients, the final params) from the wire and map it
-/// onto the host's end-of-run result rows — the descriptor's carried content
-/// version per buffer id. The host session is then told to read the set back
-/// exactly ONCE after the step loop at the declared completion boundary.
-///
-/// The set is the wire's declared derivation (the params are the PerProgram
-/// InOut HostProvided buffers; the gradients are the PerStep buffers the
-/// train-step kernels read; the forward outputs are the PerStep written-
-/// never-consumed finals). Each buffer's content version is the descriptor's
-/// carried version for that buffer id; a declared buffer without a version
-/// key fails closed.
-///
-/// # Errors
-/// Fail-closed when a declared end-of-run buffer has no version metadata on
-/// the descriptor.
-fn declared_end_of_run_rows(
-    descriptor: &DeviceDescriptor,
-    wire: &WireDeviceProgram,
-) -> Result<Vec<DescriptorEndOfRunResult>, Vec<Diagnostic>> {
-    let declared = declared_end_of_run_observations(wire);
-    let mut rows: Vec<DescriptorEndOfRunResult> = Vec::new();
-    for (id, _) in declared
-        .forward
-        .iter()
-        .chain(&declared.gradients)
-        .chain(&declared.params)
-    {
-        let version = descriptor
-            .buffer_versions
-            .iter()
-            .find(|version| version.buffer_id == *id)
-            .map(|version| version.version)
-            .ok_or_else(|| {
-                vec![Diagnostic::error(format!(
-                    "declared end-of-run buffer {id} has no version metadata on the host descriptor"
-                ))]
-            })?;
-        rows.push(DescriptorEndOfRunResult {
-            buffer_id: *id,
-            version,
-        });
-    }
-    Ok(rows)
 }
 
 /// Render the exact ordered launch records that the host will execute.

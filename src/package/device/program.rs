@@ -9,8 +9,9 @@ use super::{
     KernelUnit, LaunchId, LaunchUnit, LosslessMirCompanionEntry, MirCollectionOp, MirFunction,
     MirFunctionId, MirIntrinsic, MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind,
     MirKernelResourceRole, MirKernelShaderStage, MirKernelSignature, MirLocalId, MirStatementKind,
-    MirTensorStorageLayout, MirType, ObservationFact, SemanticValue, SemanticValueId,
-    SemanticValueOrigin, TypeTable, ValidatedMir, ValueBinding, ValueGeneration, VecDeque,
+    MirTensorStorageLayout, MirType, ObservationCadence, ObservationFact, SemanticValue,
+    SemanticValueId, SemanticValueOrigin, TypeTable, ValidatedMir, ValueBinding, ValueGeneration,
+    VecDeque,
 };
 
 // ---------------------------------------------------------------------------
@@ -141,12 +142,12 @@ struct ProgramBuffer {
     consumed: bool,
     /// Any kernel slot accesses the buffer in place (ReadWrite).
     readwrite: bool,
-    /// A trainable parameter of a RepeatingStep training program (S5-U5):
-    /// PerProgram persistent state with HostProvided init, copied in exactly
+    /// A trainable parameter of a `RepeatingStep` training program (S5-U5):
+    /// `PerProgram` persistent state with HostProvided init, copied in exactly
     /// once at session creation (the step's once-init contract). The flag is
     /// the independent fact behind the lifetime and initialization axes — the
     /// access pattern alone would decide these differently (a readwrite
-    /// intermediate is ZeroFill, a written+consumed buffer is PerStep).
+    /// intermediate is ZeroFill, a written+consumed buffer is `PerStep`).
     param: bool,
     /// A backward companion's gradient output slot (S5-U5): a per-step
     /// scratch value feeding the optimizer step — never an observation point
@@ -246,7 +247,7 @@ fn merge_slot_facts(
 /// precede their consumers; the launch ids are carried facts and do not
 /// change, only their position in the execution sequence does.
 ///
-/// A RepeatingStep program's trainable-parameter edges are EXCLUDED: the
+/// A `RepeatingStep` program's trainable-parameter edges are EXCLUDED: the
 /// parameter is persistent state — the step writes the value the NEXT step
 /// reads — so the write→read edge within one step's sequence would form a
 /// cycle. The parameter's current value is the once-init'd (or previous-step)
@@ -1000,7 +1001,7 @@ pub(crate) fn device_program_for_lowered(
         Ok(())
     };
 
-    for function in kernel_functions {
+    for function in &kernel_functions {
         build_kernel(function)?;
     }
 
@@ -1047,28 +1048,60 @@ pub(crate) fn device_program_for_lowered(
         }
     }
 
-    // The per-step observation of a RepeatingStep training program
-    // (U8-repair G2/G3): the SCALAR final output — the loss — is the ONLY
-    // buffer read back within each step. It is identified from the
-    // observation-eligible facts (an Output-role buffer that is written and
-    // never consumed, carrying element count 1), never from a name/shape
-    // coincidence. Every OTHER observation-eligible final (the forward /
-    // activation tensors the decomposition re-exposes — including the
-    // duplicate forward-save outputs) is step-local (PerStep): declared
-    // end-of-run observations, read back once at the end, never per-step.
-    let training_loss: Option<BufferId> = if training.is_some() {
-        buffers
+    // S5A-U1: the declared per-step observation of a RepeatingStep training
+    // program — the forward kernel's RETURN output (the loss the training
+    // loop measures). Identified from the training facts, never a shape scan:
+    // the forward function's decomposition's LAST subchain (or the
+    // whole-function kernel) emits the function's return value as its PRIMARY
+    // output slot — the first write slot in binding order (the
+    // contract-shaped `signature.output`, which binds before the D-2b-1
+    // extra outputs). The scalar-loss fixtures select the same buffer the
+    // pre-cadence scalarity rule did — but the fact is now DECLARED, not
+    // inferred from element counts.
+    let per_step_observation: Option<BufferId> = if training.is_some() {
+        let forward_functions: BTreeSet<MirFunctionId> = kernel_functions
             .iter()
-            .find(|buffer| {
-                buffer.role == BufferRole::Output
-                    && buffer.written
-                    && !buffer.consumed
-                    && buffer.element_count == 1
+            .map(|function| function.id)
+            .collect();
+        builds
+            .iter()
+            .rev()
+            .find(|build| forward_functions.contains(&build.function))
+            .and_then(|build| {
+                build
+                    .resources
+                    .iter()
+                    .find(|resource| {
+                        matches!(
+                            resource.access,
+                            MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
+                        )
+                    })
+                    .map(|resource| resource.buffer_id)
             })
-            .map(|buffer| buffer.id)
     } else {
         None
     };
+
+    // S5A-U1: the declared END-OF-RUN gradient set — the companion gradient
+    // buffers the training plan's gradient-flow links feed into a train_step
+    // (the backward → train_step data-flow, a carried training fact). A
+    // frozen-input gradient no step consumes is per-step scratch — declared
+    // never, observed never.
+    let train_step_gradients: BTreeSet<BufferId> = training
+        .as_ref()
+        .map(|training| {
+            training
+                .gradients
+                .iter()
+                .filter_map(|link| {
+                    gradient_buffers
+                        .get(&(link.companion.0, link.gradient_slot))
+                        .copied()
+                })
+                .collect()
+        })
+        .unwrap_or_default();
 
     // Pass 2: materialize the program with the merged identity facts. Every
     // reference to a unified id carries the same name/role/lifetime so the
@@ -1100,7 +1133,7 @@ pub(crate) fn device_program_for_lowered(
                 // trainable-parameter flag, never derived from the role. The
                 // host receives these facts through the payload; it never
                 // re-derives a lifetime from slot role alone.
-                lifetime: unified_lifetime(entry, training_loss),
+                lifetime: unified_lifetime(entry, training.is_some(), per_step_observation),
             };
             resources.push(DeviceResource {
                 buffer: identity,
@@ -1129,25 +1162,6 @@ pub(crate) fn device_program_for_lowered(
             id: launch_id,
             kernel_index,
         });
-        for resource in resources {
-            // F6: a result names a DECLARED observation point — only the
-            // program's Output-role buffers that are final observations
-            // (ObservationPoint lifetime). Writable intermediates (InOut),
-            // per-step data-flow buffers (PerStep), and persistent parameter
-            // state are never results merely because they are writable.
-            if resource.buffer.role == BufferRole::Output
-                && resource.buffer.lifetime == BufferLifetime::ObservationPoint
-            {
-                program
-                    .results
-                    .push(radix_mir::device_program::ResultBuffer {
-                        buffer: resource.buffer.clone(),
-                        version: resource.version.clone(),
-                        role: resource.buffer.role,
-                        produced_by: launch_id,
-                    });
-            }
-        }
     }
 
     // The launch sequence follows the carried dependency graph (F3), never
@@ -1161,6 +1175,26 @@ pub(crate) fn device_program_for_lowered(
         .map(|buffer| buffer.id)
         .collect();
     program.launches = dependency_ordered_launches(&program, &param_buffer_ids)?;
+
+    // S5A-U1: declare the observation-eligible results with their cadence.
+    // The cadence is the constructor's DECLARED fact from the training
+    // program's structure — never derived from buffer shapes or names:
+    //   - a RepeatingStep training program declares the forward's return
+    //     output (the loss) PerStep and the final forward / final gradients /
+    //     final params EndOfRun;
+    //   - a SingleRun program declares every written-not-consumed final a
+    //     per-execution observation (PerStep).
+    // Each result names the launch that produces its observed version (the
+    // last write in execution order) as both its producing launch and its
+    // observation boundary. The route and the host consume THIS declared set
+    // — there is no derived end-of-run set anywhere downstream.
+    program.results = declared_result_rows(
+        &program,
+        &buffers,
+        training.is_some(),
+        per_step_observation,
+        &train_step_gradients,
+    );
 
     // Pass 3: mint the carried semantic facts (F1–F6) and validate the
     // program together with them fail-closed.
@@ -1210,14 +1244,18 @@ fn output_slot_index(signature: &MirKernelSignature, output: &MirKernelResource)
 ///   intermediate (per-step);
 /// - a kernel-written final is read back at an observation point.
 ///
-/// G2/G3 (U8 repair): a RepeatingStep training program's per-step
-/// observation is ONLY the scalar loss — the single written-not-consumed
-/// final carrying `training_loss`. Every OTHER written-not-consumed final
-/// (the forward/activation tensors the decomposition re-exposes) is a
-/// step-local final (PerStep), declared an end-of-run observation rather
-/// than a per-step readback. SingleRun programs keep the ordinary rule (all
-/// finals are observation points).
-fn unified_lifetime(entry: &ProgramBuffer, training_loss: Option<BufferId>) -> BufferLifetime {
+/// G2/G3 (U8 repair) + S5A-U1: a `RepeatingStep` training program's per-step
+/// observation is ONLY the DECLARED loss buffer (`per_step_observation`) —
+/// the forward's return output. Every OTHER written-not-consumed final (the
+/// forward/activation tensors the decomposition re-exposes) is a step-local
+/// final (`PerStep`), declared an end-of-run observation rather than a
+/// per-step readback. `SingleRun` programs keep the ordinary rule (all finals
+/// are observation points).
+fn unified_lifetime(
+    entry: &ProgramBuffer,
+    training_program: bool,
+    per_step_observation: Option<BufferId>,
+) -> BufferLifetime {
     // S5-U5 (param-identity.md): a trainable parameter accumulates updates
     // across steps in ONE buffer — allocated once (per-program), initialized
     // HostProvided at session creation, updated in place at every step.
@@ -1243,17 +1281,113 @@ fn unified_lifetime(entry: &ProgramBuffer, training_loss: Option<BufferId>) -> B
         BufferLifetime::PerProgram
     } else if entry.consumed {
         BufferLifetime::PerStep
-    } else if Some(entry.id) == training_loss {
-        // G2/G3: the declared per-step observation — the loss — is the only
+    } else if Some(entry.id) == per_step_observation {
+        // The declared per-step observation — the loss — is the only
         // written-not-consumed final read back within each step.
         BufferLifetime::ObservationPoint
-    } else if training_loss.is_some() {
-        // G2/G3: a RepeatingStep program's OTHER written-not-consumed finals
-        // (the forward tensors, including the decomposition's re-exposed
+    } else if training_program {
+        // A RepeatingStep program's OTHER written-not-consumed finals (the
+        // forward tensors, including the decomposition's re-exposed
         // duplicates) are step-local — never per-step observations, never
         // per-step readbacks.
         BufferLifetime::PerStep
     } else {
         BufferLifetime::ObservationPoint
     }
+}
+
+/// The launch that produces a buffer's observed version: the LAST write
+/// (Write/ReadWrite) in execution order — the version the final readback
+/// observes (a trainable param's in-place train_step update, a companion's
+/// gradient write, a forward subchain's final write).
+fn producing_launch(program: &DeviceProgram, buffer: BufferId) -> Option<LaunchId> {
+    let mut produced: Option<LaunchId> = None;
+    for launch in &program.launches {
+        let Some(kernel) = program.kernels.get(launch.kernel_index) else {
+            continue;
+        };
+        if kernel.resources.iter().any(|resource| {
+            resource.buffer.id == buffer
+                && matches!(
+                    resource.access,
+                    MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
+                )
+        }) {
+            produced = Some(launch.id);
+        }
+    }
+    produced
+}
+
+/// Declare the observation-eligible results of a materialized program with
+/// their observation cadence (S5A-U1). The cadence is a DECLARED fact from
+/// the training program's structure — never derived from buffer shapes or
+/// names:
+///
+/// - a `RepeatingStep` training program declares the forward's return output
+///   (the loss) `PerStep` and the final forward / final gradients / final
+///   params `EndOfRun` — the gradients are the training plan's gradient-flow
+///   buffers (the companion slots a train_step consumes), never a frozen
+///   input's gradient;
+/// - a `SingleRun` program declares every declared per-execution observation
+///   point (an `ObservationPoint`-lifetime final) `PerStep`; per-step
+///   scratch (a companion gradient slot) is never a result.
+///
+/// Each result names the launch that produces its observed version (the last
+/// write in execution order) as both its producing launch and its
+/// observation boundary (F6). The route and the host consume exactly this
+/// declared set — no downstream derivation exists.
+fn declared_result_rows(
+    program: &DeviceProgram,
+    buffers: &[ProgramBuffer],
+    training_program: bool,
+    per_step_observation: Option<BufferId>,
+    train_step_gradients: &BTreeSet<BufferId>,
+) -> Vec<radix_mir::device_program::ResultBuffer> {
+    let mut rows: Vec<radix_mir::device_program::ResultBuffer> = Vec::new();
+    for buffer in buffers {
+        let Some(produced_by) = producing_launch(program, buffer.id) else {
+            continue;
+        };
+        let lifetime = unified_lifetime(buffer, training_program, per_step_observation);
+        let cadence = if training_program {
+            if Some(buffer.id) == per_step_observation {
+                // The declared per-step observation — the loss.
+                ObservationCadence::PerStep
+            } else if buffer.param
+                || train_step_gradients.contains(&buffer.id)
+                || (buffer.role == BufferRole::Output && buffer.written && !buffer.consumed)
+            {
+                // The final forward / final gradients / final params.
+                ObservationCadence::EndOfRun
+            } else {
+                continue;
+            }
+        } else if lifetime == BufferLifetime::ObservationPoint {
+            // SingleRun: every declared per-execution observation point (the
+            // written-not-consumed finals). Per-step scratch (a companion
+            // gradient slot) is never a result.
+            ObservationCadence::PerStep
+        } else {
+            continue;
+        };
+        rows.push(radix_mir::device_program::ResultBuffer {
+            buffer: BufferIdentity {
+                id: buffer.id,
+                name: buffer.name.clone(),
+                role: buffer.role,
+                storage: MirTensorStorageLayout::DeviceHandle,
+                lifetime,
+            },
+            version: BufferVersion {
+                version: 1,
+                element_ty: buffer.element_ty,
+                element_count: buffer.element_count,
+            },
+            role: buffer.role,
+            produced_by,
+            cadence,
+        });
+    }
+    rows
 }

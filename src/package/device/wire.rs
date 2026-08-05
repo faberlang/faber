@@ -10,10 +10,11 @@ use super::{
     WireCompanionDerivativeKind, WireCompanionRelation, WireCompanionSelectedInput,
     WireCompanionSelectedOutput, WireDependencyEdge, WireDeviceProgram, WireDeviceResource,
     WireDispatchSize, WireInitializationPolicy, WireKernelLaunchPlan, WireKernelUnit,
-    WireLaunchUnit, WireMatMulPlan, WireMatMulSharedMemory, WireObservationFact,
-    WireOobPaddingPolicy, WireProgramLifetime, WireReduceOp, WireReductionPlan, WireResourceAccess,
-    WireResultBuffer, WireSemanticValue, WireSemanticValueOrigin, WireSharedMemoryLayout,
-    WireStorageLayout, WireTransposePlan, WireWorkgroupCount, WireWorkgroupSize,
+    WireLaunchUnit, WireMatMulPlan, WireMatMulSharedMemory, WireObservationCadence,
+    WireObservationFact, WireOobPaddingPolicy, WireProgramLifetime, WireReduceOp,
+    WireReductionPlan, WireResourceAccess, WireResultBuffer, WireSemanticValue,
+    WireSemanticValueOrigin, WireSharedMemoryLayout, WireStorageLayout, WireTransposePlan,
+    WireWorkgroupCount, WireWorkgroupSize,
 };
 // Doc-link surface: the carried generation type appears only in an
 // intra-doc link here; the import keeps the link resolvable from this module.
@@ -51,7 +52,14 @@ use super::ValueGeneration;
 /// count (a count the wire admits fail-closed at decode — zero is
 /// rejected). Bumped in lockstep with
 /// [`radix_mir_fmir::WIRE_DEVICE_PROGRAM_VERSION`].
-pub(crate) const DEVICE_RUN_PLAN_VERSION: u32 = 5;
+///
+/// **v5 → v6 (S5A-U1, the observation-cadence clean break):** every result
+/// row's explicit observation fact gains the **observation cadence**
+/// discriminator (`PerStep` / `EndOfRun`) — when the declared observation is
+/// read back. The canonical wire bytes now change when the readback cadence
+/// changes (A7). Bumped in lockstep with
+/// [`radix_mir_fmir::WIRE_DEVICE_PROGRAM_VERSION`].
+pub(crate) const DEVICE_RUN_PLAN_VERSION: u32 = 6;
 
 /// Fail-closed wire admission (S3-A4): the wire version is read FIRST,
 /// before any field-level interpretation, so an old (or unknown) codec
@@ -100,7 +108,7 @@ pub(crate) fn admit_device_program_section(
 /// relation (F4), per-buffer initialization policies and explicit
 /// observation facts on every result row (F5/F6). CUDA symbols and host
 /// input values are NOT program semantics — they never enter the canonical
-/// bytes. A RepeatingStep program carries its declared training step count
+/// bytes. A `RepeatingStep` program carries its declared training step count
 /// (S5-U5b) in the `RepeatingStep(count)` lifetime variant.
 #[must_use]
 pub(crate) fn wire_program_for_program(
@@ -186,11 +194,22 @@ pub(crate) fn wire_program_for_program(
                 version: wire_buffer_version(&result.version),
                 role: wire_role(result.role),
                 produced_by: result.produced_by.0,
-                // Explicit observation fact (F5/F6): the result row IS a
-                // declared observation point at the producing launch's
-                // completion boundary.
+                // Explicit observation fact (F5/F6) + observation cadence
+                // (S5A-U1): the result row IS a declared observation at the
+                // producing launch's completion boundary, read back per step
+                // (PerStep) or once after the step loop (EndOfRun). The
+                // cadence is the constructor's declared fact — carried
+                // verbatim, never re-derived from shapes.
                 observation: WireObservationFact {
                     at_launch: result.produced_by.0,
+                    cadence: match result.cadence {
+                        radix_mir::device_program::ObservationCadence::PerStep => {
+                            WireObservationCadence::PerStep
+                        }
+                        radix_mir::device_program::ObservationCadence::EndOfRun => {
+                            WireObservationCadence::EndOfRun
+                        }
+                    },
                 },
             })
             .collect(),

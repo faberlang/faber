@@ -111,6 +111,7 @@ fn elementwise_add_descriptor(backend: DeviceBackend, entry: &str, count: u64) -
         // declared observation point.
         roots: vec![1],
         results: vec![result(3)],
+        end_of_run_results: Vec::new(),
     }
 }
 
@@ -440,6 +441,7 @@ fn conflicting_shapes_fail_as_shape_mismatch() {
         data_flow: Vec::new(),
         roots: vec![1, 2],
         results: Vec::new(),
+        end_of_run_results: Vec::new(),
     };
     let err = execute_device_descriptor(&mut host, &descriptor, &BTreeMap::new())
         .expect_err("shape conflict must fail before launch");

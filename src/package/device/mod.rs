@@ -49,9 +49,9 @@ use faber::device::{DeviceBackend, DeviceSelection};
 use faber_host_macos_arm64::composite_host::ProgramSession;
 use faber_host_macos_arm64::device_descriptor::{
     DescriptorBuffer, DescriptorBufferVersion, DescriptorDataFlow as HostDescriptorDataFlow,
-    DescriptorKernel, DescriptorLaunch, DescriptorResult, DeviceBufferInitialization,
-    DeviceBufferLifetime, DeviceBufferRole, DeviceDataType, DeviceDescriptor,
-    DeviceProgramLifetime as HostDeviceProgramLifetime,
+    DescriptorEndOfRunResult, DescriptorKernel, DescriptorLaunch, DescriptorResult,
+    DeviceBufferInitialization, DeviceBufferLifetime, DeviceBufferRole, DeviceDataType,
+    DeviceDescriptor, DeviceProgramLifetime as HostDeviceProgramLifetime,
 };
 use radix::diagnostics::Diagnostic;
 use radix::hir::DefId;
@@ -67,6 +67,7 @@ use radix_mir::device::MirCompanionDerivativeKind;
 use radix_mir::device_program::{
     Binding, BufferId, BufferIdentity, BufferLifetime, BufferRole, BufferVersion, DeviceProgram,
     DeviceProgramLifetime, DeviceResource, KernelLaunchPlan, KernelUnit, LaunchId, LaunchUnit,
+    ObservationCadence,
 };
 use radix_mir::device_program_plans::{kernel_plan_for_function, subchain_signature_for_emission};
 use radix_mir::device_semantics::{
@@ -94,8 +95,8 @@ use radix_mir_fmir::{
     WireBufferRole, WireBufferVersion, WireCollectionKernelPlan, WireDependencyEdge,
     WireDeviceProgram, WireDeviceResource, WireDispatchSize, WireInitializationPolicy,
     WireKernelLaunchPlan, WireKernelUnit, WireLaunchUnit, WireMatMulPlan, WireMatMulSharedMemory,
-    WireObservationFact, WireOobPaddingPolicy, WireProgramLifetime, WireReduceOp,
-    WireReductionPlan, WireResourceAccess, WireResultBuffer, WireSemanticValue,
+    WireObservationCadence, WireObservationFact, WireOobPaddingPolicy, WireProgramLifetime,
+    WireReduceOp, WireReductionPlan, WireResourceAccess, WireResultBuffer, WireSemanticValue,
     WireSemanticValueOrigin, WireSharedMemoryLayout, WireStorageLayout, WireTransposePlan,
     WireWorkgroupCount, WireWorkgroupSize,
 };
@@ -137,9 +138,9 @@ pub(crate) use wire::{
 #[allow(unused_imports)]
 // the run/training types ride the device root even when a test does not name one directly.
 pub(crate) use run::{
-    declared_end_of_run_observations, device_repeat_count, device_step_count,
-    execute_session_receipts, host_receipt_graph_lines, host_receipt_launch_order_line,
-    step_run_report, EndOfRunObservationSet, StepRunReport,
+    declared_end_of_run_observations, declared_per_step_observations, device_repeat_count,
+    device_step_count, execute_session_receipts, host_receipt_graph_lines,
+    host_receipt_launch_order_line, step_run_report, EndOfRunObservationSet, StepRunReport,
 };
 #[cfg(test)]
 #[allow(unused_imports)]

@@ -2,14 +2,15 @@
 // split routes through `use super::*` (wildcard imports are denied).
 use super::{
     device_diag, function_has_shape_construction, wire_program_for_program, BTreeMap, BTreeSet,
-    DescriptorBuffer, DescriptorBufferVersion, DescriptorKernel, DescriptorLaunch,
-    DescriptorResult, DeviceBackend, DeviceBufferInitialization, DeviceBufferLifetime,
-    DeviceBufferRole, DeviceDataType, DeviceDescriptor, DeviceProgram, DeviceSelection,
-    DeviceSemantics, Diagnostic, FmirDeviceArtifact, FmirDeviceArtifactsSection, FmirDeviceBackend,
-    FmirDeviceInput, FmirDeviceProgramSection, FmirDeviceSection, FmirDeviceSelection,
-    FmirDeviceSymbol, HostDescriptorDataFlow, HostDeviceProgramLifetime, Interner, MirFunctionId,
-    ValidatedMir, WireBufferLifetime, WireBufferRole, WireDeviceProgram, WireInitializationPolicy,
-    WireProgramLifetime, WireResourceAccess, DEVICE_RUN_PLAN_VERSION,
+    DescriptorBuffer, DescriptorBufferVersion, DescriptorEndOfRunResult, DescriptorKernel,
+    DescriptorLaunch, DescriptorResult, DeviceBackend, DeviceBufferInitialization,
+    DeviceBufferLifetime, DeviceBufferRole, DeviceDataType, DeviceDescriptor, DeviceProgram,
+    DeviceSelection, DeviceSemantics, Diagnostic, FmirDeviceArtifact, FmirDeviceArtifactsSection,
+    FmirDeviceBackend, FmirDeviceInput, FmirDeviceProgramSection, FmirDeviceSection,
+    FmirDeviceSelection, FmirDeviceSymbol, HostDescriptorDataFlow, HostDeviceProgramLifetime,
+    Interner, MirFunctionId, ValidatedMir, WireBufferLifetime, WireBufferRole, WireDeviceProgram,
+    WireInitializationPolicy, WireObservationCadence, WireProgramLifetime, WireResourceAccess,
+    DEVICE_RUN_PLAN_VERSION,
 };
 // Doc-link surface: the host session/descriptor types appear only in
 // intra-doc links here (their code uses live in run.rs); the import keeps
@@ -297,6 +298,30 @@ pub(crate) fn descriptor_for_backend(
         )?;
     }
 
+    // S5A-U1: split the wire's DECLARED result rows by observation cadence.
+    // The `PerStep` rows are the per-step readbacks (ObservationPoint
+    // buffers — the loss); the `EndOfRun` rows are the one-shot end-of-run
+    // readback (PerStep / PerProgram buffers — the final forward, final
+    // gradients, final params). The host consumes both sets from the
+    // descriptor — there is no derivation and no runtime declaration seam.
+    let mut results = Vec::new();
+    let mut end_of_run_results = Vec::new();
+    for result in &wire.results {
+        if result.observation.cadence == WireObservationCadence::EndOfRun {
+            end_of_run_results.push(DescriptorEndOfRunResult {
+                buffer_id: result.buffer.id,
+                version: result.version.version,
+            });
+        } else {
+            results.push(DescriptorResult {
+                buffer_id: result.buffer.id,
+                version: result.version.version,
+                produced_by: result.produced_by,
+                at_launch: result.observation.at_launch,
+            });
+        }
+    }
+
     let descriptor = DeviceDescriptor {
         backend,
         module_image: blob.to_vec(),
@@ -332,18 +357,13 @@ pub(crate) fn descriptor_for_backend(
         // F3: the declared legal execution roots — the launches the graph may
         // start from, carried verbatim.
         roots: wire.roots.clone(),
-        // F6: the declared observation points — the explicit result rows the
-        // host reads back, projected from the wire's observation facts.
-        results: wire
-            .results
-            .iter()
-            .map(|result| DescriptorResult {
-                buffer_id: result.buffer.id,
-                version: result.version.version,
-                produced_by: result.produced_by,
-                at_launch: result.observation.at_launch,
-            })
-            .collect(),
+        // F6 + S5A-U1: the declared observation points — the explicit result
+        // rows the host reads back, projected from the wire's observation
+        // facts. The `results` are the PerStep rows (read back every step);
+        // the `end_of_run_results` are the EndOfRun rows (read back once
+        // after the step loop).
+        results,
+        end_of_run_results,
     };
 
     descriptor
@@ -357,8 +377,10 @@ pub(crate) fn descriptor_for_backend(
 /// descriptor has no result surface, so a result-only or contradictory record
 /// would otherwise be able to add metadata without proving a real producer.
 /// Result rows are the authoritative readback set, but the host can only read
-/// back `ObservationPoint` buffers and its receipt is keyed by buffer id; an
-/// unsupported lifetime or repeated id therefore fails before host creation.
+/// back buffers that match the DECLARED observation cadence (`ObservationPoint`
+/// for a `PerStep` row; `PerStep`/`PerProgram` for an `EndOfRun` row) and its receipt
+/// is keyed by buffer id; an unsupported lifetime or repeated id therefore
+/// fails before host creation.
 fn validate_wire_results(wire: &WireDeviceProgram) -> Result<(), Vec<Diagnostic>> {
     let mut result_buffers = BTreeMap::new();
     for (result_index, result) in wire.results.iter().enumerate() {
@@ -472,25 +494,58 @@ fn validate_wire_results(wire: &WireDeviceProgram) -> Result<(), Vec<Diagnostic>
                 ),
             )]);
         }
-        if resource.buffer.lifetime != WireBufferLifetime::ObservationPoint {
-            return Err(vec![device_diag(
-                "result",
-                format!(
-                    "result {result_index} names buffer {} with lifetime {}; only observation-point results are supported by the host readback contract",
-                    result.buffer.id,
-                    resource.buffer.lifetime.spelling()
-                ),
-            )]);
+        // S5A-U1: the declared observation cadence must be consistent with
+        // the buffer's lifetime class — a PerStep result names an
+        // ObservationPoint buffer (read back every step); an EndOfRun result
+        // names a PerStep or PerProgram buffer (read back once after the
+        // loop). A cadence that contradicts the lifetime fails before host
+        // construction (the same rule the radix decode boundary runs).
+        match result.observation.cadence {
+            WireObservationCadence::PerStep
+                if resource.buffer.lifetime != WireBufferLifetime::ObservationPoint =>
+            {
+                return Err(vec![device_diag(
+                    "result",
+                    format!(
+                        "result {result_index} declares a per-step observation of buffer {} with lifetime {}; only observation-point buffers are read back within every step",
+                        result.buffer.id,
+                        resource.buffer.lifetime.spelling()
+                    ),
+                )]);
+            }
+            WireObservationCadence::EndOfRun
+                if !matches!(
+                    resource.buffer.lifetime,
+                    WireBufferLifetime::PerStep | WireBufferLifetime::PerProgram
+                ) =>
+            {
+                return Err(vec![device_diag(
+                    "result",
+                    format!(
+                        "result {result_index} declares an end-of-run observation of buffer {} with lifetime {}; only per-step and per-program buffers are read back once at the end",
+                        result.buffer.id,
+                        resource.buffer.lifetime.spelling()
+                    ),
+                )]);
+            }
+            _ => {}
         }
-        if !matches!(
-            resource.access,
-            WireResourceAccess::Write | WireResourceAccess::ReadWrite
-        ) {
+        // A result's producing launch must WRITE the observed version: at
+        // least one slot of the producing kernel writes (or read-writes)
+        // the buffer — the first matching slot may be a read slot of an
+        // in-place update (a train_step reads AND writes its param buffers).
+        if !kernel.resources.iter().any(|slot| {
+            slot.buffer.id == result.buffer.id
+                && matches!(
+                    slot.access,
+                    WireResourceAccess::Write | WireResourceAccess::ReadWrite
+                )
+        }) {
             return Err(vec![device_diag(
                 "result",
                 format!(
-                    "result {result_index} names launch {} as producer, but its matching resource is read-only",
-                    result.produced_by
+                    "result {result_index} names launch {} as producer, but its kernel never writes buffer {}",
+                    result.produced_by, result.buffer.id
                 ),
             )]);
         }
@@ -588,7 +643,7 @@ fn wire_element_ty_to_host(spelling: &str) -> Result<DeviceDataType, Vec<Diagnos
 /// input-buffer identities).
 ///
 /// The map covers BOTH the program's read-only input buffers AND a
-/// RepeatingStep program's trainable parameters — InOut buffers with
+/// `RepeatingStep` program's trainable parameters — InOut buffers with
 /// `HostProvided` initialization (the once-init param values). The host
 /// consumes the map through [`ProgramSession::init_params`] for
 /// `RepeatingStep` sessions and through per-execution copy-in for
@@ -666,7 +721,9 @@ pub(crate) struct WireGraphEdge {
 /// version). Test-only since U5: the descriptor consumes the wire's CARRIED
 /// `dependencies` verbatim.
 #[cfg(test)]
-pub(crate) fn wire_resource_graph(device: &FmirDeviceSection) -> (Vec<WireGraphBuffer>, Vec<WireGraphEdge>) {
+pub(crate) fn wire_resource_graph(
+    device: &FmirDeviceSection,
+) -> (Vec<WireGraphBuffer>, Vec<WireGraphEdge>) {
     let wire = &device.device_program.program;
     let mut buffers: Vec<WireGraphBuffer> = Vec::new();
     let mut producers: Vec<(u32, u32, u32)> = Vec::new();

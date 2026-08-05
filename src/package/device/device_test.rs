@@ -445,14 +445,20 @@ fn descriptor_preserves_wire_launch_order_and_version_keys() {
             version: medius_version,
             role: WireBufferRole::InOut,
             produced_by: 12,
-            observation: WireObservationFact { at_launch: 12 },
+            observation: WireObservationFact {
+                at_launch: 12,
+                cadence: WireObservationCadence::PerStep,
+            },
         });
         wire.results.push(WireResultBuffer {
             buffer: result_buffer,
             version: result_version,
             role: WireBufferRole::Output,
             produced_by: 11,
-            observation: WireObservationFact { at_launch: 11 },
+            observation: WireObservationFact {
+                at_launch: 11,
+                cadence: WireObservationCadence::PerStep,
+            },
         });
         // Make the intermediate's slots observation-point (the form the host
         // readback contract accepts for this projection test).
@@ -878,7 +884,10 @@ fn descriptor_rejects_inout_result_before_host_projection() {
             version: medius_version,
             role: WireBufferRole::InOut,
             produced_by: 1,
-            observation: WireObservationFact { at_launch: 1 },
+            observation: WireObservationFact {
+                at_launch: 1,
+                cadence: WireObservationCadence::PerStep,
+            },
         },
     );
 
@@ -916,9 +925,9 @@ fn descriptor_rejects_duplicate_result_buffer_before_host_projection() {
 
 /// S2-5 constructor identity unification: the two-kernel chain shares ONE
 /// `BufferId` for the device-resident intermediate (`medius`, InOut role,
-/// PerStep lifetime) across both kernels — produced by launch 1, consumed by
-/// launch 2 (a data-flow edge) — while the declared input stays PerProgram
-/// and the final output stays ObservationPoint.
+/// `PerStep` lifetime) across both kernels — produced by launch 1, consumed by
+/// launch 2 (a data-flow edge) — while the declared input stays `PerProgram`
+/// and the final output stays `ObservationPoint`.
 #[test]
 fn two_kernel_chain_unifies_intermediate_identity() {
     let program = two_kernel_program();
@@ -2160,7 +2169,7 @@ fn companion_relation_projected_onto_the_wire() {
 /// its generated companion, a package-local train_step (SGD update:
 /// param' = param − grad) called from a constant-bounded entry loop, and the
 /// loop's re-bindings. The declared source loop bound (100) matches the
-/// default declared RepeatingStep step count, so the constructor admits it.
+/// default declared `RepeatingStep` step count, so the constructor admits it.
 ///
 /// The forward returns a TENSOR (not `fractus`): a scalar-return primal's
 /// companion carries an f64-typed upstream gradient, outside the current
@@ -2206,7 +2215,7 @@ incipit {
 "#;
 
 /// The same training loop with a source bound (8) that contradicts the
-/// default declared RepeatingStep step count (100) — the step-count
+/// default declared `RepeatingStep` step count (100) — the step-count
 /// admission must fail closed.
 const TRAINING_LOOP_FIXTURE_MISMATCH: &str = r#"@ nucleum
 @ radix lane "air"
@@ -2247,13 +2256,13 @@ incipit {
 }
 "#;
 
-/// Build the training fixture's RepeatingStep device program through the
+/// Build the training fixture's `RepeatingStep` device program through the
 /// ordinary constructor.
 fn training_fixture_program(source: &str, name: &str) -> (DeviceProgram, DeviceSemantics) {
     training_fixture_program_with_steps(source, name, DEFAULT_TRAINING_STEPS)
 }
 
-/// Build the training fixture's RepeatingStep device program with an explicit
+/// Build the training fixture's `RepeatingStep` device program with an explicit
 /// declared step count.
 fn training_fixture_program_with_steps(
     source: &str,
@@ -2275,8 +2284,8 @@ fn training_fixture_program_with_steps(
 }
 
 /// The S5-U5 constructor materializes the MLP-shaped training program: the
-/// decomposed forward + backward + train_step kernel set on a RepeatingStep
-/// lifetime, with the trainable params projected to PerProgram InOut buffers
+/// decomposed forward + backward + train_step kernel set on a `RepeatingStep`
+/// lifetime, with the trainable params projected to `PerProgram` InOut buffers
 /// with HostProvided init, and the loss observation as the single declared
 /// result.
 #[test]
@@ -2368,11 +2377,18 @@ fn repeating_step_constructor_materializes_training_program() {
         );
     }
 
-    // F6: the ONLY declared observation is the loss result (the forward's
-    // final output); the gradient intermediates and the param aliases are
-    // never results merely because they are writable.
-    assert_eq!(program.results.len(), 1, "one loss observation point");
-    assert_eq!(program.results[0].buffer.role, BufferRole::Output);
+    // S5A-U1: the DECLARED observation cadence set — the loss is the single
+    // PerStep result (the forward's final output); the final forward /
+    // final gradients / final params are declared EndOfRun (read back once
+    // at the end). Gradient intermediates and parameter aliases are never
+    // per-step results merely because they are writable.
+    let per_step: Vec<_> = program
+        .results
+        .iter()
+        .filter(|result| result.cadence == ObservationCadence::PerStep)
+        .collect();
+    assert_eq!(per_step.len(), 1, "one per-step loss observation");
+    assert_eq!(per_step[0].buffer.role, BufferRole::Output);
 
     // The semantics mint HostProvided init for the params (never ZeroFill
     // despite the InOut access) and carry no param dependency edge (the
@@ -2475,9 +2491,9 @@ fn repeating_step_step_count_mismatch_fails_closed() {
     );
 }
 
-/// The RepeatingStep wire + host descriptor projection (the image/host agree
-/// surface): the wire carries the RepeatingStep lifetime, the params as
-/// InOut + PerProgram + HostProvided, and the descriptor admits through
+/// The `RepeatingStep` wire + host descriptor projection (the image/host agree
+/// surface): the wire carries the `RepeatingStep` lifetime, the params as
+/// InOut + `PerProgram` + HostProvided, and the descriptor admits through
 /// `descriptor_for_backend` with the same facts and the loss observation.
 #[test]
 fn repeating_step_wire_and_descriptor_project_params_and_observation() {
@@ -2565,7 +2581,7 @@ fn repeating_step_wire_and_descriptor_project_params_and_observation() {
     );
 }
 
-/// The route step-driving core (S5-U5): a RepeatingStep session once-inits
+/// The route step-driving core (S5-U5): a `RepeatingStep` session once-inits
 /// its HostProvided params, executes N steps on ONE session, collects the
 /// per-step loss trace, and reports the convergence verdict. Driven on the
 /// fake Metal driver — no real device required.
@@ -2681,6 +2697,7 @@ fn repeating_step_route_runs_steps_once_init_loss_trace_convergence() {
             produced_by: 2,
             at_launch: 2,
         }],
+        end_of_run_results: Vec::new(),
     };
     descriptor
         .validate()
@@ -2713,8 +2730,9 @@ fn repeating_step_route_runs_steps_once_init_loss_trace_convergence() {
     session.teardown().expect("teardown");
 
     assert_eq!(receipts.len(), 100, "exactly 100 steps on ONE session");
-    // The loss trace strictly decreases: loss_k = 1.0 − 0.01·(k+1).
-    let report = step_run_report(&receipts);
+    // The loss trace strictly decreases: loss_k = 1.0 − 0.01·(k+1). The
+    // loss is the DECLARED per-step observation buffer (id 3).
+    let report = step_run_report(&receipts, 3);
     assert_eq!(report.step_count, 100);
     assert_eq!(report.loss_trace.len(), 100);
     let first = report.loss_trace[0]
@@ -2845,8 +2863,8 @@ fn admit_device_program_section_rejects_zero_step_count() {
         .expect_err("a zero declared step count fails the faber boundary admission");
     assert!(error[0].message.contains("step count 0"));
 }
-/// The constructor's RepeatingStep param materialization is
-/// emitter-compatible: the forward kernel (PerProgram InOut HostProvided
+/// The constructor's `RepeatingStep` param materialization is
+/// emitter-compatible: the forward kernel (`PerProgram` InOut HostProvided
 /// param bindings) emits through the S5-U1b decomposition-aware Metal
 /// emitter — the carried subchain plan and the InOut param bindings are
 /// consumed without a real device. (The full training image's multi-output
@@ -3020,8 +3038,8 @@ fn with_interpreted_workspace_package<R>(
 /// S5-U5c: the gradus library `train_step_2x2` body — a provider import, not
 /// a package-local function — enters the package MIR through the interpreted
 /// consumer's library merge, folds (magnitudines/crea → elementwise fills),
-/// and materializes as the RepeatingStep program's optimizer-step kernel,
-/// exactly like a package-local step: params PerProgram InOut HostProvided,
+/// and materializes as the `RepeatingStep` program's optimizer-step kernel,
+/// exactly like a package-local step: params `PerProgram` InOut HostProvided,
 /// gradients wired from the companion, and the train_step kernel carrying
 /// the library's entry name.
 #[test]
@@ -3152,11 +3170,16 @@ fn library_backed_train_step_materializes_into_device_program() {
         );
     }
 
-    // The loss observation is the single declared result.
+    // The loss is the single DECLARED PerStep result; the finals are
+    // declared EndOfRun.
     assert_eq!(
-        program.results.len(),
+        program
+            .results
+            .iter()
+            .filter(|result| result.cadence == ObservationCadence::PerStep)
+            .count(),
         1,
-        "the loss is the single observation"
+        "the loss is the single per-step observation"
     );
     assert!(
         semantics
@@ -3442,10 +3465,13 @@ incipit {
 "#;
 
 /// U8-repair G2/G3: the decomposed scalar-loss MLP shape declares exactly
-/// ONE per-step observation — the scalar loss — even though the
-/// decomposition exposes multiple written-not-consumed finals (the forward
-/// tensors and the re-exposed forward saves). The other finals are
-/// step-local (PerStep) end-of-run observations, never per-step readbacks.
+/// S5A-U1: the decomposed scalar-loss MLP shape declares exactly ONE
+/// `PerStep` observation — the scalar loss — even though the decomposition
+/// exposes multiple written-not-consumed finals (the forward tensors and
+/// the re-exposed forward saves). The other finals are DECLARED `EndOfRun`
+/// observations (read back once at the end), never per-step readbacks. No
+/// scalarity/derivation heuristic selects the loss — the cadence is the
+/// constructor's declared fact.
 #[test]
 fn decomposed_scalar_loss_forward_declares_only_the_loss_per_step() {
     let (program, _semantics) =
@@ -3458,22 +3484,37 @@ fn decomposed_scalar_loss_forward_declares_only_the_loss_per_step() {
         "a training loop materializes a RepeatingStep program"
     );
 
-    // Exactly ONE per-step observation: the scalar loss.
+    // Exactly ONE PerStep observation: the scalar loss. Every other result
+    // row is DECLARED EndOfRun (the final forward, gradients, params).
+    let per_step: Vec<_> = program
+        .results
+        .iter()
+        .filter(|result| result.cadence == ObservationCadence::PerStep)
+        .collect();
+    let end_of_run: Vec<_> = program
+        .results
+        .iter()
+        .filter(|result| result.cadence == ObservationCadence::EndOfRun)
+        .collect();
     assert_eq!(
-        program.results.len(),
+        per_step.len(),
         1,
         "the decomposed forward exposes many written-not-consumed finals, \
-         but ONLY the scalar loss is a per-step observation"
+         but ONLY the loss is declared a per-step observation"
     );
     assert_eq!(
-        program.results[0].version.element_count, 1,
+        per_step[0].version.element_count, 1,
         "the per-step observation is the scalar loss (f32[1])"
     );
-    assert_eq!(program.results[0].buffer.role, BufferRole::Output);
+    assert_eq!(per_step[0].buffer.role, BufferRole::Output);
+    assert!(
+        !end_of_run.is_empty(),
+        "the final forward/gradients/params are declared EndOfRun observations"
+    );
 
     // The loss buffer is the ONLY ObservationPoint buffer; every other
     // written-not-consumed final (forward tensor / re-exposed save) is
-    // step-local.
+    // step-local (EndOfRun).
     let mut seen: Vec<u32> = Vec::new();
     for resource in program
         .kernels
@@ -3487,7 +3528,7 @@ fn decomposed_scalar_loss_forward_declares_only_the_loss_per_step() {
     }
     assert_eq!(
         seen,
-        vec![program.results[0].buffer.id.0],
+        vec![per_step[0].buffer.id.0],
         "the loss is the only observation-point buffer"
     );
 
@@ -3521,10 +3562,8 @@ fn real_mlp_fixture_declares_one_per_step_observation() {
         env!("CARGO_MANIFEST_DIR"),
         "/../examples/training/mlp/src/train.fab"
     ));
-    let (program, _semantics) = with_interpreted_workspace_package(
-        "g2-real-mlp",
-        source,
-        |lowered| {
+    let (program, _semantics) =
+        with_interpreted_workspace_package("g2-real-mlp", source, |lowered| {
             device_program_for_lowered(
                 &lowered.validated,
                 &lowered.interner,
@@ -3534,9 +3573,8 @@ fn real_mlp_fixture_declares_one_per_step_observation() {
             .expect("constructor succeeds")
             .map(|(program, semantics, _step_count)| (program, semantics))
             .expect("fixture yields a device program")
-        },
-    )
-    .expect("real MLP fixture lowers");
+        })
+        .expect("real MLP fixture lowers");
 
     program.validate().expect("constructed program validates");
     assert_eq!(
@@ -3544,17 +3582,53 @@ fn real_mlp_fixture_declares_one_per_step_observation() {
         DeviceProgramLifetime::RepeatingStep,
         "the MLP is a RepeatingStep training program"
     );
+    let per_step: Vec<_> = program
+        .results
+        .iter()
+        .filter(|result| result.cadence == ObservationCadence::PerStep)
+        .collect();
+    let end_of_run: Vec<_> = program
+        .results
+        .iter()
+        .filter(|result| result.cadence == ObservationCadence::EndOfRun)
+        .collect();
     assert_eq!(
-        program.results.len(),
+        per_step.len(),
         1,
         "the real MLP declares exactly ONE per-step observation — the loss \
          (was five: h1, h2, loss + two duplicates → 5 readbacks/step)"
     );
     assert_eq!(
-        program.results[0].version.element_count, 1,
+        per_step[0].version.element_count, 1,
         "the per-step observation is the scalar loss (f32[1])"
     );
-    assert_eq!(program.results[0].buffer.role, BufferRole::Output);
+    assert_eq!(per_step[0].buffer.role, BufferRole::Output);
+    assert_eq!(
+        end_of_run.len(),
+        12,
+        "the real MLP declares 12 end-of-run rows (4 forward + 4 gradients + 4 params)"
+    );
+    // The evidence expectations (U8/U9) hold: the DECLARED end-of-run set is
+    // the same 12 rows the Stage 5 evidence observed once at the completion
+    // boundary — 4 final forward (incl. 2 duplicate saves) + 4 final
+    // gradients + 4 final params.
+    let wire = wire_program_for_program(&program, &_semantics, DEFAULT_TRAINING_STEPS);
+    let end_of_run = declared_end_of_run_observations(&wire);
+    assert_eq!(
+        end_of_run.forward.len(),
+        4,
+        "the final forward set is the evidence's 4 forward rows"
+    );
+    assert_eq!(
+        end_of_run.gradients.len(),
+        4,
+        "the final gradient set is the evidence's 4 gradient rows"
+    );
+    assert_eq!(
+        end_of_run.params.len(),
+        4,
+        "the final params set is the evidence's 4 param rows"
+    );
 }
 
 /// U8-repair G1: the training report selects the LOSS observation — the
@@ -3707,6 +3781,7 @@ fn step_run_report_selects_the_scalar_loss_observation() {
                 at_launch: 1,
             },
         ],
+        end_of_run_results: Vec::new(),
     };
     descriptor
         .validate()
@@ -3740,31 +3815,62 @@ fn step_run_report_selects_the_scalar_loss_observation() {
     session.teardown().expect("teardown");
 
     // The per-step readback carries BOTH observations; the report selects
-    // the SCALAR loss (1.0), never the first buffer in BTreeMap order (the
-    // tensor's first element 4.0).
+    // the DECLARED per-step observation — the loss buffer 4 (1.0), never the
+    // first buffer in BTreeMap order (the tensor's first element 4.0).
     assert!(
-        receipts
-            .first()
-            .expect("receipt")
-            .outputs
-            .contains_key(&3),
+        receipts.first().expect("receipt").outputs.contains_key(&3),
         "the tensor observation is read back per step"
     );
-    let report = step_run_report(&receipts);
+    let report = step_run_report(&receipts, 4);
     assert_eq!(report.initial_loss, Some(1.0));
     assert_eq!(report.final_loss, Some(1.0));
-    assert_ne!(report.initial_loss, Some(4.0), "never the tensor's first element");
+    assert_ne!(
+        report.initial_loss,
+        Some(4.0),
+        "never the tensor's first element"
+    );
 }
 
-/// U8-repair G2/G3: the route derives the declared end-of-run observation
-/// set (final forward, final gradients, final params) from the wire — the
-/// exit-gate rows' buffers, observable once at the end, never per-step.
+/// S5A-U1: the route CONSUMES the declared end-of-run observation set from
+/// the wire — exactly the result rows whose observation cadence is
+/// `EndOfRun` (final forward, final gradients, final params), grouped for
+/// the receipt by each row's declared role + lifetime. There is no
+/// derivation: the constructor declared the set, the wire carries it, and
+/// this function only groups it.
 #[test]
-fn declared_end_of_run_observations_derive_from_the_wire() {
+fn declared_end_of_run_observations_consume_the_declared_wire_set() {
     let (program, semantics) =
         training_fixture_program(SCALAR_LOSS_DECOMPOSED_FIXTURE, "g2-end-of-run");
     let section = section_for_program(&program, &semantics);
-    let declared = declared_end_of_run_observations(&section.device_program.program);
+    let wire = &section.device_program.program;
+    let declared = declared_end_of_run_observations(wire);
+
+    // The DECLARED set is exactly the wire's EndOfRun result rows — the
+    // count matches the constructor's declared rows, no kernel scan.
+    let declared_end_of_run_rows: Vec<u32> = wire
+        .results
+        .iter()
+        .filter(|result| result.observation.cadence == WireObservationCadence::EndOfRun)
+        .map(|result| result.buffer.id)
+        .collect();
+    let grouped: Vec<u32> = declared
+        .forward
+        .iter()
+        .chain(&declared.gradients)
+        .chain(&declared.params)
+        .map(|(id, _)| *id)
+        .collect();
+    assert_eq!(
+        grouped.len(),
+        declared_end_of_run_rows.len(),
+        "every declared EndOfRun row is grouped exactly once"
+    );
+    for id in &declared_end_of_run_rows {
+        assert!(
+            grouped.contains(id),
+            "declared EndOfRun buffer {id} is grouped"
+        );
+    }
 
     // The final params: the four PerProgram InOut trainable buffers.
     assert_eq!(
@@ -3772,27 +3878,40 @@ fn declared_end_of_run_observations_derive_from_the_wire() {
         4,
         "weight1/bias1/weight2/bias2 are the declared final params"
     );
-    // The final gradients: the companion-written buffers (at least the four
-    // trainable gradient slots).
+    // The final gradients: the declared EndOfRun rows on PerStep InOut
+    // buffers (the companion-written gradient slots).
     assert!(
         declared.gradients.len() >= 4,
         "the declared final gradients include the trainable gradient slots"
     );
-    // The final forward: the PerStep Output-role written-not-consumed
-    // finals (the decomposition's forward tensors).
+    // The final forward: the declared EndOfRun rows on PerStep Output
+    // buffers (the decomposition's forward tensors).
     assert!(
         !declared.forward.is_empty(),
         "the final forward tensors are declared end-of-run observations"
     );
     // The per-step loss observation is NOT declared an end-of-run
     // observation (it is the per-step observation).
-    let per_step = program.results[0].buffer.id.0;
+    let per_step = per_step_result_ids(&program);
+    assert_eq!(per_step.len(), 1, "exactly one per-step observation");
+    let per_step = per_step[0];
     assert!(
         !declared.forward.iter().any(|(id, _)| *id == per_step)
             && !declared.gradients.iter().any(|(id, _)| *id == per_step)
             && !declared.params.iter().any(|(id, _)| *id == per_step),
         "the per-step loss observation is not an end-of-run observation"
     );
+}
+
+/// The DECLARED per-step observation buffer ids of a materialized program:
+/// the result rows whose observation cadence is `PerStep` (the loss).
+fn per_step_result_ids(program: &DeviceProgram) -> Vec<u32> {
+    program
+        .results
+        .iter()
+        .filter(|result| result.cadence == ObservationCadence::PerStep)
+        .map(|result| result.buffer.id.0)
+        .collect()
 }
 
 // ── S5-U1 decomposed-local identity ────────────────────────────────────────
