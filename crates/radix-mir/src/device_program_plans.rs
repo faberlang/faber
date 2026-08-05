@@ -46,8 +46,8 @@ use crate::kernel_plan::{CollectionKernelPlan, MatMulShapes, SharedMemoryLayout}
 use crate::layout::MirTensorStorageLayout;
 use crate::{
     MirCollectionOp, MirFunction, MirKernelDispatchSize, MirKernelWorkgroupCount, MirLayoutKind,
-    MirLocalId, MirPlaceBase, MirRuntimeCall, MirStatementKind, MirType, MirValidationContext,
-    MirWorkgroupSize,
+    MirLocalId, MirPlaceBase, MirRuntimeCall, MirScalarLayout, MirStatementKind, MirType,
+    MirValidationContext, MirWorkgroupSize,
 };
 use radix_types::{Type, TypeId};
 use rustc_hash::FxHashMap;
@@ -472,10 +472,19 @@ fn tensor_element_ty(
 /// 1-element input at the scalar's own type — mirroring how the ABI scalar
 /// kernel path treats `F32`/`I32`/`U32`
 /// ([`crate::tensor_type::is_kernel_element_layout`]).
-/// A scalar outside that surface (e.g. f64) stays fail-closed with the
-/// ABI's own typed diagnostic; non-scalar, non-tensor layouts stay
-/// fail-closed with a typed diagnostic.
+///
+/// **Typed f64→f32 kernel-scalar narrowing (D-6a, residual-doc option (b)):**
+/// an f64 scalar data-flow value (the MLP shape's lane scalar-return local or
+/// the companion's f64 upstream seed) narrows to a 1-element F32 buffer when
+/// the subchain body's operator graph is f32-safe
+/// ([`crate::tensor_type::operator_graph_is_f32_safe`]) — the MLP shape
+/// computes over f32 tensors and only the boundary scalar is f64. This is an
+/// explicit typed device-materialization rule, never an implicit truncation:
+/// a genuinely non-narrowable f64 graph (no tensor graph, or any non-F32
+/// tensor element) stays fail-closed with the ABI's own typed diagnostic.
+/// Non-scalar, non-tensor layouts stay fail-closed with a typed diagnostic.
 fn data_flow_element_ty_and_count(
+    function: &MirFunction,
     ty: MirType,
     validation: &MirValidationContext<'_>,
 ) -> Result<(MirType, u64), PlanMappingError> {
@@ -486,6 +495,16 @@ fn data_flow_element_ty_and_count(
     match layout.kind {
         MirLayoutKind::Scalar(scalar) if crate::tensor_type::is_kernel_element_layout(scalar) => {
             Ok((ty, 1))
+        }
+        MirLayoutKind::Scalar(MirScalarLayout::F64)
+            if crate::tensor_type::operator_graph_is_f32_safe(function, validation) =>
+        {
+            let f32_ty = crate::tensor_type::f32_scalar_type(validation).ok_or_else(|| {
+                PlanMappingError::mapping(
+                    "f32 scalar type unavailable for the typed f64→f32 kernel-scalar narrowing",
+                )
+            })?;
+            Ok((f32_ty, 1))
         }
         MirLayoutKind::Scalar(scalar) => Err(PlanMappingError::mapping(format!(
             "kernel scalar layout {}",
@@ -758,7 +777,7 @@ pub fn subchain_signature_for_emission(
         if bound.contains(&param.local) {
             continue;
         }
-        let (element_ty, count) = data_flow_element_ty_and_count(param.ty, validation)?;
+        let (element_ty, count) = data_flow_element_ty_and_count(function, param.ty, validation)?;
         signature.extra_inputs.push(storage_input_with_local(
             next_binding,
             element_ty,
@@ -774,7 +793,7 @@ pub fn subchain_signature_for_emission(
     next_binding = next_binding.saturating_add(1);
     for &output in outputs.iter().skip(1) {
         let local_ty = function_local_ty(function, output)?;
-        let (element_ty, count) = data_flow_element_ty_and_count(local_ty, validation)?;
+        let (element_ty, count) = data_flow_element_ty_and_count(function, local_ty, validation)?;
         signature.extra_outputs.push(storage_output_with_local(
             next_binding,
             element_ty,

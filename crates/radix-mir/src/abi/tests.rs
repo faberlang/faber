@@ -1005,3 +1005,133 @@ fn multi_input_return_buffer_kernel_keeps_plain_elementwise_contract() {
     assert_eq!(signature.extra_inputs[0].element_count, 4);
     assert_eq!(signature.output.element_count, 4);
 }
+
+#[test]
+fn kernel_abi_narrows_f64_scalar_param_over_f32_safe_graph() {
+    // D-6a (residual-doc option (b)): the whole-function ABI scalar surface
+    // admits the MLP companion shape — an f64 upstream seed param over an
+    // f32-safe operator graph (every tensor element type F32) narrows to a
+    // 1-element F32 input by the explicit typed rule, never a truncation.
+    // The companion is `backward(x, w, nil(), upstream: fractus) →
+    // (grad_x, grad_w)` — the S3-A2 tuple-return shape with an f64 seed.
+    let mut types = TypeTable::new();
+    let f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let f64 = types.sized_numeric(Primitive::Fractus, NumericWidth::F64);
+    let f64_ty = MirType::semantic(f64);
+    let shape = types.intern_index(IndexExpr::Literal(4));
+    let tensor_id = types.tensor_with_shape(f32, shape);
+    let tensor_ty = MirType::semantic(tensor_id);
+    let tuple_return_ty = MirType::semantic(types.intern(Type::Tuple(vec![tensor_id, tensor_id])));
+    let vacuum_ty = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let validation = validation_with_device_tensor_layouts(&types);
+
+    let function = MirFunction {
+        id: MirFunctionId(20),
+        source: Some(DefId(20)),
+        name: None,
+        params: vec![
+            MirParam {
+                local: MirLocalId(0),
+                name: None,
+                ty: tensor_ty,
+                mode: MirParamMode::Owned,
+                span: Span::default(),
+            },
+            MirParam {
+                local: MirLocalId(1),
+                name: None,
+                ty: tensor_ty,
+                mode: MirParamMode::Owned,
+                span: Span::default(),
+            },
+            MirParam {
+                local: MirLocalId(2),
+                name: None,
+                ty: vacuum_ty,
+                mode: MirParamMode::Owned,
+                span: Span::default(),
+            },
+            MirParam {
+                local: MirLocalId(3),
+                name: None,
+                ty: f64_ty,
+                mode: MirParamMode::Owned,
+                span: Span::default(),
+            },
+        ],
+        locals: vec![
+            MirLocal {
+                id: MirLocalId(0),
+                name: None,
+                ty: tensor_ty,
+                mutable: false,
+                span: Span::default(),
+            },
+            MirLocal {
+                id: MirLocalId(1),
+                name: None,
+                ty: tensor_ty,
+                mutable: false,
+                span: Span::default(),
+            },
+            MirLocal {
+                id: MirLocalId(3),
+                name: None,
+                ty: f64_ty,
+                mutable: false,
+                span: Span::default(),
+            },
+        ],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: Vec::new(),
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span: Span::default(),
+            },
+            span: Span::default(),
+        }],
+        return_ty: tuple_return_ty,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    };
+
+    let signature = MirKernelSignature::storage_buffer_kernel(&function, &validation)
+        .expect("companion resolves");
+
+    // The f64 upstream seed binds as a 1-element read input at the NARROWED
+    // f32 type (the operator graph is f32-safe).
+    let seed = signature
+        .extra_inputs
+        .iter()
+        .find(|resource| resource.source_local == Some(MirLocalId(3)))
+        .expect("the f64 upstream seed binds as an extra input");
+    assert_eq!(
+        seed.element_ty,
+        MirType::semantic(f32),
+        "the f64 seed narrows to the f32 kernel-scalar type"
+    );
+    assert_eq!(seed.element_count, 1);
+}
+
+#[test]
+fn kernel_abi_keeps_f64_scalar_fail_closed_for_pure_scalar_kernel() {
+    // The typed rule's fail-closed boundary on the whole-function scalar
+    // surface: a PURE-scalar f64 kernel (no tensor graph at all) is not
+    // f32-safe and keeps the existing typed diagnostic — `add_one(fractus x)
+    // → fractus` stays a kernel scalar layout f64 rejection.
+    let mut types = TypeTable::new();
+    let f64 = types.sized_numeric(Primitive::Fractus, NumericWidth::F64);
+    let f64_ty = MirType::semantic(f64);
+    let validation = validation_with_device_tensor_layouts(&types);
+    let function = scalar_kernel_function(f64_ty);
+    let error = MirKernelSignature::storage_buffer_kernel(&function, &validation)
+        .expect_err("a pure-scalar f64 kernel must keep the fail-closed diagnostic");
+
+    assert_eq!(error.issue, "mir_kernel_scalar_layout_unsupported");
+    assert_eq!(error.detail.as_deref(), Some("f64"));
+}

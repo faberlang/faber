@@ -51,6 +51,18 @@ fn rank2_tensor_ty(types: &mut TypeTable, dims: [u64; 2]) -> MirType {
     MirType::semantic(types.intern(Type::Tensor(f32_ty, shape)))
 }
 
+/// A rank-2 `fractus<f64>[M, N]` tensor type — the genuinely non-narrowable
+/// operator-graph element the typed f64→f32 rule must NOT admit (D-6a).
+fn rank2_f64_tensor_ty(types: &mut TypeTable, dims: [u64; 2]) -> MirType {
+    let f64_ty = types.sized_numeric(Primitive::Fractus, NumericWidth::F64);
+    let dim_ids = dims
+        .iter()
+        .map(|&dim| types.intern_index(IndexExpr::Literal(dim)))
+        .collect::<Vec<_>>();
+    let shape = types.intern_index(IndexExpr::Tuple(dim_ids));
+    MirType::semantic(types.intern(Type::Tensor(f64_ty, shape)))
+}
+
 // -----------------------------------------------------------------------
 // Signature fixtures (the post-contract shapes `apply_collection_op_contract`
 // produces — the shape `CollectionKernelPlan::from_contract` requires).
@@ -1450,11 +1462,15 @@ fn f32_scalar_data_flow_param_resolves_in_subchain_emission_signature() {
 }
 
 #[test]
-fn f64_scalar_data_flow_param_fails_closed_in_subchain_emission_signature() {
-    // The latent `fractus` variant: the companion's scalar seed is f64,
-    // outside the ABI kernel scalar surface (F32/I32/U32). The emission
-    // signature must fail closed with the ABI's own typed diagnostic, never
-    // silently narrow — the fixture's `→ f32` change is a separate unit.
+fn f64_scalar_data_flow_param_narrows_to_f32_in_f32_safe_subchain_emission_signature() {
+    // D-6a (residual-doc option (b)): the MLP shape — a companion whose
+    // scalar upstream seed is f64 while the operator graph is f32-safe
+    // (every tensor element type in the subchain body is F32). The typed
+    // f64→f32 kernel-scalar narrowing rule admits the seed as a 1-element
+    // F32 input; this replaces the pre-D-6a fail-closed expectation for the
+    // SAME fixture (the f32-safe MLP shape is now explicitly admitted, not
+    // truncated). A genuinely non-narrowable f64 graph stays fail-closed
+    // ([`f64_scalar_data_flow_param_fails_closed_for_f64_tensor_graph`]).
     let mut types = TypeTable::new();
     let seed_ty = f64_ty(&mut types);
     let function = matmul_scalar_seed_function(&mut types, seed_ty);
@@ -1464,13 +1480,189 @@ fn f64_scalar_data_flow_param_fails_closed_in_subchain_emission_signature() {
         dispatch_y: 1,
     };
 
+    let signature = subchain_signature_for_emission(&function, &contract, &validation, &[])
+        .expect("an f64 scalar data-flow param over an f32-safe graph narrows to f32");
+
+    // The f64 seed binds as a 1-element read input at the narrowed F32 type.
+    let seed = signature
+        .extra_inputs
+        .iter()
+        .find(|resource| resource.source_local == Some(MirLocalId(2)))
+        .expect("the scalar seed binds as an extra input");
+    assert_eq!(seed.element_count, 1);
+    assert_eq!(
+        seed.element_ty,
+        f32_ty(&mut types),
+        "the f64 seed narrows to the f32 kernel-scalar type"
+    );
+}
+
+#[test]
+fn f64_scalar_return_local_binds_as_narrowed_1element_output_in_emission_signature() {
+    // D-6a done_when 2: a scalar-return local in a subchain's consumed-output
+    // set over an f32-safe graph binds as a 1-element kernel output at its
+    // NARROWED scalar type — the MLP lane's f64 loss local narrows to f32 at
+    // the device boundary (residual-doc option (b), never a truncation).
+    let mut types = TypeTable::new();
+    let seed_ty = f64_ty(&mut types);
+    let function = matmul_scalar_seed_function(&mut types, seed_ty);
+    let validation = MirValidationContext::new(&types);
+    let contract = CollectionOpContract::MatMul {
+        dispatch_x: 1,
+        dispatch_y: 1,
+    };
+
+    // outputs = [recipe result (4), scalar-return local (2)] — the f64 scalar
+    // local is an ADDITIONAL consumed output (D-2b-1 shape).
+    let signature = subchain_signature_for_emission(
+        &function,
+        &contract,
+        &validation,
+        &[MirLocalId(4), MirLocalId(2)],
+    )
+    .expect("a scalar-return local over an f32-safe graph resolves in the emission signature");
+
+    assert_eq!(signature.extra_outputs.len(), 1);
+    let extra = &signature.extra_outputs[0];
+    assert_eq!(extra.source_local, Some(MirLocalId(2)));
+    assert_eq!(
+        extra.element_ty,
+        f32_ty(&mut types),
+        "the f64 scalar-return local narrows to the f32 kernel-scalar type"
+    );
+    assert_eq!(
+        extra.element_count, 1,
+        "the scalar-return local binds as a 1-element kernel output"
+    );
+}
+
+#[test]
+fn f64_scalar_data_flow_param_fails_closed_for_f64_tensor_graph() {
+    // The typed rule's boundary: a subchain whose operator graph is genuinely
+    // f64 (its recipe operand is an f64 tensor, not an f32 tensor) is NOT
+    // f32-safe — the f64 scalar seed must keep the existing fail-closed typed
+    // diagnostic, never a silent truncation.
+    let mut types = TypeTable::new();
+    let seed_ty = f64_ty(&mut types);
+    let function = matmul_f64_tensor_seed_function(&mut types, seed_ty);
+    let validation = MirValidationContext::new(&types);
+    let contract = CollectionOpContract::MatMul {
+        dispatch_x: 1,
+        dispatch_y: 1,
+    };
+
     let error = subchain_signature_for_emission(&function, &contract, &validation, &[])
-        .expect_err("an f64 scalar data-flow param must fail closed");
+        .expect_err("an f64 scalar over a genuinely f64 tensor graph must fail closed");
     assert!(
         error.message.contains("kernel scalar layout f64"),
         "the diagnostic must name the unsupported scalar layout, got: {}",
         error.message
     );
+}
+
+/// The [`matmul_scalar_seed_function`] companion shape over F64 tensors — the
+/// genuinely non-narrowable graph the typed f64→f32 rule must NOT admit
+/// (D-6a: the narrowing applies only when the operator graph is f32-safe).
+fn matmul_f64_tensor_seed_function(types: &mut TypeTable, seed_ty: MirType) -> MirFunction {
+    let tensor = rank2_f64_tensor_ty(types, [4, 4]);
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![
+            MirParam {
+                local: MirLocalId(0),
+                name: None,
+                ty: tensor,
+                mode: MirParamMode::Owned,
+                span: test_span(),
+            },
+            MirParam {
+                local: MirLocalId(1),
+                name: None,
+                ty: tensor,
+                mode: MirParamMode::Owned,
+                span: test_span(),
+            },
+            MirParam {
+                local: MirLocalId(2),
+                name: None,
+                ty: seed_ty,
+                mode: MirParamMode::Owned,
+                span: test_span(),
+            },
+        ],
+        locals: vec![
+            MirLocal {
+                id: MirLocalId(0),
+                name: None,
+                ty: tensor,
+                mutable: false,
+                span: test_span(),
+            },
+            MirLocal {
+                id: MirLocalId(1),
+                name: None,
+                ty: tensor,
+                mutable: false,
+                span: test_span(),
+            },
+            MirLocal {
+                id: MirLocalId(2),
+                name: None,
+                ty: seed_ty,
+                mutable: false,
+                span: test_span(),
+            },
+        ],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![
+                MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: Some(MirPlace::local(MirLocalId(3))),
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorMatMul),
+                            args: vec![
+                                MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                                MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                            ],
+                            return_ty: tensor,
+                        },
+                    },
+                    span: test_span(),
+                },
+                MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: Some(MirPlace::local(MirLocalId(4))),
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorDiv),
+                            args: vec![
+                                MirOperand::Place(MirPlace::local(MirLocalId(3))),
+                                MirOperand::Place(MirPlace::local(MirLocalId(2))),
+                            ],
+                            return_ty: tensor,
+                        },
+                    },
+                    span: test_span(),
+                },
+            ],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(4),
+                )))),
+                span: test_span(),
+            },
+            span: test_span(),
+        }],
+        return_ty: tensor,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: test_span(),
+    }
 }
 
 // -----------------------------------------------------------------------
