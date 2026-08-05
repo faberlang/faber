@@ -1122,8 +1122,7 @@ impl fmt::Display for DeviceProgramError {
             ),
             Self::DependencyCycle { edge } => write!(
                 f,
-                "dependency graph contains a cycle through launch {} (edge {producer} → {consumer})",
-                edge.consumer,
+                "dependency graph contains a cycle through launch {consumer} (edge {producer} → {consumer})",
                 producer = edge.producer,
                 consumer = edge.consumer,
             ),
