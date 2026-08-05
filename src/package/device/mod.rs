@@ -137,8 +137,9 @@ pub(crate) use wire::{
 #[allow(unused_imports)]
 // the run/training types ride the device root even when a test does not name one directly.
 pub(crate) use run::{
-    device_repeat_count, device_step_count, execute_session_receipts, host_receipt_graph_lines,
-    host_receipt_launch_order_line, step_run_report, StepRunReport,
+    declared_end_of_run_observations, device_repeat_count, device_step_count,
+    execute_session_receipts, host_receipt_graph_lines, host_receipt_launch_order_line,
+    step_run_report, EndOfRunObservationSet, StepRunReport,
 };
 #[cfg(test)]
 #[allow(unused_imports)]

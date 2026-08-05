@@ -3384,6 +3384,417 @@ fn decomposed_companion_gradient_slots_provision_from_subchain_buffers() {
     );
 }
 
+// ── U8-repair: per-step observation = the loss only (G2/G3) ────────────────
+
+/// The decomposed SCALAR-loss MLP shape (U8-repair G2/G3): the forward
+/// returns the scalar MSE reduction (`f32`, matching the S5-U7 explicit
+/// loss contract — a `fractus` return would carry an f64 upstream outside
+/// the kernel scalar surface) and decomposes into recipe subchains
+/// (matmul, add, matmul, add, sub, mul, reduction), so the decomposition
+/// exposes several written-not-consumed finals — the forward tensors and
+/// the re-exposed forward saves. The per-step observation must be ONLY the
+/// scalar loss.
+const SCALAR_LOSS_DECOMPOSED_FIXTURE: &str = r#"@ nucleum
+@ radix lane "air"
+@ radix backward "loss_backward"
+functio loss(tensor<f32, [2,2]> x, tensor<f32, [2,2]> w1, tensor<f32, [2,2]> b1, tensor<f32, [2,2]> w2, tensor<f32, [2,2]> b2) → f32 {
+    fixum tensor<f32, [2,2]> t1 ← x.matmul(w1)
+    fixum tensor<f32, [2,2]> h1 ← t1.addita(b1)
+    fixum tensor<f32, [2,2]> t2 ← h1.matmul(w2)
+    fixum tensor<f32, [2,2]> h2 ← t2.addita(b2)
+    fixum tensor<f32, [2,2]> residual ← h2.subtrahe(x)
+    fixum tensor<f32, [2,2]> squared ← residual.multiplica(residual)
+    redde squared.media()
+}
+
+functio train_step(tensor<f32, [2,2]> w1, tensor<f32, [2,2]> b1, tensor<f32, [2,2]> w2, tensor<f32, [2,2]> b2, tensor<f32, [2,2]> gw1, tensor<f32, [2,2]> gb1, tensor<f32, [2,2]> gw2, tensor<f32, [2,2]> gb2) → iuncta<tensor<f32, [2,2]>, tensor<f32, [2,2]>, tensor<f32, [2,2]>, tensor<f32, [2,2]>> {
+    fixum tensor<f32, [2,2]> nw1 ← w1.subtrahe(gw1)
+    fixum tensor<f32, [2,2]> nb1 ← b1.subtrahe(gb1)
+    fixum tensor<f32, [2,2]> nw2 ← w2.subtrahe(gw2)
+    fixum tensor<f32, [2,2]> nb2 ← b2.subtrahe(gb2)
+    redde iuncta<tensor<f32, [2,2]>, tensor<f32, [2,2]>, tensor<f32, [2,2]>, tensor<f32, [2,2]>> [nw1, nb1, nw2, nb2]
+}
+
+functio nil() → vacuum {
+    tacet
+}
+
+incipit {
+    fixum lista<f32> data ← [1.0, 2.0, 3.0, 4.0]
+    fixum tensor<f32, []> seed ← vacua
+    fixum tensor<f32, [2,2]> x ← seed.strue(data, [2, 2])
+    varia tensor<f32, [2,2]> w1 ← seed.strue(data, [2, 2])
+    varia tensor<f32, [2,2]> b1 ← seed.strue(data, [2, 2])
+    varia tensor<f32, [2,2]> w2 ← seed.strue(data, [2, 2])
+    varia tensor<f32, [2,2]> b2 ← seed.strue(data, [2, 2])
+    fixum f32 upstream ← 1.0
+    fixum numerus steps ← 100
+    itera ab 0‥steps fixum step {
+        fixum _ grads ← loss_backward(x, w1, b1, w2, b2, nil(), upstream)
+        fixum [_, gw1, gb1, gw2, gb2] ← grads
+        fixum [nw1, nb1, nw2, nb2] ← train_step(w1, b1, w2, b2, gw1, gb1, gw2, gb2)
+        w1 ← nw1
+        b1 ← nb1
+        w2 ← nw2
+        b2 ← nb2
+    }
+}
+"#;
+
+/// U8-repair G2/G3: the decomposed scalar-loss MLP shape declares exactly
+/// ONE per-step observation — the scalar loss — even though the
+/// decomposition exposes multiple written-not-consumed finals (the forward
+/// tensors and the re-exposed forward saves). The other finals are
+/// step-local (PerStep) end-of-run observations, never per-step readbacks.
+#[test]
+fn decomposed_scalar_loss_forward_declares_only_the_loss_per_step() {
+    let (program, _semantics) =
+        training_fixture_program(SCALAR_LOSS_DECOMPOSED_FIXTURE, "g2-scalar-loss");
+
+    program.validate().expect("constructed program validates");
+    assert_eq!(
+        program.lifetime,
+        DeviceProgramLifetime::RepeatingStep,
+        "a training loop materializes a RepeatingStep program"
+    );
+
+    // Exactly ONE per-step observation: the scalar loss.
+    assert_eq!(
+        program.results.len(),
+        1,
+        "the decomposed forward exposes many written-not-consumed finals, \
+         but ONLY the scalar loss is a per-step observation"
+    );
+    assert_eq!(
+        program.results[0].version.element_count, 1,
+        "the per-step observation is the scalar loss (f32[1])"
+    );
+    assert_eq!(program.results[0].buffer.role, BufferRole::Output);
+
+    // The loss buffer is the ONLY ObservationPoint buffer; every other
+    // written-not-consumed final (forward tensor / re-exposed save) is
+    // step-local.
+    let mut seen: Vec<u32> = Vec::new();
+    for resource in program
+        .kernels
+        .iter()
+        .flat_map(|kernel| kernel.resources.iter())
+        .filter(|resource| resource.buffer.lifetime == BufferLifetime::ObservationPoint)
+    {
+        if !seen.contains(&resource.buffer.id.0) {
+            seen.push(resource.buffer.id.0);
+        }
+    }
+    assert_eq!(
+        seen,
+        vec![program.results[0].buffer.id.0],
+        "the loss is the only observation-point buffer"
+    );
+
+    // The trainable params stay PerProgram InOut (persistent device-resident
+    // state across all steps).
+    let mut param_ids: Vec<u32> = Vec::new();
+    for resource in program
+        .kernels
+        .iter()
+        .flat_map(|kernel| kernel.resources.iter())
+        .filter(|resource| {
+            resource.buffer.lifetime == BufferLifetime::PerProgram
+                && resource.buffer.role == BufferRole::InOut
+        })
+    {
+        if !param_ids.contains(&resource.buffer.id.0) {
+            param_ids.push(resource.buffer.id.0);
+        }
+    }
+    assert_eq!(param_ids.len(), 4, "w1/b1/w2/b2 are PerProgram InOut");
+}
+
+/// U8-repair G2/G3 (real fixture): the actual `examples/training/mlp`
+/// device fixture — the Gradus-backed scalar-loss MLP — declares exactly
+/// ONE per-step observation (the loss) after the observation-set fix. This
+/// is the same package the U8 evidence ran (FIVE observation-point buffers
+/// before the fix: h1, h2, loss + two duplicates → 5 readbacks/step).
+#[test]
+fn real_mlp_fixture_declares_one_per_step_observation() {
+    let source = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../examples/training/mlp/src/train.fab"
+    ));
+    let (program, _semantics) = with_interpreted_workspace_package(
+        "g2-real-mlp",
+        source,
+        |lowered| {
+            device_program_for_lowered(
+                &lowered.validated,
+                &lowered.interner,
+                &lowered.companions,
+                DEFAULT_TRAINING_STEPS,
+            )
+            .expect("constructor succeeds")
+            .map(|(program, semantics, _step_count)| (program, semantics))
+            .expect("fixture yields a device program")
+        },
+    )
+    .expect("real MLP fixture lowers");
+
+    program.validate().expect("constructed program validates");
+    assert_eq!(
+        program.lifetime,
+        DeviceProgramLifetime::RepeatingStep,
+        "the MLP is a RepeatingStep training program"
+    );
+    assert_eq!(
+        program.results.len(),
+        1,
+        "the real MLP declares exactly ONE per-step observation — the loss \
+         (was five: h1, h2, loss + two duplicates → 5 readbacks/step)"
+    );
+    assert_eq!(
+        program.results[0].version.element_count, 1,
+        "the per-step observation is the scalar loss (f32[1])"
+    );
+    assert_eq!(program.results[0].buffer.role, BufferRole::Output);
+}
+
+/// U8-repair G1: the training report selects the LOSS observation — the
+/// declared scalar observation — never the first observation buffer in
+/// BTreeMap order (the U8 G1 divergence: the report picked buffer 4 = h1,
+/// value −0.36, instead of the scalar loss 1.5764).
+#[test]
+fn step_run_report_selects_the_scalar_loss_observation() {
+    // A RepeatingStep descriptor whose per-step readbacks carry BOTH a
+    // tensor observation (buffer 3, 2 elements, produced by launch 2) and
+    // the scalar loss observation (buffer 4, 1 element, produced by launch
+    // 1). In BTreeMap order buffer 3 comes FIRST — the pre-fix
+    // `outputs.iter().next()` would pick the tensor's first element (4.0),
+    // exactly the U8 G1 divergence.
+    let descriptor = DeviceDescriptor {
+        backend: DeviceBackend::Metal,
+        module_image: b"fake msl".to_vec(),
+        kernels: vec![
+            DescriptorKernel {
+                entry: "observa".to_owned(),
+                buffers: vec![
+                    DescriptorBuffer {
+                        buffer_id: 2,
+                        buffer_name: "p".to_owned(),
+                        semantic_value: 2,
+                        role: DeviceBufferRole::Input,
+                        lifetime: DeviceBufferLifetime::PerProgram,
+                        initialization: DeviceBufferInitialization::HostProvided,
+                        binding: 0,
+                        element_ty: DeviceDataType::F32,
+                        element_count: 1,
+                        version: 1,
+                    },
+                    DescriptorBuffer {
+                        buffer_id: 4,
+                        buffer_name: "loss".to_owned(),
+                        semantic_value: 4,
+                        role: DeviceBufferRole::Output,
+                        lifetime: DeviceBufferLifetime::ObservationPoint,
+                        initialization: DeviceBufferInitialization::KernelInitialized,
+                        binding: 1,
+                        element_ty: DeviceDataType::F32,
+                        element_count: 1,
+                        version: 1,
+                    },
+                ],
+                grid: [1, 1, 1],
+                block: [1, 1, 1],
+            },
+            DescriptorKernel {
+                entry: "forward".to_owned(),
+                buffers: vec![
+                    DescriptorBuffer {
+                        buffer_id: 1,
+                        buffer_name: "a".to_owned(),
+                        semantic_value: 1,
+                        role: DeviceBufferRole::Input,
+                        lifetime: DeviceBufferLifetime::PerProgram,
+                        initialization: DeviceBufferInitialization::HostProvided,
+                        binding: 0,
+                        element_ty: DeviceDataType::F32,
+                        element_count: 2,
+                        version: 1,
+                    },
+                    DescriptorBuffer {
+                        buffer_id: 5,
+                        buffer_name: "b".to_owned(),
+                        semantic_value: 5,
+                        role: DeviceBufferRole::Input,
+                        lifetime: DeviceBufferLifetime::PerProgram,
+                        initialization: DeviceBufferInitialization::HostProvided,
+                        binding: 1,
+                        element_ty: DeviceDataType::F32,
+                        element_count: 2,
+                        version: 1,
+                    },
+                    DescriptorBuffer {
+                        buffer_id: 3,
+                        buffer_name: "tensor".to_owned(),
+                        semantic_value: 3,
+                        role: DeviceBufferRole::Output,
+                        lifetime: DeviceBufferLifetime::ObservationPoint,
+                        initialization: DeviceBufferInitialization::KernelInitialized,
+                        binding: 2,
+                        element_ty: DeviceDataType::F32,
+                        element_count: 2,
+                        version: 1,
+                    },
+                ],
+                grid: [1, 1, 1],
+                block: [2, 1, 1],
+            },
+        ],
+        launches: vec![
+            DescriptorLaunch {
+                id: 1,
+                kernel_index: 0,
+            },
+            DescriptorLaunch {
+                id: 2,
+                kernel_index: 1,
+            },
+        ],
+        buffer_versions: vec![
+            DescriptorBufferVersion {
+                buffer_id: 1,
+                version: 1,
+                element_ty: DeviceDataType::F32,
+                element_count: 2,
+            },
+            DescriptorBufferVersion {
+                buffer_id: 2,
+                version: 1,
+                element_ty: DeviceDataType::F32,
+                element_count: 1,
+            },
+            DescriptorBufferVersion {
+                buffer_id: 3,
+                version: 1,
+                element_ty: DeviceDataType::F32,
+                element_count: 2,
+            },
+            DescriptorBufferVersion {
+                buffer_id: 4,
+                version: 1,
+                element_ty: DeviceDataType::F32,
+                element_count: 1,
+            },
+            DescriptorBufferVersion {
+                buffer_id: 5,
+                version: 1,
+                element_ty: DeviceDataType::F32,
+                element_count: 2,
+            },
+        ],
+        program_lifetime: HostDeviceProgramLifetime::RepeatingStep,
+        data_flow: Vec::new(),
+        roots: vec![1, 2],
+        results: vec![
+            DescriptorResult {
+                buffer_id: 3,
+                version: 1,
+                produced_by: 2,
+                at_launch: 2,
+            },
+            DescriptorResult {
+                buffer_id: 4,
+                version: 1,
+                produced_by: 1,
+                at_launch: 1,
+            },
+        ],
+    };
+    descriptor
+        .validate()
+        .expect("hand-built descriptor validates");
+
+    let mut host = CompositeHost::with_device(
+        DeviceRuntime::Metal(
+            MetalHostSession::with_driver(Box::new(
+                faber_host_macos_arm64::FakeMetalDriver::default()
+                    .with_known_entry("observa")
+                    .with_known_entry("forward"),
+            ))
+            .expect("fake metal admit"),
+        ),
+        "fake-metal-device",
+    )
+    .expect("fake host");
+
+    // The once-init params: p = 1.0 (the scalar loss — copied into buffer 4
+    // each step by `observa`), a = [1,2], b = [3,4] (the tensor observation
+    // buffer 3 = a + b = [4,6]).
+    let mut params = BTreeMap::new();
+    params.insert(1, vec![1.0, 2.0]);
+    params.insert(2, vec![1.0]);
+    params.insert(5, vec![3.0, 4.0]);
+
+    let mut session = super::super::host_factory::create_program_session(&mut host, &descriptor)
+        .expect("fake session");
+    let receipts =
+        execute_session_receipts(&mut session, &descriptor, &params, 100).expect("steps execute");
+    session.teardown().expect("teardown");
+
+    // The per-step readback carries BOTH observations; the report selects
+    // the SCALAR loss (1.0), never the first buffer in BTreeMap order (the
+    // tensor's first element 4.0).
+    assert!(
+        receipts
+            .first()
+            .expect("receipt")
+            .outputs
+            .contains_key(&3),
+        "the tensor observation is read back per step"
+    );
+    let report = step_run_report(&receipts);
+    assert_eq!(report.initial_loss, Some(1.0));
+    assert_eq!(report.final_loss, Some(1.0));
+    assert_ne!(report.initial_loss, Some(4.0), "never the tensor's first element");
+}
+
+/// U8-repair G2/G3: the route derives the declared end-of-run observation
+/// set (final forward, final gradients, final params) from the wire — the
+/// exit-gate rows' buffers, observable once at the end, never per-step.
+#[test]
+fn declared_end_of_run_observations_derive_from_the_wire() {
+    let (program, semantics) =
+        training_fixture_program(SCALAR_LOSS_DECOMPOSED_FIXTURE, "g2-end-of-run");
+    let section = section_for_program(&program, &semantics);
+    let declared = declared_end_of_run_observations(&section.device_program.program);
+
+    // The final params: the four PerProgram InOut trainable buffers.
+    assert_eq!(
+        declared.params.len(),
+        4,
+        "weight1/bias1/weight2/bias2 are the declared final params"
+    );
+    // The final gradients: the companion-written buffers (at least the four
+    // trainable gradient slots).
+    assert!(
+        declared.gradients.len() >= 4,
+        "the declared final gradients include the trainable gradient slots"
+    );
+    // The final forward: the PerStep Output-role written-not-consumed
+    // finals (the decomposition's forward tensors).
+    assert!(
+        !declared.forward.is_empty(),
+        "the final forward tensors are declared end-of-run observations"
+    );
+    // The per-step loss observation is NOT declared an end-of-run
+    // observation (it is the per-step observation).
+    let per_step = program.results[0].buffer.id.0;
+    assert!(
+        !declared.forward.iter().any(|(id, _)| *id == per_step)
+            && !declared.gradients.iter().any(|(id, _)| *id == per_step)
+            && !declared.params.iter().any(|(id, _)| *id == per_step),
+        "the per-step loss observation is not an end-of-run observation"
+    );
+}
+
 // ── S5-U1 decomposed-local identity ────────────────────────────────────────
 
 /// A companion-shaped decomposed body: a matmul+add forward whose generated

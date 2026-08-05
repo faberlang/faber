@@ -1047,6 +1047,29 @@ pub(crate) fn device_program_for_lowered(
         }
     }
 
+    // The per-step observation of a RepeatingStep training program
+    // (U8-repair G2/G3): the SCALAR final output — the loss — is the ONLY
+    // buffer read back within each step. It is identified from the
+    // observation-eligible facts (an Output-role buffer that is written and
+    // never consumed, carrying element count 1), never from a name/shape
+    // coincidence. Every OTHER observation-eligible final (the forward /
+    // activation tensors the decomposition re-exposes — including the
+    // duplicate forward-save outputs) is step-local (PerStep): declared
+    // end-of-run observations, read back once at the end, never per-step.
+    let training_loss: Option<BufferId> = if training.is_some() {
+        buffers
+            .iter()
+            .find(|buffer| {
+                buffer.role == BufferRole::Output
+                    && buffer.written
+                    && !buffer.consumed
+                    && buffer.element_count == 1
+            })
+            .map(|buffer| buffer.id)
+    } else {
+        None
+    };
+
     // Pass 2: materialize the program with the merged identity facts. Every
     // reference to a unified id carries the same name/role/lifetime so the
     // schema's cross-reference consistency checks pass. The launch ids are
@@ -1077,7 +1100,7 @@ pub(crate) fn device_program_for_lowered(
                 // trainable-parameter flag, never derived from the role. The
                 // host receives these facts through the payload; it never
                 // re-derives a lifetime from slot role alone.
-                lifetime: unified_lifetime(entry),
+                lifetime: unified_lifetime(entry, training_loss),
             };
             resources.push(DeviceResource {
                 buffer: identity,
@@ -1186,7 +1209,15 @@ fn output_slot_index(signature: &MirKernelSignature, output: &MirKernelResource)
 /// - a kernel-written buffer another kernel consumes is a step-local
 ///   intermediate (per-step);
 /// - a kernel-written final is read back at an observation point.
-fn unified_lifetime(entry: &ProgramBuffer) -> BufferLifetime {
+///
+/// G2/G3 (U8 repair): a RepeatingStep training program's per-step
+/// observation is ONLY the scalar loss — the single written-not-consumed
+/// final carrying `training_loss`. Every OTHER written-not-consumed final
+/// (the forward/activation tensors the decomposition re-exposes) is a
+/// step-local final (PerStep), declared an end-of-run observation rather
+/// than a per-step readback. SingleRun programs keep the ordinary rule (all
+/// finals are observation points).
+fn unified_lifetime(entry: &ProgramBuffer, training_loss: Option<BufferId>) -> BufferLifetime {
     // S5-U5 (param-identity.md): a trainable parameter accumulates updates
     // across steps in ONE buffer — allocated once (per-program), initialized
     // HostProvided at session creation, updated in place at every step.
@@ -1211,6 +1242,16 @@ fn unified_lifetime(entry: &ProgramBuffer) -> BufferLifetime {
     if !entry.written {
         BufferLifetime::PerProgram
     } else if entry.consumed {
+        BufferLifetime::PerStep
+    } else if Some(entry.id) == training_loss {
+        // G2/G3: the declared per-step observation — the loss — is the only
+        // written-not-consumed final read back within each step.
+        BufferLifetime::ObservationPoint
+    } else if training_loss.is_some() {
+        // G2/G3: a RepeatingStep program's OTHER written-not-consumed finals
+        // (the forward tensors, including the decomposition's re-exposed
+        // duplicates) are step-local — never per-step observations, never
+        // per-step readbacks.
         BufferLifetime::PerStep
     } else {
         BufferLifetime::ObservationPoint
