@@ -34,6 +34,7 @@
 
 mod admit;
 mod device;
+mod distributed;
 mod distributed_identity;
 mod hash;
 mod image;
@@ -43,6 +44,7 @@ mod wire;
 
 pub(crate) use admit::*;
 pub use device::*;
+pub use distributed::*;
 pub use distributed_identity::*;
 pub use hash::*;
 pub use image::*;
@@ -53,6 +55,10 @@ pub use wire::*;
 #[cfg(test)]
 #[path = "distributed_identity_test.rs"]
 mod distributed_identity_test;
+
+#[cfg(test)]
+#[path = "distributed_test.rs"]
+mod distributed_test;
 
 /// Image schema version. Ratchets as clean breaks; there is no compatibility
 /// decoder (A7). `3 → 4` clean break adds the optional `device` section
@@ -85,6 +91,15 @@ pub const PACKAGE_MIR_ARTIFACT_VERSION: u32 = 6;
 /// field-level interpretation, with a focused diagnostic
 /// ([`UnsupportedDeviceProgramVersion`](crate::error::FmirImageError::UnsupportedDeviceProgramVersion)).
 pub const WIRE_DEVICE_PROGRAM_VERSION: u32 = 7;
+
+/// The version ratchet of the optional distributed execution section
+/// (MD2-W1 A7). The section carries its OWN nested version, admitted
+/// fail-closed **before field interpretation** (the `admit_device_section`
+/// pattern, FC4) — independently of the nested device-program wire version
+/// and the outer image version. The first distributed-section shape is v1;
+/// the nested `WIRE_DEVICE_PROGRAM_VERSION = 7` and the outer
+/// `PACKAGE_MIR_ARTIFACT_VERSION = 6` stay untouched (FC1).
+pub const WIRE_DISTRIBUTED_SECTION_VERSION: u32 = 1;
 
 /// Text image `target` tag.
 pub const FMIR_TEXT_TARGET_NAME: &str = "fmir-text";
@@ -130,6 +145,18 @@ mod tests {
         // numerically with `PACKAGE_MIR_ARTIFACT_VERSION`; the two are
         // admitted by separate gates.
         assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 7);
+    }
+
+    #[test]
+    fn distributed_section_versions_leave_the_accepted_wire_untouched() {
+        // MD2-W1 (A7): the distributed section rides the accepted wire 7 as
+        // an optional sibling field with its OWN version ratchet. The nested
+        // device-program wire version, the outer image version, and the
+        // section's own version are admitted by separate gates; none of the
+        // frozen version constants changes with the distributed section.
+        assert_eq!(WIRE_DISTRIBUTED_SECTION_VERSION, 1);
+        assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 7);
+        assert_eq!(PACKAGE_MIR_ARTIFACT_VERSION, 6);
     }
 
     #[test]

@@ -15,23 +15,22 @@
 //!   MD2-B1) is frozen to the same `sha256:<64-hex>` format.
 
 use super::{
-    canonical_program_bytes, device_identity_hash, logical_distributed_plan_hash,
-    SHA256_IDENTITY_PREFIX, WireBufferIdentity, WireBufferLifetime, WireBufferRole,
-    WireBufferVersion, WireBinding, WireCollectionKernelPlan, WireDependencyEdge,
-    WireDeviceProgram, WireDeviceResource, WireDispatchSize, WireInitializationPolicy,
-    WireKernelLaunchPlan, WireKernelUnit, WireLaunchUnit, WireObservationCadence,
-    WireObservationFact, WireProgramLifetime, WireResourceAccess, WireResultBuffer,
-    WireSemanticValue, WireSemanticValueOrigin, WireStorageLayout, WireWorkgroupCount,
-    WireWorkgroupSize,
+    canonical_program_bytes, device_identity_hash, logical_distributed_plan_hash, WireBinding,
+    WireBufferIdentity, WireBufferLifetime, WireBufferRole, WireBufferVersion,
+    WireCollectionKernelPlan, WireDependencyEdge, WireDeviceProgram, WireDeviceResource,
+    WireDispatchSize, WireInitializationPolicy, WireKernelLaunchPlan, WireKernelUnit,
+    WireLaunchUnit, WireObservationCadence, WireObservationFact, WireProgramLifetime,
+    WireResourceAccess, WireResultBuffer, WireSemanticValue, WireSemanticValueOrigin,
+    WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize, SHA256_IDENTITY_PREFIX,
 };
 use radix_mir::device_program::{BufferId, LaunchId};
 use radix_mir::device_semantics::SemanticValueId;
 use radix_mir::distributed::{
     encode_logical_plan, BarrierId, BarrierOperation, CollectiveId, CollectiveOperation,
     DeclaredPlacement, DeviceProgramPartition, DistributedExecutionGraph, DistributedExecutionPlan,
-    ExecutionCommitBoundary, ExecutionOperation, LaunchOperation, LOGICAL_PLAN_VERSION,
-    LogicalPlacement, PartitionId, PlacementConstraint, PlacementContract, PlacementObjective,
-    PlanVersion, TransferDirection, TransferId, TransferOperation, TransportPath,
+    ExecutionCommitBoundary, ExecutionOperation, LaunchOperation, LogicalPlacement, PartitionId,
+    PlacementConstraint, PlacementContract, PlacementObjective, PlanVersion, TransferDirection,
+    TransferId, TransferOperation, TransportPath, LOGICAL_PLAN_VERSION,
 };
 use radix_mir::layout::MirTensorStorageLayout;
 use radix_mir::MirType;
@@ -330,10 +329,7 @@ fn logical_distributed_plan_hash_distinguishes_different_plans() {
     let altered = altered_logical_plan();
 
     // The fixtures really differ at the canonical-bytes substrate...
-    assert_ne!(
-        encode_logical_plan(&plan),
-        encode_logical_plan(&altered)
-    );
+    assert_ne!(encode_logical_plan(&plan), encode_logical_plan(&altered));
     // ...so the hashes must differ.
     assert_ne!(
         logical_distributed_plan_hash(&plan),
@@ -427,6 +423,9 @@ fn bound_distributed_plan_hash_spelling_contract_is_frozen() {
     );
     assert_eq!(
         spelling,
-        format!("{SHA256_IDENTITY_PREFIX}{:x}", Sha256::digest(bound_canonical))
+        format!(
+            "{SHA256_IDENTITY_PREFIX}{:x}",
+            Sha256::digest(bound_canonical)
+        )
     );
 }

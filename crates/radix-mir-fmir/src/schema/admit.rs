@@ -1,8 +1,14 @@
 use super::device::FmirDeviceSection;
+use super::distributed::{
+    expected_plan_for_section, wire_plan_to_plan, FmirDistributedExecutionSection,
+};
 use super::hash::fnv1a64_blob_hash;
 use super::requirements::is_known_device_requirement;
-use super::{PACKAGE_MIR_ARTIFACT_VERSION, WIRE_DEVICE_PROGRAM_VERSION};
-use crate::schema::validate_wire_program;
+use super::wire::WireDeviceProgram;
+use super::{
+    logical_distributed_plan_hash, validate_wire_distributed_section, validate_wire_program,
+    PACKAGE_MIR_ARTIFACT_VERSION, WIRE_DEVICE_PROGRAM_VERSION, WIRE_DISTRIBUTED_SECTION_VERSION,
+};
 
 /// Fail-closed artifact-version gate. Versions ratchet as clean breaks;
 /// there is no compatibility decoder.
@@ -113,5 +119,96 @@ pub(crate) fn admit_device_section(
     validate_wire_program(&device.device_program.program)?;
     check_device_requirements(device)?;
     check_artifact_hashes(device)?;
+    // MD2-W1: the optional distributed execution section is admitted
+    // fail-closed at load — its own version ratchet, wire-level section
+    // validation, MD2-V1's gate on the reconstructed plan, the equivalence
+    // gate, and the H1 hash cross-check. Absent for single-device packages.
+    if let Some(distributed) = &device.distributed {
+        admit_distributed_section(distributed, &device.device_program.program)?;
+    }
+    Ok(())
+}
+
+/// Fail-closed admission of the optional distributed execution section
+/// (MD2-W1). Runs when the section is present, in order:
+///
+/// 1. **version ratchet** (A7) — `WIRE_DISTRIBUTED_SECTION_VERSION` is
+///    checked before any field interpretation (the `admit_device_section`
+///    pattern, FC4);
+/// 2. **wire-level section validation** — the declared placement facts
+///    resolve against the carried single-device program; the declared hash
+///    is the canonical spelling;
+/// 3. **MD2-V1's gate** — the reconstructed delivered plan passes the
+///    fail-before-launch checks (stale versions, topology, owners, replicas,
+///    completeness, cycles, admissible collectives);
+/// 4. **equivalence gate** — re-derive `(program, declared placement)` and
+///    compare canonical bytes with the actually delivered plan (stale /
+///    tampered fails with a focused diagnostic);
+/// 5. **H1 hash cross-check** — the section's declared
+///    `logical_distributed_plan_hash` equals the hash recomputed over the
+///    delivered plan.
+pub(crate) fn admit_distributed_section(
+    section: &FmirDistributedExecutionSection,
+    wire_program: &WireDeviceProgram,
+) -> Result<(), crate::error::FmirImageError> {
+    // A7: the section's own version ratchet fails closed BEFORE any field
+    // interpretation — independently of the nested device-program wire
+    // version and the outer image version.
+    if section.v != WIRE_DISTRIBUTED_SECTION_VERSION {
+        return Err(
+            crate::error::FmirImageError::UnsupportedDistributedSectionVersion {
+                actual: section.v,
+                expected: WIRE_DISTRIBUTED_SECTION_VERSION,
+            },
+        );
+    }
+    validate_wire_distributed_section(section, wire_program)?;
+    let delivered = wire_plan_to_plan(&section.logical_plan)?;
+    delivered.validate().map_err(|error| {
+        crate::error::FmirImageError::DistributedSectionInvalid {
+            detail: format!("delivered logical plan fails the fail-before-launch gate: {error}"),
+        }
+    })?;
+    equivalence_gate(section, wire_program)?;
+    // MD2-H1 cross-check: the declared hash must equal the hash recomputed
+    // over the delivered plan (reconstructed from the wire — the section
+    // mirrors D1's classes, calls V1's gate, and cross-checks H1's hash).
+    let recomputed = logical_distributed_plan_hash(&delivered);
+    if recomputed != section.logical_distributed_plan_hash {
+        return Err(
+            crate::error::FmirImageError::DistributedSectionHashMismatch {
+                expected: section.logical_distributed_plan_hash.clone(),
+                recomputed,
+            },
+        );
+    }
+    Ok(())
+}
+
+/// The equivalence gate (MD2-W1, exit-gate bullet 4): re-derive
+/// `(program, declared placement)` from the carried single-device program and
+/// the declared placement facts and compare **canonical bytes** with the
+/// **actually delivered plan** (reconstructed from the section). A mutated
+/// delivered plan (partition owner, graph edge, transfer byte contract) or a
+/// mutated declared placement fails with a focused stale/tampered diagnostic.
+/// The gate inspects the delivered bytes — it never trusts the section's
+/// self-declared `logical_distributed_plan_hash`.
+pub(crate) fn equivalence_gate(
+    section: &FmirDistributedExecutionSection,
+    wire_program: &WireDeviceProgram,
+) -> Result<(), crate::error::FmirImageError> {
+    let delivered = wire_plan_to_plan(&section.logical_plan)?;
+    let expected = expected_plan_for_section(section, wire_program)?;
+    let delivered_bytes = radix_mir::distributed::encode_logical_plan(&delivered);
+    let expected_bytes = radix_mir::distributed::encode_logical_plan(&expected);
+    if delivered_bytes != expected_bytes {
+        return Err(crate::error::FmirImageError::DistributedSectionEquivalenceMismatch {
+            detail: format!(
+                "the delivered logical plan ({} partitions, {} operations) is not the deterministic derivation of the declared program + placement — stale or tampered; admission re-derives (program, declared placement) and compares canonical bytes with the delivered plan",
+                delivered.partitions.len(),
+                delivered.graph.operations.len(),
+            ),
+        });
+    }
     Ok(())
 }

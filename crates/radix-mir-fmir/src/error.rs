@@ -79,6 +79,48 @@ pub enum FmirImageError {
         /// The focused rule violation.
         detail: String,
     },
+
+    /// The nested distributed-section version is unsupported (MD2-W1 A7).
+    /// The distributed section carries its OWN version ratchet, admitted
+    /// fail-closed before any field-level interpretation — independently of
+    /// the nested device-program wire version and the outer image version.
+    UnsupportedDistributedSectionVersion {
+        /// Version encoded in the distributed section.
+        actual: u32,
+        /// Version this loader accepts.
+        expected: u32,
+    },
+
+    /// A distributed section violates a fail-closed rule (MD2-W1): a
+    /// wire-level section check (facts that do not resolve against the
+    /// single-device program, an unknown element-type spelling) or the
+    /// fail-before-launch validation gate (MD2-V1, run on the reconstructed
+    /// logical plan). The detail carries the focused diagnostic.
+    DistributedSectionInvalid {
+        /// The focused rule violation.
+        detail: String,
+    },
+
+    /// The equivalence gate failed (MD2-W1, exit-gate bullet 4): admission
+    /// re-derived `(program, declared placement)` and the canonical bytes do
+    /// NOT match the actually delivered logical plan (reconstructed from the
+    /// section). The delivered plan is stale or tampered — the gate inspects
+    /// the delivered bytes, never a self-declared hash.
+    DistributedSectionEquivalenceMismatch {
+        /// The focused stale/tampered diagnostic.
+        detail: String,
+    },
+
+    /// The section's declared `logical_distributed_plan_hash` does not match
+    /// the hash recomputed over the delivered logical plan (MD2-W1
+    /// cross-checks MD2-H1's hash domain). A stale self-declared hash fails
+    /// closed.
+    DistributedSectionHashMismatch {
+        /// The hash stored in the section.
+        expected: String,
+        /// The hash recomputed from the delivered logical plan.
+        recomputed: String,
+    },
 }
 
 impl fmt::Display for FmirImageError {
@@ -129,6 +171,24 @@ impl fmt::Display for FmirImageError {
             }
             Self::WireProgramInvalid { detail } => {
                 write!(f, "invalid device program: {detail}")
+            }
+            Self::UnsupportedDistributedSectionVersion { actual, expected } => {
+                write!(
+                    f,
+                    "unsupported distributed-section version {actual}; expected {expected}"
+                )
+            }
+            Self::DistributedSectionInvalid { detail } => {
+                write!(f, "invalid distributed section: {detail}")
+            }
+            Self::DistributedSectionEquivalenceMismatch { detail } => {
+                write!(f, "distributed plan mismatch: {detail}")
+            }
+            Self::DistributedSectionHashMismatch { expected, recomputed } => {
+                write!(
+                    f,
+                    "distributed-section logical-plan hash {expected} does not match the delivered plan (recomputed {recomputed})"
+                )
             }
         }
     }

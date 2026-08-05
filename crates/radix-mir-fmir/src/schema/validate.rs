@@ -1,8 +1,10 @@
+use super::distributed::FmirDistributedExecutionSection;
 use super::wire::{
     WireBroadcastDeclaration, WireBufferIdentity, WireBufferLifetime, WireCollectionKernelPlan,
     WireDeviceProgram, WireInitializationPolicy, WireObservationCadence, WireProgramLifetime,
     WireResourceAccess,
 };
+use super::SHA256_IDENTITY_PREFIX;
 
 // ---------------------------------------------------------------------------
 // Wire-level semantic admission (Stage 3R F1–F7)
@@ -562,4 +564,74 @@ fn wire_buffer_init_policy(
 /// A focused `WireProgramInvalid` admission error.
 fn wire_invalid(detail: String) -> crate::error::FmirImageError {
     crate::error::FmirImageError::WireProgramInvalid { detail }
+}
+
+// ---------------------------------------------------------------------------
+// Wire-level distributed-section validation (MD2-W1)
+// ---------------------------------------------------------------------------
+
+/// Wire-level validation of the optional distributed execution section
+/// (MD2-W1): the declared placement facts must **resolve against the carried
+/// single-device program** — every fact names a declared F1 semantic value
+/// and a referenced device buffer, and every byte contract is positive; and
+/// the declared `logical_distributed_plan_hash` must be the canonical
+/// `sha256:<64-hex>` spelling (MD2-H1). Plan-internal consistency is the
+/// fail-before-launch gate's (MD2-V1), run on the reconstructed plan at
+/// admission — this module checks only the facts that live on the wire
+/// section and reference the program's own wire surface.
+pub(crate) fn validate_wire_distributed_section(
+    section: &FmirDistributedExecutionSection,
+    wire: &WireDeviceProgram,
+) -> Result<(), crate::error::FmirImageError> {
+    // MD2-H1 canonical format: `sha256:` + 64 hex.
+    if !section
+        .logical_distributed_plan_hash
+        .starts_with(SHA256_IDENTITY_PREFIX)
+    {
+        return Err(distributed_invalid(format!(
+            "distributed section declares a logical-plan hash without the `{SHA256_IDENTITY_PREFIX}` prefix ({}); the hash spelling is frozen (MD2-H1)",
+            section.logical_distributed_plan_hash
+        )));
+    }
+    let digest = &section.logical_distributed_plan_hash[SHA256_IDENTITY_PREFIX.len()..];
+    if digest.len() != 64 || !digest.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err(distributed_invalid(format!(
+            "distributed section declares a logical-plan hash with a non-canonical digest ({}); expected `sha256:` + 64 hex digits",
+            section.logical_distributed_plan_hash
+        )));
+    }
+
+    for fact in &section.declared_placement {
+        if !wire
+            .semantic_values
+            .iter()
+            .any(|value| value.id == fact.value)
+        {
+            return Err(distributed_invalid(format!(
+                "declared placement fact names semantic value {}, which the single-device program never declares (F1)",
+                fact.value
+            )));
+        }
+        if !wire_buffers(wire)
+            .iter()
+            .any(|buffer| buffer.id == fact.buffer)
+        {
+            return Err(distributed_invalid(format!(
+                "declared placement fact names buffer {}, which the single-device program never references",
+                fact.buffer
+            )));
+        }
+        if fact.byte_count == 0 {
+            return Err(distributed_invalid(format!(
+                "declared placement fact for semantic value {} carries byte count 0 — no byte/shape contract (exit-gate bullet 2)",
+                fact.value
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// A focused `DistributedSectionInvalid` admission error.
+fn distributed_invalid(detail: String) -> crate::error::FmirImageError {
+    crate::error::FmirImageError::DistributedSectionInvalid { detail }
 }

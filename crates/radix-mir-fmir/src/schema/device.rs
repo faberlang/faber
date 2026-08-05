@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use super::distributed::FmirDistributedExecutionSection;
 use super::wire::WireDeviceProgram;
 
 // ---------------------------------------------------------------------------
@@ -37,6 +38,16 @@ pub struct FmirDeviceSection {
     /// `device:cuda`. Unknown `device:` requirements fail admission at
     /// package load ([`crate::schema::check_device_requirements`]).
     pub runtime_requirements: Vec<String>,
+    /// The optional distributed execution section (MD2-W1). `None` for
+    /// single-device packages (MD-A15) — wire-7 single-device images keep
+    /// the independent single-device path (the A10 identity and the nested
+    /// `WIRE_DEVICE_PROGRAM_VERSION = 7` bytes are untouched). `Some` for
+    /// distributed images: the section carries its OWN version ratchet
+    /// ([`crate::schema::WIRE_DISTRIBUTED_SECTION_VERSION`]) and is admitted
+    /// fail-closed at load; the single-device run route rejects it
+    /// ("distributed execution requires MD3") until MD3. Old consumers
+    /// reject the new field via `deny_unknown_fields` (fail-closed, A7).
+    pub distributed: Option<FmirDistributedExecutionSection>,
 }
 
 /// The typed device-program section (S3-A4 / N3.3): the opaque payload string

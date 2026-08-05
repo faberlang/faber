@@ -183,6 +183,9 @@ fn sample_device_section() -> FmirDeviceSection {
             values: vec![1.0, 2.0, 3.0, 4.0],
         }],
         runtime_requirements: vec!["device:metal".to_owned(), "device:cuda".to_owned()],
+        // MD2-W1: absent for single-device packages (MD-A15) — the
+        // independent single-device path.
+        distributed: None,
     }
 }
 
