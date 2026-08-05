@@ -306,8 +306,10 @@ impl super::FaberCodegen {
                 writer.write(match mode {
                     radix_hir::HirIteraMode::Ex => surface.keyword(TokenKind::Ex),
                     radix_hir::HirIteraMode::De => surface.keyword(TokenKind::De),
-                    // `ab` is not a reader-locale keyword; it stays canonical.
-                    radix_hir::HirIteraMode::Ab => "ab",
+                    // `ab` is a contextual keyword (tokenless); localize it
+                    // through the reader pack like `iuncta`, with Latin
+                    // fallback when a pack has no row.
+                    radix_hir::HirIteraMode::Ab => surface.contextual_keyword("ab"),
                 });
                 writer.write(" ");
                 self.write_expr(iter, types, names, interner, surface, writer);
