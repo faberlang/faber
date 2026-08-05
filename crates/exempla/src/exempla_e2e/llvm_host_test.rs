@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn llvm_host_gap_ledger_is_structurally_valid() {
     let ledger = parse_gap_ledger(GAP_LEDGER).expect("checked-in LLVM host gap ledger must parse");
-    assert_eq!(ledger.gap.len(), 134);
+    assert_eq!(ledger.gap.len(), 143);
 }
 
 #[test]

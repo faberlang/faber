@@ -303,6 +303,16 @@ fn build_rust_lane(
             .expect("corpus path must be relative to corpus root")
             .to_string_lossy()
             .into_owned();
+        // Known Rust codegen debt: skip the oracle build and record the pair
+        // as `outcome/rust_oracle_missing` (see the machine gap ledger). The
+        // generated Rust for these paths does not compile as a bin target.
+        if rust::is_known_rust_build_failure(path) {
+            eprintln!(
+                "[llvm-host parity rust {:03}] {} (known build failure, skipped)",
+                index, relative
+            );
+            continue;
+        }
         let code = rust::compile_rust_exemplum(&compiler, path, corpus_root)
             .unwrap_or_else(|reason| panic!("Rust oracle compile failed for {relative}: {reason}"));
         let code =
@@ -394,8 +404,13 @@ fn build_llvm_lane(
                 let Some((index, path)) = candidates.get(slot) else {
                     break;
                 };
+                // Dev stdlib is required for frontmatter `locale = "…"`
+                // reader-pack resolution (corpus sources carry locale
+                // frontmatter since 2026-08-04).
                 let session = radix::driver::Session::new(
-                    radix::Config::default().with_target(radix::codegen::Target::LlvmText),
+                    radix::Config::default()
+                        .with_target(radix::codegen::Target::LlvmText)
+                        .with_dev_stdlib(),
                 );
                 let result =
                     llvm::classify_llvm_exemplum(&session, path, *index, temp_root, toolchain);

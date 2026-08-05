@@ -1,9 +1,25 @@
-# Gap ledger captured by the live LLVM host pairwise run on 2026-07-15.
+# Gap ledger captured by the live LLVM host pairwise run on 2026-08-05.
 # This is measured live evidence, not an accepted-failure allowlist.
 schema_version = 1
-measured = "2026-07-15@883c6e200-live-pairwise-10f8c5703"
-rust_executable_denominator = 280
+measured = "2026-08-05@7d1041a6a-live-pairwise"
+rust_executable_denominator = 291
 gap_ceiling = 144
+
+[[gap]]
+path = "ad/async-solum-leget.fab"
+owner_stage = 4
+boundary = "emit"
+issue = "llvm_emission_unsupported"
+reason = "MIR lowers, but LLVM text emission rejects the live shape"
+first_seen = "2026-08-05@live-pairwise"
+
+[[gap]]
+path = "ad/async-tempus-dormiet.fab"
+owner_stage = 3
+boundary = "mir"
+issue = "mir_lowering_rejected"
+reason = "MIR lowering rejects the live shape"
+first_seen = "2026-08-05@live-pairwise"
 
 [[gap]]
 path = "ad/sermo-conversio.fab"
@@ -15,10 +31,10 @@ first_seen = "2026-07-10@32b4f09af"
 
 [[gap]]
 path = "ad/sermo-live-directional.fab"
-owner_stage = 4
-boundary = "link"
-issue = "runtime_import_unresolved"
-reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
+owner_stage = 5
+boundary = "outcome"
+issue = "rust_oracle_missing"
+reason = "Rust oracle build blocked: known sermo accipe/scrinium option double-wrap codegen regression (E0308); tracked as harness-blocked row"
 first_seen = "2026-07-10@32b4f09af"
 
 [[gap]]
@@ -43,14 +59,6 @@ owner_stage = 4
 boundary = "link"
 issue = "runtime_import_unresolved"
 reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
-first_seen = "2026-07-10@32b4f09af"
-
-[[gap]]
-path = "ad/solum-lege-generic.fab"
-owner_stage = 4
-boundary = "emit"
-issue = "llvm_emission_unsupported"
-reason = "MIR lowers, but LLVM text emission rejects the live shape"
 first_seen = "2026-07-10@32b4f09af"
 
 [[gap]]
@@ -100,6 +108,14 @@ boundary = "outcome"
 issue = "llvm_fixture_mismatch"
 reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
 first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "cede/cede.fab"
+owner_stage = 4
+boundary = "link"
+issue = "runtime_import_unresolved"
+reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
+first_seen = "2026-08-05@live-pairwise"
 
 [[gap]]
 path = "clausa/clausa.fab"
@@ -302,6 +318,14 @@ reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected 
 first_seen = "2026-07-10@32b4f09af"
 
 [[gap]]
+path = "futura/futura.fab"
+owner_stage = 4
+boundary = "emit"
+issue = "llvm_emission_unsupported"
+reason = "MIR lowers, but LLVM text emission rejects the live shape"
+first_seen = "2026-08-05@live-pairwise"
+
+[[gap]]
 path = "futurum/futurum.fab"
 owner_stage = 5
 boundary = "outcome"
@@ -324,6 +348,14 @@ boundary = "outcome"
 issue = "llvm_fixture_mismatch"
 reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
 first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "gpu-core-types/matrix-register.fab"
+owner_stage = 4
+boundary = "emit"
+issue = "llvm_emission_unsupported"
+reason = "MIR lowers, but LLVM text emission rejects the live shape"
+first_seen = "2026-08-05@live-pairwise"
 
 [[gap]]
 path = "immutata/immutata.fab"
@@ -350,6 +382,14 @@ reason = "LLVM verifies, but one or more runtime imports remain unresolved at na
 first_seen = "2026-07-10@32b4f09af"
 
 [[gap]]
+path = "incipiet/incipiet.fab"
+owner_stage = 4
+boundary = "emit"
+issue = "llvm_emission_unsupported"
+reason = "MIR lowers, but LLVM text emission rejects the live shape"
+first_seen = "2026-08-05@live-pairwise"
+
+[[gap]]
 path = "instans/instans.fab"
 owner_stage = 4
 boundary = "link"
@@ -368,9 +408,9 @@ first_seen = "2026-07-10@32b4f09af"
 [[gap]]
 path = "integratio/fluxus-cede.fab"
 owner_stage = 4
-boundary = "link"
-issue = "runtime_import_unresolved"
-reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
+boundary = "emit"
+issue = "llvm_emission_unsupported"
+reason = "MIR lowers, but LLVM text emission rejects the live shape"
 first_seen = "2026-07-10@32b4f09af"
 
 [[gap]]
@@ -387,14 +427,6 @@ owner_stage = 5
 boundary = "outcome"
 issue = "stdout_mismatch"
 reason = "both lanes ran; LLVM stdout differs from the Rust oracle"
-first_seen = "2026-07-10@32b4f09af"
-
-[[gap]]
-path = "intrinseca/numeric-operator-methods.fab"
-owner_stage = 5
-boundary = "outcome"
-issue = "rust_fixture_mismatch"
-reason = "both lanes ran; Rust oracle stdout differs from the sibling .expected fixture"
 first_seen = "2026-07-10@32b4f09af"
 
 [[gap]]
@@ -415,10 +447,10 @@ first_seen = "2026-07-10@32b4f09af"
 
 [[gap]]
 path = "itera/cursor-iteratio.fab"
-owner_stage = 4
-boundary = "link"
-issue = "runtime_import_unresolved"
-reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
+owner_stage = 3
+boundary = "mir"
+issue = "mir_lowering_rejected"
+reason = "MIR lowering rejects the live shape"
 first_seen = "2026-07-10@32b4f09af"
 
 [[gap]]
@@ -574,14 +606,6 @@ reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture
 first_seen = "2026-07-10@32b4f09af"
 
 [[gap]]
-path = "nonnihil/nonnihil.fab"
-owner_stage = 5
-boundary = "outcome"
-issue = "llvm_fixture_mismatch"
-reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
-first_seen = "2026-07-10@32b4f09af"
-
-[[gap]]
 path = "nota/nota.fab"
 owner_stage = 5
 boundary = "outcome"
@@ -652,6 +676,54 @@ boundary = "outcome"
 issue = "llvm_fixture_mismatch"
 reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
 first_seen = "2026-07-10@32b4f09af"
+
+[[gap]]
+path = "operatores/modular-word-sha-round.fab"
+owner_stage = 5
+boundary = "outcome"
+issue = "llvm_fixture_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
+first_seen = "2026-08-05@live-pairwise"
+
+[[gap]]
+path = "operatores/modular-word-u16.fab"
+owner_stage = 4
+boundary = "emit"
+issue = "llvm_emission_unsupported"
+reason = "MIR lowers, but LLVM text emission rejects the live shape"
+first_seen = "2026-08-05@live-pairwise"
+
+[[gap]]
+path = "operatores/modular-word-u64-sha-round.fab"
+owner_stage = 4
+boundary = "emit"
+issue = "llvm_emission_unsupported"
+reason = "MIR lowers, but LLVM text emission rejects the live shape"
+first_seen = "2026-08-05@live-pairwise"
+
+[[gap]]
+path = "operatores/modular-word-u64.fab"
+owner_stage = 4
+boundary = "emit"
+issue = "llvm_emission_unsupported"
+reason = "MIR lowers, but LLVM text emission rejects the live shape"
+first_seen = "2026-08-05@live-pairwise"
+
+[[gap]]
+path = "operatores/modular-word-u8.fab"
+owner_stage = 4
+boundary = "emit"
+issue = "llvm_emission_unsupported"
+reason = "MIR lowers, but LLVM text emission rejects the live shape"
+first_seen = "2026-08-05@live-pairwise"
+
+[[gap]]
+path = "operatores/modular-word.fab"
+owner_stage = 4
+boundary = "emit"
+issue = "llvm_emission_unsupported"
+reason = "MIR lowers, but LLVM text emission rejects the live shape"
+first_seen = "2026-08-05@live-pairwise"
 
 [[gap]]
 path = "operatores/nonnull-chain.fab"
@@ -991,18 +1063,18 @@ first_seen = "2026-07-10@32b4f09af"
 
 [[gap]]
 path = "vector/builtins.fab"
-owner_stage = 8
+owner_stage = 4
 boundary = "link"
-issue = "entry_or_package_link_missing"
-reason = "LLVM reaches native link, but the host entry or package adapter is missing"
+issue = "runtime_import_unresolved"
+reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
 first_seen = "2026-07-10@32b4f09af"
 
 [[gap]]
 path = "vector/cross.fab"
-owner_stage = 8
+owner_stage = 4
 boundary = "link"
-issue = "entry_or_package_link_missing"
-reason = "LLVM reaches native link, but the host entry or package adapter is missing"
+issue = "runtime_import_unresolved"
+reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
 first_seen = "2026-07-10@32b4f09af"
 
 [[gap]]
@@ -1015,18 +1087,18 @@ first_seen = "2026-07-12@live-pairwise-sponte-vel"
 
 [[gap]]
 path = "vector/dot.fab"
-owner_stage = 8
+owner_stage = 4
 boundary = "link"
-issue = "entry_or_package_link_missing"
-reason = "LLVM reaches native link, but the host entry or package adapter is missing"
+issue = "runtime_import_unresolved"
+reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
 first_seen = "2026-07-10@32b4f09af"
 
 [[gap]]
 path = "vector/elementwise.fab"
-owner_stage = 8
+owner_stage = 4
 boundary = "link"
-issue = "entry_or_package_link_missing"
-reason = "LLVM reaches native link, but the host entry or package adapter is missing"
+issue = "runtime_import_unresolved"
+reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
 first_seen = "2026-07-10@32b4f09af"
 
 [[gap]]
@@ -1039,10 +1111,10 @@ first_seen = "2026-07-12@live-pairwise-sponte-vel"
 
 [[gap]]
 path = "vector/kernel.fab"
-owner_stage = 8
+owner_stage = 4
 boundary = "link"
-issue = "entry_or_package_link_missing"
-reason = "LLVM reaches native link, but the host entry or package adapter is missing"
+issue = "runtime_import_unresolved"
+reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
 first_seen = "2026-07-10@32b4f09af"
 
 [[gap]]
@@ -1055,10 +1127,10 @@ first_seen = "2026-07-12@live-pairwise-sponte-vel"
 
 [[gap]]
 path = "vector/swizzle.fab"
-owner_stage = 8
+owner_stage = 4
 boundary = "link"
-issue = "entry_or_package_link_missing"
-reason = "LLVM reaches native link, but the host entry or package adapter is missing"
+issue = "runtime_import_unresolved"
+reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
 first_seen = "2026-07-10@32b4f09af"
 
 [[gap]]

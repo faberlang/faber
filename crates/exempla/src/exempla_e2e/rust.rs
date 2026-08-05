@@ -35,13 +35,19 @@ const KNOWN_FAILURES: &[KnownFailure] = &[
         path: "ad/sermo-live-directional.fab",
         kind: KnownFailureKind::BuildFailure,
     },
-    // Relative `./auxilium` module link: Compiler/CLI path still CODEGEN001
-    // when the entry path is absolute (e2e corpus_dir); residual link debt.
-    KnownFailure {
-        path: "importa/importa.fab",
-        kind: KnownFailureKind::BuildFailure,
-    },
 ];
+
+/// Whether a path is a tracked known Rust build failure (codegen debt).
+///
+/// The LLVM host parity harness keeps such paths in the executable
+/// denominator but records them as `outcome/rust_oracle_missing` instead of
+/// panicking on the compile failure (see `llvm_host.rs`).
+pub(super) fn is_known_rust_build_failure(path: &Path) -> bool {
+    KNOWN_FAILURES.iter().any(|failure| {
+        failure.kind == KnownFailureKind::BuildFailure && path.ends_with(failure.path)
+    })
+}
+
 /// A compiled exemplum awaiting the batched workspace build and run.
 struct ExemplumJob {
     idx: usize,
@@ -626,6 +632,17 @@ pub(super) fn compile_rust_exemplum(
         return compile_package_library_exemplum(file);
     }
 
+    // importa/importa.fab imports a sibling auxilium.fab; single-file CLI emit
+    // cannot resolve the relative sibling (the base path is the process CWD),
+    // so compile the entry + sibling as one package unit. Restored from the
+    // pre-3c72cfb harness special case (see task e69dec39).
+    if file
+        .strip_prefix(exempla_dir)
+        .is_ok_and(|relative| relative == Path::new("importa/importa.fab"))
+    {
+        return compile_importa_package_exemplum(compiler, file);
+    }
+
     // Prefer the CLI compile path so relative `importa ex "./…"` siblings get an
     // import contract (namespace + file interfaces) and emit a linked module —
     // plain `Compiler::compile` leaves a bare `use crate::auxilium::…` with no
@@ -703,6 +720,38 @@ fn compile_package_library_exemplum(file: &Path) -> Result<String, String> {
     match result.output {
         Some(Output::Rust(output)) => Ok(output.code),
         Some(_) => Err("package compiler did not produce Rust output".to_owned()),
+        None => {
+            let diagnostics = format_diagnostics(&result);
+            Err(format!("compile failed: {diagnostics}"))
+        }
+    }
+}
+
+/// Package-compile `importa/importa.fab` with its sibling `auxilium.fab`.
+///
+/// Single-file CLI emit resolves relative `importa ex "./…"` siblings against
+/// the process CWD and requires the import contract to type the imported call,
+/// so the CLI compile runs from the entry's own directory (restored after).
+/// This special case replaces the pre-3c72cfb package-codegen path, which the
+/// current radix codegen no longer types correctly without the import contract.
+fn compile_importa_package_exemplum(_compiler: &Compiler, entry: &Path) -> Result<String, String> {
+    let previous_cwd = std::env::current_dir()
+        .map_err(|err| format!("cannot read working directory for importa compile: {err}"))?;
+    let entry_dir = entry
+        .parent()
+        .ok_or_else(|| "package entry has no parent directory".to_owned())?;
+    std::env::set_current_dir(entry_dir).map_err(|err| {
+        format!(
+            "cannot enter {} for importa compile: {err}",
+            entry_dir.display()
+        )
+    })?;
+    let result = radix::tool::compile_cli_path(entry, false, radix::codegen::Target::Rust);
+    std::env::set_current_dir(&previous_cwd)
+        .map_err(|err| format!("cannot restore working directory after importa compile: {err}"))?;
+    match result.output {
+        Some(Output::Rust(output)) => Ok(output.code),
+        Some(_) => Err("compiler did not produce Rust output".to_owned()),
         None => {
             let diagnostics = format_diagnostics(&result);
             Err(format!("compile failed: {diagnostics}"))

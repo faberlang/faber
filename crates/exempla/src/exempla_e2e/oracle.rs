@@ -114,6 +114,12 @@ const EXPECTED_COMPILE_FAILURES: &[(&str, &str)] = &[
 
 const WRONG_LANE_FAILURES: &[(&str, &str)] = &[
     ("air/air-lane.fab", "lane_requires_mir_backed_target"),
+    // GPU kernel proofs (kind=kernel, category=gpu, `@ nucleum`): kernel
+    // bodies have no Rust executable outcome, so they are not host-oracle
+    // lanes (campaign A11: GPU capability outcomes, not host emulation).
+    ("cuda/addita-proof.fab", "kernel_requires_gpu_lane"),
+    ("cuda/matmul-proof.fab", "kernel_requires_gpu_lane"),
+    ("cuda/summa-proof.fab", "kernel_requires_gpu_lane"),
     (
         "script-kernel/aleator-uuid.fab",
         "kernel_import_script_mode_only",
