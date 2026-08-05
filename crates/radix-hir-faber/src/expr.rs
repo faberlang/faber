@@ -382,15 +382,31 @@ impl super::FaberCodegen {
                 }
                 writer.write("}");
             }
-            HirExpressionKind::Tuple(items, _) => {
-                writer.write("(");
+            HirExpressionKind::Tuple(items, type_args) => {
+                // Tuples are constructed with an explicit `iuncta<A, B>` prefix
+                // so the bracket literal parses back as a tuple rather than an
+                // array (bare `[...]` is an array literal in expression
+                // position). The prefix is dropped only for internal
+                // placeholders that never reach emission.
+                if let Some(type_args) = type_args {
+                    writer.write(surface.contextual_keyword("iuncta"));
+                    writer.write("<");
+                    for (idx, ty) in type_args.iter().enumerate() {
+                        if idx > 0 {
+                            writer.write(", ");
+                        }
+                        writer.write(&self.type_to_faber(*ty, types, names, interner, surface));
+                    }
+                    writer.write("> ");
+                }
+                writer.write("[");
                 for (idx, item) in items.iter().enumerate() {
                     if idx > 0 {
                         writer.write(", ");
                     }
                     self.write_expr(item, types, names, interner, surface, writer);
                 }
-                writer.write(")");
+                writer.write("]");
             }
             HirExpressionKind::Scribe(kind, args) => {
                 writer.write(match kind {

@@ -10,7 +10,7 @@ use crate::surface::{KeywordSurface, TypeBindingKind};
 use radix_hir::DefId;
 use radix_lexer::{Interner, Symbol};
 use radix_types::{
-    CollectionKind, NumericWidth, Primitive, SemanticMutability, Type, TypeId, TypeTable,
+    CollectionKind, Primitive, SemanticMutability, Type, TypeId, TypeTable,
 };
 use rustc_hash::FxHashMap;
 
@@ -215,7 +215,14 @@ impl super::FaberCodegen {
             }
 
             Type::Infer(_) => "_".to_owned(),
-            Type::Tuple(_) => "ignotum".to_owned(),
+            Type::Tuple(members) => {
+                let members = members
+                    .iter()
+                    .map(|member| self.type_to_faber(*member, types, names, interner, surface))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("{}<{members}>", surface.contextual_keyword("iuncta"))
+            }
             Type::Union(members) => {
                 self.format_union_type(members, types, names, interner, surface)
             }
@@ -319,11 +326,10 @@ impl super::FaberCodegen {
         interner: &Interner,
         surface: &impl KeywordSurface,
     ) -> String {
-        if let Some(width) = self.tensor_element_width_marker(elem, types) {
-            let shape_text = crate::figura::format_figura(shape, types, interner);
-            return format!("t{width}{shape_text}");
-        }
-
+        // Long form only: `tensor<f32, [2, 2]>` is the documented default
+        // surface and re-parses in every locale. The `tf32[2, 2]` width sugar
+        // remains valid input but is not emitted canonically, so canonical
+        // round-trips keep the author's type spelling.
         format!(
             "tensor<{}, {}>",
             self.type_to_faber(elem, types, names, interner, surface),
@@ -346,22 +352,6 @@ impl super::FaberCodegen {
             self.type_to_faber(elem, types, names, interner, surface),
             crate::figura::format_figura(shape, types, interner)
         )
-    }
-
-    fn tensor_element_width_marker(&self, elem: TypeId, types: &TypeTable) -> Option<&'static str> {
-        match types.get(elem) {
-            Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32) => Some("f32"),
-            Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64) => Some("f64"),
-            Type::SizedNumeric(Primitive::Numerus, NumericWidth::I8) => Some("i8"),
-            Type::SizedNumeric(Primitive::Numerus, NumericWidth::I16) => Some("i16"),
-            Type::SizedNumeric(Primitive::Numerus, NumericWidth::I32) => Some("i32"),
-            Type::SizedNumeric(Primitive::Numerus, NumericWidth::I64) => Some("i64"),
-            Type::SizedNumeric(Primitive::Numerus, NumericWidth::U8) => Some("u8"),
-            Type::SizedNumeric(Primitive::Numerus, NumericWidth::U16) => Some("u16"),
-            Type::SizedNumeric(Primitive::Numerus, NumericWidth::U32) => Some("u32"),
-            Type::SizedNumeric(Primitive::Numerus, NumericWidth::U64) => Some("u64"),
-            _ => None,
-        }
     }
 }
 
@@ -501,7 +491,7 @@ mod tests {
             "textus ∪ nihil"
         );
 
-        let i32_ty = types.sized_numeric(Primitive::Numerus, NumericWidth::I32);
+        let i32_ty = types.sized_numeric(Primitive::Numerus, radix_types::NumericWidth::I32);
         assert_eq!(
             codegen.type_to_faber(i32_ty, &types, &names, &interner, &surface),
             "numerus<i32>"
