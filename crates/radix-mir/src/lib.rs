@@ -13,6 +13,7 @@ pub mod device;
 pub mod device_program;
 pub mod device_program_plans;
 pub mod device_semantics;
+pub mod distributed;
 pub mod dump;
 pub mod generic;
 pub mod gradient;
