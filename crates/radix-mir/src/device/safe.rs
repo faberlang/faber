@@ -17,11 +17,12 @@ use crate::control::{
 use crate::visit::MirVisitor;
 use crate::{
     MirAggregate, MirAggregateKind, MirCollectionOp, MirFunction, MirIntrinsic, MirLayoutKind,
-    MirLayoutTable, MirLocal, MirLocalId, MirParam, MirPlace, MirPlaceBase, MirProjection,
-    MirRuntimeCall, MirScalarLayout, MirStatement, MirStatementKind, MirTemp, MirTempId,
-    MirTensorLocusLayout, MirTensorStorageLayout, MirTerminator, MirTerminatorKind, MirType,
-    MirValidationContext, MirValue, ValidatedMir,
+    MirLayoutTable, MirLocal, MirLocalId, MirParam, MirPlace, MirPlaceBase, MirProgram,
+    MirProjection, MirRuntimeCall, MirScalarLayout, MirStatement, MirStatementKind, MirTemp,
+    MirTempId, MirTensorLocusLayout, MirTensorStorageLayout, MirTerminator, MirTerminatorKind,
+    MirType, MirValidationContext, MirValue, ValidatedMir,
 };
+use radix_hir::DefId;
 use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable};
 use rustc_hash::FxHashSet;
 
@@ -58,6 +59,8 @@ pub fn classify_device_safe(
     device: &MirDeviceContext,
 ) -> Lowerability {
     let mut classifier = DeviceSafeClassifier::new(validated.validation(), device);
+    classifier.program_multi_output_sources =
+        program_multi_output_sources(validated.program(), device, validated.validation().types);
     classifier.visit_program(validated.program());
     classifier.finish()
 }
@@ -69,8 +72,41 @@ pub fn classify_device_safe_for_target_entry(
 ) -> Lowerability {
     let mut classifier = DeviceSafeClassifier::new(validated.validation(), device);
     classifier.allow_host_owned_tensor_entry = true;
+    classifier.program_multi_output_sources =
+        program_multi_output_sources(validated.program(), device, validated.validation().types);
     classifier.visit_program(validated.program());
     classifier.finish()
+}
+
+/// The program-level multi-output source set (S3-A1 U9): the source
+/// [`DefId`]s of device-role functions in the program whose return type is
+/// a non-empty tuple. A decomposed multi-output source's subchain
+/// synthetics all share the SOURCE's `DefId` (`build_subchain_function`
+/// keeps `source`), while only the LAST subchain returns a non-empty tuple
+/// (its output set — D-6); an intermediate single-output subchain's own
+/// return type is Vacuum (`Return(None)` — the CUDA artifact override in
+/// radix-mir-llvm nvvm/artifact.rs). A tuple-typed slot in ANY subchain of
+/// a multi-output source is the result-tuple aggregation, not a device
+/// aggregate value, so the gate admits it through this set even when the
+/// fragment's own return type is not the tuple.
+fn program_multi_output_sources(
+    program: &MirProgram,
+    device: &MirDeviceContext,
+    types: &TypeTable,
+) -> FxHashSet<DefId> {
+    let mut result = FxHashSet::default();
+    for function in &program.functions {
+        let Some(source) = function.source else {
+            continue;
+        };
+        if device.role_for_function(function).is_none() {
+            continue;
+        }
+        if is_result_tuple_type(types, function.return_ty) {
+            result.insert(source);
+        }
+    }
+    result
 }
 
 /// The dead fold-artifact slots of one function (S5-W-A1): the local and
@@ -178,10 +214,25 @@ struct DeviceSafeClassifier<'a> {
     allows_structured_nested_indexed_write_loop_break: bool,
     allows_structured_nested_indexed_write_loop_continue: bool,
     allow_host_owned_tensor_entry: bool,
+    /// The source [`DefId`] of the function under visit — consulted by the
+    /// S3-A1 U9 program-level multi-output source allowance.
+    current_source: Option<DefId>,
     /// S3-A1: whether the function under visit returns a non-empty tuple —
     /// the multi-output kernel contract. Tuple values (the result
     /// aggregation) are then classified per element instead of as aggregate.
     multi_output_result: bool,
+    /// S3-A1 (U9): the program-level multi-output source set — the source
+    /// `DefId`s of device-role functions in the program whose return type
+    /// is a non-empty tuple. A decomposed multi-output source's subchain
+    /// synthetics keep the SOURCE function's full local table (including
+    /// the tuple-typed result local) while an intermediate single-output
+    /// subchain's own return type is Vacuum (`Return(None)` — the CUDA
+    /// artifact override in radix-mir-llvm nvvm/artifact.rs). The
+    /// per-function `multi_output_result` flag is false there, so the gate
+    /// admits a tuple-typed slot in a fragment whose source is in this set
+    /// instead (the tuple remains part of the multi-output contract even
+    /// when the fragment's own return is not the tuple).
+    program_multi_output_sources: FxHashSet<DefId>,
     /// S5-W-A1: the dead fold-artifact slots of the function under visit —
     /// the destinations of `Array`/`Tensor` constructs (the static-shape
     /// fold's shape-list / vacua artifacts) that no statement or terminator
@@ -220,7 +271,9 @@ impl<'a> DeviceSafeClassifier<'a> {
             allows_structured_nested_indexed_write_loop_break: false,
             allows_structured_nested_indexed_write_loop_continue: false,
             allow_host_owned_tensor_entry: false,
+            current_source: None,
             multi_output_result: false,
+            program_multi_output_sources: FxHashSet::default(),
             dead_fold_artifact_slots: FoldArtifactSlots::default(),
             gaps: Vec::new(),
         }
@@ -422,6 +475,20 @@ impl<'a> DeviceSafeClassifier<'a> {
             self.record_policy(SHAPE_DEVICE_PLACE_PROJECTION);
         }
     }
+
+    /// Whether a tuple-typed slot is the multi-output result-tuple contract
+    /// (S3-A1): a non-empty tuple type admitted either by the function's
+    /// OWN return (the per-function `multi_output_result` flag) or by the
+    /// program-level multi-output source set (the U9 subchain case — a
+    /// decomposed source's intermediate subchain synthetic keeps the
+    /// tuple-typed result local while its own return type is Vacuum).
+    fn is_multi_output_result_type(&self, ty: MirType) -> bool {
+        is_result_tuple_type(self.types, ty)
+            && (self.multi_output_result
+                || self
+                    .current_source
+                    .is_some_and(|def| self.program_multi_output_sources.contains(&def)))
+    }
 }
 
 impl MirVisitor for DeviceSafeClassifier<'_> {
@@ -459,6 +526,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
         let previous_allows_structured_nested_indexed_write_loop_continue =
             self.allows_structured_nested_indexed_write_loop_continue;
         self.in_device_function = self.device.role_for_function(function).is_some();
+        self.current_source = function.source;
         self.allows_structured_return_branch = false;
         self.allows_structured_indexed_write_branch = false;
         self.allows_structured_indexed_write_goto = false;
@@ -588,6 +656,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
         self.multi_output_result = false;
         self.dead_fold_artifact_slots = FoldArtifactSlots::default();
         self.in_device_function = was_in_device_function;
+        self.current_source = None;
         self.allows_structured_return_branch = previous_allows_structured_return_branch;
         self.allows_structured_indexed_write_branch =
             previous_allows_structured_indexed_write_branch;
@@ -626,7 +695,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
 
     fn visit_local(&mut self, local: &MirLocal) {
         if self.in_device_function
-            && !(self.multi_output_result && is_result_tuple_type(self.types, local.ty))
+            && !self.is_multi_output_result_type(local.ty)
             && !self.dead_fold_artifact_slots.locals.contains(&local.id)
         {
             self.check_device_type(local.ty);
@@ -635,7 +704,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
 
     fn visit_temp(&mut self, temp: &MirTemp) {
         if self.in_device_function
-            && !(self.multi_output_result && is_result_tuple_type(self.types, temp.ty))
+            && !self.is_multi_output_result_type(temp.ty)
             && !self.dead_fold_artifact_slots.temps.contains(&temp.id)
         {
             self.check_device_type(temp.ty);
@@ -864,7 +933,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
 
     fn visit_value(&mut self, value: &MirValue) {
         if self.in_device_function {
-            if !(self.multi_output_result && is_result_tuple_type(self.types, value.ty)) {
+            if !self.is_multi_output_result_type(value.ty) {
                 self.check_device_type(value.ty);
             }
             crate::visit::walk_value(self, value);
