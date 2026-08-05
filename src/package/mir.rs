@@ -722,44 +722,35 @@ fn package_device_section(
         else {
             continue;
         };
-        // The whole-function ABI signature is derived ONLY to scan the
-        // reverse-AD upstream seed inputs. A decomposed kernel (S5-U1) whose
-        // source function mixes recipes — e.g. the scalar-return lane, whose
-        // whole signature legitimately fails the return-buffer equality law
-        // — has no whole-function signature to scan; its subchain signatures
-        // were already validated by the constructor, so skip it. The
-        // upstream seed lives in the companion's kernels, whose whole
-        // signature (tuple return) still derives.
-        let Ok(signature) = radix_mir::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+        // A decomposed kernel (S5-U1) whose source function mixes recipes —
+        // e.g. the scalar-return lane, whose whole signature legitimately
+        // fails the return-buffer equality law — has no whole-function
+        // signature to derive; its subchain signatures were already
+        // validated by the constructor, so skip it.
+        let Ok(_signature) = radix_mir::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
             function, lowered.validated.validation(), &lowered.interner,
         ) else {
             continue;
         };
-        for (resource, program_name) in signature
-            .resources()
-            .filter(|resource| {
-                resource.kind == radix_mir::abi::MirKernelResourceKind::StorageBuffer
-                    && resource.role == radix_mir::abi::MirKernelResourceRole::Input
-            })
-            .zip(kernel.resources.iter().filter(|resource| {
-                resource.buffer.role == radix_mir::device_program::BufferRole::Input
-            }))
-        {
-            let upstream = resource.element_count == 1
-                && resource.source_local.is_some_and(|local| {
-                    function
-                        .params
-                        .iter()
-                        .find(|param| param.local == local)
-                        .is_none_or(|param| {
-                            // The reverse-AD seed param carries no source
-                            // name, or a synthetic (uninternable) symbol.
-                            param.name.is_none()
-                                || param.name.is_some_and(|symbol| {
-                                    (symbol.0 as usize) >= lowered.interner.strings().len()
-                                })
-                        })
-                });
+        // The reverse-AD upstream seed: the companion's anonymous scalar
+        // param (no source name, or a synthetic uninternable symbol) is
+        // provisioned with 1.0. The seed is detected from the FUNCTION's
+        // params — a decomposed subchain kernel's Input resources do not
+        // positionally align with the whole-function signature's Input
+        // resources (the subchain carries a subset of the function's reads
+        // in its own binding order), so the old signature↔kernel positional
+        // zip mispaired the seed against a named param and never provisioned
+        // it (the D-5 fallout `mlp_backward__1 input_4` failure).
+        let has_anonymous_param = function.params.iter().any(|param| {
+            param.name.is_none()
+                || param.name.is_some_and(|symbol| {
+                    (symbol.0 as usize) >= lowered.interner.strings().len()
+                })
+        });
+        for program_name in kernel.resources.iter().filter(|resource| {
+            resource.buffer.role == radix_mir::device_program::BufferRole::Input
+        }) {
+            let upstream = has_anonymous_param && program_name.version.element_count == 1;
             if upstream {
                 let name = program_name.buffer.name.clone();
                 if !device_inputs.contains_key(&name) {
