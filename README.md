@@ -16,7 +16,7 @@ faberlang/
   hosts/           public host monorepo embedded in core support
   norma/           public standard library source
   triga/           optional graphics and geometry library
-  examples/        public application examples + language corpus
+  examples/        public application examples (corpus split: radix/corpus + faber/corpus)
   cista/           public package-store CLI/lib
 ```
 
@@ -44,15 +44,29 @@ crate from source requires the sibling Radix, Cista, `faber-runtime`, and
 ## Commands
 
 - `faber check` / `build` / `run` / `test`
+- `faber check --deny-warnings`, `faber check --deny <CODE>` — promote warnings
+  or specific diagnostic-catalog codes to hard failures (also on `build`, `run`, `test`)
 - `faber script` — MIR interpret (no Cargo)
 - `faber format`, `faber explain`, `faber targets`
 
 See `faber --help` and after-help text for the full surface.
 
+## Reader locale
+
+Faber source and diagnostics can render in a reader locale. `faber check`,
+`build`, `run`, and `test` accept `--locale <locale>` for the code locale and
+`--diagnostic-locale <locale>` for the message language (independent of the code
+locale); `faber format --locale la` reproduces the former `--canonical` re-emit
+surface. The manifest equivalent is the `faber.toml` `[locale]` table (legacy
+`[reader]` alias still accepted during the rename sweep). Installed packs live
+in the private Radix `stdlib/locale/` (eight locales: `la`, `ar`, `hi`, `vi`,
+`th-TH`, `zh-Hans`, `zh-Hant`, `en`); a package can override with a local
+`locale/<locale>.toml`.
+
 ## Device execution (Metal / CUDA)
 
 `faber run` selects a device backend for device-capable packages (the
-differentiable-GPU campaign, S1-6 vertical slice):
+`gpu-training-lowering` campaign, stages 1–6):
 
 ```bash
 faber run --backend metal <package>   # Apple Metal (e.g. Apple M5 Max)
@@ -82,7 +96,10 @@ faber run --backend auto  <package>   # resolve: exactly one admitted backend
 
 Proof fixture: `examples/training/device-summa` (one tree-reduction kernel
 through the whole pipeline on both backends, numeric-policy v1.0.0 parity
-against its pinned CPU oracle).
+against its pinned CPU oracle). The surface also materializes training loops
+end-to-end: a library-backed `train_step` / companion VJP with per-step
+observation cadence (loss), gradient-slot → buffer mapping, and end-of-run value
+readback.
 
 ## Factory goals
 
