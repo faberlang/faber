@@ -245,18 +245,32 @@ impl<'a> MirValidationContext<'a> {
             .external_function_identities
             .clone_from(&self.external_function_identities);
         context.struct_fields.clone_from(&self.struct_fields);
-        context.struct_type_params.clone_from(&self.struct_type_params);
+        context
+            .struct_type_params
+            .clone_from(&self.struct_type_params);
         context.enum_type_params.clone_from(&self.enum_type_params);
-        context.optional_struct_fields.clone_from(&self.optional_struct_fields);
-        context.nullable_struct_fields.clone_from(&self.nullable_struct_fields);
+        context
+            .optional_struct_fields
+            .clone_from(&self.optional_struct_fields);
+        context
+            .nullable_struct_fields
+            .clone_from(&self.nullable_struct_fields);
         context.opaque_structs.clone_from(&self.opaque_structs);
-        context.json_struct_field_keys.clone_from(&self.json_struct_field_keys);
+        context
+            .json_struct_field_keys
+            .clone_from(&self.json_struct_field_keys);
         context.variant_parents.clone_from(&self.variant_parents);
         context.enum_variants.clone_from(&self.enum_variants);
-        context.variant_positions.clone_from(&self.variant_positions);
+        context
+            .variant_positions
+            .clone_from(&self.variant_positions);
         context.variant_fields.clone_from(&self.variant_fields);
-        context.scalar_value_domains.clone_from(&self.scalar_value_domains);
-        context.closure_environments.clone_from(&self.closure_environments);
+        context
+            .scalar_value_domains
+            .clone_from(&self.scalar_value_domains);
+        context
+            .closure_environments
+            .clone_from(&self.closure_environments);
         context
     }
 
