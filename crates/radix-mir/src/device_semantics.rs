@@ -582,14 +582,9 @@ impl DeviceSemantics {
                 .count()
                 > 1
             {
-                let conflict = self
-                    .relations
-                    .iter()
-                    .find(|other| {
-                        other.primal == relation.primal
-                            && relation_conflict_field(relation, other).is_some()
-                    })
-                    .and_then(|other| relation_conflict_field(relation, other));
+                let conflict = self.relations.iter().find_map(|other| {
+                    (other.primal == relation.primal).then(|| relation_conflict_field(relation, other))?
+                });
                 if let Some((field, first, second)) = conflict {
                     return Err(DeviceProgramError::ContradictoryRelationRow {
                         primal: relation.primal,
