@@ -11,6 +11,7 @@ radix = { path = "../../../radix/crates/radix" }
 rustc-hash = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
 toml = "1.1.2"
 wait-timeout = "0.2"
 

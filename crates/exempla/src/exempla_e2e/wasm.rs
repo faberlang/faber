@@ -33,13 +33,13 @@ pub(crate) enum WasmTier {
 }
 
 #[derive(Debug)]
-struct WasmE2eResult {
-    path: PathBuf,
-    tier: WasmTier,
-    reason: String,
-    stubless_bucket: Option<WasmInstantiationBucket>,
-    stub_bucket: Option<WasmInstantiationBucket>,
-    run_bucket: Option<WasmRunBucket>,
+pub(crate) struct WasmE2eResult {
+    pub(crate) path: PathBuf,
+    pub(crate) tier: WasmTier,
+    pub(crate) reason: String,
+    pub(crate) stubless_bucket: Option<WasmInstantiationBucket>,
+    pub(crate) stub_bucket: Option<WasmInstantiationBucket>,
+    pub(crate) run_bucket: Option<WasmRunBucket>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -65,7 +65,7 @@ fn exempla_wasm_e2e() {
         "Wasm e2e harness found no exempla files"
     );
 
-    let session = Session::new(Config::default().with_target(Target::Wasm));
+    let session = wasm_session();
     let temp_root = make_temp_root();
     let toolchain = detect_wasm_toolchain();
     let mut results = Vec::with_capacity(exempla.len());
@@ -79,6 +79,18 @@ fn exempla_wasm_e2e() {
     assert_wasm_aggregate_floors(&results);
 }
 
+/// Session for the Wasm lane. The frontmatter-locale frontend resolves
+/// `locale = "…"` declarations from the stdlib reader directory, so every
+/// probe session must configure the stdlib path (corpus fixtures declare
+/// `locale = "la"`).
+pub(crate) fn wasm_session() -> Session {
+    Session::new(
+        Config::default()
+            .with_target(Target::Wasm)
+            .with_stdlib(crate::paths::radix_stdlib_dir()),
+    )
+}
+
 fn detect_wasm_toolchain() -> WasmToolchain {
     WasmToolchain {
         validator_available: command_available("wasm-tools", &["--version"]),
@@ -87,7 +99,7 @@ fn detect_wasm_toolchain() -> WasmToolchain {
     }
 }
 
-fn classify_wasm_exemplum(
+pub(crate) fn classify_wasm_exemplum(
     session: &Session,
     file: &Path,
     idx: usize,

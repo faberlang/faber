@@ -517,7 +517,7 @@ fn exempla_swift_library_mode() {
         return;
     }
 
-    use radix::{codegen::OutputMode, tool::compile_cli_path_with_reader_pack};
+    use radix::{codegen::OutputMode, tool::compile_cli_path_with_locale_pack};
 
     // Create a simple library-mode Faber source: no incipit, one public function.
     let temp_root = make_temp_root();
@@ -527,7 +527,7 @@ fn exempla_swift_library_mode() {
     let source = "functio salve() \u{2192} textus { redde \"salve\" }\n";
     std::fs::write(&fab_file, source).expect("write test fab file");
 
-    let result = compile_cli_path_with_reader_pack(
+    let result = compile_cli_path_with_locale_pack(
         &fab_file,
         false,
         Target::Swift,
@@ -592,7 +592,7 @@ fn exempla_swift_library_mode() {
 
 #[test]
 fn exempla_swift_library_mode_public_decls() {
-    use radix::{codegen::OutputMode, tool::compile_cli_path_with_reader_pack};
+    use radix::{codegen::OutputMode, tool::compile_cli_path_with_locale_pack};
 
     let temp_root = make_temp_root();
     let dir = temp_root.join("swift_lib_public");
@@ -602,7 +602,7 @@ fn exempla_swift_library_mode_public_decls() {
     let source = "functio salve() \u{2192} textus { redde \"salve\" }\n";
     std::fs::write(&fab_file, source).expect("write test fab file");
 
-    let result = compile_cli_path_with_reader_pack(
+    let result = compile_cli_path_with_locale_pack(
         &fab_file,
         false,
         Target::Swift,
