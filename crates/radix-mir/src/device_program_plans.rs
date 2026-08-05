@@ -235,10 +235,10 @@ pub fn carried_plan_agrees(
 ///
 /// The ABI role/access pair must be compatible with the carried program
 /// role. Exact agreement holds for per-kernel roles; a **unified**
-/// intermediate (S2-5) carries the program role InOut on slots whose own
+/// intermediate (S2-5) carries the program role `InOut` on slots whose own
 /// ABI is (Output, Write) or (Input, Read) — the program role is a
 /// cross-kernel identity fact (N2.6 data-flow identity), not a per-slot
-/// derivation. InOut accepts any coherent ABI pair; incoherent pairs (e.g.
+/// derivation. `InOut` accepts any coherent ABI pair; incoherent pairs (e.g.
 /// writing an input) still fail closed because `from_abi_role` yields
 /// `None` for them.
 #[must_use]
