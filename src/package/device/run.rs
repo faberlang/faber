@@ -164,7 +164,8 @@ pub(crate) fn device_step_count(declared: u32) -> Result<u32, Vec<Diagnostic>> {
 /// the image's canonical payload + declared artifact blob, executes the
 /// full lifecycle (load → allocate → copy-in → launch → sync → readback →
 /// release), and prints the A9 observed events (selected hardware, module
-/// hash, allocations, launches, syncs, transfers, readbacks, releases), the
+/// hash, execution descriptor hash, allocations, launches, syncs, transfers,
+/// readbacks, releases), the
 /// A10 declared logical resource graph (buffer identities, roles, lifetimes,
 /// versions, data-flow edges), and the repeated-execution leak proof.
 ///
@@ -221,6 +222,9 @@ pub(crate) fn execute_device_route(
     // the typed wire (semantics-only — CUDA symbols and declared inputs are
     // absent by construction), hashed with the source identities. Both image
     // routes carry the identical wire, so the identity is route-independent.
+    // This is the sole semantic-identity claim (S5A-U3): the descriptor hash
+    // printed in the A9 line is the execution-descriptor hash and is NOT a
+    // semantic identity.
     let source_refs = source_hashes.iter().map(String::as_str).collect::<Vec<_>>();
     let canonical = radix_mir_fmir::canonical_program_bytes(&device.device_program.program);
     let identity = radix_mir_fmir::device_identity_hash(&source_refs, &canonical);
@@ -273,11 +277,16 @@ pub(crate) fn execute_device_route(
 
     // A9 observed lifecycle events of the last execution (R9): real
     // synchronization operations, the exact readback count, and the
-    // completion boundary the receipt states.
+    // completion boundary the receipt states. The descriptor hash printed
+    // here is the EXECUTION-descriptor hash (S5A-U3): it inlines the
+    // backend entry-name bytes (`kernel.entry`), so it is backend-entry-
+    // inclusive and is NOT a semantic-identity claim — the backend-neutral
+    // semantic identity of the complete program is the A10 identity printed
+    // above.
     println!(
-        "device: module hash fnv64:{:016x} semantic graph hash fnv64:{:016x} launches {} syncs {} transfers {} readbacks {} releases {} allocated {}",
+        "device: module hash fnv64:{:016x} execution descriptor hash fnv64:{:016x} launches {} syncs {} transfers {} readbacks {} releases {} allocated {}",
         receipt.module_hash,
-        receipt.semantic_graph_hash,
+        receipt.execution_descriptor_hash,
         receipt.launches,
         receipt.syncs,
         receipt.transfers,
