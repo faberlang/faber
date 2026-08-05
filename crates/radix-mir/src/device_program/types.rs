@@ -1,0 +1,357 @@
+use crate::abi::{
+    collection_op_workgroup_count, MirKernelDispatchSize, MirKernelResource,
+    MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature,
+    MirKernelWorkgroupCount, MirWorkgroupSize,
+};
+use crate::kernel_plan::CollectionKernelPlan;
+use crate::layout::MirTensorStorageLayout;
+use crate::{MirFunction, MirFunctionId, MirType};
+
+/// Program-unique identity of one device-resident buffer.
+///
+/// Buffers are the unit of data flow between kernels: a kernel writes a buffer
+/// version and a later kernel reads it. The numeric id is the identity key;
+/// [`DeviceProgram::buffer_registry`] derives the program-level registry from
+/// every resource and result that references an id.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct BufferId(pub u32);
+
+/// Logical role of a buffer across the whole program.
+///
+/// - [`Input`](BufferRole::Input): copied in from the host, read-only on the
+///   device (weights, constants, inputs).
+/// - [`Output`](BufferRole::Output): written by a device kernel and read back
+///   as a program result.
+/// - [`InOut`](BufferRole::InOut): device-resident intermediate, written by
+///   one kernel and read by another (activations, gradients, optimizer state).
+///
+/// The role is program-level; the per-slot read/write usage at a kernel is the
+/// resource's [`MirKernelResourceAccess`]. [`BufferRole::from_abi_role`] maps
+/// the ABI role/access pair onto the program role.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BufferRole {
+    /// Host-provided input; every slot accesses it read-only.
+    Input,
+    /// Device-produced result; read back at an observation point.
+    Output,
+    /// Device-resident intermediate shared across kernels.
+    InOut,
+}
+
+impl BufferRole {
+    /// Map an ABI kernel-resource role/access pair onto a program buffer role.
+    ///
+    /// The ABI surface ([`MirKernelResourceRole`], [`MirKernelResourceAccess`])
+    /// has no `in-out` role; an in-out buffer is expressed as a read-write
+    /// access (on either role). Pairs that cannot express a coherent program
+    /// role — writing an input, reading an output — yield `None`.
+    #[must_use]
+    pub fn from_abi_role(
+        role: MirKernelResourceRole,
+        access: MirKernelResourceAccess,
+    ) -> Option<Self> {
+        match (role, access) {
+            (MirKernelResourceRole::Input, MirKernelResourceAccess::Read) => Some(Self::Input),
+            (MirKernelResourceRole::Output, MirKernelResourceAccess::Write) => Some(Self::Output),
+            (_, MirKernelResourceAccess::ReadWrite) => Some(Self::InOut),
+            _ => None,
+        }
+    }
+
+    /// The ABI resource role this program role maps back to
+    /// (in-out maps to the input role with read-write access).
+    #[must_use]
+    pub fn abi_role(self) -> MirKernelResourceRole {
+        match self {
+            Self::Input | Self::InOut => MirKernelResourceRole::Input,
+            Self::Output => MirKernelResourceRole::Output,
+        }
+    }
+
+    /// The ABI resource access this program role maps back to.
+    #[must_use]
+    pub fn abi_access(self) -> MirKernelResourceAccess {
+        match self {
+            Self::Input => MirKernelResourceAccess::Read,
+            Self::Output => MirKernelResourceAccess::Write,
+            Self::InOut => MirKernelResourceAccess::ReadWrite,
+        }
+    }
+
+    /// Short diagnostic spelling.
+    #[must_use]
+    pub fn spelling(self) -> &'static str {
+        match self {
+            Self::Input => "input",
+            Self::Output => "output",
+            Self::InOut => "in-out",
+        }
+    }
+}
+
+/// How long a buffer's storage lives in the device program.
+///
+/// The contract names three lifetimes: **per-program** buffers are allocated
+/// once and persist for the whole program duration (weights, persistent
+/// optimizer state); **per-step** buffers are recycled between training-step
+/// iterations (activations, gradients); an **observation point** buffer is
+/// read back at a declared point (a program result). These classifications
+/// feed host allocation/teardown policy (Stage 2 lifecycle) and the A9
+/// receipts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BufferLifetime {
+    /// Allocated once for the whole program; persists across steps.
+    PerProgram,
+    /// Live within one training step; recycled between iterations.
+    PerStep,
+    /// Read back at a declared observation point.
+    ObservationPoint,
+}
+
+impl BufferLifetime {
+    /// Short diagnostic spelling.
+    #[must_use]
+    pub fn spelling(self) -> &'static str {
+        match self {
+            Self::PerProgram => "per-program",
+            Self::PerStep => "per-step",
+            Self::ObservationPoint => "observation-point",
+        }
+    }
+}
+
+/// Stable identity facts of one device buffer.
+///
+/// Every resource and result that references a buffer repeats these facts; the
+/// program registry verifies they agree. Storage layout is the live MIR
+/// [`MirTensorStorageLayout`] — a device-program buffer is
+/// [`DeviceHandle`](MirTensorStorageLayout::DeviceHandle) for device-resident
+/// storage or [`HostOwned`](MirTensorStorageLayout::HostOwned) for host-side
+/// storage that the host copies in/out.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BufferIdentity {
+    /// Program-unique identity key.
+    pub id: BufferId,
+    /// Logical name (diagnostics; target-neutral — never a backend binding).
+    pub name: String,
+    /// Program-level role (input / output / in-out).
+    pub role: BufferRole,
+    /// Where the storage lives (`DeviceHandle` / `HostOwned`).
+    pub storage: MirTensorStorageLayout,
+    /// How long the storage lives.
+    pub lifetime: BufferLifetime,
+}
+
+/// One content version of a buffer: a shape snapshot.
+///
+/// Shape-changing operations are explicit: a new shape is a **new version**,
+/// and no slot may rebind an existing version to a different shape (no
+/// in-place reinterpretation — [`DeviceProgram::validate`] enforces this).
+/// Version numbers are program-unique per buffer and start at 1 (0 is
+/// reserved as the unset sentinel).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BufferVersion {
+    /// Monotonic version number within the buffer (≥ 1).
+    pub version: u32,
+    /// Element type of this version's shape.
+    pub element_ty: MirType,
+    /// Element count of this version's shape.
+    pub element_count: u64,
+}
+
+/// Target-neutral binding indices for a kernel slot.
+///
+/// `group`/`binding` are the two-level binding indices used by the kernel ABI
+/// (`MirKernelResource.group`/`.binding`); backends map them to their own
+/// binding syntax. The values are program facts, never inferred from emitted
+/// text (A3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Binding {
+    /// First-level binding index.
+    pub group: u32,
+    /// Second-level binding index within the group.
+    pub binding: u32,
+}
+
+/// A typed buffer slot bound to a kernel.
+///
+/// This is the typed resource list entry of a [`KernelUnit`]: one buffer
+/// version bound at one binding, with the slot's read/write access.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeviceResource {
+    /// The buffer's program-level identity facts.
+    pub buffer: BufferIdentity,
+    /// The content version (and shape) this slot binds.
+    pub version: BufferVersion,
+    /// Target-neutral binding indices.
+    pub binding: Binding,
+    /// Slot read/write access (live ABI enum).
+    pub access: MirKernelResourceAccess,
+}
+
+impl DeviceResource {
+    /// Adapt a live ABI kernel resource into a device-program slot.
+    ///
+    /// Maps the resource's group/binding and access; the caller supplies the
+    /// program-level buffer identity and the content version to bind.
+    /// Non-data resources — the runtime-extent count channel — are not device
+    /// buffers and yield `None` (the extent stays a kernel-signature concern).
+    #[must_use]
+    pub fn from_kernel_resource(
+        buffer: BufferIdentity,
+        version: BufferVersion,
+        resource: &MirKernelResource,
+    ) -> Option<Self> {
+        if resource.kind != MirKernelResourceKind::StorageBuffer {
+            return None;
+        }
+        Some(Self {
+            buffer,
+            version,
+            binding: Binding {
+                group: resource.group,
+                binding: resource.binding,
+            },
+            access: resource.access,
+        })
+    }
+}
+
+/// The workgroup / dispatch / launch plan of one kernel.
+///
+/// Carries the per-kernel thread-shape facts hosts need to launch: the
+/// workgroup size, the dispatch size, and the derived workgroup (grid) count.
+/// The count is derived by the live ABI helper
+/// [`collection_op_workgroup_count`] (matmul launches the tile grid verbatim;
+/// everything else dispatches `ceil(dispatch / workgroup)` per axis).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct KernelLaunchPlan {
+    /// Threads per workgroup.
+    pub workgroup: MirWorkgroupSize,
+    /// Dispatch extent in workgroups for each axis.
+    pub dispatch_size: MirKernelDispatchSize,
+    /// Derived workgroup count the host launches.
+    pub workgroup_count: MirKernelWorkgroupCount,
+}
+
+impl KernelLaunchPlan {
+    /// Build the launch plan from a live kernel signature and its MIR
+    /// function, deriving the workgroup count via the shared ABI rule.
+    #[must_use]
+    pub fn from_signature_and_function(
+        signature: &MirKernelSignature,
+        function: &MirFunction,
+    ) -> Self {
+        let workgroup = signature.workgroup;
+        let dispatch_size = signature.dispatch_size;
+        let workgroup_count = collection_op_workgroup_count(function, dispatch_size, workgroup);
+        Self {
+            workgroup,
+            dispatch_size,
+            workgroup_count,
+        }
+    }
+}
+
+/// One ordered kernel declaration in the device program.
+///
+/// `function` identifies the MIR function this kernel lowers from; `entry` is
+/// the target-neutral logical entry name (backends map it to their syntax);
+/// `plan` is the shared algorithmic recipe ([`CollectionKernelPlan`], with the
+/// `Elementwise` variant covering the no-recipe fallback); `resources` is the
+/// typed resource list; `launch` is the workgroup/dispatch/launch plan.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KernelUnit {
+    /// MIR function id this kernel is lowered from.
+    pub function: MirFunctionId,
+    /// Target-neutral logical entry name.
+    pub entry: String,
+    /// Shared algorithmic recipe (elementwise, matmul, reduction).
+    pub plan: CollectionKernelPlan,
+    /// Typed buffer slots bound by this kernel.
+    pub resources: Vec<DeviceResource>,
+    /// Workgroup / dispatch / launch plan.
+    pub launch: KernelLaunchPlan,
+}
+
+/// Program-unique identity of one launch in the ordered sequence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct LaunchId(pub u32);
+
+/// One entry in the ordered launch sequence.
+///
+/// `launches` is the program's execution order — the generalized form of the
+/// WGSL chain descriptor's `chain`. A kernel may be launched multiple times
+/// (a repeated per-step launch or a re-launch after a shape change); the
+/// launch plan is the launched kernel's [`KernelUnit`]`::launch`, so the host
+/// needs no per-launch override for the S1-1 contract.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LaunchUnit {
+    /// Program-unique launch id.
+    pub id: LaunchId,
+    /// Index into [`DeviceProgram`]`::kernels`.
+    pub kernel_index: usize,
+}
+
+/// An explicit result buffer (multi-output readback).
+///
+/// Multi-output results are declared explicitly: each result names the buffer
+/// identity and version to observe, the launch that produced it, and its role
+/// (output or in-out — an in-place-updated buffer read back at an observation
+/// point is a result too). The observation role must agree with the buffer's
+/// identity role ([`DeviceProgram::validate`] enforces the cross-check).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResultBuffer {
+    /// Identity of the observed buffer.
+    pub buffer: BufferIdentity,
+    /// Observed content version and shape.
+    pub version: BufferVersion,
+    /// Role of the observation (output or in-out).
+    pub role: BufferRole,
+    /// The launch that produced the observed version.
+    pub produced_by: LaunchId,
+}
+
+/// The execution-lifetime regime of the whole program.
+///
+/// Buffer lifetimes (per-program / per-step / observation point) live on each
+/// [`BufferIdentity`]; this is the program-level counterpart: whether the
+/// program runs once or repeats as a training step (which is when per-step
+/// buffers recycle between iterations while per-program buffers persist).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DeviceProgramLifetime {
+    /// One-shot program run.
+    #[default]
+    SingleRun,
+    /// Repeating training step; per-step buffers recycle between iterations.
+    RepeatingStep,
+}
+
+/// A target-neutral MIR device program (A2; the frozen N1.6 schema).
+///
+/// ```text
+/// DeviceProgram { kernels: Vec<KernelUnit>, launches, lifetime, results }
+/// ```
+///
+/// - `kernels`: the ordered kernel declarations (function id, entry, plan,
+///   typed resource list, launch plan).
+/// - `launches`: the ordered execution sequence over the kernels.
+/// - `lifetime`: the program execution-lifetime regime.
+/// - `results`: the explicit multi-output result buffers.
+///
+/// Buffer identities, versions, and the producer/consumer data-flow edges are
+/// derived as a [`BufferRegistry`] (see [`DeviceProgram::buffer_registry`]);
+/// [`DeviceProgram::validate`] enforces the consistency rules, including the
+/// shape-changing contract (a new shape is a new version; no in-place
+/// reinterpretation).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct DeviceProgram {
+    /// Ordered kernel declarations.
+    pub kernels: Vec<KernelUnit>,
+    /// Ordered launch sequence.
+    pub launches: Vec<LaunchUnit>,
+    /// Program execution-lifetime regime.
+    pub lifetime: DeviceProgramLifetime,
+    /// Explicit multi-output result buffers.
+    pub results: Vec<ResultBuffer>,
+}

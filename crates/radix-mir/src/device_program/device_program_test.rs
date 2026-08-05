@@ -5,10 +5,10 @@ use crate::abi::{
     MirWorkgroupSize,
 };
 use crate::device_semantics::{
-    InitializationFact, InitializationPolicy, ObservationFact, SemanticValue, SemanticValueOrigin,
-    ValueBinding, ValueGeneration,
+    DeviceSemantics, InitializationFact, InitializationPolicy, ObservationFact, SemanticValue,
+    SemanticValueId, SemanticValueOrigin, ValueBinding, ValueGeneration,
 };
-use crate::kernel_plan::ReduceOp;
+use crate::kernel_plan::{CollectionKernelPlan, ReduceOp};
 use crate::layout::MirTensorStorageLayout;
 use crate::{
     MirBlock, MirBlockId, MirCollectionOp, MirFunction, MirFunctionId, MirIntrinsic, MirLocalId,

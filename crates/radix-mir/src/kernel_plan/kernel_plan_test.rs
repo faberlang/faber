@@ -1,9 +1,10 @@
+use super::build::{matmul_barrier_schedule, reduction_barrier_schedule};
 use super::*;
 use crate::abi::{
-    MirKernelDispatchSize, MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind,
-    MirKernelResourceRole, MirWorkgroupSize,
+    CollectionOpContract, MirKernelDispatchSize, MirKernelResource, MirKernelResourceAccess,
+    MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature, MirWorkgroupSize,
 };
-use crate::{MirFunctionId, MirLocalId, MirType};
+use crate::{MirCollectionOp, MirFunctionId, MirLocalId, MirType};
 use radix_types::{NumericWidth, Primitive, TypeTable};
 
 fn f32_ty(types: &mut TypeTable) -> MirType {
