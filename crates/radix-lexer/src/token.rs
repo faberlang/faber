@@ -264,8 +264,10 @@ pub enum TokenKind {
     ApproxNotEq, // ≉
     BangEq,      // ≠
     BangEqEq,    // (reserved for future / internal; no source form)
-    Lt,          // <
-    Gt,          // >
+    Lt,          // ≺ strict less-than comparison
+    Gt,          // ≻ strict greater-than comparison
+    LtAscii,     // < generic application delimiter (legacy comparison during migration)
+    GtAscii,     // > generic application delimiter (legacy comparison during migration)
     LtEq,        // ≤
     GtEq,        // ≥
 

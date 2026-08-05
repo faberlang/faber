@@ -1882,8 +1882,8 @@ impl Parser {
                 | TokenKind::RParen
                 | TokenKind::Arrow
                 | TokenKind::ExitArrow
-                | TokenKind::Lt
-                | TokenKind::Gt
+                | TokenKind::LtAscii
+                | TokenKind::GtAscii
                 | TokenKind::Colon
                 | TokenKind::Dot
                 | TokenKind::Eq
@@ -1973,7 +1973,7 @@ impl Parser {
     ///
     /// Type parameters (`T`) precede size parameters (`magnitudo N`).
     fn parse_generic_params(&mut self) -> Result<Vec<TypeParam>, ParseError> {
-        if !self.eat(&TokenKind::Lt) {
+        if !self.eat(&TokenKind::LtAscii) {
             return Ok(Vec::new());
         }
 
@@ -1998,7 +1998,7 @@ impl Parser {
             }
         }
 
-        self.expect(&TokenKind::Gt, "expected '>' after generic parameters")?;
+        self.expect(&TokenKind::GtAscii, "expected '>' after generic parameters")?;
         Ok(params)
     }
 

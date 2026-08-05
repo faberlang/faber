@@ -147,7 +147,7 @@ impl Parser {
                 radix_types::numeric_width::sparsa_sugar_width_marker(&name_str)
             {
                 self.parse_sparsa_width_sugar(name, width)?
-            } else if self.eat(&TokenKind::Lt) {
+            } else if self.eat(&TokenKind::LtAscii) {
                 if name_str == "atomic" {
                     let elem = Box::new(self.parse_type()?);
                     if self.eat(&TokenKind::Comma) {
@@ -157,13 +157,13 @@ impl Parser {
                         )
                         .with_arg("issue", "atomic_single_element"));
                     }
-                    self.expect(&TokenKind::Gt, "expected '>'")?;
+                    self.expect(&TokenKind::GtAscii, "expected '>'")?;
                     TypeExprKind::Atomic(elem)
                 } else if name_str == "promissum" {
                     let success = Box::new(self.parse_type()?);
                     let kind = if self.eat(&TokenKind::ExitArrow) {
                         let alternate = Box::new(self.parse_type()?);
-                        self.expect(&TokenKind::Gt, "expected '>'")?;
+                        self.expect(&TokenKind::GtAscii, "expected '>'")?;
                         TypeExprKind::PromissumFailable(success, alternate)
                     } else {
                         if self.eat(&TokenKind::Comma) {
@@ -173,7 +173,7 @@ impl Parser {
                             )
                             .with_arg("issue", "promissum_alternate_uses_exit_arrow"));
                         }
-                        self.expect(&TokenKind::Gt, "expected '>'")?;
+                        self.expect(&TokenKind::GtAscii, "expected '>'")?;
                         TypeExprKind::Named(name, vec![*success])
                     };
                     kind
@@ -200,7 +200,7 @@ impl Parser {
                         .with_arg("issue", issue));
                     }
                     let shape = self.parse_figura()?;
-                    self.expect(&TokenKind::Gt, "expected '>'")?;
+                    self.expect(&TokenKind::GtAscii, "expected '>'")?;
                     if name_str == "tensor" {
                         TypeExprKind::Tensor(elem, shape)
                     } else if name_str == "sparsa" {
@@ -218,7 +218,7 @@ impl Parser {
                             break;
                         }
                     }
-                    self.expect(&TokenKind::Gt, "expected '>'")?;
+                    self.expect(&TokenKind::GtAscii, "expected '>'")?;
                     if name_str == "iuncta" && params.len() > 16 {
                         return Err(
                             ParseError::structured(ParseErrorKind::InvalidType, name.span)
@@ -389,7 +389,7 @@ impl Parser {
     }
 
     fn reject_type_sugar_angle_bracket(&mut self, sugar: &'static str) -> Result<(), ParseError> {
-        if self.check(&TokenKind::Lt) {
+        if self.check(&TokenKind::LtAscii) {
             let issue = match sugar {
                 "lista" => "lista_sugar_angle_bracket_form",
                 "vector" => "vector_sugar_angle_bracket_form",

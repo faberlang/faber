@@ -242,8 +242,13 @@ impl Parser {
 
         loop {
             let op = match self.peek().kind {
+                // Canonical strict comparison is `Lt`/`Gt` (≺/≻).
+                // `LtAscii`/`GtAscii` (`<`/`>`) as comparison are legacy during
+                // the glyph migration; `<`/`>` remain generic delimiters.
                 TokenKind::Lt => BinOp::Lt,
                 TokenKind::Gt => BinOp::Gt,
+                TokenKind::LtAscii => BinOp::Lt,
+                TokenKind::GtAscii => BinOp::Gt,
                 TokenKind::LtEq => BinOp::LtEq,
                 TokenKind::GtEq => BinOp::GtEq,
                 _ if self.check_keyword_in_slot("intra") => BinOp::InRange,
@@ -693,7 +698,7 @@ impl Parser {
         let mut expr = self.parse_primary()?;
 
         loop {
-            if self.check(&TokenKind::Lt) {
+            if self.check(&TokenKind::LtAscii) {
                 self.reject_retired_angle_type_call_constructor(&expr)?;
                 let checkpoint = self.checkpoint();
                 if let Ok(type_args) = self.parse_call_type_args() {
@@ -917,14 +922,14 @@ impl Parser {
         };
 
         let checkpoint = self.checkpoint();
-        self.expect(&TokenKind::Lt, "expected '<'")?;
+        self.expect(&TokenKind::LtAscii, "expected '<'")?;
         if let Some(issue) = shape_issue {
             let _elem = self.parse_type()?;
             if !self.eat(&TokenKind::Comma) {
                 return Err(self.expected_expression_error(issue));
             }
             let _figura = self.parse_figura()?;
-            self.expect(&TokenKind::Gt, "expected '>'")?;
+            self.expect(&TokenKind::GtAscii, "expected '>'")?;
         } else {
             let _params = self.finish_type_args_list()?;
         }
@@ -1387,7 +1392,7 @@ impl Parser {
         self.expect_keyword_in_slot("iuncta", "expected 'iuncta'")?;
 
         // Parse <type-args>
-        self.expect(&TokenKind::Lt, "expected '<' after 'iuncta'")?;
+        self.expect(&TokenKind::LtAscii, "expected '<' after 'iuncta'")?;
         let type_args = self.finish_type_args_list()?;
 
         // Parse [elements]
@@ -1966,7 +1971,7 @@ impl Parser {
     }
 
     fn try_parse_type_args(&mut self) -> Result<Vec<TypeExpr>, ParseError> {
-        if !self.eat(&TokenKind::Lt) {
+        if !self.eat(&TokenKind::LtAscii) {
             return Ok(Vec::new());
         }
         self.finish_type_args_list()
@@ -1982,7 +1987,7 @@ impl Parser {
             }
         }
 
-        self.expect(&TokenKind::Gt, "expected '>'")?;
+        self.expect(&TokenKind::GtAscii, "expected '>'")?;
         Ok(args)
     }
 
@@ -1991,7 +1996,7 @@ impl Parser {
     /// The postfix loop has already confirmed `<` is present; this helper consumes
     /// it and requires a well-formed `< type (, type)* >` list before `(`.
     fn parse_call_type_args(&mut self) -> Result<Vec<TypeExpr>, ParseError> {
-        if !self.eat(&TokenKind::Lt) {
+        if !self.eat(&TokenKind::LtAscii) {
             return Err(self.expected_expression_error("call_type_args_start"));
         }
         self.finish_type_args_list()

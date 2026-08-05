@@ -766,3 +766,41 @@ fn nihil_non_est_parses_as_identity_negation() {
     };
     assert_eq!(binary.op, BinOp::IsNot);
 }
+
+/// `≺`/`≻` are the canonical strict comparison glyphs; they parse as Lt/Gt.
+#[test]
+fn strict_comparison_glyphs_parse_as_lt_gt() {
+    let result = parse_ok("fixum _ a ← x ≺ y et z ≻ w");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Binary(and) = &expr.kind else {
+        panic!("expected and root, got {:?}", expr.kind);
+    };
+    assert_eq!(and.op, BinOp::And);
+    let ExprKind::Binary(lt) = &and.lhs.kind else {
+        panic!("expected comparison LHS, got {:?}", and.lhs.kind);
+    };
+    assert_eq!(lt.op, BinOp::Lt);
+    let ExprKind::Binary(gt) = &and.rhs.kind else {
+        panic!("expected comparison RHS, got {:?}", and.rhs.kind);
+    };
+    assert_eq!(gt.op, BinOp::Gt);
+}
+
+/// Legacy ASCII `<`/`>` still parse as comparison during the glyph migration.
+#[test]
+fn ascii_comparison_parses_as_lt_during_migration() {
+    let result = parse_ok("fixum _ a ← x < y");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Binary(binary) = &expr.kind else {
+        panic!("expected binary expression, got {:?}", expr.kind);
+    };
+    assert_eq!(binary.op, BinOp::Lt);
+}

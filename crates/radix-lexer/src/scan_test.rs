@@ -557,16 +557,18 @@ fn lexes_equality_comparison_operators() {
 
 #[test]
 fn lexes_relational_operators() {
-    let result = lex("< ≤ > ≥");
+    let result = lex("< ≤ ≺ > ≥ ≻");
     assert!(result.errors.is_empty());
     let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
     assert_eq!(
         kinds,
         vec![
-            TokenKind::Lt,
+            TokenKind::LtAscii,
             TokenKind::LtEq,
-            TokenKind::Gt,
+            TokenKind::Lt,
+            TokenKind::GtAscii,
             TokenKind::GtEq,
+            TokenKind::Gt,
             TokenKind::Eof,
         ]
     );

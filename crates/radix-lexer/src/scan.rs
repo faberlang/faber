@@ -315,8 +315,10 @@ impl<'a> Lexer<'a> {
                     TokenKind::Bang
                 }
             }
-            '<' => TokenKind::Lt,
-            '>' => TokenKind::Gt,
+            '<' => TokenKind::LtAscii,
+            '>' => TokenKind::GtAscii,
+            '≺' => TokenKind::Lt,
+            '≻' => TokenKind::Gt,
             '←' => TokenKind::Assign,
             '≡' => TokenKind::EqEq,
             '≈' => TokenKind::ApproxEq,
