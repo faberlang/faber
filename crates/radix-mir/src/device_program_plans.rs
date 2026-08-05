@@ -297,6 +297,14 @@ impl RecipeKind {
             CollectionKernelPlan::TiledMatMul(_) => Self::TiledMatMul,
             CollectionKernelPlan::TreeReduction(_) => Self::TreeReduction,
             CollectionKernelPlan::Transpose(_) => Self::Transpose,
+            // S6-N1: recipe names frozen but NOT admitted (admission is
+            // S6-P1); nothing can construct these plans yet, so the arm is
+            // unreachable until P1 lands.
+            CollectionKernelPlan::AxisReduction(_)
+            | CollectionKernelPlan::RowSoftmax(_)
+            | CollectionKernelPlan::LayerNormalization(_) => {
+                unreachable!("recipe plans are not admitted until S6-P1")
+            }
         }
     }
 }
@@ -396,6 +404,14 @@ fn plan_shared_memory_bytes(plan: &CollectionKernelPlan) -> u64 {
         CollectionKernelPlan::TiledMatMul(plan) => {
             shared_memory_layout_bytes(&plan.shared_memory.shared_a)
                 + shared_memory_layout_bytes(&plan.shared_memory.shared_b)
+        }
+        // S6-N1: recipe names frozen but NOT admitted (admission is S6-P1);
+        // nothing can construct these plans yet, so the arm is unreachable
+        // until P1 lands.
+        CollectionKernelPlan::AxisReduction(_)
+        | CollectionKernelPlan::RowSoftmax(_)
+        | CollectionKernelPlan::LayerNormalization(_) => {
+            unreachable!("recipe plans are not admitted until S6-P1")
         }
     }
 }

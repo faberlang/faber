@@ -867,7 +867,7 @@ pub enum MirCollectionOp {
     /// Sum across a specific axis: `sum(x, axis)`. The axis is a trailing
     /// const operand (`MirConstant::Int`) in the `MirRuntimeCall::args` list.
     /// Result rank is input rank - 1.
-    SumAxis,
+    TensorSumAxis,
     Round,
     Floor,
     Ceiling,
@@ -903,8 +903,10 @@ pub enum MirCollectionOp {
     TensorRelu,
     /// Softmax: `exp(x_i` - max(x)) / `sum(exp(x_j` - max(x))) with numerical
     /// stability. Operates on rank-1 (vector) or rank-2 (batched row-wise,
-    /// axis 1 — the last axis). No VJP in v1; the full Jacobian
-    /// diag(s) - s@sᵀ is deferred to a follow-on goal.
+    /// axis 1 — the last axis). The AIR VJP exists
+    /// (`radix-air/src/reverse_ad/vjp.rs`, softmax walk: Mul → `TensorSumAxis`
+    /// → Fill → Sub → Mul); the MIR op itself is a forward collection op and
+    /// the device recipe (`RowSoftmax`) is admitted by the stage-6 P1 unit.
     TensorSoftmax,
     TensorTranspose,
     /// Categorical cross-entropy loss: forward-only. Takes (logits, targets)

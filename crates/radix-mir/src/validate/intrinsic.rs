@@ -484,7 +484,7 @@ impl Validator<'_, '_> {
             | MirCollectionOp::Split
             | MirCollectionOp::Minimum
             | MirCollectionOp::Maximum
-            | MirCollectionOp::SumAxis
+            | MirCollectionOp::TensorSumAxis
             | MirCollectionOp::TensorReshape
             | MirCollectionOp::TensorGet
             | MirCollectionOp::TensorFill
@@ -741,16 +741,16 @@ impl Validator<'_, '_> {
                     "collection sum result type mismatch",
                 );
             }
-            MirCollectionOp::SumAxis => {
+            MirCollectionOp::TensorSumAxis => {
                 let Some(receiver_ty) = first_arg_ty else {
                     return;
                 };
                 if !matches!(self.type_kind(receiver_ty), Type::Tensor(_, _)) {
-                    self.error(span, "SumAxis receiver is not a tensor");
+                    self.error(span, "TensorSumAxis receiver is not a tensor");
                     return;
                 }
                 if !matches!(self.type_kind(call.return_ty), Type::Tensor(_, _)) {
-                    self.error(span, "SumAxis result is not a tensor");
+                    self.error(span, "TensorSumAxis result is not a tensor");
                 }
             }
             MirCollectionOp::ReverseInPlace => {

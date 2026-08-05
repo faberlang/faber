@@ -586,7 +586,7 @@ fn collection_op(op: MirCollectionOp) -> &'static str {
         MirCollectionOp::Maximum => "maximum",
         MirCollectionOp::Approximate => "approximate",
         MirCollectionOp::Sum => "sum",
-        MirCollectionOp::SumAxis => "sum_axis",
+        MirCollectionOp::TensorSumAxis => "tensor_sum_axis",
         MirCollectionOp::Round => "round",
         MirCollectionOp::Floor => "floor",
         MirCollectionOp::Ceiling => "ceiling",

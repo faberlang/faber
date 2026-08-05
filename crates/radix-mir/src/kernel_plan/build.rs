@@ -204,6 +204,14 @@ impl CollectionKernelPlan {
             CollectionKernelPlan::TreeReduction(plan) => validate_reduction_plan(plan),
             CollectionKernelPlan::TiledMatMul(plan) => validate_matmul_plan(plan),
             CollectionKernelPlan::Transpose(plan) => validate_transpose_plan(plan),
+            // S6-N1: recipe names frozen but NOT admitted (admission is
+            // S6-P1); nothing can construct these plans yet, so the arm is
+            // unreachable until P1 lands.
+            CollectionKernelPlan::AxisReduction(_)
+            | CollectionKernelPlan::RowSoftmax(_)
+            | CollectionKernelPlan::LayerNormalization(_) => {
+                unreachable!("recipe plans are not admitted until S6-P1")
+            }
         }
     }
 }

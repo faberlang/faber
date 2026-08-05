@@ -64,6 +64,47 @@ pub enum CollectionKernelPlan {
     /// Rank-2 transpose recipe (`[M,N] → [N,M]`): one thread per output
     /// element with a column-major index remap (S5-U1). See [`TransposePlan`].
     Transpose(TransposePlan),
+    /// Axis-reduction recipe (S6-N1: name frozen; admission/resolution is
+    /// S6-P1): reduce a tensor over a single axis by `op`. See
+    /// [`AxisReductionPlan`].
+    AxisReduction(AxisReductionPlan),
+    /// Row-wise softmax recipe (S6-N1: name frozen; admission/resolution is
+    /// S6-P1): numerically stable softmax over the last (row) axis. See
+    /// [`RowSoftmaxPlan`].
+    RowSoftmax(RowSoftmaxPlan),
+    /// Layer-normalization recipe (S6-N1: name frozen; admission/resolution
+    /// is S6-P1): row mean/var with optional affine. See
+    /// [`LayerNormalizationPlan`].
+    LayerNormalization(LayerNormalizationPlan),
+}
+
+/// Axis-reduction recipe plan (name frozen by S6-N1; admission, resolution,
+/// and decomposition implemented by S6-P1). The axis comes from the trailing
+/// const operand of the lowering.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AxisReductionPlan {
+    /// Reduction operator (`Sum` in v1).
+    pub op: ReduceOp,
+    /// Axis reduced over (from the trailing const operand).
+    pub axis: u64,
+}
+
+/// Row-wise softmax recipe plan (name frozen by S6-N1; admission, resolution,
+/// and decomposition implemented by S6-P1). Operates over the last (row)
+/// axis.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RowSoftmaxPlan {
+    /// Row axis (the last axis in v1).
+    pub axis: u64,
+}
+
+/// Layer-normalization recipe plan (name frozen by S6-N1; admission,
+/// resolution, and decomposition implemented by S6-P1). The full field set
+/// (epsilon, affine) is resolved by P1 from the const operands.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LayerNormalizationPlan {
+    /// Normalization axis (from the trailing const operand).
+    pub axis: u64,
 }
 
 /// Matmul operand shapes `(M, K, N)`, resolved from the rank-2 tensor types
