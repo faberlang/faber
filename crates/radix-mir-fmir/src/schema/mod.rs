@@ -1,0 +1,163 @@
+//! FMIR portable package-image schema.
+//!
+//! Owns the wire structs, the artifact-version constant (clean-break ratchets;
+//! no compatibility decoder — A7), the `fmir-text` / `fmir` target tags, the
+//! FNV-1a hash used for source identities, runner fingerprints, and backend
+//! artifact provenance, the SHA-256 same-package identity, and the host +
+//! device runtime-requirement allowlists.
+//!
+//! # Device payload (N1.7 / architecture record §7)
+//!
+//! A `3 → 4` clean break adds the optional `device` section to
+//! [`FmirTextImageFile`] / [`FmirBinaryImageFile`] for the differentiable-GPU
+//! campaign. A `4 → 5` clean break (operator-authorized package-seam break,
+//! S3-A4 / N3.3) replaces the section's opaque payload string with the
+//! **typed complete device program** (kernels, launches, results,
+//! per-resource access + version, lifetime) and moves CUDA symbols + host
+//! input values to per-artifact / declared-inputs metadata, so the canonical
+//! program bytes (the A10 identity substrate) are semantics-only. The section
+//! carries the backend selection request, the declared backend artifacts
+//! (Metal MSL + CUDA PTX) each with its own FNV-1a provenance hash, and the
+//! device runtime requirements (`device:metal`, `device:cuda`). A device
+//! payload is admitted only from the exact producing toolchain version, and
+//! unknown `device:` requirements fail admission at package load.
+//!
+//! A `5 → 6` clean break (Stage 3R U1, the F1–F7 frozen contract) carries the
+//! repaired semantic facts on the wire: a **semantic value identity** per
+//! buffer (F1), explicit **value generations** per write slot (F2), carried
+//! **roots + producer/consumer dependencies** (F3), the lossless
+//! **primal/companion relation** (F4), and independent **initialization +
+//! observation axes** (F5/F6). The nested device-program wire version
+//! ([`WIRE_DEVICE_PROGRAM_VERSION`]) and the outer image version
+//! ([`PACKAGE_MIR_ARTIFACT_VERSION`]) fail closed **independently** at the
+//! radix decode boundary (F7/S8), before host construction or launch.
+
+mod admit;
+mod device;
+mod hash;
+mod image;
+mod requirements;
+mod validate;
+mod wire;
+
+pub(crate) use admit::*;
+pub use device::*;
+pub use hash::*;
+pub use image::*;
+pub use requirements::*;
+pub(crate) use validate::*;
+pub use wire::*;
+
+/// Image schema version. Ratchets as clean breaks; there is no compatibility
+/// decoder (A7). `3 → 4` clean break adds the optional `device` section
+/// (canonical device-program payload, selection, backend artifacts, device
+/// runtime requirements) for the differentiable-GPU campaign (N1.7). `4 → 5`
+/// clean break (operator memo; S3-A4) makes the device section a
+/// TYPED complete program (the opaque payload string is replaced) and moves
+/// CUDA symbols + host inputs to metadata. `5 → 6` clean break (Stage 3R U1)
+/// carries the F1–F7 semantic facts (semantic value identity, generations,
+/// roots, dependencies, lossless relation, initialization/observation axes).
+/// Old version-5 images fail closed with
+/// [`UnsupportedVersion`](crate::error::FmirImageError::UnsupportedVersion).
+pub const PACKAGE_MIR_ARTIFACT_VERSION: u32 = 6;
+
+/// The faber-owned wire/codec version of the typed device-program section
+/// (the nested `v` field of [`FmirDeviceProgramSection`]). Bumped in lockstep
+/// with the `DEVICE_RUN_PLAN_VERSION` constructor ratchet; bumped `3 → 4` by
+/// the Stage 3R U1 clean break (F7/S8) and `4 → 5` by the S5-U5b clean break
+/// (the declared RepeatingStep step count rides the lifetime variant). Admitted
+/// independently of the outer image version: [`admit_device_section`] rejects
+/// a mismatched nested version before any field-level interpretation, with a
+/// focused diagnostic
+/// ([`UnsupportedDeviceProgramVersion`](crate::error::FmirImageError::UnsupportedDeviceProgramVersion)).
+pub const WIRE_DEVICE_PROGRAM_VERSION: u32 = 5;
+
+/// Text image `target` tag.
+pub const FMIR_TEXT_TARGET_NAME: &str = "fmir-text";
+
+/// Binary image `target` tag.
+pub const FMIR_TARGET_NAME: &str = "fmir";
+
+/// FNV-1a 64-bit offset basis (standard).
+pub const FNV1A64_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
+
+/// FNV-1a 64-bit prime (standard).
+pub const FNV1A64_PRIME: u64 = 0x0100_0000_01b3;
+
+/// Deterministic canonical bytes of the COMPLETE device program — the A10
+/// identity substrate. Both image routes carry the identical typed program
+/// (Metal and CUDA images derive the same `WireDeviceProgram`), so both
+/// derive identical bytes. Postcard serialization is deterministic for a
+/// fixed struct shape and infallible for these scalar/string/enum fields.
+#[must_use]
+pub fn canonical_program_bytes(program: &WireDeviceProgram) -> Vec<u8> {
+    postcard::to_allocvec(program).expect("wire program serialization is infallible")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn artifact_version_is_6_for_the_carried_semantics_schema() {
+        assert_eq!(PACKAGE_MIR_ARTIFACT_VERSION, 6);
+    }
+
+    #[test]
+    fn device_program_wire_version_is_5_after_the_step_count_break() {
+        // Stage 3R U1 bumped the nested device-program wire version 3 → 4
+        // (S1); S5-U5b bumps it 4 → 5 (the declared RepeatingStep step count
+        // rides the lifetime variant). Admitted independently of the outer
+        // FMIR version (S8).
+        assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 5);
+        assert_ne!(WIRE_DEVICE_PROGRAM_VERSION, PACKAGE_MIR_ARTIFACT_VERSION);
+    }
+
+    #[test]
+    fn target_tags_are_configured() {
+        assert_eq!(FMIR_TEXT_TARGET_NAME, "fmir-text");
+        assert_eq!(FMIR_TARGET_NAME, "fmir");
+    }
+
+    #[test]
+    fn fnv1a64_matches_reference_vector() {
+        // Empty input must equal the offset basis.
+        assert_eq!(fnv1a64(b""), FNV1A64_OFFSET);
+        // Single byte "a".
+        assert_eq!(fnv1a64(b"a"), 0xaf63_dc4c_8601_ec8c);
+    }
+
+    #[test]
+    fn host_requirements_allowlist() {
+        assert!(is_known_host_requirement("host:argv"));
+        assert!(is_known_host_requirement("host:fs"));
+        assert!(is_known_host_requirement("host:process"));
+        assert!(!is_known_host_requirement("host:nope"));
+        assert!(!is_known_host_requirement("kernel:foo.bar"));
+        assert!(!is_known_host_requirement(""));
+    }
+
+    #[test]
+    fn device_requirements_allowlist_extends_host_allowlist() {
+        // Frozen device requirements (N1.7).
+        assert!(is_known_device_requirement("device:metal"));
+        assert!(is_known_device_requirement("device:cuda"));
+        assert!(!is_known_device_requirement("device:vulkan"));
+        assert!(!is_known_device_requirement("device:"));
+        assert!(!is_known_device_requirement("host:fs"));
+        // Combined admission allowlist = host ∪ device.
+        assert!(is_known_requirement("host:argv"));
+        assert!(is_known_requirement("device:metal"));
+        assert!(is_known_requirement("device:cuda"));
+        assert!(!is_known_requirement("device:vulkan"));
+        assert!(!is_known_requirement("kernel:foo.bar"));
+    }
+
+    #[test]
+    fn fnv1a64_blob_hash_is_canonical_spelling() {
+        // Empty blob → FNV offset basis, zero-padded to 16 hex.
+        assert_eq!(fnv1a64_blob_hash(b""), "fnv64:cbf29ce484222325");
+        // Single-byte "a" matches the reference vector in fnv1a64.
+        assert_eq!(fnv1a64_blob_hash(b"a"), "fnv64:af63dc4c8601ec8c");
+    }
+}

@@ -1,0 +1,528 @@
+use serde::{Deserialize, Serialize};
+
+// ---------------------------------------------------------------------------
+// The typed complete device program (S3-A4 / N3.3)
+// ---------------------------------------------------------------------------
+//
+// Mirrors the radix-mir `device_program::DeviceProgram` schema field-for-field
+// (the S1-1 shared-schema authority) so the wire carries the COMPLETE program:
+// kernels (function id, entry, plan, typed resources, launch), launches
+// (ordered; may be >1 per kernel), the program lifetime, and the explicit
+// result buffers. Per-resource access and the content version are distinct
+// fields (the 4-axis separation, N3.4); data-flow edges derive
+// deterministically from the complete access + launches (the source facts are
+// on the wire), so the host never re-derives topology from launch order or a
+// slot-role string.
+//
+// Stage 3R (U1, S3–S7) extends the typed program with the F1–F7 carried
+// facts: a semantic-value table + per-buffer identity (F1), explicit value
+// generations per slot (F2), carried roots + dependency edges (F3), the
+// lossless companion relation (F4), and the initialization / observation axes
+// (F5/F6). `deny_unknown_fields` admission means an old consumer never
+// silently ignores these sections.
+
+/// The complete device program (wire form).
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireDeviceProgram {
+    /// Ordered kernel declarations.
+    pub kernels: Vec<WireKernelUnit>,
+    /// Ordered launch sequence (a kernel may be launched more than once).
+    pub launches: Vec<WireLaunchUnit>,
+    /// Program execution-lifetime regime.
+    pub lifetime: WireProgramLifetime,
+    /// Explicit multi-output result buffers.
+    pub results: Vec<WireResultBuffer>,
+    /// Carried semantic-value table (F1): one row per stable value identity.
+    pub semantic_values: Vec<WireSemanticValue>,
+    /// Declared legal execution roots — launch ids the host may start from
+    /// (F3). Never inferred from kernel declaration order.
+    pub roots: Vec<u32>,
+    /// Carried producer/consumer dependency edges (F3).
+    pub dependencies: Vec<WireDependencyEdge>,
+    /// Lossless primal/companion relation rows (F4/S7).
+    pub relations: Vec<WireCompanionRelation>,
+}
+
+/// One carried semantic value (F1): the stable identity plus the origin fact
+/// it is derived from. Two unrelated same-name/same-shape values are distinct
+/// rows; two rows minted from one origin would alias and fail admission.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireSemanticValue {
+    /// Program-unique stable identity.
+    pub id: u32,
+    /// Diagnostic name (never an identity fact).
+    pub name: String,
+    /// The carried fact this identity is derived from.
+    pub origin: WireSemanticValueOrigin,
+}
+
+/// The carried MIR/value fact a [`WireSemanticValue`] identity derives from.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireSemanticValueOrigin {
+    /// The value flows from a specific MIR local of a specific function.
+    MirLocal { function: u32, local: u32 },
+    /// A host-provided input value.
+    HostInput,
+    /// A synthetic value minted by the materializer (e.g. a gradient slot);
+    /// the label discriminates distinct synthetic values.
+    Synthetic { label: String },
+}
+
+/// One carried producer/consumer dependency edge (F3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireDependencyEdge {
+    /// The launch that produces the value consumed downstream.
+    pub producer: u32,
+    /// The launch that consumes it.
+    pub consumer: u32,
+    /// The buffer whose content flows across the edge.
+    pub buffer: u32,
+    /// The content version that flows.
+    pub version: u32,
+}
+
+/// One lossless primal/companion relation row (F4/S7): selected inputs with
+/// the gradient-to-primal identity, selected outputs, and device-residency.
+/// Duplicate or contradictory rows fail admission.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireCompanionRelation {
+    /// Primal function id.
+    pub primal: u32,
+    /// Companion function id.
+    pub companion: u32,
+    /// Derivative kind.
+    pub derivative: WireCompanionDerivativeKind,
+    /// The primal is an explicitly device-resident forward kernel.
+    pub device_resident: bool,
+    /// The selected differentiable inputs.
+    pub selected_inputs: Vec<WireCompanionSelectedInput>,
+    /// The selected primal outputs.
+    pub selected_outputs: Vec<WireCompanionSelectedOutput>,
+}
+
+/// The derivative kind a companion computes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireCompanionDerivativeKind {
+    /// Reverse-mode vector-Jacobian product.
+    ReverseModeVjp,
+}
+
+/// One selected differentiable input (F4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireCompanionSelectedInput {
+    /// The primal parameter this input is.
+    pub param: u32,
+    /// Parameter position in the primal signature.
+    pub position: u32,
+    /// The primal parameter's type id.
+    pub ty: u32,
+    /// The companion result-tuple slot carrying this input's gradient.
+    pub gradient_slot: u32,
+}
+
+/// One selected primal output (F4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireCompanionSelectedOutput {
+    /// Output position in the primal result tuple.
+    pub position: u32,
+    /// The output's type id.
+    pub ty: u32,
+    /// The upstream gradient's type id.
+    pub upstream_gradient_ty: u32,
+}
+
+/// One ordered kernel declaration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireKernelUnit {
+    /// MIR function id this kernel is lowered from.
+    pub function: u32,
+    /// Target-neutral logical entry name.
+    pub entry: String,
+    /// Shared algorithmic recipe (elementwise, matmul, reduction).
+    pub plan: WireCollectionKernelPlan,
+    /// Typed buffer slots bound by this kernel.
+    pub resources: Vec<WireDeviceResource>,
+    /// Workgroup / dispatch / launch plan.
+    pub launch: WireKernelLaunchPlan,
+}
+
+/// A typed buffer slot bound to a kernel: identity + content version +
+/// binding + slot access (the 4-axis separation keeps access a distinct
+/// field from role/lifetime, N3.4), plus the F2 generation this slot
+/// consumes/produces and the F5 initialization policy that governs the
+/// buffer's storage.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireDeviceResource {
+    /// The buffer's program-level identity facts.
+    pub buffer: WireBufferIdentity,
+    /// The content version (and shape) this slot binds.
+    pub version: WireBufferVersion,
+    /// Target-neutral binding indices.
+    pub binding: WireBinding,
+    /// Slot read/write access.
+    pub access: WireResourceAccess,
+    /// Explicit value generation (F2): a write slot produces this generation;
+    /// a read slot consumes it; a read-write slot produces it and consumes
+    /// the previous one. Generation 0 (unset) is rejected.
+    pub generation: u32,
+    /// Independent initialization axis (F5): how the buffer's storage is
+    /// brought to its first defined state — never derived from role/lifetime.
+    pub initialization: WireInitializationPolicy,
+}
+
+/// Stable identity facts of one device buffer.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireBufferIdentity {
+    /// Program-unique identity key.
+    pub id: u32,
+    /// Logical name (diagnostics; target-neutral — never a backend binding).
+    pub name: String,
+    /// Program-level role (input / output / in-out).
+    pub role: WireBufferRole,
+    /// Where the storage lives (`DeviceHandle` / `HostOwned`).
+    pub storage: WireStorageLayout,
+    /// How long the storage lives.
+    pub lifetime: WireBufferLifetime,
+    /// The stable semantic value identity this buffer holds (F1).
+    pub semantic_value: u32,
+}
+
+/// One content version of a buffer (a shape snapshot; version ≥ 1).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireBufferVersion {
+    /// Monotonic version number within the buffer (≥ 1).
+    pub version: u32,
+    /// Element-type spelling of this version's shape (the campaign dtype
+    /// surface; "f32" for this delivery).
+    pub element_ty: String,
+    /// Element count of this version's shape.
+    pub element_count: u64,
+}
+
+/// Target-neutral binding indices.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireBinding {
+    /// First-level binding index.
+    pub group: u32,
+    /// Second-level binding index within the group.
+    pub binding: u32,
+}
+
+/// The workgroup / dispatch / launch plan of one kernel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireKernelLaunchPlan {
+    /// Threads per workgroup.
+    pub workgroup: WireWorkgroupSize,
+    /// Dispatch extent in workgroups for each axis.
+    pub dispatch_size: WireDispatchSize,
+    /// Derived workgroup count the host launches.
+    pub workgroup_count: WireWorkgroupCount,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireWorkgroupSize {
+    pub x: u32,
+    pub y: u32,
+    pub z: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireDispatchSize {
+    pub x: u64,
+    pub y: u64,
+    pub z: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireWorkgroupCount {
+    pub x: u64,
+    pub y: u64,
+    pub z: u64,
+}
+
+/// One entry in the ordered launch sequence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireLaunchUnit {
+    /// Program-unique launch id.
+    pub id: u32,
+    /// Index into `kernels`.
+    pub kernel_index: u32,
+}
+
+/// An explicit result buffer (multi-output readback).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireResultBuffer {
+    /// Identity of the observed buffer.
+    pub buffer: WireBufferIdentity,
+    /// Observed content version and shape.
+    pub version: WireBufferVersion,
+    /// Role of the observation (output or in-out).
+    pub role: WireBufferRole,
+    /// The launch that produced the observed version.
+    pub produced_by: u32,
+    /// The explicit observation fact (F5/F6): this row is a DECLARED
+    /// observation point. A writable intermediate or persistent state is a
+    /// result only through this fact — never because it is writable.
+    pub observation: WireObservationFact,
+}
+
+/// The explicit observation fact of a result row (F5/F6): the value is read
+/// back at a declared completion boundary, decoupled from role and lifetime.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireObservationFact {
+    /// The launch whose completion boundary makes the observation valid.
+    pub at_launch: u32,
+}
+
+/// Independent initialization axis (F5).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireInitializationPolicy {
+    /// Storage is zero-filled at allocation.
+    ZeroFill,
+    /// Storage is uploaded from host-provided values.
+    HostProvided,
+    /// Storage is fully written by a device kernel before any read.
+    KernelInitialized,
+}
+
+impl WireInitializationPolicy {
+    /// Short diagnostic spelling.
+    #[must_use]
+    pub fn spelling(self) -> &'static str {
+        match self {
+            Self::ZeroFill => "zero-fill",
+            Self::HostProvided => "host-provided",
+            Self::KernelInitialized => "kernel-initialized",
+        }
+    }
+}
+
+/// Program-level buffer role.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireBufferRole {
+    /// Host-provided input; every slot accesses it read-only.
+    Input,
+    /// Device-produced result; read back at an observation point.
+    Output,
+    /// Device-resident intermediate shared across kernels.
+    InOut,
+}
+
+impl WireBufferRole {
+    /// Short diagnostic spelling.
+    #[must_use]
+    pub fn spelling(self) -> &'static str {
+        match self {
+            Self::Input => "input",
+            Self::Output => "output",
+            Self::InOut => "in-out",
+        }
+    }
+}
+
+/// Storage-lifetime class (the frozen three-class enum, N3.4 — no fourth
+/// class by convenience).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireBufferLifetime {
+    /// Allocated once for the whole program; persists across steps.
+    PerProgram,
+    /// Live within one training step; recycled between iterations.
+    PerStep,
+    /// Read back at a declared observation point.
+    ObservationPoint,
+}
+
+impl WireBufferLifetime {
+    /// Short diagnostic spelling.
+    #[must_use]
+    pub fn spelling(self) -> &'static str {
+        match self {
+            Self::PerProgram => "per-program",
+            Self::PerStep => "per-step",
+            Self::ObservationPoint => "observation-point",
+        }
+    }
+}
+
+/// Slot read/write access.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireResourceAccess {
+    Read,
+    Write,
+    ReadWrite,
+}
+
+/// Where the storage lives.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireStorageLayout {
+    HostOwned,
+    DeviceHandle,
+}
+
+/// Program execution-lifetime regime. A `RepeatingStep` program carries its
+/// **declared step count** (the S5-U5b wire carriage): the number of training
+/// steps the route drives on one session, admitted fail-closed at decode (a
+/// zero count is rejected by [`crate::schema::validate_wire_program`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireProgramLifetime {
+    /// One-shot program run.
+    #[default]
+    SingleRun,
+    /// Repeating training step with the declared step count; per-step buffers
+    /// recycle between iterations.
+    RepeatingStep(u32),
+}
+
+/// The shared algorithmic recipe set (mirror of `CollectionKernelPlan`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub enum WireCollectionKernelPlan {
+    /// No collection-op recipe (elementwise kernel).
+    Elementwise,
+    /// Tiled-matmul recipe.
+    TiledMatMul(WireMatMulPlan),
+    /// Sequential tree-reduction recipe.
+    TreeReduction(WireReductionPlan),
+    /// Rank-2 transpose recipe (S5-U1).
+    Transpose(WireTransposePlan),
+}
+
+/// Rank-2 transpose recipe (`[M,N] → [N,M]`), the wire mirror of
+/// `kernel_plan::TransposePlan` (S5-U1): one thread per output element with
+/// a column-major index remap, no shared memory, no barriers.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireTransposePlan {
+    /// Source rows `M` (output columns).
+    pub m: u64,
+    /// Source columns `N` (output rows).
+    pub n: u64,
+    /// Workgroup lane count on `x` (the elementwise-style 1D contract).
+    pub workgroup_x: u32,
+    /// Dispatch extent on `x` (`M·N` output elements).
+    pub dispatch_x: u64,
+}
+
+/// Tiled-matmul recipe.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireMatMulPlan {
+    /// Left matrix rows `M`.
+    pub m: u64,
+    /// Contracted inner dimension `K`.
+    pub k: u64,
+    /// Right matrix columns `N`.
+    pub n: u64,
+    /// Square tile edge.
+    pub tile: u32,
+    /// Workgroup lane count on `x`.
+    pub workgroup_x: u32,
+    /// Workgroup lane count on `y`.
+    pub workgroup_y: u32,
+    /// The two shared-memory operand tiles.
+    pub shared_memory: WireMatMulSharedMemory,
+    /// Per-K-tile barrier schedule.
+    pub barriers: Vec<WireBarrierPoint>,
+    /// Zero-fill policy for the operand tail tiles.
+    pub oob_padding: WireOobPaddingPolicy,
+}
+
+/// The two shared-memory operand tiles of the tiled-matmul recipe.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireMatMulSharedMemory {
+    /// Left-matrix tile.
+    pub shared_a: WireSharedMemoryLayout,
+    /// Right-matrix tile.
+    pub shared_b: WireSharedMemoryLayout,
+}
+
+/// Tree-reduction recipe.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireReductionPlan {
+    /// Sum or mean (mean divides by the true tensor length).
+    pub op: WireReduceOp,
+    /// True flat tensor length `n`.
+    pub length: u64,
+    /// Power-of-two workgroup lane count.
+    pub workgroup_x: u32,
+    /// Per-workgroup partial slot count.
+    pub partials: u64,
+    /// Shared-memory buffer the tree reduces through.
+    pub shared_memory: WireSharedMemoryLayout,
+    /// Ordered barrier schedule.
+    pub barriers: Vec<WireBarrierPoint>,
+    /// Zero-fill policy for tail elements beyond `length`.
+    pub oob_padding: WireOobPaddingPolicy,
+}
+
+/// One shared-memory buffer layout.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireSharedMemoryLayout {
+    /// Byte width of one element.
+    pub element_byte_width: u32,
+    /// Number of slots.
+    pub slot_count: u32,
+    /// Logical buffer name (backends map to target syntax).
+    pub buffer_name: String,
+}
+
+/// A barrier program point in a recipe.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireBarrierPoint {
+    /// The phase whose writes this barrier publishes.
+    pub after: WireBarrierPhase,
+}
+
+/// What shared-memory writes a barrier publishes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireBarrierPhase {
+    SharedMemoryLoad,
+    ReductionStep,
+    InnerProductStep,
+}
+
+/// Out-of-bounds padding policy for collection-op recipes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireOobPaddingPolicy {
+    ZeroFill,
+}
+
+/// Reduction combination operator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireReduceOp {
+    Sum,
+    Mean,
+}
