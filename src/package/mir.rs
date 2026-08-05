@@ -302,15 +302,13 @@ pub(crate) fn build_package_mir_artifact(
 ) -> Result<PackageMirArtifact, Vec<Diagnostic>> {
     with_prepared_package_mir(config, input, argumenta, |prepared, _| {
         let package_root = package_artifact_root(input)?;
-        let artifact_root = package_root.join("target").join(PACKAGE_MIR_ARTIFACT_DIR);
-        fs::create_dir_all(&artifact_root)
-            .map_err(|error| vec![mir_diag(&prepared.entry_path, error.to_string())])?;
-        let manifest_path = artifact_root.join(PACKAGE_MIR_MANIFEST_FILE);
-        fs::write(
-            &manifest_path,
+        let artifact_root = package_artifact_dir(&package_root, &prepared.entry_path, "")?;
+        let manifest_path = write_package_image(
+            &artifact_root,
+            &prepared.entry_path,
+            PACKAGE_MIR_MANIFEST_FILE,
             package_mir_manifest(prepared, &package_root),
-        )
-        .map_err(|error| vec![mir_diag(&prepared.entry_path, error.to_string())])?;
+        )?;
         Ok(PackageMirArtifact {
             root: artifact_root,
             manifest_path,
@@ -331,13 +329,14 @@ pub(crate) fn build_package_fmir_text_image(
         CliPlanningMode::FmirTextRuntime,
         |prepared, lowered| {
             let package_root = package_artifact_root(input)?;
-            let artifact_root = package_root.join("target").join(PACKAGE_MIR_ARTIFACT_DIR);
-            fs::create_dir_all(&artifact_root)
-                .map_err(|error| vec![mir_diag(&prepared.entry_path, error.to_string())])?;
-            let image_path = artifact_root.join(FMIR_TEXT_IMAGE_FILE);
+            let artifact_root = package_artifact_dir(&package_root, &prepared.entry_path, "")?;
             let image = package_fmir_text_image(prepared, lowered, &package_root)?;
-            fs::write(&image_path, image)
-                .map_err(|error| vec![mir_diag(&prepared.entry_path, error.to_string())])?;
+            let image_path = write_package_image(
+                &artifact_root,
+                &prepared.entry_path,
+                FMIR_TEXT_IMAGE_FILE,
+                image,
+            )?;
             Ok(PackageFmirTextImage { image_path })
         },
     )
@@ -355,13 +354,10 @@ pub(crate) fn build_package_fmir_image(
         CliPlanningMode::FmirTextRuntime,
         |prepared, lowered| {
             let package_root = package_artifact_root(input)?;
-            let artifact_root = package_root.join("target").join(PACKAGE_MIR_ARTIFACT_DIR);
-            fs::create_dir_all(&artifact_root)
-                .map_err(|error| vec![mir_diag(&prepared.entry_path, error.to_string())])?;
-            let image_path = artifact_root.join(FMIR_IMAGE_FILE);
+            let artifact_root = package_artifact_dir(&package_root, &prepared.entry_path, "")?;
             let image = package_fmir_binary_image(prepared, lowered, &package_root)?;
-            fs::write(&image_path, image)
-                .map_err(|error| vec![mir_diag(&prepared.entry_path, error.to_string())])?;
+            let image_path =
+                write_package_image(&artifact_root, &prepared.entry_path, FMIR_IMAGE_FILE, image)?;
             Ok(PackageFmirImage { image_path })
         },
     )
@@ -380,16 +376,15 @@ pub(crate) fn build_package_fmir_binary_bundle(
         CliPlanningMode::FmirTextRuntime,
         |prepared, lowered| {
             let package_root = package_artifact_root(input)?;
-            let artifact_root = package_root
-                .join("target")
-                .join(PACKAGE_MIR_ARTIFACT_DIR)
-                .join(FMIR_BIN_ARTIFACT_DIR);
-            fs::create_dir_all(&artifact_root)
-                .map_err(|error| vec![mir_diag(&prepared.entry_path, error.to_string())])?;
-            let image_path = artifact_root.join(FMIR_IMAGE_FILE);
+            let artifact_root =
+                package_artifact_dir(&package_root, &prepared.entry_path, FMIR_BIN_ARTIFACT_DIR)?;
             let image = package_fmir_binary_image(prepared, lowered, &package_root)?;
-            fs::write(&image_path, &image)
-                .map_err(|error| vec![mir_diag(&prepared.entry_path, error.to_string())])?;
+            let image_path = write_package_image(
+                &artifact_root,
+                &prepared.entry_path,
+                FMIR_IMAGE_FILE,
+                &image,
+            )?;
 
             let entrypoint_path = artifact_root.join(FMIR_BIN_ENTRYPOINT_FILE);
             write_fmir_bin_runner(
@@ -810,7 +805,7 @@ fn fmir_package_image_from_lowered(
         prepared
             .source_paths
             .iter()
-            .map(|path| fs::read(path).map(|bytes| format!("fnv64:{:016x}", fnv1a64(&bytes))))
+            .map(|path| fs::read(path).map(|bytes| fnv64_hex(&bytes)))
             .collect::<Result<Vec<_>, _>>()
             .map_err(|error| {
                 vec![mir_diag(
@@ -821,6 +816,7 @@ fn fmir_package_image_from_lowered(
     } else {
         Vec::new()
     };
+    let (types, interner) = snapshot_context(lowered);
     Ok(FmirPackageImage {
         diagnostic_path,
         format,
@@ -828,13 +824,8 @@ fn fmir_package_image_from_lowered(
         runtime_requirements: prepared.runtime_requirements.clone(),
         cli: prepared.fmir_text_cli.clone(),
         exit_code: prepared.cli_exit_code,
-        types: lowered.validated.validation().types.snapshot(),
-        interner: lowered
-            .validated
-            .validation()
-            .interner
-            .map(|interner| interner.strings().to_vec())
-            .unwrap_or_default(),
+        types,
+        interner,
         program: lowered.program.clone(),
         device,
         source_hashes,
@@ -927,7 +918,43 @@ fn with_prepared_package_mir_with_cli_mode_and_consumer<R>(
     consumer: PackageMirConsumer,
     run: impl for<'a> FnOnce(&PreparedPackageMir<'a>, &LoweredMirUnit<'a>) -> Result<R, Vec<Diagnostic>>,
 ) -> Result<R, Vec<Diagnostic>> {
-    let mut package = analyze_package(config, input)?;
+    let package = analyze_package(config, input)?;
+    prepare_package_mir(
+        config,
+        package,
+        argumenta,
+        cli_mode,
+        consumer,
+        None,
+        || manifest_device_config(input),
+        run,
+    )
+}
+
+/// Shared package-MIR preparation pipeline for the source-analysis and
+/// loaded-package drivers: diagnostics gate → CLI plan → namespace-link
+/// resolution → entry selection → unit rewriting → lowering → validation →
+/// runtime-requirement collection → device config (the source route reads the
+/// manifest; the loaded route supplies fixed empty values) → a
+/// `PreparedPackageMir`, then `run`.
+fn prepare_package_mir<R>(
+    config: &Config,
+    mut package: AnalyzedPackage,
+    argumenta: &[String],
+    cli_mode: CliPlanningMode,
+    consumer: PackageMirConsumer,
+    loaded_links: Option<&BTreeMap<PathBuf, BTreeMap<String, PathBuf>>>,
+    device_config: impl FnOnce() -> Result<
+        (
+            BTreeMap<String, Vec<f32>>,
+            Option<DeviceSelection>,
+            Option<u32>,
+            bool,
+        ),
+        Vec<Diagnostic>,
+    >,
+    run: impl for<'a> FnOnce(&PreparedPackageMir<'a>, &LoweredMirUnit<'a>) -> Result<R, Vec<Diagnostic>>,
+) -> Result<R, Vec<Diagnostic>> {
     if package
         .diagnostics
         .iter()
@@ -936,7 +963,6 @@ fn with_prepared_package_mir_with_cli_mode_and_consumer<R>(
         return Err(package.diagnostics);
     }
     let cli_plan = plan_cli_package(&mut package, argumenta, cli_mode)?;
-
     let library_resolver = library_resolver_from_config(config);
     let mut library_cache = LibraryInterfaceCache::with_config(config);
     let links = local_namespace_call_targets(
@@ -944,7 +970,7 @@ fn with_prepared_package_mir_with_cli_mode_and_consumer<R>(
         consumer,
         &library_resolver,
         &mut library_cache,
-        None,
+        loaded_links,
     )?;
     let entry_index = select_entry_unit(&package)?;
     let entry_path = package.units[entry_index].path.clone();
@@ -972,8 +998,7 @@ fn with_prepared_package_mir_with_cli_mode_and_consumer<R>(
         bridge_norma_providers_to_kernel(&mut lowered, &entry_path)?;
     }
     let runtime_requirements = collect_package_runtime_requirements(&lowered, &cli_plan);
-    let (device_inputs, device_backend, device_steps, device_declared) =
-        manifest_device_config(input)?;
+    let (device_inputs, device_backend, device_steps, device_declared) = device_config()?;
     let prepared = PreparedPackageMir {
         entry_path: entry_path.clone(),
         source_paths,
@@ -990,81 +1015,67 @@ fn with_prepared_package_mir_with_cli_mode_and_consumer<R>(
 }
 
 /// Loaded-package MIR driver: prepare a package reconstructed from a FHIR
-/// envelope for lowering/run. Mirrors
-/// [`with_prepared_package_mir_with_cli_mode_and_consumer`] but skips
+/// envelope for lowering/run. Mirrors [`prepare_package_mir`] but skips
 /// `analyze_package` (the package arrives already reconstructed) and resolves
 /// local imports from the envelope's explicit link table instead of the
 /// filesystem.
 fn with_prepared_package_mir_from_loaded<R>(
     config: &Config,
-    mut package: AnalyzedPackage,
+    package: AnalyzedPackage,
     loaded_links: &BTreeMap<PathBuf, BTreeMap<String, PathBuf>>,
     argumenta: &[String],
     run: impl for<'a> FnOnce(&PreparedPackageMir<'a>, &LoweredMirUnit<'a>) -> Result<R, Vec<Diagnostic>>,
 ) -> Result<R, Vec<Diagnostic>> {
-    if package
-        .diagnostics
-        .iter()
-        .any(|diagnostic| diagnostic.is_error())
-    {
-        return Err(package.diagnostics);
-    }
-    let cli_plan = plan_cli_package(&mut package, argumenta, CliPlanningMode::Parsed)?;
-    let library_resolver = library_resolver_from_config(config);
-    let mut library_cache = LibraryInterfaceCache::with_config(config);
-    let links = local_namespace_call_targets(
-        &package,
-        PackageMirConsumer::Interpreted,
-        &library_resolver,
-        &mut library_cache,
-        Some(loaded_links),
-    )?;
-    let entry_index = select_entry_unit(&package)?;
-    let entry_path = package.units[entry_index].path.clone();
-    let source_paths = package.units.iter().map(|unit| unit.path.clone()).collect();
-    for unit in &mut package.units {
-        rewrite_unit_namespace_calls(unit, &links.calls, &links.namespaces)?;
-    }
-    let mut lowered = lower_package_units(
-        &mut package,
-        entry_index,
-        &links,
-        &library_resolver,
-        &mut library_cache,
-        &cli_plan,
-        config.no_fuse,
-    )?;
-    validate_program(&lowered.program, lowered.validated.validation()).map_err(|errors| {
-        errors
-            .into_iter()
-            .map(|error| mir_lowering_diag(&entry_path, error.message))
-            .collect::<Vec<_>>()
-    })?;
-    bridge_norma_providers_to_kernel(&mut lowered, &entry_path)?;
-    let runtime_requirements = collect_package_runtime_requirements(&lowered, &cli_plan);
     // The FHIR-loaded route reconstructs the package from an envelope; no
     // filesystem manifest is consulted here, so no device payload is
     // constructed on this route (N1.1: source routes reject explicit GPU
     // requests; `auto` keeps the CPU route).
-    let prepared = PreparedPackageMir {
-        entry_path: entry_path.clone(),
-        source_paths,
-        runtime_requirements,
-        cli_exit_code: cli_plan.exit_code,
-        fmir_text_cli: cli_plan.fmir_text_cli.clone(),
-        device_inputs: BTreeMap::new(),
-        device_backend: None,
-        device_steps: None,
-        device_declared: false,
-        _marker: std::marker::PhantomData,
-    };
-    run(&prepared, &lowered)
+    prepare_package_mir(
+        config,
+        package,
+        argumenta,
+        CliPlanningMode::Parsed,
+        PackageMirConsumer::Interpreted,
+        Some(loaded_links),
+        || Ok((BTreeMap::new(), None, None, false)),
+        run,
+    )
 }
 
 fn package_artifact_root(input: &Path) -> Result<PathBuf, Vec<Diagnostic>> {
     super::discover_build_layout(input)
         .map(|layout| layout.package_root)
         .map_err(|diagnostic| vec![*diagnostic])
+}
+
+/// `<package_root>/target/<faber-mir>/[<subdir>]` artifact directory for a
+/// package build, created on demand.
+fn package_artifact_dir(
+    package_root: &Path,
+    diagnostic_path: &Path,
+    subdir: &str,
+) -> Result<PathBuf, Vec<Diagnostic>> {
+    let artifact_root = package_root
+        .join("target")
+        .join(PACKAGE_MIR_ARTIFACT_DIR)
+        .join(subdir);
+    fs::create_dir_all(&artifact_root)
+        .map_err(|error| vec![mir_diag(diagnostic_path, error.to_string())])?;
+    Ok(artifact_root)
+}
+
+/// Write a package FMIR image artifact under `artifact_root` and return its
+/// path.
+fn write_package_image(
+    artifact_root: &Path,
+    diagnostic_path: &Path,
+    file: &str,
+    bytes: impl AsRef<[u8]>,
+) -> Result<PathBuf, Vec<Diagnostic>> {
+    let image_path = artifact_root.join(file);
+    fs::write(&image_path, bytes)
+        .map_err(|error| vec![mir_diag(diagnostic_path, error.to_string())])?;
+    Ok(image_path)
 }
 
 /// Read the package's `[device]` surface for the S1-6 device payload:
@@ -1142,8 +1153,152 @@ fn relative_or_display(root: &Path, path: &Path) -> String {
         .to_string()
 }
 
-fn escape_manifest_value(value: &str) -> String {
+/// TOML basic-string escaping (backslash + double quote), shared by the
+/// manifest-value and path writers.
+fn escape_toml_basic_string(value: &str) -> String {
     value.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+fn escape_manifest_value(value: &str) -> String {
+    escape_toml_basic_string(value)
+}
+
+/// Snapshot the validated type table and interner strings carried by FMIR
+/// images (text, binary, and source-built formats share the snapshot shape).
+fn snapshot_context(lowered: &LoweredMirUnit<'_>) -> (TypeTableSnapshot, Vec<String>) {
+    (
+        lowered.validated.validation().types.snapshot(),
+        lowered
+            .validated
+            .validation()
+            .interner
+            .map(|interner| interner.strings().to_vec())
+            .unwrap_or_default(),
+    )
+}
+
+/// Common FMIR image header section — the fields the text and binary image
+/// formats share verbatim. Each packager fills in only the format-specific
+/// program payload and encode step.
+struct FmirImageHeader {
+    version: u32,
+    target: String,
+    package_root: String,
+    entry: String,
+    entry_function: String,
+    toolchain: FmirTextToolchainSection,
+    runtime: FmirTextRuntimeSection,
+    sources: FmirTextSourcesSection,
+    cli: Option<FmirTextCliSection>,
+    exit_code: Option<i32>,
+    types: FmirTextTypesSection,
+    interner: Vec<String>,
+    device: Option<FmirDeviceSection>,
+}
+
+fn fmir_image_header(
+    prepared: &PreparedPackageMir<'_>,
+    lowered: &LoweredMirUnit<'_>,
+    package_root: &Path,
+    target: &str,
+) -> Result<FmirImageHeader, Vec<Diagnostic>> {
+    let mut sources = prepared
+        .source_paths
+        .iter()
+        .map(|path| source_identity(path, package_root))
+        .collect::<Result<Vec<_>, _>>()?;
+    sources.sort_by(|left, right| left.file.cmp(&right.file));
+    let device = package_device_section(prepared, lowered, &prepared.entry_path)?;
+    let (types, interner) = snapshot_context(lowered);
+    Ok(FmirImageHeader {
+        version: PACKAGE_MIR_ARTIFACT_VERSION,
+        target: target.to_owned(),
+        package_root: ".".to_owned(),
+        entry: relative_or_display(package_root, &prepared.entry_path),
+        entry_function: "run_entry".to_owned(),
+        toolchain: FmirTextToolchainSection {
+            faber_cli_version: PACKAGE_MIR_TOOLCHAIN_VERSION.to_owned(),
+        },
+        runtime: FmirTextRuntimeSection {
+            requirement: prepared.runtime_requirements.clone(),
+        },
+        sources: FmirTextSourcesSection { source: sources },
+        cli: prepared.fmir_text_cli.clone(),
+        exit_code: prepared.cli_exit_code,
+        types: FmirTextTypesSection { table: types },
+        interner,
+        device,
+    })
+}
+
+impl FmirImageHeader {
+    fn into_text_image(self, json: String) -> FmirTextImageFile {
+        let FmirImageHeader {
+            version,
+            target,
+            package_root,
+            entry,
+            entry_function,
+            toolchain,
+            runtime,
+            sources,
+            cli,
+            exit_code,
+            types,
+            interner,
+            device,
+        } = self;
+        FmirTextImageFile {
+            version,
+            target,
+            package_root,
+            entry,
+            entry_function,
+            toolchain,
+            runtime,
+            sources,
+            cli,
+            exit_code,
+            types,
+            interner,
+            program: FmirTextProgramSection { json },
+            device,
+        }
+    }
+
+    fn into_binary_image(self, program: MirProgram) -> FmirBinaryImageFile {
+        let FmirImageHeader {
+            version,
+            target,
+            package_root,
+            entry,
+            entry_function,
+            toolchain,
+            runtime,
+            sources,
+            cli,
+            exit_code,
+            types,
+            interner,
+            device,
+        } = self;
+        FmirBinaryImageFile {
+            version,
+            target,
+            package_root,
+            entry,
+            entry_function,
+            toolchain,
+            runtime,
+            sources,
+            cli,
+            exit_code,
+            types,
+            interner,
+            program,
+            device,
+        }
+    }
 }
 
 fn package_fmir_text_image(
@@ -1157,42 +1312,8 @@ fn package_fmir_text_image(
             format!("could not encode fmir-text program: {error}"),
         )]
     })?;
-    let mut sources = prepared
-        .source_paths
-        .iter()
-        .map(|path| source_identity(path, package_root))
-        .collect::<Result<Vec<_>, _>>()?;
-    sources.sort_by(|left, right| left.file.cmp(&right.file));
-
-    let device = package_device_section(prepared, lowered, &prepared.entry_path)?;
-
-    let image = FmirTextImageFile {
-        version: PACKAGE_MIR_ARTIFACT_VERSION,
-        target: FMIR_TEXT_TARGET_NAME.to_owned(),
-        package_root: ".".to_owned(),
-        entry: relative_or_display(package_root, &prepared.entry_path),
-        entry_function: "run_entry".to_owned(),
-        toolchain: FmirTextToolchainSection {
-            faber_cli_version: PACKAGE_MIR_TOOLCHAIN_VERSION.to_owned(),
-        },
-        runtime: FmirTextRuntimeSection {
-            requirement: prepared.runtime_requirements.clone(),
-        },
-        sources: FmirTextSourcesSection { source: sources },
-        cli: prepared.fmir_text_cli.clone(),
-        exit_code: prepared.cli_exit_code,
-        types: FmirTextTypesSection {
-            table: lowered.validated.validation().types.snapshot(),
-        },
-        interner: lowered
-            .validated
-            .validation()
-            .interner
-            .map(|interner| interner.strings().to_vec())
-            .unwrap_or_default(),
-        program: FmirTextProgramSection { json: program_json },
-        device,
-    };
+    let image = fmir_image_header(prepared, lowered, package_root, FMIR_TEXT_TARGET_NAME)?
+        .into_text_image(program_json);
     encode_text_image(&image).map_err(|error| {
         vec![mir_diag(
             &prepared.entry_path,
@@ -1206,42 +1327,8 @@ fn package_fmir_binary_image(
     lowered: &LoweredMirUnit<'_>,
     package_root: &Path,
 ) -> Result<Vec<u8>, Vec<Diagnostic>> {
-    let mut sources = prepared
-        .source_paths
-        .iter()
-        .map(|path| source_identity(path, package_root))
-        .collect::<Result<Vec<_>, _>>()?;
-    sources.sort_by(|left, right| left.file.cmp(&right.file));
-
-    let device = package_device_section(prepared, lowered, &prepared.entry_path)?;
-
-    let image = FmirBinaryImageFile {
-        version: PACKAGE_MIR_ARTIFACT_VERSION,
-        target: FMIR_TARGET_NAME.to_owned(),
-        package_root: ".".to_owned(),
-        entry: relative_or_display(package_root, &prepared.entry_path),
-        entry_function: "run_entry".to_owned(),
-        toolchain: FmirTextToolchainSection {
-            faber_cli_version: PACKAGE_MIR_TOOLCHAIN_VERSION.to_owned(),
-        },
-        runtime: FmirTextRuntimeSection {
-            requirement: prepared.runtime_requirements.clone(),
-        },
-        sources: FmirTextSourcesSection { source: sources },
-        cli: prepared.fmir_text_cli.clone(),
-        exit_code: prepared.cli_exit_code,
-        types: FmirTextTypesSection {
-            table: lowered.validated.validation().types.snapshot(),
-        },
-        interner: lowered
-            .validated
-            .validation()
-            .interner
-            .map(|interner| interner.strings().to_vec())
-            .unwrap_or_default(),
-        program: lowered.program.clone(),
-        device,
-    };
+    let image = fmir_image_header(prepared, lowered, package_root, FMIR_TARGET_NAME)?
+        .into_binary_image(lowered.program.clone());
     encode_binary_image(&image).map_err(|error| {
         vec![mir_diag(
             &prepared.entry_path,
@@ -1330,7 +1417,7 @@ faber = {{ path = "{faber_cli_path}", version = "={PACKAGE_MIR_TOOLCHAIN_VERSION
 }
 
 fn render_fmir_bin_runner_main_rs(image: &[u8]) -> String {
-    let mut source = format!("// embedded image fnv64:{:016x}\n", fnv1a64(image));
+    let mut source = format!("// embedded image {}\n", fnv64_hex(image));
     source.push_str(
         r#"fn main() {
     let args = std::env::args().skip(1).collect::<Vec<_>>();
@@ -1394,9 +1481,7 @@ fn invoke_fmir_bin_runner_build(
 }
 
 fn toml_basic_string_path(path: &Path) -> String {
-    path.to_string_lossy()
-        .replace('\\', "\\\\")
-        .replace('"', "\\\"")
+    escape_toml_basic_string(&path.to_string_lossy())
 }
 
 #[cfg(unix)]
@@ -1422,6 +1507,12 @@ fn make_fmir_bin_entrypoint_executable(
     Ok(())
 }
 
+/// FNV-1a provenance hash idiom shared by image and runner artifacts: a
+/// fixed-width hex digest under an `fnv64:` prefix.
+fn fnv64_hex(bytes: &[u8]) -> String {
+    format!("fnv64:{:016x}", fnv1a64(bytes))
+}
+
 fn source_identity(
     path: &Path,
     package_root: &Path,
@@ -1434,7 +1525,7 @@ fn source_identity(
     })?;
     Ok(FmirTextSourceIdentity {
         file: relative_or_display(package_root, path),
-        hash: format!("fnv64:{:016x}", fnv1a64(&bytes)),
+        hash: fnv64_hex(&bytes),
     })
 }
 
@@ -1633,32 +1724,183 @@ fn patch_fmir_text_cli_record_fields(
     true
 }
 
-fn load_fmir_text_image(text: &str, path: &Path) -> Result<FmirPackageImage, Vec<Diagnostic>> {
-    let image = decode_text_image(text, PACKAGE_MIR_TOOLCHAIN_VERSION).map_err(|error| match error {
-        FmirImageError::Parse(detail) => vec![mir_issue_diag(
-            path,
-            "fmir_text_image_parse_failed",
-            format!("could not parse fmir-text image: {detail}"),
-        )],
+/// Decoded FMIR image payload fields shared by the text and binary loaders;
+/// only the program representation differs (JSON string vs decoded MIR).
+struct FmirImagePayload {
+    entry_function: String,
+    runtime_requirement: Vec<String>,
+    interner: Vec<String>,
+    cli: Option<FmirTextCliSection>,
+    exit_code: Option<i32>,
+    types: TypeTableSnapshot,
+    program: FmirImageProgram,
+    device: Option<FmirDeviceSection>,
+    source_hashes: Vec<String>,
+}
+
+enum FmirImageProgram {
+    Text { json: String },
+    Binary(MirProgram),
+}
+
+impl From<FmirTextImageFile> for FmirImagePayload {
+    fn from(image: FmirTextImageFile) -> Self {
+        Self {
+            entry_function: image.entry_function,
+            runtime_requirement: image.runtime.requirement,
+            interner: image.interner,
+            cli: image.cli,
+            exit_code: image.exit_code,
+            types: image.types.table,
+            program: FmirImageProgram::Text {
+                json: image.program.json,
+            },
+            device: image.device,
+            source_hashes: image
+                .sources
+                .source
+                .iter()
+                .map(|identity| identity.hash.clone())
+                .collect(),
+        }
+    }
+}
+
+impl From<FmirBinaryImageFile> for FmirImagePayload {
+    fn from(image: FmirBinaryImageFile) -> Self {
+        Self {
+            entry_function: image.entry_function,
+            runtime_requirement: image.runtime.requirement,
+            interner: image.interner,
+            cli: image.cli,
+            exit_code: image.exit_code,
+            types: image.types.table,
+            program: FmirImageProgram::Binary(image.program),
+            device: image.device,
+            source_hashes: image
+                .sources
+                .source
+                .iter()
+                .map(|identity| identity.hash.clone())
+                .collect(),
+        }
+    }
+}
+
+/// Load an FMIR image (text or binary) into an in-memory package image:
+/// decode → map `FmirImageError` to diagnostics → decode the program payload
+/// → assemble the package image. `decode` supplies the format-specific
+/// decoder and payload conversion; `style` supplies the format-specific
+/// diagnostic wording.
+fn load_fmir_image_with<D>(
+    path: &Path,
+    format: FmirPackageImageFormat,
+    style: FmirImageErrorStyle,
+    decode: D,
+) -> Result<FmirPackageImage, Vec<Diagnostic>>
+where
+    D: FnOnce() -> Result<FmirImagePayload, FmirImageError>,
+{
+    let payload = decode().map_err(|error| fmir_image_decode_error(error, path, &style))?;
+    let FmirImagePayload {
+        entry_function,
+        runtime_requirement,
+        interner,
+        cli,
+        exit_code,
+        types,
+        program,
+        device,
+        source_hashes,
+    } = payload;
+    let program = match program {
+        FmirImageProgram::Text { json } => serde_json::from_str(&json).map_err(|error| {
+            vec![mir_diag(
+                path,
+                format!("could not decode fmir-text MIR program: {error}"),
+            )]
+        })?,
+        FmirImageProgram::Binary(program) => program,
+    };
+    Ok(FmirPackageImage {
+        diagnostic_path: path.to_path_buf(),
+        format,
+        entry_function,
+        runtime_requirements: runtime_requirement,
+        interner,
+        cli,
+        exit_code,
+        types,
+        program,
+        device,
+        source_hashes,
+    })
+}
+
+/// FMIR image decode-error style: the text and binary loaders report
+/// identical diagnostics except for the format label in message text and how
+/// the parse arm is reported.
+struct FmirImageErrorStyle {
+    /// Format label embedded in message text: `fmir-text` or `fmir`.
+    label: &'static str,
+    /// Parse-arm verb: `parse` (text) vs `decode` (binary).
+    parse_verb: &'static str,
+    /// Issue code for the parse arm (text reports an issue; binary reports a
+    /// plain diagnostic).
+    parse_issue: Option<&'static str>,
+    /// Issue code for the unsupported-version arm.
+    version_issue: &'static str,
+}
+
+fn fmir_image_decode_error(
+    error: FmirImageError,
+    path: &Path,
+    style: &FmirImageErrorStyle,
+) -> Vec<Diagnostic> {
+    match error {
+        FmirImageError::Parse(detail) => match style.parse_issue {
+            Some(issue) => vec![mir_issue_diag(
+                path,
+                issue,
+                format!(
+                    "could not {} {} image: {detail}",
+                    style.parse_verb, style.label
+                ),
+            )],
+            None => vec![mir_diag(
+                path,
+                format!(
+                    "could not {} {} image: {detail}",
+                    style.parse_verb, style.label
+                ),
+            )],
+        },
         FmirImageError::UnsupportedVersion { actual, expected } => vec![mir_issue_diag(
             path,
-            "fmir_text_image_version_unsupported",
-            format!("unsupported fmir-text image version {actual}; expected {expected}"),
+            style.version_issue,
+            format!(
+                "unsupported {} image version {actual}; expected {expected}",
+                style.label
+            ),
         )
         .with_arg("actual", actual.to_string())
         .with_arg("expected", expected.to_string())],
         FmirImageError::WrongTarget { found: _, expected } => vec![mir_diag(
             path,
-            format!("fmir-text image target must be `{expected}`"),
+            format!("{} image target must be `{expected}`", style.label),
         )],
         FmirImageError::UnsupportedToolchain { found, expected } => vec![mir_diag(
             path,
-            format!("unsupported fmir-text image toolchain {found}; expected {expected}"),
+            format!(
+                "unsupported {} image toolchain {found}; expected {expected}",
+                style.label
+            ),
         )],
         FmirImageError::UnsupportedRuntimeRequirement { requirement } => vec![mir_diag(
             path,
             format!(
-                "unsupported fmir-text image device runtime requirement `{requirement}` (expected `device:metal` or `device:cuda`)"
+                "unsupported {} image device runtime requirement `{requirement}` (expected `device:metal` or `device:cuda`)",
+                style.label
             ),
         )],
         FmirImageError::ArtifactHashMismatch { backend, expected, actual } => {
@@ -1669,7 +1911,8 @@ fn load_fmir_text_image(text: &str, path: &Path) -> Result<FmirPackageImage, Vec
             vec![mir_diag(
                 path,
                 format!(
-                    "fmir-text image device artifact hash mismatch for backend `{backend}` (stored {expected}, recomputed {actual})"
+                    "{} image device artifact hash mismatch for backend `{backend}` (stored {expected}, recomputed {actual})",
+                    style.label
                 ),
             )]
         }
@@ -1677,9 +1920,7 @@ fn load_fmir_text_image(text: &str, path: &Path) -> Result<FmirPackageImage, Vec
             mir_issue_diag(
                 path,
                 "fmir_image_device_program_version_unsupported",
-                format!(
-                    "unsupported device-program wire version {actual}; expected {expected}"
-                ),
+                format!("unsupported device-program wire version {actual}; expected {expected}"),
             )
             .with_arg("actual", actual.to_string())
             .with_arg("expected", expected.to_string()),
@@ -1689,107 +1930,35 @@ fn load_fmir_text_image(text: &str, path: &Path) -> Result<FmirPackageImage, Vec
             "fmir_image_device_program_invalid",
             format!("invalid device program in image: {detail}"),
         )],
-    })?;
-    let program = serde_json::from_str(&image.program.json).map_err(|error| {
-        vec![mir_diag(
-            path,
-            format!("could not decode fmir-text MIR program: {error}"),
-        )]
-    })?;
-    Ok(FmirPackageImage {
-        diagnostic_path: path.to_path_buf(),
-        format: FmirPackageImageFormat::FmirText,
-        entry_function: image.entry_function,
-        runtime_requirements: image.runtime.requirement,
-        interner: image.interner,
-        cli: image.cli,
-        exit_code: image.exit_code,
-        types: image.types.table,
-        program,
-        device: image.device,
-        source_hashes: image
-            .sources
-            .source
-            .iter()
-            .map(|identity| identity.hash.clone())
-            .collect(),
-    })
+    }
+}
+
+fn load_fmir_text_image(text: &str, path: &Path) -> Result<FmirPackageImage, Vec<Diagnostic>> {
+    load_fmir_image_with(
+        path,
+        FmirPackageImageFormat::FmirText,
+        FmirImageErrorStyle {
+            label: "fmir-text",
+            parse_verb: "parse",
+            parse_issue: Some("fmir_text_image_parse_failed"),
+            version_issue: "fmir_text_image_version_unsupported",
+        },
+        || decode_text_image(text, PACKAGE_MIR_TOOLCHAIN_VERSION).map(FmirImagePayload::from),
+    )
 }
 
 fn load_fmir_image(bytes: &[u8], path: &Path) -> Result<FmirPackageImage, Vec<Diagnostic>> {
-    let image = decode_binary_image(bytes, PACKAGE_MIR_TOOLCHAIN_VERSION)
-        .map_err(|error| match error {
-            FmirImageError::Parse(detail) => {
-                vec![mir_diag(path, format!("could not decode fmir image: {detail}"))]
-            }
-            FmirImageError::UnsupportedVersion { actual, expected } => vec![mir_issue_diag(
-                path,
-                "fmir_image_version_unsupported",
-                format!("unsupported fmir image version {actual}; expected {expected}"),
-            )
-            .with_arg("actual", actual.to_string())
-            .with_arg("expected", expected.to_string())],
-            FmirImageError::WrongTarget { found: _, expected } => vec![mir_diag(
-                path,
-                format!("fmir image target must be `{expected}`"),
-            )],
-            FmirImageError::UnsupportedToolchain { found, expected } => vec![mir_diag(
-                path,
-                format!("unsupported fmir image toolchain {found}; expected {expected}"),
-            )],
-            FmirImageError::UnsupportedRuntimeRequirement { requirement } => vec![mir_diag(
-                path,
-                format!(
-                    "unsupported fmir image device runtime requirement `{requirement}` (expected `device:metal` or `device:cuda`)"
-                ),
-            )],
-            FmirImageError::ArtifactHashMismatch { backend, expected, actual } => {
-                let backend = match backend {
-                    FmirDeviceBackend::Metal => "metal",
-                    FmirDeviceBackend::Cuda => "cuda",
-                };
-                vec![mir_diag(
-                    path,
-                    format!(
-                        "fmir image device artifact hash mismatch for backend `{backend}` (stored {expected}, recomputed {actual})"
-                    ),
-                )]
-            }
-            FmirImageError::UnsupportedDeviceProgramVersion { actual, expected } => vec![
-                mir_issue_diag(
-                    path,
-                    "fmir_image_device_program_version_unsupported",
-                    format!(
-                        "unsupported device-program wire version {actual}; expected {expected}"
-                    ),
-                )
-                .with_arg("actual", actual.to_string())
-                .with_arg("expected", expected.to_string()),
-            ],
-            FmirImageError::WireProgramInvalid { detail } => vec![mir_issue_diag(
-                path,
-                "fmir_image_device_program_invalid",
-                format!("invalid device program in image: {detail}"),
-            )],
-        })?;
-    Ok(FmirPackageImage {
-        diagnostic_path: path.to_path_buf(),
-        format: FmirPackageImageFormat::Fmir,
-        entry_function: image.entry_function,
-        runtime_requirements: image.runtime.requirement,
-        interner: image.interner,
-        cli: image.cli,
-        exit_code: image.exit_code,
-        types: image.types.table,
-        program: image.program,
-        device: image.device,
-        source_hashes: image
-            .sources
-            .source
-            .iter()
-            .map(|identity| identity.hash.clone())
-            .collect(),
-    })
+    load_fmir_image_with(
+        path,
+        FmirPackageImageFormat::Fmir,
+        FmirImageErrorStyle {
+            label: "fmir",
+            parse_verb: "decode",
+            parse_issue: None,
+            version_issue: "fmir_image_version_unsupported",
+        },
+        || decode_binary_image(bytes, PACKAGE_MIR_TOOLCHAIN_VERSION).map(FmirImagePayload::from),
+    )
 }
 
 fn validate_package_mir_manifest(manifest: &str, path: &Path) -> Result<(), Vec<Diagnostic>> {
