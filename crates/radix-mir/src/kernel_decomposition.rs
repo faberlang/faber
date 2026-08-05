@@ -234,18 +234,39 @@ pub fn decompose_kernel_function(
     // it writes that a LATER subchain of the same function reads (or the
     // function returns). The recipe result stays the primary output; the
     // consumed elementwise destinations are the additional outputs. The last
-    // subchain's output set is the function's return local (unchanged).
-    // Walk backwards accumulating each later subchain's external inputs
-    // (its synthetic params) — exactly the locals a later subchain reads
-    // from outside itself.
+    // subchain's output set is the function's return local — plus, for a
+    // tuple-return function (D-6), every return-tuple field local the last
+    // subchain writes: the return-tuple `Construct` binds full-tuple index
+    // `i` → local, and a gradient local assembled inside the last subchain
+    // has no distinct kernel buffer (no gradient slot to alias) unless it is
+    // exposed here as an extra output. Walk backwards accumulating each
+    // later subchain's external inputs (its synthetic params) — exactly the
+    // locals a later subchain reads from outside itself.
+    let return_tuple_fields = source_return_tuple_fields(function);
     let mut later_inputs: BTreeSet<MirLocalId> = BTreeSet::new();
     for position in (0..subchains.len()).rev() {
         let written = &written_by[position];
         let mut outputs: Vec<MirLocalId> = Vec::new();
         if position + 1 == subchains.len() {
-            if let Some(return_local) =
+            if let Some(fields) = &return_tuple_fields {
+                // D-6: a tuple-return LAST subchain exposes the return-tuple
+                // fields it writes (in full-tuple index order) as its output
+                // set. The return-tuple LOCAL itself is never a kernel output
+                // — the ABI flattens tuple returns into per-field device-view
+                // outputs, and a nested tuple element (the return-tuple local
+                // as an output) would fail the indexed-kernel device-view law.
+                // Every gradient slot's producer resolution
+                // (`producer_position`) then lands on a distinct kernel output
+                // buffer (the train_step reads alias the field buffers).
+                for &field in fields {
+                    if written.contains(&field) && !outputs.contains(&field) {
+                        outputs.push(field);
+                    }
+                }
+            } else if let Some(return_local) =
                 crate::read_analysis::terminator_return_local(&block.terminator.kind)
             {
+                // A scalar-return last subchain keeps the source return local.
                 if written.contains(&return_local) {
                     outputs.push(return_local);
                 }
@@ -280,13 +301,14 @@ impl KernelDecomposition {
     /// statements and rebuilds the params from the subchain's data-flow
     /// inputs — exactly the function the pass resolved the subchain's plan
     /// from — so the emitters can lower a decomposed kernel from the same
-    /// typed facts. The last subchain keeps the source return terminator
-    /// (the scalar-return reduction shape survives the slice). An
-    /// intermediate subchain is a buffer-producing kernel: a single-output
-    /// subchain returns nothing, and a subchain with additional consumed
-    /// outputs (D-2b-1) returns a TUPLE of its output set
-    /// (`[primary, extra_outputs...]`) so the emitters' multi-output
-    /// tuple-tail paths can materialize them as extra kernel outputs.
+    /// typed facts. A scalar-return last subchain keeps the source return
+    /// terminator (the scalar-return reduction shape survives the slice). A
+    /// buffer-producing subchain returns a TUPLE of its output set
+    /// (`[primary, extra_outputs...]`) when it carries additional outputs
+    /// (D-2b-1) — or, for a tuple-return LAST subchain (D-6), when its
+    /// exposed return-tuple fields are its output set — so the emitters'
+    /// multi-output tuple-tail paths can materialize them as extra kernel
+    /// outputs; a single-output intermediate subchain returns nothing.
     ///
     /// # Panics
     /// Panics when `index` is out of range (callers validate against
@@ -318,11 +340,13 @@ impl KernelDecomposition {
     /// type is missing, so callers run this (idempotent — interning is
     /// hash-consed, and the element types come from the source function's
     /// locals, which the synthetics keep) on the mutable table the subchain
-    /// derivation uses before building any synthetic.
+    /// derivation uses before building any synthetic. A multi-output LAST
+    /// subchain (a tuple-return function whose return-tuple fields are
+    /// exposed as extra outputs, D-6) is interned the same way.
     pub fn intern_output_tuple_types(&self, source: &MirFunction, types: &mut TypeTable) {
         for (position, subchain) in self.subchains.iter().enumerate() {
             let is_last = position + 1 == self.subchains.len();
-            if is_last || subchain.outputs.len() <= 1 {
+            if !needs_synthetic_tuple_return(&subchain.outputs, is_last, source) {
                 continue;
             }
             let element_ids: Vec<TypeId> = subchain
@@ -333,6 +357,107 @@ impl KernelDecomposition {
             types.tuple(element_ids);
         }
     }
+
+    /// The FULL result-tuple → local field bindings of a tuple-return
+    /// function (D-6): the return-tuple `Construct` binds full-tuple index
+    /// `i` → the local carrying that field. The last subchain keeps the
+    /// source return assembly, so these bindings describe the decomposition's
+    /// result tuple exactly as the caller's full-tuple gradient slots index
+    /// it — a companion's `gradient_slot` is a FULL result-tuple index (the
+    /// selected input's param position), never any subchain's local output
+    /// index.
+    ///
+    /// `None` when the function does not return a tuple built by an ordered
+    /// non-spread `Construct` of plain local places (a scalar return, a bare
+    /// local return, or an aggregate the caller cannot index by plain local
+    /// field).
+    #[must_use]
+    pub fn return_tuple_fields(&self, source: &MirFunction) -> Option<Vec<MirLocalId>> {
+        source_return_tuple_fields(source)
+    }
+
+    /// The producer resolution (D-6): which subchain kernel's output produces
+    /// a given local, as `(subchain index, output position in that subchain's
+    /// `outputs`)`. The output position doubles as the subchain kernel's
+    /// output-slot tuple index (the emission signature's `output` is position
+    /// 0 and each `extra_outputs` element follows), so the caller can look up
+    /// the produced buffer by `(subchain index, position)`.
+    ///
+    /// `None` when no subchain exposes the local as an output — the local is
+    /// internal to its subchain (never read by a later subchain, so the
+    /// D-2a consumed-output pass did not expose it) and has no distinct
+    /// kernel buffer to alias.
+    #[must_use]
+    pub fn producer_position(&self, local: MirLocalId) -> Option<(usize, usize)> {
+        self.subchains
+            .iter()
+            .enumerate()
+            .find_map(|(index, subchain)| {
+                subchain
+                    .outputs
+                    .iter()
+                    .position(|&output| output == local)
+                    .map(|position| (index, position))
+            })
+    }
+}
+
+/// The FULL result-tuple → local field bindings of a tuple-return function
+/// (D-6): the return-tuple `Construct` binds full-tuple index `i` → the
+/// local carrying that field. The last subchain keeps the source return
+/// assembly, so these bindings describe the decomposition's result tuple
+/// exactly as the caller's full-tuple gradient slots index it. `None` when
+/// the function does not return a tuple built by an ordered non-spread
+/// `Construct` of plain local places.
+fn source_return_tuple_fields(source: &MirFunction) -> Option<Vec<MirLocalId>> {
+    if source.blocks.len() != 1 {
+        return None;
+    }
+    let block = &source.blocks[0];
+    let return_local = crate::read_analysis::terminator_return_local(&block.terminator.kind)?;
+    block.statements.iter().find_map(|statement| {
+        let MirStatementKind::Construct {
+            destination,
+            aggregate,
+        } = &statement.kind
+        else {
+            return None;
+        };
+        if crate::read_analysis::place_local_base(destination) != Some(return_local) {
+            return None;
+        }
+        if aggregate.kind != MirAggregateKind::Tuple {
+            return None;
+        }
+        let MirAggregateFields::Ordered(items) = &aggregate.fields else {
+            return None;
+        };
+        items
+            .iter()
+            .map(|item| match item {
+                MirAggregateItem::Operand(MirOperand::Place(place)) => {
+                    crate::read_analysis::place_local_base(place)
+                }
+                _ => None,
+            })
+            .collect::<Option<Vec<_>>>()
+    })
+}
+
+/// Whether a subchain's synthetic returns a TUPLE of its output locals (the
+/// multi-output contract): a multi-output intermediate subchain, or — D-6 —
+/// a tuple-return LAST subchain whose exposed return-tuple fields are its
+/// output set (even a single exposed field returns the 1-tuple so the ABI's
+/// result-tuple flattening stays consistent with the field buffers).
+fn needs_synthetic_tuple_return(
+    outputs: &[MirLocalId],
+    is_last: bool,
+    source: &MirFunction,
+) -> bool {
+    if outputs.len() > 1 {
+        return true;
+    }
+    is_last && !outputs.is_empty() && source_return_tuple_fields(source).is_some()
 }
 
 /// Build the synthetic kernel function for one subchain slice.
@@ -390,27 +515,25 @@ fn build_subchain_function(
         .map(|&index| block.statements[index].clone())
         .collect();
 
-    // D-2b-1: the return carries the subchain's consumed-output set. The
-    // last subchain keeps the source return; a single-output intermediate
-    // subchain is a buffer-producing kernel that returns nothing. An
-    // intermediate subchain with ADDITIONAL consumed outputs returns a
-    // TUPLE of the output locals (`[primary, extra_outputs...]` in the
-    // subchain's `outputs` order) — the multi-output contract the ABI
-    // recognizes via `result_tuple_count` (`abi.rs`). The tuple element
-    // types come from the source function's locals (the synthetic keeps the
-    // source local tables); the tuple TYPE must already be interned in
-    // `types` (mirroring the reverse-AD `find_tuple` pattern, where the
-    // gradient-tuple walk holds only `&TypeTable`).
+    // D-2b-1: the return carries the subchain's consumed-output set. A
+    // multi-output subchain (an intermediate subchain with ADDITIONAL
+    // consumed outputs, or — D-6 — a tuple-return LAST subchain whose
+    // return-tuple fields are exposed as its output set) returns a TUPLE of
+    // the output locals (`[primary, extra_outputs...]` in the subchain's
+    // `outputs` order) — the multi-output contract the ABI recognizes via
+    // `result_tuple_count` (`abi.rs`). The tuple element types come from the
+    // source function's locals (the synthetic keeps the source local tables);
+    // the tuple TYPE must already be interned in `types` (mirroring the
+    // reverse-AD `find_tuple` pattern, where the gradient-tuple walk holds
+    // only `&TypeTable`). A single-output last subchain keeps the source
+    // return terminator — the return local keeps its original id, so the
+    // scalar-return reduction shape survives the slice — and a single-output
+    // intermediate subchain is a buffer-producing kernel that returns
+    // nothing.
     let terminator;
     let return_ty;
     let mut temps = source.temps.clone();
-    if is_last {
-        // The last subchain keeps the source return terminator: the return
-        // local keeps its original id, so the scalar-return reduction shape
-        // survives the slice.
-        terminator = block.terminator.clone();
-        return_ty = source.return_ty;
-    } else if outputs.len() > 1 {
+    if needs_synthetic_tuple_return(outputs, is_last, source) {
         let element_ids: Vec<TypeId> = outputs
             .iter()
             .map(|&local| source_local_ty(source, local).semantic_id())
@@ -452,6 +575,12 @@ fn build_subchain_function(
             span,
         };
         return_ty = tuple_ty;
+    } else if is_last {
+        // The last subchain keeps the source return terminator: the return
+        // local keeps its original id, so the scalar-return reduction shape
+        // survives the slice.
+        terminator = block.terminator.clone();
+        return_ty = source.return_ty;
     } else {
         terminator = MirTerminator {
             kind: MirTerminatorKind::Return(None),

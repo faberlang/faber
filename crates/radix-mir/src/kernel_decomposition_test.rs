@@ -1,8 +1,8 @@
 use super::*;
 use crate::validate::ValidatedMir;
 use crate::{
-    MirBinOp, MirBlock, MirBlockId, MirCallee, MirFunctionId, MirLocal, MirLocalId, MirOperand,
-    MirParam, MirPlace, MirProgram, MirStatement, MirTerminator, MirValue, MirValueId,
+    MirBinOp, MirBlock, MirBlockId, MirCallee, MirConstant, MirFunctionId, MirLocal, MirLocalId,
+    MirOperand, MirParam, MirPlace, MirProgram, MirStatement, MirTerminator, MirValue, MirValueId,
     MirValueKind,
 };
 use radix_lexer::Span;
@@ -275,6 +275,58 @@ fn elementwise_mul_function(types: &mut TypeTable) -> MirFunction {
         )],
         Some(2),
         r1,
+    )
+}
+
+/// A tuple-`Construct` statement (the lowered `redde iuncta<...> [f0, f1]`):
+/// destination local + ordered plain-local fields.
+fn tuple_construct_statement(destination: u32, fields: &[u32], ty: MirType) -> MirStatement {
+    MirStatement {
+        kind: MirStatementKind::Construct {
+            destination: MirPlace::local(MirLocalId(destination)),
+            aggregate: MirAggregate {
+                kind: MirAggregateKind::Tuple,
+                ty,
+                fields: MirAggregateFields::Ordered(
+                    fields
+                        .iter()
+                        .map(|&field| {
+                            MirAggregateItem::Operand(MirOperand::Place(MirPlace::local(
+                                MirLocalId(field),
+                            )))
+                        })
+                        .collect(),
+                ),
+            },
+        },
+        span: test_span(),
+    }
+}
+
+/// A gradient-companion-shaped tuple-return body (D-6): three recipe
+/// subchains compute `xt`, the gradient locals `gw`/`gb`, and the loss; a
+/// trailing `Construct` assembles the FULL result tuple `[loss, gw, gb]`
+/// (the loss field 0 + the gradient fields 1 and 2 — the shape whose
+/// full-tuple indices the caller's `gradient_slot` facts index).
+fn gradient_companion_tuple_function(types: &mut TypeTable) -> MirFunction {
+    let r2 = rank2_tensor_ty(types, [4, 4]);
+    let scalar = scalar_f32_ty(types);
+    let tuple_ty = MirType::semantic(types.tuple(vec![
+        scalar.semantic_id(),
+        r2.semantic_id(),
+        r2.semantic_id(),
+    ]));
+    device_function(
+        &[(0, r2), (1, r2)],
+        vec![
+            collection_statement(MirCollectionOp::TensorTranspose, &[0], 4, r2),
+            collection_statement(MirCollectionOp::TensorMatMul, &[4, 1], 5, r2),
+            collection_statement(MirCollectionOp::TensorMatMul, &[4, 0], 7, r2),
+            collection_statement(MirCollectionOp::TensorMean, &[5], 6, scalar),
+            tuple_construct_statement(8, &[6, 5, 7], tuple_ty),
+        ],
+        Some(8),
+        tuple_ty,
     )
 }
 
@@ -959,4 +1011,147 @@ fn intern_output_tuple_types_pre_interns_multi_output_subchain_returns() {
         "one tuple temp is added once the tuple type is interned"
     );
     assert_eq!(synthetic.temps[0].ty, MirType::semantic(tuple_id));
+}
+
+// -----------------------------------------------------------------------
+// D-6: full result-tuple → local field bindings + producer resolution
+// (gradient-slot → buffer mapping for decomposed companions).
+// -----------------------------------------------------------------------
+
+#[test]
+fn tuple_return_fields_map_full_result_tuple_indices_to_locals() {
+    // The gradient-companion shape: the trailing Construct binds full-tuple
+    // index 0 → loss (local 6), index 1 → gw (local 5), index 2 → gb
+    // (local 7). The gradient-slot facts index these FULL indices (gw=1,
+    // gb=2) — never any subchain's local output indices.
+    let mut types = TypeTable::new();
+    let function = gradient_companion_tuple_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let decomposition = decompose_kernel_function(&function, &validation).expect("body decomposes");
+
+    let fields = decomposition
+        .return_tuple_fields(&function)
+        .expect("a tuple-return function exposes its full result-tuple fields");
+    assert_eq!(
+        fields,
+        vec![MirLocalId(6), MirLocalId(5), MirLocalId(7)],
+        "full-tuple index i binds the local assembled into field i"
+    );
+
+    // Every gradient field resolves to the subchain kernel whose output
+    // produces its local (the buffers the train_step gradient reads alias).
+    // Field 0 (the loss) is written by the LAST subchain and — D-6 — the
+    // tuple-return last subchain exposes its written return-tuple fields as
+    // its output set (the return-tuple local itself is never a kernel
+    // output: the ABI flattens tuple returns into per-field device-view
+    // buffers). Fields 1 and 2 are produced by the intermediate subchains
+    // that compute them.
+    assert_eq!(
+        decomposition.producer_position(fields[0]),
+        Some((3, 0)),
+        "the loss field (assembled inside the last subchain) is exposed as an \
+         output of the last subchain"
+    );
+    assert_eq!(
+        decomposition.producer_position(fields[1]),
+        Some((1, 0)),
+        "gw (field 1) is produced by subchain 1's first output slot"
+    );
+    assert_eq!(
+        decomposition.producer_position(fields[2]),
+        Some((2, 0)),
+        "gb (field 2) is produced by subchain 2's first output slot"
+    );
+    assert_eq!(
+        decomposition.subchains[3].outputs,
+        vec![MirLocalId(6)],
+        "the tuple-return last subchain's output set is the return-tuple field \
+         it writes (the loss), in full-tuple index order — never the nested \
+         return-tuple local"
+    );
+}
+
+#[test]
+fn scalar_return_function_has_no_tuple_fields() {
+    // A scalar-return function (the mlp_loss forward) exposes no full
+    // result-tuple fields — the caller's gradient-slot mapping is a no-op.
+    let mut types = TypeTable::new();
+    let function = mlp_loss_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let decomposition =
+        decompose_kernel_function(&function, &validation).expect("mlp_loss body decomposes");
+    assert_eq!(
+        decomposition.return_tuple_fields(&function),
+        None,
+        "a scalar return has no tuple Construct field bindings"
+    );
+    assert_eq!(
+        decomposition.producer_position(MirLocalId(2)),
+        Some((0, 0)),
+        "the producer resolution still resolves forward-save locals"
+    );
+}
+
+#[test]
+fn tuple_return_with_non_plain_field_fails_closed() {
+    // A tuple Construct with a non-plain (constant) field cannot bind that
+    // full-tuple index to a local — the field mapping fails closed (None),
+    // never a silent wrong local.
+    let mut types = TypeTable::new();
+    let r2 = rank2_tensor_ty(&mut types, [4, 4]);
+    let span = test_span();
+    let tuple_ty = MirType::semantic(types.tuple(vec![r2.semantic_id()]));
+    let function = MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![MirParam {
+            local: MirLocalId(0),
+            name: None,
+            ty: r2,
+            mode: MirParamMode::Owned,
+            span,
+        }],
+        locals: Vec::new(),
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![
+                collection_statement(MirCollectionOp::TensorTranspose, &[0], 1, r2),
+                MirStatement {
+                    kind: MirStatementKind::Construct {
+                        destination: MirPlace::local(MirLocalId(2)),
+                        aggregate: MirAggregate {
+                            kind: MirAggregateKind::Tuple,
+                            ty: tuple_ty,
+                            fields: MirAggregateFields::Ordered(vec![MirAggregateItem::Operand(
+                                MirOperand::Constant(MirConstant::Int(7)),
+                            )]),
+                        },
+                    },
+                    span,
+                },
+            ],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(2),
+                )))),
+                span,
+            },
+            span,
+        }],
+        return_ty: tuple_ty,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    };
+    let validation = MirValidationContext::new(&types);
+    let decomposition = decompose_kernel_function(&function, &validation).expect("body decomposes");
+    assert_eq!(
+        decomposition.return_tuple_fields(&function),
+        None,
+        "a non-plain tuple field fails the local binding closed"
+    );
 }
