@@ -1249,14 +1249,14 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                     MirRuntimeCall {
                         intrinsic:
                             MirIntrinsic::Collection(
-                                op @ (MirCollectionOp::TensorAdd
+                                MirCollectionOp::TensorAdd
                                 | MirCollectionOp::TensorSub
                                 | MirCollectionOp::TensorMul
                                 | MirCollectionOp::TensorDiv
                                 | MirCollectionOp::TensorNeg
                                 | MirCollectionOp::TensorFill
                                 | MirCollectionOp::TensorRelu
-                                | MirCollectionOp::TensorGelu),
+                                | MirCollectionOp::TensorGelu,
                             ),
                         ..
                     },
@@ -1267,7 +1267,6 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                 // expression (the companion's missing mul/div/fill arms, plus
                 // the pointwise family; TensorAdd/TensorRelu predate S3-A5).
                 // The WGSL emitter keeps its per-op fail-closed emit gate.
-                let _ = op;
                 crate::visit::walk_stmt(self, stmt);
             }
             MirStatementKind::RuntimeCall { .. } => self.record_policy(SHAPE_KERNEL_RUNTIME_CALL),
