@@ -398,20 +398,6 @@ fn dependency_ordered_launches(
         }
     }
     if ordered.len() != program.launches.len() {
-        let remaining: Vec<LaunchId> = program
-            .launches
-            .iter()
-            .map(|launch| launch.id)
-            .filter(|id| !ordered.contains(id))
-            .collect();
-        let leftover_edges: Vec<&radix_mir::device_program::DataFlowPair> = edges
-            .iter()
-            .filter(|edge| remaining.contains(&edge.producer) && remaining.contains(&edge.consumer))
-            .collect();
-        eprintln!(
-            "DBG launch-order cycle: remaining launches {:?}; edges {:?}",
-            remaining, leftover_edges
-        );
         return Err(vec![device_diag(
             "launch order",
             "the carried producer/consumer dependency graph contains a cycle; the launch sequence cannot follow it",
