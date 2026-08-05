@@ -34,6 +34,7 @@
 
 mod admit;
 mod device;
+mod distributed_identity;
 mod hash;
 mod image;
 mod requirements;
@@ -42,11 +43,16 @@ mod wire;
 
 pub(crate) use admit::*;
 pub use device::*;
+pub use distributed_identity::*;
 pub use hash::*;
 pub use image::*;
 pub use requirements::*;
 pub(crate) use validate::*;
 pub use wire::*;
+
+#[cfg(test)]
+#[path = "distributed_identity_test.rs"]
+mod distributed_identity_test;
 
 /// Image schema version. Ratchets as clean breaks; there is no compatibility
 /// decoder (A7). `3 → 4` clean break adds the optional `device` section
