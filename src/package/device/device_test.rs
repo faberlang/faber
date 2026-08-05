@@ -10,6 +10,7 @@ use faber_host_macos_arm64::device_host::DeviceRuntime;
 use faber_host_macos_arm64::MetalHostSession;
 use radix::mir::LoweredMirUnit;
 use radix_mir::device_program::DataFlowPair;
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 fn dev_norma_library_home() -> PathBuf {
@@ -2945,6 +2946,58 @@ incipit {
 }
 "#;
 
+/// The D-6 decomposed-training fixture: the train_step_4x4 / mlp_backward
+/// SHAPE with a package-local step — a matmul+add MLP forward whose
+/// generated companion DECOMPOSES into subchain kernels, four trainable
+/// params (w1, b1, w2, b2), and a four-gradient train_step called from a
+/// constant-bounded entry loop. The companion's gradient slots index the
+/// FULL result tuple (gw1=1, gb1=2, gw2=3, gb2=4) — the tuple the last
+/// subchain's return-tuple Construct assembles — never the subchains' local
+/// output-slot indices (0–3 forward-saves).
+const DECOMPOSED_TRAIN_LOOP_FIXTURE: &str = r#"@ nucleum
+@ radix lane "air"
+@ radix backward "loss_backward"
+functio loss(tensor<f32, [2,2]> x, tensor<f32, [2,2]> w1, tensor<f32, [2,2]> b1, tensor<f32, [2,2]> w2, tensor<f32, [2,2]> b2) → tensor<f32, [2,2]> {
+    fixum tensor<f32, [2,2]> t1 ← x.matmul(w1)
+    fixum tensor<f32, [2,2]> h1 ← t1.addita(b1)
+    fixum tensor<f32, [2,2]> t2 ← h1.matmul(w2)
+    redde t2.addita(b2)
+}
+
+functio train_step(tensor<f32, [2,2]> w1, tensor<f32, [2,2]> b1, tensor<f32, [2,2]> w2, tensor<f32, [2,2]> b2, tensor<f32, [2,2]> gw1, tensor<f32, [2,2]> gb1, tensor<f32, [2,2]> gw2, tensor<f32, [2,2]> gb2) → iuncta<tensor<f32, [2,2]>, tensor<f32, [2,2]>, tensor<f32, [2,2]>, tensor<f32, [2,2]>> {
+    fixum tensor<f32, [2,2]> nw1 ← w1.subtrahe(gw1)
+    fixum tensor<f32, [2,2]> nb1 ← b1.subtrahe(gb1)
+    fixum tensor<f32, [2,2]> nw2 ← w2.subtrahe(gw2)
+    fixum tensor<f32, [2,2]> nb2 ← b2.subtrahe(gb2)
+    redde iuncta<tensor<f32, [2,2]>, tensor<f32, [2,2]>, tensor<f32, [2,2]>, tensor<f32, [2,2]>> [nw1, nb1, nw2, nb2]
+}
+
+functio nil() → vacuum {
+    tacet
+}
+
+incipit {
+    fixum lista<f32> data ← [1.0, 2.0, 3.0, 4.0]
+    fixum tensor<f32, []> seed ← vacua
+    fixum tensor<f32, [2,2]> x ← seed.strue(data, [2, 2])
+    varia tensor<f32, [2,2]> w1 ← seed.strue(data, [2, 2])
+    varia tensor<f32, [2,2]> b1 ← seed.strue(data, [2, 2])
+    varia tensor<f32, [2,2]> w2 ← seed.strue(data, [2, 2])
+    varia tensor<f32, [2,2]> b2 ← seed.strue(data, [2, 2])
+    fixum tensor<f32, [2,2]> upstream ← seed.strue(data, [2, 2])
+    fixum numerus steps ← 100
+    itera ab 0‥steps fixum step {
+        fixum _ grads ← loss_backward(x, w1, b1, w2, b2, nil(), upstream)
+        fixum [_, gw1, gb1, gw2, gb2] ← grads
+        fixum [nw1, nb1, nw2, nb2] ← train_step(w1, b1, w2, b2, gw1, gb1, gw2, gb2)
+        w1 ← nw1
+        b1 ← nb1
+        w2 ← nw2
+        b2 ← nb2
+    }
+}
+"#;
+
 /// Build a fixture under the INTERPRETED consumer with the workspace library
 /// home (the `faber run` consumer — the one that links library imports into
 /// the merged package MIR, `gradus:*` included).
@@ -3111,6 +3164,223 @@ fn library_backed_train_step_materializes_into_device_program() {
             .iter()
             .any(|relation| relation.device_resident),
         "the carried companion relation rides the semantics"
+    );
+}
+
+// ── D-6: gradient-slot → buffer mapping from decomposition tuple assembly ──
+
+/// The D-6 constructor fix, end to end: a DECOMPOSED companion's gradient
+/// slots (FULL result-tuple indices gw1=1, gb1=2, gw2=3, gb2=4) provision
+/// from the subchain kernels that produce the return-tuple fields — the
+/// train_step gradient reads alias the subchain gradient buffers (the
+/// backward → train_step device-to-device edge), with NO fresh host-input
+/// fallthrough for any declared gradient slot. The ABI flattens the
+/// companion's return tuple into per-field device-view buffers, so even a
+/// field assembled inside the last subchain (gw1) is exposed as a kernel
+/// output.
+///
+/// Pre-fix (D-6 diagnosis): the constructor keyed `gradient_buffers` by each
+/// subchain's LOCAL output-slot index — correct only for a whole-function
+/// companion — so the forward-save subchain's local indices 0–3 filled
+/// slots 1–3 with the WRONG buffers and slot 4 (gb2) never filled, letting
+/// grad_bias2 fall through to a fresh host-input buffer.
+#[test]
+fn decomposed_companion_gradient_slots_provision_from_subchain_buffers() {
+    let (program, _semantics) =
+        training_fixture_program(DECOMPOSED_TRAIN_LOOP_FIXTURE, "d6-decomposed-grad-slots");
+
+    program.validate().expect("constructed program validates");
+    assert_eq!(
+        program.lifetime,
+        DeviceProgramLifetime::RepeatingStep,
+        "a training loop materializes a RepeatingStep program"
+    );
+
+    // The MLP forward and its generated companion DECOMPOSE into subchain
+    // kernels; the (elementwise) train_step stays a whole-function kernel.
+    let entries: Vec<&str> = program
+        .kernels
+        .iter()
+        .map(|kernel| kernel.entry.as_str())
+        .collect();
+    assert!(
+        entries[0].starts_with("loss"),
+        "the forward kernel materializes first, got {entries:?}"
+    );
+    assert!(
+        entries.contains(&"train_step"),
+        "the elementwise train_step is a whole-function kernel, got {entries:?}"
+    );
+    let companion_kernels: Vec<&str> = entries
+        .iter()
+        .copied()
+        .filter(|entry| entry.starts_with("loss_backward__"))
+        .collect();
+    assert!(
+        companion_kernels.len() >= 4,
+        "the matmul+add backward decomposes into multiple recipe subchains, got {companion_kernels:?}"
+    );
+    let step = program
+        .kernels
+        .iter()
+        .find(|kernel| kernel.entry == "train_step")
+        .expect("the train_step kernel is materialized");
+
+    // The gradient inputs of the step: read slots that are NOT the persistent
+    // trainable-param buffers (the params are PerProgram InOut state).
+    let param_ids: Vec<BufferId> = program
+        .kernels
+        .iter()
+        .flat_map(|kernel| kernel.resources.iter())
+        .filter(|resource| {
+            resource.buffer.lifetime == BufferLifetime::PerProgram
+                && resource.buffer.role == BufferRole::InOut
+        })
+        .map(|resource| resource.buffer.id)
+        .collect();
+    let mut gradient_ids: Vec<BufferId> = step
+        .resources
+        .iter()
+        .filter(|resource| {
+            resource.access == MirKernelResourceAccess::Read
+                && !param_ids.contains(&resource.buffer.id)
+        })
+        .map(|resource| resource.buffer.id)
+        .collect();
+    gradient_ids.sort_unstable();
+    gradient_ids.dedup();
+    assert_eq!(
+        gradient_ids.len(),
+        4,
+        "the train_step reads exactly the four declared gradient slots (gw1, gb1, gw2, gb2), \
+         no fifth fallthrough read"
+    );
+
+    // NO fresh host-input fallthrough: every gradient buffer is WRITTEN by a
+    // companion subchain kernel (the backward → train_step edge), and every
+    // gradient buffer is per-step scratch (the gradient flag), never a fresh
+    // host-provided input.
+    for id in &gradient_ids {
+        let producers: Vec<&str> = companion_kernels
+            .iter()
+            .copied()
+            .filter(|entry| {
+                let kernel = program
+                    .kernels
+                    .iter()
+                    .find(|kernel| kernel.entry.as_str() == *entry)
+                    .expect("entry resolves");
+                kernel.resources.iter().any(|resource| {
+                    resource.buffer.id == *id && resource.access != MirKernelResourceAccess::Read
+                })
+            })
+            .collect();
+        assert!(
+            !producers.is_empty(),
+            "gradient buffer {id:?} is produced by a companion subchain kernel \
+             (no fresh host-input fallthrough for any declared gradient slot); \
+             step slots: {:?}; all buffer names: {:?}",
+            step.resources
+                .iter()
+                .filter(|resource| resource.buffer.id == *id)
+                .map(|resource| (&resource.buffer.name, resource.access))
+                .collect::<Vec<_>>(),
+            program
+                .kernels
+                .iter()
+                .flat_map(|kernel| kernel.resources.iter())
+                .filter(|resource| resource.buffer.id == *id)
+                .map(|resource| (
+                    &resource.buffer.name,
+                    &resource.buffer.role,
+                    &resource.buffer.lifetime
+                ))
+                .collect::<Vec<_>>()
+        );
+        let buffer = program
+            .kernels
+            .iter()
+            .flat_map(|kernel| kernel.resources.iter())
+            .find(|resource| resource.buffer.id == *id)
+            .expect("gradient buffer resolves")
+            .buffer
+            .clone();
+        assert_eq!(
+            buffer.lifetime,
+            BufferLifetime::PerStep,
+            "gradient buffer {id:?} is per-step scratch (the gradient flag), never an observation"
+        );
+    }
+
+    // The gradient buffers alias the DISTINCT intermediate subchains that
+    // compute each gradient (the D-6 tuple-field producers) — not the
+    // forward-save subchain's local slots 0–3 (the pre-fix wrong values,
+    // which would collapse three gradients onto ONE subchain's buffers).
+    let distinct_producers: BTreeSet<u32> = gradient_ids
+        .iter()
+        .filter_map(|id| {
+            companion_kernels
+                .iter()
+                .copied()
+                .find(|entry| {
+                    program
+                        .kernels
+                        .iter()
+                        .find(|kernel| kernel.entry.as_str() == *entry)
+                        .expect("entry resolves")
+                        .resources
+                        .iter()
+                        .any(|resource| {
+                            resource.buffer.id == *id
+                                && resource.access != MirKernelResourceAccess::Read
+                        })
+                })
+                .and_then(|entry| {
+                    program
+                        .kernels
+                        .iter()
+                        .position(|kernel| kernel.entry.as_str() == entry)
+                        .map(|position| u32::try_from(position).unwrap_or(u32::MAX))
+                })
+        })
+        .collect();
+    assert!(
+        distinct_producers.len() >= 3,
+        "the four gradients are produced by at least three DISTINCT subchain \
+         kernels — each slot aliases its own gradient producer (gw2 and gb1 \
+         fold into the same matmul-VJP subchain here), never collapsed onto \
+         ONE forward-save subchain's local output indices 0–3 (the pre-fix \
+         wrong values), got {distinct_producers:?}"
+    );
+
+    // The last subchain's tuple output stays a device-side dead end: its
+    // buffer is not read by the train_step (the step reads the intermediate
+    // subchain buffers the tuple fields flow from).
+    let last_companion_entry = companion_kernels.last().expect("a last companion subchain");
+    let last_companion = program
+        .kernels
+        .iter()
+        .find(|kernel| kernel.entry.as_str() == *last_companion_entry)
+        .expect("last companion kernel resolves");
+    // D-6: the last subchain exposes its written return-tuple field (gw1) as
+    // a kernel output — the ABI flattens the return tuple into per-field
+    // device-view buffers, so the last subchain IS one of the distinct
+    // gradient producers (never a fresh host-input, never a nested tuple
+    // buffer).
+    let last_output_ids: Vec<BufferId> = last_companion
+        .resources
+        .iter()
+        .filter(|resource| resource.access != MirKernelResourceAccess::Read)
+        .map(|resource| resource.buffer.id)
+        .collect();
+    assert!(
+        !last_output_ids.is_empty(),
+        "the last companion subchain writes at least its exposed gradient field"
+    );
+    assert!(
+        last_output_ids.iter().any(|id| gradient_ids.contains(id)),
+        "the last subchain's written return-tuple field is one of the four \
+         gradient buffers the train_step aliases (the D-6 field exposure)"
     );
 }
 

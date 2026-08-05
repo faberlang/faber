@@ -634,6 +634,13 @@ pub(crate) fn device_program_for_lowered(
             function
         };
         let base_entry = kernel_entry_name(kernel_source, interner);
+        // The decomposed path records each subchain output slot's buffer id
+        // (subchain index, output-slot index) while the subchains are built,
+        // so the D-6 fill can resolve the companion's FULL result-tuple
+        // field producers after all subchains are emitted (a subchain's
+        // local output-slot index is the forward-save set, never the
+        // full-tuple index the gradient slots index).
+        let mut subchain_output_buffer_ids: BTreeMap<(usize, u32), BufferId> = BTreeMap::new();
         let mut emit_subchain = |synthetic: &MirFunction,
                                  signature: &MirKernelSignature,
                                  plan: CollectionKernelPlan,
@@ -641,7 +648,8 @@ pub(crate) fn device_program_for_lowered(
                                  param_updates: &BTreeMap<
             (MirFunctionId, MirLocalId),
             (u32, u32),
-        >|
+        >,
+                                 subchain_index: Option<usize>|
          -> Result<(), Vec<Diagnostic>> {
             let mut resources: Vec<ResourceBuild> = Vec::new();
             // The trainable param local → its registered buffer id, filled
@@ -814,16 +822,31 @@ pub(crate) fn device_program_for_lowered(
                 // minted (the train_step kernels built afterwards alias them);
                 // a companion gradient slot is a per-step scratch value,
                 // never an observation point.
+                //
+                // Whole-function path (`subchain_index` is None): the
+                // kernel's output tuple IS the companion's full result tuple,
+                // so the output-slot index is the full result-tuple index the
+                // gradient slots index. Decomposition path: a subchain's
+                // local output-slot index is NOT the full-tuple index (it is
+                // the forward-save set), so the gradient slots are marked
+                // after ALL subchains from the decomposition's return-tuple
+                // field bindings (D-6) — here only the produced buffer id is
+                // recorded for that fill.
                 if let (Some(source), Some(output_index)) = (kernel_source.source, output_index) {
-                    if companion_gradient_slots
-                        .get(&source.0)
-                        .is_some_and(|slots| slots.contains(&output_index))
+                    if subchain_index.is_none()
+                        && companion_gradient_slots
+                            .get(&source.0)
+                            .is_some_and(|slots| slots.contains(&output_index))
                     {
                         if let Some(entry) = buffers.iter_mut().find(|entry| entry.id == buffer_id)
                         {
                             entry.gradient = true;
                         }
                         gradient_buffers.insert((source.0, output_index), buffer_id);
+                    }
+                    if let Some(subchain_index) = subchain_index {
+                        subchain_output_buffer_ids
+                            .insert((subchain_index, output_index), buffer_id);
                     }
                 }
                 resources.push(ResourceBuild {
@@ -869,6 +892,7 @@ pub(crate) fn device_program_for_lowered(
                     plan,
                     base_entry,
                     &param_updates,
+                    None,
                 );
             }
         }
@@ -925,7 +949,53 @@ pub(crate) fn device_program_for_lowered(
                 subchain.plan.clone(),
                 entry,
                 &param_updates,
+                Some(subchain_index),
             )?;
+        }
+        // D-6 gradient-slot → buffer mapping: the companion's gradient slots
+        // index the FULL result-tuple (a selected input's param position),
+        // which the LAST subchain's return-tuple Construct binds to locals.
+        // The train_step gradient reads alias the producing subchains'
+        // gradient buffers (backward → train_step device-to-device edge); the
+        // return-tuple local itself is never a kernel output (the ABI
+        // flattens tuple returns into per-field device-view buffers). The
+        // whole-function path already marked its output slots above (its
+        // output tuple IS the full result tuple); this fill is the
+        // decomposition path's marking.
+        if let Some(source) = kernel_source.source {
+            if companion_gradient_slots.contains_key(&source.0) {
+                if let Some(fields) = decomposition.return_tuple_fields(kernel_source) {
+                    for (slot, field_local) in fields.iter().enumerate() {
+                        let slot = u32::try_from(slot).unwrap_or(u32::MAX);
+                        if !companion_gradient_slots[&source.0].contains(&slot) {
+                            continue;
+                        }
+                        // The decomposition exposes every return-tuple field
+                        // local as a subchain output (D-6: the last subchain
+                        // ALSO exposes its written fields), so every gradient
+                        // slot resolves to a distinct kernel buffer. A local
+                        // that is somehow not exposed (a written local never
+                        // returned and never read by a later subchain) can
+                        // never be a gradient slot — the lookup skips it.
+                        let Some((producer_index, output_position)) =
+                            decomposition.producer_position(*field_local)
+                        else {
+                            continue;
+                        };
+                        let output_position = u32::try_from(output_position).unwrap_or(u32::MAX);
+                        let Some(&buffer_id) =
+                            subchain_output_buffer_ids.get(&(producer_index, output_position))
+                        else {
+                            continue;
+                        };
+                        if let Some(entry) = buffers.iter_mut().find(|entry| entry.id == buffer_id)
+                        {
+                            entry.gradient = true;
+                        }
+                        gradient_buffers.insert((source.0, slot), buffer_id);
+                    }
+                }
+            }
         }
         Ok(())
     };
