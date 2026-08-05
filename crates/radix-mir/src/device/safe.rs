@@ -634,7 +634,10 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
     }
 
     fn visit_temp(&mut self, temp: &MirTemp) {
-        if self.in_device_function && !self.dead_fold_artifact_slots.temps.contains(&temp.id) {
+        if self.in_device_function
+            && !(self.multi_output_result && is_result_tuple_type(self.types, temp.ty))
+            && !self.dead_fold_artifact_slots.temps.contains(&temp.id)
+        {
             self.check_device_type(temp.ty);
         }
     }
