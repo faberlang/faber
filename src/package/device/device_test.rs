@@ -9,7 +9,17 @@ use faber_host_macos_arm64::device_descriptor::{
 use faber_host_macos_arm64::device_host::DeviceRuntime;
 use faber_host_macos_arm64::MetalHostSession;
 use radix::mir::LoweredMirUnit;
+use radix_mir::abi::{MirBroadcastDeclaration, MirRankExtensionBroadcast};
 use radix_mir::device_program::DataFlowPair;
+use radix_mir::kernel_plan::{AxisReductionPlan, LayerNormalizationPlan, ReduceOp, RowSoftmaxPlan};
+use radix_mir_fmir::schema::{
+    WireAxisReductionPlan, WireBroadcastDeclaration, WireBroadcastFact, WireLayerNormalizationPlan,
+    WireRowSoftmaxPlan,
+};
+// The S6-C2 producer variant is not on the device-root re-export list (the
+// ordinary producer is the seam); the test reaches it through the wire
+// module directly (a sibling of this test module under `device`).
+use crate::package::device::wire::wire_program_for_program_with_broadcast_facts;
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
@@ -2862,6 +2872,138 @@ fn admit_device_program_section_rejects_zero_step_count() {
     let error = admit_device_program_section(&section.device_program)
         .expect_err("a zero declared step count fails the faber boundary admission");
     assert!(error[0].message.contains("step count 0"));
+}
+
+// ── S6-C2: broadcast facts + the recipe-variant wire mirrors ──────────────
+
+/// S6-C2 (A7): the faber boundary admission rejects a carried rank-extension
+/// broadcast fact whose lower-rank dims are not the higher-rank trailing
+/// dims — a shape mismatch fails closed here (the same rule the radix decode
+/// boundary runs), never reaching host construction.
+#[test]
+fn admit_device_program_section_rejects_mismatched_broadcast_fact() {
+    let (program, semantics) =
+        device_program_and_semantics_from_corpus_fixture("cuda/summa-proof.fab");
+    let mut section = section_for_program(&program, &semantics);
+    section.device_program.program.kernels[0].plan =
+        WireCollectionKernelPlan::RankExtensionAdd(WireBroadcastFact {
+            lhs_shape: vec![2, 8],
+            rhs_shape: vec![4],
+            result_shape: vec![2, 8],
+            declaration: WireBroadcastDeclaration::RankExtension,
+        });
+    let error = admit_device_program_section(&section.device_program)
+        .expect_err("a mismatched broadcast fact fails the faber boundary admission");
+    assert!(
+        error[0]
+            .message
+            .contains("mismatched rank-extension broadcast fact"),
+        "the fail-closed diagnostic names the shape mismatch: {}",
+        error[0].message
+    );
+}
+
+/// S6-C2: the S6-N1-frozen recipe variants carry their real wire mirrors on
+/// the faber producer surface — each plan maps to its typed wire plan (the
+/// producer arms that replaced the old fail-closed seam) and the v7 wire
+/// admits through the radix decode boundary with the mirror intact.
+#[test]
+fn frozen_recipe_variant_plans_produce_real_wire_mirrors() {
+    let (mut program, semantics) =
+        device_program_and_semantics_from_corpus_fixture("cuda/summa-proof.fab");
+    let cases = [
+        (
+            CollectionKernelPlan::AxisReduction(AxisReductionPlan {
+                op: ReduceOp::Sum,
+                axis: 1,
+            }),
+            WireCollectionKernelPlan::AxisReduction(WireAxisReductionPlan {
+                op: WireReduceOp::Sum,
+                axis: 1,
+            }),
+        ),
+        (
+            CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan { axis: 1 }),
+            WireCollectionKernelPlan::RowSoftmax(WireRowSoftmaxPlan { axis: 1 }),
+        ),
+        (
+            CollectionKernelPlan::LayerNormalization(LayerNormalizationPlan { axis: 1 }),
+            WireCollectionKernelPlan::LayerNormalization(WireLayerNormalizationPlan { axis: 1 }),
+        ),
+    ];
+    for (plan, expected) in cases {
+        program.kernels[0].plan = plan.clone();
+        let wire = wire_program_for_program(&program, &semantics, DEFAULT_TRAINING_STEPS);
+        assert_eq!(
+            wire.kernels[0].plan, expected,
+            "the recipe plan {plan:?} maps to its typed wire mirror"
+        );
+        let admitted = wire_admits_through_radix_decode(section_for_program(&program, &semantics));
+        assert_eq!(
+            admitted.kernels[0].plan, expected,
+            "the recipe wire mirror survives the radix decode admission"
+        );
+    }
+}
+
+/// S6-C2: the producer arm carries a kernel's rank-extension broadcast fact
+/// onto the wire — an elementwise kernel with a carried
+/// [`MirRankExtensionBroadcast`] emits [`WireCollectionKernelPlan::RankExtensionAdd`]
+/// (the typed fact rides the plan, never dropped and never inferred); without
+/// a carried fact the same kernel stays on its bare `Elementwise` mirror, and
+/// a consistent carried fact passes the faber admission + the radix decode
+/// boundary.
+#[test]
+fn rank_extension_broadcast_fact_rides_the_wire() {
+    let (mut program, semantics) =
+        device_program_and_semantics_from_corpus_fixture("cuda/summa-proof.fab");
+    program.kernels[0].plan = CollectionKernelPlan::Elementwise;
+    let fact = MirRankExtensionBroadcast {
+        lhs_shape: vec![2, 8],
+        rhs_shape: vec![8],
+        result_shape: vec![2, 8],
+        declaration: MirBroadcastDeclaration::RankExtension,
+    };
+    let with_fact = |program: &DeviceProgram| {
+        wire_program_for_program_with_broadcast_facts(
+            program,
+            &semantics,
+            DEFAULT_TRAINING_STEPS,
+            &[Some(&fact)],
+        )
+    };
+
+    // The carried fact rides the plan as the RankExtensionAdd wire variant.
+    assert_eq!(
+        with_fact(&program).kernels[0].plan,
+        WireCollectionKernelPlan::RankExtensionAdd(WireBroadcastFact {
+            lhs_shape: vec![2, 8],
+            rhs_shape: vec![8],
+            result_shape: vec![2, 8],
+            declaration: WireBroadcastDeclaration::RankExtension,
+        }),
+        "the carried broadcast fact rides the wire as the RankExtensionAdd plan"
+    );
+    // Without a carried fact the same kernel stays on the bare Elementwise
+    // mirror (the ordinary producer passes an empty fact set).
+    let plain = wire_program_for_program(&program, &semantics, DEFAULT_TRAINING_STEPS);
+    assert_eq!(
+        plain.kernels[0].plan,
+        WireCollectionKernelPlan::Elementwise,
+        "no carried fact means no RankExtensionAdd on the wire"
+    );
+
+    // A shape-consistent carried fact admits through the faber boundary AND
+    // the radix decode boundary.
+    let mut section = section_for_program(&program, &semantics);
+    section.device_program.program = with_fact(&program);
+    admit_device_program_section(&section.device_program)
+        .expect("a shape-consistent broadcast fact admits at the faber boundary");
+    let admitted = wire_admits_through_radix_decode(section);
+    assert!(matches!(
+        admitted.kernels[0].plan,
+        WireCollectionKernelPlan::RankExtensionAdd(_)
+    ));
 }
 /// The constructor's `RepeatingStep` param materialization is
 /// emitter-compatible: the forward kernel (`PerProgram` InOut HostProvided

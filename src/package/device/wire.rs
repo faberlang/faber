@@ -16,6 +16,14 @@ use super::{
     WireSemanticValueOrigin, WireSharedMemoryLayout, WireStorageLayout, WireTransposePlan,
     WireWorkgroupCount, WireWorkgroupSize,
 };
+// S6-C2 wire-surface imports: the new plan wire mirrors and the carried
+// broadcast-fact mirror live on the radix-mir-fmir schema (not on the faber
+// mir-split seam), so they import directly from the schema crate.
+use radix_mir::abi::{MirBroadcastDeclaration, MirRankExtensionBroadcast};
+use radix_mir_fmir::schema::{
+    WireAxisReductionPlan, WireBroadcastDeclaration, WireBroadcastFact, WireLayerNormalizationPlan,
+    WireRowSoftmaxPlan,
+};
 // Doc-link surface: the carried generation type appears only in an
 // intra-doc link here; the import keeps the link resolvable from this module.
 #[allow(unused_imports)]
@@ -59,7 +67,17 @@ use super::ValueGeneration;
 /// read back. The canonical wire bytes now change when the readback cadence
 /// changes (A7). Bumped in lockstep with
 /// [`radix_mir_fmir::WIRE_DEVICE_PROGRAM_VERSION`].
-pub(crate) const DEVICE_RUN_PLAN_VERSION: u32 = 6;
+///
+/// **v6 → v7 (S6-C2, the broadcast-fact + recipe-mirror clean break):** the
+/// kernel plan gains the broadcast-carrying
+/// [`WireCollectionKernelPlan::RankExtensionAdd`] variant (the typed
+/// [`WireBroadcastFact`] of the `addita_bias` rank-extension lowering) and
+/// the S6-N1-frozen recipe variants gain real wire mirrors
+/// (`AxisReduction` / `RowSoftmax` / `LayerNormalization`). The carried
+/// broadcast facts are admitted fail-closed here (a shape mismatch rejects)
+/// and at the radix decode boundary (A7). Bumped in lockstep with
+/// [`radix_mir_fmir::WIRE_DEVICE_PROGRAM_VERSION`].
+pub(crate) const DEVICE_RUN_PLAN_VERSION: u32 = 7;
 
 /// Fail-closed wire admission (S3-A4): the wire version is read FIRST,
 /// before any field-level interpretation, so an old (or unknown) codec
@@ -68,11 +86,14 @@ pub(crate) const DEVICE_RUN_PLAN_VERSION: u32 = 6;
 /// version gate. After the version gate, the S5-U5b declared step count is
 /// admitted: a `RepeatingStep` program must declare at least one step (a
 /// count the route could never drive fails closed here and at the radix
-/// decode boundary).
+/// decode boundary). The S6-C2 carried broadcast facts are then admitted:
+/// every `RankExtensionAdd` plan payload must be internally consistent (a
+/// shape mismatch rejects — the fact is carried, never inferred, A3).
 ///
 /// # Errors
-/// Fail-closed when the wire carries an unsupported version, or a
-/// `RepeatingStep` program declares a zero step count.
+/// Fail-closed when the wire carries an unsupported version, a
+/// `RepeatingStep` program declares a zero step count, or a carried
+/// rank-extension broadcast fact is internally inconsistent.
 pub(crate) fn admit_device_program_section(
     section: &FmirDeviceProgramSection,
 ) -> Result<(), Vec<Diagnostic>> {
@@ -94,6 +115,40 @@ pub(crate) fn admit_device_program_section(
             )]);
         }
     }
+    // S6-C2 (A7): every carried rank-extension broadcast fact (the
+    // `RankExtensionAdd` plan payload) must be internally consistent — the
+    // higher-rank operand is exactly one rank above the lower-rank operand,
+    // the lower-rank dims equal the higher-rank trailing dims, and the
+    // result is the higher-rank shape. A shape mismatch fails closed here,
+    // the same rule the radix decode boundary runs.
+    for kernel in &section.program.kernels {
+        let WireCollectionKernelPlan::RankExtensionAdd(fact) = &kernel.plan else {
+            continue;
+        };
+        let (higher, lower) = if fact.lhs_shape.len() >= fact.rhs_shape.len() {
+            (&fact.lhs_shape, &fact.rhs_shape)
+        } else {
+            (&fact.rhs_shape, &fact.lhs_shape)
+        };
+        if fact.declaration != WireBroadcastDeclaration::RankExtension {
+            return Err(vec![Diagnostic::error(format!(
+                "kernel '{}' carries the unsupported broadcast declaration {fact:?}; only rank-extension is admitted (S6-C2 A7)",
+                kernel.entry
+            ))]);
+        }
+        if higher.len() != lower.len() + 1 || lower != &higher[1..] {
+            return Err(vec![Diagnostic::error(format!(
+                "kernel '{}' carries a mismatched rank-extension broadcast fact (lhs {:?}, rhs {:?}); the lower-rank dims must equal the higher-rank trailing dims (S6-C2 A7)",
+                kernel.entry, fact.lhs_shape, fact.rhs_shape
+            ))]);
+        }
+        if fact.result_shape != *higher {
+            return Err(vec![Diagnostic::error(format!(
+                "kernel '{}' carries a rank-extension broadcast fact whose result shape {:?} does not equal the higher-rank operand shape {:?} (S6-C2 A7)",
+                kernel.entry, fact.result_shape, *higher
+            ))]);
+        }
+    }
     Ok(())
 }
 
@@ -110,11 +165,35 @@ pub(crate) fn admit_device_program_section(
 /// input values are NOT program semantics — they never enter the canonical
 /// bytes. A `RepeatingStep` program carries its declared training step count
 /// (S5-U5b) in the `RepeatingStep(count)` lifetime variant.
+///
+/// S6-C2: the carried per-kernel rank-extension broadcast facts are threaded
+/// through [`wire_program_for_program_with_broadcast_facts`]; the ordinary
+/// producer (the current constructor does not resolve the facts yet — the
+/// route is S6-P1) passes an empty set, so every kernel stays on its plan's
+/// own wire mirror.
 #[must_use]
 pub(crate) fn wire_program_for_program(
     program: &DeviceProgram,
     semantics: &DeviceSemantics,
     repeating_steps: u32,
+) -> WireDeviceProgram {
+    wire_program_for_program_with_broadcast_facts(program, semantics, repeating_steps, &[])
+}
+
+/// The full S6-C2 producer: the same complete-program projection with the
+/// carried per-kernel rank-extension broadcast facts (the `addita_bias`
+/// device-ABI facts) threaded onto the wire. A kernel whose
+/// [`MirRankExtensionBroadcast`] is carried at `kernel_index` emits
+/// [`WireCollectionKernelPlan::RankExtensionAdd`] (the typed fact rides the
+/// plan — a program fact, never dropped and never inferred, A3). The
+/// `broadcast_facts` slice is indexed by kernel declaration order; a kernel
+/// without a carried fact keeps its plan's own mirror.
+#[must_use]
+pub(crate) fn wire_program_for_program_with_broadcast_facts(
+    program: &DeviceProgram,
+    semantics: &DeviceSemantics,
+    repeating_steps: u32,
+    broadcast_facts: &[Option<&MirRankExtensionBroadcast>],
 ) -> WireDeviceProgram {
     WireDeviceProgram {
         kernels: program
@@ -124,7 +203,10 @@ pub(crate) fn wire_program_for_program(
             .map(|(kernel_index, kernel)| WireKernelUnit {
                 function: kernel.function.0,
                 entry: kernel.entry.clone(),
-                plan: wire_plan(&kernel.plan),
+                plan: wire_plan(
+                    &kernel.plan,
+                    broadcast_facts.get(kernel_index).copied().flatten(),
+                ),
                 resources: kernel
                     .resources
                     .iter()
@@ -424,10 +506,20 @@ fn wire_access(access: MirKernelResourceAccess) -> WireResourceAccess {
 }
 
 /// Map a radix [`CollectionKernelPlan`] onto its typed wire mirror (the
-/// complete plan is a program fact — never dropped on the wire).
-fn wire_plan(plan: &CollectionKernelPlan) -> WireCollectionKernelPlan {
+/// complete plan is a program fact — never dropped on the wire). An
+/// elementwise kernel whose device ABI records a rank-extension broadcast
+/// fact (S6-C2, the `addita_bias` lowering) carries
+/// [`WireCollectionKernelPlan::RankExtensionAdd`] — the typed fact rides the
+/// plan, never inferred (A3); a recipe plan never carries a broadcast fact.
+fn wire_plan(
+    plan: &CollectionKernelPlan,
+    broadcast: Option<&MirRankExtensionBroadcast>,
+) -> WireCollectionKernelPlan {
     match plan {
-        CollectionKernelPlan::Elementwise => WireCollectionKernelPlan::Elementwise,
+        CollectionKernelPlan::Elementwise => match broadcast {
+            Some(fact) => WireCollectionKernelPlan::RankExtensionAdd(wire_broadcast_fact(fact)),
+            None => WireCollectionKernelPlan::Elementwise,
+        },
         CollectionKernelPlan::TiledMatMul(matmul) => {
             WireCollectionKernelPlan::TiledMatMul(WireMatMulPlan {
                 m: matmul.m,
@@ -462,10 +554,7 @@ fn wire_plan(plan: &CollectionKernelPlan) -> WireCollectionKernelPlan {
         }
         CollectionKernelPlan::TreeReduction(reduction) => {
             WireCollectionKernelPlan::TreeReduction(WireReductionPlan {
-                op: match reduction.op {
-                    radix_mir::kernel_plan::ReduceOp::Sum => WireReduceOp::Sum,
-                    radix_mir::kernel_plan::ReduceOp::Mean => WireReduceOp::Mean,
-                },
+                op: wire_reduce_op(reduction.op),
                 length: reduction.length,
                 workgroup_x: reduction.workgroup_x,
                 partials: reduction.partials,
@@ -500,19 +589,49 @@ fn wire_plan(plan: &CollectionKernelPlan) -> WireCollectionKernelPlan {
                 dispatch_x: transpose.dispatch_x,
             })
         }
-        // S6-N1: recipe names frozen but NOT admitted (admission is S6-P1);
-        // there is no wire mirror for these recipes yet (the S6-C2 wire bump
-        // carries the mirrors). No kernel can carry these plans before P1, so
-        // reaching this arm is a stage-ordering violation — fail closed.
-        // (`assert!` keeps the faber hygiene ratchet within budget: the
-        // `panic!`/`unreachable!`/`.expect(` budgets are already at their
-        // caps, and `assert!` is not a ratcheted pattern.)
-        CollectionKernelPlan::AxisReduction(_)
-        | CollectionKernelPlan::RowSoftmax(_)
-        | CollectionKernelPlan::LayerNormalization(_) => {
-            assert!(false, "recipe plans are not admitted until S6-P1");
-            std::process::abort()
+        // S6-C2: the S6-N1-frozen recipe variants now carry their real wire
+        // mirrors (the radix-mir-fmir schema pins the exact shapes at
+        // radix-mir-fmir/src/schema/wire.rs) — the plans are program facts,
+        // carried field-for-field. Recipe admission/resolution is S6-P1, but
+        // the wire surface is the producer contract under wire 7.
+        CollectionKernelPlan::AxisReduction(plan) => {
+            WireCollectionKernelPlan::AxisReduction(WireAxisReductionPlan {
+                op: wire_reduce_op(plan.op),
+                axis: plan.axis,
+            })
         }
+        CollectionKernelPlan::RowSoftmax(plan) => {
+            WireCollectionKernelPlan::RowSoftmax(WireRowSoftmaxPlan { axis: plan.axis })
+        }
+        CollectionKernelPlan::LayerNormalization(plan) => {
+            WireCollectionKernelPlan::LayerNormalization(WireLayerNormalizationPlan {
+                axis: plan.axis,
+            })
+        }
+    }
+}
+
+/// Map a radix reduction operator onto its typed wire mirror (the shared
+/// operator surface of the tree-reduction and axis-reduction recipes).
+fn wire_reduce_op(op: radix_mir::kernel_plan::ReduceOp) -> WireReduceOp {
+    match op {
+        radix_mir::kernel_plan::ReduceOp::Sum => WireReduceOp::Sum,
+        radix_mir::kernel_plan::ReduceOp::Mean => WireReduceOp::Mean,
+    }
+}
+
+/// Map a carried [`MirRankExtensionBroadcast`] (the S6-C2 device-ABI fact)
+/// onto its typed wire mirror: the operand/result shapes and the broadcast
+/// declaration ride the plan verbatim — the fact is a program fact, never
+/// dropped on the wire and never inferred (A3).
+fn wire_broadcast_fact(fact: &MirRankExtensionBroadcast) -> WireBroadcastFact {
+    WireBroadcastFact {
+        lhs_shape: fact.lhs_shape.clone(),
+        rhs_shape: fact.rhs_shape.clone(),
+        result_shape: fact.result_shape.clone(),
+        declaration: match fact.declaration {
+            MirBroadcastDeclaration::RankExtension => WireBroadcastDeclaration::RankExtension,
+        },
     }
 }
 
