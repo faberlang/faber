@@ -55,7 +55,7 @@ fn hir_target_coverage_matrix() {
         exempla_dir.display()
     );
 
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_stdlib(crate::paths::radix_stdlib_dir()));
     let rows = build_matrix_rows(&session, &exempla);
     print_matrix_report(&rows, started.elapsed());
     assert_matrix_ratchet(&rows);
@@ -67,7 +67,7 @@ fn hir_target_coverage_matrix() {
 fn emit_hir_target_matrix() {
     let exempla_dir = crate::paths::corpus_dir();
     let exempla = collect_exempla_files(&exempla_dir);
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_stdlib(crate::paths::radix_stdlib_dir()));
     let rows = build_matrix_rows(&session, &exempla);
     println!("ROWS");
     for row in &rows {

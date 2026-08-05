@@ -89,7 +89,7 @@ fn mir_target_coverage_matrix() {
         "MIR target matrix found no exempla files"
     );
 
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_stdlib(crate::paths::radix_stdlib_dir()));
     let rows = build_matrix_rows(&session, &exempla);
     print_matrix_report(&rows, started.elapsed());
     assert_matrix_ratchet(&rows);
@@ -101,7 +101,7 @@ fn mir_target_coverage_matrix() {
 fn emit_mir_target_matrix() {
     let exempla_dir = crate::paths::corpus_dir();
     let exempla = collect_exempla_files(&exempla_dir);
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_stdlib(crate::paths::radix_stdlib_dir()));
     let rows = build_matrix_rows(&session, &exempla);
 
     let mir_capable = rows.iter().filter(|row| row.mir_capable).count();
