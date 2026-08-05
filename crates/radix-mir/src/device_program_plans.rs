@@ -43,13 +43,13 @@ use crate::abi::{
 };
 use crate::device_program::{Binding, BufferRole, DeviceProgram, DeviceResource, KernelUnit};
 use crate::kernel_plan::{CollectionKernelPlan, MatMulShapes, SharedMemoryLayout};
-use crate::layout::{MirScalarLayout, MirTensorStorageLayout};
+use crate::layout::MirTensorStorageLayout;
 use crate::{
-    MirCollectionOp, MirFunction, MirIntrinsic, MirKernelDispatchSize, MirKernelWorkgroupCount,
-    MirLayoutKind, MirLocalId, MirOperand, MirPlaceBase, MirRuntimeCall, MirStatementKind,
-    MirType, MirValidationContext, MirWorkgroupSize,
+    MirCollectionOp, MirFunction, MirKernelDispatchSize, MirKernelWorkgroupCount, MirLayoutKind,
+    MirLocalId, MirPlaceBase, MirRuntimeCall, MirStatementKind, MirType, MirValidationContext,
+    MirWorkgroupSize,
 };
-use radix_types::{IndexExpr, Type, TypeId};
+use radix_types::{Type, TypeId};
 use rustc_hash::FxHashMap;
 use std::fmt;
 
@@ -160,7 +160,7 @@ pub fn kernel_plan_for_function(
 ) -> Result<Option<CollectionKernelPlan>, PlanMappingError> {
     // Scan ALL statements: the kernel body's plan is decided by its complete
     // collection-op set, never by the first matching statement (N3.2).
-    let ops = collection_ops_for_function(function);
+    let ops = crate::collection_ops::collection_ops_for_function(function);
     if ops.is_empty() {
         return Ok(None);
     }
@@ -405,58 +405,6 @@ fn shared_memory_layout_bytes(layout: &SharedMemoryLayout) -> u64 {
         .saturating_mul(u64::try_from(layout.element_byte_width).unwrap_or(u64::MAX))
 }
 
-/// The distinct collection ops in a kernel body's statement scan, in scan
-/// order (the same scan `abi::collection_op_contract` runs; the plan pass
-/// needs the FULL op set — never the first match only (N3.2) — to decide
-/// recipe presence and to reject unplannable ops with a typed diagnostic).
-///
-/// A collection op whose result is never read is DEAD (S3-A5: the companion
-/// recomputes the forward's mean without using it) — it is not part of the
-/// kernel's semantics and must not drive the plan (a dead reduction must not
-/// force a reduction contract on an elementwise kernel).
-///
-/// The dead filter resolves reads against `read_context` — the function the
-/// op set is scanned from when that is the live context, or the SOURCE
-/// function when the scan runs over a decomposition subchain (the
-/// subchain's produced local is read by a LATER subchain, invisible inside
-/// the subchain slice itself).
-fn collection_ops_with_read_context(
-    function: &MirFunction,
-    read_context: &MirFunction,
-) -> Vec<MirCollectionOp> {
-    let mut ops: Vec<MirCollectionOp> = Vec::new();
-    for block in &function.blocks {
-        for statement in &block.statements {
-            if let MirStatementKind::RuntimeCall {
-                destination,
-                call:
-                    MirRuntimeCall {
-                        intrinsic: MirIntrinsic::Collection(op),
-                        ..
-                    },
-                ..
-            } = &statement.kind
-            {
-                if destination
-                    .as_ref()
-                    .is_some_and(|dest| !crate::read_analysis::place_is_read(read_context, dest))
-                {
-                    continue;
-                }
-                if !ops.contains(op) {
-                    ops.push(*op);
-                }
-            }
-        }
-    }
-    ops
-}
-
-fn collection_ops_for_function(function: &MirFunction) -> Vec<MirCollectionOp> {
-    collection_ops_with_read_context(function, function)
-}
-
-
 /// Whether a collection op is a pointwise tensor transform the generic
 /// elementwise kernel body covers (no recipe). This is the closed set that
 /// decides the no-recipe plan: an op outside it has no kernel plan and fails
@@ -519,10 +467,11 @@ fn tensor_element_ty(
 /// operands (a local read from an earlier subchain).
 ///
 /// Tensors bind at their device-view element type and literal dim product
-/// ([`tensor_element_ty`] / [`tensor_literal_dims`]); a scalar data-flow
+/// ([`tensor_element_ty`] / [`crate::tensor_type::tensor_literal_dims`]); a scalar data-flow
 /// param (S5-W-A1: the companion's scalar upstream seed) binds as a
 /// 1-element input at the scalar's own type — mirroring how the ABI scalar
-/// kernel path treats `F32`/`I32`/`U32` (`abi::is_kernel_element_layout`).
+/// kernel path treats `F32`/`I32`/`U32`
+/// ([`crate::tensor_type::is_kernel_element_layout`]).
 /// A scalar outside that surface (e.g. f64) stays fail-closed with the
 /// ABI's own typed diagnostic; non-scalar, non-tensor layouts stay
 /// fail-closed with a typed diagnostic.
@@ -535,14 +484,17 @@ fn data_flow_element_ty_and_count(
         .layout_for_type(ty)
         .map_err(|error| PlanMappingError::mapping(error.message))?;
     match layout.kind {
-        MirLayoutKind::Scalar(scalar) if is_kernel_element_layout(scalar) => Ok((ty, 1)),
+        MirLayoutKind::Scalar(scalar) if crate::tensor_type::is_kernel_element_layout(scalar) => {
+            Ok((ty, 1))
+        }
         MirLayoutKind::Scalar(scalar) => Err(PlanMappingError::mapping(format!(
             "kernel scalar layout {}",
             scalar.spelling()
         ))),
         MirLayoutKind::DeviceView(_) => {
             let element_ty = tensor_element_ty(ty, validation)?;
-            let count = tensor_literal_dims(ty, validation)?
+            let count = crate::tensor_type::tensor_literal_dims(ty, validation)
+                .map_err(PlanMappingError::mapping)?
                 .into_iter()
                 .fold(1u64, u64::saturating_mul);
             Ok((element_ty, count))
@@ -551,16 +503,6 @@ fn data_flow_element_ty_and_count(
             "data-flow input requires a tensor or kernel-scalar type",
         )),
     }
-}
-
-/// Whether a scalar layout is a kernel buffer element — the ABI's
-/// `is_kernel_element_layout` surface (the only scalar layouts a kernel
-/// storage buffer can carry).
-fn is_kernel_element_layout(scalar: MirScalarLayout) -> bool {
-    matches!(
-        scalar,
-        MirScalarLayout::F32 | MirScalarLayout::I32 | MirScalarLayout::U32
-    )
 }
 
 /// The local type of a recipe-op statement's first operand (the tensor the
@@ -572,24 +514,23 @@ fn recipe_operand_ty(
 ) -> Result<MirType, PlanMappingError> {
     for block in &function.blocks {
         for statement in &block.statements {
+            let Some(statement_op) = crate::collection_ops::statement_collection_op(statement)
+            else {
+                continue;
+            };
+            if statement_op != op {
+                continue;
+            }
             let MirStatementKind::RuntimeCall {
-                call:
-                    MirRuntimeCall {
-                        intrinsic: MirIntrinsic::Collection(statement_op),
-                        args,
-                        ..
-                    },
+                call: MirRuntimeCall { args, .. },
                 ..
             } = &statement.kind
             else {
                 continue;
             };
-            if *statement_op != op {
-                continue;
-            }
             return args
                 .first()
-                .and_then(|arg| operand_local_ty(function, arg))
+                .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
                 .map_or_else(
                     || {
                         Err(PlanMappingError::mapping(format!(
@@ -858,16 +799,10 @@ pub fn subchain_signature_for_emission(
 fn recipe_destination_local(function: &MirFunction) -> Option<MirLocalId> {
     for block in &function.blocks {
         for statement in &block.statements {
-            let MirStatementKind::RuntimeCall {
-                destination,
-                call:
-                    MirRuntimeCall {
-                        intrinsic: MirIntrinsic::Collection(_),
-                        ..
-                    },
-                ..
-            } = &statement.kind
-            else {
+            if crate::collection_ops::statement_collection_op(statement).is_none() {
+                continue;
+            }
+            let MirStatementKind::RuntimeCall { destination, .. } = &statement.kind else {
                 continue;
             };
             let Some(place) = destination else {
@@ -887,13 +822,11 @@ fn recipe_destination_local(function: &MirFunction) -> Option<MirLocalId> {
 fn recipe_operand_locals(function: &MirFunction) -> Result<Vec<MirLocalId>, PlanMappingError> {
     for block in &function.blocks {
         for statement in &block.statements {
+            if crate::collection_ops::statement_collection_op(statement).is_none() {
+                continue;
+            }
             let MirStatementKind::RuntimeCall {
-                call:
-                    MirRuntimeCall {
-                        intrinsic: MirIntrinsic::Collection(_),
-                        args,
-                        ..
-                    },
+                call: MirRuntimeCall { args, .. },
                 ..
             } = &statement.kind
             else {
@@ -941,25 +874,6 @@ fn storage_output_with_local(
     resource
 }
 
-/// The MIR type of a local in the subchain function (params, then declared
-/// locals) — the shared params-then-locals lookup the signature seam uses
-/// (mirrors `abi::operand_local_ty` and the decomposition's local-type
-/// resolution).
-fn local_ty(function: &MirFunction, local: MirLocalId) -> Option<MirType> {
-    function
-        .params
-        .iter()
-        .find(|param| param.local == local)
-        .map(|param| param.ty)
-        .or_else(|| {
-            function
-                .locals
-                .iter()
-                .find(|entry| entry.id == local)
-                .map(|entry| entry.ty)
-        })
-}
-
 /// The MIR type of a local in the subchain function — the additional-output
 /// sizing source for the emission signature seam.
 ///
@@ -970,7 +884,7 @@ fn function_local_ty(
     function: &MirFunction,
     local: MirLocalId,
 ) -> Result<MirType, PlanMappingError> {
-    local_ty(function, local).ok_or_else(|| {
+    crate::local_ty::local_ty(function, local).ok_or_else(|| {
         PlanMappingError::mapping(format!(
             "subchain output local {local:?} has no type in the subchain body"
         ))
@@ -982,18 +896,8 @@ fn function_local_ty(
 fn is_recipe_op_scan(function: &MirFunction, op: MirCollectionOp) -> bool {
     for block in &function.blocks {
         for statement in &block.statements {
-            if let MirStatementKind::RuntimeCall {
-                call:
-                    MirRuntimeCall {
-                        intrinsic: MirIntrinsic::Collection(statement_op),
-                        ..
-                    },
-                ..
-            } = &statement.kind
-            {
-                if *statement_op == op {
-                    return true;
-                }
+            if crate::collection_ops::statement_collection_op(statement) == Some(op) {
+                return true;
             }
         }
     }
@@ -1025,7 +929,7 @@ pub fn resolve_subchain_plan(
     read_context: &MirFunction,
     validation: &MirValidationContext<'_>,
 ) -> Result<CollectionKernelPlan, PlanMappingError> {
-    let ops = collection_ops_with_read_context(function, read_context);
+    let ops = crate::collection_ops::collection_ops_with_read_context(function, read_context);
     let mut recipe_op: Option<MirCollectionOp> = None;
     for op in ops {
         if is_recipe_op(op) {
@@ -1073,13 +977,13 @@ fn kernel_matmul_shapes(
 ) -> Result<Option<MatMulShapes>, PlanMappingError> {
     for block in &function.blocks {
         for statement in &block.statements {
+            if crate::collection_ops::statement_collection_op(statement)
+                != Some(MirCollectionOp::TensorMatMul)
+            {
+                continue;
+            }
             let MirStatementKind::RuntimeCall {
-                call:
-                    MirRuntimeCall {
-                        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorMatMul),
-                        args,
-                        ..
-                    },
+                call: MirRuntimeCall { args, .. },
                 ..
             } = &statement.kind
             else {
@@ -1090,14 +994,18 @@ fn kernel_matmul_shapes(
                     "matmul requires exactly two tensor operands",
                 ));
             }
-            let left_ty = operand_local_ty(function, &args[0]).ok_or_else(|| {
-                PlanMappingError::mapping("matmul left operand has no local type")
-            })?;
-            let right_ty = operand_local_ty(function, &args[1]).ok_or_else(|| {
-                PlanMappingError::mapping("matmul right operand has no local type")
-            })?;
-            let left_dims = tensor_literal_dims(left_ty, validation)?;
-            let right_dims = tensor_literal_dims(right_ty, validation)?;
+            let left_ty =
+                crate::local_ty::operand_local_ty(function, &args[0]).ok_or_else(|| {
+                    PlanMappingError::mapping("matmul left operand has no local type")
+                })?;
+            let right_ty =
+                crate::local_ty::operand_local_ty(function, &args[1]).ok_or_else(|| {
+                    PlanMappingError::mapping("matmul right operand has no local type")
+                })?;
+            let left_dims = crate::tensor_type::tensor_literal_dims(left_ty, validation)
+                .map_err(PlanMappingError::mapping)?;
+            let right_dims = crate::tensor_type::tensor_literal_dims(right_ty, validation)
+                .map_err(PlanMappingError::mapping)?;
             if left_dims.len() != 2 || right_dims.len() != 2 {
                 return Err(PlanMappingError::mapping(
                     "matmul requires rank-2 tensor operands",
@@ -1116,52 +1024,6 @@ fn kernel_matmul_shapes(
         }
     }
     Ok(None)
-}
-
-/// Resolve a runtime-call operand to the MIR type of the local it references
-/// (via [`local_ty`]) — mirrors `abi::operand_local_ty` for the plan-mapping
-/// matmul shape scan.
-fn operand_local_ty(function: &MirFunction, operand: &MirOperand) -> Option<MirType> {
-    let MirOperand::Place(place) = operand else {
-        return None;
-    };
-    let MirPlaceBase::Local(local) = place.base else {
-        return None;
-    };
-    local_ty(function, local)
-}
-
-/// Literal shape dims of a tensor-typed MIR type (a flat literal is a rank-1
-/// shape; a tuple is the dim list) — mirrors `abi::tensor_literal_dims`.
-fn tensor_literal_dims(
-    ty: MirType,
-    validation: &MirValidationContext<'_>,
-) -> Result<Vec<u64>, PlanMappingError> {
-    let Type::Tensor(_, shape) = validation.types.get(ty.semantic_id()) else {
-        return Err(PlanMappingError::mapping(
-            "kernel collection op requires tensor types",
-        ));
-    };
-    match validation.types.get_index(*shape) {
-        IndexExpr::Literal(count) => Ok(vec![*count]),
-        IndexExpr::Tuple(dims) => {
-            let mut out = Vec::with_capacity(dims.len());
-            for &dim in dims {
-                match validation.types.get_index(dim) {
-                    IndexExpr::Literal(count) => out.push(*count),
-                    _ => {
-                        return Err(PlanMappingError::mapping(
-                            "kernel collection op requires literal dimensions",
-                        ))
-                    }
-                }
-            }
-            Ok(out)
-        }
-        _ => Err(PlanMappingError::mapping(
-            "kernel collection op requires static shape",
-        )),
-    }
 }
 
 #[cfg(test)]

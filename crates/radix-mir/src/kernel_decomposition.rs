@@ -49,11 +49,14 @@ use crate::device_program_plans::{
 };
 use crate::kernel_plan::CollectionKernelPlan;
 use crate::{
-    MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlock,
-    MirCollectionOp, MirFunction, MirIntrinsic, MirLocalId, MirOperand, MirParam, MirParamMode,
-    MirPlace, MirRuntimeCall, MirStatement, MirStatementKind, MirTemp, MirTempId, MirTerminator,
-    MirTerminatorKind, MirType, MirValidationContext,
+    MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlock, MirFunction,
+    MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace, MirStatement, MirStatementKind,
+    MirTemp, MirTempId, MirTerminator, MirTerminatorKind, MirType, MirValidationContext,
 };
+// The decomposition's own scan helpers moved to `crate::collection_ops`; the
+// collection-op types remain in scope for the `#[path]` test module.
+#[cfg(test)]
+use crate::{MirCollectionOp, MirIntrinsic, MirRuntimeCall};
 use radix_types::{TypeId, TypeTable};
 use std::collections::BTreeSet;
 
@@ -135,7 +138,7 @@ pub fn decompose_kernel_function(
     let mut current: Vec<usize> = Vec::new();
     let mut current_has_recipe = false;
     for (index, statement) in block.statements.iter().enumerate() {
-        let Some(op) = statement_collection_op(statement) else {
+        let Some(op) = crate::collection_ops::statement_collection_op(statement) else {
             // Elementwise value math (Assign / Construct / Call).
             current.push(index);
             continue;
@@ -183,20 +186,24 @@ pub fn decompose_kernel_function(
         // (the subchain's produced local is consumed by a later subchain,
         // invisible inside the slice itself).
         let plan = resolve_subchain_plan(&synthetic, function, validation)?;
-        let produced = indices
-            .iter()
-            .rev()
-            .find_map(|&index| crate::read_analysis::statement_destination(&block.statements[index]));
+        let produced = indices.iter().rev().find_map(|&index| {
+            crate::read_analysis::statement_destination(&block.statements[index])
+        });
         let written: BTreeSet<MirLocalId> = indices
             .iter()
-            .filter_map(|&index| crate::read_analysis::statement_destination(&block.statements[index]))
+            .filter_map(|&index| {
+                crate::read_analysis::statement_destination(&block.statements[index])
+            })
             .collect();
         let inputs: BTreeSet<MirLocalId> =
             synthetic.params.iter().map(|param| param.local).collect();
         // The recipe that opened this subchain (the plan's result local).
         let recipe_result = indices.iter().find_map(|&index| {
             let statement = &block.statements[index];
-            if matches!(statement_collection_op(statement), Some(op) if is_recipe_op(op)) {
+            if matches!(
+                crate::collection_ops::statement_collection_op(statement),
+                Some(op) if is_recipe_op(op)
+            ) {
                 crate::read_analysis::statement_destination(statement)
             } else {
                 None
@@ -236,7 +243,9 @@ pub fn decompose_kernel_function(
         let written = &written_by[position];
         let mut outputs: Vec<MirLocalId> = Vec::new();
         if position + 1 == subchains.len() {
-            if let Some(return_local) = crate::read_analysis::terminator_return_local(&block.terminator.kind) {
+            if let Some(return_local) =
+                crate::read_analysis::terminator_return_local(&block.terminator.kind)
+            {
                 if written.contains(&return_local) {
                     outputs.push(return_local);
                 }
@@ -477,39 +486,13 @@ fn build_subchain_function(
 /// the synthetic subchain param type. Temps are not referenced by plain
 /// local operands (the decomposition's read analysis only tracks
 /// [`MirPlaceBase::Local`]), so they never appear as a subchain param.
+///
+/// Falls back to the source function's return type when the local is neither
+/// a param nor a declared local (the decomposition's W5 fallback; the shared
+/// lookup returns `None` and this wrapper applies the return-type fallback).
 fn source_local_ty(source: &MirFunction, local: MirLocalId) -> MirType {
-    source
-        .params
-        .iter()
-        .find(|param| param.local == local)
-        .map(|param| param.ty)
-        .or_else(|| {
-            source
-                .locals
-                .iter()
-                .find(|entry| entry.id == local)
-                .map(|entry| entry.ty)
-        })
-        .unwrap_or(source.return_ty)
+    crate::local_ty::local_ty(source, local).unwrap_or(source.return_ty)
 }
-
-/// The collection op a statement carries, when it is a collection runtime
-/// call.
-fn statement_collection_op(statement: &MirStatement) -> Option<MirCollectionOp> {
-    let MirStatementKind::RuntimeCall {
-        call:
-            MirRuntimeCall {
-                intrinsic: MirIntrinsic::Collection(op),
-                ..
-            },
-        ..
-    } = &statement.kind
-    else {
-        return None;
-    };
-    Some(*op)
-}
-
 
 /// Whether a statement's destination is never read anywhere in the source
 /// function (the S3-A5 dead-op filter). A destination that IS a function

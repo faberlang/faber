@@ -74,14 +74,10 @@ impl std::fmt::Display for MirTypeError {
 
 impl std::error::Error for MirTypeError {}
 
-/// Per-function `MirType` lookup for place-base resolution.
-///
-/// Each probe's `FunctionContext` implements this so shared helpers can resolve
-/// local and temp storage types without depending on probe-specific state.
-pub trait MirTypeLookup {
-    fn local_ty(&self, id: MirLocalId) -> Option<MirType>;
-    fn temp_ty(&self, id: MirTempId) -> Option<MirType>;
-}
+/// Shared `MirType` lookup for place-base resolution, re-exported here for
+/// the public `radix_mir::ty` surface (the trait itself lives in
+/// [`crate::local_ty`], where the shared params-then-locals lookup also lives).
+pub use crate::local_ty::MirTypeLookup;
 
 /// Unwrap one layer of `Option<T>` / nullable `T ∪ nihil` / alias chain to the
 /// payload type. Non-option primitives pass through unchanged so callers can

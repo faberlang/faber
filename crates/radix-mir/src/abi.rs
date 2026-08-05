@@ -7,8 +7,8 @@
 
 use crate::{
     shader_contract::ShaderStageIoRole, MirCollectionOp, MirFunction, MirFunctionId, MirIntrinsic,
-    MirLayoutKind, MirLocalId, MirOperand, MirParam, MirPlaceBase, MirRuntimeCall, MirScalarLayout,
-    MirStatementKind, MirType, MirValidationContext,
+    MirLayoutKind, MirLocalId, MirParam, MirRuntimeCall, MirScalarLayout, MirStatementKind,
+    MirType, MirValidationContext,
 };
 use radix_hir::DefId;
 use radix_lexer::Interner;
@@ -2354,13 +2354,11 @@ pub fn collection_op_contract(
 ) -> Result<Option<CollectionOpContract>, MirAbiError> {
     for block in &function.blocks {
         for statement in &block.statements {
+            let Some(op) = crate::collection_ops::statement_collection_op(statement) else {
+                continue;
+            };
             let MirStatementKind::RuntimeCall {
-                call:
-                    MirRuntimeCall {
-                        intrinsic: MirIntrinsic::Collection(op),
-                        args,
-                        ..
-                    },
+                call: MirRuntimeCall { args, .. },
                 ..
             } = &statement.kind
             else {
@@ -2368,8 +2366,9 @@ pub fn collection_op_contract(
             };
             match op {
                 MirCollectionOp::Sum | MirCollectionOp::TensorMean => {
-                    let Some(operand_ty) =
-                        args.first().and_then(|arg| operand_local_ty(function, arg))
+                    let Some(operand_ty) = args
+                        .first()
+                        .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
                     else {
                         continue;
                     };
@@ -2386,18 +2385,22 @@ pub fn collection_op_contract(
                     }));
                 }
                 MirCollectionOp::TensorMatMul => {
-                    let Some(left_ty) =
-                        args.first().and_then(|arg| operand_local_ty(function, arg))
+                    let Some(left_ty) = args
+                        .first()
+                        .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
                     else {
                         continue;
                     };
-                    let Some(right_ty) =
-                        args.get(1).and_then(|arg| operand_local_ty(function, arg))
+                    let Some(right_ty) = args
+                        .get(1)
+                        .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
                     else {
                         continue;
                     };
-                    let left_dims = tensor_literal_dims(left_ty, validation)?;
-                    let right_dims = tensor_literal_dims(right_ty, validation)?;
+                    let left_dims = crate::tensor_type::tensor_literal_dims(left_ty, validation)
+                        .map_err(MirAbiError::new)?;
+                    let right_dims = crate::tensor_type::tensor_literal_dims(right_ty, validation)
+                        .map_err(MirAbiError::new)?;
                     if left_dims.len() != 2 || right_dims.len() != 2 {
                         return Err(MirAbiError::new(
                             "matmul dispatch contract requires rank-2 tensor operands",
@@ -2413,12 +2416,14 @@ pub fn collection_op_contract(
                     }));
                 }
                 MirCollectionOp::TensorTranspose => {
-                    let Some(operand_ty) =
-                        args.first().and_then(|arg| operand_local_ty(function, arg))
+                    let Some(operand_ty) = args
+                        .first()
+                        .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
                     else {
                         continue;
                     };
-                    let dims = tensor_literal_dims(operand_ty, validation)?;
+                    let dims = crate::tensor_type::tensor_literal_dims(operand_ty, validation)
+                        .map_err(MirAbiError::new)?;
                     if dims.len() != 2 {
                         return Err(MirAbiError::new(
                             "transpose dispatch contract requires a rank-2 tensor operand",
@@ -2439,62 +2444,6 @@ pub fn collection_op_contract(
         }
     }
     Ok(None)
-}
-
-/// Resolve a runtime-call operand to the MIR type of the local it references
-/// (params first, then locals), for collection-op contract shape extraction.
-fn operand_local_ty(function: &MirFunction, operand: &MirOperand) -> Option<MirType> {
-    let MirOperand::Place(place) = operand else {
-        return None;
-    };
-    let MirPlaceBase::Local(local) = place.base else {
-        return None;
-    };
-    function
-        .params
-        .iter()
-        .find(|param| param.local == local)
-        .map(|param| param.ty)
-        .or_else(|| {
-            function
-                .locals
-                .iter()
-                .find(|local_entry| local_entry.id == local)
-                .map(|local_entry| local_entry.ty)
-        })
-}
-
-/// Literal shape dims of a tensor-typed MIR type (a flat literal is a rank-1
-/// shape; a tuple is the dim list).
-fn tensor_literal_dims(
-    ty: MirType,
-    validation: &MirValidationContext<'_>,
-) -> Result<Vec<u64>, MirAbiError> {
-    let Type::Tensor(_, shape) = validation.types.get(ty.semantic_id()) else {
-        return Err(MirAbiError::new(
-            "kernel collection op requires tensor types",
-        ));
-    };
-    match validation.types.get_index(*shape) {
-        IndexExpr::Literal(count) => Ok(vec![*count]),
-        IndexExpr::Tuple(dims) => {
-            let mut out = Vec::with_capacity(dims.len());
-            for &dim in dims {
-                match validation.types.get_index(dim) {
-                    IndexExpr::Literal(count) => out.push(*count),
-                    _ => {
-                        return Err(MirAbiError::new(
-                            "kernel collection op requires literal dimensions",
-                        ))
-                    }
-                }
-            }
-            Ok(out)
-        }
-        _ => Err(MirAbiError::new(
-            "kernel collection op requires static shape",
-        )),
-    }
 }
 
 /// Power-of-two workgroup lane count for a reduction: `min(256, next_pow2(n))`
@@ -3497,13 +3446,10 @@ fn kernel_has_collection_op(
 ) -> bool {
     for block in &function.blocks {
         for statement in &block.statements {
-            let MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
+            let Some(op) = crate::collection_ops::statement_collection_op(statement) else {
                 continue;
             };
-            let MirIntrinsic::Collection(op) = &call.intrinsic else {
-                continue;
-            };
-            if predicate(*op) {
+            if predicate(op) {
                 return true;
             }
         }
@@ -3650,7 +3596,9 @@ fn buffer_element_type(
         .layout_for_type(ty)
         .map_err(|error| MirAbiError::new(error.message))?;
     match layout.kind {
-        MirLayoutKind::Scalar(scalar) if is_kernel_element_layout(scalar) => Ok(ty),
+        MirLayoutKind::Scalar(scalar) if crate::tensor_type::is_kernel_element_layout(scalar) => {
+            Ok(ty)
+        }
         MirLayoutKind::Scalar(scalar) => Err(MirAbiError::with_detail(
             format!("kernel scalar layout {}", scalar.spelling()),
             "mir_kernel_scalar_layout_unsupported",
@@ -3717,7 +3665,7 @@ fn require_kernel_device_view(
             view.rank
         )));
     }
-    if !is_kernel_element_layout(view.element) {
+    if !crate::tensor_type::is_kernel_element_layout(view.element) {
         return Err(MirAbiError::with_detail(
             format!("kernel device view element {}", view.element.spelling()),
             "mir_kernel_device_view_element_unsupported",
@@ -3736,7 +3684,9 @@ fn buffer_element_count(
         .layout_for_type(ty)
         .map_err(|error| MirAbiError::new(error.message))?;
     match layout.kind {
-        MirLayoutKind::Scalar(scalar) if is_kernel_element_layout(scalar) => Ok(1),
+        MirLayoutKind::Scalar(scalar) if crate::tensor_type::is_kernel_element_layout(scalar) => {
+            Ok(1)
+        }
         MirLayoutKind::Scalar(scalar) => Err(MirAbiError::new(format!(
             "kernel scalar layout {}",
             scalar.spelling()
@@ -3834,15 +3784,8 @@ fn tensor_element_type(ty: MirType, validation: &MirValidationContext<'_>) -> Op
     }
 }
 
-fn is_kernel_element_layout(layout: MirScalarLayout) -> bool {
-    matches!(
-        layout,
-        MirScalarLayout::F32 | MirScalarLayout::I32 | MirScalarLayout::U32
-    )
-}
-
 fn kernel_element_byte_width(layout: MirScalarLayout) -> Result<u16, MirAbiError> {
-    if !is_kernel_element_layout(layout) {
+    if !crate::tensor_type::is_kernel_element_layout(layout) {
         return Err(MirAbiError::new(format!(
             "kernel scalar layout {}",
             layout.spelling()

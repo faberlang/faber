@@ -7,6 +7,7 @@
 pub mod abi;
 pub mod ai_workbench_stage5;
 pub mod capability;
+mod collection_ops;
 pub mod control;
 pub mod device;
 pub mod device_program;
@@ -20,6 +21,7 @@ pub mod kernel_decomposition;
 pub mod kernel_module;
 pub mod kernel_plan;
 pub mod layout;
+mod local_ty;
 pub mod names;
 pub mod nodes;
 pub mod placement;
@@ -31,15 +33,16 @@ pub mod tensor_operation_parity;
 pub mod tensor_placement;
 pub mod tensor_runtime_abi;
 pub mod tensor_systems_target;
+mod tensor_type;
 pub mod ty;
 pub mod validate;
 pub mod visit;
 
 mod figura;
-#[allow(dead_code)]
-mod tensor_bracket;
 /// Shared statement/value read analysis for device-program lowering.
 mod read_analysis;
+#[allow(dead_code)]
+mod tensor_bracket;
 
 /// Shared lista→tensor shape helpers used by validation and the MIR stepper.
 pub mod lista_tensor_conversio;

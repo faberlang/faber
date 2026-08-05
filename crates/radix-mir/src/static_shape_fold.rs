@@ -213,14 +213,17 @@ pub fn fold_static_shapes(
     let mut shape_sources: BTreeMap<MirLocalId, ShapeSource> = BTreeMap::new();
     for block in &function.blocks {
         for statement in &block.statements {
+            let Some(op) = crate::collection_ops::statement_collection_op(statement) else {
+                continue;
+            };
             let MirStatementKind::RuntimeCall { destination, call } = &statement.kind else {
                 continue;
             };
             let Some(local) = destination_local_traced(destination.as_ref(), &temp_to_local) else {
                 continue;
             };
-            match call.intrinsic {
-                MirIntrinsic::Collection(MirCollectionOp::TensorShape) => {
+            match op {
+                MirCollectionOp::TensorShape => {
                     let dims = shape_receiver_dims(call, function, validation)?;
                     shape_sources.insert(
                         local,
@@ -233,9 +236,7 @@ pub fn fold_static_shapes(
                         },
                     );
                 }
-                MirIntrinsic::Collection(
-                    MirCollectionOp::TensorCreate | MirCollectionOp::TensorFromFlat,
-                ) => {
+                MirCollectionOp::TensorCreate | MirCollectionOp::TensorFromFlat => {
                     let dims =
                         tensor_literal_dims(call.return_ty, validation).ok_or_else(|| {
                             ShapeFoldError::new(
@@ -487,7 +488,7 @@ fn magnitudines_receiver_ty(
             "magnitudines() has no receiver operand",
         ));
     };
-    let Some(ty) = operand_local_ty(receiver, function) else {
+    let Some(ty) = crate::local_ty::operand_local_ty(function, receiver) else {
         return Err(ShapeFoldError::new(
             ShapeFoldErrorKind::UnfoldableMagnitudines,
             "magnitudines() receiver has no resolvable MIR type",
@@ -632,23 +633,6 @@ fn destination_local_traced(
         return None;
     };
     temp_to_local.get(&temp).copied()
-}
-
-/// The MIR type of a local (params first, then locals).
-fn operand_local_ty(operand: &MirOperand, function: &MirFunction) -> Option<MirType> {
-    let local = crate::read_analysis::operand_local(operand)?;
-    function
-        .params
-        .iter()
-        .find(|param| param.local == local)
-        .map(|param| param.ty)
-        .or_else(|| {
-            function
-                .locals
-                .iter()
-                .find(|entry| entry.id == local)
-                .map(|entry| entry.ty)
-        })
 }
 
 #[cfg(test)]
