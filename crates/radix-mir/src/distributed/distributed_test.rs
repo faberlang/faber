@@ -106,7 +106,7 @@ fn fact(value: u32, buffer: u32, contract: PlacementContract, byte_count: u64) -
 }
 
 /// The CS-1 mechanics fixture: a synthetic two-partition device program with
-/// cross-partition buffer references (the full SmolLM2 materialization is
+/// cross-partition buffer references (the full `SmolLM2` materialization is
 /// GI1/MD4A; the mechanics proof uses a synthetic program per the MD2
 /// delivery spec §P1 fixture row).
 ///
@@ -115,6 +115,10 @@ fn fact(value: u32, buffer: u32, contract: PlacementContract, byte_count: u64) -
 /// P0 launch, declared result). Launches: L1 (P0, writes M), L2 (P1, reads M
 /// cross-partition), L3 (P1, writes O), L4 (P0, reads R), L5 (P0, reads O
 /// cross-partition).
+#[expect(
+    clippy::many_single_char_names,
+    reason = "fixture buffers are one letter each (W/I/M/A/C/B/R/O), mirroring the doc comment mapping"
+)]
 fn cs1_program() -> (TypeTable, DeviceProgram) {
     let mut types = TypeTable::new();
     let f32 = f32_ty(&mut types);

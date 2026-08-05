@@ -62,6 +62,7 @@ use crate::MirType;
 ///    result barriers of the moved `(buffer, version)` and the launch that
 ///    produces it; the graph's declared commit boundary references every
 ///    result barrier and every result's producing launch.
+#[must_use]
 pub fn derive(
     program: &DeviceProgram,
     facts: &[PlacementFact],
@@ -152,6 +153,10 @@ pub fn derive(
         result_barrier_ids.push((
             result.buffer.id,
             result.version.version,
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "BarrierId is a u32 ordinal by design; result-row indices are far below u32::MAX"
+            )]
             BarrierId(index as u32),
         ));
     }
@@ -285,6 +290,10 @@ pub fn derive(
         participants.sort_unstable();
         participants.dedup();
         operations.push(ExecutionOperation::Barrier(BarrierOperation {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "BarrierId is a u32 ordinal by design; result-row indices are far below u32::MAX"
+            )]
             id: BarrierId(index as u32),
             partitions: participants,
         }));
@@ -325,7 +334,7 @@ fn declared_partition_ids(facts: &[PlacementFact]) -> Vec<PartitionId> {
 }
 
 /// The declared fact for a buffer (the first declared fact wins).
-fn fact_for<'a>(facts: &'a [PlacementFact], buffer: BufferId) -> Option<&'a PlacementFact> {
+fn fact_for(facts: &[PlacementFact], buffer: BufferId) -> Option<&PlacementFact> {
     facts.iter().find(|fact| fact.buffer == buffer)
 }
 

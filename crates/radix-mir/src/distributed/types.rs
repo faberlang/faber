@@ -283,7 +283,7 @@ impl TransferDirection {
 /// never relabel a copy to hide cost.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TransportPath {
-    /// Pinned host memory ↔ device over PCIe — the admitted path (T2 §1).
+    /// Pinned host memory ↔ device over `PCIe` — the admitted path (T2 §1).
     HostStaged,
 }
 
@@ -365,8 +365,8 @@ impl fmt::Display for CollectiveId {
 
 /// Admissible collective kind (v1 set — the admissible-set discriminant).
 ///
-/// `Broadcast` is the **only** admitted collective in v1. AllReduce,
-/// AllGather, AllToAll, and ReduceScatter are **declared unsupported** and
+/// `Broadcast` is the **only** admitted collective in v1. `AllReduce`,
+/// `AllGather`, `AllToAll`, and `ReduceScatter` are **declared unsupported** and
 /// fail before launch (md2-delivery §P1; T2 §3/§8). The enum is closed — it
 /// has no variant for any other kind, so no plan can name one and the graph
 /// API rejects any other kind at the type boundary.
@@ -464,7 +464,7 @@ pub enum ExecutionOperation {
 /// The upper execution graph of a distributed plan.
 ///
 /// Launches, transfers, collectives, and barriers all participate — it is
-/// **not** a "CommunicationGraph" (naming contract §3). Operations are
+/// **not** a "`CommunicationGraph`" (naming contract §3). Operations are
 /// stored in deterministic plan order (launches in program order, then
 /// transfers, collectives, and barriers in the derivation's fixed order).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
