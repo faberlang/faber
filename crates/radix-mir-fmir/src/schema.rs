@@ -102,7 +102,7 @@ pub struct FmirTextImageFile {
     pub device: Option<FmirDeviceSection>,
 }
 
-/// postcard binary image schema. Field order is the serialized layout
+/// Postcard binary image schema. Field order is the serialized layout
 /// (`version` first) and must not be reordered — a silent byte break.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FmirBinaryImageFile {
@@ -864,6 +864,7 @@ pub enum FmirTextCliValueType {
 
 /// Standard FNV-1a 64-bit hash, used for source-identity hashes and the
 /// generated runner's embedded-image fingerprint.
+#[must_use]
 pub fn fnv1a64(bytes: &[u8]) -> u64 {
     let mut hash = FNV1A64_OFFSET;
     for byte in bytes {
