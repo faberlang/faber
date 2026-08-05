@@ -109,7 +109,7 @@ fn plan_browser_product_static_assets(
 }
 
 /// Write planned static assets and the asset manifest to disk. Called only
-/// after preflight ([`plan_browser_product_static_assets`]) and cleanup.
+/// after preflight ([`plan_browser_product_static_assets`]).
 fn write_browser_product_static_assets(
     plan: StaticAssetPlan,
 ) -> Result<BrowserProductAssetBuild, Box<Diagnostic>> {
@@ -158,7 +158,7 @@ fn write_browser_product_static_assets(
 /// `web` target.
 ///
 /// Convenience wrapper: plan (preflight) + write in one call. For callers that
-/// need cleanup between preflight and write (e.g. [`build_browser_product`]),
+/// need staging between preflight and write (e.g. [`build_browser_product`]),
 /// call the two phases directly.
 #[cfg(test)]
 pub(crate) fn build_browser_product_static_assets(
@@ -511,8 +511,6 @@ fn render_product_json(
     static_assets: &[BrowserProductAsset],
     shader_artifacts: Option<&(BrowserProductAsset, BrowserProductAsset)>,
 ) -> Result<String, Box<Diagnostic>> {
-    use std::time::{SystemTime, UNIX_EPOCH};
-
     let mut artifacts: Vec<serde_json::Value> = Vec::new();
 
     // ESM entry: faber-browser.js
@@ -1298,16 +1296,6 @@ fn emit_typescript_modules(
     Ok(())
 }
 
-/// Emit TypeScript for library dependencies (kind=lib, target=ts) into the
-/// TypeScript output directory alongside app modules.
-///
-/// Reads `faber.lock` to discover TS-targeting library packages, then
-/// emits each `.fab` source file via `faber emit -t ts` (same approach
-/// as `link-triga-ts.mjs`). Emitted files are named `{package}-{module}.ts`
-/// and get namespace-wrapped exports the same way app modules do.
-///
-/// Phase 2: minimal emit — no import rewriting, no tsc passthrough.
-/// Radix codegen defects are handled in Phase 3.
 /// Apply emit-defect post-processing for library TypeScript files.
 ///
 /// Phase 3: these are minimal patches for codegen defects that would otherwise
@@ -1375,17 +1363,6 @@ fn apply_library_emit_fixes(mut code: String) -> String {
     result
 }
 
-/// Emit TypeScript for library dependencies (kind=lib, target=ts) into the
-/// TypeScript output directory alongside app modules.
-///
-/// Reads `faber.lock` to discover TS-targeting library packages, then
-/// emits each `.fab` source file via `faber emit -t ts` (same approach
-/// as `link-triga-ts.mjs`). Emitted files are named `{package}-{module}.ts`
-/// and get namespace-wrapped exports the same way app modules do.
-///
-/// Phase 2: minimal emit — no import rewriting, no tsc passthrough.
-/// Phase 3: post-processing fixes for known codegen defects (unresolved_def,
-///          IIFE-as-LHS) applied via [`apply_library_emit_fixes`].
 /// Resolve the faber CLI binary for subprocess `emit`.
 ///
 /// Unit tests run under a cargo test harness binary (`deps/faber-<hash>`), so
@@ -1420,6 +1397,17 @@ fn resolve_faber_cli_binary() -> PathBuf {
     PathBuf::from("faber")
 }
 
+/// Emit TypeScript for library dependencies (kind=lib, target=ts) into the
+/// TypeScript output directory alongside app modules.
+///
+/// Reads `faber.lock` to discover TS-targeting library packages, then
+/// emits each `.fab` source file via `faber emit -t ts` (same approach
+/// as `link-triga-ts.mjs`). Emitted files are named `{package}-{module}.ts`
+/// and get namespace-wrapped exports the same way app modules do.
+///
+/// Phase 2: minimal emit — no import rewriting, no tsc passthrough.
+/// Phase 3: post-processing fixes for known codegen defects (unresolved_def,
+///          IIFE-as-LHS) applied via [`apply_library_emit_fixes`].
 fn emit_library_typescript_modules(
     _config: &radix::driver::Config,
     package_root: &Path,
