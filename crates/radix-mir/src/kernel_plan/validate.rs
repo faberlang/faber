@@ -1,6 +1,7 @@
 use super::plan::{
-    BarrierPhase, BarrierPoint, MatMulPlan, ReductionPlan, SharedMemoryLayout, TransposePlan,
-    MATMUL_SHARED_A_BUFFER_NAME, MATMUL_SHARED_B_BUFFER_NAME, WORKGROUP_SHARED_MEMORY_LIMIT_BYTES,
+    AxisReductionPlan, BarrierPhase, BarrierPoint, MatMulPlan, ReduceOp, ReductionPlan,
+    SharedMemoryLayout, TransposePlan, MATMUL_SHARED_A_BUFFER_NAME, MATMUL_SHARED_B_BUFFER_NAME,
+    WORKGROUP_SHARED_MEMORY_LIMIT_BYTES,
 };
 use std::fmt;
 
@@ -175,6 +176,23 @@ pub(super) fn validate_transpose_plan(plan: &TransposePlan) -> Result<(), PlanVa
             n: plan.n,
             dispatch_x: plan.dispatch_x,
         });
+    }
+    Ok(())
+}
+
+/// Axis-reduction recipe validation (S6-P1).
+///
+/// The v1 recipe set admits only `Sum` (a mean-over-axis is not part of the
+/// transformer surface; the tree-reduction family already covers flat
+/// means). The axis value, its in-range check, and the input/output element
+/// counts are resolution-time typed-fact checks
+/// ([`super::CollectionKernelPlan::from_transformer_op`] — the plan carries
+/// only the resolved axis), so the static check pins the closed op set.
+pub(super) fn validate_axis_reduction_plan(
+    plan: &AxisReductionPlan,
+) -> Result<(), PlanValidationError> {
+    if !matches!(plan.op, ReduceOp::Sum) {
+        return Err(PlanValidationError::AxisReductionUnsupportedOp { op: plan.op });
     }
     Ok(())
 }
@@ -393,6 +411,9 @@ pub enum PlanValidationError {
     /// The transpose dispatch extent must tile exactly `M·N` output
     /// elements (one thread per output element).
     TransposeDispatchMismatch { m: u64, n: u64, dispatch_x: u64 },
+    /// The axis-reduction recipe's v1 closed op set is `Sum` only — a
+    /// mean-over-axis is not part of the transformer surface.
+    AxisReductionUnsupportedOp { op: ReduceOp },
 }
 
 impl fmt::Display for PlanValidationError {
@@ -477,6 +498,10 @@ impl fmt::Display for PlanValidationError {
                 f,
                 "transpose dispatch extent {dispatch_x} must tile exactly {m}×{n} = {} output elements",
                 m.saturating_mul(*n)
+            ),
+            Self::AxisReductionUnsupportedOp { op } => write!(
+                f,
+                "axis-reduction recipe v1 admits only Sum, got {op:?}"
             ),
         }
     }

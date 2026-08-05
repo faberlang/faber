@@ -4,11 +4,39 @@ use crate::abi::{
     CollectionOpContract, MirKernelDispatchSize, MirKernelResource, MirKernelResourceAccess,
     MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature, MirWorkgroupSize,
 };
-use crate::{MirCollectionOp, MirFunctionId, MirLocalId, MirType};
-use radix_types::{NumericWidth, Primitive, TypeTable};
+use crate::{
+    MirBlock, MirBlockId, MirCollectionOp, MirConstant, MirFunction, MirFunctionId, MirIntrinsic,
+    MirLocal, MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace, MirRuntimeCall,
+    MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind, MirType,
+    MirValidationContext,
+};
+use radix_lexer::Span;
+use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeTable};
 
 fn f32_ty(types: &mut TypeTable) -> MirType {
     MirType::semantic(types.sized_numeric(Primitive::Fractus, NumericWidth::F32))
+}
+
+fn test_span() -> Span {
+    Span::default()
+}
+
+/// A rank-2 `tf32[M, N]` tensor type with static literal dims.
+fn rank2_tensor_ty(types: &mut TypeTable, dims: [u64; 2]) -> MirType {
+    let f32_ty = f32_ty(types);
+    let dim_ids = dims
+        .iter()
+        .map(|&dim| types.intern_index(IndexExpr::Literal(dim)))
+        .collect::<Vec<_>>();
+    let shape = types.intern_index(IndexExpr::Tuple(dim_ids));
+    MirType::semantic(types.intern(Type::Tensor(f32_ty.semantic_id(), shape)))
+}
+
+/// A rank-1 `tf32[n]` tensor type.
+fn rank1_tensor_ty(types: &mut TypeTable, count: u64) -> MirType {
+    let f32_ty = f32_ty(types);
+    let len = types.intern_index(IndexExpr::Literal(count));
+    MirType::semantic(types.intern(Type::Tensor(f32_ty.semantic_id(), len)))
 }
 
 /// A post-contract reduction signature: workgroup `(ws, 1, 1)`, dispatch
@@ -932,6 +960,413 @@ fn plan_validation_error(plan: &ReductionPlan) -> PlanValidationError {
     CollectionKernelPlan::TreeReduction(plan.clone())
         .validate()
         .expect_err("broken plan must fail validation")
+}
+
+// ── S6-P1 transformer recipe resolution (`from_transformer_op`) ──────────
+
+/// A single-transformer-op kernel fixture: `t = op(x, const_args…)` over a
+/// rank-2 `[dims]` tensor. The fixture keeps the rank-2 type on the return
+/// and locals (the plan resolution reads the operand dims from the args,
+/// not the return).
+fn transformer_function(
+    types: &mut TypeTable,
+    dims: [u64; 2],
+    op: MirCollectionOp,
+    const_args: Vec<MirOperand>,
+) -> MirFunction {
+    let r2 = rank2_tensor_ty(types, dims);
+    let span = test_span();
+    let mut args = vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))];
+    args.extend(const_args);
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![MirParam {
+            local: MirLocalId(0),
+            name: None,
+            ty: r2,
+            mode: MirParamMode::Owned,
+            span,
+        }],
+        locals: vec![MirLocal {
+            id: MirLocalId(0),
+            name: None,
+            ty: r2,
+            mutable: false,
+            span,
+        }],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::RuntimeCall {
+                    destination: Some(MirPlace::local(MirLocalId(1))),
+                    call: MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Collection(op),
+                        args,
+                        return_ty: r2,
+                    },
+                },
+                span,
+            }],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(1),
+                )))),
+                span,
+            },
+            span,
+        }],
+        return_ty: r2,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    }
+}
+
+/// A generic-1D transformer signature: workgroup `(1,1,1)`, dispatch
+/// `(output_count, 1, 1)`, input/output at the flattened counts — the shape
+/// the ABI produces for kernels without a collection-op contract.
+fn transformer_signature(input_count: u64, output_count: u64) -> MirKernelSignature {
+    let mut types = TypeTable::new();
+    let element_ty = f32_ty(&mut types);
+    MirKernelSignature {
+        function: MirFunctionId(0),
+        input: MirKernelResource {
+            group: 0,
+            binding: 0,
+            kind: MirKernelResourceKind::StorageBuffer,
+            role: MirKernelResourceRole::Input,
+            access: MirKernelResourceAccess::Read,
+            element_ty,
+            element_count: input_count,
+            source_local: Some(MirLocalId(0)),
+            source_name: None,
+        },
+        extra_inputs: Vec::new(),
+        output: MirKernelResource {
+            group: 0,
+            binding: 1,
+            kind: MirKernelResourceKind::StorageBuffer,
+            role: MirKernelResourceRole::Output,
+            access: MirKernelResourceAccess::Write,
+            element_ty,
+            element_count: output_count,
+            source_local: None,
+            source_name: None,
+        },
+        extra_outputs: Vec::new(),
+        accumulation_buffers: Vec::new(),
+        builtin_inputs: Vec::new(),
+        called_builtins: Vec::new(),
+        workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
+        dispatch_size: MirKernelDispatchSize {
+            x: output_count,
+            y: 1,
+            z: 1,
+        },
+    }
+}
+
+#[test]
+fn tensor_sum_axis_resolves_axis_reduction_plan() {
+    // S6-P1 admission: `t = sum_axis(x, 1)` over `[4,4]` resolves the
+    // AxisReduction recipe with `op: Sum` and the axis from the trailing
+    // const operand (S6-N1-frozen plan struct).
+    let mut types = TypeTable::new();
+    let function = transformer_function(
+        &mut types,
+        [4, 4],
+        MirCollectionOp::TensorSumAxis,
+        vec![MirOperand::Constant(MirConstant::Int(1))],
+    );
+    let signature = transformer_signature(16, 4);
+    let validation = MirValidationContext::new(&types);
+    let plan = CollectionKernelPlan::from_transformer_op(
+        &signature,
+        &function,
+        &validation,
+        MirCollectionOp::TensorSumAxis,
+    )
+    .expect("sum_axis typed facts resolve a plan");
+    let CollectionKernelPlan::AxisReduction(axis_reduction) = &plan else {
+        panic!("sum_axis must map to an axis-reduction plan, got {plan:?}");
+    };
+    assert_eq!(axis_reduction.op, ReduceOp::Sum);
+    assert_eq!(axis_reduction.axis, 1);
+    plan.validate().expect("the resolved plan validates");
+}
+
+#[test]
+fn softmax_resolves_row_softmax_plan() {
+    // S6-P1 admission: `t = softmax(x)` over `[4,4]` resolves the RowSoftmax
+    // recipe over the last (row) axis.
+    let mut types = TypeTable::new();
+    let function = transformer_function(&mut types, [4, 4], MirCollectionOp::TensorSoftmax, vec![]);
+    let signature = transformer_signature(16, 16);
+    let validation = MirValidationContext::new(&types);
+    let plan = CollectionKernelPlan::from_transformer_op(
+        &signature,
+        &function,
+        &validation,
+        MirCollectionOp::TensorSoftmax,
+    )
+    .expect("softmax typed facts resolve a plan");
+    let CollectionKernelPlan::RowSoftmax(row_softmax) = &plan else {
+        panic!("softmax must map to a row-softmax plan, got {plan:?}");
+    };
+    assert_eq!(row_softmax.axis, 1);
+    plan.validate().expect("the resolved plan validates");
+}
+
+#[test]
+fn layer_norm_resolves_layer_normalization_plan() {
+    // S6-P1 admission: `t = layernorm(x, 1, 1e-5)` over `[4,4]` resolves the
+    // LayerNormalization recipe with the axis from the const operand.
+    let mut types = TypeTable::new();
+    let function = transformer_function(
+        &mut types,
+        [4, 4],
+        MirCollectionOp::TensorLayerNorm,
+        vec![
+            MirOperand::Constant(MirConstant::Int(1)),
+            MirOperand::Constant(MirConstant::Float(1e-5)),
+        ],
+    );
+    let signature = transformer_signature(16, 16);
+    let validation = MirValidationContext::new(&types);
+    let plan = CollectionKernelPlan::from_transformer_op(
+        &signature,
+        &function,
+        &validation,
+        MirCollectionOp::TensorLayerNorm,
+    )
+    .expect("layer-norm typed facts resolve a plan");
+    let CollectionKernelPlan::LayerNormalization(layer_norm) = &plan else {
+        panic!("layer-norm must map to a layer-normalization plan, got {plan:?}");
+    };
+    assert_eq!(layer_norm.axis, 1);
+    plan.validate().expect("the resolved plan validates");
+}
+
+#[test]
+fn layer_norm_affine_operands_resolve_the_plan() {
+    // The optional affine pair (gamma, beta) does not change the carried
+    // recipe — the plan is LayerNormalization with the axis; the affine
+    // tensors are data-flow inputs, not recipe facts.
+    let mut types = TypeTable::new();
+    let mut function = transformer_function(
+        &mut types,
+        [4, 4],
+        MirCollectionOp::TensorLayerNorm,
+        vec![
+            MirOperand::Constant(MirConstant::Int(1)),
+            MirOperand::Constant(MirConstant::Float(1e-5)),
+            MirOperand::Place(MirPlace::local(MirLocalId(1))),
+            MirOperand::Place(MirPlace::local(MirLocalId(2))),
+        ],
+    );
+    // The affine pair must be typed rank-1 over the normalization dimension
+    // (the v1 constraint the plan resolution cross-checks).
+    let affine = rank1_tensor_ty(&mut types, 4);
+    function.locals.push(MirLocal {
+        id: MirLocalId(1),
+        name: None,
+        ty: affine,
+        mutable: false,
+        span: test_span(),
+    });
+    function.locals.push(MirLocal {
+        id: MirLocalId(2),
+        name: None,
+        ty: affine,
+        mutable: false,
+        span: test_span(),
+    });
+    let signature = transformer_signature(16, 16);
+    let validation = MirValidationContext::new(&types);
+    let plan = CollectionKernelPlan::from_transformer_op(
+        &signature,
+        &function,
+        &validation,
+        MirCollectionOp::TensorLayerNorm,
+    )
+    .expect("layer-norm with affine operands resolves a plan");
+    let CollectionKernelPlan::LayerNormalization(layer_norm) = &plan else {
+        panic!("layer-norm must map to a layer-normalization plan, got {plan:?}");
+    };
+    assert_eq!(layer_norm.axis, 1);
+}
+
+#[test]
+fn layer_norm_wrong_affine_shape_fails_resolution() {
+    // The v1 affine contract: gamma/beta must be rank-1 over the
+    // normalization dimension. A mismatched affine shape yields no plan.
+    let mut types = TypeTable::new();
+    let mut function = transformer_function(
+        &mut types,
+        [4, 4],
+        MirCollectionOp::TensorLayerNorm,
+        vec![
+            MirOperand::Constant(MirConstant::Int(1)),
+            MirOperand::Constant(MirConstant::Float(1e-5)),
+            MirOperand::Place(MirPlace::local(MirLocalId(1))),
+        ],
+    );
+    function.locals.push(MirLocal {
+        id: MirLocalId(1),
+        name: None,
+        ty: rank1_tensor_ty(&mut types, 8),
+        mutable: false,
+        span: test_span(),
+    });
+    let signature = transformer_signature(16, 16);
+    let validation = MirValidationContext::new(&types);
+    assert!(
+        CollectionKernelPlan::from_transformer_op(
+            &signature,
+            &function,
+            &validation,
+            MirCollectionOp::TensorLayerNorm,
+        )
+        .is_none(),
+        "a mismatched affine shape must not resolve a layer-norm plan"
+    );
+}
+
+#[test]
+fn layer_norm_non_last_axis_fails_resolution() {
+    // v1 constraint: layer norm normalizes over the LAST axis. A const axis
+    // disagreeing with the last axis yields no plan (fail-closed typed
+    // diagnostic at the caller, never a guessed plan).
+    let mut types = TypeTable::new();
+    let function = transformer_function(
+        &mut types,
+        [4, 4],
+        MirCollectionOp::TensorLayerNorm,
+        vec![
+            MirOperand::Constant(MirConstant::Int(0)),
+            MirOperand::Constant(MirConstant::Float(1e-5)),
+        ],
+    );
+    let signature = transformer_signature(16, 16);
+    let validation = MirValidationContext::new(&types);
+    assert!(
+        CollectionKernelPlan::from_transformer_op(
+            &signature,
+            &function,
+            &validation,
+            MirCollectionOp::TensorLayerNorm,
+        )
+        .is_none(),
+        "a non-last axis must not resolve a layer-norm plan"
+    );
+}
+
+#[test]
+fn layer_norm_non_const_epsilon_fails_resolution() {
+    // A3: the plan never infers a fact. A non-const epsilon operand cannot
+    // be resolved from the const operands and yields no plan.
+    let mut types = TypeTable::new();
+    let function = transformer_function(
+        &mut types,
+        [4, 4],
+        MirCollectionOp::TensorLayerNorm,
+        vec![
+            MirOperand::Constant(MirConstant::Int(1)),
+            MirOperand::Place(MirPlace::local(MirLocalId(1))),
+        ],
+    );
+    let signature = transformer_signature(16, 16);
+    let validation = MirValidationContext::new(&types);
+    assert!(
+        CollectionKernelPlan::from_transformer_op(
+            &signature,
+            &function,
+            &validation,
+            MirCollectionOp::TensorLayerNorm,
+        )
+        .is_none(),
+        "a non-const epsilon must not resolve a layer-norm plan"
+    );
+}
+
+#[test]
+fn transformer_signature_count_mismatch_returns_none() {
+    // The signature must carry the flattened input/output dims — a
+    // signature that does not carry the recipe's shape yields no plan (the
+    // same fail-closed law as the contract families).
+    let mut types = TypeTable::new();
+    let function = transformer_function(&mut types, [4, 4], MirCollectionOp::TensorSoftmax, vec![]);
+    let signature = transformer_signature(16, 8);
+    let validation = MirValidationContext::new(&types);
+    assert!(
+        CollectionKernelPlan::from_transformer_op(
+            &signature,
+            &function,
+            &validation,
+            MirCollectionOp::TensorSoftmax,
+        )
+        .is_none(),
+        "a signature that does not carry the recipe counts must not build a plan"
+    );
+}
+
+#[test]
+fn transformer_resolution_rejects_out_of_scope_ops() {
+    // A non-transformer op (here the genuinely-unplannable
+    // TensorCruxEntropia) never resolves through the transformer path.
+    let mut types = TypeTable::new();
+    let function = transformer_function(
+        &mut types,
+        [4, 4],
+        MirCollectionOp::TensorCruxEntropia,
+        vec![],
+    );
+    let signature = transformer_signature(16, 16);
+    let validation = MirValidationContext::new(&types);
+    assert!(
+        CollectionKernelPlan::from_transformer_op(
+            &signature,
+            &function,
+            &validation,
+            MirCollectionOp::TensorCruxEntropia,
+        )
+        .is_none(),
+        "a non-transformer op must not resolve a transformer plan"
+    );
+}
+
+#[test]
+fn axis_reduction_plan_validate_rejects_non_sum_op() {
+    // The v1 axis-reduction recipe set is `Sum` only.
+    let plan = CollectionKernelPlan::AxisReduction(AxisReductionPlan {
+        op: ReduceOp::Mean,
+        axis: 1,
+    });
+    assert_eq!(
+        plan.validate().expect_err("mean-over-axis must fail"),
+        PlanValidationError::AxisReductionUnsupportedOp { op: ReduceOp::Mean }
+    );
+}
+
+#[test]
+fn transformer_plans_validate() {
+    CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan { axis: 1 })
+        .validate()
+        .expect("row-softmax plan validates");
+    CollectionKernelPlan::LayerNormalization(LayerNormalizationPlan { axis: 1 })
+        .validate()
+        .expect("layer-normalization plan validates");
+    CollectionKernelPlan::AxisReduction(AxisReductionPlan {
+        op: ReduceOp::Sum,
+        axis: 1,
+    })
+    .validate()
+    .expect("axis-reduction plan validates");
 }
 
 #[test]

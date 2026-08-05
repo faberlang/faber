@@ -46,8 +46,8 @@ use crate::kernel_plan::{CollectionKernelPlan, MatMulShapes, SharedMemoryLayout}
 use crate::layout::MirTensorStorageLayout;
 use crate::{
     MirCollectionOp, MirFunction, MirKernelDispatchSize, MirKernelWorkgroupCount, MirLayoutKind,
-    MirLocalId, MirPlaceBase, MirRuntimeCall, MirStatementKind, MirType, MirValidationContext,
-    MirWorkgroupSize,
+    MirLocalId, MirPlaceBase, MirRuntimeCall, MirStatementKind, MirType, MirUnOp,
+    MirValidationContext, MirWorkgroupSize,
 };
 use radix_types::{Type, TypeId};
 use rustc_hash::FxHashMap;
@@ -145,12 +145,14 @@ pub fn plan_for_collection_op(
 /// recipe op has no resolved contract or no plan under it, when a body mixes
 /// collection ops with conflicting recipes, or when the body carries a
 /// collection op that is neither recipe-plannable nor a known elementwise
-/// transform (e.g. `TensorSoftmax`): **never a silent `Elementwise`.**
+/// transform: **never a silent `Elementwise`.**
 ///
-/// `TensorTranspose` is a recipe op (S5-U1): a transpose-bearing body
-/// resolves the rank-2 [`CollectionKernelPlan::Transpose`] recipe. A body
-/// whose complete op set MIXES distinct recipes cannot carry one plan and
-/// fails here with a typed diagnostic — the decomposition pass
+/// `TensorTranspose` is a recipe op (S5-U1); the S6-P1 transformer recipes
+/// (`TensorSumAxis` / `TensorSoftmax` / `TensorLayerNorm`) resolve through
+/// [`CollectionKernelPlan::from_transformer_op`] (no `CollectionOpContract`
+/// variant exists for them). A body whose complete op set MIXES distinct
+/// recipes cannot carry one plan and fails here with a typed diagnostic —
+/// the decomposition pass
 /// ([`crate::kernel_decomposition::decompose_kernel_function`]) is the path
 /// that splits such bodies into single-recipe subchain kernels.
 pub fn kernel_plan_for_function(
@@ -171,10 +173,35 @@ pub fn kernel_plan_for_function(
     let matmul_shapes = kernel_matmul_shapes(function, validation)?;
     let mut recipe: Option<CollectionKernelPlan> = None;
     for op in ops {
-        // Recipe ops resolve through the shared closed-set predicate
-        // ([`is_recipe_op`]) — the same boundary the decomposition slice
-        // uses; a second distinct recipe must agree exactly (never guessed).
-        if is_recipe_op(op) {
+        if is_transformer_recipe_op(op) {
+            // S6-P1: the transformer recipes have no `CollectionOpContract`
+            // variant; the plan pass resolves them from the function's typed
+            // facts (axis/epsilon from the trailing const operands, dims
+            // from the operand tensor types) and cross-checks the signature's
+            // element counts. A second distinct recipe must agree exactly
+            // (never guessed).
+            let plan =
+                CollectionKernelPlan::from_transformer_op(signature, function, validation, op)
+                    .ok_or_else(|| {
+                        PlanMappingError::mapping(format!(
+                            "collection op {op:?} has no kernel plan under its typed facts \
+                             (axis/epsilon from the const operands, shapes from the tensor types)"
+                        ))
+                    })?;
+            if let Some(existing) = &recipe {
+                if existing != &plan {
+                    return Err(PlanMappingError::mapping(format!(
+                        "kernel body mixes collection ops with conflicting recipes \
+                         ({op:?} resolves to {plan:?}, but the body already carries {existing:?})"
+                    )));
+                }
+            }
+            recipe = Some(plan);
+        } else if is_recipe_op(op) {
+            // Recipe ops resolve through the shared closed-set predicate
+            // ([`is_recipe_op`]) — the same boundary the decomposition slice
+            // uses; a second distinct recipe must agree exactly (never
+            // guessed).
             let Some(contract) = &contract else {
                 return Err(PlanMappingError::mapping(format!(
                     "collection op {op:?} has a recipe but no resolved dispatch contract"
@@ -288,6 +315,13 @@ pub enum RecipeKind {
     TreeReduction,
     /// Rank-2 transpose recipe (S5-U1).
     Transpose,
+    /// Axis-reduction recipe (S6-P1): row-wise reduction over the declared
+    /// axis (the transformer `TensorSumAxis` op).
+    AxisReduction,
+    /// Row-wise softmax recipe (S6-P1).
+    RowSoftmax,
+    /// Layer-normalization recipe (S6-P1).
+    LayerNormalization,
 }
 
 impl RecipeKind {
@@ -297,14 +331,9 @@ impl RecipeKind {
             CollectionKernelPlan::TiledMatMul(_) => Self::TiledMatMul,
             CollectionKernelPlan::TreeReduction(_) => Self::TreeReduction,
             CollectionKernelPlan::Transpose(_) => Self::Transpose,
-            // S6-N1: recipe names frozen but NOT admitted (admission is
-            // S6-P1); nothing can construct these plans yet, so the arm is
-            // unreachable until P1 lands.
-            CollectionKernelPlan::AxisReduction(_)
-            | CollectionKernelPlan::RowSoftmax(_)
-            | CollectionKernelPlan::LayerNormalization(_) => {
-                unreachable!("recipe plans are not admitted until S6-P1")
-            }
+            CollectionKernelPlan::AxisReduction(_) => Self::AxisReduction,
+            CollectionKernelPlan::RowSoftmax(_) => Self::RowSoftmax,
+            CollectionKernelPlan::LayerNormalization(_) => Self::LayerNormalization,
         }
     }
 }
@@ -397,21 +426,21 @@ fn launch_buffer_slot(resource: &DeviceResource) -> LaunchBufferSlot {
 /// workgroup-memory budget from this; 0 for elementwise kernels).
 fn plan_shared_memory_bytes(plan: &CollectionKernelPlan) -> u64 {
     match plan {
-        CollectionKernelPlan::Elementwise | CollectionKernelPlan::Transpose(_) => 0,
+        CollectionKernelPlan::Elementwise
+        | CollectionKernelPlan::Transpose(_)
+        // S6-P1: the transformer recipes declare no shared-memory layout —
+        // each row is one thread's serial pass (max → exp → row sum →
+        // divide), so the launch descriptor reports a zero workgroup-memory
+        // footprint.
+        | CollectionKernelPlan::AxisReduction(_)
+        | CollectionKernelPlan::RowSoftmax(_)
+        | CollectionKernelPlan::LayerNormalization(_) => 0,
         CollectionKernelPlan::TreeReduction(plan) => {
             shared_memory_layout_bytes(&plan.shared_memory)
         }
         CollectionKernelPlan::TiledMatMul(plan) => {
             shared_memory_layout_bytes(&plan.shared_memory.shared_a)
                 + shared_memory_layout_bytes(&plan.shared_memory.shared_b)
-        }
-        // S6-N1: recipe names frozen but NOT admitted (admission is S6-P1);
-        // nothing can construct these plans yet, so the arm is unreachable
-        // until P1 lands.
-        CollectionKernelPlan::AxisReduction(_)
-        | CollectionKernelPlan::RowSoftmax(_)
-        | CollectionKernelPlan::LayerNormalization(_) => {
-            unreachable!("recipe plans are not admitted until S6-P1")
         }
     }
 }
@@ -445,7 +474,9 @@ pub(crate) fn is_elementwise_collection_op(op: MirCollectionOp) -> bool {
 
 /// Whether a collection op is a recipe-bearing op — the closed recipe-op
 /// set the plan pass resolves a single [`CollectionKernelPlan`] for under
-/// its dispatch contract (S5-U1: reduction, matmul, and the new transpose).
+/// its dispatch contract (S5-U1: reduction, matmul, and the new transpose;
+/// S6-P1: the transformer recipes `TensorSumAxis` / `TensorSoftmax` /
+/// `TensorLayerNorm`).
 ///
 /// This is the shared boundary predicate for the single-plan scan
 /// ([`kernel_plan_for_function`]) and the decomposition slice
@@ -460,6 +491,42 @@ pub fn is_recipe_op(op: MirCollectionOp) -> bool {
             | MirCollectionOp::TensorMean
             | MirCollectionOp::TensorMatMul
             | MirCollectionOp::TensorTranspose
+            | MirCollectionOp::TensorSumAxis
+            | MirCollectionOp::TensorSoftmax
+            | MirCollectionOp::TensorLayerNorm
+    )
+}
+
+/// Whether a collection op is one of the S6-P1 transformer recipes — the
+/// recipe ops resolved from the function's typed facts by
+/// [`CollectionKernelPlan::from_transformer_op`] (no `CollectionOpContract`
+/// variant exists for them, so the plan reads the trailing const operands
+/// and the operand tensor dims directly).
+#[must_use]
+pub fn is_transformer_recipe_op(op: MirCollectionOp) -> bool {
+    matches!(
+        op,
+        MirCollectionOp::TensorSumAxis
+            | MirCollectionOp::TensorSoftmax
+            | MirCollectionOp::TensorLayerNorm
+    )
+}
+
+/// Whether a tensor-level unary assign (`MirValueKind::Unary` on a
+/// tensor-typed operand) is admitted in the device elementwise surface —
+/// the MIR-level admission seam declared by `S6-P1` for the emitter units
+/// (`S6-P2`/`S6-P3`) to dispatch tensor-unary emission from.
+///
+/// `Exp` and `Sqrt` are the `S6-P1` transformer additions (the softmax exp
+/// and the `LayerNorm` sqrt/rsqrt lanes); the pre-existing elementwise tensor
+/// unaries (`Tanh` / `Relu` / `Gelu`) stay admitted alongside. A unary
+/// outside this set on a tensor operand has no elementwise arm and stays
+/// fail-closed at the emitters — never a silent fallback.
+#[must_use]
+pub fn is_admitted_tensor_unary(op: MirUnOp) -> bool {
+    matches!(
+        op,
+        MirUnOp::Tanh | MirUnOp::Relu | MirUnOp::Gelu | MirUnOp::Exp | MirUnOp::Sqrt
     )
 }
 
@@ -711,6 +778,104 @@ pub fn contract_shape_signature(
     Ok(signature)
 }
 
+/// Build the transformer-shaped storage-buffer signature a transformer
+/// recipe subchain carries (S6-P1 seam, the sibling of
+/// [`contract_shape_signature`]).
+///
+/// The transformer recipes have no `CollectionOpContract` variant, so the
+/// plan pass cannot resolve one; the seam reconstructs exactly the facts the
+/// plan resolution requires: the recipe operand as the read input at its
+/// device-view element count (the flattened input dims) and the output
+/// buffer at the flattened output dims (input dims for the same-shape
+/// softmax/LN recipes; input dims minus the reduced axis for
+/// `TensorSumAxis`), under the generic 1D contract the ABI applies to these
+/// kernels. [`CollectionKernelPlan::from_transformer_op`]'s element-count
+/// cross-checks then pass for the subchain exactly as they do for a
+/// whole-function kernel.
+///
+/// # Errors
+/// Returns [`PlanMappingError`] when the transformer recipe's typed shape
+/// facts (dims/axis/const constraints) or the operand tensor type cannot be
+/// resolved from the subchain body.
+pub fn transformer_shape_signature(
+    function: &MirFunction,
+    op: MirCollectionOp,
+    validation: &MirValidationContext<'_>,
+) -> Result<MirKernelSignature, PlanMappingError> {
+    let (dims, axis) = crate::kernel_plan::transformer_recipe_shape(function, validation, op)
+        .ok_or_else(|| {
+            PlanMappingError::mapping(format!(
+                "transformer recipe {op:?} has no resolvable shape facts \
+                 (axis/epsilon from the const operands, dims from the tensor types)"
+            ))
+        })?;
+    let input_count = dims.iter().copied().fold(1u64, u64::saturating_mul);
+    let output_count = if op == MirCollectionOp::TensorSumAxis {
+        dims.iter()
+            .enumerate()
+            .filter(|(index, _)| *index as u64 != axis)
+            .fold(1u64, |acc, (_, &dim)| acc.saturating_mul(dim))
+    } else {
+        input_count
+    };
+    let operand_local = transformer_operand_local(function, op).ok_or_else(|| {
+        PlanMappingError::mapping(format!(
+            "transformer recipe {op:?} operand has no local in the subchain body"
+        ))
+    })?;
+    let operand_ty = crate::local_ty::local_ty(function, operand_local).ok_or_else(|| {
+        PlanMappingError::mapping(format!(
+            "transformer recipe {op:?} operand has no local type"
+        ))
+    })?;
+    let element_ty = tensor_element_ty(operand_ty, validation)?;
+    let mut signature = MirKernelSignature {
+        function: function.id,
+        input: storage_input(0, element_ty, input_count),
+        extra_inputs: Vec::new(),
+        output: storage_output(1, element_ty, output_count),
+        extra_outputs: Vec::new(),
+        accumulation_buffers: Vec::new(),
+        builtin_inputs: Vec::new(),
+        called_builtins: Vec::new(),
+        // The generic 1D contract the ABI applies to kernels without a
+        // collection-op contract (the transformer recipes have none); the
+        // emitter units (S6-P2/P3) own the row-wise thread mapping under it.
+        workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
+        dispatch_size: MirKernelDispatchSize {
+            x: output_count,
+            y: 1,
+            z: 1,
+        },
+    };
+    signature.input.source_local = Some(operand_local);
+    signature.output.source_local = recipe_destination_local(function);
+    Ok(signature)
+}
+
+/// The recipe operand local of a transformer recipe statement — the first
+/// TENSOR arg (const operands like axis/epsilon are plan facts, never
+/// buffers). `None` when the op statement is absent or carries no tensor
+/// operand.
+fn transformer_operand_local(function: &MirFunction, op: MirCollectionOp) -> Option<MirLocalId> {
+    for block in &function.blocks {
+        for statement in &block.statements {
+            if crate::collection_ops::statement_collection_op(statement) != Some(op) {
+                continue;
+            }
+            let MirStatementKind::RuntimeCall {
+                call: MirRuntimeCall { args, .. },
+                ..
+            } = &statement.kind
+            else {
+                continue;
+            };
+            return args.iter().find_map(crate::read_analysis::operand_local);
+        }
+    }
+    None
+}
+
 /// The emission signature for a decomposition subchain kernel (S5-U1b
 /// emitter seam): the contract-shaped recipe resources plus the subchain's
 /// data-flow inputs as read inputs, with the recipe operands' source locals
@@ -769,6 +934,55 @@ pub fn subchain_signature_for_emission(
         }
         bound.push(*second);
     }
+    finish_subchain_emission_signature(function, validation, outputs, &mut signature, &bound)?;
+    Ok(signature)
+}
+
+/// The emission signature for a decomposition subchain kernel carrying a
+/// S6-P1 transformer recipe (S6-P1 seam): the transformer-shaped recipe
+/// resources plus the subchain's data-flow inputs, with the recipe
+/// operand's source local patched so the emitters' input-buffer wiring
+/// resolves. Mirrors [`subchain_signature_for_emission`] for the
+/// transformer recipes (no `CollectionOpContract` variant exists, so the
+/// base signature comes from [`transformer_shape_signature`]).
+///
+/// The transformer recipes bind exactly one recipe operand (the tensor the
+/// recipe reads); the const operands (axis / epsilon) and the optional
+/// affine pair (gamma / beta) are NOT recipe operands — the affine tensors
+/// are data-flow inputs when they are subchain params, and the consts are
+/// plan facts, never buffers.
+///
+/// # Errors
+/// Returns [`PlanMappingError`] when the recipe operand's tensor type, a
+/// data-flow input's tensor type, a scalar data-flow input's kernel layout,
+/// or an additional output local's type cannot be resolved from the subchain
+/// body.
+pub fn transformer_subchain_signature_for_emission(
+    function: &MirFunction,
+    op: MirCollectionOp,
+    validation: &MirValidationContext<'_>,
+    outputs: &[MirLocalId],
+) -> Result<MirKernelSignature, PlanMappingError> {
+    let mut signature = transformer_shape_signature(function, op, validation)?;
+    let mut bound: Vec<MirLocalId> = Vec::new();
+    if let Some(operand) = transformer_operand_local(function, op) {
+        signature.input.source_local = Some(operand);
+        bound.push(operand);
+    }
+    finish_subchain_emission_signature(function, validation, outputs, &mut signature, &bound)?;
+    Ok(signature)
+}
+
+/// The shared tail of the subchain emission signatures: the data-flow
+/// inputs beyond the bound recipe operands, the primary output binding, and
+/// the additional consumed outputs (D-2b-1).
+fn finish_subchain_emission_signature(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+    outputs: &[MirLocalId],
+    signature: &mut MirKernelSignature,
+    bound: &[MirLocalId],
+) -> Result<(), PlanMappingError> {
     // Data-flow inputs: params beyond the recipe operands — locals read from
     // earlier subchains. They bind after the recipe inputs, before the
     // output, mirroring the whole-function ABI's inputs-then-output layout.
@@ -789,9 +1003,9 @@ pub fn subchain_signature_for_emission(
         ));
         next_binding = next_binding.saturating_add(1);
     }
-    // The primary output (the contract-shaped recipe output) binds after the
-    // inputs; each ADDITIONAL consumed output binds its own storage-buffer
-    // output after it (D-2b-1).
+    // The primary output (the recipe output) binds after the inputs; each
+    // ADDITIONAL consumed output binds its own storage-buffer output after
+    // it (D-2b-1).
     signature.output.binding = next_binding;
     next_binding = next_binding.saturating_add(1);
     for &output in outputs.iter().skip(1) {
@@ -805,7 +1019,7 @@ pub fn subchain_signature_for_emission(
         ));
         next_binding = next_binding.saturating_add(1);
     }
-    Ok(signature)
+    Ok(())
 }
 
 /// The local a recipe statement produces (its destination place's base
@@ -974,6 +1188,22 @@ pub fn resolve_subchain_plan(
     let Some(recipe_op) = recipe_op else {
         return Ok(CollectionKernelPlan::Elementwise);
     };
+    if is_transformer_recipe_op(recipe_op) {
+        // S6-P1: the transformer recipes have no `CollectionOpContract`
+        // variant; the plan resolves from the transformer-shaped signature
+        // (the same typed facts the plan pass consumes) — the single source
+        // of recipe truth.
+        let signature = transformer_shape_signature(function, recipe_op, validation)?;
+        return CollectionKernelPlan::from_transformer_op(
+            &signature, function, validation, recipe_op,
+        )
+        .ok_or_else(|| {
+            PlanMappingError::mapping(format!(
+                "collection op {recipe_op:?} has no kernel plan under its typed facts \
+                 (axis/epsilon from the const operands, shapes from the tensor types)"
+            ))
+        });
+    }
     let contract = collection_op_contract(function, validation)?.ok_or_else(|| {
         PlanMappingError::mapping(format!(
             "collection op {recipe_op:?} has a recipe but no resolved dispatch contract"

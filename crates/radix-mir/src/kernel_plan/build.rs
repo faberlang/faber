@@ -1,14 +1,19 @@
 use super::plan::{
-    BarrierPhase, BarrierPoint, CollectionKernelPlan, MatMulPlan, MatMulShapes, MatMulSharedMemory,
-    OobPaddingPolicy, ReduceOp, ReductionPlan, SharedMemoryLayout, TransposePlan,
-    F32_ELEMENT_BYTE_WIDTH, MATMUL_SHARED_A_BUFFER_NAME, MATMUL_SHARED_B_BUFFER_NAME, MATMUL_TILE,
+    AxisReductionPlan, BarrierPhase, BarrierPoint, CollectionKernelPlan, LayerNormalizationPlan,
+    MatMulPlan, MatMulShapes, MatMulSharedMemory, OobPaddingPolicy, ReduceOp, ReductionPlan,
+    RowSoftmaxPlan, SharedMemoryLayout, TransposePlan, F32_ELEMENT_BYTE_WIDTH,
+    MATMUL_SHARED_A_BUFFER_NAME, MATMUL_SHARED_B_BUFFER_NAME, MATMUL_TILE,
     REDUCTION_SHARED_BUFFER_NAME, TRANSPOSE_WORKGROUP_X,
 };
 use super::validate::{
-    validate_matmul_plan, validate_reduction_plan, validate_transpose_plan, PlanValidationError,
+    validate_axis_reduction_plan, validate_matmul_plan, validate_reduction_plan,
+    validate_transpose_plan, PlanValidationError,
 };
 use crate::abi::{CollectionOpContract, MirKernelSignature};
-use crate::MirCollectionOp;
+use crate::{
+    MirCollectionOp, MirConstant, MirFunction, MirOperand, MirRuntimeCall, MirStatementKind,
+    MirValidationContext,
+};
 
 /// Whether a kernel signature's **result-tuple contract** is coherent for
 /// plan resolution (S3-A1): every output resource (the first plus the extra
@@ -178,6 +183,70 @@ impl CollectionKernelPlan {
         }
     }
 
+    /// Resolve the transformer-op recipe plans (`AxisReduction` /
+    /// `RowSoftmax` / `LayerNormalization`) — the S6-P1 admission path.
+    ///
+    /// The transformer ops have **no** `CollectionOpContract` variant: the
+    /// ABI's `collection_op_contract` resolves none for them, so their
+    /// signatures keep the generic 1D contract the ABI applies to
+    /// non-collection kernels. The plan pass therefore resolves these
+    /// recipes directly from the kernel function's typed facts:
+    ///
+    /// - `TensorSumAxis` → [`CollectionKernelPlan::AxisReduction`] with
+    ///   `op: Sum` and the axis from the trailing `MirConstant::Int` const
+    ///   operand (the S6-N1-frozen `AxisReductionPlan`);
+    /// - `TensorSoftmax` → [`CollectionKernelPlan::RowSoftmax`] with the
+    ///   last axis (the row-wise, numerically stable softmax recipe);
+    /// - `TensorLayerNorm` → [`CollectionKernelPlan::LayerNormalization`]
+    ///   with the last axis, epsilon from the const operand, and the
+    ///   optional affine operand shapes cross-checked.
+    ///
+    /// The resolved plan is cross-checked against the signature's element
+    /// counts (input/output buffers must carry the flattened input/output
+    /// dims) — the A3 typed cross-check: recipe facts are carried facts, never
+    /// inferred from names or bindings. Rank 1-2 only (the stepper's v1
+    /// constraint for all three ops); anything else yields `None` and the
+    /// caller fails closed with a typed diagnostic.
+    ///
+    /// Returns `None` on any resolution or signature mismatch (the kernel
+    /// keeps the fail-closed typed diagnostic of the caller).
+    #[must_use]
+    pub fn from_transformer_op(
+        signature: &MirKernelSignature,
+        function: &MirFunction,
+        validation: &MirValidationContext<'_>,
+        op: MirCollectionOp,
+    ) -> Option<CollectionKernelPlan> {
+        match op {
+            MirCollectionOp::TensorSumAxis => {
+                let (dims, axis) = transformer_recipe_shape(function, validation, op)?;
+                let input_count = dims_product(&dims)?;
+                let output_count = dims_without_axis_product(&dims, axis)?;
+                if !signature_matches_transformer_counts(signature, input_count, output_count) {
+                    return None;
+                }
+                Some(CollectionKernelPlan::AxisReduction(AxisReductionPlan {
+                    op: ReduceOp::Sum,
+                    axis,
+                }))
+            }
+            MirCollectionOp::TensorSoftmax | MirCollectionOp::TensorLayerNorm => {
+                let (dims, axis) = transformer_recipe_shape(function, validation, op)?;
+                let count = dims_product(&dims)?;
+                if !signature_matches_transformer_counts(signature, count, count) {
+                    return None;
+                }
+                let plan = if op == MirCollectionOp::TensorSoftmax {
+                    CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan { axis })
+                } else {
+                    CollectionKernelPlan::LayerNormalization(LayerNormalizationPlan { axis })
+                };
+                Some(plan)
+            }
+            _ => None,
+        }
+    }
+
     /// Validate the plan before any emitter consumes it (L12).
     ///
     /// Checks, per recipe:
@@ -204,13 +273,14 @@ impl CollectionKernelPlan {
             CollectionKernelPlan::TreeReduction(plan) => validate_reduction_plan(plan),
             CollectionKernelPlan::TiledMatMul(plan) => validate_matmul_plan(plan),
             CollectionKernelPlan::Transpose(plan) => validate_transpose_plan(plan),
-            // S6-N1: recipe names frozen but NOT admitted (admission is
-            // S6-P1); nothing can construct these plans yet, so the arm is
-            // unreachable until P1 lands.
-            CollectionKernelPlan::AxisReduction(_)
-            | CollectionKernelPlan::RowSoftmax(_)
-            | CollectionKernelPlan::LayerNormalization(_) => {
-                unreachable!("recipe plans are not admitted until S6-P1")
+            CollectionKernelPlan::AxisReduction(plan) => validate_axis_reduction_plan(plan),
+            // S6-P1: the row-softmax and layer-normalization recipes carry
+            // no static grid/shared-memory structure — every algorithmic
+            // fact (last-axis constraint, epsilon const/finite, affine
+            // operand shapes, element counts) is a resolution-time typed
+            // check in [`CollectionKernelPlan::from_transformer_op`].
+            CollectionKernelPlan::RowSoftmax(_) | CollectionKernelPlan::LayerNormalization(_) => {
+                Ok(())
             }
         }
     }
@@ -318,4 +388,204 @@ fn signature_matches_transpose(signature: &MirKernelSignature, m: u64, n: u64) -
         && signature.dispatch_size.z == 1
         && signature.input.element_count == count
         && signature.output.element_count == count
+}
+
+/// The transformer-recipe signature cross-check: the input and output
+/// buffers must carry the flattened input and output dims of the recipe
+/// (the shape facts the ABI's generic 1D contract produces for these ops).
+///
+/// The workgroup/dispatch are deliberately not pinned here: the transformer
+/// recipes have no `CollectionOpContract` variant, so the generic 1D
+/// contract the ABI applies is the only dispatch the signature carries, and
+/// the emitter units (S6-P2/P3) own the row-wise thread mapping under it.
+fn signature_matches_transformer_counts(
+    signature: &MirKernelSignature,
+    input_count: u64,
+    output_count: u64,
+) -> bool {
+    signature.input.element_count == input_count && signature.output.element_count == output_count
+}
+
+/// The transformer recipe's typed shape facts: the literal dims of the
+/// operand tensor and the resolved axis, cross-checked against the op's
+/// const-operand constraints.
+///
+/// - `TensorSumAxis`: axis from the trailing `MirConstant::Int` const
+///   operand, in range for the rank (v1: rank 1-2);
+/// - `TensorSoftmax`: the last axis (row-wise), rank 1-2;
+/// - `TensorLayerNorm`: the last axis (v1), the const axis must equal it,
+///   the epsilon const must be finite and non-negative, and the optional
+///   affine pair must be rank-1 over the normalization dimension.
+///
+/// `None` when the op statement is absent, the operand has no static tensor
+/// dims, a const constraint fails, or the shape is outside the v1 surface.
+pub(crate) fn transformer_recipe_shape(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+    op: MirCollectionOp,
+) -> Option<(Vec<u64>, u64)> {
+    match op {
+        MirCollectionOp::TensorSumAxis => {
+            let args = transformer_statement_args(function, MirCollectionOp::TensorSumAxis)?;
+            let dims = transformer_operand_dims(function, &args[0], validation)?;
+            let rank = dims.len();
+            if rank == 0 || rank > 2 {
+                // v1: rank 1-2 only (the stepper's constraint).
+                return None;
+            }
+            let axis = const_axis(args.get(1)?)?;
+            if axis >= rank as u64 {
+                return None;
+            }
+            Some((dims, axis))
+        }
+        MirCollectionOp::TensorSoftmax => {
+            let args = transformer_statement_args(function, MirCollectionOp::TensorSoftmax)?;
+            let dims = transformer_operand_dims(function, &args[0], validation)?;
+            let rank = dims.len();
+            if rank == 0 || rank > 2 {
+                return None;
+            }
+            Some((dims, (rank - 1) as u64))
+        }
+        MirCollectionOp::TensorLayerNorm => {
+            let args = transformer_statement_args(function, MirCollectionOp::TensorLayerNorm)?;
+            let dims = transformer_operand_dims(function, &args[0], validation)?;
+            let rank = dims.len();
+            if rank == 0 || rank > 2 {
+                return None;
+            }
+            let axis = (rank - 1) as u64;
+            // v1: layer norm normalizes over the last axis; the const axis
+            // must agree (the plan never infers facts, A3).
+            if const_axis(args.get(1)?)? != axis {
+                return None;
+            }
+            if !layer_norm_const_facts(function, validation, &dims, axis) {
+                return None;
+            }
+            Some((dims, axis))
+        }
+        _ => None,
+    }
+}
+
+/// The `TensorLayerNorm` const-operand facts: the epsilon must be a
+/// `MirConstant::Float` (a const — never a value that would require
+/// inference, A3) that is finite and non-negative, and an optional affine
+/// pair (gamma, beta) must each be rank-1 tensors of the normalization
+/// dimension when present (the stepper's v1 constraint).
+fn layer_norm_const_facts(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+    dims: &[u64],
+    axis: u64,
+) -> bool {
+    let Some(args) = transformer_statement_args(function, MirCollectionOp::TensorLayerNorm) else {
+        return false;
+    };
+    if args.len() < 3 || args.len() > 5 {
+        return false;
+    }
+    let MirOperand::Constant(MirConstant::Float(epsilon)) = &args[2] else {
+        return false;
+    };
+    if !epsilon.is_finite() || *epsilon < 0.0 {
+        return false;
+    }
+    let Some(norm_index) = usize::try_from(axis)
+        .ok()
+        .filter(|index| *index < dims.len())
+    else {
+        return false;
+    };
+    let norm_dim = dims[norm_index];
+    for affine in args.iter().skip(3) {
+        let Some(affine_ty) = crate::local_ty::operand_local_ty(function, affine) else {
+            return false;
+        };
+        let Ok(affine_dims) = crate::tensor_type::tensor_literal_dims(affine_ty, validation) else {
+            return false;
+        };
+        // v1: gamma/beta are rank-1 over the normalization dimension.
+        if affine_dims.len() != 1 || affine_dims[0] != norm_dim {
+            return false;
+        }
+    }
+    true
+}
+
+/// The args of the first statement carrying `op` in the function body (the
+/// typed-fact scan the transformer recipes resolve from).
+fn transformer_statement_args(
+    function: &MirFunction,
+    op: MirCollectionOp,
+) -> Option<&[MirOperand]> {
+    for block in &function.blocks {
+        for statement in &block.statements {
+            if crate::collection_ops::statement_collection_op(statement) != Some(op) {
+                continue;
+            }
+            let MirStatementKind::RuntimeCall {
+                call: MirRuntimeCall { args, .. },
+                ..
+            } = &statement.kind
+            else {
+                continue;
+            };
+            return Some(args);
+        }
+    }
+    None
+}
+
+/// The literal dims of a transformer recipe operand (the tensor the recipe
+/// reads).
+fn transformer_operand_dims(
+    function: &MirFunction,
+    operand: &MirOperand,
+    validation: &MirValidationContext<'_>,
+) -> Option<Vec<u64>> {
+    let ty = crate::local_ty::operand_local_ty(function, operand)?;
+    crate::tensor_type::tensor_literal_dims(ty, validation).ok()
+}
+
+/// The axis const operand: a non-negative `MirConstant::Int` or a
+/// `MirConstant::UInt` (the trailing const operands of the transformer
+/// lowerings).
+fn const_axis(operand: &MirOperand) -> Option<u64> {
+    match operand {
+        MirOperand::Constant(MirConstant::Int(axis)) => u64::try_from(*axis).ok(),
+        MirOperand::Constant(MirConstant::UInt(axis)) => Some(*axis),
+        _ => None,
+    }
+}
+
+/// The flattened element count of the literal dims.
+fn dims_product(dims: &[u64]) -> Option<u64> {
+    if dims.is_empty() {
+        return None;
+    }
+    let mut product = 1u64;
+    for &dim in dims {
+        product = product.saturating_mul(dim);
+    }
+    Some(product)
+}
+
+/// The flattened element count of the dims with `axis` removed — the output
+/// shape of an axis reduction (`result rank = input rank - 1`; a rank-1
+/// reduction over its only axis yields the scalar 1-element output).
+fn dims_without_axis_product(dims: &[u64], axis: u64) -> Option<u64> {
+    let axis = usize::try_from(axis).ok()?;
+    if axis >= dims.len() {
+        return None;
+    }
+    let mut product = 1u64;
+    for (index, &dim) in dims.iter().enumerate() {
+        if index != axis {
+            product = product.saturating_mul(dim);
+        }
+    }
+    Some(product)
 }

@@ -15,9 +15,10 @@ use crate::kernel_plan::{
 };
 use crate::layout::MirTensorStorageLayout;
 use crate::{
-    MirBinOp, MirBlock, MirBlockId, MirFunction, MirFunctionId, MirIntrinsic, MirLocal, MirLocalId,
-    MirOperand, MirParam, MirParamMode, MirPlace, MirRuntimeCall, MirStatement, MirStatementKind,
-    MirTerminator, MirTerminatorKind, MirType, MirValue, MirValueId, MirValueKind,
+    MirBinOp, MirBlock, MirBlockId, MirConstant, MirFunction, MirFunctionId, MirIntrinsic,
+    MirLocal, MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace, MirRuntimeCall,
+    MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind, MirType, MirUnOp, MirValue,
+    MirValueId, MirValueKind,
 };
 use radix_lexer::Span;
 use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeTable};
@@ -209,6 +210,51 @@ fn transpose_signature(m: u64, n: u64) -> MirKernelSignature {
         },
         dispatch_size: MirKernelDispatchSize {
             x: m * n,
+            y: 1,
+            z: 1,
+        },
+    }
+}
+
+/// A generic-1D transformer signature (S6-P1): workgroup `(1,1,1)`,
+/// dispatch `(output_count, 1, 1)`, input/output at the flattened counts —
+/// the shape the ABI produces for kernels without a collection-op contract
+/// (the transformer recipes have none).
+fn transformer_signature(input_count: u64, output_count: u64) -> MirKernelSignature {
+    let mut types = TypeTable::new();
+    let element_ty = f32_ty(&mut types);
+    MirKernelSignature {
+        function: MirFunctionId(0),
+        input: MirKernelResource {
+            group: 0,
+            binding: 0,
+            kind: MirKernelResourceKind::StorageBuffer,
+            role: MirKernelResourceRole::Input,
+            access: MirKernelResourceAccess::Read,
+            element_ty,
+            element_count: input_count,
+            source_local: Some(MirLocalId(0)),
+            source_name: None,
+        },
+        extra_inputs: Vec::new(),
+        output: MirKernelResource {
+            group: 0,
+            binding: 1,
+            kind: MirKernelResourceKind::StorageBuffer,
+            role: MirKernelResourceRole::Output,
+            access: MirKernelResourceAccess::Write,
+            element_ty,
+            element_count: output_count,
+            source_local: None,
+            source_name: None,
+        },
+        extra_outputs: Vec::new(),
+        accumulation_buffers: Vec::new(),
+        builtin_inputs: Vec::new(),
+        called_builtins: Vec::new(),
+        workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
+        dispatch_size: MirKernelDispatchSize {
+            x: output_count,
             y: 1,
             z: 1,
         },
@@ -526,15 +572,9 @@ fn sum_mean_function(types: &mut TypeTable, length: u64) -> MirFunction {
     function
 }
 
-/// `t = softmax(x)` — a genuinely unplannable op (no recipe, not an
-/// elementwise transform). `TensorTranspose` is now a recipe op (S5-U1);
-/// `TensorSoftmax` stays outside the closed plan surface.
-fn softmax_function(types: &mut TypeTable) -> MirFunction {
-    tensor_kernel_function(types, 4, 1, &[(MirCollectionOp::TensorSoftmax, vec![0], 1)])
-}
-
-/// `t = mul(x, w); u = softmax(t)` — an elementwise op does not excuse an
-/// unplannable sibling statement.
+/// `t = mul(x, w); u = softmax(t)` — an elementwise transform feeding the
+/// admitted `RowSoftmax` recipe: the body derives the softmax plan (never a
+/// silent elementwise floor).
 fn mul_softmax_function(types: &mut TypeTable) -> MirFunction {
     tensor_kernel_function(
         types,
@@ -544,6 +584,117 @@ fn mul_softmax_function(types: &mut TypeTable) -> MirFunction {
             (MirCollectionOp::TensorMul, vec![0, 1], 2),
             (MirCollectionOp::TensorSoftmax, vec![2], 3),
         ],
+    )
+}
+
+/// `t = crux_entropia(x, y)` — a genuinely unplannable op (no recipe, not
+/// an elementwise transform): the fail-closed example that replaces the
+/// former softmax one (S6-P1 admits softmax).
+fn crux_entropia_function(types: &mut TypeTable) -> MirFunction {
+    tensor_kernel_function(
+        types,
+        4,
+        2,
+        &[(MirCollectionOp::TensorCruxEntropia, vec![0, 1], 1)],
+    )
+}
+
+/// `t = mul(x, w); u = crux_entropia(t, x)` — an elementwise op does not
+/// excuse an unplannable sibling statement.
+fn mul_crux_entropia_function(types: &mut TypeTable) -> MirFunction {
+    tensor_kernel_function(
+        types,
+        4,
+        2,
+        &[
+            (MirCollectionOp::TensorMul, vec![0, 1], 2),
+            (MirCollectionOp::TensorCruxEntropia, vec![2, 0], 3),
+        ],
+    )
+}
+
+/// A single transformer-op kernel over a rank-2 `[dims]` tensor with const
+/// trailing operands (the S6-P1 admission fixtures): `t = op(x, consts…)`.
+fn rank2_const_op_function(
+    types: &mut TypeTable,
+    dims: [u64; 2],
+    op: MirCollectionOp,
+    consts: Vec<MirConstant>,
+) -> MirFunction {
+    let r2 = rank2_tensor_ty(types, dims);
+    let mut args = vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))];
+    args.extend(consts.into_iter().map(MirOperand::Constant));
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![MirParam {
+            local: MirLocalId(0),
+            name: None,
+            ty: r2,
+            mode: MirParamMode::Owned,
+            span: test_span(),
+        }],
+        locals: vec![MirLocal {
+            id: MirLocalId(0),
+            name: None,
+            ty: r2,
+            mutable: false,
+            span: test_span(),
+        }],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::RuntimeCall {
+                    destination: Some(MirPlace::local(MirLocalId(1))),
+                    call: MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Collection(op),
+                        args,
+                        return_ty: r2,
+                    },
+                },
+                span: test_span(),
+            }],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(1),
+                )))),
+                span: test_span(),
+            },
+            span: test_span(),
+        }],
+        return_ty: r2,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: test_span(),
+    }
+}
+
+/// A rank-2 softmax kernel: `t = softmax(x)` over `[4,4]`.
+fn softmax_rank2_function(types: &mut TypeTable) -> MirFunction {
+    rank2_const_op_function(types, [4, 4], MirCollectionOp::TensorSoftmax, vec![])
+}
+
+/// A rank-2 axis-sum kernel: `t = sum_axis(x, 1)` over `[4,4]`.
+fn sum_axis_function(types: &mut TypeTable) -> MirFunction {
+    rank2_const_op_function(
+        types,
+        [4, 4],
+        MirCollectionOp::TensorSumAxis,
+        vec![MirConstant::Int(1)],
+    )
+}
+
+/// A rank-2 layer-norm kernel: `t = layernorm(x, 1, 1e-5)` over `[4,4]`.
+fn layer_norm_function(types: &mut TypeTable) -> MirFunction {
+    rank2_const_op_function(
+        types,
+        [4, 4],
+        MirCollectionOp::TensorLayerNorm,
+        vec![MirConstant::Int(1), MirConstant::Float(1e-5)],
     )
 }
 
@@ -1119,18 +1270,19 @@ fn contract_shape_signature_output_stays_synthetic_without_local_destination() {
 
 #[test]
 fn unplannable_collection_op_fails_closed_with_typed_diagnostic() {
-    // A device-routed function emitting TensorSoftmax has no recipe and is
-    // not an elementwise transform — the plan pass must fail with the typed
-    // diagnostic, never a silent Elementwise. (The former D1 fixture used
-    // TensorTranspose, which S5-U1 promotes to a recipe op.)
+    // S6-P1 admission test replacement: a device-routed function emitting
+    // the GENUINELY unplannable TensorCruxEntropia (no recipe, not an
+    // elementwise transform) must fail with the typed diagnostic, never a
+    // silent Elementwise. (The former fixture used TensorSoftmax, which
+    // S6-P1 promotes to the RowSoftmax recipe.)
     let mut types = TypeTable::new();
-    let function = softmax_function(&mut types);
+    let function = crux_entropia_function(&mut types);
     let signature = reduction_signature(1024, 256, 4);
     let validation = MirValidationContext::new(&types);
     let error = kernel_plan_for_function(&function, &signature, &validation)
-        .expect_err("TensorSoftmax must fail the plan pass");
+        .expect_err("TensorCruxEntropia must fail the plan pass");
     assert!(
-        error.message.contains("TensorSoftmax"),
+        error.message.contains("TensorCruxEntropia"),
         "diagnostic must name the op, got: {}",
         error.message
     );
@@ -1139,6 +1291,222 @@ fn unplannable_collection_op_fails_closed_with_typed_diagnostic() {
         "diagnostic must say no kernel plan, got: {}",
         error.message
     );
+}
+
+// -----------------------------------------------------------------------
+// S6-P1 transformer admission (TensorSumAxis / softmax / layer-norm resolve
+// a single carried recipe; re-derivation agrees with carried plans).
+// -----------------------------------------------------------------------
+
+#[test]
+fn softmax_function_resolves_row_softmax_plan() {
+    // A softmax-bearing body resolves the RowSoftmax recipe over the last
+    // (row) axis — S6-P1 closes the N3.2 fail-closed for this op.
+    let mut types = TypeTable::new();
+    let function = softmax_rank2_function(&mut types);
+    let signature = transformer_signature(16, 16);
+    let validation = MirValidationContext::new(&types);
+    let derived = kernel_plan_for_function(&function, &signature, &validation)
+        .expect("softmax function facts resolve")
+        .expect("softmax function carries a recipe plan");
+    let CollectionKernelPlan::RowSoftmax(plan) = &derived else {
+        panic!("softmax body must derive a row-softmax plan, got {derived:?}");
+    };
+    assert_eq!(plan.axis, 1, "row softmax normalizes over the last axis");
+    derived.validate().expect("the derived plan validates");
+    // A carried plan built from the same typed facts agrees exactly.
+    let carried = CollectionKernelPlan::RowSoftmax(crate::kernel_plan::RowSoftmaxPlan { axis: 1 });
+    assert!(carried_plan_agrees(&carried, Some(&derived)));
+}
+
+#[test]
+fn sum_axis_function_resolves_axis_reduction_plan() {
+    // A TensorSumAxis-bearing body resolves the AxisReduction recipe with
+    // `op: Sum` and the axis from the trailing const operand.
+    let mut types = TypeTable::new();
+    let function = sum_axis_function(&mut types);
+    let signature = transformer_signature(16, 4);
+    let validation = MirValidationContext::new(&types);
+    let derived = kernel_plan_for_function(&function, &signature, &validation)
+        .expect("sum_axis function facts resolve")
+        .expect("sum_axis function carries a recipe plan");
+    let CollectionKernelPlan::AxisReduction(plan) = &derived else {
+        panic!("sum_axis body must derive an axis-reduction plan, got {derived:?}");
+    };
+    assert_eq!(plan.op, crate::kernel_plan::ReduceOp::Sum);
+    assert_eq!(plan.axis, 1, "axis comes from the trailing const operand");
+    derived.validate().expect("the derived plan validates");
+    // A carried plan built from the same typed facts agrees exactly.
+    let carried = CollectionKernelPlan::AxisReduction(crate::kernel_plan::AxisReductionPlan {
+        op: crate::kernel_plan::ReduceOp::Sum,
+        axis: 1,
+    });
+    assert!(carried_plan_agrees(&carried, Some(&derived)));
+}
+
+#[test]
+fn layer_norm_function_resolves_layer_normalization_plan() {
+    // A layer-norm-bearing body resolves the LayerNormalization recipe with
+    // the axis (and epsilon) from the const operands.
+    let mut types = TypeTable::new();
+    let function = layer_norm_function(&mut types);
+    let signature = transformer_signature(16, 16);
+    let validation = MirValidationContext::new(&types);
+    let derived = kernel_plan_for_function(&function, &signature, &validation)
+        .expect("layer-norm function facts resolve")
+        .expect("layer-norm function carries a recipe plan");
+    let CollectionKernelPlan::LayerNormalization(plan) = &derived else {
+        panic!("layer-norm body must derive a layer-normalization plan, got {derived:?}");
+    };
+    assert_eq!(plan.axis, 1, "axis comes from the const operands");
+    derived.validate().expect("the derived plan validates");
+    // A carried plan built from the same typed facts agrees exactly.
+    let carried =
+        CollectionKernelPlan::LayerNormalization(crate::kernel_plan::LayerNormalizationPlan {
+            axis: 1,
+        });
+    assert!(carried_plan_agrees(&carried, Some(&derived)));
+}
+
+#[test]
+fn elementwise_op_feeding_softmax_derives_row_softmax_plan() {
+    // N3.2: an elementwise transform (mul) feeding the admitted softmax
+    // recipe still derives the softmax plan from the complete op set — the
+    // former "an elementwise op does not excuse an unplannable sibling"
+    // boundary is now an admission boundary.
+    let mut types = TypeTable::new();
+    let function = mul_softmax_function(&mut types);
+    let signature = transformer_signature(4, 4);
+    let validation = MirValidationContext::new(&types);
+    let derived = kernel_plan_for_function(&function, &signature, &validation)
+        .expect("mul+softmax body facts resolve")
+        .expect("mul+softmax body carries the softmax recipe");
+    let CollectionKernelPlan::RowSoftmax(plan) = &derived else {
+        panic!("mul+softmax body must derive a row-softmax plan, got {derived:?}");
+    };
+    assert_eq!(plan.axis, 0, "rank-1 [4] softmax is over axis 0");
+}
+
+#[test]
+fn transformer_recipe_kinds_are_typed() {
+    // The RecipeKind tag mirrors the new plan variants (hosts and backends
+    // switch on the tag for launch semantics).
+    assert_eq!(
+        RecipeKind::from_plan(&CollectionKernelPlan::AxisReduction(
+            crate::kernel_plan::AxisReductionPlan {
+                op: crate::kernel_plan::ReduceOp::Sum,
+                axis: 1,
+            }
+        )),
+        RecipeKind::AxisReduction
+    );
+    assert_eq!(
+        RecipeKind::from_plan(&CollectionKernelPlan::RowSoftmax(
+            crate::kernel_plan::RowSoftmaxPlan { axis: 1 }
+        )),
+        RecipeKind::RowSoftmax
+    );
+    assert_eq!(
+        RecipeKind::from_plan(&CollectionKernelPlan::LayerNormalization(
+            crate::kernel_plan::LayerNormalizationPlan { axis: 1 }
+        )),
+        RecipeKind::LayerNormalization
+    );
+}
+
+#[test]
+fn transformer_plans_report_zero_shared_memory() {
+    // The transformer recipes declare no shared-memory layout (each row is
+    // one thread's serial pass), so the launch descriptor reports a zero
+    // workgroup-memory footprint.
+    let mut types = TypeTable::new();
+    let element_ty = f32_ty(&mut types);
+    let input = identity(1, "x", BufferRole::Input);
+    let output = identity(2, "y", BufferRole::Output);
+    let kernel = KernelUnit {
+        function: MirFunctionId(0),
+        entry: "softmaxa".to_owned(),
+        plan: CollectionKernelPlan::RowSoftmax(crate::kernel_plan::RowSoftmaxPlan { axis: 1 }),
+        resources: vec![
+            resource(
+                input,
+                version(1, element_ty, 16),
+                0,
+                MirKernelResourceAccess::Read,
+            ),
+            resource(
+                output,
+                version(1, element_ty, 16),
+                1,
+                MirKernelResourceAccess::Write,
+            ),
+        ],
+        launch: KernelLaunchPlan {
+            workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
+            dispatch_size: MirKernelDispatchSize { x: 16, y: 1, z: 1 },
+            workgroup_count: MirKernelWorkgroupCount { x: 16, y: 1, z: 1 },
+        },
+    };
+    let descriptor = KernelLaunchDescriptor::from_kernel_unit(&kernel, 0);
+    assert_eq!(descriptor.recipe, RecipeKind::RowSoftmax);
+    assert_eq!(descriptor.shared_memory_bytes, 0);
+}
+
+#[test]
+fn tensor_unary_admission_declares_exp_and_sqrt() {
+    // S6-P1: the MIR-level tensor-unary admission declares Exp/Sqrt (the
+    // softmax exp and the LayerNorm sqrt lanes) alongside the pre-existing
+    // elementwise tensor unaries — the emitter dispatch seam P2/P3 consume.
+    assert!(is_admitted_tensor_unary(MirUnOp::Exp));
+    assert!(is_admitted_tensor_unary(MirUnOp::Sqrt));
+    assert!(is_admitted_tensor_unary(MirUnOp::Tanh));
+    assert!(is_admitted_tensor_unary(MirUnOp::Relu));
+    assert!(is_admitted_tensor_unary(MirUnOp::Gelu));
+    // A unary outside the admitted set has no elementwise arm.
+    assert!(!is_admitted_tensor_unary(MirUnOp::Log));
+    assert!(!is_admitted_tensor_unary(MirUnOp::Neg));
+}
+
+#[test]
+fn transformer_subchain_signature_binds_operand_and_output() {
+    // The S6-P1 emission seam: a transformer subchain's emission signature
+    // binds the recipe operand as the read input, sizes the output from the
+    // flattened output dims, and carries the recipe destination as the
+    // output source local.
+    let mut types = TypeTable::new();
+    let function = sum_axis_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let signature = transformer_subchain_signature_for_emission(
+        &function,
+        MirCollectionOp::TensorSumAxis,
+        &validation,
+        &[MirLocalId(1)],
+    )
+    .expect("sum_axis subchain emission signature resolves");
+    assert_eq!(signature.input.source_local, Some(MirLocalId(0)));
+    assert_eq!(signature.input.element_count, 16);
+    assert_eq!(signature.output.source_local, Some(MirLocalId(1)));
+    assert_eq!(
+        signature.output.element_count, 4,
+        "sum over axis 1 of [4,4] yields 4 elements"
+    );
+    assert_eq!(signature.output.binding, 1);
+    assert!(signature.extra_inputs.is_empty());
+    assert!(signature.extra_outputs.is_empty());
+    // The transformer-shaped signature carries the recipe's counts, so the
+    // shared plan pass resolves the same plan from it.
+    let plan = CollectionKernelPlan::from_transformer_op(
+        &signature,
+        &function,
+        &validation,
+        MirCollectionOp::TensorSumAxis,
+    )
+    .expect("the transformer-shaped signature resolves the carried plan");
+    let carried = CollectionKernelPlan::AxisReduction(crate::kernel_plan::AxisReductionPlan {
+        op: crate::kernel_plan::ReduceOp::Sum,
+        axis: 1,
+    });
+    assert!(carried_plan_agrees(&carried, Some(&plan)));
 }
 
 #[test]
@@ -1224,15 +1592,16 @@ fn multi_op_body_conflicting_recipes_fail_closed() {
 fn multi_op_body_with_unplannable_op_fails_closed() {
     // An elementwise sibling does not excuse an unplannable statement — the
     // full scan still rejects it. (The former fixture used
-    // mul+transpose, which S5-U1 now admits as a transpose-bearing kernel.)
+    // mul+softmax, which S6-P1 now admits as a softmax-bearing kernel, so
+    // the genuinely-unplannable TensorCruxEntropia carries the boundary.)
     let mut types = TypeTable::new();
-    let function = mul_softmax_function(&mut types);
+    let function = mul_crux_entropia_function(&mut types);
     let signature = reduction_signature(1024, 256, 4);
     let validation = MirValidationContext::new(&types);
     let error = kernel_plan_for_function(&function, &signature, &validation)
         .expect_err("an elementwise op does not excuse an unplannable op");
     assert!(
-        error.message.contains("TensorSoftmax"),
+        error.message.contains("TensorCruxEntropia"),
         "diagnostic must name the unplannable op, got: {}",
         error.message
     );

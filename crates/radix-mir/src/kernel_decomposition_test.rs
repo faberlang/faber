@@ -46,15 +46,31 @@ fn collection_statement(
     destination: u32,
     ty: MirType,
 ) -> MirStatement {
+    collection_statement_operands(
+        op,
+        args.iter()
+            .map(|&local| MirOperand::Place(MirPlace::local(MirLocalId(local))))
+            .collect(),
+        destination,
+        ty,
+    )
+}
+
+/// A collection statement built from explicit operands (the transformer
+/// fixtures carry const trailing operands — axis / epsilon — that the
+/// local-id helper cannot express).
+fn collection_statement_operands(
+    op: MirCollectionOp,
+    args: Vec<MirOperand>,
+    destination: u32,
+    ty: MirType,
+) -> MirStatement {
     MirStatement {
         kind: MirStatementKind::RuntimeCall {
             destination: Some(MirPlace::local(MirLocalId(destination))),
             call: MirRuntimeCall {
                 intrinsic: MirIntrinsic::Collection(op),
-                args: args
-                    .iter()
-                    .map(|&local| MirOperand::Place(MirPlace::local(MirLocalId(local))))
-                    .collect(),
+                args,
                 return_ty: ty,
             },
         },
@@ -246,9 +262,11 @@ fn sum_mean_function(types: &mut TypeTable) -> MirFunction {
     )
 }
 
-/// A body mixing a recipe op with an unplannable op:
-/// `t = matmul(x, w); s = softmax(t)` — the decomposition must fail with a
-/// typed diagnostic naming the unplannable op, never silently drop it.
+/// A body mixing two recipe ops — a matmul feeding a softmax:
+/// `t = matmul(x, w); s = softmax(t)` — S6-P1 admits softmax as the
+/// `RowSoftmax` recipe, so the decomposition splits the body into a
+/// `TiledMatMul` subchain and a `RowSoftmax` subchain (compound
+/// legalization, C5).
 fn matmul_softmax_function(types: &mut TypeTable) -> MirFunction {
     let r2 = rank2_tensor_ty(types, [4, 4]);
     device_function(
@@ -258,6 +276,106 @@ fn matmul_softmax_function(types: &mut TypeTable) -> MirFunction {
             collection_statement(MirCollectionOp::TensorSoftmax, &[2], 3, r2),
         ],
         Some(3),
+        r2,
+    )
+}
+
+/// A body mixing a recipe op with a genuinely-unplannable op:
+/// `t = matmul(x, w); u = crux_entropia(t, x)` — the decomposition must
+/// fail with a typed diagnostic naming the unplannable op, never silently
+/// drop it. (The former fixture used softmax, which S6-P1 admits.)
+fn matmul_crux_entropia_function(types: &mut TypeTable) -> MirFunction {
+    let r2 = rank2_tensor_ty(types, [4, 4]);
+    let scalar = scalar_f32_ty(types);
+    device_function(
+        &[(0, r2), (1, r2)],
+        vec![
+            collection_statement(MirCollectionOp::TensorMatMul, &[0, 1], 2, r2),
+            collection_statement(MirCollectionOp::TensorCruxEntropia, &[2, 0], 3, scalar),
+        ],
+        Some(3),
+        scalar,
+    )
+}
+
+/// A softmax-bearing body: `t = softmax(x)` over a rank-2 `[4,4]` tensor —
+/// S6-P1 admits the op as the `RowSoftmax` recipe.
+fn softmax_function(types: &mut TypeTable) -> MirFunction {
+    let r2 = rank2_tensor_ty(types, [4, 4]);
+    device_function(
+        &[(0, r2)],
+        vec![collection_statement(
+            MirCollectionOp::TensorSoftmax,
+            &[0],
+            1,
+            r2,
+        )],
+        Some(1),
+        r2,
+    )
+}
+
+/// A layer-norm-bearing body: `t = layernorm(x, 1, 1e-5)` over `[4,4]` —
+/// S6-P1 admits the op as the `LayerNormalization` recipe.
+fn layer_norm_function(types: &mut TypeTable) -> MirFunction {
+    let r2 = rank2_tensor_ty(types, [4, 4]);
+    device_function(
+        &[(0, r2)],
+        vec![collection_statement_operands(
+            MirCollectionOp::TensorLayerNorm,
+            vec![
+                MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                MirOperand::Constant(MirConstant::Int(1)),
+                MirOperand::Constant(MirConstant::Float(1e-5)),
+            ],
+            1,
+            r2,
+        )],
+        Some(1),
+        r2,
+    )
+}
+
+/// A sum-axis-bearing body: `t = sum_axis(x, 1)` over `[4,4]` — S6-P1
+/// admits the op as the `AxisReduction` recipe.
+fn sum_axis_function(types: &mut TypeTable) -> MirFunction {
+    let r2 = rank2_tensor_ty(types, [4, 4]);
+    device_function(
+        &[(0, r2)],
+        vec![collection_statement_operands(
+            MirCollectionOp::TensorSumAxis,
+            vec![
+                MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                MirOperand::Constant(MirConstant::Int(1)),
+            ],
+            1,
+            r2,
+        )],
+        Some(1),
+        r2,
+    )
+}
+
+/// A compound transformer body: `s = softmax(x); m = sum_axis(s, 1)` — two
+/// transformer recipes decompose into two single-recipe subchain kernels
+/// (the compound-op legalization, C5).
+fn softmax_sum_axis_function(types: &mut TypeTable) -> MirFunction {
+    let r2 = rank2_tensor_ty(types, [4, 4]);
+    device_function(
+        &[(0, r2)],
+        vec![
+            collection_statement(MirCollectionOp::TensorSoftmax, &[0], 1, r2),
+            collection_statement_operands(
+                MirCollectionOp::TensorSumAxis,
+                vec![
+                    MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                    MirOperand::Constant(MirConstant::Int(1)),
+                ],
+                2,
+                r2,
+            ),
+        ],
+        Some(2),
         r2,
     )
 }
@@ -509,6 +627,182 @@ fn matmul_vjp_body_decomposes_into_transpose_plus_matmul() {
 }
 
 // -----------------------------------------------------------------------
+// S6-P1 transformer legalization (softmax / layer-norm / sum-axis bodies
+// decompose into single-recipe subchain kernels — the C5 fix).
+// -----------------------------------------------------------------------
+
+#[test]
+fn softmax_body_decomposes_into_one_row_softmax_subchain() {
+    let mut types = TypeTable::new();
+    let function = softmax_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let decomposition =
+        decompose_kernel_function(&function, &validation).expect("softmax body decomposes");
+
+    assert_eq!(
+        decomposition.subchains.len(),
+        1,
+        "a single softmax body carries exactly one subchain, got {:?}",
+        decomposition.subchains
+    );
+    let CollectionKernelPlan::RowSoftmax(plan) = &decomposition.subchains[0].plan else {
+        panic!(
+            "the softmax subchain must carry exactly one recipe (row-softmax), got {:?}",
+            decomposition.subchains[0].plan
+        );
+    };
+    assert_eq!(plan.axis, 1, "row-wise over the last axis");
+    assert_eq!(decomposition.subchains[0].statements, vec![0]);
+    assert_eq!(decomposition.subchains[0].produced, Some(MirLocalId(1)));
+    decomposition.subchains[0]
+        .plan
+        .validate()
+        .expect("the carried row-softmax plan validates");
+}
+
+#[test]
+fn layer_norm_body_decomposes_into_one_layer_normalization_subchain() {
+    let mut types = TypeTable::new();
+    let function = layer_norm_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let decomposition =
+        decompose_kernel_function(&function, &validation).expect("layer-norm body decomposes");
+
+    assert_eq!(
+        decomposition.subchains.len(),
+        1,
+        "a single layer-norm body carries exactly one subchain, got {:?}",
+        decomposition.subchains
+    );
+    let CollectionKernelPlan::LayerNormalization(plan) = &decomposition.subchains[0].plan else {
+        panic!(
+            "the layer-norm subchain must carry exactly one recipe (layer-normalization), got {:?}",
+            decomposition.subchains[0].plan
+        );
+    };
+    assert_eq!(plan.axis, 1, "axis comes from the const operand");
+    assert_eq!(decomposition.subchains[0].statements, vec![0]);
+    decomposition.subchains[0]
+        .plan
+        .validate()
+        .expect("the carried layer-normalization plan validates");
+}
+
+#[test]
+fn sum_axis_body_decomposes_into_one_axis_reduction_subchain() {
+    let mut types = TypeTable::new();
+    let function = sum_axis_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let decomposition =
+        decompose_kernel_function(&function, &validation).expect("sum_axis body decomposes");
+
+    assert_eq!(
+        decomposition.subchains.len(),
+        1,
+        "a single sum_axis body carries exactly one subchain, got {:?}",
+        decomposition.subchains
+    );
+    let CollectionKernelPlan::AxisReduction(plan) = &decomposition.subchains[0].plan else {
+        panic!(
+            "the sum_axis subchain must carry exactly one recipe (axis-reduction), got {:?}",
+            decomposition.subchains[0].plan
+        );
+    };
+    assert_eq!(plan.op, crate::kernel_plan::ReduceOp::Sum);
+    assert_eq!(plan.axis, 1, "axis comes from the trailing const operand");
+    decomposition.subchains[0]
+        .plan
+        .validate()
+        .expect("the carried axis-reduction plan validates");
+}
+
+#[test]
+fn softmax_then_sum_axis_decomposes_into_two_transformer_subchains() {
+    // The compound legalization (C5): a body carrying softmax AND sum_axis
+    // (the softmax VJP's reduction lane) splits into two single-recipe
+    // subchain kernels with the explicit data-flow edge between them.
+    let mut types = TypeTable::new();
+    let function = softmax_sum_axis_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let decomposition = decompose_kernel_function(&function, &validation)
+        .expect("softmax+sum_axis body decomposes");
+
+    assert_eq!(
+        decomposition.subchains.len(),
+        2,
+        "softmax + sum_axis must split into two subchains, got {:?}",
+        decomposition.subchains
+    );
+
+    let softmax = &decomposition.subchains[0];
+    let CollectionKernelPlan::RowSoftmax(softmax_plan) = &softmax.plan else {
+        panic!(
+            "subchain 0 must carry the row-softmax plan, got {:?}",
+            softmax.plan
+        );
+    };
+    assert_eq!(softmax_plan.axis, 1);
+    assert_eq!(softmax.statements, vec![0]);
+    assert!(softmax.consumes.is_empty());
+    assert_eq!(softmax.produced, Some(MirLocalId(1)));
+
+    let reduction = &decomposition.subchains[1];
+    let CollectionKernelPlan::AxisReduction(reduction_plan) = &reduction.plan else {
+        panic!(
+            "subchain 1 must carry the axis-reduction plan, got {:?}",
+            reduction.plan
+        );
+    };
+    assert_eq!(reduction_plan.op, crate::kernel_plan::ReduceOp::Sum);
+    assert_eq!(reduction_plan.axis, 1);
+    assert_eq!(reduction.statements, vec![1]);
+    assert_eq!(
+        reduction.consumes,
+        vec![0],
+        "the axis-reduction subchain reads subchain 0's softmax output"
+    );
+    assert_eq!(reduction.produced, Some(MirLocalId(2)));
+}
+
+#[test]
+fn matmul_softmax_body_decomposes_into_matmul_plus_softmax() {
+    // The C5 legalization across recipe families: matmul feeding softmax
+    // splits into a TiledMatMul subchain and a RowSoftmax subchain.
+    let mut types = TypeTable::new();
+    let function = matmul_softmax_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let decomposition =
+        decompose_kernel_function(&function, &validation).expect("matmul+softmax body decomposes");
+
+    assert_eq!(
+        decomposition.subchains.len(),
+        2,
+        "matmul + softmax must split into two subchains, got {:?}",
+        decomposition.subchains
+    );
+    assert!(
+        matches!(
+            decomposition.subchains[0].plan,
+            CollectionKernelPlan::TiledMatMul(_)
+        ),
+        "subchain 0 must carry the tiled-matmul plan, got {:?}",
+        decomposition.subchains[0].plan
+    );
+    let CollectionKernelPlan::RowSoftmax(softmax_plan) = &decomposition.subchains[1].plan else {
+        panic!(
+            "subchain 1 must carry the row-softmax plan, got {:?}",
+            decomposition.subchains[1].plan
+        );
+    };
+    assert_eq!(softmax_plan.axis, 1);
+    assert_eq!(
+        decomposition.subchains[1].consumes,
+        vec![0],
+        "the softmax subchain reads the matmul output"
+    );
+}
+
+// -----------------------------------------------------------------------
 // Elementwise folding and non-linear data-flow.
 // -----------------------------------------------------------------------
 
@@ -593,12 +887,12 @@ fn divergent_data_flow_consumes_multiple_prior_subchains() {
 #[test]
 fn unplannable_op_mixed_with_recipe_fails_closed() {
     let mut types = TypeTable::new();
-    let function = matmul_softmax_function(&mut types);
+    let function = matmul_crux_entropia_function(&mut types);
     let validation = MirValidationContext::new(&types);
     let error = decompose_kernel_function(&function, &validation)
         .expect_err("an unplannable op mixed with a recipe must fail");
     assert!(
-        error.message.contains("TensorSoftmax"),
+        error.message.contains("TensorCruxEntropia"),
         "the diagnostic must name the unplannable op, got: {}",
         error.message
     );
