@@ -233,7 +233,10 @@ pub(super) fn imported_dispatch_type_rewrites(
         .collect()
 }
 
-pub(super) fn rewrite_lowered_type_ids(lowered: &mut LoweredMirUnit<'_>, rewrites: &[(TypeId, TypeId)]) {
+pub(super) fn rewrite_lowered_type_ids(
+    lowered: &mut LoweredMirUnit<'_>,
+    rewrites: &[(TypeId, TypeId)],
+) {
     for function in &mut lowered.program.functions {
         rewrite_type_id(&mut function.return_ty, rewrites);
         if let Some(error_ty) = &mut function.error_ty {
@@ -268,7 +271,10 @@ pub(super) fn rewrite_type_id(ty: &mut radix::mir::MirType, rewrites: &[(TypeId,
     }
 }
 
-pub(super) fn rewrite_statement_type_id(statement: &mut MirStatement, rewrites: &[(TypeId, TypeId)]) {
+pub(super) fn rewrite_statement_type_id(
+    statement: &mut MirStatement,
+    rewrites: &[(TypeId, TypeId)],
+) {
     match &mut statement.kind {
         MirStatementKind::Assign { value, .. } => rewrite_value_type_id(value, rewrites),
         MirStatementKind::Call { .. } => {}
@@ -320,7 +326,10 @@ pub(super) fn install_cli_dispatch_entry(
     Ok(())
 }
 
-pub(super) fn is_explicit_entry_function(function: &MirFunction, types: &radix::semantic::TypeTable) -> bool {
+pub(super) fn is_explicit_entry_function(
+    function: &MirFunction,
+    types: &radix::semantic::TypeTable,
+) -> bool {
     function.source.is_none()
         && function.name.is_none()
         && function.params.is_empty()
@@ -362,7 +371,10 @@ pub(super) fn lower_unit<'a>(
     Ok(lowered)
 }
 
-pub(super) fn append_shifted_program(merged: &mut LoweredMirUnit<'_>, lowered: &mut LoweredMirUnit<'_>) {
+pub(super) fn append_shifted_program(
+    merged: &mut LoweredMirUnit<'_>,
+    lowered: &mut LoweredMirUnit<'_>,
+) {
     append_shifted_parts(
         merged,
         &mut lowered.program,
@@ -662,4 +674,3 @@ pub(super) fn shift_function_id(id: &mut MirFunctionId, offset: u32) {
 pub(super) fn shift_environment_id(id: &mut MirClosureEnvironmentId, offset: u32) {
     id.0 += offset;
 }
-

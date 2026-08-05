@@ -893,4 +893,3 @@ pub(super) fn rewrite_non_null_chain(
         }
     }
 }
-

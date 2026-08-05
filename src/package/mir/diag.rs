@@ -10,7 +10,11 @@ pub(super) fn mir_lowering_diag(path: &Path, message: impl Into<String>) -> Diag
     mir_diag(path, message).with_phase(DiagnosticPhase::Mir)
 }
 
-pub(super) fn mir_issue_diag(path: &Path, issue: &'static str, message: impl Into<String>) -> Diagnostic {
+pub(super) fn mir_issue_diag(
+    path: &Path,
+    issue: &'static str,
+    message: impl Into<String>,
+) -> Diagnostic {
     mir_diag(path, message).with_arg("issue", issue)
 }
 

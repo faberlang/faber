@@ -2,7 +2,9 @@
 
 use super::*;
 
-pub(super) fn check_fmir_runtime_requirements(image: &FmirPackageImage) -> Result<(), Vec<Diagnostic>> {
+pub(super) fn check_fmir_runtime_requirements(
+    image: &FmirPackageImage,
+) -> Result<(), Vec<Diagnostic>> {
     let unsupported = image
         .runtime_requirements
         .iter()
@@ -156,4 +158,3 @@ pub(super) fn collect_kernel_host_requirements(
         },
     }
 }
-

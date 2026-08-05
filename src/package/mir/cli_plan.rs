@@ -649,7 +649,10 @@ pub(super) fn plan_cli_subcommand(
     })
 }
 
-pub(super) fn cli_operand_consumed_len(operands: &[PlannedCliOperand<'_>], argumenta: &[String]) -> usize {
+pub(super) fn cli_operand_consumed_len(
+    operands: &[PlannedCliOperand<'_>],
+    argumenta: &[String],
+) -> usize {
     let mut consumed = 0;
     for operand in operands {
         if cli_operand_consumes_many(operand.operand) {
@@ -784,7 +787,11 @@ pub(super) fn add_runtime_field_type_rewrites(
     }
 }
 
-pub(super) fn push_type_rewrite(rewrites: &mut Vec<(TypeId, TypeId)>, source: TypeId, target: TypeId) {
+pub(super) fn push_type_rewrite(
+    rewrites: &mut Vec<(TypeId, TypeId)>,
+    source: TypeId,
+    target: TypeId,
+) {
     if source == target || rewrites.iter().any(|(existing, _)| *existing == source) {
         return;
     }
@@ -950,7 +957,10 @@ pub(super) fn import_index_expr(
     }
 }
 
-pub(super) fn command_cli_args_type(unit: &AnalyzedPackageUnit, command: &CliCommand) -> Option<TypeId> {
+pub(super) fn command_cli_args_type(
+    unit: &AnalyzedPackageUnit,
+    command: &CliCommand,
+) -> Option<TypeId> {
     unit.analysis.hir.items.iter().find_map(|item| {
         let HirItemKind::Function(function) = &item.kind else {
             return None;
@@ -960,4 +970,3 @@ pub(super) fn command_cli_args_type(unit: &AnalyzedPackageUnit, command: &CliCom
             .flatten()
     })
 }
-

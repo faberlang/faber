@@ -193,4 +193,3 @@ pub(super) fn source_identity(
         hash: fnv64_hex(&bytes),
     })
 }
-

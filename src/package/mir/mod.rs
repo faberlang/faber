@@ -250,10 +250,10 @@ use remap::*;
 use requirements::*;
 use sources::*;
 
-#[allow(unused_imports)] // external backend harnesses consume the public package-MIR callback.
-pub use driver::with_lowered_package_mir;
 #[cfg(test)]
 pub(crate) use driver::with_interpreted_lowered_package_mir;
+#[allow(unused_imports)] // external backend harnesses consume the public package-MIR callback.
+pub use driver::with_lowered_package_mir;
 // generated fmir-bin runner crates consume this public API.
 #[allow(unused_imports)]
 pub use routes::run_fmir_image_bytes_with_stdio;

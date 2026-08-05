@@ -251,10 +251,11 @@ pub(super) fn run_loaded_fmir_image_route_with_selection<H: Host + ?Sized>(
         Err(diagnostic) => Err(vec![diagnostic]),
         Ok(None) => run_fmir_package_image(image, host),
         Ok(Some(backend)) => {
-            let device = image
-                .device
-                .as_ref()
-                .ok_or_else(|| vec![super::super::host_factory::missing_device_descriptor(backend)])?;
+            let device = image.device.as_ref().ok_or_else(|| {
+                vec![super::super::host_factory::missing_device_descriptor(
+                    backend,
+                )]
+            })?;
             super::super::device::execute_device_route(device, backend, &image.source_hashes)
         }
     }
@@ -356,12 +357,12 @@ pub fn run_fmir_image_bytes_with_stdio(
             // backend is admitted. Run it through the composite host's
             // device route (S1-6 launch seam); fail-before-launch applies
             // inside the descriptor validation.
-            let device = loaded
-                .device
-                .as_ref()
-                .ok_or_else(|| vec![super::super::host_factory::missing_device_descriptor(backend)])?;
+            let device = loaded.device.as_ref().ok_or_else(|| {
+                vec![super::super::host_factory::missing_device_descriptor(
+                    backend,
+                )]
+            })?;
             super::super::device::execute_device_route(device, backend, &loaded.source_hashes)
         }
     }
 }
-

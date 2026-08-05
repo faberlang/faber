@@ -606,4 +606,3 @@ pub(super) fn package_mir_runtime_record_i32(value: &MirRuntimeRecordValue) -> O
     };
     i32::try_from(*value).ok()
 }
-

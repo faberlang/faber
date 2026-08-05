@@ -132,7 +132,11 @@ pub(super) fn rewrite_terminator_sources(
     }
 }
 
-pub(super) fn rewrite_value_sources(value: &mut MirValue, unit_path: &Path, source_rewrites: &SourceRewrites) {
+pub(super) fn rewrite_value_sources(
+    value: &mut MirValue,
+    unit_path: &Path,
+    source_rewrites: &SourceRewrites,
+) {
     match &mut value.kind {
         MirValueKind::Operand(operand) => {
             rewrite_operand_sources(operand, unit_path, source_rewrites)
@@ -165,7 +169,11 @@ pub(super) fn rewrite_operand_sources(
     }
 }
 
-pub(super) fn rewrite_place_sources(place: &mut MirPlace, unit_path: &Path, source_rewrites: &SourceRewrites) {
+pub(super) fn rewrite_place_sources(
+    place: &mut MirPlace,
+    unit_path: &Path,
+    source_rewrites: &SourceRewrites,
+) {
     for projection in &mut place.projections {
         match projection {
             MirProjection::VariantField { variant, .. } => {
@@ -287,4 +295,3 @@ pub(super) fn rewrite_option_chain_sources(
         MirOptionChainLink::Field(_) => {}
     }
 }
-

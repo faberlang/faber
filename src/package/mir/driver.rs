@@ -302,4 +302,3 @@ pub(super) fn bridge_norma_providers_to_kernel(
         Err(diagnostics)
     }
 }
-

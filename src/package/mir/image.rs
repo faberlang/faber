@@ -647,7 +647,10 @@ pub(super) fn fmir_image_decode_error(
     }
 }
 
-pub(super) fn load_fmir_text_image(text: &str, path: &Path) -> Result<FmirPackageImage, Vec<Diagnostic>> {
+pub(super) fn load_fmir_text_image(
+    text: &str,
+    path: &Path,
+) -> Result<FmirPackageImage, Vec<Diagnostic>> {
     load_fmir_image_with(
         path,
         FmirPackageImageFormat::FmirText,
@@ -661,7 +664,10 @@ pub(super) fn load_fmir_text_image(text: &str, path: &Path) -> Result<FmirPackag
     )
 }
 
-pub(super) fn load_fmir_image(bytes: &[u8], path: &Path) -> Result<FmirPackageImage, Vec<Diagnostic>> {
+pub(super) fn load_fmir_image(
+    bytes: &[u8],
+    path: &Path,
+) -> Result<FmirPackageImage, Vec<Diagnostic>> {
     load_fmir_image_with(
         path,
         FmirPackageImageFormat::Fmir,
@@ -674,4 +680,3 @@ pub(super) fn load_fmir_image(bytes: &[u8], path: &Path) -> Result<FmirPackageIm
         || decode_binary_image(bytes, PACKAGE_MIR_TOOLCHAIN_VERSION).map(FmirImagePayload::from),
     )
 }
-

@@ -20,7 +20,11 @@ pub(super) fn remap_optional_symbol(
     })
 }
 
-pub(super) fn remap_program_text_symbols(program: &mut MirProgram, source: &Interner, target: &mut Interner) {
+pub(super) fn remap_program_text_symbols(
+    program: &mut MirProgram,
+    source: &Interner,
+    target: &mut Interner,
+) {
     for function in &mut program.functions {
         // Function names are symbols from the lowering interner; they must be
         // remapped too or `MirNames` (built against the merged interner)
@@ -127,7 +131,11 @@ pub(super) fn remap_terminator_text_symbols(
     }
 }
 
-pub(super) fn remap_value_text_symbols(value: &mut MirValue, source: &Interner, target: &mut Interner) {
+pub(super) fn remap_value_text_symbols(
+    value: &mut MirValue,
+    source: &Interner,
+    target: &mut Interner,
+) {
     match &mut value.kind {
         MirValueKind::Operand(operand) => remap_operand_text_symbols(operand, source, target),
         MirValueKind::Closure(closure) => {
@@ -142,7 +150,11 @@ pub(super) fn remap_value_text_symbols(value: &mut MirValue, source: &Interner, 
     }
 }
 
-pub(super) fn remap_operand_text_symbols(operand: &mut MirOperand, source: &Interner, target: &mut Interner) {
+pub(super) fn remap_operand_text_symbols(
+    operand: &mut MirOperand,
+    source: &Interner,
+    target: &mut Interner,
+) {
     match operand {
         MirOperand::Place(place) => remap_place_text_symbols(place, source, target),
         MirOperand::Constant(constant) => remap_constant_text_symbols(constant, source, target),
@@ -150,7 +162,11 @@ pub(super) fn remap_operand_text_symbols(operand: &mut MirOperand, source: &Inte
     }
 }
 
-pub(super) fn remap_place_text_symbols(place: &mut MirPlace, source: &Interner, target: &mut Interner) {
+pub(super) fn remap_place_text_symbols(
+    place: &mut MirPlace,
+    source: &Interner,
+    target: &mut Interner,
+) {
     for projection in &mut place.projections {
         match projection {
             MirProjection::Field(field) => {
@@ -167,7 +183,11 @@ pub(super) fn remap_place_text_symbols(place: &mut MirPlace, source: &Interner, 
     }
 }
 
-pub(super) fn remap_callee_text_symbols(callee: &mut MirCallee, source: &Interner, target: &mut Interner) {
+pub(super) fn remap_callee_text_symbols(
+    callee: &mut MirCallee,
+    source: &Interner,
+    target: &mut Interner,
+) {
     match callee {
         MirCallee::Closure(closure) => {
             remap_operand_text_symbols(&mut closure.environment, source, target)
@@ -231,7 +251,11 @@ pub(super) fn remap_aggregate_text_symbols(
     }
 }
 
-pub(super) fn remap_option_text_symbols(op: &mut MirOptionOp, source: &Interner, target: &mut Interner) {
+pub(super) fn remap_option_text_symbols(
+    op: &mut MirOptionOp,
+    source: &Interner,
+    target: &mut Interner,
+) {
     match op {
         MirOptionOp::Some(operand)
         | MirOptionOp::IsNil(operand)
@@ -296,4 +320,3 @@ pub(super) fn remap_constant_text_symbols(
         | MirConstant::Function(_) => {}
     }
 }
-

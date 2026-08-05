@@ -54,12 +54,13 @@ pub(super) fn manifest_device_config(
     ),
     Vec<Diagnostic>,
 > {
-    let layout = super::super::discover_build_layout(input).map_err(|diagnostic| vec![*diagnostic])?;
+    let layout =
+        super::super::discover_build_layout(input).map_err(|diagnostic| vec![*diagnostic])?;
     if !layout.manifest_path.exists() {
         return Ok((BTreeMap::new(), None, None, false));
     }
-    let manifest =
-        super::super::read_manifest(&layout.manifest_path).map_err(|diagnostic| vec![*diagnostic])?;
+    let manifest = super::super::read_manifest(&layout.manifest_path)
+        .map_err(|diagnostic| vec![*diagnostic])?;
     let inputs = super::super::manifest_device_inputs(&manifest.device.inputs);
     let backend = super::super::manifest_backend_selection(
         manifest.device.backend.as_deref(),
@@ -81,7 +82,10 @@ pub(super) fn manifest_device_config(
     Ok((inputs, backend, steps, declared))
 }
 
-pub(super) fn package_mir_manifest(prepared: &PreparedPackageMir<'_>, package_root: &Path) -> String {
+pub(super) fn package_mir_manifest(
+    prepared: &PreparedPackageMir<'_>,
+    package_root: &Path,
+) -> String {
     let entry = escape_manifest_value(&relative_or_display(package_root, &prepared.entry_path));
     let mut manifest = format!(
         "version = {}\ntarget = \"{}\"\nentry = \"{}\"\nentry_function = \"run_entry\"\n\n[runtime]\n",
@@ -123,7 +127,10 @@ pub(super) fn escape_manifest_value(value: &str) -> String {
     escape_toml_basic_string(value)
 }
 
-pub(super) fn validate_package_mir_manifest(manifest: &str, path: &Path) -> Result<(), Vec<Diagnostic>> {
+pub(super) fn validate_package_mir_manifest(
+    manifest: &str,
+    path: &Path,
+) -> Result<(), Vec<Diagnostic>> {
     let has_version = manifest
         .lines()
         .any(|line| line.trim() == format!("version = {PACKAGE_MIR_ARTIFACT_VERSION}"));
@@ -143,4 +150,3 @@ pub(super) fn validate_package_mir_manifest(manifest: &str, path: &Path) -> Resu
         "package MIR artifact manifest is missing required v1 metadata",
     )])
 }
-
