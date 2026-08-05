@@ -21,10 +21,7 @@ pub use diagnostic::{
     SemanticErrorKind, Severity, WarningKind,
 };
 pub use span::Span;
-pub use spec::{
-    locale_fallback_spec, locale_suggestion_spec, locale_unknown_spec,
-    DiagnosticSpec,
-};
+pub use spec::{locale_fallback_spec, locale_suggestion_spec, locale_unknown_spec, DiagnosticSpec};
 
 #[cfg(test)]
 mod smoke_tests {
