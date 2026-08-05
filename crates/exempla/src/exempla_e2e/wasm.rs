@@ -199,6 +199,24 @@ pub(crate) fn classify_wasm_exemplum(
     let stubless_probe = probe_wasm_instantiation_stubless(&wasm_file, &imports);
     let stub_probe = probe_wasm_with_stub_host(&wasm_file);
     let run_probe = run_wasm_entry_with_stub_host(&wasm_file);
+
+    // Product-runner tier boost: the portable faber-host-wasm host returns
+    // typed outcomes and exact stdout bytes without a stub host or an
+    // opaque-handle table. A Success whose captured stdout matches the
+    // sibling `.expected` reaches outcome-checked (Stage 2 proof rows).
+    if let Some((boost_tier, boost_reason)) =
+        super::wasm_product::portable_product_boost(file, &wasm_bytes)
+    {
+        return wasm_result(
+            file,
+            boost_tier,
+            boost_reason,
+            Some(stubless_probe.bucket),
+            Some(stub_probe.bucket),
+            Some(run_probe.bucket),
+        );
+    }
+
     let exemplum_key = wasm_exemplum_key(file);
     let (tier, reason) = match stub_probe.bucket {
         WasmInstantiationBucket::InstantiateValid => {

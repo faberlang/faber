@@ -18,3 +18,7 @@ wait-timeout = "0.2"
 [dev-dependencies]
 # Package MIR lower/compile for norma:* and multi-file package exempla.
 faber = { path = "../.." }
+# Stage 2 product-runner adapter: the portable faber-host-wasm host is the
+# product evidence boundary replacing the stub host and external handle maps.
+faber-host-wasm = { path = "../../../hosts/wasm" }
+wat = "1"

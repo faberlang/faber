@@ -615,6 +615,7 @@ name = "exempla"
 version = "0.1.0"
 dependencies = [
  "faber",
+ "faber-host-wasm",
  "radix",
  "rustc-hash",
  "serde",
@@ -622,6 +623,7 @@ dependencies = [
  "sha2",
  "toml 1.1.4+spec-1.1.0",
  "wait-timeout",
+ "wat",
 ]
 
 [[package]]
@@ -631,6 +633,7 @@ dependencies = [
  "cista",
  "clap",
  "faber-host-macos-arm64",
+ "faber-host-wasm",
  "faber-runtime",
  "fs2",
  "hygiene-ratchet",
@@ -665,6 +668,13 @@ dependencies = [
  "serde_json",
  "solum",
  "tempus",
+ "wasmtime",
+]
+
+[[package]]
+name = "faber-host-wasm"
+version = "0.1.0"
+dependencies = [
  "wasmtime",
 ]
 
