@@ -63,7 +63,8 @@ fn empty_diagnostic_locale_is_rejected() {
     let err = config_with_locale(Target::Rust, &entry, Some("zh-Hans"), Some("   "))
         .expect_err("empty diagnostic locale");
     assert!(
-        err.message.contains("--diagnostic-locale must not be empty"),
+        err.message
+            .contains("--diagnostic-locale must not be empty"),
         "unexpected message: {}",
         err.message
     );

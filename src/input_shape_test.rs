@@ -1,6 +1,5 @@
 use crate::input_shape::{
-    locale_supports_input, locale_without_package_error,
-    verify_input_is_package_shaped,
+    locale_supports_input, locale_without_package_error, verify_input_is_package_shaped,
 };
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -83,18 +82,12 @@ fn reader_locale_accepts_cargo_manifest_dir() {
 
 #[test]
 fn reader_locale_accepts_faber_toml() {
-    assert!(locale_supports_input(
-        &["faber.toml".to_owned()],
-        false
-    ));
+    assert!(locale_supports_input(&["faber.toml".to_owned()], false));
 }
 
 #[test]
 fn reader_locale_accepts_nested_faber_toml() {
-    assert!(locale_supports_input(
-        &["pkg/faber.toml".to_owned()],
-        false
-    ));
+    assert!(locale_supports_input(&["pkg/faber.toml".to_owned()], false));
 }
 
 #[test]
@@ -107,10 +100,7 @@ fn reader_locale_accepts_missing_package() {
 
 #[test]
 fn reader_locale_accepts_fab_entry() {
-    assert!(locale_supports_input(
-        &["main.fab".to_owned()],
-        false
-    ));
+    assert!(locale_supports_input(&["main.fab".to_owned()], false));
 }
 
 #[test]
@@ -120,10 +110,7 @@ fn reader_locale_rejects_stdin() {
 
 #[test]
 fn reader_locale_rejects_txt() {
-    assert!(!locale_supports_input(
-        &["main.txt".to_owned()],
-        false
-    ));
+    assert!(!locale_supports_input(&["main.txt".to_owned()], false));
 }
 
 #[test]

@@ -387,13 +387,7 @@ fn cli_parses_diagnostic_locale_on_build_run_test_emit() {
     for (cmd, argv) in [
         (
             "build",
-            vec![
-                "faber",
-                "build",
-                "--diagnostic-locale",
-                "en",
-                "main.fab",
-            ],
+            vec!["faber", "build", "--diagnostic-locale", "en", "main.fab"],
         ),
         (
             "run",
@@ -438,13 +432,7 @@ fn cli_parses_diagnostic_locale_on_build_run_test_emit() {
 #[test]
 fn cli_parses_locale_on_emit() {
     let emit = Cli::try_parse_from([
-        "faber",
-        "emit",
-        "--locale",
-        "zh-Hans",
-        "-t",
-        "rust",
-        "main.fab",
+        "faber", "emit", "--locale", "zh-Hans", "-t", "rust", "main.fab",
     ])
     .expect("parse emit reader locale");
     let Some(crate::cli::Command::Emit(args)) = emit.command else {
@@ -706,14 +694,8 @@ fn cli_rejects_explain_diagnostic_locale_without_term() {
 
 #[test]
 fn cli_parses_explain_diagnostic_locale_with_term() {
-    let cli = Cli::try_parse_from([
-        "faber",
-        "explain",
-        "--diagnostic-locale",
-        "th-TH",
-        "SEM010",
-    ])
-    .expect("parse explain diagnostic locale");
+    let cli = Cli::try_parse_from(["faber", "explain", "--diagnostic-locale", "th-TH", "SEM010"])
+        .expect("parse explain diagnostic locale");
     let Some(crate::cli::Command::Explain(args)) = cli.command else {
         panic!("expected explain subcommand");
     };

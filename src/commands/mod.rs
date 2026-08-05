@@ -110,11 +110,7 @@ fn dispatch(command: Command) {
         }
         Command::Targets => cmd_targets(),
         Command::Check(args) => {
-            reject_reader_locale_without_package(
-                args.locale.as_deref(),
-                &args.input,
-                args.package,
-            );
+            reject_reader_locale_without_package(args.locale.as_deref(), &args.input, args.package);
             validate_deny_codes(&args.deny);
             if args.package || package::should_treat_as_package_from_args(&args.input) {
                 package::cmd_check_package(CheckCommand {
@@ -252,8 +248,7 @@ fn reject_reader_locale_without_package(
     input: &[String],
     force_package: bool,
 ) {
-    if let Some(message) = locale_without_package_error(locale, input, force_package)
-    {
+    if let Some(message) = locale_without_package_error(locale, input, force_package) {
         eprintln!("error: {message}");
         std::process::exit(1);
     }

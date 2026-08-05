@@ -68,9 +68,7 @@ use radix_mir::device_program::{
     Binding, BufferId, BufferIdentity, BufferLifetime, BufferRole, BufferVersion, DeviceProgram,
     DeviceProgramLifetime, DeviceResource, KernelLaunchPlan, KernelUnit, LaunchId, LaunchUnit,
 };
-use radix_mir::device_program_plans::{
-    kernel_plan_for_function, subchain_signature_for_emission,
-};
+use radix_mir::device_program_plans::{kernel_plan_for_function, subchain_signature_for_emission};
 use radix_mir::device_semantics::{
     DependencyEdge, DeviceSemantics, InitializationFact, InitializationPolicy,
     LosslessMirCompanionEntry, ObservationFact, SemanticValue, SemanticValueId,
@@ -82,10 +80,9 @@ use radix_mir::layout::MirTensorStorageLayout;
 use radix_mir::names::MirNames;
 use radix_mir::{
     MirCallee, MirCollectionOp, MirConstant, MirFunctionId, MirIntrinsic, MirLocalId, MirOperand,
-    MirPlace, MirPlaceBase, MirProjection, MirStatementKind, MirTempId, MirTerminatorKind,
-    MirType, MirValueKind,
+    MirPlace, MirPlaceBase, MirProjection, MirStatementKind, MirTempId, MirTerminatorKind, MirType,
+    MirValueKind,
 };
-use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use radix_mir_fmir::schema::{
     WireCompanionDerivativeKind, WireCompanionRelation, WireCompanionSelectedInput,
     WireCompanionSelectedOutput,
@@ -102,6 +99,7 @@ use radix_mir_fmir::{
     WireSemanticValueOrigin, WireSharedMemoryLayout, WireStorageLayout, WireTransposePlan,
     WireWorkgroupCount, WireWorkgroupSize,
 };
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 
 /// Stable fail-closed diagnostic for a device-program construction failure.
 fn device_diag(context: &str, message: impl Into<String>) -> Diagnostic {
@@ -504,7 +502,11 @@ fn semantic_facts(
         .into_iter()
         // Persistent trainable-parameter state: the step's write feeds the
         // NEXT step's read — excluded from this step's dependency graph.
-        .filter(|pair| !buffers.iter().any(|buffer| buffer.param && buffer.id == pair.buffer))
+        .filter(|pair| {
+            !buffers
+                .iter()
+                .any(|buffer| buffer.param && buffer.id == pair.buffer)
+        })
         .map(|pair| DependencyEdge {
             producer: pair.producer,
             consumer: pair.consumer,
@@ -649,10 +651,7 @@ pub(crate) struct GradientLink {
 /// # Errors
 /// Fail-closed when both a declared count and a constant source bound exist
 /// and disagree.
-pub(crate) fn admit_step_count(
-    declared: u32,
-    source: Option<u32>,
-) -> Result<u32, Vec<Diagnostic>> {
+pub(crate) fn admit_step_count(declared: u32, source: Option<u32>) -> Result<u32, Vec<Diagnostic>> {
     if let Some(source) = source {
         if declared != source {
             return Err(vec![device_diag(
@@ -1127,8 +1126,10 @@ pub(crate) fn training_plan_facts(
     // only through this graph connection — never a name/shape coincidence.
     let mut gradients: Vec<GradientLink> = Vec::new();
     for param in &trainable {
-        let Some((companion, gradient_slot)) =
-            companion_calls.selected_gradient_slots.get(&param.entry_local).copied()
+        let Some((companion, gradient_slot)) = companion_calls
+            .selected_gradient_slots
+            .get(&param.entry_local)
+            .copied()
         else {
             continue;
         };
@@ -1220,7 +1221,10 @@ pub(crate) fn training_plan_facts(
     }
 
     let source_loop_bound = source_loop_bound(entry);
-    let step_count = admit_step_count(declared_steps.unwrap_or(DEFAULT_TRAINING_STEPS), source_loop_bound)?;
+    let step_count = admit_step_count(
+        declared_steps.unwrap_or(DEFAULT_TRAINING_STEPS),
+        source_loop_bound,
+    )?;
     Ok(Some(TrainingPlanFacts {
         step_count,
         source_loop_bound,
@@ -1281,21 +1285,23 @@ fn statement_defining_reads(
         for statement in &block.statements {
             let writes = match &statement.kind {
                 MirStatementKind::Assign { place, .. }
-                | MirStatementKind::Construct { destination: place, .. } => {
+                | MirStatementKind::Construct {
+                    destination: place, ..
+                } => {
                     matches!(
                         place.base,
                         MirPlaceBase::Local(local) if local == destination_local
                     ) && place.projections.is_empty()
                 }
                 MirStatementKind::RuntimeCall { destination, .. }
-                | MirStatementKind::Call { destination, .. } => destination
-                    .as_ref()
-                    .is_some_and(|place| {
+                | MirStatementKind::Call { destination, .. } => {
+                    destination.as_ref().is_some_and(|place| {
                         matches!(
                             place.base,
                             MirPlaceBase::Local(local) if local == destination_local
                         ) && place.projections.is_empty()
-                    }),
+                    })
+                }
             };
             if !writes {
                 continue;
@@ -1347,7 +1353,9 @@ fn statement_value_temp(statement: &radix_mir::MirStatement) -> Option<MirTempId
 fn statement_dest_temp(statement: &radix_mir::MirStatement) -> Option<MirTempId> {
     let destination = match &statement.kind {
         MirStatementKind::Assign { place, .. }
-        | MirStatementKind::Construct { destination: place, .. } => Some(place),
+        | MirStatementKind::Construct {
+            destination: place, ..
+        } => Some(place),
         MirStatementKind::RuntimeCall { destination, .. }
         | MirStatementKind::Call { destination, .. } => destination.as_ref(),
     };
@@ -1373,9 +1381,9 @@ fn statement_reads_local(statement: &radix_mir::MirStatement, local: MirLocalId)
             .args
             .iter()
             .any(|operand| operand_local(operand) == Some(local)),
-        MirStatementKind::Call { args, .. } => {
-            args.iter().any(|operand| operand_local(operand) == Some(local))
-        }
+        MirStatementKind::Call { args, .. } => args
+            .iter()
+            .any(|operand| operand_local(operand) == Some(local)),
         MirStatementKind::Construct { aggregate, .. } => aggregate
             .fields
             .operands()
@@ -1437,8 +1445,7 @@ pub(crate) fn device_program_for_lowered(
     declared_steps: u32,
 ) -> Result<Option<(DeviceProgram, DeviceSemantics, u32)>, Vec<Diagnostic>> {
     let program = validated.program();
-    let training =
-        training_plan_facts(validated, interner, companions, Some(declared_steps))?;
+    let training = training_plan_facts(validated, interner, companions, Some(declared_steps))?;
 
     let kernel_functions: Vec<&MirFunction> = program
         .functions
@@ -1492,7 +1499,10 @@ pub(crate) fn device_program_for_lowered(
                     .get(param.param_position as usize)
                     .map(|param| param.local)
                 {
-                    param_updates.insert((param.step_function, param_local), (param.param_position, param.update_output));
+                    param_updates.insert(
+                        (param.step_function, param_local),
+                        (param.param_position, param.update_output),
+                    );
                 }
             }
         }
@@ -1506,7 +1516,10 @@ pub(crate) fn device_program_for_lowered(
     let mut companion_gradient_slots: BTreeMap<u32, BTreeSet<u32>> = BTreeMap::new();
     if let Some(training) = &training {
         for link in &training.gradients {
-            gradient_links.insert((link.step_function, link.gradient_position), (link.companion.0, link.gradient_slot));
+            gradient_links.insert(
+                (link.step_function, link.gradient_position),
+                (link.companion.0, link.gradient_slot),
+            );
         }
     }
     // EVERY selected-input gradient slot of a device-resident companion is a
@@ -1546,7 +1559,10 @@ pub(crate) fn device_program_for_lowered(
                     .map_err(|error| vec![device_diag("shape fold", error.message)])?;
             folded = Some(outcome.function);
             folded.as_ref().ok_or_else(|| {
-                vec![device_diag("shape fold", "folded function missing after fold admission")]
+                vec![device_diag(
+                    "shape fold",
+                    "folded function missing after fold admission",
+                )]
             })?
         } else {
             function
@@ -1556,7 +1572,10 @@ pub(crate) fn device_program_for_lowered(
                                  signature: &MirKernelSignature,
                                  plan: CollectionKernelPlan,
                                  entry: String,
-                                 param_updates: &BTreeMap<(MirFunctionId, MirLocalId), (u32, u32)>|
+                                 param_updates: &BTreeMap<
+            (MirFunctionId, MirLocalId),
+            (u32, u32),
+        >|
          -> Result<(), Vec<Diagnostic>> {
             let mut resources: Vec<ResourceBuild> = Vec::new();
             // The trainable param local → its registered buffer id, filled
@@ -1567,15 +1586,16 @@ pub(crate) fn device_program_for_lowered(
                 .resources()
                 .filter(|resource| resource.kind == MirKernelResourceKind::StorageBuffer)
             {
-                let role = BufferRole::from_abi_role(resource.role, resource.access).ok_or_else(|| {
-                    vec![device_diag(
-                        "buffer role",
-                        format!(
+                let role =
+                    BufferRole::from_abi_role(resource.role, resource.access).ok_or_else(|| {
+                        vec![device_diag(
+                            "buffer role",
+                            format!(
                             "storage buffer binding {} has no coherent program role ({:?} {:?})",
                             resource.binding, resource.role, resource.access
                         ),
-                    )]
-                })?;
+                        )]
+                    })?;
                 // A trainable parameter's read slot: the buffer is persistent
                 // InOut state with HostProvided init (param-identity.md) —
                 // the program role is InOut regardless of the slot's ABI role.
@@ -1728,9 +1748,7 @@ pub(crate) fn device_program_for_lowered(
                 // minted (the train_step kernels built afterwards alias them);
                 // a companion gradient slot is a per-step scratch value,
                 // never an observation point.
-                if let (Some(source), Some(output_index)) =
-                    (kernel_source.source, output_index)
-                {
+                if let (Some(source), Some(output_index)) = (kernel_source.source, output_index) {
                     if companion_gradient_slots
                         .get(&source.0)
                         .is_some_and(|slots| slots.contains(&output_index))
@@ -1776,11 +1794,9 @@ pub(crate) fn device_program_for_lowered(
                 interner,
             );
         if let Ok(whole_signature) = &whole_signature {
-            if let Ok(Some(plan)) = kernel_plan_for_function(
-                kernel_source,
-                whole_signature,
-                validated.validation(),
-            ) {
+            if let Ok(Some(plan)) =
+                kernel_plan_for_function(kernel_source, whole_signature, validated.validation())
+            {
                 return emit_subchain(
                     kernel_source,
                     whole_signature,
@@ -1837,7 +1853,13 @@ pub(crate) fn device_program_for_lowered(
             } else {
                 format!("{base_entry}__{subchain_index}")
             };
-            emit_subchain(&synthetic, &signature, subchain.plan.clone(), entry, &param_updates)?;
+            emit_subchain(
+                &synthetic,
+                &signature,
+                subchain.plan.clone(),
+                entry,
+                &param_updates,
+            )?;
         }
         Ok(())
     };
@@ -2533,17 +2555,18 @@ pub(crate) fn device_section_for_program(
     // kernel the constructor admitted folds here with identical inputs;
     // unfoldable shapes were already rejected closed there).
     let mut emitter_program = validated.program().clone();
-    let kernel_ids: BTreeSet<MirFunctionId> =
-        program.kernels.iter().map(|kernel| kernel.function).collect();
+    let kernel_ids: BTreeSet<MirFunctionId> = program
+        .kernels
+        .iter()
+        .map(|kernel| kernel.function)
+        .collect();
     for function in &mut emitter_program.functions {
         if !kernel_ids.contains(&function.id) || !function_has_shape_construction(function) {
             continue;
         }
-        let outcome = radix_mir::static_shape_fold::fold_static_shapes(
-            function,
-            validated.validation(),
-        )
-        .map_err(|error| vec![device_diag("shape fold", error.message)])?;
+        let outcome =
+            radix_mir::static_shape_fold::fold_static_shapes(function, validated.validation())
+                .map_err(|error| vec![device_diag("shape fold", error.message)])?;
         *function = outcome.function;
     }
     let emitter_context = validated.validation().clone();
@@ -2564,11 +2587,8 @@ pub(crate) fn device_section_for_program(
     // later `--backend cuda` request fails closed as a missing declared
     // artifact (the same seam the PTX-compile-unavailable path uses). The
     // Metal artifact is the S3-A5 proof surface.
-    let cuda_artifact = match radix_mir_llvm::emit_cuda_device_artifact(
-        program,
-        &emitter_validated,
-        interner,
-    ) {
+    let cuda_artifact =
+        match radix_mir_llvm::emit_cuda_device_artifact(program, &emitter_validated, interner) {
             Ok(artifact) => Some(artifact),
             Err(error) => {
                 eprintln!(
@@ -3138,9 +3158,7 @@ fn inputs_by_buffer_id(device: &FmirDeviceSection) -> BTreeMap<u32, Vec<f32>> {
             let is_input = resource.buffer.role == WireBufferRole::Input;
             let is_host_provided_param = resource.buffer.role == WireBufferRole::InOut
                 && resource.initialization == WireInitializationPolicy::HostProvided;
-            if (is_input || is_host_provided_param)
-                && !by_id.contains_key(&resource.buffer.id)
-            {
+            if (is_input || is_host_provided_param) && !by_id.contains_key(&resource.buffer.id) {
                 if let Some(values) = by_name.get(&resource.buffer.name) {
                     by_id.insert(resource.buffer.id, values.clone());
                 }
@@ -3316,7 +3334,9 @@ fn first_observed(outputs: &BTreeMap<u32, Vec<f32>>) -> Option<f32> {
 /// loss, and the convergence verdict. Pure — the route prints it; the tests
 /// assert on it.
 #[must_use]
-pub(crate) fn step_run_report(receipts: &[faber_host_macos_arm64::composite_host::DeviceExecutionReceipt]) -> StepRunReport {
+pub(crate) fn step_run_report(
+    receipts: &[faber_host_macos_arm64::composite_host::DeviceExecutionReceipt],
+) -> StepRunReport {
     let loss_trace: Vec<BTreeMap<u32, Vec<f32>>> = receipts
         .iter()
         .map(|receipt| receipt.outputs.clone())
@@ -3362,9 +3382,9 @@ fn execute_session_receipts(
             let mut receipts = Vec::with_capacity(steps as usize);
             for _ in 0..steps {
                 receipts.push(
-                    session
-                        .execute_step()
-                        .map_err(|error| vec![super::host_factory::host_error_diagnostic(&error)])?,
+                    session.execute_step().map_err(|error| {
+                        vec![super::host_factory::host_error_diagnostic(&error)]
+                    })?,
                 );
             }
             Ok(receipts)
@@ -3374,9 +3394,9 @@ fn execute_session_receipts(
             let mut receipts = Vec::with_capacity(repeat_count);
             for _ in 0..repeat_count {
                 receipts.push(
-                    session
-                        .execute(inputs)
-                        .map_err(|error| vec![super::host_factory::host_error_diagnostic(&error)])?,
+                    session.execute(inputs).map_err(|error| {
+                        vec![super::host_factory::host_error_diagnostic(&error)]
+                    })?,
                 );
             }
             Ok(receipts)

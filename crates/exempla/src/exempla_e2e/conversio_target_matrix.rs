@@ -43,11 +43,11 @@ use radix::codegen::{
     generate_from_analyzed_with_options, generate_rust_from_analyzed, OutputMode, Target,
 };
 use radix::driver::{analyze_source, AnalyzedUnit, Config, Session};
+use radix::locale::{latin_locale_pack, KeywordSurface};
 use radix::mir::{
     classify_mir_coverage, device_roles_from_hir, lower_analyzed_unit_with_context, Lowerability,
     LoweredMirUnit, MirCoverageTarget, MirDeviceContext,
 };
-use radix::locale::{latin_locale_pack, KeywordSurface};
 use rustc_hash::FxHashMap;
 use std::path::PathBuf;
 

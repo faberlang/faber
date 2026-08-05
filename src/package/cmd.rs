@@ -726,10 +726,7 @@ fn compile_package_input(
     target: Target,
     locale: Option<&str>,
     diagnostic_locale: Option<&str>,
-) -> (
-    CompileResult,
-    Option<radix::locale::LocalePack>,
-) {
+) -> (CompileResult, Option<radix::locale::LocalePack>) {
     if input.is_empty() || input[0] == "-" {
         eprintln!("error: package compilation requires a path input");
         std::process::exit(1);
@@ -742,14 +739,13 @@ fn compile_package_input(
         std::process::exit(1);
     }
 
-    let (config, locale_pack) =
-        match config_with_locale(target, &path, locale, diagnostic_locale) {
-            Ok(selection) => selection,
-            Err(diag) => {
-                eprintln!("error: {}", diag.message);
-                std::process::exit(1);
-            }
-        };
+    let (config, locale_pack) = match config_with_locale(target, &path, locale, diagnostic_locale) {
+        Ok(selection) => selection,
+        Err(diag) => {
+            eprintln!("error: {}", diag.message);
+            std::process::exit(1);
+        }
+    };
     (compile_package(&config, &path), locale_pack)
 }
 

@@ -87,10 +87,7 @@ pub fn lookup_installed_diagnostic(
 }
 
 /// Resolve a diagnostic explanation from an already loaded reader pack.
-pub fn lookup_diagnostic_in_pack(
-    query: &str,
-    pack: &LocalePack,
-) -> Option<DiagnosticExplanation> {
+pub fn lookup_diagnostic_in_pack(query: &str, pack: &LocalePack) -> Option<DiagnosticExplanation> {
     let key = DiagnosticLookupKey::parse(query)?;
     resolve_diagnostic_in_pack(query, pack, key)
 }
@@ -121,11 +118,7 @@ pub fn render_plain(explanation: &DiagnosticExplanation) -> String {
     );
     section(&mut out, "NAME", [name.as_str()]);
     section(&mut out, "KIND", ["diagnostic"]);
-    section(
-        &mut out,
-        "READER LOCALE",
-        [explanation.locale.as_str()],
-    );
+    section(&mut out, "READER LOCALE", [explanation.locale.as_str()]);
     section(&mut out, "MESSAGE", [explanation.message.as_str()]);
 
     if let Some(help) = explanation.help.as_deref() {

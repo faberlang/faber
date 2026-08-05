@@ -656,10 +656,9 @@ fn package_device_section(
     // S5-U5b: the manifest `[device] steps` channel (or the portable default)
     // is the declared repeating step count the constructor admits against the
     // source loop bound and the wire carries.
-    let declared_steps =
-        prepared
-            .device_steps
-            .unwrap_or(super::device::DEFAULT_TRAINING_STEPS);
+    let declared_steps = prepared
+        .device_steps
+        .unwrap_or(super::device::DEFAULT_TRAINING_STEPS);
     let Some((program, semantics, step_count)) = super::device::device_program_for_lowered(
         &lowered.validated,
         &lowered.interner,
@@ -679,8 +678,7 @@ fn package_device_section(
     // materialized as SingleRun is a contradiction — fail closed, never a
     // silently dropped count.
     if prepared.device_steps.is_some()
-        && program.lifetime
-            != radix_mir::device_program::DeviceProgramLifetime::RepeatingStep
+        && program.lifetime != radix_mir::device_program::DeviceProgramLifetime::RepeatingStep
     {
         return Err(vec![crate::package_diagnostic_error(
             "faber.toml device.steps applies only to a training-loop package; this package's device program is not a RepeatingStep training program",
@@ -743,13 +741,15 @@ fn package_device_section(
         // it (the D-5 fallout `mlp_backward__1 input_4` failure).
         let has_anonymous_param = function.params.iter().any(|param| {
             param.name.is_none()
-                || param.name.is_some_and(|symbol| {
-                    (symbol.0 as usize) >= lowered.interner.strings().len()
-                })
+                || param
+                    .name
+                    .is_some_and(|symbol| (symbol.0 as usize) >= lowered.interner.strings().len())
         });
-        for program_name in kernel.resources.iter().filter(|resource| {
-            resource.buffer.role == radix_mir::device_program::BufferRole::Input
-        }) {
+        for program_name in kernel
+            .resources
+            .iter()
+            .filter(|resource| resource.buffer.role == radix_mir::device_program::BufferRole::Input)
+        {
             let upstream = has_anonymous_param && program_name.version.element_count == 1;
             if upstream {
                 let name = program_name.buffer.name.clone();
@@ -4830,11 +4830,11 @@ fn remap_optional_symbol(
     source: &Interner,
     target: &mut Interner,
 ) -> Option<Symbol> {
-    name.and_then(|symbol| {
+    name.map(|symbol| {
         if (symbol.0 as usize) < source.strings().len() {
-            Some(target.intern(source.resolve(symbol)))
+            target.intern(source.resolve(symbol))
         } else {
-            Some(symbol)
+            symbol
         }
     })
 }

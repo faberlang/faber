@@ -255,8 +255,14 @@ fn locale_forces_compiled_run_policy_for_single_fab_file() {
 fn run_config_loads_locale_pack_for_go_targets() {
     let example = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale/th-TH");
 
-    let config =
-        run_config(Target::Go, &example, Some("th-TH"), None, WarnPolicy::default()).expect("run config");
+    let config = run_config(
+        Target::Go,
+        &example,
+        Some("th-TH"),
+        None,
+        WarnPolicy::default(),
+    )
+    .expect("run config");
 
     assert_eq!(config.target, Target::Go);
     assert_eq!(
@@ -272,8 +278,14 @@ fn run_config_loads_locale_pack_for_go_targets() {
 fn run_config_uses_manifest_locale_for_non_rust_targets() {
     let example = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale/th-TH");
 
-    let config =
-        run_config(Target::FmirText, &example, None, None, WarnPolicy::default()).expect("run config");
+    let config = run_config(
+        Target::FmirText,
+        &example,
+        None,
+        None,
+        WarnPolicy::default(),
+    )
+    .expect("run config");
 
     assert_eq!(config.target, Target::FmirText);
     assert_eq!(

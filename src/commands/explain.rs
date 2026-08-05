@@ -60,8 +60,10 @@ pub(super) fn cmd_explain(args: ExplainArgs) {
     };
 
     if diagnostic_explain::is_diagnostic_query(&term) {
-        match diagnostic_explain::lookup_installed_diagnostic(&term, args.diagnostic_locale.as_deref())
-        {
+        match diagnostic_explain::lookup_installed_diagnostic(
+            &term,
+            args.diagnostic_locale.as_deref(),
+        ) {
             Ok(Some(explanation)) if args.json => {
                 match diagnostic_explain::render_json(&explanation) {
                     Ok(json) => {
