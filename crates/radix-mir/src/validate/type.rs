@@ -1,0 +1,725 @@
+//! Projection, assignability, and type checks.
+
+use super::{FunctionScope, MirValidationError, Validator};
+use crate::{
+    instantiate_existing_generic_type, MirAggregateCarrier, MirAggregateFamily, MirBlockId,
+    MirClosureEnvironmentId, MirConstant, MirGenericBindings, MirKernelBuiltin, MirLayoutKind,
+    MirLocalId, MirOperand, MirProjection, MirScalarLayout, MirType,
+};
+use radix_hir::DefId;
+use radix_lexer::{Span, Symbol};
+use radix_types::{IndexExpr, NumericWidth, Primitive, Type};
+use rustc_hash::FxHashSet;
+
+impl Validator<'_, '_> {
+    pub(crate) fn project_closure_capture(
+        &mut self,
+        environment_id: MirClosureEnvironmentId,
+        source: DefId,
+        span: Span,
+    ) -> Option<MirType> {
+        self.context
+            .closure_environments
+            .get(&environment_id)
+            .and_then(|environment| {
+                environment
+                    .captures
+                    .iter()
+                    .find(|capture| capture.source == source)
+                    .map(|capture| capture.ty)
+            })
+            .or_else(|| {
+                self.error(span, "closure capture projection is missing metadata");
+                None
+            })
+    }
+
+    pub(crate) fn project_field(
+        &mut self,
+        base_ty: MirType,
+        field: Symbol,
+        span: Span,
+    ) -> Option<MirType> {
+        if self.is_handler_error_nuntius_projection(base_ty, field) {
+            return Some(self.primitive(Primitive::Textus));
+        }
+        if matches!(self.type_kind(base_ty), Type::Primitive(Primitive::Ignotum)) {
+            return Some(self.primitive(Primitive::Ignotum));
+        }
+        match self.type_kind(base_ty).clone() {
+            Type::Struct(def_id) => self
+                .context
+                .struct_fields
+                .get(&def_id)
+                .and_then(|fields| fields.get(&field))
+                .copied()
+                .or_else(|| {
+                    self.error(span, "struct field projection is missing field metadata");
+                    None
+                }),
+            Type::Record(fields) => {
+                fields
+                    .get(&field)
+                    .copied()
+                    .map(MirType::semantic)
+                    .or_else(|| {
+                        self.error(span, "record field projection references unknown field");
+                        None
+                    })
+            }
+            Type::Applied(base, args) => {
+                let Type::Struct(def_id) = self.context.types.get(base) else {
+                    self.error(span, "applied field projection base is not a struct");
+                    return None;
+                };
+                let Some(raw_field_ty) = self
+                    .context
+                    .struct_fields
+                    .get(def_id)
+                    .and_then(|fields| fields.get(&field))
+                    .copied()
+                else {
+                    self.error(
+                        span,
+                        "applied struct field projection is missing field metadata",
+                    );
+                    return None;
+                };
+                let Some(params) = self.context.struct_type_params.get(def_id) else {
+                    self.error(
+                        span,
+                        "applied struct field projection is missing type parameters",
+                    );
+                    return None;
+                };
+                if params.len() != args.len() {
+                    self.error(
+                        span,
+                        "applied struct field projection type argument count mismatch",
+                    );
+                    return None;
+                }
+                let bindings = params
+                    .iter()
+                    .copied()
+                    .zip(args.into_iter().map(MirType::semantic))
+                    .collect::<MirGenericBindings>();
+                instantiate_existing_generic_type(self.context.types, raw_field_ty, &bindings, span)
+                    .map_err(|error| self.error(error.span, error.message))
+                    .ok()
+            }
+            Type::Map(key, value) => {
+                self.require_assignable(
+                    self.primitive(Primitive::Textus),
+                    MirType::semantic(key),
+                    span,
+                    "map field projection key type mismatch",
+                );
+                Some(MirType::semantic(value))
+            }
+            _ => {
+                self.error(span, "field projection base is not a struct or record");
+                None
+            }
+        }
+    }
+
+    pub(crate) fn project_vector_lane(
+        &mut self,
+        base_ty: MirType,
+        index: u8,
+        span: Span,
+    ) -> Option<MirType> {
+        let Type::Vector(element, width) = self.type_kind(base_ty).clone() else {
+            self.error(span, "vector lane projection base is not vector");
+            return None;
+        };
+        match self.context.types.get_index(width) {
+            IndexExpr::Literal(width) if u64::from(index) < *width => {
+                Some(MirType::semantic(element))
+            }
+            IndexExpr::Literal(_) => {
+                self.error(span, "vector lane projection index is out of bounds");
+                None
+            }
+            _ => {
+                self.error(span, "vector lane projection width is not a literal");
+                None
+            }
+        }
+    }
+
+    pub(crate) fn project_matrix_cell(
+        &mut self,
+        base_ty: MirType,
+        row: u8,
+        column: u8,
+        span: Span,
+    ) -> Option<MirType> {
+        let Type::Matrix(element, shape) = self.type_kind(base_ty).clone() else {
+            self.error(span, "matrix cell projection base is not matrix");
+            return None;
+        };
+        match crate::matrix_shape::literal_matrix_shape(shape, self.context.types) {
+            Some((rows, columns)) if row < rows && column < columns => {
+                Some(MirType::semantic(element))
+            }
+            Some(_) => {
+                self.error(span, "matrix cell projection index is out of bounds");
+                None
+            }
+            None => {
+                self.error(span, "matrix cell projection shape is not literal");
+                None
+            }
+        }
+    }
+
+    pub(crate) fn is_handler_error_nuntius_projection(
+        &self,
+        base_ty: MirType,
+        field: Symbol,
+    ) -> bool {
+        let Some(interner) = self.context.interner else {
+            return false;
+        };
+        if interner.resolve(field) != crate::HANDLER_MESSAGE_FIELD {
+            return false;
+        }
+        matches!(
+            self.type_kind(base_ty),
+            Type::Primitive(Primitive::Textus | Primitive::Ignotum)
+        )
+    }
+
+    pub(crate) fn project_variant_field(
+        &mut self,
+        base_ty: MirType,
+        variant: DefId,
+        field: Symbol,
+        span: Span,
+    ) -> Option<MirType> {
+        if let Some(enum_def) = self.enum_def_from_type(base_ty) {
+            self.validate_variant_parent(variant, enum_def, span);
+        } else {
+            self.error(span, "variant field projection base is not enum");
+        }
+        self.context
+            .variant_fields
+            .get(&variant)
+            .and_then(|fields| fields.get(&field))
+            .copied()
+            .or_else(|| {
+                self.error(span, "variant field projection is missing field metadata");
+                None
+            })
+    }
+
+    pub(crate) fn validate_variant_parent(&mut self, variant: DefId, enum_def: DefId, span: Span) {
+        match self.context.variant_parents.get(&variant).copied() {
+            Some(parent) if parent == enum_def => {}
+            Some(_) => self.error(span, "enum variant does not belong to enum type"),
+            None => self.error(span, "enum variant is missing parent metadata"),
+        }
+    }
+
+    pub(crate) fn project_index(
+        &mut self,
+        base_ty: MirType,
+        index: Option<(&MirOperand, MirType)>,
+        span: Span,
+    ) -> Option<MirType> {
+        match self.type_kind(base_ty).clone() {
+            Type::Array(inner) => {
+                if let Some((_, index_ty)) = index {
+                    self.require_assignable(
+                        index_ty,
+                        self.primitive(Primitive::Numerus),
+                        span,
+                        "array index is not numerus",
+                    );
+                }
+                Some(MirType::semantic(inner))
+            }
+            Type::Tensor(inner, _) => {
+                if let Some((_, index_ty)) = index {
+                    self.require_device_view_index(index_ty, span);
+                }
+                Some(MirType::semantic(inner))
+            }
+            Type::Map(key, value) => {
+                if let Some((index_op, index_ty)) = index {
+                    self.require_assignable_or_fitting_constant(
+                        index_op,
+                        index_ty,
+                        MirType::semantic(key),
+                        span,
+                        "map index key type mismatch",
+                    );
+                }
+                Some(MirType::semantic(value))
+            }
+            Type::Primitive(Primitive::Textus) => {
+                if let Some((_, index_ty)) = index {
+                    self.require_assignable(
+                        index_ty,
+                        self.primitive(Primitive::Numerus),
+                        span,
+                        "textus index is not numerus",
+                    );
+                }
+                Some(self.primitive(Primitive::Textus))
+            }
+            Type::Primitive(Primitive::Octeti) => {
+                if let Some((_, index_ty)) = index {
+                    self.require_assignable(
+                        index_ty,
+                        self.primitive(Primitive::Numerus),
+                        span,
+                        "octeti index is not numerus",
+                    );
+                }
+                match crate::ty::index_projection_result_ty(base_ty, self.context.types) {
+                    Ok(ty) => Some(ty),
+                    Err(error) => {
+                        self.error(span, error.message);
+                        None
+                    }
+                }
+            }
+            Type::Tuple(elements) => match index {
+                Some((MirOperand::Constant(MirConstant::Int(n)), _)) => {
+                    // Negative or non-fitting indices are out of bounds; usize::MAX is the
+                    // out-of-range sentinel (matches the old `as` wrap for negatives on 64-bit).
+                    let idx = usize::try_from(*n).unwrap_or(usize::MAX);
+                    if idx >= elements.len() {
+                        self.error(
+                            span,
+                            format!("tuple index {n} out of bounds for arity {}", elements.len()),
+                        );
+                        None
+                    } else {
+                        Some(MirType::semantic(elements[idx]))
+                    }
+                }
+                Some((MirOperand::Constant(MirConstant::UInt(n)), _)) => {
+                    // Non-fitting indices are out of bounds; usize::MAX is the out-of-range sentinel.
+                    let idx = usize::try_from(*n).unwrap_or(usize::MAX);
+                    if idx >= elements.len() {
+                        self.error(
+                            span,
+                            format!("tuple index {n} out of bounds for arity {}", elements.len()),
+                        );
+                        None
+                    } else {
+                        Some(MirType::semantic(elements[idx]))
+                    }
+                }
+                Some(_) => {
+                    self.error(span, "tuple subscript requires compile-time constant index");
+                    None
+                }
+                None => None,
+            },
+            _ => {
+                self.error(span, "index projection base is not indexable");
+                None
+            }
+        }
+    }
+
+    pub(crate) fn validate_projection_representation(
+        &mut self,
+        base_ty: MirType,
+        result_ty: MirType,
+        projection: &MirProjection,
+        span: Span,
+    ) {
+        let Ok(base_layout) = self.context.layouts.layout_for_type(base_ty) else {
+            return;
+        };
+        match base_layout.kind {
+            MirLayoutKind::DeviceView(view) => {
+                if !matches!(projection, MirProjection::Index(_)) {
+                    self.error(span, "device view projection must be an index");
+                }
+                if !view.row_major || view.offset_elements != 0 {
+                    self.error(
+                        span,
+                        "device view index projection requires materialized row-major storage",
+                    );
+                }
+                if view.rank != 1 {
+                    self.error(span, "device view index projection requires rank-1 storage");
+                }
+                let Ok(result_layout) = self.context.layouts.layout_for_type(result_ty) else {
+                    self.error(span, "device view projection result has no layout");
+                    return;
+                };
+                if result_layout.kind != MirLayoutKind::Scalar(view.element) {
+                    self.error(span, "device view projection element layout mismatch");
+                }
+            }
+            MirLayoutKind::Aggregate(layout)
+                if layout.carrier == MirAggregateCarrier::PhysicalValue
+                    && layout.family != MirAggregateFamily::Tuple =>
+            {
+                if matches!(projection, MirProjection::Index(_)) {
+                    self.error(
+                        span,
+                        "physical aggregate representation has no index projection contract",
+                    );
+                }
+            }
+            MirLayoutKind::Aggregate(layout)
+                if layout.family == MirAggregateFamily::TensorRuntime =>
+            {
+                if matches!(projection, MirProjection::Index(_)) {
+                    self.error(
+                        span,
+                        "tensor runtime aggregate has no device-view projection contract",
+                    );
+                }
+            }
+            MirLayoutKind::DeviceVector(vector) => {
+                if !matches!(
+                    projection,
+                    MirProjection::Field(_) | MirProjection::VectorLane(_)
+                ) {
+                    self.error(
+                        span,
+                        "device vector projection must be a swizzle field or lane",
+                    );
+                }
+                let Ok(result_layout) = self.context.layouts.layout_for_type(result_ty) else {
+                    self.error(span, "device vector projection result has no layout");
+                    return;
+                };
+                if let MirLayoutKind::DeviceVector(result_vector) = result_layout.kind {
+                    if result_vector.element != vector.element {
+                        self.error(span, "device vector swizzle element layout mismatch");
+                    }
+                } else if let MirLayoutKind::Scalar(result_scalar) = result_layout.kind {
+                    if result_scalar != vector.element {
+                        self.error(span, "device vector lane element layout mismatch");
+                    }
+                } else {
+                    self.error(
+                        span,
+                        "device vector projection result must be a vector or element scalar",
+                    );
+                }
+            }
+            MirLayoutKind::DeviceMatrix(matrix) => {
+                if !matches!(projection, MirProjection::MatrixCell { .. }) {
+                    self.error(span, "device matrix projection must be a matrix cell");
+                }
+                let Ok(result_layout) = self.context.layouts.layout_for_type(result_ty) else {
+                    self.error(span, "device matrix projection result has no layout");
+                    return;
+                };
+                if result_layout.kind != MirLayoutKind::Scalar(matrix.element) {
+                    self.error(span, "device matrix cell element layout mismatch");
+                }
+            }
+            MirLayoutKind::PackedNumeric(packed) => {
+                self.error(span, packed.unsupported_execution_issue());
+            }
+            MirLayoutKind::Aggregate(_)
+            | MirLayoutKind::Scalar(_)
+            | MirLayoutKind::Atomic(_)
+            | MirLayoutKind::OpaqueHandle
+            | MirLayoutKind::Void
+            | MirLayoutKind::Never => {}
+        }
+    }
+
+    pub(crate) fn require_device_view_index(&mut self, index_ty: MirType, span: Span) {
+        match self.type_kind(index_ty) {
+            Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _) => {}
+            _ => self.error(span, "device view index is not integer"),
+        }
+    }
+
+    pub(crate) fn require_block(
+        &mut self,
+        scope: &FunctionScope<'_, '_>,
+        block: MirBlockId,
+        span: Span,
+    ) {
+        if !scope.blocks.contains(&block) {
+            self.error(span, format!("block bb{} does not exist", block.0));
+        }
+    }
+
+    pub(crate) fn validate_mir_type(&mut self, ty: MirType, span: Span) {
+        let mut seen = FxHashSet::default();
+        self.validate_type_id(ty.semantic_id(), span, &mut seen);
+    }
+
+    pub(crate) fn validate_type_id(
+        &mut self,
+        ty: radix_types::TypeId,
+        span: Span,
+        seen: &mut FxHashSet<radix_types::TypeId>,
+    ) {
+        if !seen.insert(ty) {
+            return;
+        }
+
+        match self.context.types.get(ty).clone() {
+            Type::Infer(_) => self.error(span, "MIR type is unresolved inference variable"),
+            Type::Error => self.error(span, "MIR type is semantic error recovery type"),
+            Type::Array(inner)
+            | Type::Set(inner)
+            | Type::Promissum(inner)
+            | Type::Cursor(inner)
+            | Type::Tensor(inner, _)
+            | Type::Vector(inner, _)
+            | Type::Matrix(inner, _)
+            | Type::Sparsa(inner, _)
+            | Type::Atomic(inner)
+            | Type::Option(inner)
+            | Type::Ref(_, inner)
+            | Type::Alias(_, inner) => self.validate_type_id(inner, span, seen),
+            Type::PromissumFailable(success, alternate) | Type::AsyncCursor(success, alternate) => {
+                self.validate_type_id(success, span, seen);
+                self.validate_type_id(alternate, span, seen);
+            }
+            Type::Map(key, value) => {
+                self.validate_type_id(key, span, seen);
+                self.validate_type_id(value, span, seen);
+            }
+            Type::Record(fields) => {
+                for field_ty in fields.values() {
+                    self.validate_type_id(*field_ty, span, seen);
+                }
+            }
+            Type::Func(sig) => {
+                for param in &sig.params {
+                    self.validate_type_id(param.ty, span, seen);
+                }
+                self.validate_type_id(sig.ret, span, seen);
+                if let Some(error_ty) = sig.err {
+                    self.validate_type_id(error_ty, span, seen);
+                }
+            }
+            Type::Applied(base, args) => {
+                self.validate_type_id(base, span, seen);
+                for arg in args {
+                    self.validate_type_id(arg, span, seen);
+                }
+            }
+            Type::Union(members) => {
+                for member in members {
+                    self.validate_type_id(member, span, seen);
+                }
+            }
+            Type::Primitive(_)
+            | Type::SizedNumeric(_, _)
+            | Type::ModularWord(_)
+            | Type::SizedInstans(_)
+            | Type::Intervallum(_)
+            | Type::Tuple(_)
+            | Type::Struct(_)
+            | Type::Enum(_)
+            | Type::Interface(_)
+            | Type::Param(_) => {}
+        }
+    }
+
+    pub(crate) fn require_assignable(
+        &mut self,
+        from: MirType,
+        to: MirType,
+        span: Span,
+        message: &'static str,
+    ) {
+        if !self
+            .context
+            .types
+            .assignable(from.semantic_id(), to.semantic_id())
+        {
+            self.error(span, message);
+        }
+    }
+
+    /// Like [`Self::require_assignable`], but accepts an integer literal
+    /// constant that fits the expected integer or modular type. MIR constants
+    /// carry plain `numerus` / `numerus<u64>` types, while source literals in
+    /// a typed collection were already range-checked by semantic analysis
+    /// against the declared element/key type — re-rejecting them here would
+    /// break `lista<modulus<u32>> ← [4294967295, 3]`-style programs.
+    pub(crate) fn require_assignable_or_fitting_constant(
+        &mut self,
+        operand: &MirOperand,
+        found: MirType,
+        expected: MirType,
+        span: Span,
+        message: &'static str,
+    ) {
+        if self
+            .context
+            .types
+            .assignable(found.semantic_id(), expected.semantic_id())
+        {
+            return;
+        }
+        if self.integer_constant_fits(operand, expected) {
+            return;
+        }
+        self.error(span, message);
+    }
+
+    pub(crate) fn integer_constant_fits(&self, operand: &MirOperand, expected: MirType) -> bool {
+        let MirOperand::Constant(constant) = operand else {
+            return false;
+        };
+        let (signed, unsigned) = match constant {
+            MirConstant::Int(v) => (Some(*v), None),
+            MirConstant::UInt(v) => (None, Some(*v)),
+            _ => return false,
+        };
+        match self.type_kind(expected) {
+            Type::ModularWord(width) => {
+                let max = width.unsigned_max().unwrap_or(u64::MAX);
+                match (signed, unsigned) {
+                    (Some(v), _) => u64::try_from(v).is_ok_and(|vu| vu <= max),
+                    (_, Some(v)) => v <= max,
+                    (None, None) => false,
+                }
+            }
+            Type::SizedNumeric(Primitive::Numerus, width) => {
+                let (lo, hi) = numerus_width_range(*width);
+                match (signed, unsigned) {
+                    (Some(v), _) => (lo..=hi).contains(&i128::from(v)),
+                    (_, Some(v)) => (lo..=hi).contains(&i128::from(v)),
+                    (None, None) => false,
+                }
+            }
+            Type::Primitive(Primitive::Numerus) => {
+                signed.is_some() || unsigned.is_some_and(|v| i64::try_from(v).is_ok())
+            }
+            _ => false,
+        }
+    }
+
+    pub(crate) fn require_exact(
+        &mut self,
+        found: MirType,
+        expected: MirType,
+        span: Span,
+        message: &'static str,
+    ) {
+        if found.semantic_id() != expected.semantic_id() {
+            self.error(span, message);
+        }
+    }
+
+    pub(crate) fn constant_ty(&self, value: &MirConstant) -> MirType {
+        match value {
+            MirConstant::Int(_) => self.primitive(Primitive::Numerus),
+            // Unsigned constants carry the sized `numerus<u64>` type so typed
+            // boundaries (tabula keys, copia members) accept them exactly.
+            MirConstant::UInt(_) => self
+                .context
+                .types
+                .find_sized_numeric(Primitive::Numerus, NumericWidth::U64)
+                .map_or_else(|| self.primitive(Primitive::Numerus), MirType::semantic),
+            MirConstant::Float(_) => self.primitive(Primitive::Fractus),
+            MirConstant::String(_) => self.primitive(Primitive::Textus),
+            MirConstant::Ascii(_) => self.primitive(Primitive::Ascii),
+            MirConstant::Bool(_) => self.primitive(Primitive::Bivalens),
+            MirConstant::Nil => self.primitive(Primitive::Nihil),
+            MirConstant::Unit => self.primitive(Primitive::Vacuum),
+            MirConstant::Octeti(_) => self.primitive(Primitive::Octeti),
+            MirConstant::Regex { .. } => self.primitive(Primitive::Regex),
+            MirConstant::Function(_) => self.primitive(Primitive::Ignotum),
+        }
+    }
+
+    pub(crate) fn primitive(&self, primitive: Primitive) -> MirType {
+        MirType::semantic(self.context.types.primitive(primitive))
+    }
+
+    pub(crate) fn is_u32_scalar(&self, ty: MirType) -> bool {
+        self.context
+            .layouts
+            .layout_for_type(ty)
+            .is_ok_and(|layout| layout.kind == MirLayoutKind::Scalar(MirScalarLayout::U32))
+    }
+
+    pub(crate) fn is_u32_vector3(&self, ty: MirType) -> bool {
+        let Ok(layout) = self.context.layouts.layout_for_type(ty) else {
+            return false;
+        };
+        let MirLayoutKind::DeviceVector(vector) = layout.kind else {
+            return false;
+        };
+        vector.element == MirScalarLayout::U32 && vector.width == MirKernelBuiltin::VECTOR_WIDTH
+    }
+
+    pub(crate) fn is_vacuum(&self, ty: MirType) -> bool {
+        ty.semantic_id() == self.context.types.primitive(Primitive::Vacuum)
+    }
+
+    pub(crate) fn is_unit_return(&self, ty: MirType) -> bool {
+        matches!(
+            self.context.types.get(ty.semantic_id()),
+            Type::Primitive(Primitive::Vacuum | Primitive::Nihil)
+        )
+    }
+
+    pub(crate) fn is_numquam(&self, ty: MirType) -> bool {
+        ty.semantic_id() == self.context.types.primitive(Primitive::Numquam)
+    }
+
+    pub(crate) fn type_kind(&self, ty: MirType) -> &Type {
+        self.context.types.get(ty.semantic_id())
+    }
+
+    pub(crate) fn enum_def_from_type(&self, ty: MirType) -> Option<DefId> {
+        match self.type_kind(ty) {
+            Type::Enum(def_id) => Some(*def_id),
+            Type::Applied(base, _) => self.enum_def_from_type(MirType::semantic(*base)),
+            Type::Alias(_, inner) => self.enum_def_from_type(MirType::semantic(*inner)),
+            Type::Ref(_, inner) => self.enum_def_from_type(MirType::semantic(*inner)),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn nullable_inner_ty(&self, ty: MirType) -> Option<MirType> {
+        self.context
+            .types
+            .nullable_inner(ty.semantic_id())
+            .map(MirType::semantic)
+    }
+
+    pub(crate) fn report_duplicate_local_ids(&mut self, pairs: &[(MirLocalId, Span)]) {
+        for (id, span) in pairs {
+            self.error(*span, format!("duplicate MIR local id _{}", id.0));
+        }
+    }
+
+    pub(crate) fn error(&mut self, span: Span, message: impl Into<String>) {
+        self.errors.push(MirValidationError::new(span, message));
+    }
+}
+
+/// Inclusive `[min, max]` of a `numerus<W>` width as i128 so every width —
+/// including `u64` — range-checks without host overflow.
+fn numerus_width_range(width: NumericWidth) -> (i128, i128) {
+    match width {
+        NumericWidth::I8 => (i128::from(i8::MIN), i128::from(i8::MAX)),
+        NumericWidth::I16 => (i128::from(i16::MIN), i128::from(i16::MAX)),
+        NumericWidth::I32 => (i128::from(i32::MIN), i128::from(i32::MAX)),
+        NumericWidth::I64 => (i128::from(i64::MIN), i128::from(i64::MAX)),
+        NumericWidth::U8 => (0, i128::from(u8::MAX)),
+        NumericWidth::U16 => (0, i128::from(u16::MAX)),
+        NumericWidth::U32 => (0, i128::from(u32::MAX)),
+        NumericWidth::U64 => (0, i128::from(u64::MAX)),
+        NumericWidth::F16 | NumericWidth::F32 | NumericWidth::F64 => {
+            (i128::from(i64::MIN), i128::from(i64::MAX))
+        }
+    }
+}

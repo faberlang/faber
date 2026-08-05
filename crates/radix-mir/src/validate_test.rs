@@ -2,12 +2,12 @@ use super::*;
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBinOp, MirBlock,
     MirBlockId, MirCallee, MirCollectionOp, MirConstant, MirFunction, MirFunctionId, MirGradientOp,
-    MirIntrinsic, MirLocal, MirOperand, MirPlace, MirPlaceBase, MirProgram, MirProjection,
-    MirRuntimeCall, MirStatement, MirStatementKind, MirSwitchCase, MirTerminator,
+    MirIntrinsic, MirLocal, MirLocalId, MirOperand, MirPlace, MirPlaceBase, MirProgram,
+    MirProjection, MirRuntimeCall, MirStatement, MirStatementKind, MirSwitchCase, MirTerminator,
     MirTerminatorKind, MirType, MirUnOp, MirValue, MirValueId, MirValueKind,
 };
 use radix_lexer::{Span, Symbol};
-use radix_types::{IndexExpr, Primitive};
+use radix_types::{IndexExpr, Primitive, TypeId, TypeTable};
 
 // -----------------------------------------------------------------------
 // Helpers

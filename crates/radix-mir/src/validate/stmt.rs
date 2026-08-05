@@ -1,0 +1,401 @@
+//! Block, statement, terminator, and CFG structural checks.
+
+use super::{
+    DuplicateFunctionFinder, FunctionScope, FunctionShape, GenericTypeBindings, Validator,
+};
+use crate::visit::terminator_successors;
+use crate::{
+    MirBlock, MirBlockId, MirFunction, MirFunctionId, MirStatement, MirStatementKind,
+    MirTerminator, MirTerminatorKind,
+};
+use radix_types::Primitive;
+use rustc_hash::{FxHashMap, FxHashSet};
+
+impl Validator<'_, '_> {
+    pub(crate) fn validate_program(&mut self) {
+        for (id, span) in DuplicateFunctionFinder::find(self.program) {
+            self.error(span, format!("duplicate MIR function id f{}", id.0));
+        }
+        // Build the function index once; every FunctionScope borrows it (PRP-053).
+        // Prior path cloned the full map per function (O(N²) hash-map copies).
+        let functions_by_id = self
+            .program
+            .functions
+            .iter()
+            .map(|function| (function.id, function))
+            .collect::<FxHashMap<_, _>>();
+
+        for function in &self.program.functions {
+            self.validate_function(function, &functions_by_id);
+        }
+    }
+
+    pub(crate) fn validate_function(
+        &mut self,
+        function: &MirFunction,
+        functions_by_id: &FxHashMap<MirFunctionId, &MirFunction>,
+    ) {
+        // First prove declaration shape, then validate executable block bodies
+        // against maps built from that shape. This keeps later diagnostics about
+        // bad uses from being polluted by partially collected declarations.
+        self.validate_mir_type(function.return_ty, function.span);
+        if let Some(error_ty) = function.error_ty {
+            self.validate_mir_type(error_ty, function.span);
+        }
+        for param in &function.params {
+            self.validate_mir_type(param.ty, param.span);
+        }
+        for local in &function.locals {
+            self.validate_mir_type(local.ty, local.span);
+        }
+        for temp in &function.temps {
+            self.validate_mir_type(temp.ty, temp.span);
+        }
+        let shape = FunctionShape::collect(function);
+        self.report_duplicate_local_ids(&shape.duplicate_param_locals);
+        self.report_duplicate_local_ids(&shape.duplicate_locals);
+        for (id, span) in &shape.conflicting_locals {
+            self.error(
+                *span,
+                format!("duplicate MIR local id _{} has conflicting type", id.0),
+            );
+        }
+        for (id, span) in &shape.duplicate_temps {
+            self.error(*span, format!("duplicate MIR temp id %{}", id.0));
+        }
+        for (id, span) in &shape.duplicate_blocks {
+            self.error(*span, format!("duplicate MIR block id bb{}", id.0));
+        }
+        let mut scope = FunctionScope {
+            function,
+            functions_by_id,
+            locals: shape.locals,
+            temps: shape.temps,
+            blocks: shape.blocks,
+            values: FxHashMap::default(),
+        };
+
+        for block in &function.blocks {
+            self.validate_block(&mut scope, block);
+        }
+
+        self.validate_cfg(function, &scope);
+    }
+
+    pub(crate) fn validate_block(&mut self, scope: &mut FunctionScope<'_, '_>, block: &MirBlock) {
+        scope.values.clear();
+        for stmt in &block.statements {
+            self.validate_stmt(scope, stmt);
+        }
+        self.validate_terminator(scope, &block.terminator);
+    }
+
+    pub(crate) fn validate_stmt(&mut self, scope: &mut FunctionScope<'_, '_>, stmt: &MirStatement) {
+        match &stmt.kind {
+            MirStatementKind::Assign { place, value } => {
+                let place_ty = self.validate_place(scope, place, stmt.span);
+                self.validate_value(scope, value);
+                if let Some(place_ty) = place_ty {
+                    self.require_assignable(
+                        value.ty,
+                        place_ty,
+                        value.span,
+                        "assigned value type does not match destination",
+                    );
+                }
+                scope.values.insert(value.id, value.ty);
+            }
+            MirStatementKind::Call {
+                destination,
+                callee,
+                args,
+            } => {
+                let sig = self.validate_callee(scope, callee, stmt.span);
+                if let Some(sig) = &sig {
+                    if sig.error_ty.is_some() {
+                        self.error(stmt.span, "ordinary call callee is failable; use try_call");
+                    }
+                }
+                let mut generic_bindings = GenericTypeBindings::default();
+                self.validate_call_args(
+                    scope,
+                    sig.as_ref(),
+                    args,
+                    stmt.span,
+                    &mut generic_bindings,
+                );
+                self.validate_optional_destination(
+                    scope,
+                    destination.as_ref(),
+                    sig.as_ref().map(|sig| sig.return_ty),
+                    stmt.span,
+                    &mut generic_bindings,
+                );
+            }
+            MirStatementKind::RuntimeCall { destination, call } => {
+                self.validate_runtime_call(scope, destination.as_ref(), call, stmt.span);
+            }
+            MirStatementKind::Construct {
+                destination,
+                aggregate,
+            } => {
+                let destination_ty = self.validate_place(scope, destination, stmt.span);
+                self.validate_aggregate(scope, aggregate, stmt.span);
+                if let Some(destination_ty) = destination_ty {
+                    self.require_assignable(
+                        aggregate.ty,
+                        destination_ty,
+                        stmt.span,
+                        "construct destination type does not match aggregate type",
+                    );
+                }
+            }
+        }
+    }
+
+    pub(crate) fn validate_terminator(
+        &mut self,
+        scope: &mut FunctionScope<'_, '_>,
+        terminator: &MirTerminator,
+    ) {
+        for target in terminator_successors(&terminator.kind) {
+            self.require_block(scope, target, terminator.span);
+        }
+
+        match &terminator.kind {
+            MirTerminatorKind::Return(None) => {
+                if !self.is_unit_return(scope.function.return_ty)
+                    && !scope.function.is_generator
+                    && !scope.function.is_async
+                {
+                    self.error(
+                        terminator.span,
+                        "no-value return in value-returning function",
+                    );
+                }
+            }
+            MirTerminatorKind::Return(Some(value)) => {
+                if let Some(value_ty) = self.validate_operand(scope, value, terminator.span) {
+                    self.require_assignable(
+                        value_ty,
+                        scope.function.return_ty,
+                        terminator.span,
+                        "return type mismatch",
+                    );
+                }
+            }
+            MirTerminatorKind::ReturnError(value) => {
+                let Some(error_ty) = scope.function.error_ty else {
+                    self.error(
+                        terminator.span,
+                        "return_error in function without alternate-exit type",
+                    );
+                    self.validate_operand(scope, value, terminator.span);
+                    return;
+                };
+                if let Some(value_ty) = self.validate_operand(scope, value, terminator.span) {
+                    self.require_assignable(
+                        value_ty,
+                        error_ty,
+                        terminator.span,
+                        "return_error type mismatch",
+                    );
+                }
+            }
+            MirTerminatorKind::TryCall {
+                destination,
+                callee,
+                args,
+                error_place,
+                ..
+            } => {
+                let sig = self.validate_callee(scope, callee, terminator.span);
+                let mut generic_bindings = GenericTypeBindings::default();
+                self.validate_call_args(
+                    scope,
+                    sig.as_ref(),
+                    args,
+                    terminator.span,
+                    &mut generic_bindings,
+                );
+                self.validate_optional_destination(
+                    scope,
+                    destination.as_ref(),
+                    sig.as_ref().map(|sig| sig.return_ty),
+                    terminator.span,
+                    &mut generic_bindings,
+                );
+                let error_place_ty = self.validate_place(scope, error_place, terminator.span);
+                if sig.is_none() {
+                    self.error(
+                        terminator.span,
+                        "try_call callee does not have a known failable signature",
+                    );
+                }
+                match (sig.as_ref().and_then(|sig| sig.error_ty), error_place_ty) {
+                    (Some(error_ty), Some(place_ty)) => {
+                        self.bind_generic_type_witness(
+                            error_ty,
+                            place_ty,
+                            &mut generic_bindings,
+                            terminator.span,
+                            "try_call error place type mismatch",
+                        );
+                        if let Some(error_ty) = self.instantiate_generic_type(
+                            error_ty,
+                            &generic_bindings,
+                            terminator.span,
+                        ) {
+                            self.require_assignable(
+                                error_ty,
+                                place_ty,
+                                terminator.span,
+                                "try_call error place type mismatch",
+                            );
+                        }
+                    }
+                    (None, _) if sig.is_some() => {
+                        self.error(terminator.span, "try_call callee is not known failable");
+                    }
+                    _ => {}
+                }
+            }
+            MirTerminatorKind::Goto(_) => {}
+            MirTerminatorKind::Branch { condition, .. } => {
+                if let Some(condition_ty) = self.validate_operand(scope, condition, terminator.span)
+                {
+                    self.require_exact(
+                        condition_ty,
+                        self.primitive(Primitive::Bivalens),
+                        terminator.span,
+                        "branch condition is not bivalens",
+                    );
+                }
+            }
+            MirTerminatorKind::Switch { value, cases, .. } => {
+                self.validate_operand(scope, value, terminator.span);
+                if cases.is_empty() {
+                    self.error(terminator.span, "switch has no cases");
+                }
+                for (i, case) in cases.iter().enumerate() {
+                    if cases[..i].iter().any(|prev| prev.value == case.value) {
+                        self.error(terminator.span, "duplicate switch case value");
+                    }
+                }
+            }
+            MirTerminatorKind::Unreachable => {}
+        }
+    }
+
+    /// Validate CFG invariants: entry block existence, reachability, and
+    /// termination. Called after per-block validation so successor targets
+    /// have already been checked for existence.
+    pub(crate) fn validate_cfg(&mut self, function: &MirFunction, scope: &FunctionScope<'_, '_>) {
+        let entry = MirBlockId(0);
+
+        // 1. Entry block must exist.
+        if !scope.blocks.contains(&entry) {
+            self.error(function.span, "function has no entry block bb0");
+            return;
+        }
+
+        // 2. Reachability — BFS from entry block.
+        let block_map: FxHashMap<MirBlockId, &MirBlock> =
+            function.blocks.iter().map(|b| (b.id, b)).collect();
+
+        // Collect the set of all blocks that are referenced as successors
+        // by at least one terminator. Blocks not referenced by any terminator
+        // (e.g. join points sealed as Unreachable) are dead code created by
+        // the lowerer — they are not orphan bugs.
+        let mut successor_targets = FxHashSet::default();
+        for block in &function.blocks {
+            for succ in terminator_successors(&block.terminator.kind) {
+                successor_targets.insert(succ);
+            }
+        }
+
+        let mut reachable = FxHashSet::default();
+        let mut stack = vec![entry];
+        reachable.insert(entry);
+        while let Some(current) = stack.pop() {
+            if let Some(block) = block_map.get(&current) {
+                for succ in terminator_successors(&block.terminator.kind) {
+                    if reachable.insert(succ) {
+                        stack.push(succ);
+                    }
+                }
+            }
+        }
+
+        for block in &function.blocks {
+            // Only flag blocks that are referenced as successor targets but are
+            // not reachable from entry. These are genuine orphans: some
+            // terminator tries to reach them but no path from entry exists.
+            //
+            // Blocks that no terminator references are dead code (unused join
+            // points, eliminated paths) — the lowerer creates them and later
+            // passes clean them up. They are not reachability bugs.
+            if successor_targets.contains(&block.id) && !reachable.contains(&block.id) {
+                self.error(
+                    block.span,
+                    format!("block bb{} is not reachable from entry", block.id.0),
+                );
+            }
+        }
+
+        // 3. Termination — every reachable block must have at least one path
+        //    to Return / ReturnError / Unreachable.
+        //
+        //    Reverse-BFS from seed terminators: mark all blocks that can
+        //    reach a seed by following predecessor edges backward. This
+        //    accepts loops (the exit reaches Return) while rejecting pure
+        //    Goto cycles (no path to any seed).
+
+        // Build predecessor map: for each block, which blocks target it.
+        let mut predecessors: FxHashMap<MirBlockId, Vec<MirBlockId>> = FxHashMap::default();
+        for block in &function.blocks {
+            for succ in terminator_successors(&block.terminator.kind) {
+                predecessors.entry(succ).or_default().push(block.id);
+            }
+        }
+
+        // Identify seeds: blocks whose terminator is Return/ReturnError/Unreachable.
+        let mut reaches_terminator = FxHashSet::default();
+        let mut stack: Vec<MirBlockId> = Vec::new();
+        for block in &function.blocks {
+            match &block.terminator.kind {
+                MirTerminatorKind::Return(_)
+                | MirTerminatorKind::ReturnError(_)
+                | MirTerminatorKind::Unreachable => {
+                    reaches_terminator.insert(block.id);
+                    stack.push(block.id);
+                }
+                _ => {}
+            }
+        }
+
+        // Reverse-BFS: follow predecessor edges backward from seeds.
+        while let Some(current) = stack.pop() {
+            if let Some(preds) = predecessors.get(&current) {
+                for pred in preds {
+                    if reaches_terminator.insert(*pred) {
+                        stack.push(*pred);
+                    }
+                }
+            }
+        }
+
+        for block in &function.blocks {
+            if reachable.contains(&block.id) && !reaches_terminator.contains(&block.id) {
+                self.error(
+                    block.span,
+                    format!(
+                        "block bb{} does not reach a terminator \
+                         (Return/ReturnError/Unreachable) on every path",
+                        block.id.0,
+                    ),
+                );
+            }
+        }
+    }
+}
