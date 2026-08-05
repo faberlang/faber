@@ -171,50 +171,43 @@ pub fn kernel_plan_for_function(
     let matmul_shapes = kernel_matmul_shapes(function, validation)?;
     let mut recipe: Option<CollectionKernelPlan> = None;
     for op in ops {
-        match op {
-            // Recipe ops must resolve under the carried contract; a second
-            // distinct recipe must agree exactly (never guessed).
-            MirCollectionOp::Sum
-            | MirCollectionOp::TensorMean
-            | MirCollectionOp::TensorMatMul
-            | MirCollectionOp::TensorTranspose => {
-                let Some(contract) = &contract else {
-                    return Err(PlanMappingError::mapping(format!(
-                        "collection op {op:?} has a recipe but no resolved dispatch contract"
-                    )));
-                };
-                let shapes = if op == MirCollectionOp::TensorMatMul {
-                    matmul_shapes
-                } else {
-                    None
-                };
-                let plan = CollectionKernelPlan::from_contract(
-                    signature, contract, op, shapes,
-                )
+        // Recipe ops resolve through the shared closed-set predicate
+        // ([`is_recipe_op`]) — the same boundary the decomposition slice
+        // uses; a second distinct recipe must agree exactly (never guessed).
+        if is_recipe_op(op) {
+            let Some(contract) = &contract else {
+                return Err(PlanMappingError::mapping(format!(
+                    "collection op {op:?} has a recipe but no resolved dispatch contract"
+                )));
+            };
+            let shapes = if op == MirCollectionOp::TensorMatMul {
+                matmul_shapes
+            } else {
+                None
+            };
+            let plan = CollectionKernelPlan::from_contract(signature, contract, op, shapes)
                 .ok_or_else(|| {
                     PlanMappingError::mapping(format!(
                         "collection op {op:?} has no kernel plan under the resolved {contract:?} contract"
                     ))
                 })?;
-                if let Some(existing) = &recipe {
-                    if existing != &plan {
-                        return Err(PlanMappingError::mapping(format!(
-                            "kernel body mixes collection ops with conflicting recipes \
-                             ({op:?} resolves to {plan:?}, but the body already carries {existing:?})"
-                        )));
-                    }
+            if let Some(existing) = &recipe {
+                if existing != &plan {
+                    return Err(PlanMappingError::mapping(format!(
+                        "kernel body mixes collection ops with conflicting recipes \
+                         ({op:?} resolves to {plan:?}, but the body already carries {existing:?})"
+                    )));
                 }
-                recipe = Some(plan);
             }
+            recipe = Some(plan);
+        } else if is_elementwise_collection_op(op) {
             // Elementwise transforms contribute no recipe; the function-level
             // scan decides them elementwise.
-            _ if is_elementwise_collection_op(op) => {}
-            _ => {
-                return Err(PlanMappingError::mapping(format!(
-                    "collection op {op:?} has no kernel plan \
-                     (no recipe and not an elementwise transform)"
-                )));
-            }
+        } else {
+            return Err(PlanMappingError::mapping(format!(
+                "collection op {op:?} has no kernel plan \
+                 (no recipe and not an elementwise transform)"
+            )));
         }
     }
     Ok(recipe)
@@ -993,17 +986,11 @@ fn storage_output_with_local(
     resource
 }
 
-/// The MIR type of a local in the subchain function (params, then locals) —
-/// the additional-output sizing source (mirrors `abi::operand_local_ty` and
-/// the decomposition's local-type resolution for the signature seam).
-///
-/// # Errors
-/// Returns [`PlanMappingError`] when the local is neither a param nor a
-/// declared local of the subchain body.
-fn function_local_ty(
-    function: &MirFunction,
-    local: MirLocalId,
-) -> Result<MirType, PlanMappingError> {
+/// The MIR type of a local in the subchain function (params, then declared
+/// locals) — the shared params-then-locals lookup the signature seam uses
+/// (mirrors `abi::operand_local_ty` and the decomposition's local-type
+/// resolution).
+fn local_ty(function: &MirFunction, local: MirLocalId) -> Option<MirType> {
     function
         .params
         .iter()
@@ -1016,11 +1003,23 @@ fn function_local_ty(
                 .find(|entry| entry.id == local)
                 .map(|entry| entry.ty)
         })
-        .ok_or_else(|| {
-            PlanMappingError::mapping(format!(
-                "subchain output local {local:?} has no type in the subchain body"
-            ))
-        })
+}
+
+/// The MIR type of a local in the subchain function — the additional-output
+/// sizing source for the emission signature seam.
+///
+/// # Errors
+/// Returns [`PlanMappingError`] when the local is neither a param nor a
+/// declared local of the subchain body.
+fn function_local_ty(
+    function: &MirFunction,
+    local: MirLocalId,
+) -> Result<MirType, PlanMappingError> {
+    local_ty(function, local).ok_or_else(|| {
+        PlanMappingError::mapping(format!(
+            "subchain output local {local:?} has no type in the subchain body"
+        ))
+    })
 }
 
 /// Whether the body's op-set scan carries the given recipe op (the
@@ -1165,8 +1164,8 @@ fn kernel_matmul_shapes(
 }
 
 /// Resolve a runtime-call operand to the MIR type of the local it references
-/// (params first, then locals) — mirrors `abi::operand_local_ty` for the
-/// plan-mapping matmul shape scan.
+/// (via [`local_ty`]) — mirrors `abi::operand_local_ty` for the plan-mapping
+/// matmul shape scan.
 fn operand_local_ty(function: &MirFunction, operand: &MirOperand) -> Option<MirType> {
     let MirOperand::Place(place) = operand else {
         return None;
@@ -1174,18 +1173,7 @@ fn operand_local_ty(function: &MirFunction, operand: &MirOperand) -> Option<MirT
     let MirPlaceBase::Local(local) = place.base else {
         return None;
     };
-    function
-        .params
-        .iter()
-        .find(|param| param.local == local)
-        .map(|param| param.ty)
-        .or_else(|| {
-            function
-                .locals
-                .iter()
-                .find(|local_entry| local_entry.id == local)
-                .map(|local_entry| local_entry.ty)
-        })
+    local_ty(function, local)
 }
 
 /// Literal shape dims of a tensor-typed MIR type (a flat literal is a rank-1
