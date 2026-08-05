@@ -342,6 +342,14 @@ fn diagnostic_text_assertion_allowlisted(root: &Path, path: &Path) -> bool {
         // device-artifact surfaces), allowlisted for issue/code migration.
         || rel == "crates/radix-mir/src/device_program_plans_test.rs"
         || rel == "crates/radix-mir-llvm/tests/device_artifact.rs"
+        // MIR-surface text assertions awaiting the standardized-error-messages
+        // factory goal (docs/factory/standardized-error-messages/): the
+        // underlying error types carry no stable code/issue yet. Remove each
+        // entry as its tests migrate to code/issue assertions — the allowlist
+        // only shrinks.
+        || rel == "crates/radix-mir/src/kernel_decomposition_test.rs"
+        || rel == "crates/radix-mir/src/static_shape_fold_test.rs"
+        || rel == "crates/radix-mir-llvm/tests/device_mode.rs"
 }
 
 fn display_relative(root: &Path, path: &Path) -> String {
