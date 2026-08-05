@@ -50,14 +50,16 @@ use crate::device_program_plans::{
 use crate::kernel_plan::CollectionKernelPlan;
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlock, MirFunction,
-    MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace, MirStatement, MirStatementKind,
-    MirTemp, MirTempId, MirTerminator, MirTerminatorKind, MirType, MirValidationContext,
+    MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace, MirPlaceBase, MirStatement,
+    MirStatementKind, MirTemp, MirTempId, MirTerminator, MirTerminatorKind, MirType,
+    MirValidationContext,
 };
 // The decomposition's own scan helpers moved to `crate::collection_ops`; the
 // collection-op types remain in scope for the `#[path]` test module.
 #[cfg(test)]
 use crate::{MirCollectionOp, MirIntrinsic, MirRuntimeCall};
-use radix_types::{TypeId, TypeTable};
+use radix_types::{Type, TypeId, TypeTable};
+use rustc_hash::FxHashSet;
 use std::collections::BTreeSet;
 
 /// One decomposed kernel subchain: a contiguous statement slice of the
@@ -400,6 +402,174 @@ impl KernelDecomposition {
                     .map(|position| (index, position))
             })
     }
+}
+
+/// The output-set tuple aggregation slots of a multi-output subchain
+/// (S5A-U4): the locals and temps that hold the result-tuple aggregation the
+/// ABI flattens into DISTINCT output resources.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct ResultAggregationSlots {
+    /// Tuple-typed locals that are the output-set tuple aggregation.
+    pub locals: FxHashSet<MirLocalId>,
+    /// Tuple-typed temps that are the output-set tuple aggregation.
+    pub temps: FxHashSet<MirTempId>,
+}
+
+impl ResultAggregationSlots {
+    /// Whether a place base is one of the result-aggregation slots.
+    #[must_use]
+    pub fn contains(&self, base: &MirPlaceBase) -> bool {
+        match base {
+            MirPlaceBase::Local(local) => self.locals.contains(local),
+            MirPlaceBase::Temp(temp) => self.temps.contains(temp),
+        }
+    }
+}
+
+/// The output-set tuple aggregation slots of one function (S5A-U4) — the
+/// device-safety gate's tuple allowance, replacing the program-level
+/// multi-output source `DefId` set (radix `ce36c1285`).
+///
+/// A slot is a result-aggregation slot — the ONLY tuple-typed
+/// local/temp/value the gate admits — when the decomposition records it as
+/// the explicit output-set tuple a multi-output subchain aggregates:
+///
+/// 1. **Own result aggregation** — the function's return type is a non-empty
+///    tuple and it returns that tuple through the base of the terminator's
+///    return operand. This covers a plain tuple-return device function AND a
+///    D-2b-1 subchain synthetic whose return IS the output-set tuple (the
+///    tuple built into its fresh tuple temp by `build_subchain_function`).
+///
+/// 2. **Kept source result-tuple local** — a tuple-typed local the subchain
+///    synthetics keep from the source's full local table
+///    (`build_subchain_function` clones it): the local the source's
+///    return-tuple `Construct` wrote into (D-6), which every subchain of the
+///    decomposed multi-output source declares even when the fragment's own
+///    return is the output-set tuple (the last subchain) or Vacuum (a
+///    single-output intermediate subchain — the CUDA artifact override). The
+///    local is admitted when it is never READ in the fragment (the kept
+///    aggregation is never consumed — the return assembly was replaced by
+///    the synthetic's tuple-temp construct) and the fragment returns a
+///    non-empty tuple or nothing — exactly the two synthetic shapes a
+///    decomposed multi-output source produces. An unrelated LIVE tuple
+///    aggregate in a tuple-returning source is read somewhere and stays
+///    fail-closed.
+///
+/// Within rule 2, an intermediate subchain's kept local is never written
+/// either; a last subchain's kept local is written by the source's kept
+/// Tuple `Construct` (which survives the slice). Both are covered by
+/// admitting locals that are written only by a Tuple `Construct` (or not
+/// written at all). A local written by an ordinary `Assign`/`RuntimeCall`
+/// is not a kept aggregation and stays fail-closed even when dead.
+#[must_use]
+pub fn multi_output_result_aggregation_slots(
+    function: &MirFunction,
+    types: &TypeTable,
+) -> ResultAggregationSlots {
+    let mut slots = ResultAggregationSlots::default();
+
+    // Rule 1: the function's OWN result aggregation — the local/temp base of
+    // the terminator's return operand when the return type is a non-empty
+    // tuple.
+    if is_non_empty_tuple_type(types, function.return_ty) {
+        if let MirTerminatorKind::Return(Some(operand)) = &function.blocks[0].terminator.kind {
+            match operand {
+                MirOperand::Place(place) => match place.base {
+                    MirPlaceBase::Local(local)
+                        if is_non_empty_tuple_type(
+                            types,
+                            crate::local_ty::local_ty(function, local)
+                                .unwrap_or(function.return_ty),
+                        ) =>
+                    {
+                        slots.locals.insert(local);
+                    }
+                    MirPlaceBase::Temp(temp)
+                        if is_non_empty_tuple_type(
+                            types,
+                            function
+                                .temps
+                                .iter()
+                                .find(|entry| entry.id == temp)
+                                .map_or(function.return_ty, |entry| entry.ty),
+                        ) =>
+                    {
+                        slots.temps.insert(temp);
+                    }
+                    _ => {}
+                },
+                MirOperand::Temp(temp)
+                    if is_non_empty_tuple_type(
+                        types,
+                        function
+                            .temps
+                            .iter()
+                            .find(|entry| entry.id == *temp)
+                            .map_or(function.return_ty, |entry| entry.ty),
+                    ) =>
+                {
+                    slots.temps.insert(*temp);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    // Rule 2: the KEPT source result-tuple local (D-6). The kept local is
+    // never read (the fragment's return assembly is the synthetic's
+    // tuple-temp construct, or nothing), and the fragment is one of the two
+    // shapes a decomposed multi-output source produces: a non-empty-tuple
+    // return (the last subchain / a multi-output intermediate) or nothing (a
+    // single-output intermediate subchain).
+    let read = crate::read_analysis::function_read_locals(function);
+    let returns_tuple_or_nothing = is_non_empty_tuple_type(types, function.return_ty)
+        || function
+            .blocks
+            .iter()
+            .any(|block| matches!(block.terminator.kind, MirTerminatorKind::Return(None)));
+    if returns_tuple_or_nothing {
+        let mut written: FxHashSet<MirLocalId> = FxHashSet::default();
+        let mut tuple_construct_destinations: FxHashSet<MirLocalId> = FxHashSet::default();
+        for block in &function.blocks {
+            for statement in &block.statements {
+                if let MirStatementKind::Construct {
+                    destination,
+                    aggregate,
+                } = &statement.kind
+                {
+                    if aggregate.kind == MirAggregateKind::Tuple {
+                        if let Some(local) = crate::read_analysis::place_local_base(destination) {
+                            tuple_construct_destinations.insert(local);
+                        }
+                    }
+                }
+                if let Some(local) = crate::read_analysis::statement_destination(statement) {
+                    written.insert(local);
+                }
+            }
+        }
+        for local in &function.locals {
+            if !is_non_empty_tuple_type(types, local.ty)
+                || function.params.iter().any(|param| param.local == local.id)
+                || read.contains(&local.id)
+            {
+                continue;
+            }
+            if tuple_construct_destinations.contains(&local.id) || !written.contains(&local.id) {
+                slots.locals.insert(local.id);
+            }
+        }
+    }
+
+    slots
+}
+
+/// Whether a type is a non-empty tuple (the S3-A1 result-tuple contract).
+fn is_non_empty_tuple_type(types: &TypeTable, ty: MirType) -> bool {
+    matches!(
+        types.get(ty.semantic_id()),
+        Type::Tuple(elements) if !elements.is_empty()
+    )
 }
 
 /// The FULL result-tuple → local field bindings of a tuple-return function

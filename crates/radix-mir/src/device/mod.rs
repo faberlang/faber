@@ -757,4 +757,203 @@ mod tests {
             "the decomposed companion's kept 6-tuple result local must pass the gate, got: {verdict:?}"
         );
     }
+
+    /// A tuple-returning source that ALSO carries a live unrelated tuple
+    /// aggregate (S5A-U4): the return aggregation local (built by a Tuple
+    /// `Construct` and returned) is the multi-output contract, while the
+    /// unrelated tuple local `u` — constructed and then READ by a plain
+    /// `Assign` — is a genuine device aggregate value. The pre-fix
+    /// program-level multi-output source set (radix ce36c1285) admitted any
+    /// tuple-typed slot sharing the source `DefId`; the decomposition-fact
+    /// gate must admit ONLY the result-aggregation tuples, so `u` stays
+    /// fail-closed with the typed aggregate diagnostic.
+    fn tuple_returning_source_with_live_unrelated_tuple(types: &mut TypeTable) -> MirFunction {
+        let r2 = rank2_tensor_ty(types, [4, 4]);
+        let one_tuple = tuple_of_one_ty(types, r2);
+        let pair_tuple = MirType::semantic(types.intern(Type::Tuple(vec![r2.semantic_id(); 2])));
+        let span = test_span();
+        MirFunction {
+            id: MirFunctionId(0),
+            source: Some(radix_hir::DefId(1)),
+            name: None,
+            params: vec![
+                MirParam {
+                    local: MirLocalId(0),
+                    name: None,
+                    ty: r2,
+                    mode: MirParamMode::Owned,
+                    span,
+                },
+                MirParam {
+                    local: MirLocalId(1),
+                    name: None,
+                    ty: r2,
+                    mode: MirParamMode::Owned,
+                    span,
+                },
+            ],
+            locals: vec![
+                MirLocal {
+                    id: MirLocalId(0),
+                    name: None,
+                    ty: r2,
+                    mutable: false,
+                    span,
+                },
+                MirLocal {
+                    id: MirLocalId(1),
+                    name: None,
+                    ty: r2,
+                    mutable: false,
+                    span,
+                },
+                MirLocal {
+                    id: MirLocalId(2),
+                    name: None,
+                    ty: r2,
+                    mutable: false,
+                    span,
+                },
+                MirLocal {
+                    id: MirLocalId(3),
+                    name: None,
+                    ty: pair_tuple,
+                    mutable: false,
+                    span,
+                },
+                MirLocal {
+                    id: MirLocalId(4),
+                    name: None,
+                    ty: one_tuple,
+                    mutable: false,
+                    span,
+                },
+                MirLocal {
+                    id: MirLocalId(5),
+                    name: None,
+                    ty: pair_tuple,
+                    mutable: false,
+                    span,
+                },
+            ],
+            temps: Vec::new(),
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![
+                    // t = x @ w — the live tensor body.
+                    MirStatement {
+                        kind: MirStatementKind::RuntimeCall {
+                            destination: Some(MirPlace::local(MirLocalId(2))),
+                            call: MirRuntimeCall {
+                                intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorMatMul),
+                                args: vec![
+                                    MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                                    MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                                ],
+                                return_ty: r2,
+                            },
+                        },
+                        span,
+                    },
+                    // u ← construct tuple(t, t) — the unrelated live tuple
+                    // aggregate.
+                    MirStatement {
+                        kind: MirStatementKind::Construct {
+                            destination: MirPlace::local(MirLocalId(3)),
+                            aggregate: MirAggregate {
+                                kind: MirAggregateKind::Tuple,
+                                ty: pair_tuple,
+                                fields: MirAggregateFields::Ordered(vec![
+                                    MirAggregateItem::Operand(MirOperand::Place(MirPlace::local(
+                                        MirLocalId(2),
+                                    ))),
+                                    MirAggregateItem::Operand(MirOperand::Place(MirPlace::local(
+                                        MirLocalId(2),
+                                    ))),
+                                ]),
+                            },
+                        },
+                        span,
+                    },
+                    // t2 ← u — reads u: the unrelated aggregate is LIVE.
+                    MirStatement {
+                        kind: MirStatementKind::Assign {
+                            place: MirPlace::local(MirLocalId(5)),
+                            value: MirValue {
+                                id: MirValueId(0),
+                                kind: MirValueKind::Operand(MirOperand::Place(MirPlace::local(
+                                    MirLocalId(3),
+                                ))),
+                                ty: pair_tuple,
+                                span,
+                            },
+                        },
+                        span,
+                    },
+                    // result ← construct tuple(t) — the multi-output result
+                    // aggregation.
+                    MirStatement {
+                        kind: MirStatementKind::Construct {
+                            destination: MirPlace::local(MirLocalId(4)),
+                            aggregate: MirAggregate {
+                                kind: MirAggregateKind::Tuple,
+                                ty: one_tuple,
+                                fields: MirAggregateFields::Ordered(vec![
+                                    MirAggregateItem::Operand(MirOperand::Place(MirPlace::local(
+                                        MirLocalId(2),
+                                    ))),
+                                ]),
+                            },
+                        },
+                        span,
+                    },
+                ],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                        MirLocalId(4),
+                    )))),
+                    span,
+                },
+                span,
+            }],
+            return_ty: one_tuple,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span,
+        }
+    }
+
+    #[test]
+    fn unrelated_live_tuple_aggregate_in_tuple_returning_source_fails_target_entry_gate() {
+        // S5A-U4: the gate admits EXACTLY the decomposition's
+        // result-aggregation tuples. A live unrelated tuple aggregate in a
+        // tuple-returning source — which the pre-fix program-level
+        // multi-output source `DefId` set (ce36c1285) admitted — must fail
+        // closed with the typed aggregate diagnostic.
+        let mut types = TypeTable::new();
+        let function = tuple_returning_source_with_live_unrelated_tuple(&mut types);
+        let program = crate::MirProgram {
+            functions: vec![function],
+        };
+        let validated = ValidatedMir::new(program, MirValidationContext::new(&types))
+            .expect("the tuple-returning source must remain well-formed MIR");
+        let device = MirDeviceContext::from_hir_roles(FxHashMap::from_iter([(
+            radix_hir::DefId(1),
+            MirDeviceRole::Kernel,
+        )]));
+
+        let verdict = classify_device_safe_for_target_entry(&validated, &device);
+        let gaps = verdict.gaps();
+        assert!(
+            !gaps.is_empty(),
+            "a live unrelated tuple aggregate in a tuple-returning source must fail the target-entry gate"
+        );
+        assert!(
+            gaps.iter()
+                .any(|gap| gap.shape().contains("device aggregate value type Tuple")),
+            "the unrelated tuple aggregate must fail with the aggregate diagnostic, got: {gaps:?}"
+        );
+    }
 }
