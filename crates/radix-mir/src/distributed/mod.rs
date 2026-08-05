@@ -38,6 +38,7 @@
 pub mod canonical;
 pub mod derive;
 pub mod types;
+pub mod validate;
 
 pub use canonical::{encode_logical_plan, CANONICAL_MAGIC, CANONICAL_REVISION};
 pub use derive::derive;
