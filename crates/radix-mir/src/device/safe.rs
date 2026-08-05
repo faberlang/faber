@@ -987,8 +987,8 @@ fn is_device_vector_element(element: MirScalarLayout) -> bool {
 
 /// Whether a value is an admitted TENSOR unary assign (S6-P2): a
 /// `MirValueKind::Unary` whose op is in the P1-admitted unary set
-/// (`is_admitted_tensor_unary`, device_program_plans.rs — `Exp`/`Sqrt` are
-/// the S6-P1 transformer additions, the softmax exp and the LayerNorm sqrt
+/// (`is_admitted_tensor_unary`, `device_program_plans.rs` — `Exp`/`Sqrt` are
+/// the S6-P1 transformer additions, the softmax exp and the `LayerNorm` sqrt
 /// lanes) applied to a TENSOR-typed result. The tensor restriction mirrors
 /// the elementwise emitters' tensor-expr surface: a scalar (or otherwise
 /// non-tensor) unary is not admitted by this seam and keeps its value-type
