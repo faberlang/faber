@@ -3,6 +3,45 @@ use radix::codegen::Target;
 use radix::{Compiler, Config, Output};
 use std::fs;
 
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_solum_lege_generic -- --ignored --nocapture"]
+fn llvm_host_solum_lege_generic_fixture_matches_rust_output() {
+    let fab_path = crate::paths::corpus_dir().join("ad/solum-lege-generic.fab");
+    let config = radix::Config::default().with_target(Target::LlvmText);
+    let llvm = faber_cli::package::with_lowered_package_mir(&config, &fab_path, |lowered| {
+        let interner = lowered
+            .validated
+            .validation()
+            .interner
+            .ok_or_else(|| "package MIR validation context has no interner".to_owned())?;
+        radix::mir::emit_llvm_text_probe(&lowered.validated, interner)
+            .map_err(|error| format!("{}:{}", error.category, error.shape))
+    })
+    .expect("ad/solum-lege-generic.fab package analysis must succeed")
+    .expect("ad/solum-lege-generic.fab LLVM emission must succeed");
+    let temp_root = super::super::common::make_temp_root();
+    let llvm_file = temp_root.join("solum-lege-generic.ll");
+    fs::write(&llvm_file, &llvm).expect("write solum-lege-generic LLVM text");
+
+    // Outcome parity vs the Rust oracle: the fixture scribes
+    // /tmp/faber-solum-lege-generic.txt, then reads it back as textus /
+    // lista<textus> / octeti. The oracle (generated Rust lane) prints:
+    //   body text + nota newline, ["prima", "secunda"], [112, 114, …], "solum
+    //   lege generic parata" — exit 0. The LLVM host must match byte-for-byte.
+    let probe = run_llvm_exemplum(&llvm_file, &temp_root, "solum-lege-generic", &fab_path);
+    assert_eq!(probe.bucket, LlvmRunBucket::Runnable, "{}", probe.reason);
+    assert_eq!(
+        probe.stdout,
+        "prima\nsecunda\n\n[\"prima\", \"secunda\"]\n[112, 114, 105, 109, 97, 10, 115, 101, 99, 117, 110, 100, 97, 10]\nsolum lege generic parata\n"
+    );
+    assert!(
+        probe.stderr.is_empty(),
+        "unexpected stderr: {:?}",
+        probe.stderr
+    );
+    assert_eq!(probe.exit_code, Some(0));
+}
+
 /// Helper: compile a fab file to LLVM text, write the .ll, run it, and assert OutputMatched.
 fn assert_llvm_text_output_matches(fab_relative: &str, stem: &str) {
     let fab_path = crate::paths::corpus_dir().join(fab_relative);
