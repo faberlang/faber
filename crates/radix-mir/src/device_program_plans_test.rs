@@ -609,7 +609,7 @@ fn add_mul_function(types: &mut TypeTable) -> MirFunction {
 }
 
 /// The `mlp_backward` companion shape (S5-W-A1): `t = x @ w; out = t / s`
-/// — a TiledMatMul recipe whose data-flow set carries a SCALAR upstream
+/// — a `TiledMatMul` recipe whose data-flow set carries a SCALAR upstream
 /// seed (`s`) beyond the two recipe operands (`x`, `w`). The seed's type is
 /// the parameter: the generated companion types the seed from the primal's
 /// scalar return type (f32 in the fixed MLP fixture, f64 in the latent

@@ -240,21 +240,23 @@ impl<'a> MirValidationContext<'a> {
     {
         let mut context = MirValidationContext::<'b>::new(types);
         context.interner = self.interner;
-        context.functions = self.functions.clone();
-        context.external_function_identities = self.external_function_identities.clone();
-        context.struct_fields = self.struct_fields.clone();
-        context.struct_type_params = self.struct_type_params.clone();
-        context.enum_type_params = self.enum_type_params.clone();
-        context.optional_struct_fields = self.optional_struct_fields.clone();
-        context.nullable_struct_fields = self.nullable_struct_fields.clone();
-        context.opaque_structs = self.opaque_structs.clone();
-        context.json_struct_field_keys = self.json_struct_field_keys.clone();
-        context.variant_parents = self.variant_parents.clone();
-        context.enum_variants = self.enum_variants.clone();
-        context.variant_positions = self.variant_positions.clone();
-        context.variant_fields = self.variant_fields.clone();
-        context.scalar_value_domains = self.scalar_value_domains.clone();
-        context.closure_environments = self.closure_environments.clone();
+        context.functions.clone_from(&self.functions);
+        context
+            .external_function_identities
+            .clone_from(&self.external_function_identities);
+        context.struct_fields.clone_from(&self.struct_fields);
+        context.struct_type_params.clone_from(&self.struct_type_params);
+        context.enum_type_params.clone_from(&self.enum_type_params);
+        context.optional_struct_fields.clone_from(&self.optional_struct_fields);
+        context.nullable_struct_fields.clone_from(&self.nullable_struct_fields);
+        context.opaque_structs.clone_from(&self.opaque_structs);
+        context.json_struct_field_keys.clone_from(&self.json_struct_field_keys);
+        context.variant_parents.clone_from(&self.variant_parents);
+        context.enum_variants.clone_from(&self.enum_variants);
+        context.variant_positions.clone_from(&self.variant_positions);
+        context.variant_fields.clone_from(&self.variant_fields);
+        context.scalar_value_domains.clone_from(&self.scalar_value_domains);
+        context.closure_environments.clone_from(&self.closure_environments);
         context
     }
 

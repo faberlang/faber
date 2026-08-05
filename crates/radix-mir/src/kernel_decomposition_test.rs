@@ -82,7 +82,7 @@ fn assign_statement(destination: u32, lhs: u32, rhs: u32, ty: MirType) -> MirSta
 }
 
 /// A plain (non-collection) function call statement — e.g. the GELU in the
-/// diagnosed mlp_loss lane. Call destinations carry no statement-level
+/// diagnosed `mlp_loss` lane. Call destinations carry no statement-level
 /// type; callers type the destination local in the locals table explicitly
 /// (the plan resolver reads operand types from the preserved local tables).
 fn call_statement(destination: u32, args: &[u32]) -> MirStatement {
@@ -275,7 +275,7 @@ fn elementwise_mul_function(types: &mut TypeTable) -> MirFunction {
     )
 }
 
-/// The mlp_loss GELU-lane shape (D-2a): `h1 = matmul(x, w1);
+/// The `mlp_loss` GELU-lane shape (D-2a): `h1 = matmul(x, w1);
 /// h1b = h1 + h1; a1 = gelu(h1b); h2 = matmul(a1, w2); loss = mean(h2)` —
 /// subchain 0 folds the elementwise Add + GELU (plain Call) after its
 /// matmul, and the GELU destination `a1` (NOT `h1b`) is read by the second
@@ -819,10 +819,10 @@ fn plain_fixture_outputs_are_the_recipe_results() {
 // D-2b-1: the synthetic subchain function's return carries its output set.
 // -----------------------------------------------------------------------
 
-/// The mlp_loss GELU-lane shape with the GELU as an ELEMENTWISE collection
+/// The `mlp_loss` GELU-lane shape with the GELU as an ELEMENTWISE collection
 /// op (a `TensorGelu` runtime call) instead of the plain Call: `h1 =
 /// matmul(x, w1); h1b = h1 + h1; a1 = gelu(h1b); h2 = matmul(a1, w2);
-/// loss = mean(h2)` — subchain 0 folds the Add + TensorGelu and exposes `a1`
+/// loss = mean(h2)` — subchain 0 folds the Add + `TensorGelu` and exposes `a1`
 /// as an additional output, and the whole body VALIDATES (the plain-Call
 /// variant's callee has no resolvable signature in the isolated fixture, and
 /// tensor addition is a collection op, not a binary arithmetic value).

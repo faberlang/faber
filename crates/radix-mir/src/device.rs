@@ -1520,7 +1520,7 @@ mod tests {
         }
     }
 
-    /// The S5-U2c train_step artifact shape the emitters see AFTER the
+    /// The S5-U2c `train_step` artifact shape the emitters see AFTER the
     /// static-shape fold: a DEAD `Array` shape-list construct whose temp
     /// destination forwards into an unread `lista` local (the fold's
     /// untraceable `temp→local` artifact), plus a live tensor body
@@ -1753,8 +1753,7 @@ mod tests {
         let verdict = classify_device_safe_for_target_entry(&validated, &device);
         assert!(
             verdict.is_capable(),
-            "dead fold-artifact Array/Tensor constructs must pass the gate, got: {:?}",
-            verdict
+            "dead fold-artifact Array/Tensor constructs must pass the gate, got: {verdict:?}"
         );
     }
 
