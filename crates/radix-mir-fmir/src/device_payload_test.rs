@@ -19,15 +19,17 @@ use crate::schema::{
     FmirDeviceProgramSection, FmirDeviceSection, FmirDeviceSelection, FmirDeviceSymbol,
     FmirTextCliRootSection, FmirTextCliSection, FmirTextImageFile, FmirTextProgramSection,
     FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection,
-    FmirTextToolchainSection, FmirTextTypesSection, WireBinding, WireBufferIdentity,
-    WireBufferLifetime, WireBufferRole, WireBufferVersion, WireCollectionKernelPlan,
-    WireCompanionDerivativeKind, WireCompanionRelation, WireCompanionSelectedInput,
-    WireCompanionSelectedOutput, WireDependencyEdge, WireDeviceProgram, WireDeviceResource,
-    WireDispatchSize, WireInitializationPolicy, WireKernelLaunchPlan, WireKernelUnit,
-    WireLaunchUnit, WireObservationCadence, WireObservationFact, WireProgramLifetime,
-    WireResourceAccess, WireResultBuffer, WireSemanticValue, WireSemanticValueOrigin,
-    WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize, FMIR_TARGET_NAME,
-    FMIR_TEXT_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION, WIRE_DEVICE_PROGRAM_VERSION,
+    FmirTextToolchainSection, FmirTextTypesSection, WireAxisReductionPlan, WireBinding,
+    WireBroadcastDeclaration, WireBroadcastFact, WireBufferIdentity, WireBufferLifetime,
+    WireBufferRole, WireBufferVersion, WireCollectionKernelPlan, WireCompanionDerivativeKind,
+    WireCompanionRelation, WireCompanionSelectedInput, WireCompanionSelectedOutput,
+    WireDependencyEdge, WireDeviceProgram, WireDeviceResource, WireDispatchSize,
+    WireInitializationPolicy, WireKernelLaunchPlan, WireKernelUnit, WireLaunchUnit,
+    WireLayerNormalizationPlan, WireObservationCadence, WireObservationFact, WireProgramLifetime,
+    WireReduceOp, WireResourceAccess, WireResultBuffer, WireRowSoftmaxPlan, WireSemanticValue,
+    WireSemanticValueOrigin, WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize,
+    FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION,
+    WIRE_DEVICE_PROGRAM_VERSION,
 };
 use radix_mir::MirProgram;
 use radix_types::TypeTable;
@@ -1409,5 +1411,126 @@ fn fnv1a64_blob_hash_admits_a_correctly_hashed_artifact() {
     assert_eq!(
         decoded.device.unwrap().artifacts.artifact[0].hash,
         fnv1a64_blob_hash(blob.as_bytes())
+    );
+}
+
+// ---------------------------------------------------------------------------
+// S6-C2: the typed broadcast fact + the recipe-variant wire mirrors
+// ---------------------------------------------------------------------------
+
+/// S6-C2: the typed rank-extension broadcast fact round-trips through the
+/// text codec (the wire carries it under the versioned bump, A7).
+#[test]
+fn rank_extension_broadcast_fact_round_trips_on_the_wire() {
+    let fact = WireBroadcastFact {
+        lhs_shape: vec![2, 8],
+        rhs_shape: vec![8],
+        result_shape: vec![2, 8],
+        declaration: WireBroadcastDeclaration::RankExtension,
+    };
+    let mut program = sample_wire_program();
+    program.kernels[0].plan = WireCollectionKernelPlan::RankExtensionAdd(fact.clone());
+    let mut section = sample_device_section();
+    section.device_program.program = program;
+    let image = text_image_with_device(Some(section));
+    let decoded = decode_text_image(&encode_text_image(&image).unwrap(), TOOLCHAIN)
+        .expect("a kernel carrying a valid rank-extension broadcast fact admits cleanly");
+    assert_eq!(
+        decoded.device.unwrap().device_program.program.kernels[0].plan,
+        WireCollectionKernelPlan::RankExtensionAdd(fact),
+        "the typed broadcast fact survives the wire round-trip"
+    );
+}
+
+/// S6-C2: the S6-N1-frozen recipe variants gain real wire mirrors — each
+/// serializes and round-trips through the text codec.
+#[test]
+fn frozen_recipe_variant_plans_round_trip_on_the_wire() {
+    let plans = [
+        WireCollectionKernelPlan::AxisReduction(WireAxisReductionPlan {
+            op: WireReduceOp::Sum,
+            axis: 1,
+        }),
+        WireCollectionKernelPlan::RowSoftmax(WireRowSoftmaxPlan { axis: 1 }),
+        WireCollectionKernelPlan::LayerNormalization(WireLayerNormalizationPlan { axis: 1 }),
+    ];
+    for plan in plans {
+        let mut program = sample_wire_program();
+        program.kernels[0].plan = plan.clone();
+        let mut section = sample_device_section();
+        section.device_program.program = program;
+        let image = text_image_with_device(Some(section));
+        let decoded = decode_text_image(&encode_text_image(&image).unwrap(), TOOLCHAIN)
+            .unwrap_or_else(|error| panic!("recipe plan {plan:?} must admit cleanly: {error}"));
+        assert_eq!(
+            decoded.device.unwrap().device_program.program.kernels[0].plan,
+            plan,
+            "the recipe plan survives the wire round-trip"
+        );
+    }
+}
+
+/// S6-C2: the broadcast fact rides the canonical identity bytes (A10) — a
+/// program carrying the fact derives different canonical bytes.
+#[test]
+fn broadcast_fact_changes_the_canonical_identity_bytes() {
+    let mut program = sample_wire_program();
+    let base = canonical_program_bytes(&program);
+    program.kernels[0].plan = WireCollectionKernelPlan::RankExtensionAdd(WireBroadcastFact {
+        lhs_shape: vec![2, 8],
+        rhs_shape: vec![8],
+        result_shape: vec![2, 8],
+        declaration: WireBroadcastDeclaration::RankExtension,
+    });
+    assert_ne!(
+        canonical_program_bytes(&program),
+        base,
+        "the typed broadcast fact changes the canonical program bytes"
+    );
+}
+
+/// S6-C2 (A7): a carried broadcast fact whose lower-rank dims are not the
+/// higher-rank trailing dims fails admission closed at the decode boundary.
+#[test]
+fn mismatched_broadcast_fact_fails_admission_closed() {
+    let error = wire_admission_error(|program| {
+        program.kernels[0].plan = WireCollectionKernelPlan::RankExtensionAdd(WireBroadcastFact {
+            lhs_shape: vec![2, 8],
+            rhs_shape: vec![4],
+            result_shape: vec![2, 8],
+            declaration: WireBroadcastDeclaration::RankExtension,
+        });
+    })
+    .expect_err("a mismatched broadcast fact must fail admission closed");
+    assert!(
+        matches!(error, FmirImageError::WireProgramInvalid { .. }),
+        "the mismatched broadcast fails with the focused wire-admission diagnostic: {error:?}"
+    );
+    let detail = match error {
+        FmirImageError::WireProgramInvalid { detail } => detail,
+        other => panic!("unexpected error variant: {other:?}"),
+    };
+    assert!(
+        detail.contains("rank-extension broadcast"),
+        "the diagnostic names the broadcast rule: {detail}"
+    );
+}
+
+/// S6-C2 (A7): a broadcast fact whose result shape does not equal the
+/// higher-rank operand shape fails admission closed.
+#[test]
+fn broadcast_fact_with_wrong_result_shape_fails_admission_closed() {
+    let error = wire_admission_error(|program| {
+        program.kernels[0].plan = WireCollectionKernelPlan::RankExtensionAdd(WireBroadcastFact {
+            lhs_shape: vec![2, 8],
+            rhs_shape: vec![8],
+            result_shape: vec![2, 4],
+            declaration: WireBroadcastDeclaration::RankExtension,
+        });
+    })
+    .expect_err("a broadcast fact with a wrong result shape must fail admission closed");
+    assert!(
+        matches!(error, FmirImageError::WireProgramInvalid { .. }),
+        "the wrong-result-shape broadcast fails with the focused wire-admission diagnostic: {error:?}"
     );
 }

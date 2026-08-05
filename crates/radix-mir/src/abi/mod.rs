@@ -5,6 +5,7 @@
 //! and purpose of ABI surfaces; target-specific spelling still belongs to the
 //! target emitter.
 
+mod broadcast;
 mod contract;
 mod error;
 mod launch;
@@ -15,6 +16,7 @@ mod signature;
 mod tests;
 mod types;
 
+pub use broadcast::*;
 pub use contract::*;
 pub use error::*;
 pub use launch::*;

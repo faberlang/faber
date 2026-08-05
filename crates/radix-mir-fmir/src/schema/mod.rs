@@ -65,15 +65,20 @@ pub const PACKAGE_MIR_ARTIFACT_VERSION: u32 = 6;
 /// (the nested `v` field of [`FmirDeviceProgramSection`]). Bumped in lockstep
 /// with the `DEVICE_RUN_PLAN_VERSION` constructor ratchet; bumped `3 → 4` by
 /// the Stage 3R U1 clean break (F7/S8), `4 → 5` by the S5-U5b clean break
-/// (the declared `RepeatingStep` step count rides the lifetime variant), and
+/// (the declared `RepeatingStep` step count rides the lifetime variant),
 /// `5 → 6` by the Stage 5A U1 clean break (S5A-U1: every result row's
 /// observation fact carries the explicit **observation cadence** —
 /// `PerStep`/`EndOfRun` — so the canonical wire bytes change when the
-/// readback cadence changes). Admitted independently of the outer image
-/// version: [`admit_device_section`] rejects a mismatched nested version
-/// before any field-level interpretation, with a focused diagnostic
+/// readback cadence changes), and `6 → 7` by the S6-C2 clean break (the
+/// S6-N1-frozen recipe variants `AxisReduction`/`RowSoftmax`/
+/// `LayerNormalization` gain real wire mirrors and every kernel carries the
+/// typed rank-extension **broadcast fact** — both change the canonical wire
+/// bytes; admission validates the carried broadcast fail-closed, A7).
+/// Admitted independently of the outer image version:
+/// [`admit_device_section`] rejects a mismatched nested version before any
+/// field-level interpretation, with a focused diagnostic
 /// ([`UnsupportedDeviceProgramVersion`](crate::error::FmirImageError::UnsupportedDeviceProgramVersion)).
-pub const WIRE_DEVICE_PROGRAM_VERSION: u32 = 6;
+pub const WIRE_DEVICE_PROGRAM_VERSION: u32 = 7;
 
 /// Text image `target` tag.
 pub const FMIR_TEXT_TARGET_NAME: &str = "fmir-text";
@@ -107,16 +112,18 @@ mod tests {
     }
 
     #[test]
-    fn device_program_wire_version_is_6_after_the_observation_cadence_break() {
+    fn device_program_wire_version_is_7_after_the_broadcast_fact_break() {
         // Stage 3R U1 bumped the nested device-program wire version 3 → 4
         // (S1); S5-U5b bumps it 4 → 5 (the declared RepeatingStep step count
         // rides the lifetime variant); S5A-U1 bumps it 5 → 6 (every result
         // row's observation fact carries the explicit PerStep/EndOfRun
-        // cadence). The nested wire version ratchets independently of the
-        // outer image version (S8) — it currently coincides numerically with
-        // `PACKAGE_MIR_ARTIFACT_VERSION` but the two are admitted by
-        // separate gates.
-        assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 6);
+        // cadence); S6-C2 bumps it 6 → 7 (the recipe-variant wire mirrors and
+        // the typed rank-extension broadcast fact change the canonical wire
+        // bytes). The nested wire version ratchets independently of the
+        // outer image version (S8) — it currently does NOT coincide
+        // numerically with `PACKAGE_MIR_ARTIFACT_VERSION`; the two are
+        // admitted by separate gates.
+        assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 7);
     }
 
     #[test]

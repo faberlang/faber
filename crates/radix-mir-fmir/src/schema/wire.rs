@@ -147,12 +147,41 @@ pub struct WireKernelUnit {
     pub function: u32,
     /// Target-neutral logical entry name.
     pub entry: String,
-    /// Shared algorithmic recipe (elementwise, matmul, reduction).
+    /// Shared algorithmic recipe (elementwise, matmul, reduction). A
+    /// rank-extension tensor-tensor add kernel carries its typed broadcast
+    /// fact inside the plan (the S6-C2 `RankExtensionAdd` variant) — the
+    /// plan is a program fact, never dropped on the wire.
     pub plan: WireCollectionKernelPlan,
     /// Typed buffer slots bound by this kernel.
     pub resources: Vec<WireDeviceResource>,
     /// Workgroup / dispatch / launch plan.
     pub launch: WireKernelLaunchPlan,
+}
+
+/// The typed broadcast fact carried on the wire (S6-C2), mirroring
+/// `radix_mir::abi::MirRankExtensionBroadcast`: the operand/result shapes
+/// and the broadcast declaration of a rank-extension elementwise op.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireBroadcastFact {
+    /// Higher-rank operand shape (e.g. `[B, D]`).
+    pub lhs_shape: Vec<u64>,
+    /// Lower-rank operand shape (e.g. `[D]`).
+    pub rhs_shape: Vec<u64>,
+    /// Result shape (equals the higher-rank operand shape for an add).
+    pub result_shape: Vec<u64>,
+    /// The broadcast declaration.
+    pub declaration: WireBroadcastDeclaration,
+}
+
+/// How a tensor operand is broadcast against its elementwise peer (A3: the
+/// declaration is a carried fact, never derived from source spelling).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireBroadcastDeclaration {
+    /// Rank extension: LHS rank = RHS rank + 1 and the lower-rank dims equal
+    /// the higher-rank trailing dims (`[B,D]` + `[D]` → `[B,D]`).
+    RankExtension,
 }
 
 /// A typed buffer slot bound to a kernel: identity + content version +
@@ -437,12 +466,61 @@ pub enum WireProgramLifetime {
 pub enum WireCollectionKernelPlan {
     /// No collection-op recipe (elementwise kernel).
     Elementwise,
+    /// S6-C2: an elementwise kernel whose tensor-tensor add carries the
+    /// typed rank-extension broadcast fact (the `addita_bias` lowering
+    /// `[B,D]` + `[D]`). The fact rides the plan so it is never dropped and
+    /// never inferred (A3); admission validates it fail-closed (A7).
+    RankExtensionAdd(WireBroadcastFact),
     /// Tiled-matmul recipe.
     TiledMatMul(WireMatMulPlan),
     /// Sequential tree-reduction recipe.
     TreeReduction(WireReductionPlan),
     /// Rank-2 transpose recipe (S5-U1).
     Transpose(WireTransposePlan),
+    /// Axis-reduction recipe (S6-N1 name freeze; wire mirror lands in S6-C2):
+    /// reduce a tensor over a single axis by `op`. Mirrors
+    /// `kernel_plan::AxisReductionPlan`; admission/resolution is S6-P1.
+    AxisReduction(WireAxisReductionPlan),
+    /// Row-wise softmax recipe (S6-N1 name freeze; wire mirror lands in
+    /// S6-C2): numerically stable softmax over the last (row) axis. Mirrors
+    /// `kernel_plan::RowSoftmaxPlan`; admission/resolution is S6-P1.
+    RowSoftmax(WireRowSoftmaxPlan),
+    /// Layer-normalization recipe (S6-N1 name freeze; wire mirror lands in
+    /// S6-C2): row mean/var with optional affine. Mirrors
+    /// `kernel_plan::LayerNormalizationPlan`; admission/resolution is S6-P1.
+    LayerNormalization(WireLayerNormalizationPlan),
+}
+
+/// Axis-reduction recipe plan (wire mirror of `kernel_plan::AxisReductionPlan`,
+/// S6-N1 name freeze, S6-C2 wire mirror). The axis comes from the trailing
+/// const operand of the lowering.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireAxisReductionPlan {
+    /// Reduction operator (`Sum` in v1).
+    pub op: WireReduceOp,
+    /// Axis reduced over (from the trailing const operand).
+    pub axis: u64,
+}
+
+/// Row-wise softmax recipe plan (wire mirror of `kernel_plan::RowSoftmaxPlan`,
+/// S6-N1 name freeze, S6-C2 wire mirror). Operates over the last (row) axis.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireRowSoftmaxPlan {
+    /// Row axis (the last axis in v1).
+    pub axis: u64,
+}
+
+/// Layer-normalization recipe plan (wire mirror of
+/// `kernel_plan::LayerNormalizationPlan`, S6-N1 name freeze, S6-C2 wire
+/// mirror). The full field set (epsilon, affine) is resolved by S6-P1 from
+/// the const operands.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireLayerNormalizationPlan {
+    /// Normalization axis (from the trailing const operand).
+    pub axis: u64,
 }
 
 /// Rank-2 transpose recipe (`[M,N] → [N,M]`), the wire mirror of

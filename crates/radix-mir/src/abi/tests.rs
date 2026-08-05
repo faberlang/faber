@@ -1126,3 +1126,166 @@ fn kernel_abi_keeps_f64_scalar_fail_closed_for_pure_scalar_kernel() {
     assert_eq!(error.issue, "mir_kernel_scalar_layout_unsupported");
     assert_eq!(error.detail.as_deref(), Some("f64"));
 }
+
+// ── S6-C2: typed rank-extension broadcast fact ──────────────────────────
+
+/// Build a tensor-tensor `TensorAdd` kernel: `out = add(left, right)` with
+/// the given left/right/result tensor types.
+fn tensor_add_kernel(
+    left_ty: MirType,
+    right_ty: MirType,
+    result_ty: MirType,
+    left_local: MirLocalId,
+    right_local: MirLocalId,
+    result_local: MirLocalId,
+) -> MirFunction {
+    let span = Span::default();
+    MirFunction {
+        id: MirFunctionId(0),
+        source: Some(DefId(9)),
+        name: None,
+        params: vec![
+            MirParam {
+                local: left_local,
+                name: None,
+                ty: left_ty,
+                mode: MirParamMode::Owned,
+                span,
+            },
+            MirParam {
+                local: right_local,
+                name: None,
+                ty: right_ty,
+                mode: MirParamMode::Owned,
+                span,
+            },
+        ],
+        locals: Vec::new(),
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::RuntimeCall {
+                    destination: Some(MirPlace::local(result_local)),
+                    call: MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorAdd),
+                        args: vec![
+                            MirOperand::Place(MirPlace::local(left_local)),
+                            MirOperand::Place(MirPlace::local(right_local)),
+                        ],
+                        return_ty: result_ty,
+                    },
+                },
+                span,
+            }],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    result_local,
+                )))),
+                span,
+            },
+            span,
+        }],
+        return_ty: result_ty,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    }
+}
+
+/// Tensor types for the S6-C2 rank-extension pair: `[2,8]`, `[8]`, `[2]`.
+fn rank_extension_types(types: &mut TypeTable) -> (MirType, MirType, MirType, MirType) {
+    let f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let f32_ty = MirType::semantic(f32);
+    let dim2 = types.intern_index(IndexExpr::Literal(2));
+    let dim8 = types.intern_index(IndexExpr::Literal(8));
+    let shape_b = types.intern_index(IndexExpr::Tuple(vec![dim8]));
+    let shape_x = types.intern_index(IndexExpr::Tuple(vec![dim2, dim8]));
+    let shape_tail_wrong = types.intern_index(IndexExpr::Tuple(vec![dim2]));
+    (
+        MirType::semantic(types.tensor_with_shape(f32, shape_x)),
+        MirType::semantic(types.tensor_with_shape(f32, shape_b)),
+        MirType::semantic(types.tensor_with_shape(f32, shape_tail_wrong)),
+        f32_ty,
+    )
+}
+
+/// S6-C2: the device ABI records the typed rank-extension broadcast fact for
+/// a `[2,8]` + `[8]` tensor-tensor add (the `addita_bias` lowering).
+#[test]
+fn abi_records_rank_extension_broadcast_fact() {
+    let mut types = TypeTable::new();
+    let (x_ty, b_ty, _wrong_ty, _) = rank_extension_types(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let function = tensor_add_kernel(
+        x_ty,
+        b_ty,
+        x_ty,
+        MirLocalId(0),
+        MirLocalId(1),
+        MirLocalId(2),
+    );
+
+    let fact = rank_extension_broadcast_fact(&function, &validation)
+        .expect("the [2,8]+[8] pair must resolve")
+        .expect("the kernel carries a broadcast fact");
+
+    assert_eq!(fact.lhs_shape, vec![2, 8]);
+    assert_eq!(fact.rhs_shape, vec![8]);
+    assert_eq!(fact.result_shape, vec![2, 8]);
+    assert_eq!(fact.declaration, MirBroadcastDeclaration::RankExtension);
+}
+
+/// S6-C2: a same-shape tensor-tensor add (the general `addita`) carries no
+/// broadcast fact — the fact is only for rank-extension pairs.
+#[test]
+fn abi_records_no_fact_for_same_shape_add() {
+    let mut types = TypeTable::new();
+    let (x_ty, _, _, _) = rank_extension_types(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let function = tensor_add_kernel(
+        x_ty,
+        x_ty,
+        x_ty,
+        MirLocalId(0),
+        MirLocalId(1),
+        MirLocalId(2),
+    );
+
+    let fact = rank_extension_broadcast_fact(&function, &validation).expect("no failure");
+    assert!(fact.is_none(), "same-shape add carries no broadcast fact");
+}
+
+/// S6-C2: a tensor-tensor add whose shape pair is neither same-shape nor a
+/// valid rank extension fails closed with a typed diagnostic (A3/A7 — the
+/// fact cannot be recorded, so the kernel must not reach emission).
+#[test]
+fn abi_rejects_invalid_broadcast_pair_fail_closed() {
+    let mut types = TypeTable::new();
+    let (x_ty, _, wrong_tail_ty, _) = rank_extension_types(&mut types);
+    // `[2,8]` + `[2]`: rank difference is one, but `[2]` is not the trailing
+    // dims `[8]` — an invalid broadcast pair.
+    let validation = MirValidationContext::new(&types);
+    let function = tensor_add_kernel(
+        x_ty,
+        wrong_tail_ty,
+        x_ty,
+        MirLocalId(0),
+        MirLocalId(1),
+        MirLocalId(2),
+    );
+
+    let error = rank_extension_broadcast_fact(&function, &validation)
+        .expect_err("an invalid broadcast pair must fail closed");
+
+    assert!(
+        error
+            .message
+            .contains("neither same-shape nor a rank extension"),
+        "typed diagnostic expected, got: {}",
+        error.message
+    );
+    assert_eq!(error.issue, "mir_abi_error");
+}

@@ -1,6 +1,7 @@
 use super::wire::{
-    WireBufferIdentity, WireBufferLifetime, WireDeviceProgram, WireInitializationPolicy,
-    WireObservationCadence, WireProgramLifetime, WireResourceAccess,
+    WireBroadcastDeclaration, WireBufferIdentity, WireBufferLifetime, WireCollectionKernelPlan,
+    WireDeviceProgram, WireInitializationPolicy, WireObservationCadence, WireProgramLifetime,
+    WireResourceAccess,
 };
 
 // ---------------------------------------------------------------------------
@@ -14,7 +15,7 @@ use super::wire::{
 // fails admission before host construction or launch.
 
 /// Validate the carried wire facts fail-closed (F1–F7 + the S5-U5b declared
-/// step count).
+/// step count + the S6-C2 broadcast fact).
 pub(crate) fn validate_wire_program(
     wire: &WireDeviceProgram,
 ) -> Result<(), crate::error::FmirImageError> {
@@ -25,6 +26,52 @@ pub(crate) fn validate_wire_program(
     validate_wire_relations(wire)?;
     validate_wire_axes(wire, &launches)?;
     validate_wire_step_count(wire)?;
+    validate_wire_broadcast_facts(wire)?;
+    Ok(())
+}
+
+/// Rule S6-C2 (A7): every carried rank-extension broadcast fact (the
+/// `RankExtensionAdd` plan payload) must be internally consistent — the
+/// higher-rank operand is exactly one rank above the lower-rank operand, the
+/// lower-rank dims equal the higher-rank trailing dims, and the result is
+/// the higher-rank shape. A shape mismatch fails admission closed (the fact
+/// is carried, never inferred — A3).
+fn validate_wire_broadcast_facts(
+    wire: &WireDeviceProgram,
+) -> Result<(), crate::error::FmirImageError> {
+    for kernel in &wire.kernels {
+        let WireCollectionKernelPlan::RankExtensionAdd(fact) = &kernel.plan else {
+            continue;
+        };
+        let higher = if fact.lhs_shape.len() >= fact.rhs_shape.len() {
+            &fact.lhs_shape
+        } else {
+            &fact.rhs_shape
+        };
+        let lower = if fact.lhs_shape.len() >= fact.rhs_shape.len() {
+            &fact.rhs_shape
+        } else {
+            &fact.lhs_shape
+        };
+        if fact.declaration != WireBroadcastDeclaration::RankExtension {
+            return Err(wire_invalid(format!(
+                "kernel '{}' carries the unsupported broadcast declaration {fact:?}; only rank-extension is admitted (S6-C2 A7)",
+                kernel.entry
+            )));
+        }
+        if higher.len() != lower.len() + 1 || lower != &higher[1..] {
+            return Err(wire_invalid(format!(
+                "kernel '{}' carries a mismatched rank-extension broadcast fact (lhs {:?}, rhs {:?}); the lower-rank dims must equal the higher-rank trailing dims (S6-C2 A7)",
+                kernel.entry, fact.lhs_shape, fact.rhs_shape
+            )));
+        }
+        if fact.result_shape != *higher {
+            return Err(wire_invalid(format!(
+                "kernel '{}' carries a rank-extension broadcast fact whose result shape {:?} does not equal the higher-rank operand shape {:?} (S6-C2 A7)",
+                kernel.entry, fact.result_shape, *higher
+            )));
+        }
+    }
     Ok(())
 }
 
