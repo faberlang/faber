@@ -36,7 +36,6 @@ fn fmir_manifest_and_image_file_names_are_configured() {
 fn fmir_bin_entrypoint_and_runner_names_are_configured() {
     assert_eq!(FMIR_BIN_ENTRYPOINT_FILE, "run");
     assert_eq!(FMIR_BIN_RUNNER_CRATE_DIR, "runner");
-    assert_eq!(FMIR_BIN_RUNNER_TARGET_DIR, "runner-target");
     assert_eq!(FMIR_BIN_RUNNER_PACKAGE_NAME, "faber-fmir-bin-runner");
 }
 

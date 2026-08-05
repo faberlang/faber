@@ -110,7 +110,6 @@ const FMIR_TEXT_IMAGE_FILE: &str = "image.fmir.txt";
 const FMIR_IMAGE_FILE: &str = "image.fmir";
 const FMIR_BIN_ENTRYPOINT_FILE: &str = "run";
 const FMIR_BIN_RUNNER_CRATE_DIR: &str = "runner";
-const FMIR_BIN_RUNNER_TARGET_DIR: &str = "runner-target";
 const FMIR_BIN_RUNNER_PACKAGE_NAME: &str = "faber-fmir-bin-runner";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -122,19 +121,16 @@ pub(crate) struct PackageMirArtifact {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct PackageFmirTextImage {
-    pub(crate) root: PathBuf,
     pub(crate) image_path: PathBuf,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct PackageFmirImage {
-    pub(crate) root: PathBuf,
     pub(crate) image_path: PathBuf,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct PackageFmirBinaryBundle {
-    pub(crate) root: PathBuf,
     pub(crate) entrypoint_path: PathBuf,
     pub(crate) image_path: PathBuf,
 }
@@ -342,10 +338,7 @@ pub(crate) fn build_package_fmir_text_image(
             let image = package_fmir_text_image(prepared, lowered, &package_root)?;
             fs::write(&image_path, image)
                 .map_err(|error| vec![mir_diag(&prepared.entry_path, error.to_string())])?;
-            Ok(PackageFmirTextImage {
-                root: artifact_root,
-                image_path,
-            })
+            Ok(PackageFmirTextImage { image_path })
         },
     )
 }
@@ -369,10 +362,7 @@ pub(crate) fn build_package_fmir_image(
             let image = package_fmir_binary_image(prepared, lowered, &package_root)?;
             fs::write(&image_path, image)
                 .map_err(|error| vec![mir_diag(&prepared.entry_path, error.to_string())])?;
-            Ok(PackageFmirImage {
-                root: artifact_root,
-                image_path,
-            })
+            Ok(PackageFmirImage { image_path })
         },
     )
 }
@@ -411,7 +401,6 @@ pub(crate) fn build_package_fmir_binary_bundle(
             )?;
 
             Ok(PackageFmirBinaryBundle {
-                root: artifact_root,
                 entrypoint_path,
                 image_path,
             })
