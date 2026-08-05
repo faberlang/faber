@@ -71,8 +71,9 @@ pub struct KernelSubchain {
     /// Indices into [`KernelDecomposition::subchains`] whose produced local
     /// this subchain reads — its explicit carried data-flow inputs.
     pub consumes: Vec<usize>,
-    /// The local this subchain produces (the destination of its last
-    /// statement), when a later subchain consumes it.
+    /// The local this subchain produces — the destination of the last
+    /// destination-writing statement in the slice — when a later subchain
+    /// consumes it.
     pub produced: Option<MirLocalId>,
     /// The locals this subchain must expose as kernel outputs (D-2a): the
     /// recipe result (the subchain's primary/current output) plus every
@@ -205,11 +206,7 @@ pub fn decompose_kernel_function(
         // Data-flow: subchains whose produced local this subchain reads.
         let mut consumes = Vec::new();
         for (prior, prior_written) in written_by.iter().enumerate() {
-            if synthetic
-                .params
-                .iter()
-                .any(|param| prior_written.contains(&param.local))
-            {
+            if prior_written.iter().any(|local| inputs.contains(local)) {
                 consumes.push(prior);
             }
         }
@@ -399,7 +396,10 @@ fn build_subchain_function(
     let return_ty;
     let mut temps = source.temps.clone();
     if is_last {
-        terminator = source_terminator_return(source);
+        // The last subchain keeps the source return terminator: the return
+        // local keeps its original id, so the scalar-return reduction shape
+        // survives the slice.
+        terminator = block.terminator.clone();
         return_ty = source.return_ty;
     } else if outputs.len() > 1 {
         let element_ids: Vec<TypeId> = outputs
@@ -471,13 +471,6 @@ fn build_subchain_function(
         shader_stage: source.shader_stage,
         span,
     }
-}
-
-/// The source function's return terminator, preserved for the last subchain
-/// (the return local keeps its original id, so the scalar-return reduction
-/// shape survives the slice).
-fn source_terminator_return(source: &MirFunction) -> MirTerminator {
-    source.blocks[0].terminator.clone()
 }
 
 /// The MIR type of a local in the source function (params, then locals) —
@@ -603,13 +596,10 @@ fn value_read_locals(value: &MirValue) -> Vec<MirLocalId> {
         MirValueKind::Operand(operand) | MirValueKind::Unary { operand, .. } => {
             operand_local(operand).into_iter().collect()
         }
-        MirValueKind::Binary { lhs, rhs, .. } => {
-            let mut locals = operand_local(lhs).into_iter().collect::<Vec<_>>();
-            if let Some(rhs) = operand_local(rhs) {
-                locals.push(rhs);
-            }
-            locals
-        }
+        MirValueKind::Binary { lhs, rhs, .. } => operand_local(lhs)
+            .into_iter()
+            .chain(operand_local(rhs))
+            .collect(),
         _ => Vec::new(),
     }
 }
