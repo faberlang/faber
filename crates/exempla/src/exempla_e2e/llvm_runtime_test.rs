@@ -394,3 +394,123 @@ fn llvm_host_valor_scalar_conversion_fixture_matches_raw_expected_bytes() {
         probe.reason
     );
 }
+
+/// L7 (cf3cff8f): scalar display/format parity — `octet`/`numerus<u8>` values
+/// display their unsigned magnitude like the Rust oracle (`222`, `128`), not
+/// the signed i8 rendering the LLVM host used to emit (`-34`, `-128`).
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_octet_unsigned_display -- --ignored --nocapture"]
+fn llvm_host_octet_unsigned_display_matches_rust_output() {
+    let fab_path = crate::paths::corpus_dir().join("octet/octet.fab");
+    let result = Compiler::new(
+        Config::default()
+            .with_target(Target::LlvmText)
+            .with_dev_stdlib(),
+    )
+    .compile(&fab_path);
+    assert!(
+        result.success(),
+        "octet/octet.fab LLVM compile failed: {:?}",
+        result.diagnostics
+    );
+    let Some(Output::LlvmText(output)) = result.output else {
+        panic!("octet/octet.fab did not produce LLVM text");
+    };
+    let temp_root = super::super::common::make_temp_root();
+    let llvm_file = temp_root.join("octet.ll");
+    fs::write(&llvm_file, output.code).expect("write octet LLVM text");
+
+    let probe = run_llvm_exemplum(&llvm_file, &temp_root, "octet", &fab_path);
+    assert_eq!(
+        probe.stdout,
+        "5\n222\n128\n",
+        "octet bytes must display unsigned: {}",
+        probe.reason
+    );
+    assert!(
+        probe.stderr.is_empty(),
+        "unexpected stderr: {:?}",
+        probe.stderr
+    );
+    assert_eq!(probe.exit_code, Some(0));
+}
+
+/// L7 (cf3cff8f): scalar display/format parity — `modulus<u32>` values display
+/// their unsigned magnitude like the Rust oracle (`4197074466`), not the signed
+/// i32 rendering (`-97892830`).
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_modular_word_unsigned_display -- --ignored --nocapture"]
+fn llvm_host_modular_word_unsigned_display_matches_rust_output() {
+    let fab_path = crate::paths::corpus_dir().join("operatores/modular-word-sha-round.fab");
+    let result = Compiler::new(
+        Config::default()
+            .with_target(Target::LlvmText)
+            .with_dev_stdlib(),
+    )
+    .compile(&fab_path);
+    assert!(
+        result.success(),
+        "operatores/modular-word-sha-round.fab LLVM compile failed: {:?}",
+        result.diagnostics
+    );
+    let Some(Output::LlvmText(output)) = result.output else {
+        panic!("modular-word-sha-round did not produce LLVM text");
+    };
+    let temp_root = super::super::common::make_temp_root();
+    let llvm_file = temp_root.join("modular-word-sha-round.ll");
+    fs::write(&llvm_file, output.code).expect("write modular-word-sha-round LLVM text");
+
+    let probe = run_llvm_exemplum(&llvm_file, &temp_root, "modular-word-sha-round", &fab_path);
+    assert_eq!(
+        probe.stdout,
+        "1567288269\n4197074466\n",
+        "modulus<u32> values must display unsigned: {}",
+        probe.reason
+    );
+    assert!(
+        probe.stderr.is_empty(),
+        "unexpected stderr: {:?}",
+        probe.stderr
+    );
+    assert_eq!(probe.exit_code, Some(0));
+}
+
+/// L7 (cf3cff8f): scalar display/format parity — `§`-template f64 formatting
+/// keeps the integral `.0` decimal marker (`valor: 5.0`) like the Rust oracle,
+/// not `value.to_string()`'s `valor: 5`.
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_f64_format_matches_rust_output -- --ignored --nocapture"]
+fn llvm_host_f64_format_matches_rust_output() {
+    let fab_path = crate::paths::corpus_dir().join("mori/mori.fab");
+    let result = Compiler::new(
+        Config::default()
+            .with_target(Target::LlvmText)
+            .with_dev_stdlib(),
+    )
+    .compile(&fab_path);
+    assert!(
+        result.success(),
+        "mori/mori.fab LLVM compile failed: {:?}",
+        result.diagnostics
+    );
+    let Some(Output::LlvmText(output)) = result.output else {
+        panic!("mori/mori.fab did not produce LLVM text");
+    };
+    let temp_root = super::super::common::make_temp_root();
+    let llvm_file = temp_root.join("mori.ll");
+    fs::write(&llvm_file, output.code).expect("write mori LLVM text");
+
+    let probe = run_llvm_exemplum(&llvm_file, &temp_root, "mori", &fab_path);
+    assert_eq!(
+        probe.stdout,
+        "valor: 5.0\nvalor: 2\n",
+        "integral f64 must keep the .0 marker: {}",
+        probe.reason
+    );
+    assert!(
+        probe.stderr.is_empty(),
+        "unexpected stderr: {:?}",
+        probe.stderr
+    );
+    assert_eq!(probe.exit_code, Some(0));
+}
