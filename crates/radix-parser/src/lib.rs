@@ -48,8 +48,8 @@ pub use error::{ParseError, ParseErrorKind};
 
 use radix_diagnostics::PhaseErrorKind;
 use radix_lexer::{
-    keyword_allowed_as_ident, keyword_spelling_for_token, Interner, KeywordOwner, LexResult, Span,
-    Symbol, Token, TokenKind,
+    keyword_allowed_as_ident, keyword_spelling_for_token, lookup_keyword_spec, Interner,
+    KeywordOwner, KeywordScope, LexResult, Span, Symbol, Token, TokenKind,
 };
 #[allow(clippy::wildcard_imports)]
 // syntax is a pure re-export barrel from radix-syntax
@@ -352,32 +352,47 @@ impl Parser {
         self.peek().kind == kw
     }
 
-    /// Check if the current token matches a keyword in a grammar slot.
+    /// Resolve the current word's keyword identity through the registry.
     ///
-    /// A grammar slot accepts a keyword in either form:
-    /// - the legacy reserved-token form (`TokenKind::Modulus`), including the
-    ///   pack-localized token emitted for a pack row; and
-    /// - the tokenless surface form (`TokenKind::Ident` whose spelling is the
-    ///   Latin key, or resolves to it through the reader pack).
-    ///
-    /// This is the dual-mode dispatch the contextual-keywords migration uses:
-    /// rows still carrying a `token_kind` match by token, migrated rows match
-    /// by spelling in grammar position.
-    fn check_keyword_in_slot(&self, latin_key: &str) -> bool {
-        match self.peek().kind {
-            TokenKind::Ident(sym) => {
-                let source = self.interner.resolve(sym);
-                source == latin_key
-                    || self
-                        .reader_keyword_latin_keys
-                        .get(source)
-                        .is_some_and(|key| key == latin_key)
-            }
-            ref kind => keyword_spelling_for_token(kind) == Some(latin_key),
-        }
+    /// Returns the locale-independent identity token for a declared keyword in
+    /// any source surface (latin, or a pack spelling resolved to its latin
+    /// key), or `None` when the current token is not a keyword.
+    fn current_keyword_ident(&self) -> Option<TokenKind> {
+        let TokenKind::Ident(sym) = self.peek().kind else {
+            return None;
+        };
+        let latin = self.identifier_text_or_keyword_latin_key(sym);
+        lookup_keyword_spec(latin).and_then(|spec| spec.token_kind.clone())
     }
 
-    /// Same as [`Self::check_keyword_in_slot`] but on the raw token stream —
+    /// Check whether the current word is the given keyword, by identity.
+    ///
+    /// Keywords are locale items: this matches the registry identity, not a
+    /// surface spelling, so it holds for any reader pack.
+    fn check_keyword_ident(&self, identity: TokenKind) -> bool {
+        self.current_keyword_ident() == Some(identity)
+    }
+
+    /// Check whether the current word is a keyword claimed for the given owner.
+    ///
+    /// Owner queries (param mode, declaration introducer, predicate operator,
+    /// …) are registry-driven and locale-independent.
+    fn check_keyword_in_owner(&self, owner: KeywordOwner) -> bool {
+        let TokenKind::Ident(sym) = self.peek().kind else {
+            return false;
+        };
+        let latin = self.identifier_text_or_keyword_latin_key(sym);
+        matches!(
+            lookup_keyword_spec(latin),
+            Some(spec)
+                if matches!(
+                    spec.scope,
+                    KeywordScope::Contextual(owners) if owners.contains(&owner)
+                )
+        )
+    }
+
+    /// Same as [`Self::check_keyword_ident`] but on the raw token stream —
     /// no trivia skipping. Used for same-line guards (`iace … si cond`,
     /// `mori … si cond`) where an intervening newline means the word starts a
     /// new statement instead of this statement's guard.
@@ -504,9 +519,9 @@ impl Parser {
         }
     }
 
-    /// Consume a keyword in a grammar slot if present, returning whether it matched.
-    fn eat_keyword_in_slot(&mut self, latin_key: &str) -> bool {
-        if self.check_keyword_in_slot(latin_key) {
+    /// Consume the current word when it is the given keyword identity.
+    fn eat_keyword_ident(&mut self, identity: TokenKind) -> bool {
+        if self.check_keyword_ident(identity) {
             self.advance();
             true
         } else {
@@ -599,19 +614,9 @@ impl Parser {
         }
     }
 
-    /// Expect a specific keyword.
-    fn expect_keyword(&mut self, kw: TokenKind, msg: &str) -> Result<(), ParseError> {
-        if self.check_keyword(kw) {
-            self.advance();
-            Ok(())
-        } else {
-            Err(self.expected_message_error(msg))
-        }
-    }
-
-    /// Expect a keyword in a grammar slot, erroring when absent.
-    fn expect_keyword_in_slot(&mut self, latin_key: &str, msg: &str) -> Result<(), ParseError> {
-        if self.check_keyword_in_slot(latin_key) {
+    /// Require the current word to be the given keyword identity.
+    fn expect_keyword_ident(&mut self, identity: TokenKind, msg: &str) -> Result<(), ParseError> {
+        if self.check_keyword_ident(identity) {
             self.advance();
             Ok(())
         } else {
@@ -675,56 +680,49 @@ impl Parser {
     fn is_recovery_boundary(&self, kind: &TokenKind) -> bool {
         if let TokenKind::Ident(sym) = kind {
             let latin = self.identifier_text_or_keyword_latin_key(*sym);
+            let ident = lookup_keyword_spec(latin).and_then(|spec| spec.token_kind.clone());
             return matches!(
-                latin,
-                "discretio"
-                    | "fixum"
-                    | "functio"
-                    | "genus"
-                    | "implendum"
-                    | "ordo"
-                    | "sit"
-                    | "typus"
-                    | "varia"
-                    // Control-flow statement starts (Batch F).
-                    | "discerne"
-                    | "dum"
-                    | "elige"
-                    | "fac"
-                    | "si"
-                    | "perge"
-                    | "redde"
-                    | "rumpe"
-                    // Resource/transfer and route statements (Batch G).
-                    | "cura"
-                    | "tacet"
-                    | "ad"
+                ident,
+                Some(TokenKind::Discretio)
+                    | Some(TokenKind::Fixum)
+                    | Some(TokenKind::Varia)
+                    | Some(TokenKind::Functio)
+                    | Some(TokenKind::Genus)
+                    | Some(TokenKind::Implendum)
+                    | Some(TokenKind::Ordo)
+                    | Some(TokenKind::Sit)
+                    | Some(TokenKind::Typus)
+                    | Some(TokenKind::Discerne)
+                    | Some(TokenKind::Dum)
+                    | Some(TokenKind::Elige)
+                    | Some(TokenKind::Fac)
+                    | Some(TokenKind::Si)
+                    | Some(TokenKind::Perge)
+                    | Some(TokenKind::Redde)
+                    | Some(TokenKind::Rumpe)
+                    | Some(TokenKind::Cura)
+                    | Some(TokenKind::Tacet)
+                    | Some(TokenKind::Ad)
+                    | Some(TokenKind::Abstractus)
+                    | Some(TokenKind::Ex)
+                    | Some(TokenKind::Importa)
+                    | Some(TokenKind::Proba)
+                    | Some(TokenKind::Probandum)
+                    | Some(TokenKind::Custodi)
+                    | Some(TokenKind::Itera)
+                    | Some(TokenKind::Iace)
+                    | Some(TokenKind::Mori)
+                    | Some(TokenKind::Cede)
+                    | Some(TokenKind::Adfirma)
+                    | Some(TokenKind::Scribe)
+                    | Some(TokenKind::Incipiet)
+                    | Some(TokenKind::Incipit)
             );
         }
         matches!(
             kind,
-            // Declarations
-            TokenKind::Abstractus
-                | TokenKind::Ex
-                | TokenKind::Importa
-                | TokenKind::Proba
-                | TokenKind::Probandum
-            // Control flow
-                | TokenKind::Custodi
-                | TokenKind::Itera
-            // Transfer
-                | TokenKind::Iace
-                | TokenKind::Mori
-                | TokenKind::Cede
-            // Error handling
-                | TokenKind::Adfirma
-            // Output
-                | TokenKind::Scribe
-            // Entry points
-                | TokenKind::Incipiet
-                | TokenKind::Incipit
             // Structural boundaries
-                | TokenKind::At
+            TokenKind::At
                 | TokenKind::Eof
                 | TokenKind::LBrace
                 | TokenKind::RBrace

@@ -95,7 +95,6 @@ fn bare_optio_annotation_expected_identifier() {
     let result = parse_program(
         r"
 @ optio
-incipit argumenta args {}
 ",
     );
     let err = result
@@ -726,7 +725,7 @@ fn proba_temporis_modifier_requires_integer() {
 #[test]
 fn bare_at_annotation_name_rejected() {
     assert_parse_error_matches(
-        "@\nincipit argumenta args {}\n",
+        "@\n",
         ParseExpectation::Args(&[("issue", "annotation_name")]),
     );
 }
@@ -828,7 +827,6 @@ fn bare_optio_annotation_requires_identifier() {
     assert_parse_error_matches(
         r"
 @ optio
-incipit argumenta args {}
 ",
         ParseExpectation::Arg {
             name: "expected",
@@ -884,7 +882,7 @@ fn optio_typus_requires_identifier() {
     assert_parse_error_matches(
         r"
 @ optio output typus
-incipit argumenta args {}
+{}
 ",
         ParseExpectation::Arg {
             name: "expected",
@@ -898,7 +896,7 @@ fn optio_vel_requires_expression() {
     assert_parse_error_matches(
         r"
 @ optio output vel
-incipit argumenta args {}
+{}
 ",
         ParseExpectation::Issue("expected_expression"),
     );
@@ -909,7 +907,7 @@ fn operandus_requires_identifier_after_type() {
     assert_parse_error_matches(
         r"
 @ operandus textus
-incipit argumenta args {}
+{}
 ",
         ParseExpectation::Arg {
             name: "expected",
@@ -948,7 +946,7 @@ fn operandus_vel_requires_expression() {
     assert_parse_error_matches(
         r"
 @ operandus textus input vel
-incipit argumenta args {}
+{}
 ",
         ParseExpectation::Issue("expected_expression"),
     );
@@ -2564,20 +2562,21 @@ fac { tacet } cape err {}
 }
 
 #[test]
-fn bare_block_with_cape_rejected() {
-    assert_parse_error_matches(
-        r"functio invalid() → vacuum { { tacet } cape err { tacet } }",
-        ParseExpectation::Issue("expected_expression"),
-    );
+fn cape_keyword_usable_as_identifier_after_block() {
+    // No reserved words: `cape` (catch) is an ordinary identifier outside its
+    // recovery-clause slot, so it is a valid expression statement.
+    let result = parse_ok(r"functio f() → vacuum { { tacet } cape }");
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 1);
 }
 
 #[test]
-fn removed_tempta_fails_with_plain_parse_error() {
-    // `tempta` is no longer a keyword: it must fail as an ordinary parse
-    // error, never with a targeted `retired_statement` migration diagnostic.
-    let source = r"functio old() → vacuum { tempta { tacet } cape err { tacet } }";
+fn removed_tempta_is_ordinary_identifier() {
+    // `tempta` is not a registered keyword; it must parse as an ordinary
+    // identifier expression with no targeted retired-statement diagnostic.
+    let source = r"functio f() → vacuum { tempta }";
     let result = parse_program(source);
-    assert!(!result.success());
+    assert!(result.success());
     assert!(
         !result
             .errors
@@ -3265,25 +3264,33 @@ implendum Par {
 }
 
 #[test]
-fn solum_keyword_as_binding_name_rejected() {
-    assert_parse_error_matches(
-        r"fixum solum x ← 1",
-        ParseExpectation::Arg {
-            name: "expected",
-            value: "identifier",
-        },
-    );
+fn solum_keyword_usable_as_binding_name() {
+    // No reserved words: `solum` (test annotation) is an ordinary identifier
+    // outside its annotation slot.
+    let result = parse_ok(r"fixum _ solum ← 1");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let BindingPattern::Ident(binding) = &var.binding else {
+        panic!("expected identifier binding");
+    };
+    assert_eq!(symbol_name(&result, binding.name), "solum");
 }
 
 #[test]
-fn mori_keyword_as_binding_name_rejected() {
-    assert_parse_error_matches(
-        r"fixum mori x ← 1",
-        ParseExpectation::Arg {
-            name: "expected",
-            value: "identifier",
-        },
-    );
+fn mori_keyword_usable_as_binding_name() {
+    // No reserved words: `mori` (panic statement) is an ordinary identifier
+    // outside its statement slot.
+    let result = parse_ok(r"fixum _ mori ← 1");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let BindingPattern::Ident(binding) = &var.binding else {
+        panic!("expected identifier binding");
+    };
+    assert_eq!(symbol_name(&result, binding.name), "mori");
 }
 
 #[test]
@@ -3664,19 +3671,19 @@ fn parses_cede_as_yield_statement_only() {
 }
 
 #[test]
-fn rejects_cede_in_initializer_expression_position() {
-    assert_parse_error_matches(
-        "functio f() fiunt → numerus { fixum _ x ← cede 1 cede 2 }",
-        ParseExpectation::Issue("expected_expression"),
-    );
+fn cede_keyword_usable_as_identifier_in_initializer() {
+    // No reserved words: `cede` (yield) is an ordinary identifier outside its
+    // generator-yield slot, so it is a valid initializer expression.
+    let result = parse_ok("functio f() fiunt → numerus { fixum _ x ← cede }");
+    assert_eq!(result.program.as_ref().expect("program").statements.len(), 1);
 }
 
 #[test]
-fn rejects_cede_in_call_argument_expression_position() {
-    assert_parse_error_matches(
-        "functio f() fiunt → numerus { nota cede 1 cede 2 }",
-        ParseExpectation::Issue("expected_expression"),
-    );
+fn cede_keyword_usable_as_identifier_in_call_argument() {
+    // No reserved words: `cede` is an ordinary identifier in call-argument
+    // position (its generator-yield claim is statement-shaped).
+    let result = parse_ok("functio f() fiunt → numerus { nota cede }");
+    assert_eq!(result.program.as_ref().expect("program").statements.len(), 1);
 }
 
 #[test]

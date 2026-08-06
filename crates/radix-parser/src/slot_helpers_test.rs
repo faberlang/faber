@@ -69,11 +69,11 @@ fn parser_over_with_pack(source: &str) -> Parser {
 #[test]
 fn slot_helper_matches_legacy_reserved_token_form() {
     let mut parser = parser_over("iuncta");
-    assert!(parser.check_keyword_in_slot("iuncta"));
-    assert!(!parser.check_keyword_in_slot("modulus"));
-    assert!(parser.eat_keyword_in_slot("iuncta"));
+    assert!(parser.check_keyword_ident(TokenKind::Iuncta));
+    assert!(!parser.check_keyword_ident(TokenKind::Modulus));
+    assert!(parser.eat_keyword_ident(TokenKind::Iuncta));
     assert!(
-        !parser.check_keyword_in_slot("iuncta"),
+        !parser.check_keyword_ident(TokenKind::Iuncta),
         "consumed token must not re-match"
     );
 }
@@ -83,38 +83,38 @@ fn slot_helper_matches_tokenless_ident_by_latin_text() {
     // The pack does not localize `iuncta`, so it lexes as an `Ident` — the
     // Latin-fallback shape a migrated keyword takes under a partial pack.
     let mut parser = parser_over_with_pack("iuncta");
-    assert!(parser.check_keyword_in_slot("iuncta"));
-    assert!(parser.eat_keyword_in_slot("iuncta"));
+    assert!(parser.check_keyword_ident(TokenKind::Iuncta));
+    assert!(parser.eat_keyword_ident(TokenKind::Iuncta));
 }
 
 #[test]
 fn slot_helper_matches_localized_pack_spelling() {
     let mut parser = parser_over_with_pack("本地");
-    assert!(parser.check_keyword_in_slot("iuncta"));
-    assert!(!parser.check_keyword_in_slot("modulus"));
-    assert!(parser.eat_keyword_in_slot("iuncta"));
+    assert!(parser.check_keyword_ident(TokenKind::Iuncta));
+    assert!(!parser.check_keyword_ident(TokenKind::Modulus));
+    assert!(parser.eat_keyword_ident(TokenKind::Iuncta));
 }
 
 #[test]
 fn slot_helper_matches_tokenless_precedent_via_pack_key() {
     // Existing tokenless precedent: `await` → `tacebit` through the pack map.
     let mut parser = parser_over_with_pack("await");
-    assert!(parser.check_keyword_in_slot("tacebit"));
-    assert!(!parser.check_keyword_in_slot("iuncta"));
-    assert!(parser.eat_keyword_in_slot("tacebit"));
+    assert!(parser.check_keyword_ident(TokenKind::Tacebit));
+    assert!(!parser.check_keyword_ident(TokenKind::Iuncta));
+    assert!(parser.eat_keyword_ident(TokenKind::Tacebit));
 }
 
 #[test]
 fn slot_helper_rejects_ordinary_identifier() {
     let mut parser = parser_over("nomine");
-    assert!(!parser.check_keyword_in_slot("iuncta"));
-    assert!(!parser.eat_keyword_in_slot("iuncta"));
+    assert!(!parser.check_keyword_ident(TokenKind::Iuncta));
+    assert!(!parser.eat_keyword_ident(TokenKind::Iuncta));
 }
 
 #[test]
 fn slot_helper_expect_errors_when_absent() {
     let mut parser = parser_over("nomine");
-    let result = parser.expect_keyword_in_slot("iuncta", "expected 'iuncta'");
+    let result = parser.expect_keyword_ident(TokenKind::Iuncta, "expected 'iuncta'");
     assert!(
         result.is_err(),
         "missing slot keyword must produce an error"

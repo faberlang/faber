@@ -113,33 +113,35 @@ fn lexes_control_flow_keywords_as_identifiers_after_tokenless_migration() {
 fn lexes_modulus_as_identifier_after_tokenless_migration() {
     let result = lex("modulus chorda {");
     assert!(result.errors.is_empty());
-    // Batch A made `modulus` tokenless: it lexes as an identifier and the
-    // parser claims it by spelling in type position.
+    // Every keyword lexes as an identifier; the parser claims it by identity
+    // in type position.
     assert!(matches!(result.tokens[0].kind, TokenKind::Ident(_)));
     let spec = lookup_keyword_spec("modulus").expect("modulus should be registered");
-    assert_eq!(spec.token_kind, None);
+    assert_eq!(spec.token_kind, Some(TokenKind::Modulus));
     // 3.1c — span: modulus at 0..7
     assert_eq!(result.tokens[0].span, crate::Span::new(0, 7));
 }
 
 #[test]
 fn keyword_registry_specs_lex_to_current_tokens() {
-    for spec in keyword_specs()
-        .iter()
-        .filter(|spec| spec.currently_lexes_as_keyword())
-    {
+    for spec in keyword_specs() {
         let result = lex(spec.text);
         assert!(
             result.errors.is_empty(),
             "failed to lex keyword spec '{}'",
             spec.text
         );
-        let token_kind = spec.token_kind.as_ref().expect("checked above");
-
+        // Keywords lex as identifiers; the identity resolves through the
+        // recorded latin-key map, so the parser can claim any of them.
+        assert!(
+            matches!(result.tokens[0].kind, TokenKind::Ident(_)),
+            "keyword '{}' must lex as an identifier",
+            spec.text
+        );
         assert_eq!(
-            format!("{:?}", result.tokens[0].kind),
-            format!("{token_kind:?}"),
-            "lexer disagrees with KeywordSpec for '{}'",
+            result.reader_keyword_latin_keys.get(spec.text),
+            Some(&spec.text.to_string()),
+            "latin key not recorded for '{}'",
             spec.text
         );
     }
@@ -150,28 +152,13 @@ fn keyword_lookup_uses_nfkc_normalized_identifier_text() {
     let result = lex("ｃａｐｅ textus name ← \"ok\"");
 
     assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
-    assert_eq!(result.tokens[0].kind, TokenKind::Cape);
-}
-
-#[test]
-fn metadata_only_keyword_specs_lex_as_identifiers() {
-    for spec in keyword_specs()
-        .iter()
-        .filter(|spec| !spec.currently_lexes_as_keyword())
-    {
-        let result = lex(spec.text);
-        assert!(
-            result.errors.is_empty(),
-            "failed to lex metadata spec '{}'",
-            spec.text
-        );
-        assert!(
-            matches!(result.tokens[0].kind, TokenKind::Ident(_)),
-            "metadata-only KeywordSpec '{}' should lex as an identifier, got {:?}",
-            spec.text,
-            result.tokens[0].kind
-        );
-    }
+    // Keywords lex as identifiers; the NFKC-normalized spelling resolves to
+    // the latin identity through the recorded key map.
+    assert!(matches!(result.tokens[0].kind, TokenKind::Ident(_)));
+    assert_eq!(
+        result.reader_keyword_latin_keys.get("cape"),
+        Some(&"cape".to_string())
+    );
 }
 
 #[test]
@@ -501,14 +488,19 @@ fn lexer_interns_equivalent_unicode_forms_as_one_symbol() {
     let result = lex("cape café = 1\ncape cafe\u{301} = 2");
     assert!(result.errors.is_empty());
 
-    let mut idents = result.tokens.iter().filter_map(|token| match token.kind {
-        TokenKind::Ident(sym) => Some(sym),
-        _ => None,
-    });
+    let idents: Vec<_> = result
+        .tokens
+        .iter()
+        .filter_map(|token| match token.kind {
+            TokenKind::Ident(sym) => Some(sym),
+            _ => None,
+        })
+        .collect();
 
-    let first = idents.next().expect("first identifier");
-    let second = idents.next().expect("second identifier");
-    assert_eq!(first, second);
+    // `cape` now lexes as an identifier too; both spellings of `cape` and both
+    // spellings of `café` must intern to one symbol each (NFKC equivalence).
+    assert_eq!(idents[0], idents[2]);
+    assert_eq!(idents[1], idents[3]);
 }
 
 // ---------------------------------------------------------------------------
@@ -1146,9 +1138,9 @@ fn lexes_proba_header_keywords() {
     let result = lex(r#"proba "case" omitte "blocked""#);
     assert!(result.errors.is_empty());
     let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
-    assert!(matches!(kinds[0], TokenKind::Proba));
+    assert!(matches!(kinds[0], TokenKind::Ident(_)));
     assert!(matches!(kinds[1], TokenKind::String(_)));
-    assert!(matches!(kinds[2], TokenKind::Omitte));
+    assert!(matches!(kinds[2], TokenKind::Ident(_)));
     assert!(matches!(kinds[3], TokenKind::String(_)));
     assert!(matches!(kinds[4], TokenKind::Eof));
 }
@@ -1158,12 +1150,12 @@ fn lexes_proba_scheduling_keywords() {
     let result = lex(r#"futurum "later" solum tag "focus" temporis 5"#);
     assert!(result.errors.is_empty());
     let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
-    assert!(matches!(kinds[0], TokenKind::Futurum));
+    assert!(matches!(kinds[0], TokenKind::Ident(_)));
     assert!(matches!(kinds[1], TokenKind::String(_)));
-    assert!(matches!(kinds[2], TokenKind::Solum));
-    assert!(matches!(kinds[3], TokenKind::Tag));
+    assert!(matches!(kinds[2], TokenKind::Ident(_)));
+    assert!(matches!(kinds[3], TokenKind::Ident(_)));
     assert!(matches!(kinds[4], TokenKind::String(_)));
-    assert!(matches!(kinds[5], TokenKind::Temporis));
+    assert!(matches!(kinds[5], TokenKind::Ident(_)));
     assert!(matches!(kinds[6], TokenKind::Integer(5)));
     assert!(matches!(kinds[7], TokenKind::Eof));
 }
@@ -1173,10 +1165,10 @@ fn lexes_proba_metrics_keywords() {
     let result = lex("metior repete 2 fragilis 1");
     assert!(result.errors.is_empty());
     let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
-    assert!(matches!(kinds[0], TokenKind::Metior));
-    assert!(matches!(kinds[1], TokenKind::Repete));
+    assert!(matches!(kinds[0], TokenKind::Ident(_)));
+    assert!(matches!(kinds[1], TokenKind::Ident(_)));
     assert!(matches!(kinds[2], TokenKind::Integer(2)));
-    assert!(matches!(kinds[3], TokenKind::Fragilis));
+    assert!(matches!(kinds[3], TokenKind::Ident(_)));
     assert!(matches!(kinds[4], TokenKind::Integer(1)));
     assert!(matches!(kinds[5], TokenKind::Eof));
 }
@@ -1186,9 +1178,9 @@ fn lexes_proba_environment_keywords() {
     let result = lex(r#"requirit "net" solum_in "ci""#);
     assert!(result.errors.is_empty());
     let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
-    assert!(matches!(kinds[0], TokenKind::Requirit));
+    assert!(matches!(kinds[0], TokenKind::Ident(_)));
     assert!(matches!(kinds[1], TokenKind::String(_)));
-    assert!(matches!(kinds[2], TokenKind::SolumIn));
+    assert!(matches!(kinds[2], TokenKind::Ident(_)));
     assert!(matches!(kinds[3], TokenKind::String(_)));
     assert!(matches!(kinds[4], TokenKind::Eof));
 }
@@ -1400,7 +1392,7 @@ fn newline_tokens_separate_comments_and_keywords() {
         .map(|token| match &token.kind {
             TokenKind::LineComment(_) => "Comment",
             TokenKind::Newline => "Newline",
-            TokenKind::Incipit => "Incipit",
+            TokenKind::Ident(_) => "Incipit",
             TokenKind::Eof => "Eof",
             other => panic!("unexpected token {other:?}"),
         })
@@ -1424,7 +1416,7 @@ fn crlf_emits_single_newline_token() {
         .map(|token| match &token.kind {
             TokenKind::LineComment(_) => "Comment",
             TokenKind::Newline => "Newline",
-            TokenKind::Incipit => "Incipit",
+            TokenKind::Ident(_) => "Incipit",
             other => panic!("unexpected token {other:?}"),
         })
         .collect();
