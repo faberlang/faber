@@ -155,6 +155,27 @@ fn resolve_faber_cli_binary() -> PathBuf {
     PathBuf::from("faber")
 }
 
+/// Resolve the reader locale selected by a library package.
+///
+/// Library TypeScript emission runs the CLI once per source file, so the
+/// package reader choice must be forwarded explicitly. Without this, the
+/// subprocess falls back to the Latin reader even when the package manifest
+/// selects the English surface.
+fn library_reader_locale(pkg_root: &Path) -> Result<Option<String>, Box<Diagnostic>> {
+    let manifest_path = pkg_root.join(super::super::MANIFEST_FILE);
+    if !manifest_path.is_file() {
+        return Ok(None);
+    }
+    let manifest = super::super::manifest::read_manifest(&manifest_path)?;
+    Ok(manifest
+        .locale
+        .locale
+        .as_deref()
+        .map(str::trim)
+        .filter(|locale| !locale.is_empty())
+        .map(str::to_owned))
+}
+
 /// Emit TypeScript for library dependencies (kind=lib, target=ts) into the
 /// TypeScript output directory alongside app modules.
 ///
@@ -237,10 +258,12 @@ pub(super) fn emit_library_typescript_modules(
                 }
             }
 
-            let output = std::process::Command::new(&faber_bin)
-                .args(["emit", "-t", "ts"])
-                .arg(fab_path)
-                .output();
+            let mut command = std::process::Command::new(&faber_bin);
+            command.args(["emit", "-t", "ts"]);
+            if let Some(locale) = library_reader_locale(&pkg_root)? {
+                command.arg("--locale").arg(locale);
+            }
+            let output = command.arg(fab_path).output();
             let output = match output {
                 Ok(output) => output,
                 Err(err) => {

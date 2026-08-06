@@ -436,10 +436,19 @@ pub(super) fn augment_namespace_imports(
         let mut changed = false;
 
         for binding in existing.iter() {
-            let Some(exports) = namespace_exports.get(binding) else {
+            // A nested library import may be normalized to an aliased
+            // namespace binding (`object as graph_object`). The exported
+            // module name is the left side; the right side is only the local
+            // name used by generated references.
+            let (module_binding, _local_binding) = binding
+                .split_once(" as ")
+                .map_or((binding.as_str(), binding.as_str()), |(module, local)| {
+                    (module.trim(), local.trim())
+                });
+            let Some(exports) = namespace_exports.get(module_binding) else {
                 continue;
             };
-            if binding == "dom" {
+            if module_binding == "dom" {
                 for export in exports {
                     if is_dom_type_export(export)
                         && is_ts_identifier(export)
@@ -453,7 +462,7 @@ pub(super) fn augment_namespace_imports(
                 continue;
             }
             for export in exports {
-                if export == binding
+                if export == module_binding
                     || !is_ts_identifier(export)
                     || !bare_import_needed(&code, export)
                     || reserved_names.contains(export)

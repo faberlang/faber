@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
+use super::ts_rewrite::augment_namespace_imports;
 use super::*;
 
 /// Write a `faber.lock` in `app` that locks a single TS library dependency
@@ -391,4 +392,22 @@ import { mystery } from "triga:mystery";
     let out = normalize_library_namespace_bindings(code.to_owned(), &map);
     assert!(out.contains(r#"import { Light, lighting } from "triga:lighting/light";"#));
     assert!(out.contains(r#"import { mystery } from "triga:mystery";"#));
+}
+
+#[test]
+fn augment_namespace_imports_resolves_aliased_library_namespaces() {
+    let exports = BTreeMap::from([(
+        "object".to_owned(),
+        vec!["Object3D".to_owned(), "Scene".to_owned()],
+    )]);
+    let code = r#"import { object as graph_object } from "./triga-graph-object.js";
+class Camera {
+    base!: Object3D;
+}
+"#;
+
+    let out = augment_namespace_imports(code.to_owned(), &exports, &BTreeSet::new());
+    assert!(out.contains(
+        r#"import { Object3D, object as graph_object } from "./triga-graph-object.js";"#
+    ));
 }

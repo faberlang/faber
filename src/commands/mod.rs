@@ -200,7 +200,7 @@ fn dispatch(command: Command) {
                     &emit_command.input,
                     emit_command.package,
                 );
-                tool::cmd_emit(emit_command);
+                emit::cmd_emit_with_locale(emit_command);
             }
         }
         Command::Format(args) => cmd_format(&format::FormatCommand {

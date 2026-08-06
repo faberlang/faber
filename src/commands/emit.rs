@@ -9,6 +9,21 @@ pub fn cmd_emit_faber(command: EmitCommand) {
         std::process::exit(1);
     }
 
+    cmd_emit_with_locale(command);
+}
+
+/// Emit a single-file target with Faber-owned reader-locale resolution.
+///
+/// TypeScript remains on Radix's direct-file route, but it still needs the
+/// package-aware locale resolver here when a library source file uses a
+/// non-Latin reader surface. Keeping this seam in Faber avoids asking Radix
+/// to rediscover Faber's install and package layout.
+pub fn cmd_emit_with_locale(command: EmitCommand) {
+    if command.package {
+        eprintln!("error: package emit must use the package compiler route");
+        std::process::exit(1);
+    }
+
     // Faber owns locale → pack resolution (install layout + package manifests
     // live here, not in radix). Code pack drives emit surface; diagnostic pack
     // drives message rendering (`--diagnostic-locale` when set).
