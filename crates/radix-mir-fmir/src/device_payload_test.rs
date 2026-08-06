@@ -36,7 +36,7 @@ use radix_types::TypeTable;
 
 const TOOLCHAIN: &str = "0.79.0";
 
-/// The faber-owned wire/codec version (DEVICE_RUN_PLAN_VERSION bump, Stage 3R
+/// The faber-owned wire/codec version (`DEVICE_RUN_PLAN_VERSION` bump, Stage 3R
 /// U1 S1): a pre-break v3 payload must fail the nested admission closed.
 const WIRE_VERSION: u32 = WIRE_DEVICE_PROGRAM_VERSION;
 

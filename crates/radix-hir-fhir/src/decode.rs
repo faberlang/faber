@@ -9,6 +9,11 @@ use crate::error::HirArtifactError;
 use crate::validate::validate_referential_integrity;
 
 /// Serialize a [`HirArtifact`] to deterministic `postcard` bytes.
+///
+/// # Errors
+///
+/// Returns `postcard::Error` if serialization fails (e.g. unsupported data
+/// shapes); serialization of a valid artifact is expected to succeed.
 pub fn encode(artifact: &HirArtifact) -> Result<Vec<u8>, postcard::Error> {
     postcard::to_allocvec(artifact)
 }
@@ -26,6 +31,13 @@ pub fn encode(artifact: &HirArtifact) -> Result<Vec<u8>, postcard::Error> {
 ///
 /// Malformed postcard data, truncation, and referential-integrity violations
 /// return a structured [`HirArtifactError`]. This function never panics.
+///
+/// # Errors
+///
+/// Returns [`HirArtifactError::Truncated`] on truncated input,
+/// [`HirArtifactError::Malformed`] on postcard decoding failures,
+/// [`HirArtifactError::UnsupportedSchemaVersion`] on a version mismatch,
+/// and the validation errors from the referential-integrity gate (U2.3).
 pub fn decode(bytes: &[u8]) -> Result<HirArtifact, HirArtifactError> {
     // F3: read the schema-version prefix (first wire field) and reject any
     // mismatch before interpreting the payload. A schema-v1 artifact is

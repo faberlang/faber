@@ -118,6 +118,12 @@ pub const FNV1A64_PRIME: u64 = 0x0100_0000_01b3;
 /// (Metal and CUDA images derive the same `WireDeviceProgram`), so both
 /// derive identical bytes. Postcard serialization is deterministic for a
 /// fixed struct shape and infallible for these scalar/string/enum fields.
+///
+/// # Panics
+///
+/// Panics if postcard serialization of the wire program fails; the field
+/// shape is fixed and scalar/string/enum only, so this never happens in
+/// practice.
 #[must_use]
 pub fn canonical_program_bytes(program: &WireDeviceProgram) -> Vec<u8> {
     postcard::to_allocvec(program).expect("wire program serialization is infallible")

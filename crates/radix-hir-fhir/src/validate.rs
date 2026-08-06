@@ -12,9 +12,9 @@ use rustc_hash::FxHashSet;
 // Referential integrity validation (U2.3)
 // ---------------------------------------------------------------------------
 
-/// Collect every definition-site DefId from the artifact into a registry
-/// set. The registry is used to membership-test DefId references: a DefId
-/// is valid iff it is a builtin (0 < d.0 < USER_DEF_ID_BASE) or it
+/// Collect every definition-site `DefId` from the artifact into a registry
+/// set. The registry is used to membership-test `DefId` references: a `DefId`
+/// is valid iff it is a builtin (0 < d.0 < `USER_DEF_ID_BASE`) or it
 /// appears in this set. Per prep S2.
 fn collect_def_registry(artifact: &HirArtifact) -> FxHashSet<radix_types::DefId> {
     use radix_hir::HirItemKind;
@@ -177,7 +177,7 @@ fn collect_def_registry(artifact: &HirArtifact) -> FxHashSet<radix_types::DefId>
     registry
 }
 
-/// Collect definition-site DefIds from a HIR block, recursing into
+/// Collect definition-site `DefIds` from a HIR block, recursing into
 /// statements and expressions.
 fn collect_block_defs(block: &radix_hir::HirBlock, registry: &mut FxHashSet<radix_types::DefId>) {
     use radix_hir::HirStatementKind;
@@ -193,8 +193,8 @@ fn collect_block_defs(block: &radix_hir::HirBlock, registry: &mut FxHashSet<radi
     }
 }
 
-/// Collect definition-site DefIds from expression trees reachable from a
-/// statement (local init, Expr stmt, Redde, IncDec, Custodi).
+/// Collect definition-site `DefIds` from expression trees reachable from a
+/// statement (local init, Expr stmt, Redde, `IncDec`, Custodi).
 fn collect_stmt_expr_defs(
     kind: &radix_hir::HirStatementKind,
     registry: &mut FxHashSet<radix_types::DefId>,
@@ -222,7 +222,7 @@ fn collect_stmt_expr_defs(
     }
 }
 
-/// Collect definition-site DefIds from annotation expression payloads.
+/// Collect definition-site `DefIds` from annotation expression payloads.
 ///
 /// The validator walks item-annotation subtrees (expression fields, contract
 /// references); the registry must register definition sites in the same
@@ -239,7 +239,7 @@ fn collect_annotation_defs(
     }
 }
 
-/// Collect definition-site DefIds from a HIR expression tree.
+/// Collect definition-site `DefIds` from a HIR expression tree.
 fn collect_expr_defs(
     expr: &radix_hir::HirExpression,
     registry: &mut FxHashSet<radix_types::DefId>,
@@ -458,7 +458,7 @@ fn collect_expr_defs(
     }
 }
 
-/// Collect definition-site DefIds from a HIR pattern.
+/// Collect definition-site `DefIds` from a HIR pattern.
 fn collect_pattern_defs(pat: &radix_hir::HirPattern, registry: &mut FxHashSet<radix_types::DefId>) {
     match pat {
         radix_hir::HirPattern::Binding(def_id, _)
@@ -478,9 +478,9 @@ fn collect_pattern_defs(pat: &radix_hir::HirPattern, registry: &mut FxHashSet<ra
     }
 }
 
-/// Collect all HirIds from the HIR tree into a set for membership-test
+/// Collect all `HirIds` from the HIR tree into a set for membership-test
 /// validation. This accounts for nested statements and expressions that
-/// have their own HirIds beyond the top-level items.
+/// have their own `HirIds` beyond the top-level items.
 fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
     use radix_hir::{HirExpressionKind, HirStatementKind};
 
@@ -553,7 +553,7 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
                         }
                     }
                     radix_hir::HirOptionalChainKind::Index(e) => collect_expr(e, registry),
-                    _ => {}
+                    radix_hir::HirOptionalChainKind::Member(_) => {}
                 }
             }
             HirExpressionKind::NonNull(base, chain) => {
@@ -565,7 +565,7 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
                         }
                     }
                     radix_hir::HirNonNullKind::Index(e) => collect_expr(e, registry),
-                    _ => {}
+                    radix_hir::HirNonNullKind::Member(_) => {}
                 }
             }
             HirExpressionKind::Block(block) => collect_block(block, registry),
@@ -1201,7 +1201,7 @@ pub(crate) fn validate_referential_integrity(
                 match chain {
                     radix_hir::HirOptionalChainKind::Member(s) => check_symbol(*s)?,
                     radix_hir::HirOptionalChainKind::Index(e) => {
-                        validate_expr(e, check_symbol, check_def, check_hir, check_type)?
+                        validate_expr(e, check_symbol, check_def, check_hir, check_type)?;
                     }
                     radix_hir::HirOptionalChainKind::Call(args) => {
                         for arg in args {
@@ -1224,7 +1224,7 @@ pub(crate) fn validate_referential_integrity(
                 match chain {
                     radix_hir::HirNonNullKind::Member(s) => check_symbol(*s)?,
                     radix_hir::HirNonNullKind::Index(e) => {
-                        validate_expr(e, check_symbol, check_def, check_hir, check_type)?
+                        validate_expr(e, check_symbol, check_def, check_hir, check_type)?;
                     }
                     radix_hir::HirNonNullKind::Call(args) => {
                         for arg in args {
@@ -1419,7 +1419,7 @@ pub(crate) fn validate_referential_integrity(
                 match target {
                     radix_hir::HirConversioTarget::Type(ty) => check_type(*ty)?,
                     radix_hir::HirConversioTarget::Intervallum(e) => {
-                        validate_expr(e, check_symbol, check_def, check_hir, check_type)?
+                        validate_expr(e, check_symbol, check_def, check_hir, check_type)?;
                     }
                 }
                 for sym in params {
@@ -1504,7 +1504,7 @@ pub(crate) fn validate_referential_integrity(
             check_symbol(field.name)?;
             match &field.value {
                 radix_hir::HirAnnotationValue::Expr(e) => {
-                    validate_expr(e, check_symbol, check_def, check_hir, check_type)?
+                    validate_expr(e, check_symbol, check_def, check_hir, check_type)?;
                 }
                 radix_hir::HirAnnotationValue::Type(ty) => check_type(*ty)?,
                 radix_hir::HirAnnotationValue::Symbol(s)

@@ -3,6 +3,7 @@
 /// `kernel:*` requirements are validated by the `faber` loading policy, which
 /// has access to the kernel module/verb manifest resolution in the `radix`
 /// package.
+#[must_use]
 pub fn is_known_host_requirement(requirement: &str) -> bool {
     matches!(
         requirement,
@@ -23,6 +24,7 @@ pub fn is_known_host_requirement(requirement: &str) -> bool {
 /// Whether a runtime requirement is a known `device:*` capability (N1.7).
 /// `device:metal` and `device:cuda` are the frozen device requirements for the
 /// differentiable-GPU campaign.
+#[must_use]
 pub fn is_known_device_requirement(requirement: &str) -> bool {
     matches!(requirement, "device:metal" | "device:cuda")
 }
@@ -32,6 +34,7 @@ pub fn is_known_device_requirement(requirement: &str) -> bool {
 /// [`is_known_host_requirement`] allowlist extended with `device:metal` /
 /// `device:cuda` (N1.7). A requirement that is neither a known `host:*` nor a
 /// known `device:*` fails admission.
+#[must_use]
 pub fn is_known_requirement(requirement: &str) -> bool {
     is_known_host_requirement(requirement) || is_known_device_requirement(requirement)
 }

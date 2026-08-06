@@ -368,7 +368,7 @@ pub struct WireBarrierOperation {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum WireTransportPath {
-    /// Pinned host memory ↔ device over PCIe — the admitted path.
+    /// Pinned host memory ↔ device over `PCIe` — the admitted path.
     HostStaged,
 }
 

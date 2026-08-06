@@ -12,12 +12,12 @@ use super::{
 
 /// Fail-closed artifact-version gate. Versions ratchet as clean breaks;
 /// there is no compatibility decoder.
-pub(crate) fn check_version(actual: &u32) -> Result<(), crate::error::FmirImageError> {
-    if *actual == PACKAGE_MIR_ARTIFACT_VERSION {
+pub(crate) fn check_version(actual: u32) -> Result<(), crate::error::FmirImageError> {
+    if actual == PACKAGE_MIR_ARTIFACT_VERSION {
         Ok(())
     } else {
         Err(crate::error::FmirImageError::UnsupportedVersion {
-            actual: *actual,
+            actual,
             expected: PACKAGE_MIR_ARTIFACT_VERSION,
         })
     }

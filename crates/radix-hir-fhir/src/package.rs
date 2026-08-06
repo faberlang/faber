@@ -247,6 +247,11 @@ impl std::error::Error for FhirPackageError {
 ///
 /// Pure serializer: validity is enforced on [`decode_package`]. The builder
 /// (`radix::hir::package::build_package`) is responsible for canonical order.
+///
+/// # Errors
+///
+/// Returns `postcard::Error` if serialization fails (e.g. unsupported data
+/// shapes); serialization of a valid package is expected to succeed.
 pub fn encode_package(pkg: &FhirPackage) -> Result<Vec<u8>, postcard::Error> {
     postcard::to_allocvec(pkg)
 }
@@ -263,6 +268,15 @@ pub fn encode_package(pkg: &FhirPackage) -> Result<Vec<u8>, postcard::Error> {
 ///
 /// No failure path invokes the lexer, parser, resolver, semantic analyzer,
 /// or HIR lowering.
+///
+/// # Errors
+///
+/// Returns [`FhirPackageError::Truncated`] on truncated input,
+/// [`FhirPackageError::Malformed`] on postcard decoding failures,
+/// [`FhirPackageError::UnsupportedPackageSchemaVersion`] on a version
+/// mismatch, [`FhirPackageError::UnsupportedUnitSchemaVersion`] on a unit
+/// version mismatch, and the unit-decode / package-level validation errors
+/// (missing entry, duplicate modules or dependencies).
 pub fn decode_package(bytes: &[u8]) -> Result<DecodedFhirPackage, FhirPackageError> {
     // 1. Package version prefix gate.
     let (schema_version, _rest) = postcard::take_from_bytes::<u32>(bytes).map_err(|e| {
@@ -595,7 +609,7 @@ mod tests {
         pkg.entry_path = "src/absent.fab".to_owned();
         match decode_package(&encode(&pkg)) {
             Err(FhirPackageError::MissingEntry { entry }) => {
-                assert_eq!(entry, "src/absent.fab")
+                assert_eq!(entry, "src/absent.fab");
             }
             other => panic!("expected MissingEntry, got {other:?}"),
         }

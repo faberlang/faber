@@ -51,5 +51,5 @@ pub fn device_identity_hash(source_hashes: &[&str], canonical_payload: &[u8]) ->
     hasher.update((canonical_payload.len() as u64).to_le_bytes());
     hasher.update(canonical_payload);
     let digest = hasher.finalize();
-    format!("sha256:{:x}", digest)
+    format!("sha256:{digest:x}")
 }

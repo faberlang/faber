@@ -12,11 +12,21 @@ use crate::schema::{
 };
 
 /// Serialize a text image to pretty TOML.
+///
+/// # Errors
+///
+/// Returns [`FmirImageError::Parse`] if the image shape cannot be
+/// serialized to TOML (e.g. unsupported field values).
 pub fn encode_text_image(image: &FmirTextImageFile) -> Result<String, FmirImageError> {
     toml::to_string_pretty(image).map_err(|error| FmirImageError::Parse(error.to_string()))
 }
 
 /// Serialize a binary image to `postcard` bytes.
+///
+/// # Errors
+///
+/// Returns [`FmirImageError::Parse`] if the image shape cannot be
+/// serialized to `postcard` bytes.
 pub fn encode_binary_image(image: &FmirBinaryImageFile) -> Result<Vec<u8>, FmirImageError> {
     postcard::to_allocvec(image).map_err(|error| FmirImageError::Parse(error.to_string()))
 }
@@ -25,13 +35,20 @@ pub fn encode_binary_image(image: &FmirBinaryImageFile) -> Result<Vec<u8>, FmirI
 ///
 /// The `expected_toolchain` is the compiler crate version the image must have
 /// been produced with (faber passes its own `CARGO_PKG_VERSION`).
+///
+/// # Errors
+///
+/// Returns [`FmirImageError::Parse`] on TOML decode failure, and the
+/// version / target / toolchain / device-admission gate errors
+/// ([`FmirImageError::UnsupportedVersion`], target and toolchain
+/// mismatches) from the fail-closed admission checks.
 pub fn decode_text_image(
     text: &str,
     expected_toolchain: &str,
 ) -> Result<FmirTextImageFile, FmirImageError> {
     let image: FmirTextImageFile =
         toml::from_str(text).map_err(|error| FmirImageError::Parse(error.to_string()))?;
-    check_version(&image.version)?;
+    check_version(image.version)?;
     check_target(&image.target, FMIR_TEXT_TARGET_NAME)?;
     check_toolchain(&image.toolchain.faber_cli_version, expected_toolchain)?;
     if let Some(device) = &image.device {
@@ -77,6 +94,13 @@ fn read_version_varint(bytes: &[u8]) -> Option<u32> {
 ///
 /// The `expected_toolchain` is the compiler crate version the image must have
 /// been produced with (faber passes its own `CARGO_PKG_VERSION`).
+///
+/// # Errors
+///
+/// Returns [`FmirImageError::UnsupportedVersion`] when the pre-scanned
+/// version field does not match the supported artifact version,
+/// [`FmirImageError::Parse`] on postcard decode failure, and the target /
+/// toolchain / device-admission gate errors from the fail-closed checks.
 pub fn decode_binary_image(
     bytes: &[u8],
     expected_toolchain: &str,
@@ -94,7 +118,7 @@ pub fn decode_binary_image(
     }
     let image: FmirBinaryImageFile =
         postcard::from_bytes(bytes).map_err(|error| FmirImageError::Parse(error.to_string()))?;
-    check_version(&image.version)?;
+    check_version(image.version)?;
     check_target(&image.target, FMIR_TARGET_NAME)?;
     check_toolchain(&image.toolchain.faber_cli_version, expected_toolchain)?;
     if let Some(device) = &image.device {
