@@ -6,6 +6,7 @@
 
 mod common;
 mod conversio_target_matrix;
+mod cli_parity;
 mod gpu_workload;
 mod hir_target_matrix;
 mod llvm_runtime;

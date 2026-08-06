@@ -207,36 +207,41 @@ pub(super) fn classify_llvm_exemplum(
     let cli_program = analysis.cli_program.is_some();
     // CLI `exitus` contract (campaign D8): the emitted program entry returns
     // the declared exit code as the process code (Rust-parity exit semantics).
-    let exit_code = analysis.cli_program.as_ref().and_then(|program| {
-        program.exit.as_ref().and_then(|exit| match exit {
-            radix::cli::CliExit::Fixed(code) => Some(*code),
-            radix::cli::CliExit::Binding(_)
-            | radix::cli::CliExit::Field { .. }
-            | radix::cli::CliExit::Unsupported => None,
+    // S8.2: for the static-descriptor adapter lane the descriptor carries the
+    // exit policy (Fixed/Binding/Field) and the runtime derives the process
+    // code; the legacy fixed-code emission seam stays for non-adapter paths.
+    let exit_code = if cli_program {
+        None
+    } else {
+        analysis.cli_program.as_ref().and_then(|program| {
+            program.exit.as_ref().and_then(|exit| match exit {
+                radix::cli::CliExit::Fixed(code) => Some(*code),
+                radix::cli::CliExit::Binding(_)
+                | radix::cli::CliExit::Field { .. }
+                | radix::cli::CliExit::Unsupported => None,
+            })
         })
-    });
+    };
+    // S8.2 CLI adapter plan: the versioned static descriptor + per-function
+    // record surfaces, built from the analyzed CliProgram (never reparsed
+    // from source).
+    let cli_adapter = analysis
+        .cli_program
+        .as_ref()
+        .map(radix::cli_descriptor::build_cli_adapter_plan);
     let mir = match if cli_program {
-        radix::mir::lower_analyzed_unit_allowing_cli_entry_with_context(&mut analysis)
+        radix::mir::lower_analyzed_unit_with_cli_adapter_with_context(&mut analysis)
     } else {
         radix::mir::lower_analyzed_unit_with_context(&mut analysis)
     } {
         Ok(mir) => mir,
         Err(errors) => {
-            let cli_record_pending = cli_program
-                && errors.iter().all(|error| {
-                    error.issue == "invalid_mir_record_aggregate_is_missing_required_field"
-                });
             return llvm_result(
                 file,
                 LlvmTier::FrontendAnalyzed,
                 LlvmEmissionBucket::MirLoweringFailed,
                 format!(
-                    "{}MIR lowering failed: {}",
-                    if cli_record_pending {
-                        "CLI runtime record binding pending; "
-                    } else {
-                        ""
-                    },
+                    "MIR lowering failed: {}",
                     errors
                         .iter()
                         .map(|error| error.issue.clone())
@@ -247,11 +252,11 @@ pub(super) fn classify_llvm_exemplum(
         }
     };
 
-    let llvm = match radix::mir::emit_llvm_text_probe_with_device_roles_and_exit(
+    let llvm = match emit_llvm_for_program(
         &device_roles,
-        &mir.validated,
-        &mir.interner,
+        &mir,
         exit_code,
+        cli_adapter,
     ) {
         Ok(llvm) => llvm,
         Err(error) if error.category == "unsupported-mir-shape" => {
@@ -276,6 +281,30 @@ pub(super) fn classify_llvm_exemplum(
     };
 
     classify_emitted_llvm(file, idx, temp_root, toolchain, llvm)
+}
+
+/// Emit the LLVM module for a lowered program: the S8.2 static-descriptor
+/// adapter lane for CLI programs, the ordinary roles+exit lane otherwise.
+fn emit_llvm_for_program(
+    device_roles: &rustc_hash::FxHashMap<radix::hir::DefId, radix::mir::MirDeviceRole>,
+    mir: &radix::mir::LoweredMirUnit<'_>,
+    exit_code: Option<i64>,
+    cli_adapter: Option<radix::mir::CliAdapterPlan>,
+) -> Result<String, radix::mir::MirLlvmTextProbeError> {
+    match cli_adapter {
+        Some(plan) => radix::mir::emit_llvm_text_probe_with_cli_adapter(
+            device_roles,
+            &mir.validated,
+            &mir.interner,
+            plan,
+        ),
+        None => radix::mir::emit_llvm_text_probe_with_device_roles_and_exit(
+            device_roles,
+            &mir.validated,
+            &mir.interner,
+            exit_code,
+        ),
+    }
 }
 
 /// Whether a corpus fixture is the two-module package proof
