@@ -1788,18 +1788,14 @@ fn assert_package_corpus_llvm_smoke(relative: &str, label: &str) {
     let entry = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../radix/corpus")
         .join(relative);
-    let emitted = with_lowered_package_mir(
-        &Config::default(),
-        &entry,
-        |lowered| {
-            let interner = lowered
-                .validated
-                .validation()
-                .interner
-                .expect("package MIR carries interner");
-            radix::mir::emit_llvm_text_probe(&lowered.validated, interner)
-        },
-    )
+    let emitted = with_lowered_package_mir(&Config::default(), &entry, |lowered| {
+        let interner = lowered
+            .validated
+            .validation()
+            .interner
+            .expect("package MIR carries interner");
+        radix::mir::emit_llvm_text_probe(&lowered.validated, interner)
+    })
     .expect("corpus package lowers to MIR")
     .expect("corpus package emits LLVM");
 

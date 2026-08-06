@@ -31,8 +31,7 @@ pub(crate) fn command_output_with_timeout(
     // load (the flaky LLVM-runtime byte-comparison family root cause).
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
-    let (sender, receiver) =
-        std::sync::mpsc::channel::<Result<(Vec<u8>, Vec<u8>), String>>();
+    let (sender, receiver) = std::sync::mpsc::channel::<Result<(Vec<u8>, Vec<u8>), String>>();
     std::thread::spawn(move || {
         use std::io::Read;
         let collected = (|| -> Result<(Vec<u8>, Vec<u8>), String> {
@@ -53,7 +52,9 @@ pub(crate) fn command_output_with_timeout(
         let _ = sender.send(collected);
     });
 
-    let deadline = Instant::now().checked_add(timeout).unwrap_or_else(Instant::now);
+    let deadline = Instant::now()
+        .checked_add(timeout)
+        .unwrap_or_else(Instant::now);
     let status = loop {
         match child.try_wait() {
             Ok(Some(status)) => break status,
@@ -77,7 +78,11 @@ pub(crate) fn command_output_with_timeout(
     let (out, err) = receiver
         .recv_timeout(Duration::from_secs(10))
         .map_err(|_| "timed out collecting child output".to_owned())??;
-    Ok(Output { status, stdout: out, stderr: err })
+    Ok(Output {
+        status,
+        stdout: out,
+        stderr: err,
+    })
 }
 
 pub(crate) fn command_status_with_timeout(
@@ -89,7 +94,9 @@ pub(crate) fn command_status_with_timeout(
         .map_err(|error| format!("cannot spawn child: {error}"))?;
     // Same race-free poll loop as `command_output_with_timeout` (no pipe
     // collector needed here: the caller inherits the harness's stdio).
-    let deadline = Instant::now().checked_add(timeout).unwrap_or_else(Instant::now);
+    let deadline = Instant::now()
+        .checked_add(timeout)
+        .unwrap_or_else(Instant::now);
     loop {
         match child.try_wait() {
             Ok(Some(status)) => return Ok(status),

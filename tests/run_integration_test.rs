@@ -391,8 +391,7 @@ incipit {
 
 #[test]
 fn build_reader_locale_rejects_forced_package_stdin_input() {
-    let (stdout, stderr, ok) =
-        run_faber(&["build", "--package", "--locale", "zh-Hans", "-"]);
+    let (stdout, stderr, ok) = run_faber(&["build", "--package", "--locale", "zh-Hans", "-"]);
 
     assert!(!ok, "build should reject stdin reader-locale package input");
     assert!(
@@ -764,8 +763,7 @@ fn test_reader_locale_rejects_stdin_input() {
 
 #[test]
 fn check_reader_locale_rejects_forced_package_stdin_input() {
-    let (stdout, stderr, ok) =
-        run_faber(&["check", "--package", "--locale", "zh-Hans", "-"]);
+    let (stdout, stderr, ok) = run_faber(&["check", "--package", "--locale", "zh-Hans", "-"]);
 
     assert!(!ok, "check should reject stdin reader-locale package input");
     assert!(

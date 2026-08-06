@@ -173,9 +173,7 @@ fn run_linked_binary(binary_file: &Path, fab_path: &Path, run_args: &[&str]) -> 
         Duration::from_secs(10),
     );
     let Ok(run) = run else {
-        let Err(error) = run else {
-            unreachable!()
-        };
+        let Err(error) = run else { unreachable!() };
         return LlvmRunProbe::run_failed(
             format!("cannot execute linked binary: {error}"),
             String::new(),
@@ -236,16 +234,14 @@ fn run_linked_binary(binary_file: &Path, fab_path: &Path, run_args: &[&str]) -> 
 /// helper waits through the `wait-timeout` crate, whose Unix SIGCHLD design
 /// can lose a child's exit notification and stall the full timeout under
 /// parallel subprocess load (the flaky-under-contention family root cause).
-fn verify_llvm_text(
-    toolchain: &LlvmHostToolchain,
-    llvm_file: &Path,
-) -> Result<(), String> {
+fn verify_llvm_text(toolchain: &LlvmHostToolchain, llvm_file: &Path) -> Result<(), String> {
     let mut command = Command::new(&toolchain.llvm_as);
     command
         .arg("-o")
         .arg(if cfg!(windows) { "NUL" } else { "/dev/null" })
         .arg(llvm_file);
-    let output = super::common::command_output_with_timeout(&mut command, Duration::from_secs(120))?;
+    let output =
+        super::common::command_output_with_timeout(&mut command, Duration::from_secs(120))?;
     if !output.status.success() {
         return Err(format!(
             "llvm-as failed: {}",
@@ -271,7 +267,8 @@ fn link_llvm_text(
         .arg(runtime_archive)
         .arg("-o")
         .arg(output_file);
-    let output = super::common::command_output_with_timeout(&mut command, Duration::from_secs(120))?;
+    let output =
+        super::common::command_output_with_timeout(&mut command, Duration::from_secs(120))?;
     if !output.status.success() {
         return Err(format!(
             "clang link failed: {}",

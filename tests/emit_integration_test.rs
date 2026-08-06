@@ -364,8 +364,7 @@ fn emit_reader_locale_rejects_stdin_input() {
 
 #[test]
 fn emit_reader_locale_rejects_forced_package_stdin_input() {
-    let (stdout, stderr, ok) =
-        run_faber_emit(&["emit", "--package", "--locale", "th-TH", "-"]);
+    let (stdout, stderr, ok) = run_faber_emit(&["emit", "--package", "--locale", "th-TH", "-"]);
 
     assert!(!ok, "emit should reject stdin reader-locale package input");
     assert!(
@@ -431,8 +430,7 @@ fn emit_reader_locale_forced_package_rejects_existing_non_package_file() {
 
 #[test]
 fn emit_reader_locale_missing_package_path_surfaces_missing_path_error() {
-    let (stdout, stderr, ok) =
-        run_faber_emit(&["emit", "--locale", "th-TH", "missing-package"]);
+    let (stdout, stderr, ok) = run_faber_emit(&["emit", "--locale", "th-TH", "missing-package"]);
 
     assert!(!ok, "missing package path should fail");
     assert!(
