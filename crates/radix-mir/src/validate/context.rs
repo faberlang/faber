@@ -78,6 +78,15 @@ pub struct MirValidationContext<'a> {
     pub interner: Option<&'a Interner>,
     pub functions: FxHashMap<DefId, MirFunctionSignature>,
     pub external_function_identities: FxHashMap<DefId, MirExternalFunctionIdentity>,
+    /// Current package product identity (package-aware compiles only).
+    ///
+    /// Set by package-aware MIR lowering from the caller's package identity.
+    /// Emitters use it to classify `external_function_identities` whose
+    /// `product` is the *current* package: those are cross-module user-code
+    /// link identities (D-PA5 distinct symbol class), not library/host
+    /// identities. `None` for plain single-file compiles (legacy provider
+    /// routing, unchanged behavior).
+    pub package_product: Option<String>,
     pub struct_fields: FxHashMap<DefId, FxHashMap<Symbol, MirType>>,
     pub struct_type_params: FxHashMap<DefId, Vec<Symbol>>,
     pub enum_type_params: FxHashMap<DefId, Vec<Symbol>>,
@@ -105,6 +114,7 @@ impl<'a> MirValidationContext<'a> {
             interner: None,
             functions: FxHashMap::default(),
             external_function_identities: FxHashMap::default(),
+            package_product: None,
             struct_fields: FxHashMap::default(),
             struct_type_params: FxHashMap::default(),
             enum_type_params: FxHashMap::default(),
@@ -153,6 +163,7 @@ impl<'a> MirValidationContext<'a> {
         context
             .external_function_identities
             .clone_from(&self.external_function_identities);
+        context.package_product.clone_from(&self.package_product);
         context.struct_fields.clone_from(&self.struct_fields);
         context
             .struct_type_params
