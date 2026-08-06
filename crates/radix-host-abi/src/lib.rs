@@ -222,6 +222,10 @@ abi_string_family! {
         SYMBOL_ARRAY_OPTION = "__faber_rt_v1_array_option",
         SYMBOL_ARRAY_SORT = "__faber_rt_v1_array_sort",
         SYMBOL_ARRAY_SUM = "__faber_rt_v1_array_sum",
+        // W16: S8.1 process argumenta — the runtime returns the captured
+        // argv (excluding host argv[0]) as a `lista<textus>` handle so the
+        // emitted entry can bind the `incipit argumenta` local.
+        SYMBOL_ARGUMENTS = "__faber_rt_v1_arguments",
         SYMBOL_OPTION_NONE = "__faber_rt_v1_option_none",
         SYMBOL_OPTION_SOME = "__faber_rt_v1_option_some",
         SYMBOL_OPTION_IS_PRESENT = "__faber_rt_v1_option_is_present",
