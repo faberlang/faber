@@ -6,7 +6,7 @@ canonical = true
 summary = "Restricts a test to a named environment or target."
 syntax = "solum_in <string> <string>"
 related = ["requirit"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -37,6 +37,6 @@ locale = "la"
 #   declaration-only test modifier (whitelist: solum-in/solum-in.fab).
 #
 
-proba "ci only" solum_in "ci" {
-    adfirma verum
+test "ci only" only_in "ci" {
+    assert true
 }

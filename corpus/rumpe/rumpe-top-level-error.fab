@@ -5,7 +5,7 @@ category = "transfer"
 canonical = false
 summary = "compile error when rumpe has no enclosing breakable block"
 related = ["fac", "dum"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -25,6 +25,6 @@ locale = "la"
 
 # expected: rumpe outside breakable block
 
-incipit {
-    rumpe
+main {
+    break
 }

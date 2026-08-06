@@ -6,7 +6,7 @@ canonical = false
 summary = "Canonical hello-world smoke with module-scope nota output."
 syntax = "nota <textus-literal>"
 related = ["incipit", "nota"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # incipit — Canonical hello-world smoke with module-scope nota output
@@ -35,4 +35,4 @@ locale = "la"
 # BACKEND:
 #   Roundtrip harness gives this file special-case handling (canonical smoke).
 
-nota "Salve, Munde!"
+print "Salve, Munde!"

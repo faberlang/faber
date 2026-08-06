@@ -7,7 +7,7 @@ summary = "Generic ordered collection type."
 syntax = "lista<T>"
 aliases = ["array", "list"]
 related = ["tabula", "copia", "∷", "itera"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -39,16 +39,16 @@ locale = "la"
 # BACKEND: Go e2e whitelist — lista intrinsic methods not yet lowered for Go
 # (whitelist: lista/methodi-mutatio.fab).
 
-incipit {
-    varia _ res ← [3, 1, 2] ∷ lista<numerus>
+main {
+    var _ res ← [3, 1, 2] ∷ list<int>
 
     res.appende(4)
-    fixum _ primusremotus ← res.decapita()
-    fixum _ ultimusremotus ← res.detrahe()
+    const _ primusremotus ← res.decapita()
+    const _ ultimusremotus ← res.detrahe()
     res.inverte()
     res.ordina()
 
-    nota res
-    nota primusremotus
-    nota ultimusremotus
+    print res
+    print primusremotus
+    print ultimusremotus
 }

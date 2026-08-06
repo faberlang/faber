@@ -7,7 +7,7 @@ summary = "Declares an enumeration."
 syntax = "ordo <name> <block>"
 aliases = ["enum"]
 related = ["discretio"]
-locale = "la"
+locale = "en"
 +++
 
 
@@ -38,38 +38,38 @@ locale = "la"
 #   rubrum
 #   actum
 
-ordo Color { rubrum, viridis, caeruleum }
+enum Color { rubrum, viridis, caeruleum }
 
-ordo Condicio { pendens = 0, actum = 1, finitum = 2 }
+enum Condicio { pendens = 0, actum = 1, finitum = 2 }
 
-incipit {
+main {
     # Using ordo values
-    fixum _ color ← Color.rubrum
-    fixum _ condicio ← Condicio.actum
+    const _ color ← Color.rubrum
+    const _ condicio ← Condicio.actum
 
     # Select by ordo
-    elige color {
-        casu Color.rubrum {
-            nota "rubrum"
+    switch color {
+        case Color.rubrum {
+            print "rubrum"
         }
-        casu Color.viridis {
-            nota "viridis"
+        case Color.viridis {
+            print "viridis"
         }
-        casu Color.caeruleum {
-            nota "caeruleum"
+        case Color.caeruleum {
+            print "caeruleum"
         }
     }
 
     # Select by ordo with numeric values
-    elige condicio {
-        casu Condicio.pendens {
-            nota "pendens"
+    switch condicio {
+        case Condicio.pendens {
+            print "pendens"
         }
-        casu Condicio.actum {
-            nota "actum"
+        case Condicio.actum {
+            print "actum"
         }
-        casu Condicio.finitum {
-            nota "finitum"
+        case Condicio.finitum {
+            print "finitum"
         }
     }
 }

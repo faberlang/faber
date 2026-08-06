@@ -7,7 +7,7 @@ summary = "JSON-shaped dynamic value literal for open object-shaped data."
 syntax = "valor"
 aliases = ["json", "object"]
 related = ["genus", "∷", "ignotum", "tabula"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -45,18 +45,18 @@ locale = "la"
 # BACKEND: Go emitter does not lower object `sparge` into maps (whitelist:
 # destructura/literal.fab).
 
-incipit {
+main {
     # --- Empty and simple records ---
 
-    fixum _ vacuum ← {}
-    nota vacuum
+    const _ void ← {}
+    print void
 
-    fixum _ punctum ← { "x": 10, "y": 20 }
-    nota punctum
+    const _ punctum ← { "x": 10, "y": 20 }
+    print punctum
 
     # Text keys and constant values
-    fixum _ forma ← { "clavis": 42 }
-    nota forma
+    const _ forma ← { "clavis": 42 }
+    print forma
 
     # NOTE: JSON valor literals accept only constant values (strings, numbers,
     # booleans, null, nested objects/arrays). For variable-backed field
@@ -64,6 +64,6 @@ incipit {
 
     # --- Nested valor ---
 
-    fixum _ nidum ← { "extra": { "medium": 1 } }
-    nota nidum
+    const _ nidum ← { "extra": { "medium": 1 } }
+    print nidum
 }

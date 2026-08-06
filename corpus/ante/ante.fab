@@ -6,7 +6,7 @@ canonical = true
 summary = "Creates an exclusive range with a Latin keyword."
 syntax = "<expression> ante <expression>"
 related = ["usque", "‥"]
-locale = "la"
+locale = "en"
 +++
 
 
@@ -36,9 +36,9 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   none
 
-incipit {
+main {
     # i = 0, 1, 2, 3 (stops before 4)
-    itera ab 0 ante 4 fixum i {
-        nota i
+    for range 0 before 4 const i {
+        print i
     }
 }

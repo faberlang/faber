@@ -6,7 +6,7 @@ canonical = true
 summary = "Null literal and nullable union bindings."
 syntax = "nihil"
 related = ["∪", "sponte", "nihil"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -36,16 +36,16 @@ locale = "la"
 # BACKEND:
 #   Cross-ref nihil/nihil.fab.
 
-functio maybe() → numerus ∪ nihil {
-    redde 42
+fn maybe() → int ∪ null {
+    return 42
 }
 
-incipit {
-    fixum numerus ∪ nihil absent ← nihil
-    nota absent
+main {
+    const int ∪ null absent ← null
+    print absent
 
-    fixum _ nihilne ← absent est nihil
-    nota nihilne
+    const _ nihilne ← absent is null
+    print nihilne
 
-    nota maybe() non est nihil
+    print maybe() not is null
 }

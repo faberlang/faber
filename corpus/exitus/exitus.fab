@@ -6,7 +6,7 @@ canonical = true
 summary = "Sets the exit code or exit expression for an entry point."
 syntax = "incipit argumenta <name> exitus <expr> <block>"
 related = ["incipit", "incipiet", "argumenta"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # exitus — Sets the exit code or exit expression for an entry point
@@ -35,5 +35,5 @@ locale = "la"
 #
 
 @ cli "exitus-smoke"
-incipit argumenta args exitus 1 {
+main args args exit 1 {
 }

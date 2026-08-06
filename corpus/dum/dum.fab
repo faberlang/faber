@@ -7,7 +7,7 @@ summary = "Repeats a block while a condition remains true."
 syntax = "dum <condition> <block|ergo statement>"
 aliases = ["while"]
 related = ["si", "ergo", "fac"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -35,38 +35,38 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   dum.expected
 
-incipit {
+main {
     # Ascending counter: varia so the loop variable can mutate
-    varia numerus computus ← 0
+    var int computus ← 0
 
-    dum computus < 5 {
-        nota computus
+    while computus < 5 {
+        print computus
         computus ← computus + 1
     }
 
     # Descending loop: condition becomes falsum at 0
-    varia numerus reliquum ← 3
+    var int reliquum ← 3
 
-    dum reliquum > 0 {
-        nota "reliquum: §"(reliquum)
+    while reliquum > 0 {
+        print "reliquum: §"(reliquum)
         reliquum ← reliquum - 1
     }
 
-    nota "perfectum!"
+    print "perfectum!"
 }
 
-proba "dum counts up to its condition" {
-    varia numerus computus ← 0
-    dum computus < 5 {
+test "dum counts up to its condition" {
+    var int computus ← 0
+    while computus < 5 {
         computus ← computus + 1
     }
-    adfirma computus ≡ 5
+    assert computus ≡ 5
 }
 
-proba "dum counts down to zero" {
-    varia numerus reliquum ← 3
-    dum reliquum > 0 {
+test "dum counts down to zero" {
+    var int reliquum ← 3
+    while reliquum > 0 {
         reliquum ← reliquum - 1
     }
-    adfirma reliquum ≡ 0
+    assert reliquum ≡ 0
 }

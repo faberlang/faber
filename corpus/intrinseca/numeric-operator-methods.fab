@@ -6,7 +6,7 @@ canonical = false
 summary = "Receiver operator methods emit glyphs; imperativus mutates varia."
 syntax = "x.addita(y) | acc.adde(y)"
 related = ["numerus", "fractus", "mathesis"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # numeric-operator-methods — Receiver operator methods emit glyphs; imperativus mutates varia
@@ -29,17 +29,17 @@ locale = "la"
 #   15.0
 #   8
 
-incipit {
-    fixum fractus x ← 2.0
-    fixum fractus chained ← x.addita(1.0).multiplicata(3.0)
+main {
+    const float x ← 2.0
+    const float chained ← x.addita(1.0).multiplicata(3.0)
 
-    varia fractus acc ← 10.0
+    var float acc ← 10.0
     acc.adde(5.0)
 
-    fixum numerus mask ← 12
-    fixum numerus bits ← mask.coniuncta(10)
+    const int mask ← 12
+    const int bits ← mask.coniuncta(10)
 
-    nota chained
-    nota acc
-    nota bits
+    print chained
+    print acc
+    print bits
 }

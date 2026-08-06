@@ -5,7 +5,7 @@ category = "numeric"
 summary = "bf16 remains deferred; f16 is the only half-width marker today."
 syntax = "f16"
 related = ["fractus"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # f16 — bf16 remains deferred; f16 is the only half-width marker today
@@ -29,6 +29,6 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   reject: bf16 is deferred.
 
-functio rejected_half(bf16 x) → bf16 {
-    redde x
+fn rejected_half(bf16 x) → bf16 {
+    return x
 }

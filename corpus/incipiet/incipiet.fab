@@ -6,7 +6,7 @@ canonical = true
 summary = "Declares the asynchronous program entry point."
 syntax = "incipiet <block>"
 related = ["incipit", "figendum", "tacebit"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # incipiet — Declares the asynchronous program entry point
@@ -38,25 +38,25 @@ locale = "la"
 #   (synchronous entry).
 
 # Helper async finite function
-functio accipe() fiet → textus {
+fn accipe() async → string {
     # Simulates async finite operation
-    redde "datum paratum"
+    return "datum paratum"
 }
 
-functio metire(textus datum) fiet → numerus {
-    redde datum.longitudo()
+fn metire(string datum) async → int {
+    return datum.longitudo()
 }
 
 # Futura entry point
-incipiet {
-    nota "incipiet initium"
+async_main {
+    print "incipiet initium"
 
     # Await fiet functions with figendum
-    figendum _ datum ← accipe()
-    nota "acceptum: §"(datum)
+    await_const _ datum ← accipe()
+    print "acceptum: §"(datum)
 
-    figendum _ longitudo ← metire(datum)
-    nota "longitudo: §"(longitudo)
+    await_const _ longitudo ← metire(datum)
+    print "longitudo: §"(longitudo)
 
-    nota "opus perfectum"
+    print "opus perfectum"
 }

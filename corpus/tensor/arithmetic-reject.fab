@@ -6,7 +6,7 @@ canonical = false
 summary = "Tensor arithmetic rejects non-numeric elements and mixed numeric widths."
 syntax = "tensor.addita(other)"
 related = ["tensor", "typus", "conversio"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -36,14 +36,14 @@ locale = "la"
 # This exemplum intentionally fails to compile; it is registered in the
 # per-backend EXPECTED_FAILURES lists.
 
-incipit {
-    fixum tensor<textus, [2]> words_a ← vacua
-    fixum tensor<textus, [2]> words_b ← vacua
-    fixum tensor<textus, [2]> words_sum ← words_a.addita(words_b)
-    nota words_sum.longitudo()
+main {
+    const tensor<string, [2]> words_a ← vacua
+    const tensor<string, [2]> words_b ← vacua
+    const tensor<string, [2]> words_sum ← words_a.addita(words_b)
+    print words_sum.longitudo()
 
-    fixum tensor<numerus<i32>, [2]> i32_a ← vacua
-    fixum tensor<numerus<i64>, [2]> i64_b ← vacua
-    fixum tensor<numerus<i32>, [2]> mixed ← i32_a.addita(i64_b)
-    nota mixed.longitudo()
+    const tensor<int<i32>, [2]> i32_a ← vacua
+    const tensor<int<i64>, [2]> i64_b ← vacua
+    const tensor<int<i32>, [2]> mixed ← i32_a.addita(i64_b)
+    print mixed.longitudo()
 }

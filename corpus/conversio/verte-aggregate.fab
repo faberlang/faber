@@ -6,7 +6,7 @@ canonical = false
 summary = "Aggregate construction into struct, lista, and tabula targets."
 syntax = "Type { fields } | <lista-expression> ∷ lista<T> | { \"key\": value }"
 related = ["verte", "genus", "lista", "tabula"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -40,21 +40,21 @@ locale = "la"
 #   2
 #   10
 
-genus Civis {
-    textus nomen
-    textus regio = "Roma"
-    numerus aetas sponte
+class Civis {
+    string nomen
+    string regio = "Roma"
+    int aetas optional
 }
 
-incipit {
-    fixum Civis civis ← Civis { nomen = "Livia" }
-    fixum lista<numerus> numeri ← [1, 2, 3] ∷ lista<numerus>
-    fixum tabula<textus, numerus> puncta ← { "alpha": 10, "beta": 20 }
+main {
+    const Civis civis ← Civis { nomen = "Livia" }
+    const list<int> numeri ← [1, 2, 3] ∷ list<int>
+    const map<string, int> puncta ← { "alpha": 10, "beta": 20 }
 
-    nota civis.nomen
-    nota civis.regio
-    nota civis.aetas vel 0
-    nota numeri.longitudo()
-    nota numeri.accipe(1) vel 0
-    nota puncta.accipe("alpha") vel 0
+    print civis.nomen
+    print civis.regio
+    print civis.aetas coalesce 0
+    print numeri.longitudo()
+    print numeri.accipe(1) coalesce 0
+    print puncta.accipe("alpha") coalesce 0
 }

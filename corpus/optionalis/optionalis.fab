@@ -6,7 +6,7 @@ canonical = false
 summary = "Optional chaining for nested voluntary field access."
 syntax = "<expression>?.<name> | <expression>?[<expression>]"
 related = ["?.", "sponte", "vel"]
-locale = "la"
+locale = "en"
 +++
 
 
@@ -34,55 +34,55 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   optionalis.expected — present and absent path samples.
 
-genus Locus {
-    textus urbs
-    textus regio sponte
+class Locus {
+    string urbs
+    string regio optional
 }
 
-genus Civis {
-    textus nomen
+class Civis {
+    string nomen
     # voluntary nested record
-    Locus locus sponte
+    Locus locus optional
 }
 
-incipit {
+main {
     # --- Civis with full locus ---
 
-    fixum _ aelia ← Civis {
+    const _ aelia ← Civis {
         nomen = "Aelia",
         locus = Locus { urbs = "Roma", regio = "Italia" }
     }
 
-    fixum _ urbs ← aelia?.locus?.urbs
+    const _ urbs ← aelia?.locus?.urbs
     # "Roma"
-    nota urbs
+    print urbs
 
-    fixum _ regio ← aelia?.locus?.regio
+    const _ regio ← aelia?.locus?.regio
     # "Italia"
-    nota regio
+    print regio
 
     # --- Civis with no locus (chain short-circuits to nihil) ---
 
-    fixum _ brutus ← Civis { nomen = "Brutus" }
-    fixum _ urbs2 ← brutus?.locus?.urbs
+    const _ brutus ← Civis { nomen = "Brutus" }
+    const _ urbs2 ← brutus?.locus?.urbs
     # nihil
-    nota urbs2
+    print urbs2
 
-    fixum _ regio2 ← brutus?.locus?.regio
+    const _ regio2 ← brutus?.locus?.regio
     # nihil
-    nota regio2
+    print regio2
 
     # --- Accessus optionalis on lista ---
 
-    fixum _ litterae ← ["a", "b", "c"]
+    const _ litterae ← ["a", "b", "c"]
     # "a"
-    nota litterae?[0]
+    print litterae?[0]
     # nihil (out of range)
-    nota litterae?[10]
+    print litterae?[10]
 
     # --- Combining with vel for defaults ---
 
-    fixum _ defecta ← brutus?.locus?.urbs vel "ignota"
+    const _ defecta ← brutus?.locus?.urbs coalesce "ignota"
     # "ignota"
-    nota defecta
+    print defecta
 }

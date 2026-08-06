@@ -6,12 +6,12 @@ canonical = true
 summary = "Boolean literals verum and falsum with bivalens bindings."
 syntax = "verum | falsum"
 related = ["falsum", "bivalens", "verum"]
-locale = "la"
+locale = "en"
 +++
-incipit {
-    fixum bivalens enabled ← verum
-    fixum bivalens disabled ← falsum
-    nota enabled
-    nota disabled
-    nota enabled et non disabled
+main {
+    const bool enabled ← true
+    const bool disabled ← false
+    print enabled
+    print disabled
+    print enabled and not disabled
 }

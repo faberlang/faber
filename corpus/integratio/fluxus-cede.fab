@@ -6,7 +6,7 @@ canonical = false
 summary = "Async await-bind and stream yield in one program."
 syntax = "integratio — multi-feature happy path"
 related = ["fiet", "fiunt", "cede", "incipiet"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # integratio — Async await-bind and stream yield in one program
@@ -40,23 +40,23 @@ locale = "la"
 # BACKEND:
 #   Rust/Go e2e whitelist — async/tokio runtime not linked in harness.
 
-functio accipe() fiet → textus {
-    redde "Livia"
+fn accipe() async → string {
+    return "Livia"
 }
 
-functio paria(numerus finis) fiunt → numerus {
-    itera ab 0 ante finis fixum i {
-        si i % 2 ≡ 0 {
-            cede i
+fn paria(int finis) generator → int {
+    for range 0 before finis const i {
+        if i % 2 ≡ 0 {
+            yield i
         }
     }
 }
 
-incipiet {
-    figendum _ nomen ← accipe()
-    nota "salve §"(nomen)
+async_main {
+    await_const _ nomen ← accipe()
+    print "salve §"(nomen)
 
-    itera ex paria(8) fixum n {
-        nota n
+    for from paria(8) const n {
+        print n
     }
 }

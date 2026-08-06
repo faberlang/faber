@@ -6,7 +6,7 @@ canonical = false
 summary = "Sibling module consumed by importa ex … privata."
 syntax = "importa ex \"<path>\" privata (<name> [ut <alias>] | *)"
 related = ["importa", "privata", "ex"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # importa — Sibling module consumed by importa ex … privata
@@ -37,10 +37,10 @@ locale = "la"
 #
 # BACKEND: importa/importa.fab whitelisted when compiled alone (no sibling link).
 
-functio saluta(textus nomen) → textus {
-    redde "Salve, §!"(nomen)
+fn saluta(string nomen) → string {
+    return "Salve, §!"(nomen)
 }
 
-incipit {
-    nota saluta("auxilium")
+main {
+    print saluta("auxilium")
 }

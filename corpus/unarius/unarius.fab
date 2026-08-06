@@ -6,7 +6,7 @@ canonical = true
 summary = "Unary negation, logical not, sign comparisons, and optional presence tests."
 syntax = "-<expr> | non <expr> | <expr> > 0 | <expr> est nihil"
 related = ["non", "est", "non est"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -37,41 +37,41 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   unarius.expected — unary operator samples.
 
-incipit {
+main {
     # Numeric negation
-    fixum _ x ← 5
-    fixum _ neg ← -x
+    const _ x ← 5
+    const _ neg ← -x
     # -5
-    nota neg
+    print neg
 
     # Logical negation
-    fixum _ flag ← verum
-    fixum _ non_signum ← non flag
+    const _ flag ← true
+    const _ non_signum ← not flag
     # falsum
-    nota non_signum
+    print non_signum
 
     # Positive/negative checks
-    fixum _ a ← 10
-    fixum _ b ← -3
+    const _ a ← 10
+    const _ b ← -3
     # verum
-    nota a > 0
+    print a > 0
     # falsum
-    nota a < 0
+    print a < 0
     # falsum
-    nota b > 0
+    print b > 0
     # verum
-    nota b < 0
+    print b < 0
 
     # Null checks
-    fixum textus ∪ nihil forsitan ← nihil
+    const string ∪ null forsitan ← null
     # verum
-    nota forsitan est nihil
+    print forsitan is null
     # falsum
-    nota forsitan non est nihil
+    print forsitan not is null
 
-    fixum textus ∪ nihil adest ← "salve"
+    const string ∪ null adest ← "salve"
     # falsum
-    nota adest est nihil
+    print adest is null
     # verum
-    nota adest non est nihil
+    print adest not is null
 }

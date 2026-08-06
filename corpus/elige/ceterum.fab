@@ -6,7 +6,7 @@ canonical = false
 summary = "Value branch with a default ceterum clause."
 syntax = "elige <expression> { casu … ceterum { … } }"
 related = ["elige", "casu", "ceterum"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -37,56 +37,56 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Weekday, command, and custom-grade messages.
 
-incipit {
+main {
     # ceterum handles unmatched cases
-    fixum _ dies ← "mercurii"
+    const _ dies ← "mercurii"
 
-    elige dies {
-        casu "lunae" {
-            nota "initium hebdomadis"
+    switch dies {
+        case "lunae" {
+            print "initium hebdomadis"
         }
-        casu "veneris" {
-            nota "finis hebdomadis"
+        case "veneris" {
+            print "finis hebdomadis"
         }
-        ceterum {
-            nota "medium hebdomadis"
+        default {
+            print "medium hebdomadis"
         }
     }
 
     # ceterum with unknown input
-    fixum _ imperium ← "ignotum"
+    const _ command ← "ignotum"
 
-    elige imperium {
-        casu "incipe" {
-            nota "incipit..."
+    switch command {
+        case "incipe" {
+            print "incipit..."
         }
-        casu "siste" {
-            nota "sistit..."
+        case "siste" {
+            print "sistit..."
         }
-        casu "redintegra" {
-            nota "reincipit..."
+        case "redintegra" {
+            print "reincipit..."
         }
-        ceterum {
-            nota "imperium ignotum"
+        default {
+            print "imperium ignotum"
         }
     }
 
     # Multiple statements in ceterum
-    fixum _ gradus ← 99
+    const _ gradus ← 99
 
-    elige gradus {
-        casu 1 {
-            nota "rudis"
+    switch gradus {
+        case 1 {
+            print "rudis"
         }
-        casu 2 {
-            nota "medius"
+        case 2 {
+            print "medius"
         }
-        casu 3 {
-            nota "provectus"
+        case 3 {
+            print "provectus"
         }
-        ceterum {
-            nota "gradus proprius"
-            nota "gradus: §"(gradus)
+        default {
+            print "gradus proprius"
+            print "gradus: §"(gradus)
         }
     }
 }

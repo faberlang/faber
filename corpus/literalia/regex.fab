@@ -6,7 +6,7 @@ canonical = true
 summary = "Compile textus patterns to regex via ↦ regex."
 syntax = "<textus> ↦ regex"
 related = ["lege", "conversio", "scriptum"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -37,15 +37,15 @@ locale = "la"
 #   Cross-ref lege/lege.fab for regex beside stdin reads.
 #   Cross-ref scriptum/scriptum.fab for § template application.
 
-incipit {
-    fixum _ digits ← "\d+" ↦ regex
-    nota digits
+main {
+    const _ digits ← "\d+" ↦ regex
+    print digits
 
-    fixum _ word ← "(?i)\w+" ↦ regex
-    nota word
+    const _ word ← "(?i)\w+" ↦ regex
+    print word
 
     # Template application → textus, then conversio to regex (dynamic path segments)
-    fixum _ tenant ← "acme"
-    fixum _ homePath ← "/home/§/.*"(tenant) ↦ regex
-    nota homePath
+    const _ tenant ← "acme"
+    const _ homePath ← "/home/§/.*"(tenant) ↦ regex
+    print homePath
 }

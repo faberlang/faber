@@ -6,7 +6,7 @@ canonical = true
 summary = "Writes a debug value to standard output."
 syntax = "vide <expression>"
 related = ["scribe", "mone"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -36,6 +36,6 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   vide-style diagnostic: "inspecta"
 
-incipit {
-    vide "inspecta"
+main {
+    debug "inspecta"
 }

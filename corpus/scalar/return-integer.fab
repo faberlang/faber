@@ -7,7 +7,7 @@ summary = "Function returning an integer literal via redde 42."
 syntax = "redde <integer-literal>"
 aliases = ["return"]
 related = ["vacuum", "functio"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -33,6 +33,6 @@ locale = "la"
 # Verifies that the Swift backend emits a function returning an
 # integer literal (SC-001: primitives, functions, return).
 
-functio da_numerum() → numerus {
-    redde 42
+fn da_numerum() → int {
+    return 42
 }

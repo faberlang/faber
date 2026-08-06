@@ -6,7 +6,7 @@ canonical = false
 summary = "Tensor v1 intrinsic catalog: forma, accipe, ponde, reple, crea, strue, sectio, materialize, planata."
 syntax = "tensor.forma | accipe | ponde | reple | crea | strue | sectio | materialize | planata"
 related = ["tensor", "lista", "magnitudo"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -38,8 +38,8 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   shape.fab stdout contract (longitudo, shape vector, accipe, scalar value).
 
-incipit {
-    fixum lista<f32> flat ← [
+main {
+    const list<f32> flat ← [
         1.0,
         2.0,
         3.0,
@@ -47,29 +47,29 @@ incipit {
         5.0,
         6.0,
     ]
-    fixum lista<numerus> shape ← [2, 3]
+    const list<int> shape ← [2, 3]
 
-    fixum tf32[] seed ← vacua
-    varia tf32[2, 3] grid ← seed.strue(flat, shape)
-    fixum lista<numerus> dims ← grid.magnitudines()
+    const tf32[] seed ← vacua
+    var tf32[2, 3] grid ← seed.strue(flat, shape)
+    const list<int> dims ← grid.magnitudines()
 
-    fixum lista<numerus> newshape ← [3, 2]
-    fixum tf32[3, 2] reshaped ← grid.forma(newshape)
+    const list<int> newshape ← [3, 2]
+    const tf32[3, 2] reshaped ← grid.forma(newshape)
 
-    fixum lista<numerus> origin ← [0, 0]
+    const list<int> origin ← [0, 0]
     grid.ponde(origin, 9.0)
-    fixum f32 corner ← grid.accipe(origin) vel 0.0
+    const f32 corner ← grid.accipe(origin) coalesce 0.0
 
-    varia tf32[2, 3] filler ← grid.crea(0.0, [2, 3])
+    var tf32[2, 3] filler ← grid.crea(0.0, [2, 3])
     filler.reple(4.0)
 
-    fixum tf32[1, 3] slice ← grid.sectio(0, 1)
-    fixum tf32[1, 3] owned ← slice.materialize()
-    fixum lista<f32> flat2 ← owned.planata()
+    const tf32[1, 3] slice ← grid.sectio(0, 1)
+    const tf32[1, 3] owned ← slice.materialize()
+    const list<f32> flat2 ← owned.planata()
 
-    nota grid.longitudo()
-    nota dims
-    nota reshaped.longitudo()
-    nota corner
-    nota flat2.longitudo()
+    print grid.longitudo()
+    print dims
+    print reshaped.longitudo()
+    print corner
+    print flat2.longitudo()
 }

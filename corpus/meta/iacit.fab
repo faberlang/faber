@@ -6,7 +6,7 @@ canonical = true
 summary = "Marks a function as able to throw along a recoverable channel."
 syntax = "functio <name>(...) iacit → <type> [⇥ <error-type>]"
 related = ["iace", "cape", "⇥", "errata", "immutata"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -34,10 +34,10 @@ locale = "la"
 # BACKEND:
 #   Prefer explicit ⇥ error types for callable contracts; see iace/functio-fallibilis.fab.
 
-implendum Canens {
-    functio canta(textus vox) iacit → vacuum
+interface Canens {
+    fn canta(string vox) throws → void
 }
 
-incipit {
-    nota "iacit modifier declared"
+main {
+    print "iacit modifier declared"
 }

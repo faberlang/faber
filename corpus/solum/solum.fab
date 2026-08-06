@@ -6,7 +6,7 @@ canonical = true
 summary = "Marks a test as the only test to run."
 syntax = "solum"
 related = ["omitte", "futurum"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -37,6 +37,6 @@ locale = "la"
 #   declaration-only test modifier (whitelist: solum/solum.fab).
 #
 
-proba "focus me" solum {
-    adfirma verum
+test "focus me" only {
+    assert true
 }

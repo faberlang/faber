@@ -6,7 +6,7 @@ canonical = true
 summary = "Half-open and inclusive range endpoints in itera ab and intra."
 syntax = "<expression> ‥ <expression> | <expression> … <expression>"
 related = ["‥", "…", "ante", "usque", "intra"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -34,18 +34,18 @@ locale = "la"
 # BACKEND:
 #   Cross-ref itera/intervallum.fab and intra/intra.fab.
 
-incipit {
-    varia numerus exclusivus ← 0
-    itera ab 0‥5 fixum _ {
+main {
+    var int exclusivus ← 0
+    for range 0‥5 const _ {
         exclusivus ⊕
     }
     # 5 iterations
-    nota exclusivus
+    print exclusivus
 
-    varia numerus inclusivus ← 0
-    itera ab 0…5 fixum _ {
+    var int inclusivus ← 0
+    for range 0…5 const _ {
         inclusivus ⊕
     }
     # 6 iterations
-    nota inclusivus
+    print inclusivus
 }

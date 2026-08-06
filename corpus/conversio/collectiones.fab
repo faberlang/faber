@@ -6,7 +6,7 @@ canonical = false
 summary = "Cross-collection conversio between lista, copia, tabula, tensor, and cursor."
 syntax = "<expression> ↦ <collection-type>"
 related = ["↦", "lista", "copia", "tabula", "tensor"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -35,29 +35,29 @@ locale = "la"
 # Holdouts (`lista ↦ tabula`, async `promissum` boundaries) reject at typecheck.
 # See docs/factory/conversio-collection-coverage/.
 
-incipit {
-    fixum lista<numerus> xs ← [1, 2, 2, 3]
-    fixum copia<numerus> unique ← xs ↦ copia<numerus>
-    nota unique.longitudo()
+main {
+    const list<int> xs ← [1, 2, 2, 3]
+    const set<int> unique ← xs ↦ set<int>
+    print unique.longitudo()
 
-    fixum lista<numerus> roundtrip ← unique ↦ lista<numerus>
-    nota roundtrip.longitudo()
+    const list<int> roundtrip ← unique ↦ list<int>
+    print roundtrip.longitudo()
 
-    fixum lista<numerus> tensorSource ← [4, 5, 6]
-    fixum tensor<numerus, [3]> grid ← tensorSource ↦ tensor<numerus, [3]>
-    fixum lista<numerus> flat ← grid ↦ lista<numerus>
-    nota flat.longitudo()
+    const list<int> tensorSource ← [4, 5, 6]
+    const tensor<int, [3]> grid ← tensorSource ↦ tensor<int, [3]>
+    const list<int> flat ← grid ↦ list<int>
+    print flat.longitudo()
 
-    fixum tabula<textus, numerus> scores ← { "alpha": 10, "beta": 20 }
-    fixum lista<textus> keys ← scores ↦ lista<textus>
-    nota keys.longitudo()
+    const map<string, int> scores ← { "alpha": 10, "beta": 20 }
+    const list<string> keys ← scores ↦ list<string>
+    print keys.longitudo()
 
-    fixum tabula<textus, numerus> moreScores ← { "gamma": 30, "delta": 40 }
-    fixum lista<numerus> values ← moreScores ↦ lista<numerus>
-    nota values.longitudo()
+    const map<string, int> moreScores ← { "gamma": 30, "delta": 40 }
+    const list<int> values ← moreScores ↦ list<int>
+    print values.longitudo()
 
-    fixum lista<numerus> cursorSource ← [7, 8, 9]
-    fixum cursor<numerus> stream ← cursorSource ↦ cursor<numerus>
-    fixum lista<numerus> materialized ← stream ↦ lista<numerus>
-    nota materialized.longitudo()
+    const list<int> cursorSource ← [7, 8, 9]
+    const cursor<int> stream ← cursorSource ↦ cursor<int>
+    const list<int> materialized ← stream ↦ list<int>
+    print materialized.longitudo()
 }

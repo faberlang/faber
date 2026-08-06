@@ -7,7 +7,7 @@ summary = "Breaks out of the innermost loop."
 syntax = "rumpe"
 aliases = ["break"]
 related = ["perge", "dum"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -36,29 +36,29 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   0–4 (stops before 5), then nested pairs until interior hits 2.
 
-incipit {
+main {
     # Break when reaching 5
-    varia _ i ← 0
+    var _ i ← 0
 
-    dum i < 10 {
-        si i ≡ 5 {
-            rumpe
+    while i < 10 {
+        if i ≡ 5 {
+            break
         }
-        nota i
+        print i
         i ← i + 1
     }
 
     # Break in nested loop
-    varia _ exterior ← 0
+    var _ exterior ← 0
 
-    dum exterior < 3 {
-        varia _ interior ← 0
+    while exterior < 3 {
+        var _ interior ← 0
 
-        dum interior < 10 {
-            si interior ≡ 2 {
-                rumpe
+        while interior < 10 {
+            if interior ≡ 2 {
+                break
             }
-            nota "exterior←§, interior←§"(exterior, interior)
+            print "exterior←§, interior←§"(exterior, interior)
             interior ← interior + 1
         }
 

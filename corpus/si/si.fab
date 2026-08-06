@@ -7,7 +7,7 @@ summary = "Starts a conditional branch that runs when its condition is true."
 syntax = "si <condition> <block>"
 aliases = ["if"]
 related = ["sin", "secus", "ergo"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -36,52 +36,52 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   x maior quam 5, Adult, Can vote (si.expected).
 
-incipit {
+main {
     # Simple truthy branch — only the first condition matches
-    fixum _ x ← 10
+    const _ x ← 10
 
-    si x > 5 {
-        nota "x maior quam 5"
+    if x > 5 {
+        print "x maior quam 5"
     }
 
-    si x > 20 {
+    if x > 20 {
         # skipped: 10 ≯ 20
-        nota "x maior quam 20"
+        print "x maior quam 20"
     }
 
     # Block body: multiple statements run together when condition holds
-    fixum _ aetas ← 25
+    const _ aetas ← 25
 
-    si aetas ≥ 18 {
-        nota "Adult"
-        nota "Can vote"
+    if aetas ≥ 18 {
+        print "Adult"
+        print "Can vote"
     }
 }
 
-proba "si runs its body on a verum condition" {
-    fixum _ x ← 10
-    varia bivalens maior ← falsum
-    si x > 5 {
-        maior ← verum
+test "si runs its body on a verum condition" {
+    const _ x ← 10
+    var bool maior ← false
+    if x > 5 {
+        maior ← true
     }
-    adfirma maior
+    assert maior
 }
 
-proba "si skips its body on a falsum condition" {
-    fixum _ x ← 10
-    varia bivalens maior ← falsum
-    si x > 20 {
-        maior ← verum
+test "si skips its body on a falsum condition" {
+    const _ x ← 10
+    var bool maior ← false
+    if x > 20 {
+        maior ← true
     }
-    adfirma non maior
+    assert not maior
 }
 
-proba "si block body runs every statement" {
-    fixum _ aetas ← 25
-    varia numerus gradus ← 0
-    si aetas ≥ 18 {
+test "si block body runs every statement" {
+    const _ aetas ← 25
+    var int gradus ← 0
+    if aetas ≥ 18 {
         gradus ← gradus + 1
         gradus ← gradus + 1
     }
-    adfirma gradus ≡ 2
+    assert gradus ≡ 2
 }

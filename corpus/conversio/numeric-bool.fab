@@ -6,7 +6,7 @@ canonical = false
 summary = "Scalar numeric and bivalens primitive conversio."
 syntax = "<expression> ↦ <numeric-or-bivalens-type>"
 related = ["↦", "numerus", "fractus", "bivalens"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -36,25 +36,25 @@ locale = "la"
 # Byte reinterpretation (`numerus`/`fractus`/`bivalens` ↔ `octeti`) is rejected
 # at typecheck — use `chorda` instead. See docs/factory/conversio-numeric-bool-coverage/.
 
-incipit {
-    fixum fractus pi ← 3.7
-    fixum numerus truncated ← pi ↦ numerus
-    nota truncated
+main {
+    const float pi ← 3.7
+    const int truncated ← pi ↦ int
+    print truncated
 
-    fixum bivalens fromFractus ← pi ↦ bivalens
-    nota fromFractus
+    const bool fromFractus ← pi ↦ bool
+    print fromFractus
 
-    fixum numerus count ← 42
-    fixum bivalens fromNumerus ← count ↦ bivalens
-    nota fromNumerus
+    const int count ← 42
+    const bool fromNumerus ← count ↦ bool
+    print fromNumerus
 
-    fixum bivalens flag ← verum
-    fixum numerus asInt ← flag ↦ numerus
-    fixum fractus asFloat ← flag ↦ fractus
-    nota asInt
-    nota asFloat
+    const bool flag ← true
+    const int asInt ← flag ↦ int
+    const float asFloat ← flag ↦ float
+    print asInt
+    print asFloat
 
-    fixum ascii token ← 'yes'
-    fixum bivalens fromAscii ← token ↦ bivalens
-    nota fromAscii
+    const ascii token ← 'yes'
+    const bool fromAscii ← token ↦ bool
+    print fromAscii
 }

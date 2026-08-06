@@ -6,13 +6,13 @@ canonical = true
 summary = "Braced canonical @ futura unit marker."
 syntax = "@ futura { }"
 related = ["futura", "annotation-sugar"]
-locale = "la"
+locale = "en"
 +++
-@ futura { }
-functio f() → vacuum {
-    redde
+@ future { }
+fn f() → void {
+    return
 }
 
-incipit {
-    nota "futura-braced"
+main {
+    print "futura-braced"
 }

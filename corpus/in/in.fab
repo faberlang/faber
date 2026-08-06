@@ -6,7 +6,7 @@ canonical = true
 summary = "Marks a mutable borrowed parameter."
 syntax = "in <type> <name>"
 related = ["de", "ex"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # in — Marks a mutable borrowed parameter
@@ -34,11 +34,11 @@ locale = "la"
 #   Cross-ref: functio/in-ex.fab.
 #
 
-functio summa(in lista<numerus> values) → numerus {
-    redde values.summa()
+fn summa(mut list<int> values) → int {
+    return values.summa()
 }
 
-incipit {
-    fixum _ xs ← [1, 2, 3]
-    nota summa(xs)
+main {
+    const _ xs ← [1, 2, 3]
+    print summa(xs)
 }

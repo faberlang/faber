@@ -7,7 +7,7 @@ summary = "Asserts that a condition is true at runtime."
 syntax = "adfirma <expression> [, <message>]"
 aliases = ["assert"]
 related = ["proba", "fac", "cape"]
-locale = "la"
+locale = "en"
 +++
 
 
@@ -40,36 +40,36 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   empty — adfirma only (adfirma.expected)
 
-incipit {
-    fixum _ x ← 10
+main {
+    const _ x ← 10
 
     # Simple assertion without message
-    adfirma x > 0
+    assert x > 0
 
     # Assertion with custom message
-    adfirma x ≡ 10 secus "x decem esse debet"
+    assert x ≡ 10 else "x decem esse debet"
 
     # Multiple assertions
-    fixum _ nomen ← "Marcus"
-    adfirma nomen ≡ "Marcus"
-    adfirma nomen ≠ "" secus "nomen vacuum non sit"
+    const _ nomen ← "Marcus"
+    assert nomen ≡ "Marcus"
+    assert nomen ≠ "" else "nomen vacuum non sit"
 
     # Boolean assertions
-    fixum _ viget ← verum
-    adfirma viget
-    adfirma viget ≡ verum secus "vigere debet"
+    const _ viget ← true
+    assert viget
+    assert viget ≡ true else "vigere debet"
 }
 
-proba "assertions validate invariants" {
-    fixum _ x ← 10
-    adfirma x > 0
-    adfirma x ≡ 10 secus "x decem esse debet"
+test "assertions validate invariants" {
+    const _ x ← 10
+    assert x > 0
+    assert x ≡ 10 else "x decem esse debet"
 
-    fixum _ nomen ← "Marcus"
-    adfirma nomen ≡ "Marcus"
-    adfirma nomen ≠ "" secus "nomen vacuum non sit"
+    const _ nomen ← "Marcus"
+    assert nomen ≡ "Marcus"
+    assert nomen ≠ "" else "nomen vacuum non sit"
 
-    fixum _ viget ← verum
-    adfirma viget
-    adfirma viget ≡ verum secus "vigere debet"
+    const _ viget ← true
+    assert viget
+    assert viget ≡ true else "vigere debet"
 }

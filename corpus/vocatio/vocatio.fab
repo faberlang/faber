@@ -6,7 +6,7 @@ canonical = true
 summary = "Function, method, chained, and sparge spread call expressions."
 syntax = "<name>(<args>) | <expr>.<method>(<args>) | <name>(sparge <lista>)"
 related = ["functio", "sparge", "genus"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -40,65 +40,65 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Salve, arithmetic results, chained builder output, spread-arg sum.
 
-functio saluta() {
-    nota "Salve!"
+fn saluta() {
+    print "Salve!"
 }
 
-functio adde(numerus a, numerus b) → numerus {
-    redde a + b
+fn adde(int a, int b) → int {
+    return a + b
 }
 
-functio multiplica(numerus x, numerus y) → numerus {
-    redde x * y
+fn multiplica(int x, int y) → int {
+    return x * y
 }
 
-genus Computator {
-    numerus valor = 0
+class Computator {
+    int valor = 0
 
-    functio pone(numerus n) → Computator {
-        ego.valor ← n
-        redde ego
+    fn pone(int n) → Computator {
+        self.valor ← n
+        return self
     }
 
-    functio duplica() → Computator {
-        ego.valor ← ego.valor * 2
-        redde ego
+    fn duplica() → Computator {
+        self.valor ← self.valor * 2
+        return self
     }
 
-    functio accipe() → numerus {
-        redde ego.valor
+    fn accipe() → int {
+        return self.valor
     }
 }
 
-incipit {
+main {
     # Simple call (no arguments)
     saluta()
 
     # Call with arguments
-    fixum _ summa ← adde(10, 20)
+    const _ summa ← adde(10, 20)
     # 30
-    nota summa
+    print summa
 
     # Multiple arguments
-    fixum _ productum ← multiplica(5, 6)
+    const _ productum ← multiplica(5, 6)
     # 30
-    nota productum
+    print productum
 
     # Method call on objectum
-    varia _ computator ← Computator {}
+    var _ computator ← Computator {}
     computator.pone(10)
     # 10
-    nota computator.accipe()
+    print computator.accipe()
 
     # Chained method calls
-    varia _ alter ← Computator {}
-    fixum _ valor ← alter.pone(5).duplica().duplica().accipe()
+    var _ alter ← Computator {}
+    const _ value ← alter.pone(5).duplica().duplica().accipe()
     # 20
-    nota valor
+    print value
 
     # Call with sparge
-    fixum lista<numerus> numeri ← [3, 7]
-    fixum _ sparsa ← adde(sparge numeri)
+    const list<int> numeri ← [3, 7]
+    const _ sparsa ← adde(spread numeri)
     # 10
-    nota sparsa
+    print sparsa
 }

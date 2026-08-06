@@ -6,7 +6,7 @@ canonical = false
 summary = "Postfix dum loop attached to a fac block."
 syntax = "fac <block> dum <condition>"
 related = ["fac", "dum"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # fac — Postfix dum loop attached to a fac block
@@ -32,16 +32,16 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   fac-dum.expected
 
-incipit {
-    varia numerus counter ← 0
-    fac {
+main {
+    var int counter ← 0
+    do {
         counter ← counter + 1
-        nota "Iteration §"(counter)
-    } dum counter < 3
+        print "Iteration §"(counter)
+    } while counter < 3
 
-    varia numerus attempts ← 0
-    fac {
+    var int attempts ← 0
+    do {
         attempts ← attempts + 1
-        nota "Attempt §"(attempts)
-    } dum attempts < 2
+        print "Attempt §"(attempts)
+    } while attempts < 2
 }

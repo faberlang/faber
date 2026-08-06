@@ -5,7 +5,7 @@ category = "integration"
 summary = "Multi-feature smoke: discretio, finge, discerne omnia, and per-field ut aliases."
 syntax = "discerne omnia <subject> <block>"
 related = ["discretio", "finge", "ut", "casu"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # discerne — Multi-feature smoke: discretio, finge, discerne omnia, and per-field ut aliases
@@ -34,32 +34,32 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   none — deterministic variant strings; no .expected sidecar.
 
-discretio Mandatum {
-    Moveo { textus locus, numerus passus },
-    Loquere { textus verba },
+union Mandatum {
+    Moveo { string locus, int passus },
+    Loquere { string verba },
     Tace
 }
 
-functio narra(Mandatum m) → textus {
-    discerne omnia m {
-        casu Moveo fixum locus, passus {
-            redde "moveo § per §"(locus, passus)
+fn narra(Mandatum m) → string {
+    match all m {
+        case Moveo const locus, passus {
+            return "moveo § per §"(locus, passus)
         }
-        casu Loquere fixum verba ut dictum {
-            redde "loquere §"(dictum)
+        case Loquere const verba as dictum {
+            return "loquere §"(dictum)
         }
-        casu Tace {
-            redde "silentium"
+        case Tace {
+            return "silentium"
         }
     }
 }
 
-incipit {
-    fixum Mandatum a ← finge Moveo { locus = "forum", passus = 8 }
-    fixum Mandatum b ← finge Loquere { verba = "salve" }
-    fixum Mandatum c ← finge Tace
+main {
+    const Mandatum a ← variant Moveo { locus = "forum", passus = 8 }
+    const Mandatum b ← variant Loquere { verba = "salve" }
+    const Mandatum c ← variant Tace
 
-    nota narra(a)
-    nota narra(b)
-    nota narra(c)
+    print narra(a)
+    print narra(b)
+    print narra(c)
 }

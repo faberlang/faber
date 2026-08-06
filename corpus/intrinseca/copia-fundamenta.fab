@@ -7,7 +7,7 @@ summary = "Generic set collection type."
 syntax = "copia<T>"
 aliases = ["set"]
 related = ["lista", "tabula", "inter"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # copia — Generic set collection type
@@ -38,17 +38,17 @@ locale = "la"
 #
 # BACKEND: Go e2e whitelist — copia method surface not yet lowered for Go.
 
-incipit {
-    varia copia<numerus> numeri ← vacua
+main {
+    var set<int> numeri ← vacua
 
     numeri.adde(1)
     numeri.adde(2)
     numeri.adde(3)
 
-    fixum _ habetduo ← numeri.habet(2)
-    fixum _ remotus ← numeri.dele(3)
-    fixum _ longitudo ← numeri.longitudo()
-    fixum _ vacuaest ← numeri.vacua()
+    const _ habetduo ← numeri.habet(2)
+    const _ remotus ← numeri.dele(3)
+    const _ longitudo ← numeri.longitudo()
+    const _ vacuaest ← numeri.vacua()
 
-    nota habetduo, remotus, longitudo, vacuaest
+    print habetduo, remotus, longitudo, vacuaest
 }

@@ -6,7 +6,7 @@ canonical = false
 summary = "Valor datetime carriers to instans through runtime extraction."
 syntax = "valor ↦ instans | instans<ms> [⇥ fallback]"
 related = ["↦", "⇥", "valor"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -30,17 +30,17 @@ locale = "la"
 # Rust route and the MIR stepper route. Text wire values are parsed as RFC3339;
 # invalid carriers recover through `⇥`.
 
-incipit {
-    fixum valor utc ← "1979-05-27T07:32:00Z"
-    fixum valor offset ← "1979-05-27T16:32:00+0900"
-    fixum instans seconds ← utc ↦ instans
-    fixum instans<ms> millis ← utc ↦ instans<ms>
-    fixum instans normalized ← offset ↦ instans
-    fixum valor bad ← "not-a-datetime"
-    fixum instans recovered ← bad ↦ instans ⇥ seconds
+main {
+    const value utc ← "1979-05-27T07:32:00Z"
+    const value offset ← "1979-05-27T16:32:00+0900"
+    const instant seconds ← utc ↦ instant
+    const instant<ms> millis ← utc ↦ instant<ms>
+    const instant normalized ← offset ↦ instant
+    const value bad ← "not-a-datetime"
+    const instant recovered ← bad ↦ instant ⇥ seconds
 
-    nota seconds ↦ textus
-    nota millis ↦ textus
-    nota normalized ↦ textus
-    nota recovered ↦ textus
+    print seconds ↦ string
+    print millis ↦ string
+    print normalized ↦ string
+    print recovered ↦ string
 }

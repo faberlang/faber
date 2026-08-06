@@ -7,7 +7,7 @@ summary = "Imports names from another module or package source."
 syntax = "importa ex <source> <privata|publica> (<name> [ut <alias>] | * ut <alias>)"
 aliases = ["import"]
 related = ["ex", "privata", "publica", "ut"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # importa — Imports names from another module or package source
@@ -39,8 +39,8 @@ locale = "la"
 #
 # BACKEND: Rust/Go e2e whitelist — single-file compile cannot resolve sibling.
 
-importa ex "./auxilium" privata auxilium
+import from "./auxilium" private auxilium
 
-incipit {
-    nota auxilium.saluta("Marcus")
+main {
+    print auxilium.saluta("Marcus")
 }

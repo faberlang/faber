@@ -3,7 +3,7 @@ term = "vector"
 kind = "kernel"
 category = "gpu"
 summary = "global_invocation_id returns vector<u32, 3>"
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -22,8 +22,8 @@ locale = "la"
 
 
 
-@ nucleum
-functio builtin_probe(fractus<f32> x) → fractus<f32> {
-    fixum vector<u32, 3> gid ← global_invocation_id()
-    redde x
+@ kernel
+fn builtin_probe(float<f32> x) → float<f32> {
+    const vector<u32, 3> gid ← global_invocation_id()
+    return x
 }

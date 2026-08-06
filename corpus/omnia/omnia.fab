@@ -6,7 +6,7 @@ canonical = true
 summary = "Marks a test hook as applying to every case."
 syntax = "omnia"
 related = ["praepara", "postpara"]
-locale = "la"
+locale = "en"
 +++
 
 
@@ -34,20 +34,20 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   none — stdout not pinned for this exemplum.
 
-discretio Condicio {
+union Condicio {
     Activa,
     Quietus
 }
 
-functio narra(Condicio condicio) → textus {
+fn narra(Condicio condicio) → string {
     # every variant must have a casu
-    discerne omnia condicio {
-        casu Activa { redde "activa" }
-        casu Quietus { redde "quietus" }
+    match all condicio {
+        case Activa { return "activa" }
+        case Quietus { return "quietus" }
     }
 }
 
-incipit {
-    fixum _ condicio ← finge Activa
-    nota narra(condicio)
+main {
+    const _ condicio ← variant Activa
+    print narra(condicio)
 }

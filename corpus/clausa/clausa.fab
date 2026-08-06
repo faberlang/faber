@@ -7,7 +7,7 @@ summary = "Closure and lambda expressions with inferred or annotated types."
 syntax = "<params> ∴ <expression> | (<params>) → <type> ∴ <expression>"
 aliases = ["lambda", "closure"]
 related = ["∴", "functio", "numerus"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -39,33 +39,33 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   clausa.expected
 
-incipit {
+main {
     # Single-parameter closure: numerus x ∴ x * 2
-    fixum _ duplica ← numerus x ∴ x * 2
-    nota duplica(5)
+    const _ duplica ← int x ∴ x * 2
+    print duplica(5)
 
     # Multi-parameter typed closure
-    fixum _ adde ← (numerus a, numerus b) → numerus ∴ a + b
-    nota adde(3, 4)
+    const _ adde ← (int a, int b) → int ∴ a + b
+    print adde(3, 4)
 
-    fixum _ numeri ← [1, 2, 3]
-    varia lista<numerus> duplicati ← vacua
+    const _ numeri ← [1, 2, 3]
+    var list<int> duplicati ← vacua
     # predicate closure
-    fixum _ par ← numerus x → bivalens ∴ x % 2 ≡ 0
-    varia lista<numerus> pares ← vacua
-    itera ex numeri fixum n {
+    const _ par ← int x → bool ∴ x % 2 ≡ 0
+    var list<int> pares ← vacua
+    for from numeri const n {
         duplicati.appende(duplica(n))
-        si par(n) {
+        if par(n) {
             pares.appende(n)
         }
     }
-    nota duplicati.longitudo()
-    nota duplicati[0]
-    nota duplicati[2]
-    nota pares.longitudo()
-    nota pares[0]
+    print duplicati.longitudo()
+    print duplicati[0]
+    print duplicati[2]
+    print pares.longitudo()
+    print pares[0]
 
-    fixum _ positivus ← numerus n → bivalens ∴ n > 0
-    nota positivus(10)
-    nota positivus(-5)
+    const _ positivus ← int n → bool ∴ n > 0
+    print positivus(10)
+    print positivus(-5)
 }

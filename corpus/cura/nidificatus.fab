@@ -6,7 +6,7 @@ canonical = false
 summary = "Nested allocator scopes with inner and outer arena bindings."
 syntax = "cura \"arena\" fixum _ <alloc> { … }"
 related = ["cura", "arena"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -36,11 +36,11 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   "outer" then "inner" lines.
 
-incipit {
-    cura "arena" fixum _ outer {
-        nota "outer"
-        cura "arena" fixum _ inner {
-            nota "inner"
+main {
+    with "arena" const _ outer {
+        print "outer"
+        with "arena" const _ inner {
+            print "inner"
         }
     }
 }

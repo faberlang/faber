@@ -6,7 +6,7 @@ canonical = true
 summary = "Writes a value to standard output."
 syntax = "scribe <expression>"
 related = ["vide", "mone"]
-locale = "la"
+locale = "en"
 +++
 
 
@@ -37,24 +37,24 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   nota.expected — greeting, variable, formatted strings, sum, coordinates.
 
-incipit {
+main {
     # Simple string output
-    nota "Salve, Munde!"
+    print "Salve, Munde!"
 
     # Variable output
-    fixum _ nomen ← "Marcus"
-    nota nomen
+    const _ nomen ← "Marcus"
+    print nomen
 
     # Multiple arguments
-    fixum _ aetas ← 30
-    nota "nomen: §"(nomen)
-    nota "aetas: §"(aetas)
+    const _ aetas ← 30
+    print "nomen: §"(nomen)
+    print "aetas: §"(aetas)
 
     # Expressions
-    fixum _ x ← 10
-    fixum _ y ← 20
-    nota "summa: §"(x + y)
+    const _ x ← 10
+    const _ y ← 20
+    print "summa: §"(x + y)
 
     # Multiple values in one statement
-    nota "coordinata: § §"(x, y)
+    print "coordinata: § §"(x, y)
 }

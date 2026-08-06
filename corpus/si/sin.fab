@@ -7,7 +7,7 @@ summary = "Adds an else-if branch after a previous si branch."
 syntax = "sin <condition> <block>"
 aliases = ["else if"]
 related = ["si", "secus"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -39,23 +39,23 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Afternoon (hour=14 matches first sin branch).
 
-incipit {
-    fixum _ hour ← 14
+main {
+    const _ hour ← 14
 
-    si hour < 6 {
-        nota "Late night"
+    if hour < 6 {
+        print "Late night"
     }
-    sin hour < 12 {
-        nota "Morning"
+    elif hour < 12 {
+        print "Morning"
     }
-    sin hour < 18 {
+    elif hour < 18 {
         # 14 ≥ 12 and 14 < 18
-        nota "Afternoon"
+        print "Afternoon"
     }
-    sin hour < 22 {
-        nota "Evening"
+    elif hour < 22 {
+        print "Evening"
     }
-    secus {
-        nota "Night"
+    else {
+        print "Night"
     }
 }

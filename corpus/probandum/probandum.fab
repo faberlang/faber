@@ -7,7 +7,7 @@ summary = "Groups related test cases into a named suite."
 syntax = "probandum <name> [modifiers] <block>"
 aliases = ["describe", "suite"]
 related = ["proba", "adfirma"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -40,19 +40,19 @@ locale = "la"
 # BACKEND: No incipit block — test-runner surface; exempla e2e whitelists as
 # declaration-only (whitelist: probandum/probandum.fab).
 
-probandum "arithmetica" {
-    proba "unum plus unum" {
-        adfirma 1 + 1 ≡ 2
+describe "arithmetica" {
+    test "unum plus unum" {
+        assert 1 + 1 ≡ 2
     }
 
-    proba "multiplicatio" {
-        adfirma 3 * 4 ≡ 12
+    test "multiplicatio" {
+        assert 3 * 4 ≡ 12
     }
 
-    probandum "implicata" {
-        proba "comparatio" {
-            fixum _ x ← 10
-            adfirma x ≥ 10
+    describe "implicata" {
+        test "comparatio" {
+            const _ x ← 10
+            assert x ≥ 10
         }
     }
 }

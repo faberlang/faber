@@ -7,7 +7,7 @@ summary = "Runs the fallback branch when preceding conditional branches do not m
 syntax = "secus <block>"
 aliases = ["else", "otherwise"]
 related = ["si", "sin"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -38,12 +38,12 @@ locale = "la"
 #   Cross-ref: si/secus.fab.
 #
 
-incipit {
-    fixum _ hour ← 23
-    si hour < 12 {
-        nota "morning"
+main {
+    const _ hour ← 23
+    if hour < 12 {
+        print "morning"
     }
-    secus {
-        nota "afternoon-or-later"
+    else {
+        print "afternoon-or-later"
     }
 }

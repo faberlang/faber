@@ -6,7 +6,7 @@ canonical = true
 summary = "Generic functions with angle-bracket type and magnitudo parameters."
 syntax = "functio <name><T, magnitudo N>(<params>) → <type> <block>"
 related = ["functio", "genus", "magnitudo"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # generic — Generic functions with angle-bracket type and magnitudo parameters
@@ -36,14 +36,14 @@ locale = "la"
 # BACKEND: Generic call codegen gap on Rust (`T: Clone`; whitelist: generic/generic.fab).
 # Call sites are deferred in this smoke exemplar.
 
-functio identitas<T>(T valor) → T {
-    redde valor
+fn identitas<T>(T value) → T {
+    return value
 }
 
-functio primum<T>(lista<T> res) → T ∪ nihil {
-    redde res.primus()
+fn primum<T>(list<T> res) → T ∪ null {
+    return res.primus()
 }
 
-incipit {
-    nota "generic function signatures paratae"
+main {
+    print "generic function signatures paratae"
 }

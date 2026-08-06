@@ -6,7 +6,7 @@ canonical = false
 summary = "Same-shape tensor ↔ sparsa representation conversio."
 syntax = "tensor<T, F> ↦ sparsa<T, F> | sparsa<T, F> ↦ tensor<T, F>"
 related = ["sparsa", "tensor", "↦"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -31,10 +31,10 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Sparse stored count and dense round-trip rank.
 
-incipit {
-    fixum tf32[2, 2] dense ← [[1.0, 0.0], [0.0, 2.0]] ↦ tf32[2, 2]
-    fixum sf32[2, 2] sparse ← dense ↦ sf32[2, 2]
-    fixum tf32[2, 2] roundtrip ← sparse ↦ tf32[2, 2]
+main {
+    const tf32[2, 2] dense ← [[1.0, 0.0], [0.0, 2.0]] ↦ tf32[2, 2]
+    const sf32[2, 2] sparse ← dense ↦ sf32[2, 2]
+    const tf32[2, 2] roundtrip ← sparse ↦ tf32[2, 2]
 
-    nota sparse.nonnihil(), roundtrip.longitudo()
+    print sparse.nonnihil(), roundtrip.longitudo()
 }

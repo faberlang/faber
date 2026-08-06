@@ -6,7 +6,7 @@ canonical = false
 summary = "sparsa rejects non-numeric element types in v1."
 syntax = "sparsa<textus, [N]> — rejected"
 related = ["sparsa", "tensor"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -31,7 +31,7 @@ locale = "la"
 # This exemplum intentionally fails to compile; it is registered in the
 # per-backend EXPECTED_FAILURES lists.
 
-incipit {
-    fixum sparsa<textus, [2]> words ← vacua
-    nota words.longitudo()
+main {
+    const sparsa<string, [2]> words ← vacua
+    print words.longitudo()
 }

@@ -6,7 +6,7 @@ canonical = false
 summary = "Compiler-owned fractus rounding methodi."
 syntax = "valor.rotunda | pavimentum | tectum | trunca"
 related = ["fractus", "intrinseca"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # fractus — Compiler-owned fractus rounding methodi
@@ -34,13 +34,13 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Smoke asserts exit 0 only.
 
-incipit {
-    fixum fractus valor ← -3.75
+main {
+    const float value ← -3.75
 
-    fixum _ rotundus ← valor.rotunda()
-    fixum _ basis ← valor.pavimentum()
-    fixum _ culmen ← valor.tectum()
-    fixum _ truncatus ← valor.trunca()
+    const _ rotundus ← value.rotunda()
+    const _ basis ← value.pavimentum()
+    const _ culmen ← value.tectum()
+    const _ truncatus ← value.trunca()
 
-    nota rotundus, basis, culmen, truncatus
+    print rotundus, basis, culmen, truncatus
 }

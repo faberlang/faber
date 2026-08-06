@@ -7,7 +7,7 @@ summary = "Declares that a type implements one or more implendum contracts."
 syntax = "genus <name> implet <interface-list> <block>"
 aliases = ["implements"]
 related = ["genus", "implendum"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # implet — Declares that a type implements one or more implendum contracts
@@ -33,20 +33,20 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   implet.expected — Aurelia from implendum plenum().
 
-implendum Nominatum {
-    functio plenum() → textus
+interface Nominatum {
+    fn plenum() → string
 }
 
-genus Civis implet Nominatum {
-    textus nomen
+class Civis implements Nominatum {
+    string nomen
 
-    functio plenum() → textus {
+    fn plenum() → string {
         # satisfies implendum requirement
-        redde "§"(ego.nomen)
+        return "§"(self.nomen)
     }
 }
 
-incipit {
-    fixum _ civis ← Civis { nomen = "Aurelia" }
-    nota civis.plenum()
+main {
+    const _ civis ← Civis { nomen = "Aurelia" }
+    print civis.plenum()
 }

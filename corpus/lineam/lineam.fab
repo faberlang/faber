@@ -6,7 +6,7 @@ canonical = true
 summary = "Reads one line of input."
 syntax = "lege lineam"
 related = ["lege"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -34,6 +34,6 @@ locale = "la"
 #   Rust/Go/roundtrip whitelist like lege/lege.fab.
 #
 
-incipit {
-    nota "lineam exemplum — stdin read deferred in harness"
+main {
+    print "lineam exemplum — stdin read deferred in harness"
 }

@@ -6,7 +6,7 @@ canonical = true
 summary = "Sets the step for a range."
 syntax = "<range> per <expression>"
 related = ["ante", "usque"]
-locale = "la"
+locale = "en"
 +++
 
 
@@ -34,9 +34,9 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   0, 2, 4, 6 (step by 2 over 0‥8).
 
-incipit {
+main {
     # i = 0, 2, 4, 6 (step by 2)
-    itera ab 0‥8 per 2 fixum i {
-        nota i
+    for range 0‥8 step 2 const i {
+        print i
     }
 }

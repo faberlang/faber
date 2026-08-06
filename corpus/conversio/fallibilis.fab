@@ -6,7 +6,7 @@ canonical = true
 summary = "Three recovery postures for fallible conversio: inline ⇥, ⇥ propagation, and fac/cape."
 syntax = "<expression> ↦ <type> | functio … → T ⇥ E | fac { … } cape err { … }"
 related = ["↦", "⇥", "fac", "cape", "iace"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -33,50 +33,50 @@ locale = "la"
 #   Rust lowers all three postures (inline `⇥`, propagation, `fac`/`cape`).
 #   Go/TS remain diagnostic-only until their failable stacks mature.
 
-functio epochZero() → instans {
-    redde "1970-01-01T00:00:00Z" ↦ instans
+fn epochZero() → instant {
+    return "1970-01-01T00:00:00Z" ↦ instant
 }
 
-functio parseInstans(valor v) → instans ⇥ textus {
-    redde v ↦ instans
+fn parseInstans(value v) → instant ⇥ string {
+    return v ↦ instant
 }
 
-functio inlineRecovery(valor v) → instans {
-    redde v ↦ instans ⇥ epochZero()
+fn inlineRecovery(value v) → instant {
+    return v ↦ instant ⇥ epochZero()
 }
 
-functio tutum(valor v) → instans {
-    fac {
-        redde parseInstans(v)
+fn tutum(value v) → instant {
+    do {
+        return parseInstans(v)
     }
-    cape err {
-        mone err
-        redde epochZero()
-    }
-}
-
-functio tutumDirect(valor v) → instans {
-    fac {
-        redde v ↦ instans
-    }
-    cape err {
-        mone err
-        redde epochZero()
+    catch err {
+        warn err
+        return epochZero()
     }
 }
 
-incipit {
-    fixum valor good ← "1979-05-27T07:32:00Z"
-    fixum valor bad ← "not-a-datetime"
+fn tutumDirect(value v) → instant {
+    do {
+        return v ↦ instant
+    }
+    catch err {
+        warn err
+        return epochZero()
+    }
+}
 
-    adfirma inlineRecovery(good) ≡ (good ↦ instans)
-    adfirma inlineRecovery(bad) ≡ epochZero()
+main {
+    const value good ← "1979-05-27T07:32:00Z"
+    const value bad ← "not-a-datetime"
 
-    adfirma tutum(good) ≡ (good ↦ instans)
-    adfirma tutum(bad) ≡ epochZero()
+    assert inlineRecovery(good) ≡ (good ↦ instant)
+    assert inlineRecovery(bad) ≡ epochZero()
 
-    adfirma tutumDirect(good) ≡ (good ↦ instans)
-    adfirma tutumDirect(bad) ≡ epochZero()
+    assert tutum(good) ≡ (good ↦ instant)
+    assert tutum(bad) ≡ epochZero()
 
-    nota inlineRecovery(good), tutum(good), tutumDirect(good)
+    assert tutumDirect(good) ≡ (good ↦ instant)
+    assert tutumDirect(bad) ≡ epochZero()
+
+    print inlineRecovery(good), tutum(good), tutumDirect(good)
 }

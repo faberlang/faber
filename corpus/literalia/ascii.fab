@@ -7,7 +7,7 @@ summary = "Single-quoted ASCII machine-text literals."
 syntax = "'<text>'"
 aliases = ["'...'"]
 related = ["textus", "string"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -28,7 +28,7 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   pg:query
 
-incipit {
-    fixum _ route ← 'pg:query'
-    nota route
+main {
+    const _ route ← 'pg:query'
+    print route
 }

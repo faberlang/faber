@@ -6,7 +6,7 @@ canonical = true
 summary = "Bitwise or and est-negation operators."
 syntax = "<expression> ∨ <expression> | <expression> non est <expression>"
 related = ["∧", "⊻", "¬", "et", "aut", "vel", "non est", "est"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -35,20 +35,20 @@ locale = "la"
 #   Cross-ref boolean short-circuit: et/et.fab, aut/binarius.fab, vel/binarius.fab.
 #   Negated est parses as `expr non est target`.
 
-incipit {
-    fixum _ vexilla ← 0b1010
-    fixum _ persona ← 0b1100
-    fixum _ velata ← vexilla ∨ persona
+main {
+    const _ vexilla ← 0b1010
+    const _ persona ← 0b1100
+    const _ velata ← vexilla ∨ persona
     # 14 (0b1110)
-    nota velata
+    print velata
 
-    fixum textus ∪ nihil praesens ← "salve"
-    fixum textus ∪ nihil absens ← nihil
-    fixum _ habetValorem ← praesens non est nihil
+    const string ∪ null praesens ← "salve"
+    const string ∪ null absens ← null
+    const _ habetValorem ← praesens not is null
     # verum
-    nota habetValorem
+    print habetValorem
 
-    fixum _ caretValorem ← absens non est nihil
+    const _ caretValorem ← absens not is null
     # falsum
-    nota caretValorem
+    print caretValorem
 }

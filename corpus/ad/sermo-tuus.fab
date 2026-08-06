@@ -5,7 +5,7 @@ category = "endpoint"
 canonical = true
 summary = "typed inbound sermo stream view"
 related = ["ad", "sermo", "scrinium", "cursor"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -26,10 +26,10 @@ locale = "la"
 
 # sermo.tuus<T>() — typed inbound frame stream
 
-incipit {
-    fixum _ s ← ad 'runtime:echo' ("salve")
+main {
+    const _ s ← call 'runtime:echo' ("salve")
 
-    itera ex s.tuus<textus>().cursor() fixum frame {
-        adfirma frame.data ≡ "salve"
+    for from s.tuus<string>().cursor() const frame {
+        assert frame.data ≡ "salve"
     }
 }

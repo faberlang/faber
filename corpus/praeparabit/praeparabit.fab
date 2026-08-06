@@ -6,7 +6,7 @@ canonical = true
 summary = "Registers an async before-each test hook."
 syntax = "praeparabit <block>"
 related = ["praepara", "postparabit"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -37,11 +37,11 @@ locale = "la"
 #   declaration-only test hook (whitelist: praeparabit/praeparabit.fab).
 #
 
-probandum "async hooks" {
-    praeparabit {
-        nota "before each async"
+describe "async hooks" {
+    async_setup {
+        print "before each async"
     }
-    proba "sample" {
-        adfirma verum
+    test "sample" {
+        assert true
     }
 }

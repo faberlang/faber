@@ -3,7 +3,7 @@ term = "vector"
 kind = "kernel"
 category = "gpu"
 summary = "nucleum kernel baseline for vector GPU emit"
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -22,7 +22,7 @@ locale = "la"
 
 
 
-@ nucleum
-functio scala(fractus<f32> x) → fractus<f32> {
-    redde x + 1.0
+@ kernel
+fn scala(float<f32> x) → float<f32> {
+    return x + 1.0
 }

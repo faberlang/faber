@@ -6,7 +6,7 @@ canonical = false
 summary = "tensor<textus, [N]> as a universal container with non-numeric elements."
 syntax = "tensor<textus, [N]>"
 related = ["tensor", "textus"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -34,10 +34,10 @@ locale = "la"
 # EXPECTED stdout:
 #   alpha
 
-incipit {
-    fixum lista<textus> flat ← ["alpha", "beta", "gamma"]
-    fixum tensor<textus, []> seed ← vacua
-    fixum tensor<textus, [3]> grid ← seed.strue(flat, [3])
-    fixum textus cell ← grid.accipe([0]) vel ""
-    nota cell
+main {
+    const list<string> flat ← ["alpha", "beta", "gamma"]
+    const tensor<string, []> seed ← vacua
+    const tensor<string, [3]> grid ← seed.strue(flat, [3])
+    const string cell ← grid.accipe([0]) coalesce ""
+    print cell
 }

@@ -6,7 +6,7 @@ canonical = true
 summary = "solum.lege<T> admits only supported materialization target types."
 syntax = "solum.lege<textus>(via) | solum.lege<lista<textus>>(via) | solum.lege<octeti>(via)"
 related = ["ad", "solum", "generic"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -35,17 +35,17 @@ locale = "la"
 # prove each accepted target shape independently of the harness working
 # directory.
 
-importa ex "norma:solum" privata solum
+import from "norma:solum" private solum
 
-incipit {
-    fixum textus textPath ← "/tmp/faber-solum-lege-generic.txt"
+main {
+    const string textPath ← "/tmp/faber-solum-lege-generic.txt"
     solum.scribe(textPath, "prima\nsecunda\n")
 
-    fixum textus body ← solum.lege<textus>(textPath)
-    fixum lista<textus> lineae ← solum.lege<lista<textus>>(textPath)
-    fixum octeti bytes ← solum.lege<octeti>(textPath)
-    nota body
-    nota lineae
-    nota bytes
-    nota "solum lege generic parata"
+    const string body ← solum.lege<string>(textPath)
+    const list<string> lineae ← solum.lege<list<string>>(textPath)
+    const bytes bytes ← solum.lege<bytes>(textPath)
+    print body
+    print lineae
+    print bytes
+    print "solum lege generic parata"
 }

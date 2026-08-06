@@ -7,7 +7,7 @@ summary = "Block textus literals with embedded quotes and newlines."
 syntax = "«<text>»"
 aliases = ["«...»"]
 related = ["string", "textus"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -32,11 +32,11 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   he said "salve", line one
 
-incipit {
-    fixum _ quote ← «he said "salve"»
-    nota quote
+main {
+    const _ quote ← «he said "salve"»
+    print quote
 
-    fixum _ multiline ← «line one
+    const _ multiline ← «line one
 still line one»
-    nota multiline.sectio(0, 8)
+    print multiline.sectio(0, 8)
 }

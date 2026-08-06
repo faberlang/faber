@@ -6,7 +6,7 @@ canonical = false
 summary = "Compact casu and ceterum branches with ergo redde."
 syntax = "casu <value> ergo redde <expression>"
 related = ["elige", "ergo", "redde"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -35,47 +35,47 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Status codes, type ids, and mixed-case handler output.
 
-functio nuntius(numerus codex) → textus {
-    elige codex {
-        casu 1 ergo redde "paratum"
-        casu 2 ergo redde "missum"
-        casu 3 ergo redde "fractum"
-        casu 4 ergo redde "absens"
-        ceterum ergo redde "ignotum"
+fn nuntius(int codex) → string {
+    switch codex {
+        case 1 then return "paratum"
+        case 2 then return "missum"
+        case 3 then return "fractum"
+        case 4 then return "absens"
+        default then return "ignotum"
     }
 }
 
-functio qualis(textus nomen) → numerus {
-    elige nomen {
-        casu "textus" ergo redde 1
-        casu "numerus" ergo redde 2
-        casu "fractus" ergo redde 3
-        casu "bivalens" ergo redde 4
-        ceterum ergo redde 0
+fn qualis(string nomen) → int {
+    switch nomen {
+        case "textus" then return 1
+        case "numerus" then return 2
+        case "fractus" then return 3
+        case "bivalens" then return 4
+        default then return 0
     }
 }
 
 # casu 2 uses a block body instead of ergo redde (side effect + return)
-functio tracta(numerus codex) → textus {
-    elige codex {
-        casu 1 ergo redde "simplex"
-        casu 2 {
-            nota "codex 2 tractatur..."
-            redde "compositus"
+fn tracta(int codex) → string {
+    switch codex {
+        case 1 then return "simplex"
+        case 2 {
+            print "codex 2 tractatur..."
+            return "compositus"
         }
-        casu 3 ergo redde "iterum simplex"
-        ceterum ergo redde "defectum"
+        case 3 then return "iterum simplex"
+        default then return "defectum"
     }
 }
 
-incipit {
-    nota nuntius(1)
-    nota nuntius(4)
-    nota nuntius(9)
+main {
+    print nuntius(1)
+    print nuntius(4)
+    print nuntius(9)
 
-    nota qualis("textus")
-    nota qualis("ignotum")
+    print qualis("textus")
+    print qualis("ignotum")
 
-    nota tracta(1)
-    nota tracta(2)
+    print tracta(1)
+    print tracta(2)
 }

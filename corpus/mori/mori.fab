@@ -7,7 +7,7 @@ summary = "Raises a fatal error or panic."
 syntax = "mori <expression>"
 aliases = ["panic"]
 related = ["iace", "ergo"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -34,34 +34,34 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Happy-path division and lista access; mori paths are commented out.
 
-functio divide(numerus a, numerus b) → fractus {
+fn divide(int a, int b) → float {
     # Use mori for invariant violations
-    si b ≡ 0 {
-        mori "divisio per nihilum"
+    if b ≡ 0 {
+        panic "divisio per nihilum"
     }
-    redde (a ↦ fractus) / (b ↦ fractus)
+    return (a ↦ float) / (b ↦ float)
 }
 
-functio accipe(lista<numerus> res, numerus index) → numerus {
+fn accipe(list<int> res, int index) → int {
     # Bounds check with mori
-    si index < 0 aut index ≥ res.longitudo() {
-        mori "index extra fines"
+    if index < 0 or index ≥ res.longitudo() {
+        panic "index extra fines"
     }
-    redde res[index]
+    return res[index]
 }
 
-incipit {
+main {
     # Happy path — mori branches not taken
-    fixum _ valor ← divide(10, 2)
+    const _ value ← divide(10, 2)
     # 5.0
-    nota "valor: §"(valor)
+    print "valor: §"(value)
 
     # This would call mori:
     # fixum _ malum ← divide(10, 0)
 
     # Lista accessus
-    fixum _ nums ← [1, 2, 3]
-    fixum _ lectum ← accipe(nums, 1)
+    const _ nums ← [1, 2, 3]
+    const _ lectum ← accipe(nums, 1)
     # 2
-    nota "valor: §"(lectum)
+    print "valor: §"(lectum)
 }

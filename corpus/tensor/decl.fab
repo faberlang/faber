@@ -6,7 +6,7 @@ canonical = true
 summary = "tensor<T, Figura> declaration shell with rank-0 vacua."
 syntax = "tensor<T, Figura> | tensor<T, []>"
 related = ["tensor", "lista"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -37,13 +37,13 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Rank-0 tensor longitudo after round-trip identity call.
 
-functio identity(tensor<fractus<f32>, []> value) → tensor<fractus<f32>, []> {
-    redde value
+fn identity(tensor<float<f32>, []> value) → tensor<float<f32>, []> {
+    return value
 }
 
-incipit {
-    fixum tensor<fractus<f32>, []> empty ← vacua
-    fixum tensor<fractus<f32>, []> roundtrip ← identity(empty)
+main {
+    const tensor<float<f32>, []> empty ← vacua
+    const tensor<float<f32>, []> roundtrip ← identity(empty)
 
-    nota roundtrip.longitudo()
+    print roundtrip.longitudo()
 }

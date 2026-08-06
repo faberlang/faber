@@ -6,7 +6,7 @@ canonical = true
 summary = "Async solum.leget<T> uses the same solum:lege route as sync solum.lege<T>."
 syntax = "solum.leget<textus>(via)"
 related = ["ad", "solum", "futura", "sermo"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -32,12 +32,12 @@ locale = "la"
 # declares the wrapper with compatibility `@ futura`; callers consume it through
 # the explicit morphology forms such as `figendum`.
 
-importa ex "norma:solum" privata solum
+import from "norma:solum" private solum
 
-incipiet {
-    fixum textus textPath ← "/tmp/faber-async-solum-leget.txt"
+async_main {
+    const string textPath ← "/tmp/faber-async-solum-leget.txt"
     solum.scribe(textPath, "async solum\n")
 
-    figendum textus body ← solum.leget<textus>(textPath)
-    adfirma body ≡ "async solum\n"
+    await_const string body ← solum.leget<string>(textPath)
+    assert body ≡ "async solum\n"
 }

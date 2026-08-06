@@ -6,7 +6,7 @@ canonical = false
 summary = "Asserts conditions inside function bodies."
 syntax = "adfirma <expression> [, <message>]"
 related = ["adfirma", "functio"]
-locale = "la"
+locale = "en"
 +++
 
 
@@ -41,35 +41,35 @@ locale = "la"
 #   none — preconditions and postconditions only; no nota output
 
 # Validate input at function start
-functio divide(numerus a, numerus b) → numerus {
-    adfirma b ≠ 0 secus "divisor non sit nihil"
-    redde a / b
+fn divide(int a, int b) → int {
+    assert b ≠ 0 else "divisor non sit nihil"
+    return a / b
 }
 
 # Multiple assertions
-functio aetas(numerus natus, numerus nunc) → numerus {
-    adfirma natus > 0 secus "annus natus positivus sit"
-    adfirma nunc ≥ natus secus "annus nunc post natum sit"
-    redde nunc - natus
+fn aetas(int natus, int nunc) → int {
+    assert natus > 0 else "annus natus positivus sit"
+    assert nunc ≥ natus else "annus nunc post natum sit"
+    return nunc - natus
 }
 
 # Validate result before returning
-functio absolutum(numerus n) → numerus {
-    varia _ valor ← n
-    si n < 0 {
-        valor ← -n
+fn absolutum(int n) → int {
+    var _ value ← n
+    if n < 0 {
+        value ← -n
     }
-    adfirma valor ≥ 0 secus "valor non negativus sit"
-    redde valor
+    assert value ≥ 0 else "valor non negativus sit"
+    return value
 }
 
-incipit {
-    fixum _ quotiens ← divide(20, 4)
-    adfirma quotiens ≡ 5
+main {
+    const _ quotiens ← divide(20, 4)
+    assert quotiens ≡ 5
 
-    fixum _ annorum ← aetas(1990, 2024)
-    adfirma annorum ≡ 34
+    const _ annorum ← aetas(1990, 2024)
+    assert annorum ≡ 34
 
-    fixum _ abs ← absolutum(-42)
-    adfirma abs ≡ 42
+    const _ abs ← absolutum(-42)
+    assert abs ≡ 42
 }

@@ -6,7 +6,7 @@ canonical = true
 summary = "Braced canonical @ cli program marker."
 syntax = "@ cli { nomen = \"NAME\" }"
 related = ["cli", "optio", "annotation-sugar"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -31,11 +31,11 @@ locale = "la"
 # PAIR: sugar `@ cli "NAME"` (see optio/optio.fab)
 
 @ cli { nomen = "annotation-sugar-smoke" }
-@ optio {
+@ option {
     binding = verbose,
     brevis = "v",
     longum = "verbose",
-    typus = bivalens,
+    typus = bool,
     descriptio = "Verbose mode",
 }
-incipit argumenta args { }
+main args args { }

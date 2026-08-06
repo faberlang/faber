@@ -5,7 +5,7 @@ category = "transfer"
 canonical = false
 summary = "rumpe exits fac from nested si without entering cape"
 related = ["fac", "si", "cape"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -24,18 +24,18 @@ locale = "la"
 # See also: fac, si, cape
 # =============================================================================
 
-incipit {
-    varia numerus valorem ← 0
-    fac {
-        si verum {
-            si verum {
-                rumpe
+main {
+    var int valorem ← 0
+    do {
+        if true {
+            if true {
+                break
             }
         }
         valorem ← 2
     }
-    cape err {
+    catch err {
         valorem ← 3
     }
-    nota valorem
+    print valorem
 }

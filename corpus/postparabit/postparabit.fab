@@ -6,7 +6,7 @@ canonical = true
 summary = "Registers an async after-each test hook."
 syntax = "postparabit <block>"
 related = ["postpara", "praeparabit"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -35,11 +35,11 @@ locale = "la"
 #   declaration-only test hook (whitelist: postparabit/postparabit.fab).
 #
 
-probandum "async hooks" {
-    postparabit {
-        nota "after each async"
+describe "async hooks" {
+    async_teardown {
+        print "after each async"
     }
-    proba "sample" {
-        adfirma verum
+    test "sample" {
+        assert true
     }
 }

@@ -6,7 +6,7 @@ canonical = false
 summary = "Radix-parameterized integer parsing from textus."
 syntax = "<textus> ↦ numerus<W, Radix>"
 related = ["↦", "numerus", "textus"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -39,12 +39,12 @@ locale = "la"
 # BACKEND:
 #   HIR-direct Rust and MIR-stepper routes must agree for radix parsing.
 
-incipit {
-    fixum _ hex ← "ff" ↦ numerus<i32, Hex>
-    fixum _ bin ← "1010" ↦ numerus<i32, Bin>
-    fixum _ oct ← "755" ↦ numerus<i32, Oct>
+main {
+    const _ hex ← "ff" ↦ int<i32, Hex>
+    const _ bin ← "1010" ↦ int<i32, Bin>
+    const _ oct ← "755" ↦ int<i32, Oct>
 
-    nota hex
-    nota bin
-    nota oct
+    print hex
+    print bin
+    print oct
 }

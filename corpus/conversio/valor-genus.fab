@@ -6,7 +6,7 @@ canonical = true
 summary = "valor ↦ genus extraction with missing-field defaults and mandatory-field failure via ⇥ recovery."
 syntax = "<valor-expression> ↦ <genus-type> [⇥ <recovery>]"
 related = ["↦", "⇥"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -29,34 +29,34 @@ locale = "la"
 # defaultable fields zero-initialize; missing mandatory fields fail at runtime
 # (recoverable via `⇥`). Extra JSON keys are ignored.
 
-genus Persona {
-    textus nomen
-    numerus aetas sponte
-    textus regio = "Roma"
-    instans born
+class Persona {
+    string nomen
+    int aetas optional
+    string regio = "Roma"
+    instant born
 }
 
-incipit {
-    fixum valor payload ← {
+main {
+    const value payload ← {
         "nomen": "Marcus",
         "born": "1979-05-27T07:32:00Z",
         "extra": "ignored"
-    } ↦ valor
-    fixum Persona good ← payload ↦ Persona
-    adfirma good.nomen ≡ "Marcus"
-    adfirma good.aetas ≡ nihil
-    adfirma good.regio ≡ "Roma"
+    } ↦ value
+    const Persona good ← payload ↦ Persona
+    assert good.nomen ≡ "Marcus"
+    assert good.aetas ≡ null
+    assert good.regio ≡ "Roma"
 
-    fixum valor stale ← { "nomen": "Livia" } ↦ valor
-    fixum Persona recovered ← stale ↦ Persona ⇥ good
-    adfirma recovered.nomen ≡ "Marcus"
+    const value stale ← { "nomen": "Livia" } ↦ value
+    const Persona recovered ← stale ↦ Persona ⇥ good
+    assert recovered.nomen ≡ "Marcus"
 
-    fixum valor boxed ← recovered ↦ valor
-    fixum Persona roundtrip ← boxed ↦ Persona
-    adfirma roundtrip.nomen ≡ "Marcus"
-    adfirma roundtrip.regio ≡ "Roma"
+    const value boxed ← recovered ↦ value
+    const Persona roundtrip ← boxed ↦ Persona
+    assert roundtrip.nomen ≡ "Marcus"
+    assert roundtrip.regio ≡ "Roma"
 
-    nota roundtrip.nomen
-    nota roundtrip.regio
-    nota roundtrip.born ↦ textus
+    print roundtrip.nomen
+    print roundtrip.regio
+    print roundtrip.born ↦ string
 }

@@ -7,7 +7,7 @@ summary = "Reserved visibility annotation rejected by semantic analysis."
 syntax = "@ protecta"
 aliases = ["protected"]
 related = ["publica", "privata"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -37,11 +37,11 @@ locale = "la"
 # EXPECTED ERROR:
 #   `@ protecta` is reserved and has no active visibility meaning
 
-@ protecta
-functio protectum() → textus {
-    redde "protecta"
+@ protected
+fn protectum() → string {
+    return "protecta"
 }
 
-incipit {
-    nota protectum()
+main {
+    print protectum()
 }

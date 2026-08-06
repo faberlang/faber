@@ -6,7 +6,7 @@ canonical = false
 summary = "Literal-shaped lista to tensor conversio."
 syntax = "<lista> ↦ <tensor-type-with-literal-Figura>"
 related = ["↦", "lista", "tensor", "Figura"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -30,13 +30,13 @@ locale = "la"
 # The flat lista lowers through the same structa/tensor_from_flat path as the
 # explicit tensor construction method.
 
-incipit {
-    fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
-    fixum tf32[2, 2] grid ← flat ↦ tf32[2, 2]
-    fixum lista<numerus> dims ← grid.magnitudines()
-    fixum lista<f32> out ← grid.planata()
+main {
+    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    const tf32[2, 2] grid ← flat ↦ tf32[2, 2]
+    const list<int> dims ← grid.magnitudines()
+    const list<f32> out ← grid.planata()
 
-    nota dims
-    nota grid.longitudo()
-    nota out.longitudo()
+    print dims
+    print grid.longitudo()
+    print out.longitudo()
 }

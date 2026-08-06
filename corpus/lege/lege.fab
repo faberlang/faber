@@ -6,7 +6,7 @@ canonical = true
 summary = "Reads input from the active input stream."
 syntax = "lege [lineam]"
 related = ["lineam", "scribe"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -38,10 +38,10 @@ locale = "la"
 # BACKEND: Rust/Go/roundtrip e2e whitelist — lege not yet lowered for Rust/Go
 # (whitelist: lege/lege.fab).
 
-incipit {
-    fixum _ pattern ← "(?g)\d+" ↦ regex
-    nota pattern
+main {
+    const _ pattern ← "(?g)\d+" ↦ regex
+    print pattern
 
-    fixum _ line ← lege
-    nota line
+    const _ line ← read
+    print line
 }

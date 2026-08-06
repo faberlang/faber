@@ -6,7 +6,7 @@ canonical = true
 summary = "Marks an interface method as planned but unavailable for a target."
 syntax = "@ nondum [target] [reason]"
 related = ["implendum", "@"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -34,11 +34,11 @@ locale = "la"
 # BACKEND:
 #   Calls to @ nondum methods fail semantic check (SEM017); do not invoke here.
 
-implendum tempus {
-    @ nondum rs "timer handles are not implemented yet"
-    functio siste(numerus handle) → vacuum
+interface tempus {
+    @ unstable rs "timer handles are not implemented yet"
+    fn siste(int handle) → void
 }
 
-incipit {
-    nota "nondum implendum declared"
+main {
+    print "nondum implendum declared"
 }

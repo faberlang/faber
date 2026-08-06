@@ -6,7 +6,7 @@ canonical = true
 summary = "Compatibility annotation for asynchronous posture."
 syntax = "@ futura"
 related = ["cursor", "figendum", "tacebit"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # futura — Compatibility annotation for asynchronous posture
@@ -40,13 +40,13 @@ locale = "la"
 # BACKEND:
 #   Rust async runtime not linked in exempla harness (whitelist: futura/futura.fab).
 
-@ futura
-functio responde() → numerus {
-    redde 42
+@ future
+fn responde() → int {
+    return 42
 }
 
-incipiet {
+async_main {
     # figendum awaits the promissum and binds the resolved value
-    figendum _ responsum ← responde()
-    nota responsum
+    await_const _ responsum ← responde()
+    print responsum
 }

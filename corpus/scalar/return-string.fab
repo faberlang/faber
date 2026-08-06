@@ -7,7 +7,7 @@ summary = "Function returning a string literal via redde \"textus\"."
 syntax = "redde <string-literal>"
 aliases = ["return"]
 related = ["textus", "functio"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -33,6 +33,6 @@ locale = "la"
 # Verifies that the Swift backend emits a function returning a
 # string literal (SC-001: primitives, functions, return).
 
-functio da_textum() → textus {
-    redde "textus"
+fn da_textum() → string {
+    return "textus"
 }

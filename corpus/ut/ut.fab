@@ -7,7 +7,7 @@ summary = "Introduces an alias name."
 syntax = "<name> ut <alias>"
 aliases = ["as"]
 related = ["ex", "argumenta"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -38,10 +38,10 @@ locale = "la"
 #   Cross-ref: destructura/, importa/, discerne/ (per-field ut).
 #
 
-functio greet(textus location ut loc) → textus {
-    redde loc
+fn greet(string location as loc) → string {
+    return loc
 }
 
-incipit {
-    nota greet("Roma")
+main {
+    print greet("Roma")
 }

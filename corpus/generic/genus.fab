@@ -6,7 +6,7 @@ canonical = false
 summary = "Generic discretio and implendum declarations."
 syntax = "discretio <name><T> { … } | implendum <name><T> { … }"
 related = ["generic", "discretio", "implendum"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # generic — Generic discretio and implendum declarations
@@ -35,22 +35,22 @@ locale = "la"
 #
 # BACKEND: Generic `discerne` enum lowering gap on Rust (whitelist: generic/genus.fab).
 
-discretio Resultatus<T> {
-    Ok { T valor },
-    Err { textus nuntius }
+union Resultatus<T> {
+    Ok { T value },
+    Err { string nuntius }
 }
 
-implendum Reponens<T> {
-    functio accipe() → T
+interface Reponens<T> {
+    fn accipe() → T
 }
 
-functio describe(Resultatus<numerus> r) → textus {
-    discerne r {
-        casu Ok fixum valor { redde "ok: §"(valor) }
-        casu Err fixum nuntius { redde "err: §"(nuntius) }
+fn describe(Resultatus<int> r) → string {
+    match r {
+        case Ok const value { return "ok: §"(value) }
+        case Err const nuntius { return "err: §"(nuntius) }
     }
 }
 
-incipit {
-    nota "generic genus and implendum parata"
+main {
+    print "generic genus and implendum parata"
 }

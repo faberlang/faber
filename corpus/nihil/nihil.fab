@@ -6,7 +6,7 @@ canonical = true
 summary = "Represents the null value and can prefix a null check."
 syntax = "nihil [<expression>]"
 related = ["∪", "sponte"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -31,7 +31,7 @@ locale = "la"
 #   Scalar stdout smoke (see body).
 #
 
-incipit {
-    fixum _ nothing ← nihil
-    nota nothing
+main {
+    const _ nothing ← null
+    print nothing
 }

@@ -7,7 +7,7 @@ summary = "Introduces a branch inside an elige or discerne statement."
 syntax = "casu <expression> <block>"
 aliases = ["case"]
 related = ["elige", "discerne"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -38,14 +38,14 @@ locale = "la"
 #   Cross-ref: elige/elige.fab, discerne/discerne.fab.
 #
 
-incipit {
-    fixum _ code ← 200
-    elige code {
-        casu 200 {
-            nota "ok"
+main {
+    const _ code ← 200
+    switch code {
+        case 200 {
+            print "ok"
         }
-        ceterum {
-            nota "other"
+        default {
+            print "other"
         }
     }
 }

@@ -6,7 +6,7 @@ canonical = false
 summary = "Sparse tensor codegen smoke for longitudo and nonnihil calls."
 syntax = "sparsa<T, Figura>.longitudo() | sparsa<T, Figura>.nonnihil()"
 related = ["sparsa", "tensor", "vacua"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -23,9 +23,9 @@ locale = "la"
 # See also: sparsa, tensor, vacua
 # =============================================================================
 
-incipit {
-  fixum sparsa<fractus, [2, 3]> s ← vacua
-  fixum _ len ← s.longitudo()
-  fixum _ count ← s.nonnihil()
-  nota len, count
+main {
+  const sparsa<float, [2, 3]> s ← vacua
+  const _ len ← s.longitudo()
+  const _ count ← s.nonnihil()
+  print len, count
 }

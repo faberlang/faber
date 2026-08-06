@@ -6,7 +6,7 @@ canonical = true
 summary = "Marks a test as fragile."
 syntax = "fragilis <number>"
 related = ["requirit"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # fragilis — Marks a test as fragile
@@ -34,6 +34,6 @@ locale = "la"
 #   declaration-only test modifier (whitelist: fragilis/fragilis.fab).
 #
 
-proba "fragile case" fragilis 1 {
-    adfirma verum
+test "fragile case" flaky 1 {
+    assert true
 }

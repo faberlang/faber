@@ -7,7 +7,7 @@ summary = "Starts the true branch of a one-line conditional expression."
 syntax = "si <condition> sic <expression> secus <expression>"
 aliases = ["then"]
 related = ["si", "secus"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -38,9 +38,9 @@ locale = "la"
 #   Cross-ref: si/si.fab, ternarius/ternarius.fab.
 #
 
-incipit {
-    fixum _ a ← 3
-    fixum _ b ← 9
-    fixum _ max ← a > b sic a secus b
-    nota max
+main {
+    const _ a ← 3
+    const _ b ← 9
+    const _ max ← a > b yields a else b
+    print max
 }

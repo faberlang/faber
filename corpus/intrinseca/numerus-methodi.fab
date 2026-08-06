@@ -7,7 +7,7 @@ summary = "Primitive integer number type."
 syntax = "numerus"
 aliases = ["integer", "int"]
 related = ["fractus", "↦"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # numerus — Primitive integer number type
@@ -36,12 +36,12 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Smoke asserts exit 0 only.
 
-incipit {
-    fixum numerus valor ← -7
-    fixum _ absolutus ← valor.absolutum()
-    fixum _ signum ← valor.signum()
-    fixum _ minor ← valor.minimus(3)
-    fixum _ maior ← valor.maximus(3)
+main {
+    const int value ← -7
+    const _ absolutus ← value.absolutum()
+    const _ signum ← value.signum()
+    const _ minor ← value.minimus(3)
+    const _ maior ← value.maximus(3)
 
-    nota absolutus, signum, minor, maior
+    print absolutus, signum, minor, maior
 }

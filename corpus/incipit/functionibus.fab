@@ -6,7 +6,7 @@ canonical = false
 summary = "Entry point that calls module-level functio declarations."
 syntax = "incipit { <callee>(<args>) }"
 related = ["incipit", "functio"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # incipit — Entry point that calls module-level functio declarations
@@ -34,15 +34,15 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   none — smoke asserts exit 0; no .expected sidecar.
 
-functio saluta(textus nomen) → textus {
-    redde "Salve, §!"(nomen)
+fn saluta(string nomen) → string {
+    return "Salve, §!"(nomen)
 }
 
-functio adde(numerus a, numerus b) → numerus {
-    redde a + b
+fn adde(int a, int b) → int {
+    return a + b
 }
 
-incipit {
-    nota saluta("Marcus")
-    nota "summa: §"(adde(3, 5))
+main {
+    print saluta("Marcus")
+    print "summa: §"(adde(3, 5))
 }

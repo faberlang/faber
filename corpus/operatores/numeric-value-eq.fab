@@ -6,7 +6,7 @@ canonical = true
 summary = "Numeric value equality after promotion join — not fuzzy float."
 syntax = "<expression> ≈ <expression> | <expression> ≉ <expression>"
 related = ["≡", "≠", "↦", "adfirma"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -28,18 +28,18 @@ locale = "la"
 # WHY: ≡ requires identical types; ≈ promotes numerics then exact-compares.
 # 42.145 ≈ 42 must stay false (no hidden tolerance).
 
-incipit {
-    fixum numerus<u8> port ← 42 ∷ numerus<u8>
-    fixum numerus count ← 42
-    fixum _ same_width ← port ≈ count
-    nota same_width
+main {
+    const int<u8> port ← 42 ∷ int<u8>
+    const int count ← 42
+    const _ same_width ← port ≈ count
+    print same_width
 
-    fixum _ int_float ← 1 ≈ 1.0
-    nota int_float
+    const _ int_float ← 1 ≈ 1.0
+    print int_float
 
-    fixum _ not_fuzzy ← 42.145 ∷ fractus<f64> ≈ 42.0 ∷ fractus<f64>
-    nota not_fuzzy
+    const _ not_fuzzy ← 42.145 ∷ float<f64> ≈ 42.0 ∷ float<f64>
+    print not_fuzzy
 
-    fixum _ differs ← 1 ≉ 2
-    nota differs
+    const _ differs ← 1 ≉ 2
+    print differs
 }

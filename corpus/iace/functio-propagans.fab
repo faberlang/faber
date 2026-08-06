@@ -6,7 +6,7 @@ canonical = false
 summary = "Failable call propagation: a ⇥-declaring function re-throws a callee error without fac/cape."
 syntax = "functio <name>(<params>) → <type> ⇥ <error-type> <block>"
 related = ["functio", "⇥", "iace", "↦", "fac", "cape"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # functio — Failable call propagation: a ⇥-declaring function re-throws a callee error without fac/cape
@@ -40,31 +40,31 @@ locale = "la"
 #   Rust application lane emits `?`; MIR/script lowers the call through
 #   try_call with a function-level return_error edge.
 
-functio divide(numerus a, numerus b) → numerus ⇥ textus {
-    si b ≡ 0 ergo iace "division by zero"
-    redde a / b
+fn divide(int a, int b) → int ⇥ string {
+    if b ≡ 0 then throw "division by zero"
+    return a / b
 }
 
 # Propagating caller: divide's ⇥ error re-throws through this function's ⇥ exit
 # with no fac/cape ceremony. Equivalent to `redde divide(a, b)?` in Rust.
-functio propagans(numerus a, numerus b) → numerus ⇥ textus {
-    fixum numerus q ← divide(a, b)
-    redde q * 2
+fn propagans(int a, int b) → int ⇥ string {
+    const int q ← divide(a, b)
+    return q * 2
 }
 
 # Recovery boundary: the only place a fac/cape is needed is where the ⇥ chain
 # terminates and the error is actually handled.
-functio tractatus(numerus a, numerus b) → numerus {
-    fac {
-        redde propagans(a, b)
+fn tractatus(int a, int b) → int {
+    do {
+        return propagans(a, b)
     }
-    cape err {
-        mone err
-        redde 0
+    catch err {
+        warn err
+        return 0
     }
 }
 
-incipit {
-    nota tractatus(5, 2)
-    nota tractatus(5, 0)
+main {
+    print tractatus(5, 2)
+    print tractatus(5, 0)
 }

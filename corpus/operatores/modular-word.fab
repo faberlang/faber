@@ -6,7 +6,7 @@ canonical = true
 summary = "Unsigned 32-bit modular-word arithmetic and bit-pattern edges."
 syntax = "modulus<u32>"
 related = ["numerus", "¬", "⇐", "⇒"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -30,36 +30,36 @@ locale = "la"
 #   multiplication, negation, bitwise operations, and shifts use u32 wrapping.
 #   Division and remainder by zero fail.
 
-incipit {
-    varia modulus<u32> max ← 4294967295
-    fixum modulus<u32> one ← 1
-    varia modulus<u32> zero ← 0
-    fixum numerus<u32> converted ← one ↦ numerus<u32>
+main {
+    var uint<u32> max ← 4294967295
+    const uint<u32> one ← 1
+    var uint<u32> zero ← 0
+    const int<u32> converted ← one ↦ int<u32>
 
-    nota max + one
-    nota zero - one
-    nota max * 2
-    nota -one
-    nota ¬zero
-    nota one ⇐ 32
-    nota max ⇒ 32
-    nota max > zero
+    print max + one
+    print zero - one
+    print max * 2
+    print -one
+    print ¬zero
+    print one ⇐ 32
+    print max ⇒ 32
+    print max > zero
 
     max ⊕
     zero ⊖
-    nota max
-    nota zero
+    print max
+    print zero
 
-    fixum modulus<u32> methodSum ← max.addita(one)
-    fixum modulus<u32> methodShift ← max.sinistrata(32)
-    varia modulus<u32> methodAcc ← 0
+    const uint<u32> methodSum ← max.addita(one)
+    const uint<u32> methodShift ← max.sinistrata(32)
+    var uint<u32> methodAcc ← 0
     methodAcc.adde(one)
     methodAcc.sinistra(32)
-    nota converted
-    nota methodSum
-    nota methodShift
-    nota methodAcc
+    print converted
+    print methodSum
+    print methodShift
+    print methodAcc
 
-    fixum lista<modulus<u32>> words ← [one, max]
-    nota words.accipe(1) vel (0 ∷ modulus<u32>)
+    const list<uint<u32>> words ← [one, max]
+    print words.accipe(1) coalesce (0 ∷ uint<u32>)
 }

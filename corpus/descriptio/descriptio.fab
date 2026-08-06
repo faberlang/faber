@@ -6,7 +6,7 @@ canonical = true
 summary = "Attaches a description string to CLI metadata."
 syntax = "@ descriptio <string>"
 related = ["versio"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -36,6 +36,6 @@ locale = "la"
 #
 
 @ cli "descriptio-smoke"
-@ descriptio "Short CLI description"
-incipit argumenta args {
+@ description "Short CLI description"
+main args args {
 }

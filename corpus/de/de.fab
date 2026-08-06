@@ -6,7 +6,7 @@ canonical = true
 summary = "Introduces borrowed iteration or borrowed parameters."
 syntax = "de <expression>"
 related = ["ex", "in"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -36,13 +36,13 @@ locale = "la"
 #   Cross-ref: itera/de.fab.
 #
 
-incipit {
-    fixum tabula<textus, numerus> persona ← { "nomen": 1, "aetas": 30 }
-    itera de persona fixum clavis {
-        nota clavis
+main {
+    const map<string, int> persona ← { "nomen": 1, "aetas": 30 }
+    for ref persona const clavis {
+        print clavis
     }
-    fixum _ numeri ← [10, 20, 30]
-    itera de numeri fixum index {
-        nota index
+    const _ numeri ← [10, 20, 30]
+    for ref numeri const index {
+        print index
     }
 }

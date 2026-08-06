@@ -7,7 +7,7 @@ summary = "Primitive string/text type."
 syntax = "textus"
 aliases = ["string"]
 related = ["string", "scriptum", "↦"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # textus — Primitive string/text type
@@ -39,16 +39,16 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Smoke asserts exit 0 only.
 
-incipit {
-    sit nuntius ← " Ave Roma "
+main {
+    let nuntius ← " Ave Roma "
 
-    sit secta ← nuntius.sectio(1, 4)
-    sit magna ← nuntius.maiuscula()
-    sit parva ← nuntius.minuscula()
-    sit rasa ← nuntius.recide()
-    sit partes ← rasa.divide(" ")
-    sit mutata ← rasa.muta("Roma", "Munde")
+    let secta ← nuntius.sectio(1, 4)
+    let magna ← nuntius.maiuscula()
+    let parva ← nuntius.minuscula()
+    let rasa ← nuntius.recide()
+    let partes ← rasa.divide(" ")
+    let mutata ← rasa.muta("Roma", "Munde")
 
-    nota secta, magna, parva
-    nota rasa, partes, mutata
+    print secta, magna, parva
+    print rasa, partes, mutata
 }

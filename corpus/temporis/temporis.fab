@@ -6,7 +6,7 @@ canonical = true
 summary = "Sets a timeout-like duration for a test modifier."
 syntax = "temporis <number>"
 related = ["metior", "repete"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -37,6 +37,6 @@ locale = "la"
 #   declaration-only test modifier (whitelist: temporis/temporis.fab).
 #
 
-proba "timed case" temporis 5 {
-    adfirma verum
+test "timed case" timeout 5 {
+    assert true
 }

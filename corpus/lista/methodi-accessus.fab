@@ -6,7 +6,7 @@ canonical = true
 summary = "Marks a test for metered or measured execution."
 syntax = "metior"
 related = ["temporis", "prima", "ultima"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -38,16 +38,16 @@ locale = "la"
 # BACKEND: Go e2e whitelist — lista intrinsic methods not yet lowered for Go
 # (whitelist: lista/methodi-accessus.fab).
 
-incipit {
-    fixum _ res ← [1, 2, 3, 4, 5] ∷ lista<numerus>
+main {
+    const _ res ← [1, 2, 3, 4, 5] ∷ list<int>
 
-    fixum _ primus ← res.primus()
-    fixum _ ultimus ← res.ultimus()
-    fixum _ tertius ← res.accipe(2)
-    fixum _ longitudo ← res.longitudo()
-    fixum _ vacuaest ← res.vacua()
-    fixum _ habettres ← res.continet(3)
+    const _ primus ← res.primus()
+    const _ ultimus ← res.ultimus()
+    const _ tertius ← res.accipe(2)
+    const _ longitudo ← res.longitudo()
+    const _ vacuaest ← res.vacua()
+    const _ habettres ← res.continet(3)
 
-    nota primus, ultimus, tertius
-    nota longitudo, vacuaest, habettres
+    print primus, ultimus, tertius
+    print longitudo, vacuaest, habettres
 }

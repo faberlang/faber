@@ -6,7 +6,7 @@ canonical = true
 summary = "String-template substitution holes inside quoted literals."
 syntax = "\"<template>\"(<args>...)"
 related = ["textus", "scribe"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -34,8 +34,8 @@ locale = "la"
 # BACKEND:
 #   Per-file metadata belongs in +++ frontmatter, not line-start § directives.
 
-incipit {
-    fixum _ nomen ← "Marcus"
-    nota "Salve, §!"(nomen)
-    nota "§ + § = §"(1, 2, 3)
+main {
+    const _ nomen ← "Marcus"
+    print "Salve, §!"(nomen)
+    print "§ + § = §"(1, 2, 3)
 }

@@ -6,7 +6,7 @@ canonical = true
 summary = "Marks a function as requiring an allocator binding."
 syntax = "functio <name>(...) curata <required> [ut <local>] → <type>"
 related = ["cura", "arena"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -35,6 +35,6 @@ locale = "la"
 #   declaration-only allocator modifier (whitelist: curata/curata.fab).
 #
 
-functio greet(textus name) curata alloc ut a → textus {
-    redde name
+fn greet(string name) allocator alloc as a → string {
+    return name
 }

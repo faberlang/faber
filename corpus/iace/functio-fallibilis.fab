@@ -6,7 +6,7 @@ canonical = false
 summary = "Failable function returns with ⇥ error channel and fac/cape recovery."
 syntax = "functio <name>(<params>) → <type> ⇥ <error-type> <block>"
 related = ["functio", "⇥", "fac", "cape"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # functio — Failable function returns with ⇥ error channel and fac/cape recovery
@@ -37,24 +37,24 @@ locale = "la"
 # BACKEND:
 #   Rust/Go lowering does not emit failable ⇥ syntax yet — compile-only smoke.
 
-functio divide(numerus a, numerus b) → numerus ⇥ textus {
-    si b ≡ 0 ergo iace "division by zero"
-    redde a / b
+fn divide(int a, int b) → int ⇥ string {
+    if b ≡ 0 then throw "division by zero"
+    return a / b
 }
 
 # Non-failable wrapper: cape intercepts ⇥ textus from divide
-functio tutum(numerus a, numerus b) → numerus {
-    fac {
-        redde divide(a, b)
+fn tutum(int a, int b) → int {
+    do {
+        return divide(a, b)
     }
-    cape err {
+    catch err {
         # log the error channel value
-        mone err
-        redde 0
+        warn err
+        return 0
     }
 }
 
-incipit {
-    nota tutum(10, 2)
-    nota tutum(10, 0)
+main {
+    print tutum(10, 2)
+    print tutum(10, 0)
 }

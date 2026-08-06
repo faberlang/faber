@@ -7,7 +7,7 @@ summary = "Declares or explains an inline closure expression; compact ∴ syntax
 syntax = "<type> <name> [→ <type>] [⇥ <error-type>] ∴ <expression|fac-block>"
 aliases = []
 related = ["∴", "functio", "fac", "cape", "cede"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -39,9 +39,9 @@ locale = "la"
 #   Cross-ref: clausa/clausa.fab.
 #
 
-incipit {
-    fixum _ dupla ← numerus x ∴ x * 2
-    nota dupla(5)
-    fixum _ summa ← (numerus a, numerus b) → numerus ∴ a + b
-    nota summa(2, 3)
+main {
+    const _ dupla ← int x ∴ x * 2
+    print dupla(5)
+    const _ summa ← (int a, int b) → int ∴ a + b
+    print summa(2, 3)
 }

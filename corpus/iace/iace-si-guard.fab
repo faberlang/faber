@@ -6,7 +6,7 @@ canonical = true
 summary = "Conditional throw with si guard."
 syntax = "iace <expression> si <condition>"
 related = ["cape", "mori", "si", "⇥"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # iace — Conditional throw with si guard
@@ -39,38 +39,38 @@ locale = "la"
 #   "caught: empty input"
 #   "caught: negative"
 
-functio validata(textus input) → textus ⇥ textus {
+fn validata(string input) → string ⇥ string {
     # Guard: throw if input is empty
-    iace "empty input" si input.longitudo() ≡ 0
+    throw "empty input" if input.longitudo() ≡ 0
 
-    redde "valid: §"(input)
+    return "valid: §"(input)
 }
 
-incipit {
+main {
     # Happy path — guard not triggered
-    fac {
-        fixum textus a ← validata("hello")
-        nota "ok: §"(a)
+    do {
+        const string a ← validata("hello")
+        print "ok: §"(a)
     }
-    cape err {
-        nota "unexpected: §"(err)
+    catch err {
+        print "unexpected: §"(err)
     }
 
     # Empty input — iace si guard triggers
-    fac {
-        fixum textus b ← validata("")
-        nota "should not reach"
+    do {
+        const string b ← validata("")
+        print "should not reach"
     }
-    cape err {
-        nota "caught: §"(err)
+    catch err {
+        print "caught: §"(err)
     }
 
     # iace with si on same line
-    fac {
-        iace "force throw" si verum
-        nota "should not reach"
+    do {
+        throw "force throw" if true
+        print "should not reach"
     }
-    cape err {
-        nota "caught: §"(err)
+    catch err {
+        print "caught: §"(err)
     }
 }

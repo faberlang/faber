@@ -3,7 +3,7 @@ term = "vector"
 kind = "type"
 category = "register"
 summary = "vf32[4] width sugar in type position"
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -22,10 +22,10 @@ locale = "la"
 
 
 
-functio takes(vf32[4] v) → numerus {
-    redde 0
+fn takes(vf32[4] v) → int {
+    return 0
 }
 
-functio vectorSugarSmoke() → numerus {
-    redde 0
+fn vectorSugarSmoke() → int {
+    return 0
 }

@@ -7,7 +7,7 @@ summary = "Declares a named function or method."
 syntax = "functio <name>(<params>) [modifiers] [→ <type>] [⇥ <error-type>] <block>"
 aliases = ["function"]
 related = ["→", "⇥", "redde", "sponte", "ceteri", "prae", "curata", "futura", "cursor"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # functio — Declares a named function or method
@@ -35,32 +35,32 @@ locale = "la"
 #   functio.expected — four diagnostics (greetings, name, integer).
 
 # Function with no parameters, no return
-functio saluta() {
-    nota "Salve, Mundus!"
+fn saluta() {
+    print "Salve, Mundus!"
 }
 
 # Function with parameter, no explicit return type
-functio dic(textus verbum) {
-    nota verbum
+fn dic(string verbum) {
+    print verbum
 }
 
 # Function with return type
-functio nomen() → textus {
-    redde "Marcus Aurelius"
+fn nomen() → string {
+    return "Marcus Aurelius"
 }
 
 # Function with parameter and return type
-functio duplica(numerus n) → numerus {
-    redde n * 2
+fn duplica(int n) → int {
+    return n * 2
 }
 
-incipit {
+main {
     saluta()
 
     dic("Bonum diem!")
 
-    fixum _ rex ← nomen()
-    nota rex
+    const _ rex ← nomen()
+    print rex
 
-    nota duplica(21)
+    print duplica(21)
 }

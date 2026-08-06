@@ -5,7 +5,7 @@ category = "register"
 summary = "matrix<T, [R, C]> is not a tensor<T, [R, C]> alias."
 syntax = "matrix<T, [R, C]> != tensor<T, [R, C]>"
 related = ["tensor"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # matrix — matrix<T, [R, C]> is not a tensor<T, [R, C]> alias
@@ -29,6 +29,6 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   reject: matrix is not assignable to tensor without an explicit conversion policy.
 
-functio matrix_is_not_tensor(matrix<f32, [2, 2]> m) → tensor<f32, [2, 2]> {
-    redde m
+fn matrix_is_not_tensor(matrix<f32, [2, 2]> m) → tensor<f32, [2, 2]> {
+    return m
 }

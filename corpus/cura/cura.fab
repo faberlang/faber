@@ -6,7 +6,7 @@ canonical = true
 summary = "Starts an allocator scope."
 syntax = "cura \"<allocator-kind>\" fixum _ <alloc> <block>"
 related = ["arena"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -37,8 +37,8 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   "in arena".
 
-incipit {
-    cura "arena" fixum _ alloc {
-        nota "in arena"
+main {
+    with "arena" const _ alloc {
+        print "in arena"
     }
 }

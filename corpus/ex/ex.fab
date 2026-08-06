@@ -6,7 +6,7 @@ canonical = true
 summary = "Extracts fields from a value into local bindings."
 syntax = "ex <expression> <fixum|varia> <field> [, ...] [ceteri <ident>]"
 related = ["de", "ut", "ceteri"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -35,14 +35,14 @@ locale = "la"
 #   Cross-ref: destructura/objectum.fab, itera/ex.fab (itera ex mode).
 #
 
-genus Persona {
-    textus nomen
-    numerus aetas
+class Persona {
+    string nomen
+    int aetas
 }
 
-incipit {
-    fixum _ p ← Persona { nomen = "Marcus", aetas = 30 }
-    ex p fixum nomen, aetas
-    nota nomen
-    nota aetas
+main {
+    const _ p ← Persona { nomen = "Marcus", aetas = 30 }
+    from p const nomen, aetas
+    print nomen
+    print aetas
 }

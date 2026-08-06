@@ -6,7 +6,7 @@ canonical = false
 summary = "Compiler-owned textus query methodi."
 syntax = "s.longitudo | continet | initium | finis"
 related = ["textus", "intrinseca"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # textus — Compiler-owned textus query methodi
@@ -34,13 +34,13 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Smoke asserts exit 0 only.
 
-incipit {
-    fixum _ nuntius ← " Ave Roma "
+main {
+    const _ nuntius ← " Ave Roma "
 
-    fixum _ longitudo ← nuntius.longitudo()
-    fixum _ habetroma ← nuntius.continet("Roma")
-    fixum _ initiumest ← nuntius.initium(" Ave")
-    fixum _ finisest ← nuntius.finis(" ")
+    const _ longitudo ← nuntius.longitudo()
+    const _ habetroma ← nuntius.continet("Roma")
+    const _ initiumest ← nuntius.initium(" Ave")
+    const _ finisest ← nuntius.finis(" ")
 
-    nota longitudo, habetroma, initiumest, finisest
+    print longitudo, habetroma, initiumest, finisest
 }

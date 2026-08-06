@@ -7,7 +7,7 @@ summary = "Primitive floating-point number type."
 syntax = "fractus"
 aliases = ["float"]
 related = ["numerus", "↦"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # fractus — Primitive floating-point number type
@@ -36,13 +36,13 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Smoke asserts exit 0 only.
 
-incipit {
-    fixum fractus valor ← -3.75
+main {
+    const float value ← -3.75
 
-    fixum _ absolutus ← valor.absolutum()
-    fixum _ signum ← valor.signum()
-    fixum _ minor ← valor.minimus(2.5)
-    fixum _ maior ← valor.maximus(2.5)
+    const _ absolutus ← value.absolutum()
+    const _ signum ← value.signum()
+    const _ minor ← value.minimus(2.5)
+    const _ maior ← value.maximus(2.5)
 
-    nota absolutus, signum, minor, maior
+    print absolutus, signum, minor, maior
 }

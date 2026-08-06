@@ -6,7 +6,7 @@ canonical = true
 summary = "Marks a function as non-mutating."
 syntax = "functio <name>(...) immutata → <type>"
 related = ["curata", "iacit"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # immutata — Marks a function as non-mutating
@@ -34,6 +34,6 @@ locale = "la"
 #   declaration-only function modifier (whitelist: immutata/immutata.fab).
 #
 
-functio inspecta() immutata → numerus {
-    redde 0
+fn inspecta() readonly → int {
+    return 0
 }

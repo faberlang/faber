@@ -6,7 +6,7 @@ canonical = true
 summary = "Writes a warning message."
 syntax = "mone <expression>"
 related = ["scribe", "vide"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -33,6 +33,6 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   mone-style warning diagnostic (single mone call).
 
-incipit {
-    mone "cave"
+main {
+    warn "cave"
 }

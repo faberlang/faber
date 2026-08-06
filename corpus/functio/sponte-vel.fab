@@ -7,7 +7,7 @@ summary = "Declares a named function or method."
 syntax = "functio <name>(<params>) [modifiers] [→ <type>] [⇥ <error-type>] <block>"
 aliases = ["function"]
 related = ["→", "⇥", "redde", "sponte", "ceteri", "prae", "curata", "futura", "cursor"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # functio — Declares a named function or method
@@ -35,46 +35,46 @@ locale = "la"
 #   Salve, Marcus!, Salve, Dominus Marcus!, pagina lines with defaults/overrides,
 #   codex length and metire results, civis summary strings
 
-functio saluta(textus nomen, textus titulus sponte) → textus {
-    si titulus est nihil {
-        redde "Salve, §!"(nomen)
+fn saluta(string nomen, string titulus optional) → string {
+    if titulus is null {
+        return "Salve, §!"(nomen)
     }
-    redde "Salve, § §!"(titulus, nomen)
+    return "Salve, § §!"(titulus, nomen)
 }
 
-functio pagina(numerus pagina sponte vel 1, numerus quantitas sponte vel 10) → textus {
-    redde "pagina § cum § rebus"(pagina, quantitas)
+fn pagina(int pagina optional coalesce 1, int quantitas optional coalesce 10) → string {
+    return "pagina § cum § rebus"(pagina, quantitas)
 }
 
-functio metire(textus fons, de numerus altitudo sponte) → numerus {
-    si altitudo est nihil {
+fn metire(string fons, ref int altitudo optional) → int {
+    if altitudo is null {
         # de = shared borrow of fons
-        redde fons.longitudo()
+        return fons.longitudo()
     }
-    redde altitudo
+    return altitudo
 }
 
-functio civis(textus nomen, numerus aetas sponte vel 0, bivalens activus sponte vel verum) → textus {
-    redde "civis: §, aetas: §, activus: §"(nomen, aetas, activus)
+fn civis(string nomen, int aetas optional coalesce 0, bool activus optional coalesce true) → string {
+    return "civis: §, aetas: §, activus: §"(nomen, aetas, activus)
 }
 
-incipit {
-    nota saluta("Marcus")
+main {
+    print saluta("Marcus")
 
-    nota saluta("Marcus", "Dominus")
+    print saluta("Marcus", "Dominus")
 
     # both sponte params use vel defaults
-    nota pagina()
+    print pagina()
 
-    nota pagina(2, 25)
+    print pagina(2, 25)
 
     # quantitas defaults to 10
-    nota pagina(5)
+    print pagina(5)
 
-    nota metire("codex")
-    nota metire("codex", 5)
+    print metire("codex")
+    print metire("codex", 5)
 
-    nota civis("Julia")
-    nota civis("Julia", 25)
-    nota civis("Julia", 25, falsum)
+    print civis("Julia")
+    print civis("Julia", 25)
+    print civis("Julia", 25, false)
 }

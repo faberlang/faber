@@ -7,7 +7,7 @@ summary = "Generic ordered collection type."
 syntax = "lista<T>"
 aliases = ["array", "list"]
 related = ["tabula", "copia", "∷", "itera"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -39,29 +39,29 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Scalar longitudo() and indexed accipe only (lista.expected).
 
-incipit {
-    fixum lista<numerus> vacuares ← vacua
-    fixum _ numeri ← [1, 2, 3, 4, 5]
-    fixum _ nomina ← ["Marcus", "Julia", "Gaius"]
-    fixum _ vexilla ← [verum, falsum, verum]
-    fixum _ matrix ← [[1, 2], [3, 4], [5, 6]]
-    fixum _ prima ← [1, 2, 3]
-    fixum _ secunda ← [4, 5, 6]
-    fixum _ coniuncta ← [sparge prima, sparge secunda]
-    fixum _ aucta ← [0, sparge prima, 99]
+main {
+    const list<int> vacuares ← vacua
+    const _ numeri ← [1, 2, 3, 4, 5]
+    const _ nomina ← ["Marcus", "Julia", "Gaius"]
+    const _ vexilla ← [true, false, true]
+    const _ matrix ← [[1, 2], [3, 4], [5, 6]]
+    const _ prima ← [1, 2, 3]
+    const _ secunda ← [4, 5, 6]
+    const _ coniuncta ← [spread prima, spread secunda]
+    const _ aucta ← [0, spread prima, 99]
 
-    nota vacuares.longitudo()
-    nota numeri.longitudo()
-    nota numeri[0]
-    nota numeri[4]
-    nota nomina.longitudo()
-    nota nomina[1]
-    nota vexilla[0]
-    nota vexilla[2]
-    nota matrix.longitudo()
-    nota matrix[1][0]
-    nota coniuncta.longitudo()
-    nota aucta.longitudo()
-    nota aucta[0]
-    nota aucta[4]
+    print vacuares.longitudo()
+    print numeri.longitudo()
+    print numeri[0]
+    print numeri[4]
+    print nomina.longitudo()
+    print nomina[1]
+    print vexilla[0]
+    print vexilla[2]
+    print matrix.longitudo()
+    print matrix[1][0]
+    print coniuncta.longitudo()
+    print aucta.longitudo()
+    print aucta[0]
+    print aucta[4]
 }

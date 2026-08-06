@@ -7,7 +7,7 @@ summary = "Combines boolean expressions with logical and."
 syntax = "<expression> et <expression>"
 aliases = ["and"]
 related = ["aut", "non"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -35,27 +35,27 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   none
 
-incipit {
+main {
     # left operand: verum
-    fixum _ paratus ← verum
+    const _ paratus ← true
     # right operand: verum
-    fixum _ licet ← verum
+    const _ licet ← true
     # verum et verum → verum
-    fixum _ currit ← paratus et licet
+    const _ currit ← paratus and licet
 
-    nota currit
+    print currit
 }
 
-proba "and requires both operands" {
-    adfirma (verum et verum) ≡ verum
-    adfirma (falsum et verum) ≡ falsum
-    adfirma (verum et falsum) ≡ falsum
-    adfirma (falsum et falsum) ≡ falsum
+test "and requires both operands" {
+    assert (true and true) ≡ true
+    assert (false and true) ≡ false
+    assert (true and false) ≡ false
+    assert (false and false) ≡ false
 }
 
-proba "and mirrors the incipit smoke" {
-    fixum _ paratus ← verum
-    fixum _ licet ← verum
-    fixum _ currit ← paratus et licet
-    adfirma currit ≡ verum
+test "and mirrors the incipit smoke" {
+    const _ paratus ← true
+    const _ licet ← true
+    const _ currit ← paratus and licet
+    assert currit ≡ true
 }

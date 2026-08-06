@@ -6,7 +6,7 @@ canonical = true
 summary = "Repeats a test a fixed number of times."
 syntax = "repete <number>"
 related = ["fragilis"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -36,6 +36,6 @@ locale = "la"
 #   declaration-only test modifier (whitelist: repete/repete.fab).
 #
 
-proba "flaky guard" repete 2 {
-    adfirma verum
+test "flaky guard" repeat 2 {
+    assert true
 }

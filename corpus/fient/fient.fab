@@ -7,7 +7,7 @@ summary = "Callable posture for asynchronous stream functions."
 syntax = "functio name(…) fient → T"
 aliases = ["async_generator"]
 related = ["fiunt", "fiet", "cede"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================

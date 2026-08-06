@@ -7,7 +7,7 @@ summary = "Starts a for-each iteration statement."
 syntax = "itera <mode> <expression> <binding> <block>"
 aliases = ["iterate"]
 related = ["ex", "de", "ab"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -42,36 +42,36 @@ locale = "la"
 #   `fiunt` half and reports `fient` as an explicit target gap.
 
 # Multi-value sync stream function that yields values via cede
-functio grena(numerus n) fiunt → numerus {
-    itera ab 0‥n fixum i {
-        cede i
+fn grena(int n) generator → int {
+    for range 0‥n const i {
+        yield i
     }
 }
 
 # Multi-value async stream function that yields values via cede
-functio grena_futurum(numerus n) fient → numerus {
-    itera ab 0‥n fixum i {
-        cede i
+fn grena_futurum(int n) async_generator → int {
+    for range 0‥n const i {
+        yield i
     }
 }
 
-incipiet {
+async_main {
     # Direct consumption of cursor yield stream
-    nota "Sync cursor iteration:"
-    itera ex grena(3) fixum num {
-        nota "  numerus: §"(num)
+    print "Sync cursor iteration:"
+    for from grena(3) const num {
+        print "  numerus: §"(num)
     }
 
     # Collect all results from cursor function
-    varia _ effecta ← []
-    itera ex grena(5) fixum num {
+    var _ effecta ← []
+    for from grena(5) const num {
         effecta.appende(num * 2)
     }
-    nota "Sync collected:"
-    nota effecta
+    print "Sync collected:"
+    print effecta
 
-    nota "Async cursor iteration:"
-    itera ex grena_futurum(3) fixum num {
-        nota "  async numerus: §"(num)
+    print "Async cursor iteration:"
+    for from grena_futurum(3) const num {
+        print "  async numerus: §"(num)
     }
 }

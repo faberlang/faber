@@ -6,7 +6,7 @@ canonical = true
 summary = "Primitive types bivalens, vacuum, and ignotum."
 syntax = "bivalens | vacuum | ignotum"
 related = ["verum", "falsum", "functio", "∷", "vacuum"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # bivalens — Primitive types bivalens, vacuum, and ignotum
@@ -33,23 +33,23 @@ locale = "la"
 # BACKEND:
 #   Cross-ref vacuum/vacuum.fab for void returns; numerus/fractus/textus intrinseca files.
 
-functio ping() → vacuum {
-    nota "primitiva smoke"
+fn ping() → void {
+    print "primitiva smoke"
 }
 
-functio describe(ignotum value) → textus {
-    si value est nihil { redde "nihil est" }
-    redde "aliud est"
+fn describe(unknown value) → string {
+    if value is null { return "nihil est" }
+    return "aliud est"
 }
 
-functio describe_boolean(bivalens value) → textus {
-    si value est verum { redde "verum est" }
-    redde "aliud est"
+fn describe_boolean(bool value) → string {
+    if value is true { return "verum est" }
+    return "aliud est"
 }
 
-incipit {
+main {
     ping()
-    nota describe(nihil)
-    nota describe_boolean(verum)
-    nota describe(42)
+    print describe(null)
+    print describe_boolean(true)
+    print describe(42)
 }

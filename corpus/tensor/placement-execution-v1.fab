@@ -4,7 +4,7 @@ kind = "exemplum"
 category = "tensor"
 summary = "Minimal exemplar: rank-1 f32 placement execution — copy-in → kernel → readback."
 related = ["tensor", "placement", "gpu", "spine"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -35,18 +35,18 @@ locale = "la"
 #   → __faber_gpu_v1_readback (placement)
 #   → host asserts [2.0, 4.0, 6.0, 8.0]
 
-@ nucleum
-functio multiply_by_two(tf32[4] data) → tf32[4] {
-    redde data * 2.0
+@ kernel
+fn multiply_by_two(tf32[4] data) → tf32[4] {
+    return data * 2.0
 }
 
-incipit {
-    fixum lista<f32> xs ← [1.0, 2.0, 3.0, 4.0]
-    fixum tf32[] seed ← vacua
-    fixum tf32[4] input ← seed.strue(xs, [4])
+main {
+    const list<f32> xs ← [1.0, 2.0, 3.0, 4.0]
+    const tf32[] seed ← vacua
+    const tf32[4] input ← seed.strue(xs, [4])
 
-    fixum tf32[4] output ← multiply_by_two(input)
-    fixum lista<f32> result ← output.planata()
+    const tf32[4] output ← multiply_by_two(input)
+    const list<f32> result ← output.planata()
 
-    nota result
+    print result
 }

@@ -6,7 +6,7 @@ canonical = true
 summary = "Represents the false boolean value and can prefix a falsity check."
 syntax = "falsum [<expression>]"
 related = ["verum", "nihil"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # falsum — Represents the false boolean value and can prefix a falsity check
@@ -31,18 +31,18 @@ locale = "la"
 #   Scalar stdout smoke (see body).
 #
 
-incipit {
-    fixum _ inactive ← falsum
-    nota inactive
+main {
+    const _ inactive ← false
+    print inactive
 }
 
-proba "falsum is the false literal" {
-    fixum _ inactive ← falsum
-    adfirma inactive ≡ falsum
-    adfirma non inactive
+test "falsum is the false literal" {
+    const _ inactive ← false
+    assert inactive ≡ false
+    assert not inactive
 }
 
-proba "falsum contrasts with verum" {
-    adfirma falsum ≠ verum
-    adfirma falsum ≡ falsum
+test "falsum contrasts with verum" {
+    assert false ≠ true
+    assert false ≡ false
 }

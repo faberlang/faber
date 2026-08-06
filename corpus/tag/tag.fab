@@ -6,7 +6,7 @@ canonical = true
 summary = "Attaches a test tag string."
 syntax = "tag <string>"
 related = ["solum", "temporis"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -37,6 +37,6 @@ locale = "la"
 #   declaration-only test modifier (whitelist: tag/tag.fab).
 #
 
-proba "tagged case" tag "focus" {
-    adfirma verum
+test "tagged case" tag "focus" {
+    assert true
 }

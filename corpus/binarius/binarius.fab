@@ -7,7 +7,7 @@ summary = "Combines boolean expressions with logical or."
 syntax = "<expression> aut <expression>"
 aliases = ["or"]
 related = ["et", "vel", "⊻"]
-locale = "la"
+locale = "en"
 +++
 
 
@@ -45,105 +45,105 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   binarius.expected
 
-incipit {
+main {
     # Arithmetica: + - * / %
-    fixum _ summa ← 10 + 5
-    nota summa
+    const _ summa ← 10 + 5
+    print summa
 
-    fixum _ differentia ← 10 - 5
-    nota differentia
+    const _ differentia ← 10 - 5
+    print differentia
 
-    sit productum ← 10 * 5
-    nota productum
+    let productum ← 10 * 5
+    print productum
 
-    sit quotiens ← 10 / 5
-    nota quotiens
+    let quotiens ← 10 / 5
+    print quotiens
 
-    sit reliquum ← 10 % 3
-    nota reliquum
+    let reliquum ← 10 % 3
+    print reliquum
 
     # Assignatio explicita (compound glyphs removed)
-    varia _ index ← 0
+    var _ index ← 0
     index ← index + 10
     index ⊕
     index ⊖
     index ← index * 2
-    nota index
+    print index
 
     # Comparationes
-    sit aequalis ← 10 ≡ 10
-    nota aequalis
+    let aequalis ← 10 ≡ 10
+    print aequalis
 
-    sit diversus ← 10 ≠ 5
-    nota diversus
+    let diversus ← 10 ≠ 5
+    print diversus
 
-    sit minor ← 5 < 10
-    nota minor
+    let minor ← 5 < 10
+    print minor
 
-    sit maior ← 10 > 5
-    nota maior
+    let maior ← 10 > 5
+    print maior
 
-    sit medius ← 0 < 5 et 5 < 10
-    nota medius
+    let medius ← 0 < 5 and 5 < 10
+    print medius
 
     # Logica
-    sit ambo ← verum et verum
-    nota ambo
+    let ambo ← true and true
+    print ambo
 
-    sit alterutrum ← falsum aut verum
-    nota alterutrum
+    let alterutrum ← false or true
+    print alterutrum
 
-    sit neutrum ← falsum et falsum
-    nota neutrum
+    let neutrum ← false and false
+    print neutrum
 
-    sit brevis ← falsum et carum()
-    nota brevis
+    let short ← false and carum()
+    print short
 
     # vel
-    fixum textus ∪ nihil nomen ← nihil
-    sit solutum ← nomen vel "defectum"
-    nota solutum
+    const string ∪ null nomen ← null
+    let solutum ← nomen coalesce "defectum"
+    print solutum
 
-    fixum textus ∪ nihil primum ← nihil
-    fixum textus ∪ nihil secundum ← nihil
-    fixum textus tertium ← "inventum"
-    sit inventum ← primum vel secundum vel tertium
-    nota inventum
+    const string ∪ null primum ← null
+    const string ∪ null secundum ← null
+    const string tertium ← "inventum"
+    let inventum ← primum coalesce secundum coalesce tertium
+    print inventum
 
     # sic/secus — ternary conditional (sic = "thus", secus = "otherwise")
-    sit aetas ← 25
-    sit condicio ← aetas ≥ 18 sic "adultus" secus "minor"
-    nota condicio
+    let aetas ← 25
+    let condicio ← aetas ≥ 18 yields "adultus" else "minor"
+    print condicio
 
-    sit puncta ← 85
-    sit gradus ← puncta ≥ 90 sic "A" secus puncta ≥ 80 sic "B" secus puncta ≥ 70 sic "C" secus "F"
-    nota gradus
+    let puncta ← 85
+    let gradus ← puncta ≥ 90 yields "A" else puncta ≥ 80 yields "B" else puncta ≥ 70 yields "C" else "F"
+    print gradus
 
     # Bit per bit
-    sit vexilla ← 0b1010
-    sit persona ← 0b1100
+    let vexilla ← 0b1010
+    let persona ← 0b1100
 
-    sit coniuncta ← vexilla ∧ persona
-    nota coniuncta
+    let coniuncta ← vexilla ∧ persona
+    print coniuncta
 
-    sit velata ← vexilla ∨ persona
-    nota velata
+    let velata ← vexilla ∨ persona
+    print velata
 
-    sit diversa ← vexilla ⊻ persona
-    nota diversa
+    let diversa ← vexilla ⊻ persona
+    print diversa
 
     # Motus bit
-    sit sinistra ← 1 ⇐ 4
-    nota sinistra
+    let sinistra ← 1 ⇐ 4
+    print sinistra
 
-    sit dextra ← 16 ⇒ 2
-    nota dextra
+    let dextra ← 16 ⇒ 2
+    print dextra
 
-    sit persona_vacua ← (vexilla ∧ persona) ≡ 0
-    nota persona_vacua
+    let persona_vacua ← (vexilla ∧ persona) ≡ 0
+    print persona_vacua
 }
 
-functio carum() → bivalens {
-    nota "hoc non videatur"
-    redde verum
+fn carum() → bool {
+    print "hoc non videatur"
+    return true
 }

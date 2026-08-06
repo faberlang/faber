@@ -7,7 +7,7 @@ summary = "Marks a test case as skipped with a reason."
 syntax = "proba <name> omitte <reason> <block>"
 aliases = ["skip"]
 related = ["proba", "futurum"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -36,6 +36,6 @@ locale = "la"
 #   declaration-only test modifier (whitelist: omitte/omitte.fab).
 #
 
-proba "database connection" omitte "blocked" {
-    adfirma falsum
+test "database connection" skip "blocked" {
+    assert false
 }

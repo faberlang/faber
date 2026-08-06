@@ -7,7 +7,7 @@ summary = "Primitive never type for code paths that do not return normally."
 syntax = "numquam"
 aliases = ["never"]
 related = ["mori", "exitus"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -36,6 +36,6 @@ locale = "la"
 #   Cross-ref: mori/mori.fab.
 #
 
-functio fail(textus message) → numquam {
-    mori message
+fn fail(string message) → never {
+    panic message
 }

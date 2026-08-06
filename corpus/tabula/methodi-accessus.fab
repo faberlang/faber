@@ -7,7 +7,7 @@ summary = "Generic key/value map type."
 syntax = "tabula<K,V>"
 aliases = ["map", "dictionary"]
 related = ["lista", "copia", "∷", "itera"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -42,18 +42,18 @@ locale = "la"
 # BACKEND: Wasm tier floor FrontendAnalyzed (method surface not yet Runnable;
 # whitelist: tabula/methodi-accessus.fab).
 
-incipit {
-    varia tabula<textus, numerus> puncta ← vacua
+main {
+    var map<string, int> puncta ← vacua
     puncta.pone("aelia", 95)
     puncta.pone("balbus", 87)
 
-    fixum _ aelia ← puncta.accipe("aelia")
-    fixum _ absens ← puncta.accipe("carus")
-    fixum _ carus ← puncta.accipe("carus") vel 0
-    fixum _ habetbalbum ← puncta.habet("balbus")
-    fixum _ remotus ← puncta.dele("balbus")
-    fixum _ longitudo ← puncta.longitudo()
-    fixum _ vacuaest ← puncta.vacua()
+    const _ aelia ← puncta.accipe("aelia")
+    const _ absens ← puncta.accipe("carus")
+    const _ carus ← puncta.accipe("carus") coalesce 0
+    const _ habetbalbum ← puncta.habet("balbus")
+    const _ remotus ← puncta.dele("balbus")
+    const _ longitudo ← puncta.longitudo()
+    const _ vacuaest ← puncta.vacua()
 
-    nota aelia, absens, carus, habetbalbum, remotus, longitudo, vacuaest
+    print aelia, absens, carus, habetbalbum, remotus, longitudo, vacuaest
 }

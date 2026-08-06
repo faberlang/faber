@@ -6,7 +6,7 @@ canonical = false
 summary = "Compiler-owned copia set-algebra methodi."
 syntax = "copia.unio | intersectio | differentia | symmetrica | subcopia | supercopia"
 related = ["copia", "intrinseca"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # copia — Compiler-owned copia set-algebra methodi
@@ -38,24 +38,24 @@ locale = "la"
 #
 # BACKEND: Go e2e whitelist — copia method surface not yet lowered for Go.
 
-incipit {
-    varia copia<numerus> primi ← vacua
+main {
+    var set<int> primi ← vacua
     primi.adde(1)
     primi.adde(2)
     primi.adde(3)
 
-    varia copia<numerus> pares ← vacua
+    var set<int> pares ← vacua
     pares.adde(2)
     pares.adde(4)
     pares.adde(6)
 
-    fixum _ omnes ← primi.unio(pares)
-    fixum _ communia ← primi.intersectio(pares)
-    fixum _ reliqua ← primi.differentia(pares)
-    fixum _ disiuncta ← primi.symmetrica(pares)
-    fixum _ subcopiaest ← communia.subcopia(omnes)
-    fixum _ supercopiaest ← omnes.supercopia(communia)
+    const _ omnes ← primi.unio(pares)
+    const _ communia ← primi.intersectio(pares)
+    const _ reliqua ← primi.differentia(pares)
+    const _ disiuncta ← primi.symmetrica(pares)
+    const _ subcopiaest ← communia.subcopia(omnes)
+    const _ supercopiaest ← omnes.supercopia(communia)
 
-    nota omnes, communia, reliqua, disiuncta
-    nota subcopiaest, supercopiaest
+    print omnes, communia, reliqua, disiuncta
+    print subcopiaest, supercopiaest
 }

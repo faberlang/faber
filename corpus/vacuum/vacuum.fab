@@ -7,7 +7,7 @@ summary = "Primitive no-value return type."
 syntax = "vacuum"
 aliases = ["void", "unit"]
 related = ["functio", "redde"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -35,10 +35,10 @@ locale = "la"
 #   Scalar stdout smoke (see body).
 #
 
-functio log(textus message) → vacuum {
-    nota message
+fn log(string message) → void {
+    print message
 }
 
-incipit {
+main {
     log("vacuum smoke")
 }

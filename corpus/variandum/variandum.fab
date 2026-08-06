@@ -7,7 +7,7 @@ summary = "Awaits a promissum and binds a mutable name."
 syntax = "variandum T name ← future"
 aliases = ["await_var"]
 related = ["figendum", "tacebit", "fiet", "promissum"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================

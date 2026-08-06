@@ -6,7 +6,7 @@ canonical = true
 summary = "Braced canonical @ nondum availability record."
 syntax = "@ nondum { target = rs, ratio = \"…\" }"
 related = ["nondum", "annotation-sugar"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -25,11 +25,11 @@ locale = "la"
 # See also: nondum, annotation-sugar
 # =============================================================================
 
-implendum tempus {
-  @ nondum { target = rs, ratio = "timer handles are not implemented" }
-  functio siste(numerus handle) → vacuum
+interface tempus {
+  @ unstable { target = rs, ratio = "timer handles are not implemented" }
+  fn siste(int handle) → void
 }
 
-incipit {
-    nota "nondum-braced"
+main {
+    print "nondum-braced"
 }

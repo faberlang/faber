@@ -7,7 +7,7 @@ summary = "Returns a value from a function."
 syntax = "redde <expression>"
 aliases = ["return"]
 related = ["→", "⇥", "ergo", "iace", "tacet"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -36,36 +36,36 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   30, Salve, Munde, 42, 0, 20
 
-functio adde(numerus a, numerus b) → numerus {
-    redde a + b
+fn adde(int a, int b) → int {
+    return a + b
 }
 
-functio saluta(textus nomen) → textus {
-    redde "Salve, " + nomen
+fn saluta(string nomen) → string {
+    return "Salve, " + nomen
 }
 
-functio duoetquadraginta() → numerus {
-    redde 42
+fn duoetquadraginta() → int {
+    return 42
 }
 
-functio tace() → vacuum {
+fn tace() → void {
     # bare redde for vacuum return type
-    redde
+    return
 }
 
-functio porta(numerus x) → numerus {
-    si x < 0 {
+fn porta(int x) → int {
+    if x < 0 {
         # early return on negative input
-        redde 0
+        return 0
     }
-    redde x * 2
+    return x * 2
 }
 
-incipit {
-    nota adde(10, 20)
-    nota saluta("Munde")
-    nota duoetquadraginta()
+main {
+    print adde(10, 20)
+    print saluta("Munde")
+    print duoetquadraginta()
     tace()
-    nota porta(-5)
-    nota porta(10)
+    print porta(-5)
+    print porta(10)
 }

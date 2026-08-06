@@ -6,7 +6,7 @@ canonical = true
 summary = "Introduces borrowed iteration or borrowed parameters."
 syntax = "de <expression>"
 related = ["ex", "in"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -34,29 +34,29 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   none — stdout not pinned for this exemplum.
 
-incipit {
+main {
     # Iterate over tabula keys
-    fixum tabula<textus, textus> persona ← { "nomen": "Marcus", "urbs": "Roma" }
+    const map<string, string> persona ← { "nomen": "Marcus", "urbs": "Roma" }
 
-    itera de persona fixum clavis {
-        nota clavis
+    for ref persona const clavis {
+        print clavis
     }
 
     # Access values using the key
-    itera de persona fixum clavis {
-        nota clavis, persona[clavis]
+    for ref persona const clavis {
+        print clavis, persona[clavis]
     }
 
     # Iterate over lista indices
-    fixum _ numeri ← [10, 20, 30]
+    const _ numeri ← [10, 20, 30]
 
-    itera de numeri fixum index {
-        nota "index: § valor: §"(index, numeri[index])
+    for ref numeri const index {
+        print "index: § valor: §"(index, numeri[index])
     }
 
     # With numerus-valued tabula
-    fixum tabula<textus, numerus> forma ← { "alpha": 1, "beta": 2 }
-    itera de forma fixum k {
-        nota k
+    const map<string, int> forma ← { "alpha": 1, "beta": 2 }
+    for ref forma const k {
+        print k
     }
 }

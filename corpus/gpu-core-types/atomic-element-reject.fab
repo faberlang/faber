@@ -5,7 +5,7 @@ category = "storage"
 summary = "atomic<T> v1 accepts only i32 and u32 elements."
 syntax = "atomic<i32> | atomic<u32>"
 related = ["numerus"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # atomic — atomic<T> v1 accepts only i32 and u32 elements
@@ -29,6 +29,6 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   reject: atomic<f32> is outside the v1 element set.
 
-functio rejected_atomic(atomic<f32> cell) → vacuum {
-    redde
+fn rejected_atomic(atomic<f32> cell) → void {
+    return
 }

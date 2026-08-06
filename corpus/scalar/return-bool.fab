@@ -7,7 +7,7 @@ summary = "Functions returning boolean literals via redde verum and redde falsum
 syntax = "redde <bool-literal>"
 aliases = ["return"]
 related = ["verum", "falsum", "bivalens", "functio"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -34,10 +34,10 @@ locale = "la"
 # Verifies that the Swift backend emits functions returning
 # boolean literals (SC-001: primitives, functions, return).
 
-functio da_verum() → bivalens {
-    redde verum
+fn da_verum() → bool {
+    return true
 }
 
-functio da_falsum() → bivalens {
-    redde falsum
+fn da_falsum() → bool {
+    return false
 }

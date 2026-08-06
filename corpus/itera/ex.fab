@@ -6,7 +6,7 @@ canonical = true
 summary = "Extracts fields from a value into local bindings."
 syntax = "ex <expression> <fixum|varia> <field> [, ...] [ceteri <ident>]"
 related = ["de", "ut", "ceteri"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -33,26 +33,26 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   ex.expected — numbers, names, and doubled values.
 
-incipit {
+main {
     # Iterate over number lista
-    fixum _ numeri ← [1, 2, 3, 4, 5]
+    const _ numeri ← [1, 2, 3, 4, 5]
 
-    itera ex numeri fixum n {
-        nota n
+    for from numeri const n {
+        print n
     }
 
     # Iterate over textus lista
-    fixum _ nomina ← ["Marcus", "Julia", "Claudia"]
+    const _ nomina ← ["Marcus", "Julia", "Claudia"]
 
-    itera ex nomina fixum nomen {
-        nota nomen
+    for from nomina const nomen {
+        print nomen
     }
 
     # Transform values
-    fixum _ valores ← [10, 20, 30]
+    const _ valores ← [10, 20, 30]
 
-    itera ex valores fixum v {
-        fixum _ duplex ← v * 2
-        nota duplex
+    for from valores const v {
+        const _ duplex ← v * 2
+        print duplex
     }
 }

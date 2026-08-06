@@ -7,7 +7,7 @@ summary = "Starts a for-each iteration statement."
 syntax = "itera <mode> <expression> <binding> <block>"
 aliases = ["iterate"]
 related = ["ex", "de", "ab"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -36,29 +36,29 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   none — stdout not pinned for this exemplum.
 
-incipit {
+main {
     # Step by 2 (exclusive: 0, 2, 4, 6, 8)
-    itera ab 0‥10 per 2 fixum i {
-        nota i
+    for range 0‥10 step 2 const i {
+        print i
     }
 
     # Step by 2 (inclusive: 0, 2, 4, 6, 8, 10)
-    itera ab 0…10 per 2 fixum i {
-        nota i
+    for range 0…10 step 2 const i {
+        print i
     }
 
     # Step by 3
-    itera ab 0‥15 per 3 fixum i {
-        nota i
+    for range 0‥15 step 3 const i {
+        print i
     }
 
     # Descending with negative step
-    itera ab 10‥0 per -1 fixum i {
-        nota i
+    for range 10‥0 step -1 const i {
+        print i
     }
 
     # Descending by 2
-    itera ab 10‥0 per -2 fixum i {
-        nota i
+    for range 10‥0 step -2 const i {
+        print i
     }
 }

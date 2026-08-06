@@ -6,7 +6,7 @@ canonical = true
 summary = "T ↦ valor boxing for scalar, byte, collection, genus, and tensor carriers."
 syntax = "<typed-expression> ↦ valor"
 related = ["↦", "valor", "octeti", "lista", "tabula", "genus", "tensor"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -29,33 +29,33 @@ locale = "la"
 # `octeti` composes as a list of numeric byte values; it must not lossy-decode
 # bytes as text.
 
-genus Punctum {
-    numerus x
-    numerus y
+class Punctum {
+    int x
+    int y
 }
 
-incipit {
-    fixum numerus n ← 42
-    fixum valor scalar ← n ↦ valor
-    nota scalar
+main {
+    const int n ← 42
+    const value scalar ← n ↦ value
+    print scalar
 
-    fixum octeti bytes ← |de ad|
-    fixum valor boxedBytes ← bytes ↦ valor
-    nota boxedBytes
+    const bytes bytes ← |de ad|
+    const value boxedBytes ← bytes ↦ value
+    print boxedBytes
 
-    fixum lista<numerus> xs ← [1, 2]
-    fixum valor boxedList ← xs ↦ valor
-    nota boxedList
+    const list<int> xs ← [1, 2]
+    const value boxedList ← xs ↦ value
+    print boxedList
 
-    fixum tabula<textus, numerus> scores ← { "alpha": 10 }
-    fixum valor boxedMap ← scores ↦ valor
-    nota boxedMap
+    const map<string, int> scores ← { "alpha": 10 }
+    const value boxedMap ← scores ↦ value
+    print boxedMap
 
-    fixum Punctum pt ← Punctum { x = 3, y = 4 }
-    fixum valor boxedGenus ← pt ↦ valor
-    nota boxedGenus
+    const Punctum pt ← Punctum { x = 3, y = 4 }
+    const value boxedGenus ← pt ↦ value
+    print boxedGenus
 
-    fixum tensor<numerus, [2]> grid ← [5, 6] ↦ tensor<numerus, [2]>
-    fixum valor boxedTensor ← grid ↦ valor
-    nota boxedTensor
+    const tensor<int, [2]> grid ← [5, 6] ↦ tensor<int, [2]>
+    const value boxedTensor ← grid ↦ value
+    print boxedTensor
 }

@@ -7,7 +7,7 @@ summary = "Generic key/value map type."
 syntax = "tabula<K,V>"
 aliases = ["map", "dictionary"]
 related = ["lista", "copia", "∷", "itera"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -41,14 +41,14 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   longitudo() plus keyed lookups for alpha/beta/gamma (tabula.expected).
 
-incipit {
-    varia tabula<textus, numerus> puncta ← vacua
+main {
+    var map<string, int> puncta ← vacua
     puncta["alpha"] ← 1
     puncta["beta"] ← 2
     puncta["gamma"] ← 3
 
-    nota puncta.longitudo()
-    nota puncta["alpha"]
-    nota puncta["beta"]
-    nota puncta["gamma"]
+    print puncta.longitudo()
+    print puncta["alpha"]
+    print puncta["beta"]
+    print puncta["gamma"]
 }

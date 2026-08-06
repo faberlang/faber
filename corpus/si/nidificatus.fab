@@ -7,7 +7,7 @@ summary = "Starts a conditional branch that runs when its condition is true."
 syntax = "si <condition> <block>"
 aliases = ["if"]
 related = ["sin", "secus", "ergo"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -38,23 +38,23 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Access granted when intravit and licet are both verum.
 
-incipit {
+main {
     # logged in
-    fixum _ intravit ← verum
+    const _ intravit ← true
     # has permission
-    fixum _ licet ← verum
+    const _ licet ← true
 
-    si intravit {
+    if intravit {
         # Inner branch: permission check after login succeeds
-        si licet {
-            nota "Access granted"
+        if licet {
+            print "Access granted"
         }
-        secus {
-            nota "Permission denied"
+        else {
+            print "Permission denied"
         }
     }
-    secus {
+    else {
         # outer else: not logged in
-        nota "Please log in"
+        print "Please log in"
     }
 }

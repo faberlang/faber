@@ -7,7 +7,7 @@ summary = "Declares a tagged union with variant payloads."
 syntax = "discretio <name> [<type-params>] <block>"
 aliases = ["union", "sum type"]
 related = ["ordo", "discerne", "finge"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -40,26 +40,26 @@ locale = "la"
 #   discretiones paratae
 
 # Discretio with payload variants
-discretio Exitus {
-    Bonum { textus nuntius }
-    Malum { textus causa }
+union Exitus {
+    Bonum { string nuntius }
+    Malum { string causa }
 }
 
 # Discretio with mixed unit and payload variants
 # (Finis is a unit variant — no payload fields)
-discretio Actum {
-    Pulsus { numerus x, numerus y }
-    Clavis { textus clavis }
+union Actum {
+    Pulsus { int x, int y }
+    Clavis { string clavis }
     Finis
 }
 
 # Discretio with many fields per variant
-discretio Figura {
-    Rectum { numerus x, numerus y, numerus latitudo, numerus altitudo }
-    Circulus { numerus cx, numerus cy, numerus radius }
-    Punctum { numerus x, numerus y }
+union Figura {
+    Rectum { int x, int y, int latitudo, int altitudo }
+    Circulus { int cx, int cy, int radius }
+    Punctum { int x, int y }
 }
 
-incipit {
-    nota "discretiones paratae"
+main {
+    print "discretiones paratae"
 }

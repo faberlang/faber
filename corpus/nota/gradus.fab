@@ -6,7 +6,7 @@ canonical = false
 summary = "Diagnostic output severities: nota, vide, and mone."
 syntax = "nota <expr> | vide <expr> | mone <expr>"
 related = ["nota", "vide", "mone", "scribe"]
-locale = "la"
+locale = "en"
 +++
 
 
@@ -36,19 +36,19 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   none — output mixes diagnostic channels; no .expected sidecar.
 
-incipit {
-    fixum _ condicio ← "currit"
-    fixum _ quantitas ← 42
+main {
+    const _ condicio ← "currit"
+    const _ quantitas ← 42
 
     # Neutral diagnostic note
-    nota "opus initum"
-    nota "condicio: §"(condicio)
+    print "opus initum"
+    print "condicio: §"(condicio)
 
     # Inspection note
-    vide "vide: ansa incipit"
-    vide "vide: numerus ←", quantitas
+    debug "vide: ansa incipit"
+    debug "vide: numerus ←", quantitas
 
     # Warning note
-    mone "mone: forma vetus usa"
-    mone "mone: numerus limen superat:", quantitas
+    warn "mone: forma vetus usa"
+    warn "mone: numerus limen superat:", quantitas
 }

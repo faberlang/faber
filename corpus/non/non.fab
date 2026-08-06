@@ -7,7 +7,7 @@ summary = "Negates a boolean expression."
 syntax = "non <expression>"
 aliases = ["!"]
 related = ["verum", "falsum"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -32,27 +32,27 @@ locale = "la"
 #   Scalar stdout smoke (see body).
 #
 
-incipit {
-    fixum _ flag ← falsum
-    fixum _ negated ← non flag
-    nota negated
+main {
+    const _ flag ← false
+    const _ negated ← not flag
+    print negated
 }
 
-proba "non negates falsum" {
-    fixum _ flag ← falsum
-    fixum _ negated ← non flag
-    adfirma negated
+test "non negates falsum" {
+    const _ flag ← false
+    const _ negated ← not flag
+    assert negated
 }
 
-proba "non negates verum" {
-    fixum _ flag ← verum
-    fixum _ negated ← non flag
-    adfirma negated ≡ falsum
+test "non negates verum" {
+    const _ flag ← true
+    const _ negated ← not flag
+    assert negated ≡ false
 }
 
-proba "non applied twice returns the original" {
-    fixum _ flag ← falsum
-    fixum _ negated ← non flag
-    fixum _ bis ← non negated
-    adfirma bis ≡ falsum
+test "non applied twice returns the original" {
+    const _ flag ← false
+    const _ negated ← not flag
+    const _ bis ← not negated
+    assert bis ≡ false
 }

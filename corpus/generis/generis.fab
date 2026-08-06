@@ -6,7 +6,7 @@ canonical = true
 summary = "Marks a class member as belonging to the type itself."
 syntax = "generis <type> <name> [= <expression>]"
 related = ["genus", "nexum"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # generis — Marks a class member as belonging to the type itself
@@ -35,12 +35,12 @@ locale = "la"
 # Instance field `nomen` is per-object; `generis ruber` would be accessed on the
 # genus type in full programs (here only instance fields are read).
 
-genus Color {
-    generis textus ruber = "#ff0000"
-    textus nomen = "ruber"
+class Color {
+    static string ruber = "#ff0000"
+    string nomen = "ruber"
 }
 
-incipit {
-    fixum _ color ← Color {}
-    nota color.nomen
+main {
+    const _ color ← Color {}
+    print color.nomen
 }

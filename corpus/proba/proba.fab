@@ -7,7 +7,7 @@ summary = "Defines a single test case."
 syntax = "proba <name> [modifiers] <block>"
 aliases = ["test", "it"]
 related = ["probandum", "adfirma", "omitte", "futurum"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -37,6 +37,6 @@ locale = "la"
 #   declaration-only test case (whitelist: proba/proba.fab). Cross-ref: probandum/probandum.fab.
 #
 
-proba "arithmetic passes" tag "math" {
-    adfirma 1 + 1 ≡ 2
+test "arithmetic passes" tag "math" {
+    assert 1 + 1 ≡ 2
 }

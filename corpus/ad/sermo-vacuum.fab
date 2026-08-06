@@ -6,7 +6,7 @@ canonical = false
 summary = "ad sermo materialization can drain a stream as vacuum."
 syntax = "ad 'runtime:echo' (payload) ↦ vacuum"
 related = ["ad", "sermo", "vacuum"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -30,7 +30,7 @@ locale = "la"
 # The exemplar just confirms compilation and no runtime error. `vacuum`
 # means "drain to terminal and ignore payloads."
 
-incipit {
-    fixum _ v ← ad 'runtime:echo' ("salve") ↦ vacuum
-    adfirma verum
+main {
+    const _ v ← call 'runtime:echo' ("salve") ↦ void
+    assert true
 }

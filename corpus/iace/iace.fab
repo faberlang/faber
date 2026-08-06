@@ -7,7 +7,7 @@ summary = "Throws a recoverable error."
 syntax = "iace <expression>"
 aliases = ["throw"]
 related = ["⇥", "cape", "mori", "redde"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # iace — Throws a recoverable error
@@ -39,33 +39,33 @@ locale = "la"
 # BACKEND:
 #   Rust/Go lowering does not emit iace/cape yet — compile-only smoke.
 
-incipit {
+main {
     # Bare iace with textus payload
-    fac {
-        iace "Something went wrong"
+    do {
+        throw "Something went wrong"
     }
-    cape err {
-        nota "Caught:", err
+    catch err {
+        print "Caught:", err
     }
 
     # iace with interpolated message
-    fixum _ code ← 404
-    fac {
-        iace "Error code: §"(code)
+    const _ code ← 404
+    do {
+        throw "Error code: §"(code)
     }
-    cape err {
-        nota "Caught:", err
+    catch err {
+        print "Caught:", err
     }
 
     # Conditional iace inside fac — validation guard
-    fixum _ value ← -5
-    fac {
-        si value < 0 {
-            iace "Value must be non-negative"
+    const _ value ← -5
+    do {
+        if value < 0 {
+            throw "Value must be non-negative"
         }
-        nota "Value is valid"
+        print "Value is valid"
     }
-    cape err {
-        nota "Validation failed:", err
+    catch err {
+        print "Validation failed:", err
     }
 }

@@ -7,7 +7,7 @@ summary = "Awaits a promissum and returns its success value from a fiet body."
 syntax = "reddet future"
 aliases = ["return_await"]
 related = ["figendum", "tacebit", "fiet", "redde"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
