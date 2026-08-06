@@ -22,12 +22,15 @@
 //! The builder itself does not invoke the linker: linking is the caller's job
 //! via the returned [`PackageLlvmLinkManifest`].
 
-use radix::cli::CliExit;
 use radix::diagnostics::Diagnostic;
 use radix::driver::Config;
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use super::compile::{analyze_package, AnalyzedPackage, AnalyzedPackageUnit};
+use super::library::{with_library_cached_analysis_mut, LibraryInterfaceCache};
+use super::{library_resolver_for_package, LibraryImportBinding};
+use crate::library::LibraryResolver;
 
 /// Select the single entry unit of the package graph (mirrors the package-MIR
 /// driver's `select_entry_unit`).
@@ -115,6 +118,10 @@ pub struct PackageLlvmModule {
     pub module_segments: Vec<String>,
     /// Whether this unit is the package's single entry unit.
     pub is_entry: bool,
+    /// Whether this module is a selected flat Norma unit (S8.5 Norma graph:
+    /// transitive used modules only, resolved through the Faber package
+    /// graph's library resolver — never a harness-side re-resolution).
+    pub is_norma: bool,
     /// The emitted `.ll` file for this unit.
     pub llvm_path: PathBuf,
 }
@@ -166,7 +173,7 @@ pub fn build_package_llvm(
     options: &PackageLlvmOptions,
 ) -> Result<PackageLlvmBuild, Vec<Diagnostic>> {
     let mut package = analyze_package(config, input)?;
-    build_package_llvm_from_graph(&mut package, options)
+    build_package_llvm_from_graph(config, &mut package, options)
 }
 
 /// Build the package-to-LLVM artifact from an already-analyzed package graph.
@@ -181,6 +188,7 @@ pub fn build_package_llvm(
 /// Returns diagnostics when the graph has errors, when the entry unit is not
 /// exactly one, or when a unit's MIR lowering / LLVM emission fails.
 pub(crate) fn build_package_llvm_from_graph(
+    config: &Config,
     package: &mut AnalyzedPackage,
     options: &PackageLlvmOptions,
 ) -> Result<PackageLlvmBuild, Vec<Diagnostic>> {
@@ -215,9 +223,18 @@ pub(crate) fn build_package_llvm_from_graph(
             unit_path: unit.path.clone(),
             module_segments: unit.module_segments.clone(),
             is_entry: unit.is_entry,
+            is_norma: false,
             llvm_path,
         });
     }
+
+    // S8.5 Norma graph: selected flat Norma units (transitive used modules
+    // only, resolved exactly as Rust package compile does through the Faber
+    // package graph's library resolver — no new resolver) emit one `.ll`
+    // module per unit. Each module defines its exported functions under the
+    // canonical `__faber_external_product_norma_module_…_func_…` identities
+    // the entry (and any sibling Norma module) declares and calls.
+    emit_selected_norma_modules(config, package, &options.output_dir, &product, &mut modules)?;
 
     let entry_module = modules
         .iter()
@@ -283,6 +300,127 @@ fn module_file_name(
     output_dir.join(format!("{index:03}-{product}-{segments}.ll"))
 }
 
+/// Deterministic `.ll` file name for a selected Norma unit: the module path is
+/// prefixed with `norma` so the file is never confused with a package sibling
+/// module that happens to share the same terminal segments.
+fn norma_module_file_name(
+    output_dir: &Path,
+    product: &str,
+    index: usize,
+    module_segments: &[String],
+) -> PathBuf {
+    let segments = if module_segments.is_empty() {
+        "root".to_owned()
+    } else {
+        module_segments.join("-")
+    };
+    output_dir.join(format!("{index:03}-{product}-norma-{segments}.ll"))
+}
+
+/// Emit one `.ll` module per selected Norma unit (S8.5 Norma graph).
+///
+/// Selection = the transitive closure of `norma:*` imports carried by the
+/// package graph (`expanded_library_imports`, dependencies first, deduped by
+/// identity) — exactly the modules a Rust package compile selects. Each module
+/// is analyzed through the package graph's library cache, lowered through MIR
+/// with the canonical `(product = "norma", module_path, item)` package
+/// identities attached (so its exported functions define
+/// `__faber_external_product_norma_module_…_func_…`), and emitted in library
+/// mode (no `__faber_program_entry_v1`). No `.ll` text concatenation and no
+/// secondary import parser.
+fn emit_selected_norma_modules(
+    config: &Config,
+    package: &AnalyzedPackage,
+    output_dir: &Path,
+    product: &str,
+    modules: &mut Vec<PackageLlvmModule>,
+) -> Result<(), Vec<Diagnostic>> {
+    let library_resolver =
+        library_resolver_for_package(config, &package.spec.package_root)?;
+    let mut library_cache = LibraryInterfaceCache::with_config(config);
+    let mut seen = BTreeSet::new();
+    let mut index = modules.len();
+    for unit in &package.units {
+        for import in &unit.expanded_library_imports {
+            let key = (
+                import.module.package.clone(),
+                import.module.module_path.join("/"),
+            );
+            if !seen.insert(key) {
+                continue;
+            }
+            let module_segments = import.module.module_path.clone();
+            let llvm_path = norma_module_file_name(
+                output_dir,
+                product,
+                index,
+                &module_segments,
+            );
+            emit_one_norma_module(
+                import,
+                &library_resolver,
+                &mut library_cache,
+                &llvm_path,
+            )?;
+            modules.push(PackageLlvmModule {
+                unit_path: import.module.interface_path.clone(),
+                module_segments,
+                is_entry: false,
+                is_norma: true,
+                llvm_path,
+            });
+            index += 1;
+        }
+    }
+    Ok(())
+}
+
+/// Analyze, lower, and emit ONE selected Norma unit as a library-mode `.ll`
+/// module. The mutable-analysis access stays inside [`with_library_cached_analysis_mut`]
+/// so the lowered borrow cannot leak out of the cache.
+fn emit_one_norma_module(
+    import: &LibraryImportBinding,
+    library_resolver: &LibraryResolver,
+    library_cache: &mut LibraryInterfaceCache,
+    llvm_path: &Path,
+) -> Result<(), Vec<Diagnostic>> {
+    let module_segments = import.module.module_path.clone();
+    with_library_cached_analysis_mut(import, library_resolver, library_cache, |analysis, _cache| {
+        // The canonical Norma identity: `(norma, module_path, item)`. The
+        // package graph resolved the module to this interface path; the
+        // attached facts make MIR record the same identity the consumer's
+        // `record_library_item_identity` produced for its call sites.
+        analysis.package_import_identities = Some(radix::driver::PackageImportIdentities {
+            product: "norma".to_owned(),
+            module_segments: module_segments.clone(),
+            imports: std::collections::BTreeMap::new(),
+        });
+        let lowered = radix::mir::lower_analyzed_unit_with_context(analysis).map_err(|errors| {
+            radix::codegen::CodegenError {
+                message: errors
+                    .iter()
+                    .map(|error| error.message.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" | "),
+                args: Vec::new(),
+            }
+        })?;
+        let llvm = radix::mir::emit_llvm_text_probe_library_module(
+            &lowered.validated,
+            &lowered.interner,
+        )
+        .map_err(|error| radix::codegen::CodegenError {
+            message: format!("{}:{}", error.category, error.shape),
+            args: Vec::new(),
+        })?;
+        std::fs::write(llvm_path, llvm).map_err(|error| radix::codegen::CodegenError {
+            message: format!("cannot write package LLVM module {}: {error}", llvm_path.display()),
+            args: Vec::new(),
+        })
+    })
+    .map_err(|diagnostic| vec![diagnostic])
+}
+
 /// Attach canonical package identities (if absent), lower, and emit one unit
 /// as an LLVM module. Entry units carry the host program entry; siblings are
 /// emitted in library mode (no `__faber_program_entry_v1`).
@@ -300,14 +438,19 @@ fn emit_unit_module(
         }
     }
     let device_roles = radix::mir::device_roles_from_hir(&unit.analysis.hir);
-    let exit_code = unit.analysis.cli_program.as_ref().and_then(|program| {
-        program.exit.as_ref().and_then(|exit| match exit {
-            CliExit::Fixed(code) => Some(*code),
-            CliExit::Binding(_) | CliExit::Field { .. } | CliExit::Unsupported => None,
-        })
-    });
+    // S8.2/S8.6: a CLI-bearing entry unit emits through the versioned static
+    // descriptor adapter lane — the product CLI lane (never a harness-side
+    // reparse). The descriptor carries the exit policy (Fixed/Binding/Field)
+    // and the runtime derives the process code; the legacy fixed-code emission
+    // seam is dropped for CLI entries. Ordinary (non-CLI) entries keep the
+    // device-roles lane with no explicit exit code.
+    let cli_adapter = unit
+        .analysis
+        .cli_program
+        .as_ref()
+        .map(radix::cli_descriptor::build_cli_adapter_plan);
     let lowered = if is_entry && unit.analysis.cli_program.is_some() {
-        radix::mir::lower_analyzed_unit_allowing_cli_entry_with_context(&mut unit.analysis)
+        radix::mir::lower_analyzed_unit_with_cli_adapter_with_context(&mut unit.analysis)
     } else {
         radix::mir::lower_analyzed_unit_with_context(&mut unit.analysis)
     }
@@ -320,12 +463,20 @@ fn emit_unit_module(
             .collect::<Vec<_>>()
     })?;
     if is_entry {
-        radix::mir::emit_llvm_text_probe_with_device_roles_and_exit(
-            &device_roles,
-            &lowered.validated,
-            &lowered.interner,
-            exit_code,
-        )
+        match cli_adapter {
+            Some(plan) => radix::mir::emit_llvm_text_probe_with_cli_adapter(
+                &device_roles,
+                &lowered.validated,
+                &lowered.interner,
+                plan,
+            ),
+            None => radix::mir::emit_llvm_text_probe_with_device_roles_and_exit(
+                &device_roles,
+                &lowered.validated,
+                &lowered.interner,
+                None,
+            ),
+        }
     } else {
         radix::mir::emit_llvm_text_probe_library_module(&lowered.validated, &lowered.interner)
     }

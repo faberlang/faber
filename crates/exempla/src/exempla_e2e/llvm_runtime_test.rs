@@ -1253,6 +1253,126 @@ incipit {
     assert_eq!(probe.exit_code, Some(0));
 }
 
+/// S8.5 (hand-3 db2bbd69): Norma graph proof — a package fixture importing
+/// `norma:chorda` resolves the selected flat Norma unit exactly as Rust
+/// package compile does (Faber package graph — no new resolver), lowers it
+/// through MIR, and emits ONE `.ll` module per unit (D11 one-module-per-unit):
+///
+/// - the entry module declares and calls the canonical external symbols
+///   (`__faber_external_product_norma_module_chorda_func_retorta`,
+///   `…_reputat`, `…_nexa`) the Norma module defines;
+/// - the `chorda` module (library mode — no entry) defines the same symbols;
+/// - all modules + the host runtime archive link in one clang command;
+/// - the executable prints `radar`, `2`, `a-b-c` (exit 0) — identical to the
+///   Rust package-compile oracle and the sibling `.expected` fixture.
+///
+/// No source/runtime special case by exemplar path: the call is a normal
+/// `norma:chorda` import resolved through the package graph.
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_norma_chorda_graph_link -- --ignored --nocapture"]
+fn llvm_host_norma_chorda_graph_link_matches_rust_oracle() {
+    const EXTERNAL_RETORTA: &str = "__faber_external_product_norma_module_chorda_func_retorta";
+    const EXTERNAL_REPUTAT: &str = "__faber_external_product_norma_module_chorda_func_reputat";
+    const ENTRY_SOURCE: &str = r#"# chorda-consumer — norma-backed fixture
+importa ex "norma:chorda" privata chorda
+
+incipit {
+    nota chorda.retorta("radar")
+    nota chorda.reputat("ababa", "ab")
+    nota chorda.nexa(["a", "b", "c"], "-")
+}
+"#;
+    const EXPECTED: &str = "radar\n2\na-b-c\n";
+
+    let temp_root = super::super::common::make_temp_root();
+    let package_dir = temp_root.join("chorda-consumer");
+    fs::create_dir_all(&package_dir).expect("create chorda-consumer fixture dir");
+    fs::write(package_dir.join("chorda-consumer.fab"), ENTRY_SOURCE)
+        .expect("write chorda-consumer.fab");
+    fs::write(package_dir.join("chorda-consumer.expected"), EXPECTED)
+        .expect("write expected");
+    let fab_path = package_dir.join("chorda-consumer.fab");
+
+    let config = radix::Config::default().with_target(Target::LlvmText);
+    let runtime_archive = llvm_runtime_archive().expect("LLVM host runtime archive");
+    let options = faber_cli::package::PackageLlvmOptions::new(temp_root.join("chorda.modules"))
+        .with_runtime_archive(Some(runtime_archive));
+    let build = faber_cli::package::build_package_llvm(&config, &fab_path, &options)
+        .expect("chorda-consumer package LLVM build must succeed");
+
+    // S8.5 selection: the entry unit plus ONE selected flat Norma unit
+    // (`norma:chorda` — the transitive used module closure).
+    assert_eq!(
+        build.modules.len(),
+        2,
+        "chorda-consumer package graph must resolve entry + selected Norma unit"
+    );
+    let entry_module = build
+        .modules
+        .iter()
+        .find(|module| module.is_entry)
+        .expect("entry module");
+    let norma_module = build
+        .modules
+        .iter()
+        .find(|module| module.is_norma)
+        .expect("selected Norma unit module");
+    assert_eq!(
+        norma_module.module_segments,
+        vec!["chorda".to_owned()],
+        "selected Norma unit must carry its canonical module path"
+    );
+    assert!(
+        norma_module.unit_path.ends_with("chorda.fab"),
+        "Norma module must point at its resolved interface source: {}",
+        norma_module.unit_path.display()
+    );
+    let entry = fs::read_to_string(&entry_module.llvm_path).expect("read entry module");
+    let norma = fs::read_to_string(&norma_module.llvm_path).expect("read Norma module");
+    for external in [EXTERNAL_RETORTA, EXTERNAL_REPUTAT] {
+        assert!(
+            entry.contains(external),
+            "entry module must declare/call the Norma external symbol {external}:\n{entry}"
+        );
+        assert!(
+            norma.contains(external),
+            "Norma module must define the external symbol {external}:\n{norma}"
+        );
+    }
+    assert!(
+        entry.contains("define %FaberRtExitV1 @__faber_program_entry_v1"),
+        "entry module must define the host program entry:\n{entry}"
+    );
+    assert!(
+        !norma.contains("__faber_program_entry_v1"),
+        "Norma library module must not emit a program entry:\n{norma}"
+    );
+    assert_eq!(
+        build.manifest.entry_module, entry_module.llvm_path,
+        "manifest must record the exactly-one entry module"
+    );
+    assert_eq!(
+        build.manifest.modules,
+        build.modules.iter().map(|module| module.llvm_path.clone()).collect::<Vec<_>>(),
+        "manifest module list must be the exact deterministic module list"
+    );
+
+    let probe = run_llvm_modules(
+        &build.manifest.modules,
+        &temp_root,
+        "chorda-norma-graph",
+        &fab_path,
+    );
+    assert_eq!(probe.bucket, LlvmRunBucket::OutputMatched, "{}", probe.reason);
+    assert_eq!(probe.stdout, EXPECTED);
+    assert!(
+        probe.stderr.is_empty(),
+        "unexpected stderr: {:?}",
+        probe.stderr
+    );
+    assert_eq!(probe.exit_code, Some(0));
+}
+
 /// S8.1 (d3de92fa): declaration-only entry completeness — a corpus fixture
 /// with no `incipit` and no module-scope statements (`proba/proba.fab`) must
 /// still produce a binary with a successful entry: the emitted module carries

@@ -134,6 +134,82 @@ fn package_llvm_builder_emits_one_module_per_unit_with_entry_symbol() {
 }
 
 #[test]
+fn package_llvm_builder_emits_one_norma_module_per_selected_unit() {
+    const EXTERNAL_RETORTA: &str = "__faber_external_product_norma_module_chorda_func_retorta";
+    const ENTRY: &str = r#"# chorda-consumer — imports a flat Norma unit
+importa ex "norma:chorda" privata chorda
+
+incipit {
+    nota chorda.retorta("radar")
+}
+"#;
+
+    let dir = test_temp_dir("llvm-builder");
+    let package_dir = dir.join("chorda-consumer");
+    fs::create_dir_all(&package_dir).expect("create chorda-consumer dir");
+    fs::write(package_dir.join("chorda-consumer.fab"), ENTRY).expect("write entry");
+    let entry = package_dir.join("chorda-consumer.fab");
+    let options = PackageLlvmOptions::new(dir.join("out"));
+    let build = build_package_llvm(&llvm_config(), &entry, &options)
+        .expect("chorda-consumer package LLVM build must succeed");
+
+    // S8.5 Norma graph: entry + ONE selected flat Norma unit (transitive used
+    // modules only), one .ll per unit.
+    assert_eq!(
+        build.modules.len(),
+        2,
+        "expected the entry unit plus one selected Norma unit"
+    );
+    let entry_module = build
+        .modules
+        .iter()
+        .find(|module| module.is_entry)
+        .expect("entry module");
+    let norma_module = build
+        .modules
+        .iter()
+        .find(|module| module.is_norma)
+        .expect("selected Norma unit module");
+    assert_eq!(
+        norma_module.module_segments,
+        vec!["chorda".to_owned()],
+        "Norma unit must carry its canonical module path"
+    );
+    assert!(
+        norma_module.unit_path.ends_with("chorda.fab"),
+        "Norma unit must point at its resolved interface source, got {}",
+        norma_module.unit_path.display()
+    );
+    assert_eq!(
+        norma_module.llvm_path.file_name().map(|name| name.to_string_lossy().into_owned()),
+        Some("001-chorda-consumer-norma-chorda.ll".to_owned()),
+        "Norma module file name must be deterministic and norma-prefixed"
+    );
+    let entry_text = fs::read_to_string(&entry_module.llvm_path).expect("read entry module");
+    let norma_text = fs::read_to_string(&norma_module.llvm_path).expect("read Norma module");
+    assert!(
+        entry_text.contains(EXTERNAL_RETORTA),
+        "entry module must declare/call the Norma external symbol:\n{entry_text}"
+    );
+    assert!(
+        norma_text.lines().any(|line| {
+            line.trim_start().starts_with("define ")
+                && line.contains(&format!("@{EXTERNAL_RETORTA}"))
+        }),
+        "Norma module must define the external symbol:\n{norma_text}"
+    );
+    assert!(
+        !norma_text.contains("__faber_program_entry_v1"),
+        "Norma library module must not emit a program entry:\n{norma_text}"
+    );
+    assert_eq!(
+        build.manifest.modules,
+        build.modules.iter().map(|module| module.llvm_path.clone()).collect::<Vec<_>>(),
+        "manifest must list one module per unit including the selected Norma unit"
+    );
+}
+
+#[test]
 fn package_llvm_builder_manifest_is_inspectable() {
     let dir = test_temp_dir("llvm-builder");
     let runtime_archive = dir.join("libfaber_host_llvm.a");
