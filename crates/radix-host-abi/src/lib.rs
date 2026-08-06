@@ -196,6 +196,29 @@ abi_string_family! {
         SYMBOL_INSTANS_FROM_VALOR = "__faber_rt_v1_instans_from_valor",
         SYMBOL_INSTANS_RETAG = "__faber_rt_v1_instans_retag",
         SYMBOL_INSTANS_GET_TEXT = "__faber_rt_v1_instans_get_text",
+        // P6 (promotion packet or-recovery-rows): the `⇥` recovery family for
+        // aggregate/opaque payload extraction. `expr ↦ T ⇥ recovery` lowers to
+        // a fixed-signature `(payload + fallback → payload)` row per closed-set
+        // conversion, so the host substitutes the fallback on a missing or
+        // wrong-typed payload instead of aborting. Precedent: the parse `_or`
+        // rows (text_parse_integer_or/text_parse_float_or) and option_get_or
+        // are the accepted closed-set recovery mechanism; the valor_cape row
+        // covers the fac/cape channel, not this inline `⇥` fallback. The wasm
+        // leaf rewires its convert_2_* shapes to these symbols (D5 closed-table
+        // rule); the LLVM leaf consumes the same rows.
+        SYMBOL_VALOR_GET_I64_OR = "__faber_rt_v1_valor_get_i64_or",
+        SYMBOL_VALOR_GET_F64_OR = "__faber_rt_v1_valor_get_f64_or",
+        SYMBOL_VALOR_GET_I1_OR = "__faber_rt_v1_valor_get_i1_or",
+        SYMBOL_VALOR_GET_TEXT_OR = "__faber_rt_v1_valor_get_text_or",
+        SYMBOL_VALOR_GET_ASCII_OR = "__faber_rt_v1_valor_get_ascii_or",
+        SYMBOL_VALOR_GET_OCTETI_OR = "__faber_rt_v1_valor_get_octeti_or",
+        SYMBOL_VALOR_GET_ARRAY_OR = "__faber_rt_v1_valor_get_array_or",
+        SYMBOL_VALOR_GET_MAP_OR = "__faber_rt_v1_valor_get_map_or",
+        SYMBOL_VALOR_GET_GENUS_OR = "__faber_rt_v1_valor_get_genus_or",
+        SYMBOL_OCTETI_GET_TEXT_OR = "__faber_rt_v1_octeti_get_text_or",
+        SYMBOL_OCTETI_GET_ASCII_OR = "__faber_rt_v1_octeti_get_ascii_or",
+        SYMBOL_INSTANS_FROM_TEXT_OR = "__faber_rt_v1_instans_from_text_or",
+        SYMBOL_INSTANS_FROM_VALOR_OR = "__faber_rt_v1_instans_from_valor_or",
         SYMBOL_INSTANS_DISPLAY = "__faber_rt_v1_instans_display",
         SYMBOL_NUMERUS_OVERFLOW = "__faber_rt_v1_numerus_overflow",
         SYMBOL_COMPARE_LT = "__faber_rt_v1_compare_lt_2_ptr_ptr_to_i1",
