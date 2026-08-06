@@ -364,8 +364,16 @@ mod tests {
         let types = TypeTable::new();
         let interner = Interner::new();
 
-        let err = emit(&hir, &empty_presentation(), &types, &interner, &TestSurface, &FxHashMap::default(), &FxHashMap::default())
-            .expect_err("legacy Cede HIR must fail closed before Faber emission");
+        let err = emit(
+            &hir,
+            &empty_presentation(),
+            &types,
+            &interner,
+            &TestSurface,
+            &FxHashMap::default(),
+            &FxHashMap::default(),
+        )
+        .expect_err("legacy Cede HIR must fail closed before Faber emission");
 
         assert!(
             err.message.contains("legacy context-dependent cede HIR"),

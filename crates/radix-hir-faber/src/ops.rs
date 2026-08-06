@@ -49,11 +49,7 @@ impl super::FaberCodegen {
     ///
     /// Keyword operators (`non`) localize through the reader surface; glyph
     /// operators are locale-invariant.
-    pub(super) fn unop_to_faber(
-        &self,
-        op: HirUnOp,
-        surface: &impl KeywordSurface,
-    ) -> String {
+    pub(super) fn unop_to_faber(&self, op: HirUnOp, surface: &impl KeywordSurface) -> String {
         match op {
             HirUnOp::Neg => "-".to_owned(),
             HirUnOp::Not => format!("{} ", surface.keyword(TokenKind::Non)),
@@ -98,11 +94,7 @@ impl super::FaberCodegen {
     /// Keyword operators (`et`, `aut`, `vel`, `est`, `non est`, `inter`,
     /// `intra`) localize through the reader surface; glyph operators are
     /// locale-invariant.
-    pub(super) fn binop_to_faber(
-        &self,
-        op: HirBinOp,
-        surface: &impl KeywordSurface,
-    ) -> String {
+    pub(super) fn binop_to_faber(&self, op: HirBinOp, surface: &impl KeywordSurface) -> String {
         match op {
             HirBinOp::Add => "+".to_owned(),
             HirBinOp::Sub => "-".to_owned(),

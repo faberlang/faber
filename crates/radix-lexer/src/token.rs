@@ -148,14 +148,14 @@ pub enum TokenKind {
     Iace,    // throw
     Mori,    // panic
     // === Keywords: Async ===
-    Cede,     // await/yield
-    Clausura, // closure
-    Cursor,   // generator (annotation)
-    Futura,   // async (annotation)
-    Fiet,     // async finite (callable posture)
-    Fiunt,    // sync stream (callable posture)
-    Fient,    // async generator (callable posture)
-    Figendum, // await const binding
+    Cede,      // await/yield
+    Clausura,  // closure
+    Cursor,    // generator (annotation)
+    Futura,    // async (annotation)
+    Fiet,      // async finite (callable posture)
+    Fiunt,     // sync stream (callable posture)
+    Fient,     // async generator (callable posture)
+    Figendum,  // await const binding
     Variandum, // await var binding
     Reddet,    // return_await
     Tacebit,   // await

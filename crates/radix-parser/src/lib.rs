@@ -683,49 +683,48 @@ impl Parser {
             let ident = lookup_keyword_spec(latin).and_then(|spec| spec.token_kind.clone());
             return matches!(
                 ident,
-                Some(TokenKind::Discretio)
-                    | Some(TokenKind::Fixum)
-                    | Some(TokenKind::Varia)
-                    | Some(TokenKind::Functio)
-                    | Some(TokenKind::Genus)
-                    | Some(TokenKind::Implendum)
-                    | Some(TokenKind::Ordo)
-                    | Some(TokenKind::Sit)
-                    | Some(TokenKind::Typus)
-                    | Some(TokenKind::Discerne)
-                    | Some(TokenKind::Dum)
-                    | Some(TokenKind::Elige)
-                    | Some(TokenKind::Fac)
-                    | Some(TokenKind::Si)
-                    | Some(TokenKind::Perge)
-                    | Some(TokenKind::Redde)
-                    | Some(TokenKind::Rumpe)
-                    | Some(TokenKind::Cura)
-                    | Some(TokenKind::Tacet)
-                    | Some(TokenKind::Ad)
-                    | Some(TokenKind::Abstractus)
-                    | Some(TokenKind::Ex)
-                    | Some(TokenKind::Importa)
-                    | Some(TokenKind::Proba)
-                    | Some(TokenKind::Probandum)
-                    | Some(TokenKind::Custodi)
-                    | Some(TokenKind::Itera)
-                    | Some(TokenKind::Iace)
-                    | Some(TokenKind::Mori)
-                    | Some(TokenKind::Cede)
-                    | Some(TokenKind::Adfirma)
-                    | Some(TokenKind::Scribe)
-                    | Some(TokenKind::Incipiet)
-                    | Some(TokenKind::Incipit)
+                Some(
+                    TokenKind::Discretio
+                        | TokenKind::Fixum
+                        | TokenKind::Varia
+                        | TokenKind::Functio
+                        | TokenKind::Genus
+                        | TokenKind::Implendum
+                        | TokenKind::Ordo
+                        | TokenKind::Sit
+                        | TokenKind::Typus
+                        | TokenKind::Discerne
+                        | TokenKind::Dum
+                        | TokenKind::Elige
+                        | TokenKind::Fac
+                        | TokenKind::Si
+                        | TokenKind::Perge
+                        | TokenKind::Redde
+                        | TokenKind::Rumpe
+                        | TokenKind::Cura
+                        | TokenKind::Tacet
+                        | TokenKind::Ad
+                        | TokenKind::Abstractus
+                        | TokenKind::Ex
+                        | TokenKind::Importa
+                        | TokenKind::Proba
+                        | TokenKind::Probandum
+                        | TokenKind::Custodi
+                        | TokenKind::Itera
+                        | TokenKind::Iace
+                        | TokenKind::Mori
+                        | TokenKind::Cede
+                        | TokenKind::Adfirma
+                        | TokenKind::Scribe
+                        | TokenKind::Incipiet
+                        | TokenKind::Incipit
+                )
             );
         }
         matches!(
             kind,
             // Structural boundaries
-            TokenKind::At
-                | TokenKind::Eof
-                | TokenKind::LBrace
-                | TokenKind::RBrace
+            TokenKind::At | TokenKind::Eof | TokenKind::LBrace | TokenKind::RBrace
         )
     }
 

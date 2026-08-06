@@ -1344,7 +1344,7 @@ fn sum_axis_function_resolves_axis_reduction_plan() {
     assert!(carried_plan_agrees(&carried, Some(&derived)));
 }
 
-/// The keep-dims SumAxis subchain shape (mirrors `bert_tiny_backward__13`):
+/// The keep-dims `SumAxis` subchain shape (mirrors `bert_tiny_backward__13`):
 /// `t = sum_axis(x, 1); u = t / divisor; v = fill(x, u); w = x - v;
 /// q = w * w; return (t, w, q)` over `[2,8]` tensors. The recipe output is
 /// the REDUCED `[2]` result while the folded elementwise tail produces the
@@ -1406,12 +1406,7 @@ fn keep_dims_sum_axis_tail_function(types: &mut TypeTable) -> MirFunction {
                     },
                     span: test_span(),
                 },
-                tensor_kernel_collection_call(
-                    MirCollectionOp::TensorDiv,
-                    &[64, 63],
-                    65,
-                    tensor,
-                ),
+                tensor_kernel_collection_call(MirCollectionOp::TensorDiv, &[64, 63], 65, tensor),
                 tensor_kernel_collection_call(MirCollectionOp::TensorFill, &[48, 65], 66, tensor),
                 tensor_kernel_collection_call(MirCollectionOp::TensorSub, &[48, 66], 67, tensor),
                 tensor_kernel_collection_call(MirCollectionOp::TensorMul, &[67, 67], 68, tensor),
@@ -1477,7 +1472,7 @@ fn tensor_kernel_collection_call(
     }
 }
 
-/// R6 (P1) transformer dispatch: a keep-dims SumAxis subchain whose folded
+/// R6 (P1) transformer dispatch: a keep-dims `SumAxis` subchain whose folded
 /// elementwise tail carries full-shape consumed outputs dispatches over the
 /// UNION of the output extents — the reduced `[2]` recipe output plus the
 /// `[2,8]` (16-element) tail outputs — so no tail element is left
@@ -1511,7 +1506,10 @@ fn transformer_subchain_dispatch_covers_the_union_of_output_extents() {
         "the folded tail's consumed outputs stay bound as extra outputs"
     );
     for extra in &signature.extra_outputs {
-        assert_eq!(extra.element_count, 16, "the tail outputs keep their full shape");
+        assert_eq!(
+            extra.element_count, 16,
+            "the tail outputs keep their full shape"
+        );
     }
 
     // A same-shape transformer recipe (softmax) keeps its full-shape

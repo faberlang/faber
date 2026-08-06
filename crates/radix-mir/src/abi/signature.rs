@@ -147,40 +147,39 @@ impl MirKernelSignature {
         // the multi-output contract — every param is an input and the tuple
         // elements are DISTINCT output resources. Checked before the
         // single-output arms, which would reject the tuple as an aggregate.
-        let signature = if !function.params.is_empty()
-            && result_tuple_count(function, validation).is_some()
-        {
-            Self::multi_output_return_kernel(
-                function,
-                &function.params,
-                validation,
-                interner,
-                allow_host_owned_tensor_entry,
-            )?
-        } else if let Some(interner) = interner {
-            if let Some(signature) = Self::source_named_indexed_view_kernel(
-                function,
-                validation,
-                interner,
-                allow_host_owned_tensor_entry,
-            )? {
-                signature
+        let signature =
+            if !function.params.is_empty() && result_tuple_count(function, validation).is_some() {
+                Self::multi_output_return_kernel(
+                    function,
+                    &function.params,
+                    validation,
+                    interner,
+                    allow_host_owned_tensor_entry,
+                )?
+            } else if let Some(interner) = interner {
+                if let Some(signature) = Self::source_named_indexed_view_kernel(
+                    function,
+                    validation,
+                    interner,
+                    allow_host_owned_tensor_entry,
+                )? {
+                    signature
+                } else {
+                    Self::fallback_kernel_signature(
+                        function,
+                        validation,
+                        Some(interner),
+                        allow_host_owned_tensor_entry,
+                    )?
+                }
             } else {
                 Self::fallback_kernel_signature(
                     function,
                     validation,
-                    Some(interner),
+                    interner,
                     allow_host_owned_tensor_entry,
                 )?
-            }
-        } else {
-            Self::fallback_kernel_signature(
-                function,
-                validation,
-                interner,
-                allow_host_owned_tensor_entry,
-            )?
-        };
+            };
         // The per-kernel storage-buffer binding maximum (Metal's
         // `[[buffer(N)]]` attribute allows bindings 0..=30): a signature over
         // it cannot be emitted as one kernel, so the synthesis refuses it
@@ -410,7 +409,9 @@ impl MirKernelSignature {
                 access: MirKernelResourceAccess::Write,
                 element_ty: view_ty,
                 element_count: view_count,
-                source_local: return_fields.as_ref().and_then(|fields| fields.get(index).copied()),
+                source_local: return_fields
+                    .as_ref()
+                    .and_then(|fields| fields.get(index).copied()),
                 source_name: None,
             });
         }

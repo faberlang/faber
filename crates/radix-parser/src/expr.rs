@@ -1066,8 +1066,8 @@ impl Parser {
             // Type-position keywords migrated to tokenless (Batch A: `modulus`,
             // `iuncta`) must still route to an explicit type target rather than
             // the range fallback — in Latin or a reader-pack surface spelling.
-            let is_type_slot_keyword =
-                self.check_keyword_ident(TokenKind::Modulus) || self.check_keyword_ident(TokenKind::Iuncta);
+            let is_type_slot_keyword = self.check_keyword_ident(TokenKind::Modulus)
+                || self.check_keyword_ident(TokenKind::Iuncta);
             if !Self::is_conversio_type_keyword(latin)
                 && !Self::is_capitalized_type_name(name)
                 && !is_type_slot_keyword
@@ -1591,8 +1591,7 @@ impl Parser {
                         _ => false,
                     }
                 } else {
-                    !self.ident_is_structure_keyword(sym)
-                        && second_slot(&self.peek_at(1).kind)
+                    !self.ident_is_structure_keyword(sym) && second_slot(&self.peek_at(1).kind)
                 }
             }
             _ => false,

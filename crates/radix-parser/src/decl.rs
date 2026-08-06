@@ -63,7 +63,7 @@ impl Parser {
                 match self.current_keyword_ident() {
                     // Declaration introducers.
                     Some(TokenKind::Discretio) => self.parse_union_decl()?,
-                    Some(TokenKind::Fixum) | Some(TokenKind::Varia) => self.parse_var_decl()?,
+                    Some(TokenKind::Fixum | TokenKind::Varia) => self.parse_var_decl()?,
                     Some(TokenKind::Functio) => self.parse_func_decl()?,
                     Some(TokenKind::Genus) => self.parse_class_decl()?,
                     Some(TokenKind::Implendum) => self.parse_interface_decl()?,
@@ -82,9 +82,7 @@ impl Parser {
                     Some(TokenKind::Cede) => self.parse_cede_stmt()?,
                     Some(TokenKind::Adfirma) => self.parse_adfirma_stmt()?,
                     Some(TokenKind::Scribe) => self.parse_scribe_stmt()?,
-                    Some(TokenKind::Incipit) | Some(TokenKind::Incipiet) => {
-                        self.parse_incipit_stmt()?
-                    }
+                    Some(TokenKind::Incipit | TokenKind::Incipiet) => self.parse_incipit_stmt()?,
                     Some(TokenKind::Ex) => self.parse_extract_stmt()?,
                     // Control flow.
                     Some(TokenKind::Discerne) => self.parse_discerne_stmt()?,
@@ -99,7 +97,7 @@ impl Parser {
                     Some(TokenKind::Cura) => self.parse_cura_stmt()?,
                     Some(TokenKind::Tacet) => self.parse_tacet_stmt()?,
                     Some(TokenKind::Ad) => self.parse_ad_stmt()?,
-                    Some(TokenKind::Figendum) | Some(TokenKind::Variandum) => {
+                    Some(TokenKind::Figendum | TokenKind::Variandum) => {
                         let is_immutable =
                             self.current_keyword_ident() == Some(TokenKind::Figendum);
                         self.parse_await_var_decl(if is_immutable {
@@ -111,7 +109,7 @@ impl Parser {
                     Some(TokenKind::Reddet) => self.parse_reddet_stmt(start)?,
                     Some(TokenKind::Tacebit) => self.parse_tacebit_stmt(start)?,
                     // Output scribe builtins.
-                    Some(TokenKind::Nota) | Some(TokenKind::Mone) | Some(TokenKind::Vide) => {
+                    Some(TokenKind::Nota | TokenKind::Mone | TokenKind::Vide) => {
                         self.parse_scribe_stmt()?
                     }
                     _ => self.parse_expr_stmt()?,
@@ -1048,8 +1046,8 @@ impl Parser {
             return Err(self.invalid_import_error_at("import_name_inference_failed", path_span));
         }
 
-        let explicit_visibility =
-            self.check_keyword_ident(TokenKind::Privata) || self.check_keyword_ident(TokenKind::Publica);
+        let explicit_visibility = self.check_keyword_ident(TokenKind::Privata)
+            || self.check_keyword_ident(TokenKind::Publica);
         let visibility = if self.eat_keyword_ident(TokenKind::Privata) {
             Visibility::Privata
         } else if self.eat_keyword_ident(TokenKind::Publica) {
@@ -1855,10 +1853,8 @@ impl Parser {
         // annotation-arg position it stays an argument, matching the
         // pre-migration token behavior (is_declaration_start_token never
         // listed Typus; is_annotation_arg listed it as an arg).
-        matches!(
-            self.peek().kind,
-            TokenKind::LBrace
-        ) || self.check_keyword_ident(TokenKind::Abstractus)
+        matches!(self.peek().kind, TokenKind::LBrace)
+            || self.check_keyword_ident(TokenKind::Abstractus)
             || self.check_keyword_ident(TokenKind::Importa)
             || self.check_keyword_ident(TokenKind::Incipit)
             || self.check_keyword_ident(TokenKind::Proba)

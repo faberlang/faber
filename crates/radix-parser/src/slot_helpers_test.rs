@@ -148,9 +148,8 @@ fn localized_type_spelling_after_initialized_field_is_not_an_operand() {
     // localizes `textus` → `string`, the guard missed the second field's type
     // and the retired `true`-prefix predicate check fired (PARSE001) on
     // `bool visible = true` followed by `string name`.
-    let mut parser = parser_over_with_pack(
-        "genus X {\n    bool visible = true\n    string name\n}\n",
-    );
+    let mut parser =
+        parser_over_with_pack("genus X {\n    bool visible = true\n    string name\n}\n");
     let result = parser.parse_program();
     assert!(
         result.errors.is_empty(),
@@ -176,7 +175,8 @@ fn statement_terminal_literal_is_not_a_retired_predicate() {
     );
 
     // The retired standalone form must still be rejected.
-    let mut parser = parser_over_with_pack("genus X {\n    fn f() → bool {\n        false j\n    }\n}\n");
+    let mut parser =
+        parser_over_with_pack("genus X {\n    fn f() → bool {\n        false j\n    }\n}\n");
     let result = parser.parse_program();
     assert!(
         result.errors.iter().any(|error| {

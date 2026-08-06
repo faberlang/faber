@@ -202,9 +202,17 @@ fn program(items: Vec<HirItem>, entry: Option<HirBlock>) -> HirProgram {
 
 fn render(hir: &HirProgram, presentation: &HirPresentation, interner: &Interner) -> String {
     let types = TypeTable::new();
-    emit(hir, presentation, &types, interner, &TestSurface, &FxHashMap::default(), &FxHashMap::default())
-        .expect("emit should succeed")
-        .code
+    emit(
+        hir,
+        presentation,
+        &types,
+        interner,
+        &TestSurface,
+        &FxHashMap::default(),
+        &FxHashMap::default(),
+    )
+    .expect("emit should succeed")
+    .code
 }
 
 // ── Render slots ──
@@ -476,9 +484,17 @@ fn emits_member_trivia_for_struct_fields_and_methods() {
         entry_start_anchor: None,
     };
 
-    let code = emit(&hir, &presentation, &types, &interner, &TestSurface, &FxHashMap::default(), &FxHashMap::default())
-        .expect("emit should succeed")
-        .code;
+    let code = emit(
+        &hir,
+        &presentation,
+        &types,
+        &interner,
+        &TestSurface,
+        &FxHashMap::default(),
+        &FxHashMap::default(),
+    )
+    .expect("emit should succeed")
+    .code;
     assert!(
         code.contains("# field comment\n    textus name"),
         "field trivia must render before the field:\n{code}"

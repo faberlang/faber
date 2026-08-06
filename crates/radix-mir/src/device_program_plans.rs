@@ -948,7 +948,7 @@ pub fn subchain_signature_for_emission(
 /// `TensorSumAxis`-produced input at the REDUCED count — the same count the
 /// producing subchain's seam output carries — so the emitters' and the faber
 /// constructor's cross-kernel unification see one shape per local
-/// (carried_resources_agree). `None` keeps the type-derived count (whole-
+/// (`carried_resources_agree`). `None` keeps the type-derived count (whole-
 /// function and test call sites).
 pub fn subchain_signature_for_emission_with_source(
     function: &MirFunction,
@@ -1017,7 +1017,7 @@ pub fn transformer_subchain_signature_for_emission(
 /// bind a `TensorSumAxis`-produced input at the REDUCED count — the same
 /// count this seam sizes the producing subchain's primary output at — so
 /// the emitters' and the faber constructor's cross-kernel unification see
-/// one shape per local (carried_resources_agree). `None` keeps the
+/// one shape per local (`carried_resources_agree`). `None` keeps the
 /// type-derived count (whole-function and test call sites).
 pub fn transformer_subchain_signature_for_emission_with_source(
     function: &MirFunction,
@@ -1057,7 +1057,7 @@ pub fn transformer_subchain_signature_for_emission_with_source(
 /// output extents: the recipe output plus every additional consumed output
 /// (the R6 P1 per-output-guard contract the elementwise multi-output ABI
 /// already applies). Same-shape recipes (softmax / layer-norm) keep their
-/// full-shape dispatch; the keep-dims SumAxis tail lifts it to the full
+/// full-shape dispatch; the keep-dims `SumAxis` tail lifts it to the full
 /// elementwise tail extent.
 fn apply_transformer_union_dispatch(signature: &mut MirKernelSignature) {
     let union = signature
@@ -1074,8 +1074,8 @@ fn apply_transformer_union_dispatch(signature: &mut MirKernelSignature) {
 /// widened d8518267 seam repair): the data-flow count resolution consults it
 /// so a `TensorSumAxis`-produced input binds at the REDUCED count — the same
 /// count the producing subchain's seam output carries — instead of the
-/// keep-dims local type's element product (the AIR LayerNorm VJP types
-/// SumAxis results at the operand shape). `None` keeps the type-derived
+/// keep-dims local type's element product (the AIR `LayerNorm` VJP types
+/// `SumAxis` results at the operand shape). `None` keeps the type-derived
 /// count (whole-function and test call sites).
 fn finish_subchain_emission_signature(
     function: &MirFunction,
@@ -1138,7 +1138,7 @@ fn finish_subchain_emission_signature(
 /// source function — the flattening of the operand dims minus the reduced
 /// axis, exactly the count [`transformer_shape_signature`] sizes the
 /// reduction output at (SumAxis-specific: the CCI collection-op variants
-/// `TensorRmsNorm` / `TensorRope` / `TensorGather` have no SumAxis reduction
+/// `TensorRmsNorm` / `TensorRope` / `TensorGather` have no `SumAxis` reduction
 /// semantics and are never matched). `None` when the local is not a
 /// `TensorSumAxis` destination — a data-flow input with no reduction
 /// semantics keeps its type-derived count.
@@ -1194,7 +1194,7 @@ fn sum_axis_destination_count(
 /// local), if the destination is a plain local (A2-2b) — matched to the
 /// RECIPE op specifically (D-2b verification, hand-5's hypothesis): a
 /// subchain slice can fold elementwise collection statements BEFORE the
-/// recipe, and the primary output source_local must bind the RECIPE result,
+/// recipe, and the primary output `source_local` must bind the RECIPE result,
 /// never an elementwise destination — a misbound `[2]`-count reduction
 /// output would carry a `[2,8]`-shaped source local and conflate with the
 /// elementwise buffer. The recipe ops carry no `CollectionOpContract`

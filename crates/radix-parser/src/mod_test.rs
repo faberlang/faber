@@ -3675,7 +3675,10 @@ fn cede_keyword_usable_as_identifier_in_initializer() {
     // No reserved words: `cede` (yield) is an ordinary identifier outside its
     // generator-yield slot, so it is a valid initializer expression.
     let result = parse_ok("functio f() fiunt → numerus { fixum _ x ← cede }");
-    assert_eq!(result.program.as_ref().expect("program").statements.len(), 1);
+    assert_eq!(
+        result.program.as_ref().expect("program").statements.len(),
+        1
+    );
 }
 
 #[test]
@@ -3683,7 +3686,10 @@ fn cede_keyword_usable_as_identifier_in_call_argument() {
     // No reserved words: `cede` is an ordinary identifier in call-argument
     // position (its generator-yield claim is statement-shaped).
     let result = parse_ok("functio f() fiunt → numerus { nota cede }");
-    assert_eq!(result.program.as_ref().expect("program").statements.len(), 1);
+    assert_eq!(
+        result.program.as_ref().expect("program").statements.len(),
+        1
+    );
 }
 
 #[test]

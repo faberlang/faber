@@ -1069,7 +1069,10 @@ fn oversized_elementwise_body_splits_within_the_buffer_budget() {
         seen.extend(subchain.statements.iter().copied());
     }
     let expected: Vec<usize> = (0..function.blocks[0].statements.len()).collect();
-    assert_eq!(seen, expected, "the split must partition the source statements in order");
+    assert_eq!(
+        seen, expected,
+        "the split must partition the source statements in order"
+    );
     let last = &decomposition.subchains[subchain_count - 1];
     assert_eq!(
         last.statements.last(),

@@ -46,11 +46,11 @@
 //! and re-labels existing MIR statements; it never introduces a GPU-specific
 //! AIR node or relowers semantics.
 
+use crate::abi::MAX_STORAGE_BUFFERS_PER_KERNEL;
 use crate::device_program_plans::{
     data_flow_element_ty_and_count, is_elementwise_collection_op, is_recipe_op,
     resolve_subchain_plan, PlanMappingError,
 };
-use crate::abi::MAX_STORAGE_BUFFERS_PER_KERNEL;
 use crate::kernel_plan::CollectionKernelPlan;
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlock, MirFunction,
@@ -415,11 +415,13 @@ fn split_oversized_elementwise_body(
             read
         })
         .collect();
-    let (temps_defined_at, temps_referenced_at): (Vec<BTreeSet<MirTempId>>, Vec<BTreeSet<MirTempId>>) =
-        indices
-            .iter()
-            .map(|&index| statement_temp_sets(&block.statements[index]))
-            .collect();
+    let (temps_defined_at, temps_referenced_at): (
+        Vec<BTreeSet<MirTempId>>,
+        Vec<BTreeSet<MirTempId>>,
+    ) = indices
+        .iter()
+        .map(|&index| statement_temp_sets(&block.statements[index]))
+        .collect();
 
     // suffix_reads[k] = the union of reads at positions >= k (the locals a
     // statement range's writes are consumed by when the range ends at k).
@@ -455,8 +457,8 @@ fn split_oversized_elementwise_body(
     let mut first_field = first_field_raw;
     for index in 0..first_field_raw {
         for &temp in &temps_defined_at[index] {
-            let feeds_field_range = (first_field_raw..n)
-                .any(|later| temps_referenced_at[later].contains(&temp));
+            let feeds_field_range =
+                (first_field_raw..n).any(|later| temps_referenced_at[later].contains(&temp));
             if feeds_field_range {
                 first_field = first_field.min(index);
             }
@@ -478,7 +480,10 @@ fn split_oversized_elementwise_body(
         let is_return_assembly = matches!(
             block.statements[index].kind,
             MirStatementKind::Construct {
-                aggregate: MirAggregate { kind: MirAggregateKind::Tuple, .. },
+                aggregate: MirAggregate {
+                    kind: MirAggregateKind::Tuple,
+                    ..
+                },
                 ..
             }
         );
@@ -502,10 +507,8 @@ fn split_oversized_elementwise_body(
             return false;
         }
         let (params, written) = range_params_and_written(&written_at, &reads_at, start, end);
-        let consumed: BTreeSet<MirLocalId> = written
-            .intersection(&suffix_reads[end])
-            .copied()
-            .collect();
+        let consumed: BTreeSet<MirLocalId> =
+            written.intersection(&suffix_reads[end]).copied().collect();
         let consumed_count = consumed.len();
         if consumed_count == 0 {
             return false;
@@ -524,7 +527,7 @@ fn split_oversized_elementwise_body(
         // or vacua seed cut across a boundary would fail the signature).
         consumed.iter().all(|&local| {
             crate::local_ty::local_ty(function, local)
-                .map_or(false, |ty| data_flow_element_ty_and_count(ty, validation).is_ok())
+                .is_some_and(|ty| data_flow_element_ty_and_count(ty, validation).is_ok())
         })
     };
 
@@ -608,7 +611,9 @@ fn statement_temp_sets(statement: &MirStatement) -> (BTreeSet<MirTempId>, BTreeS
     let mut defined = BTreeSet::new();
     let mut referenced = BTreeSet::new();
     match &statement.kind {
-        MirStatementKind::RuntimeCall { destination, call, .. } => {
+        MirStatementKind::RuntimeCall {
+            destination, call, ..
+        } => {
             if let Some(place) = destination {
                 if let MirPlaceBase::Temp(temp) = place.base.clone() {
                     defined.insert(temp);
@@ -625,7 +630,9 @@ fn statement_temp_sets(statement: &MirStatement) -> (BTreeSet<MirTempId>, BTreeS
                 referenced.insert(temp);
             }
         }
-        MirStatementKind::Call { destination, args, .. } => {
+        MirStatementKind::Call {
+            destination, args, ..
+        } => {
             if let Some(place) = destination {
                 if let MirPlaceBase::Temp(temp) = place.base.clone() {
                     defined.insert(temp);
@@ -637,7 +644,11 @@ fn statement_temp_sets(statement: &MirStatement) -> (BTreeSet<MirTempId>, BTreeS
                 }
             }
         }
-        MirStatementKind::Construct { destination, aggregate, .. } => {
+        MirStatementKind::Construct {
+            destination,
+            aggregate,
+            ..
+        } => {
             if let MirPlaceBase::Temp(temp) = destination.base.clone() {
                 defined.insert(temp);
             }
@@ -676,7 +687,10 @@ fn temp_closed_range(
         return false;
     }
     for slot in end..temps_defined_at.len() {
-        if temps_referenced_at[slot].iter().any(|temp| defined.contains(temp)) {
+        if temps_referenced_at[slot]
+            .iter()
+            .any(|temp| defined.contains(temp))
+        {
             return false;
         }
     }
