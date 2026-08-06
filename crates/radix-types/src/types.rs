@@ -1264,8 +1264,7 @@ impl Hash for Type {
                 base.hash(state);
                 args.hash(state);
             }
-            Self::Infer(v) => v.hash(state),
-            Self::InferUnion(v) => v.hash(state),
+            Self::Infer(v) | Self::InferUnion(v) => v.hash(state),
             Self::Union(members) | Self::Tuple(members) => members.hash(state),
             Self::Error => {}
         }
