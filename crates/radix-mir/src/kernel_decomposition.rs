@@ -969,6 +969,18 @@ impl ResultAggregationSlots {
 /// admitting locals that are written only by a Tuple `Construct` (or not
 /// written at all). A local written by an ordinary `Assign`/`RuntimeCall`
 /// is not a kept aggregation and stays fail-closed even when dead.
+///
+/// 3. **Kept source result-tuple temp** — the temp analog of rule 2: a
+///    tuple-typed TEMP the subchain synthetics keep from the source's full
+///    temp table (`build_subchain_function` clones `source.temps`). A
+///    reverse-AD companion whose result aggregation lowers into a TEMP
+///    (the bert-tiny backward gradient tuple, `Return(Some(Temp(..)))`))
+///    keeps that temp in every subchain, but the synthetic's own return is a
+///    FRESH tuple temp (`needs_synthetic_tuple_return`), so the kept source
+///    tuple temp is never READ and is written only by the source's Tuple
+///    `Construct` (the last subchain) or not written at all (an intermediate
+///    subchain). It is admitted under the identical structural conditions as
+///    the kept local — and an unrelated LIVE tuple temp stays fail-closed.
 #[must_use]
 pub fn multi_output_result_aggregation_slots(
     function: &MirFunction,
@@ -1038,6 +1050,14 @@ pub fn multi_output_result_aggregation_slots(
     if returns_tuple_or_nothing {
         let mut written: FxHashSet<MirLocalId> = FxHashSet::default();
         let mut tuple_construct_destinations: FxHashSet<MirLocalId> = FxHashSet::default();
+        // S5A-U4 (rule 3): the kept source result-tuple TEMP — the temp
+        // analog of the kept result-tuple local. A reverse-AD companion
+        // whose result aggregation lowers into a temp keeps that temp in
+        // every subchain synthetic; the synthetic's own return is a FRESH
+        // tuple temp, so the kept source tuple temp is admitted under the
+        // identical structural conditions.
+        let mut written_temps: FxHashSet<MirTempId> = FxHashSet::default();
+        let mut tuple_construct_temp_destinations: FxHashSet<MirTempId> = FxHashSet::default();
         for block in &function.blocks {
             for statement in &block.statements {
                 if let MirStatementKind::Construct {
@@ -1048,11 +1068,16 @@ pub fn multi_output_result_aggregation_slots(
                     if aggregate.kind == MirAggregateKind::Tuple {
                         if let Some(local) = crate::read_analysis::place_local_base(destination) {
                             tuple_construct_destinations.insert(local);
+                        } else if let MirPlaceBase::Temp(temp) = destination.base {
+                            tuple_construct_temp_destinations.insert(temp);
                         }
                     }
                 }
                 if let Some(local) = crate::read_analysis::statement_destination(statement) {
                     written.insert(local);
+                }
+                if let Some(temp) = statement_destination_temp(statement) {
+                    written_temps.insert(temp);
                 }
             }
         }
@@ -1067,6 +1092,24 @@ pub fn multi_output_result_aggregation_slots(
                 slots.locals.insert(local.id);
             }
         }
+        for temp in &function.temps {
+            if !is_non_empty_tuple_type(types, temp.ty)
+                || crate::read_analysis::temp_directly_read(function, temp.id)
+            {
+                continue;
+            }
+            // A kept source tuple temp admitted only when written solely by a
+            // Tuple `Construct` (the last subchain) or not written at all (an
+            // intermediate subchain) — mirroring the kept-local rule. A temp
+            // written by an ordinary `Assign`/`RuntimeCall` is not a kept
+            // aggregation and stays fail-closed even when dead; a LIVE tuple
+            // temp (read somewhere) is excluded above by `temp_directly_read`.
+            if tuple_construct_temp_destinations.contains(&temp.id)
+                || !written_temps.contains(&temp.id)
+            {
+                slots.temps.insert(temp.id);
+            }
+        }
     }
 
     slots
@@ -1078,6 +1121,26 @@ fn is_non_empty_tuple_type(types: &TypeTable, ty: MirType) -> bool {
         types.get(ty.semantic_id()),
         Type::Tuple(elements) if !elements.is_empty()
     )
+}
+
+/// The destination temp of a statement, when it writes a temp place — the
+/// temp analog of [`crate::read_analysis::statement_destination`] (which
+/// tracks only [`MirPlaceBase::Local`]). Used by the S5A-U4 kept
+/// result-tuple temp admission (rule 3 of
+/// [`multi_output_result_aggregation_slots`]).
+fn statement_destination_temp(statement: &MirStatement) -> Option<MirTempId> {
+    let destination: Option<&MirPlace> = match &statement.kind {
+        MirStatementKind::Assign { place, .. }
+        | MirStatementKind::Construct {
+            destination: place, ..
+        } => Some(place),
+        MirStatementKind::RuntimeCall { destination, .. }
+        | MirStatementKind::Call { destination, .. } => destination.as_ref(),
+    };
+    destination.and_then(|place| match place.base {
+        MirPlaceBase::Temp(temp) => Some(temp),
+        MirPlaceBase::Local(_) => None,
+    })
 }
 
 /// The FULL result-tuple → local field bindings of a tuple-return function
