@@ -18,7 +18,7 @@ locale = "en"
 #   • the `↦ regex` conversion — compiling a textus pattern into a regex value
 #
 # Common mistakes:
-#   • Not checking est nihil before using the value — lege may return nihil at end of input.
+#   • Not checking is null before using the value — read may return null at end of input.
 #
 # See also: lineam, scribe
 # =============================================================================
@@ -26,7 +26,7 @@ locale = "en"
 # lege and regex conversio — I/O read and compiled pattern expressions
 #
 # fixum _ pattern ← "\d+" ↦ regex   -- compiled regex from textus
-# fixum _ line ← lege                  -- stdin line read
+# fixum _ input ← lege                  -- stdin line read
 #
 # GRAMMAR:
 #   conversio :← stringLit '↦' 'regex'
@@ -42,6 +42,6 @@ main {
     const _ pattern ← "(?g)\d+" ↦ regex
     print pattern
 
-    const _ line ← read
-    print line
+    const _ input ← read
+    print input
 }
