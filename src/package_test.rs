@@ -6783,7 +6783,7 @@ locale = "zh-Hans"
         result
             .diagnostics
             .iter()
-            .map(|diag| (diag.code.clone(), diag.message.clone()))
+            .map(|diag| (diag.code, diag.message.clone()))
             .collect::<Vec<_>>()
     );
 }

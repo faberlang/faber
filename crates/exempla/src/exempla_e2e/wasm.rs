@@ -179,13 +179,13 @@ pub(crate) fn classify_wasm_exemplum(
             return wasm_result(
                 file,
                 WasmTier::MirLowered,
-                    format!("Wasm emission failed: {error}"),
-                    None,
-                    None,
-                    None,
-                );
-            }
-        };
+                format!("Wasm emission failed: {error}"),
+                None,
+                None,
+                None,
+            );
+        }
+    };
     // The stub host's diagnostic events carry the same symbol space the wasm
     // emitter used, so the complete lowered interner feeds the event decoder.
     let interner = &mir.interner;

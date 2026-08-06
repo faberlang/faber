@@ -356,14 +356,12 @@ fn norma_module_file_name(
 /// through a compiled Faber module.
 fn is_carried_provider_module(package: &str, module_segments: &[String]) -> bool {
     package == "norma"
-        && module_segments
-            .first()
-            .is_some_and(|segment| {
-                matches!(
-                    segment.as_str(),
-                    "solum" | "tempus" | "toml" | "valor" | "json"
-                )
-            })
+        && module_segments.first().is_some_and(|segment| {
+            matches!(
+                segment.as_str(),
+                "solum" | "tempus" | "toml" | "valor" | "json"
+            )
+        })
 }
 
 fn emit_selected_norma_modules(
@@ -373,8 +371,7 @@ fn emit_selected_norma_modules(
     product: &str,
     modules: &mut Vec<PackageLlvmModule>,
 ) -> Result<(), Vec<Diagnostic>> {
-    let library_resolver =
-        library_resolver_for_package(config, &package.spec.package_root)?;
+    let library_resolver = library_resolver_for_package(config, &package.spec.package_root)?;
     let mut library_cache = LibraryInterfaceCache::with_config(config);
     let mut seen = BTreeSet::new();
     let mut index = modules.len();
@@ -405,18 +402,8 @@ fn emit_selected_norma_modules(
                 continue;
             }
             let module_segments = import.module.module_path.clone();
-            let llvm_path = norma_module_file_name(
-                output_dir,
-                product,
-                index,
-                &module_segments,
-            );
-            emit_one_norma_module(
-                import,
-                &library_resolver,
-                &mut library_cache,
-                &llvm_path,
-            )?;
+            let llvm_path = norma_module_file_name(output_dir, product, index, &module_segments);
+            emit_one_norma_module(import, &library_resolver, &mut library_cache, &llvm_path)?;
             modules.push(PackageLlvmModule {
                 unit_path: import.module.interface_path.clone(),
                 module_segments,
@@ -440,39 +427,48 @@ fn emit_one_norma_module(
     llvm_path: &Path,
 ) -> Result<(), Vec<Diagnostic>> {
     let module_segments = import.module.module_path.clone();
-    with_library_cached_analysis_mut(import, library_resolver, library_cache, |analysis, _cache| {
-        // The canonical Norma identity: `(norma, module_path, item)`. The
-        // package graph resolved the module to this interface path; the
-        // attached facts make MIR record the same identity the consumer's
-        // `record_library_item_identity` produced for its call sites.
-        analysis.package_import_identities = Some(radix::driver::PackageImportIdentities {
-            product: "norma".to_owned(),
-            module_segments: module_segments.clone(),
-            imports: std::collections::BTreeMap::new(),
-        });
-        let lowered = radix::mir::lower_analyzed_unit_with_context(analysis).map_err(|errors| {
-            radix::codegen::CodegenError {
-                message: errors
-                    .iter()
-                    .map(|error| error.message.as_str())
-                    .collect::<Vec<_>>()
-                    .join(" | "),
+    with_library_cached_analysis_mut(
+        import,
+        library_resolver,
+        library_cache,
+        |analysis, _cache| {
+            // The canonical Norma identity: `(norma, module_path, item)`. The
+            // package graph resolved the module to this interface path; the
+            // attached facts make MIR record the same identity the consumer's
+            // `record_library_item_identity` produced for its call sites.
+            analysis.package_import_identities = Some(radix::driver::PackageImportIdentities {
+                product: "norma".to_owned(),
+                module_segments: module_segments.clone(),
+                imports: std::collections::BTreeMap::new(),
+            });
+            let lowered =
+                radix::mir::lower_analyzed_unit_with_context(analysis).map_err(|errors| {
+                    radix::codegen::CodegenError {
+                        message: errors
+                            .iter()
+                            .map(|error| error.message.as_str())
+                            .collect::<Vec<_>>()
+                            .join(" | "),
+                        args: Vec::new(),
+                    }
+                })?;
+            let llvm = radix::mir::emit_llvm_text_probe_library_module(
+                &lowered.validated,
+                &lowered.interner,
+            )
+            .map_err(|error| radix::codegen::CodegenError {
+                message: format!("{}:{}", error.category, error.shape),
                 args: Vec::new(),
-            }
-        })?;
-        let llvm = radix::mir::emit_llvm_text_probe_library_module(
-            &lowered.validated,
-            &lowered.interner,
-        )
-        .map_err(|error| radix::codegen::CodegenError {
-            message: format!("{}:{}", error.category, error.shape),
-            args: Vec::new(),
-        })?;
-        std::fs::write(llvm_path, llvm).map_err(|error| radix::codegen::CodegenError {
-            message: format!("cannot write package LLVM module {}: {error}", llvm_path.display()),
-            args: Vec::new(),
-        })
-    })
+            })?;
+            std::fs::write(llvm_path, llvm).map_err(|error| radix::codegen::CodegenError {
+                message: format!(
+                    "cannot write package LLVM module {}: {error}",
+                    llvm_path.display()
+                ),
+                args: Vec::new(),
+            })
+        },
+    )
     .map_err(|diagnostic| vec![diagnostic])
 }
 

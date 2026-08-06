@@ -18,7 +18,11 @@ fn run_cli_source(name: &str, source: &str, args: &[&str]) -> LlvmRunProbe {
     // and linked .bin from colliding across tests.
     let sequence = SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let unique = format!("{name}-{sequence}-{}", std::process::id());
-    let session = Session::new(Config::default().with_target(Target::LlvmText).with_dev_stdlib());
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::LlvmText)
+            .with_dev_stdlib(),
+    );
     let mut analysis =
         radix::driver::analyze_source(&session, name, source).expect("analyze CLI source");
     let device_roles = radix::mir::device_roles_from_hir(&analysis.hir);

@@ -1027,8 +1027,9 @@ fn stage8_rust_lane(
         .map(|(relative, package, _member)| {
             let mut command = Command::new(target.join(format!("debug/{package}")));
             command.args(rust_oracle(&corpus_root.join(&relative)).run_args());
-            let output = super::common::command_output_with_timeout(&mut command, Duration::from_secs(20))
-                .unwrap_or_else(|error| panic!("cannot run Rust oracle {relative}: {error}"));
+            let output =
+                super::common::command_output_with_timeout(&mut command, Duration::from_secs(20))
+                    .unwrap_or_else(|error| panic!("cannot run Rust oracle {relative}: {error}"));
             (
                 relative,
                 Stage8ProcessOutcome {
@@ -1058,7 +1059,9 @@ fn check_stage8_pair(
         RustOracleOutcome::RunSuccess { exit_code, .. }
         | RustOracleOutcome::DeclarationOnly { exit_code, .. }
         | RustOracleOutcome::ExpectedNonzeroExit { exit_code, .. } => Some(exit_code),
-        RustOracleOutcome::ExpectedRuntimeFailure { stderr_contains, .. } => {
+        RustOracleOutcome::ExpectedRuntimeFailure {
+            stderr_contains, ..
+        } => {
             if rust.exit_code == Some(0) || !rust.stderr.contains(stderr_contains) {
                 return Err(format!(
                     "{relative}: rust lane failed the runtime-failure contract"

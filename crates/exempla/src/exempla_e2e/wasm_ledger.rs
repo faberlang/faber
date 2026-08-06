@@ -211,7 +211,10 @@ fn required_tier_for(rust_class: RustClass) -> EvidenceTier {
 /// deferral table. The oracle class is the only source of `contract-reject` /
 /// `n/a`; a fixture may only become `deferred` through [`DEFERRED_POLICY`].
 fn treatment_for(path: &str, rust_class: RustClass) -> WasmTreatment {
-    if DEFERRED_POLICY.iter().any(|(deferred_path, ..)| *deferred_path == path) {
+    if DEFERRED_POLICY
+        .iter()
+        .any(|(deferred_path, ..)| *deferred_path == path)
+    {
         return WasmTreatment::Deferred;
     }
     match rust_class {
@@ -322,9 +325,7 @@ fn blocker_for(
                     EvidenceTier::Mir => "wasm_emission_unsupported",
                     EvidenceTier::Emitted => "wasm_validation_failed",
                     EvidenceTier::Validated => {
-                        if result.stubless_bucket
-                            == Some(WasmInstantiationBucket::MissingImport)
-                        {
+                        if result.stubless_bucket == Some(WasmInstantiationBucket::MissingImport) {
                             "runtime_import_unresolved"
                         } else {
                             "host_instantiation_blocked"
@@ -478,8 +479,8 @@ pub(crate) fn generate_ledger_text(rows: &[WasmLedgerRow]) -> Result<String, Str
         schema_version: LEDGER_SCHEMA_VERSION,
         rows: rows.to_vec(),
     };
-    let body = toml::to_string_pretty(&file)
-        .map_err(|err| format!("cannot serialize ledger: {err}"))?;
+    let body =
+        toml::to_string_pretty(&file).map_err(|err| format!("cannot serialize ledger: {err}"))?;
     Ok(format!(
         "# Wasm host-parity target ledger — Stage 1 baseline (measured artifact).\n\
          # Generated deterministically by the exempla wasm-ledger checker\n\
@@ -565,10 +566,7 @@ fn read_index_files(corpus: &Path) -> BTreeSet<String> {
 }
 
 fn valid_path(path: &str) -> bool {
-    path.ends_with(".fab")
-        && !path.starts_with('/')
-        && !path.contains("..")
-        && !path.contains('\\')
+    path.ends_with(".fab") && !path.starts_with('/') && !path.contains("..") && !path.contains('\\')
 }
 
 /// Validate a parsed ledger against the live corpus. Returns every violation;
@@ -598,13 +596,19 @@ pub(crate) fn check_ledger_rows(rows: &[WasmLedgerRow]) -> Vec<String> {
         }
     }
     if snapshot.index_files.is_empty() {
-        errors.push("corpus index.toml has no [[files]] entries (denominator unverifiable)".to_owned());
+        errors.push(
+            "corpus index.toml has no [[files]] entries (denominator unverifiable)".to_owned(),
+        );
     } else {
         for path in snapshot.index_files.difference(&snapshot.files) {
-            errors.push(format!("corpus index lists `{path}` but no such .fab was discovered"));
+            errors.push(format!(
+                "corpus index lists `{path}` but no such .fab was discovered"
+            ));
         }
         for path in snapshot.files.difference(&snapshot.index_files) {
-            errors.push(format!("discovered `.fab` `{path}` missing from corpus index"));
+            errors.push(format!(
+                "discovered `.fab` `{path}` missing from corpus index"
+            ));
         }
     }
 
@@ -696,7 +700,10 @@ pub(crate) fn check_ledger_rows(rows: &[WasmLedgerRow]) -> Vec<String> {
             }
             RowOutcome::Gap => {
                 if row.reason.as_deref().unwrap_or("").is_empty() {
-                    errors.push(format!("row `{}` is a gap without a boundary reason", row.path));
+                    errors.push(format!(
+                        "row `{}` is a gap without a boundary reason",
+                        row.path
+                    ));
                 }
             }
             RowOutcome::Parity => {}

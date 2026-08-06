@@ -145,24 +145,27 @@ pub(crate) use host_factory::{
     BackendDiscoveryReceipt, E_BACKEND_UNAVAILABLE, E_DEVICE_ABI_MISMATCH, E_DEVICE_DESCRIPTOR,
     E_DEVICE_DTYPE_MISMATCH, E_DEVICE_ENTRY_MISMATCH, E_DEVICE_SHAPE_MISMATCH, E_NO_DEVICE_PROGRAM,
 };
+#[allow(unused_imports)]
+// graph-rooted build is package-crate internal (graph type is pub(crate)).
+pub(crate) use llvm::build_package_llvm_from_graph;
+#[allow(unused_imports)]
+// LLVM host harnesses consume the reusable package-to-LLVM builder (S8.3).
+pub use llvm::{
+    build_package_llvm, PackageLlvmBuild, PackageLlvmLinkManifest, PackageLlvmModule,
+    PackageLlvmOptions,
+};
+#[allow(unused_imports)]
+// `faber build/run --target llvm-host` + product tests consume the Stage 9 lane.
+pub use llvm_host::{
+    build_host_program, discover_llvm_host_toolchain, ensure_llvm_runtime_archive,
+    host_llvm_target_triple, host_triple_for, LlvmHostBuild, LlvmHostProfile,
+};
 #[allow(unused_imports)] // generated fmir-bin runner crates consume this public API.
 pub use mir::run_fmir_image_bytes_with_stdio;
 #[cfg(test)]
 pub(super) use mir::test_support::{fmir_image_test_summary, fmir_text_image_test_summary};
 #[allow(unused_imports)] // External backend harnesses consume the public package-MIR callback.
 pub use mir::with_lowered_package_mir;
-#[allow(unused_imports)] // LLVM host harnesses consume the reusable package-to-LLVM builder (S8.3).
-pub use llvm::{
-    build_package_llvm, PackageLlvmBuild, PackageLlvmLinkManifest, PackageLlvmModule,
-    PackageLlvmOptions,
-};
-#[allow(unused_imports)] // `faber build/run --target llvm-host` + product tests consume the Stage 9 lane.
-pub use llvm_host::{
-    build_host_program, discover_llvm_host_toolchain, ensure_llvm_runtime_archive,
-    host_llvm_target_triple, host_triple_for, LlvmHostBuild, LlvmHostProfile,
-};
-#[allow(unused_imports)] // graph-rooted build is package-crate internal (graph type is pub(crate)).
-pub(crate) use llvm::build_package_llvm_from_graph;
 #[allow(unused_imports)] // FMIR stages consume this crate-visible image API.
 pub(crate) use mir::{
     build_package_fmir_binary_bundle, build_package_fmir_image, build_package_fmir_text_image,

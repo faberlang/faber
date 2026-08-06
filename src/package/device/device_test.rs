@@ -1376,7 +1376,11 @@ functio mixio(tf32[2,8] x, tf32[8,2] w) → tf32[2,2] {
         },
     )
     .expect("fixture lowers");
-    assert_eq!(program.kernels.len(), 2, "matmul + softmax subchain kernels");
+    assert_eq!(
+        program.kernels.len(),
+        2,
+        "matmul + softmax subchain kernels"
+    );
     let softmax_kernel = program
         .kernels
         .iter()
@@ -2677,12 +2681,12 @@ fn repeating_step_wire_and_descriptor_project_params_and_observation() {
     let mut param_slots: Vec<&WireDeviceResource> = Vec::new();
     for kernel in &wire.kernels {
         for resource in &kernel.resources {
-            if resource.buffer.name == "w" || resource.buffer.name == "b" {
-                if !param_slots.iter().any(|slot| {
+            if (resource.buffer.name == "w" || resource.buffer.name == "b")
+                && !param_slots.iter().any(|slot| {
                     slot.buffer.id == resource.buffer.id && slot.access == WireResourceAccess::Write
-                }) {
-                    param_slots.push(resource);
-                }
+                })
+            {
+                param_slots.push(resource);
             }
         }
     }
@@ -3327,7 +3331,7 @@ fn library_backed_train_step_materializes_into_device_program() {
         "s5u5c-gradus-step",
         LIBRARY_TRAIN_STEP_LOOP_FIXTURE,
         |lowered| {
-            let result = device_program_for_lowered(
+            device_program_for_lowered(
                 &lowered.validated,
                 &lowered.interner,
                 &lowered.companions,
@@ -3335,8 +3339,7 @@ fn library_backed_train_step_materializes_into_device_program() {
             )
             .expect("constructor succeeds")
             .map(|(program, semantics, _step_count)| (program, semantics))
-            .expect("library-backed training fixture yields a device program");
-            result
+            .expect("library-backed training fixture yields a device program")
         },
     )
     .expect("fixture lowers");
@@ -3474,7 +3477,8 @@ fn library_backed_train_step_materializes_into_device_program() {
 /// gradus `train_step_bert_linear`/`_layernorm` bodies materialized), from
 /// the exemplum's own source in `examples/training/bert-tiny-fragment`.
 fn bert_tiny_exemplum_program() -> (DeviceProgram, DeviceSemantics) {
-    let exemplum = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../examples/training/bert-tiny-fragment");
+    let exemplum =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../examples/training/bert-tiny-fragment");
     let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
     super::super::mir::with_interpreted_lowered_package_mir(
         &radix::driver::Config::default()
@@ -3547,16 +3551,12 @@ fn decomposed_train_step_scaled_grad_intermediates_never_alias_params() {
     // The PRE sub-slice (subchain 0 — fills + scaled-grad muls) writes ONLY
     // per-step scaled-grad intermediates: never a parameter buffer.
     let pre = linear[0];
-    for write in pre
-        .resources
-        .iter()
-        .filter(|resource| {
-            matches!(
-                resource.access,
-                MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
-            )
-        })
-    {
+    for write in pre.resources.iter().filter(|resource| {
+        matches!(
+            resource.access,
+            MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
+        )
+    }) {
         assert!(
             !param_ids.contains(&write.buffer.id),
             "the pre sub-slice must not write the parameter buffer `{}` (id {:?}) — \
@@ -4397,10 +4397,10 @@ fn decomposed_companion_unifies_recomputed_forward_save_by_local_identity() {
     // input_1) for the SAME carried local. The (function, source-local)
     // origin identity unifies them onto ONE buffer; the name+shape wiring
     // alone would mint two (or alias an unrelated value).
-    fn binding_slot<'a>(
-        kernel: &'a radix_mir::device_program::KernelUnit,
+    fn binding_slot(
+        kernel: &radix_mir::device_program::KernelUnit,
         binding: u32,
-    ) -> &'a radix_mir::device_program::DeviceResource {
+    ) -> &radix_mir::device_program::DeviceResource {
         kernel
             .resources
             .iter()

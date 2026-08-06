@@ -56,12 +56,9 @@ pub(crate) fn portable_product_boost(
 /// probe surface as `wasm::classify_wasm_exemplum`).
 fn emit_wasm_bytes(session: &Session, fab_path: &Path) -> Vec<u8> {
     let source = std::fs::read_to_string(fab_path).expect("fixture source must be readable");
-    let mut analysis = radix::driver::analyze_source(
-        session,
-        &fab_path.display().to_string(),
-        &source,
-    )
-    .expect("proof fixture must analyze");
+    let mut analysis =
+        radix::driver::analyze_source(session, &fab_path.display().to_string(), &source)
+            .expect("proof fixture must analyze");
     let mir = radix::mir::lower_analyzed_unit_with_context(&mut analysis)
         .expect("proof fixture must lower to MIR");
     // Use the lowered unit's complete symbol table (lowering interns symbols
@@ -88,19 +85,13 @@ fn wasm_product() {
     // Proof fixtures selected from the Stage 1 ledger: both emit only scalar
     // `faber_rt_v1` diagnostics, so their execution needs no externally
     // reconstructed opaque-handle table.
-    let proofs: &[(&str, &str)] = &[
-        ("sic/sic.fab", "9"),
-        ("per/per.fab", "0\n2\n4\n6"),
-    ];
+    let proofs: &[(&str, &str)] = &[("sic/sic.fab", "9"), ("per/per.fab", "0\n2\n4\n6")];
     for (fab_rel, oracle_stdout) in proofs {
         let fab_path = crate::paths::corpus_dir().join(fab_rel);
         let wasm_bytes = emit_wasm_bytes(&session, &fab_path);
-        let outcome =
-            run_product(&wasm_bytes).expect("portable product engine must initialize");
+        let outcome = run_product(&wasm_bytes).expect("portable product engine must initialize");
         let RunOutcome::Success { stdout, .. } = &outcome else {
-            panic!(
-                "{fab_rel} must run to success through the portable runner, got: {outcome:?}"
-            );
+            panic!("{fab_rel} must run to success through the portable runner, got: {outcome:?}");
         };
         assert_eq!(
             normalize_newline(stdout),
@@ -115,12 +106,14 @@ fn wasm_product() {
     let host = WasmRtV1Host::new().expect("portable product engine must initialize");
     let default = RunConfig::default();
 
-    let legacy = wat_bytes(r#"
+    let legacy = wat_bytes(
+        r#"
 (module
   (import "faber_diag" "nota_i64" (func $legacy (param i64)))
   (func (export "incipit") (call $legacy (i64.const 1)))
 )
-"#);
+"#,
+    );
     let outcome = host.run(&legacy, &default);
     assert!(
         matches!(
@@ -134,12 +127,14 @@ fn wasm_product() {
     // W14: the tensor family is now admitted, so the genuinely unadmitted
     // field moves to `tensor_div` (the emitter fails closed on the division
     // row — no host binding exists for it).
-    let unknown_field = wat_bytes(r#"
+    let unknown_field = wat_bytes(
+        r#"
 (module
   (import "faber_rt_v1" "__faber_rt_v1_tensor_div" (func $len (param i32) (result i32)))
   (func (export "incipit") (drop (call $len (i32.const 0))))
 )
-"#);
+"#,
+    );
     let outcome = host.run(&unknown_field, &default);
     assert!(
         matches!(
@@ -149,12 +144,14 @@ fn wasm_product() {
         "unknown v1 field must be an explicit import rejection, got: {outcome:?}"
     );
 
-    let bad_signature = wat_bytes(r#"
+    let bad_signature = wat_bytes(
+        r#"
 (module
   (import "faber_rt_v1" "__faber_rt_v1_diagnostic_nota_i64" (func $nota (param i32)))
   (func (export "incipit") (call $nota (i32.const 1)))
 )
-"#);
+"#,
+    );
     let outcome = host.run(&bad_signature, &default);
     assert_eq!(
         outcome.category(),
@@ -162,11 +159,13 @@ fn wasm_product() {
         "declared signature conflicting with the admitted binding must be LinkFailed, got: {outcome:?}"
     );
 
-    let missing_entry = wat_bytes(r#"
+    let missing_entry = wat_bytes(
+        r#"
 (module
   (func (export "other") (return))
 )
-"#);
+"#,
+    );
     let outcome = host.run(&missing_entry, &default);
     assert!(
         matches!(&outcome, RunOutcome::EntryMissing { entry } if entry == "incipit"),
@@ -230,13 +229,12 @@ fn wasm_collection_scalar_cluster_runs_through_the_product_host() {
                     "{rel} captured stdout must match the sibling .expected"
                 );
             }
-            other => panic!(
-                "{rel} must run to success through the portable runner, got: {other:?}"
-            ),
+            other => {
+                panic!("{rel} must run to success through the portable runner, got: {other:?}")
+            }
         }
     }
 }
-
 
 /// W14 per-fixture runner probes for the closed tensor display rows: each
 /// fixture emits as a real compiler artifact, runs through the portable
@@ -285,13 +283,12 @@ fn wasm_tensor_display_cluster_runs_through_the_product_host() {
                     "{rel} captured stdout must match the sibling .expected"
                 );
             }
-            other => panic!(
-                "{rel} must run to success through the portable runner, got: {other:?}"
-            ),
+            other => {
+                panic!("{rel} must run to success through the portable runner, got: {other:?}")
+            }
         }
     }
 }
-
 
 /// W12 per-fixture runner probes for the closed Stage 5B text/diagnostic
 /// rows: each fixture emits as a real compiler artifact, runs through the
@@ -325,9 +322,9 @@ fn wasm_text_diagnostic_cluster_runs_through_the_product_host() {
                     "{rel} captured stdout must match the sibling .expected"
                 );
             }
-            other => panic!(
-                "{rel} must run to success through the portable runner, got: {other:?}"
-            ),
+            other => {
+                panic!("{rel} must run to success through the portable runner, got: {other:?}")
+            }
         }
     }
 }

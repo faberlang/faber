@@ -167,11 +167,7 @@ pub fn run_llvm_modules_with_args(
     run_linked_binary(&binary_file, fab_path, run_args)
 }
 
-fn run_linked_binary(
-    binary_file: &Path,
-    fab_path: &Path,
-    run_args: &[&str],
-) -> LlvmRunProbe {
+fn run_linked_binary(binary_file: &Path, fab_path: &Path, run_args: &[&str]) -> LlvmRunProbe {
     let run = super::common::command_output_with_timeout(
         &mut Command::new(binary_file).args(run_args),
         Duration::from_secs(10),

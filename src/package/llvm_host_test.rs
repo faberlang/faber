@@ -112,21 +112,38 @@ fn llvm_host_debug_build_produces_inspectable_layout() {
     assert!(build.binary_path.starts_with(&build.target_dir));
     assert!(build.binary_path.is_file(), "binary must exist");
     assert!(build.modules_dir.is_dir(), "modules dir must exist");
-    assert_eq!(build.optimized_dir, None, "debug must not run the opt pipeline");
+    assert_eq!(
+        build.optimized_dir, None,
+        "debug must not run the opt pipeline"
+    );
 
     let module_count = fs::read_dir(&build.modules_dir)
         .expect("read modules dir")
         .count();
-    assert_eq!(module_count, 1, "single-unit greeting fixture emits one .ll");
+    assert_eq!(
+        module_count, 1,
+        "single-unit greeting fixture emits one .ll"
+    );
 
-    assert!(build.manifest_path.is_file(), "link-manifest.toml must exist");
-    let manifest =
-        fs::read_to_string(&build.manifest_path).expect("read link manifest");
-    assert!(manifest.contains("host_triple"), "manifest records host triple");
-    assert!(manifest.contains("profile = \"debug\""), "manifest records profile");
+    assert!(
+        build.manifest_path.is_file(),
+        "link-manifest.toml must exist"
+    );
+    let manifest = fs::read_to_string(&build.manifest_path).expect("read link manifest");
+    assert!(
+        manifest.contains("host_triple"),
+        "manifest records host triple"
+    );
+    assert!(
+        manifest.contains("profile = \"debug\""),
+        "manifest records profile"
+    );
     assert!(manifest.contains("llvm_as"), "manifest records llvm-as");
     assert!(manifest.contains("clang"), "manifest records clang");
-    assert!(manifest.contains("runtime_archive"), "manifest records the archive");
+    assert!(
+        manifest.contains("runtime_archive"),
+        "manifest records the archive"
+    );
     assert!(manifest.contains(".ll"), "manifest records module paths");
     assert!(
         manifest.contains("native_flags") && manifest.contains("-g"),
@@ -156,9 +173,14 @@ fn llvm_host_release_build_pins_opt_pipeline() {
 
     assert!(build.target_dir.ends_with("target/faber-llvm/release"));
     assert!(build.binary_path.is_file(), "release binary must exist");
-    let optimized_dir = build.optimized_dir.expect("release must run the opt pipeline");
+    let optimized_dir = build
+        .optimized_dir
+        .expect("release must run the opt pipeline");
     let opt_count = fs::read_dir(&optimized_dir).expect("read opt dir").count();
-    assert_eq!(opt_count, 1, "release runs the pinned pipeline over each module");
+    assert_eq!(
+        opt_count, 1,
+        "release runs the pinned pipeline over each module"
+    );
 
     let manifest = fs::read_to_string(&build.manifest_path).expect("read link manifest");
     assert!(manifest.contains("profile = \"release\""));
@@ -178,7 +200,9 @@ fn llvm_host_binary_runs_and_forwards_exit_code() {
     let greeting = write_greeting_fixture(&dir);
     let build = build_host_program(&llvm_host_config(), &greeting, LlvmHostProfile::Debug)
         .expect("greeting build must succeed");
-    let run = Command::new(&build.binary_path).output().expect("run binary");
+    let run = Command::new(&build.binary_path)
+        .output()
+        .expect("run binary");
     assert!(run.status.success());
     assert_eq!(
         String::from_utf8_lossy(&run.stdout),
@@ -191,10 +215,11 @@ fn llvm_host_binary_runs_and_forwards_exit_code() {
     fs::create_dir_all(&package_dir).expect("create exitura dir");
     let exit_entry = package_dir.join("exitura.fab");
     fs::write(&exit_entry, EXIT_FIXTURE).expect("write exitura.fab");
-    let exit_build =
-        build_host_program(&llvm_host_config(), &exit_entry, LlvmHostProfile::Debug)
-            .expect("exitura build must succeed");
-    let run = Command::new(&exit_build.binary_path).output().expect("run exitura binary");
+    let exit_build = build_host_program(&llvm_host_config(), &exit_entry, LlvmHostProfile::Debug)
+        .expect("exitura build must succeed");
+    let run = Command::new(&exit_build.binary_path)
+        .output()
+        .expect("run exitura binary");
     assert_eq!(
         run.status.code(),
         Some(7),
@@ -221,11 +246,17 @@ fn llvm_host_debug_and_release_agree_on_greeting() {
     let release = build_host_program(&llvm_host_config(), &entry, LlvmHostProfile::Release)
         .expect("release build must succeed");
 
-    let debug_run = Command::new(&debug.binary_path).output().expect("run debug binary");
-    let release_run =
-        Command::new(&release.binary_path).output().expect("run release binary");
+    let debug_run = Command::new(&debug.binary_path)
+        .output()
+        .expect("run debug binary");
+    let release_run = Command::new(&release.binary_path)
+        .output()
+        .expect("run release binary");
     assert!(debug_run.status.success());
     assert!(release_run.status.success());
     assert_eq!(debug_run.stdout, release_run.stdout);
-    assert_eq!(String::from_utf8_lossy(&release_run.stdout), "Salve, Munde!\n");
+    assert_eq!(
+        String::from_utf8_lossy(&release_run.stdout),
+        "Salve, Munde!\n"
+    );
 }

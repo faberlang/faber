@@ -6,8 +6,8 @@
 
 use super::{
     check_committed_ledger, check_ledger_rows, generate_ledger_text, ledger_path,
-    parse_ledger_text, verify_committed_is_fresh, LedgerFile, RowOutcome, RustClass,
-    WasmLedgerRow, WasmTreatment, LEDGER_SCHEMA_VERSION,
+    parse_ledger_text, verify_committed_is_fresh, LedgerFile, RowOutcome, RustClass, WasmLedgerRow,
+    WasmTreatment, LEDGER_SCHEMA_VERSION,
 };
 use std::fs;
 
@@ -31,7 +31,10 @@ fn ledger_round_trip_preserves_rows() {
     let text = generate_ledger_text(&rows).expect("serialize");
     let file = parse_ledger_text(&text).expect("re-parse");
     assert_eq!(file.schema_version, LEDGER_SCHEMA_VERSION);
-    assert_eq!(file.rows, rows, "round-trip must preserve every row exactly");
+    assert_eq!(
+        file.rows, rows,
+        "round-trip must preserve every row exactly"
+    );
 }
 
 #[test]
@@ -39,15 +42,17 @@ fn ledger_generation_is_deterministic() {
     let rows = committed_rows();
     let first = generate_ledger_text(&rows).expect("first serialize");
     let second = generate_ledger_text(&rows).expect("second serialize");
-    assert_eq!(first, second, "regeneration of identical rows must be byte-identical");
+    assert_eq!(
+        first, second,
+        "regeneration of identical rows must be byte-identical"
+    );
 }
 
 #[test]
 fn committed_schema_version_is_current() {
     let file = committed_file();
     assert_eq!(
-        file.schema_version,
-        LEDGER_SCHEMA_VERSION,
+        file.schema_version, LEDGER_SCHEMA_VERSION,
         "committed ledger schema must be current"
     );
 }
@@ -57,7 +62,10 @@ fn committed_rows_are_sorted_by_path() {
     let rows = committed_rows();
     let mut sorted = rows.clone();
     sorted.sort_by(|left, right| left.path.cmp(&right.path));
-    assert_eq!(rows, sorted, "ledger rows must be sorted by corpus-relative path");
+    assert_eq!(
+        rows, sorted,
+        "ledger rows must be sorted by corpus-relative path"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -75,7 +83,8 @@ fn committed_ledger_passes_check() {
 fn committed_ledger_matches_live_measurement() {
     // Full closeout: re-run the frontend/MIR/Wasm probes and require the fresh
     // regeneration to be byte-identical to the committed ledger.
-    let summary = verify_committed_is_fresh().expect("committed ledger must match live measurement");
+    let summary =
+        verify_committed_is_fresh().expect("committed ledger must match live measurement");
     assert_eq!(summary.rows, committed_rows().len());
 }
 
@@ -144,10 +153,16 @@ fn ownerless_row_rejected() {
     // Removing the owner field makes the ledger text fail to parse.
     let text =
         fs::read_to_string(ledger_path()).expect("committed ledger must exist for these tests");
-    let line = text.lines().find(|line| line.trim_start().starts_with("owner = ")).expect("owner line");
+    let line = text
+        .lines()
+        .find(|line| line.trim_start().starts_with("owner = "))
+        .expect("owner line");
     let mutated = text.replace(line, "# owner removed for test");
     let error = parse_ledger_text(&mutated).expect_err("missing owner must fail to parse");
-    assert!(error.contains("owner"), "expected a missing-owner parse error, got: {error}");
+    assert!(
+        error.contains("owner"),
+        "expected a missing-owner parse error, got: {error}"
+    );
 }
 
 #[test]
@@ -175,7 +190,9 @@ fn obsolete_blocker_rejected() {
     rows[idx].blocker = "bogus_blocker".to_owned();
     let errors = check_ledger_rows(&rows);
     assert!(
-        errors.iter().any(|error| error.contains("obsolete/unknown blocker")),
+        errors
+            .iter()
+            .any(|error| error.contains("obsolete/unknown blocker")),
         "expected an obsolete-blocker error, got: {errors:?}"
     );
 }
@@ -205,7 +222,9 @@ fn policy_without_reason_rejected() {
     rows[idx].reason = None;
     let errors = check_ledger_rows(&rows);
     assert!(
-        errors.iter().any(|error| error.contains("without a policy reason")),
+        errors
+            .iter()
+            .any(|error| error.contains("without a policy reason")),
         "expected a policy-without-reason error, got: {errors:?}"
     );
 }
@@ -220,7 +239,9 @@ fn inconsistent_outcome_rejected() {
     rows[idx].outcome = RowOutcome::Gap;
     let errors = check_ledger_rows(&rows);
     assert!(
-        errors.iter().any(|error| error.contains("outcome") && error.contains("derived")),
+        errors
+            .iter()
+            .any(|error| error.contains("outcome") && error.contains("derived")),
         "expected an outcome/tier inconsistency error, got: {errors:?}"
     );
 }
@@ -248,7 +269,10 @@ fn unknown_enum_rejected() {
         fs::read_to_string(ledger_path()).expect("committed ledger must exist for these tests");
     let mutated = text.replacen("treatment = \"shared\"", "treatment = \"bogus\"", 1);
     let error = parse_ledger_text(&mutated).expect_err("unknown treatment enum must fail to parse");
-    assert!(error.contains("treatment"), "expected an unknown-enum parse error, got: {error}");
+    assert!(
+        error.contains("treatment"),
+        "expected an unknown-enum parse error, got: {error}"
+    );
 }
 
 // ---------------------------------------------------------------------------

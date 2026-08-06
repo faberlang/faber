@@ -28,7 +28,11 @@ fn llvm_host_exitus_declared_exit_code_matches_rust_oracle() {
             radix::cli::CliExit::Fixed(code) => Some(*code),
             _ => None,
         });
-    assert_eq!(exit_code, Some(1), "exitus fixture must declare exit code 1");
+    assert_eq!(
+        exit_code,
+        Some(1),
+        "exitus fixture must declare exit code 1"
+    );
     let lowered = radix::mir::lower_analyzed_unit_allowing_cli_entry_with_context(&mut analysis)
         .expect("exitus.fab CLI MIR lowering must succeed");
     let llvm = radix::mir::emit_llvm_text_probe_with_device_roles_and_exit(
@@ -53,8 +57,16 @@ fn llvm_host_exitus_declared_exit_code_matches_rust_oracle() {
         "exitus 1 must produce process exit 1: {}",
         probe.reason
     );
-    assert!(probe.stdout.is_empty(), "unexpected stdout: {:?}", probe.stdout);
-    assert!(probe.stderr.is_empty(), "unexpected stderr: {:?}", probe.stderr);
+    assert!(
+        probe.stdout.is_empty(),
+        "unexpected stdout: {:?}",
+        probe.stdout
+    );
+    assert!(
+        probe.stderr.is_empty(),
+        "unexpected stderr: {:?}",
+        probe.stderr
+    );
 }
 
 /// L9 (cee2f7b7): nota parity for optional-chain values — `nota` of a
@@ -539,8 +551,7 @@ fn llvm_host_octet_unsigned_display_matches_rust_output() {
 
     let probe = run_llvm_exemplum(&llvm_file, &temp_root, "octet", &fab_path);
     assert_eq!(
-        probe.stdout,
-        "5\n222\n128\n",
+        probe.stdout, "5\n222\n128\n",
         "octet bytes must display unsigned: {}",
         probe.reason
     );
@@ -579,8 +590,7 @@ fn llvm_host_modular_word_unsigned_display_matches_rust_output() {
 
     let probe = run_llvm_exemplum(&llvm_file, &temp_root, "modular-word-sha-round", &fab_path);
     assert_eq!(
-        probe.stdout,
-        "1567288269\n4197074466\n",
+        probe.stdout, "1567288269\n4197074466\n",
         "modulus<u32> values must display unsigned: {}",
         probe.reason
     );
@@ -619,8 +629,7 @@ fn llvm_host_f64_format_matches_rust_output() {
 
     let probe = run_llvm_exemplum(&llvm_file, &temp_root, "mori", &fab_path);
     assert_eq!(
-        probe.stdout,
-        "valor: 5.0\nvalor: 2\n",
+        probe.stdout, "valor: 5.0\nvalor: 2\n",
         "integral f64 must keep the .0 marker: {}",
         probe.reason
     );
@@ -796,7 +805,10 @@ fn llvm_host_tensor_shape_dims_matches_rust_output() {
 #[test]
 #[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_tensor_arithmetic_elementwise -- --ignored --nocapture"]
 fn llvm_host_tensor_arithmetic_elementwise_matches_rust_output() {
-    assert_opaque_fixture_output("tensor/arithmetic-elementwise.fab", "tensor-arithmetic-elementwise");
+    assert_opaque_fixture_output(
+        "tensor/arithmetic-elementwise.fab",
+        "tensor-arithmetic-elementwise",
+    );
 }
 
 /// L10 (fa1a5d8c): opaque-display family — `nota dims` renders `[2, 2]` after
@@ -804,7 +816,10 @@ fn llvm_host_tensor_arithmetic_elementwise_matches_rust_output() {
 #[test]
 #[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_lista_tensor_shaped -- --ignored --nocapture"]
 fn llvm_host_lista_tensor_shaped_matches_rust_output() {
-    assert_opaque_fixture_output("conversio/lista-tensor-shaped.fab", "conversio-lista-tensor-shaped");
+    assert_opaque_fixture_output(
+        "conversio/lista-tensor-shaped.fab",
+        "conversio-lista-tensor-shaped",
+    );
 }
 
 /// L10 (fa1a5d8c): opaque-display family — `nota dims` renders `[3, 3]` after
@@ -832,7 +847,10 @@ fn llvm_host_lista_methodi_copiae_matches_rust_output() {
 #[test]
 #[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_lista_methodi_functionales -- --ignored --nocapture"]
 fn llvm_host_lista_methodi_functionales_matches_rust_output() {
-    assert_opaque_fixture_output("lista/methodi-functionales.fab", "lista-methodi-functionales");
+    assert_opaque_fixture_output(
+        "lista/methodi-functionales.fab",
+        "lista-methodi-functionales",
+    );
 }
 
 /// L10 (fa1a5d8c): opaque-display family — mutated `lista<numerus>` renders
@@ -1054,8 +1072,7 @@ fn llvm_host_genus_creo_hook_matches_rust_output() {
     fs::write(&llvm_file, output.code).expect("write creo LLVM text");
     let probe = run_llvm_exemplum(&llvm_file, &temp_root, "genus-creo", &fab_path);
     assert_eq!(
-        probe.stdout,
-        "50\n100\n5\n10\n78.53975\n",
+        probe.stdout, "50\n100\n5\n10\n78.53975\n",
         "{}",
         probe.reason
     );
@@ -1149,7 +1166,12 @@ fn llvm_host_importa_two_module_link_matches_rust_oracle() {
         "importa-two-module",
         &fab_path,
     );
-    assert_eq!(probe.bucket, LlvmRunBucket::OutputMatched, "{}", probe.reason);
+    assert_eq!(
+        probe.bucket,
+        LlvmRunBucket::OutputMatched,
+        "{}",
+        probe.reason
+    );
     assert_eq!(probe.stdout, "Salve, Marcus!\n");
     assert!(
         probe.stderr.is_empty(),
@@ -1174,8 +1196,7 @@ fn llvm_host_importa_two_module_link_matches_rust_oracle() {
 #[test]
 #[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_geminus_two_module_link -- --ignored --nocapture"]
 fn llvm_host_geminus_two_module_link_matches_rust_oracle() {
-    const EXTERNAL_GREETING: &str =
-        "__faber_external_product_geminus_module_adiutor_func_greeting";
+    const EXTERNAL_GREETING: &str = "__faber_external_product_geminus_module_adiutor_func_greeting";
     const ENTRY_SOURCE: &str = r#"# geminus — local-import consumer of adiutor.fab
 importa ex "./adiutor" privata adiutor
 
@@ -1248,7 +1269,11 @@ incipit {
     );
     assert_eq!(
         build.manifest.modules,
-        build.modules.iter().map(|module| module.llvm_path.clone()).collect::<Vec<_>>(),
+        build
+            .modules
+            .iter()
+            .map(|module| module.llvm_path.clone())
+            .collect::<Vec<_>>(),
         "manifest module list must be the exact deterministic module list"
     );
 
@@ -1258,7 +1283,12 @@ incipit {
         "geminus-two-module",
         &fab_path,
     );
-    assert_eq!(probe.bucket, LlvmRunBucket::OutputMatched, "{}", probe.reason);
+    assert_eq!(
+        probe.bucket,
+        LlvmRunBucket::OutputMatched,
+        "{}",
+        probe.reason
+    );
     assert_eq!(probe.stdout, "Salve, Tullia!\n");
     assert!(
         probe.stderr.is_empty(),
@@ -1304,8 +1334,7 @@ incipit {
     fs::create_dir_all(&package_dir).expect("create chorda-consumer fixture dir");
     fs::write(package_dir.join("chorda-consumer.fab"), ENTRY_SOURCE)
         .expect("write chorda-consumer.fab");
-    fs::write(package_dir.join("chorda-consumer.expected"), EXPECTED)
-        .expect("write expected");
+    fs::write(package_dir.join("chorda-consumer.expected"), EXPECTED).expect("write expected");
     let fab_path = package_dir.join("chorda-consumer.fab");
 
     let config = radix::Config::default().with_target(Target::LlvmText);
@@ -1368,7 +1397,11 @@ incipit {
     );
     assert_eq!(
         build.manifest.modules,
-        build.modules.iter().map(|module| module.llvm_path.clone()).collect::<Vec<_>>(),
+        build
+            .modules
+            .iter()
+            .map(|module| module.llvm_path.clone())
+            .collect::<Vec<_>>(),
         "manifest module list must be the exact deterministic module list"
     );
 
@@ -1378,7 +1411,12 @@ incipit {
         "chorda-norma-graph",
         &fab_path,
     );
-    assert_eq!(probe.bucket, LlvmRunBucket::OutputMatched, "{}", probe.reason);
+    assert_eq!(
+        probe.bucket,
+        LlvmRunBucket::OutputMatched,
+        "{}",
+        probe.reason
+    );
     assert_eq!(probe.stdout, EXPECTED);
     assert!(
         probe.stderr.is_empty(),
@@ -1413,7 +1451,9 @@ fn llvm_host_declaration_only_entry_matches_rust_oracle() {
         panic!("proba/proba.fab did not produce LLVM text");
     };
     assert!(
-        output.code.contains("define %FaberRtExitV1 @__faber_program_entry_v1"),
+        output
+            .code
+            .contains("define %FaberRtExitV1 @__faber_program_entry_v1"),
         "declaration-only must still emit the real program entry:\n{}",
         output.code
     );
@@ -1466,8 +1506,7 @@ fn llvm_host_module_scope_statements_execute_once_in_order() {
     let fab_path = Path::new("module-scope.fab");
     let probe = run_llvm_exemplum(&llvm_file, &temp_root, "module-scope", fab_path);
     assert_eq!(
-        probe.stdout,
-        "prima\nsecunda\ntertia\n",
+        probe.stdout, "prima\nsecunda\ntertia\n",
         "module-scope statements must execute once in source order: {}",
         probe.reason
     );
@@ -1705,7 +1744,11 @@ fn llvm_host_nonnull_chain_matches() {
         );
         let expected =
             fs::read(fab_path.with_extension("expected")).expect("read non-null expected bytes");
-        assert_eq!(probe.stdout.as_bytes(), expected, "{path} byte-exact output");
+        assert_eq!(
+            probe.stdout.as_bytes(),
+            expected,
+            "{path} byte-exact output"
+        );
         assert_eq!(probe.exit_code, Some(0), "{path} exit code");
     }
 }
@@ -1736,12 +1779,15 @@ fn llvm_host_de_borrowed_iteration_matches_rust_output() {
     fs::write(&llvm_file, output.code).expect("write de LLVM text");
     let probe = run_llvm_exemplum(&llvm_file, &temp_root, "de", &fab_path);
     assert_eq!(
-        probe.stdout,
-        "nomen\naetas\n0\n1\n2\n",
+        probe.stdout, "nomen\naetas\n0\n1\n2\n",
         "tabula keys + lista indices must print: {}",
         probe.reason
     );
-    assert!(probe.stderr.is_empty(), "unexpected stderr: {:?}", probe.stderr);
+    assert!(
+        probe.stderr.is_empty(),
+        "unexpected stderr: {:?}",
+        probe.stderr
+    );
     assert_eq!(probe.exit_code, Some(0));
 }
 
@@ -1770,12 +1816,15 @@ fn llvm_host_octeti_unify_cross_assignment_matches_rust_output() {
     fs::write(&llvm_file, output.code).expect("write octeti unify LLVM text");
     let probe = run_llvm_exemplum(&llvm_file, &temp_root, "octeti-unify", &fab_path);
     assert_eq!(
-        probe.stdout,
-        "4\n222\n5\n2\n",
+        probe.stdout, "4\n222\n5\n2\n",
         "octeti methods on the cross-assigned array must match: {}",
         probe.reason
     );
-    assert!(probe.stderr.is_empty(), "unexpected stderr: {:?}", probe.stderr);
+    assert!(
+        probe.stderr.is_empty(),
+        "unexpected stderr: {:?}",
+        probe.stderr
+    );
     assert_eq!(probe.exit_code, Some(0));
 }
 
@@ -1802,9 +1851,7 @@ fn llvm_host_numerus_overflow_panics_with_rust_message() {
         panic!("numerus-overflow did not produce LLVM text");
     };
     assert!(
-        output
-            .code
-            .contains("llvm.sadd.with.overflow.i64"),
+        output.code.contains("llvm.sadd.with.overflow.i64"),
         "numerus add must use the checked intrinsic:\n{}",
         output.code
     );
@@ -1857,7 +1904,9 @@ fn llvm_host_tensor_structa_count_mismatch_panics_with_rust_message() {
         probe.reason
     );
     assert!(
-        probe.stderr.contains("tensor structa element count does not match shape"),
+        probe
+            .stderr
+            .contains("tensor structa element count does not match shape"),
         "structa error message: {:?}",
         probe.stderr
     );
@@ -1902,7 +1951,10 @@ fn llvm_host_l23_multi_arg_nota_grouping_matches_expected() {
         ("tabula/methodi-accessus.fab", "tabula-methodi-accessus"),
         ("sparsa/conversio.fab", "sparsa-conversio"),
         ("sparsa/decl.fab", "sparsa-decl"),
-        ("sparsa/sparsa-codegen-smoke.fab", "sparsa-sparsa-codegen-smoke"),
+        (
+            "sparsa/sparsa-codegen-smoke.fab",
+            "sparsa-sparsa-codegen-smoke",
+        ),
     ] {
         assert_tensor_fixture_output(rel, stem);
     }

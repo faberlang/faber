@@ -4,16 +4,15 @@ use super::{
     collection_op_contract, decompose_kernel_function, device_diag, is_transformer_recipe_op,
     kernel_plan_for_function, subchain_signature_for_emission_with_source, training_plan_facts,
     transformer_subchain_signature_for_emission_with_source, tuple_return_locals, BTreeMap,
-    BTreeSet, Binding, BufferId,
-    BufferIdentity, BufferLifetime, BufferRole, BufferVersion, CollectionKernelPlan,
-    DependencyEdge, DeviceProgram, DeviceProgramLifetime, DeviceResource, DeviceSemantics,
-    Diagnostic, HashMap, InitializationFact, InitializationPolicy, Interner, KernelLaunchPlan,
-    KernelUnit, LaunchId, LaunchUnit, LosslessMirCompanionEntry, MirCollectionOp, MirFunction,
-    MirFunctionId, MirIntrinsic, MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind,
-    MirKernelResourceRole, MirKernelShaderStage, MirKernelSignature, MirLocalId, MirStatementKind,
-    MirTensorStorageLayout, MirType, ObservationCadence, ObservationFact, SemanticValue,
-    SemanticValueId, SemanticValueOrigin, TypeTable, ValidatedMir, ValueBinding, ValueGeneration,
-    VecDeque,
+    BTreeSet, Binding, BufferId, BufferIdentity, BufferLifetime, BufferRole, BufferVersion,
+    CollectionKernelPlan, DependencyEdge, DeviceProgram, DeviceProgramLifetime, DeviceResource,
+    DeviceSemantics, Diagnostic, HashMap, InitializationFact, InitializationPolicy, Interner,
+    KernelLaunchPlan, KernelUnit, LaunchId, LaunchUnit, LosslessMirCompanionEntry, MirCollectionOp,
+    MirFunction, MirFunctionId, MirIntrinsic, MirKernelResource, MirKernelResourceAccess,
+    MirKernelResourceKind, MirKernelResourceRole, MirKernelShaderStage, MirKernelSignature,
+    MirLocalId, MirStatementKind, MirTensorStorageLayout, MirType, ObservationCadence,
+    ObservationFact, SemanticValue, SemanticValueId, SemanticValueOrigin, TypeTable, ValidatedMir,
+    ValueBinding, ValueGeneration, VecDeque,
 };
 
 // ---------------------------------------------------------------------------
@@ -734,10 +733,7 @@ pub(crate) fn device_program_for_lowered(
                 let alias_param = match output_index {
                     Some(output_index) => {
                         let full_tuple_slot = resource.source_local.is_some_and(|local| {
-                            return_tuple_locals
-                                .get(output_index as usize)
-                                .copied()
-                                == Some(local)
+                            return_tuple_locals.get(output_index as usize).copied() == Some(local)
                         });
                         if full_tuple_slot {
                             param_updates

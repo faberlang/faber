@@ -658,11 +658,14 @@ fn package_fmir_image_provisions_decomposed_companion_upstream_seed() {
     let config = radix::driver::Config::default()
         .with_stdlib(workspace)
         .with_target(radix::codegen::Target::Fmir);
-    let image = build_package_fmir_image(&config, dir.path(), &[])
-        .expect("the BERT-tiny image builds");
+    let image =
+        build_package_fmir_image(&config, dir.path(), &[]).expect("the BERT-tiny image builds");
     let bytes = std::fs::read(&image.image_path).expect("read the image");
     let loaded = load_fmir_image(&bytes, &image.image_path).expect("the image loads");
-    let device = loaded.device.as_ref().expect("the image carries a device section");
+    let device = loaded
+        .device
+        .as_ref()
+        .expect("the image carries a device section");
 
     // The program carries the companion's 1-element PerProgram input (the
     // reverse-AD seed) — proof the seed reached the device program even

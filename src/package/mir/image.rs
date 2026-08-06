@@ -108,13 +108,9 @@ pub(super) fn package_device_section(
         // gap): a 1-element Input buffer the program does not produce and
         // the manifest does not declare is the reverse-AD seed.
         if has_anonymous_param {
-            for program_name in kernel
-                .resources
-                .iter()
-                .filter(|resource| {
-                    resource.buffer.role == radix_mir::device_program::BufferRole::Input
-                })
-            {
+            for program_name in kernel.resources.iter().filter(|resource| {
+                resource.buffer.role == radix_mir::device_program::BufferRole::Input
+            }) {
                 if program_name.version.element_count == 1
                     && !device_inputs.contains_key(&program_name.buffer.name)
                     && !produced.contains(&program_name.buffer.name)
@@ -136,9 +132,7 @@ pub(super) fn package_device_section(
         for program_name in kernel
             .resources
             .iter()
-            .filter(|resource| {
-                resource.buffer.role == radix_mir::device_program::BufferRole::Input
-            })
+            .filter(|resource| resource.buffer.role == radix_mir::device_program::BufferRole::Input)
         {
             // A companion's 1-element input (the reverse-AD seed) is
             // provisioned above (or declared in the manifest) — never a

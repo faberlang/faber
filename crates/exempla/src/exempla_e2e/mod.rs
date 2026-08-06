@@ -4,9 +4,9 @@
 
 #![allow(dead_code)]
 
+mod cli_parity;
 mod common;
 mod conversio_target_matrix;
-mod cli_parity;
 mod gpu_workload;
 mod hir_target_matrix;
 // Shared LLVM-host classification + Stage 8 builder-parity proof. The module

@@ -181,7 +181,10 @@ incipit {
         norma_module.unit_path.display()
     );
     assert_eq!(
-        norma_module.llvm_path.file_name().map(|name| name.to_string_lossy().into_owned()),
+        norma_module
+            .llvm_path
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned()),
         Some("001-chorda-consumer-norma-chorda.ll".to_owned()),
         "Norma module file name must be deterministic and norma-prefixed"
     );
@@ -204,7 +207,11 @@ incipit {
     );
     assert_eq!(
         build.manifest.modules,
-        build.modules.iter().map(|module| module.llvm_path.clone()).collect::<Vec<_>>(),
+        build
+            .modules
+            .iter()
+            .map(|module| module.llvm_path.clone())
+            .collect::<Vec<_>>(),
         "manifest must list one module per unit including the selected Norma unit"
     );
 }
@@ -230,15 +237,11 @@ fn package_llvm_builder_skips_carried_provider_modules() {
              importa ex \"norma:{module}\" privata {module}\n\n\
              incipit {{\n}}\n"
         );
-        fs::write(
-            package_dir.join(format!("{module}-consumer.fab")),
-            source,
-        )
-        .expect("write entry");
+        fs::write(package_dir.join(format!("{module}-consumer.fab")), source).expect("write entry");
         let entry = package_dir.join(format!("{module}-consumer.fab"));
         let options = PackageLlvmOptions::new(dir.join("out"));
-        let build = build_package_llvm(&llvm_config(), &entry, &options)
-            .unwrap_or_else(|diagnostics| {
+        let build =
+            build_package_llvm(&llvm_config(), &entry, &options).unwrap_or_else(|diagnostics| {
                 panic!("{module}-consumer package LLVM build must succeed: {diagnostics:?}")
             });
 
@@ -287,8 +290,7 @@ incipit {
         .expect("solum-consumer package LLVM build must succeed");
 
     assert_eq!(build.modules.len(), 1, "entry unit only");
-    let entry_text =
-        fs::read_to_string(&build.modules[0].llvm_path).expect("read entry module");
+    let entry_text = fs::read_to_string(&build.modules[0].llvm_path).expect("read entry module");
     assert!(
         entry_text.contains("__faber_rt_v1_solum_write_text"),
         "entry must resolve solum.scribe to the versioned intrinsic:\n{entry_text}"
@@ -431,8 +433,7 @@ fn package_llvm_builder_cli_entry_emits_adapter_lane() {
 
     assert_eq!(build.modules.len(), 1, "single-unit CLI package");
     assert!(build.modules[0].is_entry);
-    let entry_text =
-        fs::read_to_string(&build.modules[0].llvm_path).expect("read CLI entry .ll");
+    let entry_text = fs::read_to_string(&build.modules[0].llvm_path).expect("read CLI entry .ll");
     assert!(
         entry_text.contains("@__faber_cli_descriptor_v1"),
         "CLI entry module must embed the static descriptor:\n{entry_text}"

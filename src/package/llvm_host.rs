@@ -163,11 +163,14 @@ pub fn ensure_llvm_runtime_archive() -> Result<PathBuf, Diagnostic> {
         ))
         .with_arg("issue", "llvm_host_runtime_archive_unavailable"));
     }
-    let archive = runtime_root.join("target").join("release").join(if cfg!(windows) {
-        "faber_host_llvm.lib"
-    } else {
-        "libfaber_host_llvm.a"
-    });
+    let archive = runtime_root
+        .join("target")
+        .join("release")
+        .join(if cfg!(windows) {
+            "faber_host_llvm.lib"
+        } else {
+            "libfaber_host_llvm.a"
+        });
     if archive.is_file() && runtime_source_is_stale(&runtime_root, &archive) {
         return Ok(archive);
     }
@@ -266,8 +269,7 @@ pub fn build_host_program(
 ) -> Result<LlvmHostBuild, Vec<Diagnostic>> {
     let host_triple = host_llvm_target_triple().map_err(|diagnostic| vec![diagnostic])?;
     let toolchain = discover_llvm_host_toolchain().map_err(|diagnostic| vec![diagnostic])?;
-    let runtime_archive =
-        ensure_llvm_runtime_archive().map_err(|diagnostic| vec![diagnostic])?;
+    let runtime_archive = ensure_llvm_runtime_archive().map_err(|diagnostic| vec![diagnostic])?;
 
     let layout = match discover_build_layout(input) {
         Ok(layout) => layout,
@@ -341,7 +343,12 @@ pub fn build_host_program(
         ))]
     })?;
     let (runtime_name, runtime_version) = runtime_artifact_metadata();
-    write_runtime_identity(&runtime_dir, &runtime_archive, &runtime_name, &runtime_version)?;
+    write_runtime_identity(
+        &runtime_dir,
+        &runtime_archive,
+        &runtime_name,
+        &runtime_version,
+    )?;
 
     let manifest_path = target_dir.join("link-manifest.toml");
     write_link_manifest(
@@ -497,9 +504,18 @@ fn write_link_manifest(
     let mut doc = toml::map::Map::new();
 
     let mut target = toml::map::Map::new();
-    target.insert("name".to_owned(), toml::Value::String("llvm-host".to_owned()));
-    target.insert("host_triple".to_owned(), toml::Value::String(record.host_triple.to_owned()));
-    target.insert("profile".to_owned(), toml::Value::String(record.profile.dir_name().to_owned()));
+    target.insert(
+        "name".to_owned(),
+        toml::Value::String("llvm-host".to_owned()),
+    );
+    target.insert(
+        "host_triple".to_owned(),
+        toml::Value::String(record.host_triple.to_owned()),
+    );
+    target.insert(
+        "profile".to_owned(),
+        toml::Value::String(record.profile.dir_name().to_owned()),
+    );
     doc.insert("target".to_owned(), toml::Value::Table(target));
 
     let mut tools = toml::map::Map::new();
@@ -510,7 +526,8 @@ fn write_link_manifest(
     tools.insert(
         "llvm_as_version".to_owned(),
         toml::Value::String(
-            tool_first_line_version(&record.toolchain.llvm_as).unwrap_or_else(|_| "unknown".to_owned()),
+            tool_first_line_version(&record.toolchain.llvm_as)
+                .unwrap_or_else(|_| "unknown".to_owned()),
         ),
     );
     tools.insert(
@@ -520,14 +537,20 @@ fn write_link_manifest(
     tools.insert(
         "clang_version".to_owned(),
         toml::Value::String(
-            tool_first_line_version(&record.toolchain.clang).unwrap_or_else(|_| "unknown".to_owned()),
+            tool_first_line_version(&record.toolchain.clang)
+                .unwrap_or_else(|_| "unknown".to_owned()),
         ),
     );
     if let Some(opt) = record.opt_tool {
-        tools.insert("opt".to_owned(), toml::Value::String(opt.display().to_string()));
+        tools.insert(
+            "opt".to_owned(),
+            toml::Value::String(opt.display().to_string()),
+        );
         tools.insert(
             "opt_version".to_owned(),
-            toml::Value::String(tool_first_line_version(opt).unwrap_or_else(|_| "unknown".to_owned())),
+            toml::Value::String(
+                tool_first_line_version(opt).unwrap_or_else(|_| "unknown".to_owned()),
+            ),
         );
     }
     doc.insert("toolchain".to_owned(), toml::Value::Table(tools));
@@ -557,7 +580,10 @@ fn write_link_manifest(
                 .collect(),
         ),
     );
-    link.insert("output".to_owned(), toml::Value::String(record.output.display().to_string()));
+    link.insert(
+        "output".to_owned(),
+        toml::Value::String(record.output.display().to_string()),
+    );
     link.insert(
         "entry_module".to_owned(),
         toml::Value::String(build.manifest.entry_module.display().to_string()),
@@ -566,14 +592,18 @@ fn write_link_manifest(
 
     if let Some(pipeline) = record.profile.opt_pipeline() {
         let mut opt = toml::map::Map::new();
-        opt.insert("pipeline".to_owned(), toml::Value::String(pipeline.to_owned()));
+        opt.insert(
+            "pipeline".to_owned(),
+            toml::Value::String(pipeline.to_owned()),
+        );
         doc.insert("opt".to_owned(), toml::Value::Table(opt));
     }
 
-    let text = toml::to_string_pretty(&toml::Value::Table(doc))
-        .map_err(|error| vec![crate::package_diagnostic_error(format!(
+    let text = toml::to_string_pretty(&toml::Value::Table(doc)).map_err(|error| {
+        vec![crate::package_diagnostic_error(format!(
             "cannot serialize llvm-host link manifest: {error}"
-        ))])?;
+        ))]
+    })?;
     fs::write(path, text).map_err(|error| {
         vec![crate::package_diagnostic_error(format!(
             "cannot write llvm-host link manifest {}: {error}",
@@ -595,16 +625,23 @@ fn write_runtime_identity(
     version: &str,
 ) -> Result<(), Vec<Diagnostic>> {
     let mut doc = toml::map::Map::new();
-    doc.insert("runtime_name".to_owned(), toml::Value::String(name.to_owned()));
-    doc.insert("runtime_version".to_owned(), toml::Value::String(version.to_owned()));
+    doc.insert(
+        "runtime_name".to_owned(),
+        toml::Value::String(name.to_owned()),
+    );
+    doc.insert(
+        "runtime_version".to_owned(),
+        toml::Value::String(version.to_owned()),
+    );
     doc.insert(
         "archive".to_owned(),
         toml::Value::String(archive.display().to_string()),
     );
-    let text = toml::to_string_pretty(&toml::Value::Table(doc))
-        .map_err(|error| vec![crate::package_diagnostic_error(format!(
+    let text = toml::to_string_pretty(&toml::Value::Table(doc)).map_err(|error| {
+        vec![crate::package_diagnostic_error(format!(
             "cannot serialize llvm-host runtime identity: {error}"
-        ))])?;
+        ))]
+    })?;
     let path = dir.join("identity.toml");
     fs::write(&path, text).map_err(|error| {
         vec![crate::package_diagnostic_error(format!(
@@ -648,9 +685,10 @@ fn runtime_artifact_metadata() -> (String, String) {
 
 /// First line of `tool --version` for manifest version recording.
 fn tool_first_line_version(tool: &Path) -> Result<String, String> {
-    let output = Command::new(tool).arg("--version").output().map_err(|error| {
-        format!("cannot execute {}: {error}", tool.display())
-    })?;
+    let output = Command::new(tool)
+        .arg("--version")
+        .output()
+        .map_err(|error| format!("cannot execute {}: {error}", tool.display()))?;
     if !output.status.success() {
         return Err(format!("{} --version failed", tool.display()));
     }
@@ -667,7 +705,13 @@ fn tool_first_line_version(tool: &Path) -> Result<String, String> {
 fn find_on_path(name: &str) -> Option<PathBuf> {
     let path = std::env::var_os("PATH")?;
     std::env::split_paths(&path)
-        .map(|directory| directory.join(if cfg!(windows) { format!("{name}.exe") } else { name.to_owned() }))
+        .map(|directory| {
+            directory.join(if cfg!(windows) {
+                format!("{name}.exe")
+            } else {
+                name.to_owned()
+            })
+        })
         .find(|candidate| candidate.is_file())
 }
 
