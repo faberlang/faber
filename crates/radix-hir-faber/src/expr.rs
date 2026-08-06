@@ -372,7 +372,12 @@ impl super::FaberCodegen {
                 writer.write("vacua");
             }
             HirExpressionKind::Struct(def_id, fields) => {
-                writer.write(&self.name_for_def(*def_id, names, interner));
+                let name = self
+                    .imported_def_spellings
+                    .get(def_id)
+                    .cloned()
+                    .unwrap_or_else(|| self.name_for_def(*def_id, names, interner));
+                writer.write(&name);
                 writer.write(" {");
                 for (idx, (name, value)) in fields.iter().enumerate() {
                     if idx > 0 {
@@ -682,7 +687,12 @@ impl super::FaberCodegen {
 
             match types.get(target) {
                 Type::Struct(def_id) => {
-                    writer.write(&self.name_for_def(*def_id, names, interner));
+                    let name = self
+                        .imported_type_spellings
+                        .get(&target)
+                        .cloned()
+                        .unwrap_or_else(|| self.name_for_def(*def_id, names, interner));
+                    writer.write(&name);
                     writer.write(" {");
                     for (idx, field) in entries.iter().enumerate() {
                         if idx > 0 {

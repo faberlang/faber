@@ -548,6 +548,7 @@ mod tests {
             &interner,
             &LatinSurface,
             &FxHashMap::default(),
+            &FxHashMap::default(),
         )
         .expect("empty HIR must emit");
         assert!(

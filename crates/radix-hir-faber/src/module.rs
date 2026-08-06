@@ -7,7 +7,7 @@ use crate::surface::KeywordSurface;
 use crate::trivia::{write_leading_trivia, TriviaIndex};
 use radix_codegen_shared::{CodeWriter, CodegenError};
 use radix_diagnostics::DiagnosticArg;
-use radix_hir::HirExpressionKind;
+use radix_hir::{DefId, HirExpressionKind};
 use radix_hir::{
     HirItem, HirItemKind, HirPresentation, HirProgram, HirProgramEnd, HirSourceAnchorId,
 };
@@ -35,6 +35,9 @@ pub struct FaberCodegen {
     /// nominal types, so re-emitted types keep their namespace even though
     /// the local name table has no entry for them.
     pub(crate) imported_type_spellings: FxHashMap<TypeId, String>,
+    /// `DefId` → qualified source spelling for imported nominals in
+    /// struct-literal construction expressions.
+    pub(crate) imported_def_spellings: FxHashMap<DefId, String>,
 }
 
 /// Emit canonical Faber source from analyzed HIR and its presentation.
@@ -42,9 +45,10 @@ pub struct FaberCodegen {
 /// The presentation sidecar is inseparable from the HIR value it annotates;
 /// an [`empty_presentation`] reproduces trivia-free canonical output.
 ///
-/// `imported_type_spellings` maps imported nominal `TypeId`s to their
-/// qualified source spelling (`base.Vector3`); pass an empty map when no
-/// import contract is available and imported types fall back to `def_N`.
+/// `imported_type_spellings` / `imported_def_spellings` map imported nominal
+/// `TypeId`s and `DefId`s to their qualified source spelling (`base.Vector3`);
+/// pass empty maps when no import contract is available and imported types
+/// fall back to `def_N`.
 ///
 /// # Errors
 ///
@@ -57,9 +61,11 @@ pub fn emit(
     interner: &Interner,
     surface: &impl KeywordSurface,
     imported_type_spellings: &FxHashMap<TypeId, String>,
+    imported_def_spellings: &FxHashMap<DefId, String>,
 ) -> Result<FaberOutput, CodegenError> {
     let mut codegen = FaberCodegen::default();
     codegen.imported_type_spellings = imported_type_spellings.clone();
+    codegen.imported_def_spellings = imported_def_spellings.clone();
     codegen.generate(hir, presentation, types, interner, surface)
 }
 
@@ -346,7 +352,7 @@ mod tests {
         let types = TypeTable::new();
         let interner = Interner::new();
 
-        let err = emit(&hir, &empty_presentation(), &types, &interner, &TestSurface, &FxHashMap::default())
+        let err = emit(&hir, &empty_presentation(), &types, &interner, &TestSurface, &FxHashMap::default(), &FxHashMap::default())
             .expect_err("legacy Cede HIR must fail closed before Faber emission");
 
         assert!(
