@@ -514,3 +514,78 @@ fn llvm_host_f64_format_matches_rust_output() {
     );
     assert_eq!(probe.exit_code, Some(0));
 }
+
+/// L8 (acbd2a3d): tensor outcome family — compile a corpus fixture through the
+/// dev-stdlib LLVM host path, run the linked binary, and assert the stdout is
+/// byte-exact against the sibling `.expected` sidecar (the Rust oracle).
+fn assert_tensor_fixture_output(fab_relative: &str, stem: &str) {
+    let fab_path = crate::paths::corpus_dir().join(fab_relative);
+    let result = Compiler::new(
+        Config::default()
+            .with_target(Target::LlvmText)
+            .with_dev_stdlib(),
+    )
+    .compile(&fab_path);
+    assert!(
+        result.success(),
+        "{fab_relative} LLVM compile failed: {:?}",
+        result.diagnostics
+    );
+    let Some(Output::LlvmText(output)) = result.output else {
+        panic!("{fab_relative} did not produce LLVM text");
+    };
+    let temp_root = super::super::common::make_temp_root();
+    let llvm_file = temp_root.join(format!("{stem}.ll"));
+    fs::write(&llvm_file, output.code).expect("write {fab_relative} LLVM text");
+    let probe = run_llvm_exemplum(&llvm_file, &temp_root, stem, &fab_path);
+    assert_eq!(
+        probe.bucket,
+        LlvmRunBucket::OutputMatched,
+        "{fab_relative}: {}",
+        probe.reason
+    );
+    assert!(
+        probe.stderr.is_empty(),
+        "{fab_relative}: unexpected stderr: {:?}",
+        probe.stderr
+    );
+    assert_eq!(probe.exit_code, Some(0), "{fab_relative}");
+}
+
+/// L8 (acbd2a3d): tensor outcome family — bracket access (`accipe`/`ponde`
+/// with a `u32` index vector) previously read zeros because the LLVM host
+/// rejected non-i64 index arrays. The runtime now widens any i64-fit integer
+/// index vector, and the fixture matches the Rust oracle (`3.0 3.0 4.0 4.0 4.0`).
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_tensor_bracket_access -- --ignored --nocapture"]
+fn llvm_host_tensor_bracket_access_matches_rust_output() {
+    assert_tensor_fixture_output("tensor/bracket-access.fab", "tensor-bracket-access");
+}
+
+/// L8 (acbd2a3d): tensor outcome family — `u32` thread-id index vectors and
+/// `lista<u32>` origins route through `accipe`/`ponde` and match the oracle
+/// (`0.0 9.0 9.0 7.0`).
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_tensor_index_width -- --ignored --nocapture"]
+fn llvm_host_tensor_index_width_matches_rust_output() {
+    assert_tensor_fixture_output("tensor/index-width.fab", "tensor-index-width");
+}
+
+/// L8 (acbd2a3d): tensor outcome family — element-width `u8`/`u16` tensors
+/// convert through the versioned `tensor_convert` bridge and rank correctly
+/// (`4 1 0 0 0 0 0`). Previously the host rejected the u8/u16 carrier kinds and
+/// the subsequent rank read uninitialized stack memory (nondeterministic).
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_conversio_tensor_convert -- --ignored --nocapture"]
+fn llvm_host_conversio_tensor_convert_matches_rust_output() {
+    assert_tensor_fixture_output("conversio/tensor.fab", "conversio-tensor");
+}
+
+/// L8 (acbd2a3d): tensor outcome family — `tensor<textus, [N]>` universal
+/// container: `strue`/`accipe` route PTR-kind elements through the tensor ABI
+/// and the read text matches the oracle (`alpha`).
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_tensor_textus -- --ignored --nocapture"]
+fn llvm_host_tensor_textus_matches_rust_output() {
+    assert_tensor_fixture_output("tensor/textus.fab", "tensor-textus");
+}
