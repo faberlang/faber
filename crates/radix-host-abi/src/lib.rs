@@ -300,6 +300,14 @@ abi_string_family! {
         SYMBOL_REGEX_GET_TEXT = "__faber_rt_v1_regex_get_text",
         SYMBOL_REGEX_LITERAL_1_PTR_TO_PTR = "__faber_rt_v1_regex_literal_1_ptr_to_ptr",
         SYMBOL_READ_LINE_0_TO_PTR = "__faber_rt_v1_read_line_0_to_ptr",
+        // P5 (promotion packet cursor-stream-abi): the shared cursor-stream
+        // materialization row. One fixed symbol whose signature carries the
+        // generator function id (the callee-encoded `cursor_stream_{callee}`
+        // dialect of the LLVM lane is retired in favor of this row — D5
+        // closed-table rule). The host invokes the generator to completion
+        // and collects its `cede` yields into a `lista<T>` (the stepper's
+        // `eval_cursor_stream` is the reference semantics).
+        SYMBOL_CURSOR_STREAM = "__faber_rt_v1_cursor_stream",
         SYMBOL_INTERVAL_NEW = "__faber_rt_v1_interval_new",
         SYMBOL_INTERVAL_INTERSECT = "__faber_rt_v1_interval_intersect",
         SYMBOL_INTERVAL_UNION = "__faber_rt_v1_interval_union",
