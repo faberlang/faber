@@ -257,7 +257,6 @@ fn tensor_workload_proof_rung_indices_are_contiguous_from_zero() {
 /// failure and fails the test. The script is a committed triga deliverable;
 /// its absence is a repo defect and fails loudly, it is not a skip.
 #[test]
-#[ignore = "known breakage: GPU chain dispatch proof times out; tracked separately"]
 fn tensor_workload_proof_rung1_device_gpu_chain_dispatch() {
     // ── 1. Compile the exemplar through the faber pipeline ────────────────
     let row = tensor_workload_proof_rows()[1];
@@ -424,7 +423,6 @@ fn tensor_workload_proof_rung1_device_gpu_chain_dispatch() {
 /// is the rung-2 `OutputChecked` evidence gate; a regression of the barrier
 /// ordering fails loudly here (exit 1) and in the wgsl_text ordering test.
 #[test]
-#[ignore = "known breakage: GPU chain dispatch proof times out; tracked separately"]
 fn tensor_workload_proof_rung2_device_gpu_chain_dispatch() {
     // ── 1. Compile the exemplar through the faber pipeline ────────────────
     let row = tensor_workload_proof_rows()[2];
