@@ -753,8 +753,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             // local/temp declarations and the const-copy statement checks
             // admit them exactly as the emitters' dead-skip does (Metal
             // 26424928f Gap 1; NVVM emits the harmless native-i64 store).
-            self.dead_const_copy_slots =
-                dead_non_kernel_scalar_const_slots(function, self.layouts);
+            self.dead_const_copy_slots = dead_non_kernel_scalar_const_slots(function, self.layouts);
             // S5A-U4: the output-set tuple aggregation slots of this function
             // (its own result-tuple return aggregation plus a decomposed
             // multi-output source's kept result-tuple local) — the ONLY
