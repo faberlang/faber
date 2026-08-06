@@ -8,6 +8,9 @@ publish = false
 
 [dev-dependencies]
 
-[lints]
-workspace = true
+# Bundled into the faber core-support archive, which ships crate roots
+# without the radix workspace root manifest. Keep lints self-contained so
+# the archive stays parseable standalone (see faber core-support contract).
+[lints.clippy]
+pedantic = "deny"
 
