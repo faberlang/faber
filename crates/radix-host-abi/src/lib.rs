@@ -191,6 +191,8 @@ abi_string_family! {
         SYMBOL_INSTANS_FROM_VALOR = "__faber_rt_v1_instans_from_valor",
         SYMBOL_INSTANS_RETAG = "__faber_rt_v1_instans_retag",
         SYMBOL_INSTANS_GET_TEXT = "__faber_rt_v1_instans_get_text",
+        SYMBOL_INSTANS_DISPLAY = "__faber_rt_v1_instans_display",
+        SYMBOL_NUMERUS_OVERFLOW = "__faber_rt_v1_numerus_overflow",
         SYMBOL_COMPARE_LT = "__faber_rt_v1_compare_lt_2_ptr_ptr_to_i1",
         SYMBOL_COMPARE_GT = "__faber_rt_v1_compare_gt_2_ptr_ptr_to_i1",
         SYMBOL_COMPARE_LTE = "__faber_rt_v1_compare_lte_2_ptr_ptr_to_i1",
