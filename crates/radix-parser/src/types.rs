@@ -289,10 +289,8 @@ impl Parser {
         // binary-cup member. The hole arm rejects a directly-following cup;
         // this guards the `first` slot defensively against future callers.
         if matches!(first.kind, TypeExprKind::UnionHole) {
-            return Err(
-                ParseError::structured(ParseErrorKind::InvalidType, start)
-                    .with_arg("issue", "unexpected_cup_after_union_hole"),
-            );
+            return Err(ParseError::structured(ParseErrorKind::InvalidType, start)
+                .with_arg("issue", "unexpected_cup_after_union_hole"));
         }
         let mut members = Vec::new();
         flatten_union_member(first, &mut members);
