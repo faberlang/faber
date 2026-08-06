@@ -628,8 +628,9 @@ pub fn walk_type_expr<V: Visitor>(visitor: &mut V, ty: &TypeExpr) {
         return;
     };
     match &ty.kind {
-        TypeExprKind::Infer => {}
-        TypeExprKind::UnionHole => {}
+        // Both holes are leaves with no nested type syntax to walk. Kept in
+        // one arm: the shared empty body is intentional (clippy::match_same_arms).
+        TypeExprKind::Infer | TypeExprKind::UnionHole => {}
         TypeExprKind::Tensor(elem, figura)
         | TypeExprKind::Sparsa(elem, figura)
         | TypeExprKind::Vector(elem, figura)
