@@ -21,8 +21,9 @@ use super::{
 // mir-split seam), so they import directly from the schema crate.
 use radix_mir::abi::{MirBroadcastDeclaration, MirRankExtensionBroadcast};
 use radix_mir_fmir::schema::{
-    WireAxisReductionPlan, WireBroadcastDeclaration, WireBroadcastFact, WireLayerNormalizationPlan,
-    WireRowSoftmaxPlan,
+    WireAxisReductionPlan, WireBroadcastDeclaration, WireBroadcastFact,
+    WireCausalMaskedSoftmaxPlan, WireGatherPlan, WireLayerNormalizationPlan,
+    WireRmsNormalizationPlan, WireRopePlan, WireRowSoftmaxPlan,
 };
 // Doc-link surface: the carried generation type appears only in an
 // intra-doc link here; the import keeps the link resolvable from this module.
@@ -606,6 +607,33 @@ fn wire_plan(
         CollectionKernelPlan::LayerNormalization(plan) => {
             WireCollectionKernelPlan::LayerNormalization(WireLayerNormalizationPlan {
                 axis: plan.axis,
+            })
+        }
+        // GI3-1: the pinned-row inference recipes gain their mechanical wire
+        // mirrors (the F1 decision, audit 112dc81a; S6-C2 precedent) — the
+        // plans are program facts carried field-for-field under wire 7, no
+        // `FmirDeviceSection` field change, no version bump.
+        CollectionKernelPlan::Gather(plan) => WireCollectionKernelPlan::Gather(WireGatherPlan {
+            table_rows: plan.table_rows,
+            table_cols: plan.table_cols,
+            id_count: plan.id_count,
+        }),
+        CollectionKernelPlan::RmsNormalization(plan) => {
+            WireCollectionKernelPlan::RmsNormalization(WireRmsNormalizationPlan {
+                axis: plan.axis,
+                epsilon_bits: plan.epsilon_bits,
+                width: plan.width,
+            })
+        }
+        CollectionKernelPlan::Rope(plan) => WireCollectionKernelPlan::Rope(WireRopePlan {
+            pos: plan.pos,
+            dim: plan.dim,
+            width: plan.width,
+        }),
+        CollectionKernelPlan::CausalMaskedSoftmax(plan) => {
+            WireCollectionKernelPlan::CausalMaskedSoftmax(WireCausalMaskedSoftmaxPlan {
+                rows: plan.rows,
+                cols: plan.cols,
             })
         }
     }
