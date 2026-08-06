@@ -105,7 +105,14 @@ impl super::FaberCodegen {
 
         match &expr.kind {
             HirExpressionKind::Path(def_id) => {
-                writer.write(&self.name_for_def(*def_id, names, interner));
+                if self.self_def_ids.contains(def_id) {
+                    // A `Path` to a struct/enum def in value position can only
+                    // come from `ego` (self): a bare type name is not a value.
+                    // Print the localized self keyword instead of the type name.
+                    writer.write(surface.keyword(TokenKind::Ego));
+                } else {
+                    writer.write(&self.name_for_def(*def_id, names, interner));
+                }
             }
             HirExpressionKind::Literal(lit) => self.write_literal(lit, interner, surface, writer),
             HirExpressionKind::ReadLine(_) => writer.write(surface.contextual_keyword("lege")),

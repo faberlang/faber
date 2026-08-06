@@ -13,7 +13,7 @@ use radix_hir::{
 };
 use radix_lexer::{Interner, Span, TokenKind};
 use radix_types::{TypeId, TypeTable};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Canonical Faber output from HIR re-emission.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,6 +38,10 @@ pub struct FaberCodegen {
     /// `DefId` → qualified source spelling for imported nominals in
     /// struct-literal construction expressions.
     pub(crate) imported_def_spellings: FxHashMap<DefId, String>,
+    /// Def ids of this unit's struct/enum items: a `Path` to one of these in
+    /// value position is a `ego` (self) reference and must re-emit as the
+    /// self keyword, not the type name.
+    pub(crate) self_def_ids: FxHashSet<DefId>,
 }
 
 /// Emit canonical Faber source from analyzed HIR and its presentation.
@@ -113,6 +117,14 @@ impl FaberCodegen {
 
         let mut writer = CodeWriter::new();
         let names = self.collect_names(hir);
+        self.self_def_ids = hir
+            .items
+            .iter()
+            .filter_map(|item| match &item.kind {
+                HirItemKind::Struct(_) | HirItemKind::Enum(_) => Some(item.def_id),
+                _ => None,
+            })
+            .collect();
 
         for (idx, item) in hir.items.iter().enumerate() {
             if is_compiler_injected_item(item) {
