@@ -1885,3 +1885,49 @@ fn llvm_host_modular_word_family_matches() {
         assert_llvm_host_fixture_exits_zero(path);
     }
 }
+
+/// L23 (d57baa50): the multi-arg nota grouping space-joins EVERY argument
+/// (mirroring the HIR-Rust lane) into ONE diagnostic line, so the closed rows
+/// match their sibling `.expected` byte-exact with exit 0.
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_l23_multi_arg_nota_grouping -- --ignored --nocapture"]
+fn llvm_host_l23_multi_arg_nota_grouping_matches_expected() {
+    for (rel, stem) in [
+        ("itera/nidificatus.fab", "itera-nidificatus"),
+        ("lista/methodi-accessus.fab", "lista-methodi-accessus"),
+        ("tabula/methodi-accessus.fab", "tabula-methodi-accessus"),
+        ("sparsa/conversio.fab", "sparsa-conversio"),
+        ("sparsa/decl.fab", "sparsa-decl"),
+        ("sparsa/sparsa-codegen-smoke.fab", "sparsa-sparsa-codegen-smoke"),
+    ] {
+        assert_tensor_fixture_output(rel, stem);
+    }
+}
+
+/// L23 (d57baa50): closed rows without a `.expected` sidecar assert the exact
+/// Rust-oracle stdout (space-joined multi-arg notas, option payloads rendered
+/// via `display_option` semantics).
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_l23_multi_arg_nota_stdout -- --ignored --nocapture"]
+fn llvm_host_l23_multi_arg_nota_grouping_matches_rust_output() {
+    for (rel, stem, expected) in [
+        (
+            "intrinseca/textus-transformationes.fab",
+            "textus-transformationes",
+            "Ave  AVE ROMA   ave roma \nAve Roma [\"Ave\", \"Roma\"] Ave Munde\n",
+        ),
+        (
+            "intrinseca/vacua-ascribere.fab",
+            "vacua-ascribere",
+            "42 2 verum\n95 1 secundus\n",
+        ),
+        (
+            "itera/de.fab",
+            "itera-de",
+            "nomen\nurbs\nnomen Marcus\nurbs Roma\nindex: 0 valor: 10\nindex: 1 valor: 20\nindex: 2 valor: 30\nalpha\nbeta\n",
+        ),
+    ] {
+        assert_opaque_fixture_stdout(rel, stem, expected);
+    }
+}
+
