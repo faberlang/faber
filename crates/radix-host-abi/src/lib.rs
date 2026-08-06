@@ -229,6 +229,13 @@ abi_string_family! {
         SYMBOL_COMPARE_NE = "__faber_rt_v1_compare_ne_2_ptr_ptr_to_i1",
         SYMBOL_CONVERT_RUNTIME_PTR = "__faber_rt_v1_convert_runtime_1_ptr_to_ptr",
         SYMBOL_TEMPUS_NUNC = "__faber_rt_v1_tempus_nunc",
+        // P3 (wasm-host-parity residual): the async tempus wait (`dormiet`/
+        // `expectet`) capability. The LLVM lane inlines a `poll` sleep; the
+        // wasm module cannot syscall, so the wait routes through a closed-set
+        // host row taking the millisecond duration (numerus i64 carrier) and
+        // returning the (vacuum) payload carrier. The wasm host implements the
+        // sleep; the stub host default-values the import (instant wait).
+        SYMBOL_TEMPUS_WAIT = "__faber_rt_v1_tempus_wait",
         SYMBOL_TOML_SOLVE = "__faber_rt_v1_toml_solve",
         SYMBOL_VALOR_CAPE = "__faber_rt_v1_valor_cape",
         SYMBOL_JSON_PANGE = "__faber_rt_v1_json_pange",
