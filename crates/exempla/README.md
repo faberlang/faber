@@ -24,7 +24,18 @@ examples/             app tracks only
 
 ## Run
 
-From the faber repo root:
+Exempla is **not** part of the Faber agent default suite. Plain
+`cargo nextest run` in this repo uses a narrow default profile that
+**excludes** this crate. Full-workspace (including exempla) is:
+
+```bash
+# EXPENSIVE — release / explicit only (see faber/AGENTS.md)
+./scripta/release-gate
+# or:
+cargo nextest run --profile full
+```
+
+Targeted exempla runs (still opt-in):
 
 ```bash
 cargo test -p exempla --lib
@@ -32,8 +43,9 @@ cargo test -p exempla --lib mir_target_coverage_matrix -- --ignored --nocapture
 cargo test -p exempla --test e2e_harness exempla_rust_e2e -- --ignored --nocapture
 ```
 
-Radix `./scripta/test --full` forwards the matrix/parity subset here via
-`--manifest-path ../faber/Cargo.toml`.
+Radix `./scripta/test --full` / `--e2e` forwards matrix/parity/backend harnesses
+here via `--manifest-path ../faber/Cargo.toml`. Those ladder stages are also
+expensive and must not be agent-proactive.
 
 ## Paths
 

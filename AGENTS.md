@@ -9,26 +9,79 @@ from sibling repos listed in `core-support-manifest.txt`.
 
 ```text
 src/                    CLI + package pipeline
-crates/exempla/         end-to-end test harness
+crates/exempla/         corpus / language e2e harness (workspace member)
 crates/hygiene-ratchet/ production code hygiene budgets
-tests/                  integration tests (emit, hygiene)
+tests/                  integration tests (emit, run, hygiene, …)
+scripta/test            cheap progressive ladder (agent default)
+scripta/release-gate    EXPENSIVE full-workspace closeout (release only)
+.config/nextest.toml    nextest profiles (default is narrow)
 build.rs                core-support assembler (reads core-support-manifest.txt)
 core-support-manifest.txt  sibling repo paths relative to faberlang container
 ```
 
-## Validation ladder
+## Test law (cheap-first — no exceptions)
 
-The sibling radix ladder is the workspace test gate: `../radix/scripta/test`
-(run from `radix/`). Run it at the appropriate stage depth during and at the
-end of an implementation:
+### Agents must not proactively run expensive surfaces
 
-- During work: `--check` (stages 1–3) or `--stage 1-4` for the touched surface.
-- Closeout: `--stage 1-6` (or `--full`); `--e2e <target>` for codegen e2e.
-- Stages 3 (proba), 5 (matrix), and 6 (parity) run this repo's binary and the
-  exempla corpus, so faber changes must pass them before closeout.
-- Inner loop: `cargo nextest run -p faber --lib` plus the hygiene ratchet gate
-  `cargo test --test hygiene` (budgets in `tests/hygiene.rs`: no new
-  `.expect(`/`.unwrap()`/`panic!`/`unreachable!`/`let _ =` in `src`).
+| Surface | Command | When |
+| --- | --- | --- |
+| **Default (agents)** | `./scripta/test` or `cargo nextest run` | Every implementation loop |
+| **Named test** | `cargo nextest run -E 'test(name)'` | Fixing one failure |
+| **Unit + package_test** | `./scripta/test --stage unit` | Explicit need for package_test |
+| **Product integration** | `./scripta/test --stage product` | Explicit need for `tests/*` |
+| **Full workspace** | `./scripta/release-gate` | **Release prep or operator said so** |
+| **Language matrices / e2e** | `../radix/scripta/test --stage 5-6` / `--e2e` | **Release / explicit only** |
+
+**Forbidden for agents without an explicit operator request:**
+
+- `./scripta/release-gate`
+- `cargo nextest run --profile full`
+- `cargo nextest run --workspace` (pulls exempla + every binary)
+- `cargo nextest run --profile product` as a “safety sweep”
+- Re-running the full suite after every single-test fix
+
+After fixing one failure: re-run **that test** (or stage 1). Do **not** run
+release-gate “to make sure nothing else broke” unless the operator asked for
+release/full closeout.
+
+### What `cargo nextest run` means here
+
+`.config/nextest.toml` makes the **default** profile cheap:
+
+- package `faber`, library tests only
+- **excludes** `package_test` megasuite
+- **excludes** `tests/*` integration binaries
+- **excludes** `crates/exempla`
+
+Profiles:
+
+| Profile | Filter |
+| --- | --- |
+| `default` | faber lib minus `package_test` |
+| `unit` | all faber lib (includes `package_test`) |
+| `product` | all faber package tests (lib + integration) |
+| `full` | entire workspace including exempla |
+
+### Faber ladder (`./scripta/test`)
+
+Progressive stages (default = stage 1 only):
+
+1. **default** — hygiene + nextest `--profile default`
+2. **unit** — nextest `--profile unit` (slow; includes `package_test`)
+3. **product** — nextest `--profile product` (slow; spawns CLI / nested cargo)
+
+There is **no** progressive stage for full workspace or exempla. That is
+`./scripta/release-gate` only.
+
+### Radix ladder (compiler + language proofs)
+
+The sibling radix ladder remains the compiler gate: `../radix/scripta/test`
+from `radix/`. Stages 5–6 and `--e2e` are language closeout (expensive). They
+are not the Faber agent default either.
+
+- During compiler work: `--check` or `--stage 1-4` as appropriate.
+- Language closeout: `--stage 1-6` / `--e2e` only when explicitly needed or
+  for release.
 
 ## CI dependencies
 
@@ -51,10 +104,11 @@ tagged commit, or the build fails. Follow this exact order:
 1. Bump version in `Cargo.toml` (`version = "X.Y.Z"`).
 2. Run `cargo update` to regenerate `Cargo.lock`.
 3. Verify: `cargo build --locked --release --bin faber` passes.
-4. Verify: `cargo nextest run` passes (or known-ignored tests only).
-   For inner-loop verification during development, scope to touched crates:
-   `cargo nextest run -p faber --lib`. Full-workspace runs are auditor-only
-   at theme boundaries.
+4. Verify expensive product suite: **`./scripta/release-gate --locked-release-build`**
+   (or `./scripta/release-gate` if the release binary was already built).
+   This is the only place full-workspace nextest is required for a release.
+   Optional language closeout: `../radix/scripta/test --full` and/or `--e2e`
+   when the release includes compiler/corpus claims.
 5. **Single commit** containing both the version bump and the regenerated
    `Cargo.lock`. Do not commit them separately.
 6. Tag that commit: `git tag vX.Y.Z`.

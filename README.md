@@ -41,6 +41,24 @@ End users of released binaries do not need sibling checkouts. Building this
 crate from source requires the sibling Radix, Cista, `faber-runtime`, and
 `hosts` checkouts used by the local `faberlang/` layout.
 
+## Tests (cheap-first)
+
+| Command | Cost | Use |
+| --- | --- | --- |
+| `./scripta/test` | cheap | Default agent / day-to-day loop |
+| `cargo nextest run` | cheap | Same as stage 1 nextest (default profile) |
+| `./scripta/test --stage unit` | slow | Explicit: includes `package_test` |
+| `./scripta/test --stage product` | slow | Explicit: integration binaries under `tests/` |
+| `./scripta/release-gate` | **expensive** | **Release prep only** (full workspace + exempla) |
+
+`cargo nextest run` does **not** run the full workspace. Profiles live in
+`.config/nextest.toml` (`default` / `unit` / `product` / `full`).
+
+Agents must not run `./scripta/release-gate` or `--profile full` unless the
+operator is preparing a release or explicitly requests that gate. Language
+corpus matrices and backend e2e stay on the radix ladder
+(`../radix/scripta/test --stage 5-6` / `--e2e`), also explicit-only.
+
 ## Commands
 
 - `faber check` / `build` / `run` / `test`
