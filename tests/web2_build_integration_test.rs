@@ -42,6 +42,9 @@ version = "0.1.0"
 [paths]
 entry = "main.fab"
 
+[reader]
+locale = "la"
+
 [build]
 target = "ts"
 kind = "bin"

@@ -162,10 +162,10 @@ fn emit_reflection_prints_wgsl_sidecar_json() {
 
 #[test]
 fn emit_faber_target_routes_to_canonical_faber_output() {
-    let output = run_faber_emit_faber_stdin("incipit {\n  nota \"ok\"\n}\n");
+    let output = run_faber_emit_faber_stdin("main {\n  print \"ok\"\n}\n");
 
     assert!(
-        output.contains("incipit {"),
+        output.contains("main {"),
         "expected Faber output:\n{output}"
     );
     assert!(

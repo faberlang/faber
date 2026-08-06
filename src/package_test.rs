@@ -1789,7 +1789,7 @@ fn assert_package_corpus_llvm_smoke(relative: &str, label: &str) {
         .join("../radix/corpus")
         .join(relative);
     let emitted = with_lowered_package_mir(
-        &Config::default().with_stdlib(dev_norma_library_home()),
+        &Config::default(),
         &entry,
         |lowered| {
             let interner = lowered
@@ -10869,6 +10869,9 @@ version = "0.1.0"
 [paths]
 entry = "main.fab"
 
+[reader]
+locale = "la"
+
 [build]
 target = "ts"
 kind = "bin"
@@ -10921,6 +10924,9 @@ version = "0.1.0"
 
 [paths]
 entry = "main.fab"
+
+[reader]
+locale = "la"
 
 [build]
 target = "ts"
@@ -11469,6 +11475,9 @@ version = "0.1.0"
 
 [paths]
 entry = "main.fab"
+
+[reader]
+locale = "la"
 
 [build]
 target = "ts"
