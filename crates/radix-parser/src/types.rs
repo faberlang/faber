@@ -39,10 +39,10 @@ impl Parser {
     #[allow(dead_code)]
     pub(super) fn try_parse_type(&mut self) -> Result<Option<TypeExpr>, ParseError> {
         // Check for type start (mode prefix or base: '_', ident, '(', or later ∪ handled inside parse_type)
-        if self.check_keyword(TokenKind::De)
-            || self.check_keyword(TokenKind::In)
-            || self.check_keyword_in_slot("iuncta")
-            || self.check_keyword_in_slot("modulus")
+        if self.check_keyword_ident(TokenKind::De)
+            || self.check_keyword_ident(TokenKind::In)
+            || self.check_keyword_ident(TokenKind::Iuncta)
+            || self.check_keyword_ident(TokenKind::Modulus)
             || matches!(self.peek().kind, TokenKind::Underscore(_))
             || matches!(self.peek().kind, TokenKind::Ident(_))
             || self.check(&TokenKind::LParen)
@@ -70,9 +70,9 @@ impl Parser {
         let start = self.current_span();
 
         // Ownership mode: de/in (prefix). Nullable is no longer a prefix; use T ∪ nihil.
-        let mode = if self.eat_keyword(TokenKind::De) {
+        let mode = if self.eat_keyword_ident(TokenKind::De) {
             Some(TypeMode::De)
-        } else if self.eat_keyword(TokenKind::In) {
+        } else if self.eat_keyword_ident(TokenKind::In) {
             Some(TypeMode::In)
         } else {
             None
@@ -97,21 +97,29 @@ impl Parser {
             TypeExprKind::Infer
         } else {
             // Named type (including 'nihil' as type name)
-            let name = if self.check_keyword_in_slot("nihil") {
+            let name = if self.check_keyword_ident(TokenKind::Nihil) {
                 let span = self.peek().span;
                 self.advance();
                 self.keyword_ident("nihil", span)
-            } else if self.check_keyword_in_slot("modulus") {
+            } else if self.check_keyword_ident(TokenKind::Modulus) {
                 let span = self.peek().span;
                 self.advance();
                 self.keyword_ident("modulus", span)
-            } else if self.check_keyword_in_slot("iuncta") {
+            } else if self.check_keyword_ident(TokenKind::Iuncta) {
                 let span = self.peek().span;
                 self.advance();
                 self.keyword_ident("iuncta", span)
             } else {
                 let ident = self.parse_ident()?;
-                self.canonical_type_ident(ident)
+                // Canonicalize a type spelling to its latin identity only for
+                // a single-part type. A qualified prefix is an import binding
+                // (namespace) and must keep its authored spelling — a binding
+                // may coincide with a localized type spelling (e.g. `object`).
+                if self.check(&TokenKind::Dot) {
+                    ident
+                } else {
+                    self.canonical_type_ident(ident)
+                }
             };
 
             let mut path = vec![name];
@@ -147,7 +155,7 @@ impl Parser {
                 radix_types::numeric_width::sparsa_sugar_width_marker(&name_str)
             {
                 self.parse_sparsa_width_sugar(name, width)?
-            } else if self.eat(&TokenKind::Lt) {
+            } else if self.eat(&TokenKind::LtAscii) {
                 if name_str == "atomic" {
                     let elem = Box::new(self.parse_type()?);
                     if self.eat(&TokenKind::Comma) {
@@ -157,13 +165,13 @@ impl Parser {
                         )
                         .with_arg("issue", "atomic_single_element"));
                     }
-                    self.expect(&TokenKind::Gt, "expected '>'")?;
+                    self.expect(&TokenKind::GtAscii, "expected '>'")?;
                     TypeExprKind::Atomic(elem)
                 } else if name_str == "promissum" {
                     let success = Box::new(self.parse_type()?);
                     let kind = if self.eat(&TokenKind::ExitArrow) {
                         let alternate = Box::new(self.parse_type()?);
-                        self.expect(&TokenKind::Gt, "expected '>'")?;
+                        self.expect(&TokenKind::GtAscii, "expected '>'")?;
                         TypeExprKind::PromissumFailable(success, alternate)
                     } else {
                         if self.eat(&TokenKind::Comma) {
@@ -173,7 +181,7 @@ impl Parser {
                             )
                             .with_arg("issue", "promissum_alternate_uses_exit_arrow"));
                         }
-                        self.expect(&TokenKind::Gt, "expected '>'")?;
+                        self.expect(&TokenKind::GtAscii, "expected '>'")?;
                         TypeExprKind::Named(name, vec![*success])
                     };
                     kind
@@ -200,7 +208,7 @@ impl Parser {
                         .with_arg("issue", issue));
                     }
                     let shape = self.parse_figura()?;
-                    self.expect(&TokenKind::Gt, "expected '>'")?;
+                    self.expect(&TokenKind::GtAscii, "expected '>'")?;
                     if name_str == "tensor" {
                         TypeExprKind::Tensor(elem, shape)
                     } else if name_str == "sparsa" {
@@ -218,7 +226,7 @@ impl Parser {
                             break;
                         }
                     }
-                    self.expect(&TokenKind::Gt, "expected '>'")?;
+                    self.expect(&TokenKind::GtAscii, "expected '>'")?;
                     if name_str == "iuncta" && params.len() > 16 {
                         return Err(
                             ParseError::structured(ParseErrorKind::InvalidType, name.span)
@@ -389,7 +397,7 @@ impl Parser {
     }
 
     fn reject_type_sugar_angle_bracket(&mut self, sugar: &'static str) -> Result<(), ParseError> {
-        if self.check(&TokenKind::Lt) {
+        if self.check(&TokenKind::LtAscii) {
             let issue = match sugar {
                 "lista" => "lista_sugar_angle_bracket_form",
                 "vector" => "vector_sugar_angle_bracket_form",

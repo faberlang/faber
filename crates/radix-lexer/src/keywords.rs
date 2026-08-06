@@ -1,24 +1,29 @@
 //! Keyword spelling registry for lexer and language-tool policy.
 //!
-//! The scanner delegates normal-mode keyword recognition to this registry. It
-//! records which spellings are current keywords, which are annotation names,
-//! which are intentionally contextual, and which spellings are aliases for
-//! migration or teaching purposes.
+//! The registry is the single source of truth for keyword identity. Every
+//! keyword — in any reader locale — resolves to a locale-independent identity
+//! token via [`lookup_keyword_spec`]; the parser claims keywords by that
+//! identity in its grammar slots.
 //!
 //! WHY THIS EXISTS
 //! ===============
-//! Faber's front end is still moving some words from globally reserved tokens
-//! toward parser-owned or metadata-owned contexts. Keeping that intent in a
+//! Keywords are locale items: a reader pack re-spells the same identity for
+//! each language, and the lexer never emits keyword tokens — every keyword
+//! lexes as an identifier with its latin key recorded, so the parser resolves
+//! identity through this registry in any locale. Keeping that intent in a
 //! structured registry lets diagnostics and explain output work from one
 //! taxonomy instead of rediscovering policy from a large scanner `match`.
 //!
 //! INVARIANTS
 //! ==========
-//! - `token_kind: Some(_)` means the current lexer can emit that token in at
-//!   least one source mode; `None` means the spelling is tracked metadata and
-//!   should lex as an identifier today.
-//! - `Alias` entries name their canonical spelling but may still lex as their
-//!   own token while migration diagnostics are developed.
+//! - `token_kind: Some(_)` is the keyword's locale-independent **identity**
+//!   token. It is never emitted by the lexer (there are no reserved words);
+//!   the parser references keywords by this identity.
+//! - `scope` records where a keyword is claimed (parser-owned slots, test
+//!   surface, annotation names, or aliases). `Global` does not exist — no
+//!   keyword is reserved everywhere.
+//! - `Alias` entries name their canonical spelling; the alias spelling is
+//!   claimed by identity in the canonical keyword's slots.
 //! - Annotation spellings are registry entries, not normal-mode reserved words.
 //! - Keyword groups declare source-surface completeness constraints for future
 //!   reader packs; missing one member of a group is a pack validation error.
@@ -39,10 +44,8 @@ use super::token::TokenKind;
 pub enum KeywordScope {
     /// Reserved anywhere normal-mode keyword recognition runs.
     ///
-    /// Transitional: rows that stop emitting a token (`token_kind: None`) must
-    /// migrate off `Global` — a tokenless row is not reserved, the parser
-    /// claims it by spelling in its grammar slots. The registry test
-    /// `tokenless_rows_must_not_be_global` enforces this.
+    /// Legacy: no keyword carries `Global` scope — there are no reserved
+    /// words. The variant remains for API compatibility.
     Global,
 
     /// Intended for one or more parser contexts, even if currently lexed as a keyword.
@@ -248,7 +251,7 @@ pub struct KeywordSpec {
     /// Source spelling as users write it.
     pub text: &'static str,
 
-    /// Token emitted by the current lexer, or `None` for metadata-only entries.
+    /// Locale-independent keyword identity token (never emitted by the lexer).
     pub token_kind: Option<TokenKind>,
 
     /// Ownership and reservation policy for this spelling.
@@ -259,7 +262,10 @@ pub struct KeywordSpec {
 }
 
 impl KeywordSpec {
-    /// Return whether the live lexer currently emits a keyword token here.
+    /// Return whether this keyword has an identity token.
+    ///
+    /// Every registered keyword has one; the lexer never emits keyword tokens,
+    /// so this is identity presence, not lexer emission.
     #[must_use]
     pub fn currently_lexes_as_keyword(&self) -> bool {
         self.token_kind.is_some()
@@ -387,73 +393,73 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     // === Keywords: Declarations ===
     KeywordSpec {
         text: "discretio",
-        token_kind: None,
+        token_kind: Some(TokenKind::Discretio),
         scope: KeywordScope::Contextual(DECLARATION_INTRODUCER),
         category: KeywordCategory::Declaration,
     },
     KeywordSpec {
         text: "fixum",
-        token_kind: None,
+        token_kind: Some(TokenKind::Fixum),
         scope: KeywordScope::Contextual(DECLARATION_INTRODUCER),
         category: KeywordCategory::Declaration,
     },
     KeywordSpec {
         text: "functio",
-        token_kind: None,
+        token_kind: Some(TokenKind::Functio),
         scope: KeywordScope::Contextual(DECLARATION_INTRODUCER),
         category: KeywordCategory::Declaration,
     },
     KeywordSpec {
         text: "genus",
-        token_kind: None,
+        token_kind: Some(TokenKind::Genus),
         scope: KeywordScope::Contextual(DECLARATION_INTRODUCER),
         category: KeywordCategory::Declaration,
     },
     KeywordSpec {
         text: "iuncta",
-        token_kind: None,
+        token_kind: Some(TokenKind::Iuncta),
         scope: KeywordScope::Contextual(TYPE_NAME_OR_CONSTRUCTOR),
         category: KeywordCategory::Declaration,
     },
     KeywordSpec {
         text: "implendum",
-        token_kind: None,
+        token_kind: Some(TokenKind::Implendum),
         scope: KeywordScope::Contextual(DECLARATION_INTRODUCER),
         category: KeywordCategory::Declaration,
     },
     KeywordSpec {
         text: "importa",
         token_kind: Some(TokenKind::Importa),
-        scope: KeywordScope::Global,
+        scope: KeywordScope::Contextual(DECLARATION_INTRODUCER),
         category: KeywordCategory::Declaration,
     },
     KeywordSpec {
         text: "modulus",
-        token_kind: None,
+        token_kind: Some(TokenKind::Modulus),
         scope: KeywordScope::Contextual(TYPE_NAME),
         category: KeywordCategory::TypeOperation,
     },
     KeywordSpec {
         text: "ordo",
-        token_kind: None,
+        token_kind: Some(TokenKind::Ordo),
         scope: KeywordScope::Contextual(DECLARATION_INTRODUCER),
         category: KeywordCategory::Declaration,
     },
     KeywordSpec {
         text: "sit",
-        token_kind: None,
+        token_kind: Some(TokenKind::Sit),
         scope: KeywordScope::Contextual(DECLARATION_INTRODUCER),
         category: KeywordCategory::Declaration,
     },
     KeywordSpec {
         text: "typus",
-        token_kind: None,
+        token_kind: Some(TokenKind::Typus),
         scope: KeywordScope::Contextual(DECLARATION_INTRODUCER),
         category: KeywordCategory::Declaration,
     },
     KeywordSpec {
         text: "varia",
-        token_kind: None,
+        token_kind: Some(TokenKind::Varia),
         scope: KeywordScope::Contextual(DECLARATION_INTRODUCER),
         category: KeywordCategory::Declaration,
     },
@@ -550,112 +556,112 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     },
     KeywordSpec {
         text: "sponte",
-        token_kind: None,
+        token_kind: Some(TokenKind::Sponte),
         scope: KeywordScope::Contextual(DECLARATION_MARKER),
         category: KeywordCategory::Modifier,
     },
     // === Keywords: Control flow ===
     KeywordSpec {
         text: "casu",
-        token_kind: None,
+        token_kind: Some(TokenKind::Casu),
         scope: KeywordScope::Contextual(CONTROL_FLOW),
         category: KeywordCategory::ControlFlow,
     },
     KeywordSpec {
         text: "ceterum",
-        token_kind: None,
+        token_kind: Some(TokenKind::Ceterum),
         scope: KeywordScope::Contextual(CONTROL_FLOW),
         category: KeywordCategory::ControlFlow,
     },
     KeywordSpec {
         text: "custodi",
         token_kind: Some(TokenKind::Custodi),
-        scope: KeywordScope::Global,
+        scope: KeywordScope::Contextual(CONTROL_FLOW),
         category: KeywordCategory::ControlFlow,
     },
     KeywordSpec {
         text: "discerne",
-        token_kind: None,
+        token_kind: Some(TokenKind::Discerne),
         scope: KeywordScope::Contextual(CONTROL_FLOW),
         category: KeywordCategory::ControlFlow,
     },
     KeywordSpec {
         text: "dum",
-        token_kind: None,
+        token_kind: Some(TokenKind::Dum),
         scope: KeywordScope::Contextual(CONTROL_FLOW),
         category: KeywordCategory::ControlFlow,
     },
     KeywordSpec {
         text: "elige",
-        token_kind: None,
+        token_kind: Some(TokenKind::Elige),
         scope: KeywordScope::Contextual(CONTROL_FLOW),
         category: KeywordCategory::ControlFlow,
     },
     KeywordSpec {
         text: "ergo",
-        token_kind: None,
+        token_kind: Some(TokenKind::Ergo),
         scope: KeywordScope::Contextual(CONTROL_FLOW),
         // Compact statement-body joint only; clausura uses glyph TokenKind::Therefore.
         category: KeywordCategory::ControlFlow,
     },
     KeywordSpec {
         text: "fac",
-        token_kind: None,
+        token_kind: Some(TokenKind::Fac),
         scope: KeywordScope::Contextual(CONTROL_FLOW),
         category: KeywordCategory::ControlFlow,
     },
     KeywordSpec {
         text: "itera",
         token_kind: Some(TokenKind::Itera),
-        scope: KeywordScope::Global,
+        scope: KeywordScope::Contextual(CONTROL_FLOW),
         category: KeywordCategory::ControlFlow,
     },
     KeywordSpec {
         text: "secus",
-        token_kind: None,
+        token_kind: Some(TokenKind::Secus),
         scope: KeywordScope::Contextual(CONTROL_FLOW),
         category: KeywordCategory::ControlFlow,
     },
     KeywordSpec {
         text: "si",
-        token_kind: None,
+        token_kind: Some(TokenKind::Si),
         scope: KeywordScope::Contextual(CONTROL_FLOW),
         category: KeywordCategory::ControlFlow,
     },
     KeywordSpec {
         text: "sic",
         token_kind: Some(TokenKind::Sic),
-        scope: KeywordScope::Global,
+        scope: KeywordScope::Contextual(CONTROL_FLOW),
         category: KeywordCategory::ControlFlow,
     },
     KeywordSpec {
         text: "sin",
-        token_kind: None,
+        token_kind: Some(TokenKind::Sin),
         scope: KeywordScope::Contextual(CONTROL_FLOW),
         category: KeywordCategory::ControlFlow,
     },
     // === Keywords: Transfer ===
     KeywordSpec {
         text: "perge",
-        token_kind: None,
+        token_kind: Some(TokenKind::Perge),
         scope: KeywordScope::Contextual(CONTROL_FLOW),
         category: KeywordCategory::Transfer,
     },
     KeywordSpec {
         text: "redde",
-        token_kind: None,
+        token_kind: Some(TokenKind::Redde),
         scope: KeywordScope::Contextual(CONTROL_FLOW),
         category: KeywordCategory::Transfer,
     },
     KeywordSpec {
         text: "rumpe",
-        token_kind: None,
+        token_kind: Some(TokenKind::Rumpe),
         scope: KeywordScope::Contextual(CONTROL_FLOW),
         category: KeywordCategory::Transfer,
     },
     KeywordSpec {
         text: "tacet",
-        token_kind: None,
+        token_kind: Some(TokenKind::Tacet),
         scope: KeywordScope::Contextual(STATEMENT_INTRODUCER),
         category: KeywordCategory::Transfer,
     },
@@ -663,37 +669,37 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     KeywordSpec {
         text: "adfirma",
         token_kind: Some(TokenKind::Adfirma),
-        scope: KeywordScope::Global,
+        scope: KeywordScope::Contextual(CONTROL_FLOW),
         category: KeywordCategory::ErrorHandling,
     },
     KeywordSpec {
         text: "cape",
         token_kind: Some(TokenKind::Cape),
-        scope: KeywordScope::Global,
+        scope: KeywordScope::Contextual(CONTROL_FLOW),
         category: KeywordCategory::ErrorHandling,
     },
     KeywordSpec {
         text: "iace",
         token_kind: Some(TokenKind::Iace),
-        scope: KeywordScope::Global,
+        scope: KeywordScope::Contextual(CONTROL_FLOW),
         category: KeywordCategory::ErrorHandling,
     },
     KeywordSpec {
         text: "mori",
         token_kind: Some(TokenKind::Mori),
-        scope: KeywordScope::Global,
+        scope: KeywordScope::Contextual(CONTROL_FLOW),
         category: KeywordCategory::ErrorHandling,
     },
     // === Keywords: Async ===
     KeywordSpec {
         text: "cede",
         token_kind: Some(TokenKind::Cede),
-        scope: KeywordScope::Global,
+        scope: KeywordScope::Contextual(CONTROL_FLOW),
         category: KeywordCategory::Async,
     },
     KeywordSpec {
         text: "clausura",
-        token_kind: None,
+        token_kind: Some(TokenKind::Clausura),
         scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER),
         category: KeywordCategory::Async,
     },
@@ -702,132 +708,132 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     // parser-owned grammar slots (eat_identifier_text); not globally reserved.
     KeywordSpec {
         text: "fiet",
-        token_kind: None,
+        token_kind: Some(TokenKind::Fiet),
         scope: KeywordScope::Contextual(CALLABLE_POSTURE),
         category: KeywordCategory::Async,
     },
     KeywordSpec {
         text: "fiunt",
-        token_kind: None,
+        token_kind: Some(TokenKind::Fiunt),
         scope: KeywordScope::Contextual(CALLABLE_POSTURE),
         category: KeywordCategory::Async,
     },
     KeywordSpec {
         text: "fient",
-        token_kind: None,
+        token_kind: Some(TokenKind::Fient),
         scope: KeywordScope::Contextual(CALLABLE_POSTURE),
         category: KeywordCategory::Async,
     },
     // === Contextual control-operation spellings (token_kind: None) ===
     KeywordSpec {
         text: "figendum",
-        token_kind: None,
+        token_kind: Some(TokenKind::Figendum),
         scope: KeywordScope::Contextual(CONTROL_OPERATION),
         category: KeywordCategory::Async,
     },
     KeywordSpec {
         text: "variandum",
-        token_kind: None,
+        token_kind: Some(TokenKind::Variandum),
         scope: KeywordScope::Contextual(CONTROL_OPERATION),
         category: KeywordCategory::Async,
     },
     KeywordSpec {
         text: "reddet",
-        token_kind: None,
+        token_kind: Some(TokenKind::Reddet),
         scope: KeywordScope::Contextual(CONTROL_OPERATION),
         category: KeywordCategory::Async,
     },
     KeywordSpec {
         text: "tacebit",
-        token_kind: None,
+        token_kind: Some(TokenKind::Tacebit),
         scope: KeywordScope::Contextual(CONTROL_OPERATION),
         category: KeywordCategory::Async,
     },
     // === Keywords: Boolean/null ===
     KeywordSpec {
         text: "falsum",
-        token_kind: None,
+        token_kind: Some(TokenKind::Falsum),
         scope: KeywordScope::Contextual(LITERAL),
         category: KeywordCategory::Literal,
     },
     KeywordSpec {
         text: "nihil",
-        token_kind: None,
+        token_kind: Some(TokenKind::Nihil),
         scope: KeywordScope::Contextual(LITERAL),
         category: KeywordCategory::Literal,
     },
     KeywordSpec {
         text: "verum",
-        token_kind: None,
+        token_kind: Some(TokenKind::Verum),
         scope: KeywordScope::Contextual(LITERAL),
         category: KeywordCategory::Literal,
     },
     // === Keywords: Logical operators ===
     KeywordSpec {
         text: "aut",
-        token_kind: None,
+        token_kind: Some(TokenKind::Aut),
         scope: KeywordScope::Contextual(OPERATOR),
         category: KeywordCategory::Operator,
     },
     KeywordSpec {
         text: "est",
-        token_kind: None,
+        token_kind: Some(TokenKind::Est),
         scope: KeywordScope::Contextual(OPERATOR),
         category: KeywordCategory::Operator,
     },
     KeywordSpec {
         text: "et",
-        token_kind: None,
+        token_kind: Some(TokenKind::Et),
         scope: KeywordScope::Contextual(OPERATOR),
         category: KeywordCategory::Operator,
     },
     KeywordSpec {
         text: "non",
-        token_kind: None,
+        token_kind: Some(TokenKind::Non),
         scope: KeywordScope::Contextual(OPERATOR),
         category: KeywordCategory::Operator,
     },
     KeywordSpec {
         text: "vel",
-        token_kind: None,
+        token_kind: Some(TokenKind::Vel),
         scope: KeywordScope::Contextual(OPERATOR),
         category: KeywordCategory::Operator,
     },
     // === Keywords: Objects ===
     KeywordSpec {
         text: "ego",
-        token_kind: None,
+        token_kind: Some(TokenKind::Ego),
         scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER),
         category: KeywordCategory::Object,
     },
     KeywordSpec {
         text: "finge",
-        token_kind: None,
+        token_kind: Some(TokenKind::Finge),
         scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER),
         category: KeywordCategory::Object,
     },
     KeywordSpec {
         text: "implet",
-        token_kind: None,
+        token_kind: Some(TokenKind::Implet),
         scope: KeywordScope::Contextual(GENUS_HEADER),
         category: KeywordCategory::Object,
     },
     KeywordSpec {
         text: "sub",
-        token_kind: None,
+        token_kind: Some(TokenKind::Sub),
         scope: KeywordScope::Contextual(GENUS_HEADER),
         category: KeywordCategory::Object,
     },
     // === Keywords: Output ===
     KeywordSpec {
         text: "mone",
-        token_kind: None,
+        token_kind: Some(TokenKind::Mone),
         scope: KeywordScope::Contextual(SCRIBE_STATEMENT),
         category: KeywordCategory::Output,
     },
     KeywordSpec {
         text: "nota",
-        token_kind: None,
+        token_kind: Some(TokenKind::Nota),
         scope: KeywordScope::Contextual(SCRIBE_STATEMENT),
         category: KeywordCategory::Output,
     },
@@ -839,7 +845,7 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     },
     KeywordSpec {
         text: "vide",
-        token_kind: None,
+        token_kind: Some(TokenKind::Vide),
         scope: KeywordScope::Contextual(SCRIBE_STATEMENT),
         category: KeywordCategory::Output,
     },
@@ -853,33 +859,33 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     KeywordSpec {
         text: "incipiet",
         token_kind: Some(TokenKind::Incipiet),
-        scope: KeywordScope::Global,
+        scope: KeywordScope::Contextual(DECLARATION_INTRODUCER),
         category: KeywordCategory::EntryPoint,
     },
     KeywordSpec {
         text: "incipit",
         token_kind: Some(TokenKind::Incipit),
-        scope: KeywordScope::Global,
+        scope: KeywordScope::Contextual(DECLARATION_INTRODUCER),
         category: KeywordCategory::EntryPoint,
     },
     // === Keywords: Resource management ===
     KeywordSpec {
         text: "cura",
-        token_kind: None,
+        token_kind: Some(TokenKind::Cura),
         scope: KeywordScope::Contextual(STATEMENT_INTRODUCER),
         category: KeywordCategory::Resource,
     },
     // === Keywords: Endpoint ===
     KeywordSpec {
         text: "ad",
-        token_kind: None,
+        token_kind: Some(TokenKind::Ad),
         scope: KeywordScope::Contextual(ROUTE_EXPRESSION),
         category: KeywordCategory::Endpoint,
     },
     // === Keywords: Misc ===
     KeywordSpec {
         text: "ab",
-        token_kind: None,
+        token_kind: Some(TokenKind::Ab),
         scope: KeywordScope::Contextual(ITERATION_MODE),
         category: KeywordCategory::Misc,
     },
@@ -892,7 +898,7 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     KeywordSpec {
         text: "ex",
         token_kind: Some(TokenKind::Ex),
-        scope: KeywordScope::Global,
+        scope: KeywordScope::Contextual(DECLARATION_INTRODUCER),
         category: KeywordCategory::Misc,
     },
     KeywordSpec {
@@ -903,31 +909,31 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     },
     KeywordSpec {
         text: "lege",
-        token_kind: None,
+        token_kind: Some(TokenKind::Lege),
         scope: KeywordScope::Contextual(BUILTIN_CALL),
         category: KeywordCategory::Misc,
     },
     KeywordSpec {
         text: "lineam",
-        token_kind: None,
+        token_kind: Some(TokenKind::Lineam),
         scope: KeywordScope::Contextual(BUILTIN_CALL),
         category: KeywordCategory::Misc,
     },
     KeywordSpec {
         text: "omnia",
-        token_kind: None,
+        token_kind: Some(TokenKind::Omnia),
         scope: KeywordScope::Contextual(DECLARATION_MARKER),
         category: KeywordCategory::Misc,
     },
     KeywordSpec {
         text: "praefixum",
-        token_kind: None,
+        token_kind: Some(TokenKind::Praefixum),
         scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER),
         category: KeywordCategory::Misc,
     },
     KeywordSpec {
         text: "scriptum",
-        token_kind: None,
+        token_kind: Some(TokenKind::Scriptum),
         scope: KeywordScope::Contextual(BUILTIN_CALL),
         category: KeywordCategory::Misc,
     },
@@ -946,31 +952,31 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     // === Keywords: Ranges ===
     KeywordSpec {
         text: "ante",
-        token_kind: None,
+        token_kind: Some(TokenKind::Ante),
         scope: KeywordScope::Contextual(RANGE_OPERATOR),
         category: KeywordCategory::Range,
     },
     KeywordSpec {
         text: "inter",
-        token_kind: None,
+        token_kind: Some(TokenKind::Inter),
         scope: KeywordScope::Contextual(RANGE_OPERATOR),
         category: KeywordCategory::Range,
     },
     KeywordSpec {
         text: "intra",
-        token_kind: None,
+        token_kind: Some(TokenKind::Intra),
         scope: KeywordScope::Contextual(RANGE_OPERATOR),
         category: KeywordCategory::Range,
     },
     KeywordSpec {
         text: "per",
-        token_kind: None,
+        token_kind: Some(TokenKind::Per),
         scope: KeywordScope::Contextual(RANGE_OPERATOR),
         category: KeywordCategory::Range,
     },
     KeywordSpec {
         text: "usque",
-        token_kind: None,
+        token_kind: Some(TokenKind::Usque),
         scope: KeywordScope::Contextual(RANGE_OPERATOR),
         category: KeywordCategory::Range,
     },
@@ -1105,61 +1111,61 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     // === Keywords: Annotation ===
     KeywordSpec {
         text: "brevis",
-        token_kind: None,
+        token_kind: Some(TokenKind::Brevis),
         scope: KeywordScope::Contextual(ANNOTATION_MODIFIER),
         category: KeywordCategory::Annotation,
     },
     KeywordSpec {
         text: "cli",
-        token_kind: None,
+        token_kind: Some(TokenKind::Cli),
         scope: KeywordScope::Annotation,
         category: KeywordCategory::Annotation,
     },
     KeywordSpec {
         text: "cursor",
-        token_kind: None,
+        token_kind: Some(TokenKind::Cursor),
         scope: KeywordScope::Annotation,
         category: KeywordCategory::Annotation,
     },
     KeywordSpec {
         text: "descriptio",
-        token_kind: None,
+        token_kind: Some(TokenKind::Descriptio),
         scope: KeywordScope::Contextual(ANNOTATION_MODIFIER),
         category: KeywordCategory::Annotation,
     },
     KeywordSpec {
         text: "futura",
-        token_kind: None,
+        token_kind: Some(TokenKind::Futura),
         scope: KeywordScope::Annotation,
         category: KeywordCategory::Annotation,
     },
     KeywordSpec {
         text: "imperium",
-        token_kind: None,
+        token_kind: Some(TokenKind::Imperium),
         scope: KeywordScope::Annotation,
         category: KeywordCategory::Annotation,
     },
     KeywordSpec {
         text: "longum",
-        token_kind: None,
+        token_kind: Some(TokenKind::Longum),
         scope: KeywordScope::Contextual(ANNOTATION_MODIFIER),
         category: KeywordCategory::Annotation,
     },
     KeywordSpec {
         text: "operandus",
-        token_kind: None,
+        token_kind: Some(TokenKind::Operandus),
         scope: KeywordScope::Annotation,
         category: KeywordCategory::Annotation,
     },
     KeywordSpec {
         text: "optio",
-        token_kind: None,
+        token_kind: Some(TokenKind::Optio),
         scope: KeywordScope::Annotation,
         category: KeywordCategory::Annotation,
     },
     KeywordSpec {
         text: "ubique",
-        token_kind: None,
+        token_kind: Some(TokenKind::Ubique),
         scope: KeywordScope::Contextual(ANNOTATION_MODIFIER),
         category: KeywordCategory::Annotation,
     },
@@ -1168,49 +1174,49 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     // device, …) while HIR keeps Latin family ids.
     KeywordSpec {
         text: "nucleum",
-        token_kind: None,
+        token_kind: Some(TokenKind::Nucleum),
         scope: KeywordScope::Annotation,
         category: KeywordCategory::Annotation,
     },
     KeywordSpec {
         text: "machina",
-        token_kind: None,
+        token_kind: Some(TokenKind::Machina),
         scope: KeywordScope::Annotation,
         category: KeywordCategory::Annotation,
     },
     KeywordSpec {
         text: "vertex",
-        token_kind: None,
+        token_kind: Some(TokenKind::Vertex),
         scope: KeywordScope::Annotation,
         category: KeywordCategory::Annotation,
     },
     KeywordSpec {
         text: "fragment",
-        token_kind: None,
+        token_kind: Some(TokenKind::Fragment),
         scope: KeywordScope::Annotation,
         category: KeywordCategory::Annotation,
     },
     KeywordSpec {
         text: "nondum",
-        token_kind: None,
+        token_kind: Some(TokenKind::Nondum),
         scope: KeywordScope::Annotation,
         category: KeywordCategory::Annotation,
     },
     KeywordSpec {
         text: "verte",
-        token_kind: None,
+        token_kind: Some(TokenKind::Verte),
         scope: KeywordScope::Annotation,
         category: KeywordCategory::Annotation,
     },
     KeywordSpec {
         text: "nomen",
-        token_kind: None,
+        token_kind: Some(TokenKind::Nomen),
         scope: KeywordScope::Contextual(ANNOTATION_MODIFIER),
         category: KeywordCategory::Annotation,
     },
     KeywordSpec {
         text: "radix",
-        token_kind: None,
+        token_kind: Some(TokenKind::Radix),
         scope: KeywordScope::Annotation,
         category: KeywordCategory::Annotation,
     },

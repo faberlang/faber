@@ -152,6 +152,29 @@ pub enum TokenKind {
     Clausura, // closure
     Cursor,   // generator (annotation)
     Futura,   // async (annotation)
+    Fiet,     // async finite (callable posture)
+    Fiunt,    // sync stream (callable posture)
+    Fient,    // async generator (callable posture)
+    Figendum, // await const binding
+    Variandum, // await var binding
+    Reddet,    // return_await
+    Tacebit,   // await
+    // === Keywords: Annotation families (wave 1) ===
+    Brevis,     // short
+    Cli,        // cli
+    Descriptio, // description
+    Fragment,   // fragment
+    Imperium,   // command
+    Longum,     // long
+    Machina,    // device
+    Nomen,      // name
+    Nondum,     // unstable
+    Nucleum,    // kernel
+    Operandus,  // operand
+    Optio,      // option
+    Radix,      // radix
+    Ubique,     // global
+    Vertex,     // vertex
     // === Keywords: Boolean/null ===
     Falsum, // false
     Nihil,  // null/nil
@@ -195,6 +218,7 @@ pub enum TokenKind {
     Sparge,    // spread operator
     Ut,        // as/alias
     // === Keywords: Ranges ===
+    Ab,    // range/iteration mode
     Ante,  // exclusive end range
     Inter, // between
     Intra, // within
@@ -264,8 +288,10 @@ pub enum TokenKind {
     ApproxNotEq, // ≉
     BangEq,      // ≠
     BangEqEq,    // (reserved for future / internal; no source form)
-    Lt,          // <
-    Gt,          // >
+    Lt,          // ≺ strict less-than comparison
+    Gt,          // ≻ strict greater-than comparison
+    LtAscii,     // < generic application delimiter (legacy comparison during migration)
+    GtAscii,     // > generic application delimiter (legacy comparison during migration)
     LtEq,        // ≤
     GtEq,        // ≥
 
@@ -423,6 +449,29 @@ impl TokenKind {
                 | Nulla
                 | Positivum
                 | Sponte
+                | Ab
+                | Fiet
+                | Fiunt
+                | Fient
+                | Figendum
+                | Variandum
+                | Reddet
+                | Tacebit
+                | Brevis
+                | Cli
+                | Descriptio
+                | Fragment
+                | Imperium
+                | Longum
+                | Machina
+                | Nomen
+                | Nondum
+                | Nucleum
+                | Operandus
+                | Optio
+                | Radix
+                | Ubique
+                | Vertex
         )
     }
 

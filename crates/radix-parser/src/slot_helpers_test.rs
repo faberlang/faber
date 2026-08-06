@@ -28,6 +28,26 @@ impl KeywordPack for SlotTestPack {
         match text {
             "本地" => Some("iuncta"),
             "await" => Some("tacebit"),
+            // Genus, statements, and literals let class-body regression tests
+            // exercise localized type spellings and statement terminals end to
+            // end.
+            "genus" => Some("genus"),
+            "fn" => Some("functio"),
+            "var" => Some("varia"),
+            "if" => Some("si"),
+            "then" => Some("ergo"),
+            "return" => Some("redde"),
+            "true" => Some("verum"),
+            "false" => Some("falsum"),
+            _ => None,
+        }
+    }
+
+    fn type_latin_key(&self, text: &str) -> Option<&str> {
+        match text {
+            "bool" => Some("bivalens"),
+            "int" => Some("numerus"),
+            "string" => Some("textus"),
             _ => None,
         }
     }
@@ -69,11 +89,11 @@ fn parser_over_with_pack(source: &str) -> Parser {
 #[test]
 fn slot_helper_matches_legacy_reserved_token_form() {
     let mut parser = parser_over("iuncta");
-    assert!(parser.check_keyword_in_slot("iuncta"));
-    assert!(!parser.check_keyword_in_slot("modulus"));
-    assert!(parser.eat_keyword_in_slot("iuncta"));
+    assert!(parser.check_keyword_ident(TokenKind::Iuncta));
+    assert!(!parser.check_keyword_ident(TokenKind::Modulus));
+    assert!(parser.eat_keyword_ident(TokenKind::Iuncta));
     assert!(
-        !parser.check_keyword_in_slot("iuncta"),
+        !parser.check_keyword_ident(TokenKind::Iuncta),
         "consumed token must not re-match"
     );
 }
@@ -83,40 +103,90 @@ fn slot_helper_matches_tokenless_ident_by_latin_text() {
     // The pack does not localize `iuncta`, so it lexes as an `Ident` — the
     // Latin-fallback shape a migrated keyword takes under a partial pack.
     let mut parser = parser_over_with_pack("iuncta");
-    assert!(parser.check_keyword_in_slot("iuncta"));
-    assert!(parser.eat_keyword_in_slot("iuncta"));
+    assert!(parser.check_keyword_ident(TokenKind::Iuncta));
+    assert!(parser.eat_keyword_ident(TokenKind::Iuncta));
 }
 
 #[test]
 fn slot_helper_matches_localized_pack_spelling() {
     let mut parser = parser_over_with_pack("本地");
-    assert!(parser.check_keyword_in_slot("iuncta"));
-    assert!(!parser.check_keyword_in_slot("modulus"));
-    assert!(parser.eat_keyword_in_slot("iuncta"));
+    assert!(parser.check_keyword_ident(TokenKind::Iuncta));
+    assert!(!parser.check_keyword_ident(TokenKind::Modulus));
+    assert!(parser.eat_keyword_ident(TokenKind::Iuncta));
 }
 
 #[test]
 fn slot_helper_matches_tokenless_precedent_via_pack_key() {
     // Existing tokenless precedent: `await` → `tacebit` through the pack map.
     let mut parser = parser_over_with_pack("await");
-    assert!(parser.check_keyword_in_slot("tacebit"));
-    assert!(!parser.check_keyword_in_slot("iuncta"));
-    assert!(parser.eat_keyword_in_slot("tacebit"));
+    assert!(parser.check_keyword_ident(TokenKind::Tacebit));
+    assert!(!parser.check_keyword_ident(TokenKind::Iuncta));
+    assert!(parser.eat_keyword_ident(TokenKind::Tacebit));
 }
 
 #[test]
 fn slot_helper_rejects_ordinary_identifier() {
     let mut parser = parser_over("nomine");
-    assert!(!parser.check_keyword_in_slot("iuncta"));
-    assert!(!parser.eat_keyword_in_slot("iuncta"));
+    assert!(!parser.check_keyword_ident(TokenKind::Iuncta));
+    assert!(!parser.eat_keyword_ident(TokenKind::Iuncta));
 }
 
 #[test]
 fn slot_helper_expect_errors_when_absent() {
     let mut parser = parser_over("nomine");
-    let result = parser.expect_keyword_in_slot("iuncta", "expected 'iuncta'");
+    let result = parser.expect_keyword_ident(TokenKind::Iuncta, "expected 'iuncta'");
     assert!(
         result.is_err(),
         "missing slot keyword must produce an error"
+    );
+}
+
+#[test]
+fn localized_type_spelling_after_initialized_field_is_not_an_operand() {
+    // Regression: the field-boundary guard matched type spellings against the
+    // latin conversio-type list by raw source text. Under a pack that
+    // localizes `textus` → `string`, the guard missed the second field's type
+    // and the retired `true`-prefix predicate check fired (PARSE001) on
+    // `bool visible = true` followed by `string name`.
+    let mut parser = parser_over_with_pack(
+        "genus X {\n    bool visible = true\n    string name\n}\n",
+    );
+    let result = parser.parse_program();
+    assert!(
+        result.errors.is_empty(),
+        "localized type spelling after an initialized field must not fire the retired prefix predicate: {:?}",
+        result.errors
+    );
+}
+
+#[test]
+fn statement_terminal_literal_is_not_a_retired_predicate() {
+    // Regression: `return false` followed by the next statement's identifier
+    // (`j ← j + 1`) read as the retired `falsum <operand>` prefix form and
+    // fired PARSE001. A literal in operand position is a value; only a
+    // statement-start literal followed by an operand is the retired form.
+    let mut parser = parser_over_with_pack(
+        "genus X {\n    fn f() → bool {\n        var int j ← 0\n        if j ≡ 1 then return false\n        j ← j + 1\n        return true\n    }\n}\n",
+    );
+    let result = parser.parse_program();
+    assert!(
+        result.errors.is_empty(),
+        "statement-terminal literal must not fire the retired prefix predicate: {:?}",
+        result.errors
+    );
+
+    // The retired standalone form must still be rejected.
+    let mut parser = parser_over_with_pack("genus X {\n    fn f() → bool {\n        false j\n    }\n}\n");
+    let result = parser.parse_program();
+    assert!(
+        result.errors.iter().any(|error| {
+            matches!(error.kind, super::ParseErrorKind::Expected)
+                && error
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "issue" && arg.value == "retired_prefix_predicate")
+        }),
+        "standalone `false <operand>` must still be rejected: {:?}",
+        result.errors
     );
 }

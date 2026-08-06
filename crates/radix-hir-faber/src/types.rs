@@ -177,9 +177,11 @@ impl super::FaberCodegen {
                 )
             }
 
-            Type::Struct(def_id) | Type::Enum(def_id) | Type::Interface(def_id) => {
-                self.name_for_def(*def_id, names, interner)
-            }
+            Type::Struct(def_id) | Type::Enum(def_id) | Type::Interface(def_id) => self
+                .imported_type_spellings
+                .get(&type_id)
+                .cloned()
+                .unwrap_or_else(|| self.name_for_def(*def_id, names, interner)),
 
             Type::Alias(def_id, resolved) => names.get(def_id).map_or_else(
                 || self.type_to_faber(*resolved, types, names, interner, surface),
@@ -463,6 +465,27 @@ mod tests {
     }
 
     #[test]
+    fn type_to_faber_prints_imported_qualified_spelling() {
+        // Regression: an imported nominal (`base.Vector3`) has no local def
+        // name, so the emitter printed the `def_N` fallback. The qualified
+        // spelling carried from the import contract must win.
+        let mut codegen = FaberCodegen::default();
+        let mut types = TypeTable::new();
+        let names = FxHashMap::default();
+        let interner = Interner::new();
+        let surface = LatinSurface;
+
+        let type_id = types.intern(Type::Struct(DefId(0x9000_0001)));
+        codegen
+            .imported_type_spellings
+            .insert(type_id, "base.Vector3".to_owned());
+        assert_eq!(
+            codegen.type_to_faber(type_id, &types, &names, &interner, &surface),
+            "base.Vector3"
+        );
+    }
+
+    #[test]
     fn type_to_faber_renders_primitives_lista_and_option() {
         let codegen = FaberCodegen::default();
         let mut types = TypeTable::new();
@@ -524,6 +547,8 @@ mod tests {
             &types,
             &interner,
             &LatinSurface,
+            &FxHashMap::default(),
+            &FxHashMap::default(),
         )
         .expect("empty HIR must emit");
         assert!(

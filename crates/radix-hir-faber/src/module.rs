@@ -7,12 +7,13 @@ use crate::surface::KeywordSurface;
 use crate::trivia::{write_leading_trivia, TriviaIndex};
 use radix_codegen_shared::{CodeWriter, CodegenError};
 use radix_diagnostics::DiagnosticArg;
-use radix_hir::HirExpressionKind;
+use radix_hir::{DefId, HirExpressionKind};
 use radix_hir::{
     HirItem, HirItemKind, HirPresentation, HirProgram, HirProgramEnd, HirSourceAnchorId,
 };
 use radix_lexer::{Interner, Span, TokenKind};
-use radix_types::TypeTable;
+use radix_types::{TypeId, TypeTable};
+use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Canonical Faber output from HIR re-emission.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,12 +31,28 @@ pub struct FaberOutput {
 pub struct FaberCodegen {
     /// Flattened trivia attachments for the presentation being generated.
     pub(crate) trivia: TriviaIndex,
+    /// `TypeId` → qualified source spelling (`base.Vector3`) for imported
+    /// nominal types, so re-emitted types keep their namespace even though
+    /// the local name table has no entry for them.
+    pub(crate) imported_type_spellings: FxHashMap<TypeId, String>,
+    /// `DefId` → qualified source spelling for imported nominals in
+    /// struct-literal construction expressions.
+    pub(crate) imported_def_spellings: FxHashMap<DefId, String>,
+    /// Def ids of this unit's struct/enum items: a `Path` to one of these in
+    /// value position is a `ego` (self) reference and must re-emit as the
+    /// self keyword, not the type name.
+    pub(crate) self_def_ids: FxHashSet<DefId>,
 }
 
 /// Emit canonical Faber source from analyzed HIR and its presentation.
 ///
 /// The presentation sidecar is inseparable from the HIR value it annotates;
 /// an [`empty_presentation`] reproduces trivia-free canonical output.
+///
+/// `imported_type_spellings` / `imported_def_spellings` map imported nominal
+/// `TypeId`s and `DefId`s to their qualified source spelling (`base.Vector3`);
+/// pass empty maps when no import contract is available and imported types
+/// fall back to `def_N`.
 ///
 /// # Errors
 ///
@@ -47,8 +64,13 @@ pub fn emit(
     types: &TypeTable,
     interner: &Interner,
     surface: &impl KeywordSurface,
+    imported_type_spellings: &FxHashMap<TypeId, String>,
+    imported_def_spellings: &FxHashMap<DefId, String>,
 ) -> Result<FaberOutput, CodegenError> {
-    FaberCodegen::default().generate(hir, presentation, types, interner, surface)
+    let mut codegen = FaberCodegen::default();
+    codegen.imported_type_spellings = imported_type_spellings.clone();
+    codegen.imported_def_spellings = imported_def_spellings.clone();
+    codegen.generate(hir, presentation, types, interner, surface)
 }
 
 /// An empty presentation: no owners, no attachments, and a structural program
@@ -95,6 +117,14 @@ impl FaberCodegen {
 
         let mut writer = CodeWriter::new();
         let names = self.collect_names(hir);
+        self.self_def_ids = hir
+            .items
+            .iter()
+            .filter_map(|item| match &item.kind {
+                HirItemKind::Struct(_) | HirItemKind::Enum(_) => Some(item.def_id),
+                _ => None,
+            })
+            .collect();
 
         for (idx, item) in hir.items.iter().enumerate() {
             if is_compiler_injected_item(item) {
@@ -334,7 +364,7 @@ mod tests {
         let types = TypeTable::new();
         let interner = Interner::new();
 
-        let err = emit(&hir, &empty_presentation(), &types, &interner, &TestSurface)
+        let err = emit(&hir, &empty_presentation(), &types, &interner, &TestSurface, &FxHashMap::default(), &FxHashMap::default())
             .expect_err("legacy Cede HIR must fail closed before Faber emission");
 
         assert!(

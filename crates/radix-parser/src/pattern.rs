@@ -44,13 +44,13 @@ impl Parser {
             patterns.push(self.parse_pattern()?);
             if self.eat(&TokenKind::Comma) {
                 // Continue parsing patterns
-            } else if self.eat_keyword_in_slot("et") {
+            } else if self.eat_keyword_ident(TokenKind::Et) {
                 // 'et' also separates patterns
             } else {
                 break;
             }
             // EDGE: Stop if we hit body-starting tokens
-            if self.check(&TokenKind::LBrace) || self.check_keyword_in_slot("ergo") {
+            if self.check(&TokenKind::LBrace) || self.check_keyword_ident(TokenKind::Ergo) {
                 break;
             }
         }
@@ -123,16 +123,16 @@ impl Parser {
     /// shallow list of names with the requested mutability; deeper shape checks
     /// belong to semantic analysis.
     fn parse_pattern_bind(&mut self) -> Result<Option<PatternBind>, ParseError> {
-        let bind = if self.eat_keyword(TokenKind::Ut) {
+        let bind = if self.eat_keyword_ident(TokenKind::Ut) {
             let alias = self.parse_ident()?;
             Some(PatternBind::Alias(alias))
-        } else if self.eat_keyword_in_slot("fixum") {
+        } else if self.eat_keyword_ident(TokenKind::Fixum) {
             let bindings = self.parse_pattern_bind_list()?;
             Some(PatternBind::Bindings {
                 mutability: AstMutability::Immutable,
                 bindings,
             })
-        } else if self.eat_keyword_in_slot("varia") {
+        } else if self.eat_keyword_ident(TokenKind::Varia) {
             let bindings = self.parse_pattern_bind_list()?;
             Some(PatternBind::Bindings {
                 mutability: AstMutability::Mutable,
@@ -150,7 +150,7 @@ impl Parser {
         let mut bindings = Vec::new();
         loop {
             let name = self.parse_ident()?;
-            let alias = if self.eat_keyword(TokenKind::Ut) {
+            let alias = if self.eat_keyword_ident(TokenKind::Ut) {
                 Some(self.parse_ident()?)
             } else {
                 None
@@ -161,8 +161,8 @@ impl Parser {
             }
             // EDGE: Stop at body-starting tokens or pattern separators
             if self.check(&TokenKind::LBrace)
-                || self.check_keyword_in_slot("ergo")
-                || self.check_keyword_in_slot("et")
+                || self.check_keyword_ident(TokenKind::Ergo)
+                || self.check_keyword_ident(TokenKind::Et)
             {
                 break;
             }
@@ -205,11 +205,11 @@ impl Parser {
             // claimed by spelling so `casu verum` stays a literal pattern
             // instead of falling through to a name binding.
             TokenKind::Ident(_) => {
-                let literal = if self.check_keyword_in_slot("verum") {
+                let literal = if self.check_keyword_ident(TokenKind::Verum) {
                     Some(Literal::Bool(true))
-                } else if self.check_keyword_in_slot("falsum") {
+                } else if self.check_keyword_ident(TokenKind::Falsum) {
                     Some(Literal::Bool(false))
-                } else if self.check_keyword_in_slot("nihil") {
+                } else if self.check_keyword_ident(TokenKind::Nihil) {
                     Some(Literal::Nil)
                 } else {
                     None

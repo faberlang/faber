@@ -315,8 +315,10 @@ impl<'a> Lexer<'a> {
                     TokenKind::Bang
                 }
             }
-            '<' => TokenKind::Lt,
-            '>' => TokenKind::Gt,
+            '<' => TokenKind::LtAscii,
+            '>' => TokenKind::GtAscii,
+            '≺' => TokenKind::Lt,
+            '≻' => TokenKind::Gt,
             '←' => TokenKind::Assign,
             '≡' => TokenKind::EqEq,
             '≈' => TokenKind::ApproxEq,
@@ -922,20 +924,30 @@ impl<'a> Lexer<'a> {
     ///
     /// `text` is already NFKC-normalized by [`Lexer::scan_identifier`]. Identifier
     /// paths use [`Interner::intern_normalized`] so NFKC runs once per token.
+    ///
+    /// Keyword tokens are never emitted: every keyword lexes as an identifier
+    /// with its latin identity recorded in [`Lexer::reader_keyword_latin_keys`],
+    /// and the parser claims keywords by identity through the registry. This is
+    /// locale-independent — pack spellings resolve to the same latin identity.
     fn keyword_or_ident(&mut self, text: &str, span: Span) -> TokenKind {
         if text == "_" {
             return TokenKind::Underscore(self.interner.intern_normalized(text));
         }
 
         let Some(pack) = self.locale_pack else {
-            return keyword_token_kind(text)
-                .unwrap_or_else(|| TokenKind::Ident(self.interner.intern_normalized(text)));
+            // Normal (Latin) surface: every registered keyword lexes as an
+            // identifier; the parser claims it by identity. Recording the
+            // latin key (== source text here) keeps parser-side resolution
+            // uniform with pack modes.
+            if keyword_token_kind(text).is_some() {
+                self.reader_keyword_latin_keys
+                    .insert(text.to_string(), text.to_string());
+            }
+            return TokenKind::Ident(self.interner.intern_normalized(text));
         };
 
-        if let Some(kind) = pack.keyword_token_kind(text) {
-            return kind;
-        }
-
+        // Pack surface. Declared keyword/type spellings lex as identifiers
+        // with their latin key recorded; the parser claims them by identity.
         let mut declared = false;
         if let Some(latin_key) = pack.keyword_latin_key(text) {
             self.reader_keyword_latin_keys
@@ -964,12 +976,8 @@ impl<'a> Lexer<'a> {
                 localized: fallback.localized,
                 span,
             });
-            if let Some(token_kind) = fallback.token_kind {
-                return token_kind;
-            }
-            // Tokenless keyword (migrated row): the fallback is recorded
-            // loudly, but the word lexes as an identifier and the parser
-            // claims it by spelling in its grammar slot.
+            // The fallback is recorded loudly, but the word lexes as an
+            // identifier; the parser claims it by identity in its grammar slot.
             return TokenKind::Ident(self.interner.intern_normalized(text));
         }
 

@@ -129,9 +129,9 @@ impl Parser {
         }
 
         // sic secus style
-        if self.eat_keyword(TokenKind::Sic) {
+        if self.eat_keyword_ident(TokenKind::Sic) {
             let then = Box::new(self.parse_expression()?);
-            self.expect_keyword_in_slot("secus", "expected 'secus' after 'sic'")?;
+            self.expect_keyword_ident(TokenKind::Secus, "expected 'secus' after 'sic'")?;
             let else_ = Box::new(self.parse_ternary()?);
             let span = start.merge(self.previous_span());
             let id = self.next_id();
@@ -155,7 +155,7 @@ impl Parser {
         let start = self.current_span();
         let mut left = self.parse_and()?;
 
-        while self.check_keyword_in_slot("aut") {
+        while self.check_keyword_ident(TokenKind::Aut) {
             self.advance();
             let right = self.parse_and()?;
             left = self.binary_expr(start, left, BinOp::Or, right);
@@ -169,7 +169,7 @@ impl Parser {
         let start = self.current_span();
         let mut left = self.parse_equality()?;
 
-        while self.check_keyword_in_slot("et") {
+        while self.check_keyword_ident(TokenKind::Et) {
             self.advance();
             let right = self.parse_equality()?;
             left = self.binary_expr(start, left, BinOp::And, right);
@@ -184,8 +184,8 @@ impl Parser {
         let mut left = self.parse_comparison()?;
 
         loop {
-            let op = if self.eat_keyword_in_slot("non") {
-                if self.eat_keyword_in_slot("est") {
+            let op = if self.eat_keyword_ident(TokenKind::Non) {
+                if self.eat_keyword_ident(TokenKind::Est) {
                     BinOp::IsNot
                 } else {
                     return Err(self.expected_expression_error("equality_non_missing_est"));
@@ -196,14 +196,14 @@ impl Parser {
                     TokenKind::ApproxEq => BinOp::ApproxEq,
                     TokenKind::ApproxNotEq => BinOp::ApproxNotEq,
                     TokenKind::BangEq => BinOp::NotEq,
-                    _ if self.check_keyword_in_slot("est") => BinOp::Is,
+                    _ if self.check_keyword_ident(TokenKind::Est) => BinOp::Is,
                     _ => break,
                 };
                 self.advance();
                 // EDGE: `expr est non ...` is a common misspelling of `expr non est ...`.
                 // Reject eagerly so the user gets a clear diagnostic instead of a silent
                 // parse as `expr est (non ...)` with a later type error.
-                if matches!(op, BinOp::Is) && self.check_keyword_in_slot("non") {
+                if matches!(op, BinOp::Is) && self.check_keyword_ident(TokenKind::Non) {
                     return Err(self.expected_expression_error("est_non_spelling"));
                 }
                 op
@@ -242,12 +242,17 @@ impl Parser {
 
         loop {
             let op = match self.peek().kind {
+                // Canonical strict comparison is `Lt`/`Gt` (≺/≻).
+                // `LtAscii`/`GtAscii` (`<`/`>`) as comparison are legacy during
+                // the glyph migration; `<`/`>` remain generic delimiters.
                 TokenKind::Lt => BinOp::Lt,
                 TokenKind::Gt => BinOp::Gt,
+                TokenKind::LtAscii => BinOp::Lt,
+                TokenKind::GtAscii => BinOp::Gt,
                 TokenKind::LtEq => BinOp::LtEq,
                 TokenKind::GtEq => BinOp::GtEq,
-                _ if self.check_keyword_in_slot("intra") => BinOp::InRange,
-                _ if self.check_keyword_in_slot("inter") => BinOp::Between,
+                _ if self.check_keyword_ident(TokenKind::Intra) => BinOp::InRange,
+                _ if self.check_keyword_ident(TokenKind::Inter) => BinOp::Between,
                 _ => break,
             };
             self.advance();
@@ -334,10 +339,10 @@ impl Parser {
         } else if self.check(&TokenKind::Ellipsis) {
             self.advance();
             Some(RangeKind::Inclusive)
-        } else if self.check_keyword_in_slot("ante") {
+        } else if self.check_keyword_ident(TokenKind::Ante) {
             self.advance();
             Some(RangeKind::Exclusive)
-        } else if self.check_keyword_in_slot("usque") {
+        } else if self.check_keyword_ident(TokenKind::Usque) {
             self.advance();
             Some(RangeKind::Inclusive)
         } else {
@@ -346,7 +351,7 @@ impl Parser {
 
         if let Some(kind) = kind {
             let end = Box::new(self.parse_range_bound()?);
-            let step = if self.eat_keyword_in_slot("per") {
+            let step = if self.eat_keyword_ident(TokenKind::Per) {
                 Some(Box::new(self.parse_range_bound()?))
             } else {
                 None
@@ -436,7 +441,7 @@ impl Parser {
         let start = self.current_span();
         let mut left = self.parse_unary_inner(allow_conversio)?;
 
-        while self.check_keyword_in_slot("vel") {
+        while self.check_keyword_ident(TokenKind::Vel) {
             self.advance();
             let right = self.parse_vel_rhs(allow_conversio)?;
             left = self.binary_expr(start, left, BinOp::Coalesce, right);
@@ -459,10 +464,10 @@ impl Parser {
         } else if self.check(&TokenKind::Ellipsis) {
             self.advance();
             Some(RangeKind::Inclusive)
-        } else if self.check_keyword_in_slot("ante") {
+        } else if self.check_keyword_ident(TokenKind::Ante) {
             self.advance();
             Some(RangeKind::Exclusive)
-        } else if self.check_keyword_in_slot("usque") {
+        } else if self.check_keyword_ident(TokenKind::Usque) {
             self.advance();
             Some(RangeKind::Inclusive)
         } else {
@@ -471,7 +476,7 @@ impl Parser {
 
         if let Some(kind) = kind {
             let end = Box::new(self.parse_unary_inner(allow_conversio)?);
-            let step = if self.eat_keyword_in_slot("per") {
+            let step = if self.eat_keyword_ident(TokenKind::Per) {
                 Some(Box::new(self.parse_unary_inner(allow_conversio)?))
             } else {
                 None
@@ -513,7 +518,7 @@ impl Parser {
         let op = match self.peek().kind {
             TokenKind::Minus => Some(UnOp::Neg),
             TokenKind::BitwiseNot => Some(UnOp::BitNot),
-            _ if self.check_keyword_in_slot("non") => Some(UnOp::Not),
+            _ if self.check_keyword_ident(TokenKind::Non) => Some(UnOp::Not),
             _ => None,
         };
 
@@ -530,7 +535,7 @@ impl Parser {
         }
 
         // finge
-        if self.check_keyword_in_slot("finge") {
+        if self.check_keyword_ident(TokenKind::Finge) {
             return self.parse_variant_expr();
         }
 
@@ -570,13 +575,36 @@ impl Parser {
         let Some((predicate, replacement)) = self.literal_prefix_predicate_replacement() else {
             return Ok(());
         };
-        if !self.peek_at_one_starts_prefix_operand() || self.looks_like_following_field_member() {
+        if !self.peek_at_one_starts_prefix_operand()
+            || self.looks_like_following_field_member()
+            || !self.operand_starts_same_line()
+        {
             return Ok(());
         }
         Err(self
             .expected_expression_error("retired_prefix_predicate")
             .with_arg("predicate", predicate)
             .with_arg("replacement", replacement))
+    }
+
+    /// Whether the token after the current one starts on the same source line.
+    ///
+    /// The retired prefix-predicate forms (`falsum <operand>`) are legacy
+    /// single-line expressions. A literal at the end of a statement followed
+    /// by the next statement's first token (`return false` then `j ← j + 1`)
+    /// reads identically at the token level, so firing across a line break
+    /// would reject valid statement sequences.
+    fn operand_starts_same_line(&self) -> bool {
+        let slot = self.non_trivia_indices.partition_point(|&i| i < self.pos);
+        let Some(&this_idx) = self.non_trivia_indices.get(slot) else {
+            return false;
+        };
+        let Some(&next_idx) = self.non_trivia_indices.get(slot + 1) else {
+            return true;
+        };
+        !self.tokens[this_idx + 1..next_idx]
+            .iter()
+            .any(|token| token.kind == TokenKind::Newline)
     }
 
     /// Whether the token one ahead would start a value (prefix) operand.
@@ -594,7 +622,7 @@ impl Parser {
             TokenKind::Ident(sym) => {
                 let latin_key = self.identifier_text_or_keyword_latin_key(sym);
                 match lookup_keyword_spec(latin_key) {
-                    Some(spec) if spec.token_kind.is_none() => matches!(
+                    Some(spec) => matches!(
                         spec.scope,
                         KeywordScope::Contextual(owners)
                             if owners.iter().any(|o| matches!(
@@ -613,28 +641,14 @@ impl Parser {
     }
 
     fn literal_prefix_predicate_replacement(&self) -> Option<(&'static str, &'static str)> {
-        match self.peek().kind {
-            TokenKind::Verum => Some(("verum", "value est verum")),
-            TokenKind::Falsum => Some(("falsum", "value est falsum")),
-            TokenKind::Nihil => Some(("nihil", "value est nihil")),
-            // Batch C made these words tokenless; resolve the spelling so the
-            // retired `nihil x` prefix detection still fires.
-            TokenKind::Ident(sym) => {
-                let latin = self.identifier_text_or_keyword_latin_key(sym);
-                match latin {
-                    "verum" if self.check_keyword_in_slot("verum") => {
-                        Some(("verum", "value est verum"))
-                    }
-                    "falsum" if self.check_keyword_in_slot("falsum") => {
-                        Some(("falsum", "value est falsum"))
-                    }
-                    "nihil" if self.check_keyword_in_slot("nihil") => {
-                        Some(("nihil", "value est nihil"))
-                    }
-                    _ => None,
-                }
-            }
-            _ => None,
+        if self.check_keyword_ident(TokenKind::Verum) {
+            Some(("verum", "value est verum"))
+        } else if self.check_keyword_ident(TokenKind::Falsum) {
+            Some(("falsum", "value est falsum"))
+        } else if self.check_keyword_ident(TokenKind::Nihil) {
+            Some(("nihil", "value est nihil"))
+        } else {
+            None
         }
     }
 
@@ -642,6 +656,17 @@ impl Parser {
         let Some((predicate, replacement)) = self.required_prefix_predicate_replacement() else {
             return Ok(());
         };
+        // Only the retired predicate form (`negativum <value>`) fires: a bare
+        // identifier use of the same spelling (e.g. a variable named
+        // `negative`) followed by anything that does not start a value operand
+        // is an ordinary expression. The retired form is a legacy single-line
+        // expression, so the operand must start on the same line.
+        if !self.peek_at_one_starts_prefix_operand()
+            || self.looks_like_following_field_member()
+            || !self.operand_starts_same_line()
+        {
+            return Ok(());
+        }
         Err(self
             .expected_expression_error("retired_prefix_predicate")
             .with_arg("predicate", predicate)
@@ -649,13 +674,18 @@ impl Parser {
     }
 
     fn required_prefix_predicate_replacement(&self) -> Option<(&'static str, &'static str)> {
-        match self.peek().kind {
-            TokenKind::Nulla => Some(("nulla", "value est nihil")),
-            TokenKind::Nonnulla => Some(("nonnulla", "value non est nihil")),
-            TokenKind::Nonnihil => Some(("nonnihil", "value non est nihil")),
-            TokenKind::Negativum => Some(("negativum", "value < 0")),
-            TokenKind::Positivum => Some(("positivum", "value > 0")),
-            _ => None,
+        if self.check_keyword_ident(TokenKind::Nulla) {
+            Some(("nulla", "value est nihil"))
+        } else if self.check_keyword_ident(TokenKind::Nonnulla) {
+            Some(("nonnulla", "value non est nihil"))
+        } else if self.check_keyword_ident(TokenKind::Nonnihil) {
+            Some(("nonnihil", "value non est nihil"))
+        } else if self.check_keyword_ident(TokenKind::Negativum) {
+            Some(("negativum", "value < 0"))
+        } else if self.check_keyword_ident(TokenKind::Positivum) {
+            Some(("positivum", "value > 0"))
+        } else {
+            None
         }
     }
 
@@ -668,7 +698,15 @@ impl Parser {
         match kind {
             TokenKind::Ident(sym) => {
                 let name = self.interner.resolve(*sym);
-                Self::is_conversio_type_keyword(name) || Self::is_capitalized_type_name(name)
+                // Resolve a localized type spelling to its latin identity
+                // before matching the conversio-type list (`string` →
+                // `textus` under the en pack), so the field-boundary guard
+                // fires under every reader locale.
+                let latin = self
+                    .reader_type_latin_keys
+                    .get(name)
+                    .map_or(name, String::as_str);
+                Self::is_conversio_type_keyword(latin) || Self::is_capitalized_type_name(name)
             }
             _ => false,
         }
@@ -693,7 +731,7 @@ impl Parser {
         let mut expr = self.parse_primary()?;
 
         loop {
-            if self.check(&TokenKind::Lt) {
+            if self.check(&TokenKind::LtAscii) {
                 self.reject_retired_angle_type_call_constructor(&expr)?;
                 let checkpoint = self.checkpoint();
                 if let Ok(type_args) = self.parse_call_type_args() {
@@ -917,14 +955,14 @@ impl Parser {
         };
 
         let checkpoint = self.checkpoint();
-        self.expect(&TokenKind::Lt, "expected '<'")?;
+        self.expect(&TokenKind::LtAscii, "expected '<'")?;
         if let Some(issue) = shape_issue {
             let _elem = self.parse_type()?;
             if !self.eat(&TokenKind::Comma) {
                 return Err(self.expected_expression_error(issue));
             }
             let _figura = self.parse_figura()?;
-            self.expect(&TokenKind::Gt, "expected '>'")?;
+            self.expect(&TokenKind::GtAscii, "expected '>'")?;
         } else {
             let _params = self.finish_type_args_list()?;
         }
@@ -986,7 +1024,7 @@ impl Parser {
         } else {
             None
         };
-        if self.check_keyword_in_slot("vel") {
+        if self.check_keyword_ident(TokenKind::Vel) {
             return Err(self.invalid_expression_error("conversio_recovery_uses_vel"));
         }
         let span = span_start.merge(self.previous_span());
@@ -1018,12 +1056,19 @@ impl Parser {
 
         if let TokenKind::Ident(sym) = self.peek().kind {
             let name = self.interner.resolve(sym);
+            // Resolve a localized type spelling to its latin identity before
+            // the conversio-type list match (`int` → `numerus` under the en
+            // pack), so `↦ int<u32>` routes to an explicit type target.
+            let latin = self
+                .reader_type_latin_keys
+                .get(name)
+                .map_or(name, String::as_str);
             // Type-position keywords migrated to tokenless (Batch A: `modulus`,
             // `iuncta`) must still route to an explicit type target rather than
             // the range fallback — in Latin or a reader-pack surface spelling.
             let is_type_slot_keyword =
-                self.check_keyword_in_slot("modulus") || self.check_keyword_in_slot("iuncta");
-            if !Self::is_conversio_type_keyword(name)
+                self.check_keyword_ident(TokenKind::Modulus) || self.check_keyword_ident(TokenKind::Iuncta);
+            if !Self::is_conversio_type_keyword(latin)
                 && !Self::is_capitalized_type_name(name)
                 && !is_type_slot_keyword
             {
@@ -1152,11 +1197,11 @@ impl Parser {
                 // Iuncta tuple construction: iuncta<A, B> [a, b]. `iuncta` is
                 // tokenless (Batch A), so the constructor slot claims the
                 // spelling here — Latin text or a reader-pack surface.
-                if self.check_keyword_in_slot("iuncta") {
+                if self.check_keyword_ident(TokenKind::Iuncta) {
                     return self.parse_iuncta_expr();
                 }
                 // Self literal (tokenless since Batch G).
-                if self.check_keyword_in_slot("ego") {
+                if self.check_keyword_ident(TokenKind::Ego) {
                     let span = self.peek().span;
                     self.advance();
                     return Ok(Expr {
@@ -1166,35 +1211,42 @@ impl Parser {
                     });
                 }
                 // Comptime expression: praefixum(expr) (tokenless since Batch G).
-                if self.check_keyword_in_slot("praefixum") {
+                if self.check_keyword_ident(TokenKind::Praefixum) {
                     return self.parse_praefixum_expr();
                 }
                 // Closure (tokenless since Batch G).
-                if self.check_keyword_in_slot("clausura") {
+                if self.check_keyword_ident(TokenKind::Clausura) {
                     return self.parse_clausura_expr();
                 }
                 // Expression-form stream ad: ad 'route' (opener)? (tokenless
                 // since Batch G). Blockless only — a following '{' belongs to
                 // the statement parser.
-                if self.check_keyword_in_slot("ad") {
+                if self.check_keyword_ident(TokenKind::Ad) {
                     return self.parse_ad_expr();
                 }
-                // Builtin calls (tokenless since Batch B): scriptum format
-                // calls and the lege/lineam input builtins.
-                if self.check_keyword_in_slot("scriptum") {
+                // Builtin calls: scriptum format calls and the lege/lineam
+                // input builtins. scriptum is claimed only when followed by
+                // `(` so the spelling stays usable as an ordinary identifier
+                // expression (`discerne format { … }` where `format` is a
+                // variable); lege/lineam are bare value builtins.
+                if self.check_keyword_ident(TokenKind::Scriptum)
+                    && self.peek_at(1).kind == TokenKind::LParen
+                {
                     return self.parse_scriptum_expr();
                 }
-                if self.check_keyword_in_slot("lege") || self.check_keyword_in_slot("lineam") {
+                if self.check_keyword_ident(TokenKind::Lege)
+                    || self.check_keyword_ident(TokenKind::Lineam)
+                {
                     return self.parse_lege_expr();
                 }
                 // Literal values (tokenless since Batch C): verum/falsum/nihil.
-                if self.check_keyword_in_slot("verum")
-                    || self.check_keyword_in_slot("falsum")
-                    || self.check_keyword_in_slot("nihil")
+                if self.check_keyword_ident(TokenKind::Verum)
+                    || self.check_keyword_ident(TokenKind::Falsum)
+                    || self.check_keyword_ident(TokenKind::Nihil)
                 {
-                    let literal = if self.check_keyword_in_slot("verum") {
+                    let literal = if self.check_keyword_ident(TokenKind::Verum) {
                         Literal::Bool(true)
-                    } else if self.check_keyword_in_slot("falsum") {
+                    } else if self.check_keyword_ident(TokenKind::Falsum) {
                         Literal::Bool(false)
                     } else {
                         Literal::Nil
@@ -1327,7 +1379,7 @@ impl Parser {
     }
 
     fn parse_primary_ident(&mut self) -> Result<Ident, ParseError> {
-        if self.check_keyword(TokenKind::Solum) {
+        if self.check_keyword_ident(TokenKind::Solum) {
             let span = self.peek().span;
             self.advance();
             return Ok(self.keyword_ident("solum", span));
@@ -1338,7 +1390,7 @@ impl Parser {
 
     fn parse_variant_expr(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
-        self.expect_keyword_in_slot("finge", "expected 'finge'")?;
+        self.expect_keyword_ident(TokenKind::Finge, "expected 'finge'")?;
 
         let variant = self.parse_ident()?;
 
@@ -1384,10 +1436,10 @@ impl Parser {
     /// Consumes the `iuncta` keyword via `expect_keyword_in_slot`.
     fn parse_iuncta_expr(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
-        self.expect_keyword_in_slot("iuncta", "expected 'iuncta'")?;
+        self.expect_keyword_ident(TokenKind::Iuncta, "expected 'iuncta'")?;
 
         // Parse <type-args>
-        self.expect(&TokenKind::Lt, "expected '<' after 'iuncta'")?;
+        self.expect(&TokenKind::LtAscii, "expected '<' after 'iuncta'")?;
         let type_args = self.finish_type_args_list()?;
 
         // Parse [elements]
@@ -1418,7 +1470,7 @@ impl Parser {
 
     fn parse_clausura_expr(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
-        self.expect_keyword_in_slot("clausura", "expected 'clausura'")?;
+        self.expect_keyword_ident(TokenKind::Clausura, "expected 'clausura'")?;
 
         // Parse parameters: type name, type name, ...
         let mut params = Vec::new();
@@ -1497,19 +1549,20 @@ impl Parser {
     /// structure rather than expression/param material. Type-position words
     /// (`modulus`, `iuncta`) remain material; every other migrated keyword is
     /// structural and must not trigger expression speculation.
-    fn ident_is_tokenless_structure_keyword(&self, sym: Symbol) -> bool {
+    fn ident_is_structure_keyword(&self, sym: Symbol) -> bool {
         let latin = self.identifier_text_or_keyword_latin_key(sym);
-        match lookup_keyword_spec(latin) {
-            Some(spec) if spec.token_kind.is_none() => matches!(
-                spec.scope,
-                KeywordScope::Contextual(owners)
-                    if !owners.iter().any(|o| matches!(
-                        o,
-                        KeywordOwner::TypeName | KeywordOwner::Constructor
-                    ))
-            ),
-            _ => false,
-        }
+        matches!(
+            lookup_keyword_spec(latin),
+            Some(spec)
+                if matches!(
+                    spec.scope,
+                    KeywordScope::Contextual(owners)
+                        if !owners.iter().any(|o| matches!(
+                            o,
+                            KeywordOwner::TypeName | KeywordOwner::Constructor
+                        ))
+                )
+        )
     }
 
     fn can_start_compact_clausura(&self) -> bool {
@@ -1520,21 +1573,28 @@ impl Parser {
         // wrong-context rejection, which is intentionally not rolled back.
         let second_slot = |kind: &TokenKind| match kind {
             TokenKind::Underscore(_) | TokenKind::Tag => true,
-            TokenKind::Ident(sym) => !self.ident_is_tokenless_structure_keyword(*sym),
+            TokenKind::Ident(sym) => !self.ident_is_structure_keyword(*sym),
             _ => false,
         };
         match self.peek().kind {
             TokenKind::LParen => true,
             TokenKind::Underscore(_) => second_slot(&self.peek_at(1).kind),
             TokenKind::Ident(sym) => {
-                !self.ident_is_tokenless_structure_keyword(sym)
-                    && second_slot(&self.peek_at(1).kind)
+                // Param-mode keywords (`de`/`in`) are claimed by their
+                // ParameterMode owner in the registry; a mode marker in the
+                // first closure slot means the parameter name follows.
+                let is_param_mode = self.check_keyword_in_owner(KeywordOwner::ParameterMode);
+                if is_param_mode {
+                    match self.peek_at(1).kind {
+                        TokenKind::Ident(name) => !self.ident_is_structure_keyword(name),
+                        TokenKind::Underscore(_) => true,
+                        _ => false,
+                    }
+                } else {
+                    !self.ident_is_structure_keyword(sym)
+                        && second_slot(&self.peek_at(1).kind)
+                }
             }
-            TokenKind::De | TokenKind::In => match self.peek_at(1).kind {
-                TokenKind::Ident(sym) => !self.ident_is_tokenless_structure_keyword(sym),
-                TokenKind::Underscore(_) => true,
-                _ => false,
-            },
             _ => false,
         }
     }
@@ -1550,7 +1610,7 @@ impl Parser {
         };
 
         let (ret, err) = self.parse_optional_clausura_signature()?;
-        if self.check_keyword_in_slot("ergo") {
+        if self.check_keyword_ident(TokenKind::Ergo) {
             return Err(ParseError::structured(
                 ParseErrorKind::ErgoWrongContext,
                 self.current_span(),
@@ -1610,7 +1670,7 @@ impl Parser {
     /// This function must not consume a `{` block.
     fn parse_ad_expr(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
-        self.expect_keyword_in_slot("ad", "expected 'ad'")?;
+        self.expect_keyword_ident(TokenKind::Ad, "expected 'ad'")?;
         let id = self.next_id();
 
         // Route: required ascii literal
@@ -1664,7 +1724,7 @@ impl Parser {
     }
 
     fn parse_compact_clausura_body(&mut self) -> Result<ClausuraBody, ParseError> {
-        if self.check_keyword_in_slot("fac") {
+        if self.check_keyword_ident(TokenKind::Fac) {
             return Ok(ClausuraBody::Fac(self.parse_fac_construct(false)?));
         }
         if self.check(&TokenKind::LBrace) {
@@ -1692,7 +1752,7 @@ impl Parser {
 
         while !self.check(&TokenKind::RParen) && !self.is_at_end() {
             let start = self.current_span();
-            let spread = self.eat_keyword(TokenKind::Sparge);
+            let spread = self.eat_keyword_ident(TokenKind::Sparge);
             let value = Box::new(self.parse_expression()?);
             let span = start.merge(self.previous_span());
             args.push(Argument {
@@ -1713,7 +1773,7 @@ impl Parser {
         let mut elements = Vec::new();
 
         while !self.check(&TokenKind::RBracket) && !self.is_at_end() {
-            if self.eat_keyword(TokenKind::Sparge) {
+            if self.eat_keyword_ident(TokenKind::Sparge) {
                 elements.push(ArrayElement::Spread(Box::new(self.parse_expression()?)));
             } else {
                 elements.push(ArrayElement::Expr(Box::new(self.parse_expression()?)));
@@ -1734,7 +1794,7 @@ impl Parser {
             let start = self.current_span();
 
             // Spread
-            if self.eat_keyword(TokenKind::Sparge) {
+            if self.eat_keyword_ident(TokenKind::Sparge) {
                 let expr = Box::new(self.parse_expression()?);
                 let span = start.merge(self.previous_span());
                 fields.push(ObjectField {
@@ -1966,7 +2026,7 @@ impl Parser {
     }
 
     fn try_parse_type_args(&mut self) -> Result<Vec<TypeExpr>, ParseError> {
-        if !self.eat(&TokenKind::Lt) {
+        if !self.eat(&TokenKind::LtAscii) {
             return Ok(Vec::new());
         }
         self.finish_type_args_list()
@@ -1982,7 +2042,7 @@ impl Parser {
             }
         }
 
-        self.expect(&TokenKind::Gt, "expected '>'")?;
+        self.expect(&TokenKind::GtAscii, "expected '>'")?;
         Ok(args)
     }
 
@@ -1991,7 +2051,7 @@ impl Parser {
     /// The postfix loop has already confirmed `<` is present; this helper consumes
     /// it and requires a well-formed `< type (, type)* >` list before `(`.
     fn parse_call_type_args(&mut self) -> Result<Vec<TypeExpr>, ParseError> {
-        if !self.eat(&TokenKind::Lt) {
+        if !self.eat(&TokenKind::LtAscii) {
             return Err(self.expected_expression_error("call_type_args_start"));
         }
         self.finish_type_args_list()
@@ -2005,7 +2065,7 @@ impl Parser {
     /// Parse the `scriptum("template", args...)` formatting builtin.
     fn parse_scriptum_expr(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
-        self.expect_keyword_in_slot("scriptum", "expected 'scriptum'")?;
+        self.expect_keyword_ident(TokenKind::Scriptum, "expected 'scriptum'")?;
         self.expect(&TokenKind::LParen, "expected '(' after 'scriptum'")?;
 
         // First arg is the format string
@@ -2031,10 +2091,10 @@ impl Parser {
     /// Parse `lege` and `lineam` input builtins.
     fn parse_lege_expr(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
-        let line = if self.eat_keyword_in_slot("lineam") {
+        let line = if self.eat_keyword_ident(TokenKind::Lineam) {
             true
         } else {
-            self.expect_keyword_in_slot("lege", "expected 'lege' or 'lineam'")?;
+            self.expect_keyword_ident(TokenKind::Lege, "expected 'lege' or 'lineam'")?;
             false
         };
 
@@ -2050,7 +2110,7 @@ impl Parser {
     /// Parse `praefixum(expr)`, the source-level compile-time evaluation marker.
     fn parse_praefixum_expr(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
-        self.expect_keyword_in_slot("praefixum", "expected 'praefixum'")?;
+        self.expect_keyword_ident(TokenKind::Praefixum, "expected 'praefixum'")?;
         self.expect(&TokenKind::LParen, "expected '(' after 'praefixum'")?;
 
         let body = PraefixumBody::Expr(Box::new(self.parse_expression()?));

@@ -411,6 +411,13 @@ impl super::FaberCodegen {
         writer: &mut CodeWriter,
     ) {
         for stmt in &block.statements {
+            // Omit compiler-synthesized locals (shader implicit IO, CLI args);
+            // they are runtime-provided, not authored source.
+            if let HirStatementKind::Local(local) = &stmt.kind {
+                if local.runtime_provided {
+                    continue;
+                }
+            }
             self.write_stmt(stmt, types, names, interner, surface, writer);
         }
         if let Some(expr) = &block.expr {

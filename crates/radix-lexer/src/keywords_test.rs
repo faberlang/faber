@@ -103,16 +103,16 @@ fn test_annotation_names_are_owned_by_annotation_policy() {
 }
 
 #[test]
-fn selected_global_keywords_remain_allowed_for_members() {
-    // `cape` stays a Global keyword token (Batch B made `nota` tokenless).
-    assert_eq!(
-        keyword_allowed_as_ident(KeywordOwner::MemberIdentifier, &TokenKind::Cape),
-        Some("cape")
-    );
-    assert_eq!(
-        keyword_allowed_as_ident(KeywordOwner::DeclarationName, &TokenKind::Cape),
-        Some("cape")
-    );
+fn no_keyword_has_global_scope() {
+    // No reserved words: every keyword is claimed in a parser-owned slot
+    // (Contextual, TestOwned, Alias, or Annotation), never reserved globally.
+    for spec in keyword_specs() {
+        assert!(
+            !matches!(spec.scope, KeywordScope::Global),
+            "keyword '{}' must not be globally reserved",
+            spec.text
+        );
+    }
 }
 
 #[test]
@@ -129,15 +129,14 @@ fn retired_statement_spellings_are_not_registered_keywords() {
 
 #[test]
 fn identifier_like_owner_policy_is_shared_across_keyword_scopes() {
+    // TestOwned and Alias keywords are usable as identifiers in
+    // declaration/parameter/member positions (identifier-like owners); the
+    // same keywords are not allowed in structural/modifier positions.
     for owner in [
         KeywordOwner::DeclarationName,
         KeywordOwner::ParameterName,
         KeywordOwner::MemberIdentifier,
     ] {
-        assert_eq!(
-            keyword_allowed_as_ident(owner, &TokenKind::Cape),
-            Some("cape")
-        );
         assert_eq!(
             keyword_allowed_as_ident(owner, &TokenKind::Scribe),
             Some("scribe")
@@ -153,7 +152,6 @@ fn identifier_like_owner_policy_is_shared_across_keyword_scopes() {
         KeywordOwner::FunctionModifier,
         KeywordOwner::PredicateOperator,
     ] {
-        assert_eq!(keyword_allowed_as_ident(owner, &TokenKind::Cape), None);
         assert_eq!(keyword_allowed_as_ident(owner, &TokenKind::Scribe), None);
         assert_eq!(keyword_allowed_as_ident(owner, &TokenKind::Fragilis), None);
     }
@@ -176,11 +174,11 @@ fn nonnihil_remains_predicate_and_member_identifier() {
 }
 
 #[test]
-fn metadata_entries_do_not_claim_normal_keyword_tokens() {
+fn annotation_family_keywords_have_identities() {
     let futura = lookup_keyword_spec("futura").expect("futura metadata should be registered");
     assert_eq!(futura.scope, KeywordScope::Annotation);
     assert_eq!(futura.category, KeywordCategory::Annotation);
-    assert!(futura.token_kind.is_none());
+    assert_eq!(futura.token_kind, Some(TokenKind::Futura));
 
     assert!(lookup_keyword_spec("sectio").is_none());
 }

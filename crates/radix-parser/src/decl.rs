@@ -26,7 +26,8 @@
 
 use super::{ParseError, ParseErrorKind, Parser};
 use radix_lexer::{
-    keyword_allowed_as_ident, lookup_keyword_spec, KeywordOwner, KeywordScope, TokenKind,
+    keyword_allowed_as_ident, keyword_spelling_for_token, lookup_keyword_spec, KeywordOwner,
+    KeywordScope, TokenKind,
 };
 #[allow(clippy::wildcard_imports)]
 // syntax is a pure re-export barrel from radix-syntax
@@ -52,68 +53,67 @@ impl Parser {
         let id = self.next_id();
 
         let kind = match self.peek().kind {
-            // Declarations (token-shaped introducers)
-            TokenKind::Abstractus => self.parse_abstract_class_decl()?,
-            TokenKind::Ex => self.parse_extract_stmt()?,
-            TokenKind::Importa => self.parse_import_decl()?,
-            TokenKind::Proba => StmtKind::Proba(self.parse_proba_case()?),
-            TokenKind::Probandum => self.parse_probandum_decl()?,
-            // Control flow (token-shaped)
-            TokenKind::Custodi => self.parse_custodi_stmt()?,
-            TokenKind::Itera => self.parse_itera_stmt()?,
-            // Transfer (token-shaped)
-            TokenKind::Iace => self.parse_iace_stmt()?,
-            TokenKind::Mori => self.parse_mori_stmt()?,
-            TokenKind::Cede => self.parse_cede_stmt()?,
-            // Error handling
-            TokenKind::Adfirma => self.parse_adfirma_stmt()?,
-            // Output
-            TokenKind::Scribe => self.parse_scribe_stmt()?,
-            // Entry points
-            TokenKind::Incipit | TokenKind::Incipiet => self.parse_incipit_stmt()?,
             // Block
             TokenKind::LBrace => StmtKind::Block(self.parse_block()?),
 
-            // Contextual control-operation keywords (token_kind: None):
-            // recognized by spelling in statement-initial position only.
-            TokenKind::Ident(sym) => {
-                let contextual = self.identifier_text_or_keyword_latin_key(sym).to_owned();
-                match contextual.as_str() {
-                    // Declaration introducers (tokenless since Batch E).
-                    "discretio" => self.parse_union_decl()?,
-                    "fixum" | "varia" => self.parse_var_decl()?,
-                    "functio" => self.parse_func_decl()?,
-                    "genus" => self.parse_class_decl()?,
-                    "implendum" => self.parse_interface_decl()?,
-                    "ordo" => self.parse_enum_decl()?,
-                    "sit" => self.parse_sit_decl()?,
-                    "typus" => self.parse_type_alias_decl()?,
-                    // Control flow (tokenless since Batch F).
-                    "discerne" => self.parse_discerne_stmt()?,
-                    "dum" => self.parse_dum_stmt()?,
-                    "elige" => self.parse_elige_stmt()?,
-                    "fac" => self.parse_fac_stmt()?,
-                    "si" => self.parse_si_stmt()?,
-                    "perge" => self.parse_perge_stmt()?,
-                    "redde" => self.parse_redde_stmt()?,
-                    "rumpe" => self.parse_rumpe_stmt()?,
-                    // Resource/transfer and route statements (tokenless since
-                    // Batch G).
-                    "cura" => self.parse_cura_stmt()?,
-                    "tacet" => self.parse_tacet_stmt()?,
-                    "ad" => self.parse_ad_stmt()?,
-                    "figendum" | "variandum" => {
-                        let is_immutable = contextual == "figendum";
+            // Keyword-led statements: dispatch on the registry keyword
+            // identity (locale-independent), claimed only in statement-initial
+            // position.
+            TokenKind::Ident(_) => {
+                match self.current_keyword_ident() {
+                    // Declaration introducers.
+                    Some(TokenKind::Discretio) => self.parse_union_decl()?,
+                    Some(TokenKind::Fixum) | Some(TokenKind::Varia) => self.parse_var_decl()?,
+                    Some(TokenKind::Functio) => self.parse_func_decl()?,
+                    Some(TokenKind::Genus) => self.parse_class_decl()?,
+                    Some(TokenKind::Implendum) => self.parse_interface_decl()?,
+                    Some(TokenKind::Ordo) => self.parse_enum_decl()?,
+                    Some(TokenKind::Sit) => self.parse_sit_decl()?,
+                    Some(TokenKind::Typus) => self.parse_type_alias_decl()?,
+                    // Statement introducers (previously token-shaped).
+                    Some(TokenKind::Abstractus) => self.parse_abstract_class_decl()?,
+                    Some(TokenKind::Importa) => self.parse_import_decl()?,
+                    Some(TokenKind::Proba) => StmtKind::Proba(self.parse_proba_case()?),
+                    Some(TokenKind::Probandum) => self.parse_probandum_decl()?,
+                    Some(TokenKind::Custodi) => self.parse_custodi_stmt()?,
+                    Some(TokenKind::Itera) => self.parse_itera_stmt()?,
+                    Some(TokenKind::Iace) => self.parse_iace_stmt()?,
+                    Some(TokenKind::Mori) => self.parse_mori_stmt()?,
+                    Some(TokenKind::Cede) => self.parse_cede_stmt()?,
+                    Some(TokenKind::Adfirma) => self.parse_adfirma_stmt()?,
+                    Some(TokenKind::Scribe) => self.parse_scribe_stmt()?,
+                    Some(TokenKind::Incipit) | Some(TokenKind::Incipiet) => {
+                        self.parse_incipit_stmt()?
+                    }
+                    Some(TokenKind::Ex) => self.parse_extract_stmt()?,
+                    // Control flow.
+                    Some(TokenKind::Discerne) => self.parse_discerne_stmt()?,
+                    Some(TokenKind::Dum) => self.parse_dum_stmt()?,
+                    Some(TokenKind::Elige) => self.parse_elige_stmt()?,
+                    Some(TokenKind::Fac) => self.parse_fac_stmt()?,
+                    Some(TokenKind::Si) => self.parse_si_stmt()?,
+                    Some(TokenKind::Perge) => self.parse_perge_stmt()?,
+                    Some(TokenKind::Redde) => self.parse_redde_stmt()?,
+                    Some(TokenKind::Rumpe) => self.parse_rumpe_stmt()?,
+                    // Resource/transfer and route statements.
+                    Some(TokenKind::Cura) => self.parse_cura_stmt()?,
+                    Some(TokenKind::Tacet) => self.parse_tacet_stmt()?,
+                    Some(TokenKind::Ad) => self.parse_ad_stmt()?,
+                    Some(TokenKind::Figendum) | Some(TokenKind::Variandum) => {
+                        let is_immutable =
+                            self.current_keyword_ident() == Some(TokenKind::Figendum);
                         self.parse_await_var_decl(if is_immutable {
                             AstMutability::Immutable
                         } else {
                             AstMutability::Mutable
                         })?
                     }
-                    "reddet" => self.parse_reddet_stmt(start)?,
-                    "tacebit" => self.parse_tacebit_stmt(start)?,
-                    // Output scribe builtins (tokenless since Batch B).
-                    "nota" | "mone" | "vide" => self.parse_scribe_stmt()?,
+                    Some(TokenKind::Reddet) => self.parse_reddet_stmt(start)?,
+                    Some(TokenKind::Tacebit) => self.parse_tacebit_stmt(start)?,
+                    // Output scribe builtins.
+                    Some(TokenKind::Nota) | Some(TokenKind::Mone) | Some(TokenKind::Vide) => {
+                        self.parse_scribe_stmt()?
+                    }
                     _ => self.parse_expr_stmt()?,
                 }
             }
@@ -156,9 +156,9 @@ impl Parser {
     /// Destructuring keeps its historical untyped shape because the binding
     /// pattern itself owns the names and any rest element.
     fn parse_var_decl(&mut self) -> Result<StmtKind, ParseError> {
-        let (mutability, is_await) = if self.eat_keyword_in_slot("fixum") {
+        let (mutability, is_await) = if self.eat_keyword_ident(TokenKind::Fixum) {
             (AstMutability::Immutable, false)
-        } else if self.eat_keyword_in_slot("varia") {
+        } else if self.eat_keyword_ident(TokenKind::Varia) {
             (AstMutability::Mutable, false)
         } else {
             return Err(Self::expected_error("fixum or varia", self.current_span()));
@@ -255,7 +255,7 @@ impl Parser {
     /// kind.
     fn parse_sit_decl(&mut self) -> Result<StmtKind, ParseError> {
         let start = self.current_span();
-        self.expect_keyword_in_slot("sit", "expected 'sit'")?;
+        self.expect_keyword_ident(TokenKind::Sit, "expected 'sit'")?;
 
         if self.check(&TokenKind::LBracket) || self.check(&TokenKind::LBrace) {
             return Err(
@@ -330,7 +330,7 @@ impl Parser {
         let mut rest = None;
 
         while !self.check(&TokenKind::RBracket) && !self.is_at_end() {
-            if self.eat_keyword(TokenKind::Ceteri) {
+            if self.eat_keyword_ident(TokenKind::Ceteri) {
                 if rest.is_some() {
                     return Err(ParseError::structured(
                         ParseErrorKind::Expected,
@@ -341,7 +341,7 @@ impl Parser {
                 }
                 let name = self.parse_ident()?;
                 rest = Some(name);
-                if self.eat(&TokenKind::Comma) && self.check_keyword(TokenKind::Ceteri) {
+                if self.eat(&TokenKind::Comma) && self.check_keyword_ident(TokenKind::Ceteri) {
                     return Err(ParseError::structured(
                         ParseErrorKind::Expected,
                         self.current_span(),
@@ -386,7 +386,7 @@ impl Parser {
         let mut rest = None;
 
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
-            if self.eat_keyword(TokenKind::Ceteri) {
+            if self.eat_keyword_ident(TokenKind::Ceteri) {
                 if rest.is_some() {
                     return Err(ParseError::structured(
                         ParseErrorKind::Expected,
@@ -396,7 +396,7 @@ impl Parser {
                     .with_arg("keyword", "ceteri"));
                 }
                 rest = Some(self.parse_ident()?);
-                if self.eat(&TokenKind::Comma) && self.check_keyword(TokenKind::Ceteri) {
+                if self.eat(&TokenKind::Comma) && self.check_keyword_ident(TokenKind::Ceteri) {
                     return Err(ParseError::structured(
                         ParseErrorKind::Expected,
                         self.current_span(),
@@ -408,7 +408,7 @@ impl Parser {
             }
 
             let name = self.parse_ident()?;
-            let alias = if self.eat_keyword(TokenKind::Ut) {
+            let alias = if self.eat_keyword_ident(TokenKind::Ut) {
                 Some(self.parse_ident()?)
             } else {
                 None
@@ -439,7 +439,7 @@ impl Parser {
     /// WHY: Functions can have type parameters (for generics), ownership mode
     /// parameters (de/in/ex), and trailing modifiers (curata, errata, etc.).
     fn parse_func_decl(&mut self) -> Result<StmtKind, ParseError> {
-        self.expect_keyword_in_slot("functio", "expected 'functio'")?;
+        self.expect_keyword_ident(TokenKind::Functio, "expected 'functio'")?;
 
         let name = self.parse_function_name()?;
         let type_params = self.parse_generic_params()?;
@@ -513,7 +513,7 @@ impl Parser {
     ///
     /// Generic parameters live in the angle-bracket list before `(`.
     fn parse_param_list(&mut self) -> Result<Vec<Param>, ParseError> {
-        if self.check_keyword(TokenKind::Prae) {
+        if self.check_keyword_ident(TokenKind::Prae) {
             return Err(self.removed_prae_typus_error());
         }
 
@@ -523,18 +523,18 @@ impl Parser {
             let start = self.current_span();
 
             // Mode: de/in/ex (prefix on type)
-            let mode = if self.eat_keyword(TokenKind::De) {
+            let mode = if self.eat_keyword_ident(TokenKind::De) {
                 AstParamMode::De
-            } else if self.eat_keyword(TokenKind::In) {
+            } else if self.eat_keyword_ident(TokenKind::In) {
                 AstParamMode::In
-            } else if self.eat_keyword(TokenKind::Ex) {
+            } else if self.eat_keyword_ident(TokenKind::Ex) {
                 AstParamMode::Ex
             } else {
                 AstParamMode::Owned
             };
 
             // Rest: ceteri
-            let rest = self.eat_keyword(TokenKind::Ceteri);
+            let rest = self.eat_keyword_ident(TokenKind::Ceteri);
 
             // Type
             let ty = self.parse_type()?;
@@ -545,14 +545,14 @@ impl Parser {
             let sponte = self.parse_post_name_marker()?;
 
             // Alias: ut NAME
-            let alias = if self.eat_keyword(TokenKind::Ut) {
+            let alias = if self.eat_keyword_ident(TokenKind::Ut) {
                 Some(self.parse_param_name()?)
             } else {
                 None
             };
 
             // Default: vel EXPR
-            let default = if self.eat_keyword_in_slot("vel") {
+            let default = if self.eat_keyword_ident(TokenKind::Vel) {
                 Some(Box::new(self.parse_expression()?))
             } else {
                 None
@@ -583,21 +583,21 @@ impl Parser {
         let mut modifiers = Vec::new();
 
         loop {
-            if self.eat_keyword(TokenKind::Argumenta) {
+            if self.eat_keyword_ident(TokenKind::Argumenta) {
                 let name = self.parse_ident()?;
                 modifiers.push(FuncModifier::Argumenta(name));
-            } else if self.eat_keyword(TokenKind::Curata) {
+            } else if self.eat_keyword_ident(TokenKind::Curata) {
                 let required = self.parse_ident()?;
-                let alias = if self.eat_keyword(TokenKind::Ut) {
+                let alias = if self.eat_keyword_ident(TokenKind::Ut) {
                     Some(self.parse_ident()?)
                 } else {
                     None
                 };
                 modifiers.push(FuncModifier::Curata { required, alias });
-            } else if self.eat_keyword(TokenKind::Errata) {
+            } else if self.eat_keyword_ident(TokenKind::Errata) {
                 let name = self.parse_ident()?;
                 modifiers.push(FuncModifier::Errata(name));
-            } else if self.eat_keyword(TokenKind::Exitus) {
+            } else if self.eat_keyword_ident(TokenKind::Exitus) {
                 let value = if let TokenKind::Integer(n) = self.peek().kind {
                     self.advance();
                     match i64::try_from(n) {
@@ -614,11 +614,11 @@ impl Parser {
                     ExitusValue::Name(self.parse_ident()?)
                 };
                 modifiers.push(FuncModifier::Exitus(value));
-            } else if self.eat_keyword(TokenKind::Immutata) {
+            } else if self.eat_keyword_ident(TokenKind::Immutata) {
                 modifiers.push(FuncModifier::Immutata);
-            } else if self.eat_keyword(TokenKind::Iacit) {
+            } else if self.eat_keyword_ident(TokenKind::Iacit) {
                 modifiers.push(FuncModifier::Iacit);
-            } else if self.eat_keyword(TokenKind::Optiones) {
+            } else if self.eat_keyword_ident(TokenKind::Optiones) {
                 let name = self.parse_ident()?;
                 modifiers.push(FuncModifier::Optiones(name));
             } else {
@@ -634,7 +634,7 @@ impl Parser {
         if self.eat_identifier_text("fixus") {
             return Err(self.removed_fixus_error());
         }
-        Ok(self.eat_keyword_in_slot("sponte"))
+        Ok(self.eat_keyword_ident(TokenKind::Sponte))
     }
 
     // =============================================================================
@@ -656,18 +656,18 @@ impl Parser {
 
     /// Parse `abstractus genus ...` without introducing a second class grammar.
     fn parse_abstract_class_decl(&mut self) -> Result<StmtKind, ParseError> {
-        self.expect_keyword(TokenKind::Abstractus, "expected 'abstractus'")?;
+        self.expect_keyword_ident(TokenKind::Abstractus, "expected 'abstractus'")?;
         self.parse_class_decl_inner(true)
     }
 
     fn parse_class_decl_inner(&mut self, is_abstract: bool) -> Result<StmtKind, ParseError> {
-        self.expect_keyword_in_slot("genus", "expected 'genus'")?;
+        self.expect_keyword_ident(TokenKind::Genus, "expected 'genus'")?;
 
         let name = self.parse_class_name()?;
         let type_params = self.parse_generic_params()?;
 
         // Extends
-        let extends = if self.eat_keyword_in_slot("sub") {
+        let extends = if self.eat_keyword_ident(TokenKind::Sub) {
             Some(self.parse_decl_name()?)
         } else {
             None
@@ -675,7 +675,7 @@ impl Parser {
 
         // Implements
         let mut implements = Vec::new();
-        if self.eat_keyword_in_slot("implet") {
+        if self.eat_keyword_ident(TokenKind::Implet) {
             loop {
                 implements.push(self.parse_decl_name()?);
                 if !self.eat(&TokenKind::Comma) {
@@ -718,7 +718,7 @@ impl Parser {
 
         let annotations = self.parse_annotations()?;
 
-        let kind = if self.check_keyword_in_slot("functio") {
+        let kind = if self.check_keyword_ident(TokenKind::Functio) {
             // Method
             let StmtKind::Func(func) = self.parse_func_decl()? else {
                 return Err(Self::expected_error("functio", self.current_span()));
@@ -726,8 +726,8 @@ impl Parser {
             ClassMemberKind::Method(func)
         } else {
             // Field
-            let is_static = self.eat_keyword(TokenKind::Generis);
-            let is_bound = self.eat_keyword(TokenKind::Nexum);
+            let is_static = self.eat_keyword_ident(TokenKind::Generis);
+            let is_bound = self.eat_keyword_ident(TokenKind::Nexum);
 
             let ty = self.parse_type()?;
             let name = self.parse_param_name()?;
@@ -773,7 +773,7 @@ impl Parser {
     /// parsing, but they stop before bodies so the `AST` carries a contract rather
     /// than an implementation placeholder.
     fn parse_interface_decl(&mut self) -> Result<StmtKind, ParseError> {
-        self.expect_keyword_in_slot("implendum", "expected 'implendum'")?;
+        self.expect_keyword_ident(TokenKind::Implendum, "expected 'implendum'")?;
 
         let name = self.parse_decl_name()?;
         let type_params = self.parse_generic_params()?;
@@ -786,7 +786,7 @@ impl Parser {
             let annotations = self.parse_annotations()?;
             let start = self.current_span();
 
-            self.expect_keyword_in_slot("functio", "expected 'functio'")?;
+            self.expect_keyword_ident(TokenKind::Functio, "expected 'functio'")?;
             let method_name = self.parse_member_ident()?;
 
             self.expect(&TokenKind::LParen, "expected '('")?;
@@ -832,7 +832,7 @@ impl Parser {
 
     /// Parse a type alias declaration.
     fn parse_type_alias_decl(&mut self) -> Result<StmtKind, ParseError> {
-        self.expect_keyword_in_slot("typus", "expected 'typus'")?;
+        self.expect_keyword_ident(TokenKind::Typus, "expected 'typus'")?;
         let name = self.parse_decl_name()?;
         let type_params = self.parse_generic_params()?;
         self.expect(&TokenKind::Eq, "expected '='")?;
@@ -857,7 +857,7 @@ impl Parser {
     ///
     /// WHY: Enums can have explicit integer or string values for FFI compatibility.
     fn parse_enum_decl(&mut self) -> Result<StmtKind, ParseError> {
-        self.expect_keyword_in_slot("ordo", "expected 'ordo'")?;
+        self.expect_keyword_ident(TokenKind::Ordo, "expected 'ordo'")?;
         let name = self.parse_decl_name()?;
 
         self.expect(&TokenKind::LBrace, "expected '{'")?;
@@ -955,7 +955,7 @@ impl Parser {
     /// WHY: Tagged unions (discriminated unions) enable sum types with optional
     /// variant-specific payload fields.
     fn parse_union_decl(&mut self) -> Result<StmtKind, ParseError> {
-        self.expect_keyword_in_slot("discretio", "expected 'discretio'")?;
+        self.expect_keyword_ident(TokenKind::Discretio, "expected 'discretio'")?;
         let name = self.parse_decl_name()?;
         let type_params = self.parse_generic_params()?;
 
@@ -1020,7 +1020,7 @@ impl Parser {
     /// names a local module, stdlib interface, or invalid provider path.
     fn parse_import_decl(&mut self) -> Result<StmtKind, ParseError> {
         let start = self.current_span();
-        self.expect_keyword(TokenKind::Importa, "expected 'importa'")?;
+        self.expect_keyword_ident(TokenKind::Importa, "expected 'importa'")?;
 
         let (path, visibility, kind) = if self.check(&TokenKind::LBrace) {
             self.parse_import_record()?
@@ -1040,7 +1040,7 @@ impl Parser {
     fn parse_import_sugar(
         &mut self,
     ) -> Result<(radix_lexer::Symbol, Visibility, ImportKind), ParseError> {
-        self.expect_keyword(TokenKind::Ex, "expected 'ex'")?;
+        self.expect_keyword_ident(TokenKind::Ex, "expected 'ex'")?;
 
         let path = self.parse_string()?;
         let path_span = self.previous_span();
@@ -1049,22 +1049,22 @@ impl Parser {
         }
 
         let explicit_visibility =
-            self.check_keyword(TokenKind::Privata) || self.check_keyword(TokenKind::Publica);
-        let visibility = if self.eat_keyword(TokenKind::Privata) {
+            self.check_keyword_ident(TokenKind::Privata) || self.check_keyword_ident(TokenKind::Publica);
+        let visibility = if self.eat_keyword_ident(TokenKind::Privata) {
             Visibility::Privata
-        } else if self.eat_keyword(TokenKind::Publica) {
+        } else if self.eat_keyword_ident(TokenKind::Publica) {
             Visibility::Publica
         } else {
             Visibility::Privata
         };
 
         let kind = if self.eat(&TokenKind::Star) {
-            self.expect_keyword(TokenKind::Ut, "expected 'ut'")?;
+            self.expect_keyword_ident(TokenKind::Ut, "expected 'ut'")?;
             let alias = self.parse_ident()?;
             ImportKind::Wildcard { alias }
         } else if explicit_visibility && self.is_import_named_binding_start() {
             let name = self.parse_decl_name()?;
-            let alias = if self.eat_keyword(TokenKind::Ut) {
+            let alias = if self.eat_keyword_ident(TokenKind::Ut) {
                 Some(self.parse_ident()?)
             } else {
                 None
@@ -1174,9 +1174,9 @@ impl Parser {
     }
 
     fn parse_import_visibility_value(&mut self) -> Result<Visibility, ParseError> {
-        if self.eat_keyword(TokenKind::Privata) {
+        if self.eat_keyword_ident(TokenKind::Privata) {
             Ok(Visibility::Privata)
-        } else if self.eat_keyword(TokenKind::Publica) {
+        } else if self.eat_keyword_ident(TokenKind::Publica) {
             Ok(Visibility::Publica)
         } else {
             Err(self.invalid_import_error("invalid_import_visibility"))
@@ -1256,7 +1256,7 @@ impl Parser {
     /// test cases (proba), and nesting for organization.
     fn parse_probandum_decl(&mut self) -> Result<StmtKind, ParseError> {
         let start = self.current_span();
-        self.expect_keyword(TokenKind::Probandum, "expected 'probandum'")?;
+        self.expect_keyword_ident(TokenKind::Probandum, "expected 'probandum'")?;
 
         let name = self.parse_string()?;
         let modifiers = self.parse_test_modifiers()?;
@@ -1282,34 +1282,24 @@ impl Parser {
         let mut nested = Vec::new();
 
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
-            if self.check_keyword(TokenKind::Praepara)
-                || self.check_keyword(TokenKind::Praeparabit)
-                || self.check_keyword(TokenKind::Postpara)
-                || self.check_keyword(TokenKind::Postparabit)
+            if self.check_keyword_ident(TokenKind::Praepara)
+                || self.check_keyword_ident(TokenKind::Praeparabit)
+                || self.check_keyword_ident(TokenKind::Postpara)
+                || self.check_keyword_ident(TokenKind::Postparabit)
             {
                 let start = self.current_span();
-                let kind = match self.peek().kind {
-                    TokenKind::Praepara => {
-                        self.advance();
-                        PraeparaKind::Praepara
-                    }
-                    TokenKind::Praeparabit => {
-                        self.advance();
-                        PraeparaKind::Praeparabit
-                    }
-                    TokenKind::Postpara => {
-                        self.advance();
-                        PraeparaKind::Postpara
-                    }
-                    TokenKind::Postparabit => {
-                        self.advance();
-                        PraeparaKind::Postparabit
-                    }
-                    _ => {
-                        return Err(Self::expected_error("praepara hook", self.current_span()));
-                    }
+                let kind = if self.eat_keyword_ident(TokenKind::Praepara) {
+                    PraeparaKind::Praepara
+                } else if self.eat_keyword_ident(TokenKind::Praeparabit) {
+                    PraeparaKind::Praeparabit
+                } else if self.eat_keyword_ident(TokenKind::Postpara) {
+                    PraeparaKind::Postpara
+                } else if self.eat_keyword_ident(TokenKind::Postparabit) {
+                    PraeparaKind::Postparabit
+                } else {
+                    return Err(Self::expected_error("praepara hook", self.current_span()));
                 };
-                let all = self.eat_keyword_in_slot("omnia");
+                let all = self.eat_keyword_ident(TokenKind::Omnia);
                 let body = self.parse_block()?;
                 let span = start.merge(self.previous_span());
                 setup.push(PraeparaBlock {
@@ -1318,11 +1308,11 @@ impl Parser {
                     body,
                     span,
                 });
-            } else if self.check_keyword(TokenKind::Probandum) {
+            } else if self.check_keyword_ident(TokenKind::Probandum) {
                 if let StmtKind::Probandum(test) = self.parse_probandum_decl()? {
                     nested.push(test);
                 }
-            } else if self.check_keyword(TokenKind::Proba) {
+            } else if self.check_keyword_ident(TokenKind::Proba) {
                 let case = self.parse_proba_case()?;
                 tests.push(case);
             } else {
@@ -1345,7 +1335,7 @@ impl Parser {
 
     fn parse_proba_case(&mut self) -> Result<ProbaCase, ParseError> {
         let start = self.current_span();
-        self.expect_keyword(TokenKind::Proba, "expected 'proba'")?;
+        self.expect_keyword_ident(TokenKind::Proba, "expected 'proba'")?;
 
         let name = self.parse_string()?;
 
@@ -1365,32 +1355,32 @@ impl Parser {
     fn parse_test_modifiers(&mut self) -> Result<Vec<ProbaModifier>, ParseError> {
         let mut modifiers = Vec::new();
         loop {
-            if self.eat_keyword(TokenKind::Omitte) {
+            if self.eat_keyword_ident(TokenKind::Omitte) {
                 let reason = self.parse_string()?;
                 modifiers.push(ProbaModifier::Omitte(reason));
-            } else if self.eat_keyword(TokenKind::Futurum) {
+            } else if self.eat_keyword_ident(TokenKind::Futurum) {
                 let reason = self.parse_string()?;
                 modifiers.push(ProbaModifier::Futurum(reason));
-            } else if self.eat_keyword(TokenKind::Solum) {
+            } else if self.eat_keyword_ident(TokenKind::Solum) {
                 modifiers.push(ProbaModifier::Solum);
-            } else if self.eat_keyword(TokenKind::Tag) {
+            } else if self.eat_keyword_ident(TokenKind::Tag) {
                 let tag = self.parse_string()?;
                 modifiers.push(ProbaModifier::Tag(tag));
-            } else if self.eat_keyword(TokenKind::Temporis) {
+            } else if self.eat_keyword_ident(TokenKind::Temporis) {
                 let n = self.parse_test_modifier_integer("temporis")?;
                 modifiers.push(ProbaModifier::Temporis(n));
-            } else if self.eat_keyword(TokenKind::Metior) {
+            } else if self.eat_keyword_ident(TokenKind::Metior) {
                 modifiers.push(ProbaModifier::Metior);
-            } else if self.eat_keyword(TokenKind::Repete) {
+            } else if self.eat_keyword_ident(TokenKind::Repete) {
                 let n = self.parse_test_modifier_integer("repete")?;
                 modifiers.push(ProbaModifier::Repete(n));
-            } else if self.eat_keyword(TokenKind::Fragilis) {
+            } else if self.eat_keyword_ident(TokenKind::Fragilis) {
                 let n = self.parse_test_modifier_integer("fragilis")?;
                 modifiers.push(ProbaModifier::Fragilis(n));
-            } else if self.eat_keyword(TokenKind::Requirit) {
+            } else if self.eat_keyword_ident(TokenKind::Requirit) {
                 let req = self.parse_string()?;
                 modifiers.push(ProbaModifier::Requirit(req));
-            } else if self.eat_keyword(TokenKind::SolumIn) {
+            } else if self.eat_keyword_ident(TokenKind::SolumIn) {
                 let env = self.parse_string()?;
                 modifiers.push(ProbaModifier::SolumIn(env));
             } else {
@@ -1447,28 +1437,32 @@ impl Parser {
             return self.parse_braced_annotation(name);
         }
 
-        let annotation_name = self.interner.resolve(name.name).to_owned();
-
-        match annotation_name.as_str() {
-            "cli" => return self.parse_cli_annotation(),
-            "imperium" => return self.parse_imperium_annotation(),
-            "optio" => return self.parse_optio_annotation(),
-            "operandus" => return self.parse_operandus_annotation(),
-            "radix" if self.next_annotation_ident_is("typus") => {
+        // Dispatch on the consumed annotation name's keyword identity (any
+        // reader locale), not the current token (which is already past it).
+        let annotation_identity = {
+            let latin = self.identifier_text_or_keyword_latin_key(name.name);
+            lookup_keyword_spec(latin).and_then(|spec| spec.token_kind.clone())
+        };
+        match annotation_identity {
+            Some(TokenKind::Cli) => return self.parse_cli_annotation(),
+            Some(TokenKind::Imperium) => return self.parse_imperium_annotation(),
+            Some(TokenKind::Optio) => return self.parse_optio_annotation(),
+            Some(TokenKind::Operandus) => return self.parse_operandus_annotation(),
+            Some(TokenKind::Radix) if self.next_annotation_ident_is(TokenKind::Typus) => {
                 return self.parse_radix_typus_domain_annotation();
             }
-            "radix" if self.next_annotation_ident_is("lane") => {
+            Some(TokenKind::Radix) if self.next_word_is("lane") => {
                 return self.parse_radix_lane_annotation();
             }
-            "publica" => {
+            Some(TokenKind::Publica) => {
                 self.expect_annotation_end("unexpected token after @ publica")?;
                 return Ok(AnnotationKind::Publica);
             }
-            "protecta" => {
+            Some(TokenKind::Protecta) => {
                 self.expect_annotation_end("unexpected token after @ protecta")?;
                 return Ok(AnnotationKind::Protecta);
             }
-            "privata" => {
+            Some(TokenKind::Privata) => {
                 self.expect_annotation_end("unexpected token after @ privata")?;
                 return Ok(AnnotationKind::Privata);
             }
@@ -1531,7 +1525,7 @@ impl Parser {
     /// `functio` is a keyword, so ordinary expression parsing rejects it. Accept the
     /// attachment-target vocabulary as keyword idents, string literals, or bare idents.
     fn parse_annotatio_target_value(&mut self) -> Result<AnnotationFieldValue, ParseError> {
-        if self.check_keyword_in_slot("functio") {
+        if self.check_keyword_ident(TokenKind::Functio) {
             let span = self.peek().span;
             self.advance();
             let name = self.keyword_ident("functio", span);
@@ -1587,17 +1581,17 @@ impl Parser {
         let mut default = None;
 
         while self.is_annotation_arg() {
-            if self.eat_annotation_ident("brevis") {
+            if self.eat_annotation_ident(TokenKind::Brevis) {
                 short = Some(self.parse_string()?);
-            } else if self.eat_annotation_ident("longum") {
+            } else if self.eat_annotation_ident(TokenKind::Longum) {
                 long = Some(self.parse_string()?);
-            } else if self.eat_annotation_ident("typus") {
+            } else if self.eat_annotation_ident(TokenKind::Typus) {
                 ty = Some(self.parse_type()?);
-            } else if self.eat_annotation_ident("descriptio") {
+            } else if self.eat_annotation_ident(TokenKind::Descriptio) {
                 description = Some(self.parse_string()?);
-            } else if self.eat_annotation_ident("ubique") {
+            } else if self.eat_annotation_ident(TokenKind::Ubique) {
                 global = true;
-            } else if self.eat_annotation_ident("vel") {
+            } else if self.eat_annotation_ident(TokenKind::Vel) {
                 default = Some(Box::new(self.parse_annotation_default()?));
             } else {
                 return Err(self
@@ -1623,7 +1617,7 @@ impl Parser {
     }
 
     fn parse_operandus_annotation(&mut self) -> Result<AnnotationKind, ParseError> {
-        let rest = self.eat_annotation_ident("ceteri");
+        let rest = self.eat_annotation_ident(TokenKind::Ceteri);
         let ty = self.parse_type()?;
         let binding = self.parse_ident()?;
         let mut description = None;
@@ -1631,11 +1625,11 @@ impl Parser {
         let mut default = None;
 
         while self.is_annotation_arg() {
-            if self.eat_annotation_ident("descriptio") {
+            if self.eat_annotation_ident(TokenKind::Descriptio) {
                 description = Some(self.parse_string()?);
-            } else if self.eat_annotation_ident("ubique") {
+            } else if self.eat_annotation_ident(TokenKind::Ubique) {
                 global = true;
-            } else if self.eat_annotation_ident("vel") {
+            } else if self.eat_annotation_ident(TokenKind::Vel) {
                 default = Some(Box::new(self.parse_annotation_default()?));
             } else {
                 return Err(self
@@ -1655,9 +1649,9 @@ impl Parser {
     }
 
     fn parse_radix_typus_domain_annotation(&mut self) -> Result<AnnotationKind, ParseError> {
-        self.expect_annotation_ident("typus", "expected 'typus' after @ radix")?;
+        self.expect_annotation_ident(TokenKind::Typus, "expected 'typus' after @ radix")?;
         let param = self.parse_ident()?;
-        self.expect_annotation_ident("in", "expected 'in' in @ radix typus domain")?;
+        self.expect_annotation_ident(TokenKind::In, "expected 'in' in @ radix typus domain")?;
 
         let mut allowed = Vec::new();
         while self.is_annotation_type_start() {
@@ -1674,7 +1668,7 @@ impl Parser {
     }
 
     fn parse_radix_lane_annotation(&mut self) -> Result<AnnotationKind, ParseError> {
-        self.expect_annotation_ident("lane", "expected 'lane' after @ radix")?;
+        self.expect_annotation_word("lane", "expected 'lane' after @ radix")?;
         let lane = self.parse_lane_value()?;
         self.expect_annotation_end("unexpected token after @ radix lane value")?;
         Ok(AnnotationKind::RadixLane(RadixLaneAnnotation { lane }))
@@ -1738,7 +1732,7 @@ impl Parser {
         }
     }
 
-    fn eat_annotation_ident(&mut self, expected: &str) -> bool {
+    fn eat_annotation_ident(&mut self, expected: TokenKind) -> bool {
         if self.next_annotation_ident_is(expected) {
             self.advance();
             true
@@ -1747,31 +1741,50 @@ impl Parser {
         }
     }
 
-    fn next_annotation_ident_is(&self, expected: &str) -> bool {
-        // `expected` is always the Latin identity. Accept pack surface spellings
-        // via the same latin-key map grammar slots use.
-        match &self.peek().kind {
-            TokenKind::Ident(sym) | TokenKind::Underscore(sym) => {
-                self.identifier_text_or_keyword_latin_key(*sym) == expected
-            }
-            _ => match expected {
-                "in" => self.check(&TokenKind::In),
-                "ceteri" => self.check(&TokenKind::Ceteri),
-                "typus" => self.check_keyword_in_slot("typus"),
-                "vel" => self.check_keyword_in_slot("vel"),
-                other => self.check_keyword_in_slot(other),
-            },
+    fn next_annotation_ident_is(&self, expected: TokenKind) -> bool {
+        // `expected` is a keyword identity; the current word resolves to its
+        // identity through the registry in any reader locale.
+        self.current_keyword_ident() == Some(expected)
+    }
+
+    /// Check the current word against a literal grammar word (not a registry
+    /// keyword), e.g. the `lane` marker in `@ radix lane "…"`. Matches the
+    /// source spelling or its resolved latin key.
+    fn next_word_is(&self, text: &str) -> bool {
+        let TokenKind::Ident(sym) = self.peek().kind else {
+            return false;
+        };
+        self.identifier_text_or_keyword_latin_key(sym) == text
+    }
+
+    fn expect_annotation_ident(
+        &mut self,
+        expected: TokenKind,
+        message: &str,
+    ) -> Result<(), ParseError> {
+        if self.next_annotation_ident_is(expected.clone()) {
+            self.advance();
+            Ok(())
+        } else {
+            let expected_spelling = keyword_spelling_for_token(&expected).unwrap_or("");
+            Err(self
+                .invalid_annotation_error("expected_annotation_ident")
+                .with_arg("expected", expected_spelling)
+                .with_arg(
+                    "context",
+                    message.strip_prefix("expected ").unwrap_or(message),
+                ))
         }
     }
 
-    fn expect_annotation_ident(&mut self, expected: &str, message: &str) -> Result<(), ParseError> {
-        if self.next_annotation_ident_is(expected) {
+    fn expect_annotation_word(&mut self, text: &str, message: &str) -> Result<(), ParseError> {
+        if self.next_word_is(text) {
             self.advance();
             Ok(())
         } else {
             Err(self
                 .invalid_annotation_error("expected_annotation_ident")
-                .with_arg("expected", expected)
+                .with_arg("expected", text)
                 .with_arg(
                     "context",
                     message.strip_prefix("expected ").unwrap_or(message),
@@ -1844,20 +1857,20 @@ impl Parser {
         // listed Typus; is_annotation_arg listed it as an arg).
         matches!(
             self.peek().kind,
-            TokenKind::Abstractus
-                | TokenKind::Importa
-                | TokenKind::Incipit
-                | TokenKind::Proba
-                | TokenKind::Probandum
-                | TokenKind::LBrace
-        ) || self.check_keyword_in_slot("discretio")
-            || self.check_keyword_in_slot("fixum")
-            || self.check_keyword_in_slot("functio")
-            || self.check_keyword_in_slot("genus")
-            || self.check_keyword_in_slot("implendum")
-            || self.check_keyword_in_slot("ordo")
-            || self.check_keyword_in_slot("sit")
-            || self.check_keyword_in_slot("varia")
+            TokenKind::LBrace
+        ) || self.check_keyword_ident(TokenKind::Abstractus)
+            || self.check_keyword_ident(TokenKind::Importa)
+            || self.check_keyword_ident(TokenKind::Incipit)
+            || self.check_keyword_ident(TokenKind::Proba)
+            || self.check_keyword_ident(TokenKind::Probandum)
+            || self.check_keyword_ident(TokenKind::Discretio)
+            || self.check_keyword_ident(TokenKind::Fixum)
+            || self.check_keyword_ident(TokenKind::Functio)
+            || self.check_keyword_ident(TokenKind::Genus)
+            || self.check_keyword_ident(TokenKind::Implendum)
+            || self.check_keyword_ident(TokenKind::Ordo)
+            || self.check_keyword_ident(TokenKind::Sit)
+            || self.check_keyword_ident(TokenKind::Varia)
     }
 
     fn is_annotation_arg(&self) -> bool {
@@ -1882,8 +1895,8 @@ impl Parser {
                 | TokenKind::RParen
                 | TokenKind::Arrow
                 | TokenKind::ExitArrow
-                | TokenKind::Lt
-                | TokenKind::Gt
+                | TokenKind::LtAscii
+                | TokenKind::GtAscii
                 | TokenKind::Colon
                 | TokenKind::Dot
                 | TokenKind::Eq
@@ -1901,12 +1914,9 @@ impl Parser {
             TokenKind::Ident(sym) => {
                 let latin = self.identifier_text_or_keyword_latin_key(sym);
                 match lookup_keyword_spec(latin) {
-                    // A tokenless keyword ends the annotation type list unless
-                    // it is a type-position word (`modulus`, `iuncta`).
-                    // Pre-migration, keyword tokens were never annotation type
-                    // starts; migrated keywords must not become one by
-                    // arriving as identifiers.
-                    Some(spec) if spec.token_kind.is_none() => matches!(
+                    // A keyword ends the annotation type list unless it is a
+                    // type-position word (`modulus`, `iuncta`).
+                    Some(spec) => matches!(
                         spec.scope,
                         KeywordScope::Contextual(owners)
                             if owners.iter().any(|o| matches!(
@@ -1919,7 +1929,7 @@ impl Parser {
             }
             _ => matches!(
                 self.peek().kind,
-                TokenKind::Underscore(_) | TokenKind::De | TokenKind::In | TokenKind::LParen
+                TokenKind::Underscore(_) | TokenKind::LParen
             ),
         }
     }
@@ -1973,7 +1983,7 @@ impl Parser {
     ///
     /// Type parameters (`T`) precede size parameters (`magnitudo N`).
     fn parse_generic_params(&mut self) -> Result<Vec<TypeParam>, ParseError> {
-        if !self.eat(&TokenKind::Lt) {
+        if !self.eat(&TokenKind::LtAscii) {
             return Ok(Vec::new());
         }
 
@@ -1981,7 +1991,7 @@ impl Parser {
         let mut seen_magnitudo = false;
         loop {
             let start = self.current_span();
-            let (kind, name) = if self.eat_keyword(TokenKind::Magnitudo) {
+            let (kind, name) = if self.eat_keyword_ident(TokenKind::Magnitudo) {
                 seen_magnitudo = true;
                 (GenericParamKind::Magnitudo, self.parse_ident()?)
             } else {
@@ -1998,7 +2008,7 @@ impl Parser {
             }
         }
 
-        self.expect(&TokenKind::Gt, "expected '>' after generic parameters")?;
+        self.expect(&TokenKind::GtAscii, "expected '>' after generic parameters")?;
         Ok(params)
     }
 
