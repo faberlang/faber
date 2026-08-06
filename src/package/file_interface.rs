@@ -3,8 +3,9 @@ use radix::driver::AnalyzedUnit;
 use radix::file_interface::{
     snapshot_interface_callable_with_resolver, snapshot_interface_type_with_resolver, FileExport,
     FileExportKind, FileInterface, FileInterfaceError, InterfaceAnnotationContract,
-    InterfaceAnnotationContractField, InterfaceMethodExport, InterfaceNominalExport,
-    InterfaceQualifiedIdentity, InterfaceStructExport, InterfaceStructField,
+    InterfaceAnnotationContractField, InterfaceLibraryIdentity, InterfaceMethodExport,
+    InterfaceNominalExport, InterfaceQualifiedIdentity, InterfaceStructExport,
+    InterfaceStructField,
 };
 use radix::hir::{
     DefId, HirConst, HirFunction, HirInterface, HirInterfaceMethod, HirItemKind, HirParamMode,
@@ -74,6 +75,13 @@ pub(crate) fn extract_file_interface_with_identity(
 ) -> Result<FileInterface, Diagnostic> {
     let public_exports = export_names.iter().collect::<BTreeSet<_>>();
     let mut interface = FileInterface::new();
+    if let Some(ctx) = export_identity {
+        interface.identity = Some(InterfaceLibraryIdentity {
+            provider: ctx.provider.clone(),
+            package: ctx.package.clone(),
+            module_path: ctx.module_path.clone(),
+        });
+    }
 
     for item in &analysis.hir.items {
         let Some(name) = hir_item_name(&item.kind, analysis) else {
