@@ -59,7 +59,7 @@ struct ExemplumJob {
 }
 
 #[test]
-#[ignore = "known breakage: instans corpus exemplum fails analysis (SEM010); tracked separately"]
+#[ignore = "known breakage: instans corpus exemplum fails analysis (SEM010); see need e28474a2"]
 fn instans_rust_codegen_preserves_valor_and_textus_error_paths() {
     let exempla_dir = crate::paths::corpus_dir();
     let file = exempla_dir.join("instans/instans.fab");
