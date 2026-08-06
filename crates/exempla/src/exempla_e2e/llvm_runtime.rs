@@ -68,6 +68,21 @@ pub fn run_llvm_exemplum(
     stem: &str,
     fab_path: &Path,
 ) -> LlvmRunProbe {
+    run_llvm_exemplum_with_args(llvm_file, temp_root, stem, fab_path, &[])
+}
+
+/// Link and run an emitted LLVM module with explicit process arguments.
+///
+/// The exact Rust oracle args are passed through so `incipit argumenta`
+/// fixtures observe the same process context in both lanes (S8.1 process
+/// argumenta).
+pub fn run_llvm_exemplum_with_args(
+    llvm_file: &Path,
+    temp_root: &Path,
+    stem: &str,
+    fab_path: &Path,
+    run_args: &[&str],
+) -> LlvmRunProbe {
     let toolchain = match llvm_host_toolchain() {
         Ok(toolchain) => toolchain,
         Err(reason) => return LlvmRunProbe::toolchain_missing(format!("tier C skipped: {reason}")),
@@ -84,9 +99,68 @@ pub fn run_llvm_exemplum(
     if let Err(reason) = toolchain.link(llvm_file, &runtime_archive, &binary_file) {
         return LlvmRunProbe::link_failed(reason);
     }
+    run_linked_binary(&binary_file, fab_path, run_args)
+}
 
+/// Run the two-module package proof (D-PA4/D11): verify the entry + sibling
+/// LLVM modules with `llvm-as`, link BOTH with the host runtime archive in one
+/// `clang` invocation, run, and classify the outcome against the sibling
+/// `.expected` fixture. The entry module declares/calls the sibling's function
+/// under its canonical external symbol; the sibling module defines it; the
+/// ordinary linker resolves the pair.
+pub fn run_llvm_module_pair(
+    entry_file: &Path,
+    sibling_file: &Path,
+    temp_root: &Path,
+    stem: &str,
+    fab_path: &Path,
+) -> LlvmRunProbe {
+    let toolchain = match llvm_host_toolchain() {
+        Ok(toolchain) => toolchain,
+        Err(reason) => return LlvmRunProbe::toolchain_missing(format!("tier C skipped: {reason}")),
+    };
+    let runtime_archive = match llvm_runtime_archive() {
+        Ok(path) => path,
+        Err(reason) => return LlvmRunProbe::toolchain_missing(reason),
+    };
+
+    let binary_file = temp_root.join(format!("{stem}.bin"));
+    for module in [entry_file, sibling_file] {
+        if let Err(reason) = toolchain.verify(module) {
+            return LlvmRunProbe::link_failed(format!(
+                "{} failed llvm-as: {reason}",
+                module.display()
+            ));
+        }
+    }
+    let link = super::common::command_output_with_timeout(
+        &mut Command::new(&toolchain.clang)
+            .arg(entry_file)
+            .arg(sibling_file)
+            .arg(&runtime_archive)
+            .arg("-o")
+            .arg(&binary_file),
+        Duration::from_secs(120),
+    );
+    let Ok(link) = link else {
+        return LlvmRunProbe::link_failed(format!("cannot execute clang link: {link:?}"));
+    };
+    if !link.status.success() {
+        return LlvmRunProbe::link_failed(format!(
+            "clang link failed: {}",
+            String::from_utf8_lossy(&link.stderr).trim()
+        ));
+    }
+    run_linked_binary(&binary_file, fab_path, &[])
+}
+
+fn run_linked_binary(
+    binary_file: &Path,
+    fab_path: &Path,
+    run_args: &[&str],
+) -> LlvmRunProbe {
     let run = super::common::command_output_with_timeout(
-        &mut Command::new(&binary_file),
+        &mut Command::new(binary_file).args(run_args),
         Duration::from_secs(10),
     );
     let Ok(run) = run else {

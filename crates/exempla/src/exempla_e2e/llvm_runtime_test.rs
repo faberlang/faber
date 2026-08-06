@@ -1062,3 +1062,284 @@ fn llvm_host_genus_creo_hook_matches_rust_output() {
 fn llvm_host_vocatio_method_mutation_matches_expected() {
     assert_genus_fixture_output("vocatio/vocatio.fab", "vocatio-vocatio");
 }
+/// D-PA4 (hand-3 d5596b1c): the importa two-module LLVM-host link proof.
+///
+/// `importa/importa.fab` imports a sibling user-code module and calls
+/// `saluta` through the canonical external symbol
+/// `__faber_external_product_importa_module_auxilium_func_saluta`; the sibling
+/// module (`importa/auxilium.fab`, library mode — no entry) defines the same
+/// symbol. Both modules link with the host runtime archive into one
+/// executable whose stdout is `Salve, Marcus!` (exit 0), matching
+/// `importa.expected` and the Rust oracle.
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_importa_two_module_link -- --ignored --nocapture"]
+fn llvm_host_importa_two_module_link_matches_rust_oracle() {
+    const EXTERNAL_SALUTA: &str = "__faber_external_product_importa_module_auxilium_func_saluta";
+    let fab_path = crate::paths::corpus_dir().join("importa/importa.fab");
+    let sibling = crate::paths::corpus_dir().join("importa/auxilium.fab");
+
+    let result = radix::tool::compile_cli_path(&fab_path, false, Target::LlvmText);
+    assert!(
+        result.success(),
+        "importa.fab LLVM compile failed: {:?}",
+        result.diagnostics
+    );
+    let Some(Output::LlvmText(entry)) = result.output else {
+        panic!("importa.fab did not produce LLVM text");
+    };
+    assert!(
+        entry.code.contains(EXTERNAL_SALUTA),
+        "entry module must declare/call the sibling external symbol:\n{}",
+        entry.code
+    );
+
+    let sibling_source = fs::read_to_string(&sibling).expect("read auxilium.fab");
+    let session = radix::driver::Session::new(
+        Config::default()
+            .with_target(Target::LlvmText)
+            .with_dev_stdlib(),
+    );
+    let mut analysis =
+        radix::driver::analyze_source(&session, &sibling.display().to_string(), &sibling_source)
+            .expect("auxilium.fab frontend analysis must succeed");
+    if let Some(identities) = radix::tool::package_identity_facts_for_path(&sibling) {
+        analysis.package_import_identities = Some(identities);
+    }
+    let lowered = radix::mir::lower_analyzed_unit_with_context(&mut analysis)
+        .expect("auxilium.fab MIR lowering must succeed");
+    let sibling_llvm = radix::mir::emit_llvm_text_probe_library_module(
+        &lowered.validated,
+        &lowered.interner,
+    )
+    .expect("auxilium.fab library-mode LLVM emission must succeed");
+    assert!(
+        sibling_llvm.contains(EXTERNAL_SALUTA),
+        "sibling module must define the external symbol:\n{sibling_llvm}"
+    );
+    assert!(
+        !sibling_llvm.contains("__faber_program_entry_v1"),
+        "library module must not emit a program entry:\n{sibling_llvm}"
+    );
+
+    let temp_root = super::super::common::make_temp_root();
+    let entry_file = temp_root.join("importa.entry.ll");
+    let sibling_file = temp_root.join("importa.sibling.ll");
+    fs::write(&entry_file, entry.code).expect("write entry LLVM text");
+    fs::write(&sibling_file, sibling_llvm).expect("write sibling LLVM text");
+
+    let probe = run_llvm_module_pair(
+        &entry_file,
+        &sibling_file,
+        &temp_root,
+        "importa-two-module",
+        &fab_path,
+    );
+    assert_eq!(probe.bucket, LlvmRunBucket::OutputMatched, "{}", probe.reason);
+    assert_eq!(probe.stdout, "Salve, Marcus!\n");
+    assert!(
+        probe.stderr.is_empty(),
+        "unexpected stderr: {:?}",
+        probe.stderr
+    );
+    assert_eq!(probe.exit_code, Some(0));
+}
+
+/// S8.1 (d3de92fa): declaration-only entry completeness — a corpus fixture
+/// with no `incipit` and no module-scope statements (`proba/proba.fab`) must
+/// still produce a binary with a successful entry: the emitted module carries
+/// the REAL `__faber_program_entry_v1` (no missing-incipit workaround), the
+/// link succeeds, and the process exits 0 with no output, matching the Rust
+/// oracle's `DeclarationOnly` outcome.
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_declaration_only_entry -- --ignored --nocapture"]
+fn llvm_host_declaration_only_entry_matches_rust_oracle() {
+    let fab_path = crate::paths::corpus_dir().join("proba/proba.fab");
+    let result = Compiler::new(
+        Config::default()
+            .with_target(Target::LlvmText)
+            .with_dev_stdlib(),
+    )
+    .compile(&fab_path);
+    assert!(
+        result.success(),
+        "proba/proba.fab LLVM compile failed: {:?}",
+        result.diagnostics
+    );
+    let Some(Output::LlvmText(output)) = result.output else {
+        panic!("proba/proba.fab did not produce LLVM text");
+    };
+    assert!(
+        output.code.contains("define %FaberRtExitV1 @__faber_program_entry_v1"),
+        "declaration-only must still emit the real program entry:\n{}",
+        output.code
+    );
+    let temp_root = super::super::common::make_temp_root();
+    let llvm_file = temp_root.join("declaration-only.ll");
+    fs::write(&llvm_file, output.code).expect("write declaration-only LLVM text");
+    let probe = run_llvm_exemplum(&llvm_file, &temp_root, "declaration-only", &fab_path);
+    assert_eq!(probe.exit_code, Some(0), "{}", probe.reason);
+    assert!(
+        probe.stdout.is_empty(),
+        "unexpected stdout: {:?}",
+        probe.stdout
+    );
+    assert!(
+        probe.stderr.is_empty(),
+        "unexpected stderr: {:?}",
+        probe.stderr
+    );
+}
+
+/// S8.1 (d3de92fa): module-scope statements — executable top-level statements
+/// without an explicit `incipit` become an implicit entry that executes
+/// exactly once in source order. The three `nota` statements must render in
+/// deterministic order (`prima`, `secunda`, `tertia`), exit 0, matching the
+/// Rust oracle's implicit-entry behavior.
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_module_scope_statements -- --ignored --nocapture"]
+fn llvm_host_module_scope_statements_execute_once_in_order() {
+    let source = "nota \"prima\"\nnota \"secunda\"\nnota \"tertia\"\n";
+    let session = radix::driver::Session::new(
+        Config::default()
+            .with_target(Target::LlvmText)
+            .with_dev_stdlib(),
+    );
+    let mut analysis = radix::driver::analyze_source(&session, "module-scope.fab", source)
+        .expect("module-scope source frontend analysis must succeed");
+    let device_roles = radix::mir::device_roles_from_hir(&analysis.hir);
+    let lowered = radix::mir::lower_analyzed_unit_with_context(&mut analysis)
+        .expect("module-scope source MIR lowering must succeed");
+    let llvm = radix::mir::emit_llvm_text_probe_with_device_roles_and_exit(
+        &device_roles,
+        &lowered.validated,
+        &lowered.interner,
+        None,
+    )
+    .expect("module-scope source LLVM emission must succeed");
+    let temp_root = super::super::common::make_temp_root();
+    let llvm_file = temp_root.join("module-scope.ll");
+    fs::write(&llvm_file, &llvm).expect("write module-scope LLVM text");
+    let fab_path = Path::new("module-scope.fab");
+    let probe = run_llvm_exemplum(&llvm_file, &temp_root, "module-scope", fab_path);
+    assert_eq!(
+        probe.stdout,
+        "prima\nsecunda\ntertia\n",
+        "module-scope statements must execute once in source order: {}",
+        probe.reason
+    );
+    assert!(
+        probe.stderr.is_empty(),
+        "unexpected stderr: {:?}",
+        probe.stderr
+    );
+    assert_eq!(probe.exit_code, Some(0));
+}
+
+/// S8.1 (d3de92fa): process argumenta — an `incipit argumenta args` binding
+/// without `@ cli` lowers to an `array<textus>` local the emitted entry seeds
+/// from `__faber_rt_v1_arguments`. The runtime captures argv excluding the
+/// host argv[0] program path (Faber semantics; the product `processus`
+/// provider and the Rust CLI parser both use `args().skip(1)`), and the
+/// harness passes the exact Rust oracle args to the LLVM binary, so `args[0]`
+/// is the first user argument.
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_argumenta_argv -- --ignored --nocapture"]
+fn llvm_host_argumenta_binding_reads_process_argv() {
+    let source = "incipit argumenta args {\n    nota args[0]\n}\n";
+    let session = radix::driver::Session::new(
+        Config::default()
+            .with_target(Target::LlvmText)
+            .with_dev_stdlib(),
+    );
+    let mut analysis = radix::driver::analyze_source(&session, "argumenta.fab", source)
+        .expect("argumenta source frontend analysis must succeed");
+    assert!(
+        analysis.cli_program.is_none(),
+        "raw argumenta fixture must not carry a CLI descriptor"
+    );
+    let device_roles = radix::mir::device_roles_from_hir(&analysis.hir);
+    let lowered = radix::mir::lower_analyzed_unit_with_context(&mut analysis)
+        .expect("argumenta source MIR lowering must succeed");
+    let llvm = radix::mir::emit_llvm_text_probe_with_device_roles_and_exit(
+        &device_roles,
+        &lowered.validated,
+        &lowered.interner,
+        None,
+    )
+    .expect("argumenta source LLVM emission must succeed");
+    assert!(
+        llvm.contains("__faber_rt_v1_arguments"),
+        "entry must seed the argumenta local from the runtime carrier:\n{llvm}"
+    );
+    let temp_root = super::super::common::make_temp_root();
+    let llvm_file = temp_root.join("argumenta.ll");
+    fs::write(&llvm_file, &llvm).expect("write argumenta LLVM text");
+    let fab_path = Path::new("argumenta.fab");
+    // Exact oracle args are passed to the LLVM host; argv[0] (the binary
+    // path) is excluded per Faber semantics, so args[0] is the first user
+    // argument. (Named residual: the raw-argumenta Rust codegen at
+    // radix-hir-rust/src/module.rs emits `std::env::args().collect()`, which
+    // still includes argv[0]; the CLI parser and the product `processus`
+    // provider both skip it.)
+    let probe = run_llvm_exemplum_with_args(
+        &llvm_file,
+        &temp_root,
+        "argumenta",
+        fab_path,
+        &["alpha", "beta", "gamma"],
+    );
+    assert_eq!(probe.stdout, "alpha\n", "{}", probe.reason);
+    assert!(
+        probe.stderr.is_empty(),
+        "unexpected stderr: {:?}",
+        probe.stderr
+    );
+    assert_eq!(probe.exit_code, Some(0));
+}
+
+/// S8.1 (d3de92fa): expected runtime-failure propagation — a failed `adfirma`
+/// latches `STATUS_PANIC` in the emitted entry and the runtime main returns
+/// the latched status as the process exit code (3), proving runtime failures
+/// propagate through the entry contract instead of exiting 0.
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_runtime_failure_propagation -- --ignored --nocapture"]
+fn llvm_host_runtime_failure_propagates_status() {
+    let source = "incipit {\n    adfirma 1 + 1 ≡ 3\n}\n";
+    let session = radix::driver::Session::new(
+        Config::default()
+            .with_target(Target::LlvmText)
+            .with_dev_stdlib(),
+    );
+    let mut analysis = radix::driver::analyze_source(&session, "runtime-failure.fab", source)
+        .expect("runtime-failure source frontend analysis must succeed");
+    let device_roles = radix::mir::device_roles_from_hir(&analysis.hir);
+    let lowered = radix::mir::lower_analyzed_unit_with_context(&mut analysis)
+        .expect("runtime-failure source MIR lowering must succeed");
+    let llvm = radix::mir::emit_llvm_text_probe_with_device_roles_and_exit(
+        &device_roles,
+        &lowered.validated,
+        &lowered.interner,
+        None,
+    )
+    .expect("runtime-failure source LLVM emission must succeed");
+    assert!(
+        llvm.contains("__faber_rt_v1_assert"),
+        "failed adfirma must route through the versioned assert carrier:\n{llvm}"
+    );
+    let temp_root = super::super::common::make_temp_root();
+    let llvm_file = temp_root.join("runtime-failure.ll");
+    fs::write(&llvm_file, &llvm).expect("write runtime-failure LLVM text");
+    let fab_path = Path::new("runtime-failure.fab");
+    let probe = run_llvm_exemplum(&llvm_file, &temp_root, "runtime-failure", fab_path);
+    assert_eq!(
+        probe.exit_code,
+        Some(3),
+        "failed adfirma must propagate STATUS_PANIC (3) as the process exit: {}",
+        probe.reason
+    );
+    assert!(
+        probe.stdout.is_empty(),
+        "unexpected stdout: {:?}",
+        probe.stdout
+    );
+}

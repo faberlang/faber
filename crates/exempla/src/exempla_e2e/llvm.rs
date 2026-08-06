@@ -14,7 +14,7 @@ use super::oracle::rust_oracle;
 use super::rust;
 use radix::codegen::Target;
 use radix::driver::Session;
-use radix::Config;
+use radix::{Config, Output};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -180,6 +180,13 @@ pub(super) fn classify_llvm_exemplum(
             );
         }
     }
+    // importa/importa.fab is the two-module package proof (D-PA4/D11): the
+    // entry imports a sibling user-code module, so the harness compiles BOTH
+    // package units and links them into one executable via the ordinary
+    // linker (no host runtime involvement in the user-to-user call).
+    if is_importa_two_module_fixture(file) {
+        return classify_importa_two_module_llvm_exemplum(file, idx, temp_root, toolchain);
+    }
     let mut analysis =
         match radix::driver::analyze_source(session, &file.display().to_string(), &source) {
             Ok(analysis) => analysis,
@@ -271,6 +278,173 @@ pub(super) fn classify_llvm_exemplum(
     classify_emitted_llvm(file, idx, temp_root, toolchain, llvm)
 }
 
+/// Whether a corpus fixture is the two-module package proof
+/// (`importa/importa.fab` + sibling `importa/auxilium.fab`).
+fn is_importa_two_module_fixture(file: &Path) -> bool {
+    file.strip_prefix(crate::paths::corpus_dir())
+        .is_ok_and(|relative| relative == Path::new("importa/importa.fab"))
+}
+
+/// The two-module LLVM-host link proof for `importa/importa.fab` (D-PA4).
+///
+/// One LLVM module per package unit (D11): the entry module declares and
+/// directly calls the sibling's `saluta` under the canonical external symbol
+/// `__faber_external_product_importa_module_auxilium_func_saluta`; the sibling
+/// module (library mode — no entry) defines the same symbol. Both modules are
+/// assembled and linked with the host runtime archive; the executable must
+/// print `Salve, Marcus!` and exit 0, matching the sibling `.expected` fixture
+/// and the Rust oracle.
+fn classify_importa_two_module_llvm_exemplum(
+    file: &Path,
+    idx: usize,
+    temp_root: &Path,
+    _toolchain: &LlvmToolchain,
+) -> LlvmE2eResult {
+    const EXTERNAL_SALUTA: &str = "__faber_external_product_importa_module_auxilium_func_saluta";
+    let corpus = crate::paths::corpus_dir();
+    let sibling = corpus.join("importa/auxilium.fab");
+    let stem = format!("{idx:03}-importa");
+
+    // Entry module: CLI compile path (import contract + package identities).
+    let entry_output = radix::tool::compile_cli_path(file, false, Target::LlvmText);
+    let entry_llvm = match entry_output.output {
+        Some(Output::LlvmText(output)) => output.code,
+        Some(_) => {
+            return llvm_result(
+                file,
+                LlvmTier::MirLowered,
+                LlvmEmissionBucket::EmissionFailed,
+                "entry emit did not produce LLVM text".to_owned(),
+            );
+        }
+        None => {
+            return llvm_result(
+                file,
+                LlvmTier::SourceReadable,
+                LlvmEmissionBucket::MirLoweringFailed,
+                format!(
+                    "entry compile failed: {}",
+                    format_diagnostic_messages(&entry_output.diagnostics)
+                ),
+            );
+        }
+    };
+    if !entry_llvm.contains(EXTERNAL_SALUTA) {
+        return llvm_result(
+            file,
+            LlvmTier::MirLowered,
+            LlvmEmissionBucket::EmissionFailed,
+            format!("entry module does not declare/call the sibling external symbol {EXTERNAL_SALUTA}"),
+        );
+    }
+
+    // Sibling module: analyze + package identity facts + library-mode emit.
+    let sibling_source = match fs::read_to_string(&sibling) {
+        Ok(source) => source,
+        Err(err) => {
+            return llvm_result(
+                file,
+                LlvmTier::SourceReadable,
+                LlvmEmissionBucket::OutputWriteFailed,
+                format!("cannot read sibling {}: {err}", sibling.display()),
+            );
+        }
+    };
+    let session = Session::new(Config::default().with_target(Target::LlvmText).with_dev_stdlib());
+    let mut sibling_analysis =
+        match radix::driver::analyze_source(&session, &sibling.display().to_string(), &sibling_source) {
+            Ok(analysis) => analysis,
+            Err(diagnostics) => {
+                return llvm_result(
+                    file,
+                    LlvmTier::SourceReadable,
+                    LlvmEmissionBucket::FrontendFailed,
+                    format!(
+                        "sibling frontend failed: {}",
+                        format_diagnostic_messages(&diagnostics)
+                    ),
+                );
+            }
+        };
+    if let Some(identities) = radix::tool::package_identity_facts_for_path(&sibling) {
+        sibling_analysis.package_import_identities = Some(identities);
+    }
+    let sibling_lowered = match radix::mir::lower_analyzed_unit_with_context(&mut sibling_analysis) {
+        Ok(lowered) => lowered,
+        Err(errors) => {
+            return llvm_result(
+                file,
+                LlvmTier::FrontendAnalyzed,
+                LlvmEmissionBucket::MirLoweringFailed,
+                format!(
+                    "sibling MIR lowering failed: {}",
+                    errors
+                        .iter()
+                        .map(|error| error.issue.clone())
+                        .collect::<Vec<_>>()
+                        .join(" | ")
+                ),
+            );
+        }
+    };
+    let sibling_llvm = match radix::mir::emit_llvm_text_probe_library_module(
+        &sibling_lowered.validated,
+        &sibling_lowered.interner,
+    ) {
+        Ok(llvm) => llvm,
+        Err(error) => {
+            return llvm_result(
+                file,
+                LlvmTier::MirLowered,
+                LlvmEmissionBucket::Unsupported,
+                format!("LLVM emission unsupported: {}:{}", error.category, error.shape),
+            );
+        }
+    };
+    if !sibling_llvm.contains(EXTERNAL_SALUTA) {
+        return llvm_result(
+            file,
+            LlvmTier::MirLowered,
+            LlvmEmissionBucket::EmissionFailed,
+            format!("sibling module does not define the external symbol {EXTERNAL_SALUTA}"),
+        );
+    }
+
+    let entry_file = temp_root.join(format!("{stem}.entry.ll"));
+    let sibling_file = temp_root.join(format!("{stem}.sibling.ll"));
+    if let Err(err) = fs::write(&entry_file, &entry_llvm) {
+        return llvm_result(
+            file,
+            LlvmTier::LlvmEmitted,
+            LlvmEmissionBucket::OutputWriteFailed,
+            format!("cannot write entry LLVM output: {err}"),
+        );
+    }
+    if let Err(err) = fs::write(&sibling_file, &sibling_llvm) {
+        return llvm_result(
+            file,
+            LlvmTier::LlvmEmitted,
+            LlvmEmissionBucket::OutputWriteFailed,
+            format!("cannot write sibling LLVM output: {err}"),
+        );
+    }
+
+    let run_probe = super::llvm_runtime::run_llvm_module_pair(
+        &entry_file,
+        &sibling_file,
+        temp_root,
+        &stem,
+        file,
+    );
+    classify_llvm_run_tier(
+        file,
+        &entry_file,
+        LlvmVerifier::LlvmAs,
+        LlvmEmissionBucket::VerifierValid,
+        run_probe,
+    )
+}
+
 fn classify_package_llvm_exemplum(
     file: &Path,
     idx: usize,
@@ -353,11 +527,16 @@ fn classify_emitted_llvm(
     if let Some(verifier) = toolchain.verifier {
         match verify_llvm(verifier, &llvm_file) {
             Ok(()) => {
-                let run_probe = super::llvm_runtime::run_llvm_exemplum(
+                // S8.1 process argumenta: the LLVM binary receives the exact
+                // Rust oracle args so `incipit argumenta` fixtures observe the
+                // same process context in both lanes.
+                let oracle_args = rust_oracle(file).run_args();
+                let run_probe = super::llvm_runtime::run_llvm_exemplum_with_args(
                     &llvm_file,
                     temp_root,
                     &format!("{idx:03}-{stem}"),
                     file,
+                    oracle_args,
                 );
                 return classify_llvm_run_tier(
                     file,

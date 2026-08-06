@@ -137,6 +137,14 @@ pub(crate) fn classify_wasm_exemplum(
             }
         };
 
+    // D-PA4: package-aware fixtures (local sibling imports) carry the canonical
+    // identity facts into MIR, so the wasm lane's fail-close diagnostic names
+    // the real fact (`importa:auxilium:saluta`) instead of the raw import
+    // spelling. The lane stays fail-closed (no wasm package path yet).
+    if let Some(identities) = radix::tool::package_import_identities_for_path(file) {
+        analysis.package_import_identities = Some(identities);
+    }
+
     let interner = analysis.interner.clone();
     let mir = match radix::mir::lower_analyzed_unit_with_context(&mut analysis) {
         Ok(mir) => mir,
