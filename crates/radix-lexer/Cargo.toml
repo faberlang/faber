@@ -13,8 +13,8 @@ serde = { version = "1.0.228", features = ["derive"] }
 unicode-ident = "1"
 unicode-normalization = "0.1"
 
-[lints.clippy]
-pedantic = "deny"
+[lints]
+workspace = true
 
 [dev-dependencies]
 proptest = "1.11.0"

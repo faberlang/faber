@@ -13,5 +13,6 @@ radix-lexer = { path = "../radix-lexer" }
 radix-types = { path = "../radix-types" }
 rustc-hash = "2"
 
-[lints.clippy]
-pedantic = "deny"
+[lints]
+workspace = true
+

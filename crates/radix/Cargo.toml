@@ -6,9 +6,9 @@ description = "Recursive descent compiler for Faber → Rust/Faber"
 license = "MIT"
 
 [lints.clippy]
-# Group first at lower priority so per-lint allows below win package-wide
-# (lib + tests + examples + bins).
+# Group first at lower priority so per-lint allows below win package-wide.
 pedantic = { level = "deny", priority = -1 }
+# (lib + tests + examples + bins).
 # Structural / intentional
 too_many_lines = "allow"
 match_same_arms = "allow"

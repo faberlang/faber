@@ -18,6 +18,12 @@ members = [
 ]
 resolver = "2"
 
+# Workspace-wide clippy enforcement. Every crate inherits this via
+# `[lints] workspace = true` in its own Cargo.toml. Per-crate overrides
+# (if any) layer on top and are kept local to that crate.
+[workspace.lints.clippy]
+pedantic = { level = "deny", priority = -1 }
+
 # Faster debug builds for test cycles. Line-table-only debuginfo is enough
 # for stack traces and basic debugging; full debuginfo (default) is expensive
 # to compile and bloats artifacts. Higher codegen-units lets rustc parallelize

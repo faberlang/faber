@@ -9,5 +9,5 @@ publish = false
 [lib]
 path = "src/lib.rs"
 
-[lints.clippy]
-pedantic = "deny"
+[lints]
+workspace = true

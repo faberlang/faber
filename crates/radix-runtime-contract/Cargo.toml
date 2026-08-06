@@ -8,5 +8,6 @@ publish = false
 
 [dev-dependencies]
 
-[lints.clippy]
-pedantic = "deny"
+[lints]
+workspace = true
+

@@ -10,5 +10,6 @@ publish = false
 radix-lexer = { path = "../radix-lexer" }
 serde = { version = "1.0.228", features = ["derive"] }
 
-[lints.clippy]
-pedantic = "deny"
+[lints]
+workspace = true
+
