@@ -35,7 +35,13 @@ pub(super) fn interpret_path(path: &PathBuf, program_args: &[String]) {
                 std::process::exit(1);
             }
         };
-        let config = radix::driver::Config::default();
+        let config = match package::default_config_with_locale(radix::Target::TypeScript) {
+            Ok(config) => config.with_dev_stdlib(),
+            Err(diagnostic) => {
+                eprint_archive_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
+                std::process::exit(1);
+            }
+        };
         let mut host = StdioHost::with_argumenta(program_args.to_vec());
         if let Err(mut diagnostics) =
             package::run_package_mir(&config, archive.package_input(), &mut host)
@@ -49,7 +55,13 @@ pub(super) fn interpret_path(path: &PathBuf, program_args: &[String]) {
     }
 
     if is_package_interpret_input(path) {
-        let config = radix::driver::Config::default();
+        let config = match package::default_config_with_locale(radix::Target::TypeScript) {
+            Ok(config) => config.with_dev_stdlib(),
+            Err(diagnostic) => {
+                super::eprint_compile_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
+                std::process::exit(1);
+            }
+        };
         let mut host = StdioHost::with_argumenta(program_args.to_vec());
         if let Err(diagnostics) = package::run_package_mir(&config, path, &mut host) {
             super::eprint_compile_diagnostics(&diagnostics);
@@ -89,7 +101,14 @@ fn manifestless_file_declares_non_kernel_import(path: &Path) -> bool {
     let Ok(peeled) = radix::driver::peel_raw_source(&display_name, &raw_source) else {
         return false;
     };
-    let parse = radix::parser::parse(radix::lexer::lex(peeled.body));
+    let lex = match package::default_config_with_locale(radix::Target::TypeScript) {
+        Ok(config) => match config.locale_pack.as_ref() {
+            Some(pack) => radix::lexer::lex_with_locale_pack(peeled.body, pack),
+            None => radix::lexer::lex(peeled.body),
+        },
+        Err(_) => radix::lexer::lex(peeled.body),
+    };
+    let parse = radix::parser::parse(lex);
     let Some(program) = parse.program else {
         return false;
     };

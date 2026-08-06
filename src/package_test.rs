@@ -5109,13 +5109,15 @@ incipit {
     let result = compile_package(&Config::default(), &entry);
 
     assert!(result.output.is_none());
-    assert!(result.diagnostics.iter().any(|diag| diag.is_error()
-        && diagnostic_has_issue(diag, "namespace_missing_export")
-        && diagnostic_has_arg(diag, "member", "siste")
-        && diag
-            .source_line
-            .as_deref()
-            .is_some_and(|line| line.contains("siste"))));
+    assert!(result.diagnostics.iter().any(|diag| {
+        diag.is_error()
+            && diagnostic_has_issue(diag, "namespace_missing_export")
+            && diagnostic_has_arg(diag, "member", "siste")
+            && diag
+                .source_line
+                .as_deref()
+                .is_some_and(|line| line.contains("siste"))
+    }));
 }
 
 #[test]
@@ -5450,19 +5452,18 @@ fn dual_norma_format_imports_scope_provenance_by_binding() {
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
-        r#"
-importa ex "norma:yaml" privata yaml
-importa ex "norma:json" privata json
+        r#"import from "norma:yaml" private yaml_mod
+import from "norma:json" private json_mod
 
-incipit {
-  fixum valor yaml_doc ← yaml.solve("count: 1")
-  fixum _ yaml_text ← yaml.pange(yaml_doc)
-  fac {
-    fixum json json_doc ← json.solve("{\"count\": 1}")
-    fixum _ json_text ← json.pange(json_doc)
+main {
+  const value yaml_doc ← yaml_mod.solve("count: 1")
+  const _ yaml_text ← yaml_mod.pange(yaml_doc)
+  do {
+    const json json_doc ← json_mod.solve("{\"count\": 1}")
+    const _ json_text ← json_mod.pange(json_doc)
   }
-  cape err {
-    nota err
+  catch err {
+    print err
   }
 }
 
@@ -7076,9 +7077,10 @@ functio run() {}
 
     let result = compile_package(&Config::default(), &dir);
     assert!(result.output.is_none());
-    assert!(result.diagnostics.iter().any(|diag| diag
-        .args
-        .contains(&DiagnosticArg::new("issue", "nested_module_mount"))));
+    assert!(result.diagnostics.iter().any(|diag| {
+        diag.args
+            .contains(&DiagnosticArg::new("issue", "nested_module_mount"))
+    }));
 }
 
 #[test]

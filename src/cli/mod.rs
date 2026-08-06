@@ -114,7 +114,8 @@ pub struct FormatArgs {
     pub paths: Vec<PathBuf>,
 
     /// Re-emit in the given reader-locale surface (HIR-backed round-trip;
-    /// `la` reproduces the former `--canonical` surface). No flag keeps
+    /// `en` is the default product surface and `la` remains available for
+    /// heritage sources. No flag keeps
     /// author mode.
     #[arg(long = "locale", value_name = "LOCALE")]
     pub locale: Option<String>,

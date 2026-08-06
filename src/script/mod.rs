@@ -6,7 +6,8 @@
 
 mod trap;
 
-use radix::driver::{Config, Session};
+use radix::codegen::Target;
+use radix::driver::Session;
 use radix::mir::run_source as radix_run_source;
 use std::panic::AssertUnwindSafe;
 use std::process::ExitCode;
@@ -41,7 +42,10 @@ pub fn run_named(
     source: &str,
     host: &mut dyn Host,
 ) -> Result<ExitCode, RunSourceError> {
-    let session = Session::new(Config::default());
+    let config = crate::package::default_config_with_locale(Target::TypeScript)
+        .map_err(|diagnostic| RunSourceError::Frontend(vec![*diagnostic]))?
+        .with_dev_stdlib();
+    let session = Session::new(config);
     run_with_session(&session, name, source, host)
 }
 

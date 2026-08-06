@@ -85,7 +85,7 @@ fn installed_default_pack_resolves_diagnostic_issue_structurally() {
         explanation.issue.as_deref(),
         Some("initializer_annotation_mismatch")
     );
-    assert_eq!(explanation.locale, "la");
+    assert_eq!(explanation.locale, "en");
     assert!(!explanation.message.is_empty());
     assert!(explanation
         .help
