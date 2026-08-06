@@ -6,7 +6,7 @@ canonical = true
 summary = "Sparse tensor width sugar mirrors dense tensor sugar with an s prefix."
 syntax = "sf32[2, 3] | si64[N] | su32[4]"
 related = ["tensor", "numeric type sugar"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -25,14 +25,14 @@ locale = "la"
 
 # STYLE: sparse tensor sugar (sf32, si64[N]) — see docs/design/numeric-type-sugar.md
 
-incipit {
-    varia sf32[2, 3] grid ← vacua
+main {
+    var sf32[2, 3] grid ← vacua
     grid.ponde([0, 1], 4.0)
 
-    fixum _ value ← grid.accipe([0, 1])
-    fixum _ absent ← grid.accipe([1, 2])
-    fixum _ count ← grid.nonnihil()
+    const _ value ← grid.accipe([0, 1])
+    const _ absent ← grid.accipe([1, 2])
+    const _ count ← grid.nonnihil()
 
-    fixum tf32[2, 3] dense ← grid.densata()
-    nota value, absent, count, dense.longitudo()
+    const tf32[2, 3] dense ← grid.densata()
+    print value, absent, count, dense.longitudo()
 }

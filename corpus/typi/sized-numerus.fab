@@ -6,7 +6,7 @@ canonical = false
 summary = "Sized numerus and fractus width annotations in type position."
 syntax = "numerus<W> | fractus<W>"
 related = ["numerus", "fractus", "instans"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -30,14 +30,14 @@ locale = "la"
 #
 # WHY: `numerus<W>` and `fractus<W>` carry explicit target widths in type position.
 
-incipit {
-    fixum numerus<i32> narrow ← 7 ∷ numerus<i32>
-    fixum numerus<u64> wide ← 255 ∷ numerus<u64>
-    fixum numerus<i64> signed ← narrow
-    fixum fractus<f32> single ← 1.5 ∷ fractus<f32>
+main {
+    const int<i32> narrow ← 7 ∷ int<i32>
+    const int<u64> wide ← 255 ∷ int<u64>
+    const int<i64> signed ← narrow
+    const float<f32> single ← 1.5 ∷ float<f32>
 
-    nota narrow
-    nota wide
-    nota signed
-    nota single
+    print narrow
+    print wide
+    print signed
+    print single
 }

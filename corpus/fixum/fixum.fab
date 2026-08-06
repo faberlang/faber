@@ -7,7 +7,7 @@ summary = "Declares an immutable binding."
 syntax = "fixum <type|_> <pattern> [← <expression>]"
 aliases = ["const", "immutable"]
 related = ["varia", "sit", "←"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # fixum — Declares an immutable binding
@@ -44,45 +44,45 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   fixum.expected (Salve, Marcus! / 7 / 30 / 300)
 
-functio scale(bivalens compact, numerus base) → numerus {
-    fixum numerus factor
-    si compact {
+fn scale(bool compact, int base) → int {
+    const int factor
+    if compact {
         factor ← 10
     }
-    secus {
+    else {
         factor ← 100
     }
-    redde base * factor
+    return base * factor
 }
 
-incipit {
-    fixum _ nomen ← "Marcus"
-    fixum _ salve ← "Salve, §!"(nomen)
+main {
+    const _ nomen ← "Marcus"
+    const _ salve ← "Salve, §!"(nomen)
 
-    nota salve
+    print salve
 
-    fixum numerus pending
+    const int pending
     pending ← 7
-    nota pending
+    print pending
 
-    nota scale(verum, 3)
-    nota scale(falsum, 3)
+    print scale(true, 3)
+    print scale(false, 3)
 }
 
-proba "fixum immediate init" {
-    fixum _ nomen ← "Marcus"
-    fixum _ salve ← "Salve, §!"(nomen)
-    adfirma nomen ≡ "Marcus"
-    adfirma salve ≡ "Salve, Marcus!"
+test "fixum immediate init" {
+    const _ nomen ← "Marcus"
+    const _ salve ← "Salve, §!"(nomen)
+    assert nomen ≡ "Marcus"
+    assert salve ≡ "Salve, Marcus!"
 }
 
-proba "fixum deferred init writes once" {
-    fixum numerus pending
+test "fixum deferred init writes once" {
+    const int pending
     pending ← 7
-    adfirma pending ≡ 7
+    assert pending ≡ 7
 }
 
-proba "fixum factor selected per branch" {
-    adfirma scale(verum, 3) ≡ 30
-    adfirma scale(falsum, 3) ≡ 300
+test "fixum factor selected per branch" {
+    assert scale(true, 3) ≡ 30
+    assert scale(false, 3) ≡ 300
 }

@@ -5,7 +5,7 @@ category = "numeric"
 summary = "f16 and fractus<f16> type-position width markers."
 syntax = "f16 | fractus<f16>"
 related = ["fractus", "matrix"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # f16 — f16 and fractus<f16> type-position width markers
@@ -37,10 +37,10 @@ locale = "la"
 #   still reject until a real half carrier is implemented. Sexp can carry this
 #   identity-style example but is not a half runtime authority.
 
-functio keep_half(f16 x) → f16 {
-    redde x
+fn keep_half(f16 x) → f16 {
+    return x
 }
 
-functio keep_half_long(fractus<f16> x) → fractus<f16> {
-    redde x
+fn keep_half_long(float<f16> x) → float<f16> {
+    return x
 }

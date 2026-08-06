@@ -6,7 +6,7 @@ canonical = true
 summary = "Marks an option or operand as global."
 syntax = "ubique"
 related = ["optio", "operandus"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -38,6 +38,6 @@ locale = "la"
 #
 
 @ cli "ubique-smoke"
-@ optio verbose brevis "v" longum "verbose" typus bivalens ubique descriptio "Global verbose flag"
-incipit argumenta args {
+@ option verbose short "v" long "verbose" type bool global description "Global verbose flag"
+main args args {
 }

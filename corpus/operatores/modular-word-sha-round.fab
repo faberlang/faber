@@ -6,7 +6,7 @@ canonical = false
 summary = "One native SHA-256 compression round using modulus<u32>."
 syntax = "modulus<u32>"
 related = ["numerus", "⇐", "⇒", "∧", "∨", "⊻", "¬"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -26,29 +26,29 @@ locale = "la"
 # A small proof of the word contract: one textbook SHA-256 round for the
 # first padded word of "abc". This is not the full digest implementation.
 
-functio dextra(modulus<u32> value, modulus<u32> count) → modulus<u32> {
-    redde (value ⇒ count) ∨ (value ⇐ (32 - count))
+fn dextra(uint<u32> value, uint<u32> count) → uint<u32> {
+    return (value ⇒ count) ∨ (value ⇐ (32 - count))
 }
 
-incipit {
-    fixum modulus<u32> a ← 1779033703
-    fixum modulus<u32> b ← 3144134277
-    fixum modulus<u32> c ← 1013904242
-    fixum modulus<u32> d ← 2773480762
-    fixum modulus<u32> e ← 1359893119
-    fixum modulus<u32> f ← 2600822924
-    fixum modulus<u32> g ← 528734635
-    fixum modulus<u32> h ← 1541459225
-    fixum modulus<u32> w ← 1633837952
-    fixum modulus<u32> k ← 1116352408
+main {
+    const uint<u32> a ← 1779033703
+    const uint<u32> b ← 3144134277
+    const uint<u32> c ← 1013904242
+    const uint<u32> d ← 2773480762
+    const uint<u32> e ← 1359893119
+    const uint<u32> f ← 2600822924
+    const uint<u32> g ← 528734635
+    const uint<u32> h ← 1541459225
+    const uint<u32> w ← 1633837952
+    const uint<u32> k ← 1116352408
 
-    fixum modulus<u32> sigma1 ← dextra(e, 6 ∷ modulus<u32>) ⊻ dextra(e, 11 ∷ modulus<u32>) ⊻ dextra(e, 25 ∷ modulus<u32>)
-    fixum modulus<u32> choose ← (e ∧ f) ⊻ ((¬e) ∧ g)
-    fixum modulus<u32> temp1 ← h + sigma1 + choose + k + w
-    fixum modulus<u32> sigma0 ← dextra(a, 2 ∷ modulus<u32>) ⊻ dextra(a, 13 ∷ modulus<u32>) ⊻ dextra(a, 22 ∷ modulus<u32>)
-    fixum modulus<u32> majority ← (a ∧ b) ⊻ (a ∧ c) ⊻ (b ∧ c)
-    fixum modulus<u32> temp2 ← sigma0 + majority
+    const uint<u32> sigma1 ← dextra(e, 6 ∷ uint<u32>) ⊻ dextra(e, 11 ∷ uint<u32>) ⊻ dextra(e, 25 ∷ uint<u32>)
+    const uint<u32> choose ← (e ∧ f) ⊻ ((¬e) ∧ g)
+    const uint<u32> temp1 ← h + sigma1 + choose + k + w
+    const uint<u32> sigma0 ← dextra(a, 2 ∷ uint<u32>) ⊻ dextra(a, 13 ∷ uint<u32>) ⊻ dextra(a, 22 ∷ uint<u32>)
+    const uint<u32> majority ← (a ∧ b) ⊻ (a ∧ c) ⊻ (b ∧ c)
+    const uint<u32> temp2 ← sigma0 + majority
 
-    nota temp1 + temp2
-    nota d + temp1
+    print temp1 + temp2
+    print d + temp1
 }

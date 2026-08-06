@@ -6,7 +6,7 @@ canonical = true
 summary = "Equality and ordering comparisons returning bivalens."
 syntax = "<expression> ≡ <expression> | <expression> ≠ <expression> | <expression> ≤ <expression> | <expression> ≥ <expression>"
 related = ["≠", "≤", "≥", "est", "adfirma"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -34,30 +34,30 @@ locale = "la"
 # BACKEND:
 #   Scalar bivalens stdout; chain with et for interval tests.
 
-incipit {
-    fixum _ aequalis ← 10 ≡ 10
-    nota aequalis
+main {
+    const _ aequalis ← 10 ≡ 10
+    print aequalis
 
-    fixum _ diversus ← 10 ≠ 5
-    nota diversus
+    const _ diversus ← 10 ≠ 5
+    print diversus
 
-    fixum _ nonMaior ← 5 ≤ 10
-    nota nonMaior
+    const _ nonMaior ← 5 ≤ 10
+    print nonMaior
 
-    fixum _ nonMinor ← 10 ≥ 5
-    nota nonMinor
+    const _ nonMinor ← 10 ≥ 5
+    print nonMinor
 
-    fixum _ intervallum ← 0 < 5 et 5 < 10
-    nota intervallum
+    const _ intervallum ← 0 < 5 and 5 < 10
+    print intervallum
 }
 
-proba "equal and not-equal comparisons" {
-    adfirma 10 ≡ 10
-    adfirma 10 ≠ 5
+test "equal and not-equal comparisons" {
+    assert 10 ≡ 10
+    assert 10 ≠ 5
 }
 
-proba "ordering and chained interval" {
-    adfirma 5 ≤ 10
-    adfirma 10 ≥ 5
-    adfirma 0 < 5 et 5 < 10
+test "ordering and chained interval" {
+    assert 5 ≤ 10
+    assert 10 ≥ 5
+    assert 0 < 5 and 5 < 10
 }

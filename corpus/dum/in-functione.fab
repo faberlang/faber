@@ -6,7 +6,7 @@ canonical = false
 summary = "While loops inside function bodies."
 syntax = "dum <condition> <block>"
 related = ["dum", "functio"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -34,33 +34,33 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Factorial and power-of-two growth samples.
 
-functio factorial(numerus n) → numerus {
-    varia numerus valor ← 1
-    varia numerus currens ← n
+fn factorial(int n) → int {
+    var int value ← 1
+    var int currens ← n
 
-    dum currens > 1 {
-        valor ← valor * currens
+    while currens > 1 {
+        value ← value * currens
         currens ← currens - 1
     }
 
-    redde valor
+    return value
 }
 
 # Doubles until vis exceeds n (first power of two strictly greater than n)
-functio potentia(numerus n) → numerus {
-    varia numerus vis ← 1
+fn potentia(int n) → int {
+    var int vis ← 1
 
-    dum vis ≤ n {
+    while vis ≤ n {
         vis ← vis * 2
     }
 
-    redde vis
+    return vis
 }
 
-incipit {
-    nota "5! ←", factorial(5)
-    nota "10! ←", factorial(10)
+main {
+    print "5! ←", factorial(5)
+    print "10! ←", factorial(10)
 
-    nota "potentia post 100: §"(potentia(100))
-    nota "potentia post 1000: §"(potentia(1000))
+    print "potentia post 100: §"(potentia(100))
+    print "potentia post 1000: §"(potentia(1000))
 }

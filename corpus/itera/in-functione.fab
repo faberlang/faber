@@ -7,7 +7,7 @@ summary = "Starts a for-each iteration statement."
 syntax = "itera <mode> <expression> <binding> <block>"
 aliases = ["iterate"]
 related = ["ex", "de", "ab"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -34,48 +34,48 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Sums, maxima, and counts above a threshold for sample listas.
 
-functio summa(lista<numerus> numeri) → numerus {
-    varia numerus total ← 0
+fn summa(list<int> numeri) → int {
+    var int total ← 0
 
-    itera ex numeri fixum n {
+    for from numeri const n {
         total ← total + n
     }
 
-    redde total
+    return total
 }
 
 # Assumes non-empty lista (seed from first element)
-functio maximum(lista<numerus> numeri) → numerus {
-    varia numerus max ← numeri[0]
+fn maximum(list<int> numeri) → int {
+    var int max ← numeri[0]
 
-    itera ex numeri fixum n {
-        si n > max {
+    for from numeri const n {
+        if n > max {
             max ← n
         }
     }
 
-    redde max
+    return max
 }
 
-functio supra(lista<numerus> numeri, numerus limen) → numerus {
-    varia numerus numerus ← 0
+fn supra(list<int> numeri, int limen) → int {
+    var int int ← 0
 
-    itera ex numeri fixum n {
-        si n > limen {
-            numerus ← numerus + 1
+    for from numeri const n {
+        if n > limen {
+            int ← int + 1
         }
     }
 
-    redde numerus
+    return int
 }
 
-incipit {
-    fixum _ numeri ← [1, 2, 3, 4, 5]
+main {
+    const _ numeri ← [1, 2, 3, 4, 5]
 
-    nota summa(numeri)
-    nota maximum(numeri)
-    nota supra(numeri, 3)
+    print summa(numeri)
+    print maximum(numeri)
+    print supra(numeri, 3)
 
-    nota summa([10, 20, 30])
-    nota maximum([5, 12, 8, 20, 3])
+    print summa([10, 20, 30])
+    print maximum([5, 12, 8, 20, 3])
 }

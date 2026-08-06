@@ -7,7 +7,7 @@ summary = "Marks an import as re-exported from the current module."
 syntax = "importa ex <source> publica <name>"
 aliases = ["public"]
 related = ["privata", "importa"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -35,11 +35,11 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   publica
 
-@ publica
-functio publicum() → textus {
-    redde "publica"
+@ public
+fn publicum() → string {
+    return "publica"
 }
 
-incipit {
-    nota publicum()
+main {
+    print publicum()
 }

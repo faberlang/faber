@@ -6,7 +6,7 @@ canonical = true
 summary = "Marks a class member as bound to the current instance."
 syntax = "nexum <type> <name> [= <expression>]"
 related = ["genus", "ego"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -34,17 +34,17 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   nexum.expected — bound field value 7 via accipe().
 
-genus Computator {
+class Computator {
     # bound field — same value for every instance
-    nexum numerus valor = 0
+    nexum int valor = 0
 
-    functio accipe() → numerus {
-        redde ego.valor
+    fn accipe() → int {
+        return self.valor
     }
 }
 
-incipit {
+main {
     # instance overrides bound default
-    fixum _ c ← Computator { valor = 7 }
-    nota c.accipe()
+    const _ c ← Computator { valor = 7 }
+    print c.accipe()
 }

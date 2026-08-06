@@ -7,7 +7,7 @@ summary = "Introduces a compact statement consequent."
 syntax = "<head> ergo <statement>"
 aliases = ["ergo", "therefore"]
 related = ["si", "dum", "clausura", "redde", "tacet", "ergo"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -38,61 +38,61 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Sign classes, division results, grades, and search hits.
 
-functio classis(numerus x) → textus {
-    si x < 0 ergo redde "negativus"
-    si x ≡ 0 ergo redde "nihil"
-    redde "positivus"
+fn classis(int x) → string {
+    if x < 0 then return "negativus"
+    if x ≡ 0 then return "nihil"
+    return "positivus"
 }
 
 # Optional return: nihil when divisor is zero
-functio divide(numerus a, numerus b) → numerus ∪ nihil {
-    si b ≡ 0 ergo redde nihil
-    redde a / b
+fn divide(int a, int b) → int ∪ null {
+    if b ≡ 0 then return null
+    return a / b
 }
 
 # sin chain with secus ergo redde fallback
-functio gradus(numerus puncta) → textus {
-    si puncta ≥ 90 ergo redde "A"
-    sin puncta ≥ 80 ergo redde "B"
-    sin puncta ≥ 70 ergo redde "C"
-    sin puncta ≥ 60 ergo redde "D"
-    secus ergo redde "F"
+fn gradus(int puncta) → string {
+    if puncta ≥ 90 then return "A"
+    elif puncta ≥ 80 then return "B"
+    elif puncta ≥ 70 then return "C"
+    elif puncta ≥ 60 then return "D"
+    else then return "F"
 }
 
 # Early return inside itera ex loop
-functio inveni(lista<numerus> res, numerus quaesitum) → numerus ∪ nihil {
-    itera ex res fixum item {
-        si item ≡ quaesitum ergo redde item
+fn inveni(list<int> res, int quaesitum) → int ∪ null {
+    for from res const item {
+        if item ≡ quaesitum then return item
     }
-    redde nihil
+    return null
 }
 
-functio habet(tabula<textus, numerus> tabula, textus clavis) → bivalens {
-    itera de tabula fixum k {
-        si k ≡ clavis ergo redde verum
+fn habet(map<string, int> map, string clavis) → bool {
+    for ref map const k {
+        if k ≡ clavis then return true
     }
-    redde falsum
+    return false
 }
 
-incipit {
+main {
     # Sign classification
-    nota classis(-5)
-    nota classis(0)
-    nota classis(10)
+    print classis(-5)
+    print classis(0)
+    print classis(10)
 
     # Optional return on invalid divisor
     # 5
-    nota divide(10, 2)
+    print divide(10, 2)
     # nihil
-    nota divide(10, 0)
+    print divide(10, 0)
 
     # Letter grades via sin chain
-    nota gradus(95)
-    nota gradus(85)
-    nota gradus(55)
+    print gradus(95)
+    print gradus(85)
+    print gradus(55)
 
     # Linear search with early redde
-    fixum _ numeri ← [1, 2, 3, 4, 5]
-    nota inveni(numeri, 3)
-    nota inveni(numeri, 9)
+    const _ numeri ← [1, 2, 3, 4, 5]
+    print inveni(numeri, 3)
+    print inveni(numeri, 9)
 }

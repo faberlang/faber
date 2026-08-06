@@ -5,7 +5,7 @@ category = "range"
 canonical = true
 summary = "Clamp, materialize, and contain via conversio and continet."
 related = ["intra", "↦", "lista"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # intervallum — Clamp, materialize, and contain via conversio and continet
@@ -29,32 +29,32 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   none — stdout not pinned for this exemplum.
 
-incipit {
+main {
     # --- value clamp (half-open interior vs inclusive endpoint) ---
-    fixum _ half ← 15 ↦ 0‥10
-    fixum _ closed ← 15 ↦ 0…10
-    adfirma half ≡ 9
-    adfirma closed ≡ 10
+    const _ half ← 15 ↦ 0‥10
+    const _ closed ← 15 ↦ 0…10
+    assert half ≡ 9
+    assert closed ≡ 10
 
     # --- materialize to lista or 1-d tensor ---
-    fixum lista<numerus> half_list ← 0‥10 ↦ lista<numerus>
-    fixum lista<numerus> closed_list ← 0…3 ↦ lista<numerus>
-    fixum tensor<numerus, [10]> half_grid ← 0‥10 ↦ tensor<numerus, [10]>
-    fixum tensor<numerus, [4]> closed_grid ← 0…3 ↦ tensor<numerus, [4]>
-    fixum lista<numerus> half_flat ← half_grid.planata()
-    fixum lista<numerus> closed_flat ← closed_grid.planata()
-    adfirma half_list.longitudo() ≡ 10
-    adfirma closed_list.longitudo() ≡ 4
-    adfirma half_flat.longitudo() ≡ 10
-    adfirma closed_flat.longitudo() ≡ 4
+    const list<int> half_list ← 0‥10 ↦ list<int>
+    const list<int> closed_list ← 0…3 ↦ list<int>
+    const tensor<int, [10]> half_grid ← 0‥10 ↦ tensor<int, [10]>
+    const tensor<int, [4]> closed_grid ← 0…3 ↦ tensor<int, [4]>
+    const list<int> half_flat ← half_grid.planata()
+    const list<int> closed_flat ← closed_grid.planata()
+    assert half_list.longitudo() ≡ 10
+    assert closed_list.longitudo() ≡ 4
+    assert half_flat.longitudo() ≡ 10
+    assert closed_flat.longitudo() ≡ 4
 
     # --- range-to-range clamp inherits target inclusivity ---
-    fixum intervallum<numerus> wide ← 0‥100
-    fixum intervallum<numerus> narrow ← wide ↦ 10…50
-    adfirma narrow.longitudo() ≡ 41
+    const intervallum<int> wide ← 0‥100
+    const intervallum<int> narrow ← wide ↦ 10…50
+    assert narrow.longitudo() ≡ 41
 
     # --- stored containment via continet (intra desugars to the same surface) ---
-    fixum intervallum<numerus> fines ← 0‥10
-    fixum _ inside ← fines.continet(5)
-    adfirma inside
+    const intervallum<int> fines ← 0‥10
+    const _ inside ← fines.continet(5)
+    assert inside
 }

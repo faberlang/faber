@@ -7,7 +7,7 @@ summary = "Generic ordered collection type."
 syntax = "lista<T>"
 aliases = ["array", "list"]
 related = ["tabula", "copia", "∷", "itera"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -45,22 +45,22 @@ locale = "la"
 # BACKEND: Go e2e whitelist — lista intrinsic methods not yet lowered for Go
 # (whitelist: lista/methodi-copiae.fab).
 
-incipit {
-    fixum _ res ← [1, 2, 3, 4, 5] ∷ lista<numerus>
+main {
+    const _ res ← [1, 2, 3, 4, 5] ∷ list<int>
 
-    fixum _ addita ← res.addita(6)
-    fixum _ sectio ← res.sectio(1, 4)
-    fixum _ primaduo ← res.prima(2)
-    fixum _ ultimaduo ← res.ultima(2)
-    fixum _ omissaduo ← res.omissa(2)
-    fixum _ inversa ← res.inversa()
-    fixum _ ordinata ← [3, 1, 2].ordinata()
+    const _ addita ← res.addita(6)
+    const _ sectio ← res.sectio(1, 4)
+    const _ primaduo ← res.prima(2)
+    const _ ultimaduo ← res.ultima(2)
+    const _ omissaduo ← res.omissa(2)
+    const _ inversa ← res.inversa()
+    const _ ordinata ← [3, 1, 2].ordinata()
 
-    nota addita
-    nota sectio
-    nota primaduo
-    nota ultimaduo
-    nota omissaduo
-    nota inversa
-    nota ordinata
+    print addita
+    print sectio
+    print primaduo
+    print ultimaduo
+    print omissaduo
+    print inversa
+    print ordinata
 }

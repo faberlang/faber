@@ -6,7 +6,7 @@ canonical = false
 summary = "Genus literal instantiation with field overrides."
 syntax = "<Genus> { <field> = <expr>, … }"
 related = ["genus", "valor"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # genus — Genus literal instantiation with field overrides
@@ -32,24 +32,24 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   10, 20, "Marcus", 0
 
-genus Punctum {
-    numerus x
-    numerus y
+class Punctum {
+    int x
+    int y
 }
 
-genus Persona {
-    textus nomen
-    numerus aetas = 0
+class Persona {
+    string nomen
+    int aetas = 0
 }
 
-incipit {
+main {
     # All required fields supplied
-    fixum _ p1 ← Punctum { x = 10, y = 20 }
-    nota p1.x
-    nota p1.y
+    const _ p1 ← Punctum { x = 10, y = 20 }
+    print p1.x
+    print p1.y
 
     # Omitted field picks up genus default
-    fixum _ persona ← Persona { nomen = "Marcus" }
-    nota persona.nomen
-    nota persona.aetas
+    const _ persona ← Persona { nomen = "Marcus" }
+    print persona.nomen
+    print persona.aetas
 }

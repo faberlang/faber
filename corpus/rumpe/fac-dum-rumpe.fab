@@ -5,7 +5,7 @@ category = "transfer"
 canonical = false
 summary = "innermost dum wins over enclosing fac for rumpe"
 related = ["fac", "dum"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -25,16 +25,16 @@ locale = "la"
 
 # loop wins over enclosing fac — rumpe exits dum only
 
-incipit {
-    varia numerus x ← 0
-    fac {
-        dum x < 3 {
+main {
+    var int x ← 0
+    do {
+        while x < 3 {
             x ← x + 1
-            si x ≡ 2 ergo rumpe
+            if x ≡ 2 then break
         }
-        nota x
+        print x
     }
-    cape err {
-        nota 0
+    catch err {
+        print 0
     }
 }

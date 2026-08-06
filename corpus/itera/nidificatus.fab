@@ -7,7 +7,7 @@ summary = "Starts a for-each iteration statement."
 syntax = "itera <mode> <expression> <binding> <block>"
 aliases = ["iterate"]
 related = ["ex", "de", "ab"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -39,28 +39,28 @@ locale = "la"
 # BACKEND:
 #   Go backend does not emit nested itera yet — compile-only smoke.
 
-incipit {
+main {
     # Nested lista iteration — 3 × 3 combinations
-    fixum _ rows ← [1, 2, 3]
-    fixum _ cols ← ["A", "B", "C"]
+    const _ rows ← [1, 2, 3]
+    const _ cols ← ["A", "B", "C"]
 
-    itera ex rows fixum row {
-        itera ex cols fixum col {
-            nota row, col
+    for from rows const row {
+        for from cols const col {
+            print row, col
         }
     }
 
     # Multiplication table over exclusive ranges 1‥4 (i, j ∈ {1,2,3})
-    itera ab 1‥4 fixum i {
-        itera ab 1‥4 fixum j {
-            nota i, "*", j, "←", i * j
+    for range 1‥4 const i {
+        for range 1‥4 const j {
+            print i, "*", j, "←", i * j
         }
     }
 
     # Nested ranges: 4 × 4 grid of (x, y) with x, y ∈ {0,1,2,3}
-    itera ab 0‥3 fixum x {
-        itera ab 0‥3 fixum y {
-            nota x, y
+    for range 0‥3 const x {
+        for range 0‥3 const y {
+            print x, y
         }
     }
 }

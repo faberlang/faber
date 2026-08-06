@@ -6,7 +6,7 @@ canonical = false
 summary = "Tensor bracket access lowers to accipe and ponde."
 syntax = "tensor[index] | tensor[index] ← value"
 related = ["tensor", "accipe", "ponde", "lista"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -40,26 +40,26 @@ locale = "la"
 #   4.0
 #   4.0
 
-incipit {
-    fixum tf32[] seed ← vacua
-    varia tf32[4] input ← seed.crea(0.0, [4])
-    varia tf32[4] output ← seed.crea(0.0, [4])
+main {
+    const tf32[] seed ← vacua
+    var tf32[4] input ← seed.crea(0.0, [4])
+    var tf32[4] output ← seed.crea(0.0, [4])
 
-    fixum u32 id ← 1
+    const u32 id ← 1
     input[id] ← 3.0
-    fixum f32 old ← input[id] vel 0.0
-    fixum f32 oldMethod ← input.accipe([id]) vel 0.0
+    const f32 old ← input[id] coalesce 0.0
+    const f32 oldMethod ← input.accipe([id]) coalesce 0.0
     output[id] ← old + 1.0
-    fixum f32 updated ← output[id] vel 0.0
+    const f32 updated ← output[id] coalesce 0.0
 
-    varia tf32[2, 2] grid ← seed.crea(0.0, [2, 2])
+    var tf32[2, 2] grid ← seed.crea(0.0, [2, 2])
     grid[[1, 0]] ← updated
-    fixum f32 cell ← grid[[1, 0]] vel 0.0
-    fixum f32 cellMethod ← grid.accipe([1, 0]) vel 0.0
+    const f32 cell ← grid[[1, 0]] coalesce 0.0
+    const f32 cellMethod ← grid.accipe([1, 0]) coalesce 0.0
 
-    nota old
-    nota oldMethod
-    nota updated
-    nota cell
-    nota cellMethod
+    print old
+    print oldMethod
+    print updated
+    print cell
+    print cellMethod
 }

@@ -7,7 +7,7 @@ summary = "Marks a named declaration slot (parameter or genus field) as voluntar
 syntax = "<type> <name> sponte [= default | vel default]"
 aliases = ["optional", "voluntary"]
 related = ["vel", "nihil", "∪", "functio", "genus"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -38,15 +38,15 @@ locale = "la"
 #   declaration-only optional slots (whitelist: sponte/sponte.fab). Cross-ref: optionalis/optionalis.fab.
 #
 
-functio greet(textus nomen, textus titulus sponte) → textus {
-    redde nomen
+fn greet(string nomen, string titulus optional) → string {
+    return nomen
 }
 
-functio paginate(numerus pagina sponte vel 1) → textus {
-    redde "page"
+fn paginate(int pagina optional coalesce 1) → string {
+    return "page"
 }
 
-genus User {
-    textus name
-    textus email sponte
+class User {
+    string name
+    string email optional
 }

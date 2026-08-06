@@ -6,7 +6,7 @@ canonical = true
 summary = "Braced canonical @ verte rename mapping."
 syntax = "@ verte { target = rs, methodus = \"…\" }"
 related = ["verte", "annotation-sugar"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -25,11 +25,11 @@ locale = "la"
 # See also: verte, annotation-sugar
 # =============================================================================
 
-@ verte { target = rs, methodus = "push" }
-functio addeExemplar() → vacuum {
-    tacet
+@ rename { target = rs, methodus = "push" }
+fn addeExemplar() → void {
+    pass
 }
 
-incipit {
-    nota "verte-braced"
+main {
+    print "verte-braced"
 }

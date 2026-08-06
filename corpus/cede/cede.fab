@@ -7,7 +7,7 @@ summary = "Yields one value from a generator."
 syntax = "cede <expression>"
 aliases = ["yield"]
 related = ["cursor", "fiunt", "fient"]
-locale = "la"
+locale = "en"
 +++
 
 
@@ -40,11 +40,11 @@ locale = "la"
 # BACKEND:
 #   Cursor stream materialization smoke.
 
-functio stream() fiunt → numerus {
-    cede 1
-    cede 2
+fn stream() generator → int {
+    yield 1
+    yield 2
 }
 
-incipit {
-    nota stream()
+main {
+    print stream()
 }

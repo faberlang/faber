@@ -7,7 +7,7 @@ summary = "Runs the fallback branch when preceding conditional branches do not m
 syntax = "secus <block>"
 aliases = ["else", "otherwise"]
 related = ["si", "sin"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -42,47 +42,47 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Grade and weather messages for sample scores and temperatures.
 
-incipit {
+main {
     # Two-way branch: exactly one arm runs
-    fixum _ puncta ← 85
+    const _ puncta ← 85
 
-    si puncta ≥ 90 {
-        nota "gradus: A"
+    if puncta ≥ 90 {
+        print "gradus: A"
     }
-    secus {
+    else {
         # 85 < 90 → this arm
-        nota "gradus: B aut minor"
+        print "gradus: B aut minor"
     }
 
     # Each branch may contain several statements
-    fixum _ calor ← 22
+    const _ calor ← 22
 
-    si calor > 30 {
-        nota "calidum"
-        nota "aquam bibe"
+    if calor > 30 {
+        print "calidum"
+        print "aquam bibe"
     }
-    secus {
+    else {
         # 22 ≤ 30
-        nota "commodum"
-        nota "caelum mite"
+        print "commodum"
+        print "caelum mite"
     }
 
     # sin chains additional tests; first match wins (75 → C)
-    fixum _ gradus ← 75
+    const _ gradus ← 75
 
-    si gradus ≥ 90 {
-        nota "A - optimum"
+    if gradus ≥ 90 {
+        print "A - optimum"
     }
-    sin gradus ≥ 80 {
-        nota "B - bonum"
+    elif gradus ≥ 80 {
+        print "B - bonum"
     }
-    sin gradus ≥ 70 {
-        nota "C - satis"
+    elif gradus ≥ 70 {
+        print "C - satis"
     }
-    sin gradus ≥ 60 {
-        nota "D - transit"
+    elif gradus ≥ 60 {
+        print "D - transit"
     }
-    secus {
-        nota "F - deficit"
+    else {
+        print "F - deficit"
     }
 }

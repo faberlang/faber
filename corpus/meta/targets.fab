@@ -7,7 +7,7 @@ summary = "Compilation backends listed by faber targets or radix targets."
 syntax = "faber targets"
 aliases = ["target compatibility", "backends"]
 related = ["manifest", "cli", "∷", "↦"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -35,10 +35,10 @@ locale = "la"
 # BACKEND:
 #   META prose + minimal cross-target function smoke.
 
-functio salve() → textus {
-    redde "salve"
+fn salve() → string {
+    return "salve"
 }
 
-incipit {
-    nota salve()
+main {
+    print salve()
 }

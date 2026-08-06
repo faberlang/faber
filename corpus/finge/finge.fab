@@ -6,7 +6,7 @@ canonical = true
 summary = "Constructs a tagged union variant."
 syntax = "finge <variant> [{ <field> = <expr>, ... }] [∷ <type>]"
 related = ["discretio"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # finge — Constructs a tagged union variant
@@ -34,39 +34,39 @@ locale = "la"
 
 # --- Discretio types to construct ---
 
-discretio Condicio {
+union Condicio {
     Agens,
     Iners,
     Pendens
 }
 
-discretio Nuntius {
-    Pulsus { numerus x, numerus y },
-    Clavis { textus clavis },
+union Nuntius {
+    Pulsus { int x, int y },
+    Clavis { string clavis },
     Finis
 }
 
-discretio Responsum {
-    Bonum { textus nuntius },
-    Malum { textus causa }
+union Responsum {
+    Bonum { string nuntius },
+    Malum { string causa }
 }
 
-incipit {
+main {
     # --- Unit variants with explicit type ---
 
-    fixum Condicio s1 ← finge Agens ∷ Condicio
-    fixum Condicio s2 ← finge Pendens ∷ Condicio
+    const Condicio s1 ← variant Agens ∷ Condicio
+    const Condicio s2 ← variant Pendens ∷ Condicio
 
     # --- Payload variants with explicit type ---
 
-    fixum Nuntius e1 ← finge Pulsus { x = 100, y = 200 } ∷ Nuntius
-    fixum Nuntius e2 ← finge Clavis { clavis = "intro" } ∷ Nuntius
-    fixum Nuntius e3 ← finge Finis ∷ Nuntius
+    const Nuntius e1 ← variant Pulsus { x = 100, y = 200 } ∷ Nuntius
+    const Nuntius e2 ← variant Clavis { clavis = "intro" } ∷ Nuntius
+    const Nuntius e3 ← variant Finis ∷ Nuntius
 
     # --- Responsum variants ---
 
-    fixum Responsum r1 ← finge Bonum { nuntius = "opus perfectum" } ∷ Responsum
-    fixum Responsum r2 ← finge Malum { causa = "opus fractum" } ∷ Responsum
+    const Responsum r1 ← variant Bonum { nuntius = "opus perfectum" } ∷ Responsum
+    const Responsum r2 ← variant Malum { causa = "opus fractum" } ∷ Responsum
 
-    nota "finge expressiones paratae"
+    print "finge expressiones paratae"
 }

@@ -7,7 +7,7 @@ summary = "Promise-like result type associated with async finite functions."
 syntax = "promissum<T> | promissum<T ⇥ E>"
 aliases = ["promise"]
 related = ["fiet", "futura", "figendum", "tacebit"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -38,10 +38,10 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   promissum typus notus (promissum.expected).
 
-functio compute() fiet → numerus {
-    redde 7
+fn compute() async → int {
+    return 7
 }
 
-incipit {
-    nota "promissum typus notus"
+main {
+    print "promissum typus notus"
 }

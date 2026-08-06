@@ -6,7 +6,7 @@ canonical = false
 summary = "Sized primitive family violation (expect type error)."
 syntax = "numerus<f32> — rejected; use fractus<f32>"
 related = ["numerus", "fractus"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -30,7 +30,7 @@ locale = "la"
 #
 # WHY: `numerus<W>` rejects float width markers; use `fractus<f32>` instead.
 
-incipit {
-    fixum numerus<f32> invalid ← 1.0 ∷ fractus<f32>
-    nota invalid
+main {
+    const int<f32> invalid ← 1.0 ∷ float<f32>
+    print invalid
 }

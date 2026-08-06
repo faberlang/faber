@@ -7,7 +7,7 @@ summary = "Short quoted textus string literals and template application."
 syntax = "\"<text>\""
 aliases = ["\"...\""]
 related = ["block-string", "§", "textus"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -33,11 +33,11 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Salve, Salve, Mundus!
 
-incipit {
-    fixum _ greeting ← "Salve"
-    nota greeting
+main {
+    const _ greeting ← "Salve"
+    print greeting
 
-    fixum _ nomen ← "Mundus"
-    fixum _ message ← "Salve, §!"(nomen)
-    nota message
+    const _ nomen ← "Mundus"
+    const _ message ← "Salve, §!"(nomen)
+    print message
 }

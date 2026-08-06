@@ -7,7 +7,7 @@ summary = "Declares a named function or method."
 syntax = "functio <name>(<params>) [modifiers] [→ <type>] [⇥ <error-type>] <block>"
 aliases = ["function"]
 related = ["→", "⇥", "redde", "sponte", "ceteri", "prae", "curata", "futura", "cursor"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # functio — Declares a named function or method
@@ -36,49 +36,49 @@ locale = "la"
 #   summatio: 15, 55
 
 # Factorial: n! ← n * (n-1)!
-functio factorial(numerus n) → numerus {
-    si n ≤ 1 {
+fn factorial(int n) → int {
+    if n ≤ 1 {
         # base case
-        redde 1
+        return 1
     }
-    redde n * factorial(n - 1)
+    return n * factorial(n - 1)
 }
 
 # Fibonacci: fib(n) ← fib(n-1) + fib(n-2)
-functio fibonacci(numerus n) → numerus {
-    si n ≤ 0 {
-        redde 0
+fn fibonacci(int n) → int {
+    if n ≤ 0 {
+        return 0
     }
-    si n ≡ 1 {
-        redde 1
+    if n ≡ 1 {
+        return 1
     }
-    redde fibonacci(n - 1) + fibonacci(n - 2)
+    return fibonacci(n - 1) + fibonacci(n - 2)
 }
 
 # Sum from 1 to n
-functio summatio(numerus n) → numerus {
-    si n ≤ 0 {
-        redde 0
+fn summatio(int n) → int {
+    if n ≤ 0 {
+        return 0
     }
-    redde n + summatio(n - 1)
+    return n + summatio(n - 1)
 }
 
-incipit {
+main {
     # --- Factorial examples ---
 
-    nota factorial(0)
-    nota factorial(1)
-    nota factorial(5)
-    nota factorial(10)
+    print factorial(0)
+    print factorial(1)
+    print factorial(5)
+    print factorial(10)
 
     # --- Fibonacci examples ---
 
-    nota fibonacci(0)
-    nota fibonacci(1)
-    nota fibonacci(10)
+    print fibonacci(0)
+    print fibonacci(1)
+    print fibonacci(10)
 
     # --- Summation examples ---
 
-    nota summatio(5)
-    nota summatio(10)
+    print summatio(5)
+    print summatio(10)
 }

@@ -6,7 +6,7 @@ canonical = false
 summary = "Truthiness conversion to bivalens."
 syntax = "<expression> ↦ bivalens"
 related = ["↦", "bivalens"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -41,17 +41,17 @@ locale = "la"
 # BACKEND:
 #   HIR-direct Rust and MIR-stepper routes must agree for truthiness.
 
-incipit {
-    fixum _ b1 ← 0 ↦ bivalens
-    fixum _ b2 ← 42 ↦ bivalens
-    nota b1
-    nota b2
+main {
+    const _ b1 ← 0 ↦ bool
+    const _ b2 ← 42 ↦ bool
+    print b1
+    print b2
 
-    fixum _ b3 ← "" ↦ bivalens
-    fixum _ b4 ← "salve" ↦ bivalens
-    nota b3
-    nota b4
+    const _ b3 ← "" ↦ bool
+    const _ b4 ← "salve" ↦ bool
+    print b3
+    print b4
 
-    fixum _ habet ← ("123" ↦ numerus ⇥ 0) ↦ bivalens
-    nota habet
+    const _ habet ← ("123" ↦ int ⇥ 0) ↦ bool
+    print habet
 }

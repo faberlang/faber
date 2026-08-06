@@ -6,7 +6,7 @@ canonical = false
 summary = "While loops with compound et/aut conditions."
 syntax = "dum <condition> <block>"
 related = ["dum", "et", "aut"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -35,27 +35,27 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Retry counts and paired decrements of a and b.
 
-incipit {
+main {
     # et: loop stops when currit becomes falsum (after 3 iterations)
-    varia bivalens currit ← verum
-    varia numerus conatus ← 0
+    var bool currit ← true
+    var int conatus ← 0
 
-    dum currit et conatus < 5 {
-        nota "conatus: §"(conatus)
+    while currit and conatus < 5 {
+        print "conatus: §"(conatus)
         conatus ← conatus + 1
 
-        si conatus ≥ 3 {
+        if conatus ≥ 3 {
             # breaks the et condition on next check
-            currit ← falsum
+            currit ← false
         }
     }
 
     # aut: continues while at least one counter is positive
-    varia numerus a ← 5
-    varia numerus b ← 3
+    var int a ← 5
+    var int b ← 3
 
-    dum a > 0 aut b > 0 {
-        nota "a: § b: §"(a, b)
+    while a > 0 or b > 0 {
+        print "a: § b: §"(a, b)
         a ← a - 1
         b ← b - 1
     }

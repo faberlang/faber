@@ -3,7 +3,7 @@ term = "json"
 kind = "type"
 category = "type"
 canonical = true
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -21,34 +21,34 @@ locale = "la"
 # See also: 
 # =============================================================================
 
-importa ex "norma:json" privata json
+import from "norma:json" private json
 
 @ json
-genus Payload {
+class Payload {
     @ json { nomen = "wire_name" }
-    textus name
+    string name
 }
 
-incipit {
-    fixum json literal ← { "wire_name": "Ada", "items": [1, { "ok": true }] }
-    fixum valor broad ← literal ↦ valor
-    fixum json narrowed ← broad ↦ json
+main {
+    const json literal ← { "wire_name": "Ada", "items": [1, { "ok": true }] }
+    const value broad ← literal ↦ value
+    const json narrowed ← broad ↦ json
 
-    fixum Payload payload ← narrowed ↦ Payload
-    fixum json encoded ← payload ↦ json
-    fixum textus wire ← json.pange(encoded)
-    fixum json ∪ nihil tentativa ← json.tempta(wire)
+    const Payload payload ← narrowed ↦ Payload
+    const json encoded ← payload ↦ json
+    const string wire ← json.pange(encoded)
+    const json ∪ null tentativa ← json.tempta(wire)
 
-    nota payload.name
-    nota wire
-    nota tentativa
+    print payload.name
+    print wire
+    print tentativa
 
-    fac {
-        fixum json reparsed ← json.solve(wire)
-        fixum Payload roundtrip ← reparsed ↦ Payload
-        nota roundtrip.name
+    do {
+        const json reparsed ← json.solve(wire)
+        const Payload roundtrip ← reparsed ↦ Payload
+        print roundtrip.name
     }
-    cape err {
-        nota err
+    catch err {
+        print err
     }
 }

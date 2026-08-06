@@ -6,7 +6,7 @@ canonical = true
 summary = "Creates an inclusive range with a Latin keyword."
 syntax = "<expression> usque <expression>"
 related = ["ante", "…"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -36,9 +36,9 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   0, 1, 2, 3 (inclusive range through finis).
 
-incipit {
+main {
     # i = 0, 1, 2, 3 (includes 3)
-    itera ab 0 usque 3 fixum i {
-        nota i
+    for range 0 until 3 const i {
+        print i
     }
 }

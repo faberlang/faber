@@ -7,7 +7,7 @@ summary = "Adds an else-if branch after a previous si branch."
 syntax = "sin <condition> <block>"
 aliases = ["else if"]
 related = ["si", "secus"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -37,15 +37,15 @@ locale = "la"
 #   Cross-ref: si/sin.fab.
 #
 
-incipit {
-    fixum _ score ← 85
-    si score ≥ 90 {
-        nota "excellent"
+main {
+    const _ score ← 85
+    if score ≥ 90 {
+        print "excellent"
     }
-    sin score ≥ 80 {
-        nota "good"
+    elif score ≥ 80 {
+        print "good"
     }
-    secus {
-        nota "needs work"
+    else {
+        print "needs work"
     }
 }

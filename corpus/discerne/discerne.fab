@@ -7,7 +7,7 @@ summary = "Starts an exhaustive pattern match over a value or values."
 syntax = "discerne <subject> <block>"
 aliases = ["match"]
 related = ["discretio", "casu"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -41,43 +41,43 @@ locale = "la"
 #   discerne exempla parata
 
 # discretio — tagged union / enum declaration
-discretio Condicio {
+union Condicio {
     Agens,
     Iners,
     Pendens
 }
 
-discretio Nuntius {
-    Pulsus { numerus x, numerus y },
-    Clavis { textus clavis },
+union Nuntius {
+    Pulsus { int x, int y },
+    Clavis { string clavis },
     Finis
 }
 
 # Simple casu matching on unit variants (no payload)
-functio nomina(Condicio s) → textus {
-    discerne s {
-        casu Agens { redde "agens" }
-        casu Iners { redde "iners" }
-        casu Pendens { redde "pendens" }
+fn nomina(Condicio s) → string {
+    match s {
+        case Agens { return "agens" }
+        case Iners { return "iners" }
+        case Pendens { return "pendens" }
     }
 }
 
 # casu with fixum bindings destructures variant fields
-functio tracta(Nuntius e) → nihil {
-    discerne e {
-        casu Pulsus fixum x, y {
-            nota "pulsus: § §"(x, y)
+fn tracta(Nuntius e) → null {
+    match e {
+        case Pulsus const x, y {
+            print "pulsus: § §"(x, y)
         }
-        casu Clavis fixum clavis {
-            nota "clavis: §"(clavis)
+        case Clavis const clavis {
+            print "clavis: §"(clavis)
         }
-        casu Finis {
-            nota "finis"
+        case Finis {
+            print "finis"
         }
     }
 }
 
-incipit {
+main {
     # nomina/tracta are defined for downstream exempla; smoke check only
-    nota "discerne exempla parata"
+    print "discerne exempla parata"
 }

@@ -6,7 +6,7 @@ canonical = true
 summary = "Conversio arms for instans precision family and textus datetime provenance."
 syntax = "<expression> ↦ instans | instans<ms> | instans<us> | instans<ns>"
 related = ["↦", "⇥", "textus"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -36,31 +36,31 @@ locale = "la"
 # instans ↦ textus        — precision-honoring RFC3339 `Z` emit
 # textus ↦ instans ⇥ …     — explicit recovery when wire is not a datetime
 
-incipit {
-    fixum textus utc ← "1979-05-27T07:32:00.123456Z"
-    fixum textus offset ← "1979-05-27T16:32:00+0900"
+main {
+    const string utc ← "1979-05-27T07:32:00.123456Z"
+    const string offset ← "1979-05-27T16:32:00+0900"
 
-    fixum instans seconds ← utc ↦ instans
-    fixum instans<ms> millis ← seconds ↦ instans<ms>
-    fixum instans<us> micros ← utc ↦ instans<us>
-    fixum instans<ns> nanos ← utc ↦ instans<ns>
-    fixum instans normalized ← offset ↦ instans
+    const instant seconds ← utc ↦ instant
+    const instant<ms> millis ← seconds ↦ instant<ms>
+    const instant<us> micros ← utc ↦ instant<us>
+    const instant<ns> nanos ← utc ↦ instant<ns>
+    const instant normalized ← offset ↦ instant
 
-    adfirma millis ↦ textus ≡ "1979-05-27T07:32:00.000Z"
-    adfirma micros ↦ textus ≡ "1979-05-27T07:32:00.123456Z"
-    adfirma normalized ≡ seconds secus "offset ingest lands on same UTC instant"
+    assert millis ↦ string ≡ "1979-05-27T07:32:00.000Z"
+    assert micros ↦ string ≡ "1979-05-27T07:32:00.123456Z"
+    assert normalized ≡ seconds else "offset ingest lands on same UTC instant"
 
-    fixum instans<ns> fine ← nanos
-    fixum instans narrowed ← fine ↦ instans
-    adfirma narrowed ↦ textus ≡ "1979-05-27T07:32:00Z"
+    const instant<ns> fine ← nanos
+    const instant narrowed ← fine ↦ instant
+    assert narrowed ↦ string ≡ "1979-05-27T07:32:00Z"
 
-    fixum textus bad ← "not-a-datetime"
-    fixum instans recovered ← bad ↦ instans ⇥ seconds
-    adfirma recovered ≡ seconds
+    const string bad ← "not-a-datetime"
+    const instant recovered ← bad ↦ instant ⇥ seconds
+    assert recovered ≡ seconds
 
-    nota seconds ↦ textus
-    nota millis ↦ textus
-    nota micros ↦ textus
-    nota nanos ↦ textus
-    nota narrowed ↦ textus
+    print seconds ↦ string
+    print millis ↦ string
+    print micros ↦ string
+    print nanos ↦ string
+    print narrowed ↦ string
 }

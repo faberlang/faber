@@ -7,7 +7,7 @@ summary = "Declares an inferred immutable local."
 syntax = "sit <name> [← <expression>]"
 aliases = []
 related = ["fixum", "varia", "←"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -46,17 +46,17 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   sit.expected
 
-incipit {
-    sit salve ← "Salve"
-    sit nomen ← "Marcus"
-    sit nuntius ← "§, §!"(salve, nomen)
+main {
+    let salve ← "Salve"
+    let nomen ← "Marcus"
+    let nuntius ← "§, §!"(salve, nomen)
 
-    nota nuntius
+    print nuntius
 
-    sit label
+    let label
     label ← "deferred"
-    nota label
+    print label
 
-    fixum _ idem ← nuntius
-    nota idem
+    const _ idem ← nuntius
+    print idem
 }

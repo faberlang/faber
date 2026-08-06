@@ -6,7 +6,7 @@ canonical = true
 summary = "Unsigned 64-bit modular-word arithmetic and bit-pattern edges."
 syntax = "modulus<u64>"
 related = ["numerus", "¬", "⇐", "⇒"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -30,46 +30,46 @@ locale = "la"
 #   multiplication, negation, bitwise operations, and shifts use u64 wrapping.
 #   Division and remainder by zero fail.
 
-incipit {
-    varia modulus<u64> max ← 18446744073709551615
-    fixum modulus<u64> one ← 1
-    varia modulus<u64> zero ← 0
-    fixum numerus<u64> converted ← one ↦ numerus<u64>
+main {
+    var uint<u64> max ← 18446744073709551615
+    const uint<u64> one ← 1
+    var uint<u64> zero ← 0
+    const int<u64> converted ← one ↦ int<u64>
 
-    nota max + one
-    nota zero - one
-    nota max * 2
-    nota -one
-    nota ¬zero
-    nota one ⇐ 64
-    nota max ⇒ 64
-    nota max > zero
+    print max + one
+    print zero - one
+    print max * 2
+    print -one
+    print ¬zero
+    print one ⇐ 64
+    print max ⇒ 64
+    print max > zero
 
     # Carrier-mix equality: conversions and arithmetic results compare by
     # value against literals (review regression).
-    fixum modulus<u64> uno ← 1 ↦ modulus<u64>
-    nota one ≡ uno
-    nota one ≡ one + 0
+    const uint<u64> uno ← 1 ↦ uint<u64>
+    print one ≡ uno
+    print one ≡ one + 0
 
     max ⊕
     zero ⊖
-    nota max
-    nota zero
+    print max
+    print zero
 
-    fixum modulus<u64> methodSum ← max.addita(one)
-    fixum modulus<u64> methodShift ← max.sinistrata(64)
-    varia modulus<u64> methodAcc ← 0
+    const uint<u64> methodSum ← max.addita(one)
+    const uint<u64> methodShift ← max.sinistrata(64)
+    var uint<u64> methodAcc ← 0
     methodAcc.adde(one)
     methodAcc.sinistra(64)
-    nota converted
-    nota methodSum
-    nota methodShift
-    nota methodAcc
+    print converted
+    print methodSum
+    print methodShift
+    print methodAcc
 
-    fixum lista<modulus<u64>> words ← [one, max]
-    nota words.accipe(1) vel (0 ∷ modulus<u64>)
+    const list<uint<u64>> words ← [one, max]
+    print words.accipe(1) coalesce (0 ∷ uint<u64>)
 
-    varia lista<modulus<u64>> sorted ← [18446744073709551615, 3, 10, 2]
+    var list<uint<u64>> sorted ← [18446744073709551615, 3, 10, 2]
     sorted.ordina()
-    nota sorted
+    print sorted
 }

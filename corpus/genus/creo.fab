@@ -6,7 +6,7 @@ canonical = false
 summary = "Genus constructor hook that runs after field initialization."
 syntax = "genus <name> { … functio creo() { … } }"
 related = ["genus", "creo"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # genus — Genus constructor hook that runs after field initialization
@@ -38,58 +38,58 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   50, 100 (clamped), then radius 5 with derived diameter 10 and area
 
-genus Terminus {
-    numerus valor = 0
+class Terminus {
+    int valor = 0
 
-    functio creo() {
-        si ego.valor < 0 {
-            ego.valor ← 0
+    fn creo() {
+        if self.valor < 0 {
+            self.valor ← 0
         }
 
-        si ego.valor > 100 {
-            ego.valor ← 100
+        if self.valor > 100 {
+            self.valor ← 100
         }
     }
 
-    functio accipe() → numerus {
-        redde ego.valor
+    fn accipe() → int {
+        return self.valor
     }
 }
 
-genus Circulus {
-    numerus radius = 1
-    numerus diameter = 0
-    fractus area = 0
+class Circulus {
+    int radius = 1
+    int diameter = 0
+    float area = 0
 
-    functio creo() {
-        ego.diameter ← ego.radius * 2
-        ego.area ← 3.14159 * (ego.radius ↦ fractus) * (ego.radius ↦ fractus)
+    fn creo() {
+        self.diameter ← self.radius * 2
+        self.area ← 3.14159 * (self.radius ↦ float) * (self.radius ↦ float)
     }
 }
 
-incipit {
+main {
     # --- Validation in creo ---
 
-    fixum _ rectus ← Terminus {
+    const _ rectus ← Terminus {
         valor = 50
     }
 
-    nota rectus.accipe()
+    print rectus.accipe()
 
     # creo clamps to 100
-    fixum _ coactus ← Terminus {
+    const _ coactus ← Terminus {
         valor = 200
     }
 
-    nota coactus.accipe()
+    print coactus.accipe()
 
     # --- Derived initialization in creo ---
 
-    fixum _ c ← Circulus {
+    const _ c ← Circulus {
         radius = 5
     }
 
-    nota c.radius
-    nota c.diameter
-    nota c.area
+    print c.radius
+    print c.diameter
+    print c.area
 }

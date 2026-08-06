@@ -6,7 +6,7 @@ canonical = true
 summary = "Creates a formatted string with `§` placeholders."
 syntax = "\"<template>\"(<args>...)"
 related = ["lege", "lineam"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -36,19 +36,19 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Salve greeting, persona notice, and computed summa string.
 
-incipit {
-    fixum _ nomen ← "Marcus"
-    fixum _ aetas ← 30
+main {
+    const _ nomen ← "Marcus"
+    const _ aetas ← 30
 
     # One slot
-    fixum _ salutatio ← "Salve, §!"(nomen)
-    nota salutatio
+    const _ salutatio ← "Salve, §!"(nomen)
+    print salutatio
 
     # Multiple slots
-    fixum _ notitia ← "§ habet annos §"(nomen, aetas)
-    nota notitia
+    const _ notitia ← "§ habet annos §"(nomen, aetas)
+    print notitia
 
     # With an expression
-    fixum _ summa ← "10 + 20 ← §"(10 + 20)
-    nota summa
+    const _ summa ← "10 + 20 ← §"(10 + 20)
+    print summa
 }

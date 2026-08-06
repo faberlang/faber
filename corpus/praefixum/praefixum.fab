@@ -5,7 +5,7 @@ category = "comptime"
 canonical = true
 summary = "Forces compile-time evaluation of an expression."
 syntax = "praefixum(<expression>)"
-locale = "la"
+locale = "en"
 +++
 
 
@@ -35,29 +35,29 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   pi/tau strings, computed day/hour/second counts, block-evaluated sum.
 
-incipit {
+main {
     # Constant expression
-    fixum _ pi ← praefixum(3.14159)
-    fixum _ tau ← praefixum((2 ↦ fractus) * 3.14159)
-    nota "pi: §"(pi)
-    nota "tau: §"(tau)
+    const _ pi ← comptime(3.14159)
+    const _ tau ← comptime((2 ↦ float) * 3.14159)
+    print "pi: §"(pi)
+    print "tau: §"(tau)
 
     # Computation
-    fixum _ diesanno ← praefixum(365)
-    fixum _ horaeanno ← praefixum(365 * 24)
-    fixum _ secundaanno ← praefixum(365 * 24 * 60 * 60)
+    const _ diesanno ← comptime(365)
+    const _ horaeanno ← comptime(365 * 24)
+    const _ secundaanno ← comptime(365 * 24 * 60 * 60)
 
-    nota "dies: §"(diesanno)
-    nota "horae: §"(horaeanno)
-    nota "secunda: §"(secundaanno)
+    print "dies: §"(diesanno)
+    print "horae: §"(horaeanno)
+    print "secunda: §"(secundaanno)
 
     # Block
-    fixum tabula<textus, numerus> codices ← praefixum({
+    const map<string, int> codices ← comptime({
         "ok": 200,
         "creatum": 201,
         "noninventum": 404,
         "error": 500
     })
 
-    nota "codex rectus: §"(codices["ok"])
+    print "codex rectus: §"(codices["ok"])
 }

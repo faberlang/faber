@@ -7,7 +7,7 @@ summary = "Primitive byte-buffer type."
 syntax = "octeti"
 aliases = ["bytes"]
 related = ["textus", "lista"]
-locale = "la"
+locale = "en"
 +++
 
 
@@ -35,11 +35,11 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   octeti.expected — type-known diagnostic.
 
-typus Fascis = octeti
+type Fascis = bytes
 
-incipit {
-    fixum octeti sig ← |de ad be ef|
-    fixum octeti hello ← |48 65 6c 6c 6f|
-    fixum octeti empty ← ||
-    nota "octeti typus notus"
+main {
+    const bytes sig ← |de ad be ef|
+    const bytes hello ← |48 65 6c 6c 6f|
+    const bytes empty ← ||
+    print "octeti typus notus"
 }

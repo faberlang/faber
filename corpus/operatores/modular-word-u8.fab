@@ -6,7 +6,7 @@ canonical = true
 summary = "Unsigned 8-bit modular-word arithmetic and bit-pattern edges."
 syntax = "modulus<u8>"
 related = ["numerus", "¬", "⇐", "⇒"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -30,36 +30,36 @@ locale = "la"
 #   multiplication, negation, bitwise operations, and shifts use u8 wrapping.
 #   Division and remainder by zero fail.
 
-incipit {
-    varia modulus<u8> max ← 255
-    fixum modulus<u8> one ← 1
-    varia modulus<u8> zero ← 0
-    fixum numerus<u8> converted ← one ↦ numerus<u8>
+main {
+    var uint<u8> max ← 255
+    const uint<u8> one ← 1
+    var uint<u8> zero ← 0
+    const int<u8> converted ← one ↦ int<u8>
 
-    nota max + one
-    nota zero - one
-    nota max * 2
-    nota -one
-    nota ¬zero
-    nota one ⇐ 8
-    nota max ⇒ 8
-    nota max > zero
+    print max + one
+    print zero - one
+    print max * 2
+    print -one
+    print ¬zero
+    print one ⇐ 8
+    print max ⇒ 8
+    print max > zero
 
     max ⊕
     zero ⊖
-    nota max
-    nota zero
+    print max
+    print zero
 
-    fixum modulus<u8> methodSum ← max.addita(one)
-    fixum modulus<u8> methodShift ← max.sinistrata(8)
-    varia modulus<u8> methodAcc ← 0
+    const uint<u8> methodSum ← max.addita(one)
+    const uint<u8> methodShift ← max.sinistrata(8)
+    var uint<u8> methodAcc ← 0
     methodAcc.adde(one)
     methodAcc.sinistra(8)
-    nota converted
-    nota methodSum
-    nota methodShift
-    nota methodAcc
+    print converted
+    print methodSum
+    print methodShift
+    print methodAcc
 
-    fixum lista<modulus<u8>> words ← [one, max]
-    nota words.accipe(1) vel (0 ∷ modulus<u8>)
+    const list<uint<u8>> words ← [one, max]
+    print words.accipe(1) coalesce (0 ∷ uint<u8>)
 }

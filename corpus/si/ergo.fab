@@ -7,7 +7,7 @@ summary = "Introduces a compact statement consequent."
 syntax = "<head> ergo <statement>"
 aliases = ["ergo", "therefore"]
 related = ["si", "dum", "clausura", "redde", "tacet", "ergo"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -38,23 +38,23 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Validation and grading lines for sample x, aetas, and puncta values.
 
-incipit {
+main {
     # ergo replaces a one-statement block body
-    fixum _ x ← 10
+    const _ x ← 10
 
-    si x > 5 ergo nota "x magnum est"
+    if x > 5 then print "x magnum est"
 
     # secus ergo pairs else with a single consequent
-    fixum _ aetas ← 25
-    si aetas ≥ 18 ergo nota "adultus"
-    secus ergo nota "minor"
+    const _ aetas ← 25
+    if aetas ≥ 18 then print "adultus"
+    else then print "minor"
 
     # Two-way one-liner (85 < 90 → "non A")
-    fixum _ puncta ← 85
-    si puncta ≥ 90 ergo nota "A"
-    secus ergo nota "non A"
+    const _ puncta ← 85
+    if puncta ≥ 90 then print "A"
+    else then print "non A"
 
     # bivalens condition used directly
-    fixum _ valet ← verum
-    si valet ergo nota "Recte"
+    const _ valet ← true
+    if valet then print "Recte"
 }

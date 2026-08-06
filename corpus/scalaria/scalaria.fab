@@ -6,7 +6,7 @@ canonical = true
 summary = "Scalar operations on numerus, fractus, and bivalens in function signatures."
 syntax = "functio <name>(<scalar-params>) → <scalar-type> <block>"
 related = ["numerus", "fractus", "bivalens"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -39,18 +39,18 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Compile-only declaration tour (no incipit).
 
-functio numerica(numerus a, numerus b) → numerus {
-    redde (a + b) * 2
+fn numerica(int a, int b) → int {
+    return (a + b) * 2
 }
 
-functio fracta(fractus a, fractus b) → fractus {
-    redde (a + b) / 2.0
+fn fracta(float a, float b) → float {
+    return (a + b) / 2.0
 }
 
-functio comparata(numerus a, numerus b) → bivalens {
-    redde a ≤ b
+fn comparata(int a, int b) → bool {
+    return a ≤ b
 }
 
-functio logica(bivalens a, bivalens b) → bivalens {
-    redde non a et b
+fn logica(bool a, bool b) → bool {
+    return not a and b
 }

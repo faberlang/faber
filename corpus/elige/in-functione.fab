@@ -6,7 +6,7 @@ canonical = false
 summary = "Early returns from elige inside functions."
 syntax = "elige <expression> { casu … redde … }"
 related = ["elige", "redde", "functio"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -37,52 +37,52 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Greetings and status strings for known and unknown inputs.
 
-functio saluta(textus lingua) → textus {
-    elige lingua {
-        casu "latina" {
-            redde "Salve"
+fn saluta(string lingua) → string {
+    switch lingua {
+        case "latina" {
+            return "Salve"
         }
-        casu "graeca" {
-            redde "Chaire"
+        case "graeca" {
+            return "Chaire"
         }
-        casu "etrusca" {
-            redde "Suthi"
+        case "etrusca" {
+            return "Suthi"
         }
-        casu "osca" {
-            redde "Slagim"
+        case "osca" {
+            return "Slagim"
         }
     }
 
     # no casu matched
-    redde "Ave"
+    return "Ave"
 }
 
-functio nuntius(numerus codex) → textus {
-    elige codex {
-        casu 1 {
-            redde "paratum"
+fn nuntius(int codex) → string {
+    switch codex {
+        case 1 {
+            return "paratum"
         }
-        casu 2 {
-            redde "missum"
+        case 2 {
+            return "missum"
         }
-        casu 3 {
-            redde "fractum"
+        case 3 {
+            return "fractum"
         }
-        casu 4 {
-            redde "absens"
+        case 4 {
+            return "absens"
         }
     }
 
     # codes outside 1–4
-    redde "ignotum"
+    return "ignotum"
 }
 
-incipit {
-    nota saluta("latina")
-    nota saluta("etrusca")
-    nota saluta("ignota")
+main {
+    print saluta("latina")
+    print saluta("etrusca")
+    print saluta("ignota")
 
-    nota nuntius(1)
-    nota nuntius(4)
-    nota nuntius(9)
+    print nuntius(1)
+    print nuntius(4)
+    print nuntius(9)
 }

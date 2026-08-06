@@ -6,7 +6,7 @@ canonical = false
 summary = "Tensor reduction methods for summa and media."
 syntax = "tensor.summa() | tensor.media()"
 related = ["tensor", "fractus", "lista"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -36,8 +36,8 @@ locale = "la"
 #   21.0
 #   3.5
 
-incipit {
-    fixum lista<f32> flat ← [
+main {
+    const list<f32> flat ← [
         1.0,
         2.0,
         3.0,
@@ -45,12 +45,12 @@ incipit {
         5.0,
         6.0,
     ]
-    fixum tf32[] seed ← vacua
-    varia tf32[2, 3] grid ← seed.strue(flat, [2, 3])
+    const tf32[] seed ← vacua
+    var tf32[2, 3] grid ← seed.strue(flat, [2, 3])
 
-    fixum f32 total ← grid.summa()
-    fixum f32 mean ← grid.media()
+    const f32 total ← grid.summa()
+    const f32 mean ← grid.media()
 
-    nota total
-    nota mean
+    print total
+    print mean
 }

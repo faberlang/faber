@@ -6,7 +6,7 @@ canonical = true
 summary = "Captured backtick templates for bound payloads."
 syntax = "`template`(args)"
 related = ["scriptum", "textus", "valor"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -32,22 +32,22 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Raw template text lines showing preserved § holes.
 
-incipit {
-    fixum textus tenantId ← "tenant-42"
-    fixum textus plan ← "pro"
+main {
+    const string tenantId ← "tenant-42"
+    const string plan ← "pro"
 
-    fixum _ q ← `
+    const _ q ← `
         select id, email, plan
         from accounts
         where tenant_id = §
           and plan = §
     `(tenantId, plan)
 
-    nota q.template
+    print q.template
 
-    fixum _ indexed ← `where tenant_id = §0 or parent_tenant_id = §0`(tenantId)
-    nota indexed.template
+    const _ indexed ← `where tenant_id = §0 or parent_tenant_id = §0`(tenantId)
+    print indexed.template
 
-    fixum _ bare ← `select 1`
-    nota bare.template
+    const _ bare ← `select 1`
+    print bare.template
 }

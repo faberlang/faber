@@ -7,7 +7,7 @@ summary = "Angle-bracket generic parameters on functions and declarations."
 syntax = "functio name<T>(...) | genus Name<T, magnitudo N>"
 aliases = ["type parameters", "magnitudo"]
 related = ["typus", "functio"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -36,10 +36,10 @@ locale = "la"
 #   declaration-only generic surface (whitelist: prae/prae.fab). Cross-ref: generic/generic.fab.
 #
 
-functio identitas<T>(T valor) → T {
-    redde valor
+fn identitas<T>(T value) → T {
+    return value
 }
 
-functio primum<T>(lista<T> res) → T ∪ nihil {
-    redde res.primus()
+fn primum<T>(list<T> res) → T ∪ null {
+    return res.primus()
 }

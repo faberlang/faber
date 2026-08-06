@@ -7,7 +7,7 @@ summary = "Declares a type alias."
 syntax = "typus <name> = <type>"
 aliases = ["type"]
 related = ["genus", "implendum", "objectum", "∪"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -39,33 +39,33 @@ locale = "la"
 
 # --- Primitive type aliases ---
 
-typus Signum = numerus
-typus Cognomen = textus
-typus Viget = bivalens
+type Signum = int
+type Cognomen = string
+type Viget = bool
 
 # --- Generic type aliases ---
 
-typus Nomina = lista<textus>
-typus Puncta = lista<numerus>
-typus Index = tabula<textus, numerus>
+type Nomina = list<string>
+type Puncta = list<int>
+type Index = map<string, int>
 
 # Nullable type alias (canonical T ∪ nihil form)
-typus NomenOptivum = textus ∪ nihil
+type NomenOptivum = string ∪ null
 
-incipit {
+main {
     # Using primitive aliases
-    fixum Signum signum ← 42
-    fixum Cognomen cognomen ← "Marcus"
-    fixum Viget viget ← verum
+    const Signum signum ← 42
+    const Cognomen cognomen ← "Marcus"
+    const Viget viget ← true
 
-    nota signum
-    nota cognomen
-    nota viget
+    print signum
+    print cognomen
+    print viget
 
     # Using generic aliases
-    fixum Nomina sodales ← ["Gaius", "Lucius", "Titus"]
-    nota sodales
+    const Nomina sodales ← ["Gaius", "Lucius", "Titus"]
+    print sodales
 
-    fixum Puncta puncta ← [100, 95, 87]
-    nota puncta
+    const Puncta puncta ← [100, 95, 87]
+    print puncta
 }

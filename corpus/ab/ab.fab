@@ -6,7 +6,7 @@ canonical = true
 summary = "Selects numeric range iteration in an itera loop."
 syntax = "itera ab <range> <binding>"
 related = ["itera", "ex", "de", "per", "ab pipeline"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -33,8 +33,8 @@ locale = "la"
 #   Scalar stdout smoke (see body).
 #
 
-incipit {
-    itera ab 0‥10 per 2 fixum i {
-        nota i
+main {
+    for range 0‥10 step 2 const i {
+        print i
     }
 }

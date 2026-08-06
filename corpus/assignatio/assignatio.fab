@@ -7,7 +7,7 @@ summary = "Assigns a value to a binding, field, or assignable expression."
 syntax = "<place> ← <expression>"
 aliases = ["assignment", "assign"]
 related = ["=", "fixum", "varia", "⊕", "⊖"]
-locale = "la"
+locale = "en"
 +++
 
 
@@ -44,31 +44,31 @@ locale = "la"
 #   10
 #   salve munde
 
-incipit {
-    varia numerus x ← 10
+main {
+    var int x ← 10
 
     x ← 20
     # 20
-    nota x
+    print x
 
     x ← x + 5
     # 25
-    nota x
+    print x
 
     x ← x - 10
     # 15
-    nota x
+    print x
 
     x ← x * 2
     # 30
-    nota x
+    print x
 
     x ← x / 3
     # 10
-    nota x
+    print x
 
-    varia textus s ← "salve"
+    var string s ← "salve"
     s ← s + " munde"
     # salve munde
-    nota s
+    print s
 }

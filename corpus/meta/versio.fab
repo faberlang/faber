@@ -6,7 +6,7 @@ canonical = true
 summary = "Attaches a version string to a CLI root."
 syntax = "@ versio <string>"
 related = ["cli", "descriptio"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -36,6 +36,6 @@ locale = "la"
 
 @ cli "versio-smoke"
 @ versio "0.1.0"
-@ descriptio "Version metadata exemplum"
-incipit argumenta args {
+@ description "Version metadata exemplum"
+main args args {
 }

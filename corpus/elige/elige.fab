@@ -7,7 +7,7 @@ summary = "Starts a value-based branch statement."
 syntax = "elige <expression> <block>"
 aliases = ["switch", "choose"]
 related = ["casu", "ceterum"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -38,48 +38,48 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   elige.expected
 
-incipit {
+main {
     # Text matching
-    fixum _ condicio ← "agens"
+    const _ condicio ← "agens"
 
-    elige condicio {
-        casu "pendens" {
-            nota "exspectat..."
+    switch condicio {
+        case "pendens" {
+            print "exspectat..."
         }
-        casu "agens" {
-            nota "currit"
+        case "agens" {
+            print "currit"
         }
-        casu "perfectum" {
-            nota "perfectum"
+        case "perfectum" {
+            print "perfectum"
         }
     }
 
     # Numerus matching
-    fixum _ codex ← 200
+    const _ codex ← 200
 
-    elige codex {
-        casu 200 {
-            nota "Recte"
+    switch codex {
+        case 200 {
+            print "Recte"
         }
-        casu 404 {
-            nota "non inventum"
+        case 404 {
+            print "non inventum"
         }
-        casu 500 {
-            nota "error ministri"
+        case 500 {
+            print "error ministri"
         }
     }
 
     # Multiple statements per case
-    fixum _ modus ← "opera"
+    const _ modus ← "opera"
 
-    elige modus {
-        casu "labor" {
-            nota "modus laboris"
-            nota "verba multa"
+    switch modus {
+        case "labor" {
+            print "modus laboris"
+            print "verba multa"
         }
-        casu "opera" {
-            nota "modus operis"
-            nota "opera parata"
+        case "opera" {
+            print "modus operis"
+            print "opera parata"
         }
     }
 }

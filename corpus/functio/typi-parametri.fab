@@ -7,7 +7,7 @@ summary = "Declares a named function or method."
 syntax = "functio <name>(<params>) [modifiers] [→ <type>] [⇥ <error-type>] <block>"
 aliases = ["function"]
 related = ["→", "⇥", "redde", "sponte", "ceteri", "prae", "curata", "futura", "cursor"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # functio — Declares a named function or method
@@ -34,39 +34,39 @@ locale = "la"
 #   49, 300, "Julius habet 30 annos", falsum, verum, 5.0
 
 # Single typed parameter
-functio quadratum(numerus n) → numerus {
-    redde n * n
+fn quadratum(int n) → int {
+    return n * n
 }
 
 # Multiple typed parameters
-functio adde(numerus a, numerus b) → numerus {
-    redde a + b
+fn adde(int a, int b) → int {
+    return a + b
 }
 
 # Mixed types for string formatting
-functio narra(textus nomen, numerus aetas) → textus {
-    redde "§ habet § annos"(nomen, aetas)
+fn narra(string nomen, int aetas) → string {
+    return "§ habet § annos"(nomen, aetas)
 }
 
 # Boolean parameter and return
-functio nega(bivalens valor) → bivalens {
-    redde non valor
+fn nega(bool value) → bool {
+    return not value
 }
 
 # fractus (floating-point) parameters
-functio media(fractus a, fractus b) → fractus {
-    redde (a + b) / 2.0
+fn media(float a, float b) → float {
+    return (a + b) / 2.0
 }
 
-incipit {
-    nota quadratum(7)
+main {
+    print quadratum(7)
 
-    nota adde(100, 200)
+    print adde(100, 200)
 
-    nota narra("Julius", 30)
+    print narra("Julius", 30)
 
-    nota nega(verum)
-    nota nega(falsum)
+    print nega(true)
+    print nega(false)
 
-    nota media(3.0, 7.0)
+    print media(3.0, 7.0)
 }

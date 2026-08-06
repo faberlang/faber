@@ -6,7 +6,7 @@ canonical = true
 summary = "Checks whether a value appears in a collection."
 syntax = "<expression> inter <collection>"
 related = ["intra"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # inter — Checks whether a value appears in a collection
@@ -32,19 +32,19 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   none — stdout not pinned for this exemplum.
 
-incipit {
-    fixum _ condicio ← "agens"
-    fixum _ aetas ← 21
+main {
+    const _ condicio ← "agens"
+    const _ aetas ← 21
 
     # Basic inter with textus lista
-    si condicio inter ["pendens", "agens", "pausa"] {
-        nota "condicio valida"
+    if condicio between ["pendens", "agens", "pausa"] {
+        print "condicio valida"
     }
 
     # inter with numeric lista
-    si aetas inter [18, 21, 65] {
-        nota "aetas insignis"
+    if aetas between [18, 21, 65] {
+        print "aetas insignis"
     }
 
-    nota "exempla inter"
+    print "exempla inter"
 }

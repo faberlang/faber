@@ -7,7 +7,7 @@ summary = "faber.toml package metadata for build, run, and test."
 syntax = "faber.toml"
 aliases = ["faber.toml", "package manifest"]
 related = ["targets", "cli", "incipit", "proba"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -57,6 +57,6 @@ locale = "la"
 # BACKEND:
 #   META-only — runnable body is compile smoke only.
 
-incipit {
-    nota "manifest exemplum — configure packages via faber.toml"
+main {
+    print "manifest exemplum — configure packages via faber.toml"
 }

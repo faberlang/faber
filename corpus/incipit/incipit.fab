@@ -7,7 +7,7 @@ summary = "Declares the synchronous program entry point."
 syntax = "incipit <block>"
 aliases = ["main", "entry"]
 related = ["functio", "importa"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # incipit — Declares the synchronous program entry point
@@ -37,10 +37,10 @@ locale = "la"
 #   Contrast with salve-munde.fab (module-scope nota), functionibus.fab
 #   (calls module-level functio), and cli/cli.fab (incipit argumenta).
 
-incipit {
-    nota "ingressus"
+main {
+    print "ingressus"
 }
 
-proba "do nothing deliberately" {
-    tacet
+test "do nothing deliberately" {
+    pass
 }

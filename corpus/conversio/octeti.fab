@@ -6,7 +6,7 @@ canonical = false
 summary = "Text and byte conversio between textus, ascii, and octeti."
 syntax = "<expression> ↦ octeti | <expression> ↦ textus | <expression> ↦ ascii"
 related = ["↦", "octeti", "textus", "chorda"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -37,34 +37,34 @@ locale = "la"
 # octeti ↦ textus: UTF-8 decode (can fail on invalid bytes; use `⇥` to recover).
 # octeti ↦ ascii:  ASCII narrow (can fail on any byte ≥ 128; use `⇥`).
 
-incipit {
+main {
     # textus → octeti (UTF-8 encode)
-    fixum textus hi ← "hi"
-    fixum octeti enc ← hi ↦ octeti
-    nota enc.longitudo()
+    const string hi ← "hi"
+    const bytes enc ← hi ↦ bytes
+    print enc.longitudo()
 
     # octeti → textus (UTF-8 decode, valid bytes)
     # "hi" in UTF-8
-    fixum octeti raw ← |68 69|
-    fixum textus dec ← raw ↦ textus
-    nota dec
+    const bytes raw ← |68 69|
+    const string dec ← raw ↦ string
+    print dec
 
     # octeti → textus with recovery (invalid UTF-8 → recovery value)
-    fixum octeti badUtf8 ← |ff ff|
-    fixum textus recovered ← badUtf8 ↦ textus ⇥ "?"
-    nota recovered
+    const bytes badUtf8 ← |ff ff|
+    const string recovered ← badUtf8 ↦ string ⇥ "?"
+    print recovered
 
     # ascii → octeti
-    fixum ascii a ← 'hi'
-    fixum octeti aenc ← a ↦ octeti
-    nota aenc.longitudo()
+    const ascii a ← 'hi'
+    const bytes aenc ← a ↦ bytes
+    print aenc.longitudo()
 
     # octeti → ascii (valid ASCII bytes)
-    fixum ascii adec ← raw ↦ ascii
-    nota adec
+    const ascii adec ← raw ↦ ascii
+    print adec
 
     # octeti → ascii with recovery (non-ASCII byte → recovery value)
-    fixum octeti nonAscii ← |ff|
-    fixum ascii arecovery ← nonAscii ↦ ascii ⇥ 'x'
-    nota arecovery
+    const bytes nonAscii ← |ff|
+    const ascii arecovery ← nonAscii ↦ ascii ⇥ 'x'
+    print arecovery
 }

@@ -7,7 +7,7 @@ summary = "Continues with the next loop iteration."
 syntax = "perge"
 aliases = ["continue"]
 related = ["rumpe", "dum"]
-locale = "la"
+locale = "en"
 +++
 
 
@@ -35,34 +35,34 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Odd integers 1–9, then nested pairs skipping interior == 3.
 
-incipit {
+main {
     # Skip even numbers
-    varia _ i ← 0
+    var _ i ← 0
 
-    dum i < 10 {
+    while i < 10 {
         i ← i + 1
 
-        si i % 2 ≡ 0 {
-            perge
+        if i % 2 ≡ 0 {
+            continue
         }
 
-        nota i
+        print i
     }
 
     # Continue in nested loop
-    varia _ exterior ← 0
+    var _ exterior ← 0
 
-    dum exterior < 3 {
-        varia _ interior ← 0
+    while exterior < 3 {
+        var _ interior ← 0
 
-        dum interior < 5 {
+        while interior < 5 {
             interior ← interior + 1
 
-            si interior ≡ 3 {
-                perge
+            if interior ≡ 3 {
+                continue
             }
 
-            nota "exterior←§, interior←§"(exterior, interior)
+            print "exterior←§, interior←§"(exterior, interior)
         }
 
         exterior ← exterior + 1

@@ -7,7 +7,7 @@ summary = "Starts the default branch of an elige or discerne statement."
 syntax = "ceterum <block>"
 aliases = ["default"]
 related = ["elige", "discerne"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -38,10 +38,10 @@ locale = "la"
 #   Cross-ref: elige/ceterum.fab.
 #
 
-incipit {
-    fixum _ tag ← "z"
-    elige tag {
-        casu "a" { nota "a" }
-        ceterum { nota "default" }
+main {
+    const _ tag ← "z"
+    switch tag {
+        case "a" { print "a" }
+        default { print "default" }
     }
 }

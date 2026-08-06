@@ -6,7 +6,7 @@ canonical = false
 summary = "Tensor method hard-error policy for structa count mismatch."
 syntax = "tensor.strue(flat, shape)"
 related = ["tensor", "structa"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -31,8 +31,8 @@ locale = "la"
 # EXPECTED failure:
 #   tensor structa element count does not match shape
 
-incipit {
-    fixum tf32[] seed ← vacua
-    fixum tf32[2, 2] grid ← seed.strue([1.0, 2.0, 3.0], [2, 2])
-    nota grid.longitudo()
+main {
+    const tf32[] seed ← vacua
+    const tf32[2, 2] grid ← seed.strue([1.0, 2.0, 3.0], [2, 2])
+    print grid.longitudo()
 }

@@ -6,7 +6,7 @@ canonical = true
 summary = "Represents the true boolean value and can prefix a truthiness check."
 syntax = "verum [<expression>]"
 related = ["falsum", "nihil"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -34,17 +34,17 @@ locale = "la"
 #   Scalar stdout smoke (see body).
 #
 
-incipit {
-    fixum _ active ← verum
-    nota active
+main {
+    const _ active ← true
+    print active
 }
 
-proba "verum is the true literal" {
-    fixum _ active ← verum
-    adfirma active
-    adfirma active ≡ verum
+test "verum is the true literal" {
+    const _ active ← true
+    assert active
+    assert active ≡ true
 }
 
-proba "verum stands alone as a truthy condition" {
-    adfirma verum
+test "verum stands alone as a truthy condition" {
+    assert true
 }

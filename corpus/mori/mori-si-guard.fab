@@ -6,7 +6,7 @@ canonical = true
 summary = "Conditional fatal abort with si guard."
 syntax = "mori <expression> si <condition>"
 related = ["iace", "ergo", "si"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -41,35 +41,35 @@ locale = "la"
 #   "positive"
 #   "not empty"
 
-functio clamp(numerus x, numerus min, numerus max) → numerus {
+fn clamp(int x, int min, int max) → int {
     # Guard: abort if min > max — invariant violation
-    mori "range inverted" si min > max
+    panic "range inverted" if min > max
 
     # Guard: abort if value out of range
-    mori "value out of range" si x < min aut x > max
+    panic "value out of range" if x < min or x > max
 
-    redde x
+    return x
 }
 
-functio accessus(lista<numerus> res, numerus index) → numerus {
+fn accessus(list<int> res, int index) → int {
     # Unconditional mori — unchanged form
-    si index < 0 aut index ≥ res.longitudo() {
-        mori "index out of bounds"
+    if index < 0 or index ≥ res.longitudo() {
+        panic "index out of bounds"
     }
-    redde res[index]
+    return res[index]
 }
 
-incipit {
+main {
     # Happy path — guards not triggered
-    fixum numerus n ← clamp(5, 0, 10)
-    nota "within range"
+    const int n ← clamp(5, 0, 10)
+    print "within range"
 
     # Happy path — empty list guard not triggered
-    fixum lista<numerus> xs ← [1, 2, 3]
-    fixum numerus y ← accessus(xs, 1)
-    nota "positive"
+    const list<int> xs ← [1, 2, 3]
+    const int y ← accessus(xs, 1)
+    print "positive"
 
-    fixum lista<numerus> ys ← [42]
-    fixum numerus z ← accessus(ys, 0)
-    nota "not empty"
+    const list<int> ys ← [42]
+    const int z ← accessus(ys, 0)
+    print "not empty"
 }

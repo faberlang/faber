@@ -7,7 +7,7 @@ summary = "Starts a catch block."
 syntax = "<structured-statement> cape <name> <block>"
 aliases = ["catch"]
 related = ["fac", "iace", "⇥"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -38,16 +38,16 @@ locale = "la"
 #   Rust/Go: fac/cape emit gap (whitelist: cape/cape.fab).
 #
 
-incipit {
-    varia numerus attempt ← 0
-    fac {
+main {
+    var int attempt ← 0
+    do {
         attempt ← attempt + 1
-        si attempt > 1 {
-            iace "simulated failure"
+        if attempt > 1 {
+            throw "simulated failure"
         }
-        nota "attempt §"(attempt)
+        print "attempt §"(attempt)
     }
-    cape err {
-        nota "caught"
+    catch err {
+        print "caught"
     }
 }

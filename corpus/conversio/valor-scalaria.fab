@@ -6,7 +6,7 @@ canonical = true
 summary = "Scalar valor ↦ T extraction via FromValor (variant match, fractus widen, textus|instans wire)."
 syntax = "<valor-expression> ↦ numerus | fractus | bivalens | textus | ascii | nihil"
 related = ["↦", "⇥", "instans", "textus"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -33,45 +33,45 @@ locale = "la"
 # provenance stays on `valor ↦ instans` (see conversio/instans.fab). `⇥`
 # recovers on variant mismatch.
 
-incipit {
-    fixum valor asInt ← 42
-    fixum numerus count ← asInt ↦ numerus
-    adfirma count ≡ 42
+main {
+    const value asInt ← 42
+    const int count ← asInt ↦ int
+    assert count ≡ 42
 
-    fixum valor asFloat ← 3.5
-    fixum fractus ratio ← asFloat ↦ fractus
-    adfirma ratio ≡ 3.5
+    const value asFloat ← 3.5
+    const float ratio ← asFloat ↦ float
+    assert ratio ≡ 3.5
 
-    fixum valor intForFloat ← 7
-    fixum fractus widened ← intForFloat ↦ fractus
-    adfirma widened ≡ 7.0
+    const value intForFloat ← 7
+    const float widened ← intForFloat ↦ float
+    assert widened ≡ 7.0
 
-    fixum valor asBool ← verum
-    fixum bivalens flag ← asBool ↦ bivalens
-    adfirma flag ≡ verum
+    const value asBool ← true
+    const bool flag ← asBool ↦ bool
+    assert flag ≡ true
 
-    fixum valor asText ← "salve"
-    fixum textus greeting ← asText ↦ textus
-    adfirma greeting ≡ "salve"
+    const value asText ← "salve"
+    const string greeting ← asText ↦ string
+    assert greeting ≡ "salve"
 
-    fixum valor asWire ← "1979-05-27T07:32:00Z"
-    fixum textus wire ← asWire ↦ textus
-    adfirma wire ≡ "1979-05-27T07:32:00Z"
+    const value asWire ← "1979-05-27T07:32:00Z"
+    const string wire ← asWire ↦ string
+    assert wire ≡ "1979-05-27T07:32:00Z"
 
-    fixum valor asAscii ← 'yes'
-    fixum ascii token ← asAscii ↦ ascii
-    adfirma token ≡ 'yes'
+    const value asAscii ← 'yes'
+    const ascii token ← asAscii ↦ ascii
+    assert token ≡ 'yes'
 
-    fixum valor bad ← "not-a-number"
-    fixum numerus recovered ← bad ↦ numerus ⇥ 0
-    adfirma recovered ≡ 0
+    const value bad ← "not-a-number"
+    const int recovered ← bad ↦ int ⇥ 0
+    assert recovered ≡ 0
 
-    nota count
-    nota ratio
-    nota widened
-    nota flag
-    nota greeting
-    nota wire
-    nota token
-    nota recovered
+    print count
+    print ratio
+    print widened
+    print flag
+    print greeting
+    print wire
+    print token
+    print recovered
 }

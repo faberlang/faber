@@ -3,7 +3,7 @@ term = "vector"
 kind = "kernel"
 category = "gpu"
 summary = "vector elementwise arithmetic lowers for GPU text emit"
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -22,34 +22,34 @@ locale = "la"
 
 
 
-@ nucleum
-functio addita(fractus<f32> x) → fractus<f32> {
-    fixum vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
-    fixum vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
-    fixum vf32[4] c ← a.addita(b)
-    redde c.productum(b)
+@ kernel
+fn addita(float<f32> x) → float<f32> {
+    const vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
+    const vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
+    const vf32[4] c ← a.addita(b)
+    return c.productum(b)
 }
 
-@ nucleum
-functio subtrahe(fractus<f32> x) → fractus<f32> {
-    fixum vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
-    fixum vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
-    fixum vf32[4] c ← a.subtrahe(b)
-    redde c.productum(b)
+@ kernel
+fn subtrahe(float<f32> x) → float<f32> {
+    const vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
+    const vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
+    const vf32[4] c ← a.subtrahe(b)
+    return c.productum(b)
 }
 
-@ nucleum
-functio multiplica(fractus<f32> x) → fractus<f32> {
-    fixum vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
-    fixum vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
-    fixum vf32[4] c ← a.multiplica(b)
-    redde c.productum(b)
+@ kernel
+fn multiplica(float<f32> x) → float<f32> {
+    const vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
+    const vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
+    const vf32[4] c ← a.multiplica(b)
+    return c.productum(b)
 }
 
-@ nucleum
-functio divida(fractus<f32> x) → fractus<f32> {
-    fixum vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
-    fixum vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
-    fixum vf32[4] c ← a.divida(b)
-    redde c.productum(b)
+@ kernel
+fn divida(float<f32> x) → float<f32> {
+    const vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
+    const vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
+    const vf32[4] c ← a.divida(b)
+    return c.productum(b)
 }

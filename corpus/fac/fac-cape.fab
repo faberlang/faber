@@ -7,7 +7,7 @@ summary = "Starts a scoped do-while style loop."
 syntax = "fac <block> [cape <name> <block>] [dum <condition>]"
 aliases = ["do"]
 related = ["dum", "cape", "clausura", "perge"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # fac — Starts a scoped do-while style loop
@@ -37,24 +37,24 @@ locale = "la"
 # BACKEND:
 #   Rust/Go: fac/cape not yet emitted — compile-only smoke.
 
-incipit {
-    fac {
-        nota "Block executed successfully"
+main {
+    do {
+        print "Block executed successfully"
     }
-    cape err {
-        nota "Caught error: §"(err.nuntius)
+    catch err {
+        print "Caught error: §"(err.nuntius)
     }
 
     # iace on second attempt; cape recovers and prints err.nuntius
-    varia numerus attempts ← 0
-    fac {
+    var int attempts ← 0
+    do {
         attempts ← attempts + 1
-        nota "Attempt §"(attempts)
-        si attempts ≡ 2 {
-            iace "Simulated failure"
+        print "Attempt §"(attempts)
+        if attempts ≡ 2 {
+            throw "Simulated failure"
         }
     }
-    cape err {
-        nota "Failed on attempt §: §"(attempts, err.nuntius)
+    catch err {
+        print "Failed on attempt §: §"(attempts, err.nuntius)
     }
 }

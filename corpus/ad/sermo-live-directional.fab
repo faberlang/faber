@@ -5,7 +5,7 @@ category = "endpoint"
 canonical = true
 summary = "live outbound and inbound sermo directional views"
 related = ["ad", "sermo", "tuus", "scrinium", "cursor", "accipe"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -31,26 +31,26 @@ locale = "la"
 # accipe, cursor, and exhauri may share one tuus queue; mix them only when
 # ordered consumption is intentional.
 
-incipit {
-    fixum sermo s ← ad 'runtime:echo' ("salve")
+main {
+    const sermo s ← call 'runtime:echo' ("salve")
 
-    fixum meus<textus> m ← s.meus<textus>()
+    const meus<string> m ← s.meus<string>()
     m.da("ping")
-    fixum status outbound ← m.fini()
+    const status outbound ← m.fini()
 
-    fixum tuus<textus> t ← s.tuus<textus>()
-    itera ex t.cursor() fixum frame {
-        adfirma frame.data ≡ "salve"
+    const tuus<string> t ← s.tuus<string>()
+    for from t.cursor() const frame {
+        assert frame.data ≡ "salve"
     }
-    fixum status inbound ← t.fini()
+    const status inbound ← t.fini()
 
-    fixum sermo s2 ← ad 'runtime:echo' ("salve")
-    fixum tuus<textus> t2 ← s2.tuus<textus>()
-    fixum scrinium<textus> ∪ nihil got ← t2.accipe()
-    fixum status accipe_done ← t2.fini()
+    const sermo s2 ← call 'runtime:echo' ("salve")
+    const tuus<string> t2 ← s2.tuus<string>()
+    const scrinium<string> ∪ null got ← t2.accipe()
+    const status accipe_done ← t2.fini()
 
-    nota outbound
-    nota inbound
-    nota got
-    nota accipe_done
+    print outbound
+    print inbound
+    print got
+    print accipe_done
 }

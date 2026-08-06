@@ -7,7 +7,7 @@ summary = "Marks a test case as pending future work with a reason."
 syntax = "proba <name> futurum <reason> <block>"
 aliases = ["todo", "pending"]
 related = ["proba", "omitte"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # futurum — Marks a test case as pending future work with a reason
@@ -35,6 +35,6 @@ locale = "la"
 #   declaration-only test modifier (whitelist: futurum/futurum.fab).
 #
 
-proba "async file operations" futurum "needs async support" {
-    adfirma verum
+test "async file operations" todo "needs async support" {
+    assert true
 }

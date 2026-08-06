@@ -6,7 +6,7 @@ canonical = true
 summary = "Compose valor ↔ tensor roundtrip via lista bridges (no dedicated valor↔tensor arms)."
 syntax = "<valor> ↦ lista<T> ↦ tensor<T, [N]> ↦ lista<T> ↦ valor"
 related = ["↦", "valor", "lista", "tensor"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -29,19 +29,19 @@ locale = "la"
 # `lista<T>` first; construction uses shipped `lista ↦ tensor` (`structa`) and
 # flatten via `tensor ↦ lista` (`.planata()`), then `lista ↦ valor` boxing.
 
-incipit {
-    fixum valor arr ← [1, 2, 3, 4]
-    fixum lista<numerus> xs ← arr ↦ lista<numerus>
-    adfirma xs.longitudo() ≡ 4
+main {
+    const value arr ← [1, 2, 3, 4]
+    const list<int> xs ← arr ↦ list<int>
+    assert xs.longitudo() ≡ 4
 
-    fixum tensor<numerus, [4]> grid ← xs ↦ tensor<numerus, [4]>
-    fixum lista<numerus> flat ← grid ↦ lista<numerus>
-    adfirma flat.longitudo() ≡ 4
+    const tensor<int, [4]> grid ← xs ↦ tensor<int, [4]>
+    const list<int> flat ← grid ↦ list<int>
+    assert flat.longitudo() ≡ 4
 
-    fixum valor roundtrip ← flat ↦ valor
-    nota roundtrip
+    const value roundtrip ← flat ↦ value
+    print roundtrip
 
-    fixum valor obj ← { "alpha": 10, "beta": 20 } ↦ valor
-    fixum tabula<textus, numerus> scores ← obj ↦ tabula<textus, numerus>
-    nota scores.accipe("alpha") vel 0
+    const value obj ← { "alpha": 10, "beta": 20 } ↦ value
+    const map<string, int> scores ← obj ↦ map<string, int>
+    print scores.accipe("alpha") coalesce 0
 }

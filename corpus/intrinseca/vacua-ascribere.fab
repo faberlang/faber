@@ -6,7 +6,7 @@ canonical = false
 summary = "Typed empty collection construction with vacua."
 syntax = "varia <collection-type> <name> ← vacua"
 related = ["vacua", "lista", "tabula", "copia"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # vacua — Typed empty collection construction with vacua
@@ -44,23 +44,23 @@ locale = "la"
 #
 # BACKEND: Go e2e whitelist — collection method surface not yet lowered for Go.
 
-incipit {
-    varia tabula<textus, numerus> tabula ← vacua
-    tabula["primus"] ← 42
-    tabula["secundus"] ← 99
+main {
+    var map<string, int> map ← vacua
+    map["primus"] ← 42
+    map["secundus"] ← 99
 
-    varia lista<textus> res ← vacua
+    var list<string> res ← vacua
     res.appende("alpha")
     res.appende("beta")
 
-    varia copia<numerus> visi ← vacua
+    var set<int> visi ← vacua
     visi.adde(1)
     visi.adde(2)
 
-    fixum tabula<textus, numerus> puncta ← { "aelia": 95, "balbus": 87 }
-    fixum _ numeri ← [1, 2, 3] ∷ lista<numerus>
-    fixum _ claves ← ["primus", "secundus"] ∷ lista<textus>
+    const map<string, int> puncta ← { "aelia": 95, "balbus": 87 }
+    const _ numeri ← [1, 2, 3] ∷ list<int>
+    const _ claves ← ["primus", "secundus"] ∷ list<string>
 
-    nota tabula["primus"], res.longitudo(), visi.habet(2)
-    nota puncta["aelia"], numeri.primus(), claves.ultimus()
+    print map["primus"], res.longitudo(), visi.habet(2)
+    print puncta["aelia"], numeri.primus(), claves.ultimus()
 }

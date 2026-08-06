@@ -6,7 +6,7 @@ canonical = false
 summary = "octet is the byte scalar, a builtin spelling for numerus<u8>, the element type of octeti."
 syntax = "octet"
 related = ["octeti", "numerus", "lista"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -28,25 +28,25 @@ locale = "la"
 # WHY: pairs with octeti (the buffer). octet is numerus<u8> under a byte-facing
 # name; octeti unifies with lista<numerus<u8>>. See DEFER-029.
 
-functio describe(octeti buf) → numerus {
-    redde buf.longitudo()
+fn describe(bytes buf) → int {
+    return buf.longitudo()
 }
 
-functio firstByte(octeti buf) → octet {
-    fixum octet b ← buf.accipe(0) vel (0 ∷ octet)
-    redde b
+fn firstByte(bytes buf) → octet {
+    const octet b ← buf.accipe(0) coalesce (0 ∷ octet)
+    return b
 }
 
-incipit {
-    varia octeti sig ← |de ad be ef|
-    fixum octet b ← 0x80 ∷ octet
+main {
+    var bytes sig ← |de ad be ef|
+    const octet b ← 0x80 ∷ octet
     sig.appende(b)
-    nota describe(sig)
+    print describe(sig)
 
-    fixum octet first ← firstByte(sig)
-    nota first
+    const octet first ← firstByte(sig)
+    print first
 
-    fixum numerus<u8> raw ← b
-    fixum octet back ← raw
-    nota back
+    const int<u8> raw ← b
+    const octet back ← raw
+    print back
 }

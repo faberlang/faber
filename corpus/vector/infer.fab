@@ -6,7 +6,7 @@ canonical = false
 summary = "Vector width inference placeholder for generic vector return syntax."
 syntax = "vector<elem, _>"
 related = ["vector", "generic", "magnitudo"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -27,10 +27,10 @@ locale = "la"
 
 # vector width inference
 
-functio make<elem, magnitudo N>() → vector<elem, _> {
-    mori "infer width stub"
+fn make<elem, size N>() → vector<elem, _> {
+    panic "infer width stub"
 }
 
-functio inferSmoke() → numerus {
-    redde 0
+fn inferSmoke() → int {
+    return 0
 }

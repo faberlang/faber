@@ -6,7 +6,7 @@ canonical = true
 summary = "CLI root with options, operands, subcommands, and module mounts."
 syntax = "@ cli <name>"
 related = ["imperium", "imperia", "optio", "operandus", "argumenta", "descriptio", "ubique", "versio", "alias"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -46,24 +46,24 @@ locale = "la"
 
 @ cli "exemplum"
 @ versio "0.1.0"
-@ descriptio "Faber CLI framework smoke exemplum"
-@ optio verbose brevis "v" longum "verbose" typus bivalens ubique descriptio "Enable verbose output"
-incipit argumenta args {
+@ description "Faber CLI framework smoke exemplum"
+@ option verbose short "v" long "verbose" type bool global description "Enable verbose output"
+main args args {
 }
 
-@ imperium "greet"
+@ command "greet"
 @ alias "g"
-@ descriptio "Greet by name"
-@ operandus textus nomen descriptio "Name to greet"
-functio greet() argumenta args → vacuum {
-    si args.verbose {
-        nota "verbose"
+@ description "Greet by name"
+@ operand string nomen description "Name to greet"
+fn greet() args args → void {
+    if args.verbose {
+        print "verbose"
     }
-    nota "Salve, §!"(args.nomen)
+    print "Salve, §!"(args.nomen)
 }
 
-@ imperium "version"
+@ command "version"
 @ alias "v"
-functio version() → vacuum {
-    nota "exemplum v0.1.0"
+fn version() → void {
+    print "exemplum v0.1.0"
 }

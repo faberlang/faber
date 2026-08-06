@@ -6,7 +6,7 @@ canonical = true
 summary = "Async tempus.dormiet and sync tempus.expectet share the tempus:dormiet route."
 syntax = "tempus.expectet(ms) | tacebit tempus.dormiet(ms)"
 related = ["ad", "tempus", "futura", "sermo"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -31,10 +31,10 @@ locale = "la"
 # Norma currently declares the async wrapper with compatibility `@ futura`; this
 # example consumes it through `tacebit`.
 
-importa ex "norma:tempus" privata tempus
+import from "norma:tempus" private tempus
 
-incipiet {
+async_main {
     tempus.expectet(0)
-    tacebit tempus.dormiet(0)
-    adfirma verum
+    await tempus.dormiet(0)
+    assert true
 }

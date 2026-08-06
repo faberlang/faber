@@ -6,7 +6,7 @@ canonical = false
 summary = "Short-circuit logical or on bivalent operands."
 syntax = "<expression> aut <expression>"
 related = ["et", "vel", "binarius"]
-locale = "la"
+locale = "en"
 +++
 
 
@@ -36,13 +36,13 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   aut.expected (true)
 
-incipit {
+main {
     # left operand: falsum
-    fixum _ invitatus ← falsum
+    const _ invitatus ← false
     # right operand: verum
-    fixum _ membrum ← verum
+    const _ membrum ← true
     # falsum aut verum → verum
-    fixum _ intrat ← invitatus aut membrum
+    const _ intrat ← invitatus or membrum
 
-    nota intrat
+    print intrat
 }

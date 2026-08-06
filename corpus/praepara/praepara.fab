@@ -6,7 +6,7 @@ canonical = true
 summary = "Registers a before-each test hook."
 syntax = "praepara <block>"
 related = ["postpara", "omnia"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -37,11 +37,11 @@ locale = "la"
 #   declaration-only test hook (whitelist: praepara/praepara.fab).
 #
 
-probandum "hooks" {
-    praepara {
-        nota "before each"
+describe "hooks" {
+    setup {
+        print "before each"
     }
-    proba "sample" {
-        adfirma verum
+    test "sample" {
+        assert true
     }
 }

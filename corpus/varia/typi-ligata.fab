@@ -6,7 +6,7 @@ canonical = false
 summary = "Type-first fixum and varia bindings with explicit types."
 syntax = "varia <type> <name> ← <expr> | fixum <type> <name> ← <expr>"
 related = ["varia", "fixum", "←"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -37,44 +37,44 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Prints initial and updated values for numerus, textus, bivalens, and fractus.
 
-incipit {
+main {
     # --- Typed immutable declarations ---
 
-    fixum numerus aetas ← 30
-    fixum textus nomen ← "Marcus"
-    fixum bivalens viget ← verum
+    const int aetas ← 30
+    const string nomen ← "Marcus"
+    const bool viget ← true
 
-    nota aetas
-    nota nomen
-    nota viget
+    print aetas
+    print nomen
+    print viget
 
     # --- Typed mutable declarations ---
 
-    varia numerus numeratio ← 0
-    varia textus condicio ← "pendens"
-    varia bivalens currit ← falsum
+    var int numeratio ← 0
+    var string condicio ← "pendens"
+    var bool currit ← false
 
-    nota numeratio
-    nota condicio
-    nota currit
+    print numeratio
+    print condicio
+    print currit
 
     # Reassign mutable typed variables (fixum bindings cannot be reassigned)
     numeratio ← 100
     condicio ← "perfectum"
-    currit ← verum
+    currit ← true
 
-    nota numeratio
-    nota condicio
-    nota currit
+    print numeratio
+    print condicio
+    print currit
 
     # --- Fractional (fractus) typed bindings ---
 
-    fixum fractus pi ← 3.14159
-    varia fractus ratio ← 0.05
+    const float pi ← 3.14159
+    var float ratio ← 0.05
 
-    nota pi
-    nota ratio
+    print pi
+    print ratio
 
     ratio ← 0.10
-    nota ratio
+    print ratio
 }

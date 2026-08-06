@@ -7,7 +7,7 @@ summary = "Refers to the current instance inside a method."
 syntax = "ego.<member>"
 aliases = ["self", "this"]
 related = ["generis", "nexum"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -34,16 +34,16 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   capsa: prima
 
-genus Capsa {
-    textus titulus
+class Capsa {
+    string titulus
 
-    functio narra() → textus {
+    fn narra() → string {
         # ego = the receiver instance
-        redde "capsa: " + ego.titulus
+        return "capsa: " + self.titulus
     }
 }
 
-incipit {
-    fixum _ capsa ← Capsa { titulus = "prima" }
-    nota capsa.narra()
+main {
+    const _ capsa ← Capsa { titulus = "prima" }
+    print capsa.narra()
 }

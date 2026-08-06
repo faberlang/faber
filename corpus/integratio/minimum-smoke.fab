@@ -6,7 +6,7 @@ canonical = true
 summary = "Minimal multi-feature happy path across functio, fixum, si, and nota."
 syntax = "integratio — multi-feature happy path"
 related = ["functio", "fixum", "si", "nota"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # integratio — Minimal multi-feature happy path across functio, fixum, si, and nota
@@ -37,13 +37,13 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   minimum-smoke.expected — par 42 when n is even.
 
-functio par(numerus n) → bivalens {
-    redde n % 2 ≡ 0
+fn par(int n) → bool {
+    return n % 2 ≡ 0
 }
 
-incipit {
-    fixum _ n ← 42
-    si par(n) {
-        nota "par §"(n)
+main {
+    const _ n ← 42
+    if par(n) {
+        print "par §"(n)
     }
 }

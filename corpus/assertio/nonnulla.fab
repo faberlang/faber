@@ -6,7 +6,7 @@ canonical = false
 summary = "Non-null assertion before member, index, or call access."
 syntax = "<expression>!.<name> | <expression>![<expression>] | <expression>!(<args>)"
 related = ["!."]
-locale = "la"
+locale = "en"
 +++
 
 
@@ -41,19 +41,19 @@ locale = "la"
 # BACKEND:
 #   Rust: assertio !. not yet emitted — compile-only smoke.
 
-genus Persona {
-    textus nomen
-    textus urbs sponte
+class Persona {
+    string nomen
+    string urbs optional
 }
 
-incipit {
+main {
     # Optional genus value — !. asserts it is not nihil before field access
-    fixum Persona ∪ nihil p ← Persona { nomen = "Marcus", urbs = "Roma" }
-    nota p!.nomen
-    nota p!.urbs
+    const Persona ∪ null p ← Persona { nomen = "Marcus", urbs = "Roma" }
+    print p!.nomen
+    print p!.urbs
 
     # !. on lista index — asserts element exists
-    fixum _ litterae ← ["a", "b", "c"]
-    nota litterae![0]
-    nota litterae![2]
+    const _ litterae ← ["a", "b", "c"]
+    print litterae![0]
+    print litterae![2]
 }

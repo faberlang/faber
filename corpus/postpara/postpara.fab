@@ -6,7 +6,7 @@ canonical = true
 summary = "Registers an after-each test hook."
 syntax = "postpara <block>"
 related = ["praepara", "omnia"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -35,11 +35,11 @@ locale = "la"
 #   declaration-only test hook (whitelist: postpara/postpara.fab).
 #
 
-probandum "hooks" {
-    postpara {
-        nota "after each"
+describe "hooks" {
+    teardown {
+        print "after each"
     }
-    proba "sample" {
-        adfirma verum
+    test "sample" {
+        assert true
     }
 }

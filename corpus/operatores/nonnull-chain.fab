@@ -6,7 +6,7 @@ canonical = true
 summary = "Asserted member, index, and call access on known-present values."
 syntax = "<expression>!.<name> | <expression>![<expression>] | <expression>!(<args>)"
 related = ["!.", "![", "!("]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -34,16 +34,16 @@ locale = "la"
 # BACKEND:
 #   Rust: non-null chain lowering gap (whitelist: operatores/nonnull-chain.fab).
 
-genus Persona {
-    textus nomen
-    textus urbs sponte
+class Persona {
+    string nomen
+    string urbs optional
 }
 
-incipit {
-    fixum Persona ∪ nihil p ← Persona { nomen = "Marcus", urbs = "Roma" }
-    nota p!.nomen
-    nota p!.urbs
+main {
+    const Persona ∪ null p ← Persona { nomen = "Marcus", urbs = "Roma" }
+    print p!.nomen
+    print p!.urbs
 
-    fixum _ litterae ← ["a", "b", "c"]
-    nota litterae![0]
+    const _ litterae ← ["a", "b", "c"]
+    print litterae![0]
 }

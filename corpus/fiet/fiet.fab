@@ -7,7 +7,7 @@ summary = "Callable posture for asynchronous finite functions."
 syntax = "functio name(…) fiet → T"
 aliases = ["async"]
 related = ["futura", "promissum", "figendum", "tacebit"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================

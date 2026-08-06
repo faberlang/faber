@@ -6,7 +6,7 @@ canonical = true
 summary = "Checks whether a value lies within a range."
 syntax = "<expression> intra <range>"
 related = ["inter"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # intra — Checks whether a value lies within a range
@@ -34,23 +34,23 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   none — stdout not pinned for this exemplum.
 
-fixum _ aetas ← 25
+const _ aetas ← 25
 
 # Basic intra with ‥ operator (exclusive end)
-si aetas intra 0‥100 {
-    nota "aetas intra fines est"
+if aetas within 0‥100 {
+    print "aetas intra fines est"
 }
 
 # intra with … (inclusive end)
-si aetas intra 18…65 {
-    nota "aetas laboris"
+if aetas within 18…65 {
+    print "aetas laboris"
 }
 
 # intra with ante (explicit exclusive)
-si aetas intra 0 ante 18 {
-    nota "minor"
+if aetas within 0 before 18 {
+    print "minor"
 }
 
-incipit {
-    nota "exempla intra"
+main {
+    print "exempla intra"
 }

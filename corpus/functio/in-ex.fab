@@ -7,7 +7,7 @@ summary = "Declares a named function or method."
 syntax = "functio <name>(<params>) [modifiers] [→ <type>] [⇥ <error-type>] <block>"
 aliases = ["function"]
 related = ["→", "⇥", "redde", "sponte", "ceteri", "prae", "curata", "futura", "cursor"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # functio — Declares a named function or method
@@ -42,30 +42,30 @@ locale = "la"
 
 # --- Shared borrow: read label without taking ownership ---
 
-functio imprime(de textus label) → vacuum {
-    nota label
+fn imprime(ref string label) → void {
+    print label
 }
 
 # --- Mutable borrow: double the caller's numerus in place ---
 
-functio duplica(in numerus value) → vacuum {
+fn duplica(mut int value) → void {
     value ← value * 2
-    nota value
+    print value
 }
 
 # --- Consume: take ownership of textus and return it ---
 
-functio consume(ex textus buffer) → textus {
-    redde buffer
+fn consume(from string buffer) → string {
+    return buffer
 }
 
-incipit {
+main {
     imprime("mutabile")
 
-    varia numerus valor ← 3
+    var int value ← 3
     # in borrows valor mutably inside duplica
-    duplica(valor)
+    duplica(value)
 
     # ex moves the literal into consume
-    nota consume("salve")
+    print consume("salve")
 }

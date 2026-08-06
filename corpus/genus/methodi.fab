@@ -6,7 +6,7 @@ canonical = false
 summary = "Genus methods using ego for field access."
 syntax = "genus <name> { functio <method>(<params>) → <type> { … ego.<field> … } }"
 related = ["genus", "ego", "functio"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # genus — Genus methods using ego for field access
@@ -35,58 +35,58 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   50, 30, falsum, then counter values 0, 1, 3
 
-genus Forma {
-    numerus latitudo = 1
-    numerus altitudo = 1
+class Forma {
+    int latitudo = 1
+    int altitudo = 1
 
-    functio area() → numerus {
-        redde ego.latitudo * ego.altitudo
+    fn area() → int {
+        return self.latitudo * self.altitudo
     }
 
-    functio ambitus() → numerus {
-        redde 2 * (ego.latitudo + ego.altitudo)
+    fn ambitus() → int {
+        return 2 * (self.latitudo + self.altitudo)
     }
 
-    functio aequilatera() → bivalens {
-        redde ego.latitudo ≡ ego.altitudo
+    fn aequilatera() → bool {
+        return self.latitudo ≡ self.altitudo
     }
 }
 
-genus Numerator {
-    numerus numerus = 0
+class Numerator {
+    int numerus = 0
 
-    functio auge() {
+    fn auge() {
         # mutate instance state via ego
-        ego.numerus ← ego.numerus + 1
+        self.numerus ← self.numerus + 1
     }
 
-    functio accipe() → numerus {
-        redde ego.numerus
+    fn accipe() → int {
+        return self.numerus
     }
 }
 
-incipit {
+main {
     # --- Methods that return values ---
 
-    fixum _ forma ← Forma {
+    const _ forma ← Forma {
         latitudo = 10,
         altitudo = 5
     }
 
-    nota forma.area()
-    nota forma.ambitus()
-    nota forma.aequilatera()
+    print forma.area()
+    print forma.ambitus()
+    print forma.aequilatera()
 
     # --- Methods that modify state (varia instance binding) ---
 
-    varia _ numerator ← Numerator {}
+    var _ numerator ← Numerator {}
 
-    nota numerator.accipe()
-
-    numerator.auge()
-    nota numerator.accipe()
+    print numerator.accipe()
 
     numerator.auge()
+    print numerator.accipe()
+
     numerator.auge()
-    nota numerator.accipe()
+    numerator.auge()
+    print numerator.accipe()
 }

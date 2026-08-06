@@ -6,7 +6,7 @@ canonical = true
 summary = "Extracts fields from a value into local bindings."
 syntax = "ex <expression> <fixum|varia> <field> [, ...] [ceteri <ident>]"
 related = ["de", "ut", "ceteri"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -44,113 +44,113 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   Extracted field values, aliased names, mutated varia bindings, rest maps.
 
-genus Persona {
-    textus nomen
-    numerus aetas
-    textus urbs
+class Persona {
+    string nomen
+    int aetas
+    string urbs
 }
 
-genus Civis {
-    textus nomen
-    textus epistula
+class Civis {
+    string nomen
+    string epistula
 }
 
-genus Datum {
-    numerus numerus
-    bivalens activus
+class Datum {
+    int numerus
+    bool activus
 }
 
-genus Forma {
-    textus hospes
-    numerus portus
-    bivalens tutus
+class Forma {
+    string hospes
+    int portus
+    bool tutus
 }
 
-genus Plenus {
-    numerus signum
-    textus nomen
-    textus epistula
-    textus munus
+class Plenus {
+    int signum
+    string nomen
+    string epistula
+    string munus
 }
 
-genus Sodalis {
-    textus nomen
-    bivalens probatus
+class Sodalis {
+    string nomen
+    bool probatus
 }
 
-genus Relatus {
+class Relatus {
     Sodalis civis
 }
 
-genus Responsum {
+class Responsum {
     Relatus datum
 }
 
-genus Vestis {
-    textus modus
-    textus lingua
+class Vestis {
+    string modus
+    string lingua
 }
 
-incipit {
+main {
     # --- Basic field extraction ---
 
-    fixum _ persona ← Persona { nomen = "Marcus", aetas = 30, urbs = "Roma" }
-    ex persona fixum nomen, aetas
+    const _ persona ← Persona { nomen = "Marcus", aetas = 30, urbs = "Roma" }
+    from persona const nomen, aetas
 
-    nota nomen
-    nota aetas
+    print nomen
+    print aetas
 
     # --- Extract with alias using 'ut' ---
 
-    fixum _ civis ← Civis { nomen = "Julia", epistula = "julia@roma.com" }
-    ex civis fixum nomen ut cognomen, epistula ut epistula2
+    const _ civis ← Civis { nomen = "Julia", epistula = "julia@roma.com" }
+    from civis const nomen as cognomen, epistula as epistula2
 
-    nota cognomen
-    nota epistula2
+    print cognomen
+    print epistula2
 
     # --- Mutable destructuring with varia ---
 
-    fixum _ datum ← Datum { numerus = 100, activus = verum }
-    ex datum varia numerus, activus
+    const _ datum ← Datum { numerus = 100, activus = true }
+    from datum var numerus, activus
 
-    nota numerus
-    nota activus
+    print numerus
+    print activus
 
     numerus ← 200
-    activus ← falsum
+    activus ← false
 
-    nota numerus
-    nota activus
+    print numerus
+    print activus
 
     # --- Mixed alias and regular fields ---
 
-    fixum _ forma ← Forma { hospes = "localis", portus = 8080, tutus = verum }
-    ex forma fixum hospes, portus ut porta, tutus
+    const _ forma ← Forma { hospes = "localis", portus = 8080, tutus = true }
+    from forma const hospes, portus as porta, tutus
 
-    nota hospes
-    nota porta
-    nota tutus
+    print hospes
+    print porta
+    print tutus
 
     # --- Rest pattern with ceteri ---
 
-    fixum _ plenus ← Plenus { signum = 1, nomen = "Gaius", epistula = "g@roma.com", munus = "admin" }
-    ex plenus fixum signum, ceteri reliqua
+    const _ plenus ← Plenus { signum = 1, nomen = "Gaius", epistula = "g@roma.com", munus = "admin" }
+    from plenus const signum, rest reliqua
 
-    nota signum
-    nota reliqua
+    print signum
+    print reliqua
 
     # --- Destructura ex nested path ---
 
-    fixum _ responsum ← Responsum { datum = Relatus { civis = Sodalis { nomen = "Claudia", probatus = verum } } }
-    ex responsum.datum.civis fixum nomen ut internum, probatus
+    const _ responsum ← Responsum { datum = Relatus { civis = Sodalis { nomen = "Claudia", probatus = true } } }
+    from responsum.datum.civis const nomen as internum, probatus
 
-    nota internum
-    nota probatus
+    print internum
+    print probatus
 
     # --- Single field extraction ---
 
-    fixum _ vestis ← Vestis { modus = "nigrum", lingua = "la" }
-    ex vestis fixum modus
+    const _ vestis ← Vestis { modus = "nigrum", lingua = "la" }
+    from vestis const modus
 
-    nota modus
+    print modus
 }

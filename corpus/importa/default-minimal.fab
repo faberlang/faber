@@ -7,7 +7,7 @@ summary = "Minimal import sugar with private binding inferred from the path."
 syntax = "importa ex \"norma:chorda\""
 aliases = ["import"]
 related = ["ex", "privata", "annotation-sugar"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # importa — Minimal import sugar with private binding inferred from the path
@@ -28,6 +28,6 @@ locale = "la"
 # Missing visibility defaults to privata. Missing binding defaults to the final
 # path segment, so this imports norma:chorda as chorda.
 
-importa ex "norma:chorda"
+import from "norma:chorda"
 
-nota "importa-minimal"
+print "importa-minimal"

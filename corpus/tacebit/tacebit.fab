@@ -7,7 +7,7 @@ summary = "Awaits a promissum and discards the success value."
 syntax = "tacebit future"
 aliases = ["await"]
 related = ["figendum", "reddet", "fiet", "promissum"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================

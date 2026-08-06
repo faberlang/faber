@@ -6,7 +6,7 @@ canonical = true
 summary = "Verb-form dispatch on collection methodi (imperative vs participle endings)."
 syntax = "<collection>.<verb-a|verb-ata|verb-e|verb-ita>(<args>)"
 related = ["lista", "appende", "filtrata"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -42,66 +42,66 @@ locale = "la"
 #   mappata nova: [2, 4, 6, 8, 10]
 #   res prima: [1, 2, 3, 4, 5]
 
-incipit {
-    varia _ res ← [1, 2, 3, 4, 5] ∷ lista<numerus>
+main {
+    var _ res ← [1, 2, 3, 4, 5] ∷ list<int>
 
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
     # FILTRA: filtr-
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
     # filtrata returns a new filtered list
-    fixum _ pares ← res.filtrata(numerus x ∴ x % 2 ≡ 0)
-    nota "filtrata nova: §"(pares)
+    const _ pares ← res.filtrata(int x ∴ x % 2 ≡ 0)
+    print "filtrata nova: §"(pares)
 
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
     # ADDE: adde-
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
     # addita returns a new list with an added element
-    fixum _ aucta ← res.addita(6)
-    nota "addita nova: §"(aucta)
+    const _ aucta ← res.addita(6)
+    print "addita nova: §"(aucta)
 
     # appende mutates in place
-    varia _ mutanda ← [1, 2, 3]
+    var _ mutanda ← [1, 2, 3]
     mutanda.appende(4)
-    nota "appende mutat: §"(mutanda)
+    print "appende mutat: §"(mutanda)
 
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
     # INVERTE: invert-/invers-
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
     # inversa returns a new reversed list
-    fixum _ versa ← res.inversa()
-    nota "inversa nova: §"(versa)
+    const _ versa ← res.inversa()
+    print "inversa nova: §"(versa)
 
     # inverte mutates in place
-    varia _ invertenda ← [1, 2, 3]
+    var _ invertenda ← [1, 2, 3]
     invertenda.inverte()
-    nota "inverte mutat: §"(invertenda)
+    print "inverte mutat: §"(invertenda)
 
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
     # ORDINA: ordin-
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
     # ordinata returns a new sorted list
-    fixum _ ordinata ← res.ordinata()
-    nota "ordinata nova: §"(ordinata)
+    const _ ordinata ← res.ordinata()
+    print "ordinata nova: §"(ordinata)
 
     # ordina mutates in place
-    varia _ ordinanda ← [3, 1, 2]
+    var _ ordinanda ← [3, 1, 2]
     ordinanda.ordina()
-    nota "ordina mutat: §"(ordinanda)
+    print "ordina mutat: §"(ordinanda)
 
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
     # MAPPA: mapp-
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
     # mappata returns a new mapped list
-    fixum _ duplicata ← res.mappata(numerus x ∴ x * 2)
-    nota "mappata nova: §"(duplicata)
+    const _ duplicata ← res.mappata(int x ∴ x * 2)
+    print "mappata nova: §"(duplicata)
 
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
     # Participle operations leave the original list unchanged
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
-    nota "res prima: §"(res)
+    print "res prima: §"(res)
 }

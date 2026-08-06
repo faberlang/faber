@@ -6,7 +6,7 @@ canonical = false
 summary = "Tensor bridges and element-width conversio."
 syntax = "<tensor> ↦ <tensor-type> | <lista> ↦ tensor | tensor ↦ lista"
 related = ["↦", "tensor", "lista"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -42,36 +42,36 @@ locale = "la"
 # use `accipe`, `forma`, and `crea` instead.
 # See docs/factory/conversio-tensor-coverage/.
 
-incipit {
-    fixum lista<numerus> xs ← [1, 2, 3, 4]
-    fixum tensor<numerus, [4]> grid ← xs ↦ tensor<numerus, [4]>
-    fixum lista<numerus> flat ← grid ↦ lista<numerus>
-    nota flat.longitudo()
+main {
+    const list<int> xs ← [1, 2, 3, 4]
+    const tensor<int, [4]> grid ← xs ↦ tensor<int, [4]>
+    const list<int> flat ← grid ↦ list<int>
+    print flat.longitudo()
 
-    fixum tensor<fractus, [4]> floats ← grid ↦ tensor<fractus, [4]>
-    fixum tensor<numerus, [4]> ints ← floats ↦ tensor<numerus, [4]>
-    nota ints.longitudo()
+    const tensor<float, [4]> floats ← grid ↦ tensor<float, [4]>
+    const tensor<int, [4]> ints ← floats ↦ tensor<int, [4]>
+    print ints.longitudo()
 
-    fixum tensor<numerus<i32>, []> narrow ← vacua
-    fixum tensor<numerus<i64>, []> wide ← narrow ↦ tensor<numerus<i64>, []>
-    fixum tensor<numerus<i32>, []> narrowed ← wide ↦ tensor<numerus<i32>, []>
-    nota narrowed.longitudo()
+    const tensor<int<i32>, []> narrow ← vacua
+    const tensor<int<i64>, []> wide ← narrow ↦ tensor<int<i64>, []>
+    const tensor<int<i32>, []> narrowed ← wide ↦ tensor<int<i32>, []>
+    print narrowed.longitudo()
 
-    fixum tensor<numerus<u8>, []> bytes ← vacua
-    fixum tensor<numerus<u16>, []> words ← bytes ↦ tensor<numerus<u16>, []>
-    fixum tensor<numerus<u8>, []> shrunk ← words ↦ tensor<numerus<u8>, []>
-    nota shrunk.longitudo()
+    const tensor<int<u8>, []> bytes ← vacua
+    const tensor<int<u16>, []> words ← bytes ↦ tensor<int<u16>, []>
+    const tensor<int<u8>, []> shrunk ← words ↦ tensor<int<u8>, []>
+    print shrunk.longitudo()
 
-    fixum tensor<fractus<f32>, []> half ← vacua
-    fixum tensor<fractus, []> full ← half ↦ tensor<fractus, []>
-    fixum tensor<fractus<f32>, []> single ← full ↦ tensor<fractus<f32>, []>
-    nota single.longitudo()
+    const tensor<float<f32>, []> half ← vacua
+    const tensor<float, []> full ← half ↦ tensor<float, []>
+    const tensor<float<f32>, []> single ← full ↦ tensor<float<f32>, []>
+    print single.longitudo()
 
-    fixum tensor<fractus, []> fromFloat ← vacua
-    fixum tensor<numerus<i32>, []> fromFractus ← fromFloat ↦ tensor<numerus<i32>, []>
-    nota fromFractus.longitudo()
+    const tensor<float, []> fromFloat ← vacua
+    const tensor<int<i32>, []> fromFractus ← fromFloat ↦ tensor<int<i32>, []>
+    print fromFractus.longitudo()
 
-    fixum tensor<numerus<i32>, []> signed ← vacua
-    fixum tensor<fractus, []> promoted ← signed ↦ tensor<fractus, []>
-    nota promoted.longitudo()
+    const tensor<int<i32>, []> signed ← vacua
+    const tensor<float, []> promoted ← signed ↦ tensor<float, []>
+    print promoted.longitudo()
 }

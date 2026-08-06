@@ -6,7 +6,7 @@ canonical = true
 summary = "Explicit type arguments at function and namespaced call sites."
 syntax = "callee<type, ...>(args) — id<textus>(...), module.f<T>(...), tensor.creata<T>(...)"
 related = ["functio", "tensor", "typi-parametri"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # generic-call-type-args — Explicit type arguments at function and namespaced call sites
@@ -30,10 +30,10 @@ locale = "la"
 # Application lane (`faber check` / `faber build` / Rust emit). Default
 # `faber run` / script stepper do not yet lower explicit call-site type args.
 
-functio identitas<T>(T x) → T {
-    redde x
+fn identitas<T>(T x) → T {
+    return x
 }
 
-incipit {
-    nota identitas<textus>("creata")
+main {
+    print identitas<string>("creata")
 }

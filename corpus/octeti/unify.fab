@@ -6,7 +6,7 @@ canonical = false
 summary = "octeti unifies with lista<numerus<u8>> — every lista method works on octeti."
 syntax = "octeti"
 related = ["octeti", "lista", "numerus"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -32,43 +32,43 @@ locale = "la"
 # Cross-ref: octeti/octeti.fab (literal syntax), lista/lista.fab (lista methods),
 # typi/sized-numerus.fab (numerus<u8>). See docs/factory/octeti-unify-lista/.
 
-functio describe(octeti buf) → numerus {
-    redde buf.longitudo()
+fn describe(bytes buf) → int {
+    return buf.longitudo()
 }
 
-functio firstByte(octeti buf) → numerus<u8> {
-    fixum numerus<u8> b ← buf.accipe(0) vel (0 ∷ numerus<u8>)
-    redde b
+fn firstByte(bytes buf) → int<u8> {
+    const int<u8> b ← buf.accipe(0) coalesce (0 ∷ int<u8>)
+    return b
 }
 
-functio appendByte(in octeti buf, numerus<u8> b) → octeti {
+fn appendByte(mut bytes buf, int<u8> b) → bytes {
     buf.appende(b)
-    redde buf
+    return buf
 }
 
-functio fromBytes() → octeti {
+fn fromBytes() → bytes {
     # WHY: lista<numerus<u8>> assigns into octeti bidirectionally.
-    varia lista<numerus<u8>> bytes ← vacua
-    bytes.appende(0xde ∷ numerus<u8>)
-    bytes.appende(0xad ∷ numerus<u8>)
-    fixum octeti asBytes ← bytes
-    redde asBytes
+    var list<int<u8>> bytes ← vacua
+    bytes.appende(0xde ∷ int<u8>)
+    bytes.appende(0xad ∷ int<u8>)
+    const bytes asBytes ← bytes
+    return asBytes
 }
 
-incipit {
-    fixum octeti sig ← |de ad be ef|
+main {
+    const bytes sig ← |de ad be ef|
 
     # lista methods on an octeti receiver
-    fixum numerus n ← describe(sig)
-    nota n
+    const int n ← describe(sig)
+    print n
 
-    fixum numerus<u8> first ← firstByte(sig)
-    nota first
+    const int<u8> first ← firstByte(sig)
+    print first
 
     # construction + cross-assignment
-    fixum numerus<u8> marker ← 0xff ∷ numerus<u8>
-    fixum octeti grown ← appendByte(sig, marker)
-    nota grown.longitudo()
-    fixum octeti crossed ← fromBytes()
-    nota crossed.longitudo()
+    const int<u8> marker ← 0xff ∷ int<u8>
+    const bytes grown ← appendByte(sig, marker)
+    print grown.longitudo()
+    const bytes crossed ← fromBytes()
+    print crossed.longitudo()
 }

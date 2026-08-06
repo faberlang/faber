@@ -6,7 +6,7 @@ canonical = false
 summary = "Ternary conditional expressions with sic and secus."
 syntax = "<condition> sic <then-expr> secus <else-expr>"
 related = ["sic", "secus", "si"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -36,34 +36,34 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   ternarius.expected — nested and flat ternary results.
 
-incipit {
-    fixum _ aetas ← 25
+main {
+    const _ aetas ← 25
 
     # Latin ternary
-    fixum _ gradusaetatis ← aetas ≥ 18 sic "adultus" secus "minor"
+    const _ gradusaetatis ← aetas ≥ 18 yields "adultus" else "minor"
     # "adultus"
-    nota gradusaetatis
+    print gradusaetatis
 
     # Latin nested (reads more clearly)
-    fixum _ puncta ← 85
-    fixum _ gradus ←
-        puncta ≥ 90 sic "A" secus
-        puncta ≥ 80 sic "B" secus
-        puncta ≥ 70 sic "C" secus "F"
+    const _ puncta ← 85
+    const _ gradus ←
+        puncta ≥ 90 yields "A" else
+        puncta ≥ 80 yields "B" else
+        puncta ≥ 70 yields "C" else "F"
     # "B"
-    nota gradus
+    print gradus
 
     # In expressions
-    fixum _ maximum ← aetas > 30 sic aetas secus 30
-    nota "maximum: §"(maximum)
+    const _ maximum ← aetas > 30 yields aetas else 30
+    print "maximum: §"(maximum)
 
     # With nullish values
-    varia _ forsitan ← nihil ∷ textus ∪ nihil
-    fixum _ solutum ← forsitan non est nihil sic forsitan secus "defectum"
+    var _ forsitan ← null ∷ string ∪ null
+    const _ solutum ← forsitan not is null yields forsitan else "defectum"
     # "defectum"
-    nota solutum
+    print solutum
 
     # Prefer sic/secus for clarity
-    fixum _ licentia ← aetas ≥ 21 sic "licet bibere" secus "bibere non licet"
-    nota licentia
+    const _ licentia ← aetas ≥ 21 yields "licet bibere" else "bibere non licet"
+    print licentia
 }

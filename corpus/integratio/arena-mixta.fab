@@ -6,7 +6,7 @@ canonical = false
 summary = "Dense syntax tour: genus, closures, ranges, and optional chaining."
 syntax = "integratio — multi-feature happy path"
 related = ["genus", "clausa", "?.", "itera"]
-locale = "la"
+locale = "en"
 +++
 # =============================================================================
 # integratio — Dense syntax tour: genus, closures, ranges, and optional chaining
@@ -38,37 +38,37 @@ locale = "la"
 # BACKEND:
 #   Go e2e whitelist — expression-valued block / arena typing not yet for Go.
 
-genus Nauta {
-    textus nomen
-    textus navis sponte
-    numerus gradus = 0
+class Nauta {
+    string nomen
+    string navis optional
+    int gradus = 0
 
-    functio titulus() → textus {
-        redde "§@§"(ego.nomen, ego.navis vel "terra")
+    fn titulus() → string {
+        return "§@§"(self.nomen, self.navis coalesce "terra")
     }
 }
 
-functio classis(numerus n) → textus {
-    redde n ≥ 10 sic "veteranus" secus (n ≥ 5 sic "peritus" secus "novus")
+fn classis(int n) → string {
+    return n ≥ 10 yields "veteranus" else (n ≥ 5 yields "peritus" else "novus")
 }
 
-incipit {
-    fixum _ nautae ← [Nauta { nomen = "Aelia", navis = "Fortuna", gradus = 12 }, Nauta { nomen = "Brutus", gradus = 3 }, Nauta { nomen = "Claudia", navis = "Aurora", gradus = 7 }]
+main {
+    const _ nautae ← [Nauta { nomen = "Aelia", navis = "Fortuna", gradus = 12 }, Nauta { nomen = "Brutus", gradus = 3 }, Nauta { nomen = "Claudia", navis = "Aurora", gradus = 7 }]
 
-    fixum _ titulus ← Nauta n → textus ∴ fac {
-        fixum _ navis ← n?.navis vel "nulla navis"
-        redde "§ :: § :: §"(n.nomen, navis, classis(n.gradus))
+    const _ titulus ← Nauta n → string ∴ do {
+        const _ navis ← n?.navis coalesce "nulla navis"
+        return "§ :: § :: §"(n.nomen, navis, classis(n.gradus))
     }
 
-    itera ex nautae fixum n {
-        nota titulus(n)
+    for from nautae const n {
+        print titulus(n)
     }
 
-    varia lista<numerus> gradus ← vacua
-    itera ab 0…6 per 2 fixum i {
+    var list<int> gradus ← vacua
+    for range 0…6 step 2 const i {
         gradus.appende(i * 3)
     }
 
-    fixum _ magni ← gradus.filtrata(numerus g ∴ g ≥ 6).mappata(numerus g ∴ g + 1)
-    nota magni
+    const _ magni ← gradus.filtrata(int g ∴ g ≥ 6).mappata(int g ∴ g + 1)
+    print magni
 }

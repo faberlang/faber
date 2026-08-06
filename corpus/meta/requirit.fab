@@ -6,7 +6,7 @@ canonical = true
 summary = "Requires a named test fixture or capability."
 syntax = "requirit <string>"
 related = ["solum_in", "fragilis", "probandum"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -34,8 +34,8 @@ locale = "la"
 # BACKEND:
 #   declaration-only test modifier (whitelist: meta/requirit.fab).
 
-probandum "requirit-smoke" {
-    proba "needs network" requirit "net" {
-        adfirma verum
+describe "requirit-smoke" {
+    test "needs network" requires "net" {
+        assert true
     }
 }

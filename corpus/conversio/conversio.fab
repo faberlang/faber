@@ -7,7 +7,7 @@ summary = "Converts a value with explicit runtime parsing or coercion semantics.
 syntax = "<expression> ↦ <type> [⇥ <recovery>]"
 aliases = ["convert", "conversio"]
 related = ["∷", "⇥"]
-locale = "la"
+locale = "en"
 +++
 
 # =============================================================================
@@ -39,30 +39,30 @@ locale = "la"
 # BACKEND:
 #   Siblings radix.fab and bivalens.fab compile-only until Go semantics align.
 
-incipit {
+main {
     # ↦ converts textus → numerus
-    sit n1 ← "42" ↦ numerus
+    let n1 ← "42" ↦ int
     # ⇥ supplies recovery on failure
-    sit n2 ← "invalid" ↦ numerus ⇥ 0
-    sit n3 ← "255" ↦ numerus<i32>
+    let n2 ← "invalid" ↦ int ⇥ 0
+    let n3 ← "255" ↦ int<i32>
 
-    sit f1 ← "3.14159" ↦ fractus
-    sit f2 ← "invalid" ↦ fractus ⇥ 0.0
+    let f1 ← "3.14159" ↦ float
+    let f2 ← "invalid" ↦ float ⇥ 0.0
 
-    sit s1 ← 42 ↦ textus
-    sit s2 ← 3.14 ↦ textus
-    sit s3 ← verum ↦ textus
+    let s1 ← 42 ↦ string
+    let s2 ← 3.14 ↦ string
+    let s3 ← true ↦ string
 
     # chained ↦ left-to-right
-    sit roundtrip ← "42" ↦ numerus ↦ textus
+    let roundtrip ← "42" ↦ int ↦ string
 
-    nota n1
-    nota n2
-    nota n3
-    nota f1
-    nota f2
-    nota s1
-    nota s2
-    nota s3
-    nota roundtrip
+    print n1
+    print n2
+    print n3
+    print f1
+    print f2
+    print s1
+    print s2
+    print s3
+    print roundtrip
 }
