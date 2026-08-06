@@ -198,6 +198,16 @@ pub(super) fn classify_llvm_exemplum(
 
     let device_roles = radix::mir::device_roles_from_hir(&analysis.hir);
     let cli_program = analysis.cli_program.is_some();
+    // CLI `exitus` contract (campaign D8): the emitted program entry returns
+    // the declared exit code as the process code (Rust-parity exit semantics).
+    let exit_code = analysis.cli_program.as_ref().and_then(|program| {
+        program.exit.as_ref().and_then(|exit| match exit {
+            radix::cli::CliExit::Fixed(code) => Some(*code),
+            radix::cli::CliExit::Binding(_)
+            | radix::cli::CliExit::Field { .. }
+            | radix::cli::CliExit::Unsupported => None,
+        })
+    });
     let mir = match if cli_program {
         radix::mir::lower_analyzed_unit_allowing_cli_entry_with_context(&mut analysis)
     } else {
@@ -230,10 +240,11 @@ pub(super) fn classify_llvm_exemplum(
         }
     };
 
-    let llvm = match radix::mir::emit_llvm_text_probe_with_device_roles(
+    let llvm = match radix::mir::emit_llvm_text_probe_with_device_roles_and_exit(
         &device_roles,
         &mir.validated,
         &mir.interner,
+        exit_code,
     ) {
         Ok(llvm) => llvm,
         Err(error) if error.category == "unsupported-mir-shape" => {

@@ -3,6 +3,108 @@ use radix::codegen::Target;
 use radix::{Compiler, Config, Output};
 use std::fs;
 
+/// L9 (cee2f7b7): exit-code parity — a CLI `incipit` with `exitus 1` must make
+/// the LLVM host process exit with code 1, matching the Rust oracle (the
+/// program entry packs the declared exit code into the single-register exit
+/// struct; the runtime main returns it as the process exit code).
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_exitus_declared_exit_code -- --ignored --nocapture"]
+fn llvm_host_exitus_declared_exit_code_matches_rust_oracle() {
+    let fab_path = crate::paths::corpus_dir().join("exitus/exitus.fab");
+    let source = fs::read_to_string(&fab_path).expect("read exitus.fab");
+    let session = radix::driver::Session::new(
+        Config::default()
+            .with_target(Target::LlvmText)
+            .with_dev_stdlib(),
+    );
+    let mut analysis = radix::driver::analyze_source(&session, "exitus.fab", &source)
+        .expect("exitus.fab frontend analysis must succeed");
+    let device_roles = radix::mir::device_roles_from_hir(&analysis.hir);
+    let exit_code = analysis
+        .cli_program
+        .as_ref()
+        .and_then(|program| program.exit.as_ref())
+        .and_then(|exit| match exit {
+            radix::cli::CliExit::Fixed(code) => Some(*code),
+            _ => None,
+        });
+    assert_eq!(exit_code, Some(1), "exitus fixture must declare exit code 1");
+    let lowered = radix::mir::lower_analyzed_unit_allowing_cli_entry_with_context(&mut analysis)
+        .expect("exitus.fab CLI MIR lowering must succeed");
+    let llvm = radix::mir::emit_llvm_text_probe_with_device_roles_and_exit(
+        &device_roles,
+        &lowered.validated,
+        &lowered.interner,
+        exit_code,
+    )
+    .expect("exitus.fab LLVM emission must succeed");
+    assert!(
+        llvm.contains("ret %FaberRtExitV1 %faber.entry.packed"),
+        "program entry must return the packed exit struct:\n{llvm}"
+    );
+    let temp_root = super::super::common::make_temp_root();
+    let llvm_file = temp_root.join("exitus.ll");
+    fs::write(&llvm_file, &llvm).expect("write exitus LLVM text");
+
+    let probe = run_llvm_exemplum(&llvm_file, &temp_root, "exitus", &fab_path);
+    assert_eq!(
+        probe.exit_code,
+        Some(1),
+        "exitus 1 must produce process exit 1: {}",
+        probe.reason
+    );
+    assert!(probe.stdout.is_empty(), "unexpected stdout: {:?}", probe.stdout);
+    assert!(probe.stderr.is_empty(), "unexpected stderr: {:?}", probe.stderr);
+}
+
+/// L9 (cee2f7b7): nota parity for optional-chain values — `nota` of a
+/// present `T ∪ nihil` optional-chain result renders the payload (`100`) and
+/// the absent chain renders `nihil`, matching the sibling `.expected`
+/// (previously both passed a null opaque handle and dropped the two lines).
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_membrum_optional_chain_nota -- --ignored --nocapture"]
+fn llvm_host_membrum_optional_chain_nota_matches_expected() {
+    let fab_path = crate::paths::corpus_dir().join("membrum/membrum.fab");
+    let result = Compiler::new(
+        Config::default()
+            .with_target(Target::LlvmText)
+            .with_dev_stdlib(),
+    )
+    .compile(&fab_path);
+    assert!(
+        result.success(),
+        "membrum.fab LLVM compile failed: {:?}",
+        result.diagnostics
+    );
+    let Some(Output::LlvmText(output)) = result.output else {
+        panic!("membrum.fab did not produce LLVM text");
+    };
+    assert!(
+        output.code.contains("__faber_rt_v1_diagnostic_nota_option"),
+        "membrum optional-chain nota must use the option carrier:\n{}",
+        output.code
+    );
+    let temp_root = super::super::common::make_temp_root();
+    let llvm_file = temp_root.join("membrum.ll");
+    fs::write(&llvm_file, output.code).expect("write membrum LLVM text");
+
+    let probe = run_llvm_exemplum(&llvm_file, &temp_root, "membrum", &fab_path);
+    assert_eq!(
+        probe.bucket,
+        LlvmRunBucket::OutputMatched,
+        "{}",
+        probe.reason
+    );
+    let expected =
+        fs::read(fab_path.with_extension("expected")).expect("read membrum expected bytes");
+    assert_eq!(
+        probe.stdout.as_bytes(),
+        expected,
+        "optional-chain nota must render the payload and nihil lines"
+    );
+    assert_eq!(probe.exit_code, Some(0));
+}
+
 #[test]
 #[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_solum_lege_generic -- --ignored --nocapture"]
 fn llvm_host_solum_lege_generic_fixture_matches_rust_output() {
