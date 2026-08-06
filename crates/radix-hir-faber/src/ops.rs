@@ -13,7 +13,9 @@
 //! child expressions are parenthesized by the expression writer, which favors
 //! unambiguous reparsing over preserving associativity-derived minimality.
 
+use crate::surface::KeywordSurface;
 use radix_hir::{HirBinOp, HirExpression, HirExpressionKind, HirUnOp};
+use radix_lexer::TokenKind;
 
 impl super::FaberCodegen {
     /// Return the binding strength used by the pretty-printer.
@@ -44,11 +46,18 @@ impl super::FaberCodegen {
     }
 
     /// Canonical Faber spelling for unary operators.
-    pub(super) fn unop_to_faber(&self, op: HirUnOp) -> &'static str {
+    ///
+    /// Keyword operators (`non`) localize through the reader surface; glyph
+    /// operators are locale-invariant.
+    pub(super) fn unop_to_faber(
+        &self,
+        op: HirUnOp,
+        surface: &impl KeywordSurface,
+    ) -> String {
         match op {
-            HirUnOp::Neg => "-",
-            HirUnOp::Not => "non ",
-            HirUnOp::BitNot => "¬",
+            HirUnOp::Neg => "-".to_owned(),
+            HirUnOp::Not => format!("{} ", surface.keyword(TokenKind::Non)),
+            HirUnOp::BitNot => "¬".to_owned(),
         }
     }
 
@@ -86,33 +95,44 @@ impl super::FaberCodegen {
     ///
     /// Strict and non-strict equality currently share glyphs in canonical Faber
     /// output because HIR has already carried the semantic distinction.
-    pub(super) fn binop_to_faber(&self, op: HirBinOp) -> &'static str {
+    /// Keyword operators (`et`, `aut`, `vel`, `est`, `non est`, `inter`,
+    /// `intra`) localize through the reader surface; glyph operators are
+    /// locale-invariant.
+    pub(super) fn binop_to_faber(
+        &self,
+        op: HirBinOp,
+        surface: &impl KeywordSurface,
+    ) -> String {
         match op {
-            HirBinOp::Add => "+",
-            HirBinOp::Sub => "-",
-            HirBinOp::Mul => "*",
-            HirBinOp::Div => "/",
-            HirBinOp::Mod => "%",
-            HirBinOp::Eq | HirBinOp::StrictEq => "≡",
-            HirBinOp::ApproxEq => "≈",
-            HirBinOp::ApproxNotEq => "≉",
-            HirBinOp::NotEq | HirBinOp::StrictNotEq => "≠",
-            HirBinOp::Lt => "≺",
-            HirBinOp::Gt => "≻",
-            HirBinOp::LtEq => "≤",
-            HirBinOp::GtEq => "≥",
-            HirBinOp::And => "et",
-            HirBinOp::Or => "aut",
-            HirBinOp::Coalesce => "vel",
-            HirBinOp::BitAnd => "∧",
-            HirBinOp::BitOr => "∨",
-            HirBinOp::BitXor => "⊻",
-            HirBinOp::Shl => "⇐",
-            HirBinOp::Shr => "⇒",
-            HirBinOp::Is => "est",
-            HirBinOp::IsNot => "non est",
-            HirBinOp::InRange => "intra",
-            HirBinOp::Between => "inter",
+            HirBinOp::Add => "+".to_owned(),
+            HirBinOp::Sub => "-".to_owned(),
+            HirBinOp::Mul => "*".to_owned(),
+            HirBinOp::Div => "/".to_owned(),
+            HirBinOp::Mod => "%".to_owned(),
+            HirBinOp::Eq | HirBinOp::StrictEq => "≡".to_owned(),
+            HirBinOp::ApproxEq => "≈".to_owned(),
+            HirBinOp::ApproxNotEq => "≉".to_owned(),
+            HirBinOp::NotEq | HirBinOp::StrictNotEq => "≠".to_owned(),
+            HirBinOp::Lt => "≺".to_owned(),
+            HirBinOp::Gt => "≻".to_owned(),
+            HirBinOp::LtEq => "≤".to_owned(),
+            HirBinOp::GtEq => "≥".to_owned(),
+            HirBinOp::And => surface.keyword(TokenKind::Et).to_owned(),
+            HirBinOp::Or => surface.keyword(TokenKind::Aut).to_owned(),
+            HirBinOp::Coalesce => surface.keyword(TokenKind::Vel).to_owned(),
+            HirBinOp::BitAnd => "∧".to_owned(),
+            HirBinOp::BitOr => "∨".to_owned(),
+            HirBinOp::BitXor => "⊻".to_owned(),
+            HirBinOp::Shl => "⇐".to_owned(),
+            HirBinOp::Shr => "⇒".to_owned(),
+            HirBinOp::Is => surface.keyword(TokenKind::Est).to_owned(),
+            HirBinOp::IsNot => format!(
+                "{} {}",
+                surface.keyword(TokenKind::Non),
+                surface.keyword(TokenKind::Est)
+            ),
+            HirBinOp::InRange => surface.keyword(TokenKind::Intra).to_owned(),
+            HirBinOp::Between => surface.keyword(TokenKind::Inter).to_owned(),
         }
     }
 }

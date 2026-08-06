@@ -120,12 +120,12 @@ impl super::FaberCodegen {
                 let op_prec = self.binop_precedence(*op);
                 self.write_expr_prec(lhs, op_prec, types, names, interner, surface, writer);
                 writer.write(" ");
-                writer.write(self.binop_to_faber(*op));
+                writer.write(&self.binop_to_faber(*op, surface));
                 writer.write(" ");
                 self.write_expr_prec(rhs, op_prec, types, names, interner, surface, writer);
             }
             HirExpressionKind::Unary(op, operand) => {
-                writer.write(self.unop_to_faber(*op));
+                writer.write(&self.unop_to_faber(*op, surface));
                 self.write_expr_prec(operand, 12, types, names, interner, surface, writer);
             }
             HirExpressionKind::Call(callee, type_args, args) => {
