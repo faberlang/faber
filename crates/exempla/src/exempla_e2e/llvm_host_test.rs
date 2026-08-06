@@ -103,13 +103,11 @@ first_seen = "today"
 }
 
 #[test]
-#[ignore = "known breakage: async solum LLVM emission + semantic analysis gap; see need 34040c2f"]
 fn llvm_host_async_solum_leget_reaches_native_link() {
     assert_reaches_native_link("ad/async-solum-leget.fab");
 }
 
 #[test]
-#[ignore = "known breakage: async solum LLVM emission unsupported (solum return carrier); see need 34040c2f"]
 fn llvm_host_async_solum_leget_uses_existing_route_poll_boundary() {
     let path = crate::paths::corpus_dir().join("ad/async-solum-leget.fab");
     let config = radix::Config::default().with_target(radix::codegen::Target::LlvmText);
