@@ -1378,6 +1378,10 @@ pub enum FiguraExpr {
 pub enum TypeExprKind {
     /// Inferred type marker: _
     Infer,
+    /// Union-shaped inference hole: a standalone `∪` in type position. The
+    /// hole consumes the whole type expression; it is distinct from `Infer`
+    /// (monomorphic hole) and from `Union` (explicit member list).
+    UnionHole,
     /// Named type with optional type parameters
     Named(Ident, Vec<TypeExpr>),
     /// Qualified named type with optional type parameters: `namespace.Type`

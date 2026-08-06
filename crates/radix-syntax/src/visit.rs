@@ -629,6 +629,7 @@ pub fn walk_type_expr<V: Visitor>(visitor: &mut V, ty: &TypeExpr) {
     };
     match &ty.kind {
         TypeExprKind::Infer => {}
+        TypeExprKind::UnionHole => {}
         TypeExprKind::Tensor(elem, figura)
         | TypeExprKind::Sparsa(elem, figura)
         | TypeExprKind::Vector(elem, figura)

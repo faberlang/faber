@@ -215,6 +215,7 @@ impl super::FaberCodegen {
             }
 
             Type::Infer(_) => "_".to_owned(),
+            Type::InferUnion(_) => "∪".to_owned(),
             Type::Tuple(members) => {
                 let members = members
                     .iter()

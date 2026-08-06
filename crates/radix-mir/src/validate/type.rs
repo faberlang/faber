@@ -469,6 +469,7 @@ impl Validator<'_, '_> {
 
         match self.context.types.get(ty).clone() {
             Type::Infer(_) => self.error(span, "MIR type is unresolved inference variable"),
+            Type::InferUnion(_) => self.error(span, "MIR type is unresolved inference variable"),
             Type::Error => self.error(span, "MIR type is semantic error recovery type"),
             Type::Array(inner)
             | Type::Set(inner)

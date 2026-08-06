@@ -843,6 +843,7 @@ impl TypeTable {
                         .all(|(a_arg, b_arg)| self.equals(*a_arg, *b_arg))
             }
             (Type::Infer(a_var), Type::Infer(b_var)) => a_var == b_var,
+            (Type::InferUnion(a_var), Type::InferUnion(b_var)) => a_var == b_var,
             (Type::Union(a_types), Type::Union(b_types)) => {
                 self.union_members_equal(a_types, b_types)
             }
@@ -1191,6 +1192,12 @@ pub enum Type {
     /// Placeholder introduced during type inference.
     Infer(InferVar),
 
+    /// Union-shaped inference hole written as a standalone `∪` in type
+    /// position. Distinct from `Infer` (monomorphic hole) and `Union`
+    /// (explicit member list): solving accumulates member types into the
+    /// variable instead of binding one inhabitant.
+    InferUnion(InferVar),
+
     /// Explicit union of possible value types.
     Union(Vec<TypeId>),
 
@@ -1258,6 +1265,7 @@ impl Hash for Type {
                 args.hash(state);
             }
             Self::Infer(v) => v.hash(state),
+            Self::InferUnion(v) => v.hash(state),
             Self::Union(members) | Self::Tuple(members) => members.hash(state),
             Self::Error => {}
         }
@@ -1639,6 +1647,7 @@ fn type_refs_in_bounds(ty: &Type, types_len: usize, indices_len: usize) -> bool 
         | Type::Interface(_)
         | Type::Param(_)
         | Type::Infer(_)
+        | Type::InferUnion(_)
         | Type::Error => true,
     }
 }

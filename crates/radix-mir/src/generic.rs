@@ -553,6 +553,10 @@ fn hash_type_shape(ty: &Type, hasher: &mut impl Hasher) {
             25u8.hash(hasher);
             var.0.hash(hasher);
         }
+        Type::InferUnion(var) => {
+            29u8.hash(hasher);
+            var.0.hash(hasher);
+        }
         Type::Union(members) => {
             26u8.hash(hasher);
             for member in members {
@@ -763,6 +767,7 @@ fn instantiate_existing_type_id(
         | Type::Enum(_)
         | Type::Interface(_)
         | Type::Infer(_)
+        | Type::InferUnion(_)
         | Type::Error => Ok(ty),
     }
 }
@@ -949,6 +954,7 @@ fn type_contains_param_inner(types: &TypeTable, ty: TypeId, seen: &mut FxHashSet
         | Type::Enum(_)
         | Type::Interface(_)
         | Type::Infer(_)
+        | Type::InferUnion(_)
         | Type::Error => false,
     }
 }

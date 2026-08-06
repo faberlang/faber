@@ -525,6 +525,7 @@ impl TypeName for Type {
             Type::Param(_) => "param",
             Type::Applied(_, _) => "applied",
             Type::Infer(_) => "infer",
+            Type::InferUnion(_) => "infer_union",
             Type::Tuple(_) => "tuple",
             Type::Error => "error",
         }

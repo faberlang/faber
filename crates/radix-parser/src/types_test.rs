@@ -6,7 +6,7 @@ use crate::test_support::args_have_no_legacy_message;
 use crate::test_support::parse_ok;
 use crate::{parse, ParseErrorKind};
 use radix_lexer::lex;
-use radix_syntax::{FiguraExpr, StmtKind, TypeExprKind};
+use radix_syntax::{ClassMemberKind, FiguraExpr, StmtKind, TypeExprKind};
 
 fn parse_errors_include_issue(source: &str, kind: ParseErrorKind, issue: &str) {
     let result = parse(lex(source));
@@ -732,4 +732,177 @@ fn parses_iuncta_with_nested_types() {
     };
     assert_eq!(result.interner.resolve(inner_iuncta.name), "iuncta");
     assert_eq!(inner_params.len(), 2);
+}
+
+// =============================================================================
+// union hole type (`∪`)
+// =============================================================================
+
+#[test]
+fn parses_union_hole_binding_type() {
+    let result = parse_ok("fixum ∪ x ← 1");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(decl) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let ty = decl.ty.as_ref().expect("explicit type slot");
+    assert!(matches!(ty.kind, TypeExprKind::UnionHole));
+}
+
+#[test]
+fn parses_union_hole_param_type() {
+    let result = parse_ok("functio f(∪ value) → vacuum {}");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    assert!(matches!(func.params[0].ty.kind, TypeExprKind::UnionHole));
+}
+
+#[test]
+fn parses_union_hole_lista_element() {
+    let result = parse_ok("functio f(lista<∪> values) → vacuum {}");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    let TypeExprKind::Named(name, params) = &func.params[0].ty.kind else {
+        panic!("expected lista type");
+    };
+    assert_eq!(result.interner.resolve(name.name), "lista");
+    assert_eq!(params.len(), 1);
+    assert!(matches!(params[0].kind, TypeExprKind::UnionHole));
+}
+
+#[test]
+fn parses_union_hole_return_type() {
+    let result = parse_ok("functio f() → ∪ { redde 1 }");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    let ret = func.ret.as_ref().expect("return type");
+    assert!(matches!(ret.kind, TypeExprKind::UnionHole));
+}
+
+#[test]
+fn parses_union_hole_function_parameter_slot() {
+    // `(∪)` as a parameter slot inside a function-type annotation.
+    let result = parse_ok("functio f((∪) → numerus cb) → vacuum {}");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    let TypeExprKind::Func(sig) = &func.params[0].ty.kind else {
+        panic!("expected function type");
+    };
+    assert_eq!(sig.params.len(), 1);
+    assert!(matches!(sig.params[0].kind, TypeExprKind::UnionHole));
+}
+
+#[test]
+fn parses_union_hole_genus_field() {
+    let result = parse_ok("genus Panel { ∪ body }");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Class(class) = &program.statements[0].kind else {
+        panic!("expected genus");
+    };
+    let ClassMemberKind::Field(field) = &class.members[0].kind else {
+        panic!("expected field");
+    };
+    assert!(matches!(field.ty.kind, TypeExprKind::UnionHole));
+    assert_eq!(result.interner.resolve(field.name.name), "body");
+}
+
+#[test]
+fn parses_union_hole_tabula_value_slot() {
+    let result = parse_ok("functio f(tabula<textus, ∪> m) → vacuum {}");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    let TypeExprKind::Named(name, params) = &func.params[0].ty.kind else {
+        panic!("expected tabula type");
+    };
+    assert_eq!(result.interner.resolve(name.name), "tabula");
+    assert_eq!(params.len(), 2);
+    assert!(matches!(params[1].kind, TypeExprKind::UnionHole));
+}
+
+#[test]
+fn rejects_cup_after_union_hole() {
+    // `A ∪ ∪`: the right-hand member slot is itself a union hole.
+    parse_errors_include_issue(
+        "functio f(A ∪ ∪ value) → vacuum {}",
+        ParseErrorKind::InvalidType,
+        "unexpected_cup_after_union_hole",
+    );
+    // `A ∪ ∪ B`: same, with a member following the stray cup.
+    parse_errors_include_issue(
+        "functio f(A ∪ ∪ B value) → vacuum {}",
+        ParseErrorKind::InvalidType,
+        "unexpected_cup_after_union_hole",
+    );
+    // `∪ ∪`: a hole directly followed by a cup.
+    parse_errors_include_issue(
+        "functio f(∪ ∪ value) → vacuum {}",
+        ParseErrorKind::InvalidType,
+        "unexpected_cup_after_union_hole",
+    );
+}
+
+#[test]
+fn rejects_union_hole_as_missing_binary_side() {
+    // A leading `∪` is always the hole form; it can never be a binary cup
+    // operator with a missing left side (`∪ B`). The hole consumes the whole
+    // type expression, so the stray `B` is a structured parse error at the
+    // enclosing grammar site.
+    let result = parse(lex("functio f(∪ B value) → vacuum {}"));
+    assert!(
+        result
+            .errors
+            .iter()
+            .any(|err| err.kind == ParseErrorKind::Expected),
+        "expected a structured parse error for `∪ B`, got {:?}",
+        result
+            .errors
+            .iter()
+            .map(|err| (err.kind, err.args.clone()))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn union_hole_keeps_infer_and_binary_union_unchanged() {
+    // `_` still parses as the monomorphic hole and may appear as a union member.
+    let result = parse_ok("functio f(_ ∪ textus value) → vacuum {}");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    let TypeExprKind::Union(members) = &func.params[0].ty.kind else {
+        panic!("expected union type");
+    };
+    assert_eq!(members.len(), 2);
+    assert!(matches!(members[0].kind, TypeExprKind::Infer));
+    assert!(
+        matches!(&members[1].kind, TypeExprKind::Named(n, _) if result.interner.resolve(n.name) == "textus")
+    );
+
+    // `A ∪ B` explicit unions keep their meaning.
+    let result = parse_ok("functio f(numerus ∪ textus value) → vacuum {}");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    let TypeExprKind::Union(members) = &func.params[0].ty.kind else {
+        panic!("expected union type");
+    };
+    assert_eq!(members.len(), 2);
+    assert!(
+        matches!(&members[0].kind, TypeExprKind::Named(n, _) if result.interner.resolve(n.name) == "numerus")
+    );
+    assert!(
+        matches!(&members[1].kind, TypeExprKind::Named(n, _) if result.interner.resolve(n.name) == "textus")
+    );
 }

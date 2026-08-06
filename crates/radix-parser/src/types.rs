@@ -92,9 +92,21 @@ impl Parser {
         }
 
         // Inferred type marker: _
+        // Union hole: standalone `∪` (a second cup is a parse error; the hole
+        // consumes the whole type expression).
         let kind = if matches!(self.peek().kind, TokenKind::Underscore(_)) {
             self.advance();
             TypeExprKind::Infer
+        } else if self.check(&TokenKind::Cup) {
+            let cup_span = self.peek().span;
+            self.advance();
+            if self.check(&TokenKind::Cup) {
+                return Err(
+                    ParseError::structured(ParseErrorKind::InvalidType, cup_span)
+                        .with_arg("issue", "unexpected_cup_after_union_hole"),
+                );
+            }
+            TypeExprKind::UnionHole
         } else {
             // Named type (including 'nihil' as type name)
             let name = if self.check_keyword_ident(TokenKind::Nihil) {
@@ -273,13 +285,31 @@ impl Parser {
         if !self.eat(&TokenKind::Cup) {
             return Ok(first);
         }
+        // A union hole consumes the whole type expression and can never be a
+        // binary-cup member. The hole arm rejects a directly-following cup;
+        // this guards the `first` slot defensively against future callers.
+        if matches!(first.kind, TypeExprKind::UnionHole) {
+            return Err(
+                ParseError::structured(ParseErrorKind::InvalidType, start)
+                    .with_arg("issue", "unexpected_cup_after_union_hole"),
+            );
+        }
         let mut members = Vec::new();
         flatten_union_member(first, &mut members);
-        // Parse the next member as a full type, then flatten any nested union
-        // shape produced by the recursive parse.
-        flatten_union_member(self.parse_type()?, &mut members);
-        while self.eat(&TokenKind::Cup) {
-            flatten_union_member(self.parse_type()?, &mut members);
+        loop {
+            // Parse the next member as a full type, then flatten any nested
+            // union shape produced by the recursive parse.
+            let member = self.parse_type()?;
+            if matches!(member.kind, TypeExprKind::UnionHole) {
+                return Err(
+                    ParseError::structured(ParseErrorKind::InvalidType, member.span)
+                        .with_arg("issue", "unexpected_cup_after_union_hole"),
+                );
+            }
+            flatten_union_member(member, &mut members);
+            if !self.eat(&TokenKind::Cup) {
+                break;
+            }
         }
         let span = start.merge(self.previous_span());
         Ok(TypeExpr {
