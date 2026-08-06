@@ -14,7 +14,7 @@ use super::oracle::rust_oracle;
 use super::rust;
 use radix::codegen::Target;
 use radix::driver::Session;
-use radix::{Config, Output};
+use radix::Config;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -287,13 +287,17 @@ fn is_importa_two_module_fixture(file: &Path) -> bool {
 
 /// The two-module LLVM-host link proof for `importa/importa.fab` (D-PA4).
 ///
-/// One LLVM module per package unit (D11): the entry module declares and
-/// directly calls the sibling's `saluta` under the canonical external symbol
+/// The proof runs through the reusable package-to-LLVM builder (S8.3):
+/// the Faber package graph resolves BOTH package units (entry + sibling
+/// `auxilium.fab`), the builder emits one LLVM module per unit (D11) — the
+/// entry module declares and directly calls the sibling's `saluta` under the
+/// canonical external symbol
 /// `__faber_external_product_importa_module_auxilium_func_saluta`; the sibling
 /// module (library mode — no entry) defines the same symbol. Both modules are
 /// assembled and linked with the host runtime archive; the executable must
 /// print `Salve, Marcus!` and exit 0, matching the sibling `.expected` fixture
-/// and the Rust oracle.
+/// and the Rust oracle. No `.ll` text concatenation and no harness-side import
+/// parsing: the builder owns the graph → modules + link manifest mapping.
 fn classify_importa_two_module_llvm_exemplum(
     file: &Path,
     idx: usize,
@@ -301,31 +305,78 @@ fn classify_importa_two_module_llvm_exemplum(
     _toolchain: &LlvmToolchain,
 ) -> LlvmE2eResult {
     const EXTERNAL_SALUTA: &str = "__faber_external_product_importa_module_auxilium_func_saluta";
-    let corpus = crate::paths::corpus_dir();
-    let sibling = corpus.join("importa/auxilium.fab");
     let stem = format!("{idx:03}-importa");
 
-    // Entry module: CLI compile path (import contract + package identities).
-    let entry_output = radix::tool::compile_cli_path(file, false, Target::LlvmText);
-    let entry_llvm = match entry_output.output {
-        Some(Output::LlvmText(output)) => output.code,
-        Some(_) => {
-            return llvm_result(
-                file,
-                LlvmTier::MirLowered,
-                LlvmEmissionBucket::EmissionFailed,
-                "entry emit did not produce LLVM text".to_owned(),
-            );
-        }
-        None => {
+    let runtime_archive = match super::llvm_runtime::llvm_runtime_archive() {
+        Ok(path) => Some(path),
+        Err(reason) => {
             return llvm_result(
                 file,
                 LlvmTier::SourceReadable,
-                LlvmEmissionBucket::MirLoweringFailed,
+                LlvmEmissionBucket::OutputWriteFailed,
+                format!("LLVM host runtime archive unavailable: {reason}"),
+            );
+        }
+    };
+    let modules_dir = temp_root.join(format!("{stem}.modules"));
+    let config = radix::Config::default().with_target(Target::LlvmText);
+    let options = faber_cli::package::PackageLlvmOptions::new(modules_dir.clone())
+        .with_runtime_archive(runtime_archive);
+    let build = match faber_cli::package::build_package_llvm(&config, file, &options) {
+        Ok(build) => build,
+        Err(diagnostics) => {
+            let mir_failed = diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.phase == radix::diagnostics::DiagnosticPhase::Mir);
+            return llvm_result(
+                file,
+                if mir_failed {
+                    LlvmTier::FrontendAnalyzed
+                } else {
+                    LlvmTier::SourceReadable
+                },
+                if mir_failed {
+                    LlvmEmissionBucket::MirLoweringFailed
+                } else {
+                    LlvmEmissionBucket::FrontendFailed
+                },
                 format!(
-                    "entry compile failed: {}",
-                    format_diagnostic_messages(&entry_output.diagnostics)
+                    "package LLVM build failed: {}",
+                    format_diagnostic_messages(&diagnostics)
                 ),
+            );
+        }
+    };
+
+    let entry_module = build
+        .modules
+        .iter()
+        .find(|module| module.is_entry)
+        .expect("exactly one entry module by builder contract");
+    let sibling_module = build
+        .modules
+        .iter()
+        .find(|module| !module.is_entry)
+        .expect("importa package graph has exactly two units");
+    if build.modules.len() != 2 {
+        return llvm_result(
+            file,
+            LlvmTier::MirLowered,
+            LlvmEmissionBucket::EmissionFailed,
+            format!(
+                "importa package graph expected two units, got {}",
+                build.modules.len()
+            ),
+        );
+    }
+    let entry_llvm = match fs::read_to_string(&entry_module.llvm_path) {
+        Ok(text) => text,
+        Err(err) => {
+            return llvm_result(
+                file,
+                LlvmTier::LlvmEmitted,
+                LlvmEmissionBucket::OutputWriteFailed,
+                format!("cannot read entry LLVM output: {err}"),
             );
         }
     };
@@ -337,67 +388,14 @@ fn classify_importa_two_module_llvm_exemplum(
             format!("entry module does not declare/call the sibling external symbol {EXTERNAL_SALUTA}"),
         );
     }
-
-    // Sibling module: analyze + package identity facts + library-mode emit.
-    let sibling_source = match fs::read_to_string(&sibling) {
-        Ok(source) => source,
+    let sibling_llvm = match fs::read_to_string(&sibling_module.llvm_path) {
+        Ok(text) => text,
         Err(err) => {
             return llvm_result(
                 file,
-                LlvmTier::SourceReadable,
+                LlvmTier::LlvmEmitted,
                 LlvmEmissionBucket::OutputWriteFailed,
-                format!("cannot read sibling {}: {err}", sibling.display()),
-            );
-        }
-    };
-    let session = Session::new(Config::default().with_target(Target::LlvmText).with_dev_stdlib());
-    let mut sibling_analysis =
-        match radix::driver::analyze_source(&session, &sibling.display().to_string(), &sibling_source) {
-            Ok(analysis) => analysis,
-            Err(diagnostics) => {
-                return llvm_result(
-                    file,
-                    LlvmTier::SourceReadable,
-                    LlvmEmissionBucket::FrontendFailed,
-                    format!(
-                        "sibling frontend failed: {}",
-                        format_diagnostic_messages(&diagnostics)
-                    ),
-                );
-            }
-        };
-    if let Some(identities) = radix::tool::package_identity_facts_for_path(&sibling) {
-        sibling_analysis.package_import_identities = Some(identities);
-    }
-    let sibling_lowered = match radix::mir::lower_analyzed_unit_with_context(&mut sibling_analysis) {
-        Ok(lowered) => lowered,
-        Err(errors) => {
-            return llvm_result(
-                file,
-                LlvmTier::FrontendAnalyzed,
-                LlvmEmissionBucket::MirLoweringFailed,
-                format!(
-                    "sibling MIR lowering failed: {}",
-                    errors
-                        .iter()
-                        .map(|error| error.issue.clone())
-                        .collect::<Vec<_>>()
-                        .join(" | ")
-                ),
-            );
-        }
-    };
-    let sibling_llvm = match radix::mir::emit_llvm_text_probe_library_module(
-        &sibling_lowered.validated,
-        &sibling_lowered.interner,
-    ) {
-        Ok(llvm) => llvm,
-        Err(error) => {
-            return llvm_result(
-                file,
-                LlvmTier::MirLowered,
-                LlvmEmissionBucket::Unsupported,
-                format!("LLVM emission unsupported: {}:{}", error.category, error.shape),
+                format!("cannot read sibling LLVM output: {err}"),
             );
         }
     };
@@ -409,36 +407,24 @@ fn classify_importa_two_module_llvm_exemplum(
             format!("sibling module does not define the external symbol {EXTERNAL_SALUTA}"),
         );
     }
-
-    let entry_file = temp_root.join(format!("{stem}.entry.ll"));
-    let sibling_file = temp_root.join(format!("{stem}.sibling.ll"));
-    if let Err(err) = fs::write(&entry_file, &entry_llvm) {
+    if sibling_llvm.contains("__faber_program_entry_v1") {
         return llvm_result(
             file,
-            LlvmTier::LlvmEmitted,
-            LlvmEmissionBucket::OutputWriteFailed,
-            format!("cannot write entry LLVM output: {err}"),
-        );
-    }
-    if let Err(err) = fs::write(&sibling_file, &sibling_llvm) {
-        return llvm_result(
-            file,
-            LlvmTier::LlvmEmitted,
-            LlvmEmissionBucket::OutputWriteFailed,
-            format!("cannot write sibling LLVM output: {err}"),
+            LlvmTier::MirLowered,
+            LlvmEmissionBucket::EmissionFailed,
+            "sibling library module must not emit a program entry".to_owned(),
         );
     }
 
-    let run_probe = super::llvm_runtime::run_llvm_module_pair(
-        &entry_file,
-        &sibling_file,
+    let run_probe = super::llvm_runtime::run_llvm_modules(
+        &build.manifest.modules,
         temp_root,
         &stem,
         file,
     );
     classify_llvm_run_tier(
         file,
-        &entry_file,
+        &entry_module.llvm_path,
         LlvmVerifier::LlvmAs,
         LlvmEmissionBucket::VerifierValid,
         run_probe,

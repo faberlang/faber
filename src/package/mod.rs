@@ -47,6 +47,7 @@ mod host_factory;
 mod import_graph;
 mod library;
 mod library_link;
+mod llvm;
 mod locale;
 mod lockfile;
 mod manifest;
@@ -149,6 +150,13 @@ pub use mir::run_fmir_image_bytes_with_stdio;
 pub(super) use mir::test_support::{fmir_image_test_summary, fmir_text_image_test_summary};
 #[allow(unused_imports)] // External backend harnesses consume the public package-MIR callback.
 pub use mir::with_lowered_package_mir;
+#[allow(unused_imports)] // LLVM host harnesses consume the reusable package-to-LLVM builder (S8.3).
+pub use llvm::{
+    build_package_llvm, PackageLlvmBuild, PackageLlvmLinkManifest, PackageLlvmModule,
+    PackageLlvmOptions,
+};
+#[allow(unused_imports)] // graph-rooted build is package-crate internal (graph type is pub(crate)).
+pub(crate) use llvm::build_package_llvm_from_graph;
 #[allow(unused_imports)] // FMIR stages consume this crate-visible image API.
 pub(crate) use mir::{
     build_package_fmir_binary_bundle, build_package_fmir_image, build_package_fmir_text_image,

@@ -1062,80 +1062,189 @@ fn llvm_host_genus_creo_hook_matches_rust_output() {
 fn llvm_host_vocatio_method_mutation_matches_expected() {
     assert_genus_fixture_output("vocatio/vocatio.fab", "vocatio-vocatio");
 }
-/// D-PA4 (hand-3 d5596b1c): the importa two-module LLVM-host link proof.
+/// D-PA4 (hand-3 d5596b1c, rebuilt on the S8.3 package-to-LLVM builder): the
+/// importa two-module LLVM-host link proof runs through the reusable builder.
 ///
-/// `importa/importa.fab` imports a sibling user-code module and calls
-/// `saluta` through the canonical external symbol
+/// The Faber package graph resolves `importa/importa.fab` + sibling
+/// `auxilium.fab`; the builder emits one module per unit (D11) — the entry
+/// module declares and calls `saluta` through the canonical external symbol
 /// `__faber_external_product_importa_module_auxilium_func_saluta`; the sibling
-/// module (`importa/auxilium.fab`, library mode — no entry) defines the same
-/// symbol. Both modules link with the host runtime archive into one
-/// executable whose stdout is `Salve, Marcus!` (exit 0), matching
-/// `importa.expected` and the Rust oracle.
+/// module (library mode — no entry) defines the same symbol. Both modules link
+/// with the host runtime archive into one executable whose stdout is
+/// `Salve, Marcus!` (exit 0), matching `importa.expected` and the Rust oracle.
 #[test]
 #[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_importa_two_module_link -- --ignored --nocapture"]
 fn llvm_host_importa_two_module_link_matches_rust_oracle() {
     const EXTERNAL_SALUTA: &str = "__faber_external_product_importa_module_auxilium_func_saluta";
     let fab_path = crate::paths::corpus_dir().join("importa/importa.fab");
-    let sibling = crate::paths::corpus_dir().join("importa/auxilium.fab");
-
-    let result = radix::tool::compile_cli_path(&fab_path, false, Target::LlvmText);
-    assert!(
-        result.success(),
-        "importa.fab LLVM compile failed: {:?}",
-        result.diagnostics
-    );
-    let Some(Output::LlvmText(entry)) = result.output else {
-        panic!("importa.fab did not produce LLVM text");
-    };
-    assert!(
-        entry.code.contains(EXTERNAL_SALUTA),
-        "entry module must declare/call the sibling external symbol:\n{}",
-        entry.code
-    );
-
-    let sibling_source = fs::read_to_string(&sibling).expect("read auxilium.fab");
-    let session = radix::driver::Session::new(
-        Config::default()
-            .with_target(Target::LlvmText)
-            .with_dev_stdlib(),
-    );
-    let mut analysis =
-        radix::driver::analyze_source(&session, &sibling.display().to_string(), &sibling_source)
-            .expect("auxilium.fab frontend analysis must succeed");
-    if let Some(identities) = radix::tool::package_identity_facts_for_path(&sibling) {
-        analysis.package_import_identities = Some(identities);
-    }
-    let lowered = radix::mir::lower_analyzed_unit_with_context(&mut analysis)
-        .expect("auxilium.fab MIR lowering must succeed");
-    let sibling_llvm = radix::mir::emit_llvm_text_probe_library_module(
-        &lowered.validated,
-        &lowered.interner,
-    )
-    .expect("auxilium.fab library-mode LLVM emission must succeed");
-    assert!(
-        sibling_llvm.contains(EXTERNAL_SALUTA),
-        "sibling module must define the external symbol:\n{sibling_llvm}"
-    );
-    assert!(
-        !sibling_llvm.contains("__faber_program_entry_v1"),
-        "library module must not emit a program entry:\n{sibling_llvm}"
-    );
-
     let temp_root = super::super::common::make_temp_root();
-    let entry_file = temp_root.join("importa.entry.ll");
-    let sibling_file = temp_root.join("importa.sibling.ll");
-    fs::write(&entry_file, entry.code).expect("write entry LLVM text");
-    fs::write(&sibling_file, sibling_llvm).expect("write sibling LLVM text");
+    let config = radix::Config::default().with_target(Target::LlvmText);
+    let runtime_archive = llvm_runtime_archive().expect("LLVM host runtime archive");
+    let options = faber_cli::package::PackageLlvmOptions::new(temp_root.join("importa.modules"))
+        .with_runtime_archive(Some(runtime_archive));
+    let build = faber_cli::package::build_package_llvm(&config, &fab_path, &options)
+        .expect("importa package LLVM build must succeed");
 
-    let probe = run_llvm_module_pair(
-        &entry_file,
-        &sibling_file,
+    assert_eq!(
+        build.modules.len(),
+        2,
+        "importa package graph must resolve two units (entry + sibling)"
+    );
+    let entry_module = build
+        .modules
+        .iter()
+        .find(|module| module.is_entry)
+        .expect("entry module");
+    let sibling_module = build
+        .modules
+        .iter()
+        .find(|module| !module.is_entry)
+        .expect("sibling module");
+    let entry = fs::read_to_string(&entry_module.llvm_path).expect("read entry module");
+    let sibling = fs::read_to_string(&sibling_module.llvm_path).expect("read sibling module");
+    assert!(
+        entry.contains(EXTERNAL_SALUTA),
+        "entry module must declare/call the sibling external symbol:\n{entry}"
+    );
+    assert!(
+        sibling.contains(EXTERNAL_SALUTA),
+        "sibling module must define the external symbol:\n{sibling}"
+    );
+    assert!(
+        !sibling.contains("__faber_program_entry_v1"),
+        "library module must not emit a program entry:\n{sibling}"
+    );
+    assert!(
+        entry.contains("define %FaberRtExitV1 @__faber_program_entry_v1"),
+        "entry module must define the host program entry:\n{entry}"
+    );
+    assert_eq!(
+        build.manifest.entry_module, entry_module.llvm_path,
+        "manifest must record the exactly-one entry module"
+    );
+    assert_eq!(
+        build.manifest.modules.len(),
+        2,
+        "manifest must list one module per unit"
+    );
+
+    let probe = run_llvm_modules(
+        &build.manifest.modules,
         &temp_root,
         "importa-two-module",
         &fab_path,
     );
     assert_eq!(probe.bucket, LlvmRunBucket::OutputMatched, "{}", probe.reason);
     assert_eq!(probe.stdout, "Salve, Marcus!\n");
+    assert!(
+        probe.stderr.is_empty(),
+        "unexpected stderr: {:?}",
+        probe.stderr
+    );
+    assert_eq!(probe.exit_code, Some(0));
+}
+
+/// S8.4 (hand-3 2d77a75f): SECOND local-import fixture through the S8.3
+/// package-to-LLVM builder — multi-module cross-unit call parity (D11
+/// canonical external identities).
+///
+/// `geminus/geminus.fab` imports sibling `geminus/adiutor.fab` and calls
+/// `greeting` under
+/// `__faber_external_product_geminus_module_adiutor_func_greeting`; the
+/// sibling module (library mode — no entry) defines the same symbol. The
+/// builder emits one module per unit and an inspectable link manifest; the
+/// manifest drives a single clang link with the host runtime archive, and the
+/// executable must print `Salve, Tullia!` (exit 0), matching the fixture's
+/// `.expected` oracle.
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_geminus_two_module_link -- --ignored --nocapture"]
+fn llvm_host_geminus_two_module_link_matches_rust_oracle() {
+    const EXTERNAL_GREETING: &str =
+        "__faber_external_product_geminus_module_adiutor_func_greeting";
+    const ENTRY_SOURCE: &str = r#"# geminus — local-import consumer of adiutor.fab
+importa ex "./adiutor" privata adiutor
+
+incipit {
+    nota adiutor.greeting("Tullia")
+}
+"#;
+    const SIBLING_SOURCE: &str = r#"# adiutor — sibling module for geminus
+functio greeting(textus nomen) → textus {
+    redde "Salve, §!"(nomen)
+}
+
+incipit {
+    nota greeting("adiutor")
+}
+"#;
+
+    let temp_root = super::super::common::make_temp_root();
+    let package_dir = temp_root.join("geminus");
+    fs::create_dir_all(&package_dir).expect("create geminus fixture dir");
+    fs::write(package_dir.join("adiutor.fab"), SIBLING_SOURCE).expect("write adiutor.fab");
+    fs::write(package_dir.join("geminus.fab"), ENTRY_SOURCE).expect("write geminus.fab");
+    fs::write(package_dir.join("geminus.expected"), "Salve, Tullia!\n").expect("write expected");
+    let fab_path = package_dir.join("geminus.fab");
+
+    let config = radix::Config::default().with_target(Target::LlvmText);
+    let runtime_archive = llvm_runtime_archive().expect("LLVM host runtime archive");
+    let options = faber_cli::package::PackageLlvmOptions::new(temp_root.join("geminus.modules"))
+        .with_runtime_archive(Some(runtime_archive));
+    let build = faber_cli::package::build_package_llvm(&config, &fab_path, &options)
+        .expect("geminus package LLVM build must succeed");
+
+    assert_eq!(build.product, "geminus");
+    assert_eq!(
+        build.modules.len(),
+        2,
+        "geminus package graph must resolve two units (entry + sibling)"
+    );
+    let entry_module = build
+        .modules
+        .iter()
+        .find(|module| module.is_entry)
+        .expect("entry module");
+    let sibling_module = build
+        .modules
+        .iter()
+        .find(|module| module.module_segments == ["adiutor".to_owned()])
+        .expect("adiutor sibling module");
+    let entry = fs::read_to_string(&entry_module.llvm_path).expect("read entry module");
+    let sibling = fs::read_to_string(&sibling_module.llvm_path).expect("read sibling module");
+    assert!(
+        entry.contains(EXTERNAL_GREETING),
+        "entry module must declare/call the sibling external symbol:\n{entry}"
+    );
+    assert!(
+        sibling.contains(EXTERNAL_GREETING),
+        "sibling module must define the external symbol:\n{sibling}"
+    );
+    assert!(
+        !sibling.contains("__faber_program_entry_v1"),
+        "library module must not emit a program entry:\n{sibling}"
+    );
+    assert!(
+        entry.contains("define %FaberRtExitV1 @__faber_program_entry_v1"),
+        "entry module must define the host program entry:\n{entry}"
+    );
+    assert_eq!(
+        build.manifest.entry_module, entry_module.llvm_path,
+        "manifest must record the exactly-one entry module"
+    );
+    assert_eq!(
+        build.manifest.modules,
+        build.modules.iter().map(|module| module.llvm_path.clone()).collect::<Vec<_>>(),
+        "manifest module list must be the exact deterministic module list"
+    );
+
+    let probe = run_llvm_modules(
+        &build.manifest.modules,
+        &temp_root,
+        "geminus-two-module",
+        &fab_path,
+    );
+    assert_eq!(probe.bucket, LlvmRunBucket::OutputMatched, "{}", probe.reason);
+    assert_eq!(probe.stdout, "Salve, Tullia!\n");
     assert!(
         probe.stderr.is_empty(),
         "unexpected stderr: {:?}",
@@ -1342,4 +1451,102 @@ fn llvm_host_runtime_failure_propagates_status() {
         "unexpected stdout: {:?}",
         probe.stdout
     );
+}
+
+/// L15 (6b5f8f8f): close the exit-code cluster re-entered by the L9
+/// exit-struct ABI fix. Each fixture's stdout matches its sibling `.expected`
+/// byte-exact AND the process must exit 0 — the recovered `⇥` conversions and
+/// value-equal textus/ascii/instans `adfirma` assertions must not latch a
+/// runtime status into the exit code.
+fn assert_llvm_host_fixture_exits_zero(path: &str) {
+    let fab_path = crate::paths::corpus_dir().join(path);
+    let source = fs::read_to_string(&fab_path).expect("read fixture source");
+    let session = radix::driver::Session::new(
+        Config::default()
+            .with_target(Target::LlvmText)
+            .with_dev_stdlib(),
+    );
+    let mut analysis = radix::driver::analyze_source(&session, path, &source)
+        .expect("fixture frontend analysis must succeed");
+    let device_roles = radix::mir::device_roles_from_hir(&analysis.hir);
+    let lowered = radix::mir::lower_analyzed_unit_with_context(&mut analysis)
+        .expect("fixture MIR lowering must succeed");
+    let llvm = radix::mir::emit_llvm_text_probe_with_device_roles_and_exit(
+        &device_roles,
+        &lowered.validated,
+        &lowered.interner,
+        None,
+    )
+    .expect("fixture LLVM emission must succeed");
+    let temp_root = super::super::common::make_temp_root();
+    let stem = Path::new(path)
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("fixture");
+    let llvm_file = temp_root.join(format!("{stem}.ll"));
+    fs::write(&llvm_file, &llvm).expect("write fixture LLVM text");
+
+    let probe = run_llvm_exemplum(&llvm_file, &temp_root, stem, &fab_path);
+    assert_eq!(
+        probe.exit_code,
+        Some(0),
+        "{path}: recovered `⇥` conversions and value-equal assertions must exit 0: {}",
+        probe.reason
+    );
+    let expected = fs::read(fab_path.with_extension("expected")).expect("read expected bytes");
+    assert_eq!(
+        probe.stdout.as_bytes(),
+        expected,
+        "{path}: LLVM host stdout must match the sibling .expected byte-exact"
+    );
+}
+
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_conversio_instans_exit_zero -- --ignored --nocapture"]
+fn llvm_host_conversio_instans_exit_zero() {
+    assert_llvm_host_fixture_exits_zero("conversio/instans.fab");
+}
+
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_conversio_instans_valor_carrier_exit_zero -- --ignored --nocapture"]
+fn llvm_host_conversio_instans_valor_carrier_exit_zero() {
+    assert_llvm_host_fixture_exits_zero("conversio/instans-valor-carrier.fab");
+}
+
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_conversio_octeti_exit_zero -- --ignored --nocapture"]
+fn llvm_host_conversio_octeti_exit_zero() {
+    assert_llvm_host_fixture_exits_zero("conversio/octeti.fab");
+}
+
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_conversio_valor_scalaria_exit_zero -- --ignored --nocapture"]
+fn llvm_host_conversio_valor_scalaria_exit_zero() {
+    assert_llvm_host_fixture_exits_zero("conversio/valor-scalaria.fab");
+}
+
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_conversio_valor_genus_exit_zero -- --ignored --nocapture"]
+fn llvm_host_conversio_valor_genus_exit_zero() {
+    assert_llvm_host_fixture_exits_zero("conversio/valor-genus.fab");
+}
+
+/// L15 (6b5f8f8f): close the modular-word link re-entry — the emitter lowered
+/// `modulus<N> ↦ numerus<N>` conversions to unversioned probe symbols
+/// (`__faber_runtime_convert_runtime_*`) and modular-word listas through the
+/// legacy `__faber_aggregate_array_*` construct. Both now lower through the
+/// versioned host ABI / inline coercion, so each fixture links, runs, and
+/// matches its sibling `.expected` byte-exact with exit 0.
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_modular_word_family_matches -- --ignored --nocapture"]
+fn llvm_host_modular_word_family_matches() {
+    for path in [
+        "operatores/modular-word.fab",
+        "operatores/modular-word-u8.fab",
+        "operatores/modular-word-u16.fab",
+        "operatores/modular-word-u64.fab",
+        "operatores/modular-word-u64-sha-round.fab",
+    ] {
+        assert_llvm_host_fixture_exits_zero(path);
+    }
 }
