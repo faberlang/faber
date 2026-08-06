@@ -953,3 +953,112 @@ fn llvm_host_vel_coalescing_matches_expected() {
 fn llvm_host_ergo_redde_optional_matches_expected() {
     assert_option_fixture_output("si/ergo-redde.fab", "si-ergo-redde");
 }
+
+/// L12 (f76f674f): genus field-mutation family — compile a corpus fixture
+/// through the dev-stdlib LLVM host path, run the linked binary, and assert
+/// the stdout is byte-exact against the sibling `.expected` sidecar (the Rust
+/// oracle).
+fn assert_genus_fixture_output(fab_relative: &str, stem: &str) {
+    let fab_path = crate::paths::corpus_dir().join(fab_relative);
+    let result = Compiler::new(
+        Config::default()
+            .with_target(Target::LlvmText)
+            .with_dev_stdlib(),
+    )
+    .compile(&fab_path);
+    assert!(
+        result.success(),
+        "{fab_relative} LLVM compile failed: {:?}",
+        result.diagnostics
+    );
+    let Some(Output::LlvmText(output)) = result.output else {
+        panic!("{fab_relative} did not produce LLVM text");
+    };
+    let temp_root = super::super::common::make_temp_root();
+    let llvm_file = temp_root.join(format!("{stem}.ll"));
+    fs::write(&llvm_file, output.code).expect("write {fab_relative} LLVM text");
+    let probe = run_llvm_exemplum(&llvm_file, &temp_root, stem, &fab_path);
+    assert_eq!(
+        probe.bucket,
+        LlvmRunBucket::OutputMatched,
+        "{fab_relative}: {}",
+        probe.reason
+    );
+    assert!(
+        probe.stderr.is_empty(),
+        "{fab_relative}: unexpected stderr: {:?}",
+        probe.stderr
+    );
+    assert_eq!(probe.exit_code, Some(0), "{fab_relative}");
+}
+
+/// L12 (f76f674f): genus field-mutation family — `genus/methodi`. Mutating
+/// genus methods (`ego.numerus ← …`) previously lost the write: the receiver
+/// was passed by value and never written back, so the `Numerator` counter
+/// stayed at 0 instead of 0, 1, 3. The mutating receiver now rides a by-ref
+/// `ptr` and the caller observes the mutations (Rust-oracle `&mut self`
+/// parity).
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_genus_methodi_mutation -- --ignored --nocapture"]
+fn llvm_host_genus_methodi_mutation_matches_expected() {
+    assert_genus_fixture_output("genus/methodi.fab", "genus-methodi");
+}
+
+/// L12 (f76f674f): genus field-mutation family — `genus/creo`. The
+/// post-construction `creo` hook (validation/clamping/derived init) was never
+/// called by the LLVM emitter (MIR carries no creo call — only the Rust
+/// backend inserts it), so `Terminus { valor = 200 }` stayed 200 and
+/// `Circulus`'s derived `diameter`/`area` stayed 0. The emitter now
+/// re-inserts the `creo` call after physical genus construction, matching the
+/// Rust oracle (50, clamped 100, radius 5, diameter 10, area 78.53975).
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_genus_creo_hook -- --ignored --nocapture"]
+fn llvm_host_genus_creo_hook_matches_rust_output() {
+    let fab_path = crate::paths::corpus_dir().join("genus/creo.fab");
+    let result = Compiler::new(
+        Config::default()
+            .with_target(Target::LlvmText)
+            .with_dev_stdlib(),
+    )
+    .compile(&fab_path);
+    assert!(
+        result.success(),
+        "genus/creo.fab LLVM compile failed: {:?}",
+        result.diagnostics
+    );
+    let Some(Output::LlvmText(output)) = result.output else {
+        panic!("genus/creo.fab did not produce LLVM text");
+    };
+    assert!(
+        output.code.contains("call void @creo"),
+        "creo hook must be invoked at construction:\n{}",
+        output.code
+    );
+    let temp_root = super::super::common::make_temp_root();
+    let llvm_file = temp_root.join("genus-creo.ll");
+    fs::write(&llvm_file, output.code).expect("write creo LLVM text");
+    let probe = run_llvm_exemplum(&llvm_file, &temp_root, "genus-creo", &fab_path);
+    assert_eq!(
+        probe.stdout,
+        "50\n100\n5\n10\n78.53975\n",
+        "{}",
+        probe.reason
+    );
+    assert!(
+        probe.stderr.is_empty(),
+        "unexpected stderr: {:?}",
+        probe.stderr
+    );
+    assert_eq!(probe.exit_code, Some(0));
+}
+
+/// L12 (f76f674f): genus field-mutation family — `vocatio`. Method receivers
+/// passed by value made `pone`/`duplica` no-ops, so the chained builder
+/// `alter.pone(5).duplica().duplica().accipe()` printed 0 instead of 20 and
+/// `pone`'s `redde ego` returned the pre-mutation copy. The by-ref mutating
+/// receiver fixes the chain (10, 20) and the `redde ego` value.
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_vocatio_method_mutation -- --ignored --nocapture"]
+fn llvm_host_vocatio_method_mutation_matches_expected() {
+    assert_genus_fixture_output("vocatio/vocatio.fab", "vocatio-vocatio");
+}
