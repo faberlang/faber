@@ -27,6 +27,8 @@
 pub mod conversio_arm;
 pub mod hygiene;
 pub mod names;
+pub mod text_literal;
+pub use text_literal::unescape_faber_text;
 pub mod validation;
 
 use radix_diagnostics::DiagnosticArg;
