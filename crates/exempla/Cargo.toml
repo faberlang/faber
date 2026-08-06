@@ -11,9 +11,14 @@ radix = { path = "../../../radix/crates/radix" }
 rustc-hash = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
 toml = "1.1.2"
 wait-timeout = "0.2"
 
 [dev-dependencies]
 # Package MIR lower/compile for norma:* and multi-file package exempla.
 faber = { path = "../.." }
+# Stage 2 product-runner adapter: the portable faber-host-wasm host is the
+# product evidence boundary replacing the stub host and external handle maps.
+faber-host-wasm = { path = "../../../hosts/wasm" }
+wat = "1"

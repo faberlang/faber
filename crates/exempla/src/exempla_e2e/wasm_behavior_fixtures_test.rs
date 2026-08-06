@@ -21,10 +21,11 @@ fn wasm_behavior_fixtures_match_stub_host_diag_traces() {
         let analysis =
             radix::driver::analyze_source(&session, &path.display().to_string(), &source).unwrap();
         let mut analysis = analysis;
-        let interner = analysis.interner.clone();
         let mir = radix::mir::lower_analyzed_unit_with_context(&mut analysis).unwrap();
+        // The lowered unit carries the complete symbol table (the wasm
+        // literal table resolves literal symbols from it).
         let (_wat, bytes) =
-            radix::mir::emit_wasm_text_and_binary_probe_with_context(&mir.validated, &interner)
+            radix::mir::emit_wasm_text_and_binary_probe_with_context(&mir.validated, &mir.interner)
                 .unwrap();
         let wasm_file = temp_root.join(format!("{}.wasm", fixture.exemplum.replace('/', "_")));
         fs::write(&wasm_file, bytes).unwrap();

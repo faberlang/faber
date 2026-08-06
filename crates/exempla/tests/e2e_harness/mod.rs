@@ -37,3 +37,7 @@ pub(crate) mod wasm_behavior_fixtures;
 pub(crate) mod wasm_expectations;
 #[path = "../../src/exempla_e2e/wasm_external.rs"]
 pub(crate) mod wasm_external;
+#[path = "../../src/exempla_e2e/wasm_ledger.rs"]
+pub(crate) mod wasm_ledger;
+#[path = "../../src/exempla_e2e/wasm_product.rs"]
+pub(crate) mod wasm_product;

@@ -48,6 +48,20 @@ Common flows:
     back; failures carry stable codes (E_BACKEND_UNAVAILABLE, E_DEVICE_*,
     E_NO_DEVICE_PROGRAM). See `faber targets` (metal-text/llvm-text rows).
 
+  Native host executables (llvm-host-parity, Stage 9):
+    faber build --target llvm-host <input>             # native executable
+    faber run   --target llvm-host <input> -- <args>   # build then execute
+
+    `llvm-host` is a distinct target name (no alias). Build = shared
+    package-to-LLVM builder (one .ll per unit) + llvm-as verify + pinned
+    `opt -O2` (release) + one clang link against the faber-host-llvm runtime
+    archive; never Rust codegen for the program, never a cc fallback. Artifacts
+    land in target/faber-llvm/{debug|release}/ (modules/, link-manifest.toml,
+    runtime/identity.toml, binary). Requires a coherent LLVM toolchain
+    (llvm-as + clang, plus opt for release) and a buildable faber-runtime/
+    hosts/llvm staticlib; unsupported host triples fail with a structured
+    diagnostic. `-t llvm-text` stays emit-only (radix emit).
+
   Test selection (proba cases run on the MIR stepper, not a Cargo harness):
     faber test .
     faber test path/to/file.fab

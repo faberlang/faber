@@ -13,6 +13,7 @@ const FABER_TARGET_ROWS: &[(radix::codegen::Target, &str)] = &[
     (radix::codegen::Target::Wasm, "wasm"),
     (radix::codegen::Target::WasmText, "wasm-text"),
     (radix::codegen::Target::LlvmText, "llvm-text"),
+    (radix::codegen::Target::LlvmHost, "llvm-host"),
     (radix::codegen::Target::MetalText, "metal-text"),
     (radix::codegen::Target::WgslText, "wgsl-text"),
     (radix::codegen::Target::Sexp, "sexp"),

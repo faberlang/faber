@@ -94,6 +94,38 @@ faber run --backend auto  <package>   # resolve: exactly one admitted backend
   for this device-execution surface (`package=no` until the Stage 7 archive
   gate); `-t metal-text` / `-t llvm-text` remain emit-only.
 
+### Native host executables (`faber build/run --target llvm-host`)
+
+Stage 9 product wiring exposes the proven MIR-to-LLVM host lane as a truthful
+Faber product target:
+
+```text
+faber emit  --target llvm-text <input>      → .ll or stdout (emit-only)
+faber build --target llvm-host <input>      → native executable path
+faber run   --target llvm-host <input> -- … → build then execute (args/exit forwarded)
+faber targets                                → distinct llvm-text / llvm-host rows
+```
+
+- `llvm-host` is a distinct target name with **no alias spelling**.
+- The build routes through the shared package-to-LLVM builder (one `.ll` per
+  package unit, exactly like the pairwise exempla harness), then `llvm-as`
+  verify, a pinned `opt -O2` pipeline for release builds, and one `clang` link
+  against the `faber-host-llvm` runtime archive. Never Rust codegen for the
+  program, never a `cc` fallback.
+- Artifacts land in the inspectable `target/faber-llvm/{debug|release}/`
+  layout: `modules/` (one `.ll` per unit), `link-manifest.toml` (host triple,
+  profile, tool paths + versions, module link order, runtime archive identity,
+  native flags, output, opt pipeline), `runtime/identity.toml`, and the binary.
+- Build fails with a structured diagnostic when `llvm-as`/`clang`/`opt`
+  (release) or the runtime archive is unavailable, or when the host triple is
+  unsupported (native host builds only — no cross compile).
+- Tool prerequisites: a coherent LLVM toolchain (`llvm-as` + `clang`, plus
+  `opt` for release) and a buildable `faber-runtime/hosts/llvm` staticlib
+  (built automatically on first use).
+
+Proof fixture: `radix/corpus/incipit/salve-munde.fab` (the two commands above,
+both debug and release).
+
 Proof fixture: `examples/training/device-summa` (one tree-reduction kernel
 through the whole pipeline on both backends, numeric-policy v1.0.0 parity
 against its pinned CPU oracle). The surface also materializes training loops

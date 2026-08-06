@@ -33,13 +33,13 @@ pub(crate) enum WasmTier {
 }
 
 #[derive(Debug)]
-struct WasmE2eResult {
-    path: PathBuf,
-    tier: WasmTier,
-    reason: String,
-    stubless_bucket: Option<WasmInstantiationBucket>,
-    stub_bucket: Option<WasmInstantiationBucket>,
-    run_bucket: Option<WasmRunBucket>,
+pub(crate) struct WasmE2eResult {
+    pub(crate) path: PathBuf,
+    pub(crate) tier: WasmTier,
+    pub(crate) reason: String,
+    pub(crate) stubless_bucket: Option<WasmInstantiationBucket>,
+    pub(crate) stub_bucket: Option<WasmInstantiationBucket>,
+    pub(crate) run_bucket: Option<WasmRunBucket>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -65,7 +65,7 @@ fn exempla_wasm_e2e() {
         "Wasm e2e harness found no exempla files"
     );
 
-    let session = Session::new(Config::default().with_target(Target::Wasm));
+    let session = wasm_session();
     let temp_root = make_temp_root();
     let toolchain = detect_wasm_toolchain();
     let mut results = Vec::with_capacity(exempla.len());
@@ -79,6 +79,18 @@ fn exempla_wasm_e2e() {
     assert_wasm_aggregate_floors(&results);
 }
 
+/// Session for the Wasm lane. The frontmatter-locale frontend resolves
+/// `locale = "…"` declarations from the stdlib reader directory, so every
+/// probe session must configure the stdlib path (corpus fixtures declare
+/// `locale = "la"`).
+pub(crate) fn wasm_session() -> Session {
+    Session::new(
+        Config::default()
+            .with_target(Target::Wasm)
+            .with_stdlib(crate::paths::radix_stdlib_dir()),
+    )
+}
+
 fn detect_wasm_toolchain() -> WasmToolchain {
     WasmToolchain {
         validator_available: command_available("wasm-tools", &["--version"]),
@@ -87,7 +99,7 @@ fn detect_wasm_toolchain() -> WasmToolchain {
     }
 }
 
-fn classify_wasm_exemplum(
+pub(crate) fn classify_wasm_exemplum(
     session: &Session,
     file: &Path,
     idx: usize,
@@ -125,7 +137,14 @@ fn classify_wasm_exemplum(
             }
         };
 
-    let interner = analysis.interner.clone();
+    // D-PA4: package-aware fixtures (local sibling imports) carry the canonical
+    // identity facts into MIR, so the wasm lane's fail-close diagnostic names
+    // the real fact (`importa:auxilium:saluta`) instead of the raw import
+    // spelling. The lane stays fail-closed (no wasm package path yet).
+    if let Some(identities) = radix::tool::package_import_identities_for_path(file) {
+        analysis.package_import_identities = Some(identities);
+    }
+
     let mir = match radix::mir::lower_analyzed_unit_with_context(&mut analysis) {
         Ok(mir) => mir,
         Err(errors) => {
@@ -147,13 +166,19 @@ fn classify_wasm_exemplum(
         }
     };
 
-    let (wat, wasm_bytes) =
-        match radix::mir::emit_wasm_text_and_binary_probe_with_context(&mir.validated, &interner) {
-            Ok(pair) => pair,
-            Err(error) => {
-                return wasm_result(
-                    file,
-                    WasmTier::MirLowered,
+    let (wat, wasm_bytes) = match radix::mir::emit_wasm_text_and_binary_probe_with_context(
+        &mir.validated,
+        // The lowered unit carries the complete symbol table (lowering interns
+        // runtime/diagnostic symbols the analysis interner lacks); the wasm
+        // literal table resolves literal symbols, so the stale pre-lowering
+        // clone would panic on lowering-added symbols.
+        &mir.interner,
+    ) {
+        Ok(pair) => pair,
+        Err(error) => {
+            return wasm_result(
+                file,
+                WasmTier::MirLowered,
                     format!("Wasm emission failed: {error}"),
                     None,
                     None,
@@ -161,6 +186,9 @@ fn classify_wasm_exemplum(
                 );
             }
         };
+    // The stub host's diagnostic events carry the same symbol space the wasm
+    // emitter used, so the complete lowered interner feeds the event decoder.
+    let interner = &mir.interner;
 
     let stem = file
         .file_stem()
@@ -187,6 +215,24 @@ fn classify_wasm_exemplum(
     let stubless_probe = probe_wasm_instantiation_stubless(&wasm_file, &imports);
     let stub_probe = probe_wasm_with_stub_host(&wasm_file);
     let run_probe = run_wasm_entry_with_stub_host(&wasm_file);
+
+    // Product-runner tier boost: the portable faber-host-wasm host returns
+    // typed outcomes and exact stdout bytes without a stub host or an
+    // opaque-handle table. A Success whose captured stdout matches the
+    // sibling `.expected` reaches outcome-checked (Stage 2 proof rows).
+    if let Some((boost_tier, boost_reason)) =
+        super::wasm_product::portable_product_boost(file, &wasm_bytes)
+    {
+        return wasm_result(
+            file,
+            boost_tier,
+            boost_reason,
+            Some(stubless_probe.bucket),
+            Some(stub_probe.bucket),
+            Some(run_probe.bucket),
+        );
+    }
+
     let exemplum_key = wasm_exemplum_key(file);
     let (tier, reason) = match stub_probe.bucket {
         WasmInstantiationBucket::InstantiateValid => {
