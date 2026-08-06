@@ -10,6 +10,7 @@ use crate::package::test_support::test_temp_dir;
 use radix::codegen::rust::RustFieldNamePolicy;
 use radix::codegen::{generate_from_analyzed, Target};
 use radix::driver::Config;
+use radix::hir::{LibraryItemKind, LibraryProvider};
 use radix::mir::BufferHost;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -35,6 +36,12 @@ fn dev_norma_library_home() -> PathBuf {
 const LOCAL_MAIN: &str = "importa ex \"./util\" privata * ut utilModule\n\nfunctio run() → textus {\n    redde utilModule.salutare()\n}\n\nincipit {\n    nota utilModule.salutare()\n}\n";
 const LOCAL_UTIL: &str = "functio salutare() → textus {\n    redde \"salve\"\n}\n";
 
+const LOCAL_LOCALE_MAIN: &str = "importa ex \"./util\" privata * ut utilModule\n\nfunctio run() → textus {\n    redde utilModule.greet()\n}\n\nincipit {\n    nota utilModule.greet()\n}\n";
+const LOCAL_LOCALE_UTIL: &str = "functio salutare() → textus {\n    redde \"salve\"\n}\n";
+
+const EXTERNAL_LIBRARY_LOCALE_MAIN: &str = "import from \"triga:math\" private math\nimport from \"norma:chorda\" private chorda\n\nfn run() → string {\n    const math.Vector3 canonical ← math.vector3(1.0, 0.0, 0.0)\n    const math.Vector3 canonical_shifted ← canonical.addita(math.vector3(0.0, 1.0, 0.0))\n    const float canonical_length ← canonical_shifted.longitudo()\n    const math.Vec3 original ← math.make_vector(1.0, 0.0, 0.0)\n    const math.Vec3 shifted ← original.add(math.make_vector(0.0, 2.0, 0.0))\n    const math.Vec3 normalized ← shifted.normalize()\n    const float length ← normalized.length()\n    const string reversed ← chorda.reverse(\"abc\")\n    print canonical_length\n    print length\n    return reversed\n}\n\nmain {\n    print run()\n}\n";
+const NORMA_LATIN_COMPATIBILITY_MAIN: &str = "importa ex \"norma:chorda\" privata chorda\n\nfunctio run() → textus {\n    redde chorda.retorta(\"abc\")\n}\n\nincipit {\n    nota run()\n}\n";
+
 /// Two-module package with a local import and a namespace call in the entry.
 fn write_local_package(dir: &std::path::Path) -> std::path::PathBuf {
     let src = dir.join("src");
@@ -58,6 +65,83 @@ kind = "bin"
     .expect("write faber.toml");
     fs::write(src.join("util.fab"), LOCAL_UTIL).expect("write util.fab");
     fs::write(src.join("main.fab"), LOCAL_MAIN).expect("write main.fab");
+    src.join("main.fab")
+}
+
+fn write_local_locale_package(dir: &std::path::Path) -> std::path::PathBuf {
+    let src = dir.join("src");
+    fs::create_dir_all(&src).expect("create local locale package src");
+    fs::create_dir_all(dir.join("locale")).expect("create local locale packs");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "local-locale-fixture"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+"#,
+    )
+    .expect("write local locale manifest");
+    fs::write(
+        dir.join("locale/en-local-library.toml"),
+        r#"
+[pack]
+id = "en-local-library"
+schema_version = 1
+fallback = ["la"]
+
+[[library_members]]
+provider = "package"
+package = "local-locale-fixture"
+module_path = ["util"]
+kind = "function"
+canonical = "salutare"
+surface = "greet"
+
+[llm]
+system_prompt_snippet = "Emit local-library locale fixture source"
+exemplars = ["local-library.fab"]
+"#,
+    )
+    .expect("write local library locale pack");
+    fs::write(dir.join("locale/local-library.fab"), "incipit {}\n")
+        .expect("write local library locale exemplar");
+    fs::write(src.join("util.fab"), LOCAL_LOCALE_UTIL).expect("write local locale util");
+    fs::write(src.join("main.fab"), LOCAL_LOCALE_MAIN).expect("write local locale main");
+    src.join("main.fab")
+}
+
+fn write_external_library_locale_package(
+    dir: &std::path::Path,
+    source: &str,
+) -> std::path::PathBuf {
+    let src = dir.join("src");
+    fs::create_dir_all(&src).expect("create external library package src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "external-library-locale-fixture"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+"#,
+    )
+    .expect("write external library manifest");
+    fs::write(src.join("main.fab"), source).expect("write external library consumer");
     src.join("main.fab")
 }
 
@@ -194,6 +278,152 @@ fn build_load_round_trip_with_local_import() {
         .expect("util module");
     assert!(!util.is_entry);
     assert!(util.local_links.is_empty());
+}
+
+#[test]
+fn local_library_locale_surface_resolves_through_package_loader() {
+    let dir = test_temp_dir("fhir-local-locale");
+    let entry = write_local_locale_package(&dir);
+    let (config, _diagnostic_pack) = crate::package::config_with_locale(
+        radix::codegen::Target::Rust,
+        &entry,
+        Some("en-local-library"),
+        None,
+    )
+    .expect("load local library locale through package selection");
+    assert_eq!(
+        config
+            .locale_pack
+            .as_ref()
+            .map(|pack| pack.metadata.id.as_str()),
+        Some("en-local-library")
+    );
+    let package = analyze_package(&config, &entry).expect("analyze localized local package");
+
+    assert!(
+        package
+            .diagnostics
+            .iter()
+            .all(|diagnostic| !diagnostic.is_error()),
+        "localized local package diagnostics: {:?}",
+        package.diagnostics
+    );
+
+    let util = package
+        .units
+        .iter()
+        .find(|unit| unit.module_segments == ["util".to_owned()])
+        .expect("localized local utility unit");
+    assert_eq!(
+        util.file_interface.identity,
+        Some(radix::file_interface::InterfaceLibraryIdentity {
+            provider: "package".to_owned(),
+            package: Some("local-locale-fixture".to_owned()),
+            module_path: vec!["util".to_owned()],
+        })
+    );
+    assert!(
+        util.file_interface.exports.contains_key("salutare"),
+        "local interface must retain canonical export names"
+    );
+}
+
+#[test]
+fn english_pack_resolves_real_triga_and_norma_library_surfaces() {
+    let dir = test_temp_dir("fhir-external-library-locale");
+    let entry = write_external_library_locale_package(&dir, EXTERNAL_LIBRARY_LOCALE_MAIN);
+    let (config, _diagnostic_pack) =
+        crate::package::config_with_locale(radix::codegen::Target::Rust, &entry, Some("en"), None)
+            .expect("load installed English library locale");
+    let config = config.with_stdlib(dev_norma_library_home());
+    let package = analyze_package(&config, &entry).expect("analyze localized external libraries");
+
+    assert!(
+        package
+            .diagnostics
+            .iter()
+            .all(|diagnostic| !diagnostic.is_error()),
+        "localized external library diagnostics: {:?}",
+        package.diagnostics
+    );
+    let entry_unit = package.entry_unit().expect("external library entry unit");
+    assert_eq!(
+        entry_unit.expanded_library_imports.len(),
+        2,
+        "the consumer must resolve both real source-library imports"
+    );
+    let library_items = entry_unit
+        .analysis
+        .libraries
+        .items
+        .values()
+        .collect::<Vec<_>>();
+    assert!(
+        library_items.iter().any(|item| {
+            item.identity.provider == LibraryProvider::Package("triga".to_owned())
+                && item.identity.module_path == ["math".to_owned()]
+                && item.exported_name == "vector3"
+                && item.kind == LibraryItemKind::Function
+        }),
+        "library provenance: {library_items:?}"
+    );
+    assert!(
+        library_items.iter().any(|item| {
+            item.identity.provider == LibraryProvider::Package("triga".to_owned())
+                && item.identity.module_path == ["math".to_owned()]
+                && item.exported_name == "Vector3"
+                && item.kind == LibraryItemKind::Struct
+        }),
+        "library provenance: {library_items:?}"
+    );
+    assert!(
+        library_items.iter().any(|item| {
+            item.identity.provider == LibraryProvider::Builtin("norma".to_owned())
+                && item.identity.module_path == ["chorda".to_owned()]
+                && item.exported_name == "retorta"
+                && item.kind == LibraryItemKind::Function
+        }),
+        "library provenance: {library_items:?}"
+    );
+}
+
+#[test]
+fn latin_norma_consumer_keeps_canonical_surface_compatibility() {
+    let dir = test_temp_dir("fhir-norma-latin-compatibility");
+    let entry = write_external_library_locale_package(&dir, NORMA_LATIN_COMPATIBILITY_MAIN);
+    let config = Config::default().with_stdlib(dev_norma_library_home());
+    let package =
+        analyze_package(&config, &entry).expect("analyze Latin Norma compatibility consumer");
+
+    assert!(
+        package
+            .diagnostics
+            .iter()
+            .all(|diagnostic| !diagnostic.is_error()),
+        "Latin Norma compatibility diagnostics: {:?}",
+        package.diagnostics
+    );
+    let entry_unit = package.entry_unit().expect("Latin Norma entry unit");
+    assert_eq!(
+        entry_unit.expanded_library_imports.len(),
+        1,
+        "the Latin consumer must resolve the canonical Norma import"
+    );
+    assert!(
+        entry_unit.analysis.libraries.items.values().any(|item| {
+            item.identity.provider == LibraryProvider::Builtin("norma".to_owned())
+                && item.identity.module_path == ["chorda".to_owned()]
+                && item.exported_name == "retorta"
+                && item.kind == LibraryItemKind::Function
+        }),
+        "library provenance: {:?}",
+        entry_unit
+            .analysis
+            .libraries
+            .items
+            .values()
+            .collect::<Vec<_>>()
+    );
 }
 
 #[test]
