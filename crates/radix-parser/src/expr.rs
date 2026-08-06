@@ -671,7 +671,15 @@ impl Parser {
         match kind {
             TokenKind::Ident(sym) => {
                 let name = self.interner.resolve(*sym);
-                Self::is_conversio_type_keyword(name) || Self::is_capitalized_type_name(name)
+                // Resolve a localized type spelling to its latin identity
+                // before matching the conversio-type list (`string` →
+                // `textus` under the en pack), so the field-boundary guard
+                // fires under every reader locale.
+                let latin = self
+                    .reader_type_latin_keys
+                    .get(name)
+                    .map_or(name, String::as_str);
+                Self::is_conversio_type_keyword(latin) || Self::is_capitalized_type_name(name)
             }
             _ => false,
         }

@@ -28,6 +28,19 @@ impl KeywordPack for SlotTestPack {
         match text {
             "本地" => Some("iuncta"),
             "await" => Some("tacebit"),
+            // Genus and the boolean literals let class-body regression tests
+            // exercise localized type spellings end to end.
+            "genus" => Some("genus"),
+            "true" => Some("verum"),
+            "false" => Some("falsum"),
+            _ => None,
+        }
+    }
+
+    fn type_latin_key(&self, text: &str) -> Option<&str> {
+        match text {
+            "bool" => Some("bivalens"),
+            "string" => Some("textus"),
             _ => None,
         }
     }
@@ -118,5 +131,23 @@ fn slot_helper_expect_errors_when_absent() {
     assert!(
         result.is_err(),
         "missing slot keyword must produce an error"
+    );
+}
+
+#[test]
+fn localized_type_spelling_after_initialized_field_is_not_an_operand() {
+    // Regression: the field-boundary guard matched type spellings against the
+    // latin conversio-type list by raw source text. Under a pack that
+    // localizes `textus` → `string`, the guard missed the second field's type
+    // and the retired `true`-prefix predicate check fired (PARSE001) on
+    // `bool visible = true` followed by `string name`.
+    let mut parser = parser_over_with_pack(
+        "genus X {\n    bool visible = true\n    string name\n}\n",
+    );
+    let result = parser.parse_program();
+    assert!(
+        result.errors.is_empty(),
+        "localized type spelling after an initialized field must not fire the retired prefix predicate: {:?}",
+        result.errors
     );
 }
