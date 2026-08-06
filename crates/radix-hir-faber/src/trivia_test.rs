@@ -25,6 +25,7 @@ use radix_lexer::{Interner, Span, TokenKind};
 use radix_syntax::CallablePosture;
 use radix_types::TypeTable;
 use radix_types::USER_DEF_ID_BASE;
+use rustc_hash::FxHashMap;
 
 /// Minimal Latin surface for leaf tests (no reader-pack machinery).
 struct TestSurface;
@@ -201,7 +202,7 @@ fn program(items: Vec<HirItem>, entry: Option<HirBlock>) -> HirProgram {
 
 fn render(hir: &HirProgram, presentation: &HirPresentation, interner: &Interner) -> String {
     let types = TypeTable::new();
-    emit(hir, presentation, &types, interner, &TestSurface)
+    emit(hir, presentation, &types, interner, &TestSurface, &FxHashMap::default())
         .expect("emit should succeed")
         .code
 }
@@ -475,7 +476,7 @@ fn emits_member_trivia_for_struct_fields_and_methods() {
         entry_start_anchor: None,
     };
 
-    let code = emit(&hir, &presentation, &types, &interner, &TestSurface)
+    let code = emit(&hir, &presentation, &types, &interner, &TestSurface, &FxHashMap::default())
         .expect("emit should succeed")
         .code;
     assert!(

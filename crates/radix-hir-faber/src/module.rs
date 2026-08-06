@@ -12,7 +12,8 @@ use radix_hir::{
     HirItem, HirItemKind, HirPresentation, HirProgram, HirProgramEnd, HirSourceAnchorId,
 };
 use radix_lexer::{Interner, Span, TokenKind};
-use radix_types::TypeTable;
+use radix_types::{TypeId, TypeTable};
+use rustc_hash::FxHashMap;
 
 /// Canonical Faber output from HIR re-emission.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,12 +31,20 @@ pub struct FaberOutput {
 pub struct FaberCodegen {
     /// Flattened trivia attachments for the presentation being generated.
     pub(crate) trivia: TriviaIndex,
+    /// `TypeId` → qualified source spelling (`base.Vector3`) for imported
+    /// nominal types, so re-emitted types keep their namespace even though
+    /// the local name table has no entry for them.
+    pub(crate) imported_type_spellings: FxHashMap<TypeId, String>,
 }
 
 /// Emit canonical Faber source from analyzed HIR and its presentation.
 ///
 /// The presentation sidecar is inseparable from the HIR value it annotates;
 /// an [`empty_presentation`] reproduces trivia-free canonical output.
+///
+/// `imported_type_spellings` maps imported nominal `TypeId`s to their
+/// qualified source spelling (`base.Vector3`); pass an empty map when no
+/// import contract is available and imported types fall back to `def_N`.
 ///
 /// # Errors
 ///
@@ -47,8 +56,11 @@ pub fn emit(
     types: &TypeTable,
     interner: &Interner,
     surface: &impl KeywordSurface,
+    imported_type_spellings: &FxHashMap<TypeId, String>,
 ) -> Result<FaberOutput, CodegenError> {
-    FaberCodegen::default().generate(hir, presentation, types, interner, surface)
+    let mut codegen = FaberCodegen::default();
+    codegen.imported_type_spellings = imported_type_spellings.clone();
+    codegen.generate(hir, presentation, types, interner, surface)
 }
 
 /// An empty presentation: no owners, no attachments, and a structural program
@@ -334,7 +346,7 @@ mod tests {
         let types = TypeTable::new();
         let interner = Interner::new();
 
-        let err = emit(&hir, &empty_presentation(), &types, &interner, &TestSurface)
+        let err = emit(&hir, &empty_presentation(), &types, &interner, &TestSurface, &FxHashMap::default())
             .expect_err("legacy Cede HIR must fail closed before Faber emission");
 
         assert!(
