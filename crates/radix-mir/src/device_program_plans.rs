@@ -45,9 +45,9 @@ use crate::device_program::{Binding, BufferRole, DeviceProgram, DeviceResource, 
 use crate::kernel_plan::{CollectionKernelPlan, MatMulShapes, SharedMemoryLayout};
 use crate::layout::MirTensorStorageLayout;
 use crate::{
-    MirCollectionOp, MirFunction, MirKernelDispatchSize, MirKernelWorkgroupCount, MirLayoutKind,
-    MirLocalId, MirPlaceBase, MirRuntimeCall, MirStatementKind, MirType, MirUnOp,
-    MirValidationContext, MirWorkgroupSize,
+    MirCollectionOp, MirConstant, MirFunction, MirIntrinsic, MirKernelDispatchSize,
+    MirKernelWorkgroupCount, MirLayoutKind, MirLocalId, MirOperand, MirPlaceBase, MirRuntimeCall,
+    MirStatementKind, MirType, MirUnOp, MirValidationContext, MirWorkgroupSize,
 };
 use radix_types::{Type, TypeId};
 use rustc_hash::FxHashMap;
@@ -717,7 +717,7 @@ pub fn contract_shape_signature(
             let element_ty = tensor_element_ty(operand_ty, validation)?;
             signature.input = storage_input(0, element_ty, length);
             signature.output = storage_output(1, element_ty, partials);
-            signature.output.source_local = recipe_destination_local(function);
+            signature.output.source_local = recipe_destination_local_for(function, reduce_op);
             signature.workgroup = MirWorkgroupSize {
                 x: workgroup_x,
                 y: 1,
@@ -745,7 +745,8 @@ pub fn contract_shape_signature(
                 shapes.k.saturating_mul(shapes.n),
             ));
             signature.output = storage_output(2, element_ty, shapes.m.saturating_mul(shapes.n));
-            signature.output.source_local = recipe_destination_local(function);
+            signature.output.source_local =
+                recipe_destination_local_for(function, MirCollectionOp::TensorMatMul);
             signature.workgroup = MirWorkgroupSize {
                 x: crate::kernel_plan::MATMUL_TILE,
                 y: crate::kernel_plan::MATMUL_TILE,
@@ -762,7 +763,8 @@ pub fn contract_shape_signature(
             let element_ty = tensor_element_ty(operand_ty, validation)?;
             signature.input = storage_input(0, element_ty, m.saturating_mul(n));
             signature.output = storage_output(1, element_ty, m.saturating_mul(n));
-            signature.output.source_local = recipe_destination_local(function);
+            signature.output.source_local =
+                recipe_destination_local_for(function, MirCollectionOp::TensorTranspose);
             signature.workgroup = MirWorkgroupSize {
                 x: crate::kernel_plan::TRANSPOSE_WORKGROUP_X,
                 y: 1,
@@ -849,7 +851,7 @@ pub fn transformer_shape_signature(
         },
     };
     signature.input.source_local = Some(operand_local);
-    signature.output.source_local = recipe_destination_local(function);
+    signature.output.source_local = recipe_destination_local_for(function, op);
     Ok(signature)
 }
 
@@ -919,6 +921,24 @@ pub fn subchain_signature_for_emission(
     validation: &MirValidationContext<'_>,
     outputs: &[MirLocalId],
 ) -> Result<MirKernelSignature, PlanMappingError> {
+    subchain_signature_for_emission_with_source(function, contract, validation, outputs, None)
+}
+
+/// The source-aware form of [`subchain_signature_for_emission`] (widened
+/// d8518267 seam repair): `source` is the ORIGINAL function the subchain was
+/// decomposed from. The data-flow count resolution uses it to bind a
+/// `TensorSumAxis`-produced input at the REDUCED count — the same count the
+/// producing subchain's seam output carries — so the emitters' and the faber
+/// constructor's cross-kernel unification see one shape per local
+/// (carried_resources_agree). `None` keeps the type-derived count (whole-
+/// function and test call sites).
+pub fn subchain_signature_for_emission_with_source(
+    function: &MirFunction,
+    contract: &CollectionOpContract,
+    validation: &MirValidationContext<'_>,
+    outputs: &[MirLocalId],
+    source: Option<&MirFunction>,
+) -> Result<MirKernelSignature, PlanMappingError> {
     let mut signature = contract_shape_signature(function, contract, validation)?;
     let operands = recipe_operand_locals(function)?;
     let mut bound: Vec<MirLocalId> = Vec::new();
@@ -934,7 +954,14 @@ pub fn subchain_signature_for_emission(
         }
         bound.push(*second);
     }
-    finish_subchain_emission_signature(function, validation, outputs, &mut signature, &bound)?;
+    finish_subchain_emission_signature(
+        function,
+        validation,
+        outputs,
+        &mut signature,
+        &bound,
+        source,
+    )?;
     Ok(signature)
 }
 
@@ -963,25 +990,59 @@ pub fn transformer_subchain_signature_for_emission(
     validation: &MirValidationContext<'_>,
     outputs: &[MirLocalId],
 ) -> Result<MirKernelSignature, PlanMappingError> {
+    transformer_subchain_signature_for_emission_with_source(function, op, validation, outputs, None)
+}
+
+/// The source-aware form of [`transformer_subchain_signature_for_emission`]
+/// (widened d8518267 seam repair): `source` is the ORIGINAL function the
+/// subchain was decomposed from. The data-flow count resolution uses it to
+/// bind a `TensorSumAxis`-produced input at the REDUCED count — the same
+/// count this seam sizes the producing subchain's primary output at — so
+/// the emitters' and the faber constructor's cross-kernel unification see
+/// one shape per local (carried_resources_agree). `None` keeps the
+/// type-derived count (whole-function and test call sites).
+pub fn transformer_subchain_signature_for_emission_with_source(
+    function: &MirFunction,
+    op: MirCollectionOp,
+    validation: &MirValidationContext<'_>,
+    outputs: &[MirLocalId],
+    source: Option<&MirFunction>,
+) -> Result<MirKernelSignature, PlanMappingError> {
     let mut signature = transformer_shape_signature(function, op, validation)?;
     let mut bound: Vec<MirLocalId> = Vec::new();
     if let Some(operand) = transformer_operand_local(function, op) {
         signature.input.source_local = Some(operand);
         bound.push(operand);
     }
-    finish_subchain_emission_signature(function, validation, outputs, &mut signature, &bound)?;
+    finish_subchain_emission_signature(
+        function,
+        validation,
+        outputs,
+        &mut signature,
+        &bound,
+        source,
+    )?;
     Ok(signature)
 }
 
 /// The shared tail of the subchain emission signatures: the data-flow
 /// inputs beyond the bound recipe operands, the primary output binding, and
 /// the additional consumed outputs (D-2b-1).
+///
+/// `source` is the ORIGINAL function the subchain was decomposed from (the
+/// widened d8518267 seam repair): the data-flow count resolution consults it
+/// so a `TensorSumAxis`-produced input binds at the REDUCED count — the same
+/// count the producing subchain's seam output carries — instead of the
+/// keep-dims local type's element product (the AIR LayerNorm VJP types
+/// SumAxis results at the operand shape). `None` keeps the type-derived
+/// count (whole-function and test call sites).
 fn finish_subchain_emission_signature(
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
     outputs: &[MirLocalId],
     signature: &mut MirKernelSignature,
     bound: &[MirLocalId],
+    source: Option<&MirFunction>,
 ) -> Result<(), PlanMappingError> {
     // Data-flow inputs: params beyond the recipe operands — locals read from
     // earlier subchains. They bind after the recipe inputs, before the
@@ -995,6 +1056,16 @@ fn finish_subchain_emission_signature(
             continue;
         }
         let (element_ty, count) = data_flow_element_ty_and_count(param.ty, validation)?;
+        // S6-P1 seam repair (widened d8518267): a data-flow input that is a
+        // `TensorSumAxis` result of an EARLIER subchain binds at the REDUCED
+        // count the producer's seam output carries — the keep-dims local
+        // type would over-size the buffer to the operand shape and the faber
+        // (function, local) unification would see two shapes for one local
+        // (VersionShapeConflict). The producing SumAxis statement lives in an
+        // earlier subchain, so it is scanned from the SOURCE function.
+        let count = source
+            .and_then(|source| sum_axis_destination_count(source, param.local, validation))
+            .unwrap_or(count);
         signature.extra_inputs.push(storage_input_with_local(
             next_binding,
             element_ty,
@@ -1022,8 +1093,74 @@ fn finish_subchain_emission_signature(
     Ok(())
 }
 
+/// The reduced element count of a `TensorSumAxis` destination local in the
+/// source function — the flattening of the operand dims minus the reduced
+/// axis, exactly the count [`transformer_shape_signature`] sizes the
+/// reduction output at (SumAxis-specific: the CCI collection-op variants
+/// `TensorRmsNorm` / `TensorRope` / `TensorGather` have no SumAxis reduction
+/// semantics and are never matched). `None` when the local is not a
+/// `TensorSumAxis` destination — a data-flow input with no reduction
+/// semantics keeps its type-derived count.
+fn sum_axis_destination_count(
+    source: &MirFunction,
+    local: MirLocalId,
+    validation: &MirValidationContext<'_>,
+) -> Option<u64> {
+    for block in &source.blocks {
+        for statement in &block.statements {
+            let MirStatementKind::RuntimeCall {
+                destination,
+                call:
+                    MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorSumAxis),
+                        args,
+                        ..
+                    },
+                ..
+            } = &statement.kind
+            else {
+                continue;
+            };
+            let Some(place) = destination else {
+                continue;
+            };
+            let MirPlaceBase::Local(dest_local) = place.base else {
+                continue;
+            };
+            if dest_local != local {
+                continue;
+            }
+            let operand = args.first()?;
+            let operand_ty = crate::local_ty::operand_local_ty(source, operand)?;
+            let dims = crate::tensor_type::tensor_literal_dims(operand_ty, validation).ok()?;
+            let axis: u64 = match args.get(1)? {
+                MirOperand::Constant(MirConstant::Int(axis)) => u64::try_from(*axis).ok()?,
+                MirOperand::Constant(MirConstant::UInt(axis)) => *axis,
+                _ => return None,
+            };
+            return Some(
+                dims.iter()
+                    .enumerate()
+                    .filter(|(index, _)| *index as u64 != axis)
+                    .fold(1u64, |acc, (_, &dim)| acc.saturating_mul(dim)),
+            );
+        }
+    }
+    None
+}
+
 /// The local a recipe statement produces (its destination place's base
-/// local), if the destination is a plain local (A2-2b).
+/// local), if the destination is a plain local (A2-2b) — matched to the
+/// RECIPE op specifically (D-2b verification, hand-5's hypothesis): a
+/// subchain slice can fold elementwise collection statements BEFORE the
+/// recipe, and the primary output source_local must bind the RECIPE result,
+/// never an elementwise destination — a misbound `[2]`-count reduction
+/// output would carry a `[2,8]`-shaped source local and conflate with the
+/// elementwise buffer. The recipe ops carry no `CollectionOpContract`
+/// variant (transformer) or a contract the caller knows the op of
+/// (reduction/matmul/transpose), so the op is threaded in; the new CCI
+/// collection-op variants (`TensorRmsNorm` / `TensorRope` / `TensorGather`)
+/// are never matched here unless they are the declared recipe op.
 ///
 /// The forward-save value a companion subchain reads is produced by an
 /// EARLIER subchain of the same decomposed function, and decomposition
@@ -1032,10 +1169,10 @@ fn finish_subchain_emission_signature(
 /// `MirLocal` origin the consumer (same function, same local) joins by
 /// semantic identity. Non-local destinations (temps, or no destination)
 /// yield `None` and the Synthetic origin fallback stays honest.
-fn recipe_destination_local(function: &MirFunction) -> Option<MirLocalId> {
+fn recipe_destination_local_for(function: &MirFunction, op: MirCollectionOp) -> Option<MirLocalId> {
     for block in &function.blocks {
         for statement in &block.statements {
-            if crate::collection_ops::statement_collection_op(statement).is_none() {
+            if crate::collection_ops::statement_collection_op(statement) != Some(op) {
                 continue;
             }
             let MirStatementKind::RuntimeCall { destination, .. } = &statement.kind else {
