@@ -22,7 +22,10 @@
 //! - every statement is either a recipe op (`Sum` / `TensorMean` /
 //!   `TensorMatMul` / `TensorTranspose` / `TensorSumAxis` / `TensorSoftmax`
 //!   / `TensorLayerNorm` — the S6-P1 transformer ops are recipe boundaries
-//!   like the others), an elementwise transform
+//!   like the others — plus the GI3-1 inference recipes
+//!   `TensorRmsNorm` / `TensorRope` / `TensorGather` /
+//!   `TensorCausalMaskedSoftmax`, which follow the same
+//!   `from_transformer_op`-sibling admission path), an elementwise transform
 //!   ([`is_elementwise_collection_op`](crate::device_program_plans::is_elementwise_collection_op)),
 //!   or elementwise value math (Assign / Construct / Call);
 //! - every **live** recipe op resolves its own dispatch contract and plan.

@@ -1687,3 +1687,271 @@ fn tuple_return_with_non_plain_field_fails_closed() {
         "a non-plain tuple field fails the local binding closed"
     );
 }
+
+// -----------------------------------------------------------------------
+// GI3-1 inference-recipe legalization (rms_norm / rope / gather /
+// causal-masked-softmax bodies decompose into single-recipe subchain
+// kernels — the new recipes are recipe boundaries like the S6-P1
+// transformer ops; a compound body splits at the recipe boundary).
+// -----------------------------------------------------------------------
+
+/// A RMSNorm-bearing body: `t = rms_norm(x, 1, 1e-5, gamma)` over `[2, 960]`
+/// (the pinned hidden width) with gamma `[960]` — the CCI-1 const layout.
+fn rms_norm_decomposition_function(types: &mut TypeTable) -> MirFunction {
+    let r2 = rank2_tensor_ty(types, [2, 960]);
+    let gamma = rank1_tensor_ty(types, 960);
+    device_function(
+        &[(0, r2), (1, gamma)],
+        vec![collection_statement_operands(
+            MirCollectionOp::TensorRmsNorm,
+            vec![
+                MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                MirOperand::Constant(MirConstant::Int(1)),
+                MirOperand::Constant(MirConstant::Float(1e-5)),
+                MirOperand::Place(MirPlace::local(MirLocalId(1))),
+            ],
+            2,
+            r2,
+        )],
+        Some(2),
+        r2,
+    )
+}
+
+/// A RoPE-bearing body: `t = rope_norm(x, 0, 64)` over `[2, 64]` (the
+/// pinned NORM consecutive-pair).
+fn rope_decomposition_function(types: &mut TypeTable) -> MirFunction {
+    let r2 = rank2_tensor_ty(types, [2, 64]);
+    device_function(
+        &[(0, r2)],
+        vec![collection_statement_operands(
+            MirCollectionOp::TensorRope,
+            vec![
+                MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                MirOperand::Constant(MirConstant::Int(0)),
+                MirOperand::Constant(MirConstant::Int(64)),
+            ],
+            1,
+            r2,
+        )],
+        Some(1),
+        r2,
+    )
+}
+
+/// A row-gather-bearing body: `t = gather(table, ids)` over the pinned
+/// `[960, 49152]` token-embedding table with 9 ids → `[9, 49152]`.
+fn gather_decomposition_function(types: &mut TypeTable) -> MirFunction {
+    let table = rank2_tensor_ty(types, [960, 49_152]);
+    let output = rank2_tensor_ty(types, [9, 49_152]);
+    let ids_element = types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let ids = MirType::semantic(types.array(ids_element));
+    device_function(
+        &[(0, table), (1, ids)],
+        vec![collection_statement_operands(
+            MirCollectionOp::TensorGather,
+            vec![
+                MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                MirOperand::Place(MirPlace::local(MirLocalId(1))),
+            ],
+            2,
+            output,
+        )],
+        Some(2),
+        output,
+    )
+}
+
+/// A causal masked-softmax-bearing body: `t = causal_masked_softmax(x)`
+/// over the pinned `[9, 9]` causal score matrix.
+fn causal_masked_softmax_decomposition_function(types: &mut TypeTable) -> MirFunction {
+    let r2 = rank2_tensor_ty(types, [9, 9]);
+    device_function(
+        &[(0, r2)],
+        vec![collection_statement(
+            MirCollectionOp::TensorCausalMaskedSoftmax,
+            &[0],
+            1,
+            r2,
+        )],
+        Some(1),
+        r2,
+    )
+}
+
+/// A compound inference body: `n = rms_norm(x, 1, 1e-5, gamma); m = n @ w` —
+/// the RMSNorm recipe followed by a matmul recipe splits into two
+/// single-recipe subchain kernels.
+fn rms_norm_then_matmul_decomposition_function(types: &mut TypeTable) -> MirFunction {
+    let r2 = rank2_tensor_ty(types, [2, 960]);
+    let gamma = rank1_tensor_ty(types, 960);
+    let weight = rank2_tensor_ty(types, [960, 960]);
+    let out = rank2_tensor_ty(types, [2, 960]);
+    device_function(
+        &[(0, r2), (1, gamma), (2, weight)],
+        vec![
+            collection_statement_operands(
+                MirCollectionOp::TensorRmsNorm,
+                vec![
+                    MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                    MirOperand::Constant(MirConstant::Int(1)),
+                    MirOperand::Constant(MirConstant::Float(1e-5)),
+                    MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                ],
+                3,
+                r2,
+            ),
+            collection_statement(MirCollectionOp::TensorMatMul, &[3, 2], 4, out),
+        ],
+        Some(4),
+        out,
+    )
+}
+
+#[test]
+fn rms_norm_body_decomposes_into_one_rms_normalization_subchain() {
+    let mut types = TypeTable::new();
+    let function = rms_norm_decomposition_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let decomposition =
+        decompose_kernel_function(&function, &validation).expect("the rms_norm body decomposes");
+    assert_eq!(
+        decomposition.subchains.len(),
+        1,
+        "a single rms_norm body carries exactly one subchain, got {:?}",
+        decomposition.subchains
+    );
+    let CollectionKernelPlan::RmsNormalization(plan) = &decomposition.subchains[0].plan else {
+        panic!(
+            "the rms_norm subchain must carry exactly one recipe (RMS-normalization), got {:?}",
+            decomposition.subchains[0].plan
+        );
+    };
+    assert_eq!(plan.axis, 1, "axis comes from the const operand");
+    assert_eq!(plan.width, 960, "the normalization width is the hidden dim");
+    decomposition.subchains[0]
+        .plan
+        .validate()
+        .expect("the carried RMS-normalization plan validates");
+}
+
+#[test]
+fn rope_body_decomposes_into_one_rope_subchain() {
+    let mut types = TypeTable::new();
+    let function = rope_decomposition_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let decomposition =
+        decompose_kernel_function(&function, &validation).expect("the rope body decomposes");
+    assert_eq!(
+        decomposition.subchains.len(),
+        1,
+        "a single rope body carries exactly one subchain, got {:?}",
+        decomposition.subchains
+    );
+    let CollectionKernelPlan::Rope(plan) = &decomposition.subchains[0].plan else {
+        panic!(
+            "the rope subchain must carry exactly one recipe (rope), got {:?}",
+            decomposition.subchains[0].plan
+        );
+    };
+    assert_eq!(plan.pos, 0, "position comes from the const operand");
+    assert_eq!(plan.dim, 64, "rotated width comes from the const operand");
+    decomposition.subchains[0]
+        .plan
+        .validate()
+        .expect("the carried rope plan validates");
+}
+
+#[test]
+fn gather_body_decomposes_into_one_gather_subchain() {
+    let mut types = TypeTable::new();
+    let function = gather_decomposition_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let decomposition =
+        decompose_kernel_function(&function, &validation).expect("the gather body decomposes");
+    assert_eq!(
+        decomposition.subchains.len(),
+        1,
+        "a single gather body carries exactly one subchain, got {:?}",
+        decomposition.subchains
+    );
+    let CollectionKernelPlan::Gather(plan) = &decomposition.subchains[0].plan else {
+        panic!(
+            "the gather subchain must carry exactly one recipe (gather), got {:?}",
+            decomposition.subchains[0].plan
+        );
+    };
+    assert_eq!(plan.table_rows, 960, "table rows from the operand dims");
+    assert_eq!(plan.table_cols, 49_152, "table cols from the operand dims");
+    assert_eq!(plan.id_count, 9, "id count from the return-type dims");
+    decomposition.subchains[0]
+        .plan
+        .validate()
+        .expect("the carried gather plan validates");
+}
+
+#[test]
+fn causal_masked_softmax_body_decomposes_into_one_causal_subchain() {
+    let mut types = TypeTable::new();
+    let function = causal_masked_softmax_decomposition_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let decomposition = decompose_kernel_function(&function, &validation)
+        .expect("the causal masked-softmax body decomposes");
+    assert_eq!(
+        decomposition.subchains.len(),
+        1,
+        "a single causal masked-softmax body carries exactly one subchain, got {:?}",
+        decomposition.subchains
+    );
+    let CollectionKernelPlan::CausalMaskedSoftmax(plan) = &decomposition.subchains[0].plan else {
+        panic!(
+            "the causal masked-softmax subchain must carry exactly one recipe, got {:?}",
+            decomposition.subchains[0].plan
+        );
+    };
+    assert_eq!(plan.rows, 9, "the row (query) extent");
+    assert_eq!(plan.cols, 9, "the column (key) extent");
+    decomposition.subchains[0]
+        .plan
+        .validate()
+        .expect("the carried causal masked-softmax plan validates");
+}
+
+#[test]
+fn rms_norm_then_matmul_decomposes_into_two_subchains() {
+    // The compound legalization: a body carrying RMSNorm AND matmul splits
+    // into two single-recipe subchain kernels at the recipe boundary.
+    let mut types = TypeTable::new();
+    let function = rms_norm_then_matmul_decomposition_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let decomposition = decompose_kernel_function(&function, &validation)
+        .expect("the rms_norm+matmul body decomposes");
+    assert_eq!(
+        decomposition.subchains.len(),
+        2,
+        "rms_norm + matmul must split into two subchains, got {:?}",
+        decomposition.subchains
+    );
+    assert!(
+        matches!(
+            decomposition.subchains[0].plan,
+            CollectionKernelPlan::RmsNormalization(_)
+        ),
+        "the first subchain carries the RMS-normalization recipe, got {:?}",
+        decomposition.subchains[0].plan
+    );
+    assert!(
+        matches!(
+            decomposition.subchains[1].plan,
+            CollectionKernelPlan::TiledMatMul(_)
+        ),
+        "the second subchain carries the tiled-matmul recipe, got {:?}",
+        decomposition.subchains[1].plan
+    );
+    for subchain in &decomposition.subchains {
+        subchain
+            .plan
+            .validate()
+            .expect("every carried subchain plan validates");
+    }
+}

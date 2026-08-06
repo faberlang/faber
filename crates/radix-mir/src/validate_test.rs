@@ -2696,3 +2696,44 @@ fn test_gather_valid_ids_array_operand() {
     let errors = validate(&program, &types);
     assert!(errors.is_empty(), "expected no errors, got: {errors:?}");
 }
+
+// -----------------------------------------------------------------------
+// GI3-1: TensorCausalMaskedSoftmax MIR validation (the causal masked-row
+// softmax op the CausalMaskedSoftmax recipe resolves from).
+// -----------------------------------------------------------------------
+
+#[test]
+fn test_causal_masked_softmax_valid_rank2_receiver() {
+    let mut types = TypeTable::new();
+    let return_ty = tensor_mty(&mut types, &[2, 2]);
+    let program = cci_collection_program(
+        &mut types,
+        MirCollectionOp::TensorCausalMaskedSoftmax,
+        vec![],
+        return_ty,
+    );
+    let errors = validate(&program, &types);
+    assert!(
+        errors.is_empty(),
+        "expected no errors for a valid causal masked-softmax call, got: {errors:?}"
+    );
+}
+
+#[test]
+fn test_causal_masked_softmax_rejects_wrong_arity() {
+    let mut types = TypeTable::new();
+    let return_ty = tensor_mty(&mut types, &[2, 2]);
+    let program = cci_collection_program(
+        &mut types,
+        MirCollectionOp::TensorCausalMaskedSoftmax,
+        vec![MirOperand::Constant(MirConstant::Int(1))],
+        return_ty,
+    );
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("TensorCausalMaskedSoftmax") && e.contains("expects 1")),
+        "expected the arity diagnostic for a 2-arg causal masked-softmax call, got: {errors:?}"
+    );
+}

@@ -914,6 +914,12 @@ pub enum MirCollectionOp {
     /// source surface (no silent clamping). Shape-transforming — not
     /// `TensorGet`/`TensorSlice`.
     TensorGather,
+    /// Causal masked-row softmax (GI3-1): numerically stable row softmax
+    /// over the causal attention scores with zero probability above the
+    /// diagonal (`[x]` — the rank-2 causal score matrix; row `i` masks
+    /// columns `j > i`). No mask tensor input (the causal structure is the
+    /// recipe's semantics); the diagonal is included.
+    TensorCausalMaskedSoftmax,
     TensorDiv,
     TensorNeg,
     /// Gaussian Error Linear Unit using the tanh approximation:

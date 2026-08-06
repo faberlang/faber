@@ -464,7 +464,8 @@ impl Validator<'_, '_> {
             | MirCollectionOp::IntervalLength
             | MirCollectionOp::IntervalMaterialize
             | MirCollectionOp::Keys
-            | MirCollectionOp::Values => 1,
+            | MirCollectionOp::Values
+            | MirCollectionOp::TensorCausalMaskedSoftmax => 1,
             MirCollectionOp::Append
             | MirCollectionOp::AppendImmutable
             | MirCollectionOp::Delete
@@ -1086,7 +1087,8 @@ impl Validator<'_, '_> {
             | MirCollectionOp::TensorGelu
             | MirCollectionOp::TensorRelu
             | MirCollectionOp::TensorSoftmax
-            | MirCollectionOp::TensorTranspose => {
+            | MirCollectionOp::TensorTranspose
+            | MirCollectionOp::TensorCausalMaskedSoftmax => {
                 let Some(receiver_ty) = first_arg_ty else {
                     return;
                 };

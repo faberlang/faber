@@ -1072,11 +1072,19 @@ fn collection_kernel_plan_carries_no_communication_variant() {
             CollectionKernelPlan::AxisReduction(_) => true,
             CollectionKernelPlan::RowSoftmax(_) => true,
             CollectionKernelPlan::LayerNormalization(_) => true,
+            // GI3-1: the pinned-row inference recipes are recipe plans too
+            // (the frozen seven-variant set extended by the GI3-1 op
+            // surface) — still no communication variant.
+            CollectionKernelPlan::Gather(_) => true,
+            CollectionKernelPlan::RmsNormalization(_) => true,
+            CollectionKernelPlan::Rope(_) => true,
+            CollectionKernelPlan::CausalMaskedSoftmax(_) => true,
         }
     }
 
     // Every kernel plan a program can carry is a recipe plan — the frozen
-    // seven-variant set (D1 FC6), no communication variant.
+    // seven-variant set (D1 FC6) plus the GI3-1 inference recipes, no
+    // communication variant.
     let (_types, program) = cs1_program();
     assert!(program
         .kernels

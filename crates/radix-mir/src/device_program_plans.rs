@@ -50,7 +50,7 @@ use crate::{
     MirKernelWorkgroupCount, MirLayoutKind, MirLocalId, MirOperand, MirPlaceBase, MirRuntimeCall,
     MirStatementKind, MirType, MirUnOp, MirValidationContext, MirWorkgroupSize,
 };
-use radix_types::{Type, TypeId};
+use radix_types::{NumericWidth, Primitive, Type, TypeId};
 use rustc_hash::FxHashMap;
 use std::fmt;
 
@@ -340,6 +340,14 @@ pub enum RecipeKind {
     RowSoftmax,
     /// Layer-normalization recipe (S6-P1).
     LayerNormalization,
+    /// Row-gather recipe (GI3-1).
+    Gather,
+    /// Root-mean-square-normalization recipe (GI3-1).
+    RmsNormalization,
+    /// Rotary-position-embedding recipe (GI3-1).
+    Rope,
+    /// Causal masked-row softmax recipe (GI3-1).
+    CausalMaskedSoftmax,
 }
 
 impl RecipeKind {
@@ -352,6 +360,10 @@ impl RecipeKind {
             CollectionKernelPlan::AxisReduction(_) => Self::AxisReduction,
             CollectionKernelPlan::RowSoftmax(_) => Self::RowSoftmax,
             CollectionKernelPlan::LayerNormalization(_) => Self::LayerNormalization,
+            CollectionKernelPlan::Gather(_) => Self::Gather,
+            CollectionKernelPlan::RmsNormalization(_) => Self::RmsNormalization,
+            CollectionKernelPlan::Rope(_) => Self::Rope,
+            CollectionKernelPlan::CausalMaskedSoftmax(_) => Self::CausalMaskedSoftmax,
         }
     }
 }
@@ -452,7 +464,13 @@ fn plan_shared_memory_bytes(plan: &CollectionKernelPlan) -> u64 {
         // footprint.
         | CollectionKernelPlan::AxisReduction(_)
         | CollectionKernelPlan::RowSoftmax(_)
-        | CollectionKernelPlan::LayerNormalization(_) => 0,
+        | CollectionKernelPlan::LayerNormalization(_)
+        // GI3-1: the inference recipes are likewise row-wise serial passes
+        // with no shared-memory layout.
+        | CollectionKernelPlan::Gather(_)
+        | CollectionKernelPlan::RmsNormalization(_)
+        | CollectionKernelPlan::Rope(_)
+        | CollectionKernelPlan::CausalMaskedSoftmax(_) => 0,
         CollectionKernelPlan::TreeReduction(plan) => {
             shared_memory_layout_bytes(&plan.shared_memory)
         }
@@ -512,6 +530,12 @@ pub fn is_recipe_op(op: MirCollectionOp) -> bool {
             | MirCollectionOp::TensorSumAxis
             | MirCollectionOp::TensorSoftmax
             | MirCollectionOp::TensorLayerNorm
+            // GI3-1: the pinned-row inference recipes are recipe boundaries
+            // like the transformer ops (admission/resolution is GI3-1).
+            | MirCollectionOp::TensorRmsNorm
+            | MirCollectionOp::TensorRope
+            | MirCollectionOp::TensorGather
+            | MirCollectionOp::TensorCausalMaskedSoftmax
     )
 }
 
@@ -527,6 +551,13 @@ pub fn is_transformer_recipe_op(op: MirCollectionOp) -> bool {
         MirCollectionOp::TensorSumAxis
             | MirCollectionOp::TensorSoftmax
             | MirCollectionOp::TensorLayerNorm
+            // GI3-1: the inference recipes follow the same
+            // `from_transformer_op`-sibling admission path (no
+            // `CollectionOpContract` variant exists for them either).
+            | MirCollectionOp::TensorRmsNorm
+            | MirCollectionOp::TensorRope
+            | MirCollectionOp::TensorGather
+            | MirCollectionOp::TensorCausalMaskedSoftmax
     )
 }
 
@@ -835,6 +866,12 @@ pub fn transformer_shape_signature(
             .enumerate()
             .filter(|(index, _)| *index as u64 != axis)
             .fold(1u64, |acc, (_, &dim)| acc.saturating_mul(dim))
+    } else if op == MirCollectionOp::TensorGather {
+        // GI3-1: the row-gather result is shape-transforming `[V, D] →
+        // [T, D]`; the output count comes from the statement's return-type
+        // dims (the CCI-1 source contract carries the concrete `[T, D]`
+        // fact), never inferred from text (A3).
+        gather_return_count(function, validation)?
     } else {
         input_count
     };
@@ -870,7 +907,139 @@ pub fn transformer_shape_signature(
     };
     signature.input.source_local = Some(operand_local);
     signature.output.source_local = recipe_destination_local_for(function, op);
+    // GI3-1: the row-gather recipe binds its id vector as the signature's
+    // first extra input (binding 1, the kernel-index element type) at the
+    // id count resolved from the return-type dims; the output moves to
+    // binding 2. The ids' literal values were statically validated at the
+    // source surface — the count is a typed fact, never inferred.
+    if op == MirCollectionOp::TensorGather {
+        let ids_local = gather_ids_local(function).ok_or_else(|| {
+            PlanMappingError::mapping(
+                "row-gather recipe ids operand has no local in the subchain body",
+            )
+        })?;
+        let ids_ty = crate::local_ty::local_ty(function, ids_local).ok_or_else(|| {
+            PlanMappingError::mapping("row-gather recipe ids operand has no local type")
+        })?;
+        let id_count = gather_id_count(function, validation)?;
+        signature.extra_inputs.push(storage_input(
+            1,
+            gather_ids_element_ty(ids_ty, validation)?,
+            id_count,
+        ));
+        signature.output.binding = 2;
+    }
     Ok(signature)
+}
+
+/// The row-gather return element count (GI3-1): the product of the gather
+/// statement's return-type literal dims (`[T, D]`).
+fn gather_return_count(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+) -> Result<u64, PlanMappingError> {
+    let dims = gather_statement_return_dims(function, validation)?;
+    Ok(dims.iter().copied().fold(1u64, u64::saturating_mul))
+}
+
+/// The literal dims of the gather statement's return type.
+fn gather_statement_return_dims(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+) -> Result<Vec<u64>, PlanMappingError> {
+    for block in &function.blocks {
+        for statement in &block.statements {
+            let Some(op) = crate::collection_ops::statement_collection_op(statement) else {
+                continue;
+            };
+            if op != MirCollectionOp::TensorGather {
+                continue;
+            }
+            let MirStatementKind::RuntimeCall {
+                call: MirRuntimeCall { return_ty, .. },
+                ..
+            } = &statement.kind
+            else {
+                continue;
+            };
+            return crate::tensor_type::tensor_literal_dims(*return_ty, validation)
+                .map_err(PlanMappingError::mapping);
+        }
+    }
+    Err(PlanMappingError::mapping(
+        "row-gather statement not found in the subchain body",
+    ))
+}
+
+/// The row-gather id-vector length (GI3-1): the return dims' first element
+/// (`[T, D]`), the same typed fact the plan resolution cross-checks.
+fn gather_id_count(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+) -> Result<u64, PlanMappingError> {
+    let dims = gather_statement_return_dims(function, validation)?;
+    dims.first()
+        .copied()
+        .ok_or_else(|| PlanMappingError::mapping("row-gather return shape has no row dimension"))
+}
+
+/// The id vector's device element type (GI3-1): the ids are a
+/// `lista<numerus>` whose literal values were statically validated as
+/// non-negative at the source surface, so the device buffer binds at the
+/// kernel `numerus<u32>` index layout (the ABI's index surface) — resolved
+/// read-only via [`radix_types::TypeTable::find_sized_numeric`] (the "GPU
+/// builtin registry interns numerus<u32>" precedent). A non-numerus ids
+/// element, or a table without the canonical index layout, stays fail-closed
+/// with a typed diagnostic.
+fn gather_ids_element_ty(
+    ids_ty: MirType,
+    validation: &MirValidationContext<'_>,
+) -> Result<MirType, PlanMappingError> {
+    let Type::Array(element) = validation.types.get(ids_ty.semantic_id()) else {
+        return Err(PlanMappingError::mapping(
+            "row-gather ids operand must be a lista<numerus>",
+        ));
+    };
+    let (Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _)) =
+        validation.types.get(*element)
+    else {
+        return Err(PlanMappingError::mapping(
+            "row-gather ids operand must be a lista<numerus>",
+        ));
+    };
+    validation
+        .types
+        .find_sized_numeric(Primitive::Numerus, NumericWidth::U32)
+        .map(MirType::semantic)
+        .ok_or_else(|| {
+            PlanMappingError::mapping(
+                "row-gather ids buffer requires the numerus<u32> kernel index layout \
+                 in the type table",
+            )
+        })
+}
+
+/// The ids operand local of the gather statement (the second argument — the
+/// first is the table).
+fn gather_ids_local(function: &MirFunction) -> Option<MirLocalId> {
+    for block in &function.blocks {
+        for statement in &block.statements {
+            if crate::collection_ops::statement_collection_op(statement)
+                != Some(MirCollectionOp::TensorGather)
+            {
+                continue;
+            }
+            let MirStatementKind::RuntimeCall {
+                call: MirRuntimeCall { args, .. },
+                ..
+            } = &statement.kind
+            else {
+                continue;
+            };
+            return args.get(1).and_then(crate::read_analysis::operand_local);
+        }
+    }
+    None
 }
 
 /// The recipe operand local of a transformer recipe statement — the first
@@ -1043,6 +1212,16 @@ pub fn transformer_subchain_signature_for_emission_with_source(
     if let Some(operand) = transformer_operand_local(function, op) {
         signature.input.source_local = Some(operand);
         bound.push(operand);
+    }
+    // GI3-1: the row-gather recipe binds its id vector as the
+    // transformer-shaped signature's first extra input (binding 1) — the
+    // same binding [`transformer_shape_signature`] synthesized, so the
+    // data-flow pass never re-binds the ids as a separate input.
+    if let Some(ids_local) = gather_ids_local(function) {
+        if let Some(extra) = signature.extra_inputs.first_mut() {
+            extra.source_local = Some(ids_local);
+        }
+        bound.push(ids_local);
     }
     finish_subchain_emission_signature(
         function,

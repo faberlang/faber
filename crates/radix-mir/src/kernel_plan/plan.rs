@@ -76,6 +76,24 @@ pub enum CollectionKernelPlan {
     /// is S6-P1): row mean/var with optional affine. See
     /// [`LayerNormalizationPlan`].
     LayerNormalization(LayerNormalizationPlan),
+    /// Row-gather recipe (GI3-1: name frozen in this unit, S6-N1 precedent):
+    /// `out[t] = table[ids[t]]` over a rank-2 `[V, D]` table with an id
+    /// vector `[T]` → `[T, D]`. See [`GatherPlan`].
+    Gather(GatherPlan),
+    /// Root-mean-square-normalization recipe (GI3-1: name frozen in this
+    /// unit, S6-N1 precedent): `x/sqrt(mean(x²)+eps)·γ`, no mean
+    /// subtraction, eps from the const operand. See
+    /// [`RmsNormalizationPlan`].
+    RmsNormalization(RmsNormalizationPlan),
+    /// Rotary-position-embedding recipe (GI3-1: name frozen in this unit,
+    /// S6-N1 precedent): llama-arch NORM consecutive-pair rotation with
+    /// host-precomputed cos/sin table inputs. See [`RopePlan`].
+    Rope(RopePlan),
+    /// Causal masked-row softmax recipe (GI3-1: name frozen in this unit,
+    /// S6-N1 precedent): numerically stable row softmax over the causal
+    /// scores, zero probability above the diagonal. See
+    /// [`CausalMaskedSoftmaxPlan`].
+    CausalMaskedSoftmax(CausalMaskedSoftmaxPlan),
 }
 
 /// Axis-reduction recipe plan (name frozen by S6-N1; admission, resolution,
@@ -105,6 +123,66 @@ pub struct RowSoftmaxPlan {
 pub struct LayerNormalizationPlan {
     /// Normalization axis (from the trailing const operand).
     pub axis: u64,
+}
+
+/// Row-gather recipe plan (GI3-1: name frozen in this unit, S6-N1
+/// precedent). The typed facts resolve from the `TensorGather` statement:
+/// the rank-2 `[V, D]` table dims and the id-vector length `T` (the output
+/// `[T, D]` row count, resolved from the statement's return-type dims — the
+/// ids' literal values were statically validated at the source surface).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GatherPlan {
+    /// Table rows `V` (the first axis of `token_embd.weight` for the
+    /// pinned row).
+    pub table_rows: u64,
+    /// Table columns `D` (the row width; also the output row width).
+    pub table_cols: u64,
+    /// Id-vector length `T` (the output row count).
+    pub id_count: u64,
+}
+
+/// Root-mean-square-normalization recipe plan (GI3-1: name frozen in this
+/// unit, S6-N1 precedent). `y = x·(1/sqrt(mean(x²)+eps))·gamma`, no mean
+/// subtraction, eps resolved from the const operand and the affine gamma
+/// peer's width cross-checked against the normalization dimension.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RmsNormalizationPlan {
+    /// Normalization axis (from the trailing const operand; the last axis
+    /// in v1).
+    pub axis: u64,
+    /// Epsilon as f32 bits (the CCI-1 `epsilon_bits` precedent — the AIR
+    /// node stores the op-precision f32 bits; the pinned row's eps is the
+    /// f32 value 1e-5). The device surface is f32 (L7).
+    pub epsilon_bits: u32,
+    /// Normalization dimension width (the row extent gamma spans).
+    pub width: u64,
+}
+
+/// Rotary-position-embedding recipe plan (GI3-1: name frozen in this unit,
+/// S6-N1 precedent). llama-arch NORM consecutive-pair rotation: pairs
+/// `(x[2k], x[2k+1])` with `theta[k] = pos·freq_base^(−2k/dim)`,
+/// `freq_base` frozen at 100000 (v1 source constant); elements beyond `dim`
+/// on the last axis are preserved unrotated.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RopePlan {
+    /// Position (from the const operand).
+    pub pos: u64,
+    /// Rotated width (from the const operand; positive and even).
+    pub dim: u64,
+    /// Row width (the last-axis extent; elements beyond `dim` preserved).
+    pub width: u64,
+}
+
+/// Causal masked-row softmax recipe plan (GI3-1: name frozen in this unit,
+/// S6-N1 precedent). Row `i` of the causal score matrix masks columns
+/// `j > i` (zero probability above the diagonal; the diagonal is included)
+/// before the numerically stable row softmax.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CausalMaskedSoftmaxPlan {
+    /// Row (query) extent.
+    pub rows: u64,
+    /// Column (key) extent.
+    pub cols: u64,
 }
 
 /// Matmul operand shapes `(M, K, N)`, resolved from the rank-2 tensor types

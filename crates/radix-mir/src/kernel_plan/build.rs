@@ -1,13 +1,14 @@
 use super::plan::{
-    AxisReductionPlan, BarrierPhase, BarrierPoint, CollectionKernelPlan, LayerNormalizationPlan,
-    MatMulPlan, MatMulShapes, MatMulSharedMemory, OobPaddingPolicy, ReduceOp, ReductionPlan,
-    RowSoftmaxPlan, SharedMemoryLayout, TransposePlan, F32_ELEMENT_BYTE_WIDTH,
-    MATMUL_SHARED_A_BUFFER_NAME, MATMUL_SHARED_B_BUFFER_NAME, MATMUL_TILE,
-    REDUCTION_SHARED_BUFFER_NAME, TRANSPOSE_WORKGROUP_X,
+    AxisReductionPlan, BarrierPhase, BarrierPoint, CausalMaskedSoftmaxPlan, CollectionKernelPlan,
+    GatherPlan, LayerNormalizationPlan, MatMulPlan, MatMulShapes, MatMulSharedMemory,
+    OobPaddingPolicy, ReduceOp, ReductionPlan, RmsNormalizationPlan, RopePlan, RowSoftmaxPlan,
+    SharedMemoryLayout, TransposePlan, F32_ELEMENT_BYTE_WIDTH, MATMUL_SHARED_A_BUFFER_NAME,
+    MATMUL_SHARED_B_BUFFER_NAME, MATMUL_TILE, REDUCTION_SHARED_BUFFER_NAME, TRANSPOSE_WORKGROUP_X,
 };
 use super::validate::{
-    validate_axis_reduction_plan, validate_matmul_plan, validate_reduction_plan,
-    validate_transpose_plan, PlanValidationError,
+    validate_axis_reduction_plan, validate_causal_masked_softmax_plan, validate_gather_plan,
+    validate_matmul_plan, validate_reduction_plan, validate_rms_normalization_plan,
+    validate_rope_plan, validate_transpose_plan, PlanValidationError,
 };
 use crate::abi::{CollectionOpContract, MirKernelSignature};
 use crate::{
@@ -243,6 +244,81 @@ impl CollectionKernelPlan {
                 };
                 Some(plan)
             }
+            MirCollectionOp::TensorRmsNorm => {
+                // GI3-1: the RMSNorm recipe resolves the typed facts like the
+                // S6-P1 transformer recipes — dims from the operand tensor,
+                // axis from the trailing const operand (must be the last
+                // axis for the v1 row-wise recipe), epsilon from the const
+                // operand, and the affine gamma peer width cross-checked.
+                let (dims, axis) = transformer_recipe_shape(function, validation, op)?;
+                let count = dims_product(&dims)?;
+                if !signature_matches_transformer_counts(signature, count, count) {
+                    return None;
+                }
+                let (epsilon_bits, width) =
+                    rms_norm_const_facts(function, validation, &dims, axis)?;
+                Some(CollectionKernelPlan::RmsNormalization(
+                    RmsNormalizationPlan {
+                        axis,
+                        epsilon_bits,
+                        width,
+                    },
+                ))
+            }
+            MirCollectionOp::TensorRope => {
+                // GI3-1: the RoPE recipe resolves pos/dim from the trailing
+                // const operands and the row width from the operand dims
+                // (the last-axis extent; elements beyond `dim` are
+                // preserved unrotated).
+                let (dims, axis) = transformer_recipe_shape(function, validation, op)?;
+                let count = dims_product(&dims)?;
+                if !signature_matches_transformer_counts(signature, count, count) {
+                    return None;
+                }
+                let (pos, dim, width) = rope_const_facts(function, &dims, axis)?;
+                Some(CollectionKernelPlan::Rope(RopePlan { pos, dim, width }))
+            }
+            MirCollectionOp::TensorGather => {
+                // GI3-1: the row-gather recipe resolves the rank-2 `[V, D]`
+                // table dims and the id-vector length `T` (from the output
+                // row count) and cross-checks the signature's input/output
+                // element counts plus the ids extra-input count.
+                let (table_rows, table_cols, id_count) = gather_recipe_facts(function, validation)?;
+                let input_count = table_rows.saturating_mul(table_cols);
+                let output_count = id_count.saturating_mul(table_cols);
+                if !signature_matches_transformer_counts(signature, input_count, output_count) {
+                    return None;
+                }
+                if signature.extra_inputs.len() != 1
+                    || signature.extra_inputs[0].element_count != id_count
+                {
+                    return None;
+                }
+                Some(CollectionKernelPlan::Gather(GatherPlan {
+                    table_rows,
+                    table_cols,
+                    id_count,
+                }))
+            }
+            MirCollectionOp::TensorCausalMaskedSoftmax => {
+                // GI3-1: the causal masked-row softmax recipe resolves the
+                // rank-2 causal score matrix dims (row = query extent, col =
+                // key extent) and keeps the same shape end to end.
+                let (dims, _axis) = transformer_recipe_shape(function, validation, op)?;
+                if dims.len() != 2 {
+                    return None;
+                }
+                let count = dims_product(&dims)?;
+                if !signature_matches_transformer_counts(signature, count, count) {
+                    return None;
+                }
+                Some(CollectionKernelPlan::CausalMaskedSoftmax(
+                    CausalMaskedSoftmaxPlan {
+                        rows: dims[0],
+                        cols: dims[1],
+                    },
+                ))
+            }
             _ => None,
         }
     }
@@ -281,6 +357,18 @@ impl CollectionKernelPlan {
             // check in [`CollectionKernelPlan::from_transformer_op`].
             CollectionKernelPlan::RowSoftmax(_) | CollectionKernelPlan::LayerNormalization(_) => {
                 Ok(())
+            }
+            // GI3-1: the inference recipes carry no static grid/shared-memory
+            // structure — every algorithmic fact (axis/epsilon/gamma-width,
+            // pos/dim/row-width, table/id dims, causal extents) is a
+            // resolution-time typed check in
+            // [`CollectionKernelPlan::from_transformer_op`]; the static
+            // validators pin the positive-dimension floors.
+            CollectionKernelPlan::Gather(plan) => validate_gather_plan(plan),
+            CollectionKernelPlan::RmsNormalization(plan) => validate_rms_normalization_plan(plan),
+            CollectionKernelPlan::Rope(plan) => validate_rope_plan(plan),
+            CollectionKernelPlan::CausalMaskedSoftmax(plan) => {
+                validate_causal_masked_softmax_plan(plan)
             }
         }
     }
@@ -466,6 +554,53 @@ pub(crate) fn transformer_recipe_shape(
             }
             Some((dims, axis))
         }
+        MirCollectionOp::TensorRmsNorm => {
+            // GI3-1: RMSNorm normalizes over the last axis in v1 (row-wise,
+            // like softmax/layer-norm); the const axis must agree.
+            let args = transformer_statement_args(function, MirCollectionOp::TensorRmsNorm)?;
+            let dims = transformer_operand_dims(function, &args[0], validation)?;
+            let rank = dims.len();
+            if rank == 0 || rank > 2 {
+                return None;
+            }
+            let axis = (rank - 1) as u64;
+            if const_axis(args.get(1)?)? != axis {
+                return None;
+            }
+            Some((dims, axis))
+        }
+        MirCollectionOp::TensorRope => {
+            // GI3-1: RoPE rotates consecutive pairs on the last axis.
+            let args = transformer_statement_args(function, MirCollectionOp::TensorRope)?;
+            let dims = transformer_operand_dims(function, &args[0], validation)?;
+            let rank = dims.len();
+            if rank == 0 || rank > 2 {
+                return None;
+            }
+            Some((dims, (rank - 1) as u64))
+        }
+        MirCollectionOp::TensorCausalMaskedSoftmax => {
+            // GI3-1: the causal masked-row softmax consumes a rank-2 causal
+            // score matrix `[rows, cols]`.
+            let args =
+                transformer_statement_args(function, MirCollectionOp::TensorCausalMaskedSoftmax)?;
+            let dims = transformer_operand_dims(function, &args[0], validation)?;
+            if dims.len() != 2 {
+                return None;
+            }
+            Some((dims, 1))
+        }
+        MirCollectionOp::TensorGather => {
+            // GI3-1: the row-gather table is a rank-2 `[V, D]` tensor; the
+            // id count resolves separately from the return-type dims (the
+            // shape facts the plan pass cross-checks).
+            let args = transformer_statement_args(function, MirCollectionOp::TensorGather)?;
+            let dims = transformer_operand_dims(function, &args[0], validation)?;
+            if dims.len() != 2 {
+                return None;
+            }
+            Some((dims, 1))
+        }
         _ => None,
     }
 }
@@ -513,6 +648,142 @@ fn layer_norm_const_facts(
         }
     }
     true
+}
+
+/// The `TensorRmsNorm` const-operand facts (GI3-1): the epsilon must be a
+/// `MirConstant::Float` (a const — never a value that would require
+/// inference, A3) that is finite and positive, and the mandatory affine
+/// gamma peer must be a rank-1 tensor of the normalization dimension (the
+/// CCI-1 source contract). Returns the f32 epsilon bits (the CCI-1
+/// `epsilon_bits` precedent — the op-precision f32 bits) and the
+/// normalization width; `None` when a const constraint fails.
+fn rms_norm_const_facts(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+    dims: &[u64],
+    axis: u64,
+) -> Option<(u32, u64)> {
+    let args = transformer_statement_args(function, MirCollectionOp::TensorRmsNorm)?;
+    if args.len() != 4 {
+        return None;
+    }
+    let MirOperand::Constant(MirConstant::Float(epsilon)) = &args[2] else {
+        return None;
+    };
+    let epsilon = *epsilon as f32;
+    if !epsilon.is_finite() || epsilon <= 0.0 {
+        return None;
+    }
+    let Some(norm_index) = usize::try_from(axis)
+        .ok()
+        .filter(|index| *index < dims.len())
+    else {
+        return None;
+    };
+    let norm_dim = dims[norm_index];
+    // Gamma is the mandatory affine peer (args[3]); the CCI-1 source
+    // contract enforces a rank-1 tensor of the normalization dimension.
+    let gamma_ty = crate::local_ty::operand_local_ty(function, &args[3])?;
+    let Ok(gamma_dims) = crate::tensor_type::tensor_literal_dims(gamma_ty, validation) else {
+        return None;
+    };
+    if gamma_dims.len() != 1 || gamma_dims[0] != norm_dim {
+        return None;
+    }
+    Some((epsilon.to_bits(), norm_dim))
+}
+
+/// The `TensorRope` const-operand facts (GI3-1): `pos` must be a
+/// non-negative `MirConstant::Int`/`UInt` and `dim` a positive, even
+/// `MirConstant::Int`/`UInt` not exceeding the last-axis extent (the CCI-1
+/// source contract; the MIR validator re-checks). Returns
+/// `(pos, dim, width)`; `None` when a const constraint fails.
+fn rope_const_facts(function: &MirFunction, dims: &[u64], axis: u64) -> Option<(u64, u64, u64)> {
+    let args = transformer_statement_args(function, MirCollectionOp::TensorRope)?;
+    if args.len() != 3 {
+        return None;
+    }
+    let pos = const_non_negative(args.get(1)?)?;
+    let dim = const_non_negative(args.get(2)?)?;
+    if dim == 0 || dim % 2 != 0 {
+        return None;
+    }
+    let Some(axis_index) = usize::try_from(axis)
+        .ok()
+        .filter(|index| *index < dims.len())
+    else {
+        return None;
+    };
+    let width = dims[axis_index];
+    if dim > width {
+        return None;
+    }
+    Some((pos, dim, width))
+}
+
+/// A non-negative integer const operand (the pos/dim consts of RoPE and the
+/// axis consts of the transformer recipes).
+fn const_non_negative(operand: &MirOperand) -> Option<u64> {
+    match operand {
+        MirOperand::Constant(MirConstant::Int(value)) => u64::try_from(*value).ok(),
+        MirOperand::Constant(MirConstant::UInt(value)) => Some(*value),
+        _ => None,
+    }
+}
+
+/// The `TensorGather` recipe facts (GI3-1): the rank-2 `[V, D]` table dims
+/// and the id-vector length `T`. `T` resolves from the gather statement's
+/// return-type dims (`[T, D]`, the shape-transforming result of the CCI-1
+/// source contract) divided by the table row width — the ids' literal
+/// values were statically validated at the source surface, so the plan
+/// carries the count as a typed fact, never inferred from text (A3).
+/// `None` when the table is not rank-2, the return shape is not `[T, D]`,
+/// or the width does not divide evenly.
+fn gather_recipe_facts(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+) -> Option<(u64, u64, u64)> {
+    let args = transformer_statement_args(function, MirCollectionOp::TensorGather)?;
+    let dims = transformer_operand_dims(function, &args[0], validation)?;
+    if dims.len() != 2 {
+        return None;
+    }
+    let table_rows = dims[0];
+    let table_cols = dims[1];
+    if table_rows == 0 || table_cols == 0 {
+        return None;
+    }
+    let return_dims =
+        transformer_statement_return_dims(function, MirCollectionOp::TensorGather, validation)?;
+    if return_dims.len() != 2 || return_dims[1] != table_cols {
+        return None;
+    }
+    Some((table_rows, table_cols, return_dims[0]))
+}
+
+/// The literal dims of the first statement carrying `op`'s return type (the
+/// shape-transforming result the gather recipe sizes its output from).
+fn transformer_statement_return_dims(
+    function: &MirFunction,
+    op: MirCollectionOp,
+    validation: &MirValidationContext<'_>,
+) -> Option<Vec<u64>> {
+    for block in &function.blocks {
+        for statement in &block.statements {
+            if crate::collection_ops::statement_collection_op(statement) != Some(op) {
+                continue;
+            }
+            let MirStatementKind::RuntimeCall {
+                call: MirRuntimeCall { return_ty, .. },
+                ..
+            } = &statement.kind
+            else {
+                continue;
+            };
+            return crate::tensor_type::tensor_literal_dims(*return_ty, validation).ok();
+        }
+    }
+    None
 }
 
 /// The args of the first statement carrying `op` in the function body (the

@@ -1,7 +1,7 @@
 use super::plan::{
-    AxisReductionPlan, BarrierPhase, BarrierPoint, MatMulPlan, ReduceOp, ReductionPlan,
-    SharedMemoryLayout, TransposePlan, MATMUL_SHARED_A_BUFFER_NAME, MATMUL_SHARED_B_BUFFER_NAME,
-    WORKGROUP_SHARED_MEMORY_LIMIT_BYTES,
+    AxisReductionPlan, BarrierPhase, BarrierPoint, CausalMaskedSoftmaxPlan, GatherPlan, MatMulPlan,
+    ReduceOp, ReductionPlan, RmsNormalizationPlan, RopePlan, SharedMemoryLayout, TransposePlan,
+    MATMUL_SHARED_A_BUFFER_NAME, MATMUL_SHARED_B_BUFFER_NAME, WORKGROUP_SHARED_MEMORY_LIMIT_BYTES,
 };
 use std::fmt;
 
@@ -193,6 +193,64 @@ pub(super) fn validate_axis_reduction_plan(
 ) -> Result<(), PlanValidationError> {
     if !matches!(plan.op, ReduceOp::Sum) {
         return Err(PlanValidationError::AxisReductionUnsupportedOp { op: plan.op });
+    }
+    Ok(())
+}
+
+/// Row-gather recipe validation (GI3-1). Positive dims only (a zero table
+/// row/col or a zero id count dispatches an empty grid and the gather
+/// remap would be degenerate); the id-range/table-shape facts are
+/// resolution-time typed checks
+/// ([`super::CollectionKernelPlan::from_transformer_op`]).
+pub(super) fn validate_gather_plan(plan: &GatherPlan) -> Result<(), PlanValidationError> {
+    if plan.table_rows == 0 || plan.table_cols == 0 || plan.id_count == 0 {
+        return Err(PlanValidationError::GatherZeroDimension {
+            table_rows: plan.table_rows,
+            table_cols: plan.table_cols,
+            id_count: plan.id_count,
+        });
+    }
+    Ok(())
+}
+
+/// Root-mean-square-normalization recipe validation (GI3-1). A positive
+/// normalization width (a zero width dispatches an empty row pass and the
+/// rsqrt divisor would be degenerate); the axis-in-range / positive-finite
+/// epsilon / gamma-width facts are resolution-time typed checks.
+pub(super) fn validate_rms_normalization_plan(
+    plan: &RmsNormalizationPlan,
+) -> Result<(), PlanValidationError> {
+    if plan.width == 0 {
+        return Err(PlanValidationError::RmsNormalizationZeroWidth { width: plan.width });
+    }
+    Ok(())
+}
+
+/// Rotary-position-embedding recipe validation (GI3-1). A positive rotated
+/// width (a zero `dim` admits no pair) and a positive row width; the
+/// even-`dim` / in-extent facts are resolution-time typed checks.
+pub(super) fn validate_rope_plan(plan: &RopePlan) -> Result<(), PlanValidationError> {
+    if plan.dim == 0 || plan.width == 0 {
+        return Err(PlanValidationError::RopeZeroDimension {
+            pos: plan.pos,
+            dim: plan.dim,
+            width: plan.width,
+        });
+    }
+    Ok(())
+}
+
+/// Causal masked-row softmax recipe validation (GI3-1). Positive row/column
+/// extents (a zero extent dispatches an empty grid and the row-mask remap
+/// would be degenerate).
+pub(super) fn validate_causal_masked_softmax_plan(
+    plan: &CausalMaskedSoftmaxPlan,
+) -> Result<(), PlanValidationError> {
+    if plan.rows == 0 || plan.cols == 0 {
+        return Err(PlanValidationError::CausalMaskedSoftmaxZeroDimension {
+            rows: plan.rows,
+            cols: plan.cols,
+        });
     }
     Ok(())
 }
@@ -414,6 +472,23 @@ pub enum PlanValidationError {
     /// The axis-reduction recipe's v1 closed op set is `Sum` only — a
     /// mean-over-axis is not part of the transformer surface.
     AxisReductionUnsupportedOp { op: ReduceOp },
+    /// The row-gather recipe requires positive table dims and a positive id
+    /// count (a zero dimension dispatches an empty grid and the gather remap
+    /// would be degenerate).
+    GatherZeroDimension {
+        table_rows: u64,
+        table_cols: u64,
+        id_count: u64,
+    },
+    /// The RMS-normalization recipe requires a positive normalization width
+    /// (a zero width dispatches an empty row pass).
+    RmsNormalizationZeroWidth { width: u64 },
+    /// The RoPE recipe requires a positive rotated width and a positive row
+    /// width (a zero width admits no rotation pair).
+    RopeZeroDimension { pos: u64, dim: u64, width: u64 },
+    /// The causal masked-softmax recipe requires positive row/column extents
+    /// (a zero extent dispatches an empty grid).
+    CausalMaskedSoftmaxZeroDimension { rows: u64, cols: u64 },
 }
 
 impl fmt::Display for PlanValidationError {
@@ -502,6 +577,26 @@ impl fmt::Display for PlanValidationError {
             Self::AxisReductionUnsupportedOp { op } => write!(
                 f,
                 "axis-reduction recipe v1 admits only Sum, got {op:?}"
+            ),
+            Self::GatherZeroDimension {
+                table_rows,
+                table_cols,
+                id_count,
+            } => write!(
+                f,
+                "row-gather requires positive dims, got table {table_rows}×{table_cols}, id count {id_count}"
+            ),
+            Self::RmsNormalizationZeroWidth { width } => write!(
+                f,
+                "RMS-normalization requires a positive normalization width, got {width}"
+            ),
+            Self::RopeZeroDimension { pos, dim, width } => write!(
+                f,
+                "RoPE requires a positive rotated width and row width, got pos={pos}, dim={dim}, width={width}"
+            ),
+            Self::CausalMaskedSoftmaxZeroDimension { rows, cols } => write!(
+                f,
+                "causal masked-softmax requires positive row/column extents, got rows={rows}, cols={cols}"
             ),
         }
     }

@@ -2405,3 +2405,704 @@ fn subchain_additional_outputs_resolve_in_emission_signature() {
     assert!(single.extra_outputs.is_empty());
     assert_eq!(single.output.binding, 2);
 }
+
+// -----------------------------------------------------------------------
+// GI3-1 inference-recipe admission (Gather / RmsNormalization / Rope /
+// CausalMaskedSoftmax resolve + validate on the shared plan surface; the
+// pinned-shape fixtures prove the pinned row's decoder op surface; SiLU is
+// verified as a composition of the admitted elementwise surface + the
+// S6-P1 Exp unary — never a recipe).
+// -----------------------------------------------------------------------
+
+/// A rank-2 RMSNorm kernel: `t = rms_norm(x, 1, 1e-5, gamma)` over `[2, 960]`
+/// (the pinned hidden width), gamma `[960]` — the CCI-1 const layout
+/// `[x, axis, eps, gamma]` (axis = last, eps = 1e-5, gamma mandatory).
+fn rms_norm_function(types: &mut TypeTable) -> MirFunction {
+    let input = rank2_tensor_ty(types, [2, 960]);
+    let gamma = tensor_ty(types, 960);
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![
+            MirParam {
+                local: MirLocalId(0),
+                name: None,
+                ty: input,
+                mode: MirParamMode::Owned,
+                span: test_span(),
+            },
+            MirParam {
+                local: MirLocalId(1),
+                name: None,
+                ty: gamma,
+                mode: MirParamMode::Owned,
+                span: test_span(),
+            },
+        ],
+        locals: vec![
+            MirLocal {
+                id: MirLocalId(0),
+                name: None,
+                ty: input,
+                mutable: false,
+                span: test_span(),
+            },
+            MirLocal {
+                id: MirLocalId(1),
+                name: None,
+                ty: gamma,
+                mutable: false,
+                span: test_span(),
+            },
+            MirLocal {
+                id: MirLocalId(2),
+                name: None,
+                ty: input,
+                mutable: false,
+                span: test_span(),
+            },
+        ],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::RuntimeCall {
+                    destination: Some(MirPlace::local(MirLocalId(2))),
+                    call: MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorRmsNorm),
+                        args: vec![
+                            MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                            MirOperand::Constant(MirConstant::Int(1)),
+                            MirOperand::Constant(MirConstant::Float(1e-5)),
+                            MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                        ],
+                        return_ty: input,
+                    },
+                },
+                span: test_span(),
+            }],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(2),
+                )))),
+                span: test_span(),
+            },
+            span: test_span(),
+        }],
+        return_ty: input,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: test_span(),
+    }
+}
+
+/// A rank-2 RoPE kernel: `t = rope_norm(x, pos, dim)` over `[2, 64]` (the
+/// pinned head dimension) with the NORM consecutive-pair (pos, dim).
+fn rope_function(types: &mut TypeTable, pos: i64, dim: i64) -> MirFunction {
+    rank2_const_op_function(
+        types,
+        [2, 64],
+        MirCollectionOp::TensorRope,
+        vec![MirConstant::Int(pos), MirConstant::Int(dim)],
+    )
+}
+
+/// A row-gather kernel: `t = gather(table, ids)` over the pinned `[960, 49152]`
+/// token-embedding table with 9 ids → `[9, 49152]` (the tied output head
+/// doubles as the embedding table). The ids vector is a `lista<numerus>`
+/// operand; the CCI-1 source contract statically validated its literal
+/// values, so the plan resolves the count from the return-type dims.
+fn gather_function(types: &mut TypeTable) -> MirFunction {
+    let table = rank2_tensor_ty(types, [960, 49152]);
+    let output = rank2_tensor_ty(types, [9, 49152]);
+    let ids_element = types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let ids = MirType::semantic(types.array(ids_element));
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![
+            MirParam {
+                local: MirLocalId(0),
+                name: None,
+                ty: table,
+                mode: MirParamMode::Owned,
+                span: test_span(),
+            },
+            MirParam {
+                local: MirLocalId(1),
+                name: None,
+                ty: ids,
+                mode: MirParamMode::Owned,
+                span: test_span(),
+            },
+        ],
+        locals: vec![
+            MirLocal {
+                id: MirLocalId(0),
+                name: None,
+                ty: table,
+                mutable: false,
+                span: test_span(),
+            },
+            MirLocal {
+                id: MirLocalId(1),
+                name: None,
+                ty: ids,
+                mutable: false,
+                span: test_span(),
+            },
+            MirLocal {
+                id: MirLocalId(2),
+                name: None,
+                ty: output,
+                mutable: false,
+                span: test_span(),
+            },
+        ],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::RuntimeCall {
+                    destination: Some(MirPlace::local(MirLocalId(2))),
+                    call: MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorGather),
+                        args: vec![
+                            MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                            MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                        ],
+                        return_ty: output,
+                    },
+                },
+                span: test_span(),
+            }],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(2),
+                )))),
+                span: test_span(),
+            },
+            span: test_span(),
+        }],
+        return_ty: output,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: test_span(),
+    }
+}
+
+/// A rank-2 causal masked-softmax kernel: `t = causal_masked_softmax(x)`
+/// over the pinned `[9, 9]` causal score matrix (the 9-token correctness
+/// fixture prompt).
+fn causal_masked_softmax_function(types: &mut TypeTable) -> MirFunction {
+    rank2_const_op_function(
+        types,
+        [9, 9],
+        MirCollectionOp::TensorCausalMaskedSoftmax,
+        vec![],
+    )
+}
+
+/// The gather kernel's transformer-shaped signature: table at binding 0
+/// (f32, V·D), the ids vector as the first extra input at binding 1 (u32,
+/// T), and the output at binding 2 (f32, T·D) — the shape
+/// [`transformer_shape_signature`] synthesizes.
+fn gather_signature() -> MirKernelSignature {
+    let mut types = TypeTable::new();
+    let element_ty = f32_ty(&mut types);
+    let ids_ty = MirType::semantic(types.sized_numeric(Primitive::Numerus, NumericWidth::U32));
+    MirKernelSignature {
+        function: MirFunctionId(0),
+        input: MirKernelResource {
+            group: 0,
+            binding: 0,
+            kind: MirKernelResourceKind::StorageBuffer,
+            role: MirKernelResourceRole::Input,
+            access: MirKernelResourceAccess::Read,
+            element_ty,
+            element_count: 960 * 49_152,
+            source_local: Some(MirLocalId(0)),
+            source_name: None,
+        },
+        extra_inputs: vec![MirKernelResource {
+            group: 0,
+            binding: 1,
+            kind: MirKernelResourceKind::StorageBuffer,
+            role: MirKernelResourceRole::Input,
+            access: MirKernelResourceAccess::Read,
+            element_ty: ids_ty,
+            element_count: 9,
+            source_local: Some(MirLocalId(1)),
+            source_name: None,
+        }],
+        output: MirKernelResource {
+            group: 0,
+            binding: 2,
+            kind: MirKernelResourceKind::StorageBuffer,
+            role: MirKernelResourceRole::Output,
+            access: MirKernelResourceAccess::Write,
+            element_ty,
+            element_count: 9 * 49_152,
+            source_local: None,
+            source_name: None,
+        },
+        extra_outputs: Vec::new(),
+        accumulation_buffers: Vec::new(),
+        builtin_inputs: Vec::new(),
+        called_builtins: Vec::new(),
+        workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
+        dispatch_size: MirKernelDispatchSize {
+            x: 9 * 49_152,
+            y: 1,
+            z: 1,
+        },
+    }
+}
+
+#[test]
+fn rms_norm_function_resolves_rms_normalization_plan() {
+    // A TensorRmsNorm-bearing body resolves the RmsNormalization recipe with
+    // the axis from the trailing const operand, the eps (as f32 bits) from
+    // the const operand, and the width from the operand dims.
+    let mut types = TypeTable::new();
+    let function = rms_norm_function(&mut types);
+    let signature = transformer_signature(2 * 960, 2 * 960);
+    let validation = MirValidationContext::new(&types);
+    let derived = kernel_plan_for_function(&function, &signature, &validation)
+        .expect("rms_norm function facts resolve")
+        .expect("rms_norm function carries a recipe plan");
+    let CollectionKernelPlan::RmsNormalization(plan) = &derived else {
+        panic!("rms_norm body must derive an RMS-normalization plan, got {derived:?}");
+    };
+    assert_eq!(plan.axis, 1, "RMSNorm normalizes over the last axis");
+    assert_eq!(
+        plan.epsilon_bits,
+        (1e-5_f64 as f32).to_bits(),
+        "eps is the f32 const operand bits (the pinned row's 1e-5)"
+    );
+    assert_eq!(plan.width, 960, "the normalization width is the hidden dim");
+    derived.validate().expect("the derived plan validates");
+    let carried =
+        CollectionKernelPlan::RmsNormalization(crate::kernel_plan::RmsNormalizationPlan {
+            axis: 1,
+            epsilon_bits: (1e-5_f64 as f32).to_bits(),
+            width: 960,
+        });
+    assert!(carried_plan_agrees(&carried, Some(&derived)));
+}
+
+#[test]
+fn rope_function_resolves_rope_plan() {
+    // A TensorRope-bearing body resolves the Rope recipe with the pinned
+    // NORM consecutive-pair (pos=0, dim=64) and the row width 64.
+    let mut types = TypeTable::new();
+    let function = rope_function(&mut types, 0, 64);
+    let signature = transformer_signature(2 * 64, 2 * 64);
+    let validation = MirValidationContext::new(&types);
+    let derived = kernel_plan_for_function(&function, &signature, &validation)
+        .expect("rope function facts resolve")
+        .expect("rope function carries a recipe plan");
+    let CollectionKernelPlan::Rope(plan) = &derived else {
+        panic!("rope body must derive a rope plan, got {derived:?}");
+    };
+    assert_eq!(
+        plan.pos, 0,
+        "position comes from the trailing const operand"
+    );
+    assert_eq!(plan.dim, 64, "rotated width comes from the const operand");
+    assert_eq!(plan.width, 64, "row width is the last-axis extent");
+    derived.validate().expect("the derived plan validates");
+    let carried = CollectionKernelPlan::Rope(crate::kernel_plan::RopePlan {
+        pos: 0,
+        dim: 64,
+        width: 64,
+    });
+    assert!(carried_plan_agrees(&carried, Some(&derived)));
+}
+
+#[test]
+fn gather_function_resolves_gather_plan() {
+    // A TensorGather-bearing body resolves the Gather recipe over the pinned
+    // [960, 49152] table with 9 ids → [9, 49152]. The ids vector binds as
+    // the signature's first extra input (binding 1) at the u32 index layout.
+    let mut types = TypeTable::new();
+    let function = gather_function(&mut types);
+    let signature = gather_signature();
+    let validation = MirValidationContext::new(&types);
+    let derived = kernel_plan_for_function(&function, &signature, &validation)
+        .expect("gather function facts resolve")
+        .expect("gather function carries a recipe plan");
+    let CollectionKernelPlan::Gather(plan) = &derived else {
+        panic!("gather body must derive a gather plan, got {derived:?}");
+    };
+    assert_eq!(
+        plan.table_rows, 960,
+        "table rows V come from the operand dims"
+    );
+    assert_eq!(
+        plan.table_cols, 49_152,
+        "table cols D come from the operand dims"
+    );
+    assert_eq!(
+        plan.id_count, 9,
+        "id count T comes from the return-type dims"
+    );
+    derived.validate().expect("the derived plan validates");
+    let carried = CollectionKernelPlan::Gather(crate::kernel_plan::GatherPlan {
+        table_rows: 960,
+        table_cols: 49_152,
+        id_count: 9,
+    });
+    assert!(carried_plan_agrees(&carried, Some(&derived)));
+}
+
+#[test]
+fn gather_shape_signature_binds_the_ids_extra_input() {
+    // The transformer-shaped signature seam binds the ids vector as the
+    // first extra input (binding 1, u32, count 9) with the output at
+    // binding 2 — the shape the plan resolution cross-checks and the
+    // subchain emission signature preserves.
+    let mut types = TypeTable::new();
+    let function = gather_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let signature =
+        transformer_shape_signature(&function, MirCollectionOp::TensorGather, &validation)
+            .expect("the gather seam resolves its transformer-shaped signature");
+    assert_eq!(signature.input.element_count, 960 * 49_152);
+    assert_eq!(signature.input.source_local, Some(MirLocalId(0)));
+    assert_eq!(
+        signature.extra_inputs.len(),
+        1,
+        "the ids bind as the extra input"
+    );
+    assert_eq!(signature.extra_inputs[0].element_count, 9);
+    assert_eq!(signature.extra_inputs[0].binding, 1);
+    assert_eq!(signature.output.element_count, 9 * 49_152);
+    assert_eq!(signature.output.binding, 2);
+    // The plan pass resolves the seam signature exactly as it resolves the
+    // whole-function signature — one source of recipe truth.
+    let plan = CollectionKernelPlan::from_transformer_op(
+        &signature,
+        &function,
+        &validation,
+        MirCollectionOp::TensorGather,
+    )
+    .expect("the seam signature resolves the gather plan");
+    assert!(matches!(plan, CollectionKernelPlan::Gather(_)));
+}
+
+#[test]
+fn causal_masked_softmax_function_resolves_causal_masked_softmax_plan() {
+    // A TensorCausalMaskedSoftmax-bearing body resolves the
+    // CausalMaskedSoftmax recipe over the pinned [9, 9] causal score matrix.
+    let mut types = TypeTable::new();
+    let function = causal_masked_softmax_function(&mut types);
+    let signature = transformer_signature(9 * 9, 9 * 9);
+    let validation = MirValidationContext::new(&types);
+    let derived = kernel_plan_for_function(&function, &signature, &validation)
+        .expect("causal masked-softmax function facts resolve")
+        .expect("causal masked-softmax function carries a recipe plan");
+    let CollectionKernelPlan::CausalMaskedSoftmax(plan) = &derived else {
+        panic!(
+            "causal masked-softmax body must derive a causal masked-softmax plan, got {derived:?}"
+        );
+    };
+    assert_eq!(plan.rows, 9, "the row (query) extent");
+    assert_eq!(plan.cols, 9, "the column (key) extent");
+    derived.validate().expect("the derived plan validates");
+    let carried =
+        CollectionKernelPlan::CausalMaskedSoftmax(crate::kernel_plan::CausalMaskedSoftmaxPlan {
+            rows: 9,
+            cols: 9,
+        });
+    assert!(carried_plan_agrees(&carried, Some(&derived)));
+}
+
+#[test]
+fn inference_recipe_kinds_are_typed() {
+    assert_eq!(
+        RecipeKind::from_plan(&CollectionKernelPlan::Gather(
+            crate::kernel_plan::GatherPlan {
+                table_rows: 960,
+                table_cols: 49_152,
+                id_count: 9,
+            }
+        )),
+        RecipeKind::Gather
+    );
+    assert_eq!(
+        RecipeKind::from_plan(&CollectionKernelPlan::RmsNormalization(
+            crate::kernel_plan::RmsNormalizationPlan {
+                axis: 1,
+                epsilon_bits: (1e-5_f64 as f32).to_bits(),
+                width: 960,
+            }
+        )),
+        RecipeKind::RmsNormalization
+    );
+    assert_eq!(
+        RecipeKind::from_plan(&CollectionKernelPlan::Rope(crate::kernel_plan::RopePlan {
+            pos: 0,
+            dim: 64,
+            width: 64,
+        })),
+        RecipeKind::Rope
+    );
+    assert_eq!(
+        RecipeKind::from_plan(&CollectionKernelPlan::CausalMaskedSoftmax(
+            crate::kernel_plan::CausalMaskedSoftmaxPlan { rows: 9, cols: 9 }
+        )),
+        RecipeKind::CausalMaskedSoftmax
+    );
+}
+
+#[test]
+fn const_violating_inference_ops_fail_closed() {
+    // GI3-1 fail-closed: a non-last RMSNorm axis, an odd RoPE dim, and a
+    // gather whose return width disagrees with the table stay closed with
+    // the typed plan diagnostic — the plan never infers facts (A3).
+    let mut types = TypeTable::new();
+    let mut bad_axis = rms_norm_function(&mut types);
+    // Rewrite the axis const (args[1]) to 0 (not the last axis).
+    if let MirStatementKind::RuntimeCall { call, .. } = &mut bad_axis.blocks[0].statements[0].kind {
+        call.args[1] = MirOperand::Constant(MirConstant::Int(0));
+    }
+    let validation = MirValidationContext::new(&types);
+    let error = kernel_plan_for_function(
+        &bad_axis,
+        &transformer_signature(2 * 960, 2 * 960),
+        &validation,
+    )
+    .expect_err("a non-last RMSNorm axis must fail closed");
+    assert!(
+        error.message.contains("TensorRmsNorm"),
+        "the diagnostic names the op: {error}"
+    );
+
+    let mut types = TypeTable::new();
+    let odd_rope = rope_function(&mut types, 0, 63);
+    let validation = MirValidationContext::new(&types);
+    let error = kernel_plan_for_function(
+        &odd_rope,
+        &transformer_signature(2 * 64, 2 * 64),
+        &validation,
+    )
+    .expect_err("an odd RoPE dim must fail closed");
+    assert!(
+        error.message.contains("TensorRope"),
+        "the diagnostic names the op: {error}"
+    );
+
+    // A non-admitted collection op (TensorSlice — no recipe, not elementwise)
+    // still fails closed with the typed diagnostic.
+    let mut types = TypeTable::new();
+    let slice = rank2_const_op_function(
+        &mut types,
+        [4, 4],
+        MirCollectionOp::TensorSlice,
+        vec![MirConstant::Int(0)],
+    );
+    let validation = MirValidationContext::new(&types);
+    let error = kernel_plan_for_function(&slice, &transformer_signature(16, 16), &validation)
+        .expect_err("a non-admitted collection op must fail closed");
+    assert!(
+        error.message.contains("TensorSlice"),
+        "the diagnostic names the op: {error}"
+    );
+}
+
+/// The SiLU composition fixture: `y = x·sigmoid(x)` with
+/// `sigmoid(x) = 1/(1+exp(−x))` expressed as the admitted elementwise
+/// surface (`TensorNeg` for `−x`, `TensorDiv` for `1/(1+e)`, `TensorMul` for
+/// `x·d`) plus the S6-P1 `MirUnOp::Exp` tensor unary — the composition
+/// GI3-1 verifies in place of a dedicated activation recipe.
+fn silu_composition_function(types: &mut TypeTable) -> MirFunction {
+    let r1 = tensor_ty(types, 4);
+    let exp = MirValue {
+        id: MirValueId(0),
+        kind: MirValueKind::Unary {
+            op: MirUnOp::Exp,
+            operand: MirOperand::Place(MirPlace::local(MirLocalId(1))),
+        },
+        ty: r1,
+        span: test_span(),
+    };
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![MirParam {
+            local: MirLocalId(0),
+            name: None,
+            ty: r1,
+            mode: MirParamMode::Owned,
+            span: test_span(),
+        }],
+        locals: vec![
+            MirLocal {
+                id: MirLocalId(0),
+                name: None,
+                ty: r1,
+                mutable: false,
+                span: test_span(),
+            },
+            MirLocal {
+                id: MirLocalId(1),
+                name: None,
+                ty: r1,
+                mutable: false,
+                span: test_span(),
+            },
+            MirLocal {
+                id: MirLocalId(2),
+                name: None,
+                ty: r1,
+                mutable: false,
+                span: test_span(),
+            },
+            MirLocal {
+                id: MirLocalId(3),
+                name: None,
+                ty: r1,
+                mutable: false,
+                span: test_span(),
+            },
+            MirLocal {
+                id: MirLocalId(4),
+                name: None,
+                ty: r1,
+                mutable: false,
+                span: test_span(),
+            },
+            MirLocal {
+                id: MirLocalId(5),
+                name: None,
+                ty: r1,
+                mutable: false,
+                span: test_span(),
+            },
+        ],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![
+                // n = -x
+                MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: Some(MirPlace::local(MirLocalId(1))),
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorNeg),
+                            args: vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+                            return_ty: r1,
+                        },
+                    },
+                    span: test_span(),
+                },
+                // e = exp(n) — the S6-P1 tensor unary
+                MirStatement {
+                    kind: MirStatementKind::Assign {
+                        place: MirPlace::local(MirLocalId(2)),
+                        value: exp,
+                    },
+                    span: test_span(),
+                },
+                // a = 1 + e
+                MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: Some(MirPlace::local(MirLocalId(3))),
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorAdd),
+                            args: vec![
+                                MirOperand::Constant(MirConstant::Float(1.0)),
+                                MirOperand::Place(MirPlace::local(MirLocalId(2))),
+                            ],
+                            return_ty: r1,
+                        },
+                    },
+                    span: test_span(),
+                },
+                // d = 1 / a
+                MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: Some(MirPlace::local(MirLocalId(4))),
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorDiv),
+                            args: vec![
+                                MirOperand::Constant(MirConstant::Float(1.0)),
+                                MirOperand::Place(MirPlace::local(MirLocalId(3))),
+                            ],
+                            return_ty: r1,
+                        },
+                    },
+                    span: test_span(),
+                },
+                // y = x * d
+                MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: Some(MirPlace::local(MirLocalId(5))),
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorMul),
+                            args: vec![
+                                MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                                MirOperand::Place(MirPlace::local(MirLocalId(4))),
+                            ],
+                            return_ty: r1,
+                        },
+                    },
+                    span: test_span(),
+                },
+            ],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(5),
+                )))),
+                span: test_span(),
+            },
+            span: test_span(),
+        }],
+        return_ty: r1,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: test_span(),
+    }
+}
+
+#[test]
+fn silu_composition_is_elementwise_on_the_admitted_surface() {
+    // SiLU(x) = x·sigmoid(x) = x/(1+exp(−x)) is expressible on the admitted
+    // elementwise surface (TensorNeg/TensorAdd/TensorDiv/TensorMul) plus the
+    // S6-P1 `MirUnOp::Exp` tensor unary — the composition needs NO dedicated
+    // activation recipe, so the whole body stays an elementwise kernel
+    // (kernel_plan_for_function returns the no-recipe `None`, never a
+    // fail-closed diagnostic and never a silent recipe).
+    assert!(
+        crate::device_program_plans::is_admitted_tensor_unary(MirUnOp::Exp),
+        "the S6-P1 Exp unary is admitted on the tensor elementwise surface"
+    );
+    let mut types = TypeTable::new();
+    let function = silu_composition_function(&mut types);
+    let signature = transformer_signature(4, 4);
+    let validation = MirValidationContext::new(&types);
+    let derived = kernel_plan_for_function(&function, &signature, &validation)
+        .expect("the SiLU composition facts resolve without a fail-closed diagnostic");
+    assert_eq!(
+        derived, None,
+        "the SiLU composition is elementwise (no recipe), so the plan is the no-recipe fallback"
+    );
+    // The complete collection-op set of the composition is elementwise —
+    // the closed-set predicate admits every member.
+    for op in crate::collection_ops::collection_ops_for_function(&function) {
+        assert!(
+            is_elementwise_collection_op(op),
+            "the SiLU composition op {op:?} must be elementwise-admitted"
+        );
+    }
+}
