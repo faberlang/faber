@@ -70,8 +70,8 @@ use radix_mir::device_program::{
     ObservationCadence,
 };
 use radix_mir::device_program_plans::{
-    is_transformer_recipe_op, kernel_plan_for_function, subchain_signature_for_emission,
-    transformer_subchain_signature_for_emission,
+    is_transformer_recipe_op, kernel_plan_for_function, subchain_signature_for_emission_with_source,
+    transformer_subchain_signature_for_emission_with_source,
 };
 use radix_mir::device_semantics::{
     DependencyEdge, DeviceSemantics, InitializationFact, InitializationPolicy,

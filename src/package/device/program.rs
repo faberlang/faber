@@ -2,8 +2,8 @@
 // split routes through `use super::*` (wildcard imports are denied).
 use super::{
     collection_op_contract, decompose_kernel_function, device_diag, is_transformer_recipe_op,
-    kernel_plan_for_function, subchain_signature_for_emission, training_plan_facts,
-    transformer_subchain_signature_for_emission, BTreeMap, BTreeSet, Binding, BufferId,
+    kernel_plan_for_function, subchain_signature_for_emission_with_source, training_plan_facts,
+    transformer_subchain_signature_for_emission_with_source, BTreeMap, BTreeSet, Binding, BufferId,
     BufferIdentity, BufferLifetime, BufferRole, BufferVersion, CollectionKernelPlan,
     DependencyEdge, DeviceProgram, DeviceProgramLifetime, DeviceResource, DeviceSemantics,
     Diagnostic, HashMap, InitializationFact, InitializationPolicy, Interner, KernelLaunchPlan,
@@ -948,11 +948,12 @@ pub(crate) fn device_program_for_lowered(
             let contract = collection_op_contract(&synthetic, &subchain_validation)
                 .map_err(|error| vec![device_diag("plan", error.message)])?;
             let signature = match &contract {
-                Some(contract) => subchain_signature_for_emission(
+                Some(contract) => subchain_signature_for_emission_with_source(
                     &synthetic,
                     contract,
                     &subchain_validation,
                     &subchain.outputs,
+                    Some(kernel_source),
                 )
                 .map_err(|error| vec![device_diag("signature", error.message)])?,
                 None => {
@@ -969,13 +970,17 @@ pub(crate) fn device_program_for_lowered(
                     // data-flow inputs, e.g. the LN affine tensors).
                     // Mirrors the emitters' consumption of the same seam
                     // (Metal S6-P2, NVVM S6-P3). Elementwise-only subchains
-                    // keep the full ABI synthesis.
+                    // keep the full ABI synthesis. The SOURCE function rides
+                    // both seam calls so a TensorSumAxis-produced data-flow
+                    // input binds at the reduced count (the widened d8518267
+                    // seam repair) — the same count all consumers derive.
                     if let Some(op) = transformer_recipe_op(&synthetic) {
-                        transformer_subchain_signature_for_emission(
+                        transformer_subchain_signature_for_emission_with_source(
                             &synthetic,
                             op,
                             &subchain_validation,
                             &subchain.outputs,
+                            Some(kernel_source),
                         )
                         .map_err(|error| vec![device_diag("signature", error.message)])?
                     } else {
