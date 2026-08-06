@@ -131,6 +131,11 @@ abi_string_family! {
         SYMBOL_FORMAT_I64_I64 = "__faber_rt_v1_format_i64_i64",
         SYMBOL_FORMAT_I64_I64_I64 = "__faber_rt_v1_format_i64_i64_i64",
         SYMBOL_FORMAT_F64 = "__faber_rt_v1_format_f64",
+        // L28 (ab91f49f, W16): f32 scalar format carrier — `display_fractus`
+        // keeps the f32 precision (`0.1f32` renders `0.1`, NOT the widened
+        // `0.10000000149011612` an f64 carrier would produce). Added serially
+        // to SYMBOL_ROWS per W16 single-writer discipline for the LLVM lane.
+        SYMBOL_FORMAT_F32 = "__faber_rt_v1_format_f32",
         SYMBOL_FORMAT_TEXT = "__faber_rt_v1_format_text",
         SYMBOL_FORMAT_TEXT_TEXT = "__faber_rt_v1_format_text_text",
         SYMBOL_FORMAT_TEXT_I64 = "__faber_rt_v1_format_text_i64",
