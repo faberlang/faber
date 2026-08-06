@@ -489,6 +489,23 @@ pub enum WireCollectionKernelPlan {
     /// S6-C2): row mean/var with optional affine. Mirrors
     /// `kernel_plan::LayerNormalizationPlan`; admission/resolution is S6-P1.
     LayerNormalization(WireLayerNormalizationPlan),
+    /// Row-gather recipe (GI3-1 name freeze; wire mirror in GI3-1):
+    /// `out[t] = table[ids[t]]` over a rank-2 `[V, D]` table. Mirrors
+    /// `kernel_plan::GatherPlan`; admission/resolution is GI3-1.
+    Gather(WireGatherPlan),
+    /// Root-mean-square-normalization recipe (GI3-1 name freeze; wire mirror
+    /// in GI3-1): `x/sqrt(mean(x²)+eps)·γ`, no mean subtraction. Mirrors
+    /// `kernel_plan::RmsNormalizationPlan`; admission/resolution is GI3-1.
+    RmsNormalization(WireRmsNormalizationPlan),
+    /// Rotary-position-embedding recipe (GI3-1 name freeze; wire mirror in
+    /// GI3-1): llama-arch NORM consecutive-pair rotation. Mirrors
+    /// `kernel_plan::RopePlan`; admission/resolution is GI3-1.
+    Rope(WireRopePlan),
+    /// Causal masked-row softmax recipe (GI3-1 name freeze; wire mirror in
+    /// GI3-1): masked row softmax over the causal scores, zero probability
+    /// above the diagonal. Mirrors `kernel_plan::CausalMaskedSoftmaxPlan`;
+    /// admission/resolution is GI3-1.
+    CausalMaskedSoftmax(WireCausalMaskedSoftmaxPlan),
 }
 
 /// Axis-reduction recipe plan (wire mirror of `kernel_plan::AxisReductionPlan`,
@@ -521,6 +538,61 @@ pub struct WireRowSoftmaxPlan {
 pub struct WireLayerNormalizationPlan {
     /// Normalization axis (from the trailing const operand).
     pub axis: u64,
+}
+
+/// Row-gather recipe plan (wire mirror of `kernel_plan::GatherPlan`, GI3-1
+/// name freeze). The typed facts resolve from the `TensorGather` statement:
+/// the rank-2 `[V, D]` table dims and the id-vector length `T`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireGatherPlan {
+    /// Table rows `V`.
+    pub table_rows: u64,
+    /// Table columns `D` (also the output row width).
+    pub table_cols: u64,
+    /// Id-vector length `T` (the output row count).
+    pub id_count: u64,
+}
+
+/// Root-mean-square-normalization recipe plan (wire mirror of
+/// `kernel_plan::RmsNormalizationPlan`, GI3-1 name freeze). The epsilon
+/// rides as f32 bits (the CCI-1 `epsilon_bits` precedent).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireRmsNormalizationPlan {
+    /// Normalization axis (from the trailing const operand).
+    pub axis: u64,
+    /// Epsilon as f32 bits.
+    pub epsilon_bits: u32,
+    /// Normalization dimension width.
+    pub width: u64,
+}
+
+/// Rotary-position-embedding recipe plan (wire mirror of
+/// `kernel_plan::RopePlan`, GI3-1 name freeze). llama-arch NORM
+/// consecutive-pair rotation; elements beyond `dim` preserved unrotated.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireRopePlan {
+    /// Position.
+    pub pos: u64,
+    /// Rotated width (positive and even).
+    pub dim: u64,
+    /// Row width (the last-axis extent).
+    pub width: u64,
+}
+
+/// Causal masked-row softmax recipe plan (wire mirror of
+/// `kernel_plan::CausalMaskedSoftmaxPlan`, GI3-1 name freeze). Row `i` masks
+/// columns `j > i` (zero probability above the diagonal) before the row
+/// softmax.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireCausalMaskedSoftmaxPlan {
+    /// Row (query) extent.
+    pub rows: u64,
+    /// Column (key) extent.
+    pub cols: u64,
 }
 
 /// Rank-2 transpose recipe (`[M,N] → [N,M]`), the wire mirror of

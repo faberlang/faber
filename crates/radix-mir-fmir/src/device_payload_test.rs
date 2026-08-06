@@ -21,12 +21,13 @@ use crate::schema::{
     FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection,
     FmirTextToolchainSection, FmirTextTypesSection, WireAxisReductionPlan, WireBinding,
     WireBroadcastDeclaration, WireBroadcastFact, WireBufferIdentity, WireBufferLifetime,
-    WireBufferRole, WireBufferVersion, WireCollectionKernelPlan, WireCompanionDerivativeKind,
-    WireCompanionRelation, WireCompanionSelectedInput, WireCompanionSelectedOutput,
-    WireDependencyEdge, WireDeviceProgram, WireDeviceResource, WireDispatchSize,
-    WireInitializationPolicy, WireKernelLaunchPlan, WireKernelUnit, WireLaunchUnit,
-    WireLayerNormalizationPlan, WireObservationCadence, WireObservationFact, WireProgramLifetime,
-    WireReduceOp, WireResourceAccess, WireResultBuffer, WireRowSoftmaxPlan, WireSemanticValue,
+    WireBufferRole, WireBufferVersion, WireCausalMaskedSoftmaxPlan, WireCollectionKernelPlan,
+    WireCompanionDerivativeKind, WireCompanionRelation, WireCompanionSelectedInput,
+    WireCompanionSelectedOutput, WireDependencyEdge, WireDeviceProgram, WireDeviceResource,
+    WireDispatchSize, WireGatherPlan, WireInitializationPolicy, WireKernelLaunchPlan,
+    WireKernelUnit, WireLaunchUnit, WireLayerNormalizationPlan, WireObservationCadence,
+    WireObservationFact, WireProgramLifetime, WireReduceOp, WireResourceAccess, WireResultBuffer,
+    WireRmsNormalizationPlan, WireRopePlan, WireRowSoftmaxPlan, WireSemanticValue,
     WireSemanticValueOrigin, WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize,
     FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION,
     WIRE_DEVICE_PROGRAM_VERSION,
@@ -1536,4 +1537,47 @@ fn broadcast_fact_with_wrong_result_shape_fails_admission_closed() {
         matches!(error, FmirImageError::WireProgramInvalid { .. }),
         "the wrong-result-shape broadcast fails with the focused wire-admission diagnostic: {error:?}"
     );
+}
+
+/// GI3-1: the inference-recipe wire mirrors (Gather / RmsNormalization /
+/// Rope / CausalMaskedSoftmax) serialize and round-trip through the text
+/// codec under the accepted wire version — the F1 mechanical mirror arms,
+/// no `FmirDeviceSection` field change, no version bump.
+#[test]
+fn gi3_inference_recipe_plans_round_trip_on_the_wire() {
+    let plans = [
+        WireCollectionKernelPlan::Gather(WireGatherPlan {
+            table_rows: 960,
+            table_cols: 49_152,
+            id_count: 9,
+        }),
+        WireCollectionKernelPlan::RmsNormalization(WireRmsNormalizationPlan {
+            axis: 1,
+            epsilon_bits: (1e-5_f64 as f32).to_bits(),
+            width: 960,
+        }),
+        WireCollectionKernelPlan::Rope(WireRopePlan {
+            pos: 0,
+            dim: 64,
+            width: 64,
+        }),
+        WireCollectionKernelPlan::CausalMaskedSoftmax(WireCausalMaskedSoftmaxPlan {
+            rows: 9,
+            cols: 9,
+        }),
+    ];
+    for plan in plans {
+        let mut program = sample_wire_program();
+        program.kernels[0].plan = plan.clone();
+        let mut section = sample_device_section();
+        section.device_program.program = program;
+        let image = text_image_with_device(Some(section));
+        let decoded = decode_text_image(&encode_text_image(&image).unwrap(), TOOLCHAIN)
+            .unwrap_or_else(|error| panic!("recipe plan {plan:?} must admit cleanly: {error}"));
+        assert_eq!(
+            decoded.device.unwrap().device_program.program.kernels[0].plan,
+            plan,
+            "the recipe plan survives the wire round-trip"
+        );
+    }
 }

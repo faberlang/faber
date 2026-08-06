@@ -60,9 +60,10 @@ use radix_mir::distributed::{
     ResultRef, TransferDirection, TransferId, TransferOperation, TransportPath,
 };
 use radix_mir::kernel_plan::{
-    AxisReductionPlan, BarrierPhase, BarrierPoint, CollectionKernelPlan, LayerNormalizationPlan,
-    MatMulPlan, MatMulSharedMemory, OobPaddingPolicy, ReduceOp, ReductionPlan, RowSoftmaxPlan,
-    SharedMemoryLayout, TransposePlan,
+    AxisReductionPlan, BarrierPhase, BarrierPoint, CausalMaskedSoftmaxPlan, CollectionKernelPlan,
+    GatherPlan, LayerNormalizationPlan, MatMulPlan, MatMulSharedMemory, OobPaddingPolicy, ReduceOp,
+    ReductionPlan, RmsNormalizationPlan, RopePlan, RowSoftmaxPlan, SharedMemoryLayout,
+    TransposePlan,
 };
 use radix_mir::layout::MirTensorStorageLayout;
 use radix_mir::{MirFunctionId, MirType};
@@ -564,6 +565,32 @@ fn wire_kernel_plan(plan: &WireCollectionKernelPlan) -> CollectionKernelPlan {
         }
         WireCollectionKernelPlan::LayerNormalization(plan) => {
             CollectionKernelPlan::LayerNormalization(LayerNormalizationPlan { axis: plan.axis })
+        }
+        // GI3-1: the inference-recipe wire mirrors reconstruct field-for-field
+        // (the S6-C2 mirror precedent; mechanical, no semantic facts ride the
+        // mirror beyond the plan fields).
+        WireCollectionKernelPlan::Gather(plan) => CollectionKernelPlan::Gather(GatherPlan {
+            table_rows: plan.table_rows,
+            table_cols: plan.table_cols,
+            id_count: plan.id_count,
+        }),
+        WireCollectionKernelPlan::RmsNormalization(plan) => {
+            CollectionKernelPlan::RmsNormalization(RmsNormalizationPlan {
+                axis: plan.axis,
+                epsilon_bits: plan.epsilon_bits,
+                width: plan.width,
+            })
+        }
+        WireCollectionKernelPlan::Rope(plan) => CollectionKernelPlan::Rope(RopePlan {
+            pos: plan.pos,
+            dim: plan.dim,
+            width: plan.width,
+        }),
+        WireCollectionKernelPlan::CausalMaskedSoftmax(plan) => {
+            CollectionKernelPlan::CausalMaskedSoftmax(CausalMaskedSoftmaxPlan {
+                rows: plan.rows,
+                cols: plan.cols,
+            })
         }
     }
 }
