@@ -397,7 +397,10 @@ fn test_layernorm_invalid_axis_not_int() {
                 id: MirBlockId(0),
                 statements: vec![MirStatement {
                     kind: MirStatementKind::RuntimeCall {
-                        destination: None,
+                        destination: Some(MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(2)),
+                            projections: vec![],
+                        }),
                         call: MirRuntimeCall {
                             intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorLayerNorm),
                             args: vec![
@@ -463,7 +466,10 @@ fn test_layernorm_invalid_epsilon_not_float() {
                 id: MirBlockId(0),
                 statements: vec![MirStatement {
                     kind: MirStatementKind::RuntimeCall {
-                        destination: None,
+                        destination: Some(MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(2)),
+                            projections: vec![],
+                        }),
                         call: MirRuntimeCall {
                             intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorLayerNorm),
                             args: vec![
@@ -623,7 +629,10 @@ fn test_layernorm_invalid_arity_too_few() {
                 id: MirBlockId(0),
                 statements: vec![MirStatement {
                     kind: MirStatementKind::RuntimeCall {
-                        destination: None,
+                        destination: Some(MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(2)),
+                            projections: vec![],
+                        }),
                         call: MirRuntimeCall {
                             intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorLayerNorm),
                             args: vec![MirOperand::Place(MirPlace {
@@ -2109,7 +2118,10 @@ fn test_gradient_read_handle_not_opaque_rejected() {
                 id: MirBlockId(0),
                 statements: vec![MirStatement {
                     kind: MirStatementKind::RuntimeCall {
-                        destination: None,
+                        destination: Some(MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(2)),
+                            projections: vec![],
+                        }),
                         call: MirRuntimeCall {
                             intrinsic: MirIntrinsic::Gradient(MirGradientOp::Read),
                             args: vec![MirOperand::Place(MirPlace {
@@ -2197,7 +2209,10 @@ fn test_gradient_create_rank_not_numerus_rejected() {
                 id: MirBlockId(0),
                 statements: vec![MirStatement {
                     kind: MirStatementKind::RuntimeCall {
-                        destination: None,
+                        destination: Some(MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(2)),
+                            projections: vec![],
+                        }),
                         call: MirRuntimeCall {
                             intrinsic: MirIntrinsic::Gradient(MirGradientOp::Create),
                             args: vec![
@@ -2485,4 +2500,199 @@ fn test_cede_non_promissum_rejected() {
             .any(|e| e.contains("cede") && e.contains("promissum")),
         "expected cede promissum error, got: {errors:?}"
     );
+}
+
+// -----------------------------------------------------------------------
+// CCI-1: TensorRmsNorm / TensorRope / TensorGather MIR validation
+// -----------------------------------------------------------------------
+
+/// A single collection-op program: one tensor-typed receiver local at
+/// local 0, then the given call args (the receiver place is prepended).
+fn cci_collection_program(
+    types: &mut TypeTable,
+    op: MirCollectionOp,
+    args: Vec<MirOperand>,
+    receiver_and_return_ty: MirType,
+) -> MirProgram {
+    let locals = vec![
+        MirLocal {
+            id: MirLocalId(0),
+            ty: receiver_and_return_ty,
+            name: None,
+            mutable: false,
+            span: Span::default(),
+        },
+        // Destination local for the non-vacuum collection result.
+        MirLocal {
+            id: MirLocalId(2),
+            ty: receiver_and_return_ty,
+            name: None,
+            mutable: false,
+            span: Span::default(),
+        },
+    ];
+    let mut call_args = args;
+    call_args.insert(
+        0,
+        MirOperand::Place(MirPlace {
+            base: MirPlaceBase::Local(MirLocalId(0)),
+            projections: vec![],
+        }),
+    );
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals,
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: Some(MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(2)),
+                            projections: vec![],
+                        }),
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Collection(op),
+                            args: call_args,
+                            return_ty: receiver_and_return_ty,
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    }
+}
+
+fn tensor_mty(types: &mut TypeTable, dims: &[u64]) -> MirType {
+    let f32_ty = types.sized_numeric(Primitive::Fractus, radix_types::NumericWidth::F32);
+    let dim_ids: Vec<_> = dims
+        .iter()
+        .map(|&d| types.intern_index(IndexExpr::Literal(d)))
+        .collect();
+    let shape = if dim_ids.len() == 1 {
+        dim_ids[0]
+    } else {
+        types.intern_index(IndexExpr::Tuple(dim_ids))
+    };
+    MirType::semantic(types.tensor_with_shape(f32_ty, shape))
+}
+
+fn array_mty(types: &mut TypeTable) -> MirType {
+    MirType::semantic(types.array(types.primitive(Primitive::Numerus)))
+}
+
+#[test]
+fn test_rms_norm_valid_rank2_consts_and_gamma() {
+    let mut types = TypeTable::new();
+    let gamma_ty = tensor_mty(&mut types, &[8]);
+    let return_ty = tensor_mty(&mut types, &[2, 8]);
+    let program = cci_collection_program(
+        &mut types,
+        MirCollectionOp::TensorRmsNorm,
+        vec![
+            MirOperand::Constant(MirConstant::Int(1)),
+            MirOperand::Constant(MirConstant::Float(1e-5)),
+            MirOperand::Place(MirPlace {
+                base: MirPlaceBase::Local(MirLocalId(1)),
+                projections: vec![],
+            }),
+        ],
+        return_ty,
+    );
+    let mut program = program;
+    program.functions[0].locals.push(MirLocal {
+        id: MirLocalId(1),
+        ty: gamma_ty,
+        name: None,
+        mutable: false,
+        span: Span::default(),
+    });
+    let errors = validate(&program, &types);
+    assert!(errors.is_empty(), "expected no errors, got: {errors:?}");
+}
+
+#[test]
+fn test_rms_norm_rejects_out_of_range_axis_const() {
+    let mut types = TypeTable::new();
+    let return_ty = tensor_mty(&mut types, &[2, 8]);
+    let program = cci_collection_program(
+        &mut types,
+        MirCollectionOp::TensorRmsNorm,
+        vec![
+            MirOperand::Constant(MirConstant::Int(5)),
+            MirOperand::Constant(MirConstant::Float(1e-5)),
+        ],
+        return_ty,
+    );
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("rms_norm") && e.contains("axis")),
+        "expected rms_norm axis error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn test_rope_rejects_odd_dim_const() {
+    let mut types = TypeTable::new();
+    let return_ty = tensor_mty(&mut types, &[8]);
+    let program = cci_collection_program(
+        &mut types,
+        MirCollectionOp::TensorRope,
+        vec![
+            MirOperand::Constant(MirConstant::Int(1)),
+            MirOperand::Constant(MirConstant::Int(3)),
+        ],
+        return_ty,
+    );
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("rope") && e.contains("even")),
+        "expected rope parity error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn test_gather_valid_ids_array_operand() {
+    let mut types = TypeTable::new();
+    let return_ty = tensor_mty(&mut types, &[2, 3]);
+    let program = cci_collection_program(
+        &mut types,
+        MirCollectionOp::TensorGather,
+        vec![MirOperand::Place(MirPlace {
+            base: MirPlaceBase::Local(MirLocalId(1)),
+            projections: vec![],
+        })],
+        return_ty,
+    );
+    let mut program = program;
+    program.functions[0].locals.push(MirLocal {
+        id: MirLocalId(1),
+        ty: array_mty(&mut types),
+        name: None,
+        mutable: false,
+        span: Span::default(),
+    });
+    let errors = validate(&program, &types);
+    assert!(errors.is_empty(), "expected no errors, got: {errors:?}");
 }

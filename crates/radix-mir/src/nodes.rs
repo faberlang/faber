@@ -892,6 +892,28 @@ pub enum MirCollectionOp {
     /// operands in the `MirRuntimeCall::args` list, NOT a payload struct —
     /// `MirIntrinsic::Collection` is a bare discriminant.
     TensorLayerNorm,
+    /// Root-mean-square normalization (the CCI-1 `rms_norm` source contract;
+    /// `decoder_ops::rms_norm` semantics): `y = x·(1/sqrt(mean(x²)+eps))·gamma`,
+    /// no mean subtraction, f64 sum-of-squares → f32 mean. Axis and epsilon
+    /// are trailing const operands (`[x, axis, eps, gamma]`), gamma is the
+    /// mandatory affine peer operand — mirroring `TensorLayerNorm`'s const
+    /// layout without beta. Source-side axis-valid + gamma-width contract is
+    /// enforced at the HIR→AIR construction site (fail-closed).
+    TensorRmsNorm,
+    /// llama-arch NORM consecutive-pair rotary position embedding (the CCI-1
+    /// `rope_norm` source contract): pairs `(x[2k], x[2k+1])` with
+    /// `theta[k] = pos·freq_base^(−2k/dim)`, `freq_base` frozen at 100000
+    /// (v1 source constant). `pos` + `dim` are trailing const operands
+    /// (`[x, pos, dim]`); elements beyond `dim` on the last axis are
+    /// preserved. Odd/overlarge `dim` fail closed at the source surface.
+    TensorRope,
+    /// Row gather over the first axis (the CCI-1 `gather` source contract):
+    /// `table[V,D]` + `ids[T]` → `[T,D]` with `out[t] = table[ids[t]]`,
+    /// repeated/out-of-order ids preserved. The ids vector is a plain
+    /// operand (`[x, ids]`); out-of-range/negative ids fail closed at the
+    /// source surface (no silent clamping). Shape-transforming — not
+    /// `TensorGet`/`TensorSlice`.
+    TensorGather,
     TensorDiv,
     TensorNeg,
     /// Gaussian Error Linear Unit using the tanh approximation:
