@@ -38,7 +38,7 @@ impl super::FaberCodegen {
             | HirExpressionKind::Index(_, _)
             | HirExpressionKind::OptionalChain(_, _)
             | HirExpressionKind::NonNull(_, _)
-            | HirExpressionKind::ReadLine(_) => 13,
+            | HirExpressionKind::ReadLine(_) => 14,
             _ => 14,
         }
     }
