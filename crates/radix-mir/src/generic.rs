@@ -831,6 +831,10 @@ fn type_matches_candidate(types: &TypeTable, id: TypeId, candidate: &Type) -> bo
         (Type::AsyncCursor(a_item, a_alternate), Type::AsyncCursor(b_item, b_alternate)) => {
             types.equals(*a_item, *b_item) && types.equals(*a_alternate, *b_alternate)
         }
+        (
+            Type::PromissumFailable(a_success, a_alternate),
+            Type::PromissumFailable(b_success, b_alternate),
+        ) => types.equals(*a_success, *b_success) && types.equals(*a_alternate, *b_alternate),
         (Type::Tensor(a_ty, a_shape), Type::Tensor(b_ty, b_shape))
         | (Type::Vector(a_ty, a_shape), Type::Vector(b_ty, b_shape))
         | (Type::Sparsa(a_ty, a_shape), Type::Sparsa(b_ty, b_shape)) => {

@@ -219,3 +219,36 @@ fn union_backtracking_bounded_n8() {
     ));
     assert_eq!(bindings.len(), 8);
 }
+
+#[test]
+fn promissum_failable_instantiation_finds_interned() {
+    // Regression: generic instantiation of an already-interned
+    // PromissumFailable must resolve through ExistingTypeIndex. Without the
+    // type_matches_candidate arm (same latent gap AsyncCursor had), the
+    // find falls through and reports "instantiated generic type is missing
+    // semantic metadata" even though the concrete type is interned.
+    let mut types = TypeTable::new();
+    let success = types.primitive(Primitive::Numerus);
+    let alternate = types.primitive(Primitive::Textus);
+
+    // Concrete promissum-failable already interned in the module.
+    let interned = types.intern(Type::PromissumFailable(success, alternate));
+
+    // Generic shape `promissum-failable<T, U>`.
+    let success_param = types.intern(Type::Param(Symbol(50)));
+    let alternate_param = types.intern(Type::Param(Symbol(51)));
+    let generic = types.intern(Type::PromissumFailable(success_param, alternate_param));
+
+    let mut bindings = MirGenericBindings::default();
+    bindings.insert(Symbol(50), MirType::semantic(success));
+    bindings.insert(Symbol(51), MirType::semantic(alternate));
+
+    let resolved = instantiate_existing_generic_type(
+        &types,
+        MirType::semantic(generic),
+        &bindings,
+        Span::default(),
+    )
+    .expect("generic PromissumFailable instantiation must resolve against the interned type");
+    assert_eq!(resolved.semantic_id(), interned);
+}
