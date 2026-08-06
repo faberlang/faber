@@ -1,0 +1,88 @@
++++
+term = "type-hole-union"
+kind = "type"
+category = "types"
+canonical = true
+summary = "The `_` hole infers one inhabitant type; the `∪` hole infers a finite union; `T ∪ nihil` stays a single optional inhabitant."
+syntax = "fixum _ x ← value; fixum ∪ x ← a; x ← b; fixum lista<∪> xs ← [a, b]"
+aliases = []
+related = ["unio", "nihil"]
+locale = "en"
++++
+
+# =============================================================================
+# type-hole-union — two type holes (`_` vs `∪`) and the nullable exception
+# =============================================================================
+#
+# What this teaches:
+#   • `_` is the monomorphic hole: it infers exactly ONE inhabitant type.
+#     `const _ count ← 3` solves `count : int`.
+#   • `∪` is the union hole: the slot accumulates a member type from every
+#     direct flow. `var ∪ mixed ← 1` then `mixed ← "salve"` solves
+#     `mixed : int ∪ string` without authoring the member list by hand.
+#   • `list<∪>` learns heterogeneous element types the same way:
+#     `list<∪> nodes ← [1, "two", 3]` solves to `list<int ∪ string>`.
+#   • `T ∪ null` (canonical `T ∪ nihil`) is a single OPTIONAL inhabitant,
+#     not a multi-member sum — a `_` hole solved to it emits no shape
+#     warning.
+#
+# Cross-shape solves still typecheck but are diagnosed: `_` solved to a
+# multi-member union emits WARN016 (`monomorphic_hole_solved_to_union`) and
+# `∪` solved to a single type emits WARN017 (`union_hole_solved_monomorphically`).
+# Both are promotable through the existing deny machinery; this exemplum shows
+# only the clean shapes.
+#
+# The consumer functions below only exist to use the union-typed slots so the
+# exemplum checks warning-free; the type lesson is in the annotations.
+#
+# See also: unio, nihil
+# =============================================================================
+
+# `_` infers exactly one inhabitant type from the initializer.
+fn member_count(list<int ∪ string> xs) → int {
+    match xs {
+        case _ { return 1 }
+    }
+}
+
+# `∪` accumulates a member per direct flow; `match` arms name the members.
+fn consume(int ∪ string value) → int {
+    match value {
+        case 7 { return 1 }
+        case "x" { return 2 }
+        default { return 0 }
+    }
+}
+
+# `T ∪ null` is one optional inhabitant, so a `null` arm is the null case.
+fn maybe_len(string ∪ null value) → int {
+    match value {
+        case null { return 0 }
+        default { return 1 }
+    }
+}
+
+test "the two hole kinds infer cleanly without shape warnings" {
+    # `_`: exactly one inhabitant type.
+    const _ count ← 3
+
+    # `∪`: every direct flow adds a member — solves to `int ∪ string`.
+    var ∪ mixed ← 1
+    mixed ← "salve"
+
+    # `list<∪>`: heterogeneous elements solve to `list<int ∪ string>`.
+    const list<∪> nodes ← [1, "two", 3]
+
+    # `T ∪ null`: one optional inhabitant — `_` over it stays quiet.
+    const string ∪ null opt ← "text"
+    const _ maybe ← opt
+
+    const _ m ← member_count(nodes)
+    const _ n ← consume(mixed)
+    const _ o ← maybe_len(maybe)
+
+    assert count ≡ 3
+    assert m ≡ 1
+    assert n ≡ 1
+    assert o ≡ 1
+}
