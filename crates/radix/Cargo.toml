@@ -64,7 +64,11 @@ insta = "1"
 tempfile = "3"
 
 [features]
-default = []
+default = ["full-targets"]
+full-targets = ["hir-faber", "hir-fhir", "mir-fmir"]
+hir-faber = []
+hir-fhir = []
+mir-fmir = []
 wasm-stub-host = ["dep:wasmtime"]
 
 [dependencies.wasmtime]
