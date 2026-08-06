@@ -950,6 +950,12 @@ pub fn subchain_signature_for_emission(
 /// constructor's cross-kernel unification see one shape per local
 /// (`carried_resources_agree`). `None` keeps the type-derived count (whole-
 /// function and test call sites).
+///
+/// # Errors
+/// Returns [`PlanMappingError`] when the recipe operand's tensor type, a
+/// data-flow input's tensor type, a scalar data-flow input's kernel layout,
+/// or an additional output local's type cannot be resolved from the subchain
+/// body (same failure modes as [`subchain_signature_for_emission`]).
 pub fn subchain_signature_for_emission_with_source(
     function: &MirFunction,
     contract: &CollectionOpContract,
@@ -1019,6 +1025,12 @@ pub fn transformer_subchain_signature_for_emission(
 /// the emitters' and the faber constructor's cross-kernel unification see
 /// one shape per local (`carried_resources_agree`). `None` keeps the
 /// type-derived count (whole-function and test call sites).
+///
+/// # Errors
+/// Returns [`PlanMappingError`] when the recipe operand's tensor type, a
+/// data-flow input's tensor type, a scalar data-flow input's kernel layout,
+/// or an additional output local's type cannot be resolved from the subchain
+/// body (same failure modes as [`transformer_subchain_signature_for_emission`]).
 pub fn transformer_subchain_signature_for_emission_with_source(
     function: &MirFunction,
     op: MirCollectionOp,

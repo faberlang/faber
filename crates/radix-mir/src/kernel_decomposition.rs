@@ -455,6 +455,9 @@ fn split_oversized_elementwise_body(
     // together: a temp defined in the pre range and referenced by a field
     // writer in the field range would make every pre-range cut invalid).
     let mut first_field = first_field_raw;
+    // Parallel slot arrays (temps_defined_at / temps_referenced_at); index is
+    // the statement slot, not an item to iterate for its own sake.
+    #[allow(clippy::needless_range_loop)]
     for index in 0..first_field_raw {
         for &temp in &temps_defined_at[index] {
             let feeds_field_range =
@@ -679,6 +682,8 @@ fn temp_closed_range(
 ) -> bool {
     let mut defined = BTreeSet::new();
     let mut referenced = BTreeSet::new();
+    // Parallel slot arrays; index by statement range.
+    #[allow(clippy::needless_range_loop)]
     for slot in start..end {
         defined.extend(temps_defined_at[slot].iter().copied());
         referenced.extend(temps_referenced_at[slot].iter().copied());
@@ -686,6 +691,7 @@ fn temp_closed_range(
     if !referenced.is_subset(&defined) {
         return false;
     }
+    #[allow(clippy::needless_range_loop)]
     for slot in end..temps_defined_at.len() {
         if temps_referenced_at[slot]
             .iter()
@@ -706,12 +712,15 @@ fn range_params_and_written(
     end: usize,
 ) -> (BTreeSet<MirLocalId>, BTreeSet<MirLocalId>) {
     let mut written = BTreeSet::new();
+    // Parallel slot arrays; index by statement range.
+    #[allow(clippy::needless_range_loop)]
     for slot in start..end {
         if let Some(local) = written_at[slot] {
             written.insert(local);
         }
     }
     let mut params = BTreeSet::new();
+    #[allow(clippy::needless_range_loop)]
     for slot in start..end {
         for &local in &reads_at[slot] {
             if !written.contains(&local) {
@@ -728,7 +737,7 @@ fn operand_temp(operand: &MirOperand) -> Option<MirTempId> {
         MirOperand::Temp(temp) => Some(*temp),
         MirOperand::Place(place) => match place.base.clone() {
             MirPlaceBase::Temp(temp) => Some(temp),
-            _ => None,
+            MirPlaceBase::Local(_) => None,
         },
         _ => None,
     }

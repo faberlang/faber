@@ -34,13 +34,8 @@ impl super::FaberCodegen {
             HirExpressionKind::Unary(_, _)
             | HirExpressionKind::Ref(_, _)
             | HirExpressionKind::Deref(_) => 12,
-            HirExpressionKind::Call(..)
-            | HirExpressionKind::MethodCall(..)
-            | HirExpressionKind::Field(_, _)
-            | HirExpressionKind::Index(_, _)
-            | HirExpressionKind::OptionalChain(_, _)
-            | HirExpressionKind::NonNull(_, _)
-            | HirExpressionKind::ReadLine(_) => 14,
+            // Postfix (call/method/field/index/optional/nonnull/readline)
+            // and residual forms share precedence 14.
             _ => 14,
         }
     }

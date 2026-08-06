@@ -58,6 +58,10 @@ pub struct FaberCodegen {
 ///
 /// Returns `CodegenError` if the HIR program contains error expressions that
 /// cannot be represented in canonical Faber output.
+///
+/// `FxHashMap` parameters are intentional (mirrors `TypeTable` / interner maps);
+/// do not generalize over `BuildHasher` for call-site simplicity.
+#[allow(clippy::implicit_hasher)]
 pub fn emit(
     hir: &HirProgram,
     presentation: &HirPresentation,
@@ -67,9 +71,11 @@ pub fn emit(
     imported_type_spellings: &FxHashMap<TypeId, String>,
     imported_def_spellings: &FxHashMap<DefId, String>,
 ) -> Result<FaberOutput, CodegenError> {
-    let mut codegen = FaberCodegen::default();
-    codegen.imported_type_spellings = imported_type_spellings.clone();
-    codegen.imported_def_spellings = imported_def_spellings.clone();
+    let mut codegen = FaberCodegen {
+        imported_type_spellings: imported_type_spellings.clone(),
+        imported_def_spellings: imported_def_spellings.clone(),
+        ..Default::default()
+    };
     codegen.generate(hir, presentation, types, interner, surface)
 }
 
