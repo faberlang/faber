@@ -131,9 +131,12 @@ fn wasm_product() {
         "legacy import module must be an explicit import rejection, got: {outcome:?}"
     );
 
+    // W14: the tensor family is now admitted, so the genuinely unadmitted
+    // field moves to `tensor_div` (the emitter fails closed on the division
+    // row — no host binding exists for it).
     let unknown_field = wat_bytes(r#"
 (module
-  (import "faber_rt_v1" "__faber_rt_v1_tensor_shape" (func $len (param i32) (result i32)))
+  (import "faber_rt_v1" "__faber_rt_v1_tensor_div" (func $len (param i32) (result i32)))
   (func (export "incipit") (drop (call $len (i32.const 0))))
 )
 "#);
@@ -141,7 +144,7 @@ fn wasm_product() {
     assert!(
         matches!(
             &outcome,
-            RunOutcome::ImportRejected { field, .. } if field == "__faber_rt_v1_tensor_shape"
+            RunOutcome::ImportRejected { field, .. } if field == "__faber_rt_v1_tensor_div"
         ),
         "unknown v1 field must be an explicit import rejection, got: {outcome:?}"
     );
@@ -212,6 +215,61 @@ fn wasm_collection_scalar_cluster_runs_through_the_product_host() {
         "non/non.fab",
         "si/si.fab",
         "verum/verum.fab",
+    ];
+    for rel in fixtures {
+        let fab_path = crate::paths::corpus_dir().join(rel);
+        let wasm_bytes = emit_wasm_bytes(&session, &fab_path);
+        let outcome = run_product(&wasm_bytes).expect("portable product engine must initialize");
+        let expected = read_expected_stdout(&fab_path)
+            .unwrap_or_else(|| panic!("{rel} must have a sibling .expected"));
+        match &outcome {
+            RunOutcome::Success { stdout, .. } => {
+                assert_eq!(
+                    normalize_newline(stdout),
+                    expected,
+                    "{rel} captured stdout must match the sibling .expected"
+                );
+            }
+            other => panic!(
+                "{rel} must run to success through the portable runner, got: {other:?}"
+            ),
+        }
+    }
+}
+
+
+/// W14 per-fixture runner probes for the closed tensor display rows: each
+/// fixture emits as a real compiler artifact, runs through the portable
+/// product runner, and its captured stdout matches the sibling `.expected`
+/// byte for byte (the same evidence the ledger's `outcome-checked` rows
+/// record). The set is the tensor display cluster: construction
+/// (`vacua`/`tensor_new`, `strue`/`tensor_from_flat`, `crea`/`tensor_create`,
+/// `reple`/`tensor_fill`), reads (`longitudo`/`tensor_rank`,
+/// `magnitudines`/`tensor_shape`, `accipe`/`tensor_get`), writes
+/// (`ponde`/`tensor_set`), transforms (`forma`/`tensor_reshape`,
+/// `sectio`/`tensor_slice`, `materialize`, `planata`/`tensor_flatten`),
+/// arithmetic (`addita`/`subtrahe`/`multiplica`, `matmul`), reductions
+/// (`summa`/`tensor_sum`, `media`/`tensor_mean`), the element-width convert
+/// (`tensor_convert`), and the text-element tensor (`tensor<textus, [N]>`).
+#[test]
+fn wasm_tensor_display_cluster_runs_through_the_product_host() {
+    let session = super::wasm::wasm_session();
+    let fixtures: &[&str] = &[
+        // Tensor construction/read/write/transform display.
+        "tensor/decl.fab",
+        "tensor/shape.fab",
+        "tensor/bracket-access.fab",
+        "tensor/index-width.fab",
+        "tensor/method-policy.fab",
+        "tensor/textus.fab",
+        // Tensor arithmetic + reductions.
+        "tensor/arithmetic-elementwise.fab",
+        "tensor/arithmetic-matmul.fab",
+        "tensor/arithmetic-reduction.fab",
+        // Lista↔tensor conversio bridges.
+        "conversio/tensor.fab",
+        "conversio/lista-tensor-shaped.fab",
+        "conversio/rectangular-lista-literal-tensor.fab",
     ];
     for rel in fixtures {
         let fab_path = crate::paths::corpus_dir().join(rel);
