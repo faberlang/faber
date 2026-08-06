@@ -348,6 +348,17 @@ abi_string_family! {
         SYMBOL_CLI_FIELD_I1 = "__faber_rt_v1_cli_field_i1",
         SYMBOL_CLI_SELECTED_COMMAND = "__faber_rt_v1_cli_selected_command",
         SYMBOL_CLI_EXIT_CODE = "__faber_rt_v1_cli_exit_code",
+        // P10 (promotion packet failable-status-model): the shared failable
+        // error carrier row. One fixed symbol for the `ReturnError` payload
+        // channel — the host reads the typed error payload from a failable
+        // `(status, payload)` result (the `cape err` recovery read). The LLVM
+        // lane's per-type `__faber_runtime_return_error_{ty}` dialect retires
+        // in favor of this row (D5 closed-table rule); the wasm leaf lowers
+        // the terminator's payload read to this symbol. The four P10 fixtures
+        // (`iace/functio-fallibilis`, `iace/functio-propagans`,
+        // `iace/iace-si-guard`, `operatores/function-types`) exercise the
+        // channel with textus error payloads.
+        SYMBOL_FALLIBLE_ERROR = "__faber_rt_v1_fallible_error",
         SYMBOL_PROGRAM_ENTRY = "__faber_program_entry_v1",
         SYMBOL_GPU_COPY_IN = "__faber_gpu_v1_copy_in",
         SYMBOL_GPU_READBACK = "__faber_gpu_v1_readback",
@@ -453,6 +464,15 @@ pub const STATUS_CODES: &[(&str, i32)] = &[
     ("STATUS_IO_ERROR", 2),
     ("STATUS_PANIC", 3),
     ("STATUS_UNSUPPORTED", 4),
+    // P10 (promotion packet failable-status-model): the failable error-channel
+    // discriminator. The shared failable status/payload model is the
+    // status-first multi-value `(i32 status, payload…)` of the W10 profile:
+    // STATUS_OK + the success payload on the happy path, STATUS_FALLIBLE + the
+    // typed `ReturnError` payload when the failable error channel fires
+    // (`iace` throw / `⇥` propagation / `fac`/`cape` recovery). The wasm leaf
+    // lowers `MirTerminatorKind::ReturnError` to this status-first shape; the
+    // LLVM lane consumes the same contract.
+    ("STATUS_FALLIBLE", 5),
 ];
 
 abi_diagnostics! {
