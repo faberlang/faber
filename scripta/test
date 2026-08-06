@@ -1,0 +1,215 @@
+#!/usr/bin/env bash
+# Faber progressive test ladder — cheap-first (no exceptions).
+#
+# Default (no flags) = stage 1 only: hygiene + default nextest profile.
+# That is the ONLY surface agents may run proactively.
+#
+# Expensive work is NOT here. Use:
+#   ./scripta/release-gate          # full workspace closeout (RELEASE ONLY)
+#   cargo nextest run --profile unit|product|full
+#   ../radix/scripta/test --e2e …   # language backend e2e (radix ladder)
+#
+# Stages:
+#   1  default   hygiene + nextest profile default (fast agent loop)
+#   2  unit      nextest profile unit (faber lib including package_test)
+#   3  product   nextest profile product (faber lib + integration tests)
+#
+# There is no stage that runs --profile full or exempla matrices. Those are
+# release-gate / radix-ladder only.
+#
+# Usage:
+#   ./scripta/test                 # stage 1
+#   ./scripta/test --stage 1-2
+#   ./scripta/test --stage unit
+#   ./scripta/test --check         # alias for stage 1
+#   remaining args → cargo nextest (stage that uses nextest)
+
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+ROOT="$(pwd)"
+
+SELECTED=([1]=0 [2]=0 [3]=0)
+CARGO_ARGS=()
+
+usage() {
+  cat <<'EOF'
+Faber progressive tests (cheap-first). Default = stage 1 only.
+
+Stages:
+  1  default   hygiene + cargo nextest --profile default
+  2  unit      cargo nextest --profile unit   (includes package_test; slow)
+  3  product   cargo nextest --profile product (integration binaries; slow)
+
+NOT in this script (release / explicit only):
+  ./scripta/release-gate
+  cargo nextest run --profile full
+  language e2e → ../radix/scripta/test --e2e …
+
+Flags:
+  --stage SPEC   1 | 2 | 3 | default | unit | product | 1-2 | 1-3 | all
+  --check        stage 1 only (agent default)
+  -h, --help     this help
+
+Examples:
+  ./scripta/test
+  ./scripta/test --stage 1
+  ./scripta/test --stage unit
+  ./scripta/test --stage 1-2 -- package::mir
+EOF
+}
+
+select_stage() {
+  local n="$1"
+  if [[ "$n" -lt 1 || "$n" -gt 3 ]]; then
+    echo "stage out of range: $n (progressive stages are 1–3)" >&2
+    return 1
+  fi
+  SELECTED[$n]=1
+}
+
+resolve_stage_token() {
+  local tok
+  tok="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
+  case "$tok" in
+    all) echo all ;;
+    1|default|gate|check) echo 1 ;;
+    2|unit) echo 2 ;;
+    3|product|integration) echo 3 ;;
+    full|release|exempla|e2e)
+      echo "error: '$1' is not a progressive stage" >&2
+      echo "expensive closeout: ./scripta/release-gate (RELEASE / explicit only)" >&2
+      echo "language e2e: ../radix/scripta/test --e2e …" >&2
+      return 1
+      ;;
+    *)
+      echo "unknown stage token: $1" >&2
+      return 1
+      ;;
+  esac
+}
+
+parse_stage_spec() {
+  local spec="$1"
+  local part lo hi i resolved
+  IFS=',' read -ra parts <<<"$spec"
+  for part in "${parts[@]}"; do
+    part="${part// /}"
+    [[ -z "$part" ]] && continue
+    if [[ "$part" == *-* ]]; then
+      lo="${part%%-*}"
+      hi="${part#*-}"
+      lo="$(resolve_stage_token "$lo")" || return 1
+      hi="$(resolve_stage_token "$hi")" || return 1
+      if [[ "$lo" == all || "$hi" == all ]]; then
+        echo "cannot use 'all' inside a range: $part" >&2
+        return 1
+      fi
+      if [[ "$lo" -gt "$hi" ]]; then
+        echo "empty stage range: $part" >&2
+        return 1
+      fi
+      for ((i = lo; i <= hi; i++)); do
+        select_stage "$i"
+      done
+    else
+      resolved="$(resolve_stage_token "$part")" || return 1
+      if [[ "$resolved" == all ]]; then
+        for i in 1 2 3; do
+          select_stage "$i"
+        done
+      else
+        select_stage "$resolved"
+      fi
+    fi
+  done
+}
+
+any_selected() {
+  local i
+  for i in 1 2 3; do
+    [[ "${SELECTED[$i]}" == "1" ]] && return 0
+  done
+  return 1
+}
+
+run_hygiene() {
+  echo "=== hygiene ratchet (tests/hygiene.rs) ==="
+  cargo test --test hygiene --quiet
+}
+
+run_stage_1_default() {
+  echo "=== stage 1 · default: hygiene + nextest --profile default ==="
+  run_hygiene
+  echo "=== stage 1 · cargo nextest run --profile default ==="
+  if ((${#CARGO_ARGS[@]} > 0)); then
+    cargo nextest run --profile default "${CARGO_ARGS[@]}"
+  else
+    cargo nextest run --profile default
+  fi
+}
+
+run_stage_2_unit() {
+  echo "=== stage 2 · unit: nextest --profile unit (includes package_test; SLOW) ==="
+  echo "    Prefer stage 1 unless you need package_test or a named filter."
+  if ((${#CARGO_ARGS[@]} > 0)); then
+    cargo nextest run --profile unit "${CARGO_ARGS[@]}"
+  else
+    cargo nextest run --profile unit
+  fi
+}
+
+run_stage_3_product() {
+  echo "=== stage 3 · product: nextest --profile product (integration; SLOW) ==="
+  echo "    Spawns faber binaries and may nest cargo. Explicit opt-in only."
+  if ((${#CARGO_ARGS[@]} > 0)); then
+    cargo nextest run --profile product "${CARGO_ARGS[@]}"
+  else
+    cargo nextest run --profile product
+  fi
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --check)
+      select_stage 1
+      shift
+      ;;
+    --stage)
+      shift
+      [[ $# -gt 0 ]] || { echo "error: --stage needs SPEC" >&2; exit 1; }
+      parse_stage_spec "$1" || exit 1
+      shift
+      ;;
+    --)
+      shift
+      CARGO_ARGS+=("$@")
+      break
+      ;;
+    *)
+      CARGO_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if ! any_selected; then
+  select_stage 1
+fi
+
+if [[ "${SELECTED[1]}" == "1" ]]; then
+  run_stage_1_default
+fi
+if [[ "${SELECTED[2]}" == "1" ]]; then
+  run_stage_2_unit
+fi
+if [[ "${SELECTED[3]}" == "1" ]]; then
+  run_stage_3_product
+fi
+
+echo "=== faber scripta/test: selected stages ok ==="
+echo "    (full workspace / exempla: ./scripta/release-gate — RELEASE ONLY)"

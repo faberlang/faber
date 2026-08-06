@@ -1,0 +1,33 @@
+# Faber nextest profiles — cheap-first law.
+#
+# Agents and day-to-day work use the default profile only.
+# Expensive surfaces are release/opt-in: see scripta/release-gate and
+# `cargo nextest run --profile full`.
+#
+# Profiles:
+#   default  — faber library unit tests, excluding the package_test megasuite
+#   unit     — all faber library unit tests (includes package_test)
+#   product  — all tests in the faber package (lib + integration binaries)
+#   full     — entire workspace (faber + exempla + hygiene-ratchet)
+
+[profile.default]
+# Fast agent / inner-loop surface. Does NOT build or run:
+#   - crates/exempla
+#   - tests/* integration binaries
+#   - src/package_test.rs megasuite (nested cargo / product proofs)
+default-filter = 'package(faber) & kind(lib) & not test(/^package_test::/)'
+
+[profile.unit]
+# All faber lib tests, including package_test. Still excludes exempla and
+# integration binaries. Explicit opt-in only (not agent default).
+default-filter = 'package(faber) & kind(lib)'
+
+[profile.product]
+# Full faber package: lib + tests/* (emit, run, clean-install, hygiene, …).
+# Explicit opt-in. Minutes-scale when cold.
+default-filter = 'package(faber)'
+
+[profile.full]
+# Entire workspace including exempla corpus harness. RELEASE / explicit only.
+# Agents must NOT run this unless the operator or release protocol asks.
+default-filter = 'all()'

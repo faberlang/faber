@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════════════════════
+# FABER RELEASE GATE — EXPENSIVE · SLOW · NOT FOR AGENTS BY DEFAULT
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# This script is the closeout / release-prep surface for the Faber product
+# workspace. It runs the full nextest profile (faber + exempla + all
+# integration binaries) and takes many minutes even when warm.
+#
+# WHEN TO RUN
+#   • Operator is preparing a Faber release (tag / version bump protocol)
+#   • Operator explicitly asked for full-workspace or release-gate verification
+#   • Auditor / theme-boundary closeout when the human requested full proof
+#
+# WHEN NOT TO RUN
+#   • Ordinary implementation loops
+#   • "make sure nothing else broke" after fixing one test
+#   • Agent initiative ("I'll just run the full suite to be safe")
+#   • Any session that only needs confidence on a local change
+#
+# AGENTS: do not invoke this script, `cargo nextest run --profile full`, or
+# `cargo nextest run --workspace` unless the operator message explicitly
+# requests release-gate, full-workspace, or release verification. Prefer:
+#   ./scripta/test                  # stage 1 default
+#   cargo nextest run -E 'test(…)'  # single failing test
+#
+# Language corpus matrices and backend e2e remain on the radix ladder:
+#   ../radix/scripta/test --stage 5-6
+#   ../radix/scripta/test --e2e …
+# They are also expensive and also require explicit request.
+#
+# Usage:
+#   ./scripta/release-gate
+#   ./scripta/release-gate --no-fail-fast
+#   ./scripta/release-gate -- locked-release-build   # also cargo build --locked --release
+#
+# ═══════════════════════════════════════════════════════════════════════════
+
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+ROOT="$(pwd)"
+
+NO_FAIL_FAST=1
+LOCKED_RELEASE_BUILD=0
+EXTRA_NEXTEST=()
+
+usage() {
+  cat <<'EOF'
+Faber RELEASE GATE — expensive full-workspace verification.
+
+  ./scripta/release-gate
+  ./scripta/release-gate --fail-fast
+  ./scripta/release-gate --locked-release-build
+
+This is NOT the agent default. For day-to-day work use ./scripta/test.
+
+Flags:
+  --no-fail-fast           keep going after failures (default)
+  --fail-fast              stop on first failure
+  --locked-release-build   also run cargo build --locked --release --bin faber
+  -h, --help               this help
+
+Remaining args are forwarded to cargo nextest.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --no-fail-fast)
+      NO_FAIL_FAST=1
+      shift
+      ;;
+    --fail-fast)
+      NO_FAIL_FAST=0
+      shift
+      ;;
+    --locked-release-build)
+      LOCKED_RELEASE_BUILD=1
+      shift
+      ;;
+    --)
+      shift
+      EXTRA_NEXTEST+=("$@")
+      break
+      ;;
+    *)
+      EXTRA_NEXTEST+=("$1")
+      shift
+      ;;
+  esac
+done
+
+echo "╔══════════════════════════════════════════════════════════════════════╗"
+echo "║  FABER RELEASE GATE — EXPENSIVE · full workspace nextest             ║"
+echo "║  Do not run from agent loops unless the operator explicitly asked.   ║"
+echo "╚══════════════════════════════════════════════════════════════════════╝"
+
+if [[ "$LOCKED_RELEASE_BUILD" == "1" ]]; then
+  echo "=== release-gate · cargo build --locked --release --bin faber ==="
+  cargo build --locked --release --bin faber
+fi
+
+echo "=== release-gate · hygiene ==="
+cargo test --test hygiene --quiet
+
+echo "=== release-gate · cargo nextest run --profile full ==="
+NEXTEST_ARGS=(run --profile full)
+if [[ "$NO_FAIL_FAST" == "1" ]]; then
+  NEXTEST_ARGS+=(--no-fail-fast)
+fi
+if ((${#EXTRA_NEXTEST[@]} > 0)); then
+  NEXTEST_ARGS+=("${EXTRA_NEXTEST[@]}")
+fi
+cargo nextest "${NEXTEST_ARGS[@]}"
+
+echo "=== release-gate · ok ==="
+echo "    Language matrices / backend e2e are still separate:"
+echo "      ../radix/scripta/test --stage 5-6"
+echo "      ../radix/scripta/test --e2e …"
