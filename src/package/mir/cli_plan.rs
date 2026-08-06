@@ -934,6 +934,7 @@ pub(super) fn import_semantic_type(
         | Type::Interface(_)
         | Type::Param(_)
         | Type::Infer(_)
+        | Type::InferUnion(_)
         | Type::Error) => target.intern(other),
     };
     imported.insert(ty, imported_ty);
