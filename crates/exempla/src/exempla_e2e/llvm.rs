@@ -5,11 +5,14 @@
 //! an inspectable link manifest, optional llvm-as/opt verification, and Tier
 //! C/D link-and-run of ALL modules against the host runtime with captured
 //! output compared against the Rust oracle and sibling `*.expected` files.
-//! The harness keeps no secondary resolver/emitter for entry/CLI/importa
-//! paths; the selected-Norma family (`norma:*` imports) probes the merged
-//! package-MIR program until the S8.5 Norma graph lands, and corpus stubs
-//! the package graph cannot represent at the analysis level (non-representable
-//! file interfaces) fall back to the radix single-file lane.
+//! The harness keeps no secondary resolver/emitter for entry/CLI/importa/
+//! Norma paths: selected `norma:*` units emit through the builder's S8.5
+//! per-Norma-unit lane like every other package unit (one module per unit,
+//! linked together). The single named non-builder lane is the fallback for
+//! corpus stubs the package graph cannot represent at the analysis level — a
+//! public export that cannot be snapshotted into a file interface (e.g.
+//! `vector/infer.fab`'s inferred `vector<elem, _>` width) — which keeps their
+//! historical pairwise classification through the radix single-file lane.
 
 use super::common::{
     collect_exempla_files, command_available, floor_for_corpus, format_ceiling_line,
@@ -17,7 +20,6 @@ use super::common::{
 };
 use super::llvm_runtime::{LlvmRunBucket, LlvmRunProbe};
 use super::oracle::{normalize_pairwise_output, rust_oracle, RustOracleOutcome};
-use super::rust;
 use radix::codegen::Target;
 use radix::driver::Session;
 use radix::Config;
@@ -172,25 +174,15 @@ pub(super) fn classify_llvm_exemplum(
             format!("cannot read source: {err}"),
         );
     }
-    match rust::uses_package_library_import_for(file) {
-        Ok(true) => return classify_package_llvm_exemplum(file, idx, temp_root, toolchain),
-        Ok(false) => {}
-        Err(reason) => {
-            return llvm_result(
-                file,
-                LlvmTier::SourceReadable,
-                LlvmEmissionBucket::FrontendFailed,
-                format!("cannot inspect imports: {reason}"),
-            );
-        }
-    }
-    // S8.6: every entry/CLI/importa fixture builds through the product
-    // package-to-LLVM builder (`faber/src/package/llvm.rs`) — the single
-    // shared implementation of the package graph → unit modules + link
-    // manifest mapping. No harness-side resolver/emitter remains for these
-    // paths: single-file fixtures are single-unit packages, local-import
-    // fixtures (importa) are multi-unit packages, and the ordinary linker
-    // resolves the canonical `__faber_external_…` identities across modules.
+    // S8.6/S8.8: EVERY fixture — entry, CLI, local-import, and selected-Norma
+    // (`norma:*`) — builds through the product package-to-LLVM builder
+    // (`faber/src/package/llvm.rs`): the single shared implementation of the
+    // package graph → unit modules + link manifest mapping, including the S8.5
+    // per-Norma-unit emission. No harness-side resolver or emitter remains;
+    // the only non-builder lane is the named non-package-shapeable fallback
+    // inside `classify_builder_llvm_exemplum` (an analysis-level rejection of
+    // a public export a file interface cannot represent, e.g.
+    // `vector/infer.fab`).
     classify_builder_llvm_exemplum(session, file, idx, temp_root, toolchain)
 }
 
@@ -224,7 +216,16 @@ fn classify_builder_llvm_exemplum(
         temp_root.join(format!("{idx:03}-{stem}.modules")),
     )
     .with_runtime_archive(runtime_archive);
-    let build = match faber_cli::package::build_package_llvm(&session.config, file, &options) {
+    // Product-faithful builder config: the product package build
+    // (`config_with_locale`) carries no stdlib path, so the library resolver
+    // probes the workspace for the `norma` provider home and resolves
+    // selected `norma:*` units exactly as Rust package compile does. A
+    // caller's `with_dev_stdlib` session config would point the resolver at
+    // `radix/stdlib` — which has no `norma` provider repo — so the builder is
+    // always called with the product config; the session stays for the
+    // single-file fallback lane below.
+    let builder_config = radix::Config::default().with_target(Target::LlvmText);
+    let build = match faber_cli::package::build_package_llvm(&builder_config, file, &options) {
         Ok(build) => build,
         Err(diagnostics) => {
             // MIR-lowering and LLVM-emission failures are lane-independent:
@@ -237,24 +238,40 @@ fn classify_builder_llvm_exemplum(
             if lane_independent {
                 return classify_builder_failure(file, diagnostics);
             }
-            // The package graph rejected the fixture at the analysis level
-            // (e.g. a public export that cannot be represented in a file
-            // interface — `IndexInferenceUnsupported`). Such fixtures are not
+            // The package graph rejected the fixture at the analysis level.
+            // The NAMED non-package-shapeable exception: a public export that
+            // cannot be snapshotted into a file interface (e.g.
+            // `vector/infer.fab`'s inferred `vector<elem, _>` width →
+            // `IndexInferenceUnsupported`). Such fixtures are not
             // package-shapeable but remain valid single-file programs; run
             // them through the radix single-file lane so their historical
-            // pairwise classification is preserved. Entry/CLI/importa
-            // fixtures never take this path — the builder owns their graph.
-            return classify_single_file_llvm_exemplum(session, file, idx, temp_root, toolchain);
+            // pairwise classification is preserved. Any OTHER analysis-level
+            // rejection is a genuine package-analysis failure and must surface
+            // as such — it is never masked by the fallback lane.
+            let non_package_shapeable = diagnostics.iter().any(|diagnostic| {
+                diagnostic.phase == radix::diagnostics::DiagnosticPhase::Analysis
+                    && diagnostic
+                        .message
+                        .contains("cannot be represented in a file interface")
+            });
+            if non_package_shapeable {
+                return classify_single_file_llvm_exemplum(
+                    session, file, idx, temp_root, toolchain,
+                );
+            }
+            return classify_builder_failure(file, diagnostics);
         }
     };
     classify_built_llvm(file, idx, temp_root, toolchain, &build)
 }
 
-/// Single-file compatibility lane for fixtures the package graph cannot
-/// represent (analysis-level rejection only): radix `analyze_source` → MIR →
-/// LLVM emission → verify/run. Kept ONLY as the fallback for non-package-
-/// shapeable corpus stubs; entry/CLI/importa fixtures always build through
-/// the product package-to-LLVM builder.
+/// Single-file compatibility lane for the NAMED non-package-shapeable corpus
+/// stubs (analysis-level rejection only): radix `analyze_source` → MIR → LLVM
+/// emission → verify/run. Kept ONLY for fixtures the package graph cannot
+/// represent — a public export that cannot be snapshotted into a file
+/// interface (e.g. `vector/infer.fab`'s inferred `vector<elem, _>` width);
+/// entry/CLI/importa/norma fixtures always build through the product
+/// package-to-LLVM builder and never take this path.
 fn classify_single_file_llvm_exemplum(
     session: &Session,
     file: &Path,
@@ -482,64 +499,6 @@ fn classify_built_llvm(
             build.manifest.entry_module.display()
         ),
     )
-}
-
-fn classify_package_llvm_exemplum(
-    file: &Path,
-    idx: usize,
-    temp_root: &Path,
-    toolchain: &LlvmToolchain,
-) -> LlvmE2eResult {
-    let config = radix::Config::default().with_target(Target::LlvmText);
-    let emitted = faber_cli::package::with_lowered_package_mir(&config, file, |lowered| {
-        let Some(interner) = lowered.validated.validation().interner else {
-            return Err("package MIR validation context has no interner".to_owned());
-        };
-        radix::mir::emit_llvm_text_probe(&lowered.validated, interner)
-            .map_err(|error| format!("{}:{}", error.category, error.shape))
-    });
-    let llvm = match emitted {
-        Err(diagnostics) => {
-            let mir_failed = diagnostics
-                .iter()
-                .any(|diagnostic| diagnostic.phase == radix::diagnostics::DiagnosticPhase::Mir);
-            return llvm_result(
-                file,
-                if mir_failed {
-                    LlvmTier::FrontendAnalyzed
-                } else {
-                    LlvmTier::SourceReadable
-                },
-                if mir_failed {
-                    LlvmEmissionBucket::MirLoweringFailed
-                } else {
-                    LlvmEmissionBucket::FrontendFailed
-                },
-                format!(
-                    "package analysis/MIR failed: {}",
-                    format_diagnostic_messages(&diagnostics)
-                ),
-            );
-        }
-        Ok(Err(reason)) if reason.starts_with("unsupported-mir-shape:") => {
-            return llvm_result(
-                file,
-                LlvmTier::MirLowered,
-                LlvmEmissionBucket::Unsupported,
-                format!("LLVM emission unsupported: {reason}"),
-            );
-        }
-        Ok(Err(reason)) => {
-            return llvm_result(
-                file,
-                LlvmTier::MirLowered,
-                LlvmEmissionBucket::EmissionFailed,
-                format!("LLVM emission failed: {reason}"),
-            );
-        }
-        Ok(Ok(llvm)) => llvm,
-    };
-    classify_emitted_llvm(file, idx, temp_root, toolchain, llvm)
 }
 
 fn classify_emitted_llvm(
@@ -917,12 +876,13 @@ struct Stage8ProcessOutcome {
     stderr: String,
 }
 
-/// S8.6/S8.7 ratchet: the Stage 8-owned corpus families — root entry variants
-/// (S8.1), CLI programs (S8.2), and the local-import package proof (S8.4) —
-/// must pass through the product package-to-LLVM builder
-/// (`faber/src/package/llvm.rs`) with oracle-matching exit/stdout in BOTH the
-/// Rust oracle lane and the LLVM host lane. Any row here is a Stage 8 gap: the
-/// pairwise gap ledger must stay free of these paths.
+/// S8.6/S8.7/S8.8 ratchet: the Stage 8-owned corpus families — root entry
+/// variants (S8.1), CLI programs (S8.2), the local-import package proof
+/// (S8.4), and selected-Norma consumers (S8.5) — must pass through the
+/// product package-to-LLVM builder (`faber/src/package/llvm.rs`) with
+/// oracle-matching exit/stdout in BOTH the Rust oracle lane and the LLVM host
+/// lane. Any row here is a Stage 8 gap: the pairwise gap ledger must stay
+/// free of these paths.
 #[test]
 #[ignore = "slow LLVM host build+link+run; run: cargo test -p exempla --lib stage8_entry_cli_package_builder_parity -- --ignored --nocapture"]
 fn stage8_entry_cli_package_builder_parity() {
@@ -941,6 +901,10 @@ fn stage8_entry_cli_package_builder_parity() {
         "optio/optio.fab",
         // S8.4 local imports (multi-module through the builder).
         "importa/importa.fab",
+        // S8.5/S8.8 selected Norma units through the builder: a `norma:chorda`
+        // consumer builds entry + one Norma-unit module and runs with
+        // oracle-matching exit/stdout (the S8.6 consolidation ratchet).
+        "importa/default-minimal.fab",
     ];
 
     let corpus_root = crate::paths::corpus_dir();
