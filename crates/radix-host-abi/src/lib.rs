@@ -306,7 +306,14 @@ abi_string_family! {
         LLVM_SLICE_TYPE = "%FaberRtSliceV1",
         LLVM_SLICE_TYPE_DEFINITION = "%FaberRtSliceV1 = type { ptr, i64 }",
         LLVM_EXIT_TYPE = "%FaberRtExitV1",
-        LLVM_EXIT_TYPE_DEFINITION = "%FaberRtExitV1 = type { i32, i32 }",
+        // W16 (hand-4 L9): the exit struct crosses the C boundary as a single
+        // register. LLVM's C-convention lowering of `{ i32, i32 }` splits the
+        // fields across w0/w1 on AArch64, while the rustc/clang caller packs
+        // both into x0 (verified by disassembly). The named type is now an
+        // `i64` carrying `process_code | (status.code << 32)`; the runtime
+        // `FaberRtExitV1 { process_code, status }` reads the packed x0 back
+        // unchanged.
+        LLVM_EXIT_TYPE_DEFINITION = "%FaberRtExitV1 = type i64",
         LLVM_PTR_RESULT_TYPE = "%FaberRtPtrResultV1",
         LLVM_PTR_RESULT_TYPE_DEFINITION = "%FaberRtPtrResultV1 = type { i32, ptr }",
         LLVM_STATUS_TYPE = "%FaberRtStatusV1",
