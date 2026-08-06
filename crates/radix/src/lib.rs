@@ -63,6 +63,7 @@ pub mod aspect;
 pub mod backend_smoke;
 pub mod builtins;
 pub mod cli;
+pub mod cli_descriptor;
 pub mod codegen;
 pub mod diagnostics;
 pub mod driver;
