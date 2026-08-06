@@ -243,17 +243,17 @@ pub(super) struct LibraryImportBinding {
 pub(crate) fn library_resolver_from_config(config: &radix::driver::Config) -> LibraryResolver {
     // The library home (provider repos such as `norma/` and `triga/`) is
     // independent of the reader-pack stdlib path (`stdlib/locale/<id>/pack.toml`).
-    // Prefer `FABER_LIBRARY_HOME` and the workspace probe; fall back to an
-    // explicit stdlib path only when no workspace layout is discoverable, so
-    // a custom layout can still carry provider repos.
-    match crate::library::default_library_home() {
-        Some(home) => LibraryResolver::new(home),
-        None => config
+    // Precedence: an explicit custom stdlib roots the library home; otherwise
+    // `FABER_LIBRARY_HOME` and the workspace probe locate provider repos. The
+    // auto-discovered dev stdlib is never a library home.
+    if config.stdlib_explicit {
+        return config
             .stdlib_path
             .as_ref()
             .map(|path| LibraryResolver::new(path.clone()))
-            .unwrap_or_else(LibraryResolver::default),
+            .unwrap_or_else(LibraryResolver::default);
     }
+    LibraryResolver::default()
 }
 
 /// Build a library resolver for a package root, attaching `faber.toml`
