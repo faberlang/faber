@@ -57,6 +57,93 @@ fn format_author_path_preserves_salve_munde_comments() {
     assert!(formatted.contains("nota \"Salve, Munde!\""));
 }
 
+/// Strict comparison is canonicalized to the ≺/≻ glyphs; ≤/≥ stay as-is.
+#[test]
+fn author_format_rewrites_ascii_comparison_to_glyph() {
+    let source = r"genus Proba {
+    f32 x
+    f32 y
+    functio compara(f32 other) → bivalens {
+        redde ego.x < other et ego.x > other et ego.x ≤ other et ego.x ≥ other
+    }
+}";
+    let formatted = author_format_pipeline("proba.fab", source);
+    assert!(
+        formatted.contains("ego.x ≺ other"),
+        "strict less-than should emit the ≺ glyph: {formatted}"
+    );
+    assert!(
+        formatted.contains("ego.x ≻ other"),
+        "strict greater-than should emit the ≻ glyph: {formatted}"
+    );
+    assert!(formatted.contains("ego.x ≤ other"));
+    assert!(formatted.contains("ego.x ≥ other"));
+    assert!(
+        !formatted.contains("< other"),
+        "ASCII < comparison must not survive: {formatted}"
+    );
+    assert!(
+        !formatted.contains("> other"),
+        "ASCII > comparison must not survive: {formatted}"
+    );
+}
+
+/// `<`/`>` remain ASCII generic application delimiters.
+#[test]
+fn author_format_keeps_ascii_angle_brackets_for_generics() {
+    let source = r"functio normaliza(lista<f32> values) → lista<f32> {
+    redde values
+}";
+    let formatted = author_format_pipeline("proba.fab", source);
+    assert!(
+        formatted.contains("lista<f32>"),
+        "generic delimiters stay ASCII: {formatted}"
+    );
+}
+
+/// Regression: `format --locale` must resolve provider/relative imports via the
+/// import contract. The forma re-emit path used to report SEM002
+/// unknown-qualified-type on any file with imports.
+#[test]
+fn format_locale_resolves_imports_in_corpus_fixture() {
+    let fixture = exempla("importa/default-minimal.fab");
+    let home = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("faber crate must sit in the faberlang container")
+        .to_path_buf();
+    let mut child = Command::new(faber_binary())
+        .args(["format", "--locale", "la", "--stdout"])
+        .arg(&fixture)
+        .env("FABER_LIBRARY_HOME", &home)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn faber format");
+    let mut stdout = String::new();
+    child
+        .stdout
+        .take()
+        .expect("stdout")
+        .read_to_string(&mut stdout)
+        .expect("read stdout");
+    let mut stderr = String::new();
+    if let Some(mut err) = child.stderr.take() {
+        let _ = err.read_to_string(&mut stderr);
+    }
+    assert!(
+        child.wait().expect("wait").success(),
+        "faber format --locale la failed on importing fixture: {stderr}"
+    );
+    assert!(
+        !stderr.contains("SEM002"),
+        "imports must resolve via the import contract: {stderr}"
+    );
+    assert!(
+        stdout.contains("importa ex \"norma:chorda\""),
+        "import line should survive re-emit"
+    );
+}
+
 #[test]
 fn format_author_pipeline_reparses_cura_fixture() {
     let path = exempla("cura/cura.fab");
@@ -200,11 +287,11 @@ fn format_locale_thai_localizes_surface() {
     assert!(thai_output.contains("ฟังก์ชัน นับผ่าน(รายการ<จำนวน> scores) → จำนวน"));
     assert!(thai_output.contains("แปร จำนวน total ← 0"));
     assert!(thai_output.contains("วน จาก scores คงที่ score"));
-    assert!(thai_output.contains("ถ้า score < 0 {"));
+    assert!(thai_output.contains("ถ้า score ≺ 0 {"));
     assert!(thai_output.contains("ไปต่อ"));
     assert!(thai_output.contains("หยุด"));
     assert!(thai_output.contains("ฟังก์ชัน นับถอยหลัง(จำนวน start) → จำนวน"));
-    assert!(thai_output.contains("ขณะ current > 0"));
+    assert!(thai_output.contains("ขณะ current ≻ 0"));
     assert!(thai_output.contains("เริ่ม {"));
     assert!(thai_output.contains("คงที่ จำนวน score ← 82"));
     assert!(thai_output.contains("คงที่ รายการ<จำนวน> scores ← [-1, 82, 41, 60]"));

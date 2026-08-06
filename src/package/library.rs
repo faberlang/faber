@@ -44,6 +44,10 @@ struct CachedLibraryInterface {
     analysis: Option<AnalyzedUnit>,
     file_interface: Option<FileInterface>,
     expanded_imports: Vec<LibraryImportBinding>,
+    /// Reader locale pack the module's own package (or file frontmatter)
+    /// selects; used to lex and analyze the interface regardless of the
+    /// consuming package's locale.
+    locale_pack: Option<radix::locale::LocalePack>,
 }
 
 type LibraryIdentityKey = (u8, String, Vec<String>);
@@ -290,6 +294,29 @@ fn visit_transitive_library_import(
     walk.ordered.push(import.clone());
 }
 
+/// Resolve the reader locale pack a library interface module should be read
+/// under: the file's own `+++ locale = … +++` frontmatter wins, otherwise the
+/// module package's manifest `[reader] locale` applies, otherwise Latin.
+///
+/// The consuming package's locale is deliberately NOT consulted: each module
+/// is read in its own repo's language (manifest-level default, per-file
+/// frontmatter override), which is what makes mixed-language consumers and
+/// libraries compose.
+fn resolve_library_interface_locale_pack(
+    module: &ResolvedLibraryModule,
+    frontmatter: Option<&radix::driver::FileFrontmatter>,
+) -> Result<Option<radix::locale::LocalePack>, Diagnostic> {
+    let file_locale = frontmatter
+        .and_then(radix::driver::FileFrontmatter::locale)
+        .map(str::trim)
+        .filter(|locale| !locale.is_empty());
+    match file_locale {
+        Some(locale) => super::load_locale_pack_for_input(&module.interface_path, Some(locale))
+            .map_err(|err| *err),
+        None => super::load_locale_pack_for_input(&module.interface_path, None).map_err(|err| *err),
+    }
+}
+
 fn read_and_parse_library_interface(
     module: &ResolvedLibraryModule,
 ) -> Result<CachedLibraryInterface, Diagnostic> {
@@ -298,9 +325,14 @@ fn read_and_parse_library_interface(
     let display_name = module.interface_path.display().to_string();
     let peeled = peel_raw_source(&display_name, &raw_source)
         .map_err(|error| source_load_diagnostic(&display_name, &error))?;
+    let locale_pack = resolve_library_interface_locale_pack(module, peeled.frontmatter.as_ref())?;
     // Library interfaces may declare bodyless functions bound by target manifests (G4).
+    let tokens = match locale_pack.as_ref() {
+        Some(pack) => radix::lexer::lex_with_locale_pack(peeled.body, pack),
+        None => radix::lexer::lex(peeled.body),
+    };
     let parse = parser::parse_with_options(
-        radix::lexer::lex(peeled.body),
+        tokens,
         parser::ParseOptions {
             allow_bodyless_functions: true,
         },
@@ -332,6 +364,7 @@ fn read_and_parse_library_interface(
         analysis: None,
         file_interface: None,
         expanded_imports: Vec::new(),
+        locale_pack,
     })
 }
 
@@ -565,7 +598,19 @@ fn analyze_cached_library_interface(
 
     // Library interface analysis follows the package target. Browser products
     // must not inherit Rust-only borrow qualification from Config::default().
-    let session = Session::new(library_cache.analysis_config.clone());
+    // The module's own reader locale (resolved at parse time) overrides any
+    // consuming-package locale: a Latin consumer must analyze an en library
+    // under the en pack, and vice versa.
+    let mut analysis_config = library_cache.analysis_config.clone();
+    if let Some(pack) = load_cached_library_interface(&import.module, library_cache)?
+        .locale_pack
+        .as_ref()
+    {
+        analysis_config = analysis_config.with_locale_pack(pack.clone());
+    } else {
+        analysis_config.locale_pack = None;
+    }
+    let session = Session::new(analysis_config);
     let mut analysis = match analyze_source_with_cli_program_and_import_contract(
         &session,
         &import.module.interface_path.display().to_string(),
