@@ -62,9 +62,6 @@ wat = { version = "1.250", default-features = false }
 hygiene-ratchet = { path = "../hygiene-ratchet" }
 insta = "1"
 tempfile = "3"
-# Read-only decoder oracle import for the CCI-2/3/4 source fixtures
-# (decoder_ops::rms_norm / rope_norm; faber-runtime product code is never
-# modified — the fixtures only call the oracle). Library name is `faber`.
 
 [features]
 default = []
