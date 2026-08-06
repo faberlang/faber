@@ -254,7 +254,11 @@ pub(crate) fn build_package_llvm_from_graph(
     let entry_module = modules
         .iter()
         .find(|module| module.is_entry)
-        .expect("select_entry_unit guarantees exactly one entry unit")
+        .ok_or_else(|| {
+            vec![crate::package_diagnostic_error(
+                "internal invariant: select_entry_unit guaranteed exactly one entry unit",
+            )]
+        })?
         .llvm_path
         .clone();
     let module_list = modules
