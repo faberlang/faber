@@ -165,10 +165,13 @@ impl Validator<'_, '_> {
                 }
             }
             MirIntrinsic::CursorStream(_) => {
-                if !matches!(self.type_kind(call.return_ty), Type::Array(_)) {
+                if !matches!(
+                    self.type_kind(call.return_ty),
+                    Type::Array(_) | Type::AsyncCursor(_, _)
+                ) {
                     self.error(
                         span,
-                        "cursor_stream runtime call does not return an array type",
+                        "cursor_stream runtime call does not return an array or async cursor type",
                     );
                 }
             }
@@ -408,15 +411,18 @@ impl Validator<'_, '_> {
                 let Some(receiver_ty) = receiver_ty else {
                     return;
                 };
-                let Type::Cursor(element) = self.type_kind(receiver_ty) else {
-                    self.error(span, "sermo cursor drain receiver is not cursor");
-                    return;
+                let element = match self.type_kind(receiver_ty) {
+                    Type::Cursor(element) | Type::AsyncCursor(element, _) => *element,
+                    _ => {
+                        self.error(span, "sermo cursor drain receiver is not cursor or async cursor");
+                        return;
+                    }
                 };
                 let Type::Array(result_element) = self.type_kind(call.return_ty) else {
                     self.error(span, "sermo cursor drain result is not lista");
                     return;
                 };
-                if !self.context.types.assignable(*element, *result_element) {
+                if !self.context.types.assignable(element, *result_element) {
                     self.error(span, "sermo cursor drain element type mismatch");
                 }
             }
