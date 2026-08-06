@@ -28,9 +28,15 @@ impl KeywordPack for SlotTestPack {
         match text {
             "本地" => Some("iuncta"),
             "await" => Some("tacebit"),
-            // Genus and the boolean literals let class-body regression tests
-            // exercise localized type spellings end to end.
+            // Genus, statements, and literals let class-body regression tests
+            // exercise localized type spellings and statement terminals end to
+            // end.
             "genus" => Some("genus"),
+            "fn" => Some("functio"),
+            "var" => Some("varia"),
+            "if" => Some("si"),
+            "then" => Some("ergo"),
+            "return" => Some("redde"),
             "true" => Some("verum"),
             "false" => Some("falsum"),
             _ => None,
@@ -40,6 +46,7 @@ impl KeywordPack for SlotTestPack {
     fn type_latin_key(&self, text: &str) -> Option<&str> {
         match text {
             "bool" => Some("bivalens"),
+            "int" => Some("numerus"),
             "string" => Some("textus"),
             _ => None,
         }
@@ -148,6 +155,38 @@ fn localized_type_spelling_after_initialized_field_is_not_an_operand() {
     assert!(
         result.errors.is_empty(),
         "localized type spelling after an initialized field must not fire the retired prefix predicate: {:?}",
+        result.errors
+    );
+}
+
+#[test]
+fn statement_terminal_literal_is_not_a_retired_predicate() {
+    // Regression: `return false` followed by the next statement's identifier
+    // (`j ← j + 1`) read as the retired `falsum <operand>` prefix form and
+    // fired PARSE001. A literal in operand position is a value; only a
+    // statement-start literal followed by an operand is the retired form.
+    let mut parser = parser_over_with_pack(
+        "genus X {\n    fn f() → bool {\n        var int j ← 0\n        if j ≡ 1 then return false\n        j ← j + 1\n        return true\n    }\n}\n",
+    );
+    let result = parser.parse_program();
+    assert!(
+        result.errors.is_empty(),
+        "statement-terminal literal must not fire the retired prefix predicate: {:?}",
+        result.errors
+    );
+
+    // The retired standalone form must still be rejected.
+    let mut parser = parser_over_with_pack("genus X {\n    fn f() → bool {\n        false j\n    }\n}\n");
+    let result = parser.parse_program();
+    assert!(
+        result.errors.iter().any(|error| {
+            matches!(error.kind, super::ParseErrorKind::Expected)
+                && error
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "issue" && arg.value == "retired_prefix_predicate")
+        }),
+        "standalone `false <operand>` must still be rejected: {:?}",
         result.errors
     );
 }

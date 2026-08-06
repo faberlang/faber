@@ -575,13 +575,36 @@ impl Parser {
         let Some((predicate, replacement)) = self.literal_prefix_predicate_replacement() else {
             return Ok(());
         };
-        if !self.peek_at_one_starts_prefix_operand() || self.looks_like_following_field_member() {
+        if !self.peek_at_one_starts_prefix_operand()
+            || self.looks_like_following_field_member()
+            || !self.operand_starts_same_line()
+        {
             return Ok(());
         }
         Err(self
             .expected_expression_error("retired_prefix_predicate")
             .with_arg("predicate", predicate)
             .with_arg("replacement", replacement))
+    }
+
+    /// Whether the token after the current one starts on the same source line.
+    ///
+    /// The retired prefix-predicate forms (`falsum <operand>`) are legacy
+    /// single-line expressions. A literal at the end of a statement followed
+    /// by the next statement's first token (`return false` then `j ← j + 1`)
+    /// reads identically at the token level, so firing across a line break
+    /// would reject valid statement sequences.
+    fn operand_starts_same_line(&self) -> bool {
+        let slot = self.non_trivia_indices.partition_point(|&i| i < self.pos);
+        let Some(&this_idx) = self.non_trivia_indices.get(slot) else {
+            return false;
+        };
+        let Some(&next_idx) = self.non_trivia_indices.get(slot + 1) else {
+            return true;
+        };
+        !self.tokens[this_idx + 1..next_idx]
+            .iter()
+            .any(|token| token.kind == TokenKind::Newline)
     }
 
     /// Whether the token one ahead would start a value (prefix) operand.
@@ -636,8 +659,12 @@ impl Parser {
         // Only the retired predicate form (`negativum <value>`) fires: a bare
         // identifier use of the same spelling (e.g. a variable named
         // `negative`) followed by anything that does not start a value operand
-        // is an ordinary expression.
-        if !self.peek_at_one_starts_prefix_operand() || self.looks_like_following_field_member() {
+        // is an ordinary expression. The retired form is a legacy single-line
+        // expression, so the operand must start on the same line.
+        if !self.peek_at_one_starts_prefix_operand()
+            || self.looks_like_following_field_member()
+            || !self.operand_starts_same_line()
+        {
             return Ok(());
         }
         Err(self
@@ -1029,12 +1056,19 @@ impl Parser {
 
         if let TokenKind::Ident(sym) = self.peek().kind {
             let name = self.interner.resolve(sym);
+            // Resolve a localized type spelling to its latin identity before
+            // the conversio-type list match (`int` → `numerus` under the en
+            // pack), so `↦ int<u32>` routes to an explicit type target.
+            let latin = self
+                .reader_type_latin_keys
+                .get(name)
+                .map_or(name, String::as_str);
             // Type-position keywords migrated to tokenless (Batch A: `modulus`,
             // `iuncta`) must still route to an explicit type target rather than
             // the range fallback — in Latin or a reader-pack surface spelling.
             let is_type_slot_keyword =
                 self.check_keyword_ident(TokenKind::Modulus) || self.check_keyword_ident(TokenKind::Iuncta);
-            if !Self::is_conversio_type_keyword(name)
+            if !Self::is_conversio_type_keyword(latin)
                 && !Self::is_capitalized_type_name(name)
                 && !is_type_slot_keyword
             {
