@@ -36,7 +36,7 @@ pub(crate) fn portable_product_boost(
     wasm_bytes: &[u8],
 ) -> Option<(WasmTier, String)> {
     let outcome = run_product(wasm_bytes)?;
-    let RunOutcome::Success { stdout } = outcome else {
+    let RunOutcome::Success { stdout, .. } = outcome else {
         return None;
     };
     let expected = read_expected_stdout(fab_file)?;
@@ -62,10 +62,11 @@ fn emit_wasm_bytes(session: &Session, fab_path: &Path) -> Vec<u8> {
         &source,
     )
     .expect("proof fixture must analyze");
-    let interner = analysis.interner.clone();
     let mir = radix::mir::lower_analyzed_unit_with_context(&mut analysis)
         .expect("proof fixture must lower to MIR");
-    radix::mir::emit_wasm_text_and_binary_probe_with_context(&mir.validated, &interner)
+    // Use the lowered unit's complete symbol table (lowering interns symbols
+    // the analysis interner lacks; the wasm literal table resolves them).
+    radix::mir::emit_wasm_text_and_binary_probe_with_context(&mir.validated, &mir.interner)
         .expect("proof fixture must emit Wasm")
         .1
 }
@@ -96,7 +97,7 @@ fn wasm_product() {
         let wasm_bytes = emit_wasm_bytes(&session, &fab_path);
         let outcome =
             run_product(&wasm_bytes).expect("portable product engine must initialize");
-        let RunOutcome::Success { stdout } = &outcome else {
+        let RunOutcome::Success { stdout, .. } = &outcome else {
             panic!(
                 "{fab_rel} must run to success through the portable runner, got: {outcome:?}"
             );
@@ -168,4 +169,43 @@ fn wasm_product() {
         matches!(&outcome, RunOutcome::EntryMissing { entry } if entry == "incipit"),
         "missing entry must be an explicit entry-missing outcome, got: {outcome:?}"
     );
+}
+
+/// W12 per-fixture runner probes for the closed Stage 5B text/diagnostic
+/// rows: each fixture emits as a real compiler artifact, runs through the
+/// portable product runner, and its captured stdout matches the sibling
+/// `.expected` byte for byte (the same evidence the ledger's
+/// `outcome-checked` rows record).
+#[test]
+fn wasm_text_diagnostic_cluster_runs_through_the_product_host() {
+    let session = super::wasm::wasm_session();
+    let fixtures: &[&str] = &[
+        "literalia/ascii.fab",
+        "literalia/textus.fab",
+        "literalia/regex.fab",
+        "nota/nota.fab",
+        "octeti/octeti.fab",
+        "vide/vide.fab",
+        "literalia/block-string.fab",
+        "mone/mone.fab",
+    ];
+    for rel in fixtures {
+        let fab_path = crate::paths::corpus_dir().join(rel);
+        let wasm_bytes = emit_wasm_bytes(&session, &fab_path);
+        let outcome = run_product(&wasm_bytes).expect("portable product engine must initialize");
+        let expected = read_expected_stdout(&fab_path)
+            .unwrap_or_else(|| panic!("{rel} must have a sibling .expected"));
+        match &outcome {
+            RunOutcome::Success { stdout, .. } => {
+                assert_eq!(
+                    normalize_newline(stdout),
+                    expected,
+                    "{rel} captured stdout must match the sibling .expected"
+                );
+            }
+            other => panic!(
+                "{rel} must run to success through the portable runner, got: {other:?}"
+            ),
+        }
+    }
 }

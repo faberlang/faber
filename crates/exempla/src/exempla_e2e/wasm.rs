@@ -145,7 +145,6 @@ pub(crate) fn classify_wasm_exemplum(
         analysis.package_import_identities = Some(identities);
     }
 
-    let interner = analysis.interner.clone();
     let mir = match radix::mir::lower_analyzed_unit_with_context(&mut analysis) {
         Ok(mir) => mir,
         Err(errors) => {
@@ -167,13 +166,19 @@ pub(crate) fn classify_wasm_exemplum(
         }
     };
 
-    let (wat, wasm_bytes) =
-        match radix::mir::emit_wasm_text_and_binary_probe_with_context(&mir.validated, &interner) {
-            Ok(pair) => pair,
-            Err(error) => {
-                return wasm_result(
-                    file,
-                    WasmTier::MirLowered,
+    let (wat, wasm_bytes) = match radix::mir::emit_wasm_text_and_binary_probe_with_context(
+        &mir.validated,
+        // The lowered unit carries the complete symbol table (lowering interns
+        // runtime/diagnostic symbols the analysis interner lacks); the wasm
+        // literal table resolves literal symbols, so the stale pre-lowering
+        // clone would panic on lowering-added symbols.
+        &mir.interner,
+    ) {
+        Ok(pair) => pair,
+        Err(error) => {
+            return wasm_result(
+                file,
+                WasmTier::MirLowered,
                     format!("Wasm emission failed: {error}"),
                     None,
                     None,
@@ -181,6 +186,9 @@ pub(crate) fn classify_wasm_exemplum(
                 );
             }
         };
+    // The stub host's diagnostic events carry the same symbol space the wasm
+    // emitter used, so the complete lowered interner feeds the event decoder.
+    let interner = &mir.interner;
 
     let stem = file
         .file_stem()
