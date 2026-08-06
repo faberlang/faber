@@ -110,6 +110,11 @@ impl PackageLlvmOptions {
 }
 
 /// One emitted LLVM module for a package unit (D11 one-module-per-unit).
+///
+/// `allow(dead_code)`: the faber binary inlines the package modules, so fields
+/// only the pairwise exempla harness (lib consumer) and the product builder
+/// read are flagged by the bin target's dead-code analysis.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct PackageLlvmModule {
     /// Source unit path in the package graph.
@@ -127,6 +132,11 @@ pub struct PackageLlvmModule {
 }
 
 /// Inspectable link manifest (Package Compilation Contract).
+///
+/// `allow(dead_code)`: the faber binary inlines the package modules, so fields
+/// only the pairwise exempla harness (lib consumer) and the product builder
+/// read are flagged by the bin target's dead-code analysis.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct PackageLlvmLinkManifest {
     /// One `.ll` path per unit, deterministic order (package analysis order).
@@ -145,6 +155,11 @@ pub struct PackageLlvmLinkManifest {
 }
 
 /// Complete package-to-LLVM build result.
+///
+/// `allow(dead_code)`: the faber binary inlines the package modules, so fields
+/// only the pairwise exempla harness (lib consumer) and the product builder
+/// read are flagged by the bin target's dead-code analysis.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct PackageLlvmBuild {
     /// Stable product identity used by the external symbol names
@@ -254,7 +269,7 @@ pub(crate) fn build_package_llvm_from_graph(
         .join("llvm")
         .join("bin")
         .join(&product);
-    let output = options.output_dir.join(format!("{product}"));
+    let output = options.output_dir.join(&product);
     Ok(PackageLlvmBuild {
         product,
         entry_unit: package.units[entry_index].path.clone(),

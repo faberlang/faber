@@ -101,9 +101,13 @@ pub(super) fn cmd_run(args: RunArgs) {
             cmd_run_fhir(args);
             return;
         }
+        Target::LlvmHost => {
+            cmd_run_llvm_host(&args);
+            return;
+        }
         target => {
             eprintln!(
-                "error: faber run does not support target `{}`; use `rust`, `go`, `scena`, `fhir`, `fmir-text`, `fmir`, or `fmir-bin`",
+                "error: faber run does not support target `{}`; use `rust`, `go`, `scena`, `fhir`, `fmir-text`, `fmir`, `fmir-bin`, or `llvm-host`",
                 run_target_name(target)
             );
             std::process::exit(1);
@@ -172,6 +176,7 @@ fn run_target_name(target: Target) -> &'static str {
         Target::WasmText => "wasm-text",
         Target::Wasm => "wasm",
         Target::LlvmText => "llvm-text",
+        Target::LlvmHost => "llvm-host",
         Target::MetalText => "metal-text",
         Target::WgslText => "wgsl-text",
         Target::Sexp => "sexp",
@@ -439,6 +444,35 @@ fn cmd_run_fhir(args: RunArgs) {
         eprintln!("fhir package execution failed");
         std::process::exit(1);
     }
+}
+
+/// Stage 9 S9.3: `faber run --target llvm-host` — build the native host
+/// executable through the shared product builder, then execute it with the
+/// forwarded process arguments. stdout/stderr are inherited (forwarded to the
+/// caller) and the child exit code becomes the command's exit code.
+fn cmd_run_llvm_host(args: &RunArgs) {
+    let input_path = PathBuf::from(&args.path);
+    let config = run_config_or_exit(
+        Target::LlvmHost,
+        &input_path,
+        args.locale.as_deref(),
+        args.diagnostic_locale.as_deref(),
+        warn_policy_from_args(args),
+    );
+    let profile = if args.release {
+        package::LlvmHostProfile::Release
+    } else {
+        package::LlvmHostProfile::Debug
+    };
+    let build = match package::build_host_program(&config, &input_path, profile) {
+        Ok(build) => build,
+        Err(diagnostics) => {
+            eprint_route_diagnostics(&diagnostics);
+            eprintln!("llvm-host build failed");
+            std::process::exit(1);
+        }
+    };
+    run_executable(&build.binary_path, &args.args);
 }
 
 fn cmd_run_fmir_bin(args: &RunArgs, selection: DeviceSelection) {

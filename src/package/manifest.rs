@@ -359,6 +359,7 @@ pub(crate) fn manifest_build_target(
         Some("fmir-text") => Ok(Target::FmirText),
         Some("fmir") => Ok(Target::Fmir),
         Some("fmir-bin") => Ok(Target::FmirBin),
+        Some("llvm-host") => Ok(Target::LlvmHost),
         Some(unsupported) => Err(Box::new(
             crate::package_diagnostic_error(format!(
                 "faber.toml build.target '{unsupported}' is not supported for package builds"

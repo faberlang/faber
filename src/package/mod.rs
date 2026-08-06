@@ -48,6 +48,7 @@ mod import_graph;
 mod library;
 mod library_link;
 mod llvm;
+mod llvm_host;
 mod locale;
 mod lockfile;
 mod manifest;
@@ -154,6 +155,11 @@ pub use mir::with_lowered_package_mir;
 pub use llvm::{
     build_package_llvm, PackageLlvmBuild, PackageLlvmLinkManifest, PackageLlvmModule,
     PackageLlvmOptions,
+};
+#[allow(unused_imports)] // `faber build/run --target llvm-host` + product tests consume the Stage 9 lane.
+pub use llvm_host::{
+    build_host_program, discover_llvm_host_toolchain, ensure_llvm_runtime_archive,
+    host_llvm_target_triple, host_triple_for, LlvmHostBuild, LlvmHostProfile,
 };
 #[allow(unused_imports)] // graph-rooted build is package-crate internal (graph type is pub(crate)).
 pub(crate) use llvm::build_package_llvm_from_graph;

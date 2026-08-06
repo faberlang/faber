@@ -13,10 +13,11 @@ use super::cargo::{
 use super::go_build::{emit_go_module, invoke_go_build, GoBuildLayout};
 use super::manifest::manifest_build_target;
 use super::{
-    build_package_fmir_binary_bundle, build_package_fmir_image, build_package_fmir_text_image,
-    build_package_mir_artifact, check_package, compile_package, compile_package_go,
-    config_with_locale, discover_build_layout, package_host_selection_diagnostic,
-    package_rust_runtime_plan, read_manifest, BuildLayout, MANIFEST_FILE,
+    build_host_program, build_package_fmir_binary_bundle, build_package_fmir_image,
+    build_package_fmir_text_image, build_package_mir_artifact, check_package, compile_package,
+    compile_package_go, config_with_locale, discover_build_layout,
+    package_host_selection_diagnostic, package_rust_runtime_plan, read_manifest, BuildLayout,
+    LlvmHostProfile, MANIFEST_FILE,
 };
 
 /// Execute the user-facing `faber build` command.
@@ -151,6 +152,33 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
             }
         };
         println!("{}", artifact.package_path.display());
+        return;
+    }
+
+    // Stage 9 S9.2: `faber build --target llvm-host` routes to the shared
+    // package-to-LLVM builder + native verify/link (the SAME builder the
+    // pairwise harness uses). Never Rust codegen for the program, never a `cc`
+    // fallback; fails with a structured diagnostic when the toolchain or
+    // runtime archive is unavailable or the host triple is unsupported.
+    if is_package && target == Target::LlvmHost {
+        let profile = if command.release {
+            LlvmHostProfile::Release
+        } else {
+            LlvmHostProfile::Debug
+        };
+        let build = match build_host_program(&config, &input_path, profile) {
+            Ok(build) => build,
+            Err(diagnostics) => {
+                radix::tool::print_diagnostics(
+                    &diagnostics,
+                    DiagnosticMode::Normal,
+                    locale_pack.as_ref(),
+                );
+                eprintln!("llvm-host build failed");
+                std::process::exit(1);
+            }
+        };
+        println!("{}", build.binary_path.display());
         return;
     }
 
@@ -525,6 +553,7 @@ pub fn use_package_compiler(target: Target, path: &std::path::Path, force_packag
                 | Target::Fmir
                 | Target::FmirBin
                 | Target::Fhir
+                | Target::LlvmHost
         );
     }
     false
