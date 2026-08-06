@@ -7,5 +7,9 @@ name = "hygiene-ratchet"
 version = "0.1.0"
 
 [[package]]
+name = "radix-host-abi"
+version = "0.79.0"
+
+[[package]]
 name = "radix-runtime-contract"
 version = "0.79.0"
