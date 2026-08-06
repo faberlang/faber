@@ -675,6 +675,7 @@ dependencies = [
 name = "faber-host-wasm"
 version = "0.1.0"
 dependencies = [
+ "radix-host-abi",
  "wasmtime",
 ]
 

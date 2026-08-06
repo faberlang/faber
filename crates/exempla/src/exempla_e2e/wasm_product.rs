@@ -133,7 +133,7 @@ fn wasm_product() {
 
     let unknown_field = wat_bytes(r#"
 (module
-  (import "faber_rt_v1" "__faber_rt_v1_array_length" (func $len (param i32) (result i64)))
+  (import "faber_rt_v1" "__faber_rt_v1_tensor_shape" (func $len (param i32) (result i32)))
   (func (export "incipit") (drop (call $len (i32.const 0))))
 )
 "#);
@@ -141,7 +141,7 @@ fn wasm_product() {
     assert!(
         matches!(
             &outcome,
-            RunOutcome::ImportRejected { field, .. } if field == "__faber_rt_v1_array_length"
+            RunOutcome::ImportRejected { field, .. } if field == "__faber_rt_v1_tensor_shape"
         ),
         "unknown v1 field must be an explicit import rejection, got: {outcome:?}"
     );
@@ -170,6 +170,70 @@ fn wasm_product() {
         "missing entry must be an explicit entry-missing outcome, got: {outcome:?}"
     );
 }
+
+/// W13 per-fixture runner probes for the closed Stage 5B/6 collection/scalar
+/// display rows: each fixture emits as a real compiler artifact, runs through
+/// the portable product runner, and its captured stdout matches the sibling
+/// `.expected` byte for byte (the same evidence the ledger's
+/// `outcome-checked` rows record). The set is the collection/scalar display
+/// cluster: lista/tabula/copia construction and display, array index/option
+/// reads, scalar (bivalens/option) display, and the closely-adjacent assert
+/// rows the same fixtures route through.
+#[test]
+fn wasm_collection_scalar_cluster_runs_through_the_product_host() {
+    let session = super::wasm::wasm_session();
+    let fixtures: &[&str] = &[
+        // lista construction + scalar reads + display.
+        "lista/lista.fab",
+        "lista/methodi-functionales.fab",
+        "destructura/lista.fab",
+        "sparge/sparge.fab",
+        "ceteri/ceteri.fab",
+        "clausa/clausa.fab",
+        "in/in.fab",
+        "itera/ex.fab",
+        "itera/in-functione.fab",
+        // scalar display: bivalens, option/null, format/convert rows.
+        "literalia/boolean.fab",
+        "literalia/nihil.fab",
+        "binarius/binarius.fab",
+        "vel/vel.fab",
+        "aut/aut.fab",
+        "varia/typi-ligata.fab",
+        "conversio/bivalens.fab",
+        "intrinseca/fractus-approximata.fab",
+        "operatores/numeric-value-eq.fab",
+        "operatores/comparatio.fab",
+        // assert rows (`adfirma` smoke fixtures exit 0 with pinned stdout).
+        "dum/dum.fab",
+        "et/et.fab",
+        "falsum/falsum.fab",
+        "fixum/fixum.fab",
+        "non/non.fab",
+        "si/si.fab",
+        "verum/verum.fab",
+    ];
+    for rel in fixtures {
+        let fab_path = crate::paths::corpus_dir().join(rel);
+        let wasm_bytes = emit_wasm_bytes(&session, &fab_path);
+        let outcome = run_product(&wasm_bytes).expect("portable product engine must initialize");
+        let expected = read_expected_stdout(&fab_path)
+            .unwrap_or_else(|| panic!("{rel} must have a sibling .expected"));
+        match &outcome {
+            RunOutcome::Success { stdout, .. } => {
+                assert_eq!(
+                    normalize_newline(stdout),
+                    expected,
+                    "{rel} captured stdout must match the sibling .expected"
+                );
+            }
+            other => panic!(
+                "{rel} must run to success through the portable runner, got: {other:?}"
+            ),
+        }
+    }
+}
+
 
 /// W12 per-fixture runner probes for the closed Stage 5B text/diagnostic
 /// rows: each fixture emits as a real compiler artifact, runs through the
