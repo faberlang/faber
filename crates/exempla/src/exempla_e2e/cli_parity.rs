@@ -9,13 +9,15 @@
 use super::llvm_runtime::{run_llvm_exemplum_with_args, LlvmRunProbe};
 use radix::driver::{Config, Session};
 use radix::Target;
-use std::path::PathBuf;
 
 /// Compile one CLI source through the adapter lane and run it with `args`.
 fn run_cli_source(name: &str, source: &str, args: &[&str]) -> LlvmRunProbe {
     static SEQUENCE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-    // Parallel tests share one temp dir; a unique stem keeps the emitted .ll
-    // and linked .bin from colliding across tests.
+    // A fresh managed temp root per call keeps parallel tests (and repeated
+    // runs) from sharing one artifact dir: the previous shared
+    // `faber-exempla-cli-parity` dir under the system temp never cleaned up
+    // (hundreds of 7MB linked binaries accumulated), and its uniqueness
+    // depended on pid reuse never colliding across runs.
     let sequence = SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let unique = format!("{name}-{sequence}-{}", std::process::id());
     let session = Session::new(
@@ -37,8 +39,7 @@ fn run_cli_source(name: &str, source: &str, args: &[&str]) -> LlvmRunProbe {
         plan,
     )
     .expect("emit CLI adapter");
-    let dir = std::env::temp_dir().join("faber-exempla-cli-parity");
-    std::fs::create_dir_all(&dir).expect("parity temp dir");
+    let dir = super::common::make_temp_root();
     let llvm_file = dir.join(format!("{unique}.ll"));
     std::fs::write(&llvm_file, &llvm).expect("write LLVM");
     let fab_path = dir.join(format!("{unique}.fab"));
@@ -70,7 +71,6 @@ fn cli_fab_version_command_matches_rust_oracle() {
 }
 
 #[test]
-#[ignore = "known breakage: CLI-vs-rust-oracle parity leaks/flakes under subprocess spawn; tracked separately"]
 fn cli_fab_alias_and_global_flag_match_rust_oracle() {
     let probe = run_corpus_cli("cli/cli.fab", &["g", "Tullia"]);
     assert_eq!(probe.stdout, "Salve, Tullia!\n", "alias dispatch");

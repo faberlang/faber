@@ -93,10 +93,10 @@ pub fn run_llvm_exemplum_with_args(
     };
 
     let binary_file = temp_root.join(format!("{stem}.bin"));
-    if let Err(reason) = toolchain.verify(llvm_file) {
+    if let Err(reason) = verify_llvm_text(&toolchain, llvm_file) {
         return LlvmRunProbe::link_failed(reason);
     }
-    if let Err(reason) = toolchain.link(llvm_file, &runtime_archive, &binary_file) {
+    if let Err(reason) = link_llvm_text(&toolchain, llvm_file, &runtime_archive, &binary_file) {
         return LlvmRunProbe::link_failed(reason);
     }
     run_linked_binary(&binary_file, fab_path, run_args)
@@ -142,7 +142,7 @@ pub fn run_llvm_modules_with_args(
 
     let binary_file = temp_root.join(format!("{stem}.bin"));
     for module in modules {
-        if let Err(reason) = toolchain.verify(module) {
+        if let Err(reason) = verify_llvm_text(&toolchain, module) {
             return LlvmRunProbe::link_failed(format!(
                 "{} failed llvm-as: {reason}",
                 module.display()
@@ -173,8 +173,11 @@ fn run_linked_binary(binary_file: &Path, fab_path: &Path, run_args: &[&str]) -> 
         Duration::from_secs(10),
     );
     let Ok(run) = run else {
+        let Err(error) = run else {
+            unreachable!()
+        };
         return LlvmRunProbe::run_failed(
-            "cannot execute linked binary",
+            format!("cannot execute linked binary: {error}"),
             String::new(),
             String::new(),
             None,
@@ -224,6 +227,58 @@ fn run_linked_binary(binary_file: &Path, fab_path: &Path, run_args: &[&str]) -> 
         stderr: String::from_utf8_lossy(&run.stderr).to_string(),
         exit_code: run.status.code(),
     }
+}
+
+/// Verify an emitted LLVM text module with the external `llvm-as`.
+///
+/// This mirrors [`LlvmHostToolchain::verify`] but runs through the exempla
+/// harness's race-free [`command_output_with_timeout`]: the radix toolchain
+/// helper waits through the `wait-timeout` crate, whose Unix SIGCHLD design
+/// can lose a child's exit notification and stall the full timeout under
+/// parallel subprocess load (the flaky-under-contention family root cause).
+fn verify_llvm_text(
+    toolchain: &LlvmHostToolchain,
+    llvm_file: &Path,
+) -> Result<(), String> {
+    let mut command = Command::new(&toolchain.llvm_as);
+    command
+        .arg("-o")
+        .arg(if cfg!(windows) { "NUL" } else { "/dev/null" })
+        .arg(llvm_file);
+    let output = super::common::command_output_with_timeout(&mut command, Duration::from_secs(120))?;
+    if !output.status.success() {
+        return Err(format!(
+            "llvm-as failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    Ok(())
+}
+
+/// Link one emitted LLVM text module with the host runtime archive.
+///
+/// Same race-free rationale as [`verify_llvm_text`] (replaces the radix
+/// `LlvmHostToolchain::link` wait-timeout path for exempla runs).
+fn link_llvm_text(
+    toolchain: &LlvmHostToolchain,
+    llvm_file: &Path,
+    runtime_archive: &Path,
+    output_file: &Path,
+) -> Result<(), String> {
+    let mut command = Command::new(&toolchain.clang);
+    command
+        .arg(llvm_file)
+        .arg(runtime_archive)
+        .arg("-o")
+        .arg(output_file);
+    let output = super::common::command_output_with_timeout(&mut command, Duration::from_secs(120))?;
+    if !output.status.success() {
+        return Err(format!(
+            "clang link failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    Ok(())
 }
 
 fn llvm_host_toolchain() -> Result<LlvmHostToolchain, String> {

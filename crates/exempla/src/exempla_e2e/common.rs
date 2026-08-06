@@ -10,8 +10,8 @@ use std::fs;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use wait_timeout::ChildExt;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 pub(crate) fn command_output_with_timeout(
     command: &mut Command,
@@ -22,19 +22,62 @@ pub(crate) fn command_output_with_timeout(
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|error| format!("cannot spawn child: {error}"))?;
-    match child
-        .wait_timeout(timeout)
-        .map_err(|error| format!("cannot wait for child: {error}"))?
-    {
-        Some(_) => child
-            .wait_with_output()
-            .map_err(|error| format!("cannot collect child output: {error}")),
-        None => {
+    // Move the pipe read ends into a collector thread so a chatty child can
+    // never deadlock the wait on pipe backpressure while this thread polls
+    // for exit. This deliberately avoids the `wait-timeout` crate: its Unix
+    // SIGCHLD self-pipe design can lose the exit notification for a child
+    // that exits while another thread is between `spawn()` and registration,
+    // which stalls the waiter for the FULL timeout under parallel subprocess
+    // load (the flaky LLVM-runtime byte-comparison family root cause).
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
+    let (sender, receiver) =
+        std::sync::mpsc::channel::<Result<(Vec<u8>, Vec<u8>), String>>();
+    std::thread::spawn(move || {
+        use std::io::Read;
+        let collected = (|| -> Result<(Vec<u8>, Vec<u8>), String> {
+            let mut out = Vec::new();
+            let mut err = Vec::new();
+            if let Some(mut stdout) = stdout {
+                stdout
+                    .read_to_end(&mut out)
+                    .map_err(|error| format!("cannot read child stdout: {error}"))?;
+            }
+            if let Some(mut stderr) = stderr {
+                stderr
+                    .read_to_end(&mut err)
+                    .map_err(|error| format!("cannot read child stderr: {error}"))?;
+            }
+            Ok((out, err))
+        })();
+        let _ = sender.send(collected);
+    });
+
+    let deadline = Instant::now().checked_add(timeout).unwrap_or_else(Instant::now);
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) => {}
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!("cannot wait for child: {error}"));
+            }
+        }
+        if Instant::now() >= deadline {
             let _ = child.kill();
             let _ = child.wait();
-            Err(format!("child timed out after {}s", timeout.as_secs()))
+            // The pipe reaches EOF once the killed child exits; drain the
+            // collector so it does not outlive the call.
+            let _ = receiver.recv_timeout(Duration::from_secs(3));
+            return Err(format!("child timed out after {}s", timeout.as_secs()));
         }
-    }
+        std::thread::sleep(Duration::from_millis(2));
+    };
+    let (out, err) = receiver
+        .recv_timeout(Duration::from_secs(10))
+        .map_err(|_| "timed out collecting child output".to_owned())??;
+    Ok(Output { status, stdout: out, stderr: err })
 }
 
 pub(crate) fn command_status_with_timeout(
@@ -44,16 +87,25 @@ pub(crate) fn command_status_with_timeout(
     let mut child = command
         .spawn()
         .map_err(|error| format!("cannot spawn child: {error}"))?;
-    match child
-        .wait_timeout(timeout)
-        .map_err(|error| format!("cannot wait for child: {error}"))?
-    {
-        Some(status) => Ok(status),
-        None => {
+    // Same race-free poll loop as `command_output_with_timeout` (no pipe
+    // collector needed here: the caller inherits the harness's stdio).
+    let deadline = Instant::now().checked_add(timeout).unwrap_or_else(Instant::now);
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return Ok(status),
+            Ok(None) => {}
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!("cannot wait for child: {error}"));
+            }
+        }
+        if Instant::now() >= deadline {
             let _ = child.kill();
             let _ = child.wait();
-            Err(format!("child timed out after {}s", timeout.as_secs()))
+            return Err(format!("child timed out after {}s", timeout.as_secs()));
         }
+        std::thread::sleep(Duration::from_millis(2));
     }
 }
 
@@ -195,13 +247,21 @@ fn sweep_managed_temp(prefix: &str) {
 }
 
 pub(crate) fn make_temp_root() -> TempRoot {
+    // A per-process sequence keeps parallel threads from deriving the SAME
+    // `pid`+nanos name (macOS `SystemTime` has microsecond resolution): two
+    // tests sharing one temp root would delete each other's `.ll`/`.bin`
+    // mid-run (another member of the flaky-under-contention family).
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
     sweep_managed_temp("radix-rs-e2e-");
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0);
-    let dir =
-        cargo_managed_temp_root().join(format!("radix-rs-e2e-{}-{nanos}", std::process::id()));
+    let sequence = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let dir = cargo_managed_temp_root().join(format!(
+        "radix-rs-e2e-{}-{nanos}-{sequence}",
+        std::process::id()
+    ));
     fs::create_dir_all(&dir).expect("create e2e temp root");
     TempRoot::new(dir)
 }
