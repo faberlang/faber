@@ -691,3 +691,265 @@ fn llvm_host_conversio_tensor_convert_matches_rust_output() {
 fn llvm_host_tensor_textus_matches_rust_output() {
     assert_tensor_fixture_output("tensor/textus.fab", "tensor-textus");
 }
+
+/// L10 (fa1a5d8c): opaque-display family — compile a corpus fixture through the
+/// dev-stdlib LLVM host path, run the linked binary, and assert the stdout is
+/// byte-exact against the sibling `.expected` sidecar (the Rust oracle).
+fn assert_opaque_fixture_output(fab_relative: &str, stem: &str) {
+    let fab_path = crate::paths::corpus_dir().join(fab_relative);
+    let result = Compiler::new(
+        Config::default()
+            .with_target(Target::LlvmText)
+            .with_dev_stdlib(),
+    )
+    .compile(&fab_path);
+    assert!(
+        result.success(),
+        "{fab_relative} LLVM compile failed: {:?}",
+        result.diagnostics
+    );
+    let Some(Output::LlvmText(output)) = result.output else {
+        panic!("{fab_relative} did not produce LLVM text");
+    };
+    let temp_root = super::super::common::make_temp_root();
+    let llvm_file = temp_root.join(format!("{stem}.ll"));
+    fs::write(&llvm_file, output.code).expect("write {fab_relative} LLVM text");
+    let probe = run_llvm_exemplum(&llvm_file, &temp_root, stem, &fab_path);
+    assert_eq!(
+        probe.bucket,
+        LlvmRunBucket::OutputMatched,
+        "{fab_relative}: {}",
+        probe.reason
+    );
+    assert!(
+        probe.stderr.is_empty(),
+        "{fab_relative}: unexpected stderr: {:?}",
+        probe.stderr
+    );
+    assert_eq!(probe.exit_code, Some(0), "{fab_relative}");
+}
+
+/// L10 (fa1a5d8c): opaque-display family — compile a corpus fixture with no
+/// `.expected` sidecar through the dev-stdlib LLVM host path and assert the
+/// exact Rust-oracle stdout.
+fn assert_opaque_fixture_stdout(fab_relative: &str, stem: &str, expected: &str) {
+    let fab_path = crate::paths::corpus_dir().join(fab_relative);
+    let result = Compiler::new(
+        Config::default()
+            .with_target(Target::LlvmText)
+            .with_dev_stdlib(),
+    )
+    .compile(&fab_path);
+    assert!(
+        result.success(),
+        "{fab_relative} LLVM compile failed: {:?}",
+        result.diagnostics
+    );
+    let Some(Output::LlvmText(output)) = result.output else {
+        panic!("{fab_relative} did not produce LLVM text");
+    };
+    let temp_root = super::super::common::make_temp_root();
+    let llvm_file = temp_root.join(format!("{stem}.ll"));
+    fs::write(&llvm_file, output.code).expect("write {fab_relative} LLVM text");
+    let probe = run_llvm_exemplum(&llvm_file, &temp_root, stem, &fab_path);
+    assert_eq!(
+        probe.bucket,
+        LlvmRunBucket::Runnable,
+        "{fab_relative}: {}",
+        probe.reason
+    );
+    assert_eq!(probe.stdout, expected, "{fab_relative}");
+    assert!(
+        probe.stderr.is_empty(),
+        "{fab_relative}: unexpected stderr: {:?}",
+        probe.stderr
+    );
+    assert_eq!(probe.exit_code, Some(0), "{fab_relative}");
+}
+
+/// L10 (fa1a5d8c): opaque-display family — `nota dims` on a `lista<numerus>`
+/// shape vector previously passed a null handle and dropped the line. The
+/// numeric-lista carrier now renders `[2, 3]` like the Rust oracle.
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_tensor_shape_dims -- --ignored --nocapture"]
+fn llvm_host_tensor_shape_dims_matches_rust_output() {
+    assert_opaque_fixture_output("tensor/shape.fab", "tensor-shape");
+}
+
+/// L10 (fa1a5d8c): opaque-display family — `nota out` on a `lista<f32>` result
+/// renders `[1.0, 4.0, 9.0, 16.0]` (f32 elements keep the `.0` marker).
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_tensor_arithmetic_elementwise -- --ignored --nocapture"]
+fn llvm_host_tensor_arithmetic_elementwise_matches_rust_output() {
+    assert_opaque_fixture_output("tensor/arithmetic-elementwise.fab", "tensor-arithmetic-elementwise");
+}
+
+/// L10 (fa1a5d8c): opaque-display family — `nota dims` renders `[2, 2]` after
+/// the literal-shaped lista-to-tensor conversion.
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_lista_tensor_shaped -- --ignored --nocapture"]
+fn llvm_host_lista_tensor_shaped_matches_rust_output() {
+    assert_opaque_fixture_output("conversio/lista-tensor-shaped.fab", "conversio-lista-tensor-shaped");
+}
+
+/// L10 (fa1a5d8c): opaque-display family — `nota dims` renders `[3, 3]` after
+/// the rectangular lista-literal tensor conversion.
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_rectangular_lista_tensor -- --ignored --nocapture"]
+fn llvm_host_rectangular_lista_tensor_matches_rust_output() {
+    assert_opaque_fixture_output(
+        "conversio/rectangular-lista-literal-tensor.fab",
+        "conversio-rectangular-lista-literal-tensor",
+    );
+}
+
+/// L10 (fa1a5d8c): opaque-display family — `lista<numerus>` method results
+/// (`addita`, `sectio`, `prima`, `ultima`, `omissa`, `inversa`, `ordinata`)
+/// render `[1, 2, 3, 4, 5, 6]` … like the Rust oracle.
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_lista_methodi_copiae -- --ignored --nocapture"]
+fn llvm_host_lista_methodi_copiae_matches_rust_output() {
+    assert_opaque_fixture_output("lista/methodi-copiae.fab", "lista-methodi-copiae");
+}
+
+/// L10 (fa1a5d8c): opaque-display family — filtered/mapped `lista<numerus>`
+/// results render `[2, 4]` / `[2, 4, 6, 8, 10]`.
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_lista_methodi_functionales -- --ignored --nocapture"]
+fn llvm_host_lista_methodi_functionales_matches_rust_output() {
+    assert_opaque_fixture_output("lista/methodi-functionales.fab", "lista-methodi-functionales");
+}
+
+/// L10 (fa1a5d8c): opaque-display family — mutated `lista<numerus>` renders
+/// `[1, 2]` (elements removed in place).
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_lista_methodi_mutatio -- --ignored --nocapture"]
+fn llvm_host_lista_methodi_mutatio_matches_rust_output() {
+    assert_opaque_fixture_output("lista/methodi-mutatio.fab", "lista-methodi-mutatio");
+}
+
+/// L10 (fa1a5d8c): opaque-display family — `typus` aliases resolve before the
+/// displayable-opaque check, so `nota sodales` (aliased `lista<textus>`) and
+/// `nota puncta` (aliased `lista<numerus>`) render like the Rust oracle.
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_typus_aliased_lista -- --ignored --nocapture"]
+fn llvm_host_typus_aliased_lista_matches_rust_output() {
+    assert_opaque_fixture_stdout(
+        "typus/typus.fab",
+        "typus-typus",
+        "42\nMarcus\nverum\n[\"Gaius\", \"Lucius\", \"Titus\"]\n[100, 95, 87]\n",
+    );
+}
+
+/// L10 (fa1a5d8c): opaque-display family — `valor` nota renders via the
+/// oracle's `display_valor` (`42`, `[222, 173]`, `[1, 2]`, `{"alpha": 10}`,
+/// `{"x": 3, "y": 4}`, `[5, 6]`).
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_valor_boxing -- --ignored --nocapture"]
+fn llvm_host_valor_boxing_matches_rust_output() {
+    assert_opaque_fixture_output("conversio/valor-boxing.fab", "conversio-valor-boxing");
+}
+
+/// L10 (fa1a5d8c): opaque-display family — `nota roundtrip` renders the boxed
+/// `lista<numerus>` as `[1, 2, 3, 4]`.
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_valor_tensor -- --ignored --nocapture"]
+fn llvm_host_valor_tensor_matches_rust_output() {
+    assert_opaque_fixture_output("conversio/valor-tensor.fab", "conversio-valor-tensor");
+}
+
+/// L10 (fa1a5d8c): opaque-display family — JSON-literal `tabula` nota renders
+/// in the Rust oracle's derived `Json(Tabula({...}))` Debug shape.
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_destructura_literal_json -- --ignored --nocapture"]
+fn llvm_host_destructura_literal_json_matches_rust_output() {
+    assert_opaque_fixture_stdout(
+        "destructura/literal.fab",
+        "destructura-literal",
+        "Json(Tabula({}))\nJson(Tabula({\"x\": Numerus(10), \"y\": Numerus(20)}))\nJson(Tabula({\"clavis\": Numerus(42)}))\nJson(Tabula({\"extra\": Tabula({\"medium\": Numerus(1)})}))\n",
+    );
+}
+
+/// L11 (fc9be27a): union/option null-check family — compile a corpus fixture
+/// through the dev-stdlib LLVM host path, run the linked binary, and assert the
+/// stdout is byte-exact against the sibling `.expected` sidecar (the Rust
+/// oracle). These are the L7 family-3 rows (`unarius`, `operatores/logica`,
+/// `literalia/nihil`, `vel/vel`): `est nihil` / `non est nihil` presence tests
+/// and `vel` nullish coalescing on literal-built `T ∪ nihil` values.
+fn assert_option_fixture_output(fab_relative: &str, stem: &str) {
+    let fab_path = crate::paths::corpus_dir().join(fab_relative);
+    let result = Compiler::new(
+        Config::default()
+            .with_target(Target::LlvmText)
+            .with_dev_stdlib(),
+    )
+    .compile(&fab_path);
+    assert!(
+        result.success(),
+        "{fab_relative} LLVM compile failed: {:?}",
+        result.diagnostics
+    );
+    let Some(Output::LlvmText(output)) = result.output else {
+        panic!("{fab_relative} did not produce LLVM text");
+    };
+    let temp_root = super::super::common::make_temp_root();
+    let llvm_file = temp_root.join(format!("{stem}.ll"));
+    fs::write(&llvm_file, output.code).expect("write {fab_relative} LLVM text");
+    let probe = run_llvm_exemplum(&llvm_file, &temp_root, stem, &fab_path);
+    assert_eq!(
+        probe.bucket,
+        LlvmRunBucket::OutputMatched,
+        "{fab_relative}: {}",
+        probe.reason
+    );
+    assert!(
+        probe.stderr.is_empty(),
+        "{fab_relative}: unexpected stderr: {:?}",
+        probe.stderr
+    );
+    assert_eq!(probe.exit_code, Some(0), "{fab_relative}");
+}
+
+/// L11 (fc9be27a): family 3 — `unarius` null checks. `est nihil` / `non est
+/// nihil` on a literal-built `textus ∪ nihil` binding previously failed because
+/// `option_is_present` only accepted raw pointer carriers for non-arena options.
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_unarius_null_checks -- --ignored --nocapture"]
+fn llvm_host_unarius_null_checks_matches_expected() {
+    assert_option_fixture_output("unarius/unarius.fab", "unarius-unarius");
+}
+
+/// L11 (fc9be27a): family 3 — `operatores/logica` negated-est rows. `non est
+/// nihil` on present/absent literal `textus ∪ nihil` values renders verum/falsum.
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_logica_non_est_nihil -- --ignored --nocapture"]
+fn llvm_host_logica_non_est_nihil_matches_expected() {
+    assert_option_fixture_output("operatores/logica.fab", "operatores-logica");
+}
+
+/// L11 (fc9be27a): family 3 — `literalia/nihil`. `est nihil` / `non est nihil`
+/// on a literal `numerus ∪ nihil` binding and a nullable function result
+/// previously failed because the raw option carrier rejected the scalar kind.
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_literalia_nihil -- --ignored --nocapture"]
+fn llvm_host_literalia_nihil_matches_expected() {
+    assert_option_fixture_output("literalia/nihil.fab", "literalia-nihil");
+}
+
+/// L11 (fc9be27a): family 3 — `vel/vel`. Nullish coalescing on literal-built
+/// `textus ∪ nihil` bindings (including chains) previously failed because
+/// `option_get_or` rejected the raw pointer carrier for non-arena options.
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_vel_coalescing -- --ignored --nocapture"]
+fn llvm_host_vel_coalescing_matches_expected() {
+    assert_option_fixture_output("vel/vel.fab", "vel-vel");
+}
+
+/// L11 (fc9be27a): family 3 — `si/ergo-redde`. `nota` of a nullable function
+/// result (`numerus ∪ nihil`) renders the payload or nihil; presence tests on
+/// the returned raw option decode the scalar bits per value-kind.
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_ergo_redde_optional -- --ignored --nocapture"]
+fn llvm_host_ergo_redde_optional_matches_expected() {
+    assert_option_fixture_output("si/ergo-redde.fab", "si-ergo-redde");
+}
