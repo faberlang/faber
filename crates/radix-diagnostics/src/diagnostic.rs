@@ -216,6 +216,14 @@ pub enum WarningKind {
     /// does not recognize. Accepted at warning level until allocator
     /// threading ships.
     UnrecognizedCurataAllocator,
+    /// A monomorphic `_` hole solved to a multi-member union. The source
+    /// still looks monomorphic while the inferred type is a sum of
+    /// alternatives; the warning makes that cross-shape explicit.
+    MonomorphicHoleSolvedToUnion,
+    /// A union `∪` hole solved to a single inhabitant type. The sum-shaped
+    /// slot collapsed to one member; the warning makes that cross-shape
+    /// explicit.
+    UnionHoleSolvedMonomorphically,
 }
 
 /// Semantic diagnostic categories used by passes and command policy.
