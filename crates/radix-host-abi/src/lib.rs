@@ -352,6 +352,24 @@ abi_string_family! {
         SYMBOL_GPU_COPY_IN = "__faber_gpu_v1_copy_in",
         SYMBOL_GPU_READBACK = "__faber_gpu_v1_readback",
         SYMBOL_GPU_SYNC = "__faber_gpu_v1_sync",
+        // P8 (promotion packet sermo-runtime-surface): the shared sermo
+        // materialization surface. `ad 'route'(payload)` opens a sermo stream
+        // (SermoOpen: route + valor payload → opaque stream handle backed by
+        // faber-runtime `frame::Sermo`); SermoSetOpener replaces the first
+        // request frame's payload before the stream is consumed; `↦ textus` /
+        // `↦ valor` materialize the inbound frame stream to a carrier; the
+        // `_or` row is the `⇥`-style recovery for the stream extraction (P6
+        // precedent: per-carrier `_or` fallback — here a scalar
+        // materialization that substitutes the fallback on a missing or
+        // wrong-typed payload instead of aborting). The wasm leaf rewires its
+        // `convert_1_aggregate_to_text` / `value-returning runtime call` /
+        // `convert_2_aggregate_i64_to_i64` sermo shapes to these symbols (D5
+        // closed-table rule); the LLVM leaf consumes the same rows.
+        SYMBOL_SERMO_OPEN = "__faber_rt_v1_sermo_open",
+        SYMBOL_SERMO_SET_OPENER = "__faber_rt_v1_sermo_set_opener",
+        SYMBOL_SERMO_MATERIALIZE_TEXT = "__faber_rt_v1_sermo_materialize_text",
+        SYMBOL_SERMO_MATERIALIZE_VALOR = "__faber_rt_v1_sermo_materialize_valor",
+        SYMBOL_SERMO_MATERIALIZE_I64_OR = "__faber_rt_v1_sermo_materialize_i64_or",
     }
 }
 
