@@ -209,6 +209,105 @@ incipit {
     );
 }
 
+/// S8.5 carried-provider closed set (L26 solum-lege-generic regression): a
+/// package importing a `norma:*` provider module whose functions the LLVM host
+/// lane resolves to versioned runtime intrinsics — solum/tempus/toml/valor/
+/// json — emits ONLY the entry unit module. The provider module is not a
+/// selected Norma unit: its body genuinely lives in the Rust runtime
+/// (package-provider-abi-design D-PA2), and a compiled body would reference
+/// the legacy `__faber_runtime_sermo_*`/convert dialect the host archive does
+/// not implement. The entry resolves the same provider calls to their
+/// versioned `__faber_rt_v1_*` intrinsics (the merged package-MIR probe
+/// behavior).
+#[test]
+fn package_llvm_builder_skips_carried_provider_modules() {
+    for module in ["solum", "tempus", "toml", "valor", "json"] {
+        let dir = test_temp_dir("llvm-builder");
+        let package_dir = dir.join(format!("{module}-consumer"));
+        fs::create_dir_all(&package_dir).expect("create consumer dir");
+        let source = format!(
+            "# {module}-consumer — imports the {module} provider module\n\
+             importa ex \"norma:{module}\" privata {module}\n\n\
+             incipit {{\n}}\n"
+        );
+        fs::write(
+            package_dir.join(format!("{module}-consumer.fab")),
+            source,
+        )
+        .expect("write entry");
+        let entry = package_dir.join(format!("{module}-consumer.fab"));
+        let options = PackageLlvmOptions::new(dir.join("out"));
+        let build = build_package_llvm(&llvm_config(), &entry, &options)
+            .unwrap_or_else(|diagnostics| {
+                panic!("{module}-consumer package LLVM build must succeed: {diagnostics:?}")
+            });
+
+        assert!(
+            build.modules.iter().any(|module| module.is_entry),
+            "{module}-consumer must emit the entry unit"
+        );
+        // No selected Norma unit may be a carried provider module. Provider
+        // modules that transitively carry a real data module (e.g.
+        // `norma:valor` → `norma:chorda`) still compile that data module.
+        for norma in build.modules.iter().filter(|module| module.is_norma) {
+            assert!(
+                !matches!(
+                    norma.module_segments.first().map(String::as_str),
+                    Some("solum" | "tempus" | "toml" | "valor" | "json")
+                ),
+                "{module}: carried provider module must not be emitted as a selected Norma unit: {:?}",
+                norma.module_segments
+            );
+        }
+    }
+}
+
+/// L26: the solum consumer's entry still resolves the provider calls to the
+/// versioned runtime intrinsics when the provider module is not emitted, and
+/// carries no legacy sermo/convert dialect and no compiled-provider external
+/// symbol.
+#[test]
+fn package_llvm_builder_solum_entry_resolves_versioned_intrinsics() {
+    const ENTRY: &str = r#"# solum-consumer — imports the solum provider module
+importa ex "norma:solum" privata solum
+
+incipit {
+    solum.scribe("/tmp/faber-llvm-builder-provider.txt", "prima\n")
+    nota solum.lege<textus>("/tmp/faber-llvm-builder-provider.txt")
+}
+"#;
+
+    let dir = test_temp_dir("llvm-builder");
+    let package_dir = dir.join("solum-consumer");
+    fs::create_dir_all(&package_dir).expect("create solum-consumer dir");
+    fs::write(package_dir.join("solum-consumer.fab"), ENTRY).expect("write entry");
+    let entry = package_dir.join("solum-consumer.fab");
+    let options = PackageLlvmOptions::new(dir.join("out"));
+    let build = build_package_llvm(&llvm_config(), &entry, &options)
+        .expect("solum-consumer package LLVM build must succeed");
+
+    assert_eq!(build.modules.len(), 1, "entry unit only");
+    let entry_text =
+        fs::read_to_string(&build.modules[0].llvm_path).expect("read entry module");
+    assert!(
+        entry_text.contains("__faber_rt_v1_solum_write_text"),
+        "entry must resolve solum.scribe to the versioned intrinsic:\n{entry_text}"
+    );
+    assert!(
+        entry_text.contains("__faber_rt_v1_solum_read_text"),
+        "entry must resolve solum.lege<textus> to the versioned intrinsic:\n{entry_text}"
+    );
+    assert!(
+        !entry_text.contains("__faber_external_product_norma_module_solum_func_"),
+        "entry must not call a compiled solum provider module function:\n{entry_text}"
+    );
+    assert!(
+        !entry_text.contains("__faber_runtime_sermo_")
+            && !entry_text.contains("__faber_runtime_convert_runtime_"),
+        "no legacy sermo/convert dialect may remain:\n{entry_text}"
+    );
+}
+
 #[test]
 fn package_llvm_builder_manifest_is_inspectable() {
     let dir = test_temp_dir("llvm-builder");

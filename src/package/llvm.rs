@@ -343,6 +343,29 @@ fn norma_module_file_name(
 /// `__faber_external_product_norma_module_…_func_…`), and emitted in library
 /// mode (no `__faber_program_entry_v1`). No `.ll` text concatenation and no
 /// secondary import parser.
+///
+/// Carried provider modules (the S8.5 closed set — solum/tempus/toml/valor/
+/// json) are NOT emitted: their functions resolve to the versioned runtime
+/// intrinsics at the call site, so their compiled bodies would only pull the
+/// unimplemented legacy sermo/convert dialect into the link.
+///
+/// Whether a `norma:*` library import names a carried provider module in the
+/// S8.5 closed set. Matched by provider family (first module segment) so
+/// nested modules such as `norma:solum/path` are covered the same way: every
+/// provider family body lives in the Rust runtime and is never referenced
+/// through a compiled Faber module.
+fn is_carried_provider_module(package: &str, module_segments: &[String]) -> bool {
+    package == "norma"
+        && module_segments
+            .first()
+            .is_some_and(|segment| {
+                matches!(
+                    segment.as_str(),
+                    "solum" | "tempus" | "toml" | "valor" | "json"
+                )
+            })
+}
+
 fn emit_selected_norma_modules(
     config: &Config,
     package: &AnalyzedPackage,
@@ -362,6 +385,23 @@ fn emit_selected_norma_modules(
                 import.module.module_path.join("/"),
             );
             if !seen.insert(key) {
+                continue;
+            }
+            // S8.5 carried-provider closed set: `norma:*` provider modules
+            // whose functions the LLVM host lane resolves to versioned runtime
+            // intrinsics (or native leaves) — solum/tempus/toml/valor/json
+            // (the same closed set `radix-mir-llvm/src/host.rs`
+            // `solum_call_kind` / `provider_carrier_kind` /
+            // `is_tempus_wait_call` recognize). Their bodies genuinely live in
+            // the Rust runtime (package-provider-abi-design.md D-PA2), so the
+            // builder must not compile the provider module: a compiled body
+            // lowers its `ad` routes to the legacy
+            // `__faber_runtime_sermo_*` / convert runtime dialect the host
+            // archive does not implement (L26 solum-lege-generic regression).
+            // The entry (and any sibling unit) resolves the same provider
+            // functions to their versioned `__faber_rt_v1_*` intrinsics — the
+            // merged package-MIR probe behavior.
+            if is_carried_provider_module(&import.module.package, &import.module.module_path) {
                 continue;
             }
             let module_segments = import.module.module_path.clone();
