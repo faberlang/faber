@@ -14,18 +14,18 @@ too_many_lines = "allow"
 match_same_arms = "allow"
 struct_excessive_bools = "allow"
 fn_params_excessive_bools = "allow"
+struct_field_names = "allow"
 # Residual pedantic judgment (API shape / noisy style)
 needless_pass_by_value = "allow"
-unused_self = "allow"
-unnecessary_wraps = "allow"
 similar_names = "allow"
-struct_field_names = "allow"
+unnecessary_wraps = "allow"
+unused_self = "allow"
 items_after_statements = "allow"
+used_underscore_items = "allow"
 implicit_hasher = "allow"
 too_many_arguments = "allow"
-missing_panics_doc = "allow"
-used_underscore_items = "allow"
 doc_markdown = "allow"
+missing_panics_doc = "allow"
 
 [dependencies]
 radix-codegen-shared = { path = "../radix-codegen-shared" }
