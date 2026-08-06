@@ -524,7 +524,7 @@ fn collect_fab_modules(root: &Path, dir: &Path, modules: &mut Vec<String>) {
     }
 }
 
-fn default_library_home() -> Option<PathBuf> {
+pub(crate) fn default_library_home() -> Option<PathBuf> {
     if let Some(value) = std::env::var_os(FABER_LIBRARY_HOME_ENV) {
         return Some(PathBuf::from(value));
     }

@@ -276,7 +276,7 @@ fn check_reader_locale_accepts_direct_entry_file_input() {
 
     let (stdout, stderr, ok) = run_faber(&[
         "check",
-        "--reader-locale",
+        "--locale",
         "th-TH",
         entry.to_str().expect("entry path"),
     ]);
@@ -296,7 +296,7 @@ fn check_reader_locale_accepts_manifest_file_input() {
 
     let (stdout, stderr, ok) = run_faber(&[
         "check",
-        "--reader-locale",
+        "--locale",
         "th-TH",
         manifest.to_str().expect("manifest path"),
     ]);
@@ -316,7 +316,7 @@ fn emit_reader_locale_accepts_direct_entry_file_input() {
 
     let (stdout, stderr, ok) = run_faber_emit(&[
         "emit",
-        "--reader-locale",
+        "--locale",
         "th-TH",
         entry.to_str().expect("entry path"),
     ]);
@@ -335,7 +335,7 @@ fn emit_reader_locale_accepts_manifest_file_input() {
 
     let (stdout, stderr, ok) = run_faber_emit(&[
         "emit",
-        "--reader-locale",
+        "--locale",
         "th-TH",
         manifest.to_str().expect("manifest path"),
     ]);
@@ -349,7 +349,7 @@ fn emit_reader_locale_accepts_manifest_file_input() {
 
 #[test]
 fn emit_reader_locale_rejects_stdin_input() {
-    let (stdout, stderr, ok) = run_faber_emit(&["emit", "--reader-locale", "th-TH", "-"]);
+    let (stdout, stderr, ok) = run_faber_emit(&["emit", "--locale", "th-TH", "-"]);
 
     assert!(!ok, "reader-locale stdin emit should fail");
     assert!(
@@ -357,7 +357,7 @@ fn emit_reader_locale_rejects_stdin_input() {
         "rejected emit should not write stdout: {stdout}"
     );
     assert!(
-        stderr.contains("--reader-locale th-TH requires a package path or .fab entry file"),
+        stderr.contains("--locale th-TH requires a package path or .fab entry file"),
         "expected stdin shape rejection, got:\n{stderr}"
     );
 }
@@ -365,7 +365,7 @@ fn emit_reader_locale_rejects_stdin_input() {
 #[test]
 fn emit_reader_locale_rejects_forced_package_stdin_input() {
     let (stdout, stderr, ok) =
-        run_faber_emit(&["emit", "--package", "--reader-locale", "th-TH", "-"]);
+        run_faber_emit(&["emit", "--package", "--locale", "th-TH", "-"]);
 
     assert!(!ok, "emit should reject stdin reader-locale package input");
     assert!(
@@ -373,7 +373,7 @@ fn emit_reader_locale_rejects_forced_package_stdin_input() {
         "rejected emit should not write stdout: {stdout}"
     );
     assert!(
-        stderr.contains("--reader-locale th-TH requires a package path or .fab entry file"),
+        stderr.contains("--locale th-TH requires a package path or .fab entry file"),
         "expected stdin shape rejection, got:\n{stderr}"
     );
 }
@@ -384,7 +384,7 @@ fn emit_reader_locale_rejects_existing_non_package_file() {
 
     let (stdout, stderr, ok) = run_faber_emit(&[
         "emit",
-        "--reader-locale",
+        "--locale",
         "th-TH",
         plain.to_str().expect("plain path"),
     ]);
@@ -398,7 +398,7 @@ fn emit_reader_locale_rejects_existing_non_package_file() {
         "rejected emit should not write stdout: {stdout}"
     );
     assert!(
-        stderr.contains("--reader-locale th-TH requires a package path or .fab entry file"),
+        stderr.contains("--locale th-TH requires a package path or .fab entry file"),
         "expected reader-locale shape rejection, got:\n{stderr}"
     );
 }
@@ -410,7 +410,7 @@ fn emit_reader_locale_forced_package_rejects_existing_non_package_file() {
     let (stdout, stderr, ok) = run_faber_emit(&[
         "emit",
         "--package",
-        "--reader-locale",
+        "--locale",
         "th-TH",
         plain.to_str().expect("plain path"),
     ]);
@@ -424,7 +424,7 @@ fn emit_reader_locale_forced_package_rejects_existing_non_package_file() {
         "rejected emit should not write stdout: {stdout}"
     );
     assert!(
-        stderr.contains("--reader-locale th-TH requires a package path or .fab entry file"),
+        stderr.contains("--locale th-TH requires a package path or .fab entry file"),
         "expected reader-locale shape rejection, got:\n{stderr}"
     );
 }
@@ -432,7 +432,7 @@ fn emit_reader_locale_forced_package_rejects_existing_non_package_file() {
 #[test]
 fn emit_reader_locale_missing_package_path_surfaces_missing_path_error() {
     let (stdout, stderr, ok) =
-        run_faber_emit(&["emit", "--reader-locale", "th-TH", "missing-package"]);
+        run_faber_emit(&["emit", "--locale", "th-TH", "missing-package"]);
 
     assert!(!ok, "missing package path should fail");
     assert!(
@@ -440,7 +440,7 @@ fn emit_reader_locale_missing_package_path_surfaces_missing_path_error() {
         "missing package path should not write stdout: {stdout}"
     );
     assert!(
-        !stderr.contains("--reader-locale th-TH requires a package path or .fab entry file"),
+        !stderr.contains("--locale th-TH requires a package path or .fab entry file"),
         "missing package path should reach the underlying filesystem error, got:\n{stderr}"
     );
     assert!(
@@ -457,7 +457,7 @@ fn emit_reader_locale_rejects_multiple_direct_inputs() {
 
     let (stdout, stderr, ok) = run_faber_emit(&[
         "emit",
-        "--reader-locale",
+        "--locale",
         "th-TH",
         entry_a.to_str().expect("entry path"),
         entry_b.to_str().expect("entry path"),
@@ -472,14 +472,14 @@ fn emit_reader_locale_rejects_multiple_direct_inputs() {
         "rejected emit should not write stdout: {stdout}"
     );
     assert!(
-        stderr.contains("--reader-locale th-TH requires a package path or .fab entry file"),
+        stderr.contains("--locale th-TH requires a package path or .fab entry file"),
         "expected multiple-input reader-locale rejection, got:\n{stderr}"
     );
 }
 
 #[test]
 fn emit_faber_target_localizes_reader_locale() {
-    // Phase 2: `faber emit -t faber --reader-locale=<X>` emits localized Faber
+    // Phase 2: `faber emit -t faber --locale=<X>` emits localized Faber
     // (the old "deferred" rejection is gone). Thai source re-emits in the Thai
     // surface.
     let example = reader_locale_example_root("th-TH");
@@ -489,7 +489,7 @@ fn emit_faber_target_localizes_reader_locale() {
         "emit",
         "-t",
         "faber",
-        "--reader-locale",
+        "--locale",
         "th-TH",
         entry.to_str().expect("entry path"),
     ]);
@@ -522,7 +522,7 @@ fn emit_faber_reader_locale_arabic_preserves_logical_order() {
         "emit",
         "-t",
         "faber",
-        "--reader-locale",
+        "--locale",
         "ar",
         entry.to_str().expect("entry path"),
     ]);

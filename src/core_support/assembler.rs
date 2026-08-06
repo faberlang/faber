@@ -59,6 +59,7 @@ pub fn assemble(workspace: &Path, roots: &[String]) -> io::Result<Assembly> {
     }
 
     validate_path_dependencies(workspace, &files, roots)?;
+    validate_no_workspace_inheritance(workspace, &files)?;
 
     let mut tar = tar::Builder::new(Vec::new());
     let mut records = Vec::new();
@@ -142,6 +143,52 @@ fn validate_path_dependencies(
                     dep.manifest.display(),
                     dep.raw_path,
                     resolved.display()
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Verify that no bundled `Cargo.toml` uses workspace-root inheritance.
+///
+/// The archive ships crate roots only — never the workspace root manifest —
+/// so a bundled crate declaring `[lints] workspace = true` or a dependency
+/// with `workspace = true` cannot parse standalone, and every consumer build
+/// fails with a confusing cargo error. Fail the assembly here instead so the
+/// offending crate is kept self-contained (explicit lints / explicit path
+/// deps), matching the core-support manifest's archive contract.
+fn validate_no_workspace_inheritance(
+    workspace: &Path,
+    files: &BTreeSet<PathBuf>,
+) -> io::Result<()> {
+    for file in files {
+        let name = file.file_name().and_then(|n| n.to_str());
+        if name != Some("Cargo.toml") {
+            continue;
+        }
+        let relative = match file.strip_prefix(workspace) {
+            Ok(rel) => rel,
+            Err(_) => continue,
+        };
+        if relative
+            .components()
+            .any(|c| matches!(c, Component::Normal(s) if s == "target"))
+        {
+            continue;
+        }
+        let source = match fs::read_to_string(file) {
+            Ok(s) => s,
+            Err(_) => continue,
+        };
+        for line in source.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("workspace = true") || trimmed.starts_with("workspace=true") {
+                return Err(invalid(&format!(
+                    "core-support archive crate {} uses workspace-root inheritance \
+                     (`{trimmed}`); bundled crates must be self-contained because \
+                     the archive does not ship the workspace root manifest",
+                    relative.display()
                 )));
             }
         }
