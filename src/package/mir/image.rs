@@ -84,16 +84,6 @@ pub(super) fn package_device_section(
         else {
             continue;
         };
-        // A decomposed kernel (S5-U1) whose source function mixes recipes —
-        // e.g. the scalar-return lane, whose whole signature legitimately
-        // fails the return-buffer equality law — has no whole-function
-        // signature to derive; its subchain signatures were already
-        // validated by the constructor, so skip it.
-        let Ok(_signature) = radix_mir::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
-            function, lowered.validated.validation(), &lowered.interner,
-        ) else {
-            continue;
-        };
         // The reverse-AD upstream seed: the companion's anonymous scalar
         // param (no source name, or a synthetic uninternable symbol) is
         // provisioned with 1.0. The seed is detected from the FUNCTION's
@@ -109,17 +99,51 @@ pub(super) fn package_device_section(
                     .name
                     .is_some_and(|symbol| (symbol.0 as usize) >= lowered.interner.strings().len())
         });
+        // The seed scan runs for EVERY kernel — a decomposed companion's
+        // whole-function signature does not derive (the S5-U1 skip below),
+        // but its subchain kernels still carry the 1-element seed (a
+        // tensor-return companion's f32 upstream). Gating the scan on the
+        // signature left the seed unprovisioned and the RepeatingStep
+        // once-init check failed at run time (the bert-tiny `input_4`
+        // gap): a 1-element Input buffer the program does not produce and
+        // the manifest does not declare is the reverse-AD seed.
+        if has_anonymous_param {
+            for program_name in kernel
+                .resources
+                .iter()
+                .filter(|resource| {
+                    resource.buffer.role == radix_mir::device_program::BufferRole::Input
+                })
+            {
+                if program_name.version.element_count == 1
+                    && !device_inputs.contains_key(&program_name.buffer.name)
+                    && !produced.contains(&program_name.buffer.name)
+                {
+                    upstream_seeds.push((program_name.buffer.name.clone(), vec![1.0]));
+                }
+            }
+        }
+        // A decomposed kernel (S5-U1) whose source function mixes recipes —
+        // e.g. the scalar-return lane, whose whole signature legitimately
+        // fails the return-buffer equality law — has no whole-function
+        // signature to derive; its subchain signatures were already
+        // validated by the constructor, so skip it.
+        let Ok(_signature) = radix_mir::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+            function, lowered.validated.validation(), &lowered.interner,
+        ) else {
+            continue;
+        };
         for program_name in kernel
             .resources
             .iter()
-            .filter(|resource| resource.buffer.role == radix_mir::device_program::BufferRole::Input)
+            .filter(|resource| {
+                resource.buffer.role == radix_mir::device_program::BufferRole::Input
+            })
         {
-            let upstream = has_anonymous_param && program_name.version.element_count == 1;
-            if upstream {
-                let name = program_name.buffer.name.clone();
-                if !device_inputs.contains_key(&name) {
-                    upstream_seeds.push((name, vec![1.0]));
-                }
+            // A companion's 1-element input (the reverse-AD seed) is
+            // provisioned above (or declared in the manifest) — never a
+            // missing-input failure.
+            if has_anonymous_param && program_name.version.element_count == 1 {
                 continue;
             }
             if !device_inputs.contains_key(&program_name.buffer.name) {

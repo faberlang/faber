@@ -3469,6 +3469,134 @@ fn library_backed_train_step_materializes_into_device_program() {
     );
 }
 
+/// Build the BERT-tiny exemplum's `RepeatingStep` device program through the
+/// interpreted consumer (the `faber run` path — library imports merged, the
+/// gradus `train_step_bert_linear`/`_layernorm` bodies materialized), from
+/// the exemplum's own source in `examples/training/bert-tiny-fragment`.
+fn bert_tiny_exemplum_program() -> (DeviceProgram, DeviceSemantics) {
+    let exemplum = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../examples/training/bert-tiny-fragment");
+    let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+    super::super::mir::with_interpreted_lowered_package_mir(
+        &radix::driver::Config::default()
+            .with_stdlib(workspace)
+            .with_target(radix::codegen::Target::Fmir),
+        &exemplum,
+        |lowered| {
+            device_program_for_lowered(
+                &lowered.validated,
+                &lowered.interner,
+                &lowered.companions,
+                // The exemplum's manifest declares `[device] steps = 8`; the
+                // declared count must match the source loop bound (8).
+                8,
+            )
+            .expect("constructor succeeds")
+            .map(|(program, semantics, _step_count)| (program, semantics))
+            .expect("the BERT-tiny exemplum yields a device program")
+        },
+    )
+    .expect("the BERT-tiny exemplum lowers")
+}
+
+/// The S6-U8 decomposed-train_step regression (the bert-tiny oracle RUN
+/// blocker): the oversized elementwise `train_step_bert_linear` splits into
+/// pre + field subchains, and the PRE sub-slice's local output slots (the
+/// scaled-grad intermediates) must NEVER alias the trainable-parameter
+/// buffers. Pre-fix the update-output index match aliased EVERY subchain's
+/// output slots, so the pre sub-slice (fills + scaled-grad muls, reading the
+/// wq/bq fill receivers) wrote `swq` INTO `wq` and the next subchain's `swq`
+/// read minted a fresh PerProgram input — the once-init failure. The
+/// parameter buffers are updated in place only by the FIELD sub-slices whose
+/// output slots carry the full result-tuple indices.
+#[test]
+fn decomposed_train_step_scaled_grad_intermediates_never_alias_params() {
+    let (program, _semantics) = bert_tiny_exemplum_program();
+    program.validate().expect("constructed program validates");
+
+    let linear: Vec<&radix_mir::device_program::KernelUnit> = program
+        .kernels
+        .iter()
+        .filter(|kernel| kernel.entry.starts_with("train_step_bert_linear"))
+        .collect();
+    assert!(
+        linear.len() >= 3,
+        "the oversized elementwise train_step splits into pre + field subchains, got {:?}",
+        linear
+            .iter()
+            .map(|kernel| kernel.entry.as_str())
+            .collect::<Vec<_>>()
+    );
+
+    // The trainable-parameter buffers: PerProgram InOut state.
+    let param_ids: BTreeSet<BufferId> = program
+        .kernels
+        .iter()
+        .flat_map(|kernel| kernel.resources.iter())
+        .filter(|resource| {
+            resource.buffer.lifetime == BufferLifetime::PerProgram
+                && resource.buffer.role == BufferRole::InOut
+        })
+        .map(|resource| resource.buffer.id)
+        .collect();
+    assert!(
+        param_ids.len() >= 12,
+        "the linear step's 12 trainable params project to PerProgram InOut buffers, got {}",
+        param_ids.len()
+    );
+
+    // The PRE sub-slice (subchain 0 — fills + scaled-grad muls) writes ONLY
+    // per-step scaled-grad intermediates: never a parameter buffer.
+    let pre = linear[0];
+    for write in pre
+        .resources
+        .iter()
+        .filter(|resource| {
+            matches!(
+                resource.access,
+                MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
+            )
+        })
+    {
+        assert!(
+            !param_ids.contains(&write.buffer.id),
+            "the pre sub-slice must not write the parameter buffer `{}` (id {:?}) — \
+             the scaled grad stays a distinct buffer",
+            write.buffer.name,
+            write.buffer.id
+        );
+        assert_eq!(
+            write.buffer.lifetime,
+            BufferLifetime::PerStep,
+            "the scaled-grad output of the pre sub-slice is a step-local intermediate"
+        );
+    }
+
+    // Every parameter buffer is still updated in place by the field
+    // sub-slices of its own train_step (the full result-tuple slots alias
+    // the params) — the linear params by the linear field subchains, the
+    // LayerNorm params by the layernorm step.
+    for id in &param_ids {
+        let writers: Vec<&str> = program
+            .kernels
+            .iter()
+            .filter(|kernel| {
+                kernel.resources.iter().any(|resource| {
+                    resource.buffer.id == *id
+                        && matches!(
+                            resource.access,
+                            MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
+                        )
+                })
+            })
+            .map(|kernel| kernel.entry.as_str())
+            .collect();
+        assert!(
+            !writers.is_empty(),
+            "the param buffer {id:?} is updated in place by its train_step field subchain"
+        );
+    }
+}
+
 // ── D-6: gradient-slot → buffer mapping from decomposition tuple assembly ──
 
 /// The D-6 constructor fix, end to end: a DECOMPOSED companion's gradient

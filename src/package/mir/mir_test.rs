@@ -615,3 +615,80 @@ fn package_mir_artifact_version_is_6_for_carried_semantics_schema() {
         "the carried F1–F7 semantics require the FMIR artifact version 6 clean break"
     );
 }
+
+// ── S6-U8: decomposed-companion reverse-AD seed provisioning ──────────────
+
+/// Recursively copy a package directory, skipping `target/` build artifacts.
+fn copy_package_dir_skipping_target(src: &Path, dest: &Path) {
+    for entry in std::fs::read_dir(src).expect("read package dir") {
+        let entry = entry.expect("read dir entry");
+        let dest_path = dest.join(entry.file_name());
+        if entry.path().is_dir() {
+            if entry.file_name() == "target" {
+                continue;
+            }
+            std::fs::create_dir_all(&dest_path).expect("create sub dir");
+            copy_package_dir_skipping_target(&entry.path(), &dest_path);
+        } else {
+            std::fs::copy(entry.path(), dest_path).expect("copy file");
+        }
+    }
+}
+
+/// The S6-U8 reverse-AD upstream-seed regression (the bert-tiny oracle RUN
+/// blocker): the tensor-return forward's companion carries a 1-element f32
+/// upstream seed whose input buffer rides a DECOMPOSED companion subchain
+/// kernel — the whole-function signature does not derive for a decomposed
+/// kernel, so the old seed scan skipped those kernels entirely and never
+/// provisioned the seed (the `RepeatingStep` once-init check then failed at
+/// run time: `input_4` is not provided). The seed provisioning must cover
+/// the decomposed kernels regardless of the signature scan: the image's
+/// declared once-init inputs include the 1-element seed with 1.0.
+#[test]
+fn package_fmir_image_provisions_decomposed_companion_upstream_seed() {
+    use radix_mir_fmir::schema::{WireBufferLifetime, WireBufferRole};
+    use std::path::PathBuf;
+
+    let exemplum =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../examples/training/bert-tiny-fragment");
+    let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+    let dir = crate::package::test_support::test_temp_dir("bert-tiny-seed");
+    copy_package_dir_skipping_target(&exemplum, dir.path());
+
+    let config = radix::driver::Config::default()
+        .with_stdlib(workspace)
+        .with_target(radix::codegen::Target::Fmir);
+    let image = build_package_fmir_image(&config, dir.path(), &[])
+        .expect("the BERT-tiny image builds");
+    let bytes = std::fs::read(&image.image_path).expect("read the image");
+    let loaded = load_fmir_image(&bytes, &image.image_path).expect("the image loads");
+    let device = loaded.device.as_ref().expect("the image carries a device section");
+
+    // The program carries the companion's 1-element PerProgram input (the
+    // reverse-AD seed) — proof the seed reached the device program even
+    // though its kernel is a decomposed subchain.
+    let program = &device.device_program.program;
+    let seed_slots: Vec<_> = program
+        .kernels
+        .iter()
+        .flat_map(|kernel| kernel.resources.iter())
+        .filter(|resource| {
+            resource.version.element_count == 1
+                && resource.buffer.lifetime == WireBufferLifetime::PerProgram
+                && resource.buffer.role == WireBufferRole::Input
+        })
+        .collect();
+    assert!(
+        !seed_slots.is_empty(),
+        "the companion's 1-element upstream seed rides the decomposed program"
+    );
+
+    // The once-init provisioning declares the seed with 1.0 — the host's
+    // `RepeatingStep` once-init check receives the value and passes.
+    let seed = device
+        .declared_inputs
+        .iter()
+        .find(|input| input.values.len() == 1 && input.name.starts_with("input_"))
+        .expect("the reverse-AD seed is provisioned at once-init");
+    assert_eq!(seed.values, vec![1.0]);
+}

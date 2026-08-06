@@ -130,7 +130,7 @@ pub(crate) use program::device_program_for_lowered;
 pub(crate) use run::execute_device_route;
 pub(crate) use section::device_section_for_program;
 pub(crate) use section::{artifact_for_backend, descriptor_for_backend};
-pub(crate) use training::{training_plan_facts, DEFAULT_TRAINING_STEPS};
+pub(crate) use training::{training_plan_facts, tuple_return_locals, DEFAULT_TRAINING_STEPS};
 pub(crate) use wire::{
     admit_device_program_section, wire_program_for_program, DEVICE_RUN_PLAN_VERSION,
 };

@@ -676,7 +676,7 @@ pub(crate) fn training_plan_facts(
 
 /// The return-tuple element locals of a tuple-return function, in tuple
 /// order (from the aggregate construction that produces the returned tuple).
-fn tuple_return_locals(function: &MirFunction) -> Option<Vec<MirLocalId>> {
+pub(crate) fn tuple_return_locals(function: &MirFunction) -> Option<Vec<MirLocalId>> {
     let block = function.blocks.first()?;
     let MirTerminatorKind::Return(Some(operand)) = &block.terminator.kind else {
         return None;

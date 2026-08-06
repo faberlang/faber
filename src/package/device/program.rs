@@ -3,7 +3,8 @@
 use super::{
     collection_op_contract, decompose_kernel_function, device_diag, is_transformer_recipe_op,
     kernel_plan_for_function, subchain_signature_for_emission_with_source, training_plan_facts,
-    transformer_subchain_signature_for_emission_with_source, BTreeMap, BTreeSet, Binding, BufferId,
+    transformer_subchain_signature_for_emission_with_source, tuple_return_locals, BTreeMap,
+    BTreeSet, Binding, BufferId,
     BufferIdentity, BufferLifetime, BufferRole, BufferVersion, CollectionKernelPlan,
     DependencyEdge, DeviceProgram, DeviceProgramLifetime, DeviceResource, DeviceSemantics,
     Diagnostic, HashMap, InitializationFact, InitializationPolicy, Interner, KernelLaunchPlan,
@@ -658,6 +659,14 @@ pub(crate) fn device_program_for_lowered(
             function
         };
         let base_entry = kernel_entry_name(kernel_source, interner);
+        // The source function's return-tuple field locals (in full-tuple
+        // order) — the discriminator for the S5-U5 update-output aliasing:
+        // an output slot aliases a trainable parameter only when it IS the
+        // full result-tuple slot for that parameter's update. The source
+        // function (not the folded kernel_source) is the authoritative
+        // return shape; the decomposition's subchain output slots carry the
+        // same source local ids (the fold is a pure statement rewrite).
+        let return_tuple_locals = tuple_return_locals(function);
         // The decomposed path records each subchain output slot's buffer id
         // (subchain index, output-slot index) while the subchains are built,
         // so the D-6 fill can resolve the companion's FULL result-tuple
@@ -673,7 +682,8 @@ pub(crate) fn device_program_for_lowered(
             (MirFunctionId, MirLocalId),
             (u32, u32),
         >,
-                                 subchain_index: Option<usize>|
+                                 subchain_index: Option<usize>,
+                                 return_tuple_locals: &[MirLocalId]|
          -> Result<(), Vec<Diagnostic>> {
             let mut resources: Vec<ResourceBuild> = Vec::new();
             // The trainable param local → its registered buffer id, filled
@@ -710,14 +720,36 @@ pub(crate) fn device_program_for_lowered(
                 };
                 // An update output slot: the slot's tuple index decides which
                 // parameter it updates (the loop re-binds that parameter's
-                // entry-local from this tuple element).
+                // entry-local from this tuple element). The alias applies ONLY
+                // when the output slot IS the full result-tuple slot for that
+                // parameter's update — an intermediate subchain's local output
+                // slot (the scaled-grad forward-save set, or an elementwise
+                // body's pre sub-slice) never carries a full-tuple index and
+                // must never be written into the parameter buffer: a
+                // decomposed train_step's pre subchain (fills + scaled-grad
+                // muls, reading the wq/bq fill receivers) would otherwise
+                // write its scaled-grad `swq` INTO `wq`, and the next
+                // subchain's `swq` read would mint a fresh PerProgram input
+                // (the bert-tiny once-init failure).
                 let alias_param = match output_index {
-                    Some(output_index) => param_updates
-                        .iter()
-                        .find(|((_, _), (_, update_output))| *update_output == output_index)
-                        .and_then(|((_, param_local), _)| {
-                            param_buffer_by_local.get(param_local).copied()
-                        }),
+                    Some(output_index) => {
+                        let full_tuple_slot = resource.source_local.is_some_and(|local| {
+                            return_tuple_locals
+                                .get(output_index as usize)
+                                .copied()
+                                == Some(local)
+                        });
+                        if full_tuple_slot {
+                            param_updates
+                                .iter()
+                                .find(|((_, _), (_, update_output))| *update_output == output_index)
+                                .and_then(|((_, param_local), _)| {
+                                    param_buffer_by_local.get(param_local).copied()
+                                })
+                        } else {
+                            None
+                        }
+                    }
                     None => None,
                 };
                 // A gradient input slot of a train_step: the gradient buffer
@@ -917,6 +949,7 @@ pub(crate) fn device_program_for_lowered(
                     base_entry,
                     &param_updates,
                     None,
+                    return_tuple_locals.as_deref().unwrap_or(&[]),
                 );
             }
         }
@@ -1005,6 +1038,7 @@ pub(crate) fn device_program_for_lowered(
                 entry,
                 &param_updates,
                 Some(subchain_index),
+                return_tuple_locals.as_deref().unwrap_or(&[]),
             )?;
         }
         // D-6 gradient-slot → buffer mapping: the companion's gradient slots
