@@ -430,14 +430,18 @@ fn llvm_host_instans_failable_fixture_matches_rust_output() {
 
     let probe = run_llvm_exemplum(&llvm_file, &temp_root, "conversio-fallibilis", &fab_path);
     assert_eq!(probe.bucket, LlvmRunBucket::Runnable, "{}", probe.reason);
-    // L19: raw `nota` of an instans renders the Rust oracle's `Debug` shape
-    // (`Instans { nanos: …, praecisio: … }`) through the instans display
-    // carrier, and the fac/cape-absorbed conversion failure no longer latches
-    // a nonzero exit code (byte-exact handled output exits 0). The multi-arg
-    // nota spacing (three values on one oracle line) is a MIR-lowering gap
-    // outside L19 scope, so this asserts the per-line shape only.
-    let line = "Instans { nanos: 296638320000000000, praecisio: Secunda }\n";
-    assert_eq!(probe.stdout, format!("{line}{line}{line}"));
+    // L28 (ab91f49f): the multi-arg nota grouping now covers instans Debug
+    // shapes, so the three values render the Rust oracle's ONE space-joined
+    // line byte-exact (see `llvm_host_conversio_fallibilis_grouped_nota_…`
+    // for the full assertion). The fac/cape-absorbed conversion failure no
+    // longer latches a nonzero exit code (L19).
+    let value = "Instans { nanos: 296638320000000000, praecisio: Secunda }";
+    assert_eq!(
+        probe.stdout,
+        format!("{value} {value} {value}\n"),
+        "three instans nota values must render one oracle-exact line: {}",
+        probe.reason
+    );
     assert_eq!(probe.exit_code, Some(0));
     assert_eq!(
         probe.stderr,
@@ -1985,5 +1989,74 @@ fn llvm_host_destructura_objectum_exit_zero() {
         probe.stdout.contains("nigrum\n"),
         "destructured field notas must still print: {:?}",
         probe.stdout
+    );
+}
+
+/// L28 (ab91f49f): close the sparsa/access outcome row — `nota stored, absent,
+/// count` renders three f32/numerus values the Rust oracle space-joins into
+/// ONE line (`4.0 0.0 1`). The f32 `fractus<f32>` nota now routes through the
+/// runtime's `display_fractus` f32 display path in the grouped multi-arg nota
+/// carrier, so the fixture matches its sibling `.expected` byte-exact with
+/// exit 0 (previously three separate per-arg lines).
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_sparsa_access_matches_expected -- --ignored --nocapture"]
+fn llvm_host_sparsa_access_matches_expected() {
+    assert_tensor_fixture_output("sparsa/access.fab", "sparsa-access");
+}
+
+/// L28 (ab91f49f): close the sparsa/sugar outcome row — `nota value, absent,
+/// count, dense.longitudo()` renders two f32 fractus + two numerus values the
+/// Rust oracle space-joins into ONE line (`4.0 0.0 1 2`). Same f32
+/// display_fractus grouped-nota path; byte-exact vs the sibling `.expected`.
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_sparsa_sugar_matches_expected -- --ignored --nocapture"]
+fn llvm_host_sparsa_sugar_matches_expected() {
+    assert_tensor_fixture_output("sparsa/sugar.fab", "sparsa-sugar");
+}
+
+/// L28 (ab91f49f): close the conversio/fallibilis outcome row — the three
+/// instans `nota` values now route through the grouped multi-arg nota path
+/// (each instans renders its Rust-oracle `Debug` shape via the L19
+/// `__faber_rt_v1_instans_display` carrier), so the fixture matches the
+/// oracle's single space-joined line byte-exact and exits 0. The multi-arg
+/// nota spacing gap L19 named is closed; the fac/cape-absorbed conversion
+/// failures still render on stderr without latching a status.
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_conversio_fallibilis_grouped_nota -- --ignored --nocapture"]
+fn llvm_host_conversio_fallibilis_grouped_nota_matches_rust_output() {
+    let fab_path = crate::paths::corpus_dir().join("conversio/fallibilis.fab");
+    let result = Compiler::new(
+        Config::default()
+            .with_target(Target::LlvmText)
+            .with_dev_stdlib(),
+    )
+    .compile(&fab_path);
+    assert!(
+        result.success(),
+        "conversio/fallibilis.fab LLVM compile failed: {:?}",
+        result.diagnostics
+    );
+    let Some(Output::LlvmText(output)) = result.output else {
+        panic!("conversio/fallibilis.fab did not produce LLVM text");
+    };
+    let temp_root = super::super::common::make_temp_root();
+    let llvm_file = temp_root.join("conversio-fallibilis.ll");
+    fs::write(&llvm_file, output.code).expect("write instans failable LLVM text");
+
+    let probe = run_llvm_exemplum(&llvm_file, &temp_root, "conversio-fallibilis", &fab_path);
+    assert_eq!(probe.bucket, LlvmRunBucket::Runnable, "{}", probe.reason);
+    // The Rust oracle prints ONE space-joined line of three instans Debug
+    // shapes; the grouped multi-arg nota must match byte-exact.
+    let value = "Instans { nanos: 296638320000000000, praecisio: Secunda }";
+    assert_eq!(
+        probe.stdout,
+        format!("{value} {value} {value}\n"),
+        "three instans nota values must render one oracle-exact line: {}",
+        probe.reason
+    );
+    assert_eq!(probe.exit_code, Some(0));
+    assert_eq!(
+        probe.stderr,
+        "valor to instans conversion failed\nvalor to instans conversion failed\n"
     );
 }

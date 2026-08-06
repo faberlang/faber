@@ -174,14 +174,6 @@ reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture
 first_seen = "2026-08-06@a302c8ebc-live-pairwise"
 
 [[gap]]
-path = "sparsa/access.fab"
-owner_stage = 5
-boundary = "outcome"
-issue = "llvm_fixture_mismatch"
-reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
-first_seen = "2026-07-10@32b4f09af"
-
-[[gap]]
 path = "sparsa/conversio.fab"
 owner_stage = 5
 boundary = "outcome"
@@ -199,14 +191,6 @@ first_seen = "2026-07-10@32b4f09af"
 
 [[gap]]
 path = "sparsa/sparsa-codegen-smoke.fab"
-owner_stage = 5
-boundary = "outcome"
-issue = "llvm_fixture_mismatch"
-reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
-first_seen = "2026-07-10@32b4f09af"
-
-[[gap]]
-path = "sparsa/sugar.fab"
 owner_stage = 5
 boundary = "outcome"
 issue = "llvm_fixture_mismatch"
