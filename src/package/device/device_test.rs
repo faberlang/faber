@@ -1346,6 +1346,72 @@ functio softmaxio(tf32[2,2] x) → tf32[2,2] {
 }
 
 #[test]
+fn device_program_constructor_decomposes_transformer_recipe_subchain() {
+    // S6-P1 repair: a multi-recipe body whose whole-function ABI synthesis
+    // fails (the matmul return-buffer element-count law) decomposes at
+    // recipe boundaries, and the transformer-recipe subchain (TensorSoftmax,
+    // which has no `CollectionOpContract` variant) dispatches its emission
+    // signature through the P1 seam (`transformer_subchain_signature_for_emission`)
+    // instead of falling to the generic return-buffer ABI. The constructor
+    // succeeds with one kernel per subchain: the matmul subchain carries the
+    // TiledMatMul contract-shaped signature and the softmax subchain carries
+    // the RowSoftmax recipe plan with the transformer-shaped resource layout.
+    let (program, _semantics) = with_inline_package(
+        "mixio",
+        r#"@ nucleum
+functio mixio(tf32[2,8] x, tf32[8,2] w) → tf32[2,2] {
+    fixum tf32[2,2] m ← x.matmul(w)
+    redde m.activatio_softmax()
+}"#,
+        |lowered| {
+            device_program_for_lowered(
+                &lowered.validated,
+                &lowered.interner,
+                &lowered.companions,
+                DEFAULT_TRAINING_STEPS,
+            )
+            .expect("constructor succeeds")
+            .map(|(program, semantics, _step_count)| (program, semantics))
+            .expect("device package yields a device program")
+        },
+    )
+    .expect("fixture lowers");
+    assert_eq!(program.kernels.len(), 2, "matmul + softmax subchain kernels");
+    let softmax_kernel = program
+        .kernels
+        .iter()
+        .find(|kernel| kernel.entry == "mixio__1")
+        .expect("the softmax subchain kernel exists");
+    let CollectionKernelPlan::RowSoftmax(_) = &softmax_kernel.plan else {
+        panic!(
+            "the softmax subchain kernel must carry the RowSoftmax recipe plan, got {:?}",
+            softmax_kernel.plan
+        );
+    };
+    // The transformer-shaped emission signature: the recipe operand input at
+    // binding 0 and the primary output at binding 1, both at the [2,2]
+    // device-view element count — never the elementwise return-buffer
+    // layout.
+    let element_counts: Vec<(u32, u64)> = softmax_kernel
+        .resources
+        .iter()
+        .map(|resource| (resource.binding.binding, resource.version.element_count))
+        .collect();
+    assert!(
+        element_counts
+            .iter()
+            .any(|&(binding, count)| binding == 0 && count == 4),
+        "the recipe operand input binds at 0 with the [2,2] element count: {element_counts:?}"
+    );
+    assert!(
+        element_counts
+            .iter()
+            .any(|&(binding, count)| binding == 1 && count == 4),
+        "the primary output binds at 1 with the [2,2] element count: {element_counts:?}"
+    );
+}
+
+#[test]
 fn device_program_constructor_rejects_unplannable_op_with_typed_diagnostic() {
     // N3.2 / D1 (S6-P1 boundary): the transformer admission is a CLOSED set.
     // TensorSoftmax now plans (RowSoftmax), but TensorCruxEntropia — no

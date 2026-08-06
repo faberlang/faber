@@ -1,8 +1,9 @@
 // Sibling + root items: explicit `use super` lists carry the seams the mir/
 // split routes through `use super::*` (wildcard imports are denied).
 use super::{
-    collection_op_contract, decompose_kernel_function, device_diag, kernel_plan_for_function,
-    subchain_signature_for_emission, training_plan_facts, BTreeMap, BTreeSet, Binding, BufferId,
+    collection_op_contract, decompose_kernel_function, device_diag, is_transformer_recipe_op,
+    kernel_plan_for_function, subchain_signature_for_emission, training_plan_facts,
+    transformer_subchain_signature_for_emission, BTreeMap, BTreeSet, Binding, BufferId,
     BufferIdentity, BufferLifetime, BufferRole, BufferVersion, CollectionKernelPlan,
     DependencyEdge, DeviceProgram, DeviceProgramLifetime, DeviceResource, DeviceSemantics,
     Diagnostic, HashMap, InitializationFact, InitializationPolicy, Interner, KernelLaunchPlan,
@@ -55,6 +56,28 @@ pub(super) fn function_has_shape_construction(function: &MirFunction) -> bool {
                 )
             )
         })
+}
+
+/// The transformer recipe op of a subchain body, when it carries exactly one
+/// (S6-P1 statement scan — mirrors the plan pass's typed-fact scan and the
+/// emitters' `transformer_recipe_op`: a body mixing distinct transformer
+/// recipes cannot emit as one kernel and fails closed upstream at plan
+/// resolution).
+fn transformer_recipe_op(function: &MirFunction) -> Option<MirCollectionOp> {
+    for block in &function.blocks {
+        for statement in &block.statements {
+            let MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
+                continue;
+            };
+            let MirIntrinsic::Collection(op) = call.intrinsic else {
+                continue;
+            };
+            if is_transformer_recipe_op(op) {
+                return Some(op);
+            }
+        }
+    }
+    None
 }
 
 /// The param-name for a buffer slot, when the kernel function names the
@@ -932,12 +955,38 @@ pub(crate) fn device_program_for_lowered(
                     &subchain.outputs,
                 )
                 .map_err(|error| vec![device_diag("signature", error.message)])?,
-                None => MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
-                    &synthetic,
-                    &subchain_validation,
-                    interner,
-                )
-                .map_err(|error| vec![device_diag("signature", error.message)])?,
+                None => {
+                    // S6-P1: a transformer-recipe subchain (`TensorSumAxis` /
+                    // `TensorSoftmax` / `TensorLayerNorm`) has no
+                    // `CollectionOpContract` variant — the ABI's generic
+                    // return-buffer kernel is elementwise-only and cannot
+                    // carry a genuinely size-changing reduction output (an
+                    // axis reduction's `[M,N] → [N]` fails the return-buffer
+                    // element-count law) or an affine-pair LayerNorm — so the
+                    // signature dispatch goes through the P1 seam
+                    // (`transformer_subchain_signature_for_emission`, the
+                    // transformer-shaped recipe resources plus the subchain's
+                    // data-flow inputs, e.g. the LN affine tensors).
+                    // Mirrors the emitters' consumption of the same seam
+                    // (Metal S6-P2, NVVM S6-P3). Elementwise-only subchains
+                    // keep the full ABI synthesis.
+                    if let Some(op) = transformer_recipe_op(&synthetic) {
+                        transformer_subchain_signature_for_emission(
+                            &synthetic,
+                            op,
+                            &subchain_validation,
+                            &subchain.outputs,
+                        )
+                        .map_err(|error| vec![device_diag("signature", error.message)])?
+                    } else {
+                        MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+                            &synthetic,
+                            &subchain_validation,
+                            interner,
+                        )
+                        .map_err(|error| vec![device_diag("signature", error.message)])?
+                    }
+                }
             };
             let entry = if decomposition.subchains.len() == 1 {
                 base_entry.clone()
