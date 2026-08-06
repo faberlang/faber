@@ -391,6 +391,7 @@ pub(crate) fn target_name(target: Target) -> &'static str {
         Target::Wasm => "wasm",
         Target::WasmText => "wasm-text",
         Target::LlvmText => "llvm-text",
+        Target::LlvmHost => "llvm-host",
         Target::MetalText => "metal-text",
         Target::WgslText => "wgsl-text",
         Target::Sexp => "sexp",

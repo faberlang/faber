@@ -114,7 +114,23 @@ pub fn run_llvm_modules(
     stem: &str,
     fab_path: &Path,
 ) -> LlvmRunProbe {
-    assert!(!modules.is_empty(), "run_llvm_modules needs at least one module");
+    run_llvm_modules_with_args(modules, temp_root, stem, fab_path, &[])
+}
+
+/// [`run_llvm_modules`] with explicit process arguments: the exact Rust
+/// oracle args are passed through so `incipit argumenta` fixtures observe the
+/// same process context in both lanes (S8.1 process argumenta).
+pub fn run_llvm_modules_with_args(
+    modules: &[PathBuf],
+    temp_root: &Path,
+    stem: &str,
+    fab_path: &Path,
+    run_args: &[&str],
+) -> LlvmRunProbe {
+    assert!(
+        !modules.is_empty(),
+        "run_llvm_modules_with_args needs at least one module"
+    );
     let toolchain = match llvm_host_toolchain() {
         Ok(toolchain) => toolchain,
         Err(reason) => return LlvmRunProbe::toolchain_missing(format!("tier C skipped: {reason}")),
@@ -148,7 +164,7 @@ pub fn run_llvm_modules(
             String::from_utf8_lossy(&link.stderr).trim()
         ));
     }
-    run_linked_binary(&binary_file, fab_path, &[])
+    run_linked_binary(&binary_file, fab_path, run_args)
 }
 
 fn run_linked_binary(

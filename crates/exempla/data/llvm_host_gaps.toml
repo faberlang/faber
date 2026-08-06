@@ -1,7 +1,7 @@
 # Gap ledger captured by the live LLVM host pairwise run on 2026-08-06.
 # This is measured live evidence, not an accepted-failure allowlist.
 schema_version = 1
-measured = "2026-08-06@a302c8ebc-live-pairwise"
+measured = "2026-08-06@live-pairwise-s86"
 rust_executable_denominator = 291
 gap_ceiling = 144
 
@@ -60,14 +60,6 @@ boundary = "link"
 issue = "runtime_import_unresolved"
 reason = "LLVM verifies, but one or more runtime imports remain unresolved at native link"
 first_seen = "2026-07-10@32b4f09af"
-
-[[gap]]
-path = "assertio/nonnulla.fab"
-owner_stage = 4
-boundary = "verify"
-issue = "llvm_verifier_rejected"
-reason = "LLVM emission succeeds, but llvm-as rejects the emitted module"
-first_seen = "2026-08-06@a302c8ebc-live-pairwise"
 
 [[gap]]
 path = "cede/cede.fab"
@@ -211,14 +203,6 @@ owner_stage = 5
 boundary = "outcome"
 issue = "exit_code_mismatch"
 reason = "both lanes ran; LLVM stdout matches the sibling .expected but the process exit code differs (latched runtime status)"
-first_seen = "2026-08-06@a302c8ebc-live-pairwise"
-
-[[gap]]
-path = "operatores/nonnull-chain.fab"
-owner_stage = 4
-boundary = "verify"
-issue = "llvm_verifier_rejected"
-reason = "LLVM emission succeeds, but llvm-as rejects the emitted module"
 first_seen = "2026-08-06@a302c8ebc-live-pairwise"
 
 [[gap]]

@@ -308,3 +308,42 @@ fn package_llvm_builder_single_unit_package() {
     );
     assert_eq!(build.manifest.entry_module, build.modules[0].llvm_path);
 }
+
+/// S8.2/S8.6: a CLI-bearing entry unit emits through the versioned static
+/// descriptor adapter lane (the product CLI lane) — the module embeds the
+/// serialized `@__faber_cli_descriptor_v1` global, calls the runtime argv
+/// parser, and derives the process code from the runtime exit policy, exactly
+/// like the S8.2 adapter lane. The legacy fixed-code seam is gone for CLI
+/// entries.
+#[test]
+fn package_llvm_builder_cli_entry_emits_adapter_lane() {
+    let dir = test_temp_dir("llvm-builder");
+    let package_dir = dir.join("clio");
+    fs::create_dir_all(&package_dir).expect("create clio dir");
+    fs::write(
+        package_dir.join("clio.fab"),
+        "@ cli \"clio-smoke\"\nincipit argumenta args exitus 1 {\n}\n",
+    )
+    .expect("write clio.fab");
+    let entry = package_dir.join("clio.fab");
+    let options = PackageLlvmOptions::new(dir.join("out-cli"));
+    let build = build_package_llvm(&llvm_config(), &entry, &options)
+        .expect("CLI package build must succeed");
+
+    assert_eq!(build.modules.len(), 1, "single-unit CLI package");
+    assert!(build.modules[0].is_entry);
+    let entry_text =
+        fs::read_to_string(&build.modules[0].llvm_path).expect("read CLI entry .ll");
+    assert!(
+        entry_text.contains("@__faber_cli_descriptor_v1"),
+        "CLI entry module must embed the static descriptor:\n{entry_text}"
+    );
+    assert!(
+        entry_text.contains("__faber_rt_v1_cli_parse"),
+        "CLI entry module must call the runtime argv parser:\n{entry_text}"
+    );
+    assert!(
+        entry_text.contains("__faber_rt_v1_cli_exit_code"),
+        "CLI entry module must derive the process code from the runtime exit policy:\n{entry_text}"
+    );
+}

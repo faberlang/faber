@@ -1,20 +1,27 @@
 //! LLVM exempla e2e harness: tiered emission, external verification, and runtime probes.
 //!
-//! Classifies each exemplum through frontend analysis, MIR lowering, LLVM IR
-//! emission, and optional llvm-as/opt verification. When an external toolchain is
-//! available, Tier C/D link and run emitted modules and compare captured output
-//! against sibling `*.expected` files.
+//! Classifies each exemplum through the product package-to-LLVM builder
+//! (`faber/src/package/llvm.rs`, S8.6): one `.ll` module per package unit plus
+//! an inspectable link manifest, optional llvm-as/opt verification, and Tier
+//! C/D link-and-run of ALL modules against the host runtime with captured
+//! output compared against the Rust oracle and sibling `*.expected` files.
+//! The harness keeps no secondary resolver/emitter for entry/CLI/importa
+//! paths; the selected-Norma family (`norma:*` imports) probes the merged
+//! package-MIR program until the S8.5 Norma graph lands, and corpus stubs
+//! the package graph cannot represent at the analysis level (non-representable
+//! file interfaces) fall back to the radix single-file lane.
 
 use super::common::{
     collect_exempla_files, command_available, floor_for_corpus, format_ceiling_line,
     format_diagnostic_messages, format_tier_line, make_temp_root,
 };
 use super::llvm_runtime::{LlvmRunBucket, LlvmRunProbe};
-use super::oracle::rust_oracle;
+use super::oracle::{normalize_pairwise_output, rust_oracle, RustOracleOutcome};
 use super::rust;
 use radix::codegen::Target;
 use radix::driver::Session;
 use radix::Config;
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -157,17 +164,14 @@ pub(super) fn classify_llvm_exemplum(
     temp_root: &Path,
     toolchain: &LlvmToolchain,
 ) -> LlvmE2eResult {
-    let source = match fs::read_to_string(file) {
-        Ok(source) => source,
-        Err(err) => {
-            return llvm_result(
-                file,
-                LlvmTier::SourceReadable,
-                LlvmEmissionBucket::OutputWriteFailed,
-                format!("cannot read source: {err}"),
-            );
-        }
-    };
+    if let Err(err) = fs::read_to_string(file) {
+        return llvm_result(
+            file,
+            LlvmTier::SourceReadable,
+            LlvmEmissionBucket::OutputWriteFailed,
+            format!("cannot read source: {err}"),
+        );
+    }
     match rust::uses_package_library_import_for(file) {
         Ok(true) => return classify_package_llvm_exemplum(file, idx, temp_root, toolchain),
         Ok(false) => {}
@@ -180,13 +184,95 @@ pub(super) fn classify_llvm_exemplum(
             );
         }
     }
-    // importa/importa.fab is the two-module package proof (D-PA4/D11): the
-    // entry imports a sibling user-code module, so the harness compiles BOTH
-    // package units and links them into one executable via the ordinary
-    // linker (no host runtime involvement in the user-to-user call).
-    if is_importa_two_module_fixture(file) {
-        return classify_importa_two_module_llvm_exemplum(file, idx, temp_root, toolchain);
-    }
+    // S8.6: every entry/CLI/importa fixture builds through the product
+    // package-to-LLVM builder (`faber/src/package/llvm.rs`) — the single
+    // shared implementation of the package graph → unit modules + link
+    // manifest mapping. No harness-side resolver/emitter remains for these
+    // paths: single-file fixtures are single-unit packages, local-import
+    // fixtures (importa) are multi-unit packages, and the ordinary linker
+    // resolves the canonical `__faber_external_…` identities across modules.
+    classify_builder_llvm_exemplum(session, file, idx, temp_root, toolchain)
+}
+
+/// S8.6: build one fixture through the product package-to-LLVM builder and
+/// classify the result — per-unit verifier check, then one link+run of ALL
+/// modules with the host runtime archive and the exact Rust-oracle args
+/// (S8.1 process argumenta).
+fn classify_builder_llvm_exemplum(
+    session: &Session,
+    file: &Path,
+    idx: usize,
+    temp_root: &Path,
+    toolchain: &LlvmToolchain,
+) -> LlvmE2eResult {
+    let stem = file
+        .file_stem()
+        .and_then(|name| name.to_str())
+        .unwrap_or("exemplum");
+    let runtime_archive = match super::llvm_runtime::llvm_runtime_archive() {
+        Ok(path) => Some(path),
+        Err(reason) => {
+            return llvm_result(
+                file,
+                LlvmTier::SourceReadable,
+                LlvmEmissionBucket::OutputWriteFailed,
+                format!("LLVM host runtime archive unavailable: {reason}"),
+            );
+        }
+    };
+    let options = faber_cli::package::PackageLlvmOptions::new(
+        temp_root.join(format!("{idx:03}-{stem}.modules")),
+    )
+    .with_runtime_archive(runtime_archive);
+    let build = match faber_cli::package::build_package_llvm(&session.config, file, &options) {
+        Ok(build) => build,
+        Err(diagnostics) => {
+            // MIR-lowering and LLVM-emission failures are lane-independent:
+            // the single-file path fails them identically, so classify them
+            // from the builder diagnostics directly.
+            let lane_independent = diagnostics.iter().any(|diagnostic| {
+                diagnostic.phase == radix::diagnostics::DiagnosticPhase::Mir
+                    || diagnostic.issue() == Some("llvm_emission_failed")
+            });
+            if lane_independent {
+                return classify_builder_failure(file, diagnostics);
+            }
+            // The package graph rejected the fixture at the analysis level
+            // (e.g. a public export that cannot be represented in a file
+            // interface — `IndexInferenceUnsupported`). Such fixtures are not
+            // package-shapeable but remain valid single-file programs; run
+            // them through the radix single-file lane so their historical
+            // pairwise classification is preserved. Entry/CLI/importa
+            // fixtures never take this path — the builder owns their graph.
+            return classify_single_file_llvm_exemplum(session, file, idx, temp_root, toolchain);
+        }
+    };
+    classify_built_llvm(file, idx, temp_root, toolchain, &build)
+}
+
+/// Single-file compatibility lane for fixtures the package graph cannot
+/// represent (analysis-level rejection only): radix `analyze_source` → MIR →
+/// LLVM emission → verify/run. Kept ONLY as the fallback for non-package-
+/// shapeable corpus stubs; entry/CLI/importa fixtures always build through
+/// the product package-to-LLVM builder.
+fn classify_single_file_llvm_exemplum(
+    session: &Session,
+    file: &Path,
+    idx: usize,
+    temp_root: &Path,
+    toolchain: &LlvmToolchain,
+) -> LlvmE2eResult {
+    let source = match fs::read_to_string(file) {
+        Ok(source) => source,
+        Err(err) => {
+            return llvm_result(
+                file,
+                LlvmTier::SourceReadable,
+                LlvmEmissionBucket::OutputWriteFailed,
+                format!("cannot read source: {err}"),
+            );
+        }
+    };
     let mut analysis =
         match radix::driver::analyze_source(session, &file.display().to_string(), &source) {
             Ok(analysis) => analysis,
@@ -204,32 +290,14 @@ pub(super) fn classify_llvm_exemplum(
         };
 
     let device_roles = radix::mir::device_roles_from_hir(&analysis.hir);
-    let cli_program = analysis.cli_program.is_some();
-    // CLI `exitus` contract (campaign D8): the emitted program entry returns
-    // the declared exit code as the process code (Rust-parity exit semantics).
     // S8.2: for the static-descriptor adapter lane the descriptor carries the
     // exit policy (Fixed/Binding/Field) and the runtime derives the process
-    // code; the legacy fixed-code emission seam stays for non-adapter paths.
-    let exit_code = if cli_program {
-        None
-    } else {
-        analysis.cli_program.as_ref().and_then(|program| {
-            program.exit.as_ref().and_then(|exit| match exit {
-                radix::cli::CliExit::Fixed(code) => Some(*code),
-                radix::cli::CliExit::Binding(_)
-                | radix::cli::CliExit::Field { .. }
-                | radix::cli::CliExit::Unsupported => None,
-            })
-        })
-    };
-    // S8.2 CLI adapter plan: the versioned static descriptor + per-function
-    // record surfaces, built from the analyzed CliProgram (never reparsed
-    // from source).
+    // code; the legacy fixed-code seam stays for non-adapter paths.
     let cli_adapter = analysis
         .cli_program
         .as_ref()
         .map(radix::cli_descriptor::build_cli_adapter_plan);
-    let mir = match if cli_program {
+    let mir = match if analysis.cli_program.is_some() {
         radix::mir::lower_analyzed_unit_with_cli_adapter_with_context(&mut analysis)
     } else {
         radix::mir::lower_analyzed_unit_with_context(&mut analysis)
@@ -252,12 +320,7 @@ pub(super) fn classify_llvm_exemplum(
         }
     };
 
-    let llvm = match emit_llvm_for_program(
-        &device_roles,
-        &mir,
-        exit_code,
-        cli_adapter,
-    ) {
+    let llvm = match emit_llvm_for_program(&device_roles, &mir, cli_adapter) {
         Ok(llvm) => llvm,
         Err(error) if error.category == "unsupported-mir-shape" => {
             return llvm_result(
@@ -284,11 +347,10 @@ pub(super) fn classify_llvm_exemplum(
 }
 
 /// Emit the LLVM module for a lowered program: the S8.2 static-descriptor
-/// adapter lane for CLI programs, the ordinary roles+exit lane otherwise.
+/// adapter lane for CLI programs, the ordinary roles lane otherwise.
 fn emit_llvm_for_program(
     device_roles: &rustc_hash::FxHashMap<radix::hir::DefId, radix::mir::MirDeviceRole>,
     mir: &radix::mir::LoweredMirUnit<'_>,
-    exit_code: Option<i64>,
     cli_adapter: Option<radix::mir::CliAdapterPlan>,
 ) -> Result<String, radix::mir::MirLlvmTextProbeError> {
     match cli_adapter {
@@ -302,161 +364,123 @@ fn emit_llvm_for_program(
             device_roles,
             &mir.validated,
             &mir.interner,
-            exit_code,
+            None,
         ),
     }
 }
 
-/// Whether a corpus fixture is the two-module package proof
-/// (`importa/importa.fab` + sibling `importa/auxilium.fab`).
-fn is_importa_two_module_fixture(file: &Path) -> bool {
-    file.strip_prefix(crate::paths::corpus_dir())
-        .is_ok_and(|relative| relative == Path::new("importa/importa.fab"))
-}
-
-/// The two-module LLVM-host link proof for `importa/importa.fab` (D-PA4).
-///
-/// The proof runs through the reusable package-to-LLVM builder (S8.3):
-/// the Faber package graph resolves BOTH package units (entry + sibling
-/// `auxilium.fab`), the builder emits one LLVM module per unit (D11) — the
-/// entry module declares and directly calls the sibling's `saluta` under the
-/// canonical external symbol
-/// `__faber_external_product_importa_module_auxilium_func_saluta`; the sibling
-/// module (library mode — no entry) defines the same symbol. Both modules are
-/// assembled and linked with the host runtime archive; the executable must
-/// print `Salve, Marcus!` and exit 0, matching the sibling `.expected` fixture
-/// and the Rust oracle. No `.ll` text concatenation and no harness-side import
-/// parsing: the builder owns the graph → modules + link manifest mapping.
-fn classify_importa_two_module_llvm_exemplum(
+/// Classify lane-independent builder diagnostics (MIR lowering or LLVM
+/// emission failures) into the tiered buckets the pairwise harness and the
+/// gap ledger key on. The `unsupported-mir-shape` category keeps its
+/// historical `Unsupported` bucket, so the S8.7 ratchet sees identical live
+/// classification. (Package-analysis rejections are routed to the single-file
+/// fallback by the caller, never here.)
+fn classify_builder_failure(
     file: &Path,
-    idx: usize,
-    temp_root: &Path,
-    _toolchain: &LlvmToolchain,
+    diagnostics: Vec<radix::diagnostics::Diagnostic>,
 ) -> LlvmE2eResult {
-    const EXTERNAL_SALUTA: &str = "__faber_external_product_importa_module_auxilium_func_saluta";
-    let stem = format!("{idx:03}-importa");
-
-    let runtime_archive = match super::llvm_runtime::llvm_runtime_archive() {
-        Ok(path) => Some(path),
-        Err(reason) => {
-            return llvm_result(
-                file,
-                LlvmTier::SourceReadable,
-                LlvmEmissionBucket::OutputWriteFailed,
-                format!("LLVM host runtime archive unavailable: {reason}"),
-            );
-        }
-    };
-    let modules_dir = temp_root.join(format!("{stem}.modules"));
-    let config = radix::Config::default().with_target(Target::LlvmText);
-    let options = faber_cli::package::PackageLlvmOptions::new(modules_dir.clone())
-        .with_runtime_archive(runtime_archive);
-    let build = match faber_cli::package::build_package_llvm(&config, file, &options) {
-        Ok(build) => build,
-        Err(diagnostics) => {
-            let mir_failed = diagnostics
-                .iter()
-                .any(|diagnostic| diagnostic.phase == radix::diagnostics::DiagnosticPhase::Mir);
-            return llvm_result(
-                file,
-                if mir_failed {
-                    LlvmTier::FrontendAnalyzed
-                } else {
-                    LlvmTier::SourceReadable
-                },
-                if mir_failed {
-                    LlvmEmissionBucket::MirLoweringFailed
-                } else {
-                    LlvmEmissionBucket::FrontendFailed
-                },
-                format!(
-                    "package LLVM build failed: {}",
-                    format_diagnostic_messages(&diagnostics)
-                ),
-            );
-        }
-    };
-
-    let entry_module = build
-        .modules
+    if diagnostics
         .iter()
-        .find(|module| module.is_entry)
-        .expect("exactly one entry module by builder contract");
-    let sibling_module = build
-        .modules
-        .iter()
-        .find(|module| !module.is_entry)
-        .expect("importa package graph has exactly two units");
-    if build.modules.len() != 2 {
+        .any(|diagnostic| diagnostic.issue() == Some("llvm_emission_failed"))
+    {
+        let unsupported = diagnostics.iter().any(|diagnostic| {
+            diagnostic.issue() == Some("llvm_emission_failed")
+                && diagnostic.message.contains("unsupported-mir-shape")
+        });
         return llvm_result(
             file,
             LlvmTier::MirLowered,
-            LlvmEmissionBucket::EmissionFailed,
+            if unsupported {
+                LlvmEmissionBucket::Unsupported
+            } else {
+                LlvmEmissionBucket::EmissionFailed
+            },
             format!(
-                "importa package graph expected two units, got {}",
-                build.modules.len()
+                "{}: {}",
+                if unsupported {
+                    "LLVM emission unsupported"
+                } else {
+                    "LLVM emission failed"
+                },
+                format_diagnostic_messages(&diagnostics)
             ),
         );
     }
-    let entry_llvm = match fs::read_to_string(&entry_module.llvm_path) {
-        Ok(text) => text,
-        Err(err) => {
-            return llvm_result(
-                file,
-                LlvmTier::LlvmEmitted,
-                LlvmEmissionBucket::OutputWriteFailed,
-                format!("cannot read entry LLVM output: {err}"),
-            );
-        }
-    };
-    if !entry_llvm.contains(EXTERNAL_SALUTA) {
-        return llvm_result(
-            file,
-            LlvmTier::MirLowered,
-            LlvmEmissionBucket::EmissionFailed,
-            format!("entry module does not declare/call the sibling external symbol {EXTERNAL_SALUTA}"),
-        );
-    }
-    let sibling_llvm = match fs::read_to_string(&sibling_module.llvm_path) {
-        Ok(text) => text,
-        Err(err) => {
-            return llvm_result(
-                file,
-                LlvmTier::LlvmEmitted,
-                LlvmEmissionBucket::OutputWriteFailed,
-                format!("cannot read sibling LLVM output: {err}"),
-            );
-        }
-    };
-    if !sibling_llvm.contains(EXTERNAL_SALUTA) {
-        return llvm_result(
-            file,
-            LlvmTier::MirLowered,
-            LlvmEmissionBucket::EmissionFailed,
-            format!("sibling module does not define the external symbol {EXTERNAL_SALUTA}"),
-        );
-    }
-    if sibling_llvm.contains("__faber_program_entry_v1") {
-        return llvm_result(
-            file,
-            LlvmTier::MirLowered,
-            LlvmEmissionBucket::EmissionFailed,
-            "sibling library module must not emit a program entry".to_owned(),
-        );
-    }
+    let mir_failed = diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.phase == radix::diagnostics::DiagnosticPhase::Mir);
+    llvm_result(
+        file,
+        if mir_failed {
+            LlvmTier::FrontendAnalyzed
+        } else {
+            LlvmTier::SourceReadable
+        },
+        if mir_failed {
+            LlvmEmissionBucket::MirLoweringFailed
+        } else {
+            LlvmEmissionBucket::FrontendFailed
+        },
+        format!(
+            "package LLVM build failed: {}",
+            format_diagnostic_messages(&diagnostics)
+        ),
+    )
+}
 
-    let run_probe = super::llvm_runtime::run_llvm_modules(
-        &build.manifest.modules,
-        temp_root,
-        &stem,
+/// Classify a built package: verify EVERY unit module with the external
+/// verifier, then link ALL modules with the host runtime archive in one
+/// invocation and run with the exact Rust-oracle args.
+fn classify_built_llvm(
+    file: &Path,
+    idx: usize,
+    temp_root: &Path,
+    toolchain: &LlvmToolchain,
+    build: &faber_cli::package::PackageLlvmBuild,
+) -> LlvmE2eResult {
+    let stem = file
+        .file_stem()
+        .and_then(|name| name.to_str())
+        .unwrap_or("exemplum");
+    let modules = &build.manifest.modules;
+    if let Some(verifier) = toolchain.verifier {
+        for module in modules {
+            if let Err(reason) = verify_llvm(verifier, module) {
+                return llvm_result(
+                    file,
+                    LlvmTier::LlvmEmitted,
+                    LlvmEmissionBucket::VerifierFailed,
+                    format!(
+                        "LLVM text emitted to {}; verifier failed: {reason}",
+                        module.display()
+                    ),
+                );
+            }
+        }
+        let oracle_args = rust_oracle(file).run_args();
+        let run_probe = super::llvm_runtime::run_llvm_modules_with_args(
+            modules,
+            temp_root,
+            &format!("{idx:03}-{stem}"),
+            file,
+            oracle_args,
+        );
+        return classify_llvm_run_tier(
+            file,
+            &build.manifest.entry_module,
+            verifier,
+            LlvmEmissionBucket::VerifierValid,
+            run_probe,
+        );
+    }
+    llvm_result(
         file,
-    );
-    classify_llvm_run_tier(
-        file,
-        &entry_module.llvm_path,
-        LlvmVerifier::LlvmAs,
-        LlvmEmissionBucket::VerifierValid,
-        run_probe,
+        LlvmTier::LlvmEmitted,
+        LlvmEmissionBucket::Emitted,
+        format!(
+            "LLVM text emitted to {}; verifier unavailable",
+            build.manifest.entry_module.display()
+        ),
     )
 }
 
@@ -884,4 +908,244 @@ impl LlvmVerifier {
             LlvmVerifier::Opt => "opt -disable-output",
         }
     }
+}
+
+/// Captured process outcome for one Rust-oracle lane run.
+struct Stage8ProcessOutcome {
+    exit_code: Option<i32>,
+    stdout: String,
+    stderr: String,
+}
+
+/// S8.6/S8.7 ratchet: the Stage 8-owned corpus families — root entry variants
+/// (S8.1), CLI programs (S8.2), and the local-import package proof (S8.4) —
+/// must pass through the product package-to-LLVM builder
+/// (`faber/src/package/llvm.rs`) with oracle-matching exit/stdout in BOTH the
+/// Rust oracle lane and the LLVM host lane. Any row here is a Stage 8 gap: the
+/// pairwise gap ledger must stay free of these paths.
+#[test]
+#[ignore = "slow LLVM host build+link+run; run: cargo test -p exempla --lib stage8_entry_cli_package_builder_parity -- --ignored --nocapture"]
+fn stage8_entry_cli_package_builder_parity() {
+    const STAGE8_FAMILIES: &[&str] = &[
+        // S8.1 root entry variants: ordinary, module-scope, args, exit, declaration-only.
+        "incipit/incipit.fab",
+        "incipit/salve-munde.fab",
+        "incipit/functionibus.fab",
+        "argumenta/argumenta.fab",
+        "exitus/exitus.fab",
+        "curata/curata.fab",
+        "fragilis/fragilis.fab",
+        // S8.2 CLI programs.
+        "cli/cli.fab",
+        "operandus/operandus.fab",
+        "optio/optio.fab",
+        // S8.4 local imports (multi-module through the builder).
+        "importa/importa.fab",
+    ];
+
+    let corpus_root = crate::paths::corpus_dir();
+    let paths = STAGE8_FAMILIES
+        .iter()
+        .map(|rel| corpus_root.join(rel))
+        .collect::<Vec<_>>();
+    for path in &paths {
+        assert!(
+            path.is_file(),
+            "missing Stage 8 fixture: {}",
+            path.display()
+        );
+        let oracle = rust_oracle(path);
+        assert!(
+            oracle.is_executable(),
+            "Stage 8 fixture {} must be executable",
+            path.display()
+        );
+    }
+    let temp_guard = make_temp_root();
+    let temp_root = temp_guard.join("stage8-builder-parity");
+    std::fs::create_dir_all(&temp_root).expect("cannot create Stage 8 temp root");
+
+    // Rust oracle lane: the behavioral authority for exit/stdout.
+    let rust = stage8_rust_lane(&corpus_root, &paths, &temp_root.join("rust"));
+
+    // LLVM host lane: every family fixture routes through the builder.
+    let toolchain = detect_llvm_toolchain();
+    assert!(
+        toolchain.is_available(),
+        "Stage 8 builder parity requires llvm-as or opt"
+    );
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::LlvmText)
+            .with_dev_stdlib(),
+    );
+    let mut failures = Vec::new();
+    for (idx, path) in paths.iter().enumerate() {
+        let relative = path
+            .strip_prefix(&corpus_root)
+            .expect("corpus path")
+            .to_string_lossy()
+            .into_owned();
+        let result = classify_llvm_exemplum(&session, path, idx, &temp_root, &toolchain);
+        let Some(probe) = &result.run_probe else {
+            failures.push(format!(
+                "{relative}: no LLVM run probe (tier {:?}, bucket {:?}): {}",
+                result.tier, result.bucket, result.reason
+            ));
+            continue;
+        };
+        if let Err(issue) = check_stage8_pair(
+            relative.as_str(),
+            rust_oracle(path),
+            rust.get(&relative),
+            probe,
+            path,
+        ) {
+            failures.push(issue);
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "Stage 8 builder parity failures:\n{}",
+        failures.join("\n")
+    );
+}
+
+/// Build and run the Rust oracle lane for a small fixture set (the Stage 8
+/// families): per-fixture codegen, one batched workspace build, run with the
+/// exact oracle args.
+fn stage8_rust_lane(
+    corpus_root: &Path,
+    paths: &[PathBuf],
+    temp_root: &Path,
+) -> BTreeMap<String, Stage8ProcessOutcome> {
+    let compiler = radix::Compiler::new(radix::Config::default());
+    let target = super::common::shared_target_dir(temp_root);
+    let mut jobs = Vec::new();
+    for (index, path) in paths.iter().enumerate() {
+        let relative = path
+            .strip_prefix(corpus_root)
+            .expect("corpus path")
+            .to_string_lossy()
+            .into_owned();
+        let code = super::rust::compile_rust_exemplum(&compiler, path, corpus_root)
+            .unwrap_or_else(|reason| panic!("Rust oracle compile failed for {relative}: {reason}"));
+        let code =
+            radix::tool::format_generated_code(radix::codegen::Target::Rust, &code).unwrap_or(code);
+        let stem = path
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .unwrap_or("exemplum");
+        let member = format!("rust-{index:03}-{stem}");
+        let package = format!("parity_{index:03}_{stem}").replace('-', "_");
+        super::common::write_rust_workspace_member(
+            &temp_root.join(&member),
+            &package,
+            &super::rust::rust_member_code(path, &code),
+        );
+        jobs.push((relative, package, member));
+    }
+    let members = jobs
+        .iter()
+        .map(|(_, _, member)| member.clone())
+        .collect::<Vec<_>>();
+    let manifest = super::common::write_rust_workspace_root(temp_root, &members);
+    let mut build = Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()));
+    build
+        .arg("build")
+        .arg("--manifest-path")
+        .arg(manifest)
+        .env("CARGO_TARGET_DIR", &target);
+    let status = super::common::command_status_with_timeout(&mut build, Duration::from_secs(900))
+        .expect("cannot execute batched Rust oracle build");
+    assert!(status.success(), "batched Rust oracle build failed");
+    jobs.into_iter()
+        .map(|(relative, package, _member)| {
+            let mut command = Command::new(target.join(format!("debug/{package}")));
+            command.args(rust_oracle(&corpus_root.join(&relative)).run_args());
+            let output = super::common::command_output_with_timeout(&mut command, Duration::from_secs(20))
+                .unwrap_or_else(|error| panic!("cannot run Rust oracle {relative}: {error}"));
+            (
+                relative,
+                Stage8ProcessOutcome {
+                    exit_code: output.status.code(),
+                    stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+                    stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+                },
+            )
+        })
+        .collect()
+}
+
+/// Oracle + rust-lane + LLVM-lane parity for one Stage 8 family fixture: exit
+/// code against the oracle contract and stdout against the sibling `.expected`
+/// (when present) or the rust lane (cross-lane equality).
+fn check_stage8_pair(
+    relative: &str,
+    oracle: RustOracleOutcome,
+    rust: Option<&Stage8ProcessOutcome>,
+    llvm: &LlvmRunProbe,
+    fab_path: &Path,
+) -> Result<(), String> {
+    let Some(rust) = rust else {
+        return Err(format!("{relative}: rust oracle outcome missing"));
+    };
+    let expected_exit = match oracle {
+        RustOracleOutcome::RunSuccess { exit_code, .. }
+        | RustOracleOutcome::DeclarationOnly { exit_code, .. }
+        | RustOracleOutcome::ExpectedNonzeroExit { exit_code, .. } => Some(exit_code),
+        RustOracleOutcome::ExpectedRuntimeFailure { stderr_contains, .. } => {
+            if rust.exit_code == Some(0) || !rust.stderr.contains(stderr_contains) {
+                return Err(format!(
+                    "{relative}: rust lane failed the runtime-failure contract"
+                ));
+            }
+            if llvm.exit_code == Some(0) || !llvm.stderr.contains(stderr_contains) {
+                return Err(format!(
+                    "{relative}: LLVM lane failed the runtime-failure contract (exit {:?})",
+                    llvm.exit_code
+                ));
+            }
+            return Ok(());
+        }
+        RustOracleOutcome::ExpectedCompileFailure { .. }
+        | RustOracleOutcome::ExplicitWrongLane { .. } => {
+            return Err(format!("{relative}: unexpected non-executable oracle"));
+        }
+    };
+    if rust.exit_code != expected_exit {
+        return Err(format!(
+            "{relative}: rust lane exit {:?} != oracle exit {:?}",
+            rust.exit_code, expected_exit
+        ));
+    }
+    if llvm.exit_code != expected_exit {
+        return Err(format!(
+            "{relative}: LLVM lane exit {:?} != oracle exit {:?}",
+            llvm.exit_code, expected_exit
+        ));
+    }
+    let rust_stdout = normalize_pairwise_output(&rust.stdout);
+    let llvm_stdout = normalize_pairwise_output(&llvm.stdout);
+    // Mirror the pairwise harness exactly: the sibling `.expected` file is
+    // compared as raw bytes (trailing newline preserved via
+    // `normalize_pairwise_output`); without one, the lanes must agree.
+    if let Some(expected) = fs::read(fab_path.with_extension("expected")).ok() {
+        let expected = normalize_pairwise_output(&String::from_utf8_lossy(&expected));
+        if rust_stdout != expected {
+            return Err(format!(
+                "{relative}: rust lane stdout {rust_stdout:?} != .expected {expected:?}"
+            ));
+        }
+        if llvm_stdout != expected {
+            return Err(format!(
+                "{relative}: LLVM lane stdout {llvm_stdout:?} != .expected {expected:?}"
+            ));
+        }
+    } else if rust_stdout != llvm_stdout {
+        return Err(format!(
+            "{relative}: rust stdout {rust_stdout:?} != LLVM stdout {llvm_stdout:?}"
+        ));
+    }
+    Ok(())
 }
