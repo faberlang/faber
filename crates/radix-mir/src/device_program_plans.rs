@@ -40,6 +40,7 @@
 use crate::abi::{
     collection_op_contract, CollectionOpContract, MirAbiError, MirKernelResource,
     MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature,
+    MAX_STORAGE_BUFFERS_PER_KERNEL,
 };
 use crate::device_program::{Binding, BufferRole, DeviceProgram, DeviceResource, KernelUnit};
 use crate::kernel_plan::{CollectionKernelPlan, MatMulShapes, SharedMemoryLayout};
@@ -160,6 +161,23 @@ pub fn kernel_plan_for_function(
     signature: &MirKernelSignature,
     validation: &MirValidationContext<'_>,
 ) -> Result<Option<CollectionKernelPlan>, PlanMappingError> {
+    // A kernel whose storage-buffer binding count exceeds the per-kernel
+    // maximum cannot be emitted as ONE kernel (Metal's `[[buffer(N)]]`
+    // attribute allows bindings 0..=30). The whole-function plan is refused
+    // with a typed diagnostic so the callers (faber, both emitters) fall
+    // through to the decomposition path, which splits the body into
+    // budget-fitting kernels — never a silent Elementwise floor.
+    let buffer_count = signature
+        .resources()
+        .filter(|resource| resource.kind == MirKernelResourceKind::StorageBuffer)
+        .count();
+    if buffer_count > MAX_STORAGE_BUFFERS_PER_KERNEL {
+        return Err(PlanMappingError::mapping(format!(
+            "kernel storage-buffer count {buffer_count} exceeds the \
+             {MAX_STORAGE_BUFFERS_PER_KERNEL}-buffer binding maximum; \
+             the decomposition must split the body"
+        )));
+    }
     // Scan ALL statements: the kernel body's plan is decided by its complete
     // collection-op set, never by the first matching statement (N3.2).
     let ops = crate::collection_ops::collection_ops_for_function(function);
@@ -564,7 +582,7 @@ fn tensor_element_ty(
 /// scalar-return lane is f32 end-to-end (the fixture returns f32 and its
 /// upstream seed is f32), so it never enters this arm. Non-scalar,
 /// non-tensor layouts stay fail-closed with a typed diagnostic.
-fn data_flow_element_ty_and_count(
+pub(crate) fn data_flow_element_ty_and_count(
     ty: MirType,
     validation: &MirValidationContext<'_>,
 ) -> Result<(MirType, u64), PlanMappingError> {
@@ -1022,7 +1040,30 @@ pub fn transformer_subchain_signature_for_emission_with_source(
         &bound,
         source,
     )?;
+    // The transformer dispatch must cover EVERY output's extent — the union
+    // (max) over the recipe output and the folded elementwise tail's
+    // additional consumed outputs (the keep-dims SumAxis shape: a REDUCED
+    // `[2]` recipe output with full-shape `[2,8]` tail outputs must dispatch
+    // 16 threads, never the reduced 2 — a reduced-only dispatch leaves 14
+    // elements of each tail output unwritten). The recipe arm writes its
+    // reduced output at the flat index and the tuple tail guards each write
+    // by its own extent, so the union dispatch never overruns the smaller
+    // recipe buffer (R6 P1, mirroring the elementwise multi-output union).
+    apply_transformer_union_dispatch(&mut signature);
     Ok(signature)
+}
+
+/// Set a transformer subchain signature's dispatch to the union of its
+/// output extents: the recipe output plus every additional consumed output
+/// (the R6 P1 per-output-guard contract the elementwise multi-output ABI
+/// already applies). Same-shape recipes (softmax / layer-norm) keep their
+/// full-shape dispatch; the keep-dims SumAxis tail lifts it to the full
+/// elementwise tail extent.
+fn apply_transformer_union_dispatch(signature: &mut MirKernelSignature) {
+    let union = signature
+        .output_resources()
+        .fold(0u64, |acc, output| acc.max(output.element_count));
+    signature.dispatch_size.x = union;
 }
 
 /// The shared tail of the subchain emission signatures: the data-flow

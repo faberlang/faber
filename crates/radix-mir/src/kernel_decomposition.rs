@@ -47,8 +47,10 @@
 //! AIR node or relowers semantics.
 
 use crate::device_program_plans::{
-    is_elementwise_collection_op, is_recipe_op, resolve_subchain_plan, PlanMappingError,
+    data_flow_element_ty_and_count, is_elementwise_collection_op, is_recipe_op,
+    resolve_subchain_plan, PlanMappingError,
 };
+use crate::abi::MAX_STORAGE_BUFFERS_PER_KERNEL;
 use crate::kernel_plan::CollectionKernelPlan;
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlock, MirFunction,
@@ -174,6 +176,15 @@ pub fn decompose_kernel_function(
         slices.push(current);
     }
 
+    // The per-kernel storage-buffer budget: a whole body whose emission
+    // signature exceeds it (train_step_bert_linear: 24 tensor params + the
+    // lr scalar + a 12-tuple return = 37 buffers; Metal's `[[buffer(N)]]`
+    // maximum is 31) cannot be emitted as ONE kernel. An elementwise-only
+    // body splits into consecutive elementwise sub-slices so every subchain
+    // kernel fits the budget, preserving the plan semantics (the carried
+    // data-flow edges between the subchains carry the same values).
+    let slices = split_oversized_elementwise_body(function, block, slices, validation)?;
+
     // Build the subchains. `written` records each subchain's produced
     // locals so the data-flow edges can be derived. The subchains preserve
     // the source local tables, so `inputs` (each subchain's external reads,
@@ -295,6 +306,475 @@ pub fn decompose_kernel_function(
     }
 
     Ok(KernelDecomposition { subchains })
+}
+
+/// Split an elementwise-only body whose whole-function storage-buffer count
+/// exceeds [`MAX_STORAGE_BUFFERS_PER_KERNEL`] into consecutive elementwise
+/// sub-slices, each with an emission signature at or under the budget.
+///
+/// Only the single-slice elementwise-only shape splits (the whole-function
+/// plan gate in `kernel_plan_for_function` routes an oversized body here):
+/// the body has no recipe op, so every sub-slice stays elementwise-only and
+/// the D-2a consumed-output pass decides each subchain's output set.
+///
+/// # Split structure
+///
+/// The statement stream is partitioned at the FIRST return-tuple
+/// field-writing statement (a statement whose destination is one of the
+/// function's return-tuple field locals):
+///
+/// 1. **Pre sub-slices** — the statements before the first field-writing
+///    statement (the `train_step` fills + scaled-grad muls). They produce
+///    the intermediate values (the scaled grads) and never alias the
+///    result-tuple output slots, so they are split greedily by the buffer
+///    budget alone.
+/// 2. **Field sub-slices** — the field-writing statements grouped in
+///    full-tuple order, plus (in the LAST sub-slice) the source return
+///    assembly (the tuple Construct + Return). Grouping the field writers
+///    separately keeps each field subchain's output-set tuple indices
+///    aligned with the full result-tuple indices, so the caller's
+///    result-tuple output slots (the S5-U5 `update_output` aliasing) stay
+///    correct: an intermediate field subchain whose outputs are fields
+///    `0..=k` aliases the params `0..=k` exactly, and the last subchain
+///    (which keeps the source return assembly) aliases the params whose
+///    update statements it carries.
+///
+/// # Errors
+/// Returns [`PlanMappingError`] when the body exceeds the budget but cannot
+/// be split (no return-tuple fields written in the body, or a statement
+/// after the first field writer that is neither a field writer nor part of
+/// the return assembly).
+fn split_oversized_elementwise_body(
+    function: &MirFunction,
+    block: &MirBlock,
+    slices: Vec<Vec<usize>>,
+    validation: &MirValidationContext<'_>,
+) -> Result<Vec<Vec<usize>>, PlanMappingError> {
+    // Only the single-slice elementwise-only shape splits: a recipe-bearing
+    // slice resolves contract-shaped signatures (smaller counts) and the
+    // whole-function budget gate only routes an oversized ELEMENTWISE body
+    // to the decomposition path.
+    if slices.len() != 1 {
+        return Ok(slices);
+    }
+    let indices = slices[0].clone();
+    if indices.iter().any(|&index| {
+        matches!(
+            crate::collection_ops::statement_collection_op(&block.statements[index]),
+            Some(op) if is_recipe_op(op)
+        )
+    }) {
+        return Ok(slices);
+    }
+
+    // The whole-body storage-buffer count — the same shape the faber /
+    // emitters build (every non-vacuum param is an input; a tuple return
+    // binds one output per tuple element, a scalar return one buffer) —
+    // decides whether a split is needed at all. Computed from the typed
+    // facts directly (the ABI synthesis applies target-entry storage
+    // admission, which test fixtures with host-owned tensors do not meet).
+    let input_count = function
+        .params
+        .iter()
+        .filter(|param| !crate::abi::is_vacuum(param.ty, validation))
+        .count();
+    let output_count = match validation.types.get(function.return_ty.semantic_id()) {
+        Type::Tuple(elements) if !elements.is_empty() => elements.len(),
+        _ => 1,
+    };
+    let whole_count = input_count + output_count;
+    if whole_count <= MAX_STORAGE_BUFFERS_PER_KERNEL {
+        return Ok(slices);
+    }
+
+    let n = indices.len();
+    // The return-tuple field locals in full-tuple order (local- or
+    // temp-return forms both resolve; `None` when the source does not
+    // return an ordered plain-local tuple).
+    let Some(fields) = return_tuple_field_locals(function) else {
+        return Err(PlanMappingError::mapping(format!(
+            "elementwise body storage-buffer count {whole_count} exceeds the \
+             {MAX_STORAGE_BUFFERS_PER_KERNEL}-buffer binding maximum and the body \
+             does not return an ordered plain-local tuple the split can preserve"
+        )));
+    };
+    let field_set: BTreeSet<MirLocalId> = fields.iter().copied().collect();
+
+    // Per-statement written local, read locals, and the temps a cut must
+    // not separate from their defining call.
+    let written_at: Vec<Option<MirLocalId>> = indices
+        .iter()
+        .map(|&index| crate::read_analysis::statement_destination(&block.statements[index]))
+        .collect();
+    let reads_at: Vec<Vec<MirLocalId>> = indices
+        .iter()
+        .map(|&index| {
+            let mut read = crate::read_analysis::statement_read_locals(&block.statements[index]);
+            read.sort_unstable();
+            read.dedup();
+            read
+        })
+        .collect();
+    let (temps_defined_at, temps_referenced_at): (Vec<BTreeSet<MirTempId>>, Vec<BTreeSet<MirTempId>>) =
+        indices
+            .iter()
+            .map(|&index| statement_temp_sets(&block.statements[index]))
+            .collect();
+
+    // suffix_reads[k] = the union of reads at positions >= k (the locals a
+    // statement range's writes are consumed by when the range ends at k).
+    let mut suffix_reads: Vec<BTreeSet<MirLocalId>> = Vec::with_capacity(n + 1);
+    let mut suffix = BTreeSet::new();
+    for i in (0..n).rev() {
+        suffix.extend(reads_at[i].iter().copied());
+        suffix_reads.push(suffix.clone());
+    }
+    suffix_reads.push(BTreeSet::new());
+    suffix_reads.reverse();
+
+    // The first field-writing statement. The statements before it are the
+    // "pre" range; the statements from it onward are the field range (field
+    // writers grouped in order, with the return assembly at the tail).
+    let Some(first_field_raw) = indices.iter().position(|&index| {
+        written_at
+            .get(index)
+            .and_then(|written| *written)
+            .is_some_and(|local| field_set.contains(&local))
+    }) else {
+        return Err(PlanMappingError::mapping(format!(
+            "elementwise body storage-buffer count {whole_count} exceeds the \
+             {MAX_STORAGE_BUFFERS_PER_KERNEL}-buffer binding maximum and the body \
+             writes none of its return-tuple fields (the split cannot preserve \
+             the result-tuple output semantics)"
+        )));
+    };
+    // Backtrack the boundary to include the temp-producing calls of the
+    // field writers (the real lowering's call-then-forward pairs must stay
+    // together: a temp defined in the pre range and referenced by a field
+    // writer in the field range would make every pre-range cut invalid).
+    let mut first_field = first_field_raw;
+    for index in 0..first_field_raw {
+        for &temp in &temps_defined_at[index] {
+            let feeds_field_range = (first_field_raw..n)
+                .any(|later| temps_referenced_at[later].contains(&temp));
+            if feeds_field_range {
+                first_field = first_field.min(index);
+            }
+        }
+    }
+
+    // The pre range must be entirely before the first field writer, and the
+    // field range's LOCAL-destination statements must be return-tuple field
+    // writers or the return assembly (the tuple Construct). Temp-writing
+    // collection calls (the real lowering's call-then-forward pairs) write
+    // no local and contribute no output ordering, so they are free.
+    for &index in indices.iter().skip(first_field) {
+        let Some(written) = written_at[index] else {
+            continue;
+        };
+        if field_set.contains(&written) {
+            continue;
+        }
+        let is_return_assembly = matches!(
+            block.statements[index].kind,
+            MirStatementKind::Construct {
+                aggregate: MirAggregate { kind: MirAggregateKind::Tuple, .. },
+                ..
+            }
+        );
+        if !is_return_assembly {
+            return Err(PlanMappingError::mapping(format!(
+                "elementwise body storage-buffer count {whole_count} exceeds the \
+                 {MAX_STORAGE_BUFFERS_PER_KERNEL}-buffer binding maximum and a \
+                 statement after the first return-tuple field writer writes a \
+                 non-field local outside the return assembly (the split cannot \
+                 group the result-tuple output slots)"
+            )));
+        }
+    }
+
+    // The intermediate-slice validity predicate: the range [start..end)
+    // fits the budget, exposes at least the minimum consumed-output count,
+    // carries no non-kernel-surface consumed local, and never separates a
+    // temp definition from its forward.
+    let intermediate_valid = |start: usize, end: usize| -> bool {
+        if !temp_closed_range(&temps_defined_at, &temps_referenced_at, start, end) {
+            return false;
+        }
+        let (params, written) = range_params_and_written(&written_at, &reads_at, start, end);
+        let consumed: BTreeSet<MirLocalId> = written
+            .intersection(&suffix_reads[end])
+            .copied()
+            .collect();
+        let consumed_count = consumed.len();
+        if consumed_count == 0 {
+            return false;
+        }
+        // A tuple-return source's intermediate subchain must expose at
+        // least TWO consumed outputs: a single-output intermediate returns
+        // nothing (Return(None)) with the source's tuple return type, which
+        // the ABI would misread as the FULL result tuple.
+        if fields.len() > 1 && consumed_count < 2 {
+            return false;
+        }
+        if params.len() + consumed_count > MAX_STORAGE_BUFFERS_PER_KERNEL {
+            return false;
+        }
+        // Every consumed local must bind as a kernel buffer (a shape list
+        // or vacua seed cut across a boundary would fail the signature).
+        consumed.iter().all(|&local| {
+            crate::local_ty::local_ty(function, local)
+                .map_or(false, |ty| data_flow_element_ty_and_count(ty, validation).is_ok())
+        })
+    };
+
+    // The LAST-sub-slice validity for the FIELD range: [start..n) keeps the
+    // source return assembly, so its signature carries the FULL result-tuple
+    // output count and it must write at least one return-tuple field (the
+    // caller's result-tuple output slots alias only the params its own
+    // update statements read).
+    let last_field_valid = |start: usize| -> bool {
+        let (params, written) = range_params_and_written(&written_at, &reads_at, start, n);
+        let fields_written = written.intersection(&field_set).count();
+        fields_written >= 1 && params.len() + fields.len() <= MAX_STORAGE_BUFFERS_PER_KERNEL
+    };
+
+    // Split the statement stream: the pre range (before the first field
+    // writer) and the field range (from it onward) are split independently,
+    // greedily closing the largest valid intermediate prefix at each step.
+    // A sub-slice never crosses the pre/field boundary (a mixed subchain's
+    // output-set tuple indices would misalign with the full result-tuple
+    // indices the caller's output slots alias), and a cut always leaves at
+    // least one return-tuple field writer for the last sub-slice (whose
+    // signature keeps the FULL result-tuple output count and must write at
+    // least one field for the caller's alias to fire).
+    let field_positions: Vec<usize> = (first_field..n)
+        .filter(|&index| written_at[index].is_some_and(|local| field_set.contains(&local)))
+        .collect();
+    let Some(&last_field_position) = field_positions.last() else {
+        return Err(PlanMappingError::mapping(format!(
+            "elementwise body storage-buffer count {whole_count} exceeds the \
+             {MAX_STORAGE_BUFFERS_PER_KERNEL}-buffer binding maximum and the body \
+             writes none of its return-tuple fields (the split cannot preserve \
+             the result-tuple output semantics)"
+        )));
+    };
+
+    let mut split: Vec<Vec<usize>> = Vec::new();
+    let mut start = 0;
+    while start < n {
+        // The field range's tail [start..n) forms the function's LAST
+        // sub-slice when it fits the budget and writes at least one field.
+        if start >= first_field && last_field_valid(start) {
+            split.push(indices[start..n].to_vec());
+            return Ok(split);
+        }
+        // The largest valid intermediate prefix [start..end): never crosses
+        // the pre/field boundary, and always leaves at least one
+        // field-writing statement for the last sub-slice.
+        let max_end = if start < first_field {
+            first_field
+        } else {
+            last_field_position
+        };
+        let mut end = max_end.min(n.saturating_sub(1));
+        let mut best: Option<usize> = None;
+        while end > start {
+            if intermediate_valid(start, end) {
+                best = Some(end);
+                break;
+            }
+            end -= 1;
+        }
+        let Some(end) = best else {
+            return Err(PlanMappingError::mapping(format!(
+                "elementwise body storage-buffer count {whole_count} exceeds the \
+                 {MAX_STORAGE_BUFFERS_PER_KERNEL}-buffer binding maximum and the \
+                 statement stream cannot be split within the budget"
+            )));
+        };
+        split.push(indices[start..end].to_vec());
+        start = end;
+    }
+    Ok(split)
+}
+
+/// The temps a statement DEFINES (a temp destination) and REFERENCES (a temp
+/// operand) — a cut must never separate a collection call's temp result
+/// from the forward that copies it into a local (the local-based read
+/// analysis cannot see the temp linkage, so the splitter enforces it
+/// directly).
+fn statement_temp_sets(statement: &MirStatement) -> (BTreeSet<MirTempId>, BTreeSet<MirTempId>) {
+    let mut defined = BTreeSet::new();
+    let mut referenced = BTreeSet::new();
+    match &statement.kind {
+        MirStatementKind::RuntimeCall { destination, call, .. } => {
+            if let Some(place) = destination {
+                if let MirPlaceBase::Temp(temp) = place.base.clone() {
+                    defined.insert(temp);
+                }
+            }
+            for arg in &call.args {
+                if let Some(temp) = operand_temp(arg) {
+                    referenced.insert(temp);
+                }
+            }
+        }
+        MirStatementKind::Assign { value, .. } => {
+            if let Some(temp) = value_temp(value) {
+                referenced.insert(temp);
+            }
+        }
+        MirStatementKind::Call { destination, args, .. } => {
+            if let Some(place) = destination {
+                if let MirPlaceBase::Temp(temp) = place.base.clone() {
+                    defined.insert(temp);
+                }
+            }
+            for arg in args {
+                if let Some(temp) = operand_temp(arg) {
+                    referenced.insert(temp);
+                }
+            }
+        }
+        MirStatementKind::Construct { destination, aggregate, .. } => {
+            if let MirPlaceBase::Temp(temp) = destination.base.clone() {
+                defined.insert(temp);
+            }
+            let MirAggregateFields::Ordered(items) = &aggregate.fields else {
+                return (defined, referenced);
+            };
+            for item in items {
+                if let MirAggregateItem::Operand(operand) = item {
+                    if let Some(temp) = operand_temp(operand) {
+                        referenced.insert(temp);
+                    }
+                }
+            }
+        }
+    }
+    (defined, referenced)
+}
+
+/// Whether a range [start..end) is temp-closed: every temp referenced in the
+/// range is defined in it, and every temp defined in it is referenced only
+/// inside it (a temp defined in the range but referenced after it would be
+/// undefined in the following sub-slice's synthetic).
+fn temp_closed_range(
+    temps_defined_at: &[BTreeSet<MirTempId>],
+    temps_referenced_at: &[BTreeSet<MirTempId>],
+    start: usize,
+    end: usize,
+) -> bool {
+    let mut defined = BTreeSet::new();
+    let mut referenced = BTreeSet::new();
+    for slot in start..end {
+        defined.extend(temps_defined_at[slot].iter().copied());
+        referenced.extend(temps_referenced_at[slot].iter().copied());
+    }
+    if !referenced.is_subset(&defined) {
+        return false;
+    }
+    for slot in end..temps_defined_at.len() {
+        if temps_referenced_at[slot].iter().any(|temp| defined.contains(temp)) {
+            return false;
+        }
+    }
+    true
+}
+
+/// The data-flow params (read locals not written) and the written locals of
+/// a statement range [start..end).
+fn range_params_and_written(
+    written_at: &[Option<MirLocalId>],
+    reads_at: &[Vec<MirLocalId>],
+    start: usize,
+    end: usize,
+) -> (BTreeSet<MirLocalId>, BTreeSet<MirLocalId>) {
+    let mut written = BTreeSet::new();
+    for slot in start..end {
+        if let Some(local) = written_at[slot] {
+            written.insert(local);
+        }
+    }
+    let mut params = BTreeSet::new();
+    for slot in start..end {
+        for &local in &reads_at[slot] {
+            if !written.contains(&local) {
+                params.insert(local);
+            }
+        }
+    }
+    (params, written)
+}
+
+/// The temp operand of an operand, if the operand is a plain temp.
+fn operand_temp(operand: &MirOperand) -> Option<MirTempId> {
+    match operand {
+        MirOperand::Temp(temp) => Some(*temp),
+        MirOperand::Place(place) => match place.base.clone() {
+            MirPlaceBase::Temp(temp) => Some(temp),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// The temp operand of a value, if the value is a plain temp forward.
+fn value_temp(value: &crate::MirValue) -> Option<MirTempId> {
+    match &value.kind {
+        crate::MirValueKind::Operand(operand) => operand_temp(operand),
+        _ => None,
+    }
+}
+
+/// The return-tuple field locals in full-tuple order, for a function whose
+/// return is an ordered non-spread tuple `Construct` of plain local places —
+/// resolving the local-return and the temp-return (the real lowering's
+/// shape: the terminator returns a tuple TEMP built by a tuple `Construct`).
+/// `None` when the function does not return such a tuple.
+fn return_tuple_field_locals(function: &MirFunction) -> Option<Vec<MirLocalId>> {
+    if function.blocks.len() != 1 {
+        return None;
+    }
+    let block = &function.blocks[0];
+    // The returned place base (local or temp) of the terminator.
+    let MirTerminatorKind::Return(Some(operand)) = &block.terminator.kind else {
+        return None;
+    };
+    let base = match operand {
+        MirOperand::Place(place) => place.base.clone(),
+        MirOperand::Temp(temp) => MirPlaceBase::Temp(*temp),
+        _ => return None,
+    };
+    let destination_matches = |place: &MirPlace| place.base == base;
+    block.statements.iter().find_map(|statement| {
+        let MirStatementKind::Construct {
+            destination,
+            aggregate,
+        } = &statement.kind
+        else {
+            return None;
+        };
+        if !destination_matches(destination) {
+            return None;
+        }
+        if aggregate.kind != MirAggregateKind::Tuple {
+            return None;
+        }
+        let MirAggregateFields::Ordered(items) = &aggregate.fields else {
+            return None;
+        };
+        items
+            .iter()
+            .map(|item| match item {
+                MirAggregateItem::Operand(MirOperand::Place(place)) => {
+                    crate::read_analysis::place_local_base(place)
+                }
+                _ => None,
+            })
+            .collect::<Option<Vec<_>>>()
+    })
 }
 
 impl KernelDecomposition {

@@ -15,10 +15,10 @@ use crate::kernel_plan::{
 };
 use crate::layout::MirTensorStorageLayout;
 use crate::{
-    MirBinOp, MirBlock, MirBlockId, MirConstant, MirFunction, MirFunctionId, MirIntrinsic,
-    MirLocal, MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace, MirRuntimeCall,
-    MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind, MirType, MirUnOp, MirValue,
-    MirValueId, MirValueKind,
+    MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBinOp, MirBlock,
+    MirBlockId, MirConstant, MirFunction, MirFunctionId, MirIntrinsic, MirLocal, MirLocalId,
+    MirOperand, MirParam, MirParamMode, MirPlace, MirRuntimeCall, MirStatement, MirStatementKind,
+    MirTerminator, MirTerminatorKind, MirType, MirUnOp, MirValue, MirValueId, MirValueKind,
 };
 use radix_lexer::Span;
 use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeTable};
@@ -1342,6 +1342,229 @@ fn sum_axis_function_resolves_axis_reduction_plan() {
         axis: 1,
     });
     assert!(carried_plan_agrees(&carried, Some(&derived)));
+}
+
+/// The keep-dims SumAxis subchain shape (mirrors `bert_tiny_backward__13`):
+/// `t = sum_axis(x, 1); u = t / divisor; v = fill(x, u); w = x - v;
+/// q = w * w; return (t, w, q)` over `[2,8]` tensors. The recipe output is
+/// the REDUCED `[2]` result while the folded elementwise tail produces the
+/// full-shape `[2,8]` consumed outputs.
+fn keep_dims_sum_axis_tail_function(types: &mut TypeTable) -> MirFunction {
+    let tensor = rank2_tensor_ty(types, [2, 8]);
+    let tuple = MirType::semantic(types.intern(Type::Tuple(vec![tensor.semantic_id(); 3])));
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![
+            MirParam {
+                local: MirLocalId(48),
+                name: None,
+                ty: tensor,
+                mode: MirParamMode::Owned,
+                span: test_span(),
+            },
+            MirParam {
+                local: MirLocalId(63),
+                name: None,
+                ty: tensor,
+                mode: MirParamMode::Owned,
+                span: test_span(),
+            },
+        ],
+        locals: (64..69)
+            .map(|id| MirLocal {
+                id: MirLocalId(id),
+                name: None,
+                ty: tensor,
+                mutable: false,
+                span: test_span(),
+            })
+            .chain(std::iter::once(MirLocal {
+                id: MirLocalId(69),
+                name: None,
+                ty: tuple,
+                mutable: false,
+                span: test_span(),
+            }))
+            .collect(),
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![
+                MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: Some(MirPlace::local(MirLocalId(64))),
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorSumAxis),
+                            args: vec![
+                                MirOperand::Place(MirPlace::local(MirLocalId(48))),
+                                MirOperand::Constant(MirConstant::Int(1)),
+                            ],
+                            return_ty: tensor,
+                        },
+                    },
+                    span: test_span(),
+                },
+                tensor_kernel_collection_call(
+                    MirCollectionOp::TensorDiv,
+                    &[64, 63],
+                    65,
+                    tensor,
+                ),
+                tensor_kernel_collection_call(MirCollectionOp::TensorFill, &[48, 65], 66, tensor),
+                tensor_kernel_collection_call(MirCollectionOp::TensorSub, &[48, 66], 67, tensor),
+                tensor_kernel_collection_call(MirCollectionOp::TensorMul, &[67, 67], 68, tensor),
+                MirStatement {
+                    kind: MirStatementKind::Construct {
+                        destination: MirPlace::local(MirLocalId(69)),
+                        aggregate: MirAggregate {
+                            kind: MirAggregateKind::Tuple,
+                            ty: tuple,
+                            fields: MirAggregateFields::Ordered(
+                                [64u32, 67, 68]
+                                    .into_iter()
+                                    .map(|id| {
+                                        MirAggregateItem::Operand(MirOperand::Place(
+                                            MirPlace::local(MirLocalId(id)),
+                                        ))
+                                    })
+                                    .collect(),
+                            ),
+                        },
+                    },
+                    span: test_span(),
+                },
+            ],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(69),
+                )))),
+                span: test_span(),
+            },
+            span: test_span(),
+        }],
+        return_ty: tuple,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: test_span(),
+    }
+}
+
+/// A local-destination collection-call statement (the test fixtures'
+/// elementwise shape).
+fn tensor_kernel_collection_call(
+    op: MirCollectionOp,
+    args: &[u32],
+    destination: u32,
+    ty: MirType,
+) -> MirStatement {
+    MirStatement {
+        kind: MirStatementKind::RuntimeCall {
+            destination: Some(MirPlace::local(MirLocalId(destination))),
+            call: MirRuntimeCall {
+                intrinsic: MirIntrinsic::Collection(op),
+                args: args
+                    .iter()
+                    .map(|&local| MirOperand::Place(MirPlace::local(MirLocalId(local))))
+                    .collect(),
+                return_ty: ty,
+            },
+        },
+        span: test_span(),
+    }
+}
+
+/// R6 (P1) transformer dispatch: a keep-dims SumAxis subchain whose folded
+/// elementwise tail carries full-shape consumed outputs dispatches over the
+/// UNION of the output extents — the reduced `[2]` recipe output plus the
+/// `[2,8]` (16-element) tail outputs — so no tail element is left
+/// unwritten. Same-shape recipes (softmax / layer-norm) keep their
+/// full-shape dispatch.
+#[test]
+fn transformer_subchain_dispatch_covers_the_union_of_output_extents() {
+    let mut types = TypeTable::new();
+    let function = keep_dims_sum_axis_tail_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let signature = transformer_subchain_signature_for_emission(
+        &function,
+        MirCollectionOp::TensorSumAxis,
+        &validation,
+        &[MirLocalId(64), MirLocalId(67), MirLocalId(68)],
+    )
+    .expect("keep-dims SumAxis subchain signature resolves");
+    assert_eq!(
+        signature.dispatch_size.x, 16,
+        "the SumAxis subchain must dispatch over the union (max of the \
+         reduced [2] recipe output and the [2,8] tail outputs), got {:?}",
+        signature.dispatch_size
+    );
+    assert_eq!(
+        signature.output.element_count, 2,
+        "the recipe output keeps the SumAxis-aware reduced count"
+    );
+    assert_eq!(
+        signature.extra_outputs.len(),
+        2,
+        "the folded tail's consumed outputs stay bound as extra outputs"
+    );
+    for extra in &signature.extra_outputs {
+        assert_eq!(extra.element_count, 16, "the tail outputs keep their full shape");
+    }
+
+    // A same-shape transformer recipe (softmax) keeps its full-shape
+    // dispatch — the union equals the recipe output count.
+    let mut softmax_types = TypeTable::new();
+    let softmax = softmax_rank2_function(&mut softmax_types);
+    let softmax_validation = MirValidationContext::new(&softmax_types);
+    let softmax_signature = transformer_subchain_signature_for_emission(
+        &softmax,
+        MirCollectionOp::TensorSoftmax,
+        &softmax_validation,
+        &[MirLocalId(1)],
+    )
+    .expect("softmax subchain signature resolves");
+    assert_eq!(
+        softmax_signature.dispatch_size.x, 16,
+        "a same-shape recipe's union dispatch equals its full output count"
+    );
+}
+
+/// The whole-function plan gate: a kernel signature whose storage-buffer
+/// count exceeds [`MAX_STORAGE_BUFFERS_PER_KERNEL`] (Metal's `[[buffer(N)]]`
+/// maximum, 31) is refused with a typed diagnostic so the callers fall
+/// through to the decomposition split — never a silent Elementwise floor.
+#[test]
+fn kernel_plan_refuses_signature_over_the_buffer_binding_maximum() {
+    let mut types = TypeTable::new();
+    let function = elementwise_function(&mut types);
+    let mut signature = reduction_signature(4, 1, 1);
+    // Bloat the signature to 32 storage buffers: the input + output already
+    // occupy bindings 0 and 1; 30 extra inputs push past the maximum.
+    let element_ty = signature.input.element_ty;
+    for binding in 2..32u32 {
+        signature.extra_inputs.push(MirKernelResource {
+            group: 0,
+            binding,
+            kind: MirKernelResourceKind::StorageBuffer,
+            role: MirKernelResourceRole::Input,
+            access: MirKernelResourceAccess::Read,
+            element_ty,
+            element_count: 4,
+            source_local: None,
+            source_name: None,
+        });
+    }
+    let validation = MirValidationContext::new(&types);
+    let error = kernel_plan_for_function(&function, &signature, &validation)
+        .expect_err("a signature over the binding maximum must be refused");
+    assert!(
+        error.message.contains("binding maximum"),
+        "the diagnostic must name the budget, got: {}",
+        error.message
+    );
 }
 
 #[test]

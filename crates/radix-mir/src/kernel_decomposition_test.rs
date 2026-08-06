@@ -849,6 +849,241 @@ fn elementwise_only_body_is_one_elementwise_subchain() {
     assert_eq!(decomposition.subchains[0].statements, vec![0]);
 }
 
+/// A temp-forward `_dest = %temp` copy (the real lowering's shape: a
+/// collection call writes a temp, then a plain Assign copies it into a
+/// named local).
+fn assign_from_temp(destination: u32, source: MirTempId, ty: MirType) -> MirStatement {
+    MirStatement {
+        kind: MirStatementKind::Assign {
+            place: MirPlace::local(MirLocalId(destination)),
+            value: MirValue {
+                id: MirValueId(destination),
+                kind: MirValueKind::Operand(MirOperand::Temp(source)),
+                ty,
+                span: test_span(),
+            },
+        },
+        span: test_span(),
+    }
+}
+
+/// The `train_step_bert_linear` elementwise shape that trips the
+/// per-kernel storage-buffer budget: 12 `[8]` current params + 12 `[8]`
+/// gradients + an f32 scalar lr = 25 params, 12 scaled-grad muls, 12
+/// subtract updates, and a 12-element tuple return — 37 storage buffers as
+/// ONE kernel, above the 31-buffer binding maximum. Built with the real
+/// lowering's temp shapes (collection calls write temps, the forwards copy
+/// them into locals, and the terminator returns a tuple TEMP built by a
+/// tuple `Construct`).
+fn oversized_elementwise_train_step(types: &mut TypeTable) -> MirFunction {
+    let tensor = rank1_tensor_ty(types, 8);
+    let scalar = scalar_f32_ty(types);
+    let span = test_span();
+    let tuple_ty = MirType::semantic(types.intern(Type::Tuple(vec![tensor.semantic_id(); 12])));
+    let mut params = Vec::with_capacity(25);
+    for id in 0..24u32 {
+        params.push((id, tensor));
+    }
+    params.push((24, scalar));
+    let mut statements = Vec::new();
+    let mut temps = Vec::new();
+    // 12 scaled-grad muls: `%i = tensor_mul(grad_i, lr); s_i = %i`.
+    for i in 0..12u32 {
+        let temp = MirTempId(i);
+        temps.push(MirTemp {
+            id: temp,
+            ty: tensor,
+            span,
+        });
+        statements.push(MirStatement {
+            kind: MirStatementKind::RuntimeCall {
+                destination: Some(MirPlace {
+                    base: MirPlaceBase::Temp(temp),
+                    projections: Vec::new(),
+                }),
+                call: MirRuntimeCall {
+                    intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorMul),
+                    args: vec![
+                        MirOperand::Place(MirPlace::local(MirLocalId(12 + i))),
+                        MirOperand::Place(MirPlace::local(MirLocalId(24))),
+                    ],
+                    return_ty: tensor,
+                },
+            },
+            span,
+        });
+        statements.push(assign_from_temp(30 + i, temp, tensor));
+    }
+    // 12 update subs: `%j = tensor_sub(param_i, s_i); n_i = %j`.
+    for i in 0..12u32 {
+        let temp = MirTempId(12 + i);
+        temps.push(MirTemp {
+            id: temp,
+            ty: tensor,
+            span,
+        });
+        statements.push(MirStatement {
+            kind: MirStatementKind::RuntimeCall {
+                destination: Some(MirPlace {
+                    base: MirPlaceBase::Temp(temp),
+                    projections: Vec::new(),
+                }),
+                call: MirRuntimeCall {
+                    intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorSub),
+                    args: vec![
+                        MirOperand::Place(MirPlace::local(MirLocalId(i))),
+                        MirOperand::Place(MirPlace::local(MirLocalId(30 + i))),
+                    ],
+                    return_ty: tensor,
+                },
+            },
+            span,
+        });
+        statements.push(assign_from_temp(42 + i, temp, tensor));
+    }
+    // The 12-element return-tuple assembly (temp-based, the real shape).
+    let tuple_temp = MirTempId(24);
+    temps.push(MirTemp {
+        id: tuple_temp,
+        ty: tuple_ty,
+        span,
+    });
+    statements.push(MirStatement {
+        kind: MirStatementKind::Construct {
+            destination: MirPlace {
+                base: MirPlaceBase::Temp(tuple_temp),
+                projections: Vec::new(),
+            },
+            aggregate: MirAggregate {
+                kind: MirAggregateKind::Tuple,
+                ty: tuple_ty,
+                fields: MirAggregateFields::Ordered(
+                    (42..54u32)
+                        .map(|id| {
+                            MirAggregateItem::Operand(MirOperand::Place(MirPlace::local(
+                                MirLocalId(id),
+                            )))
+                        })
+                        .collect(),
+                ),
+            },
+        },
+        span,
+    });
+    let mut locals = Vec::with_capacity(54);
+    for id in 0..54u32 {
+        locals.push(MirLocal {
+            id: MirLocalId(id),
+            name: None,
+            ty: tensor,
+            mutable: false,
+            span,
+        });
+    }
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: params
+            .into_iter()
+            .map(|(id, ty)| MirParam {
+                local: MirLocalId(id),
+                name: None,
+                ty,
+                mode: MirParamMode::Owned,
+                span,
+            })
+            .collect(),
+        locals,
+        temps,
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements,
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Temp(tuple_temp))),
+                span,
+            },
+            span,
+        }],
+        return_ty: tuple_ty,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    }
+}
+
+/// The per-kernel storage-buffer budget: an elementwise-only body whose
+/// whole-function binding count exceeds [`MAX_STORAGE_BUFFERS_PER_KERNEL`]
+/// splits into consecutive elementwise sub-slices, each at or under the
+/// budget, with the return assembly kept in the LAST sub-slice.
+#[test]
+fn oversized_elementwise_body_splits_within_the_buffer_budget() {
+    let mut types = TypeTable::new();
+    let function = oversized_elementwise_train_step(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let decomposition = decompose_kernel_function(&function, &validation)
+        .expect("oversized elementwise body decomposes into budget-fitting subchains");
+
+    assert!(
+        decomposition.subchains.len() > 1,
+        "an elementwise body over the 31-buffer maximum must split, got {:?}",
+        decomposition.subchains
+    );
+    // D-2b-2: pre-intern the multi-output subchain tuple return types (the
+    // caller contract `subchain_function` requires, mirroring the faber
+    // decomposition path).
+    let mut subchain_types = TypeTable::from_snapshot(types.snapshot()).expect("live table");
+    decomposition.intern_output_tuple_types(&function, &mut subchain_types);
+    let subchain_validation = validation.with_types(&subchain_types);
+    let subchain_count = decomposition.subchains.len();
+    let tuple_arity = 12u32;
+    for (position, subchain) in decomposition.subchains.iter().enumerate() {
+        assert_eq!(
+            subchain.plan,
+            CollectionKernelPlan::Elementwise,
+            "every split sub-slice stays elementwise-only"
+        );
+        let synthetic =
+            decomposition.subchain_function(&function, position, subchain_validation.types);
+        let outputs = if position + 1 == subchain_count {
+            // The temp-based return keeps the source assembly: the signature
+            // binds the FULL result-tuple count.
+            usize::try_from(tuple_arity).unwrap_or(usize::MAX)
+        } else {
+            subchain.outputs.len()
+        };
+        let buffer_count = synthetic.params.len() + outputs;
+        assert!(
+            buffer_count <= MAX_STORAGE_BUFFERS_PER_KERNEL,
+            "subchain {position} must fit the {MAX_STORAGE_BUFFERS_PER_KERNEL}-buffer budget, \
+             got {buffer_count} ({} params + {outputs} outputs)",
+            synthetic.params.len()
+        );
+    }
+    // The statements partition the source stream in order, and the return
+    // assembly (the final tuple Construct) lives in the LAST sub-slice.
+    let mut seen: Vec<usize> = Vec::new();
+    for subchain in &decomposition.subchains {
+        seen.extend(subchain.statements.iter().copied());
+    }
+    let expected: Vec<usize> = (0..function.blocks[0].statements.len()).collect();
+    assert_eq!(seen, expected, "the split must partition the source statements in order");
+    let last = &decomposition.subchains[subchain_count - 1];
+    assert_eq!(
+        last.statements.last(),
+        Some(&(function.blocks[0].statements.len() - 1)),
+        "the LAST sub-slice keeps the return assembly"
+    );
+    // The data flow is carried: the last sub-slice consumes the pre and
+    // field sub-slices' produced locals.
+    assert!(
+        !last.consumes.is_empty(),
+        "the last sub-slice must consume the earlier sub-slices' outputs"
+    );
+}
+
 #[test]
 fn divergent_data_flow_consumes_multiple_prior_subchains() {
     // s = sum(x); m = mean(x); t = s + m: the two recipe results feed one

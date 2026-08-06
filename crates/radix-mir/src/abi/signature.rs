@@ -1,4 +1,8 @@
-use crate::{MirFunction, MirLayoutKind, MirParam, MirType, MirValidationContext};
+use crate::{
+    MirAggregateFields, MirAggregateItem, MirAggregateKind, MirFunction, MirLayoutKind, MirLocalId,
+    MirOperand, MirParam, MirPlace, MirPlaceBase, MirStatementKind, MirTerminatorKind, MirType,
+    MirValidationContext,
+};
 use radix_lexer::Interner;
 use radix_types::{NumericWidth, Primitive, Type, TypeId};
 
@@ -15,7 +19,7 @@ use super::{
     ERR_INDEXED_VIEW_REQUIRES_INPUT, ERR_INDEXED_VIEW_RETURNS_VACUUM,
     ERR_KERNEL_IO_ELEMENT_MISMATCH, ERR_KERNEL_PARAM_RETURN_MISMATCH,
     ERR_KERNEL_RESOURCE_BINDING_OVERFLOW, ERR_KERNEL_RESULT_TUPLE_REQUIRED,
-    ERR_KERNEL_RESULT_TUPLE_REQUIRES_INPUT,
+    ERR_KERNEL_RESULT_TUPLE_REQUIRES_INPUT, MAX_STORAGE_BUFFERS_PER_KERNEL,
 };
 
 struct IndexedViewKernelContext<'a> {
@@ -143,27 +147,68 @@ impl MirKernelSignature {
         // the multi-output contract — every param is an input and the tuple
         // elements are DISTINCT output resources. Checked before the
         // single-output arms, which would reject the tuple as an aggregate.
-        if !function.params.is_empty() && result_tuple_count(function, validation).is_some() {
-            return Self::multi_output_return_kernel(
+        let signature = if !function.params.is_empty()
+            && result_tuple_count(function, validation).is_some()
+        {
+            Self::multi_output_return_kernel(
                 function,
                 &function.params,
                 validation,
                 interner,
                 allow_host_owned_tensor_entry,
-            );
-        }
-
-        if let Some(interner) = interner {
+            )?
+        } else if let Some(interner) = interner {
             if let Some(signature) = Self::source_named_indexed_view_kernel(
                 function,
                 validation,
                 interner,
                 allow_host_owned_tensor_entry,
             )? {
-                return Ok(signature);
+                signature
+            } else {
+                Self::fallback_kernel_signature(
+                    function,
+                    validation,
+                    Some(interner),
+                    allow_host_owned_tensor_entry,
+                )?
             }
+        } else {
+            Self::fallback_kernel_signature(
+                function,
+                validation,
+                interner,
+                allow_host_owned_tensor_entry,
+            )?
+        };
+        // The per-kernel storage-buffer binding maximum (Metal's
+        // `[[buffer(N)]]` attribute allows bindings 0..=30): a signature over
+        // it cannot be emitted as one kernel, so the synthesis refuses it
+        // fail-closed — the callers (the faber whole-function path, the
+        // emitters' whole-kernel cross-check, the image input resolution)
+        // fall through to the decomposition split.
+        let buffer_count = signature
+            .resources()
+            .filter(|resource| resource.kind == MirKernelResourceKind::StorageBuffer)
+            .count();
+        if buffer_count > MAX_STORAGE_BUFFERS_PER_KERNEL {
+            return Err(MirAbiError::new(format!(
+                "kernel storage-buffer count {buffer_count} exceeds the \
+                 {MAX_STORAGE_BUFFERS_PER_KERNEL}-buffer binding maximum; \
+                 the decomposition must split the body"
+            )));
         }
+        Ok(signature)
+    }
 
+    /// The single-input / multi-input / indexed-view kernel shape dispatch —
+    /// the non-tuple, non-named-param arms of the storage-buffer synthesis.
+    fn fallback_kernel_signature(
+        function: &MirFunction,
+        validation: &MirValidationContext<'_>,
+        interner: Option<&Interner>,
+        allow_host_owned_tensor_entry: bool,
+    ) -> Result<Self, MirAbiError> {
         // S3-A5: a kernel whose body carries a Reduction contract and whose
         // return is a scalar (the mean/sum result) synthesizes the
         // indexed-view reduction signature WITHOUT explicit output/index
@@ -339,6 +384,16 @@ impl MirKernelSignature {
         let extra_inputs = input_resources.into_iter().skip(1).collect();
 
         // Tuple elements → distinct output resources (first → `output`).
+        // The output resources carry the return-tuple construct's field
+        // locals as their `MirLocal` origin (the S5-U1 forward-save
+        // identity): a decomposed source's subchain synthetics share the
+        // source local table, so the (function, local) identity fact lets
+        // the faber cross-kernel unification join a producer subchain's
+        // output slot with a consumer subchain's input slot for the SAME
+        // local — without which an elementwise split's intermediate
+        // outputs would mint distinct PerProgram input buffers
+        // (uninitialized reads / missing once-init values).
+        let return_fields = Self::return_tuple_field_locals(function);
         let mut outputs = Vec::with_capacity(elements.len());
         for (index, element) in elements.iter().enumerate() {
             let element_ty = MirType::semantic(*element);
@@ -355,7 +410,7 @@ impl MirKernelSignature {
                 access: MirKernelResourceAccess::Write,
                 element_ty: view_ty,
                 element_count: view_count,
-                source_local: None,
+                source_local: return_fields.as_ref().and_then(|fields| fields.get(index).copied()),
                 source_name: None,
             });
         }
@@ -386,6 +441,57 @@ impl MirKernelSignature {
         };
         maybe_append_runtime_extent(function, &mut signature, validation);
         Ok(signature)
+    }
+
+    /// The ordered field locals of a kernel's return-tuple `Construct` — the
+    /// locals the result-tuple binds at full-tuple index `i` (the
+    /// local-return and the temp-return shapes both resolve). `None` when
+    /// the function does not return an ordered non-spread tuple of plain
+    /// local places. The multi-output ABI carries these as the output
+    /// resources' `MirLocal` origins (the S5-U1 forward-save identity), so
+    /// the decomposition subchains' cross-kernel unification joins a
+    /// producer and a consumer slot for the same local.
+    fn return_tuple_field_locals(function: &MirFunction) -> Option<Vec<MirLocalId>> {
+        if function.blocks.len() != 1 {
+            return None;
+        }
+        let block = &function.blocks[0];
+        let MirTerminatorKind::Return(Some(operand)) = &block.terminator.kind else {
+            return None;
+        };
+        let base = match operand {
+            MirOperand::Place(place) => place.base.clone(),
+            MirOperand::Temp(temp) => MirPlaceBase::Temp(*temp),
+            _ => return None,
+        };
+        let destination_matches = |place: &MirPlace| place.base == base;
+        block.statements.iter().find_map(|statement| {
+            let MirStatementKind::Construct {
+                destination,
+                aggregate,
+            } = &statement.kind
+            else {
+                return None;
+            };
+            if !destination_matches(destination) {
+                return None;
+            }
+            if aggregate.kind != MirAggregateKind::Tuple {
+                return None;
+            }
+            let MirAggregateFields::Ordered(items) = &aggregate.fields else {
+                return None;
+            };
+            items
+                .iter()
+                .map(|item| match item {
+                    MirAggregateItem::Operand(MirOperand::Place(place)) => {
+                        crate::read_analysis::place_local_base(place)
+                    }
+                    _ => None,
+                })
+                .collect::<Option<Vec<_>>>()
+        })
     }
 
     /// S3-A5: synthesize the indexed-view reduction signature for a kernel

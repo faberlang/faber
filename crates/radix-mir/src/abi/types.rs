@@ -201,6 +201,15 @@ pub struct MirKernelSignature {
     pub dispatch_size: MirKernelDispatchSize,
 }
 
+/// The maximum number of storage-buffer bindings ONE kernel may declare —
+/// the Metal `[[buffer(N)]]` attribute maximum (bindings `0..=30`,
+/// inclusive). A device-resident body whose whole-function storage-buffer
+/// signature would exceed this cannot be emitted as one kernel: the ABI
+/// signature synthesis refuses it (fail-closed, so the callers fall through
+/// to the decomposition split) and the plan pass reports the same typed
+/// diagnostic for pre-built signatures.
+pub const MAX_STORAGE_BUFFERS_PER_KERNEL: usize = 31;
+
 /// Classified builtin usage for a kernel signature — which invocation-header
 /// parameters each backend must declare. This is shared classification data
 /// only (L2); backend-local text mapping stays in each emitter.
