@@ -2,9 +2,8 @@
 
 use super::format::{formatted_source_for_write, normalize_trailing_newline, source_for_compare};
 use radix::driver::{Config, Session};
-use radix::forma::test_gate::{
-    assert_author_idempotent, assert_author_reparses, author_format_once,
-};
+use radix::forma::test_gate::{assert_author_reparses, author_format_once_with_session};
+use radix::locale::LocalePack;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -16,8 +15,18 @@ fn exempla(path: &str) -> PathBuf {
         .join(path)
 }
 
+fn english_pack() -> LocalePack {
+    let path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../radix/stdlib/locale/en/pack.toml");
+    LocalePack::from_toml_path(path).expect("load English locale pack")
+}
+
+fn english_session() -> Session {
+    Session::new(Config::default().with_locale_pack(english_pack()))
+}
+
 fn author_format_pipeline(name: &str, source: &str) -> String {
-    let session = Session::new(Config::default());
+    let session = english_session();
     let result = radix::forma::compile_author(&session, name, source);
     assert!(
         result.success(),
@@ -25,6 +34,15 @@ fn author_format_pipeline(name: &str, source: &str) -> String {
         result.diagnostics
     );
     normalize_trailing_newline(&result.output.expect("output").code)
+}
+
+fn assert_author_idempotent(name: &str, source: &str) {
+    let session = english_session();
+    let first =
+        author_format_once_with_session(&session, name, source).expect("first author format pass");
+    let second =
+        author_format_once_with_session(&session, name, &first).expect("second author format pass");
+    assert_eq!(first, second, "{name}: author(author(x)) != author(x)");
 }
 
 /// Strip `#` comment lines so keyword-surface assertions only see emitted
@@ -60,11 +78,11 @@ fn format_author_path_preserves_salve_munde_comments() {
 /// Strict comparison is canonicalized to the ≺/≻ glyphs; ≤/≥ stay as-is.
 #[test]
 fn author_format_rewrites_ascii_comparison_to_glyph() {
-    let source = r"genus Proba {
-    f32 x
-    f32 y
-    functio compara(f32 other) → bivalens {
-        redde ego.x < other et ego.x > other et ego.x ≤ other et ego.x ≥ other
+    let source = r"class Proba {
+    float x
+    float y
+    fn compara(float other) → bool {
+        return self.x < other and self.x > other and self.x ≤ other and self.x ≥ other
     }
 }";
     let formatted = author_format_pipeline("proba.fab", source);
@@ -91,12 +109,12 @@ fn author_format_rewrites_ascii_comparison_to_glyph() {
 /// `<`/`>` remain ASCII generic application delimiters.
 #[test]
 fn author_format_keeps_ascii_angle_brackets_for_generics() {
-    let source = r"functio normaliza(lista<f32> values) → lista<f32> {
-    redde values
+    let source = r"fn normaliza(list<float> values) → list<float> {
+    return values
 }";
     let formatted = author_format_pipeline("proba.fab", source);
     assert!(
-        formatted.contains("lista<f32>"),
+        formatted.contains("lista<fractus>"),
         "generic delimiters stay ASCII: {formatted}"
     );
 }
@@ -158,11 +176,11 @@ fn format_author_pipeline_reparses_cura_fixture() {
 
 #[test]
 fn format_author_pipeline_preserves_and_reparses_comment_fixture() {
-    let source = "# lead comment\n\nincipit {\n  nota \"ok\"\n}\n";
+    let source = "# lead comment\n\nmain {\n  print \"ok\"\n}\n";
     let formatted = author_format_pipeline("comment.fab", source);
     assert!(formatted.contains("# lead comment"));
     assert_author_reparses(&formatted, "comment pipeline").expect("reparse");
-    assert_author_idempotent("comment.fab", source).expect("idempotent");
+    assert_author_idempotent("comment.fab", source);
 }
 
 #[test]
@@ -170,7 +188,8 @@ fn format_test_gate_matches_compile_author_pipeline_for_salve() {
     let path = exempla("incipit/salve-munde.fab");
     let source = fs::read_to_string(&path).expect("read");
     let name = path.display().to_string();
-    let via_gate = author_format_once(&name, &source).expect("gate");
+    let via_gate =
+        author_format_once_with_session(&english_session(), &name, &source).expect("gate");
     let via_pipeline = author_format_pipeline(&name, &source);
     assert_eq!(
         via_gate, via_pipeline,
@@ -237,7 +256,7 @@ fn run_faber_format_stdout_with_args(args: &[&str]) -> String {
 #[test]
 fn format_cli_comment_fixture_reparses() {
     let fixture = std::env::temp_dir().join("faber-format-comment-unit.fab");
-    fs::write(&fixture, "# lead comment\n\nincipit {\n  nota \"ok\"\n}\n")
+    fs::write(&fixture, "# lead comment\n\nmain {\n  print \"ok\"\n}\n")
         .expect("write comment fixture");
 
     let formatted = run_faber_format_stdout(&fixture);
@@ -409,13 +428,13 @@ fn format_locale_check_passes_on_braced_futura_exempla() {
             "format",
             "--check",
             "--locale",
-            "la",
+            "en",
             path.to_str().expect("utf8 path"),
         ])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn faber format --check --locale la");
+        .expect("spawn faber format --check --locale en");
     let status = child.wait().expect("wait");
     let mut stderr = String::new();
     if let Some(mut err) = child.stderr.take() {

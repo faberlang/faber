@@ -1,6 +1,9 @@
 use super::*;
 use std::fs;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+static NEXT_TEMP_PACKAGE: AtomicU64 = AtomicU64::new(0);
 
 /// Minimal package so pack resolution can fall through to installed stdlib packs.
 fn temp_package_entry() -> (PathBuf, PathBuf) {
@@ -8,7 +11,8 @@ fn temp_package_entry() -> (PathBuf, PathBuf) {
         .duration_since(UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("faber-diag-locale-{nonce}"));
+    let serial = NEXT_TEMP_PACKAGE.fetch_add(1, Ordering::Relaxed);
+    let root = std::env::temp_dir().join(format!("faber-diag-locale-{nonce}-{serial}"));
     let _ = fs::remove_dir_all(&root);
     fs::create_dir_all(root.join("src")).expect("temp package root");
     fs::write(
@@ -30,6 +34,40 @@ kind = "bin"
     let entry = root.join("src").join("main.fab");
     fs::write(&entry, "incipit {}\n").expect("entry");
     (root, entry)
+}
+
+#[test]
+fn code_locale_defaults_to_english_pack_without_manifest_setting() {
+    let (_root, entry) = temp_package_entry();
+    let (config, diagnostic_pack) =
+        config_with_locale(Target::Rust, &entry, None, None).expect("default locale config");
+    assert_eq!(
+        config
+            .locale_pack
+            .as_ref()
+            .map(|pack| pack.metadata.id.as_str()),
+        Some("en")
+    );
+    assert_eq!(
+        diagnostic_pack
+            .as_ref()
+            .map(|pack| pack.metadata.id.as_str()),
+        Some("en")
+    );
+    let _ = fs::remove_dir_all(_root);
+}
+
+#[test]
+fn direct_default_config_uses_english_pack() {
+    let config =
+        default_config_with_locale(Target::TypeScript).expect("default code locale config");
+    assert_eq!(
+        config
+            .locale_pack
+            .as_ref()
+            .map(|pack| pack.metadata.id.as_str()),
+        Some("en")
+    );
 }
 
 #[test]

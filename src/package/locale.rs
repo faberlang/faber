@@ -9,13 +9,28 @@ use super::manifest::{manifest_for_spec, FaberManifest};
 use super::paths::normalize_path;
 use super::PackageSpec;
 
+pub(crate) const DEFAULT_CODE_LOCALE: &str = "en";
+
+/// Build the product-default code config for inputs without package context.
+pub(crate) fn default_config_with_locale(target: Target) -> Result<Config, Box<Diagnostic>> {
+    let pack_path = installed_locale_pack_path(DEFAULT_CODE_LOCALE);
+    let pack = LocalePack::from_toml_path(&pack_path).map_err(|err| {
+        Box::new(crate::package_diagnostic_error(format!(
+            "failed to load default code locale '{}' pack '{}': {err}",
+            DEFAULT_CODE_LOCALE,
+            pack_path.display()
+        )))
+    })?;
+    Ok(Config::default().with_target(target).with_locale_pack(pack))
+}
+
 /// Build a driver config (code locale) and the pack used for diagnostic rendering.
 ///
 /// Code locale (`cli_locale` / manifest / frontmatter) drives lexing and sits on
 /// `Config::locale_pack`. Diagnostics locale (`cli_diagnostic_locale`) drives
 /// message templates only. When diagnostics locale is omitted, the code pack is
-/// reused for rendering (legacy one-flag behavior). When neither is selected,
-/// both are `None` and the diagnostic catalog's English prose is used.
+/// reused for rendering. When no code locale is selected explicitly, the
+/// product default is the English `en` code pack.
 pub(crate) fn config_with_locale(
     target: Target,
     input: &Path,
@@ -110,10 +125,14 @@ fn selected_locale<'a>(
         return Ok(Some(trimmed.to_owned()));
     }
 
-    Ok(manifest
+    let manifest_locale = manifest
         .and_then(|manifest| manifest.locale.locale.as_deref())
         .map(str::trim)
-        .map(str::to_owned))
+        .map(str::to_owned);
+
+    Ok(Some(
+        manifest_locale.unwrap_or_else(|| DEFAULT_CODE_LOCALE.to_owned()),
+    ))
 }
 
 fn locale_pack_path(
@@ -154,16 +173,18 @@ fn package_root_for_selection(spec: &PackageSpec, manifest_path: Option<&Path>) 
 ///
 /// File input uses the package-aware resolver (package-local pack, else the
 /// installed pack); stdin falls back to the installed pack directly, since
-/// there is no package context to consult. `None` locale yields `None`.
+/// there is no package context to consult. An omitted locale selects the
+/// product-default `en` pack.
 pub fn locale_pack_for_emit(
     input: &[String],
     cli_locale: Option<&str>,
 ) -> Result<Option<LocalePack>, String> {
-    let Some(locale) = cli_locale
-        .map(str::trim)
-        .filter(|locale| !locale.is_empty())
-    else {
-        return Ok(None);
+    let locale = match cli_locale {
+        Some(locale) if locale.trim().is_empty() => {
+            return Err("--locale must not be empty".to_owned());
+        }
+        Some(locale) => locale.trim(),
+        None => DEFAULT_CODE_LOCALE,
     };
 
     if let Some(path) = input.iter().find(|s| !s.is_empty() && s.as_str() != "-") {

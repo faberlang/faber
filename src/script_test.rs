@@ -9,8 +9,8 @@ fn interpret_source_runs_one_liner_fixture() {
     interpret_source(
         "test.fab",
         r#"
-incipit {
-    nota "salve"
+main {
+    print "salve"
 }
 "#,
         &mut host,
@@ -34,8 +34,8 @@ fn run_source_executes_salve_fixture() {
     let mut host = BufferHost::default();
     let status = run_source(
         r#"
-incipit {
-    nota "salve"
+main {
+    print "salve"
 }
 "#,
         &mut host,

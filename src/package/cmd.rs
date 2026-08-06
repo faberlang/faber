@@ -1,5 +1,4 @@
 use radix::codegen::Target;
-use radix::driver::Config;
 use radix::tool::DiagnosticMode;
 use radix::{CompileResult, Output};
 use std::path::Path;
@@ -60,13 +59,15 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
             }
         }
     } else {
-        (
-            Config::default()
-                .with_target(target)
-                .with_dev_stdlib()
-                .with_warn_policy(warn_policy),
-            None,
-        )
+        let config = match super::locale::default_config_with_locale(target) {
+            Ok(config) => config.with_dev_stdlib().with_warn_policy(warn_policy),
+            Err(diag) => {
+                eprintln!("error: {}", diag.message);
+                std::process::exit(1);
+            }
+        };
+        let locale_pack = config.locale_pack.clone();
+        (config, locale_pack)
     };
 
     if is_package && target == Target::Scena {

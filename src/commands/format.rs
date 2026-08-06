@@ -1,7 +1,7 @@
 //! `faber format` — author-mode formatter (default) with locale/check/stdout.
 
 use radix::codegen::Target;
-use radix::driver::{split_frontmatter, Config, Session};
+use radix::driver::{peel_raw_source, split_frontmatter, Session};
 use radix::forma::{compile_author, compile_canonical, FormatCompileResult};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -22,8 +22,8 @@ pub fn cmd_format(command: &FormatCommand) {
     }
 
     // --locale=<X> selects the HIR-backed re-emit path with the localized
-    // reader surface (the former `--canonical` surface is `--locale la`);
-    // no flags keeps author mode.
+    // reader surface; `en` is the default product code surface and `la` is
+    // the explicit heritage surface. No flags keeps author mode.
     let use_reemit = command.locale.is_some();
 
     let files = match resolve_format_paths(&command.paths) {
@@ -54,7 +54,7 @@ pub fn cmd_format(command: &FormatCommand) {
 
         let name = path.display().to_string();
         let result = if use_reemit {
-            let session = match format_session(path, command.locale.as_deref()) {
+            let session = match format_session(path, command.locale.as_deref(), &source) {
                 Ok(session) => session,
                 Err(message) => {
                     eprintln!("error: {message}");
@@ -64,7 +64,14 @@ pub fn cmd_format(command: &FormatCommand) {
             };
             compile_canonical(&session, &name, &source)
         } else {
-            let session = Session::new(Config::default().with_dev_stdlib());
+            let session = match format_session(path, None, &source) {
+                Ok(session) => session,
+                Err(message) => {
+                    eprintln!("error: {message}");
+                    error_count += 1;
+                    continue;
+                }
+            };
             compile_author(&session, &name, &source)
         };
 
@@ -135,15 +142,31 @@ pub fn cmd_format(command: &FormatCommand) {
     }
 }
 
-fn format_session(path: &Path, locale: Option<&str>) -> Result<Session, String> {
-    if locale.is_none() {
-        return Ok(Session::new(Config::default().with_dev_stdlib()));
-    }
+fn format_session(path: &Path, locale: Option<&str>, source: &str) -> Result<Session, String> {
+    // An explicit CLI locale wins. Without one, preserve an existing source
+    // locale while making an untagged source use the product default (`en`).
+    let frontmatter_locale = if locale.is_none() {
+        let peeled = peel_raw_source(&path.display().to_string(), source)
+            .map_err(|error| error.to_string())?;
+        match peeled.frontmatter {
+            Some(frontmatter) => match frontmatter.locale_result() {
+                Some(Ok(locale)) => Some(locale.to_owned()),
+                Some(Err(())) => {
+                    return Err("frontmatter 'locale' key must be a string".to_owned());
+                }
+                None => None,
+            },
+            None => None,
+        }
+    } else {
+        None
+    };
+    let selected_locale = locale.or(frontmatter_locale.as_deref());
 
-    // Locale-mode sessions also need the dev stdlib path: files with
+    // Locale-mode sessions need the dev stdlib path: files with
     // `+++ locale = "…" +++` frontmatter resolve their reader pack through
     // `Config::stdlib_path` (READER003 otherwise).
-    crate::package::config_with_locale(Target::Faber, path, locale, None)
+    crate::package::config_with_locale(Target::Faber, path, selected_locale, None)
         .map(|(config, _)| Session::new(config.with_dev_stdlib()))
         .map_err(|diag| diag.message)
 }

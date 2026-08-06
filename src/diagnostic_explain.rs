@@ -10,7 +10,7 @@ use radix::locale::{DiagnosticTemplate, LocalePack};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 
-const DEFAULT_READER_LOCALE: &str = "la";
+const DEFAULT_READER_LOCALE: &str = "en";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct DiagnosticLookupKey {

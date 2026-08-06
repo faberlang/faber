@@ -206,7 +206,10 @@ pub(crate) use library::{
     program_export_names, with_library_cached_analysis_mut, LibraryInterfaceCache,
 };
 pub use locale::locale_pack_for_emit;
-pub(crate) use locale::{config_with_locale, load_locale_pack_for_input};
+#[allow(unused_imports)]
+pub(crate) use locale::{
+    config_with_locale, default_config_with_locale, load_locale_pack_for_input,
+};
 
 pub(super) const MANIFEST_FILE: &str = "faber.toml";
 
