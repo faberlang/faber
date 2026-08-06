@@ -374,7 +374,7 @@ fn json_literal_number_mapping_splits_numerus_and_fractus() {
     };
     assert!(matches!(members[0].value, JsonValue::Numerus(42)));
     assert!(matches!(members[1].value, JsonValue::Fractus(_)));
-    assert!(matches!(members[2].value, JsonValue::Numerus(1000000)));
+    assert!(matches!(members[2].value, JsonValue::Numerus(1_000_000)));
     assert!(matches!(members[3].value, JsonValue::Fractus(_)));
 }
 

@@ -1138,7 +1138,7 @@ fn parses_import_with_public_alias() {
                 "Alias"
             );
         }
-        _ => panic!("expected named import"),
+        ImportKind::Wildcard { .. } => panic!("expected named import"),
     }
 }
 
@@ -2541,11 +2541,11 @@ fac { tacet } cape err {}
         panic!("expected si");
     };
     assert!(si_stmt.catch.is_some());
-    let SecusClause::Sin(sin_stmt) = si_stmt.else_.as_ref().expect("sin") else {
+    let SecusClause::Sin(else_if_stmt) = si_stmt.else_.as_ref().expect("sin") else {
         panic!("expected sin");
     };
-    assert!(sin_stmt.catch.is_some());
-    let SecusClause::Block { catch, .. } = sin_stmt.else_.as_ref().expect("secus") else {
+    assert!(else_if_stmt.catch.is_some());
+    let SecusClause::Block { catch, .. } = else_if_stmt.else_.as_ref().expect("secus") else {
         panic!("expected secus block");
     };
     assert!(catch.is_some());

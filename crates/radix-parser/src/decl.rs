@@ -1043,7 +1043,10 @@ impl Parser {
         let path = self.parse_string()?;
         let path_span = self.previous_span();
         if self.interner.resolve(path).is_empty() {
-            return Err(self.invalid_import_error_at("import_name_inference_failed", path_span));
+            return Err(Self::invalid_import_error_at(
+                "import_name_inference_failed",
+                path_span,
+            ));
         }
 
         let explicit_visibility = self.check_keyword_ident(TokenKind::Privata)
@@ -1203,11 +1206,12 @@ impl Parser {
             .to_owned();
 
         if !Self::valid_inferred_import_name(&segment)
-            || self.inferred_import_name_is_reserved(&segment)
+            || Self::inferred_import_name_is_reserved(&segment)
         {
-            return Err(self
-                .invalid_import_error_at("import_name_inference_failed", span)
-                .with_arg("path", path_text.clone()));
+            return Err(
+                Self::invalid_import_error_at("import_name_inference_failed", span)
+                    .with_arg("path", path_text.clone()),
+            );
         }
 
         Ok(Ident {
@@ -1224,7 +1228,7 @@ impl Parser {
         (first == '_' || first.is_alphabetic()) && chars.all(|ch| ch == '_' || ch.is_alphanumeric())
     }
 
-    fn inferred_import_name_is_reserved(&self, name: &str) -> bool {
+    fn inferred_import_name_is_reserved(name: &str) -> bool {
         lookup_keyword_spec(name)
             .and_then(|spec| spec.token_kind.as_ref())
             .is_some_and(|kind| {
@@ -1233,10 +1237,10 @@ impl Parser {
     }
 
     fn invalid_import_error(&self, issue: &'static str) -> ParseError {
-        self.invalid_import_error_at(issue, self.current_span())
+        Self::invalid_import_error_at(issue, self.current_span())
     }
 
-    fn invalid_import_error_at(&self, issue: &'static str, span: radix_lexer::Span) -> ParseError {
+    fn invalid_import_error_at(issue: &'static str, span: radix_lexer::Span) -> ParseError {
         ParseError::structured(ParseErrorKind::InvalidImport, span).with_arg("issue", issue)
     }
 
@@ -1489,7 +1493,7 @@ impl Parser {
 
             let value = if family == "annotatio" && field_name_str == "target" {
                 self.parse_annotatio_target_value()?
-            } else if self.braced_annotation_field_uses_type(&family, &field_name_str) {
+            } else if Self::braced_annotation_field_uses_type(&family, &field_name_str) {
                 AnnotationFieldValue::Type(self.parse_type()?)
             } else {
                 AnnotationFieldValue::Expr(Box::new(self.parse_expression()?))
@@ -1511,7 +1515,7 @@ impl Parser {
         Ok(AnnotationKind::Braced(BracedAnnotation { name, fields }))
     }
 
-    fn braced_annotation_field_uses_type(&self, family: &str, field_name: &str) -> bool {
+    fn braced_annotation_field_uses_type(family: &str, field_name: &str) -> bool {
         matches!(
             (family, field_name),
             ("optio" | "operandus", "typus") | ("radix", "allowed")
@@ -1527,7 +1531,7 @@ impl Parser {
             let span = self.peek().span;
             self.advance();
             let name = self.keyword_ident("functio", span);
-            return Ok(self.named_type_annotation_value(name));
+            return Ok(Self::named_type_annotation_value(name));
         }
         if matches!(
             self.peek().kind,
@@ -1542,12 +1546,12 @@ impl Parser {
             TokenKind::Ident(_) | TokenKind::Underscore(_)
         ) {
             let name = self.parse_ident()?;
-            return Ok(self.named_type_annotation_value(name));
+            return Ok(Self::named_type_annotation_value(name));
         }
         Err(self.invalid_annotation_error("annotatio_unknown_target"))
     }
 
-    fn named_type_annotation_value(&self, name: Ident) -> AnnotationFieldValue {
+    fn named_type_annotation_value(name: Ident) -> AnnotationFieldValue {
         let span = name.span;
         AnnotationFieldValue::Type(TypeExpr {
             nullable: false,
@@ -1679,8 +1683,7 @@ impl Parser {
     fn parse_lane_value(&mut self) -> Result<radix_lexer::Symbol, ParseError> {
         let token = self.advance();
         match &token.kind {
-            TokenKind::String(sym) => Ok(*sym),
-            TokenKind::Ident(sym) => Ok(*sym),
+            TokenKind::String(sym) | TokenKind::Ident(sym) => Ok(*sym),
             _ => Err(Self::expected_error(
                 "string literal or identifier",
                 token.span,

@@ -70,7 +70,6 @@ fn claim_program(program: &Program, claimed: &mut HashSet<u32>) {
 fn claim_stmt(stmt: &Stmt, claimed: &mut HashSet<u32>) {
     claim_trivia(&stmt.leading_trivia, claimed);
     match &stmt.kind {
-        StmtKind::Var(_) => {}
         StmtKind::Func(func) => claim_func_decl(func, claimed),
         StmtKind::Class(class) => {
             for member in &class.members {
@@ -85,15 +84,27 @@ fn claim_stmt(stmt: &Stmt, claimed: &mut HashSet<u32>) {
                 claim_trivia(&method.leading_trivia, claimed);
             }
         }
-        StmtKind::TypeAlias(_)
+        StmtKind::Var(_)
+        | StmtKind::TypeAlias(_)
         | StmtKind::Enum(_)
         | StmtKind::Union(_)
         | StmtKind::Import(_)
-        | StmtKind::Ex(_) => {}
+        | StmtKind::Ex(_)
+        | StmtKind::Expr(_)
+        | StmtKind::IncDec(_)
+        | StmtKind::Redde(_)
+        | StmtKind::Rumpe(_)
+        | StmtKind::Perge(_)
+        | StmtKind::Iace(_)
+        | StmtKind::Mori(_)
+        | StmtKind::Tacet(_)
+        | StmtKind::Adfirma(_)
+        | StmtKind::Scribe(_)
+        | StmtKind::Reddet(_)
+        | StmtKind::Tacebit(_) => {}
         StmtKind::Probandum(probandum) => claim_probandum(probandum, claimed),
         StmtKind::Proba(proba) => claim_block(&proba.body, claimed),
         StmtKind::Block(block) => claim_block(block, claimed),
-        StmtKind::Expr(_) | StmtKind::IncDec(_) => {}
         StmtKind::Si(si) => {
             claim_if_body(&si.then, claimed);
             claim_catch(si.catch.as_ref(), claimed);
@@ -135,16 +146,6 @@ fn claim_stmt(stmt: &Stmt, claimed: &mut HashSet<u32>) {
             claim_block(&fac.body, claimed);
             claim_catch(fac.catch.as_ref(), claimed);
         }
-        StmtKind::Redde(_)
-        | StmtKind::Rumpe(_)
-        | StmtKind::Perge(_)
-        | StmtKind::Iace(_)
-        | StmtKind::Mori(_)
-        | StmtKind::Tacet(_)
-        | StmtKind::Adfirma(_)
-        | StmtKind::Scribe(_)
-        | StmtKind::Reddet(_)
-        | StmtKind::Tacebit(_) => {}
         StmtKind::Incipit(incipit) => claim_if_body(&incipit.body, claimed),
         StmtKind::Cura(cura) => {
             claim_block(&cura.body, claimed);

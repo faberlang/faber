@@ -245,10 +245,8 @@ impl Parser {
                 // Canonical strict comparison is `Lt`/`Gt` (≺/≻).
                 // `LtAscii`/`GtAscii` (`<`/`>`) as comparison are legacy during
                 // the glyph migration; `<`/`>` remain generic delimiters.
-                TokenKind::Lt => BinOp::Lt,
-                TokenKind::Gt => BinOp::Gt,
-                TokenKind::LtAscii => BinOp::Lt,
-                TokenKind::GtAscii => BinOp::Gt,
+                TokenKind::Lt | TokenKind::LtAscii => BinOp::Lt,
+                TokenKind::Gt | TokenKind::GtAscii => BinOp::Gt,
                 TokenKind::LtEq => BinOp::LtEq,
                 TokenKind::GtEq => BinOp::GtEq,
                 _ if self.check_keyword_ident(TokenKind::Intra) => BinOp::InRange,
@@ -567,7 +565,7 @@ impl Parser {
         )
     }
 
-    fn can_start_prefix_operand(&self, kind: &TokenKind) -> bool {
+    fn can_start_prefix_operand(kind: &TokenKind) -> bool {
         Self::can_start_expression(kind) && !matches!(kind, TokenKind::LBrace)
     }
 
@@ -636,7 +634,7 @@ impl Parser {
                     _ => true,
                 }
             }
-            ref kind => self.can_start_prefix_operand(kind),
+            ref kind => Self::can_start_prefix_operand(kind),
         }
     }
 

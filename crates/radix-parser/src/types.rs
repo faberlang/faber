@@ -330,7 +330,7 @@ impl Parser {
         if self.check(&TokenKind::LBracket) {
             return Err(self.invalid_type_error("lista_sugar_bracket_form"));
         }
-        let elem = self.width_element_type_expr(width, name.span)?;
+        let elem = self.width_element_type_expr(width, name.span);
         Ok(TypeExprKind::Named(
             self.keyword_ident("lista", name.span),
             vec![elem],
@@ -343,7 +343,7 @@ impl Parser {
         width: &str,
     ) -> Result<TypeExprKind, ParseError> {
         self.reject_type_sugar_angle_bracket("tensor")?;
-        let elem = self.width_element_type_expr(width, name.span)?;
+        let elem = self.width_element_type_expr(width, name.span);
         let shape = if self.check(&TokenKind::LBracket) {
             self.parse_figura()?
         } else {
@@ -358,7 +358,7 @@ impl Parser {
         width: &str,
     ) -> Result<TypeExprKind, ParseError> {
         self.reject_type_sugar_angle_bracket("vector")?;
-        let elem = self.width_element_type_expr(width, name.span)?;
+        let elem = self.width_element_type_expr(width, name.span);
         let shape = if self.check(&TokenKind::LBracket) {
             self.parse_figura()?
         } else {
@@ -376,7 +376,7 @@ impl Parser {
         if !self.check(&TokenKind::LBracket) {
             return Err(self.invalid_type_error("matrix_sugar_missing_shape"));
         }
-        let elem = self.width_element_type_expr(width, name.span)?;
+        let elem = self.width_element_type_expr(width, name.span);
         let shape = self.parse_figura()?;
         Ok(TypeExprKind::Matrix(Box::new(elem), shape))
     }
@@ -387,7 +387,7 @@ impl Parser {
         width: &str,
     ) -> Result<TypeExprKind, ParseError> {
         self.reject_type_sugar_angle_bracket("sparsa")?;
-        let elem = self.width_element_type_expr(width, name.span)?;
+        let elem = self.width_element_type_expr(width, name.span);
         let shape = if self.check(&TokenKind::LBracket) {
             self.parse_figura()?
         } else {
@@ -417,13 +417,13 @@ impl Parser {
             .with_arg("issue", issue)
     }
 
-    fn width_element_type_expr(&mut self, width: &str, span: Span) -> Result<TypeExpr, ParseError> {
-        Ok(TypeExpr {
+    fn width_element_type_expr(&mut self, width: &str, span: Span) -> TypeExpr {
+        TypeExpr {
             nullable: false,
             mode: None,
             kind: TypeExprKind::Named(self.keyword_ident(width, span), Vec::new()),
             span,
-        })
+        }
     }
 
     /// Parse a tensor `Figura` in type position.
