@@ -1931,3 +1931,59 @@ fn llvm_host_l23_multi_arg_nota_grouping_matches_rust_output() {
     }
 }
 
+/// L27 (d31792f5): `est/est.fab` — the latching fix removed the latched
+/// `STATUS_INVALID_ARGUMENT` that the recovered `lista<textus> ↦ valor` boxing
+/// produced (the fixture exited 1 with byte-exact stdout). The fixture still
+/// exits nonzero (`STATUS_PANIC`) because the `est <type>` / `non est <type>`
+/// MIR lowering (`radix/src/mir/lower.rs` `lower_type_check`) emits an
+/// `IsNil`/`IsNotNil` null-check placeholder instead of a Valor variant-tag
+/// match, so the `adfirma … non est …` asserts fail. That lowering is outside
+/// this unit's write scope (hand-1 L23 in flight); the row stays tracked in
+/// llvm_host_gaps.toml as the TypeCheck residual. The valor decode itself is
+/// proven by `valor_array_text_elements_round_trip_preserves_textus` in
+/// faber-runtime hosts/llvm.
+///
+/// L27 (d31792f5): `destructura/objectum.fab` — the `ex … ceteri reliqua` rest
+/// binding holds the whole genus record, and a `nota` of that aggregate passes
+/// the emitter's null placeholder (fail-closed opaque export). The runtime
+/// failed the render with `STATUS_UNSUPPORTED`, which latched into the process
+/// exit code (4) even though the program completed like the Rust oracle (0).
+/// Null-placeholder diagnostics no longer latch, so the exit code matches; the
+/// missing whole-struct Debug line stays a named `stdout_mismatch` display gap
+/// (aggregate genus record rendering, tracked in llvm_host_gaps.toml).
+#[test]
+#[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_destructura_objectum_exit_zero -- --ignored --nocapture"]
+fn llvm_host_destructura_objectum_exit_zero() {
+    let fab_path = crate::paths::corpus_dir().join("destructura/objectum.fab");
+    let result = Compiler::new(
+        Config::default()
+            .with_target(Target::LlvmText)
+            .with_dev_stdlib(),
+    )
+    .compile(&fab_path);
+    assert!(
+        result.success(),
+        "destructura/objectum.fab LLVM compile failed: {:?}",
+        result.diagnostics
+    );
+    let Some(Output::LlvmText(output)) = result.output else {
+        panic!("destructura/objectum.fab did not produce LLVM text");
+    };
+    let temp_root = super::super::common::make_temp_root();
+    let llvm_file = temp_root.join("objectum.ll");
+    fs::write(&llvm_file, output.code).expect("write objectum LLVM text");
+    let probe = run_llvm_exemplum(&llvm_file, &temp_root, "objectum", &fab_path);
+    assert_eq!(
+        probe.exit_code,
+        Some(0),
+        "destructura/objectum.fab must exit 0 (null-placeholder nota must not latch): {}",
+        probe.reason
+    );
+    // Scalar/textus destructured notas all render; only the whole-struct
+    // `nota reliqua` line is the named display gap (see doc comment).
+    assert!(
+        probe.stdout.contains("nigrum\n"),
+        "destructured field notas must still print: {:?}",
+        probe.stdout
+    );
+}

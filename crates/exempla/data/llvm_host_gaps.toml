@@ -70,14 +70,6 @@ reason = "LLVM verifies, but one or more runtime imports remain unresolved at na
 first_seen = "2026-08-05@live-pairwise"
 
 [[gap]]
-path = "conversio/fallibilis.fab"
-owner_stage = 5
-boundary = "outcome"
-issue = "exit_code_mismatch"
-reason = "both lanes ran; LLVM stdout matches the sibling .expected but the process exit code differs (latched runtime status)"
-first_seen = "2026-08-06@a302c8ebc-live-pairwise"
-
-[[gap]]
 path = "cursor/cursor.fab"
 owner_stage = 4
 boundary = "link"
@@ -86,19 +78,11 @@ reason = "LLVM verifies, but one or more runtime imports remain unresolved at na
 first_seen = "2026-07-10@32b4f09af"
 
 [[gap]]
-path = "de/de.fab"
-owner_stage = 5
-boundary = "outcome"
-issue = "exit_code_mismatch"
-reason = "both lanes ran; LLVM stdout matches the sibling .expected but the process exit code differs (latched runtime status)"
-first_seen = "2026-08-06@a302c8ebc-live-pairwise"
-
-[[gap]]
 path = "destructura/objectum.fab"
 owner_stage = 5
 boundary = "outcome"
-issue = "exit_code_mismatch"
-reason = "both lanes ran; LLVM stdout matches the sibling .expected but the process exit code differs (latched runtime status)"
+issue = "stdout_mismatch"
+reason = "both lanes ran; LLVM stdout differs from the Rust oracle (L27 d31792f5: exit code closed; the missing whole-struct `nota reliqua` Debug line is an aggregate genus record rendering gap)"
 first_seen = "2026-08-06@a302c8ebc-live-pairwise"
 
 [[gap]]
@@ -106,7 +90,7 @@ path = "est/est.fab"
 owner_stage = 5
 boundary = "outcome"
 issue = "exit_code_mismatch"
-reason = "both lanes ran; LLVM stdout matches the sibling .expected but the process exit code differs (latched runtime status)"
+reason = "both lanes ran; LLVM stdout matches the sibling .expected but the process exit code differs (L27 d31792f5: the latched STATUS_INVALID_ARGUMENT from the recovered lista<textus> ↦ valor boxing is fixed; residual is the `est <type>`/`non est <type>` MIR lowering — IsNil/IsNotNil null-check placeholder in radix/src/mir/lower.rs lower_type_check — failing the adfirma asserts)"
 first_seen = "2026-08-06@a302c8ebc-live-pairwise"
 
 [[gap]]
@@ -150,28 +134,12 @@ reason = "both lanes ran; LLVM stdout differs from the Rust oracle"
 first_seen = "2026-07-10@32b4f09af"
 
 [[gap]]
-path = "intrinseca/vacua-ascribere.fab"
-owner_stage = 5
-boundary = "outcome"
-issue = "exit_code_mismatch"
-reason = "both lanes ran; LLVM stdout matches the sibling .expected but the process exit code differs (latched runtime status)"
-first_seen = "2026-08-06@a302c8ebc-live-pairwise"
-
-[[gap]]
 path = "itera/cursor-iteratio.fab"
 owner_stage = 3
 boundary = "mir"
 issue = "mir_lowering_rejected"
 reason = "MIR lowering rejects the live shape"
 first_seen = "2026-07-10@32b4f09af"
-
-[[gap]]
-path = "itera/de.fab"
-owner_stage = 5
-boundary = "outcome"
-issue = "exit_code_mismatch"
-reason = "both lanes ran; LLVM stdout matches the sibling .expected but the process exit code differs (latched runtime status)"
-first_seen = "2026-08-06@a302c8ebc-live-pairwise"
 
 [[gap]]
 path = "itera/nidificatus.fab"
@@ -196,14 +164,6 @@ boundary = "outcome"
 issue = "llvm_fixture_mismatch"
 reason = "both lanes ran; LLVM stdout differs from the sibling .expected fixture"
 first_seen = "2026-07-10@32b4f09af"
-
-[[gap]]
-path = "octeti/unify.fab"
-owner_stage = 5
-boundary = "outcome"
-issue = "exit_code_mismatch"
-reason = "both lanes ran; LLVM stdout matches the sibling .expected but the process exit code differs (latched runtime status)"
-first_seen = "2026-08-06@a302c8ebc-live-pairwise"
 
 [[gap]]
 path = "operatores/numerus-overflow.fab"
