@@ -92,7 +92,7 @@ fn render_plain_includes_short_contract() {
     assert!(rendered.contains("DESCRIPTION"));
     assert!(rendered.contains("<expression> ≡ <expression>"));
     assert!(rendered.contains("operator / comparison"));
-    assert!(rendered.contains("incipit"));
+    assert!(rendered.contains("main"));
     assert!(rendered.contains("RELATED"));
 }
 

@@ -97,13 +97,39 @@ fn resolve_diagnostic_in_pack(
     pack: &LocalePack,
     key: DiagnosticLookupKey,
 ) -> Option<DiagnosticExplanation> {
+    resolve_diagnostic_row(query, pack, &key).or_else(|| {
+        // Packs that declare Latin fallback (e.g. the en pack, whose tables
+        // are self-contained and do not inherit from la) resolve diagnostics
+        // from the la pack when they carry no row of their own. The locale is
+        // reported as the requested pack's, not the fallback's.
+        if pack.has_latin_fallback() {
+            load_installed_locale_pack("la").ok().and_then(|la| {
+                resolve_diagnostic_row(query, &la, &key).map(|mut explanation| {
+                    explanation.locale = pack.metadata.id.clone();
+                    explanation
+                })
+            })
+        } else {
+            None
+        }
+    })
+}
+
+fn resolve_diagnostic_row(
+    query: &str,
+    pack: &LocalePack,
+    key: &DiagnosticLookupKey,
+) -> Option<DiagnosticExplanation> {
     let code_template = pack.diagnostics.get(&key.code)?;
     let selected = match key.issue.as_deref() {
         Some(issue) => code_template.issues.get(issue)?,
         None => code_template,
     };
     Some(DiagnosticExplanation::from_template(
-        query, key, pack, selected,
+        query,
+        key.clone(),
+        pack,
+        selected,
     ))
 }
 
