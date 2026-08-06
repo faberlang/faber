@@ -2414,7 +2414,7 @@ fn subchain_additional_outputs_resolve_in_emission_signature() {
 // S6-P1 Exp unary — never a recipe).
 // -----------------------------------------------------------------------
 
-/// A rank-2 RMSNorm kernel: `t = rms_norm(x, 1, 1e-5, gamma)` over `[2, 960]`
+/// A rank-2 `RMSNorm` kernel: `t = rms_norm(x, 1, 1e-5, gamma)` over `[2, 960]`
 /// (the pinned hidden width), gamma `[960]` — the CCI-1 const layout
 /// `[x, axis, eps, gamma]` (axis = last, eps = 1e-5, gamma mandatory).
 fn rms_norm_function(types: &mut TypeTable) -> MirFunction {
@@ -2499,7 +2499,7 @@ fn rms_norm_function(types: &mut TypeTable) -> MirFunction {
     }
 }
 
-/// A rank-2 RoPE kernel: `t = rope_norm(x, pos, dim)` over `[2, 64]` (the
+/// A rank-2 `RoPE` kernel: `t = rope_norm(x, pos, dim)` over `[2, 64]` (the
 /// pinned head dimension) with the NORM consecutive-pair (pos, dim).
 fn rope_function(types: &mut TypeTable, pos: i64, dim: i64) -> MirFunction {
     rank2_const_op_function(
@@ -2683,7 +2683,7 @@ fn rms_norm_function_resolves_rms_normalization_plan() {
     assert_eq!(plan.axis, 1, "RMSNorm normalizes over the last axis");
     assert_eq!(
         plan.epsilon_bits,
-        (1e-5_f64 as f32).to_bits(),
+        (1e-5_f32).to_bits(),
         "eps is the f32 const operand bits (the pinned row's 1e-5)"
     );
     assert_eq!(plan.width, 960, "the normalization width is the hidden dim");
@@ -2691,7 +2691,7 @@ fn rms_norm_function_resolves_rms_normalization_plan() {
     let carried =
         CollectionKernelPlan::RmsNormalization(crate::kernel_plan::RmsNormalizationPlan {
             axis: 1,
-            epsilon_bits: (1e-5_f64 as f32).to_bits(),
+            epsilon_bits: (1e-5_f32).to_bits(),
             width: 960,
         });
     assert!(carried_plan_agrees(&carried, Some(&derived)));
@@ -2840,7 +2840,7 @@ fn inference_recipe_kinds_are_typed() {
         RecipeKind::from_plan(&CollectionKernelPlan::RmsNormalization(
             crate::kernel_plan::RmsNormalizationPlan {
                 axis: 1,
-                epsilon_bits: (1e-5_f64 as f32).to_bits(),
+                epsilon_bits: (1e-5_f32).to_bits(),
                 width: 960,
             }
         )),
@@ -2917,7 +2917,7 @@ fn const_violating_inference_ops_fail_closed() {
     );
 }
 
-/// The SiLU composition fixture: `y = x·sigmoid(x)` with
+/// The `SiLU` composition fixture: `y = x·sigmoid(x)` with
 /// `sigmoid(x) = 1/(1+exp(−x))` expressed as the admitted elementwise
 /// surface (`TensorNeg` for `−x`, `TensorDiv` for `1/(1+e)`, `TensorMul` for
 /// `x·d`) plus the S6-P1 `MirUnOp::Exp` tensor unary — the composition
