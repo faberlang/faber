@@ -35,6 +35,9 @@ fn dev_norma_library_home() -> PathBuf {
 const LOCAL_MAIN: &str = "importa ex \"./util\" privata * ut utilModule\n\nfunctio run() → textus {\n    redde utilModule.salutare()\n}\n\nincipit {\n    nota utilModule.salutare()\n}\n";
 const LOCAL_UTIL: &str = "functio salutare() → textus {\n    redde \"salve\"\n}\n";
 
+const LOCAL_LOCALE_MAIN: &str = "importa ex \"./util\" privata * ut utilModule\n\nfunctio run() → textus {\n    redde utilModule.greet()\n}\n\nincipit {\n    nota utilModule.greet()\n}\n";
+const LOCAL_LOCALE_UTIL: &str = "functio salutare() → textus {\n    redde \"salve\"\n}\n";
+
 /// Two-module package with a local import and a namespace call in the entry.
 fn write_local_package(dir: &std::path::Path) -> std::path::PathBuf {
     let src = dir.join("src");
@@ -58,6 +61,56 @@ kind = "bin"
     .expect("write faber.toml");
     fs::write(src.join("util.fab"), LOCAL_UTIL).expect("write util.fab");
     fs::write(src.join("main.fab"), LOCAL_MAIN).expect("write main.fab");
+    src.join("main.fab")
+}
+
+fn write_local_locale_package(dir: &std::path::Path) -> std::path::PathBuf {
+    let src = dir.join("src");
+    fs::create_dir_all(&src).expect("create local locale package src");
+    fs::create_dir_all(dir.join("locale")).expect("create local locale packs");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "local-locale-fixture"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+"#,
+    )
+    .expect("write local locale manifest");
+    fs::write(
+        dir.join("locale/en-local-library.toml"),
+        r#"
+[pack]
+id = "en-local-library"
+schema_version = 1
+fallback = ["la"]
+
+[[library_members]]
+provider = "package"
+package = "local-locale-fixture"
+module_path = ["util"]
+kind = "function"
+canonical = "salutare"
+surface = "greet"
+
+[llm]
+system_prompt_snippet = "Emit local-library locale fixture source"
+exemplars = ["local-library.fab"]
+"#,
+    )
+    .expect("write local library locale pack");
+    fs::write(dir.join("locale/local-library.fab"), "incipit {}\n")
+        .expect("write local library locale exemplar");
+    fs::write(src.join("util.fab"), LOCAL_LOCALE_UTIL).expect("write local locale util");
+    fs::write(src.join("main.fab"), LOCAL_LOCALE_MAIN).expect("write local locale main");
     src.join("main.fab")
 }
 
@@ -194,6 +247,54 @@ fn build_load_round_trip_with_local_import() {
         .expect("util module");
     assert!(!util.is_entry);
     assert!(util.local_links.is_empty());
+}
+
+#[test]
+fn local_library_locale_surface_resolves_through_package_loader() {
+    let dir = test_temp_dir("fhir-local-locale");
+    let entry = write_local_locale_package(&dir);
+    let (config, _diagnostic_pack) = crate::package::config_with_locale(
+        radix::codegen::Target::Rust,
+        &entry,
+        Some("en-local-library"),
+        None,
+    )
+    .expect("load local library locale through package selection");
+    assert_eq!(
+        config
+            .locale_pack
+            .as_ref()
+            .map(|pack| pack.metadata.id.as_str()),
+        Some("en-local-library")
+    );
+    let package = analyze_package(&config, &entry).expect("analyze localized local package");
+
+    assert!(
+        package
+            .diagnostics
+            .iter()
+            .all(|diagnostic| !diagnostic.is_error()),
+        "localized local package diagnostics: {:?}",
+        package.diagnostics
+    );
+
+    let util = package
+        .units
+        .iter()
+        .find(|unit| unit.module_segments == ["util".to_owned()])
+        .expect("localized local utility unit");
+    assert_eq!(
+        util.file_interface.identity,
+        Some(radix::file_interface::InterfaceLibraryIdentity {
+            provider: "package".to_owned(),
+            package: Some("local-locale-fixture".to_owned()),
+            module_path: vec!["util".to_owned()],
+        })
+    );
+    assert!(
+        util.file_interface.exports.contains_key("salutare"),
+        "local interface must retain canonical export names"
+    );
 }
 
 #[test]
