@@ -163,7 +163,6 @@ const SWIFT_EXPECTED_FAILURES: &[&str] = &[
     "tacet/tacet.fab",
     "tag/tag.fab",
     "temporis/temporis.fab",
-    "tensor-fragment/tiny-linear-device/src/main.fab",
     "tensor/arithmetic-elementwise.fab",
     "tensor/arithmetic-matmul.fab",
     "tensor/arithmetic-reduction.fab",
