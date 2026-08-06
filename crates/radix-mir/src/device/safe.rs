@@ -155,6 +155,119 @@ fn is_fold_artifact_type(types: &TypeTable, ty: MirType) -> bool {
     )
 }
 
+/// The dead non-kernel-scalar const-copy slots of one function (need
+/// a0184031): plain destinations of a DEAD const-copy Assign whose value is
+/// a scalar the kernel surface cannot express — the `LayerNorm` lowering's
+/// `i64` axis const (`Assign(Local(3) <- Constant(Int(axis)))` typed `i64`;
+/// the recipe call carries the axis directly, so the const local is never
+/// read).
+///
+/// The Metal emitter skips exactly this statement (26424928f Gap 1 —
+/// "format/legality-only": the destination is never read, so no semantics
+/// change) and the NVVM emitter emits it as a harmless native-i64 slot
+/// store; the production CUDA artifact path runs this shared gate BEFORE the
+/// emitter, so the gate must agree. The CTO council constraints
+/// (5f1b1348) hold structurally:
+///
+/// - a slot is dead only when NO statement or terminator reads it (the read
+///   set covers terminators — a value read only by a block's terminator is
+///   still live);
+/// - a slot is never a function param (a param is a side effect — always
+///   live, and resource-visible), never a result-aggregation slot;
+/// - the statement-level skip additionally requires an UNPROJECTED plain
+///   slot (an output-projection / projected store is never skipped), a
+///   pure `Constant` RHS (no runtime call, no expression — the emitters'
+///   dead-skip admits only `MirOperand::Constant`), and a non-kernel-scalar
+///   value — so a LIVE or merely-difficult (non-constant) i64 stays
+///   fail-closed with the layout diagnostics.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct DeadConstCopySlots {
+    locals: FxHashSet<MirLocalId>,
+    temps: FxHashSet<MirTempId>,
+}
+
+impl DeadConstCopySlots {
+    /// Whether a place base is one of the dead non-kernel-scalar const-copy
+    /// slots.
+    fn contains(&self, base: &MirPlaceBase) -> bool {
+        match base {
+            MirPlaceBase::Local(local) => self.locals.contains(local),
+            MirPlaceBase::Temp(temp) => self.temps.contains(temp),
+        }
+    }
+}
+
+/// The dead non-kernel-scalar const-copy slots of one function (need
+/// a0184031) — the liveness scan the gate shares with the emitters' skip.
+///
+/// A slot is collected when its declared type is a non-kernel scalar (a
+/// `Scalar` layout the kernel surface cannot express — i64 etc.) and it is
+/// DEAD: no statement or terminator reads it, and a local slot is not a
+/// function param (a param is a side effect — always live). A temp slot
+/// traces through the lowered body's forward copy (`Local(l) ← Temp(t)`)
+/// exactly like the fold-artifact slots: the temp is dead when the local it
+/// forwards into (or a direct operand consumer) is never read.
+fn dead_non_kernel_scalar_const_slots(
+    function: &MirFunction,
+    layouts: &MirLayoutTable,
+) -> DeadConstCopySlots {
+    let read_locals = crate::read_analysis::function_read_locals(function);
+    let mut dead = DeadConstCopySlots::default();
+    for local in &function.locals {
+        if is_non_kernel_scalar_layout(layouts, local.ty)
+            && !function.params.iter().any(|param| param.local == local.id)
+            && !read_locals.contains(&local.id)
+        {
+            dead.locals.insert(local.id);
+        }
+    }
+    for temp in &function.temps {
+        if !is_non_kernel_scalar_layout(layouts, temp.ty)
+            || crate::read_analysis::temp_directly_read(function, temp.id)
+        {
+            continue;
+        }
+        match crate::read_analysis::temp_forward_local(function, temp.id) {
+            None => {
+                dead.temps.insert(temp.id);
+            }
+            Some(local)
+                if !function.params.iter().any(|param| param.local == local)
+                    && !read_locals.contains(&local) =>
+            {
+                dead.temps.insert(temp.id);
+            }
+            Some(_) => {}
+        }
+    }
+    dead
+}
+
+/// Whether a type's layout is a scalar the kernel surface cannot express — a
+/// `Scalar` layout that is NOT one of the kernel scalars (f32, bool, i32,
+/// u32). A DEAD const-copy of such a value (the `LayerNorm` lowering's `i64`
+/// axis const) is skipped as a format/legality-only drop (need,
+/// mirroring the Metal emitter's `value_is_non_kernel_scalar`, 26424928f
+/// Gap 1). A LIVE or merely-difficult (non-constant) value keeps the layout
+/// diagnostics.
+fn is_non_kernel_scalar_layout(layouts: &MirLayoutTable, ty: MirType) -> bool {
+    matches!(
+        layouts.layout_for_type(ty),
+        Ok(layout)
+            if matches!(
+                layout.kind,
+                MirLayoutKind::Scalar(scalar)
+                    if !matches!(
+                        scalar,
+                        MirScalarLayout::F32
+                            | MirScalarLayout::Bool
+                            | MirScalarLayout::I32
+                            | MirScalarLayout::U32
+                    )
+            )
+    )
+}
+
 struct DeviceSafeClassifier<'a> {
     types: &'a TypeTable,
     layouts: &'a MirLayoutTable,
@@ -196,6 +309,16 @@ struct DeviceSafeClassifier<'a> {
     /// `Array`/`Tensor` construct stays fail-closed with the aggregate
     /// diagnostics.
     dead_fold_artifact_slots: FoldArtifactSlots,
+    /// a0184031: the dead non-kernel-scalar const-copy slots of the function
+    /// under visit — plain destinations of a DEAD const-copy Assign whose
+    /// value is a scalar the kernel surface cannot express (the `LayerNorm`
+    /// lowering's `i64` axis const). The Metal emitter skips exactly these
+    /// statements (26424928f Gap 1) and the NVVM emitter emits them as
+    /// harmless native-i64 slot stores, so the gate admits the local/temp
+    /// declarations and the const-copy statement. A LIVE or merely-difficult
+    /// (non-constant) non-kernel scalar stays fail-closed with the layout
+    /// diagnostics.
+    dead_const_copy_slots: DeadConstCopySlots,
     gaps: Vec<CapabilityGap>,
 }
 
@@ -227,6 +350,7 @@ impl<'a> DeviceSafeClassifier<'a> {
             allow_host_owned_tensor_entry: false,
             result_aggregation_slots: ResultAggregationSlots::default(),
             dead_fold_artifact_slots: FoldArtifactSlots::default(),
+            dead_const_copy_slots: DeadConstCopySlots::default(),
             gaps: Vec::new(),
         }
     }
@@ -437,6 +561,34 @@ impl<'a> DeviceSafeClassifier<'a> {
     fn is_result_aggregation_slot(&self, base: &MirPlaceBase) -> bool {
         self.result_aggregation_slots.contains(base)
     }
+
+    /// Whether the statement is a DEAD non-kernel-scalar const-copy Assign
+    /// (need — mirroring the Metal emitter-side skip, 26424928f Gap
+    /// 1): the CTO council constraints (5f1b1348) all hold structurally —
+    ///
+    /// 1. the destination is unread by statements AND terminators (the
+    ///    precomputed dead slot set uses `function_read_locals`, which
+    ///    counts terminator reads);
+    /// 2. the destination is an UNPROJECTED plain slot (a projected store —
+    ///    including the kernel `output[i] = <result>` write — is never
+    ///    skipped), is not a function parameter (params are side effects and
+    ///    resource-visible), and is not a result-aggregation slot;
+    /// 3. the RHS is a pure `MirOperand::Constant` copy — no runtime call,
+    ///    no expression, no side effect (the emitters' dead-skip admits only
+    ///    constants);
+    /// 4. the value is a scalar the kernel surface cannot express, so the
+    ///    statement is exactly the one every affected emitter discards
+    ///    before target-specific type emission (Metal skips it; NVVM emits a
+    ///    harmless native-i64 slot store);
+    /// 5. a LIVE or merely-difficult (non-constant) non-kernel scalar is not
+    ///    a dead const-copy slot and keeps the layout diagnostics.
+    fn is_dead_non_kernel_scalar_const_copy(&self, place: &MirPlace, value: &MirValue) -> bool {
+        place.projections.is_empty()
+            && !self.is_result_aggregation_slot(&place.base)
+            && self.dead_const_copy_slots.contains(&place.base)
+            && matches!(&value.kind, MirValueKind::Operand(MirOperand::Constant(_)))
+            && is_non_kernel_scalar_layout(self.layouts, value.ty)
+    }
 }
 
 impl MirVisitor for DeviceSafeClassifier<'_> {
@@ -596,6 +748,13 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             // local, temp, and construct checks admit them exactly as the
             // emitters' S5-U2c skip does.
             self.dead_fold_artifact_slots = dead_fold_artifact_slots(function, self.types);
+            // a0184031: the dead non-kernel-scalar const-copy slots (i64
+            // axis-const locals/temps nothing reads) are precomputed so the
+            // local/temp declarations and the const-copy statement checks
+            // admit them exactly as the emitters' dead-skip does (Metal
+            // 26424928f Gap 1; NVVM emits the harmless native-i64 store).
+            self.dead_const_copy_slots =
+                dead_non_kernel_scalar_const_slots(function, self.layouts);
             // S5A-U4: the output-set tuple aggregation slots of this function
             // (its own result-tuple return aggregation plus a decomposed
             // multi-output source's kept result-tuple local) — the ONLY
@@ -610,6 +769,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
         }
 
         self.dead_fold_artifact_slots = FoldArtifactSlots::default();
+        self.dead_const_copy_slots = DeadConstCopySlots::default();
         self.result_aggregation_slots = ResultAggregationSlots::default();
         self.in_device_function = was_in_device_function;
         self.allows_structured_return_branch = previous_allows_structured_return_branch;
@@ -654,6 +814,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                 .result_aggregation_slots
                 .contains(&MirPlaceBase::Local(local.id))
             && !self.dead_fold_artifact_slots.locals.contains(&local.id)
+            && !self.dead_const_copy_slots.locals.contains(&local.id)
         {
             self.check_device_type(local.ty);
         }
@@ -665,6 +826,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                 .result_aggregation_slots
                 .contains(&MirPlaceBase::Temp(temp.id))
             && !self.dead_fold_artifact_slots.temps.contains(&temp.id)
+            && !self.dead_const_copy_slots.temps.contains(&temp.id)
         {
             self.check_device_type(temp.ty);
         }
@@ -686,6 +848,21 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                 if is_fold_artifact_type(self.types, value.ty)
                     && self.dead_fold_artifact_slots.contains(&place.base)
                 {
+                    self.visit_place(place);
+                } else if self.is_dead_non_kernel_scalar_const_copy(place, value) {
+                    // a0184031: a DEAD const-copy whose value is a scalar the
+                    // kernel surface cannot express (the LayerNorm lowering's
+                    // i64 axis const — the recipe call carries the axis
+                    // directly, so the const local is never read) fails the
+                    // layout gate before any use. The Metal emitter skips
+                    // exactly this statement (26424928f Gap 1) and the NVVM
+                    // emitter emits it as a harmless native-i64 slot store,
+                    // so the gate walks only the destination place, not the
+                    // non-kernel-scalar value. The skip is format/legality-
+                    // only: the CTO council constraints (5f1b1348) are all
+                    // proven structurally (see `is_dead_non_kernel_scalar_
+                    // const_copy`) — a LIVE or merely-difficult i64 stays
+                    // fail-closed with the layout diagnostics.
                     self.visit_place(place);
                 } else {
                     crate::visit::walk_stmt(self, stmt);
