@@ -15,7 +15,7 @@ path = "src/main.rs"
 
 [dependencies]
 # Private compiler workspace (local org layout). Not published with this crate.
-radix = { path = "../radix/crates/radix" }
+radix = { path = "../radix/crates/radix", default-features = false, features = ["full-targets"] }
 radix-mir = { path = "../radix/crates/radix-mir" }
 radix-mir-fmir = { path = "../radix/crates/radix-mir-fmir" }
 # Differentiable-GPU campaign (S1-6): the S1-3 device-artifact emitters (Metal
@@ -66,4 +66,3 @@ codegen-units = 256
 [profile.test]
 debug = 1
 codegen-units = 256
-
