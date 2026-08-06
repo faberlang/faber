@@ -414,7 +414,10 @@ impl Validator<'_, '_> {
                 let element = match self.type_kind(receiver_ty) {
                     Type::Cursor(element) | Type::AsyncCursor(element, _) => *element,
                     _ => {
-                        self.error(span, "sermo cursor drain receiver is not cursor or async cursor");
+                        self.error(
+                            span,
+                            "sermo cursor drain receiver is not cursor or async cursor",
+                        );
                         return;
                     }
                 };
