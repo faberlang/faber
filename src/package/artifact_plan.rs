@@ -384,6 +384,7 @@ fn module_key(module: &ModuleId) -> String {
 
 pub(crate) fn target_name(target: Target) -> &'static str {
     match target {
+        Target::MirStepper => "stepper",
         Target::HirRust => "rust",
         Target::HirTypeScript => "ts",
         Target::HirGo => "go",

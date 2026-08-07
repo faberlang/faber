@@ -1,5 +1,5 @@
 use super::*;
-use radix::codegen::rust::TestSelection;
+use faber_hir_rust::TestSelection;
 use radix::driver::parse_file_frontmatter;
 
 // ── validate_frontmatter_against_manifest ─────────────────────────────────

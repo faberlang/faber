@@ -1,0 +1,12 @@
+[package]
+name = "faber-hir-rust"
+version = "1.4.0"
+edition = "2021"
+description = "Faber-owned Rust HIR target support"
+license = "MIT"
+
+[dependencies]
+radix = { path = "../../../radix/crates/radix", default-features = false, features = ["hir-rust"] }
+
+[lints.clippy]
+pedantic = "deny"

@@ -1,10 +1,13 @@
-#[cfg(feature = "hir-go")]
-use radix::cli::CliProgram;
-use radix::codegen::rust::{
+#[cfg(not(feature = "hir-rust"))]
+use super::frontmatter::RustTestSelection;
+#[cfg(feature = "hir-rust")]
+use faber_hir_rust::{
     build_local_import_function_params, build_local_import_namespaces, local_import_module_key,
     remap_function_param_info, ImportedFunctionParams, ImportedNamespaceInfo, RustFieldNamePolicy,
     SiblingModuleExports, TestSelection as RustTestSelection,
 };
+#[cfg(feature = "hir-go")]
+use radix::cli::CliProgram;
 use radix::codegen::Target;
 use radix::diagnostics::Diagnostic;
 use radix::driver::{
@@ -14,31 +17,47 @@ use radix::hir::visit::{walk_expr, HirVisitor};
 use radix::hir::{HirExpressionKind, HirItemKind};
 use radix::lexer::Interner;
 use radix::syntax::{ImportDecl, ImportKind, StmtKind};
+use radix::CompileResult;
 #[cfg(feature = "hir-go")]
 use radix::GoOutput;
-use radix::{CompileResult, Output, RustOutput};
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+#[cfg(any(feature = "hir-go", feature = "hir-rust"))]
+use radix::Output;
+#[cfg(feature = "hir-rust")]
+use radix::RustOutput;
+#[cfg(feature = "hir-rust")]
+use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
+#[cfg(feature = "hir-rust")]
 use super::codegen::{assemble_crate, ModuleNode};
 
-use super::frontmatter::{manifest_path_for_spec, merge_entry_test_selection};
+use super::frontmatter::manifest_path_for_spec;
+#[cfg(feature = "hir-rust")]
+use super::frontmatter::merge_entry_test_selection;
 use super::import_graph::{
     build_mount_plan, library_import_binding, resolve_import, ImportResolution,
 };
+#[cfg(feature = "hir-rust")]
+use super::library_imported_function_params;
 use super::{
     analysis_source_for_file, discover_build_layout, discover_package, library_cached_analysis,
-    library_cached_expanded_imports, library_cached_file_interface, library_generates_rust_module,
-    library_imported_function_params, library_interface_export_names, library_interface_has_module,
-    library_module_segments, library_resolver_for_package, load_locale_pack_for_input,
-    load_package_with_locale_pack, load_provider_manifests, program_export_names, read_manifest,
-    selected_providers_for_routes, with_library_cached_analysis_mut, LibraryImportBinding,
-    LibraryInterfaceCache, PackageFile, RustRuntimePlan,
+    library_cached_file_interface, library_interface_export_names, library_interface_has_module,
+    library_resolver_for_package, load_locale_pack_for_input, load_package_with_locale_pack,
+    load_provider_manifests, program_export_names, read_manifest, selected_providers_for_routes,
+    LibraryImportBinding, LibraryInterfaceCache, PackageFile, RustRuntimePlan,
+};
+#[cfg(feature = "hir-rust")]
+use super::{
+    library_cached_expanded_imports, library_generates_rust_module, library_module_segments,
+    with_library_cached_analysis_mut,
 };
 
 pub(crate) struct AnalyzedPackage {
     pub(crate) spec: super::PackageSpec,
     pub(crate) units: Vec<AnalyzedPackageUnit>,
+    #[allow(dead_code)]
+    // retained for FHIR/frontmatter metadata even when optional target leaves are disabled
     pub(crate) entry_frontmatter: Option<radix::driver::FileFrontmatter>,
     pub(crate) diagnostics: Vec<Diagnostic>,
     /// Provider → Cargo crate name for native-binding library path deps (G4).
@@ -65,6 +84,7 @@ pub(crate) struct AnalyzedPackageUnit {
     pub(crate) expanded_library_imports: Vec<LibraryImportBinding>,
 }
 
+#[cfg(feature = "hir-rust")]
 pub(crate) struct GeneratedPackageRust {
     pub(crate) entry_code: Option<String>,
     pub(crate) module_tree: ModuleNode,
@@ -100,6 +120,7 @@ fn compile_failure(diagnostics: Vec<Diagnostic>) -> PackageCompileResult {
 /// Crate root for packages whose `faber.toml` has no `paths.entry` (typical
 /// `build.kind = "lib"` layout). Nested modules carry product + proba code;
 /// cargo test discovers `#[test]` inside those modules.
+#[cfg(feature = "hir-rust")]
 const LIBRARY_PACKAGE_HARNESS_ENTRY: &str = "\
 // Generated library package harness — no paths.entry file.
 // Package units live in nested modules below.
@@ -373,13 +394,7 @@ fn compile_package_internal(
             return compile_failure(diagnostics);
         }
     };
-    let field_name_policy = match package_field_name_policy(&spec) {
-        Ok(policy) => policy,
-        Err(diag) => {
-            return compile_failure(vec![*diag]);
-        }
-    };
-    let mut package = match analyze_package_spec(
+    let package = match analyze_package_spec(
         &config,
         spec,
         &library_resolver,
@@ -439,37 +454,61 @@ fn compile_package_internal(
         .with_arg("issue", "package_target_assembly_pending")
         .with_arg("target", plan.target)]);
     }
-    let effective_test_selection =
-        merge_entry_test_selection(test_selection, package.entry_frontmatter.as_ref());
 
-    let generated = generate_package_rust(
-        &mut package,
-        &library_resolver,
-        effective_test_selection.as_ref(),
-        field_name_policy,
-        None,
-    );
-    let diagnostics = generated.diagnostics;
-
-    if diagnostics.iter().any(|diag| diag.is_error()) {
-        return compile_failure(diagnostics);
+    #[cfg(not(feature = "hir-rust"))]
+    {
+        let _ = test_selection;
+        return compile_failure(vec![crate::package_diagnostic_error(
+            "target `rust` is not available in this faber build; rebuild with feature `hir-rust`",
+        )
+        .with_file(input.display().to_string())
+        .with_arg("issue", "package_target_unavailable")
+        .with_arg("target", "rust")]);
     }
 
-    let Some(entry_code) = generated.entry_code else {
-        return compile_failure(vec![crate::package_diagnostic_error(
-            "package compilation did not produce an entry module",
-        )
-        .with_file(package.spec.entry.display().to_string())]);
+    #[cfg(feature = "hir-rust")]
+    let field_name_policy = match package_field_name_policy(&package.spec) {
+        Ok(policy) => policy,
+        Err(diag) => {
+            return compile_failure(vec![*diag]);
+        }
     };
 
-    let crate_code = assemble_crate(&entry_code, &generated.module_tree.render(0));
-    PackageCompileResult {
-        compile_result: CompileResult {
-            output: Some(Output::Rust(RustOutput { code: crate_code })),
-            diagnostics,
-        },
-        #[cfg(feature = "hir-go")]
-        go_modules: Vec::new(),
+    #[cfg(feature = "hir-rust")]
+    {
+        let mut package = package;
+        let effective_test_selection =
+            merge_entry_test_selection(test_selection, package.entry_frontmatter.as_ref());
+
+        let generated = generate_package_rust(
+            &mut package,
+            &library_resolver,
+            effective_test_selection.as_ref(),
+            field_name_policy,
+            None,
+        );
+        let diagnostics = generated.diagnostics;
+
+        if diagnostics.iter().any(|diag| diag.is_error()) {
+            return compile_failure(diagnostics);
+        }
+
+        let Some(entry_code) = generated.entry_code else {
+            return compile_failure(vec![crate::package_diagnostic_error(
+                "package compilation did not produce an entry module",
+            )
+            .with_file(package.spec.entry.display().to_string())]);
+        };
+
+        let crate_code = assemble_crate(&entry_code, &generated.module_tree.render(0));
+        PackageCompileResult {
+            compile_result: CompileResult {
+                output: Some(Output::Rust(RustOutput { code: crate_code })),
+                diagnostics,
+            },
+            #[cfg(feature = "hir-go")]
+            go_modules: Vec::new(),
+        }
     }
 }
 
@@ -893,6 +932,7 @@ fn go_import_path(segment: &str) -> Option<&str> {
 #[path = "compile_test.rs"]
 mod tests;
 
+#[cfg(feature = "hir-rust")]
 pub(crate) fn generate_package_rust(
     package: &mut AnalyzedPackage,
     library_resolver: &crate::library::LibraryResolver,
@@ -1014,6 +1054,7 @@ fn effective_package_config(config: &Config, input: &Path) -> Result<Config, Vec
     }
 }
 
+#[cfg(feature = "hir-rust")]
 fn generate_package_unit_rust(
     unit: &mut AnalyzedPackageUnit,
     siblings: &[SiblingModuleExports<'_>],
@@ -1067,6 +1108,7 @@ fn generate_package_unit_rust(
     )
 }
 
+#[cfg(feature = "hir-rust")]
 struct LibraryNamespaceExtension<'entry, 'state> {
     hir: &'entry radix::hir::HirProgram,
     interner: &'entry Interner,
@@ -1077,6 +1119,7 @@ struct LibraryNamespaceExtension<'entry, 'state> {
     info: &'state mut ImportedNamespaceInfo<'entry>,
 }
 
+#[cfg(feature = "hir-rust")]
 fn extend_library_namespace_type_paths(
     imports: &[LibraryImportBinding],
     context: &mut LibraryNamespaceExtension<'_, '_>,
@@ -1118,6 +1161,7 @@ fn extend_library_namespace_type_paths(
     Ok(())
 }
 
+#[cfg(feature = "hir-rust")]
 fn import_binding_symbol_and_def_id(
     hir: &radix::hir::HirProgram,
     interner: &Interner,
@@ -1134,6 +1178,7 @@ fn import_binding_symbol_and_def_id(
     })
 }
 
+#[cfg(feature = "hir-rust")]
 fn extend_library_function_params<'entry>(
     imports: &[LibraryImportBinding],
     entry_types: &mut radix::semantic::TypeTable,
@@ -1153,6 +1198,7 @@ fn extend_library_function_params<'entry>(
     Ok(())
 }
 
+#[cfg(feature = "hir-rust")]
 fn insert_generated_library_modules(
     units: &[AnalyzedPackageUnit],
     library_resolver: &crate::library::LibraryResolver,
@@ -1407,6 +1453,7 @@ fn linked_crates_for_package_root(
 }
 
 /// Generate module-mode Rust for a library package unit (G4 library crates).
+#[cfg(feature = "hir-rust")]
 pub(crate) fn generate_library_unit_rust(
     unit: &AnalyzedPackageUnit,
 ) -> Result<String, radix::codegen::CodegenError> {
@@ -1481,6 +1528,7 @@ fn visit_package_analysis_file<'a>(
 }
 
 #[allow(clippy::too_many_arguments)]
+#[cfg(feature = "hir-rust")]
 fn local_import_siblings_for_unit<'a>(
     unit: &AnalyzedPackageUnit,
     unit_index: usize,
@@ -1573,21 +1621,22 @@ fn local_import_siblings_for_unit<'a>(
     siblings
 }
 
+#[cfg(feature = "hir-rust")]
 fn generate_rust_code_for_analysis(
     analysis: &radix::driver::AnalyzedUnit,
     is_entry: bool,
     test_selection: Option<&RustTestSelection>,
     field_name_policy: RustFieldNamePolicy,
     native_host_bootstrap: bool,
-    imported_function_params: Option<radix::codegen::rust::ImportedFunctionParams<'_>>,
-    imported_namespace_info: Option<radix::codegen::rust::ImportedNamespaceInfo<'_>>,
+    imported_function_params: Option<faber_hir_rust::ImportedFunctionParams<'_>>,
+    imported_namespace_info: Option<faber_hir_rust::ImportedNamespaceInfo<'_>>,
 ) -> Result<String, radix::codegen::CodegenError> {
     let cli_program = analysis.cli_program.as_ref();
     let module_mode = !is_entry;
     if is_entry {
         if let Some(cli_program) = cli_program {
             let mut codegen =
-                radix::codegen::rust::RustCodegen::new_with_library_registry_test_selection_and_types(
+                faber_hir_rust::RustCodegen::new_with_library_registry_test_selection_and_types(
                     &analysis.hir,
                     &analysis.interner,
                     &analysis.libraries,
@@ -1600,30 +1649,27 @@ fn generate_rust_code_for_analysis(
             if let Some(info) = imported_namespace_info {
                 codegen.set_imported_namespace_info(info);
             }
-            let gpu_builtins = radix::codegen::rust::rust_gpu_builtins(&analysis.gpu_builtins);
+            let gpu_builtins = faber_hir_rust::rust_gpu_builtins(&analysis.gpu_builtins);
             codegen.set_gpu_builtins(&gpu_builtins);
             codegen.set_field_name_policy(field_name_policy);
             codegen.set_native_host_bootstrap(native_host_bootstrap);
-            let cli_ir = radix::codegen::rust::to_cli_ir(cli_program);
+            let cli_ir = faber_hir_rust::to_cli_ir(cli_program);
             return codegen
                 .generate_cli(&analysis.hir, &analysis.types, &cli_ir)
                 .map(|output| output.code);
         }
     }
 
-    let gpu_builtins = radix::codegen::rust::rust_gpu_builtins(&analysis.gpu_builtins);
+    let gpu_builtins = faber_hir_rust::rust_gpu_builtins(&analysis.gpu_builtins);
     let cli_ir = if module_mode {
         None
     } else {
-        analysis
-            .cli_program
-            .as_ref()
-            .map(radix::codegen::rust::to_cli_ir)
+        analysis.cli_program.as_ref().map(faber_hir_rust::to_cli_ir)
     };
     // Leaf ModuleGenerationRequest borrows CLI IR; keep owned ir alive for the call.
     let cli_ir_ref = cli_ir.as_ref();
-    radix::codegen::rust::generate_with_library_registry_test_selection_and_imports(
-        radix::codegen::rust::ModuleGenerationRequest {
+    faber_hir_rust::generate_with_library_registry_test_selection_and_imports(
+        faber_hir_rust::ModuleGenerationRequest {
             hir: &analysis.hir,
             types: &analysis.types,
             interner: &analysis.interner,
@@ -1641,6 +1687,7 @@ fn generate_rust_code_for_analysis(
     .map(|output| output.code)
 }
 
+#[cfg(feature = "hir-rust")]
 fn package_field_name_policy(
     spec: &super::PackageSpec,
 ) -> Result<RustFieldNamePolicy, Box<Diagnostic>> {

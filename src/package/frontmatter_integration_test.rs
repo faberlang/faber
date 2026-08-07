@@ -11,7 +11,7 @@ use super::{
     compile_package, compile_package_with_test_options, compile_package_with_test_selection,
     discover_package, library_resolver_from_config, load_package,
 };
-use radix::codegen::rust::TestSelection;
+use faber_hir_rust::TestSelection;
 use radix::driver::Config;
 use radix::Output;
 use std::fs;

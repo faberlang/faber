@@ -6,9 +6,11 @@ use radix::diagnostics::{Diagnostic, DiagnosticPhase};
 use radix::driver::Config;
 use serde::Deserialize;
 
-use super::binding_probe::run_rust_binding_probe;
 use super::file_interface::extract_callable_contracts;
 use super::{analyze_package, read_manifest, resolve_package_member, validate_manifest};
+
+#[cfg(feature = "hir-rust")]
+use super::binding_probe::run_rust_binding_probe;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -52,6 +54,7 @@ pub struct BindingVerification {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum BindingProbeMode {
+    #[cfg(feature = "hir-rust")]
     ShapeOnly,
     Cargo,
 }
@@ -63,6 +66,7 @@ pub fn verify_library_bindings(
     verify_library_bindings_with_probe_mode(package_root, target, BindingProbeMode::Cargo)
 }
 
+#[cfg(feature = "hir-rust")]
 pub fn verify_library_binding_shapes(
     package_root: &Path,
     target: &str,
@@ -315,6 +319,7 @@ fn validate_shim(
 }
 
 #[allow(clippy::too_many_arguments)]
+#[cfg(feature = "hir-rust")]
 fn prove_rust_bindings(
     target: &str,
     package_root: &Path,
@@ -348,7 +353,7 @@ fn prove_rust_bindings(
             continue;
         };
         let unit = &package.units[declaration.unit_index];
-        match radix::codegen::rust::render_binding_probe(
+        match faber_hir_rust::render_binding_probe(
             &unit.analysis,
             declaration.def_id,
             &binding.symbol,
@@ -392,6 +397,31 @@ fn prove_rust_bindings(
             )]
         },
     )
+}
+
+#[allow(clippy::too_many_arguments)]
+#[cfg(not(feature = "hir-rust"))]
+fn prove_rust_bindings(
+    target: &str,
+    _package_root: &Path,
+    binding_path: &Path,
+    _dependencies: &BTreeMap<String, String>,
+    _shim: Option<&Path>,
+    manifest: &BindingManifest,
+    _declarations: &[BindingContract],
+    _package: &super::AnalyzedPackage,
+    _probe_mode: BindingProbeMode,
+) -> Result<(), Vec<Diagnostic>> {
+    if manifest.functions.is_empty() {
+        return Ok(());
+    }
+    Err(vec![diagnostic(
+        binding_path,
+        format!(
+            "binding contract probes for target `{target}` are not available in this faber build; rebuild with feature `hir-rust`"
+        ),
+        "binding_probe_target_unavailable",
+    )])
 }
 
 fn diagnostic(path: &Path, message: impl Into<String>, issue: &'static str) -> Diagnostic {

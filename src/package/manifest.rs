@@ -2,10 +2,12 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
-use radix::codegen::rust::RustFieldNamePolicy;
 use radix::codegen::Target;
 use radix::diagnostics::Diagnostic;
 use serde::Deserialize;
+
+#[cfg(feature = "hir-rust")]
+use faber_hir_rust::RustFieldNamePolicy;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -130,6 +132,8 @@ pub struct ManifestBuild {
 
     /// Generated Rust struct-field spelling policy.
     #[serde(default)]
+    #[allow(dead_code)]
+    // manifest compatibility: accepted even when the Rust target leaf is disabled
     pub rust_field_names: ManifestRustFieldNames,
 }
 
@@ -274,6 +278,7 @@ pub enum ManifestRustFieldNames {
     SnakeCase,
 }
 
+#[cfg(feature = "hir-rust")]
 impl From<ManifestRustFieldNames> for RustFieldNamePolicy {
     fn from(value: ManifestRustFieldNames) -> Self {
         match value {

@@ -16,6 +16,7 @@ path = "src/main.rs"
 [dependencies]
 # Private compiler workspace (local org layout). Not published with this crate.
 radix = { path = "../radix/crates/radix", default-features = false }
+faber-hir-rust = { path = "crates/faber-hir-rust", optional = true }
 radix-mir = { path = "../radix/crates/radix-mir" }
 radix-mir-fmir = { path = "../radix/crates/radix-mir-fmir" }
 # Differentiable-GPU campaign (S1-6): the S1-3 device-artifact emitters (Metal
@@ -72,7 +73,7 @@ full-targets = [
     "mir-wasm",
     "mir-coverage",
 ]
-hir-rust = ["radix/hir-rust"]
+hir-rust = ["radix/hir-rust", "dep:faber-hir-rust"]
 hir-faber = ["radix/hir-faber"]
 hir-ts = ["radix/hir-ts"]
 hir-go = ["radix/hir-go"]
@@ -87,7 +88,7 @@ mir-wasm = ["radix/mir-wasm"]
 mir-coverage = ["radix/mir-coverage"]
 
 [workspace]
-members = [".", "crates/exempla", "crates/hygiene-ratchet"]
+members = [".", "crates/exempla", "crates/faber-hir-rust", "crates/hygiene-ratchet"]
 resolver = "2"
 
 [profile.dev]

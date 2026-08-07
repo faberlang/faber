@@ -31,9 +31,11 @@
 
 pub mod artifact_plan;
 pub mod binding;
+#[cfg(feature = "hir-rust")]
 mod binding_probe;
 mod cargo;
 mod cmd;
+#[cfg(feature = "hir-rust")]
 mod codegen;
 mod compile;
 mod device;
@@ -48,6 +50,7 @@ mod go_build;
 mod host_factory;
 mod import_graph;
 mod library;
+#[cfg_attr(not(feature = "hir-rust"), path = "library_link_unavailable.rs")]
 mod library_link;
 mod llvm;
 mod llvm_host;
@@ -66,11 +69,14 @@ mod test_source_filter;
 #[allow(unused_imports)]
 // public package API for library callers; binary crate does not use it.
 pub use artifact_plan::ArtifactPlan;
+#[cfg(feature = "hir-rust")]
+#[allow(unused_imports)]
+// public package API for library callers/tests; binary may not call it.
+pub use binding::verify_library_binding_shapes;
 #[allow(unused_imports)]
 // public package API for library callers/tests; binary crate only uses full verification.
 pub use binding::{
-    verify_library_binding_shapes, verify_library_bindings,
-    verify_library_bindings_with_probe_mode, BindingProbeMode,
+    verify_library_bindings, verify_library_bindings_with_probe_mode, BindingProbeMode,
 };
 pub use test_source_filter::TestSourceFilter;
 // used by `commands/run.rs` / tests for G4 library path-deps on package emit
@@ -205,10 +211,14 @@ use paths::normalize_path;
 use source_files::{is_proba_source_path, load_package_source, package_source_files};
 
 pub(crate) use library::{
-    analysis_source_for_file, library_cached_analysis, library_cached_expanded_imports,
-    library_cached_file_interface, library_generates_rust_module, library_imported_function_params,
-    library_interface_export_names, library_interface_has_module, library_module_segments,
-    program_export_names, with_library_cached_analysis_mut, LibraryInterfaceCache,
+    analysis_source_for_file, library_cached_analysis, library_cached_file_interface,
+    library_interface_export_names, library_interface_has_module, program_export_names,
+    LibraryInterfaceCache,
+};
+#[cfg(feature = "hir-rust")]
+pub(crate) use library::{
+    library_cached_expanded_imports, library_generates_rust_module,
+    library_imported_function_params, library_module_segments, with_library_cached_analysis_mut,
 };
 pub use locale::locale_pack_for_emit;
 #[allow(unused_imports)]

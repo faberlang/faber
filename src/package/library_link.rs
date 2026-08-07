@@ -196,7 +196,7 @@ fn generate_linked_unit_rust(
         let Some(binding) = binding_for_function(bindings, &module, name) else {
             continue;
         };
-        let probe = radix::codegen::rust::render_binding_probe(
+        let probe = faber_hir_rust::render_binding_probe(
             &unit.analysis,
             item.def_id,
             &binding.symbol,

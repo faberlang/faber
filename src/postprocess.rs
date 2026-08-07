@@ -96,7 +96,8 @@ pub fn format_generated_code(target: Target, code: &str) -> Result<String, Strin
         Target::HirSwift => Ok(code.to_string()),
         Target::HirTypeScript => format_typescript_code(code),
         Target::HirFhir => Ok(code.to_string()),
-        Target::MirWasmBinary
+        Target::MirStepper
+        | Target::MirWasmBinary
         | Target::MirWasm
         | Target::MirLlvm
         | Target::MirLlvmHost
@@ -123,7 +124,8 @@ pub fn lint_generated_code(target: Target, code: &str) -> Result<String, String>
             Ok(code.to_string())
         }
         Target::HirTypeScript => lint_typescript_code(code),
-        Target::MirWasmBinary
+        Target::MirStepper
+        | Target::MirWasmBinary
         | Target::MirWasm
         | Target::MirLlvm
         | Target::MirLlvmHost

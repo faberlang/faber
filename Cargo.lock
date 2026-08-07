@@ -632,6 +632,7 @@ version = "1.4.0"
 dependencies = [
  "cista",
  "clap",
+ "faber-hir-rust",
  "faber-host-macos-arm64",
  "faber-host-wasm",
  "faber-runtime",
@@ -651,6 +652,13 @@ dependencies = [
  "toml 1.1.4+spec-1.1.0",
  "zip",
  "zstd",
+]
+
+[[package]]
+name = "faber-hir-rust"
+version = "1.4.0"
+dependencies = [
+ "radix",
 ]
 
 [[package]]

@@ -172,6 +172,7 @@ fn resolve_route_backend_or_exit(
 
 fn run_target_name(target: Target) -> &'static str {
     match target {
+        Target::MirStepper => "stepper",
         Target::HirRust => "rust",
         Target::HirTypeScript => "ts",
         Target::HirGo => "go",

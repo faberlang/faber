@@ -1,11 +1,14 @@
 //! Runtime dependency selection for generated Rust package artifacts.
 
+#[cfg(feature = "hir-rust")]
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+#[cfg(feature = "hir-rust")]
 use radix::diagnostics::Diagnostic;
 
+#[cfg(feature = "hir-rust")]
 pub(crate) fn runtime_path_for_target_dependencies(
     package_root: &Path,
     dependencies: &BTreeMap<String, String>,
@@ -31,6 +34,7 @@ pub(crate) fn runtime_path_from_crate_roots<'a>(
         .find_map(runtime_path_from_cargo_manifest)
 }
 
+#[cfg(feature = "hir-rust")]
 fn runtime_path_from_target_dependencies(
     package_root: &Path,
     dependencies: &BTreeMap<String, String>,
@@ -71,6 +75,7 @@ fn runtime_path_from_cargo_manifest(crate_root: &Path) -> Option<PathBuf> {
     None
 }
 
+#[cfg(feature = "hir-rust")]
 pub(crate) fn parse_dependency_requirement(requirement: &str) -> toml::Value {
     let trimmed = requirement.trim();
     if trimmed.starts_with('{') {
@@ -82,6 +87,7 @@ pub(crate) fn parse_dependency_requirement(requirement: &str) -> toml::Value {
     }
 }
 
+#[cfg(feature = "hir-rust")]
 pub(crate) fn normalize_dependency_value(package_root: &Path, value: toml::Value) -> toml::Value {
     match value {
         toml::Value::Table(mut table) => {

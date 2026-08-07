@@ -463,6 +463,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
 ///
 /// Uses HIR/type facts via [`radix::codegen::collect_rust_needs`] — never scans
 /// generated Rust text for `faber::` / `tokio::`.
+#[cfg(feature = "hir-rust")]
 fn single_file_rust_runtime_plan(
     config: &radix::Config,
     input_path: &Path,
@@ -500,6 +501,19 @@ fn single_file_rust_runtime_plan(
         provider_error: None,
         library_path_deps: Vec::new(),
     })
+}
+
+#[cfg(not(feature = "hir-rust"))]
+fn single_file_rust_runtime_plan(
+    _config: &radix::Config,
+    input_path: &Path,
+) -> Result<super::RustRuntimePlan, Vec<radix::Diagnostic>> {
+    Err(vec![crate::package_diagnostic_error(
+        "target `rust` is not available in this faber build; rebuild with feature `hir-rust`",
+    )
+    .with_file(input_path.display().to_string())
+    .with_arg("issue", "package_target_unavailable")
+    .with_arg("target", "rust")])
 }
 
 fn resolve_build_target(command: &radix::tool::BuildCommand, input_path: &Path) -> Target {

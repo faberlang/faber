@@ -4,7 +4,6 @@ use std::hash::{Hash, Hasher};
 use std::path::Path;
 
 use crate::library::{LibraryResolver, ResolvedLibraryModule};
-use radix::codegen::rust::{remap_function_param_info, ImportedFunctionParams};
 use radix::diagnostics::Diagnostic;
 use radix::driver::{
     analyze_source_with_cli_program_and_import_contract, peel_raw_source, source_load_diagnostic,
@@ -17,6 +16,7 @@ use radix::hir::{
 };
 use radix::lexer::Interner;
 use radix::parser;
+#[cfg(feature = "hir-rust")]
 use radix::semantic::TypeTable;
 use radix::syntax::{
     walk_expr, AnnotationKind, Expr, ExprKind, Program, StmtKind, Visibility, Visitor,
@@ -28,6 +28,9 @@ use super::import_graph::{
 };
 use super::{LibraryImportBinding, PackageFile};
 use radix::diagnostics::DiagnosticConvert;
+
+#[cfg(feature = "hir-rust")]
+use faber_hir_rust::{remap_function_param_info, ImportedFunctionParams};
 
 struct LibraryInterfaceItem {
     exported_name: String,
@@ -433,6 +436,7 @@ pub(crate) fn library_cached_analysis<'a>(
         })
 }
 
+#[cfg(feature = "hir-rust")]
 pub(crate) fn library_cached_expanded_imports(
     import: &LibraryImportBinding,
     library_resolver: &LibraryResolver,
@@ -492,10 +496,12 @@ pub(crate) fn with_library_cached_analysis_mut<T>(
     result
 }
 
+#[cfg(feature = "hir-rust")]
 pub(crate) fn library_module_segments(import: &LibraryImportBinding) -> Vec<String> {
     import.module.module_path.clone()
 }
 
+#[cfg(feature = "hir-rust")]
 pub(crate) fn library_generates_rust_module(
     import: &LibraryImportBinding,
     library_cache: &mut LibraryInterfaceCache,
@@ -518,6 +524,7 @@ pub(crate) fn library_generates_rust_module(
     }))
 }
 
+#[cfg(feature = "hir-rust")]
 pub(crate) fn library_imported_function_params<'entry>(
     import: &LibraryImportBinding,
     entry_types: &mut TypeTable,
