@@ -1,6 +1,6 @@
 # Decision Ledger — Faber Onboarding Stage 1: Dev Kit And Distribution Contract
 
-**Status**: active — Stage 1 decision records accepted (delivery `f77180e`); Stage 2 (payload manifest section) planned
+**Status**: active — Stage 1 decision records accepted (delivery `f77180e`); Stage 2 delivery lowered ([delivery-stage2.md](delivery-stage2.md)), ready for delivery
 **Campaign**: [faber-onboarding](CAMPAIGN.md) — Stage 1 of 10
 **Delivery spec**: [delivery-stage1.md](delivery-stage1.md) (commit `f77180e`)
 **Evidence base**: [golden-path-inventory.md](golden-path-inventory.md) (commit `36e6880d`), evidence E1–E20, lie list G1–G12, §8 handoff

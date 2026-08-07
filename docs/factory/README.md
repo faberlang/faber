@@ -29,8 +29,8 @@ in [`docs/archived/`](../archived/README.md).
 
 | Goal | Status | Done | goal | campaign | delivery | ledger | council | evidence | other |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| [component-release-streamline](component-release-streamline/CAMPAIGN.md) | active | — | 0 | 1 | 2 | 0 | 0 | 0 | 1 |
-| [faber-onboarding](faber-onboarding/CAMPAIGN.md) | active | — | 0 | 1 | 2 | 1 | 0 | 0 | 5 |
+| [component-release-streamline](component-release-streamline/CAMPAIGN.md) | active | — | 0 | 1 | 4 | 0 | 0 | 0 | 1 |
+| [faber-onboarding](faber-onboarding/CAMPAIGN.md) | active | — | 0 | 1 | 3 | 1 | 0 | 0 | 5 |
 | [faber-script-e2e-hardening](faber-script-e2e-hardening/goal.md) | active | — | 1 | 0 | 0 | 1 | 0 | 0 | 34 |
 | [sqlite-library-package](sqlite-library-package/goal.md) | active | — | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
 | [unified-package-manifest](unified-package-manifest/goal.md) | active | — | 1 | 0 | 0 | 0 | 0 | 0 | 0 |

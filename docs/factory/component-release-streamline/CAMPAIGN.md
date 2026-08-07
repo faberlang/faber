@@ -1,6 +1,6 @@
 # Campaign: Component Release Streamline (Faber · Radix · Cista)
 
-**Status**: active — Stage 0 delivered (a7b8faf); Stage 1 delivery lowered, ready for delivery
+**Status**: active — Stage 0 delivered (a7b8faf); Stage 1 delivered (944873a); Stages 2–3 deliveries lowered, ready for delivery
 **Created**: 2026-08-07
 **Mode**: routing artifact — does not implement code or perform releases
 **Control-plane location**: `/Users/ianzepp/work/faberlang/faber/docs/factory/component-release-streamline/`
