@@ -1,10 +1,13 @@
 //! GPU workload floor harness: rung classification and output-checked ratchets.
 //!
 //! This is a measurement harness, not a CUDA implementation. It classifies the
-//! workload rungs through frontend analysis, MIR lowering, device IR staging,
-//! and the currently absent CUDA launch contract. The output-checked floors stay
-//! pinned at zero until producer tracks supply launch/run capability and numeric
-//! comparison can execute against each rung's `*.ref.json`.
+//! workload rungs through frontend analysis, MIR lowering, and device IR
+//! staging. Device execution is proven on the RunPod verification lane and
+//! recorded as a receipt: a rung with a recorded CUDA-route device-execution
+//! proof (launch → sync → readback → numeric oracle against its `*.ref.json`)
+//! counts toward its output-checked floor. Rung 0 (`rung-0-matmul`) closed that
+//! path 2026-08-07 (U-05 receipt, radix a88fc4933); rungs 1–4 stay pinned at
+//! zero until their producer tracks supply launch/run capability.
 
 use super::common::{
     collect_exempla_files, command_available, format_ceiling_line, format_diagnostic_messages,
@@ -58,8 +61,10 @@ struct GpuWorkloadToolchain {
     ptxas_available: bool,
 }
 
-// First measurement baseline: the producer host launch contract is absent.
-const EXPECTED_RUNG_0_OUTPUT_CHECKED_FLOOR: usize = 0;
+// Rung-0 output-checked floor: 0 → 1 via the U-05 device-execution receipt
+// (radix a88fc4933, 2026-08-07) — rung-0-matmul launch → sync → readback →
+// numeric oracle on the RunPod dc-a100 lane; see CUDA_ROUTE_DEVICE_EXECUTION_PROOFS.
+const EXPECTED_RUNG_0_OUTPUT_CHECKED_FLOOR: usize = 1;
 const EXPECTED_RUNG_1_OUTPUT_CHECKED_FLOOR: usize = 0;
 const EXPECTED_RUNG_2_OUTPUT_CHECKED_FLOOR: usize = 0;
 const EXPECTED_RUNG_3_OUTPUT_CHECKED_FLOOR: usize = 0;
@@ -71,15 +76,42 @@ const EXPECTED_RUNG_4_OUTPUT_CHECKED_FLOOR: usize = 0;
 /// text probe cannot verify because no host provider exists. Rung 0–2 route to
 /// the cuda-kernel-emit host provider skeleton; rung 3 routes to the AIR autodiff
 /// producer gate; rung 4 routes to the placement producer gate. This is counted
-/// debt and must ratchet down as those producer gates land.
+/// debt and must ratchet down as those producer gates land. 2026-08-07: rung 0
+/// closed via the U-05 device-execution receipt, so the measured unsupported-gap
+/// count is now at most 4; the ceiling constant stays 5 as the cap.
 const EXPECTED_GPU_UNSUPPORTED_DIAGNOSTIC_CEILING: usize = 5;
+
+/// Recorded CUDA-route device-execution proofs (receipt-gated ratchets).
+///
+/// The harness measures local staging only; device execution is proven on the
+/// RunPod verification lane and recorded as a receipt. A rung listed here
+/// carries an output-checked device-execution claim (launch → sync → readback
+/// → numeric oracle) on the CUDA route and counts toward its output-checked
+/// floor. WebGPU sibling-route proofs (rungs 1–2) are NOT listed here — the
+/// route boundary law never moves CUDA-route floors from sibling-lane evidence.
+const CUDA_ROUTE_DEVICE_EXECUTION_PROOFS: &[(usize, &str)] = &[(
+    0,
+    "rung-0-matmul runpod-gated closure PASS (U-05, radix a88fc4933): dc-a100 \
+     A100-SXM4-80GB CC 8.0, launch grid 1,1,1 block 8,8,1, readback \
+     [58, 64, 139, 154] vs pinned oracle within 1e-5 (worst delta 0), teardown \
+     provider-confirmed; evidence radix docs/factory/codex-gap-campaign/\
+     u05-rung0-matmul-evidence.md + trials receipt \
+     ~/work/ianzepp/trials/runpod-gpu-verification/u05-rung0-a100-final/receipt.md",
+)];
+
+fn cuda_route_device_execution_proof(rung: usize) -> Option<&'static str> {
+    CUDA_ROUTE_DEVICE_EXECUTION_PROOFS
+        .iter()
+        .find(|(rung_idx, _)| *rung_idx == rung)
+        .map(|(_, proof)| *proof)
+}
 
 #[derive(Debug)]
 struct GpuWorkloadResult {
     path: PathBuf,
     rung: usize,
     tier: GpuWorkloadTier,
-    bucket: GpuWorkloadBucket,
+    bucket: Option<GpuWorkloadBucket>,
     reason: String,
 }
 
@@ -157,7 +189,7 @@ fn classify_gpu_workload(
                 file,
                 rung,
                 GpuWorkloadTier::SourceReadable,
-                GpuWorkloadBucket::FrontendFailed,
+                Some(GpuWorkloadBucket::FrontendFailed),
                 format!("cannot read source: {err}"),
             );
         }
@@ -168,7 +200,7 @@ fn classify_gpu_workload(
             file,
             rung,
             GpuWorkloadTier::SourceReadable,
-            GpuWorkloadBucket::ReferenceMissing,
+            Some(GpuWorkloadBucket::ReferenceMissing),
             reason,
         );
     }
@@ -181,7 +213,7 @@ fn classify_gpu_workload(
                     file,
                     rung,
                     GpuWorkloadTier::SourceReadable,
-                    GpuWorkloadBucket::FrontendFailed,
+                    Some(GpuWorkloadBucket::FrontendFailed),
                     format!(
                         "frontend failed: {}",
                         format_diagnostic_messages(&diagnostics)
@@ -199,7 +231,7 @@ fn classify_gpu_workload(
                 file,
                 rung,
                 GpuWorkloadTier::FrontendAnalyzed,
-                GpuWorkloadBucket::MirLoweringFailed,
+                Some(GpuWorkloadBucket::MirLoweringFailed),
                 format!(
                     "MIR lowering failed: {}",
                     errors
@@ -223,7 +255,7 @@ fn classify_gpu_workload(
                 file,
                 rung,
                 GpuWorkloadTier::MirLowered,
-                GpuWorkloadBucket::DeviceStagingFailed,
+                Some(GpuWorkloadBucket::DeviceStagingFailed),
                 format!("device staging failed: {error}"),
             );
         }
@@ -239,7 +271,7 @@ fn classify_gpu_workload(
             file,
             rung,
             GpuWorkloadTier::MirLowered,
-            GpuWorkloadBucket::DeviceStagingFailed,
+            Some(GpuWorkloadBucket::DeviceStagingFailed),
             format!("cannot write device LLVM output: {err}"),
         );
     }
@@ -250,7 +282,7 @@ fn classify_gpu_workload(
                 file,
                 rung,
                 GpuWorkloadTier::MirLowered,
-                GpuWorkloadBucket::DeviceStagingFailed,
+                Some(GpuWorkloadBucket::DeviceStagingFailed),
                 format!(
                     "device LLVM text emitted to {}; verifier failed: {reason}",
                     llvm_file.display()
@@ -264,11 +296,25 @@ fn classify_gpu_workload(
         None => "verifier unavailable; retained emitted device IR".to_owned(),
     };
 
+    if let Some(proof) = cuda_route_device_execution_proof(rung) {
+        return gpu_workload_result(
+            file,
+            rung,
+            GpuWorkloadTier::OutputChecked,
+            None,
+            format!(
+                "device LLVM text staged at {}; {verify_note}; CUDA-route \
+                 device-execution proof recorded: {proof}",
+                llvm_file.display()
+            ),
+        );
+    }
+
     gpu_workload_result(
         file,
         rung,
         GpuWorkloadTier::DeviceStaged,
-        GpuWorkloadBucket::LaunchContractFailed,
+        Some(GpuWorkloadBucket::LaunchContractFailed),
         format!(
             "device LLVM text staged at {}; {verify_note}; CUDA launch provider/runner absent",
             llvm_file.display()
@@ -280,7 +326,7 @@ fn gpu_workload_result(
     file: &Path,
     rung: usize,
     tier: GpuWorkloadTier,
-    bucket: GpuWorkloadBucket,
+    bucket: Option<GpuWorkloadBucket>,
     reason: String,
 ) -> GpuWorkloadResult {
     GpuWorkloadResult {
@@ -608,7 +654,7 @@ fn count_gpu_tier(results: &[GpuWorkloadResult], tier: GpuWorkloadTier) -> usize
 fn count_gpu_bucket(results: &[GpuWorkloadResult], bucket: GpuWorkloadBucket) -> usize {
     results
         .iter()
-        .filter(|result| result.bucket == bucket)
+        .filter(|result| result.bucket == Some(bucket))
         .count()
 }
 

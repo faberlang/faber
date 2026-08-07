@@ -1,7 +1,4 @@
-use super::{
-    tensor_workload_proof_rows, TensorWorkloadProofBucket, TensorWorkloadProofOwner,
-    TensorWorkloadProofTier,
-};
+use super::{tensor_workload_proof_rows, TensorWorkloadProofTier};
 use crate::exempla_e2e::common::{command_available, make_temp_root};
 use crate::exempla_e2e::gpu_workload::read_reference_fixture;
 use radix::driver::Session;
@@ -28,31 +25,25 @@ fn tensor_workload_proof_selects_rung0_matmul() {
 }
 
 #[test]
-fn tensor_workload_proof_records_current_stable_blocker() {
+fn tensor_workload_proof_rung0_is_output_checked_with_receipt() {
     let row = tensor_workload_proof_rows()[0];
 
-    assert_eq!(row.tier, TensorWorkloadProofTier::DeviceStaged);
-    assert_eq!(
-        row.bucket,
-        Some(TensorWorkloadProofBucket::LaunchContractFailed)
-    );
-    assert!(!row.output_checked);
-    assert_eq!(
-        row.blocker_owner,
-        Some(TensorWorkloadProofOwner::CudaKernelEmitHostProvider)
-    );
-    // Measured 2026-08-01 (post-sermo_open-collision-fix): the emitted
-    // device LLVM text now stages and verifies with llvm-as (radix
-    // 663cbfe58 closed the declare+define collision on 2026-07-31 23:07);
-    // the binding blocker is the absent CUDA launch provider.
-    assert!(row.blocker_issue.contains("sermo_open"));
-    assert!(row.blocker_issue.contains("collision"));
-    assert!(row.blocker_issue.contains("663cbfe58"));
-    assert!(row.blocker_issue.contains("host provider"));
-    assert!(row.blocker_issue.contains("SermoOpen"));
-    assert!(row.blocker_issue.contains("cuda:launch"));
-    assert!(row.blocker_issue.contains("no real device executor"));
-    assert!(row.blocker_issue.contains("launch contract step"));
+    // U-06 ratchet (codex-gap Stage 2, task 8199e91d): the rung-0 row moved
+    // off the CUDA launch-contract blocker onto OutputChecked, evidenced by
+    // the U-05 device-execution receipt (radix a88fc4933) — never by a CPU or
+    // staged-LLVM fallback.
+    assert_eq!(row.tier, TensorWorkloadProofTier::OutputChecked);
+    assert_eq!(row.bucket, None);
+    assert!(row.output_checked);
+    assert_eq!(row.blocker_owner, None);
+    assert_eq!(row.blocker_issue, "");
+    // The historical blocker (absent device executor; sermo_open collision
+    // fixed in radix 663cbfe58) is resolved and preserved in the receipt.
+    assert!(row.evidence.contains("a88fc4933"));
+    assert!(row.evidence.contains("u05-rung0-matmul-evidence.md"));
+    assert!(row.evidence.contains("dc-a100"));
+    assert!(row.evidence.contains("worst delta 0"));
+    assert!(row.evidence.contains("output-checked"));
 }
 
 #[test]
@@ -73,20 +64,23 @@ fn tensor_workload_proof_rung0_reference_fixture_is_valid() {
 }
 
 #[test]
-fn tensor_workload_proof_cites_pinned_gpu_baseline() {
+fn tensor_workload_proof_cites_ledger_ratchet_and_receipt() {
     let row = tensor_workload_proof_rows()[0];
 
+    // U-06: evidence anchors the ledger ratchet (baseline-ledger.md rung-0
+    // floor 0→1) and the U-05 device-execution receipt — not a staged-LLVM or
+    // CPU-fallback claim.
     assert!(row
         .evidence
         .contains("gpu-workload-floor/baseline-ledger.md"));
-    assert!(row.evidence.contains("Bucket Ownership"));
-    // U1 (G-P-12+S5): evidence cites the 2026-07-31 re-measurement (with the
-    // measured 2026-08-01 post-collision-fix re-measurement), never the stale
-    // 2026-07-22 remeasurement.
-    assert!(row.evidence.contains("2026-07-31"));
-    assert!(!row.evidence.contains("2026-07-22"));
-    assert!(row.evidence.contains("DeviceStaged"));
-    assert!(row.evidence.contains("LaunchContractFailed"));
+    assert!(row.evidence.contains("baseline-ledger.md"));
+    assert!(row.evidence.contains("rung-0 floor 0→1"));
+    assert!(row.evidence.contains("a88fc4933"));
+    assert!(row.evidence.contains("u05-rung0-matmul-evidence.md"));
+    assert!(row.evidence.contains("receipt.md"));
+    // The stale launch-contract blocker phrasing is gone from the claim.
+    assert!(!row.evidence.contains("LaunchContractFailed"));
+    assert!(!row.evidence.contains("sermo_open"));
 }
 
 #[test]

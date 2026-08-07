@@ -2,7 +2,9 @@
 //!
 //! TARGET: Stage 11 of the tensor systems timeline. These rows consume the GPU
 //! workload floor as measured evidence; they do not implement CUDA launch or
-//! move output floors by themselves.
+//! move output floors by themselves. Rung 0 closed the CUDA-route
+//! `LaunchContractFailed` blocker 2026-08-07 with the U-05 device-execution
+//! receipt (radix a88fc4933) and now carries the output-checked claim.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum TensorWorkloadProofTier {
@@ -25,6 +27,8 @@ pub(super) enum TensorWorkloadProofBucket {
     DeviceStagingFailed,
     /// Launch contract step discovered no real device executor.
     /// SermoOpen returns stub handle, but the kernel cannot be dispatched.
+    /// Rung 0 closed this blocker 2026-08-07 (U-05 device-execution receipt,
+    /// radix a88fc4933); remains the recorded class for future CUDA-route rungs.
     LaunchContractFailed,
     /// The chain staged AND dispatched on the real device path, but the
     /// readback does not match the stepper reference — a device-result
@@ -36,6 +40,9 @@ pub(super) enum TensorWorkloadProofBucket {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum TensorWorkloadProofOwner {
+    /// Resolved for rung 0 2026-08-07 by the U-05 device-execution receipt
+    /// (radix a88fc4933); remains the recorded owner for future CUDA-route
+    /// launch-contract blockers.
     CudaKernelEmitHostProvider,
 }
 
@@ -61,13 +68,12 @@ pub(super) const TENSOR_WORKLOAD_PROOF_ROWS: &[TensorWorkloadProofRow] =
         reference_path: "gpu-workload/rung-0-matmul.ref.json",
         expected_stdout_path: "gpu-workload/rung-0-matmul.expected",
         selected_operation: "rank-2 f32 matmul workload",
-        tier: TensorWorkloadProofTier::DeviceStaged,
-        bucket: Some(TensorWorkloadProofBucket::LaunchContractFailed),
-        output_checked: false,
-        blocker_owner: Some(TensorWorkloadProofOwner::CudaKernelEmitHostProvider),
-        blocker_issue:
-            "sermo_open declare+define collision fixed (radix 663cbfe58, 2026-07-31 23:07): emitted device LLVM text now stages and verifies with llvm-as; binding blocker is the absent CUDA launch provider — host provider for route 'cuda:launch' has no real device executor; SermoOpen returns stub handle but launch contract step discovers no device-side kernel launcher",
-        evidence: "docs/factory/gpu-workload-floor/baseline-ledger.md::Bucket Ownership (2026-07-31 re-measurement); re-measured 2026-08-01 (exempla_gpu_workload_e2e, llvm-as 22.1.8): sermo_open declare+define collision fixed in radix 663cbfe58 (2026-07-31 23:07) — emitted device LLVM text now stages and verifies with llvm-as, so rung 0 re-measured to DeviceStaged/LaunchContractFailed (LaunchContractFailed bucket reappeared per reconcile residual #2); CUDA launch provider/runner absent",
+        tier: TensorWorkloadProofTier::OutputChecked,
+        bucket: None,
+        output_checked: true,
+        blocker_owner: None,
+        blocker_issue: "",
+        evidence: "CUDA-route device-execution + output-checked closure PASS 2026-08-07 (U-05, codex-gap Stage 2, radix commit a88fc4933): rung-0-matmul pinned bundle on the RunPod dc-a100 lane (A100-SXM4-80GB, CC 8.0) — module load, descriptor-driven alloc/copy, plan-driven launch (grid 1,1,1 block 8,8,1), sync, readback [58, 64, 139, 154] vs pinned oracle [58.0, 64.0, 139.0, 154.0] (family matmul, atol 1e-5, worst delta 0), teardown provider-confirmed, overall PASS; evidence chain radix docs/factory/codex-gap-campaign/u05-rung0-matmul-evidence.md + trials receipt ~/work/ianzepp/trials/runpod-gpu-verification/u05-rung0-a100-final/receipt.md + radix docs/factory/gpu-workload-floor/baseline-ledger.md (rung-0 floor 0→1, 2026-08-07). Rungs 1–2 stay WebGPU-output-checked per their existing classification (route boundary law)",
     },
     TensorWorkloadProofRow {
         rung: 1,
