@@ -24,7 +24,7 @@ fn toolchain_available() -> bool {
 }
 
 fn llvm_host_config() -> radix::Config {
-    radix::Config::default().with_target(Target::LlvmHost)
+    radix::Config::default().with_target(Target::MirLlvmHost)
 }
 
 /// Write a single-unit greeting fixture under a temp package dir and return

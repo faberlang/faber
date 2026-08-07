@@ -133,7 +133,7 @@ fn exempla_sexp_e2e() {
 
     let exempla_dir = crate::paths::corpus_dir();
     let exempla = collect_exempla_files(&exempla_dir);
-    let session = Session::new(Config::default().with_target(Target::Sexp));
+    let session = Session::new(Config::default().with_target(Target::MirSexp));
     let temp_root = make_temp_root();
     let mut results = Vec::with_capacity(exempla.len());
     let mut emitted = 0usize;

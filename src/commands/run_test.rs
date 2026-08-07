@@ -9,77 +9,77 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
 fn run_target_name_maps_rust() {
-    assert_eq!(run_target_name(Target::Rust), "rust");
+    assert_eq!(run_target_name(Target::HirRust), "rust");
 }
 
 #[test]
 fn run_target_name_maps_typescript() {
-    assert_eq!(run_target_name(Target::TypeScript), "ts");
+    assert_eq!(run_target_name(Target::HirTypeScript), "ts");
 }
 
 #[test]
 fn run_target_name_maps_go() {
-    assert_eq!(run_target_name(Target::Go), "go");
+    assert_eq!(run_target_name(Target::HirGo), "go");
 }
 
 #[test]
 fn run_target_name_maps_faber() {
-    assert_eq!(run_target_name(Target::Faber), "faber");
+    assert_eq!(run_target_name(Target::HirFaber), "faber");
 }
 
 #[test]
 fn run_target_name_maps_wasm_text() {
-    assert_eq!(run_target_name(Target::WasmText), "wasm-text");
+    assert_eq!(run_target_name(Target::MirWasm), "wasm-text");
 }
 
 #[test]
 fn run_target_name_maps_wasm() {
-    assert_eq!(run_target_name(Target::Wasm), "wasm");
+    assert_eq!(run_target_name(Target::MirWasmBinary), "wasm");
 }
 
 #[test]
 fn run_target_name_maps_llvm_text() {
-    assert_eq!(run_target_name(Target::LlvmText), "llvm-text");
+    assert_eq!(run_target_name(Target::MirLlvm), "llvm-text");
 }
 
 #[test]
 fn run_target_name_maps_metal_text() {
-    assert_eq!(run_target_name(Target::MetalText), "metal-text");
+    assert_eq!(run_target_name(Target::MirMetal), "metal-text");
 }
 
 #[test]
 fn run_target_name_maps_wgsl_text() {
-    assert_eq!(run_target_name(Target::WgslText), "wgsl-text");
+    assert_eq!(run_target_name(Target::MirWgsl), "wgsl-text");
 }
 
 #[test]
 fn run_target_name_maps_sexp() {
-    assert_eq!(run_target_name(Target::Sexp), "sexp");
+    assert_eq!(run_target_name(Target::MirSexp), "sexp");
 }
 
 #[test]
 fn run_target_name_maps_scena() {
-    assert_eq!(run_target_name(Target::Scena), "scena");
+    assert_eq!(run_target_name(Target::MirScena), "scena");
 }
 
 #[test]
 fn run_target_name_maps_fmir_text() {
-    assert_eq!(run_target_name(Target::FmirText), "fmir-text");
+    assert_eq!(run_target_name(Target::MirFmir), "fmir-text");
 }
 
 #[test]
 fn run_target_name_maps_fmir() {
-    assert_eq!(run_target_name(Target::Fmir), "fmir");
+    assert_eq!(run_target_name(Target::MirFmirBinary), "fmir");
 }
 
 #[test]
 fn run_target_name_maps_fmir_bin() {
-    assert_eq!(run_target_name(Target::FmirBin), "fmir-bin");
+    assert_eq!(run_target_name(Target::MirFmirBundle), "fmir-bin");
 }
 
 #[test]
 fn run_target_name_maps_swift() {
-    assert_eq!(run_target_name(Target::Swift), "swift");
+    assert_eq!(run_target_name(Target::HirSwift), "swift");
 }
 
 // ── should_interpret — interpret flag override ────────────────────────────
@@ -87,7 +87,13 @@ fn run_target_name_maps_swift() {
 #[test]
 fn interpret_flag_overrides_package_directory() {
     let dir = temp_dir("interpret-flag-override");
-    let args = run_args(dir.clone(), true, false, None, radix::tool::CliTarget::Rust);
+    let args = run_args(
+        dir.clone(),
+        true,
+        false,
+        None,
+        radix::tool::CliTarget::HirRust,
+    );
     // Even though `dir` is a directory, `--interpret` forces interpreted mode.
     assert!(should_interpret(&args, &dir));
 }
@@ -95,7 +101,13 @@ fn interpret_flag_overrides_package_directory() {
 #[test]
 fn compile_flag_takes_precedence_over_interpret_flag() {
     let fab = PathBuf::from("script.fab");
-    let args = run_args(fab.clone(), true, true, None, radix::tool::CliTarget::Rust);
+    let args = run_args(
+        fab.clone(),
+        true,
+        true,
+        None,
+        radix::tool::CliTarget::HirRust,
+    );
     // `--compile` gates at line 28 return false before `--interpret` is checked.
     assert!(!should_interpret(&args, &fab));
 }
@@ -108,7 +120,7 @@ fn locale_takes_precedence_over_interpret_flag() {
         true,
         false,
         Some("zh-Hans".to_owned()),
-        radix::tool::CliTarget::Rust,
+        radix::tool::CliTarget::HirRust,
     );
     // locale gate at line 23 returns false before `--interpret` is checked.
     assert!(!should_interpret(&args, &fab));
@@ -122,7 +134,7 @@ fn non_rust_target_takes_precedence_over_interpret_flag() {
         true,
         false,
         None,
-        radix::tool::CliTarget::Scena,
+        radix::tool::CliTarget::MirScena,
     );
     // Target gate at line 25 returns false before `--interpret` is checked.
     assert!(!should_interpret(&args, &fab));
@@ -169,7 +181,7 @@ fn interpret_policy_defaults_to_single_fab_file() {
         false,
         false,
         None,
-        radix::tool::CliTarget::Rust,
+        radix::tool::CliTarget::HirRust,
     );
     assert!(should_interpret(&args, &fab));
 }
@@ -177,7 +189,13 @@ fn interpret_policy_defaults_to_single_fab_file() {
 #[test]
 fn compile_flag_overrides_single_fab_file() {
     let fab = PathBuf::from("script.fab");
-    let args = run_args(fab.clone(), false, true, None, radix::tool::CliTarget::Rust);
+    let args = run_args(
+        fab.clone(),
+        false,
+        true,
+        None,
+        radix::tool::CliTarget::HirRust,
+    );
     assert!(!should_interpret(&args, &fab));
 }
 
@@ -189,7 +207,7 @@ fn package_directory_defaults_to_compiled_run_policy() {
         false,
         false,
         None,
-        radix::tool::CliTarget::Rust,
+        radix::tool::CliTarget::HirRust,
     );
 
     assert!(!should_interpret(&args, &dir));
@@ -204,7 +222,7 @@ fn nonexistent_path_does_not_interpret() {
         false,
         false,
         None,
-        radix::tool::CliTarget::Rust,
+        radix::tool::CliTarget::HirRust,
     );
     assert!(!should_interpret(&args, &missing));
 }
@@ -218,7 +236,7 @@ fn nonexistent_path_with_interpret_flag_returns_true() {
         true,
         false,
         None,
-        radix::tool::CliTarget::Rust,
+        radix::tool::CliTarget::HirRust,
     );
     assert!(should_interpret(&args, &missing));
 }
@@ -231,7 +249,7 @@ fn scena_target_never_uses_script_interpret_policy() {
         false,
         false,
         None,
-        radix::tool::CliTarget::Scena,
+        radix::tool::CliTarget::MirScena,
     );
 
     assert!(!should_interpret(&args, &fab));
@@ -245,7 +263,7 @@ fn locale_forces_compiled_run_policy_for_single_fab_file() {
         false,
         false,
         Some("zh-Hans".to_owned()),
-        radix::tool::CliTarget::Rust,
+        radix::tool::CliTarget::HirRust,
     );
 
     assert!(!should_interpret(&args, &fab));
@@ -256,7 +274,7 @@ fn run_config_loads_locale_pack_for_go_targets() {
     let example = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale/th-TH");
 
     let config = run_config(
-        Target::Go,
+        Target::HirGo,
         &example,
         Some("th-TH"),
         None,
@@ -264,7 +282,7 @@ fn run_config_loads_locale_pack_for_go_targets() {
     )
     .expect("run config");
 
-    assert_eq!(config.target, Target::Go);
+    assert_eq!(config.target, Target::HirGo);
     assert_eq!(
         config
             .locale_pack
@@ -278,16 +296,10 @@ fn run_config_loads_locale_pack_for_go_targets() {
 fn run_config_uses_manifest_locale_for_non_rust_targets() {
     let example = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale/th-TH");
 
-    let config = run_config(
-        Target::FmirText,
-        &example,
-        None,
-        None,
-        WarnPolicy::default(),
-    )
-    .expect("run config");
+    let config = run_config(Target::MirFmir, &example, None, None, WarnPolicy::default())
+        .expect("run config");
 
-    assert_eq!(config.target, Target::FmirText);
+    assert_eq!(config.target, Target::MirFmir);
     assert_eq!(
         config
             .locale_pack
@@ -339,7 +351,7 @@ fn run_args_with_backend(path: PathBuf, backend: Option<crate::cli::BackendSelec
         false,
         false,
         None,
-        radix::tool::CliTarget::Fhir,
+        radix::tool::CliTarget::HirFhir,
     );
     args.backend = backend;
     args

@@ -10,7 +10,7 @@ use std::fs;
 #[ignore = "requires external radix-wasm-stub-host; run: cargo test -p exempla --lib wasm_behavior_fixtures_match_stub_host_diag_traces -- --ignored --nocapture"]
 fn wasm_behavior_fixtures_match_stub_host_diag_traces() {
     let exempla_dir = crate::paths::corpus_dir();
-    let session = Session::new(Config::default().with_target(Target::Wasm));
+    let session = Session::new(Config::default().with_target(Target::MirWasmBinary));
     let temp_root = make_temp_root();
 
     for fixture in WASM_BEHAVIOR_FIXTURES {

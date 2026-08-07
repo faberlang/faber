@@ -22,7 +22,7 @@ fn run_cli_source(name: &str, source: &str, args: &[&str]) -> LlvmRunProbe {
     let unique = format!("{name}-{sequence}-{}", std::process::id());
     let session = Session::new(
         Config::default()
-            .with_target(Target::LlvmText)
+            .with_target(Target::MirLlvm)
             .with_dev_stdlib(),
     );
     let mut analysis =

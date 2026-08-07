@@ -411,7 +411,7 @@ fn exempla_ts_e2e() {
     let exempla = collect_exempla_files(&exempla_dir);
 
     let toolchain = detect_ts_toolchain();
-    let session = radix::driver::Session::new(Config::default().with_target(Target::TypeScript));
+    let session = radix::driver::Session::new(Config::default().with_target(Target::HirTypeScript));
     let temp_root = make_temp_root();
     let total = exempla.len();
     let mut expected_count = 0usize;
@@ -956,7 +956,7 @@ fn run_ts_format_tier(toolchain: &TsToolchain, code: &str) -> (TierState, String
             "formatted skipped: no prettier or deno".to_owned(),
         ),
         TsFormatter::Prettier | TsFormatter::Deno => {
-            match radix::tool::format_generated_code(Target::TypeScript, code) {
+            match radix::tool::format_generated_code(Target::HirTypeScript, code) {
                 Ok(formatted) => (TierState::Passed, formatted, String::new()),
                 Err(err) => (
                     TierState::Failed,
@@ -976,7 +976,7 @@ fn run_ts_lint_tier(toolchain: &TsToolchain, code: &str) -> (TierState, String, 
             "linted skipped: no biome or eslint".to_owned(),
         ),
         TsLinter::Biome | TsLinter::Eslint => {
-            match radix::tool::lint_generated_code(Target::TypeScript, code) {
+            match radix::tool::lint_generated_code(Target::HirTypeScript, code) {
                 Ok(fixed) => (TierState::Passed, fixed, String::new()),
                 Err(err) => (
                     TierState::Failed,

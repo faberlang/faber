@@ -24,7 +24,7 @@ fn should_interpret(args: &RunArgs, path: &Path) -> bool {
     if args.locale.is_some() {
         return false;
     }
-    if resolve_run_target(args, path) != Target::Rust {
+    if resolve_run_target(args, path) != Target::HirRust {
         return false;
     }
     if args.compile {
@@ -70,38 +70,41 @@ pub(super) fn cmd_run(args: RunArgs) {
     };
 
     let target = resolve_run_target(&args, &input_path);
-    let device_capable_route = matches!(target, Target::Fmir | Target::FmirText | Target::FmirBin);
+    let device_capable_route = matches!(
+        target,
+        Target::MirFmirBinary | Target::MirFmir | Target::MirFmirBundle
+    );
     if !device_capable_route {
         resolve_route_backend_or_exit(selection, false);
     }
 
     match target {
-        Target::Rust => {}
-        Target::Go => {
+        Target::HirRust => {}
+        Target::HirGo => {
             cmd_run_go(&args);
             return;
         }
-        Target::Scena => {
+        Target::MirScena => {
             cmd_run_scena(args);
             return;
         }
-        Target::FmirText => {
+        Target::MirFmir => {
             cmd_run_fmir_text(args, selection);
             return;
         }
-        Target::Fmir => {
+        Target::MirFmirBinary => {
             cmd_run_fmir(args, selection);
             return;
         }
-        Target::FmirBin => {
+        Target::MirFmirBundle => {
             cmd_run_fmir_bin(&args, selection);
             return;
         }
-        Target::Fhir => {
+        Target::HirFhir => {
             cmd_run_fhir(args);
             return;
         }
-        Target::LlvmHost => {
+        Target::MirLlvmHost => {
             cmd_run_llvm_host(&args);
             return;
         }
@@ -169,23 +172,23 @@ fn resolve_route_backend_or_exit(
 
 fn run_target_name(target: Target) -> &'static str {
     match target {
-        Target::Rust => "rust",
-        Target::TypeScript => "ts",
-        Target::Go => "go",
-        Target::Faber => "faber",
-        Target::WasmText => "wasm-text",
-        Target::Wasm => "wasm",
-        Target::LlvmText => "llvm-text",
-        Target::LlvmHost => "llvm-host",
-        Target::MetalText => "metal-text",
-        Target::WgslText => "wgsl-text",
-        Target::Sexp => "sexp",
-        Target::Scena => "scena",
-        Target::FmirText => "fmir-text",
-        Target::Fmir => "fmir",
-        Target::FmirBin => "fmir-bin",
-        Target::Swift => "swift",
-        Target::Fhir => "fhir",
+        Target::HirRust => "rust",
+        Target::HirTypeScript => "ts",
+        Target::HirGo => "go",
+        Target::HirFaber => "faber",
+        Target::MirWasm => "wasm-text",
+        Target::MirWasmBinary => "wasm",
+        Target::MirLlvm => "llvm-text",
+        Target::MirLlvmHost => "llvm-host",
+        Target::MirMetal => "metal-text",
+        Target::MirWgsl => "wgsl-text",
+        Target::MirSexp => "sexp",
+        Target::MirScena => "scena",
+        Target::MirFmir => "fmir-text",
+        Target::MirFmirBinary => "fmir",
+        Target::MirFmirBundle => "fmir-bin",
+        Target::HirSwift => "swift",
+        Target::HirFhir => "fhir",
     }
 }
 
@@ -221,16 +224,16 @@ fn resolve_run_target(args: &RunArgs, input_path: &Path) -> Target {
         return Target::from(target);
     }
     let Ok(layout) = crate::package::discover_build_layout(input_path) else {
-        return Target::Fhir;
+        return Target::HirFhir;
     };
     if !layout.manifest_path.exists() {
-        return Target::Fhir;
+        return Target::HirFhir;
     }
     let Ok(manifest) = crate::package::read_manifest(&layout.manifest_path) else {
-        return Target::Fhir;
+        return Target::HirFhir;
     };
     crate::package::manifest_build_target(manifest.build.target.as_deref(), &layout.manifest_path)
-        .unwrap_or(Target::Fhir)
+        .unwrap_or(Target::HirFhir)
 }
 
 fn warn_policy_from_args(args: &RunArgs) -> radix::driver::WarnPolicy {
@@ -271,7 +274,7 @@ fn run_config_or_exit(
 fn cmd_run_go(args: &RunArgs) {
     let input_path = PathBuf::from(&args.path);
     let config = run_config_or_exit(
-        Target::Go,
+        Target::HirGo,
         &input_path,
         args.locale.as_deref(),
         args.diagnostic_locale.as_deref(),
@@ -323,7 +326,7 @@ fn cmd_run_scena(args: RunArgs) {
     let argumenta = args.args.clone();
     let mut host = StdioHost::with_argumenta(args.args);
     let config = run_config_or_exit(
-        Target::Scena,
+        Target::MirScena,
         &input_path,
         args.locale.as_deref(),
         args.diagnostic_locale.as_deref(),
@@ -349,7 +352,7 @@ fn cmd_run_fmir_text(args: RunArgs, selection: DeviceSelection) {
     let warn_policy = warn_policy_from_args(&args);
     let mut host = StdioHost::with_argumenta(args.args);
     let config = run_config_or_exit(
-        Target::FmirText,
+        Target::MirFmir,
         &input_path,
         args.locale.as_deref(),
         args.diagnostic_locale.as_deref(),
@@ -381,7 +384,7 @@ fn cmd_run_fmir(args: RunArgs, selection: DeviceSelection) {
     let warn_policy = warn_policy_from_args(&args);
     let mut host = StdioHost::with_argumenta(args.args);
     let config = run_config_or_exit(
-        Target::Fmir,
+        Target::MirFmirBinary,
         &input_path,
         args.locale.as_deref(),
         args.diagnostic_locale.as_deref(),
@@ -415,7 +418,7 @@ fn cmd_run_fhir(args: RunArgs) {
     let warn_policy = warn_policy_from_args(&args);
     let mut host = StdioHost::with_argumenta(args.args);
     let config = run_config_or_exit(
-        Target::Fhir,
+        Target::HirFhir,
         &input_path,
         args.locale.as_deref(),
         args.diagnostic_locale.as_deref(),
@@ -453,7 +456,7 @@ fn cmd_run_fhir(args: RunArgs) {
 fn cmd_run_llvm_host(args: &RunArgs) {
     let input_path = PathBuf::from(&args.path);
     let config = run_config_or_exit(
-        Target::LlvmHost,
+        Target::MirLlvmHost,
         &input_path,
         args.locale.as_deref(),
         args.diagnostic_locale.as_deref(),
@@ -478,7 +481,7 @@ fn cmd_run_llvm_host(args: &RunArgs) {
 fn cmd_run_fmir_bin(args: &RunArgs, selection: DeviceSelection) {
     let input_path = PathBuf::from(&args.path);
     let config = run_config_or_exit(
-        Target::FmirBin,
+        Target::MirFmirBundle,
         &input_path,
         args.locale.as_deref(),
         args.diagnostic_locale.as_deref(),
@@ -546,7 +549,7 @@ fn run_scena_package_with_host<H: radix::mir::Host + ?Sized>(
     argumenta: &[String],
     host: &mut H,
 ) -> Result<(), Vec<radix::diagnostics::Diagnostic>> {
-    let config = radix::driver::Config::default().with_target(Target::Scena);
+    let config = radix::driver::Config::default().with_target(Target::MirScena);
     let artifact = package::build_package_mir_artifact(&config, input_path, argumenta)?;
     package::run_package_mir_artifact(&config, &artifact, host)
 }
@@ -593,7 +596,7 @@ fn cmd_run_compiled(args: &RunArgs) {
     // POLICY: `run` is package-scoped, so stale generated crates are never
     // trusted over the current Faber sources.
     let config = run_config_or_exit(
-        Target::Rust,
+        Target::HirRust,
         &input_path,
         args.locale.as_deref(),
         args.diagnostic_locale.as_deref(),

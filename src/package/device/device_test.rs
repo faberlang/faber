@@ -1177,7 +1177,7 @@ fn companion_forward_and_backward_kernel_set_and_order() {
     let (program, semantics) = super::super::with_lowered_package_mir(
         &radix::driver::Config::default()
             .with_stdlib(dev_norma_library_home())
-            .with_target(radix::codegen::Target::Fmir),
+            .with_target(radix::codegen::Target::MirFmirBinary),
         &entry,
         |lowered| {
             device_program_for_lowered(
@@ -1249,7 +1249,7 @@ fn companion_carrier_round_trips_and_missing_companion_fails_closed() {
     let entry = PathBuf::from("/tmp/s3a2probe/src/probe.fab");
     let config = radix::driver::Config::default()
         .with_stdlib(dev_norma_library_home())
-        .with_target(radix::codegen::Target::Fmir);
+        .with_target(radix::codegen::Target::MirFmirBinary);
     super::super::with_lowered_package_mir(&config, &entry, |lowered| {
         // Round-trip: exactly one carried companion, VJP derivative,
         // device-resident (the primal is a nucleum kernel).
@@ -1305,7 +1305,7 @@ fn with_inline_package<R>(
     std::fs::write(&entry, source).expect("write temp fixture");
     let config = radix::driver::Config::default()
         .with_stdlib(dev_norma_library_home())
-        .with_target(radix::codegen::Target::Fmir);
+        .with_target(radix::codegen::Target::MirFmirBinary);
     super::super::with_lowered_package_mir(&config, &entry, run)
 }
 
@@ -2275,7 +2275,7 @@ fn companion_relation_projected_onto_the_wire() {
     let (program, semantics) = super::super::with_lowered_package_mir(
         &radix::driver::Config::default()
             .with_stdlib(dev_norma_library_home())
-            .with_target(radix::codegen::Target::Fmir),
+            .with_target(radix::codegen::Target::MirFmirBinary),
         &entry,
         |lowered| {
             device_program_for_lowered(
@@ -3314,7 +3314,7 @@ fn with_interpreted_workspace_package<R>(
     std::fs::write(&entry, source).expect("write temp fixture");
     let config = radix::driver::Config::default()
         .with_stdlib(workspace)
-        .with_target(radix::codegen::Target::Fmir);
+        .with_target(radix::codegen::Target::MirFmirBinary);
     super::super::mir::with_interpreted_lowered_package_mir(&config, &entry, run)
 }
 
@@ -3483,7 +3483,7 @@ fn bert_tiny_exemplum_program() -> (DeviceProgram, DeviceSemantics) {
     super::super::mir::with_interpreted_lowered_package_mir(
         &radix::driver::Config::default()
             .with_stdlib(workspace)
-            .with_target(radix::codegen::Target::Fmir),
+            .with_target(radix::codegen::Target::MirFmirBinary),
         &exemplum,
         |lowered| {
             device_program_for_lowered(

@@ -131,7 +131,7 @@ pub(crate) fn plan_package(package: &AnalyzedPackage, target: Target) -> Artifac
 
     let linked = linked_library_crate_map(package);
     let (supported, rejection, entry_artifact) = match target {
-        Target::Rust => {
+        Target::HirRust => {
             plan_rust_artifacts(
                 package,
                 &package_id,
@@ -146,7 +146,7 @@ pub(crate) fn plan_package(package: &AnalyzedPackage, target: Target) -> Artifac
                 .map(|n| n.id.clone());
             (true, None, entry)
         }
-        Target::Go => {
+        Target::HirGo => {
             plan_go_artifacts(package, &package_id, &mut nodes, &mut edges, &mut seen_ids);
             let entry = nodes
                 .iter()
@@ -154,7 +154,7 @@ pub(crate) fn plan_package(package: &AnalyzedPackage, target: Target) -> Artifac
                 .map(|n| n.id.clone());
             (true, None, entry)
         }
-        Target::TypeScript => {
+        Target::HirTypeScript => {
             plan_ts_artifacts(package, &package_id, &mut nodes, &mut edges, &mut seen_ids);
             let entry = nodes
                 .iter()
@@ -162,7 +162,7 @@ pub(crate) fn plan_package(package: &AnalyzedPackage, target: Target) -> Artifac
                 .map(|n| n.id.clone());
             (true, None, entry)
         }
-        Target::Faber => (
+        Target::HirFaber => (
             false,
             Some("package artifact planning does not emit Faber re-source packages yet".to_owned()),
             None,
@@ -384,23 +384,23 @@ fn module_key(module: &ModuleId) -> String {
 
 pub(crate) fn target_name(target: Target) -> &'static str {
     match target {
-        Target::Rust => "rust",
-        Target::TypeScript => "ts",
-        Target::Go => "go",
-        Target::Faber => "faber",
-        Target::Wasm => "wasm",
-        Target::WasmText => "wasm-text",
-        Target::LlvmText => "llvm-text",
-        Target::LlvmHost => "llvm-host",
-        Target::MetalText => "metal-text",
-        Target::WgslText => "wgsl-text",
-        Target::Sexp => "sexp",
-        Target::Scena => "scena",
-        Target::FmirText => "fmir-text",
-        Target::Fmir => "fmir",
-        Target::FmirBin => "fmir-bin",
-        Target::Swift => "swift",
-        Target::Fhir => "fhir",
+        Target::HirRust => "rust",
+        Target::HirTypeScript => "ts",
+        Target::HirGo => "go",
+        Target::HirFaber => "faber",
+        Target::MirWasmBinary => "wasm",
+        Target::MirWasm => "wasm-text",
+        Target::MirLlvm => "llvm-text",
+        Target::MirLlvmHost => "llvm-host",
+        Target::MirMetal => "metal-text",
+        Target::MirWgsl => "wgsl-text",
+        Target::MirSexp => "sexp",
+        Target::MirScena => "scena",
+        Target::MirFmir => "fmir-text",
+        Target::MirFmirBinary => "fmir",
+        Target::MirFmirBundle => "fmir-bin",
+        Target::HirSwift => "swift",
+        Target::HirFhir => "fhir",
     }
 }
 

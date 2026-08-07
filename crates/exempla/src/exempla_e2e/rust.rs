@@ -148,7 +148,8 @@ fn exempla_rust_e2e() {
             // Clippy --fix is intentionally omitted (see tool/commands/postprocess.rs):
             // it spun a second temp Cargo crate per exemplum. Canonicality is the
             // rust-canonical RC-003 tier, not an e2e correctness gate.
-            radix::tool::format_generated_code(radix::codegen::Target::Rust, &code).unwrap_or(code)
+            radix::tool::format_generated_code(radix::codegen::Target::HirRust, &code)
+                .unwrap_or(code)
         });
         let t_compile = tc.elapsed();
 
@@ -649,7 +650,7 @@ pub(super) fn compile_rust_exemplum(
     // plain `Compiler::compile` leaves a bare `use crate::auxilium::…` with no
     // module body.
     let _ = compiler;
-    let result = radix::tool::compile_cli_path(file, false, radix::codegen::Target::Rust);
+    let result = radix::tool::compile_cli_path(file, false, radix::codegen::Target::HirRust);
     match result.output {
         Some(Output::Rust(output)) => Ok(output.code),
         Some(_) => Err("compiler did not produce Rust output".to_owned()),
@@ -716,7 +717,7 @@ fn uses_package_library_import(import_paths: &[String]) -> bool {
 }
 
 fn compile_package_library_exemplum(file: &Path) -> Result<String, String> {
-    let config = radix::driver::Config::default().with_target(radix::codegen::Target::Rust);
+    let config = radix::driver::Config::default().with_target(radix::codegen::Target::HirRust);
     let result = faber_cli::package::compile_package(&config, file);
     match result.output {
         Some(Output::Rust(output)) => Ok(output.code),
@@ -747,7 +748,7 @@ fn compile_importa_package_exemplum(_compiler: &Compiler, entry: &Path) -> Resul
             entry_dir.display()
         )
     })?;
-    let result = radix::tool::compile_cli_path(entry, false, radix::codegen::Target::Rust);
+    let result = radix::tool::compile_cli_path(entry, false, radix::codegen::Target::HirRust);
     std::env::set_current_dir(&previous_cwd)
         .map_err(|err| format!("cannot restore working directory after importa compile: {err}"))?;
     match result.output {

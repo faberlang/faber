@@ -77,7 +77,7 @@ pub(crate) struct GeneratedPackageRust {
 pub(crate) struct PackageCompileResult {
     pub(crate) compile_result: CompileResult,
     /// Go multi-module files `(file name, file body)` for non-entry units,
-    /// populated only for `Target::Go` packages that reached codegen.
+    /// populated only for `Target::HirGo` packages that reached codegen.
     pub(crate) go_modules: Vec<(String, String)>,
 }
 
@@ -229,7 +229,7 @@ pub fn compile_package(config: &Config, input: &Path) -> CompileResult {
 /// multi-module sibling file collection in one result (no hidden thread-local
 /// side channel).
 ///
-/// The `config` must target `Target::Go`; other targets leave
+/// The `config` must target `Target::HirGo`; other targets leave
 /// [`PackageCompileResult::go_modules`] empty.
 pub(crate) fn compile_package_go(config: &Config, input: &Path) -> PackageCompileResult {
     let result = compile_package_internal(config, input, None, false, None);
@@ -386,8 +386,8 @@ fn compile_package_internal(
         }
     };
 
-    if config.target == Target::Go {
-        let plan = super::artifact_plan::plan_package(&package, Target::Go);
+    if config.target == Target::HirGo {
+        let plan = super::artifact_plan::plan_package(&package, Target::HirGo);
         if !plan.supported {
             return compile_failure(vec![crate::package_diagnostic_error(
                 plan.rejection.unwrap_or_else(|| {
@@ -401,7 +401,7 @@ fn compile_package_internal(
         return generate_package_go_result(&package, input);
     }
 
-    if config.target != Target::Rust {
+    if config.target != Target::HirRust {
         let plan = super::artifact_plan::plan_package(&package, config.target);
         if !plan.supported {
             return compile_failure(vec![crate::package_diagnostic_error(
@@ -488,7 +488,7 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Packag
         if unit.is_entry {
             continue;
         }
-        match radix::codegen::generate_from_analyzed(Target::Go, &unit.analysis, &go_surface) {
+        match radix::codegen::generate_from_analyzed(Target::HirGo, &unit.analysis, &go_surface) {
             Ok(Output::Go(output)) => {
                 let body = super::go_build::strip_go_preamble(&output.code);
                 let funcs = super::go_build::parse_go_func_sigs(&body);
@@ -544,7 +544,11 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Packag
             }
         },
         None => {
-            match radix::codegen::generate_from_analyzed(Target::Go, &entry.analysis, &go_surface) {
+            match radix::codegen::generate_from_analyzed(
+                Target::HirGo,
+                &entry.analysis,
+                &go_surface,
+            ) {
                 Ok(Output::Go(output)) => output.code,
                 Ok(_) => {
                     diagnostics.push(

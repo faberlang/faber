@@ -3,21 +3,21 @@
 use radix::tool::{target_capabilities_for_surface, TargetCommandSurface};
 
 const FABER_TARGET_ROWS: &[(radix::codegen::Target, &str)] = &[
-    (radix::codegen::Target::Rust, "rust"),
-    (radix::codegen::Target::Fhir, "fhir"),
-    (radix::codegen::Target::FmirText, "fmir-text"),
-    (radix::codegen::Target::Fmir, "fmir"),
-    (radix::codegen::Target::FmirBin, "fmir-bin"),
-    (radix::codegen::Target::Faber, "faber"),
-    (radix::codegen::Target::Go, "go"),
-    (radix::codegen::Target::Wasm, "wasm"),
-    (radix::codegen::Target::WasmText, "wasm-text"),
-    (radix::codegen::Target::LlvmText, "llvm-text"),
-    (radix::codegen::Target::LlvmHost, "llvm-host"),
-    (radix::codegen::Target::MetalText, "metal-text"),
-    (radix::codegen::Target::WgslText, "wgsl-text"),
-    (radix::codegen::Target::Sexp, "sexp"),
-    (radix::codegen::Target::TypeScript, "ts"),
+    (radix::codegen::Target::HirRust, "rust"),
+    (radix::codegen::Target::HirFhir, "fhir"),
+    (radix::codegen::Target::MirFmir, "fmir-text"),
+    (radix::codegen::Target::MirFmirBinary, "fmir"),
+    (radix::codegen::Target::MirFmirBundle, "fmir-bin"),
+    (radix::codegen::Target::HirFaber, "faber"),
+    (radix::codegen::Target::HirGo, "go"),
+    (radix::codegen::Target::MirWasmBinary, "wasm"),
+    (radix::codegen::Target::MirWasm, "wasm-text"),
+    (radix::codegen::Target::MirLlvm, "llvm-text"),
+    (radix::codegen::Target::MirLlvmHost, "llvm-host"),
+    (radix::codegen::Target::MirMetal, "metal-text"),
+    (radix::codegen::Target::MirWgsl, "wgsl-text"),
+    (radix::codegen::Target::MirSexp, "sexp"),
+    (radix::codegen::Target::HirTypeScript, "ts"),
 ];
 
 pub(crate) fn cmd_targets() {

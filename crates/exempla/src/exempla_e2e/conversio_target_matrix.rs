@@ -356,9 +356,9 @@ fn measure_hir_target(
                 };
             }
             let target_kind = match target {
-                ConversioCoverageTarget::TypeScript => Target::TypeScript,
-                ConversioCoverageTarget::Go => Target::Go,
-                ConversioCoverageTarget::Faber => Target::Faber,
+                ConversioCoverageTarget::TypeScript => Target::HirTypeScript,
+                ConversioCoverageTarget::Go => Target::HirGo,
+                ConversioCoverageTarget::Faber => Target::HirFaber,
                 _ => unreachable!(),
             };
             let latin_pack = latin_locale_pack();

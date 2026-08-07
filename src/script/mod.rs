@@ -42,7 +42,7 @@ pub fn run_named(
     source: &str,
     host: &mut dyn Host,
 ) -> Result<ExitCode, RunSourceError> {
-    let config = crate::package::default_config_with_locale(Target::TypeScript)
+    let config = crate::package::default_config_with_locale(Target::HirTypeScript)
         .map_err(|diagnostic| RunSourceError::Frontend(vec![*diagnostic]))?
         .with_dev_stdlib();
     let session = Session::new(config);

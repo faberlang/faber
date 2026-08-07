@@ -315,8 +315,8 @@ fn build_rust_lane(
         }
         let code = rust::compile_rust_exemplum(&compiler, path, corpus_root)
             .unwrap_or_else(|reason| panic!("Rust oracle compile failed for {relative}: {reason}"));
-        let code =
-            radix::tool::format_generated_code(radix::codegen::Target::Rust, &code).unwrap_or(code);
+        let code = radix::tool::format_generated_code(radix::codegen::Target::HirRust, &code)
+            .unwrap_or(code);
         let stem = path
             .file_stem()
             .and_then(|value| value.to_str())
@@ -409,7 +409,7 @@ fn build_llvm_lane(
                 // frontmatter since 2026-08-04).
                 let session = radix::driver::Session::new(
                     radix::Config::default()
-                        .with_target(radix::codegen::Target::LlvmText)
+                        .with_target(radix::codegen::Target::MirLlvm)
                         .with_dev_stdlib(),
                 );
                 let result =

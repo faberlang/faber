@@ -14,7 +14,7 @@ fn llvm_host_exitus_declared_exit_code_matches_rust_oracle() {
     let source = fs::read_to_string(&fab_path).expect("read exitus.fab");
     let session = radix::driver::Session::new(
         Config::default()
-            .with_target(Target::LlvmText)
+            .with_target(Target::MirLlvm)
             .with_dev_stdlib(),
     );
     let mut analysis = radix::driver::analyze_source(&session, "exitus.fab", &source)
@@ -79,7 +79,7 @@ fn llvm_host_membrum_optional_chain_nota_matches_expected() {
     let fab_path = crate::paths::corpus_dir().join("membrum/membrum.fab");
     let result = Compiler::new(
         Config::default()
-            .with_target(Target::LlvmText)
+            .with_target(Target::MirLlvm)
             .with_dev_stdlib(),
     )
     .compile(&fab_path);
@@ -121,7 +121,7 @@ fn llvm_host_membrum_optional_chain_nota_matches_expected() {
 #[ignore = "slow LLVM host link+run; run: cargo test -p exempla --test e2e_harness llvm_host_solum_lege_generic -- --ignored --nocapture"]
 fn llvm_host_solum_lege_generic_fixture_matches_rust_output() {
     let fab_path = crate::paths::corpus_dir().join("ad/solum-lege-generic.fab");
-    let config = radix::Config::default().with_target(Target::LlvmText);
+    let config = radix::Config::default().with_target(Target::MirLlvm);
     let llvm = faber_cli::package::with_lowered_package_mir(&config, &fab_path, |lowered| {
         let interner = lowered
             .validated
@@ -159,7 +159,7 @@ fn llvm_host_solum_lege_generic_fixture_matches_rust_output() {
 /// Helper: compile a fab file to LLVM text, write the .ll, run it, and assert OutputMatched.
 fn assert_llvm_text_output_matches(fab_relative: &str, stem: &str) {
     let fab_path = crate::paths::corpus_dir().join(fab_relative);
-    let result = Compiler::new(Config::default().with_target(Target::LlvmText)).compile(&fab_path);
+    let result = Compiler::new(Config::default().with_target(Target::MirLlvm)).compile(&fab_path);
     assert!(result.success(), "{fab_relative} LLVM compile failed");
     let Some(Output::LlvmText(output)) = result.output else {
         panic!("{fab_relative} did not produce LLVM text");
@@ -179,7 +179,7 @@ fn assert_llvm_text_output_matches(fab_relative: &str, stem: &str) {
 #[test]
 fn llvm_host_vertical_salve_munde_matches_raw_expected_bytes() {
     let fab_path = crate::paths::corpus_dir().join("incipit/salve-munde.fab");
-    let result = Compiler::new(Config::default().with_target(Target::LlvmText)).compile(&fab_path);
+    let result = Compiler::new(Config::default().with_target(Target::MirLlvm)).compile(&fab_path);
     assert!(result.success(), "salve-munde LLVM compile failed");
     let Some(Output::LlvmText(output)) = result.output else {
         panic!("salve-munde did not produce LLVM text");
@@ -204,7 +204,7 @@ fn llvm_host_vertical_salve_munde_matches_raw_expected_bytes() {
 #[test]
 fn llvm_host_boolean_display_matches_raw_expected_bytes() {
     let fab_path = crate::paths::corpus_dir().join("literalia/boolean.fab");
-    let result = Compiler::new(Config::default().with_target(Target::LlvmText)).compile(&fab_path);
+    let result = Compiler::new(Config::default().with_target(Target::MirLlvm)).compile(&fab_path);
     assert!(result.success(), "boolean LLVM compile failed");
     let Some(Output::LlvmText(output)) = result.output else {
         panic!("boolean fixture did not produce LLVM text");
@@ -244,7 +244,7 @@ fn llvm_host_verum_matches_raw_expected_bytes() {
 #[test]
 fn llvm_host_vide_diagnostic_text_matches_raw_expected_bytes() {
     let fab_path = crate::paths::corpus_dir().join("vide/vide.fab");
-    let result = Compiler::new(Config::default().with_target(Target::LlvmText)).compile(&fab_path);
+    let result = Compiler::new(Config::default().with_target(Target::MirLlvm)).compile(&fab_path);
     assert!(result.success(), "vide/vide.fab LLVM compile failed");
     let Some(Output::LlvmText(output)) = result.output else {
         panic!("vide/vide.fab did not produce LLVM text");
@@ -271,7 +271,7 @@ fn llvm_host_vide_diagnostic_text_matches_raw_expected_bytes() {
 #[test]
 fn llvm_host_mone_diagnostic_text_matches_raw_expected_bytes() {
     let fab_path = crate::paths::corpus_dir().join("mone/mone.fab");
-    let result = Compiler::new(Config::default().with_target(Target::LlvmText)).compile(&fab_path);
+    let result = Compiler::new(Config::default().with_target(Target::MirLlvm)).compile(&fab_path);
     assert!(result.success(), "mone/mone.fab LLVM compile failed");
     let Some(Output::LlvmText(output)) = result.output else {
         panic!("mone/mone.fab did not produce LLVM text");
@@ -322,7 +322,7 @@ fn llvm_host_scriptum_matches_raw_expected_bytes() {
 #[test]
 fn llvm_host_textus_query_smoke_matches_declared_contract() {
     let fab_path = crate::paths::corpus_dir().join("intrinseca/textus-quaestiones.fab");
-    let result = Compiler::new(Config::default().with_target(Target::LlvmText)).compile(&fab_path);
+    let result = Compiler::new(Config::default().with_target(Target::MirLlvm)).compile(&fab_path);
     assert!(result.success(), "textus-quaestiones LLVM compile failed");
     let Some(Output::LlvmText(output)) = result.output else {
         panic!("textus-quaestiones did not produce LLVM text");
@@ -345,7 +345,7 @@ fn llvm_host_textus_query_smoke_matches_declared_contract() {
 #[test]
 fn llvm_host_nota_grouping_matches_declared_stream_contract() {
     let fab_path = crate::paths::corpus_dir().join("nota/gradus.fab");
-    let result = Compiler::new(Config::default().with_target(Target::LlvmText)).compile(&fab_path);
+    let result = Compiler::new(Config::default().with_target(Target::MirLlvm)).compile(&fab_path);
     assert!(result.success(), "nota/gradus.fab LLVM compile failed");
     let Some(Output::LlvmText(output)) = result.output else {
         panic!("nota/gradus.fab did not produce LLVM text");
@@ -400,7 +400,7 @@ fn llvm_host_iace_matches_raw_expected_bytes() {
 #[test]
 fn llvm_host_fac_cape_failable_fixture_matches_rust_output() {
     let fab_path = crate::paths::corpus_dir().join("fac/fac-cape.fab");
-    let result = Compiler::new(Config::default().with_target(Target::LlvmText)).compile(&fab_path);
+    let result = Compiler::new(Config::default().with_target(Target::MirLlvm)).compile(&fab_path);
     assert!(result.success(), "fac/fac-cape.fab LLVM compile failed");
     let Some(Output::LlvmText(output)) = result.output else {
         panic!("fac/fac-cape.fab did not produce LLVM text");
@@ -424,7 +424,7 @@ fn llvm_host_instans_failable_fixture_matches_rust_output() {
     let fab_path = crate::paths::corpus_dir().join("conversio/fallibilis.fab");
     let result = Compiler::new(
         Config::default()
-            .with_target(Target::LlvmText)
+            .with_target(Target::MirLlvm)
             .with_dev_stdlib(),
     )
     .compile(&fab_path);
@@ -477,7 +477,7 @@ fn llvm_host_instans_valor_carrier_matches_raw_expected_bytes() {
 #[test]
 fn llvm_host_regex_conversion_fixture_matches_raw_expected_bytes() {
     let fab_path = crate::paths::corpus_dir().join("conversio/regex.fab");
-    let result = Compiler::new(Config::default().with_target(Target::LlvmText)).compile(&fab_path);
+    let result = Compiler::new(Config::default().with_target(Target::MirLlvm)).compile(&fab_path);
     assert!(result.success(), "conversio/regex.fab LLVM compile failed");
     let Some(Output::LlvmText(output)) = result.output else {
         panic!("conversio/regex.fab did not produce LLVM text");
@@ -498,7 +498,7 @@ fn llvm_host_regex_conversion_fixture_matches_raw_expected_bytes() {
 #[test]
 fn llvm_host_valor_scalar_conversion_fixture_matches_raw_expected_bytes() {
     let fab_path = crate::paths::corpus_dir().join("conversio/valor-scalaria.fab");
-    let result = Compiler::new(Config::default().with_target(Target::LlvmText)).compile(&fab_path);
+    let result = Compiler::new(Config::default().with_target(Target::MirLlvm)).compile(&fab_path);
     assert!(
         result.success(),
         "conversio/valor-scalaria.fab LLVM compile failed"
@@ -533,7 +533,7 @@ fn llvm_host_octet_unsigned_display_matches_rust_output() {
     let fab_path = crate::paths::corpus_dir().join("octet/octet.fab");
     let result = Compiler::new(
         Config::default()
-            .with_target(Target::LlvmText)
+            .with_target(Target::MirLlvm)
             .with_dev_stdlib(),
     )
     .compile(&fab_path);
@@ -572,7 +572,7 @@ fn llvm_host_modular_word_unsigned_display_matches_rust_output() {
     let fab_path = crate::paths::corpus_dir().join("operatores/modular-word-sha-round.fab");
     let result = Compiler::new(
         Config::default()
-            .with_target(Target::LlvmText)
+            .with_target(Target::MirLlvm)
             .with_dev_stdlib(),
     )
     .compile(&fab_path);
@@ -611,7 +611,7 @@ fn llvm_host_f64_format_matches_rust_output() {
     let fab_path = crate::paths::corpus_dir().join("mori/mori.fab");
     let result = Compiler::new(
         Config::default()
-            .with_target(Target::LlvmText)
+            .with_target(Target::MirLlvm)
             .with_dev_stdlib(),
     )
     .compile(&fab_path);
@@ -648,7 +648,7 @@ fn assert_tensor_fixture_output(fab_relative: &str, stem: &str) {
     let fab_path = crate::paths::corpus_dir().join(fab_relative);
     let result = Compiler::new(
         Config::default()
-            .with_target(Target::LlvmText)
+            .with_target(Target::MirLlvm)
             .with_dev_stdlib(),
     )
     .compile(&fab_path);
@@ -723,7 +723,7 @@ fn assert_opaque_fixture_output(fab_relative: &str, stem: &str) {
     let fab_path = crate::paths::corpus_dir().join(fab_relative);
     let result = Compiler::new(
         Config::default()
-            .with_target(Target::LlvmText)
+            .with_target(Target::MirLlvm)
             .with_dev_stdlib(),
     )
     .compile(&fab_path);
@@ -760,7 +760,7 @@ fn assert_opaque_fixture_stdout(fab_relative: &str, stem: &str, expected: &str) 
     let fab_path = crate::paths::corpus_dir().join(fab_relative);
     let result = Compiler::new(
         Config::default()
-            .with_target(Target::LlvmText)
+            .with_target(Target::MirLlvm)
             .with_dev_stdlib(),
     )
     .compile(&fab_path);
@@ -913,7 +913,7 @@ fn assert_option_fixture_output(fab_relative: &str, stem: &str) {
     let fab_path = crate::paths::corpus_dir().join(fab_relative);
     let result = Compiler::new(
         Config::default()
-            .with_target(Target::LlvmText)
+            .with_target(Target::MirLlvm)
             .with_dev_stdlib(),
     )
     .compile(&fab_path);
@@ -995,7 +995,7 @@ fn assert_genus_fixture_output(fab_relative: &str, stem: &str) {
     let fab_path = crate::paths::corpus_dir().join(fab_relative);
     let result = Compiler::new(
         Config::default()
-            .with_target(Target::LlvmText)
+            .with_target(Target::MirLlvm)
             .with_dev_stdlib(),
     )
     .compile(&fab_path);
@@ -1050,7 +1050,7 @@ fn llvm_host_genus_creo_hook_matches_rust_output() {
     let fab_path = crate::paths::corpus_dir().join("genus/creo.fab");
     let result = Compiler::new(
         Config::default()
-            .with_target(Target::LlvmText)
+            .with_target(Target::MirLlvm)
             .with_dev_stdlib(),
     )
     .compile(&fab_path);
@@ -1110,7 +1110,7 @@ fn llvm_host_importa_two_module_link_matches_rust_oracle() {
     const EXTERNAL_SALUTA: &str = "__faber_external_product_importa_module_auxilium_func_saluta";
     let fab_path = crate::paths::corpus_dir().join("importa/importa.fab");
     let temp_root = super::super::common::make_temp_root();
-    let config = radix::Config::default().with_target(Target::LlvmText);
+    let config = radix::Config::default().with_target(Target::MirLlvm);
     let runtime_archive = llvm_runtime_archive().expect("LLVM host runtime archive");
     let options = faber_cli::package::PackageLlvmOptions::new(temp_root.join("importa.modules"))
         .with_runtime_archive(Some(runtime_archive));
@@ -1222,7 +1222,7 @@ incipit {
     fs::write(package_dir.join("geminus.expected"), "Salve, Tullia!\n").expect("write expected");
     let fab_path = package_dir.join("geminus.fab");
 
-    let config = radix::Config::default().with_target(Target::LlvmText);
+    let config = radix::Config::default().with_target(Target::MirLlvm);
     let runtime_archive = llvm_runtime_archive().expect("LLVM host runtime archive");
     let options = faber_cli::package::PackageLlvmOptions::new(temp_root.join("geminus.modules"))
         .with_runtime_archive(Some(runtime_archive));
@@ -1337,7 +1337,7 @@ incipit {
     fs::write(package_dir.join("chorda-consumer.expected"), EXPECTED).expect("write expected");
     let fab_path = package_dir.join("chorda-consumer.fab");
 
-    let config = radix::Config::default().with_target(Target::LlvmText);
+    let config = radix::Config::default().with_target(Target::MirLlvm);
     let runtime_archive = llvm_runtime_archive().expect("LLVM host runtime archive");
     let options = faber_cli::package::PackageLlvmOptions::new(temp_root.join("chorda.modules"))
         .with_runtime_archive(Some(runtime_archive));
@@ -1438,7 +1438,7 @@ fn llvm_host_declaration_only_entry_matches_rust_oracle() {
     let fab_path = crate::paths::corpus_dir().join("proba/proba.fab");
     let result = Compiler::new(
         Config::default()
-            .with_target(Target::LlvmText)
+            .with_target(Target::MirLlvm)
             .with_dev_stdlib(),
     )
     .compile(&fab_path);
@@ -1485,7 +1485,7 @@ fn llvm_host_module_scope_statements_execute_once_in_order() {
     let source = "nota \"prima\"\nnota \"secunda\"\nnota \"tertia\"\n";
     let session = radix::driver::Session::new(
         Config::default()
-            .with_target(Target::LlvmText)
+            .with_target(Target::MirLlvm)
             .with_dev_stdlib(),
     );
     let mut analysis = radix::driver::analyze_source(&session, "module-scope.fab", source)
@@ -1531,7 +1531,7 @@ fn llvm_host_argumenta_binding_reads_process_argv() {
     let source = "incipit argumenta args {\n    nota args[0]\n}\n";
     let session = radix::driver::Session::new(
         Config::default()
-            .with_target(Target::LlvmText)
+            .with_target(Target::MirLlvm)
             .with_dev_stdlib(),
     );
     let mut analysis = radix::driver::analyze_source(&session, "argumenta.fab", source)
@@ -1590,7 +1590,7 @@ fn llvm_host_runtime_failure_propagates_status() {
     let source = "incipit {\n    adfirma 1 + 1 ≡ 3\n}\n";
     let session = radix::driver::Session::new(
         Config::default()
-            .with_target(Target::LlvmText)
+            .with_target(Target::MirLlvm)
             .with_dev_stdlib(),
     );
     let mut analysis = radix::driver::analyze_source(&session, "runtime-failure.fab", source)
@@ -1637,7 +1637,7 @@ fn assert_llvm_host_fixture_exits_zero(path: &str) {
     let source = fs::read_to_string(&fab_path).expect("read fixture source");
     let session = radix::driver::Session::new(
         Config::default()
-            .with_target(Target::LlvmText)
+            .with_target(Target::MirLlvm)
             .with_dev_stdlib(),
     );
     let mut analysis = radix::driver::analyze_source(&session, path, &source)
@@ -1719,7 +1719,7 @@ fn llvm_host_nonnull_chain_matches() {
         let fab_path = crate::paths::corpus_dir().join(path);
         let result = Compiler::new(
             Config::default()
-                .with_target(Target::LlvmText)
+                .with_target(Target::MirLlvm)
                 .with_dev_stdlib(),
         )
         .compile(&fab_path);
@@ -1766,7 +1766,7 @@ fn llvm_host_de_borrowed_iteration_matches_rust_output() {
     let fab_path = crate::paths::corpus_dir().join("de/de.fab");
     let result = Compiler::new(
         Config::default()
-            .with_target(Target::LlvmText)
+            .with_target(Target::MirLlvm)
             .with_dev_stdlib(),
     )
     .compile(&fab_path);
@@ -1803,7 +1803,7 @@ fn llvm_host_octeti_unify_cross_assignment_matches_rust_output() {
     let fab_path = crate::paths::corpus_dir().join("octeti/unify.fab");
     let result = Compiler::new(
         Config::default()
-            .with_target(Target::LlvmText)
+            .with_target(Target::MirLlvm)
             .with_dev_stdlib(),
     )
     .compile(&fab_path);
@@ -1839,7 +1839,7 @@ fn llvm_host_numerus_overflow_panics_with_rust_message() {
     let fab_path = crate::paths::corpus_dir().join("operatores/numerus-overflow.fab");
     let result = Compiler::new(
         Config::default()
-            .with_target(Target::LlvmText)
+            .with_target(Target::MirLlvm)
             .with_dev_stdlib(),
     )
     .compile(&fab_path);
@@ -1882,7 +1882,7 @@ fn llvm_host_tensor_structa_count_mismatch_panics_with_rust_message() {
     let fab_path = crate::paths::corpus_dir().join("tensor/method-errors.fab");
     let result = Compiler::new(
         Config::default()
-            .with_target(Target::LlvmText)
+            .with_target(Target::MirLlvm)
             .with_dev_stdlib(),
     )
     .compile(&fab_path);
@@ -2013,7 +2013,7 @@ fn llvm_host_destructura_objectum_exit_zero() {
     let fab_path = crate::paths::corpus_dir().join("destructura/objectum.fab");
     let result = Compiler::new(
         Config::default()
-            .with_target(Target::LlvmText)
+            .with_target(Target::MirLlvm)
             .with_dev_stdlib(),
     )
     .compile(&fab_path);
@@ -2079,7 +2079,7 @@ fn llvm_host_conversio_fallibilis_grouped_nota_matches_rust_output() {
     let fab_path = crate::paths::corpus_dir().join("conversio/fallibilis.fab");
     let result = Compiler::new(
         Config::default()
-            .with_target(Target::LlvmText)
+            .with_target(Target::MirLlvm)
             .with_dev_stdlib(),
     )
     .compile(&fab_path);

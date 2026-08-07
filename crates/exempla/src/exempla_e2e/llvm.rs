@@ -109,7 +109,7 @@ fn exempla_llvm_e2e() {
         "LLVM e2e harness found no exempla files"
     );
 
-    let session = Session::new(Config::default().with_target(Target::LlvmText));
+    let session = Session::new(Config::default().with_target(Target::MirLlvm));
     let temp_root = make_temp_root();
     let toolchain = detect_llvm_toolchain();
     let mut results = Vec::with_capacity(exempla.len());
@@ -224,7 +224,7 @@ fn classify_builder_llvm_exemplum(
     // `radix/stdlib` — which has no `norma` provider repo — so the builder is
     // always called with the product config; the session stays for the
     // single-file fallback lane below.
-    let builder_config = radix::Config::default().with_target(Target::LlvmText);
+    let builder_config = radix::Config::default().with_target(Target::MirLlvm);
     let build = match faber_cli::package::build_package_llvm(&builder_config, file, &options) {
         Ok(build) => build,
         Err(diagnostics) => {
@@ -940,7 +940,7 @@ fn stage8_entry_cli_package_builder_parity() {
     );
     let session = Session::new(
         Config::default()
-            .with_target(Target::LlvmText)
+            .with_target(Target::MirLlvm)
             .with_dev_stdlib(),
     );
     let mut failures = Vec::new();
@@ -994,8 +994,8 @@ fn stage8_rust_lane(
             .into_owned();
         let code = super::rust::compile_rust_exemplum(&compiler, path, corpus_root)
             .unwrap_or_else(|reason| panic!("Rust oracle compile failed for {relative}: {reason}"));
-        let code =
-            radix::tool::format_generated_code(radix::codegen::Target::Rust, &code).unwrap_or(code);
+        let code = radix::tool::format_generated_code(radix::codegen::Target::HirRust, &code)
+            .unwrap_or(code);
         let stem = path
             .file_stem()
             .and_then(|value| value.to_str())

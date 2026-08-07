@@ -49,7 +49,7 @@ fn assert_plain_render_contract(rendered: &str, header: &str) {
 fn assert_locale_pack_contains(locale: &str, fault_rel: &str, expected_code: &[&str]) {
     let fault = locale_fault_path(locale, fault_rel);
     let (_config, pack) =
-        config_with_locale(Target::Rust, &fault, Some(locale), None).expect("reader config");
+        config_with_locale(Target::HirRust, &fault, Some(locale), None).expect("reader config");
     let pack = pack.expect("reader pack");
     for code in expected_code {
         assert!(
@@ -87,7 +87,7 @@ fn package_render_lex004_unexpected_character_vi() {
 fn assert_single_locale_lex004(locale: &str) {
     let fault = locale_fault_path(locale, "faults/non-ascii-number.fab");
     let (config, pack) =
-        config_with_locale(Target::Rust, &fault, Some(locale), None).expect("reader config");
+        config_with_locale(Target::HirRust, &fault, Some(locale), None).expect("reader config");
     let pack = pack.expect("reader pack");
     assert_eq!(pack.metadata.id.as_str(), locale);
     assert!(pack
@@ -124,7 +124,7 @@ fn assert_single_locale_lex004(locale: &str) {
 fn package_render_emits_thai_sem010_initializer_mismatch() {
     let fault = locale_fault_path("th-TH", "faults/type-mismatch.fab");
     let (config, pack) =
-        config_with_locale(Target::Rust, &fault, Some("th-TH"), None).expect("reader config");
+        config_with_locale(Target::HirRust, &fault, Some("th-TH"), None).expect("reader config");
     let pack = pack.expect("reader pack");
     assert!(pack.diagnostics.contains_key("SEM010"));
 
@@ -156,7 +156,7 @@ fn package_render_emits_thai_sem010_initializer_mismatch() {
 fn package_render_preserves_bidi_for_arabic_sem010() {
     let fault = locale_fault_path("ar", "faults/type-mismatch.fab");
     let (config, pack) =
-        config_with_locale(Target::Rust, &fault, Some("ar"), None).expect("reader config");
+        config_with_locale(Target::HirRust, &fault, Some("ar"), None).expect("reader config");
     let pack = pack.expect("reader pack");
     assert!(pack
         .diagnostics
@@ -211,7 +211,7 @@ fn package_render_emits_sem010_initializer_mismatch_vi() {
 fn assert_single_locale_sem010(locale: &str, fault_rel: &str) {
     let fault = locale_fault_path(locale, fault_rel);
     let (config, pack) =
-        config_with_locale(Target::Rust, &fault, Some(locale), None).expect("reader config");
+        config_with_locale(Target::HirRust, &fault, Some(locale), None).expect("reader config");
     let pack = pack.expect("reader pack");
     assert!(pack.diagnostics.contains_key("SEM010"));
 
@@ -243,7 +243,7 @@ fn assert_single_locale_sem010(locale: &str, fault_rel: &str) {
 fn assert_single_locale_sem010_or_sem001(locale: &str, fault_rel: &str) {
     let fault = locale_fault_path(locale, fault_rel);
     let (config, pack) =
-        config_with_locale(Target::Rust, &fault, Some(locale), None).expect("reader config");
+        config_with_locale(Target::HirRust, &fault, Some(locale), None).expect("reader config");
     let pack = pack.expect("reader pack");
     assert!(pack.diagnostics.contains_key("SEM010"));
 
@@ -300,7 +300,7 @@ fn assert_single_locale_sem010_or_sem001(locale: &str, fault_rel: &str) {
 fn assert_single_locale_sem010_accepts_reader001(locale: &str, fault_rel: &str) {
     let fault = locale_fault_path(locale, fault_rel);
     let (config, pack) =
-        config_with_locale(Target::Rust, &fault, Some(locale), None).expect("reader config");
+        config_with_locale(Target::HirRust, &fault, Some(locale), None).expect("reader config");
     let pack = pack.expect("reader pack");
     assert!(pack.diagnostics.contains_key("SEM010"));
 
@@ -399,7 +399,7 @@ fn package_render_emits_sem001_unknown_identifier_vi() {
 fn assert_single_locale_sem001_or_reader001(locale: &str, fault_rel: &str) {
     let fault = locale_fault_path(locale, fault_rel);
     let (config, pack) =
-        config_with_locale(Target::Rust, &fault, Some(locale), None).expect("reader config");
+        config_with_locale(Target::HirRust, &fault, Some(locale), None).expect("reader config");
     let pack = pack.expect("reader pack");
     assert!(pack.diagnostics.contains_key("SEM001") || pack.diagnostics.contains_key("LOCALE001"));
 
@@ -459,7 +459,7 @@ fn package_render_emits_sem001_suggestion_for_vietnamese_name() {
     // error. The test verifies LOCALE002 spelling suggestions.
     let fault = locale_fault_path("vi", "faults/semantic-name-suggestion.fab");
     let (config, pack) =
-        config_with_locale(Target::Rust, &fault, Some("vi"), None).expect("reader config");
+        config_with_locale(Target::HirRust, &fault, Some("vi"), None).expect("reader config");
     let pack = pack.expect("reader pack");
     assert!(pack.diagnostics.contains_key("LOCALE002"));
 
@@ -497,7 +497,7 @@ fn package_render_emits_sem001_suggestion_for_vietnamese_name() {
 fn package_render_emits_reader002_accented_keyword_suggestion() {
     let fault = locale_fault_path("vi", "faults/keyword-suggestion.fab");
     let (config, pack) =
-        config_with_locale(Target::Rust, &fault, Some("vi"), None).expect("reader config");
+        config_with_locale(Target::HirRust, &fault, Some("vi"), None).expect("reader config");
     let pack = pack.expect("reader pack");
     assert!(pack.diagnostics.contains_key("LOCALE002"));
 
@@ -533,7 +533,7 @@ fn package_render_emits_reader002_accented_keyword_suggestion() {
 fn package_render_emits_reader002_typo_keyword_suggestion() {
     let fault = locale_fault_path("vi", "faults/keyword-edit-distance.fab");
     let (config, pack) =
-        config_with_locale(Target::Rust, &fault, Some("vi"), None).expect("reader config");
+        config_with_locale(Target::HirRust, &fault, Some("vi"), None).expect("reader config");
     let pack = pack.expect("reader pack");
     assert!(pack.diagnostics.contains_key("LOCALE002"));
 

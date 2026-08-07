@@ -110,7 +110,7 @@ fn llvm_host_async_solum_leget_reaches_native_link() {
 #[test]
 fn llvm_host_async_solum_leget_uses_existing_route_poll_boundary() {
     let path = crate::paths::corpus_dir().join("ad/async-solum-leget.fab");
-    let config = radix::Config::default().with_target(radix::codegen::Target::LlvmText);
+    let config = radix::Config::default().with_target(radix::codegen::Target::MirLlvm);
     let llvm = faber_cli::package::with_lowered_package_mir(&config, &path, |lowered| {
         let interner = lowered
             .validated
@@ -141,7 +141,7 @@ fn llvm_host_async_tempus_dormiet_reaches_native_link() {
 fn assert_reaches_native_link(relative_path: &str) {
     let path = crate::paths::corpus_dir().join(relative_path);
     let session = radix::driver::Session::new(
-        radix::Config::default().with_target(radix::codegen::Target::LlvmText),
+        radix::Config::default().with_target(radix::codegen::Target::MirLlvm),
     );
     let toolchain = crate::harness::llvm::detect_llvm_toolchain();
     assert!(

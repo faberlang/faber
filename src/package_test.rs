@@ -1126,7 +1126,7 @@ incipit {
     )
     .expect("write entry");
 
-    let config = Config::default().with_target(Target::Scena);
+    let config = Config::default().with_target(Target::MirScena);
     let artifact =
         build_package_mir_artifact(&config, &entry, &[]).expect("build scena package artifact");
 
@@ -1152,12 +1152,9 @@ incipit {
     )
     .expect("write entry");
 
-    let image = build_package_fmir_text_image(
-        &Config::default().with_target(Target::FmirText),
-        &entry,
-        &[],
-    )
-    .expect("build fmir-text image");
+    let image =
+        build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
+            .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read fmir text");
 
     assert_eq!(
@@ -1210,7 +1207,7 @@ functio text() → textus {
     )
     .expect("write module");
 
-    let config = Config::default().with_target(Target::FmirText);
+    let config = Config::default().with_target(Target::MirFmir);
     let first = build_package_fmir_text_image(&config, &entry, &[]).expect("first fmir-text build");
     let first_image = fs::read_to_string(&first.image_path).expect("read first image");
     let second =
@@ -1263,12 +1260,9 @@ functio text() → textus {
     )
     .expect("write module");
 
-    let image = build_package_fmir_text_image(
-        &Config::default().with_target(Target::FmirText),
-        &entry,
-        &[],
-    )
-    .expect("build fmir-text image");
+    let image =
+        build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
+            .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
 
     assert!(
@@ -1288,7 +1282,7 @@ fn package_mir_artifacts_preserve_quoted_source_paths() {
     let entry = dir.join("main\"quoted.fab");
     fs::write(&entry, "incipit { nota \"quoted\" }").expect("write quoted entry");
 
-    let config = Config::default().with_target(Target::FmirText);
+    let config = Config::default().with_target(Target::MirFmir);
     let artifact = build_package_mir_artifact(&config, &entry, &[]).expect("build manifest");
     let manifest_text = fs::read_to_string(&artifact.manifest_path).expect("read manifest");
     let manifest: toml::Value = toml::from_str(&manifest_text).expect("parse manifest");
@@ -1320,12 +1314,9 @@ fn package_fmir_text_image_rejects_bad_version_without_source_fallback() {
     let entry = dir.join("main.fab");
     fs::write(&entry, "incipit { nota \"must not run\" }").expect("write entry");
 
-    let image = build_package_fmir_text_image(
-        &Config::default().with_target(Target::FmirText),
-        &entry,
-        &[],
-    )
-    .expect("build fmir-text image");
+    let image =
+        build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
+            .expect("build fmir-text image");
     let mut image_text = fs::read_to_string(&image.image_path).expect("read image");
     image_text = rewrite_text_image_version(&image_text, 999);
     fs::write(&image.image_path, image_text).expect("write corrupt image");
@@ -1349,12 +1340,9 @@ fn package_fmir_text_image_rejects_unknown_records_without_source_fallback() {
     let entry = dir.join("main.fab");
     fs::write(&entry, "incipit { nota \"must not run\" }").expect("write entry");
 
-    let image = build_package_fmir_text_image(
-        &Config::default().with_target(Target::FmirText),
-        &entry,
-        &[],
-    )
-    .expect("build fmir-text image");
+    let image =
+        build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
+            .expect("build fmir-text image");
     let mut image_text = fs::read_to_string(&image.image_path).expect("read image");
     image_text.push_str("\nunsupported = true\n");
     fs::write(&image.image_path, image_text).expect("write image with unknown record");
@@ -1376,12 +1364,9 @@ fn package_fmir_text_image_rejects_unknown_runtime_requirement_without_source_fa
     let entry = dir.join("main.fab");
     fs::write(&entry, "incipit { nota \"must not run\" }").expect("write entry");
 
-    let image = build_package_fmir_text_image(
-        &Config::default().with_target(Target::FmirText),
-        &entry,
-        &[],
-    )
-    .expect("build fmir-text image");
+    let image =
+        build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
+            .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
     let image_text = image_text.replacen(
         r#"requirement = ["host:stdout"]"#,
@@ -1424,7 +1409,7 @@ incipit argumenta args {
     .expect("write entry");
 
     let image = build_package_fmir_text_image(
-        &Config::default().with_target(Target::FmirText),
+        &Config::default().with_target(Target::MirFmir),
         &entry,
         &["Ian".to_owned()],
     )
@@ -1462,12 +1447,9 @@ incipit argumenta args {
     )
     .expect("write entry");
 
-    let image = build_package_fmir_text_image(
-        &Config::default().with_target(Target::FmirText),
-        &entry,
-        &[],
-    )
-    .expect("build fmir-text image");
+    let image =
+        build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
+            .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
     assert!(
         !image_text.contains("runtime-value"),
@@ -1497,8 +1479,12 @@ incipit argumenta args {
     )
     .expect("write entry");
 
-    let image = build_package_fmir_image(&Config::default().with_target(Target::Fmir), &entry, &[])
-        .expect("build fmir image");
+    let image = build_package_fmir_image(
+        &Config::default().with_target(Target::MirFmirBinary),
+        &entry,
+        &[],
+    )
+    .expect("build fmir image");
     let image_bytes = fs::read(&image.image_path).expect("read image");
     assert_eq!(image.image_path, dir.join("target/faber-mir/image.fmir"));
     assert!(
@@ -1528,12 +1514,9 @@ incipit argumenta args exitus 7 {
     )
     .expect("write entry");
 
-    let image = build_package_fmir_text_image(
-        &Config::default().with_target(Target::FmirText),
-        &entry,
-        &[],
-    )
-    .expect("build fmir-text image");
+    let image =
+        build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
+            .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
     assert!(
         image_text.contains("exit_code = 7"),
@@ -1569,8 +1552,12 @@ incipit argumenta args exitus 7 {
     )
     .expect("write entry");
 
-    let image = build_package_fmir_image(&Config::default().with_target(Target::Fmir), &entry, &[])
-        .expect("build fmir image");
+    let image = build_package_fmir_image(
+        &Config::default().with_target(Target::MirFmirBinary),
+        &entry,
+        &[],
+    )
+    .expect("build fmir image");
     let bytes = fs::read(&image.image_path).expect("read image");
     let summary = fmir_image_test_summary(&bytes, &image.image_path).expect("summarize fmir image");
     assert_eq!(summary.exit_code, Some(7));
@@ -1617,12 +1604,15 @@ functio text(textus name) → textus {
     )
     .expect("write module");
 
-    let config = Config::default().with_target(Target::FmirText);
+    let config = Config::default().with_target(Target::MirFmir);
     let text_image =
         build_package_fmir_text_image(&config, &entry, &[]).expect("build fmir-text image");
-    let binary_image =
-        build_package_fmir_image(&Config::default().with_target(Target::Fmir), &entry, &[])
-            .expect("build fmir image");
+    let binary_image = build_package_fmir_image(
+        &Config::default().with_target(Target::MirFmirBinary),
+        &entry,
+        &[],
+    )
+    .expect("build fmir image");
     let text = fs::read_to_string(&text_image.image_path).expect("read text image");
     let bytes = fs::read(&binary_image.image_path).expect("read binary image");
 
@@ -1641,8 +1631,12 @@ fn package_fmir_image_rejects_bad_version_without_source_fallback() {
     let entry = dir.join("main.fab");
     fs::write(&entry, "incipit { nota \"must not run\" }").expect("write entry");
 
-    let image = build_package_fmir_image(&Config::default().with_target(Target::Fmir), &entry, &[])
-        .expect("build fmir image");
+    let image = build_package_fmir_image(
+        &Config::default().with_target(Target::MirFmirBinary),
+        &entry,
+        &[],
+    )
+    .expect("build fmir image");
     let mut image_bytes = fs::read(&image.image_path).expect("read image");
     rewrite_binary_image_version(&mut image_bytes, 99);
     fs::write(&image.image_path, image_bytes).expect("write corrupt image");
@@ -4298,7 +4292,7 @@ functio summa(tf32[2] x) → f32 {
     let result = build_package_fmir_image(
         &Config::default()
             .with_stdlib(dev_norma_library_home())
-            .with_target(Target::Fmir),
+            .with_target(Target::MirFmirBinary),
         &entry,
         &[],
     );
@@ -6920,7 +6914,7 @@ locale = "th-TH"
     .expect("write manifest");
 
     let (config, pack) =
-        config_with_locale(Target::Rust, &dir, Some("zh-Hans"), None).expect("reader config");
+        config_with_locale(Target::HirRust, &dir, Some("zh-Hans"), None).expect("reader config");
     let pack = pack.expect("reader pack");
 
     assert_eq!(pack.metadata.id, "zh-Hans");
@@ -8209,7 +8203,7 @@ entry = "main.fab"
 
     let layout = discover_build_layout(&pkg).expect("layout");
     let package = analyze_package(&Config::default(), &pkg).expect("analyze");
-    let artifact = super::artifact_plan::plan_package(&package, Target::Rust);
+    let artifact = super::artifact_plan::plan_package(&package, Target::HirRust);
     assert!(
         artifact.has_runtime_dependency("rust:runtime:faber"),
         "artifact plan must list faber runtime"
@@ -9347,22 +9341,22 @@ incipit {
 #[test]
 fn use_package_compiler_keeps_rust_fab_on_package_path() {
     let fab = Path::new("main.fab");
-    assert!(use_package_compiler(Target::Rust, fab, false));
-    assert!(use_package_compiler(Target::Scena, fab, false));
-    assert!(use_package_compiler(Target::FmirText, fab, false));
-    assert!(use_package_compiler(Target::Fmir, fab, false));
-    assert!(use_package_compiler(Target::FmirBin, fab, false));
-    assert!(use_package_compiler(Target::Fhir, fab, false));
-    assert!(!use_package_compiler(Target::WgslText, fab, false));
-    assert!(!use_package_compiler(Target::LlvmText, fab, false));
-    assert!(!use_package_compiler(Target::TypeScript, fab, false));
+    assert!(use_package_compiler(Target::HirRust, fab, false));
+    assert!(use_package_compiler(Target::MirScena, fab, false));
+    assert!(use_package_compiler(Target::MirFmir, fab, false));
+    assert!(use_package_compiler(Target::MirFmirBinary, fab, false));
+    assert!(use_package_compiler(Target::MirFmirBundle, fab, false));
+    assert!(use_package_compiler(Target::HirFhir, fab, false));
+    assert!(!use_package_compiler(Target::MirWgsl, fab, false));
+    assert!(!use_package_compiler(Target::MirLlvm, fab, false));
+    assert!(!use_package_compiler(Target::HirTypeScript, fab, false));
 }
 
 #[test]
 fn use_package_compiler_from_args_honors_force_package_for_probe_targets() {
     let input = vec!["main.fab".to_owned()];
     assert!(use_package_compiler_from_args(
-        Target::WgslText,
+        Target::MirWgsl,
         &input,
         true
     ));
@@ -9386,8 +9380,8 @@ entry = "main.fab"
     .expect("manifest");
     fs::write(dir.join("src/main.fab"), "incipit { }\n").expect("entry");
     let package = analyze_package(&Config::default(), &dir).expect("analyze");
-    let a = super::artifact_plan::plan_package(&package, Target::Rust);
-    let b = super::artifact_plan::plan_package(&package, Target::Rust);
+    let a = super::artifact_plan::plan_package(&package, Target::HirRust);
+    let b = super::artifact_plan::plan_package(&package, Target::HirRust);
     assert!(a.supported);
     assert_eq!(a.to_debug_json().unwrap(), b.to_debug_json().unwrap());
     assert!(a.nodes.iter().any(|n| n.id.starts_with("rust:entry:")));
@@ -10048,7 +10042,7 @@ entry = "main.fab"
     )
     .expect("manifest");
     fs::write(dir.join("src/main.fab"), "incipit { }\n").expect("entry");
-    let result = compile_package(&Config::default().with_target(Target::Wasm), &dir);
+    let result = compile_package(&Config::default().with_target(Target::MirWasmBinary), &dir);
     assert!(!result.success());
     assert!(result.diagnostics.iter().any(|d| diagnostic_has_issue(
         d,
@@ -10088,7 +10082,7 @@ incipit argumenta args exitus 0 {
     )
     .expect("entry");
 
-    let result = compile_package(&Config::default().with_target(Target::Go), &dir);
+    let result = compile_package(&Config::default().with_target(Target::HirGo), &dir);
     assert!(
         result.success(),
         "go package compile failed: {:?}",
@@ -10162,7 +10156,7 @@ incipit argumenta args exitus 0 {
     )
     .expect("entry");
 
-    let result = compile_package_go(&Config::default().with_target(Target::Go), &dir);
+    let result = compile_package_go(&Config::default().with_target(Target::HirGo), &dir);
     let modules = result.go_modules;
     let result = result.compile_result;
     assert!(
@@ -10211,7 +10205,7 @@ fn g6_go4_coreutils_true_package_go_builds() {
         eprintln!("skip: coreutils true package missing at {}", path.display());
         return;
     }
-    let result = compile_package_go(&Config::default().with_target(Target::Go), &path);
+    let result = compile_package_go(&Config::default().with_target(Target::HirGo), &path);
     let modules = result.go_modules;
     let result = result.compile_result;
     assert!(
@@ -10286,7 +10280,7 @@ incipit argumenta args exitus 0 {
     )
     .expect("entry");
 
-    let result = compile_package_go(&Config::default().with_target(Target::Go), &dir);
+    let result = compile_package_go(&Config::default().with_target(Target::HirGo), &dir);
     let modules = result.go_modules;
     let result = result.compile_result;
     assert!(
@@ -10358,7 +10352,7 @@ incipit argumenta args exitus 0 {
     )
     .expect("entry");
 
-    let result = compile_package(&Config::default().with_target(Target::Go), &dir);
+    let result = compile_package(&Config::default().with_target(Target::HirGo), &dir);
     assert!(!result.success(), "expected compile failure on collision");
     assert!(
         result
@@ -10381,7 +10375,7 @@ fn g6_go4_coreutils_echo_package_go_builds() {
         eprintln!("skip: coreutils echo package missing at {}", path.display());
         return;
     }
-    let result = compile_package_go(&Config::default().with_target(Target::Go), &path);
+    let result = compile_package_go(&Config::default().with_target(Target::HirGo), &path);
     let modules = result.go_modules;
     let result = result.compile_result;
     assert!(
@@ -10494,7 +10488,7 @@ incipit argumenta args exitus 0 {
     )
     .expect("entry");
 
-    let result = compile_package_go(&Config::default().with_target(Target::Go), &dir);
+    let result = compile_package_go(&Config::default().with_target(Target::HirGo), &dir);
     let modules = result.go_modules;
     let result = result.compile_result;
     assert!(
@@ -10553,7 +10547,7 @@ fn g6_go4_coreutils_false_package_go_builds() {
         );
         return;
     }
-    let result = compile_package_go(&Config::default().with_target(Target::Go), &path);
+    let result = compile_package_go(&Config::default().with_target(Target::HirGo), &path);
     let modules = result.go_modules;
     let result = result.compile_result;
     assert!(
@@ -10668,7 +10662,7 @@ incipit argumenta args exitus 0 {
     )
     .expect("entry");
 
-    let failed = compile_package_go(&Config::default().with_target(Target::Go), &bad);
+    let failed = compile_package_go(&Config::default().with_target(Target::HirGo), &bad);
     assert!(
         !failed.compile_result.success(),
         "expected Go compile failure on name collision"
@@ -10681,7 +10675,7 @@ incipit argumenta args exitus 0 {
     // A later successful compile must produce exactly its own module set.
     let good = test_temp_dir("go-fbr-good");
     write_go_module_package(&good, "go-fbr-good", "identity");
-    let ok = compile_package_go(&Config::default().with_target(Target::Go), &good);
+    let ok = compile_package_go(&Config::default().with_target(Target::HirGo), &good);
     assert!(ok.compile_result.success(), "good package must compile");
     assert_eq!(ok.go_modules.len(), 1, "expected one sibling module");
     assert!(
@@ -10698,7 +10692,7 @@ fn go_compile_repeated_and_nested_calls_do_not_exchange_modules() {
     let b = test_temp_dir("go-fbr-b");
     write_go_module_package(&b, "go-fbr-b", "beta");
 
-    let first = compile_package_go(&Config::default().with_target(Target::Go), &a);
+    let first = compile_package_go(&Config::default().with_target(Target::HirGo), &a);
     assert!(first.compile_result.success(), "package a must compile");
     assert_eq!(first.go_modules.len(), 1, "package a has one sibling");
     assert!(
@@ -10709,7 +10703,7 @@ fn go_compile_repeated_and_nested_calls_do_not_exchange_modules() {
 
     // Repeated call for a different package must not clobber the first
     // result's modules.
-    let second = compile_package_go(&Config::default().with_target(Target::Go), &b);
+    let second = compile_package_go(&Config::default().with_target(Target::HirGo), &b);
     assert!(second.compile_result.success(), "package b must compile");
     assert_eq!(second.go_modules.len(), 1, "package b has one sibling");
     assert!(
@@ -10726,7 +10720,7 @@ fn go_compile_repeated_and_nested_calls_do_not_exchange_modules() {
 
     // Nested: a compile that runs while earlier results are still held keeps
     // its own modules and leaves the earlier results untouched.
-    let third = compile_package_go(&Config::default().with_target(Target::Go), &a);
+    let third = compile_package_go(&Config::default().with_target(Target::HirGo), &a);
     assert!(
         third.compile_result.success(),
         "repeat of package a compiles"
@@ -10749,7 +10743,7 @@ fn go_compile_repeated_and_nested_calls_do_not_exchange_modules() {
 fn go_compile_modules_stay_scoped_across_non_go_compiles() {
     let go_dir = test_temp_dir("go-fbr-scope");
     write_go_module_package(&go_dir, "go-fbr-scope", "alpha");
-    let go_result = compile_package_go(&Config::default().with_target(Target::Go), &go_dir);
+    let go_result = compile_package_go(&Config::default().with_target(Target::HirGo), &go_dir);
     assert!(go_result.compile_result.success());
     assert!(
         !go_result.go_modules.is_empty(),
@@ -10800,10 +10794,10 @@ fn go_compile_concurrent_calls_do_not_exchange_modules() {
     let a_path = a.to_path_buf();
     let b_path = b.to_path_buf();
     let handle_a = thread::spawn(move || {
-        compile_package_go(&Config::default().with_target(Target::Go), &a_path)
+        compile_package_go(&Config::default().with_target(Target::HirGo), &a_path)
     });
     let handle_b = thread::spawn(move || {
-        compile_package_go(&Config::default().with_target(Target::Go), &b_path)
+        compile_package_go(&Config::default().with_target(Target::HirGo), &b_path)
     });
     let result_a = handle_a.join().expect("thread a");
     let result_b = handle_b.join().expect("thread b");
@@ -11368,7 +11362,7 @@ functio shell(dom.Scope scope) → vacuum {
 
     let manifest = read_manifest(&app.join("faber.toml")).expect("manifest");
     let build = build_browser_product(
-        &Config::default().with_target(Target::TypeScript),
+        &Config::default().with_target(Target::HirTypeScript),
         &app,
         manifest.product.as_ref().unwrap(),
     )
@@ -11390,7 +11384,7 @@ functio shell(dom.Scope scope) → vacuum {
     assert_eq!(build.controllers.len(), 1);
 
     let second = build_browser_product(
-        &Config::default().with_target(Target::TypeScript),
+        &Config::default().with_target(Target::HirTypeScript),
         &app,
         manifest.product.as_ref().unwrap(),
     )
@@ -11423,7 +11417,7 @@ functio two(dom.Scope scope) → vacuum {}
     write_static_asset_roots(&dup);
     let manifest = read_manifest(&dup.join("faber.toml")).expect("manifest");
     let err = build_browser_product(
-        &Config::default().with_target(Target::TypeScript),
+        &Config::default().with_target(Target::HirTypeScript),
         &dup,
         manifest.product.as_ref().unwrap(),
     )
@@ -11445,7 +11439,7 @@ functio shell(dom.Scope scope) → vacuum {}
     write_static_asset_roots(&invalid);
     let manifest = read_manifest(&invalid.join("faber.toml")).expect("manifest");
     let err = build_browser_product(
-        &Config::default().with_target(Target::TypeScript),
+        &Config::default().with_target(Target::HirTypeScript),
         &invalid,
         manifest.product.as_ref().unwrap(),
     )
@@ -11504,7 +11498,7 @@ functio shell(Scope scope) → vacuum {}
     .expect("entry");
     let manifest = read_manifest(&root.join("faber.toml")).expect("manifest");
     let err = build_browser_product(
-        &Config::default().with_target(Target::TypeScript),
+        &Config::default().with_target(Target::HirTypeScript),
         &root,
         manifest.product.as_ref().unwrap(),
     )
@@ -11526,7 +11520,7 @@ fn g10_web3_rejects_local_scope_shadowing() {
     write_static_asset_roots(&app);
     let manifest = read_manifest(&app.join("faber.toml")).expect("manifest");
     let err = build_browser_product(
-        &Config::default().with_target(Target::TypeScript),
+        &Config::default().with_target(Target::HirTypeScript),
         &app,
         manifest.product.as_ref().unwrap(),
     )
@@ -11561,7 +11555,7 @@ functio helper(dom.Scope scope) → vacuum {
     write_static_asset_roots(&app);
     let manifest = read_manifest(&app.join("faber.toml")).expect("manifest");
     let err = build_browser_product(
-        &Config::default().with_target(Target::TypeScript),
+        &Config::default().with_target(Target::HirTypeScript),
         &app,
         manifest.product.as_ref().unwrap(),
     )
@@ -11607,7 +11601,7 @@ functio submit_controller(dom.Scope scope) → vacuum {
 
     let manifest = read_manifest(&app.join("faber.toml")).expect("manifest");
     let build = build_browser_product(
-        &Config::default().with_target(Target::TypeScript),
+        &Config::default().with_target(Target::HirTypeScript),
         &app,
         manifest.product.as_ref().unwrap(),
     )
@@ -11678,7 +11672,7 @@ fn g10_web3_failed_rebuild_keeps_previous_product_usable() {
     let manifest = read_manifest(&app.join("faber.toml")).expect("manifest");
     let product = manifest.product.as_ref().expect("product");
     let build = build_browser_product(
-        &Config::default().with_target(Target::TypeScript),
+        &Config::default().with_target(Target::HirTypeScript),
         &app,
         product,
     )
@@ -11691,7 +11685,7 @@ fn g10_web3_failed_rebuild_keeps_previous_product_usable() {
     for stage in 1..=5 {
         inject_product_failure_at(stage);
         let err = build_browser_product(
-            &Config::default().with_target(Target::TypeScript),
+            &Config::default().with_target(Target::HirTypeScript),
             &app,
             product,
         )
@@ -11722,7 +11716,7 @@ fn g10_web3_failed_rebuild_keeps_previous_product_usable() {
 
     // A clean rebuild after the injected failures still succeeds and swaps.
     let rebuilt = build_browser_product(
-        &Config::default().with_target(Target::TypeScript),
+        &Config::default().with_target(Target::HirTypeScript),
         &app,
         product,
     )
@@ -11747,7 +11741,7 @@ fn g10_web3_first_build_failure_leaves_no_partial_product() {
     for stage in 1..=5 {
         inject_product_failure_at(stage);
         let err = build_browser_product(
-            &Config::default().with_target(Target::TypeScript),
+            &Config::default().with_target(Target::HirTypeScript),
             &app,
             product,
         )
@@ -12326,12 +12320,9 @@ fn package_fmir_text_image_is_artifact_version_6() {
     let entry = dir.join("main.fab");
     fs::write(&entry, "incipit { nota \"v6\" }").expect("write entry");
 
-    let image = build_package_fmir_text_image(
-        &Config::default().with_target(Target::FmirText),
-        &entry,
-        &[],
-    )
-    .expect("build fmir-text image");
+    let image =
+        build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
+            .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
 
     assert!(
@@ -12346,8 +12337,12 @@ fn package_fmir_image_is_artifact_version_6() {
     let entry = dir.join("main.fab");
     fs::write(&entry, "incipit { nota \"v6\" }").expect("write entry");
 
-    let image = build_package_fmir_image(&Config::default().with_target(Target::Fmir), &entry, &[])
-        .expect("build fmir image");
+    let image = build_package_fmir_image(
+        &Config::default().with_target(Target::MirFmirBinary),
+        &entry,
+        &[],
+    )
+    .expect("build fmir image");
     let bytes = fs::read(&image.image_path).expect("read image");
     let summary = fmir_image_test_summary(&bytes, &image.image_path).expect("summarize fmir image");
 
@@ -12363,12 +12358,9 @@ fn package_fmir_text_image_rejects_version_2_images() {
     let entry = dir.join("main.fab");
     fs::write(&entry, "incipit { nota \"must not run\" }").expect("write entry");
 
-    let image = build_package_fmir_text_image(
-        &Config::default().with_target(Target::FmirText),
-        &entry,
-        &[],
-    )
-    .expect("build fmir-text image");
+    let image =
+        build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
+            .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
     fs::write(
         &image.image_path,
@@ -12395,12 +12387,9 @@ fn package_fmir_text_image_rejects_future_versions() {
     let entry = dir.join("main.fab");
     fs::write(&entry, "incipit { nota \"must not run\" }").expect("write entry");
 
-    let image = build_package_fmir_text_image(
-        &Config::default().with_target(Target::FmirText),
-        &entry,
-        &[],
-    )
-    .expect("build fmir-text image");
+    let image =
+        build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
+            .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
     fs::write(
         &image.image_path,
@@ -12427,8 +12416,12 @@ fn package_fmir_image_rejects_version_2_images() {
     let entry = dir.join("main.fab");
     fs::write(&entry, "incipit { nota \"must not run\" }").expect("write entry");
 
-    let image = build_package_fmir_image(&Config::default().with_target(Target::Fmir), &entry, &[])
-        .expect("build fmir image");
+    let image = build_package_fmir_image(
+        &Config::default().with_target(Target::MirFmirBinary),
+        &entry,
+        &[],
+    )
+    .expect("build fmir image");
     let mut image_bytes = fs::read(&image.image_path).expect("read image");
     rewrite_binary_image_version(&mut image_bytes, 2);
     fs::write(&image.image_path, image_bytes).expect("write version-2 image");
@@ -12452,8 +12445,12 @@ fn package_fmir_image_rejects_future_versions() {
     let entry = dir.join("main.fab");
     fs::write(&entry, "incipit { nota \"must not run\" }").expect("write entry");
 
-    let image = build_package_fmir_image(&Config::default().with_target(Target::Fmir), &entry, &[])
-        .expect("build fmir image");
+    let image = build_package_fmir_image(
+        &Config::default().with_target(Target::MirFmirBinary),
+        &entry,
+        &[],
+    )
+    .expect("build fmir image");
     let mut image_bytes = fs::read(&image.image_path).expect("read image");
     rewrite_binary_image_version(&mut image_bytes, 99);
     fs::write(&image.image_path, image_bytes).expect("write future-version image");
@@ -12492,12 +12489,9 @@ incipit {
     )
     .expect("write entry");
 
-    let image = build_package_fmir_text_image(
-        &Config::default().with_target(Target::FmirText),
-        &entry,
-        &[],
-    )
-    .expect("build fmir-text image with upper-half u64 constants");
+    let image =
+        build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
+            .expect("build fmir-text image with upper-half u64 constants");
     fs::remove_file(&entry).expect("remove source after image build");
 
     let mut host = BufferHost::default();
@@ -12529,8 +12523,12 @@ incipit {
     )
     .expect("write entry");
 
-    let image = build_package_fmir_image(&Config::default().with_target(Target::Fmir), &entry, &[])
-        .expect("build fmir image with upper-half u64 constants");
+    let image = build_package_fmir_image(
+        &Config::default().with_target(Target::MirFmirBinary),
+        &entry,
+        &[],
+    )
+    .expect("build fmir image with upper-half u64 constants");
     fs::remove_file(&entry).expect("remove source after image build");
 
     let mut host = BufferHost::default();
@@ -12594,7 +12592,7 @@ functio simple_loss(
     .expect("write module");
 
     let config = Config {
-        target: radix::codegen::Target::Fmir,
+        target: radix::codegen::Target::MirFmirBinary,
         ..Config::default()
     };
     let package = analyze_package(&config, &dir).expect("analyze library package");
@@ -12725,7 +12723,7 @@ incipit {
     .expect("write entry");
 
     let config = radix::driver::Config::default()
-        .with_target(radix::codegen::Target::Fmir)
+        .with_target(radix::codegen::Target::MirFmirBinary)
         .with_stdlib(lib_root);
     let mut host = BufferHost::default();
     let result = run_package_mir(&config, &entry, &mut host);
@@ -12823,7 +12821,7 @@ incipit {
     .expect("write entry");
 
     let config = radix::driver::Config::default()
-        .with_target(radix::codegen::Target::Fmir)
+        .with_target(radix::codegen::Target::MirFmirBinary)
         .with_stdlib(lib_root);
     let mut host = BufferHost::default();
     let result = run_package_mir(&config, &entry, &mut host);
@@ -12929,7 +12927,7 @@ incipit {
     .expect("write entry");
 
     let config = radix::driver::Config::default()
-        .with_target(radix::codegen::Target::Fmir)
+        .with_target(radix::codegen::Target::MirFmirBinary)
         .with_stdlib(lib_root);
     let mut host = BufferHost::default();
     let result = run_package_mir(&config, &entry, &mut host);

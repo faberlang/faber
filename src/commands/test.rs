@@ -58,7 +58,7 @@ pub(super) fn cmd_test(args: &TestArgs) {
     // Target-neutral analysis config. The stepper never emits product targets;
     // any Target variant is only used for session/policy construction.
     let config = match package::config_with_locale(
-        radix::Target::TypeScript,
+        radix::Target::HirTypeScript,
         &input_path,
         args.locale.as_deref(),
         args.diagnostic_locale.as_deref(),

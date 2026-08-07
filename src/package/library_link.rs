@@ -390,7 +390,8 @@ fn promote_library_surface_visibility_line(line: &str) -> String {
 }
 
 fn format_rust(source: &str) -> String {
-    radix::tool::format_generated_code(Target::Rust, source).unwrap_or_else(|_| source.to_owned())
+    radix::tool::format_generated_code(Target::HirRust, source)
+        .unwrap_or_else(|_| source.to_owned())
 }
 
 #[derive(Debug, serde::Deserialize)]

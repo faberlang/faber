@@ -34,7 +34,7 @@ fn temp_dir(label: &str) -> PathBuf {
 #[test]
 fn plan_package_rust_is_supported() {
     let package = empty_package("g4-plan-support");
-    let a = plan_package(&package, Target::Rust);
+    let a = plan_package(&package, Target::HirRust);
     assert!(a.supported);
     assert_eq!(a.target, "rust");
 }
@@ -42,8 +42,8 @@ fn plan_package_rust_is_supported() {
 #[test]
 fn plan_package_rust_is_deterministic() {
     let package = empty_package("g4-plan-det");
-    let a = plan_package(&package, Target::Rust);
-    let b = plan_package(&package, Target::Rust);
+    let a = plan_package(&package, Target::HirRust);
+    let b = plan_package(&package, Target::HirRust);
     let a_json = a.to_debug_json();
     let b_json = b.to_debug_json();
     assert_eq!(a_json, b_json);
@@ -52,7 +52,7 @@ fn plan_package_rust_is_deterministic() {
 #[test]
 fn plan_package_rust_includes_runtime_dependency() {
     let package = empty_package("g4-plan-runtime-dep");
-    let a = plan_package(&package, Target::Rust);
+    let a = plan_package(&package, Target::HirRust);
     assert!(a
         .nodes
         .iter()
@@ -62,8 +62,8 @@ fn plan_package_rust_includes_runtime_dependency() {
 #[test]
 fn plan_package_go_and_ts_are_supported_seams() {
     let package = empty_package("/tmp/g4-plan-go");
-    let go = plan_package(&package, Target::Go);
-    let ts = plan_package(&package, Target::TypeScript);
+    let go = plan_package(&package, Target::HirGo);
+    let ts = plan_package(&package, Target::HirTypeScript);
     assert!(go.supported);
     assert_eq!(go.target, "go");
     assert!(ts.supported);
@@ -73,7 +73,8 @@ fn plan_package_go_and_ts_are_supported_seams() {
 #[test]
 fn plan_or_reject_fails_closed_for_unsupported_targets() {
     let package = empty_package("/tmp/g4-plan-reject");
-    let err = plan_or_reject(&package, Target::Wasm).expect_err("wasm package unsupported");
+    let err =
+        plan_or_reject(&package, Target::MirWasmBinary).expect_err("wasm package unsupported");
     assert_eq!(err.issue(), Some("package_target_unsupported"));
 }
 

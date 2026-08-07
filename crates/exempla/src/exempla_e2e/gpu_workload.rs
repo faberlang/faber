@@ -93,7 +93,7 @@ fn exempla_gpu_workload_e2e() {
         "GPU workload harness found no workload rungs"
     );
 
-    let session = Session::new(Config::default().with_target(Target::LlvmText));
+    let session = Session::new(Config::default().with_target(Target::MirLlvm));
     let temp_root = make_temp_root();
     let toolchain = detect_gpu_workload_toolchain();
     let mut results = Vec::with_capacity(workloads.len());

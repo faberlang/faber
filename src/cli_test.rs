@@ -175,8 +175,31 @@ fn cli_parses_emit_wgsl_text_target() {
     let Some(crate::cli::Command::Emit(args)) = cli.command else {
         panic!("expected emit subcommand");
     };
-    assert_eq!(args.target, FaberCliTarget::WgslText);
+    assert_eq!(args.target, FaberCliTarget::MirWgsl);
     assert_eq!(args.input, vec!["main.fab"]);
+}
+
+#[test]
+fn cli_parses_emit_external_target_names() {
+    for (name, expected) in [
+        ("rust", FaberCliTarget::HirRust),
+        ("faber", FaberCliTarget::HirFaber),
+        ("ts", FaberCliTarget::HirTypeScript),
+        ("go", FaberCliTarget::HirGo),
+        ("wasm-text", FaberCliTarget::MirWasm),
+        ("wasm", FaberCliTarget::MirWasmBinary),
+        ("llvm-text", FaberCliTarget::MirLlvm),
+        ("metal-text", FaberCliTarget::MirMetal),
+        ("wgsl-text", FaberCliTarget::MirWgsl),
+        ("sexp", FaberCliTarget::MirSexp),
+    ] {
+        let cli = Cli::try_parse_from(["faber", "emit", "-t", name, "main.fab"])
+            .unwrap_or_else(|err| panic!("parse emit target {name}: {err}"));
+        let Some(crate::cli::Command::Emit(args)) = cli.command else {
+            panic!("expected emit subcommand for target {name}");
+        };
+        assert_eq!(args.target, expected, "target {name}");
+    }
 }
 
 #[test]
@@ -231,7 +254,7 @@ fn cli_parses_scena_target_for_build() {
     let Some(crate::cli::Command::Build(args)) = build.command else {
         panic!("expected build subcommand");
     };
-    assert_eq!(args.target, Some(radix::tool::CliTarget::Scena));
+    assert_eq!(args.target, Some(radix::tool::CliTarget::MirScena));
     assert_eq!(args.input, "pkg");
 }
 
@@ -242,7 +265,7 @@ fn cli_parses_scena_target_for_run() {
     let Some(crate::cli::Command::Run(args)) = run.command else {
         panic!("expected run subcommand");
     };
-    assert_eq!(args.target, Some(radix::tool::CliTarget::Scena));
+    assert_eq!(args.target, Some(radix::tool::CliTarget::MirScena));
     assert_eq!(args.path, std::path::PathBuf::from("pkg"));
     assert_eq!(args.args, vec!["Ian".to_owned()]);
 }
@@ -314,7 +337,7 @@ fn cli_parses_fmir_text_target_for_build() {
     let Some(crate::cli::Command::Build(args)) = build.command else {
         panic!("expected build subcommand");
     };
-    assert_eq!(args.target, Some(radix::tool::CliTarget::FmirText));
+    assert_eq!(args.target, Some(radix::tool::CliTarget::MirFmir));
     assert_eq!(args.input, "pkg");
 }
 
@@ -325,7 +348,7 @@ fn cli_parses_fmir_target_for_build() {
     let Some(crate::cli::Command::Build(args)) = build.command else {
         panic!("expected build subcommand");
     };
-    assert_eq!(args.target, Some(radix::tool::CliTarget::Fmir));
+    assert_eq!(args.target, Some(radix::tool::CliTarget::MirFmirBinary));
     assert_eq!(args.input, "pkg");
 }
 
@@ -336,7 +359,7 @@ fn cli_parses_fmir_bin_target_for_build() {
     let Some(crate::cli::Command::Build(args)) = build.command else {
         panic!("expected build subcommand");
     };
-    assert_eq!(args.target, Some(radix::tool::CliTarget::FmirBin));
+    assert_eq!(args.target, Some(radix::tool::CliTarget::MirFmirBundle));
     assert_eq!(args.input, "pkg");
 }
 
@@ -347,7 +370,7 @@ fn cli_parses_fmir_bin_target_for_run() {
     let Some(crate::cli::Command::Run(args)) = run.command else {
         panic!("expected run subcommand");
     };
-    assert_eq!(args.target, Some(radix::tool::CliTarget::FmirBin));
+    assert_eq!(args.target, Some(radix::tool::CliTarget::MirFmirBundle));
     assert_eq!(args.path, std::path::PathBuf::from("pkg"));
     assert_eq!(args.args, vec!["Ian".to_owned()]);
 }
@@ -810,7 +833,7 @@ fn cli_parses_emit_reflection_flag() {
         panic!("expected emit subcommand");
     };
     assert!(args.reflection);
-    assert_eq!(args.target, FaberCliTarget::WgslText);
+    assert_eq!(args.target, FaberCliTarget::MirWgsl);
 }
 
 #[test]
@@ -836,5 +859,5 @@ fn cli_defaults_emit_target_to_rust() {
     let Some(crate::cli::Command::Emit(args)) = cli.command else {
         panic!("expected emit subcommand");
     };
-    assert_eq!(args.target, FaberCliTarget::Rust);
+    assert_eq!(args.target, FaberCliTarget::HirRust);
 }

@@ -166,7 +166,7 @@ fn format_session(path: &Path, locale: Option<&str>, source: &str) -> Result<Ses
     // Locale-mode sessions need the dev stdlib path: files with
     // `+++ locale = "…" +++` frontmatter resolve their reader pack through
     // `Config::stdlib_path` (READER003 otherwise).
-    crate::package::config_with_locale(Target::Faber, path, selected_locale, None)
+    crate::package::config_with_locale(Target::HirFaber, path, selected_locale, None)
         .map(|(config, _)| Session::new(config.with_dev_stdlib()))
         .map_err(|diag| diag.message)
 }

@@ -657,7 +657,7 @@ fn package_fmir_image_provisions_decomposed_companion_upstream_seed() {
 
     let config = radix::driver::Config::default()
         .with_stdlib(workspace)
-        .with_target(radix::codegen::Target::Fmir);
+        .with_target(radix::codegen::Target::MirFmirBinary);
     let image =
         build_package_fmir_image(&config, dir.path(), &[]).expect("the BERT-tiny image builds");
     let bytes = std::fs::read(&image.image_path).expect("read the image");

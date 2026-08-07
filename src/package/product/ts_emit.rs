@@ -16,7 +16,7 @@ pub(super) fn emit_typescript_modules(
     let surface = radix::locale::KeywordSurface::new(&latin);
     for unit in &package.units {
         let code = match radix::codegen::generate_from_analyzed(
-            radix::codegen::Target::TypeScript,
+            radix::codegen::Target::HirTypeScript,
             &unit.analysis,
             &surface,
         ) {

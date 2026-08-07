@@ -86,7 +86,7 @@ fn exempla_wasm_e2e() {
 pub(crate) fn wasm_session() -> Session {
     Session::new(
         Config::default()
-            .with_target(Target::Wasm)
+            .with_target(Target::MirWasmBinary)
             .with_stdlib(crate::paths::radix_stdlib_dir()),
     )
 }

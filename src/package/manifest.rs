@@ -351,15 +351,15 @@ pub(crate) fn manifest_build_target(
     path: &Path,
 ) -> Result<Target, Box<Diagnostic>> {
     match target.map(str::trim) {
-        None => Ok(Target::Fhir),
-        Some("rust") => Ok(Target::Rust),
-        Some("fhir") => Ok(Target::Fhir),
-        Some("ts") | Some("typescript") => Ok(Target::TypeScript),
-        Some("scena") => Ok(Target::Scena),
-        Some("fmir-text") => Ok(Target::FmirText),
-        Some("fmir") => Ok(Target::Fmir),
-        Some("fmir-bin") => Ok(Target::FmirBin),
-        Some("llvm-host") => Ok(Target::LlvmHost),
+        None => Ok(Target::HirFhir),
+        Some("rust") => Ok(Target::HirRust),
+        Some("fhir") => Ok(Target::HirFhir),
+        Some("ts") | Some("typescript") => Ok(Target::HirTypeScript),
+        Some("scena") => Ok(Target::MirScena),
+        Some("fmir-text") => Ok(Target::MirFmir),
+        Some("fmir") => Ok(Target::MirFmirBinary),
+        Some("fmir-bin") => Ok(Target::MirFmirBundle),
+        Some("llvm-host") => Ok(Target::MirLlvmHost),
         Some(unsupported) => Err(Box::new(
             crate::package_diagnostic_error(format!(
                 "faber.toml build.target '{unsupported}' is not supported for package builds"

@@ -269,7 +269,7 @@ fn exempla_go_e2e() {
             }
         };
 
-        let gofmt = radix::tool::format_generated_code(radix::codegen::Target::Go, &code);
+        let gofmt = radix::tool::format_generated_code(radix::codegen::Target::HirGo, &code);
         let code = match gofmt {
             Ok(code) => code,
             Err(err) => {
@@ -540,7 +540,7 @@ fn compile_go_exemplum(file: &Path) -> Result<String, String> {
     // not discover imported file interfaces. Go Tier-1 corpus fixtures are
     // path-backed source programs, so use the canonical single-file tool path
     // that resolves `norma:*` and installs typed HIR import contracts.
-    let result = compile_cli_path(file, false, Target::Go);
+    let result = compile_cli_path(file, false, Target::HirGo);
     match result.output {
         Some(Output::Go(output)) => Ok(output.code),
         Some(_) => Err("compiler did not produce Go output".to_owned()),

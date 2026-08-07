@@ -38,7 +38,7 @@ fn write_geminus_fixture(dir: &TestDir) -> PathBuf {
 }
 
 fn llvm_config() -> radix::Config {
-    radix::Config::default().with_target(Target::LlvmText)
+    radix::Config::default().with_target(Target::MirLlvm)
 }
 
 fn build_fixture(dir: &TestDir, runtime_archive: Option<PathBuf>) -> (PathBuf, PackageLlvmBuild) {

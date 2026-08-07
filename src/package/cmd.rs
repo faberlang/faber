@@ -70,7 +70,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
         (config, locale_pack)
     };
 
-    if is_package && target == Target::Scena {
+    if is_package && target == Target::MirScena {
         let artifact = match build_package_mir_artifact(&config, &input_path, &[]) {
             Ok(artifact) => artifact,
             Err(diagnostics) => {
@@ -87,7 +87,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
         return;
     }
 
-    if is_package && target == Target::FmirText {
+    if is_package && target == Target::MirFmir {
         let image = match build_package_fmir_text_image(&config, &input_path, &[]) {
             Ok(image) => image,
             Err(diagnostics) => {
@@ -104,7 +104,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
         return;
     }
 
-    if is_package && target == Target::Fmir {
+    if is_package && target == Target::MirFmirBinary {
         let image = match build_package_fmir_image(&config, &input_path, &[]) {
             Ok(image) => image,
             Err(diagnostics) => {
@@ -121,7 +121,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
         return;
     }
 
-    if is_package && target == Target::FmirBin {
+    if is_package && target == Target::MirFmirBundle {
         let bundle =
             match build_package_fmir_binary_bundle(&config, &input_path, &[], command.release) {
                 Ok(bundle) => bundle,
@@ -139,7 +139,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
         return;
     }
 
-    if is_package && target == Target::Fhir {
+    if is_package && target == Target::HirFhir {
         let artifact = match build_package_fhir(&config, &input_path) {
             Ok(artifact) => artifact,
             Err(diagnostics) => {
@@ -161,7 +161,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
     // pairwise harness uses). Never Rust codegen for the program, never a `cc`
     // fallback; fails with a structured diagnostic when the toolchain or
     // runtime archive is unavailable or the host triple is unsupported.
-    if is_package && target == Target::LlvmHost {
+    if is_package && target == Target::MirLlvmHost {
         let profile = if command.release {
             LlvmHostProfile::Release
         } else {
@@ -183,7 +183,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
         return;
     }
 
-    if is_package && target == Target::TypeScript {
+    if is_package && target == Target::HirTypeScript {
         let layout = match discover_build_layout(&input_path) {
             Ok(l) => l,
             Err(d) => {
@@ -214,7 +214,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
     // G6 GO3/GO4: package Go builds write target/faber/go and invoke `go build`.
     // The multi-module file collection travels inside the compile result
     // itself (FBR-P2-003) — no hidden thread-local state.
-    if is_package && target == radix::codegen::Target::Go {
+    if is_package && target == radix::codegen::Target::HirGo {
         let go_result = compile_package_go(&config, &input_path);
         radix::tool::print_diagnostics(
             &go_result.compile_result.diagnostics,
@@ -270,7 +270,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
 
     // Package Rust builds own a generated crate under target/faber/ and let
     // Cargo place artifacts in sibling debug/release directories.
-    if is_package && target == radix::codegen::Target::Rust {
+    if is_package && target == radix::codegen::Target::HirRust {
         let layout = match discover_build_layout(&input_path) {
             Ok(l) => l,
             Err(d) => {
@@ -364,7 +364,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
     // Single-file Rust builds that need faber-runtime / tokio (from HIR facts,
     // not emitted-text sniffing) emit a generated Cargo crate under
     // `target/faber/`. Programs without those deps keep the bare `.rs` path.
-    if target == radix::codegen::Target::Rust {
+    if target == radix::codegen::Target::HirRust {
         match single_file_rust_runtime_plan(&config, &input_path) {
             Ok(plan) if plan.requires_generated_crate() => {
                 let package_root = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
@@ -504,20 +504,20 @@ fn resolve_build_target(command: &radix::tool::BuildCommand, input_path: &Path) 
 
 /// Resolve the target for `faber check` from the package manifest.
 ///
-/// Falls back to `Target::Rust` when the manifest cannot be read or the
+/// Falls back to `Target::HirRust` when the manifest cannot be read or the
 /// input is not a package — same safe default as the pre-manifest behaviour.
 fn resolve_check_target(input_path: &Path) -> Target {
     let Ok(layout) = discover_build_layout(input_path) else {
-        return Target::Rust;
+        return Target::HirRust;
     };
     if !layout.manifest_path.exists() {
-        return Target::Rust;
+        return Target::HirRust;
     }
     let Ok(manifest) = read_manifest(&layout.manifest_path) else {
-        return Target::Rust;
+        return Target::HirRust;
     };
     manifest_build_target(manifest.build.target.as_deref(), &layout.manifest_path)
-        .unwrap_or(Target::Rust)
+        .unwrap_or(Target::HirRust)
 }
 
 /// Decide whether an input path should enter package-mode command handling.
@@ -548,13 +548,13 @@ pub fn use_package_compiler(target: Target, path: &std::path::Path, force_packag
     if path.extension().is_some_and(|ext| ext == "fab") {
         return matches!(
             target,
-            Target::Rust
-                | Target::Scena
-                | Target::FmirText
-                | Target::Fmir
-                | Target::FmirBin
-                | Target::Fhir
-                | Target::LlvmHost
+            Target::HirRust
+                | Target::MirScena
+                | Target::MirFmir
+                | Target::MirFmirBinary
+                | Target::MirFmirBundle
+                | Target::HirFhir
+                | Target::MirLlvmHost
         );
     }
     false

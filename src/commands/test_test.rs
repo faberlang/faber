@@ -74,7 +74,7 @@ proba "the broken one" {
 
 #[test]
 fn cmd_test_source_has_no_cargo_or_rust_executor() {
-    // Guard: reintroducing Cargo / Target::Rust as the test executor must fail CI.
+    // Guard: reintroducing Cargo / Target::HirRust as the test executor must fail CI.
     // Inspect only production code (exclude any test module, which names banned APIs).
     let source = include_str!("test.rs");
     let production = source
@@ -86,8 +86,8 @@ fn cmd_test_source_has_no_cargo_or_rust_executor() {
         "cmd_test must not call invoke_cargo_test"
     );
     assert!(
-        !production.contains("Target::Rust"),
-        "cmd_test must not select Target::Rust for execution"
+        !production.contains("Target::HirRust"),
+        "cmd_test must not select Target::HirRust for execution"
     );
     assert!(
         !production.contains("emit_generated_crate"),

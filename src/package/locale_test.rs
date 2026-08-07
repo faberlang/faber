@@ -40,7 +40,7 @@ kind = "bin"
 fn code_locale_defaults_to_english_pack_without_manifest_setting() {
     let (_root, entry) = temp_package_entry();
     let (config, diagnostic_pack) =
-        config_with_locale(Target::Rust, &entry, None, None).expect("default locale config");
+        config_with_locale(Target::HirRust, &entry, None, None).expect("default locale config");
     assert_eq!(
         config
             .locale_pack
@@ -60,7 +60,7 @@ fn code_locale_defaults_to_english_pack_without_manifest_setting() {
 #[test]
 fn direct_default_config_uses_english_pack() {
     let config =
-        default_config_with_locale(Target::TypeScript).expect("default code locale config");
+        default_config_with_locale(Target::HirTypeScript).expect("default code locale config");
     assert_eq!(
         config
             .locale_pack
@@ -74,7 +74,7 @@ fn direct_default_config_uses_english_pack() {
 fn diagnostic_locale_defaults_to_code_pack() {
     let (_root, entry) = temp_package_entry();
     let (config, diagnostic_pack) =
-        config_with_locale(Target::Rust, &entry, Some("zh-Hans"), None).expect("locale config");
+        config_with_locale(Target::HirRust, &entry, Some("zh-Hans"), None).expect("locale config");
     let code_pack = config.locale_pack.expect("code pack");
     let diagnostic_pack = diagnostic_pack.expect("diagnostic pack");
     assert_eq!(code_pack.metadata.id, "zh-Hans");
@@ -86,7 +86,7 @@ fn diagnostic_locale_defaults_to_code_pack() {
 fn diagnostic_locale_can_differ_from_code_locale() {
     let (_root, entry) = temp_package_entry();
     let (config, diagnostic_pack) =
-        config_with_locale(Target::Rust, &entry, Some("zh-Hans"), Some("th-TH"))
+        config_with_locale(Target::HirRust, &entry, Some("zh-Hans"), Some("th-TH"))
             .expect("locale config");
     let code_pack = config.locale_pack.expect("code pack");
     let diagnostic_pack = diagnostic_pack.expect("diagnostic pack");
@@ -98,7 +98,7 @@ fn diagnostic_locale_can_differ_from_code_locale() {
 #[test]
 fn empty_diagnostic_locale_is_rejected() {
     let (_root, entry) = temp_package_entry();
-    let err = config_with_locale(Target::Rust, &entry, Some("zh-Hans"), Some("   "))
+    let err = config_with_locale(Target::HirRust, &entry, Some("zh-Hans"), Some("   "))
         .expect_err("empty diagnostic locale");
     assert!(
         err.message

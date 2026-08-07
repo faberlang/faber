@@ -285,7 +285,7 @@ fn local_library_locale_surface_resolves_through_package_loader() {
     let dir = test_temp_dir("fhir-local-locale");
     let entry = write_local_locale_package(&dir);
     let (config, _diagnostic_pack) = crate::package::config_with_locale(
-        radix::codegen::Target::Rust,
+        radix::codegen::Target::HirRust,
         &entry,
         Some("en-local-library"),
         None,
@@ -332,9 +332,13 @@ fn local_library_locale_surface_resolves_through_package_loader() {
 fn english_pack_resolves_real_triga_and_norma_library_surfaces() {
     let dir = test_temp_dir("fhir-external-library-locale");
     let entry = write_external_library_locale_package(&dir, EXTERNAL_LIBRARY_LOCALE_MAIN);
-    let (config, _diagnostic_pack) =
-        crate::package::config_with_locale(radix::codegen::Target::Rust, &entry, Some("en"), None)
-            .expect("load installed English library locale");
+    let (config, _diagnostic_pack) = crate::package::config_with_locale(
+        radix::codegen::Target::HirRust,
+        &entry,
+        Some("en"),
+        None,
+    )
+    .expect("load installed English library locale");
     let config = config.with_stdlib(dev_norma_library_home());
     let package = analyze_package(&config, &entry).expect("analyze localized external libraries");
 
@@ -599,12 +603,12 @@ fn loaded_package_canonical_faber_parity() {
             .get(&loaded_module.relative_path)
             .unwrap_or_else(|| panic!("no direct unit for {}", loaded_module.relative_path));
         let direct_code = output_code(
-            &generate_from_analyzed(Target::Faber, direct_unit, &surface)
+            &generate_from_analyzed(Target::HirFaber, direct_unit, &surface)
                 .expect("direct canonical Faber emit"),
         )
         .to_owned();
         let loaded_code = output_code(
-            &generate_from_analyzed(Target::Faber, &loaded_module.unit, &surface)
+            &generate_from_analyzed(Target::HirFaber, &loaded_module.unit, &surface)
                 .expect("loaded canonical Faber emit"),
         )
         .to_owned();
@@ -665,7 +669,7 @@ fn loaded_package_library_import_unit_parity() {
     // is the store-backed Stage 5 path; the unit surface is source-free here.
     let latin = radix::locale::latin_locale_pack();
     let surface = radix::locale::KeywordSurface::new(&latin);
-    for target in [Target::Rust, Target::Faber] {
+    for target in [Target::HirRust, Target::HirFaber] {
         let direct_code = output_code(
             &generate_from_analyzed(target, &direct.units[0].analysis, &surface)
                 .expect("direct emit"),

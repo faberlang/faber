@@ -207,7 +207,7 @@ const EXPECTED_SWIFT_EXPECTED_FAILURE_CEILING: usize = 244;
 
 /// Compile a single Faber exemplum to Swift via the single-file emit path.
 fn compile_swift_exemplum(file: &Path) -> Result<String, String> {
-    let result = compile_cli_path(file, false, Target::Swift);
+    let result = compile_cli_path(file, false, Target::HirSwift);
     match result.output {
         Some(Output::Swift(output)) => Ok(output.code),
         Some(_) => Err("compiler did not produce Swift output".to_owned()),
@@ -529,7 +529,7 @@ fn exempla_swift_library_mode() {
     let result = compile_cli_path_with_locale_pack(
         &fab_file,
         false,
-        Target::Swift,
+        Target::HirSwift,
         None,
         OutputMode::Library,
         None,
@@ -604,7 +604,7 @@ fn exempla_swift_library_mode_public_decls() {
     let result = compile_cli_path_with_locale_pack(
         &fab_file,
         false,
-        Target::Swift,
+        Target::HirSwift,
         None,
         OutputMode::Library,
         None,

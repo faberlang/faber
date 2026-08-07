@@ -19,7 +19,7 @@ pub struct EmitArgs {
     pub diagnostic_locale: Option<String>,
 
     /// Output target language
-    #[arg(short = 't', long = "target", value_enum, default_value_t = FaberCliTarget::Rust)]
+    #[arg(short = 't', long = "target", value_enum, default_value_t = FaberCliTarget::HirRust)]
     pub target: FaberCliTarget,
 
     /// Force package compilation mode
@@ -52,63 +52,65 @@ pub struct EmitArgs {
 pub enum FaberCliTarget {
     /// Rust backend.
     #[default]
-    Rust,
+    #[value(name = "rust")]
+    HirRust,
 
     /// Canonical Faber re-emission.
     #[value(name = "faber", alias = "fab")]
-    Canonical,
+    HirFaber,
 
     /// TypeScript backend.
     #[value(name = "ts", alias = "typescript")]
-    TypeScript,
+    HirTypeScript,
 
     /// Go backend.
-    Go,
+    #[value(name = "go")]
+    HirGo,
 
     /// Experimental MIR-backed WebAssembly text target.
     #[value(name = "wasm-text", alias = "wat")]
-    WasmText,
+    MirWasm,
 
     /// Experimental MIR-backed WebAssembly binary target.
     #[value(name = "wasm")]
-    Wasm,
+    MirWasmBinary,
 
     /// Experimental MIR-backed LLVM text target.
     #[value(name = "llvm-text", alias = "llvm-ir", alias = "llvm")]
-    LlvmText,
+    MirLlvm,
 
     /// Experimental MIR-backed Metal Shading Language source probe.
     #[value(name = "metal-text", alias = "metal")]
-    MetalText,
+    MirMetal,
 
     /// Experimental MIR-backed WGSL compute-shader source probe.
     #[value(name = "wgsl-text", alias = "wgsl")]
-    WgslText,
+    MirWgsl,
 
     /// Experimental MIR-backed Racket s-expression probe.
     #[value(name = "sexp", alias = "racket", alias = "lisp")]
-    Sexp,
+    MirSexp,
 }
 
 impl FaberCliTarget {
     /// Return true when emit should reject package mode for canonical Faber output.
     pub fn is_faber(self) -> bool {
-        matches!(self, Self::Canonical)
+        matches!(self, Self::HirFaber)
     }
 
     /// Convert to the radix backend target.
     pub fn to_radix(self) -> radix::codegen::Target {
         match self {
-            FaberCliTarget::Canonical => radix::codegen::Target::Faber,
-            FaberCliTarget::Rust => radix::codegen::Target::Rust,
-            FaberCliTarget::TypeScript => radix::codegen::Target::TypeScript,
-            FaberCliTarget::Go => radix::codegen::Target::Go,
-            FaberCliTarget::WasmText => radix::codegen::Target::WasmText,
-            FaberCliTarget::Wasm => radix::codegen::Target::Wasm,
-            FaberCliTarget::LlvmText => radix::codegen::Target::LlvmText,
-            FaberCliTarget::MetalText => radix::codegen::Target::MetalText,
-            FaberCliTarget::WgslText => radix::codegen::Target::WgslText,
-            FaberCliTarget::Sexp => radix::codegen::Target::Sexp,
+            FaberCliTarget::HirFaber => radix::codegen::Target::HirFaber,
+            FaberCliTarget::HirRust => radix::codegen::Target::HirRust,
+            FaberCliTarget::HirTypeScript => radix::codegen::Target::HirTypeScript,
+            FaberCliTarget::HirGo => radix::codegen::Target::HirGo,
+            FaberCliTarget::MirWasm => radix::codegen::Target::MirWasm,
+            FaberCliTarget::MirWasmBinary => radix::codegen::Target::MirWasmBinary,
+            FaberCliTarget::MirLlvm => radix::codegen::Target::MirLlvm,
+            FaberCliTarget::MirMetal => radix::codegen::Target::MirMetal,
+            FaberCliTarget::MirWgsl => radix::codegen::Target::MirWgsl,
+            FaberCliTarget::MirSexp => radix::codegen::Target::MirSexp,
         }
     }
 }

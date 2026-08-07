@@ -367,7 +367,7 @@ functio answer() → numerus {
     .expect("write lib");
 
     let result = compile_package(
-        &Config::new().with_target(Target::Go),
+        &Config::new().with_target(Target::HirGo),
         &dir.join("main.fab"),
     );
     assert!(

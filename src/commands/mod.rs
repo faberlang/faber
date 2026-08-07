@@ -98,7 +98,10 @@ fn dispatch(command: Command) {
                 out_dir: args.out_dir,
                 package: args.package,
                 release: args.release,
-                target: args.target.unwrap_or(radix::tool::CliTarget::Rust).into(),
+                target: args
+                    .target
+                    .unwrap_or(radix::tool::CliTarget::HirRust)
+                    .into(),
                 target_explicit,
                 format: args.format,
                 linter: args.linter,
