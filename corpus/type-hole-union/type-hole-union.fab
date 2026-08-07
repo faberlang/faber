@@ -83,6 +83,38 @@ test "the two hole kinds infer cleanly without shape warnings" {
 
     assert count ≡ 3
     assert m ≡ 1
-    assert n ≡ 1
+    assert n ≡ 0
     assert o ≡ 1
+}
+
+# Runnable path for the MIR stepper (S5-U4): same union surface, printed
+# so the script harness has an exact stdout oracle (`type-hole-union.expected`).
+main {
+    # `_`: exactly one inhabitant type.
+    const _ count ← 3
+
+    # `∪`: every direct flow adds a member — solves to `int ∪ string`.
+    var ∪ mixed ← 1
+    mixed ← "salve"
+
+    # `list<∪>`: heterogeneous elements solve to `list<int ∪ string>`.
+    const list<∪> nodes ← [1, "two", 3]
+
+    # `T ∪ null`: one optional inhabitant — `_` over it stays quiet.
+    const string ∪ null opt ← "text"
+    const _ maybe ← opt
+
+    const _ m ← member_count(nodes)
+    const _ n ← consume(mixed)
+    const _ o ← maybe_len(maybe)
+
+    assert count ≡ 3
+    assert m ≡ 1
+    assert n ≡ 0
+    assert o ≡ 1
+
+    print count
+    print m
+    print n
+    print o
 }
