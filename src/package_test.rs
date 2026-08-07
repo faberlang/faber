@@ -12745,6 +12745,81 @@ incipit {
 }
 
 #[test]
+fn package_mir_executes_library_function_that_calls_nested_library() {
+    let dir = test_temp_dir("package-mir-nested-library-call");
+    let lib_root = dir.join("lib");
+    fs::create_dir_all(lib_root.join("testlib/src")).expect("create library");
+    fs::write(
+        lib_root.join("testlib/faber.toml"),
+        r#"[package]
+name = "testlib"
+version = "0.1.0"
+edition = "2026"
+
+[library]
+provider = "testlib"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+target = "fmir"
+targets = ["fmir"]
+"#,
+    )
+    .expect("write library manifest");
+    fs::write(
+        lib_root.join("testlib/src/inner.fab"),
+        r#"functio dupla(numerus value) → numerus {
+    redde value * 2
+}
+"#,
+    )
+    .expect("write nested library module");
+    fs::write(
+        lib_root.join("testlib/src/outer.fab"),
+        r#"importa ex "testlib:inner" privata inner
+
+functio computa(numerus value) → numerus {
+    redde inner.dupla(value) + 1
+}
+"#,
+    )
+    .expect("write importing library module");
+
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"importa ex "testlib:outer" privata outer
+
+incipit {
+    nota outer.computa(4)
+}
+"#,
+    )
+    .expect("write entry");
+
+    let config = Config::default()
+        .with_target(Target::MirFmirBinary)
+        .with_stdlib(lib_root);
+    let mut host = BufferHost::default();
+    let result = run_package_mir(&config, &entry, &mut host);
+
+    assert!(
+        result.is_ok(),
+        "nested library call should link and execute, got {:?}",
+        result
+            .err()
+            .unwrap_or_default()
+            .iter()
+            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(host.stdout_lines, vec!["9".to_owned()]);
+}
+
+#[test]
 fn package_mir_runs_library_imported_companion_with_sub_companion() {
     // LIB-MIR blocker regression: a library primal that calls an unannotated
     // AIR-lane function generates an auto-named `__backward_callee_N`

@@ -2,6 +2,14 @@
 
 use super::*;
 
+struct PackageMirPreparation<'a> {
+    config: &'a Config,
+    argumenta: &'a [String],
+    cli_mode: CliPlanningMode,
+    consumer: PackageMirConsumer,
+    loaded_links: Option<&'a BTreeMap<PathBuf, BTreeMap<String, PathBuf>>>,
+}
+
 /// Analyze, link, and validate a package as MIR, then lend the result to a target probe.
 ///
 /// Package ownership remains inside Faber so callers cannot retain validation
@@ -79,12 +87,14 @@ pub(super) fn with_prepared_package_mir_with_cli_mode_and_consumer<R>(
 ) -> Result<R, Vec<Diagnostic>> {
     let package = analyze_package(config, input)?;
     prepare_package_mir(
-        config,
         package,
-        argumenta,
-        cli_mode,
-        consumer,
-        None,
+        PackageMirPreparation {
+            config,
+            argumenta,
+            cli_mode,
+            consumer,
+            loaded_links: None,
+        },
         || manifest_device_config(input),
         run,
     )
@@ -96,24 +106,19 @@ pub(super) fn with_prepared_package_mir_with_cli_mode_and_consumer<R>(
 /// runtime-requirement collection → device config (the source route reads the
 /// manifest; the loaded route supplies fixed empty values) → a
 /// `PreparedPackageMir`, then `run`.
-pub(super) fn prepare_package_mir<R>(
-    config: &Config,
+fn prepare_package_mir<R>(
     mut package: AnalyzedPackage,
-    argumenta: &[String],
-    cli_mode: CliPlanningMode,
-    consumer: PackageMirConsumer,
-    loaded_links: Option<&BTreeMap<PathBuf, BTreeMap<String, PathBuf>>>,
-    device_config: impl FnOnce() -> Result<
-        (
-            BTreeMap<String, Vec<f32>>,
-            Option<DeviceSelection>,
-            Option<u32>,
-            bool,
-        ),
-        Vec<Diagnostic>,
-    >,
+    preparation: PackageMirPreparation<'_>,
+    device_config: impl FnOnce() -> Result<DeviceManifestConfig, Vec<Diagnostic>>,
     run: impl for<'a> FnOnce(&PreparedPackageMir<'a>, &LoweredMirUnit<'a>) -> Result<R, Vec<Diagnostic>>,
 ) -> Result<R, Vec<Diagnostic>> {
+    let PackageMirPreparation {
+        config,
+        argumenta,
+        cli_mode,
+        consumer,
+        loaded_links,
+    } = preparation;
     if package
         .diagnostics
         .iter()
@@ -157,17 +162,17 @@ pub(super) fn prepare_package_mir<R>(
         bridge_norma_providers_to_kernel(&mut lowered, &entry_path)?;
     }
     let runtime_requirements = collect_package_runtime_requirements(&lowered, &cli_plan);
-    let (device_inputs, device_backend, device_steps, device_declared) = device_config()?;
+    let device_config = device_config()?;
     let prepared = PreparedPackageMir {
         entry_path: entry_path.clone(),
         source_paths,
         runtime_requirements,
         cli_exit_code: cli_plan.exit_code,
         fmir_text_cli: cli_plan.fmir_text_cli.clone(),
-        device_inputs,
-        device_backend,
-        device_steps,
-        device_declared,
+        device_inputs: device_config.inputs,
+        device_backend: device_config.backend,
+        device_steps: device_config.steps,
+        device_declared: device_config.declared,
         _marker: std::marker::PhantomData,
     };
     run(&prepared, &lowered)
@@ -190,13 +195,15 @@ pub(super) fn with_prepared_package_mir_from_loaded<R>(
     // constructed on this route (N1.1: source routes reject explicit GPU
     // requests; `auto` keeps the CPU route).
     prepare_package_mir(
-        config,
         package,
-        argumenta,
-        CliPlanningMode::Parsed,
-        PackageMirConsumer::Interpreted,
-        Some(loaded_links),
-        || Ok((BTreeMap::new(), None, None, false)),
+        PackageMirPreparation {
+            config,
+            argumenta,
+            cli_mode: CliPlanningMode::Parsed,
+            consumer: PackageMirConsumer::Interpreted,
+            loaded_links: Some(loaded_links),
+        },
+        || Ok(DeviceManifestConfig::default()),
         run,
     )
 }

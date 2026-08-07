@@ -169,10 +169,12 @@ pub(super) fn package_device_section(
         &semantics,
         &lowered.validated,
         &lowered.interner,
-        selection,
-        &device_inputs,
-        S1_6_PTX_TARGET,
-        step_count,
+        super::super::device::DeviceSectionBuild {
+            selection,
+            inputs: &device_inputs,
+            ptx_target: S1_6_PTX_TARGET,
+            repeating_steps: step_count,
+        },
     )?;
     Ok(Some(section))
 }

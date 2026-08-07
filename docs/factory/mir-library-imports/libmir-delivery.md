@@ -121,9 +121,11 @@ synthetic sources (separate def-id space). Fail-closed identity preserved for
 unlinkable imports; bridged-norma kernel path untouched; ExternalTarget builds
 keep the previous silent-skip. Consumer proof
 `faber run -t fmir gradus/exempla/gradient-seam/` FD-matches (~1e-11).
-Known limitation (deferred): a library's own nested library calls are not
-recursively linked (fail closed at runtime if invoked); cross-library nominal
-type unification across separate analyses is out of scope.
+Nested library function calls are now linked through the same identity-scoped
+synthetic-source graph: dependencies are resolved to a deduplicated module
+closure, each caller namespace is rewritten before lowering, and unresolved
+dependencies keep the existing fail-closed diagnostic. Cross-library nominal
+type unification across separate analyses remains out of scope.
 
 ### Audit follow-up (2026-08-01)
 

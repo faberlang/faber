@@ -128,6 +128,14 @@ struct PreparedPackageMir<'a> {
     _marker: std::marker::PhantomData<&'a ()>,
 }
 
+#[derive(Default)]
+struct DeviceManifestConfig {
+    inputs: BTreeMap<String, Vec<f32>>,
+    backend: Option<faber::device::DeviceSelection>,
+    steps: Option<u32>,
+    declared: bool,
+}
+
 struct FmirPackageImage {
     diagnostic_path: PathBuf,
     format: FmirPackageImageFormat,

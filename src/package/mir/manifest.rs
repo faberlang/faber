@@ -45,19 +45,11 @@ pub(super) fn write_package_image(
 /// declaration.
 pub(super) fn manifest_device_config(
     input: &Path,
-) -> Result<
-    (
-        BTreeMap<String, Vec<f32>>,
-        Option<faber::device::DeviceSelection>,
-        Option<u32>,
-        bool,
-    ),
-    Vec<Diagnostic>,
-> {
+) -> Result<DeviceManifestConfig, Vec<Diagnostic>> {
     let layout =
         super::super::discover_build_layout(input).map_err(|diagnostic| vec![*diagnostic])?;
     if !layout.manifest_path.exists() {
-        return Ok((BTreeMap::new(), None, None, false));
+        return Ok(DeviceManifestConfig::default());
     }
     let manifest = super::super::read_manifest(&layout.manifest_path)
         .map_err(|diagnostic| vec![*diagnostic])?;
@@ -79,7 +71,12 @@ pub(super) fn manifest_device_config(
         .with_arg("issue", "package_device_steps_zero")]);
     }
     let declared = !inputs.is_empty() || backend.is_some();
-    Ok((inputs, backend, steps, declared))
+    Ok(DeviceManifestConfig {
+        inputs,
+        backend,
+        steps,
+        declared,
+    })
 }
 
 pub(super) fn package_mir_manifest(

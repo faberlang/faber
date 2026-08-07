@@ -79,6 +79,15 @@ pub(super) fn lower_package_units<'a>(
             library_resolver,
             library_cache,
             |analysis, _cache| {
+                if let Err(errors) = rewrite_analysis_namespace_calls(
+                    &library.path,
+                    analysis,
+                    &links.calls,
+                    &links.namespaces,
+                ) {
+                    diagnostics.extend(errors);
+                    return Ok(());
+                }
                 let bundle = match radix::driver::prepare_air_backward_bundle(analysis) {
                     Ok(bundle) => bundle,
                     Err(err) => {

@@ -22,6 +22,14 @@ use super::{DeviceProgramLifetime, ProgramSession};
 // FMIR device-section assembly
 // ---------------------------------------------------------------------------
 
+/// Package-owned inputs needed to assemble the serialized device section.
+pub(crate) struct DeviceSectionBuild<'a> {
+    pub(crate) selection: DeviceSelection,
+    pub(crate) inputs: &'a BTreeMap<String, Vec<f32>>,
+    pub(crate) ptx_target: &'a str,
+    pub(crate) repeating_steps: u32,
+}
+
 /// Assemble the FMIR `device` section for a constructed device program.
 ///
 /// Emits both backend artifacts through the S1-3 emitters (Metal MSL always;
@@ -39,11 +47,14 @@ pub(crate) fn device_section_for_program(
     semantics: &DeviceSemantics,
     validated: &ValidatedMir<'_>,
     interner: &Interner,
-    selection: DeviceSelection,
-    inputs: &BTreeMap<String, Vec<f32>>,
-    ptx_target: &str,
-    repeating_steps: u32,
+    build: DeviceSectionBuild<'_>,
 ) -> Result<FmirDeviceSection, Vec<Diagnostic>> {
+    let DeviceSectionBuild {
+        selection,
+        inputs,
+        ptx_target,
+        repeating_steps,
+    } = build;
     // S5-U5c: the emitters re-derive each kernel's body from the validated
     // MIR, so the shape-folded bodies the constructor planned must reach
     // them too — a kernel's function id still references the ORIGINAL
