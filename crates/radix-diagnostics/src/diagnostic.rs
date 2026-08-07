@@ -197,7 +197,6 @@ pub enum WarningKind {
     UnusedFunction,
     UnreachableCode,
     UnnecessaryCast,
-    DeprecatedFeature,
     TargetNoop,
     UnusedMutRefParam,
     UnusedMoveParam,
