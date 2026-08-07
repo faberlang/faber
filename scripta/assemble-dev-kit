@@ -13,7 +13,12 @@ layout contract of faber-onboarding Stage 2):
 Then generates `faber/release-manifest.yaml` — the first instance of the single
 release-manifest schema (faber/docs/release/release-manifest-schema.md §3/§4/§6)
 with `pinnedInputs.source` exact commits and `pinnedInputs.packs` rows — plus a
-payload receipt (per-file sha256, pack source commits, toolchain/version stamp).
+machine-readable JSON payload receipt (`{"packs": [...]}` plus per-file sha256,
+pack source commits, toolchain/version stamp). The receipt's `packs` rows are
+built once and shared with the manifest, so `generate-release-manifest
+--packs-receipt` consumes the real receipt with no manual translation. The
+receipt never records absolute machine paths (release leakage gate,
+process-local-first.md §4).
 
 The script never builds and never touches the network. The faber binary is an
 input (`--binary`); pack sources are read from the sibling radix checkout at
@@ -28,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import re
 import shutil
 import subprocess
@@ -197,6 +203,69 @@ def read_version(repo_relative_manifest: Path) -> str:
         fail(f"no [package] version in {repo_relative_manifest}")
 
 
+def build_pack_rows(version: str, digests: dict[str, str]) -> list[dict]:
+    """The dev-kit payload packs (release-manifest-schema.md §6 rows).
+
+    Single source of truth for the pack rows: the manifest and the
+    machine-readable JSON receipt both consume this list, so the two can never
+    drift apart. Keys match the schema exactly: name / component / version /
+    digest / compatibility / license / destination.
+    """
+    return [
+        {
+            "name": "launcher",
+            "component": "faber",
+            "version": version,
+            "digest": f"sha256:{digests['launcher']}",
+            "compatibility": "faber 1.x; ships with matching reference and locale packs",
+            "license": "MIT",
+            "destination": "bin/faber",
+        },
+        {
+            "name": "core-support",
+            "component": "faber",
+            "version": version,
+            "digest": f"sha256:{digests['core-support']}",
+            "compatibility": (
+                f"faber {version}; embedded and materialized to the platform "
+                "cache (content-hash-keyed)"
+            ),
+            "license": "MIT",
+            "destination": (
+                "embedded in launcher; materialized to <platform cache>/faber/"
+                "core-support/tar-zst-v1/<sha256>"
+            ),
+        },
+        {
+            "name": "reference-pack",
+            "component": "reference",
+            "version": version,
+            "digest": f"sha256:{digests['reference-pack']}",
+            "compatibility": "faber 1.x major lane; pack_version_skew enforced at load",
+            "license": "MIT",
+            "destination": "share/faber/reference",
+        },
+        {
+            "name": "locale-packs",
+            "component": "locale",
+            "version": version,
+            "digest": f"sha256:{digests['locale-packs']}",
+            "compatibility": f"faber {version}; locale pack schema_version 1",
+            "license": "MIT",
+            "destination": "share/faber/locale/<locale>/pack.toml",
+        },
+        {
+            "name": "library-pack",
+            "component": "norma",
+            "version": "0.1.0",
+            "digest": f"sha256:{digests['library-pack']}",
+            "compatibility": "norma 0.1.x (faber_min 0.38.0); release-owned platform package",
+            "license": "MIT",
+            "destination": "store seeding via faber install (faber-onboarding Stage 6)",
+        },
+    ]
+
+
 def write_manifest(
     manifest_dir: Path,
     *,
@@ -208,7 +277,8 @@ def write_manifest(
     source_rows = []
     for component, sibling, has_planned_tag in SCHEMA_SOURCE_ROWS:
         repo = CONTAINER / sibling
-        if not (repo / ".git").is_dir():
+        # a git worktree member has `.git` as a file, not a directory
+        if not (repo / ".git").exists():
             fail(f"sibling repo for {component} is missing: {repo}")
         commit = git_commit(repo)
         if has_planned_tag:
@@ -221,42 +291,16 @@ def write_manifest(
             row = f"    - name: {component}\n      commit: {commit}\n"
         source_rows.append(row)
 
-    pack_rows = f"""    - name: launcher
-      component: faber
-      version: {quote(version)}
-      digest: sha256:{digests['launcher']}
-      compatibility: "faber 1.x; ships with matching reference and locale packs"
-      license: MIT
-      destination: bin/faber
-    - name: core-support
-      component: faber
-      version: {quote(version)}
-      digest: sha256:{digests['core-support']}
-      compatibility: "faber {version}; embedded and materialized to the platform cache (content-hash-keyed)"
-      license: MIT
-      destination: "embedded in launcher; materialized to <platform cache>/faber/core-support/tar-zst-v1/<sha256>"
-    - name: reference-pack
-      component: reference
-      version: {quote(version)}
-      digest: sha256:{digests['reference-pack']}
-      compatibility: "faber 1.x major lane; pack_version_skew enforced at load"
-      license: MIT
-      destination: share/faber/reference
-    - name: locale-packs
-      component: locale
-      version: {quote(version)}
-      digest: sha256:{digests['locale-packs']}
-      compatibility: "faber {version}; locale pack schema_version 1"
-      license: MIT
-      destination: share/faber/locale/<locale>/pack.toml
-    - name: library-pack
-      component: norma
-      version: "0.1.0"
-      digest: sha256:{digests['library-pack']}
-      compatibility: "norma 0.1.x (faber_min 0.38.0); release-owned platform package"
-      license: MIT
-      destination: "store seeding via faber install (faber-onboarding Stage 6)"
-"""
+    pack_rows = "".join(
+        f"    - name: {row['name']}\n"
+        f"      component: {row['component']}\n"
+        f"      version: {quote(row['version'])}\n"
+        f"      digest: {row['digest']}\n"
+        f"      compatibility: {quote(row['compatibility'])}\n"
+        f"      license: {row['license']}\n"
+        f"      destination: {quote(row['destination'])}\n"
+        for row in build_pack_rows(version, digests)
+    )
 
     radix_version = read_version(RADIX / "crates" / "radix" / "Cargo.toml")
     cista_version = read_version(CONTAINER / "cista" / "Cargo.toml")
@@ -317,39 +361,54 @@ def write_receipt(
     version: str,
     triple: str,
     faber_commit: str,
+    digests: dict[str, str],
     locale_digests: dict[str, str],
     binary: Path,
 ) -> None:
     today = date.today().isoformat()
-    lines = [
-        f"Faber dev-kit payload receipt - {name}",
-        f"prepared: {today}",
-        f"version: {version}",
-        f"triple: {triple}",
-        f"faber source commit: {faber_commit}",
-        f"launcher binary: {binary} (sha256 {sha256_file(binary)})",
-        "",
-        "per-file sha256:",
+    per_file = [
+        {
+            "path": path.relative_to(staging).as_posix(),
+            "sha256": sha256_file(path),
+        }
+        for path in sorted(staging.rglob("*"))
+        if path.is_file()
     ]
-    for path in sorted(staging.rglob("*")):
-        if path.is_file():
-            lines.append(f"  {sha256_file(path)}  {path.relative_to(staging).as_posix()}")
-    lines.append("")
-    lines.append("pack source commits:")
-    for component, sibling, _ref_label in SCHEMA_SOURCE_ROWS:
-        repo = CONTAINER / sibling
-        if (repo / ".git").is_dir():
-            lines.append(f"  {component}: {git_commit(repo)}")
-    lines.append("")
-    lines.append("locale pack digests:")
-    for locale, digest in sorted(locale_digests.items()):
-        lines.append(f"  {locale}: sha256:{digest}")
-    lines.append("")
-    lines.append(f"toolchain: {sys.version.split()[0]} (python)")
+    source_commits = {
+        component: git_commit(CONTAINER / sibling)
+        for component, sibling, _has_planned_tag in SCHEMA_SOURCE_ROWS
+        if (CONTAINER / sibling / ".git").exists()
+    }
+    receipt = {
+        "receipt": f"Faber dev-kit payload receipt - {name}",
+        "prepared": today,
+        "version": version,
+        "triple": triple,
+        "faberSourceCommit": faber_commit,
+        # basename only: absolute build paths leak the developer machine
+        # (release leakage gate, process-local-first.md §4)
+        "launcher": {
+            "file": binary.name,
+            "sha256": sha256_file(binary),
+            "payloadPath": "bin/faber",
+        },
+        "packs": build_pack_rows(version, digests),
+        "payload": {
+            "perFileSha256": per_file,
+            "packSourceCommits": source_commits,
+            "localePackDigests": {
+                locale: f"sha256:{digest}"
+                for locale, digest in sorted(locale_digests.items())
+            },
+            "toolchain": f"{sys.version.split()[0]} (python)",
+        },
+    }
 
-    receipt = out_dir / f"{name}.receipt.txt"
-    receipt.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"wrote {receipt}")
+    receipt_path = out_dir / f"{name}.receipt.json"
+    receipt_path.write_text(
+        json.dumps(receipt, indent=2) + "\n", encoding="utf-8"
+    )
+    print(f"wrote {receipt_path}")
 
 
 def parse_args() -> argparse.Namespace:
@@ -435,6 +494,7 @@ def main() -> int:
         version=args.version,
         triple=args.triple,
         faber_commit=faber_commit,
+        digests=digests,
         locale_digests=locale_digests,
         binary=binary,
     )

@@ -110,6 +110,24 @@ def dir_digest(root: Path) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def locale_packs_tree_digest(locale_root: Path) -> str:
+    """Combined locale-packs digest (per-locale tree digests joined) — must
+    match scripta/assemble-dev-kit's `locale-packs` row and the manifest.
+
+    ONE computation shared by the positive and negative checks: a tampered
+    locale tree must change exactly the value the manifest pins, so the
+    negative check cannot false-pass via a structurally different digest.
+    """
+    per_locale = {
+        d.name: dir_digest(d)
+        for d in sorted(locale_root.iterdir())
+        if d.is_dir()
+    }
+    return hashlib.sha256(
+        "\n".join(f"{loc}\t{dg}" for loc, dg in sorted(per_locale.items())).encode("utf-8")
+    ).hexdigest()
+
+
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -187,12 +205,7 @@ def positive_checks(prefix: Path, work: Path, version: str, manifest_text: str) 
 
     reference_digest = dir_digest(prefix / "share" / "faber" / "reference")
     locale_root = prefix / "share" / "faber" / "locale"
-    locale_digests = {
-        d.name: dir_digest(d) for d in sorted(locale_root.iterdir()) if d.is_dir()
-    }
-    locale_packs_digest = hashlib.sha256(
-        "\n".join(f"{loc}\t{dg}" for loc, dg in sorted(locale_digests.items())).encode("utf-8")
-    ).hexdigest()
+    locale_packs_digest_ = locale_packs_tree_digest(locale_root)
     expected_reference = parse_pack_digest(manifest_text, "reference-pack")
     expected_locale = parse_pack_digest(manifest_text, "locale-packs")
     check(
@@ -202,8 +215,8 @@ def positive_checks(prefix: Path, work: Path, version: str, manifest_text: str) 
     )
     check(
         "locale-packs digest matches manifest",
-        locale_packs_digest == expected_locale,
-        detail=f"manifest={expected_locale} computed={locale_packs_digest}",
+        locale_packs_digest_ == expected_locale,
+        detail=f"manifest={expected_locale} computed={locale_packs_digest_}",
     )
 
     materialization_check(binary, work, env)
@@ -296,7 +309,10 @@ def negative_checks(prefix: Path, work: Path, version: str) -> None:
     manifest_text = read_manifest(work / "manifest.yaml")
     expected_reference = parse_pack_digest(manifest_text, "reference-pack")
     expected_locale = parse_pack_digest(manifest_text, "locale-packs")
-    tampered_locale = dir_digest(tampered / "share" / "faber" / "locale")
+    # Same computation as the positive check: the tampered locale tree must
+    # change exactly the digest the manifest pins (no structurally-different
+    # digest that could false-pass).
+    tampered_locale = locale_packs_tree_digest(tampered / "share" / "faber" / "locale")
     check(
         "tampered pack detected by digest mismatch",
         tampered_locale != expected_locale,

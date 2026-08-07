@@ -6,11 +6,17 @@ clean prepared candidate and fails with NAMED reasons on a dirty tree, wrong
 remote, version/tag mismatch, stale lock, missing notes, missing dev-kit
 packs, pin mismatches, and ambient release credentials. It never proceeds
 past the would-tag / would-upload plan placeholders.
+
+The dev-kit pack fixture is the REAL assemble-dev-kit payload layout
+(`bin/faber`, `share/faber/reference/`, `share/faber/locale/<locale>/` plus
+the embedded core-support and library-pack source sets) — never flat files
+named after the pack rows.
 """
 
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import subprocess
 import sys
@@ -21,12 +27,70 @@ from pathlib import Path
 SCRIPT = Path(__file__).with_name("release-doctor")
 GENERATOR = Path(__file__).with_name("generate-release-manifest")
 VERSION = "1.5.0"
+LOCALES = ["en", "la"]
 
-PACK_BYTES = {
-    "launcher": b"#!/bin/sh\necho faber launcher\n",
-    "core-support": b"core support payload\n",
-}
 
+# -- digest helpers — mirror the doctor's recomputations --------------------
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def tree_digest(root: Path) -> str:
+    entries: list[tuple[str, str]] = []
+    for path in sorted(root.rglob("*")):
+        if path.is_file():
+            rel = path.relative_to(root).as_posix()
+            entries.append((rel, sha256_file(path)))
+    canonical = "\n".join(f"{rel}\t{digest}" for rel, digest in sorted(entries))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def tree_digest_with_prefix(prefix: str, root: Path) -> str:
+    entries: list[tuple[str, str]] = []
+    for path in sorted(root.rglob("*")):
+        if path.is_file():
+            rel = f"{prefix}/{path.relative_to(root).as_posix()}"
+            entries.append((rel, sha256_file(path)))
+    canonical = "\n".join(f"{rel}\t{digest}" for rel, digest in sorted(entries))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def locale_packs_digest(locale_root: Path) -> str:
+    per_locale = {
+        d.name: tree_digest(d)
+        for d in sorted(locale_root.iterdir())
+        if d.is_dir()
+    }
+    return hashlib.sha256(
+        "\n".join(f"{loc}\t{dg}" for loc, dg in sorted(per_locale.items())).encode("utf-8")
+    ).hexdigest()
+
+
+def core_support_digest(container: Path) -> str:
+    # mirror the doctor: the faber root is resolved, so the container must be
+    # resolved before computing container-relative paths (macOS /var symlink)
+    container = container.resolve()
+    manifest = container / "faber" / "core-support-manifest.txt"
+    roots = []
+    for line in manifest.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        roots.append((container / line).resolve())
+    entries = [
+        (root.relative_to(container).as_posix(), tree_digest(root))
+        for root in roots
+    ]
+    canonical = "\n".join(f"{rel}\t{dg}" for rel, dg in sorted(entries))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+# -- fixture plumbing --------------------------------------------------------
 
 def git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
@@ -74,7 +138,8 @@ class ReleaseDoctorTest(unittest.TestCase):
         self.cista = self.container / "cista"
         self.runtime = self.container / "faber-runtime"
         self.hosts = self.container / "hosts"
-        self.packs_dir = self.container / "packs"
+        self.norma = self.container / "norma"
+        self.packs_dir = self.container / "dev-kit-1.5.0-aarch64-apple-darwin"
         self.build_candidate()
         self.generate_manifest()
 
@@ -84,7 +149,8 @@ class ReleaseDoctorTest(unittest.TestCase):
     # -- fixture ----------------------------------------------------------
 
     def build_candidate(self) -> None:
-        for repo in (self.faber, self.radix, self.cista, self.runtime, self.hosts):
+        for repo in (self.faber, self.radix, self.cista, self.runtime,
+                     self.hosts, self.norma):
             git_init(repo)
         write(self.faber, "Cargo.toml",
               '[package]\nname = "faber"\nversion = "1.5.0"\nedition = "2021"\n\n'
@@ -108,6 +174,9 @@ class ReleaseDoctorTest(unittest.TestCase):
         write(self.faber, "src/main.rs", "fn main() {}\n")
         write(self.faber, "docs/release/v1.5.0.md",
               "# faber v1.5.0\n\nDraft release notes.\n")
+        # core-support source set: the embedded pack's digest recomputes from
+        # these container-relative roots (same as scripta/assemble-dev-kit)
+        write(self.faber, "core-support-manifest.txt", "faber-runtime\n")
         git(self.faber, "remote", "add", "origin",
             "https://github.com/faberlang/faber.git")
         git_commit(self.faber, "faber candidate")
@@ -125,20 +194,56 @@ class ReleaseDoctorTest(unittest.TestCase):
         write(self.hosts, "Cargo.toml",
               '[package]\nname = "hosts"\nversion = "0.1.0"\nedition = "2021"\n')
         git_commit(self.hosts, "hosts")
+        write(self.norma, "src/plato.toml", 'name = "plato"\n')
+        git_commit(self.norma, "norma")
+
+    def build_payload(self) -> None:
+        """The real assemble-dev-kit output layout (a directory tree, not
+        flat files named after pack rows)."""
+        bin_dir = self.packs_dir / "bin"
+        reference = self.packs_dir / "share" / "faber" / "reference"
+        locale = self.packs_dir / "share" / "faber" / "locale"
+        bin_dir.mkdir(parents=True)
+        reference.mkdir(parents=True)
+        for name in LOCALES:
+            (locale / name).mkdir(parents=True)
+
+        (bin_dir / "faber").write_bytes(b"#!/bin/sh\necho faber 1.5.0\n")
+        (bin_dir / "faber").chmod(0o755)
+        (reference / "index.toml").write_text('terms = []\n', encoding="utf-8")
+        (reference / "PACK.toml").write_text(
+            'faber_version = "1.5.0"\n', encoding="utf-8")
+        (reference / "legacy-redirects.toml").write_text(
+            'redirects = []\n', encoding="utf-8")
+        for name in LOCALES:
+            (locale / name / "pack.toml").write_text(
+                f'[locale]\nname = "{name}"\n', encoding="utf-8")
 
     def generate_manifest(self) -> None:
-        packs: list[str] = []
-        self.packs_dir.mkdir(parents=True, exist_ok=True)
-        for name, content in PACK_BYTES.items():
-            artifact = self.packs_dir / name
-            artifact.write_bytes(content)
-            packs.append(
-                '{{"name": "{name}", "component": "faber", "version": "1.5.0", '
-                '"digest": "sha256:{digest}", "compatibility": "1.x", '
-                '"license": "MIT", "destination": "{name}"}}'.format(
-                    name=name,
-                    digest=hashlib.sha256(content).hexdigest()))
-        packs_json = "[" + ",".join(packs) + "]"
+        self.build_payload()
+        packs = [
+            {"name": "launcher", "component": "faber", "version": VERSION,
+             "digest": f"sha256:{sha256_file(self.packs_dir / 'bin' / 'faber')}",
+             "compatibility": "1.x", "license": "MIT",
+             "destination": "bin/faber"},
+            {"name": "core-support", "component": "faber", "version": VERSION,
+             "digest": f"sha256:{core_support_digest(self.container)}",
+             "compatibility": "1.x", "license": "MIT",
+             "destination": "embedded in launcher"},
+            {"name": "reference-pack", "component": "reference",
+             "version": VERSION,
+             "digest": f"sha256:{tree_digest(self.packs_dir / 'share/faber/reference')}",
+             "compatibility": "1.x", "license": "MIT",
+             "destination": "share/faber/reference"},
+            {"name": "locale-packs", "component": "locale", "version": VERSION,
+             "digest": f"sha256:{locale_packs_digest(self.packs_dir / 'share/faber/locale')}",
+             "compatibility": "1.x", "license": "MIT",
+             "destination": "share/faber/locale/<locale>/pack.toml"},
+            {"name": "library-pack", "component": "norma", "version": "0.1.0",
+             "digest": f"sha256:{tree_digest_with_prefix('norma', (self.norma / 'src').resolve())}",
+             "compatibility": "1.x", "license": "MIT",
+             "destination": "store seeding"},
+        ]
         args = [
             sys.executable, str(GENERATOR), "--root", str(self.faber),
             "--version", VERSION, "--channel", "stable", "--line", "1.x",
@@ -147,7 +252,7 @@ class ReleaseDoctorTest(unittest.TestCase):
             "--cista-sha", head_of(self.cista),
             "--faber-runtime-sha", head_of(self.runtime),
             "--hosts-sha", head_of(self.hosts),
-            "--packs", packs_json,
+            "--packs", json.dumps(packs),
         ]
         res = subprocess.run(args, check=False, capture_output=True, text=True)
         if res.returncode != 0:
@@ -224,16 +329,25 @@ class ReleaseDoctorTest(unittest.TestCase):
         self.assertIn("dev-kit packs", res.stderr)
 
     def test_fails_on_missing_pack_artifact(self) -> None:
-        (self.packs_dir / "launcher").unlink()
+        (self.packs_dir / "bin" / "faber").unlink()
         res = self.run_doctor()
         self.assertEqual(res.returncode, 1)
         self.assertIn("launcher", res.stderr)
 
     def test_fails_on_pack_digest_mismatch(self) -> None:
-        (self.packs_dir / "launcher").write_bytes(b"tampered\n")
+        (self.packs_dir / "bin" / "faber").write_bytes(b"tampered\n")
         res = self.run_doctor()
         self.assertEqual(res.returncode, 1)
         self.assertIn("digest mismatch", res.stderr)
+
+    def test_fails_on_tampered_locale_pack_tree(self) -> None:
+        la = self.packs_dir / "share" / "faber" / "locale" / "la" / "pack.toml"
+        la.write_text(la.read_text(encoding="utf-8") + "# tampered\n",
+                      encoding="utf-8")
+        res = self.run_doctor()
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("digest mismatch", res.stderr)
+        self.assertIn("locale-packs", res.stderr)
 
     def test_fails_on_ambient_release_credentials(self) -> None:
         env = {**os.environ, "FABERLANG_RELEASES_TOKEN": "not-a-real-token"}
