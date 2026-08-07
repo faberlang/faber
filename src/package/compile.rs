@@ -330,7 +330,7 @@ fn package_root_for_input(input: &Path) -> PathBuf {
 fn compile_package_internal(
     config: &Config,
     input: &Path,
-    test_selection: Option<&RustTestSelection>,
+    _test_selection: Option<&RustTestSelection>,
     include_proba: bool,
     proba_filter: Option<&super::TestSourceFilter>,
 ) -> PackageCompileResult {
@@ -420,7 +420,6 @@ fn compile_package_internal(
 
     #[cfg(not(feature = "hir-rust"))]
     {
-        let _ = test_selection;
         return compile_failure(vec![crate::package_diagnostic_error(
             "target `rust` is not available in this faber build; rebuild with feature `hir-rust`",
         )
@@ -431,11 +430,7 @@ fn compile_package_internal(
 
     #[cfg(feature = "hir-rust")]
     {
-        return super::rust_target::compile_package_rust(
-            package,
-            &library_resolver,
-            test_selection,
-        );
+        super::rust_target::compile_package_rust(package, &library_resolver, _test_selection)
     }
 }
 

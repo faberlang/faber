@@ -12,7 +12,7 @@
 pub use radix::codegen::rust::{
     build_local_import_function_params, build_local_import_namespaces,
     generate_with_library_registry_test_selection_and_imports, local_import_module_key,
-    remap_function_param_info, render_binding_probe, rust_gpu_builtins, to_cli_ir,
-    ImportedFunctionParams, ImportedNamespaceInfo, ModuleGenerationRequest, RustCodegen,
-    RustFieldNamePolicy, SiblingModuleExports, TestSelection,
+    remap_function_param_info, remap_type_id, render_binding_probe, rust_gpu_builtins, to_cli_ir,
+    ImportedFunctionParams, ImportedNamespaceFunctionEffects, ImportedNamespaceInfo,
+    ModuleGenerationRequest, RustCodegen, RustFieldNamePolicy, SiblingModuleExports, TestSelection,
 };

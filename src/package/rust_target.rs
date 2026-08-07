@@ -4,16 +4,20 @@
 //! target dispatch. This module owns the Rust-specific assembly step that turns
 //! analyzed package units into one generated Rust crate.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 
 use faber_hir_rust::{
     build_local_import_function_params, build_local_import_namespaces, local_import_module_key,
-    remap_function_param_info, ImportedFunctionParams, ImportedNamespaceInfo, RustFieldNamePolicy,
+    remap_function_param_info, remap_type_id, ImportedFunctionParams,
+    ImportedNamespaceFunctionEffects, ImportedNamespaceInfo, RustFieldNamePolicy,
     SiblingModuleExports,
 };
 use radix::diagnostics::Diagnostic;
-use radix::hir::{DefId, HirItemKind, LibraryItemKind};
+use radix::hir::visit::{walk_expr, HirVisitor};
+use radix::hir::{
+    DefId, HirExpression, HirExpressionKind, HirFunction, HirItemKind, LibraryItemKind,
+};
 use radix::lexer::Interner;
 use radix::{CompileResult, Output, RustOutput};
 
@@ -339,6 +343,7 @@ fn extend_library_namespace_type_paths(
                     message: diag.message,
                     args: diag.args,
                 })?;
+        let failable_defs = analysis.function_facts.failable_defs();
         for item in &analysis.hir.items {
             let HirItemKind::Function(func) = &item.kind else {
                 continue;
@@ -347,6 +352,20 @@ fn extend_library_namespace_type_paths(
             context.info.function_params.insert(
                 (namespace_def_id, name),
                 remap_function_param_info(func, context.entry_types, &analysis.types),
+            );
+            context.info.function_effects.insert(
+                (
+                    namespace_def_id,
+                    analysis.interner.resolve(func.name).to_owned(),
+                ),
+                ImportedNamespaceFunctionEffects {
+                    is_failable: failable_defs.contains(&item.def_id)
+                        || function_contains_direct_ad(func),
+                    is_async: func.is_async,
+                    err_ty: func
+                        .err_ty
+                        .map(|ty| remap_type_id(ty, &analysis.types, context.entry_types)),
+                },
             );
         }
         for export in context.resolver.imported_file_type_exports(binding) {
@@ -361,6 +380,28 @@ fn extend_library_namespace_type_paths(
         }
     }
     Ok(())
+}
+
+fn function_contains_direct_ad(func: &HirFunction) -> bool {
+    struct Visitor {
+        found: bool,
+    }
+
+    impl HirVisitor for Visitor {
+        fn visit_expr(&mut self, expr: &HirExpression) {
+            if matches!(expr.kind, HirExpressionKind::Ad { .. }) {
+                self.found = true;
+            }
+            walk_expr(self, expr);
+        }
+    }
+
+    let Some(body) = &func.body else {
+        return false;
+    };
+    let mut visitor = Visitor { found: false };
+    visitor.visit_block(body);
+    visitor.found
 }
 
 fn import_binding_symbol_and_def_id(
@@ -435,24 +476,27 @@ fn insert_generated_library_modules(
     linked_library_crates: &std::collections::BTreeMap<String, String>,
 ) -> Result<(), Diagnostic> {
     let mut seen = BTreeSet::new();
-    for import in units
+    let mut pending = units
         .iter()
         .flat_map(|unit| unit.expanded_library_imports.iter())
-    {
+        .cloned()
+        .collect::<VecDeque<_>>();
+    while let Some(import) = pending.pop_front() {
         // Native-binding package deps are separate Cargo crates (G4), not inlined modules.
         if linked_library_crates.contains_key(&import.module.package) {
             continue;
         }
-        let key = library_module_segments(import);
+        let key = library_module_segments(&import);
         if !seen.insert(key.clone()) {
             continue;
         }
-        if !library_generates_rust_module(import, library_cache)? {
+        let imports = library_cached_expanded_imports(&import, library_resolver, library_cache)?;
+        pending.extend(imports.iter().cloned());
+        if !library_generates_rust_module(&import, library_cache)? {
             continue;
         }
-        let imports = library_cached_expanded_imports(import, library_resolver, library_cache)?;
         let rust = with_library_cached_analysis_mut(
-            import,
+            &import,
             library_resolver,
             library_cache,
             |analysis, library_cache| {
