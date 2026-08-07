@@ -1,6 +1,14 @@
 //! Device-safe lowerability gate: rejects host-only MIR shapes before
 //! target-specific emission.
 
+mod dead_artifact;
+mod dead_const_copy;
+
+use dead_artifact::{dead_fold_artifact_slots, is_fold_artifact_type, FoldArtifactSlots};
+use dead_const_copy::{
+    dead_non_kernel_scalar_const_slots, is_non_kernel_scalar_layout, DeadConstCopySlots,
+};
+
 use super::roles::MirDeviceContext;
 use crate::capability::{CapabilityGap, Lowerability};
 use crate::control::{
@@ -19,13 +27,12 @@ use crate::literal_indexed_access::{LiteralIndexedAccessPlan, MirSlot};
 use crate::visit::MirVisitor;
 use crate::{
     MirAggregate, MirAggregateKind, MirCollectionOp, MirFunction, MirIntrinsic, MirLayoutKind,
-    MirLayoutTable, MirLocal, MirLocalId, MirOperand, MirParam, MirPlace, MirPlaceBase,
-    MirProjection, MirRuntimeCall, MirScalarLayout, MirStatement, MirStatementKind, MirTemp,
-    MirTempId, MirTensorLocusLayout, MirTensorStorageLayout, MirTerminator, MirTerminatorKind,
-    MirType, MirValidationContext, MirValue, MirValueKind, ValidatedMir,
+    MirLayoutTable, MirLocal, MirOperand, MirParam, MirPlace, MirPlaceBase, MirProjection,
+    MirRuntimeCall, MirScalarLayout, MirStatement, MirStatementKind, MirTemp, MirTensorLocusLayout,
+    MirTensorStorageLayout, MirTerminator, MirTerminatorKind, MirType, MirValidationContext,
+    MirValue, MirValueKind, ValidatedMir,
 };
 use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable};
-use rustc_hash::FxHashSet;
 
 const SLUG_ABI: &str = "missing-abi-fact";
 const SLUG_LAYOUT: &str = "missing-layout-fact";
@@ -73,200 +80,6 @@ pub fn classify_device_safe_for_target_entry(
     classifier.allow_host_owned_tensor_entry = true;
     classifier.visit_program(validated.program());
     classifier.finish()
-}
-
-/// The dead fold-artifact slots of one function (S5-W-A1): the local and
-/// temp destinations of `Array`/`Tensor` constructs that no statement or
-/// terminator reads — the static-shape fold's shape-list / vacua artifacts
-/// the emitters skip (S5-U2c).
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-struct FoldArtifactSlots {
-    locals: FxHashSet<MirLocalId>,
-    temps: FxHashSet<MirTempId>,
-}
-
-impl FoldArtifactSlots {
-    /// Whether a place base is one of the dead fold-artifact slots.
-    fn contains(&self, base: &MirPlaceBase) -> bool {
-        match base {
-            MirPlaceBase::Local(local) => self.locals.contains(local),
-            MirPlaceBase::Temp(temp) => self.temps.contains(temp),
-        }
-    }
-}
-
-/// The dead fold-artifact slots of a function (S5-W-A1) — the S5-U2c
-/// liveness scan the gate shares with the emitters.
-///
-/// A slot is collected when it is a fold-artifact slot shape
-/// (`Array`/`Tensor` — the static-shape fold's shape-list / vacua types)
-/// and DEAD: no statement or terminator reads it, and a local slot is not a
-/// function param (a param is a side effect — always live). A temp slot
-/// traces through the lowered body's forward copy (`Local(l) ← Temp(t)`):
-/// the temp is dead exactly when the local it forwards into (or a direct
-/// operand consumer) is never read — mirrors the Metal/CUDA
-/// `destination_is_read` (S5-U2c). The forward-copy target local is
-/// collected too (the fold keeps the untraceable `temp→local` forward, so
-/// the shape-list local reaches the gate as a declaration even though no
-/// statement reads it). The emitters skip exactly these slots; a live
-/// `Array`/`Tensor` construct or slot stays fail-closed with the aggregate
-/// diagnostics.
-fn dead_fold_artifact_slots(function: &MirFunction, types: &TypeTable) -> FoldArtifactSlots {
-    let read_locals = crate::read_analysis::function_read_locals(function);
-    let mut dead = FoldArtifactSlots::default();
-    for local in &function.locals {
-        if is_fold_artifact_type(types, local.ty)
-            && !function.params.iter().any(|param| param.local == local.id)
-            && !read_locals.contains(&local.id)
-        {
-            dead.locals.insert(local.id);
-        }
-    }
-    for temp in &function.temps {
-        if !is_fold_artifact_type(types, temp.ty)
-            || crate::read_analysis::temp_directly_read(function, temp.id)
-        {
-            continue;
-        }
-        match crate::read_analysis::temp_forward_local(function, temp.id) {
-            None => {
-                dead.temps.insert(temp.id);
-            }
-            Some(local)
-                if !function.params.iter().any(|param| param.local == local)
-                    && !read_locals.contains(&local) =>
-            {
-                dead.temps.insert(temp.id);
-            }
-            Some(_) => {}
-        }
-    }
-    dead
-}
-
-/// Whether a slot type is a fold-artifact slot shape (`Array`/`Tensor` —
-/// the static-shape fold's shape-list and vacua-seed types). Only these
-/// types may be dead-skipped at the gate, mirroring the emitters' S5-U2c
-/// skip surface; they are structurally non-scalar, satisfying the narrowed
-/// "non-scalar only" dead-skip rule (radix-mir-metal 78e4440e7).
-fn is_fold_artifact_type(types: &TypeTable, ty: MirType) -> bool {
-    matches!(
-        types.get(ty.semantic_id()),
-        Type::Array(_) | Type::Tensor(_, _)
-    )
-}
-
-/// The dead non-kernel-scalar const-copy slots of one function (need
-/// a0184031): plain destinations of a DEAD const-copy Assign whose value is
-/// a scalar the kernel surface cannot express — the `LayerNorm` lowering's
-/// `i64` axis const (`Assign(Local(3) <- Constant(Int(axis)))` typed `i64`;
-/// the recipe call carries the axis directly, so the const local is never
-/// read).
-///
-/// The Metal emitter skips exactly this statement (26424928f Gap 1 —
-/// "format/legality-only": the destination is never read, so no semantics
-/// change) and the NVVM emitter emits it as a harmless native-i64 slot
-/// store; the production CUDA artifact path runs this shared gate BEFORE the
-/// emitter, so the gate must agree. The CTO council constraints
-/// (5f1b1348) hold structurally:
-///
-/// - a slot is dead only when NO statement or terminator reads it (the read
-///   set covers terminators — a value read only by a block's terminator is
-///   still live);
-/// - a slot is never a function param (a param is a side effect — always
-///   live, and resource-visible), never a result-aggregation slot;
-/// - the statement-level skip additionally requires an UNPROJECTED plain
-///   slot (an output-projection / projected store is never skipped), a
-///   pure `Constant` RHS (no runtime call, no expression — the emitters'
-///   dead-skip admits only `MirOperand::Constant`), and a non-kernel-scalar
-///   value — so a LIVE or merely-difficult (non-constant) i64 stays
-///   fail-closed with the layout diagnostics.
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-struct DeadConstCopySlots {
-    locals: FxHashSet<MirLocalId>,
-    temps: FxHashSet<MirTempId>,
-}
-
-impl DeadConstCopySlots {
-    /// Whether a place base is one of the dead non-kernel-scalar const-copy
-    /// slots.
-    fn contains(&self, base: &MirPlaceBase) -> bool {
-        match base {
-            MirPlaceBase::Local(local) => self.locals.contains(local),
-            MirPlaceBase::Temp(temp) => self.temps.contains(temp),
-        }
-    }
-}
-
-/// The dead non-kernel-scalar const-copy slots of one function (need
-/// a0184031) — the liveness scan the gate shares with the emitters' skip.
-///
-/// A slot is collected when its declared type is a non-kernel scalar (a
-/// `Scalar` layout the kernel surface cannot express — i64 etc.) and it is
-/// DEAD: no statement or terminator reads it, and a local slot is not a
-/// function param (a param is a side effect — always live). A temp slot
-/// traces through the lowered body's forward copy (`Local(l) ← Temp(t)`)
-/// exactly like the fold-artifact slots: the temp is dead when the local it
-/// forwards into (or a direct operand consumer) is never read.
-fn dead_non_kernel_scalar_const_slots(
-    function: &MirFunction,
-    layouts: &MirLayoutTable,
-) -> DeadConstCopySlots {
-    let read_locals = crate::read_analysis::function_read_locals(function);
-    let mut dead = DeadConstCopySlots::default();
-    for local in &function.locals {
-        if is_non_kernel_scalar_layout(layouts, local.ty)
-            && !function.params.iter().any(|param| param.local == local.id)
-            && !read_locals.contains(&local.id)
-        {
-            dead.locals.insert(local.id);
-        }
-    }
-    for temp in &function.temps {
-        if !is_non_kernel_scalar_layout(layouts, temp.ty)
-            || crate::read_analysis::temp_directly_read(function, temp.id)
-        {
-            continue;
-        }
-        match crate::read_analysis::temp_forward_local(function, temp.id) {
-            None => {
-                dead.temps.insert(temp.id);
-            }
-            Some(local)
-                if !function.params.iter().any(|param| param.local == local)
-                    && !read_locals.contains(&local) =>
-            {
-                dead.temps.insert(temp.id);
-            }
-            Some(_) => {}
-        }
-    }
-    dead
-}
-
-/// Whether a type's layout is a scalar the kernel surface cannot express — a
-/// `Scalar` layout that is NOT one of the kernel scalars (f32, bool, i32,
-/// u32). A DEAD const-copy of such a value (the `LayerNorm` lowering's `i64`
-/// axis const) is skipped as a format/legality-only drop (need,
-/// mirroring the Metal emitter's `value_is_non_kernel_scalar`, 26424928f
-/// Gap 1). A LIVE or merely-difficult (non-constant) value keeps the layout
-/// diagnostics.
-fn is_non_kernel_scalar_layout(layouts: &MirLayoutTable, ty: MirType) -> bool {
-    matches!(
-        layouts.layout_for_type(ty),
-        Ok(layout)
-            if matches!(
-                layout.kind,
-                MirLayoutKind::Scalar(scalar)
-                    if !matches!(
-                        scalar,
-                        MirScalarLayout::F32
-                            | MirScalarLayout::Bool
-                            | MirScalarLayout::I32
-                            | MirScalarLayout::U32
-                    )
-            )
-    )
 }
 
 struct DeviceSafeClassifier<'a> {
