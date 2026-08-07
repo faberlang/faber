@@ -1,4 +1,5 @@
 {
+  "crates/exempla/src/exempla_e2e/llvm.rs": "2026-08-07T15:09:46.740267+00:00",
   "src/cli/mod.rs": "2026-07-19T17:13:18.875578+00:00",
   "src/commands/install.rs": "2026-07-19T17:13:18.875578+00:00",
   "src/commands/mod.rs": "2026-07-19T17:13:18.875578+00:00",
