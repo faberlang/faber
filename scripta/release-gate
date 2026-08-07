@@ -108,15 +108,20 @@ fi
 echo "=== release-gate · hygiene ==="
 cargo test --test hygiene --quiet
 
+# nextest-safe applies the macOS archive-signing loader mitigation here too.
 echo "=== release-gate · cargo nextest run --profile full ==="
-NEXTEST_ARGS=(run --profile full)
+NEXTEST_RUN_ARGS=()
 if [[ "$NO_FAIL_FAST" == "1" ]]; then
-  NEXTEST_ARGS+=(--no-fail-fast)
+  NEXTEST_RUN_ARGS+=(--no-fail-fast)
 fi
 if ((${#EXTRA_NEXTEST[@]} > 0)); then
-  NEXTEST_ARGS+=("${EXTRA_NEXTEST[@]}")
+  NEXTEST_RUN_ARGS+=("${EXTRA_NEXTEST[@]}")
 fi
-cargo nextest "${NEXTEST_ARGS[@]}"
+if ((${#NEXTEST_RUN_ARGS[@]} > 0)); then
+  ./scripta/nextest-safe --workspace --profile full -- "${NEXTEST_RUN_ARGS[@]}"
+else
+  ./scripta/nextest-safe --workspace --profile full --
+fi
 
 echo "=== release-gate · ok ==="
 echo "    Language matrices / backend e2e are still separate:"

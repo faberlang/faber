@@ -17,6 +17,10 @@
 # There is no stage that runs --profile full or exempla matrices. Those are
 # release-gate / radix-ladder only.
 #
+# Nextest invocations go through ./scripta/nextest-safe. On macOS it signs a
+# temporary nextest archive before execution to avoid the observed loader
+# startup wedge; FABER_SIGNED_NEXTEST=0 bypasses that mitigation for diagnosis.
+#
 # Usage:
 #   ./scripta/test                 # stage 1
 #   ./scripta/test --stage 1-2
@@ -143,9 +147,9 @@ run_stage_1_default() {
   run_hygiene
   echo "=== stage 1 · cargo nextest run --profile default ==="
   if ((${#CARGO_ARGS[@]} > 0)); then
-    cargo nextest run --profile default "${CARGO_ARGS[@]}"
+    ./scripta/nextest-safe --package faber --profile default -- "${CARGO_ARGS[@]}"
   else
-    cargo nextest run --profile default
+    ./scripta/nextest-safe --package faber --profile default --
   fi
 }
 
@@ -153,9 +157,9 @@ run_stage_2_unit() {
   echo "=== stage 2 · unit: nextest --profile unit (includes package_test; SLOW) ==="
   echo "    Prefer stage 1 unless you need package_test or a named filter."
   if ((${#CARGO_ARGS[@]} > 0)); then
-    cargo nextest run --profile unit "${CARGO_ARGS[@]}"
+    ./scripta/nextest-safe --package faber --profile unit -- "${CARGO_ARGS[@]}"
   else
-    cargo nextest run --profile unit
+    ./scripta/nextest-safe --package faber --profile unit --
   fi
 }
 
@@ -163,9 +167,9 @@ run_stage_3_product() {
   echo "=== stage 3 · product: nextest --profile product (integration; SLOW) ==="
   echo "    Spawns faber binaries and may nest cargo. Explicit opt-in only."
   if ((${#CARGO_ARGS[@]} > 0)); then
-    cargo nextest run --profile product "${CARGO_ARGS[@]}"
+    ./scripta/nextest-safe --package faber --profile product -- "${CARGO_ARGS[@]}"
   else
-    cargo nextest run --profile product
+    ./scripta/nextest-safe --package faber --profile product --
   fi
 }
 

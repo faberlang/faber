@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+# Run nextest through the macOS loader workaround when requested.
+#
+# The first argument section (before the first `--`) is used to build the
+# archive. The second section is passed to `cargo nextest run` after the
+# archive has been signed. This keeps build selection separate from runner
+# filters, which cannot be passed alongside --archive-file.
+#
+# Examples:
+#   ./scripta/nextest-safe --package faber --profile default --
+#   ./scripta/nextest-safe --workspace --profile full -- --no-fail-fast
+#
+# FABER_SIGNED_NEXTEST=0|off|false disables the workaround for diagnosis.
+
+set -euo pipefail
+
+signed_mode="${FABER_SIGNED_NEXTEST:-auto}"
+signed_mode_lc="$(printf '%s' "$signed_mode" | tr '[:upper:]' '[:lower:]')"
+case "$signed_mode_lc" in
+  0|off|false|no)
+    signed_mode="off"
+    ;;
+  1|on|true|yes|auto)
+    ;;
+  *)
+    echo "error: FABER_SIGNED_NEXTEST must be auto, 1, or 0 (got '$signed_mode')" >&2
+    exit 2
+    ;;
+esac
+
+archive_args=()
+run_args=()
+separator_seen=0
+for arg in "$@"; do
+  if [[ "$separator_seen" == "0" && "$arg" == "--" ]]; then
+    separator_seen=1
+    continue
+  fi
+  if [[ "$separator_seen" == "0" ]]; then
+    archive_args+=("$arg")
+  else
+    run_args+=("$arg")
+  fi
+done
+
+if [[ "$separator_seen" == "0" ]]; then
+  if [[ "$signed_mode" == "off" || "$(uname -s)" != "Darwin" ]]; then
+    exec cargo nextest run "$@"
+  fi
+  echo "error: nextest-safe requires '--' between archive and run arguments" >&2
+  echo "usage: ./scripta/nextest-safe <archive args> -- <run args>" >&2
+  exit 2
+fi
+
+if [[ "$signed_mode" == "off" || "$(uname -s)" != "Darwin" ]]; then
+  exec cargo nextest run "${archive_args[@]}" "${run_args[@]}"
+fi
+
+codesign_bin="$(command -v codesign || true)"
+if [[ -z "$codesign_bin" ]]; then
+  echo "error: macOS signed nextest requires codesign" >&2
+  exit 1
+fi
+
+tmp_root="$(mktemp -d "${TMPDIR:-/tmp}/faber-nextest.XXXXXX")"
+cleanup() {
+  rm -rf "$tmp_root"
+}
+trap cleanup EXIT
+
+unsigned_archive="$tmp_root/unsigned.tar.zst"
+signed_archive="$tmp_root/signed.tar.zst"
+extract_root="$tmp_root/extract"
+mkdir -p "$extract_root"
+
+echo "=== nextest-safe · macOS signed archive ==="
+archive_command=(cargo nextest archive)
+if ((${#archive_args[@]} > 0)); then
+  archive_command+=("${archive_args[@]}")
+fi
+archive_command+=(--archive-file "$unsigned_archive")
+"${archive_command[@]}"
+COPYFILE_DISABLE=1 tar --zstd -xf "$unsigned_archive" -C "$extract_root"
+
+signed_count=0
+while IFS= read -r -d '' candidate; do
+  kind="$(file -b "$candidate" 2>/dev/null || true)"
+  if [[ "$kind" == *"Mach-O"* ]]; then
+    "$codesign_bin" --force --deep --sign - "$candidate"
+    signed_count=$((signed_count + 1))
+  fi
+done < <(find "$extract_root" -type f -print0)
+
+if [[ "$signed_count" -eq 0 ]]; then
+  echo "error: signed nextest archive contained no Mach-O files" >&2
+  exit 1
+fi
+
+COPYFILE_DISABLE=1 tar --zstd --exclude='._*' -cf "$signed_archive" -C "$extract_root" target
+
+# A nextest archive run needs the profile/config selection again, but not the
+# Cargo package/build arguments that are forbidden with --archive-file.
+run_profile_args=()
+for ((i = 0; i < ${#archive_args[@]}; i++)); do
+  case "${archive_args[$i]}" in
+    --profile|-P)
+      [[ $((i + 1)) -lt ${#archive_args[@]} ]] || {
+        echo "error: $1 requires a value" >&2
+        exit 2
+      }
+      run_profile_args+=("${archive_args[$i]}" "${archive_args[$((i + 1))]}")
+      i=$((i + 1))
+      ;;
+    --profile=*)
+      run_profile_args+=("${archive_args[$i]}")
+      ;;
+  esac
+done
+
+set +e
+nextest_run=(cargo nextest run --archive-file "$signed_archive")
+if ((${#run_profile_args[@]} > 0)); then
+  nextest_run+=("${run_profile_args[@]}")
+fi
+if ((${#run_args[@]} > 0)); then
+  nextest_run+=("${run_args[@]}")
+fi
+"${nextest_run[@]}"
+nextest_rc=$?
+set -e
+exit "$nextest_rc"
