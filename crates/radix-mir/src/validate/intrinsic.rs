@@ -190,6 +190,16 @@ impl Validator<'_, '_> {
             MirIntrinsic::Gradient(op) => {
                 self.validate_gradient_call(scope, *op, call, span);
             }
+            MirIntrinsic::TypeCheck(op) => {
+                self.require_arg_count(call.args.len(), 1, span, "type_check runtime call");
+                self.validate_mir_type(op.ty, span);
+                self.require_exact(
+                    call.return_ty,
+                    self.primitive(Primitive::Bivalens),
+                    span,
+                    "type_check runtime call does not return bivalens",
+                );
+            }
         }
     }
 

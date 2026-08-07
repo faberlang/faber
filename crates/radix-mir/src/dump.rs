@@ -429,6 +429,11 @@ fn intrinsic(value: &MirIntrinsic) -> String {
         MirIntrinsic::GpuBuiltin(builtin) => format!("gpu_builtin {}", builtin.spelling()),
         MirIntrinsic::CursorStream(cursor) => format!("cursor_stream def#{}", cursor.callee.0),
         MirIntrinsic::Gradient(op) => format!("gradient_{}_op", gradient_op(*op)),
+        MirIntrinsic::TypeCheck(op) => format!(
+            "type_check positive={} type#{}",
+            op.positive,
+            op.ty.semantic_id().0
+        ),
     }
 }
 

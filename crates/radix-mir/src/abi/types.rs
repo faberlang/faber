@@ -81,6 +81,7 @@ pub enum MirRuntimeAbiFamily {
     RuntimeGpuBuiltin,
     RuntimeCursorStream,
     RuntimeGradient,
+    RuntimeTypeCheck,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -167,6 +168,11 @@ impl MirRuntimeAbi {
             MirIntrinsic::Gradient(_) => (
                 MirRuntimeAbiFamily::RuntimeGradient,
                 MirRuntimeAbiCategory::HostIntegration,
+                false,
+            ),
+            MirIntrinsic::TypeCheck(_) => (
+                MirRuntimeAbiFamily::RuntimeTypeCheck,
+                MirRuntimeAbiCategory::CoreSemantics,
                 false,
             ),
         };

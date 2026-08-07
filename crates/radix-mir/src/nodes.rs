@@ -712,6 +712,27 @@ pub enum MirIntrinsic {
     CursorStream(MirCursorStream),
     /// Gradient handle runtime operation (create, accumulate, read, zero).
     Gradient(MirGradientOp),
+    /// Compiler-owned runtime variant-tag check (`est <type>` / `non est <type>`).
+    ///
+    /// Stepper-dispatched type check on the runtime value's variant tag against
+    /// a concrete valor-carried target type; never attempts extraction. The
+    /// MIR stepper is the first systems-lane consumer of the `est`
+    /// variant-check surface (archived `docs/archived/est-variant-check/`);
+    /// device/application lanes fail closed on it.
+    TypeCheck(MirTypeCheckOp),
+}
+
+/// Type-check intrinsic payload (`est <type>` / `non est <type>`).
+///
+/// `positive` distinguishes `est` (the runtime tag matches `ty`) from
+/// `non est` (the tag does not match). `ty` is the valor-carried concrete
+/// target type whose runtime variant the operand must match (semantic type
+/// id, resolved like [`MirConversion::target_ty`]); inner type parameters
+/// are erased at Valor boxing time and are not checked.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MirTypeCheckOp {
+    pub positive: bool,
+    pub ty: MirType,
 }
 
 /// Gradient handle runtime operations.
