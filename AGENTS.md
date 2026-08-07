@@ -9,6 +9,7 @@ from sibling repos listed in `core-support-manifest.txt`.
 
 ```text
 src/                    CLI + package pipeline
+src/postprocess.rs      Faber-owned generated target-source format/lint helpers
 crates/exempla/         corpus / language e2e harness (workspace member)
 crates/hygiene-ratchet/ production code hygiene budgets
 tests/                  integration tests (emit, run, hygiene, …)
@@ -18,6 +19,28 @@ scripta/release-gate    EXPENSIVE full-workspace closeout (release only)
 build.rs                core-support assembler (reads core-support-manifest.txt)
 core-support-manifest.txt  sibling repo paths relative to faberlang container
 ```
+
+## Ownership boundaries
+
+- Radix lowers Faber into target artifacts. It does not run target-specific
+  formatters, linters, package builds, Cargo builds, or executable hosts.
+- Faber owns user/product workflow: package build/run/test, host launch, and
+  optional generated target-source postprocessing.
+- `faber build --format/--linter` and `faber emit --format/--linter` are
+  implemented in `src/postprocess.rs`. Supported tools are best-effort and
+  host-installed: `rustfmt`, `cargo clippy --fix` for generated Rust, `gofmt`,
+  `prettier`/`deno fmt`, and `biome`/`eslint`.
+- `crates/exempla/src/postprocess.rs` is harness-owned for e2e toolchain checks.
+  Do not move those helpers back into Radix.
+- Faber currently depends on Radix with `default-features = false` and
+  `features = ["full-targets"]`. If a product lane needs a smaller compiler,
+  narrow Radix features in `Cargo.toml` using the Radix `hir-*` / `mir-*`
+  feature names instead of adding runtime/toolchain behavior to Radix.
+
+`faber format` is author-source formatting. It remains distinct from generated
+target-source postprocessing. Longer-term Faber/Forma consolidation is tracked
+as factory work: Faber should own user-facing formatting policy, with rule
+slugs/options rather than a single all-or-nothing surface enum.
 
 ## Test law (cheap-first — no exceptions)
 
