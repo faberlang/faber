@@ -30,7 +30,7 @@ use radix_syntax::{
     CuraStmt, CustodiClause, CustodiStmt, DiscerneStmt, DumStmt, EligeStmt, ExField, ExStmt, Expr,
     ExprKind, ExprStmt, FacStmt, IaceStmt, IfBody, IncDecOp, IncDecStmt, IncipitStmt, IteraMode,
     IteraStmt, MoriStmt, PergeStmt, ReddeStmt, RumpeStmt, ScribeKind, ScribeStmt, SecusClause,
-    SiStmt, Stmt, StmtKind, TacetStmt,
+    SiStmt, Stmt, StmtKind, TacetStmt, Trivia,
 };
 
 // =============================================================================
@@ -65,10 +65,23 @@ impl Parser {
         let then = self.parse_ergo_body()?;
         let catch = self.try_parse_cape_stmt()?;
 
-        let else_ = if self.eat_keyword_ident(TokenKind::Secus) {
-            Some(self.parse_secus_stmt()?)
-        } else if self.eat_keyword_ident(TokenKind::Sin) {
-            Some(SecusClause::Sin(Box::new(self.parse_sin_stmt()?)))
+        // Comments and blank lines between branches of one chain sit at the
+        // ordinary statement-level divider position. Capture them as
+        // branch-link leading trivia so they are preserved and claimed
+        // instead of skipped as anonymous trivia.
+        let else_ = if self.check_keyword_ident(TokenKind::Secus)
+            || self.check_keyword_ident(TokenKind::Sin)
+        {
+            let leading_trivia = self.parse_leading_trivia();
+            if self.eat_keyword_ident(TokenKind::Secus) {
+                Some(self.parse_secus_stmt(leading_trivia)?)
+            } else {
+                self.expect_keyword_ident(TokenKind::Sin, "expected 'sin'")?;
+                Some(SecusClause::Sin {
+                    stmt: Box::new(self.parse_sin_stmt()?),
+                    leading_trivia,
+                })
+            }
         } else {
             None
         };
@@ -97,7 +110,7 @@ impl Parser {
         }
     }
 
-    fn parse_secus_stmt(&mut self) -> Result<SecusClause, ParseError> {
+    fn parse_secus_stmt(&mut self, leading_trivia: Vec<Trivia>) -> Result<SecusClause, ParseError> {
         if self.check_keyword_ident(TokenKind::Si) {
             return Err(self.expected_statement_error("secus_si_else_if"));
         }
@@ -105,13 +118,21 @@ impl Parser {
         if self.check(&TokenKind::LBrace) {
             let body = self.parse_block()?;
             let catch = self.try_parse_cape_stmt()?;
-            Ok(SecusClause::Block { body, catch })
+            Ok(SecusClause::Block {
+                body,
+                catch,
+                leading_trivia,
+            })
         } else if self.check(&TokenKind::Therefore) {
             Err(self.therefore_wrong_context_error())
         } else if self.eat_keyword_ident(TokenKind::Ergo) {
             let stmt = Box::new(self.parse_stmt()?);
             let catch = self.try_parse_cape_stmt()?;
-            Ok(SecusClause::Stmt { stmt, catch })
+            Ok(SecusClause::Stmt {
+                stmt,
+                catch,
+                leading_trivia,
+            })
         } else {
             Err(self.missing_block_error())
         }

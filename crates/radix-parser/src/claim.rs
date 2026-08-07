@@ -1,9 +1,10 @@
 //! Post-parse completeness check for `LineComment` tokens.
 //!
 //! Every `#` line-comment token must be claimed by a legal syntax trivia
-//! carrier (forward statement/member leading trivia, block-end trivia, or
-//! program-end trivia) or it is reported with one structured
-//! invalid-placement diagnostic. Comments are never silently discarded.
+//! carrier (forward statement/member leading trivia, branch-link leading
+//! trivia, block-end trivia, or program-end trivia) or it is reported with one
+//! structured invalid-placement diagnostic. Comments are never silently
+//! discarded.
 //!
 //! WHY: A cursor-embedded claim counter would need every legal position and
 //! every skip path (`peek`/`advance` inside expressions, annotation parsing,
@@ -183,18 +184,32 @@ fn claim_catch(catch: Option<&CapeClause>, claimed: &mut HashSet<u32>) {
 
 fn claim_secus(secus: &SecusClause, claimed: &mut HashSet<u32>) {
     match secus {
-        SecusClause::Sin(si) => {
+        SecusClause::Sin {
+            stmt: si,
+            leading_trivia,
+        } => {
+            claim_trivia(leading_trivia, claimed);
             claim_if_body(&si.then, claimed);
             claim_catch(si.catch.as_ref(), claimed);
             if let Some(else_) = &si.else_ {
                 claim_secus(else_, claimed);
             }
         }
-        SecusClause::Block { body, catch } => {
+        SecusClause::Block {
+            body,
+            catch,
+            leading_trivia,
+        } => {
+            claim_trivia(leading_trivia, claimed);
             claim_block(body, claimed);
             claim_catch(catch.as_ref(), claimed);
         }
-        SecusClause::Stmt { stmt, catch } => {
+        SecusClause::Stmt {
+            stmt,
+            catch,
+            leading_trivia,
+        } => {
+            claim_trivia(leading_trivia, claimed);
             claim_stmt(stmt, claimed);
             claim_catch(catch.as_ref(), claimed);
         }

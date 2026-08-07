@@ -5,7 +5,7 @@
 
 use crate::{parse, ParseErrorKind};
 use radix_lexer::lex;
-use radix_syntax::{CommentLine, StmtKind, Trivia};
+use radix_syntax::{CommentLine, SecusClause, StmtKind, Trivia};
 
 fn parse_source(source: &str) -> crate::ParseResult {
     parse(lex(source))
@@ -266,4 +266,87 @@ fn trailing_comment_before_eof_survives_on_program_end() {
     let comments = comment_lines(&program.end_trivia);
     assert_eq!(comments.len(), 1);
     assert_eq!(result.interner.resolve(comments[0].text), " trailing");
+}
+
+// ── Branch links ──
+
+#[test]
+fn comment_between_sin_branches_preserved_as_branch_link_trivia() {
+    // A section-divider comment between braced `sin` branches of one si-chain
+    // sits at the ordinary statement-level divider position and must be
+    // claimed as branch-link leading trivia, not rejected as invalid placement.
+    let source = "\
+si verum {
+  tacet
+}
+sin falsum {
+  tacet
+}
+# -- identity commands --
+sin verum {
+  tacet
+}
+";
+    let result = parse_source(source);
+    assert!(result.success(), "{:?}", result.errors);
+
+    let program = result.program.as_ref().unwrap();
+    assert_eq!(program.statements.len(), 1);
+    let StmtKind::Si(si) = &program.statements[0].kind else {
+        panic!("expected si statement");
+    };
+
+    let SecusClause::Sin {
+        stmt: falsum,
+        leading_trivia,
+    } = si.else_.as_ref().expect("first sin branch")
+    else {
+        panic!("expected sin clause");
+    };
+    assert!(comment_lines(leading_trivia).is_empty());
+
+    let SecusClause::Sin {
+        stmt: _,
+        leading_trivia,
+    } = falsum.else_.as_ref().expect("second sin branch")
+    else {
+        panic!("expected sin clause");
+    };
+    let comments = comment_lines(leading_trivia);
+    assert_eq!(comments.len(), 1);
+    assert_eq!(
+        result.interner.resolve(comments[0].text),
+        " -- identity commands --"
+    );
+    // branch-terminating newline + newline after the comment line
+    assert_eq!(newline_count(leading_trivia), 2);
+}
+
+#[test]
+fn comment_before_secus_else_preserved_as_branch_link_trivia() {
+    let source = "\
+si verum {
+  tacet
+}
+# -- fallback --
+secus {
+  tacet
+}
+";
+    let result = parse_source(source);
+    assert!(result.success(), "{:?}", result.errors);
+
+    let program = result.program.as_ref().unwrap();
+    assert_eq!(program.statements.len(), 1);
+    let StmtKind::Si(si) = &program.statements[0].kind else {
+        panic!("expected si statement");
+    };
+
+    let SecusClause::Block { leading_trivia, .. } = si.else_.as_ref().expect("secus branch") else {
+        panic!("expected secus block");
+    };
+    let comments = comment_lines(leading_trivia);
+    assert_eq!(comments.len(), 1);
+    assert_eq!(result.interner.resolve(comments[0].text), " -- fallback --");
+    assert_eq!(newline_count(leading_trivia), 2);
 }

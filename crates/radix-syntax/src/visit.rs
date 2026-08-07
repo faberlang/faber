@@ -712,7 +712,7 @@ fn walk_if_body<V: Visitor>(visitor: &mut V, body: &IfBody) {
 /// its statements, catches, and nested `si`/`sin` conditionals.
 fn walk_secus_clause<V: Visitor>(visitor: &mut V, clause: &SecusClause) {
     match clause {
-        SecusClause::Sin(stmt) => {
+        SecusClause::Sin { stmt, .. } => {
             visitor.visit_expr(&stmt.cond);
             walk_if_body(visitor, &stmt.then);
             if let Some(catch) = &stmt.catch {
@@ -723,14 +723,14 @@ fn walk_secus_clause<V: Visitor>(visitor: &mut V, clause: &SecusClause) {
                 walk_secus_clause(visitor, else_);
             }
         }
-        SecusClause::Block { body, catch } => {
+        SecusClause::Block { body, catch, .. } => {
             visitor.visit_block(body);
             if let Some(catch) = catch {
                 visitor.visit_ident(&catch.binding);
                 visitor.visit_block(&catch.body);
             }
         }
-        SecusClause::Stmt { stmt, catch } => {
+        SecusClause::Stmt { stmt, catch, .. } => {
             visitor.visit_stmt(stmt);
             if let Some(catch) = catch {
                 visitor.visit_ident(&catch.binding);

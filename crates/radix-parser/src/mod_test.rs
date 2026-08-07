@@ -1993,7 +1993,8 @@ fn parses_si_control_flow() {
     };
     assert!(matches!(if_stmt.then, IfBody::Ergo(_)));
     assert!(if_stmt.catch.is_some());
-    let SecusClause::Sin(sin_stmt) = if_stmt.else_.as_ref().expect("else clause") else {
+    let SecusClause::Sin { stmt: sin_stmt, .. } = if_stmt.else_.as_ref().expect("else clause")
+    else {
         panic!("expected sin clause");
     };
     assert!(matches!(sin_stmt.then, IfBody::Ergo(_)));
@@ -2541,7 +2542,10 @@ fac { tacet } cape err {}
         panic!("expected si");
     };
     assert!(si_stmt.catch.is_some());
-    let SecusClause::Sin(else_if_stmt) = si_stmt.else_.as_ref().expect("sin") else {
+    let SecusClause::Sin {
+        stmt: else_if_stmt, ..
+    } = si_stmt.else_.as_ref().expect("sin")
+    else {
         panic!("expected sin");
     };
     assert!(else_if_stmt.catch.is_some());

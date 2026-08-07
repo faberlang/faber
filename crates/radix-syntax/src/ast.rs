@@ -626,14 +626,20 @@ pub enum IfBody {
 
 #[derive(Debug)]
 pub enum SecusClause {
-    Sin(Box<SiStmt>),
+    Sin {
+        stmt: Box<SiStmt>,
+        /// Leading trivia (comments and blank lines) before the `sin` branch link.
+        leading_trivia: Vec<Trivia>,
+    },
     Block {
         body: BlockStmt,
         catch: Option<CapeClause>,
+        leading_trivia: Vec<Trivia>,
     },
     Stmt {
         stmt: Box<Stmt>,
         catch: Option<CapeClause>,
+        leading_trivia: Vec<Trivia>,
     },
 }
 
