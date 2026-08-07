@@ -97,36 +97,27 @@ fn run_fixture_package() -> (RunOutcome, WasmTier, String) {
     );
 
     let expected = read_expected_stdout(&entry).expect("fixture must have a sibling .expected");
-    let tier = match &outcome {
-        RunOutcome::Success { stdout, .. } if normalize_newline(stdout) == expected => {
-            WasmTier::OutputChecked
-        }
-        RunOutcome::Success { stdout, .. } => {
-            return (
-                outcome,
-                WasmTier::Runnable,
-                format!(
-                    "product host run_package succeeded but .expected mismatch: got {:?}, want {:?}",
-                    stdout, expected
-                ),
-            );
-        }
-        other => {
-            return (
-                outcome,
-                WasmTier::CompileValid,
-                format!("product host package run produced a typed non-success: {other:?}"),
-            );
-        }
-    };
-    (
-        outcome,
-        tier,
-        format!(
-            "product host run_package matched sibling .expected ({} lines)",
-            expected.lines().count()
+    let (tier, reason) = match &outcome {
+        RunOutcome::Success { stdout, .. } if normalize_newline(stdout) == expected => (
+            WasmTier::OutputChecked,
+            format!(
+                "product host run_package matched sibling .expected ({} lines)",
+                expected.lines().count()
+            ),
         ),
-    )
+        RunOutcome::Success { stdout, .. } => (
+            WasmTier::Runnable,
+            format!(
+                "product host run_package succeeded but .expected mismatch: got {:?}, want {:?}",
+                stdout, expected
+            ),
+        ),
+        other => (
+            WasmTier::CompileValid,
+            format!("product host package run produced a typed non-success: {other:?}"),
+        ),
+    };
+    (outcome, tier, reason)
 }
 
 /// U6-D done_when core: the package-aware wasm lane reports the fixture at
