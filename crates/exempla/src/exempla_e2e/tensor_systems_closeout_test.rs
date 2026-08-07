@@ -5,7 +5,7 @@ use crate::exempla_e2e::tensor_package::{
     tensor_package_proof_rows, TensorPackageProofTarget, TENSOR_PACKAGE_PROOF_FIXTURE,
 };
 use crate::exempla_e2e::tensor_workload_proof::{
-    tensor_workload_proof_rows, TensorWorkloadProofBucket,
+    tensor_workload_proof_rows, TensorWorkloadProofTier,
 };
 use radix::mir::{
     required_tensor_operation_floor_families, tensor_operation_floor_rows,
@@ -72,9 +72,14 @@ fn tensor_systems_closeout_keeps_capability_floors_code_owned() {
 
 #[test]
 fn tensor_systems_closeout_keeps_workload_blocker_and_package_proof_explicit() {
+    // U-06 re-anchor (codex-gap Stage 2): the rung-0 workload row is now
+    // output-checked (blocker resolved) via the re-verified nonce-bound U-05
+    // receipt (radix 7f520f067, run u05-rerun-nonce1) — the WorkloadFloor
+    // facet moved from StableBlocker to ExecutableProof (expected outcome of
+    // the U-06 promotion, not a weakening).
     assert!(tensor_systems_closeout_rows().iter().any(|row| {
         row.facet == TensorSystemsCloseoutFacet::WorkloadFloor
-            && row.status == TensorSystemsCloseoutStatus::StableBlocker
+            && row.status == TensorSystemsCloseoutStatus::ExecutableProof
     }));
     assert!(tensor_systems_closeout_rows().iter().any(|row| {
         row.facet == TensorSystemsCloseoutFacet::PackageProof
@@ -84,15 +89,17 @@ fn tensor_systems_closeout_keeps_workload_blocker_and_package_proof_explicit() {
     let workload = tensor_workload_proof_rows()
         .first()
         .expect("workload proof row");
-    assert_eq!(
-        workload.bucket,
-        Some(TensorWorkloadProofBucket::LaunchContractFailed)
-    );
-    assert!(!workload.output_checked);
-    assert!(
-        workload.blocker_issue.contains("host provider"),
-        "workload blocker must reference host provider gap: {workload:?}"
-    );
+    // The rung-0 CUDA-route launch-contract blocker is resolved: the row is
+    // output-checked with no bucket, no owner, no blocker issue, and the
+    // evidence anchors the re-verified receipt (radix 7f520f067) — never a
+    // CPU or staged-LLVM fallback.
+    assert_eq!(workload.tier, TensorWorkloadProofTier::OutputChecked);
+    assert_eq!(workload.bucket, None);
+    assert!(workload.output_checked);
+    assert_eq!(workload.blocker_owner, None);
+    assert_eq!(workload.blocker_issue, "");
+    assert!(workload.evidence.contains("7f520f067"));
+    assert!(workload.evidence.contains("u05-rerun-nonce1"));
 
     for target in [
         TensorPackageProofTarget::FmirText,

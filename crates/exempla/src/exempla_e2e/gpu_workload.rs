@@ -6,9 +6,9 @@
 //! recorded as a receipt: a rung with a recorded CUDA-route device-execution
 //! proof (launch → sync → readback → numeric oracle against its `*.ref.json`)
 //! counts toward its output-checked floor. Rung 0 (`rung-0-matmul`) closed that
-//! path 2026-08-07 (U-05 receipt, radix a88fc4933); rungs 1–4 stay pinned at
-//! zero until their producer tracks supply launch/run capability.
-//! PROVISIONAL pending U-05 re-verification (u05-rerun-nonce1, hand-9): rung-0's 0→1 output-checked promotion is held until the re-verified receipt lands; floor constants unchanged.
+//! path 2026-08-07 on the re-verified U-05 receipt (radix 7f520f067, run
+//! u05-rerun-nonce1; nonce-bound adoption); rungs 1–4 stay pinned at zero until
+//! their producer tracks supply launch/run capability.
 
 use super::common::{
     collect_exempla_files, command_available, format_ceiling_line, format_diagnostic_messages,
@@ -62,9 +62,10 @@ struct GpuWorkloadToolchain {
     ptxas_available: bool,
 }
 
-// Rung-0 output-checked floor: 0 → 1 via the U-05 device-execution receipt
-// (radix a88fc4933, 2026-08-07) — rung-0-matmul launch → sync → readback →
-// numeric oracle on the RunPod dc-a100 lane; see CUDA_ROUTE_DEVICE_EXECUTION_PROOFS.
+// Rung-0 output-checked floor: 0 → 1 via the re-verified U-05 device-execution
+// receipt (radix 7f520f067, run u05-rerun-nonce1, 2026-08-07) — rung-0-matmul
+// launch → sync → readback → numeric oracle on the RunPod dc-a100 lane; see
+// CUDA_ROUTE_DEVICE_EXECUTION_PROOFS.
 const EXPECTED_RUNG_0_OUTPUT_CHECKED_FLOOR: usize = 1;
 const EXPECTED_RUNG_1_OUTPUT_CHECKED_FLOOR: usize = 0;
 const EXPECTED_RUNG_2_OUTPUT_CHECKED_FLOOR: usize = 0;
@@ -92,12 +93,15 @@ const EXPECTED_GPU_UNSUPPORTED_DIAGNOSTIC_CEILING: usize = 5;
 /// route boundary law never moves CUDA-route floors from sibling-lane evidence.
 const CUDA_ROUTE_DEVICE_EXECUTION_PROOFS: &[(usize, &str)] = &[(
     0,
-    "rung-0-matmul runpod-gated closure PASS (U-05, radix a88fc4933): dc-a100 \
-     A100-SXM4-80GB CC 8.0, launch grid 1,1,1 block 8,8,1, readback \
-     [58, 64, 139, 154] vs pinned oracle within 1e-5 (worst delta 0), teardown \
-     provider-confirmed; evidence radix docs/factory/codex-gap-campaign/\
-     u05-rung0-matmul-evidence.md + trials receipt \
-     ~/work/ianzepp/trials/runpod-gpu-verification/u05-rung0-a100-final/receipt.md",
+    "rung-0-matmul runpod-gated closure PASS (U-05, re-verified u05-rerun-nonce1, \
+     radix 7f520f067): dc-a100 A100-SXM4-80GB CC 8.0, pod_provenance adopted + \
+     create_nonce e6acc08452049526da87ea0fea4fc15a, launch grid 1,1,1 block 8,8,1, \
+     readback [58, 64, 139, 154] vs pinned oracle within 1e-5 (worst delta 0), \
+     teardown provider-confirmed, zero orphan pods; evidence radix docs/factory/\
+     codex-gap-campaign/u05-rerun-nonce-bound-evidence.md + trials receipt \
+     ~/work/ianzepp/trials/runpod-gpu-verification/u05-rerun-nonce1/receipt.md \
+     (original a88fc4933 landing held pending the nonce-bound re-verification; \
+     this re-anchor is the accepted citation)",
 )];
 
 fn cuda_route_device_execution_proof(rung: usize) -> Option<&'static str> {

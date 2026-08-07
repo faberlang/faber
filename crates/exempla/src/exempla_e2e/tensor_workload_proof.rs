@@ -3,9 +3,9 @@
 //! TARGET: Stage 11 of the tensor systems timeline. These rows consume the GPU
 //! workload floor as measured evidence; they do not implement CUDA launch or
 //! move output floors by themselves. Rung 0 closed the CUDA-route
-//! `LaunchContractFailed` blocker 2026-08-07 with the U-05 device-execution
-//! receipt (radix a88fc4933) and now carries the output-checked claim.
-//! PROVISIONAL pending U-05 re-verification (u05-rerun-nonce1, hand-9): the rung-0 output-checked claim is held until the re-verified receipt lands; row constants unchanged.
+//! `LaunchContractFailed` blocker 2026-08-07 with the re-verified U-05
+//! device-execution receipt (radix 7f520f067, run u05-rerun-nonce1, nonce-bound
+//! adoption) and now carries the output-checked claim.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum TensorWorkloadProofTier {
@@ -28,8 +28,9 @@ pub(super) enum TensorWorkloadProofBucket {
     DeviceStagingFailed,
     /// Launch contract step discovered no real device executor.
     /// SermoOpen returns stub handle, but the kernel cannot be dispatched.
-    /// Rung 0 closed this blocker 2026-08-07 (U-05 device-execution receipt,
-    /// radix a88fc4933); remains the recorded class for future CUDA-route rungs.
+    /// Rung 0 closed this blocker 2026-08-07 (re-verified U-05 device-execution
+    /// receipt, radix 7f520f067, run u05-rerun-nonce1); remains the recorded
+    /// class for future CUDA-route rungs.
     LaunchContractFailed,
     /// The chain staged AND dispatched on the real device path, but the
     /// readback does not match the stepper reference — a device-result
@@ -41,9 +42,9 @@ pub(super) enum TensorWorkloadProofBucket {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum TensorWorkloadProofOwner {
-    /// Resolved for rung 0 2026-08-07 by the U-05 device-execution receipt
-    /// (radix a88fc4933); remains the recorded owner for future CUDA-route
-    /// launch-contract blockers.
+    /// Resolved for rung 0 2026-08-07 by the re-verified U-05 device-execution
+    /// receipt (radix 7f520f067, run u05-rerun-nonce1); remains the recorded
+    /// owner for future CUDA-route launch-contract blockers.
     CudaKernelEmitHostProvider,
 }
 
@@ -74,7 +75,7 @@ pub(super) const TENSOR_WORKLOAD_PROOF_ROWS: &[TensorWorkloadProofRow] =
         output_checked: true,
         blocker_owner: None,
         blocker_issue: "",
-        evidence: "CUDA-route device-execution + output-checked closure PASS 2026-08-07 (U-05, codex-gap Stage 2, radix commit a88fc4933): rung-0-matmul pinned bundle on the RunPod dc-a100 lane (A100-SXM4-80GB, CC 8.0) — module load, descriptor-driven alloc/copy, plan-driven launch (grid 1,1,1 block 8,8,1), sync, readback [58, 64, 139, 154] vs pinned oracle [58.0, 64.0, 139.0, 154.0] (family matmul, atol 1e-5, worst delta 0), teardown provider-confirmed, overall PASS; evidence chain radix docs/factory/codex-gap-campaign/u05-rung0-matmul-evidence.md + trials receipt ~/work/ianzepp/trials/runpod-gpu-verification/u05-rung0-a100-final/receipt.md + radix docs/factory/gpu-workload-floor/baseline-ledger.md (rung-0 floor 0→1, 2026-08-07). Rungs 1–2 stay WebGPU-output-checked per their existing classification (route boundary law)",
+        evidence: "CUDA-route device-execution + output-checked closure PASS 2026-08-07 (U-05, codex-gap Stage 2, radix commit a88fc4933; re-verified nonce-bound run u05-rerun-nonce1, radix 7f520f067 — accepted citation): rung-0-matmul pinned bundle on the RunPod dc-a100 lane (A100-SXM4-80GB, CC 8.0) — pod_provenance adopted + create_nonce e6acc08452049526da87ea0fea4fc15a, module load, descriptor-driven alloc/copy, plan-driven launch (grid 1,1,1 block 8,8,1), sync, readback [58, 64, 139, 154] vs pinned oracle [58.0, 64.0, 139.0, 154.0] (family matmul, atol 1e-5, worst delta 0), teardown provider-confirmed, overall PASS; evidence chain radix docs/factory/codex-gap-campaign/u05-rerun-nonce-bound-evidence.md + trials receipt ~/work/ianzepp/trials/runpod-gpu-verification/u05-rerun-nonce1/receipt.md + radix docs/factory/codex-gap-campaign/u05-rung0-matmul-evidence.md (original a88fc4933 landing held pending the re-verification) + radix docs/factory/gpu-workload-floor/baseline-ledger.md (rung-0 floor 0→1, re-anchored 2026-08-07). Rungs 1–2 stay WebGPU-output-checked per their existing classification (route boundary law)",
     },
     TensorWorkloadProofRow {
         rung: 1,

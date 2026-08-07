@@ -1,7 +1,7 @@
 //! Tensor systems campaign closeout ratchet.
 //!
 //! TARGET: Stage 13 of the tensor systems timeline. This table ties the code
-//! owned tensor operation floor, systems target rows, workload blocker row, and
+//! owned tensor operation floor, systems target rows, workload floor row, and
 //! FMIR package proof together so closeout cannot drift into a docs-only claim.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,7 +26,6 @@ impl TensorSystemsCloseoutFacet {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum TensorSystemsCloseoutStatus {
     CodeOwnedRatchet,
-    StableBlocker,
     ExecutableProof,
 }
 
@@ -34,7 +33,6 @@ impl TensorSystemsCloseoutStatus {
     pub(super) fn label(self) -> &'static str {
         match self {
             Self::CodeOwnedRatchet => "code-owned ratchet",
-            Self::StableBlocker => "stable blocker",
             Self::ExecutableProof => "executable proof",
         }
     }
@@ -60,9 +58,9 @@ pub(super) const TENSOR_SYSTEMS_CLOSEOUT_ROWS: &[TensorSystemsCloseoutRow] = &[
     },
     TensorSystemsCloseoutRow {
         facet: TensorSystemsCloseoutFacet::WorkloadFloor,
-        status: TensorSystemsCloseoutStatus::StableBlocker,
+        status: TensorSystemsCloseoutStatus::ExecutableProof,
         evidence:
-            "crates/exempla/src/exempla_e2e/tensor_workload_proof.rs::tensor_workload_proof_rows",
+            "crates/exempla/src/exempla_e2e/tensor_workload_proof.rs::tensor_workload_proof_rows (rung-0 output-checked via the re-verified U-05 receipt, radix 7f520f067, run u05-rerun-nonce1)",
     },
     TensorSystemsCloseoutRow {
         facet: TensorSystemsCloseoutFacet::PackageProof,
