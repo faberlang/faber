@@ -460,47 +460,12 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
 }
 
 /// Structured runtime plan for a single `.fab` file (no package manifest).
-///
-/// Uses HIR/type facts via [`radix::codegen::collect_rust_needs`] — never scans
-/// generated Rust text for `faber::` / `tokio::`.
 #[cfg(feature = "hir-rust")]
 fn single_file_rust_runtime_plan(
     config: &radix::Config,
     input_path: &Path,
 ) -> Result<super::RustRuntimePlan, Vec<radix::Diagnostic>> {
-    use radix::driver::{analyze_source, Session};
-    use std::collections::BTreeSet;
-    use std::fs;
-
-    let source = fs::read_to_string(input_path).map_err(|err| {
-        vec![crate::package_diagnostic_error(format!(
-            "failed to read '{}': {err}",
-            input_path.display()
-        ))]
-    })?;
-    let session = Session::new(config.clone());
-    let name = input_path
-        .file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or("input.fab");
-    let analysis = analyze_source(&session, name, &source)?;
-    let needs =
-        radix::codegen::collect_rust_needs(&analysis.hir, &analysis.types, BTreeSet::new(), None);
-    let needs_tokio =
-        analysis.hir.entry_is_async
-            || analysis.hir.items.iter().any(
-                |item| matches!(&item.kind, radix::hir::HirItemKind::Function(f) if f.is_async),
-            );
-    Ok(super::RustRuntimePlan {
-        needs_faber: needs.needs_faber_runtime,
-        needs_tokio,
-        host: None,
-        non_runtime_routes: BTreeSet::new(),
-        selected_providers: BTreeSet::new(),
-        provider_manifests: Vec::new(),
-        provider_error: None,
-        library_path_deps: Vec::new(),
-    })
+    super::rust_target::single_file_rust_runtime_plan(config, input_path)
 }
 
 #[cfg(not(feature = "hir-rust"))]
