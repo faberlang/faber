@@ -732,7 +732,7 @@ pub enum WireInputUpdateCadence {
     /// Uploaded once at session creation; never re-copied per invocation
     /// (weights, KV K/V).
     Resident,
-    /// Updated on every invocation (decode token id, the per-position RoPE
+    /// Updated on every invocation (decode token id, the per-position `RoPE`
     /// table — a per-invocation updated input, never a plan change).
     PerInvocation,
 }
