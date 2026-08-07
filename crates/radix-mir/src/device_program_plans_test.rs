@@ -2722,6 +2722,8 @@ fn rope_function_resolves_rope_plan() {
         pos: 0,
         dim: 64,
         width: 64,
+        per_row: false,
+        rows: 0,
     });
     assert!(carried_plan_agrees(&carried, Some(&derived)));
 }
@@ -2851,6 +2853,8 @@ fn inference_recipe_kinds_are_typed() {
             pos: 0,
             dim: 64,
             width: 64,
+            per_row: false,
+            rows: 0,
         })),
         RecipeKind::Rope
     );

@@ -230,11 +230,12 @@ pub(super) fn validate_rms_normalization_plan(
 /// width (a zero `dim` admits no pair) and a positive row width; the
 /// even-`dim` / in-extent facts are resolution-time typed checks.
 pub(super) fn validate_rope_plan(plan: &RopePlan) -> Result<(), PlanValidationError> {
-    if plan.dim == 0 || plan.width == 0 {
+    if plan.dim == 0 || plan.width == 0 || (plan.per_row && plan.rows == 0) {
         return Err(PlanValidationError::RopeZeroDimension {
             pos: plan.pos,
             dim: plan.dim,
             width: plan.width,
+            rows: plan.rows,
         });
     }
     Ok(())
@@ -485,7 +486,12 @@ pub enum PlanValidationError {
     RmsNormalizationZeroWidth { width: u64 },
     /// The `RoPE` recipe requires a positive rotated width and a positive row
     /// width (a zero width admits no rotation pair).
-    RopeZeroDimension { pos: u64, dim: u64, width: u64 },
+    RopeZeroDimension {
+        pos: u64,
+        dim: u64,
+        width: u64,
+        rows: u64,
+    },
     /// The causal masked-softmax recipe requires positive row/column extents
     /// (a zero extent dispatches an empty grid).
     CausalMaskedSoftmaxZeroDimension { rows: u64, cols: u64 },
@@ -590,9 +596,14 @@ impl fmt::Display for PlanValidationError {
                 f,
                 "RMS-normalization requires a positive normalization width, got {width}"
             ),
-            Self::RopeZeroDimension { pos, dim, width } => write!(
+            Self::RopeZeroDimension {
+                pos,
+                dim,
+                width,
+                rows,
+            } => write!(
                 f,
-                "RoPE requires a positive rotated width and row width, got pos={pos}, dim={dim}, width={width}"
+                "RoPE requires a positive rotated width, row width, and per-row count, got pos={pos}, dim={dim}, width={width}, rows={rows}"
             ),
             Self::CausalMaskedSoftmaxZeroDimension { rows, cols } => write!(
                 f,

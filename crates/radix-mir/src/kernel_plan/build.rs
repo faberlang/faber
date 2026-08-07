@@ -12,9 +12,10 @@ use super::validate::{
 };
 use crate::abi::{CollectionOpContract, MirKernelSignature};
 use crate::{
-    MirCollectionOp, MirConstant, MirFunction, MirOperand, MirRuntimeCall, MirStatementKind,
-    MirValidationContext,
+    MirCollectionOp, MirConstant, MirFunction, MirLocalId, MirOperand, MirParam, MirPlaceBase,
+    MirRuntimeCall, MirStatementKind, MirValidationContext,
 };
+use radix_types::Type;
 
 /// Whether a kernel signature's **result-tuple contract** is coherent for
 /// plan resolution (S3-A1): every output resource (the first plus the extra
@@ -269,14 +270,24 @@ impl CollectionKernelPlan {
                 // GI3-1: the RoPE recipe resolves pos/dim from the trailing
                 // const operands and the row width from the operand dims
                 // (the last-axis extent; elements beyond `dim` are
-                // preserved unrotated).
+                // preserved unrotated). Per-position mode (the GI3-1
+                // contract amendment) is carried by the cos/sin table
+                // operand shapes — rank-2 `[rows, dim/2]` tables rotate
+                // every row at its own position.
                 let (dims, axis) = transformer_recipe_shape(function, validation, op)?;
                 let count = dims_product(&dims)?;
                 if !signature_matches_transformer_counts(signature, count, count) {
                     return None;
                 }
-                let (pos, dim, width) = rope_const_facts(function, &dims, axis)?;
-                Some(CollectionKernelPlan::Rope(RopePlan { pos, dim, width }))
+                let (pos, dim, width, per_row, rows) =
+                    rope_plan_facts(function, validation, &dims, axis)?;
+                Some(CollectionKernelPlan::Rope(RopePlan {
+                    pos,
+                    dim,
+                    width,
+                    per_row,
+                    rows,
+                }))
             }
             MirCollectionOp::TensorGather => {
                 // GI3-1: the row-gather recipe resolves the rank-2 `[V, D]`
@@ -698,7 +709,12 @@ fn rms_norm_const_facts(
 /// `MirConstant::Int`/`UInt` not exceeding the last-axis extent (the CCI-1
 /// source contract; the MIR validator re-checks). Returns
 /// `(pos, dim, width)`; `None` when a const constraint fails.
-fn rope_const_facts(function: &MirFunction, dims: &[u64], axis: u64) -> Option<(u64, u64, u64)> {
+fn rope_plan_facts(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+    dims: &[u64],
+    axis: u64,
+) -> Option<(u64, u64, u64, bool, u64)> {
     let args = transformer_statement_args(function, MirCollectionOp::TensorRope)?;
     if args.len() != 3 {
         return None;
@@ -715,7 +731,62 @@ fn rope_const_facts(function: &MirFunction, dims: &[u64], axis: u64) -> Option<(
     if dim > width {
         return None;
     }
-    Some((pos, dim, width))
+    // Per-position mode is a typed fact of the kernel's table operands: the
+    // cos/sin tables are the two tensor params beyond the x operand and the
+    // statement destination. Rank-2 `[rows, dim/2]` tables select per-row
+    // rotation; rank-1 `[dim/2]` tables are the single-position mode.
+    let x_local = crate::read_analysis::operand_local(args.first()?)?;
+    let destination = rope_destination_local(function)?;
+    let tables: Vec<&MirParam> = function
+        .params
+        .iter()
+        .filter(|param| {
+            param.local != x_local
+                && param.local != destination
+                && crate::local_ty::local_ty(function, param.local).is_some_and(|ty| {
+                    matches!(validation.types.get(ty.semantic_id()), Type::Tensor(..))
+                })
+        })
+        .collect();
+    let (per_row, rows) = if tables.len() == 2 {
+        let first_dims = crate::tensor_type::tensor_literal_dims(
+            crate::local_ty::local_ty(function, tables[0].local)?,
+            validation,
+        )
+        .ok()?;
+        match first_dims.as_slice() {
+            [_] => (false, 0),
+            [rows, _] => (true, *rows),
+            _ => return None,
+        }
+    } else {
+        (false, 0)
+    };
+    Some((pos, dim, width, per_row, rows))
+}
+
+/// The `TensorRope` statement's destination local (the rotated output).
+fn rope_destination_local(function: &MirFunction) -> Option<MirLocalId> {
+    for block in &function.blocks {
+        for statement in &block.statements {
+            if crate::collection_ops::statement_collection_op(statement)
+                != Some(MirCollectionOp::TensorRope)
+            {
+                continue;
+            }
+            let MirStatementKind::RuntimeCall { destination, .. } = &statement.kind else {
+                continue;
+            };
+            let Some(place) = destination else {
+                return None;
+            };
+            let MirPlaceBase::Local(local) = place.base else {
+                return None;
+            };
+            return Some(local);
+        }
+    }
+    None
 }
 
 /// A non-negative integer const operand (the pos/dim consts of `RoPE` and the

@@ -165,12 +165,23 @@ pub struct RmsNormalizationPlan {
 /// on the last axis are preserved unrotated.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RopePlan {
-    /// Position (from the const operand).
+    /// Position (from the const operand). Single-position mode only — in
+    /// per-row mode the device body never reads it (the per-row positions
+    /// ride the rank-2 tables).
     pub pos: u64,
     /// Rotated width (from the const operand; positive and even).
     pub dim: u64,
     /// Row width (the last-axis extent; elements beyond `dim` preserved).
     pub width: u64,
+    /// Per-position rotation (GI3-1 contract amendment, task): each
+    /// row rotates at its own position via the rank-2 `[rows, dim/2]`
+    /// cos/sin tables. The mode is a typed fact of the kernel — the table
+    /// operand shapes (rank-2 = per-row, rank-1 `[dim/2]` = single-position),
+    /// never inferred from text (A3).
+    pub per_row: bool,
+    /// The row count (per-row mode; the table row stride — each row's
+    /// `dim/2`-entry angle segment). Zero in single-position mode.
+    pub rows: u64,
 }
 
 /// Causal masked-row softmax recipe plan (GI3-1: name frozen in this unit,

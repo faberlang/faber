@@ -576,6 +576,9 @@ pub fn is_admitted_tensor_unary(op: MirUnOp) -> bool {
     matches!(
         op,
         MirUnOp::Tanh | MirUnOp::Relu | MirUnOp::Gelu | MirUnOp::Exp | MirUnOp::Sqrt
+            // GI3-1 amendment: the device K/V f16 rounding
+            // unary (the comparator's `kv_f16_round` register rounding).
+            | MirUnOp::F16Round
     )
 }
 

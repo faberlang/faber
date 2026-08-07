@@ -1564,6 +1564,8 @@ fn gi3_inference_recipe_plans_round_trip_on_the_wire() {
             pos: 0,
             dim: 64,
             width: 64,
+            per_row: false,
+            rows: 0,
         }),
         WireCollectionKernelPlan::CausalMaskedSoftmax(WireCausalMaskedSoftmaxPlan {
             rows: 9,

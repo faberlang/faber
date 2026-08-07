@@ -574,12 +574,17 @@ pub struct WireRmsNormalizationPlan {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WireRopePlan {
-    /// Position.
+    /// Position (single-position mode).
     pub pos: u64,
     /// Rotated width (positive and even).
     pub dim: u64,
     /// Row width (the last-axis extent).
     pub width: u64,
+    /// Per-position rotation (GI3-1 amendment): each row rotates at its own
+    /// position via the rank-2 `[rows, dim/2]` tables.
+    pub per_row: bool,
+    /// The row count (per-row mode; the table row stride).
+    pub rows: u64,
 }
 
 /// Causal masked-row softmax recipe plan (wire mirror of

@@ -585,6 +585,8 @@ fn wire_kernel_plan(plan: &WireCollectionKernelPlan) -> CollectionKernelPlan {
             pos: plan.pos,
             dim: plan.dim,
             width: plan.width,
+            per_row: plan.per_row,
+            rows: plan.rows,
         }),
         WireCollectionKernelPlan::CausalMaskedSoftmax(plan) => {
             CollectionKernelPlan::CausalMaskedSoftmax(CausalMaskedSoftmaxPlan {

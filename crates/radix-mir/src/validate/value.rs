@@ -77,7 +77,8 @@ impl Validator<'_, '_> {
                     | MirUnOp::Gelu
                     | MirUnOp::Tanh
                     | MirUnOp::Exp
-                    | MirUnOp::Log => {
+                    | MirUnOp::Log
+                    | MirUnOp::F16Round => {
                         // R-W1: accept tensor operands whose ELEMENT type is float
                         // (AIR lowers AirTensorOp::Gelu/Tanh/Exp/Log/Relu/Sqrt to
                         // MirUnOp on tensor<f32,…>), while still rejecting genuinely

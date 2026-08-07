@@ -615,6 +615,12 @@ pub enum MirUnOp {
     /// Natural logarithm: ln(x). Domain: x > 0.
     /// Negative/zero inputs and non-finite results are rejected per the domain policy.
     Log,
+    /// Half-precision round trip (GI3-1 contract amendment, task):
+    /// `f16_round(x) = half_to_f32(f32_to_f16_rn(x))` — round-to-nearest-even
+    /// through f16, matching the pinned comparator's K/V-cache register
+    /// rounding (`kv_f16_round`). All finite f32 inputs are valid; the
+    /// result is the nearest f16-representable value (with f16 subnormals).
+    F16Round,
 }
 
 /// Binary operation lowered into MIR.

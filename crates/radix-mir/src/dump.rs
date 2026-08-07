@@ -695,6 +695,7 @@ fn unop(op: MirUnOp) -> &'static str {
         MirUnOp::Tanh => "tanh",
         MirUnOp::Exp => "exp",
         MirUnOp::Log => "log",
+        MirUnOp::F16Round => "f16-round",
     }
 }
 
