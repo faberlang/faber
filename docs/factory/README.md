@@ -46,6 +46,7 @@ docs/factory/check-state-consistency.sh
 | Campaign | Status | Entry |
 | --- | --- | --- |
 | Aer Purgatus code-smell remediation | complete — Goals 1–4 complete; residual queue clear | [`aer-purgatus/CAMPAIGN.md`](aer-purgatus/CAMPAIGN.md) |
+| Faber script runtime | done — Stages 1/1b shipped; Stage 2 retired; 3–5 deferred; Stage 6 optional CLI clean-break only | [`../archived/faber-script-runtime/CAMPAIGN.md`](../archived/faber-script-runtime/CAMPAIGN.md) |
 
 ## Open goals
 

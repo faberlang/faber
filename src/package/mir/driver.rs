@@ -242,7 +242,7 @@ pub(super) fn is_bridged_norma_import_path(path: &str) -> bool {
 /// in-process stepper kernel.
 ///
 /// Post-validation transform (see
-/// `docs/factory/faber-script-runtime/stage1b-package-host-bridge.md`). For
+/// `docs/archived/faber-script-runtime/stage1b-package-host-bridge.md`). For
 /// each `Package` provider whose module resolves to a kernel-manifest module,
 /// rewrite `kind` to `Kernel(module)` when the called verb is in the manifest
 /// subset; otherwise fail closed with an actionable diagnostic. Compiled

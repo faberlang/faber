@@ -167,6 +167,14 @@ pub(crate) fn plan_package(package: &AnalyzedPackage, target: Target) -> Artifac
             Some("package artifact planning does not emit Faber re-source packages yet".to_owned()),
             None,
         ),
+        Target::MirWasmBinary => {
+            plan_wasm_artifacts(package, &package_id, &mut nodes, &mut edges, &mut seen_ids);
+            let entry = nodes
+                .iter()
+                .find(|n| n.kind == ArtifactKind::GeneratedEntry)
+                .map(|n| n.id.clone());
+            (true, None, entry)
+        }
         other => (
             false,
             Some(format!(
@@ -683,6 +691,68 @@ fn plan_ts_artifacts(
                 },
                 target: Some("ts"),
                 path: gen_root.join(file),
+                depends_on: vec![source_id.clone()],
+            },
+        );
+        edges.push(DependencyEdge {
+            from: gen_id,
+            to: source_id,
+            kind: DependencyKind::SourceImport,
+        });
+    }
+}
+
+fn plan_wasm_artifacts(
+    package: &AnalyzedPackage,
+    package_id: &PackageId,
+    nodes: &mut Vec<ArtifactNode>,
+    edges: &mut Vec<DependencyEdge>,
+    seen: &mut BTreeSet<String>,
+) {
+    // One package-aware `.wat` module per unit under target/faber/wasm, named
+    // deterministically like the package-to-Wasm builder writes them
+    // (zero-padded index + product + canonical module segments).
+    let product = package
+        .spec
+        .package_root
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| package_id.name.clone());
+    let gen_root = package
+        .spec
+        .package_root
+        .join("target")
+        .join("faber")
+        .join("wasm");
+    for (index, unit) in package.units.iter().enumerate() {
+        let module = ModuleId {
+            package: package_id.clone(),
+            segments: unit.module_segments.clone(),
+        };
+        let source_id = format!("source:{}", module_key(&module));
+        let gen_id = if unit.is_entry {
+            format!("wasm:entry:{}", package_id.name)
+        } else {
+            format!("wasm:module:{}", module_key(&module))
+        };
+        let segments = if unit.module_segments.is_empty() {
+            "root".to_owned()
+        } else {
+            unit.module_segments.join("-")
+        };
+        push_unique_node(
+            nodes,
+            seen,
+            ArtifactNode {
+                id: gen_id.clone(),
+                kind: if unit.is_entry {
+                    ArtifactKind::GeneratedEntry
+                } else {
+                    ArtifactKind::GeneratedModule
+                },
+                target: Some("wasm"),
+                path: gen_root.join(format!("{index:03}-{product}-{segments}.wat")),
                 depends_on: vec![source_id.clone()],
             },
         );

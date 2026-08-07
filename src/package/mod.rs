@@ -69,6 +69,8 @@ mod rust_runtime_dependency;
 pub(crate) mod rust_target;
 mod source_files;
 mod test_source_filter;
+#[cfg(feature = "mir-wasm")]
+mod wasm;
 
 #[allow(unused_imports)]
 // public package API for library callers; binary crate does not use it.
@@ -103,6 +105,9 @@ pub use cmd::{
 #[cfg(feature = "hir-go")]
 #[allow(unused_imports)] // binary build/run paths consume this crate-visible Go entry.
 pub(crate) use compile::compile_package_go;
+#[cfg(feature = "mir-wasm")]
+#[allow(unused_imports)] // U6-D package-wasm emit path (binary `faber build/emit --target wasm`).
+pub(crate) use compile::compile_package_wasm;
 pub(crate) use compile::package_rust_runtime_plan;
 #[allow(unused_imports)] // package MIR stages consume this crate-visible analysis API.
 pub(crate) use compile::{
@@ -168,6 +173,13 @@ pub(crate) use llvm::build_package_llvm_from_graph;
 pub use llvm::{
     build_package_llvm, PackageLlvmBuild, PackageLlvmLinkManifest, PackageLlvmModule,
     PackageLlvmOptions,
+};
+#[cfg(feature = "mir-wasm")]
+#[allow(unused_imports)]
+// Wasm package harnesses consume the reusable package-to-Wasm builder (U6-D).
+pub use wasm::{
+    build_package_wasm, PackageWasmBuild, PackageWasmLinkManifest, PackageWasmModule,
+    PackageWasmOptions,
 };
 #[allow(unused_imports)]
 // `faber build/run --target llvm-host` + product tests consume the Stage 9 lane.

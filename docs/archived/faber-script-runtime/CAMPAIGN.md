@@ -1,6 +1,7 @@
 # Campaign: Faber Script Runtime
 
-**Status**: partial — Stages 1 and 1b shipped; Stages 2+ remain planned (verified 2026-07-15)
+**Status**: done — Stages 1 and 1b shipped; Stage 2 retired; Stages 3–5 deferred; Stage 6 residual is optional CLI clean-break (not a missing script runtime). Archived 2026-08-07.
+**Archived**: 2026-08-07 — product intent (MIR-stepper script/repl/test) delivered; do not reopen this campaign for execution work
 **Mode**: draft/maintain -- routing artifact; do not implement directly from
 this file.
 **Target repo**: `/Users/ianzepp/work/faberlang/faber`

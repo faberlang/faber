@@ -6,7 +6,7 @@
 //! The canonical interpreted-source command is `faber script`; this command
 //! delegates to [`crate::commands::script::interpret_path`] on the interpret
 //! branch. `--interpret` / `--compile` are retained until the Stage 6 clean
-//! break (see `docs/factory/faber-script-runtime/stage0-baseline.md`).
+//! break (see `docs/archived/faber-script-runtime/stage0-baseline.md`).
 
 use crate::cli::{BackendSelection, FmirRunArgs, RunArgs};
 use crate::input_shape::locale_without_package_error;
