@@ -65,6 +65,16 @@ impl KeywordSurface for TestSurface {
         match kind {
             TypeBindingKind::Primitive(radix_types::Primitive::Textus) => "textus",
             TypeBindingKind::Primitive(radix_types::Primitive::Numerus) => "numerus",
+            // The tensor-family kinds must not be swallowed silently by the
+            // catch-all: keep the Latin emit behavior for leaf tests.
+            TypeBindingKind::TensorFamily(radix_types::TensorFamilyKind::Tensor) => "tensor",
+            TypeBindingKind::TensorFamily(radix_types::TensorFamilyKind::Vector) => "vector",
+            TypeBindingKind::TensorFamily(radix_types::TensorFamilyKind::Matrix) => "matrix",
+            TypeBindingKind::TensorFamily(radix_types::TensorFamilyKind::Sparsa) => "sparsa",
+            TypeBindingKind::TensorFamily(radix_types::TensorFamilyKind::Atomic) => "atomic",
+            TypeBindingKind::TensorFamily(radix_types::TensorFamilyKind::Intervallum) => {
+                "intervallum"
+            }
             _ => "?",
         }
     }

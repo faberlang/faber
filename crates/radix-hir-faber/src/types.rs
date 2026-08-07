@@ -9,7 +9,9 @@
 use crate::surface::{KeywordSurface, TypeBindingKind};
 use radix_hir::DefId;
 use radix_lexer::{Interner, Symbol};
-use radix_types::{CollectionKind, Primitive, SemanticMutability, Type, TypeId, TypeTable};
+use radix_types::{
+    CollectionKind, Primitive, SemanticMutability, TensorFamilyKind, Type, TypeId, TypeTable,
+};
 use rustc_hash::FxHashMap;
 
 fn primitive_marker(prim: Primitive, surface: &impl KeywordSurface) -> &str {
@@ -113,13 +115,15 @@ impl super::FaberCodegen {
             }
 
             Type::Vector(elem, width) => format!(
-                "vector<{}, {}>",
+                "{}<{}, {}>",
+                surface.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Vector)),
                 self.type_to_faber(*elem, types, names, interner, surface),
                 crate::figura::format_figura(*width, types, interner)
             ),
 
             Type::Matrix(elem, shape) => format!(
-                "matrix<{}, {}>",
+                "{}<{}, {}>",
+                surface.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Matrix)),
                 self.type_to_faber(*elem, types, names, interner, surface),
                 crate::figura::format_figura(*shape, types, interner)
             ),
@@ -128,13 +132,23 @@ impl super::FaberCodegen {
                 self.format_sparsa_type(*elem, *shape, types, names, interner, surface)
             }
 
-            Type::Atomic(elem) => {
-                self.format_unary_type("atomic", *elem, types, names, interner, surface)
-            }
+            Type::Atomic(elem) => self.format_unary_type(
+                surface.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Atomic)),
+                *elem,
+                types,
+                names,
+                interner,
+                surface,
+            ),
 
-            Type::Intervallum(bound) => {
-                self.format_unary_type("intervallum", *bound, types, names, interner, surface)
-            }
+            Type::Intervallum(bound) => self.format_unary_type(
+                surface.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Intervallum)),
+                *bound,
+                types,
+                names,
+                interner,
+                surface,
+            ),
 
             Type::SizedNumeric(prim, width) => match prim {
                 Primitive::Numerus => format!(
@@ -332,7 +346,8 @@ impl super::FaberCodegen {
         // remains valid input but is not emitted canonically, so canonical
         // round-trips keep the author's type spelling.
         format!(
-            "tensor<{}, {}>",
+            "{}<{}, {}>",
+            surface.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Tensor)),
             self.type_to_faber(elem, types, names, interner, surface),
             crate::figura::format_figura(shape, types, interner)
         )
@@ -349,7 +364,8 @@ impl super::FaberCodegen {
         surface: &impl KeywordSurface,
     ) -> String {
         format!(
-            "sparsa<{}, {}>",
+            "{}<{}, {}>",
+            surface.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Sparsa)),
             self.type_to_faber(elem, types, names, interner, surface),
             crate::figura::format_figura(shape, types, interner)
         )
@@ -459,6 +475,12 @@ mod tests {
                 TypeBindingKind::Collection(CollectionKind::Copia) => "copia",
                 TypeBindingKind::Collection(CollectionKind::Promissum) => "promissum",
                 TypeBindingKind::Collection(CollectionKind::Cursor) => "cursor",
+                TypeBindingKind::TensorFamily(TensorFamilyKind::Tensor) => "tensor",
+                TypeBindingKind::TensorFamily(TensorFamilyKind::Vector) => "vector",
+                TypeBindingKind::TensorFamily(TensorFamilyKind::Matrix) => "matrix",
+                TypeBindingKind::TensorFamily(TensorFamilyKind::Sparsa) => "sparsa",
+                TypeBindingKind::TensorFamily(TensorFamilyKind::Atomic) => "atomic",
+                TypeBindingKind::TensorFamily(TensorFamilyKind::Intervallum) => "intervallum",
                 TypeBindingKind::ModularWord => "modulus",
                 _ => "ignotum",
             }
@@ -555,6 +577,164 @@ mod tests {
         assert!(
             out.code.is_empty(),
             "empty program should emit empty source, got {:?}",
+            out.code
+        );
+    }
+
+    // ── Tensor-family + vacua surface routing probe ───────────────────────
+
+    /// Probe surface that maps the seven new keys to distinctive markers.
+    ///
+    /// If the emitter printed hardcoded Latin, the markers would never appear.
+    /// Proves `type_to_faber` / Vacua emit route through
+    /// `type_surface`/`contextual_keyword` — under any pack the localized
+    /// spelling would propagate (en == Latin for these rows is incidental).
+    struct ProbeSurface;
+
+    impl KeywordSurface for ProbeSurface {
+        fn keyword(&self, _kind: TokenKind) -> &'static str {
+            "kw"
+        }
+
+        fn contextual_keyword(&self, latin_key: &'static str) -> &str {
+            match latin_key {
+                "vacua" => "VACUA_MARKER",
+                key => key,
+            }
+        }
+
+        fn type_surface(&self, kind: TypeBindingKind) -> &str {
+            match kind {
+                TypeBindingKind::TensorFamily(TensorFamilyKind::Tensor) => "TENSOR_MARKER",
+                TypeBindingKind::TensorFamily(TensorFamilyKind::Vector) => "VECTOR_MARKER",
+                TypeBindingKind::TensorFamily(TensorFamilyKind::Matrix) => "MATRIX_MARKER",
+                TypeBindingKind::TensorFamily(TensorFamilyKind::Sparsa) => "SPARSA_MARKER",
+                TypeBindingKind::TensorFamily(TensorFamilyKind::Atomic) => "ATOMIC_MARKER",
+                TypeBindingKind::TensorFamily(TensorFamilyKind::Intervallum) => {
+                    "INTERVALLUM_MARKER"
+                }
+                TypeBindingKind::Primitive(Primitive::Numerus) => "numerus",
+                _ => "ignotum",
+            }
+        }
+    }
+
+    #[test]
+    fn tensor_family_type_emit_routes_through_type_surface() {
+        let codegen = FaberCodegen::default();
+        let mut types = TypeTable::new();
+        let names = FxHashMap::default();
+        let interner = Interner::new();
+        let surface = ProbeSurface;
+
+        let i32_ty = types.sized_numeric(Primitive::Numerus, radix_types::NumericWidth::I32);
+        let rank0 = types.rank0_shape();
+        let lit4 = types.intern_index(radix_types::IndexExpr::Literal(4));
+        let width4 = types.intern_index(radix_types::IndexExpr::Tuple(vec![lit4]));
+        let lit2 = types.intern_index(radix_types::IndexExpr::Literal(2));
+        let square = types.intern_index(radix_types::IndexExpr::Tuple(vec![lit2, lit2]));
+
+        assert_eq!(
+            codegen.type_to_faber(
+                types.tensor_with_shape(i32_ty, rank0),
+                &types,
+                &names,
+                &interner,
+                &surface
+            ),
+            "TENSOR_MARKER<numerus<i32>, []>"
+        );
+        assert_eq!(
+            codegen.type_to_faber(
+                types.vector_with_width(i32_ty, width4),
+                &types,
+                &names,
+                &interner,
+                &surface
+            ),
+            "VECTOR_MARKER<numerus<i32>, [4]>"
+        );
+        assert_eq!(
+            codegen.type_to_faber(
+                types.matrix_with_shape(i32_ty, square),
+                &types,
+                &names,
+                &interner,
+                &surface
+            ),
+            "MATRIX_MARKER<numerus<i32>, [2, 2]>"
+        );
+        assert_eq!(
+            codegen.type_to_faber(
+                types.sparsa_with_shape(i32_ty, rank0),
+                &types,
+                &names,
+                &interner,
+                &surface
+            ),
+            "SPARSA_MARKER<numerus<i32>, []>"
+        );
+        assert_eq!(
+            codegen.type_to_faber(types.atomic(i32_ty), &types, &names, &interner, &surface),
+            "ATOMIC_MARKER<numerus<i32>>"
+        );
+        assert_eq!(
+            codegen.type_to_faber(
+                types.intervallum(types.primitive(Primitive::Numerus)),
+                &types,
+                &names,
+                &interner,
+                &surface
+            ),
+            "INTERVALLUM_MARKER<numerus>"
+        );
+    }
+
+    #[test]
+    fn vacua_emit_routes_through_contextual_keyword() {
+        // A bare entry block containing only the empty-collection marker: the
+        // emitted source must carry the probe marker, proving the Vacua arm
+        // consults the surface instead of printing the literal "vacua".
+        let interner = Interner::new();
+        let hir = HirProgram {
+            items: Vec::new(),
+            entry: Some(HirBlock::simple(
+                vec![HirStatement {
+                    id: HirId(1),
+                    kind: HirStatementKind::Expr(HirExpression {
+                        id: HirId(2),
+                        kind: HirExpressionKind::Vacua,
+                        ty: None,
+                        span: span(),
+                    }),
+                    span: span(),
+                }],
+                None,
+                span(),
+            )),
+            entry_annotations: Vec::new(),
+            entry_args_name: None,
+            entry_is_async: false,
+        };
+        let types = TypeTable::new();
+        let out = crate::emit(
+            &hir,
+            &empty_presentation(),
+            &types,
+            &interner,
+            &ProbeSurface,
+            &FxHashMap::default(),
+            &FxHashMap::default(),
+        )
+        .expect("vacua program must emit");
+        assert!(
+            out.code.contains("VACUA_MARKER"),
+            "Vacua emit must route through contextual_keyword, got:\n{}",
+            out.code
+        );
+        assert!(
+            !out.code.contains("vacua"),
+            "Vacua emit must not print the literal Latin spelling, got:\n{}",
             out.code
         );
     }

@@ -326,8 +326,21 @@ mod tests {
             "keyword"
         }
 
-        fn type_surface(&self, _kind: TypeBindingKind) -> &'static str {
-            "type"
+        fn type_surface(&self, kind: TypeBindingKind) -> &'static str {
+            match kind {
+                // Explicit arms for the tensor family so the new kind is not
+                // silently swallowed; this stub emits "type" for every kind.
+                #[allow(clippy::match_same_arms)]
+                TypeBindingKind::TensorFamily(
+                    radix_types::TensorFamilyKind::Tensor
+                    | radix_types::TensorFamilyKind::Vector
+                    | radix_types::TensorFamilyKind::Matrix
+                    | radix_types::TensorFamilyKind::Sparsa
+                    | radix_types::TensorFamilyKind::Atomic
+                    | radix_types::TensorFamilyKind::Intervallum,
+                ) => "type",
+                _ => "type",
+            }
         }
     }
 

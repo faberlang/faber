@@ -4,13 +4,14 @@
 //! The leaf does not depend on the full reader-pack machinery.
 
 use radix_lexer::TokenKind;
-use radix_types::{CollectionKind, Primitive};
+use radix_types::{CollectionKind, Primitive, TensorFamilyKind};
 
 /// Identity used when looking up localized type spellings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TypeBindingKind {
     Primitive(Primitive),
     Collection(CollectionKind),
+    TensorFamily(TensorFamilyKind),
     ModularWord,
 }
 

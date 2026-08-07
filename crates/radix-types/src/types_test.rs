@@ -12,8 +12,9 @@ use crate::NumericWidth;
 use crate::TypeId;
 use crate::{
     collection_type_specs, lookup_collection_type_spec, lookup_primitive_type_spec,
-    primitive_type_specs, CollectionKind, FuncSig, ParamType, Primitive, SemanticParamMode, Type,
-    TypeParamConstraint, TypeTable,
+    lookup_tensor_family_type_spec, primitive_type_specs, tensor_family_type_specs, CollectionKind,
+    FuncSig, ParamType, Primitive, SemanticParamMode, TensorFamilyKind, Type, TypeParamConstraint,
+    TypeTable,
 };
 
 #[test]
@@ -296,6 +297,41 @@ fn collection_type_surface_tracks_canonical_rows() {
         Some(CollectionKind::Cursor)
     );
     assert_eq!(lookup_collection_type_spec("tensor"), None);
+}
+
+#[test]
+fn tensor_family_registry_is_closed_and_disjoint_from_collections() {
+    // The tensor family is a parallel kind (D3), not a CollectionKind growth:
+    // its six canonical rows resolve through their own registry, while
+    // CollectionKind::from_name stays None for the family spellings.
+    let rows = tensor_family_type_specs()
+        .iter()
+        .map(|spec| (spec.text, spec.kind, spec.canonical))
+        .collect::<Vec<_>>();
+    let expected = [
+        ("tensor", TensorFamilyKind::Tensor),
+        ("vector", TensorFamilyKind::Vector),
+        ("matrix", TensorFamilyKind::Matrix),
+        ("sparsa", TensorFamilyKind::Sparsa),
+        ("atomic", TensorFamilyKind::Atomic),
+        ("intervallum", TensorFamilyKind::Intervallum),
+    ];
+    assert_eq!(
+        rows.len(),
+        expected.len(),
+        "registry must stay a closed set"
+    );
+    for (text, kind) in expected {
+        assert!(
+            rows.contains(&(text, kind, true)),
+            "missing canonical row {text}"
+        );
+        assert_eq!(
+            lookup_tensor_family_type_spec(text).map(|spec| spec.kind),
+            Some(kind)
+        );
+        assert_eq!(CollectionKind::from_name(text), None);
+    }
 }
 
 #[test]

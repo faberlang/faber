@@ -768,6 +768,16 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Contextual(LITERAL),
         category: KeywordCategory::Literal,
     },
+    // Empty-collection expression marker. Tokenless (lexes as an identifier):
+    // the parser claims `vacua` by spelling in its expression slot, so the
+    // keyword registry only needs the emit surface for packs. Non-Global
+    // keeps the strict EBNF vocabulary audit green.
+    KeywordSpec {
+        text: "vacua",
+        token_kind: None,
+        scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER),
+        category: KeywordCategory::Literal,
+    },
     // === Keywords: Logical operators ===
     KeywordSpec {
         text: "aut",

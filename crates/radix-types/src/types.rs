@@ -1542,6 +1542,86 @@ pub fn lookup_collection_type_spec(text: &str) -> Option<&'static CollectionType
     COLLECTION_TYPE_SPECS.iter().find(|spec| spec.text == text)
 }
 
+/// Source-level tensor-family type identities with dedicated shape/width
+/// lowering.
+///
+/// Parallel to [`CollectionKind`] but deliberately separate: collections lower
+/// through `CollectionKind::lower(types, &[TypeId])`, while the tensor family
+/// carries dedicated shape/width lowering (`Type::Tensor(elem, shape)`,
+/// `Type::Vector(elem, width)`, …) that a flat type-argument list cannot
+/// express. Pack completeness and `type_surface` need a closed kind set, so
+/// the family gets its own explicit kind rather than free-form keys.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TensorFamilyKind {
+    Tensor,
+    Vector,
+    Matrix,
+    Sparsa,
+    Atomic,
+    Intervallum,
+}
+
+/// Reader-surface row for one tensor-family type spelling.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TensorFamilyTypeSpec {
+    /// Source spelling accepted in type positions.
+    pub text: &'static str,
+
+    /// Semantic tensor-family identity represented by this spelling.
+    pub kind: TensorFamilyKind,
+
+    /// Whether this spelling is the canonical Latin surface row.
+    pub canonical: bool,
+}
+
+/// Latin tensor-family type surface used before TOML reader packs are loaded.
+pub static TENSOR_FAMILY_TYPE_SPECS: &[TensorFamilyTypeSpec] = &[
+    TensorFamilyTypeSpec {
+        text: "tensor",
+        kind: TensorFamilyKind::Tensor,
+        canonical: true,
+    },
+    TensorFamilyTypeSpec {
+        text: "vector",
+        kind: TensorFamilyKind::Vector,
+        canonical: true,
+    },
+    TensorFamilyTypeSpec {
+        text: "matrix",
+        kind: TensorFamilyKind::Matrix,
+        canonical: true,
+    },
+    TensorFamilyTypeSpec {
+        text: "sparsa",
+        kind: TensorFamilyKind::Sparsa,
+        canonical: true,
+    },
+    TensorFamilyTypeSpec {
+        text: "atomic",
+        kind: TensorFamilyKind::Atomic,
+        canonical: true,
+    },
+    TensorFamilyTypeSpec {
+        text: "intervallum",
+        kind: TensorFamilyKind::Intervallum,
+        canonical: true,
+    },
+];
+
+/// Return tensor-family type rows in deterministic declaration order.
+#[must_use]
+pub fn tensor_family_type_specs() -> &'static [TensorFamilyTypeSpec] {
+    TENSOR_FAMILY_TYPE_SPECS
+}
+
+/// Look up a tensor-family type spelling in the active static Latin surface.
+#[must_use]
+pub fn lookup_tensor_family_type_spec(text: &str) -> Option<&'static TensorFamilyTypeSpec> {
+    TENSOR_FAMILY_TYPE_SPECS
+        .iter()
+        .find(|spec| spec.text == text)
+}
+
 fn is_numeric_carrier(ty: &Type) -> bool {
     matches!(
         ty,
