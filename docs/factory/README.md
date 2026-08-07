@@ -61,5 +61,5 @@ in [`docs/archived/`](../archived/README.md).
 | autograd-equivalent-roadmap | unknown | — | 0 | 0 | 0 | 0 | 0 | 0 | 1 |
 | [component-release-streamline](component-release-streamline/CAMPAIGN.md) | unknown | — | 0 | 1 | 1 | 0 | 0 | 0 | 1 |
 | [core-support-radix-runtime-contract](core-support-radix-runtime-contract/goal.md) | unknown | — | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
-| [faber-onboarding](faber-onboarding/CAMPAIGN.md) | unknown | — | 0 | 1 | 1 | 0 | 0 | 0 | 0 |
+| [faber-onboarding](faber-onboarding/CAMPAIGN.md) | unknown | — | 0 | 1 | 1 | 0 | 0 | 0 | 1 |
 | pure-lib-browser-resolve | unknown | — | 0 | 0 | 1 | 0 | 0 | 0 | 0 |
