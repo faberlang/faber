@@ -281,3 +281,7 @@ impl Compiler {
 #[cfg(test)]
 #[path = "lib_test.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "parse_probe_test.rs"]
+mod parse_probe_test;
