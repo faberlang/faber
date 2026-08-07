@@ -1,0 +1,88 @@
+# Freeze artifact - prepared 2026-08-07 by faber/scripta/assemble-dev-kit.
+# First instance of the single release-manifest schema (faber/docs/release/
+# release-manifest-schema.md + release-manifest.schema.json). Do not edit by
+# hand: the manifest updates only as part of a release prepare step (schema
+# §7). Pins match live commits and pack digests match the assembled artifacts
+# at the prepare date.
+schemaVersion: "1"
+manifestName: faber-release
+preparedAt: 2026-08-07
+releaseIntent:
+  component: faber
+  version: "1.4.0"
+  channel: candidate
+  line: "1.x"
+pinnedInputs:
+  source:
+    - name: faber
+      commit: 0c5b235e2294c736d2d29c0c74ba0a2fdf1c7f66
+      tag: v1.4.0
+    - name: radix
+      commit: b1b3a0a9bc40cceff42325710732c65d465bf2a4
+    - name: cista
+      commit: 935528820653f0b3cd28e63c9d21ac7db90add65
+    - name: faber-runtime
+      commit: fb4a8c64f808786ae883503abe91ca0470e730bc
+    - name: hosts
+      commit: 9b7d070f3f0d850492e0853d0d0dd61a29f2a555
+
+  packs:
+    - name: launcher
+      component: faber
+      version: "1.4.0"
+      digest: sha256:619f82b29b61cc0cc5dae2d6d4ef9f6f79d9e889fd4272e804dd6fffe5f1d512
+      compatibility: "faber 1.x; ships with matching reference and locale packs"
+      license: MIT
+      destination: bin/faber
+    - name: core-support
+      component: faber
+      version: "1.4.0"
+      digest: sha256:b17f35e23117b57faebd2eaa06a75f745263690f08266f044829cf3725bc3624
+      compatibility: "faber 1.4.0; embedded and materialized to the platform cache (content-hash-keyed)"
+      license: MIT
+      destination: "embedded in launcher; materialized to <platform cache>/faber/core-support/tar-zst-v1/<sha256>"
+    - name: reference-pack
+      component: reference
+      version: "1.4.0"
+      digest: sha256:3eb799efff12da26779c0e269a81709008aac9497998df9bab2705edcbe624a7
+      compatibility: "faber 1.x major lane; pack_version_skew enforced at load"
+      license: MIT
+      destination: share/faber/reference
+    - name: locale-packs
+      component: locale
+      version: "1.4.0"
+      digest: sha256:cea681b54b3724c600fd28662bde758312e9504eaffa1cdb4e41d507d5da283d
+      compatibility: "faber 1.4.0; locale pack schema_version 1"
+      license: MIT
+      destination: share/faber/locale/<locale>/pack.toml
+    - name: library-pack
+      component: norma
+      version: "0.1.0"
+      digest: sha256:d5350e79a06a5bea39fd1e8bfa2268024212f07a1b8bc72429d9ef9ede54a70a
+      compatibility: "norma 0.1.x (faber_min 0.38.0); release-owned platform package"
+      license: MIT
+      destination: "store seeding via faber install (faber-onboarding Stage 6)"
+versionSources:
+  - component: faber
+    manifest: Cargo.toml
+    version: "1.4.0"
+  - component: radix
+    manifest: crates/radix/Cargo.toml
+    version: "0.79.0"
+  - component: cista
+    manifest: Cargo.toml
+    version: "0.1.0"
+exclusions:
+  - component: faber
+    path: crates/hygiene-ratchet
+    reason: not release-aligned; stays 0.1.0
+  - component: radix
+    path: crates/hygiene-ratchet
+    reason: not release-aligned; stays 0.1.0
+  - component: cista
+    path: crates/hygiene-ratchet
+    reason: not release-aligned; stays 0.1.0
+publication:
+  releaseTag: faber-v1.4.0
+  host: faberlang/releases
+  advancesGlobalLatest: false
