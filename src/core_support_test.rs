@@ -1,7 +1,6 @@
 #[path = "core_support/assembler.rs"]
 mod assembler;
-#[path = "core_support/path_deps.rs"]
-mod path_deps;
+use crate::core_support::path_deps;
 
 use sha2::{Digest, Sha256};
 use std::fs;

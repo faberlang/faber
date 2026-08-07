@@ -272,10 +272,9 @@ fn run_config_or_exit(
 }
 
 /// G6 GO3 — package compile → go build → exec with forwarded argv.
-fn cmd_run_go(args: &RunArgs) {
+fn cmd_run_go(_args: &RunArgs) {
     #[cfg(not(feature = "hir-go"))]
     {
-        let _ = args;
         eprintln!(
             "error: target `go` is not available in this faber build; rebuild with feature `hir-go`"
         );
@@ -283,6 +282,7 @@ fn cmd_run_go(args: &RunArgs) {
     }
     #[cfg(feature = "hir-go")]
     {
+        let args = _args;
         let input_path = PathBuf::from(&args.path);
         let config = run_config_or_exit(
             Target::HirGo,
@@ -425,10 +425,9 @@ fn cmd_run_fmir(args: RunArgs, selection: DeviceSelection) {
 
 /// Build the FHIR package envelope, load it source-free, lower to FMIR, and
 /// run in-process — no Rust, no Cargo (portable default route).
-fn cmd_run_fhir(args: RunArgs) {
+fn cmd_run_fhir(_args: RunArgs) {
     #[cfg(not(feature = "hir-fhir"))]
     {
-        let _ = args;
         eprintln!(
             "error: target `fhir` is not available in this faber build; rebuild with feature `hir-fhir`"
         );
@@ -436,6 +435,7 @@ fn cmd_run_fhir(args: RunArgs) {
     }
     #[cfg(feature = "hir-fhir")]
     {
+        let args = _args;
         let input_path = PathBuf::from(&args.path);
         let warn_policy = warn_policy_from_args(&args);
         let mut host = StdioHost::with_argumenta(args.args);

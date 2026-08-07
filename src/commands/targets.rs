@@ -24,8 +24,9 @@ pub(crate) fn cmd_targets() {
     for &(target, name) in FABER_TARGET_ROWS {
         let capabilities = target_capabilities_for_surface(TargetCommandSurface::Faber, target);
         println!(
-            "{} check={} build={} run={} package={} note={}",
+            "{} available={} check={} build={} run={} package={} note={}",
             name,
+            yes_no(target.is_available()),
             yes_no(capabilities.check),
             yes_no(capabilities.build),
             yes_no(capabilities.run),
