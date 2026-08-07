@@ -186,6 +186,7 @@ pub struct SwiftOutput {
 }
 
 /// Canonical Faber source output.
+#[derive(Debug)]
 pub struct FaberOutput {
     /// Complete re-emitted Faber source.
     pub code: String,

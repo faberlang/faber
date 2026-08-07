@@ -29,7 +29,7 @@ missing_panics_doc = "allow"
 
 [dependencies]
 radix-codegen-shared = { path = "../radix-codegen-shared" }
-radix-hir-faber = { path = "../radix-hir-faber" }
+radix-hir-faber = { path = "../radix-hir-faber", optional = true }
 radix-mir = { path = "../radix-mir" }
 radix-host-abi = { path = "../radix-host-abi" }
 radix-runtime-contract = { path = "../radix-runtime-contract" }
@@ -66,7 +66,7 @@ tempfile = "3"
 [features]
 default = ["full-targets"]
 full-targets = ["hir-faber", "hir-fhir", "mir-fmir"]
-hir-faber = []
+hir-faber = ["dep:radix-hir-faber"]
 hir-fhir = ["dep:radix-hir-fhir"]
 mir-fmir = []
 wasm-stub-host = ["dep:wasmtime"]
