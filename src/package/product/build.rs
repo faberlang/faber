@@ -36,10 +36,23 @@ pub(crate) struct BrowserController {
 /// Invariant: browser packaging consumes Radix's TypeScript backend as a host
 /// language and owns controller manifests/`tsc`; it never introduces a Radix
 /// web codegen target.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn build_browser_product(
     config: &radix::driver::Config,
     input: &Path,
     product: &ManifestProduct,
+) -> Result<BrowserProductBuild, Box<Diagnostic>> {
+    build_browser_product_with_postprocess(config, input, product, false, false)
+}
+
+/// Build a browser product and apply Faber's target-source post-processing
+/// policy before TypeScript compilation.
+pub(crate) fn build_browser_product_with_postprocess(
+    config: &radix::driver::Config,
+    input: &Path,
+    product: &ManifestProduct,
+    format: bool,
+    linter: bool,
 ) -> Result<BrowserProductBuild, Box<Diagnostic>> {
     let layout = super::super::discover_build_layout(input)?;
     // Preflight (collision + stale-output containment) runs against the final
@@ -86,6 +99,7 @@ pub(crate) fn build_browser_product(
         let declarations = ts_root.join(WEB_AMBIENT_DTS);
         fs::write(&declarations, web_ambient_declarations())
             .map_err(|err| io_diag(&declarations, err))?;
+        postprocess_typescript_sources(&ts_root, format, linter)?;
         let tsconfig = static_build.out_dir.join(TSCONFIG_FILE);
         fs::write(&tsconfig, render_tsconfig(&ts_root, &esm_root))
             .map_err(|err| io_diag(&tsconfig, err))?;
@@ -147,6 +161,41 @@ pub(crate) fn build_browser_product(
             Err(error)
         }
     }
+}
+
+/// Apply the user-facing TypeScript formatter/linter to every generated source
+/// file in the staged product tree. This runs after package and library module
+/// assembly (so imports, facades, and controller exports are final) and before
+/// `tsc` (so a successful transformation is the source that gets compiled).
+/// Post-processing itself is best-effort, matching `postprocess_code`: a tool
+/// failure emits a warning and retains the original source.
+fn postprocess_typescript_sources(
+    ts_root: &Path,
+    format: bool,
+    linter: bool,
+) -> Result<(), Box<Diagnostic>> {
+    if !format && !linter {
+        return Ok(());
+    }
+    let entries = fs::read_dir(ts_root).map_err(|err| io_diag(ts_root, err))?;
+    for entry in entries {
+        let entry = entry.map_err(|err| io_diag(ts_root, err))?;
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("ts") || !path.is_file() {
+            continue;
+        }
+        let source = fs::read_to_string(&path).map_err(|err| io_diag(&path, err))?;
+        let processed = crate::postprocess::postprocess_code(
+            source.clone(),
+            radix::codegen::Target::HirTypeScript,
+            format,
+            linter,
+        );
+        if processed != source {
+            fs::write(&path, processed).map_err(|err| io_diag(&path, err))?;
+        }
+    }
+    Ok(())
 }
 
 /// Re-target a static asset plan from the final output directory onto a

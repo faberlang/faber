@@ -13,7 +13,7 @@ use super::cargo::{
 #[cfg(feature = "hir-go")]
 use super::compile_package_go;
 #[cfg(feature = "hir-go")]
-use super::go_build::{emit_go_module, invoke_go_build, GoBuildLayout};
+use super::go_build::{emit_go_module_with_postprocess, invoke_go_build, GoBuildLayout};
 use super::manifest::manifest_build_target;
 use super::{
     build_host_program, build_package_fmir_binary_bundle, build_package_fmir_image,
@@ -210,7 +210,13 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
                 std::process::exit(1);
             });
             if let Some(product) = manifest.product.as_ref() {
-                match super::build_browser_product(&config, &input_path, product) {
+                match super::build_browser_product_with_postprocess(
+                    &config,
+                    &input_path,
+                    product,
+                    format,
+                    linter,
+                ) {
                     Ok(build) => {
                         println!("{}", build.esm_entry.display());
                         return;
@@ -256,7 +262,13 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
             };
             let go_layout = GoBuildLayout::from_package(&layout);
             let code = output_code(output);
-            if let Err(d) = emit_go_module(&go_layout, &code, &go_result.go_modules) {
+            if let Err(d) = emit_go_module_with_postprocess(
+                &go_layout,
+                &code,
+                &go_result.go_modules,
+                format,
+                linter,
+            ) {
                 eprintln!("error: {}", d.message);
                 std::process::exit(1);
             }
@@ -358,9 +370,11 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
                 std::process::exit(1);
             }
         }
+        let package_code =
+            crate::postprocess::postprocess_code(output_code(output), target, format, linter);
         match emit_generated_crate_with_runtime_plan(
             &layout,
-            &output_code(output),
+            &package_code,
             meta.as_ref(),
             &runtime_plan,
         ) {
@@ -406,7 +420,10 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
                         std::process::exit(1);
                     }
                 };
-                match emit_generated_crate_with_runtime_plan(&layout, &code, None, &plan) {
+                let generated_code =
+                    crate::postprocess::postprocess_code(code.clone(), target, format, linter);
+                match emit_generated_crate_with_runtime_plan(&layout, &generated_code, None, &plan)
+                {
                     Ok(_) => match invoke_cargo_build(&layout, command.release) {
                         Ok(binary_path) => {
                             println!("{}", binary_path.display());

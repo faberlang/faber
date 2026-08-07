@@ -5,5 +5,8 @@
 // crate root.
 pub(crate) use exempla::paths;
 
+#[path = "../src/postprocess.rs"]
+mod postprocess;
+
 #[path = "e2e_harness/mod.rs"]
 mod harness;

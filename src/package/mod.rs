@@ -143,9 +143,9 @@ pub use manifest::{
     ManifestPackage, ManifestPaths, ManifestProduct, ManifestProductEmit, ManifestProductKind,
     ManifestProductShaders, ManifestRustFieldNames, ManifestRustHost,
 };
-pub(crate) use product::build_browser_product;
+pub(crate) use product::build_browser_product_with_postprocess;
 #[cfg(test)]
-pub(crate) use product::build_browser_product_static_assets;
+pub(crate) use product::{build_browser_product, build_browser_product_static_assets};
 // binary-only package interpretation route consumes this through `commands`.
 #[allow(unused_imports)] // the S1-6 device-route seam (constructor + execution).
 pub(crate) use device::{

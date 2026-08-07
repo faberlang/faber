@@ -384,10 +384,28 @@ impl GoBuildLayout {
 }
 
 /// Write Go sources + `go.mod` for a single-package product assembly.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn emit_go_module(
     layout: &GoBuildLayout,
     entry_code: &str,
     modules: &[(String, String)],
+) -> Result<(), Diagnostic> {
+    emit_go_module_with_postprocess(layout, entry_code, modules, false, false)
+}
+
+/// Write Go sources with the user-requested Faber post-processing policy.
+///
+/// The compatibility wrapper above keeps library/test callers on the historic
+/// raw-emission path. `faber build --format/--linter` uses this entry point so
+/// every source file that reaches `go build` receives the same policy: the
+/// entry source and each already-wrapped sibling module are processed after
+/// package assembly, preserving imports and namespace injections.
+pub(crate) fn emit_go_module_with_postprocess(
+    layout: &GoBuildLayout,
+    entry_code: &str,
+    modules: &[(String, String)],
+    format: bool,
+    linter: bool,
 ) -> Result<(), Diagnostic> {
     fs::create_dir_all(&layout.module_root).map_err(|err| {
         crate::package_diagnostic_error(format!(
@@ -406,6 +424,12 @@ pub(crate) fn emit_go_module(
     remove_stale_owned_go_files(layout, modules)?;
 
     let main_path = layout.module_root.join("main.go");
+    let entry_code = crate::postprocess::postprocess_code(
+        entry_code.to_owned(),
+        radix::codegen::Target::HirGo,
+        format,
+        linter,
+    );
     fs::write(&main_path, entry_code).map_err(|err| {
         crate::package_diagnostic_error(format!("failed to write '{}': {err}", main_path.display()))
             .with_arg("issue", "package_go_emit_failed")
@@ -420,6 +444,12 @@ pub(crate) fn emit_go_module(
         } else {
             wrap_module_file(code, &std::collections::BTreeSet::new())
         };
+        let file_code = crate::postprocess::postprocess_code(
+            file_code,
+            radix::codegen::Target::HirGo,
+            format,
+            linter,
+        );
         fs::write(&path, file_code).map_err(|err| {
             crate::package_diagnostic_error(format!("failed to write '{}': {err}", path.display()))
                 .with_arg("issue", "package_go_emit_failed")

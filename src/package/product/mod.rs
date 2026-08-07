@@ -38,7 +38,9 @@ mod ts_rewrite;
 // through the product module (package/mod.rs stays byte-untouched).
 #[cfg(test)]
 pub(crate) use assets::build_browser_product_static_assets;
+#[cfg(test)]
 pub(crate) use build::build_browser_product;
+pub(crate) use build::build_browser_product_with_postprocess;
 #[cfg(test)]
 pub(crate) use build::inject_product_failure_at;
 // The product test companion imports these through `use super::*;` (mir house

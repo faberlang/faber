@@ -24,7 +24,8 @@ pub(crate) fn format_generated_code(target: Target, code: &str) -> Result<String
         | Target::MirScena
         | Target::MirFmir
         | Target::MirFmirBinary
-        | Target::MirFmirBundle => Ok(code.to_string()),
+        | Target::MirFmirBundle
+        | Target::MirStepper => Ok(code.to_string()),
     }
 }
 
@@ -45,7 +46,8 @@ pub(crate) fn lint_generated_code(target: Target, code: &str) -> Result<String, 
         | Target::MirScena
         | Target::MirFmir
         | Target::MirFmirBinary
-        | Target::MirFmirBundle => Ok(code.to_string()),
+        | Target::MirFmirBundle
+        | Target::MirStepper => Ok(code.to_string()),
     }
 }
 
@@ -65,7 +67,7 @@ fn lint_typescript_code(code: &str) -> Result<String, String> {
         return Ok(fixed);
     }
 
-    run_formatter(
+    let eslint_output = run_formatter(
         "eslint",
         &[
             "--fix-dry-run",
@@ -76,8 +78,40 @@ fn lint_typescript_code(code: &str) -> Result<String, String> {
             "json",
         ],
         code,
-    )
-    .map(|_| code.to_string())
+    )?;
+
+    parse_eslint_output(code, &eslint_output)
+}
+
+fn parse_eslint_output(code: &str, eslint_output: &str) -> Result<String, String> {
+    let results = serde_json::from_str::<serde_json::Value>(eslint_output.trim())
+        .map_err(|err| format!("eslint returned invalid JSON: {err}"))?;
+    let results = results
+        .as_array()
+        .ok_or_else(|| "eslint JSON output must be an array".to_string())?;
+    let result = match results.as_slice() {
+        [] => return Err("eslint JSON output contained no file result".to_string()),
+        [result] => result,
+        _ => {
+            return Err(format!(
+                "eslint JSON output contained {} file results; expected exactly one",
+                results.len()
+            ));
+        }
+    };
+    let result = result
+        .as_object()
+        .ok_or_else(|| "eslint JSON file result must be an object".to_string())?;
+
+    match result.get("output") {
+        Some(output) => output
+            .as_str()
+            .map(ToOwned::to_owned)
+            .ok_or_else(|| "eslint JSON output field was not a string".to_string()),
+        // ESLint omits `output` when --fix-dry-run made no changes. In that
+        // case the original source is already the fixed source.
+        None => Ok(code.to_owned()),
+    }
 }
 
 fn run_formatter(cmd: &str, args: &[&str], code: &str) -> Result<String, String> {
@@ -116,3 +150,7 @@ fn run_formatter(cmd: &str, args: &[&str], code: &str) -> Result<String, String>
         ))
     }
 }
+
+#[cfg(test)]
+#[path = "postprocess_test.rs"]
+mod tests;
