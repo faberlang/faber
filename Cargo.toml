@@ -15,7 +15,7 @@ path = "src/main.rs"
 
 [dependencies]
 # Private compiler workspace (local org layout). Not published with this crate.
-radix = { path = "../radix/crates/radix", default-features = false, features = ["full-targets"] }
+radix = { path = "../radix/crates/radix", default-features = false }
 radix-mir = { path = "../radix/crates/radix-mir" }
 radix-mir-fmir = { path = "../radix/crates/radix-mir-fmir" }
 # Differentiable-GPU campaign (S1-6): the S1-3 device-artifact emitters (Metal
@@ -54,6 +54,37 @@ zstd = "0.13"
 [dev-dependencies]
 hygiene-ratchet = { path = "crates/hygiene-ratchet" }
 tempfile = "3"
+
+[features]
+default = ["full-targets"]
+full-targets = [
+    "hir-rust",
+    "hir-faber",
+    "hir-ts",
+    "hir-go",
+    "hir-swift",
+    "hir-fhir",
+    "mir-fmir",
+    "mir-sexp",
+    "mir-metal",
+    "mir-wgsl",
+    "mir-llvm",
+    "mir-wasm",
+    "mir-coverage",
+]
+hir-rust = ["radix/hir-rust"]
+hir-faber = ["radix/hir-faber"]
+hir-ts = ["radix/hir-ts"]
+hir-go = ["radix/hir-go"]
+hir-swift = ["radix/hir-swift"]
+hir-fhir = ["radix/hir-fhir"]
+mir-fmir = ["radix/mir-fmir"]
+mir-sexp = ["radix/mir-sexp"]
+mir-metal = ["radix/mir-metal"]
+mir-wgsl = ["radix/mir-wgsl"]
+mir-llvm = ["radix/mir-llvm"]
+mir-wasm = ["radix/mir-wasm"]
+mir-coverage = ["radix/mir-coverage"]
 
 [workspace]
 members = [".", "crates/exempla", "crates/hygiene-ratchet"]

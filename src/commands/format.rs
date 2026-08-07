@@ -2,7 +2,7 @@
 
 use radix::codegen::Target;
 use radix::driver::{peel_raw_source, split_frontmatter, Session};
-use radix::forma::{compile_author, compile_canonical, FormatCompileResult};
+use radix::forma::{compile_author, FormatCompileResult};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -54,15 +54,26 @@ pub fn cmd_format(command: &FormatCommand) {
 
         let name = path.display().to_string();
         let result = if use_reemit {
-            let session = match format_session(path, command.locale.as_deref(), &source) {
-                Ok(session) => session,
-                Err(message) => {
-                    eprintln!("error: {message}");
-                    error_count += 1;
-                    continue;
-                }
-            };
-            compile_canonical(&session, &name, &source)
+            #[cfg(not(feature = "hir-faber"))]
+            {
+                eprintln!(
+                    "error: localized Faber re-emission requires a faber build with feature `hir-faber`"
+                );
+                error_count += 1;
+                continue;
+            }
+            #[cfg(feature = "hir-faber")]
+            {
+                let session = match format_session(path, command.locale.as_deref(), &source) {
+                    Ok(session) => session,
+                    Err(message) => {
+                        eprintln!("error: {message}");
+                        error_count += 1;
+                        continue;
+                    }
+                };
+                radix::forma::compile_canonical(&session, &name, &source)
+            }
         } else {
             let session = match format_session(path, None, &source) {
                 Ok(session) => session,

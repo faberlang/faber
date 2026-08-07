@@ -39,9 +39,11 @@ mod compile;
 mod device;
 mod discovery;
 mod dispatch;
+#[cfg(feature = "hir-fhir")]
 mod fhir;
 mod file_interface;
 mod frontmatter;
+#[cfg(feature = "hir-go")]
 mod go_build;
 mod host_factory;
 mod import_graph;
@@ -88,6 +90,7 @@ pub use cmd::{
     cmd_build, cmd_check_package, cmd_emit_package, should_treat_as_package_from_args,
     use_package_compiler_from_args,
 };
+#[cfg(feature = "hir-go")]
 #[allow(unused_imports)] // binary build/run paths consume this crate-visible Go entry.
 pub(crate) use compile::compile_package_go;
 pub(crate) use compile::package_rust_runtime_plan;
@@ -95,6 +98,7 @@ pub(crate) use compile::package_rust_runtime_plan;
 pub(crate) use compile::{
     analyze_package, analyze_package_for_tests, AnalyzedPackage, AnalyzedPackageUnit,
 };
+#[cfg(feature = "hir-fhir")]
 #[allow(unused_imports)]
 // binary commands/run consumes load/run + PackageFhir; lib uses build_package_fhir.
 pub(crate) use fhir::{
@@ -112,6 +116,7 @@ pub use discovery::{discover_build_layout, sanitize_crate_name, BuildLayout};
 pub(crate) use dispatch::{
     load_provider_manifests, selected_providers_for_routes, ProviderManifest,
 };
+#[cfg(feature = "hir-go")]
 #[allow(unused_imports)] // binary `commands/run` consumes run_go_binary
 pub(crate) use go_build::{emit_go_module, invoke_go_build, run_go_binary, GoBuildLayout};
 #[allow(unused_imports)] // binary `commands/run` + `commands/test` G4 linkage

@@ -267,6 +267,7 @@ pub(crate) use routes::{
 #[allow(unused_imports)]
 pub(crate) use routes::{build_package_mir_artifact, run_package_mir, run_package_mir_artifact};
 // binary `commands/run` resolves the interpreted consumer through fhir.rs.
+#[cfg(feature = "hir-fhir")]
 pub(crate) use routes::run_package_mir_from_loaded;
 
 #[cfg(test)]

@@ -1,3 +1,4 @@
+#[cfg(feature = "hir-go")]
 use radix::cli::CliProgram;
 use radix::codegen::rust::{
     build_local_import_function_params, build_local_import_namespaces, local_import_module_key,
@@ -13,7 +14,9 @@ use radix::hir::visit::{walk_expr, HirVisitor};
 use radix::hir::{HirExpressionKind, HirItemKind};
 use radix::lexer::Interner;
 use radix::syntax::{ImportDecl, ImportKind, StmtKind};
-use radix::{CompileResult, GoOutput, Output, RustOutput};
+#[cfg(feature = "hir-go")]
+use radix::GoOutput;
+use radix::{CompileResult, Output, RustOutput};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 
@@ -78,6 +81,7 @@ pub(crate) struct PackageCompileResult {
     pub(crate) compile_result: CompileResult,
     /// Go multi-module files `(file name, file body)` for non-entry units,
     /// populated only for `Target::HirGo` packages that reached codegen.
+    #[cfg(feature = "hir-go")]
     pub(crate) go_modules: Vec<(String, String)>,
 }
 
@@ -88,6 +92,7 @@ fn compile_failure(diagnostics: Vec<Diagnostic>) -> PackageCompileResult {
             output: None,
             diagnostics,
         },
+        #[cfg(feature = "hir-go")]
         go_modules: Vec::new(),
     }
 }
@@ -231,6 +236,7 @@ pub fn compile_package(config: &Config, input: &Path) -> CompileResult {
 ///
 /// The `config` must target `Target::HirGo`; other targets leave
 /// [`PackageCompileResult::go_modules`] empty.
+#[cfg(feature = "hir-go")]
 pub(crate) fn compile_package_go(config: &Config, input: &Path) -> PackageCompileResult {
     let result = compile_package_internal(config, input, None, false, None);
     PackageCompileResult {
@@ -387,18 +393,29 @@ fn compile_package_internal(
     };
 
     if config.target == Target::HirGo {
-        let plan = super::artifact_plan::plan_package(&package, Target::HirGo);
-        if !plan.supported {
-            return compile_failure(vec![crate::package_diagnostic_error(
-                plan.rejection.unwrap_or_else(|| {
-                    "package compilation does not support this target".to_owned()
-                }),
-            )
-            .with_file(input.display().to_string())
-            .with_arg("issue", "package_target_unsupported")
-            .with_arg("target", plan.target)]);
+        #[cfg(not(feature = "hir-go"))]
+        return compile_failure(vec![crate::package_diagnostic_error(
+            "target `go` is not available in this faber build; rebuild with feature `hir-go`",
+        )
+        .with_file(input.display().to_string())
+        .with_arg("issue", "package_target_unavailable")
+        .with_arg("target", "go")]);
+
+        #[cfg(feature = "hir-go")]
+        {
+            let plan = super::artifact_plan::plan_package(&package, Target::HirGo);
+            if !plan.supported {
+                return compile_failure(vec![crate::package_diagnostic_error(
+                    plan.rejection.unwrap_or_else(|| {
+                        "package compilation does not support this target".to_owned()
+                    }),
+                )
+                .with_file(input.display().to_string())
+                .with_arg("issue", "package_target_unsupported")
+                .with_arg("target", plan.target)]);
+            }
+            return generate_package_go_result(&package, input);
         }
-        return generate_package_go_result(&package, input);
     }
 
     if config.target != Target::HirRust {
@@ -451,6 +468,7 @@ fn compile_package_internal(
             output: Some(Output::Rust(RustOutput { code: crate_code })),
             diagnostics,
         },
+        #[cfg(feature = "hir-go")]
         go_modules: Vec::new(),
     }
 }
@@ -460,6 +478,7 @@ fn compile_package_internal(
 /// Local Faber imports become same-package namespace vars (`binding.Field`) that
 /// point at package-level functions from sibling units. Norma/stdlib imports
 /// remain elided by Go codegen.
+#[cfg(feature = "hir-go")]
 fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> PackageCompileResult {
     let mut diagnostics = package.diagnostics.clone();
     let Some(entry) = package.entry_unit() else {
@@ -687,6 +706,7 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Packag
     }
 }
 
+#[cfg(feature = "hir-go")]
 fn resolve_local_import_path(
     spec: &super::PackageSpec,
     from_file: &Path,
@@ -712,10 +732,12 @@ fn resolve_local_import_path(
     }
 }
 
+#[cfg(feature = "hir-go")]
 fn normalize_path_buf(path: &Path) -> PathBuf {
     std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
 }
 
+#[cfg(feature = "hir-go")]
 fn go_cli_accepts_dashed_rest_operands(program: &CliProgram) -> bool {
     if !(program.global_options.is_empty() && program.options.is_empty()) {
         return false;
@@ -727,6 +749,7 @@ fn go_cli_accepts_dashed_rest_operands(program: &CliProgram) -> bool {
         .any(|operand| operand.rest)
 }
 
+#[cfg(feature = "hir-go")]
 fn allow_go_cli_dashed_rest_operands(code: &str) -> String {
     code.replace(
         "if strings.HasPrefix(arg, \"-\") {",
@@ -739,6 +762,7 @@ fn allow_go_cli_dashed_rest_operands(code: &str) -> String {
 /// WHY: multi-module assembly emits every unit into the same `package main`.
 /// Two `functio identity` in different `.fab` files become two `func identity`
 /// and only fail at `go build` without this gate (correctness 53ff0a7).
+#[cfg(feature = "hir-go")]
 fn go_package_func_name_collision_diagnostic(
     entry_path: &Path,
     entry_code: &str,
@@ -775,6 +799,7 @@ fn go_package_func_name_collision_diagnostic(
 }
 
 /// Ensure a single-line or parenthesized Go import block includes `pkg`.
+#[cfg(feature = "hir-go")]
 fn ensure_go_import(code: &str, pkg: &str) -> String {
     if go_imports(code).iter().any(|existing| existing == pkg) {
         return code.to_owned();
@@ -822,6 +847,7 @@ fn ensure_go_import(code: &str, pkg: &str) -> String {
     code.to_owned()
 }
 
+#[cfg(feature = "hir-go")]
 fn go_imports(code: &str) -> Vec<String> {
     let mut imports = Vec::new();
     let mut in_block = false;
@@ -853,6 +879,7 @@ fn go_imports(code: &str) -> Vec<String> {
     imports
 }
 
+#[cfg(feature = "hir-go")]
 fn go_import_path(segment: &str) -> Option<&str> {
     let quoted = if let Some((_, rest)) = segment.split_once(' ') {
         rest.trim()

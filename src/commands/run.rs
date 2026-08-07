@@ -272,50 +272,61 @@ fn run_config_or_exit(
 
 /// G6 GO3 — package compile → go build → exec with forwarded argv.
 fn cmd_run_go(args: &RunArgs) {
-    let input_path = PathBuf::from(&args.path);
-    let config = run_config_or_exit(
-        Target::HirGo,
-        &input_path,
-        args.locale.as_deref(),
-        args.diagnostic_locale.as_deref(),
-        warn_policy_from_args(args),
-    );
-    let result = package::compile_package_go(&config, &input_path);
-    eprint_route_diagnostics(&result.compile_result.diagnostics);
-    let Some(output) = result.compile_result.output else {
-        eprintln!("compilation failed");
-        std::process::exit(1);
-    };
-    let code = if let radix::Output::Go(go) = output {
-        go.code
-    } else {
-        eprintln!("error: go run expected Go package output");
-        std::process::exit(1);
-    };
-    let layout = match package::discover_build_layout(&input_path) {
-        Ok(l) => l,
-        Err(d) => {
-            eprintln!("error: {}", d.message);
-            std::process::exit(1);
-        }
-    };
-    let go_layout = package::GoBuildLayout::from_package(&layout);
-    if let Err(d) = package::emit_go_module(&go_layout, &code, &result.go_modules) {
-        eprintln!("error: {}", d.message);
+    #[cfg(not(feature = "hir-go"))]
+    {
+        let _ = args;
+        eprintln!(
+            "error: target `go` is not available in this faber build; rebuild with feature `hir-go`"
+        );
         std::process::exit(1);
     }
-    let binary = match package::invoke_go_build(&go_layout) {
-        Ok(path) => path,
-        Err(d) => {
+    #[cfg(feature = "hir-go")]
+    {
+        let input_path = PathBuf::from(&args.path);
+        let config = run_config_or_exit(
+            Target::HirGo,
+            &input_path,
+            args.locale.as_deref(),
+            args.diagnostic_locale.as_deref(),
+            warn_policy_from_args(args),
+        );
+        let result = package::compile_package_go(&config, &input_path);
+        eprint_route_diagnostics(&result.compile_result.diagnostics);
+        let Some(output) = result.compile_result.output else {
+            eprintln!("compilation failed");
+            std::process::exit(1);
+        };
+        let code = if let radix::Output::Go(go) = output {
+            go.code
+        } else {
+            eprintln!("error: go run expected Go package output");
+            std::process::exit(1);
+        };
+        let layout = match package::discover_build_layout(&input_path) {
+            Ok(l) => l,
+            Err(d) => {
+                eprintln!("error: {}", d.message);
+                std::process::exit(1);
+            }
+        };
+        let go_layout = package::GoBuildLayout::from_package(&layout);
+        if let Err(d) = package::emit_go_module(&go_layout, &code, &result.go_modules) {
             eprintln!("error: {}", d.message);
             std::process::exit(1);
         }
-    };
-    match package::run_go_binary(&binary, &args.args) {
-        Ok(code) => std::process::exit(code),
-        Err(d) => {
-            eprintln!("error: {}", d.message);
-            std::process::exit(1);
+        let binary = match package::invoke_go_build(&go_layout) {
+            Ok(path) => path,
+            Err(d) => {
+                eprintln!("error: {}", d.message);
+                std::process::exit(1);
+            }
+        };
+        match package::run_go_binary(&binary, &args.args) {
+            Ok(code) => std::process::exit(code),
+            Err(d) => {
+                eprintln!("error: {}", d.message);
+                std::process::exit(1);
+            }
         }
     }
 }
@@ -414,38 +425,49 @@ fn cmd_run_fmir(args: RunArgs, selection: DeviceSelection) {
 /// Build the FHIR package envelope, load it source-free, lower to FMIR, and
 /// run in-process — no Rust, no Cargo (portable default route).
 fn cmd_run_fhir(args: RunArgs) {
-    let input_path = PathBuf::from(&args.path);
-    let warn_policy = warn_policy_from_args(&args);
-    let mut host = StdioHost::with_argumenta(args.args);
-    let config = run_config_or_exit(
-        Target::HirFhir,
-        &input_path,
-        args.locale.as_deref(),
-        args.diagnostic_locale.as_deref(),
-        warn_policy,
-    );
-    let artifact = match package::build_package_fhir(&config, &input_path) {
-        Ok(artifact) => artifact,
-        Err(diagnostics) => {
-            eprint_route_diagnostics(&diagnostics);
-            eprintln!("fhir package build failed");
-            std::process::exit(1);
-        }
-    };
-    let loaded = match package::load_package_fhir(&artifact.package_path) {
-        Ok(loaded) => loaded,
-        Err(diagnostics) => {
-            eprint_route_diagnostics(&diagnostics);
-            eprintln!("fhir package load failed");
-            std::process::exit(1);
-        }
-    };
-    if let Err(diagnostics) =
-        package::run_loaded_package_fhir(&config, loaded, &artifact.root, &mut host)
+    #[cfg(not(feature = "hir-fhir"))]
     {
-        eprint_route_diagnostics(&diagnostics);
-        eprintln!("fhir package execution failed");
+        let _ = args;
+        eprintln!(
+            "error: target `fhir` is not available in this faber build; rebuild with feature `hir-fhir`"
+        );
         std::process::exit(1);
+    }
+    #[cfg(feature = "hir-fhir")]
+    {
+        let input_path = PathBuf::from(&args.path);
+        let warn_policy = warn_policy_from_args(&args);
+        let mut host = StdioHost::with_argumenta(args.args);
+        let config = run_config_or_exit(
+            Target::HirFhir,
+            &input_path,
+            args.locale.as_deref(),
+            args.diagnostic_locale.as_deref(),
+            warn_policy,
+        );
+        let artifact = match package::build_package_fhir(&config, &input_path) {
+            Ok(artifact) => artifact,
+            Err(diagnostics) => {
+                eprint_route_diagnostics(&diagnostics);
+                eprintln!("fhir package build failed");
+                std::process::exit(1);
+            }
+        };
+        let loaded = match package::load_package_fhir(&artifact.package_path) {
+            Ok(loaded) => loaded,
+            Err(diagnostics) => {
+                eprint_route_diagnostics(&diagnostics);
+                eprintln!("fhir package load failed");
+                std::process::exit(1);
+            }
+        };
+        if let Err(diagnostics) =
+            package::run_loaded_package_fhir(&config, loaded, &artifact.root, &mut host)
+        {
+            eprint_route_diagnostics(&diagnostics);
+            eprintln!("fhir package execution failed");
+            std::process::exit(1);
+        }
     }
 }
 

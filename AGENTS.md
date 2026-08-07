@@ -32,10 +32,10 @@ core-support-manifest.txt  sibling repo paths relative to faberlang container
   `prettier`/`deno fmt`, and `biome`/`eslint`.
 - `crates/exempla/src/postprocess.rs` is harness-owned for e2e toolchain checks.
   Do not move those helpers back into Radix.
-- Faber currently depends on Radix with `default-features = false` and
-  `features = ["full-targets"]`. If a product lane needs a smaller compiler,
-  narrow Radix features in `Cargo.toml` using the Radix `hir-*` / `mir-*`
-  feature names instead of adding runtime/toolchain behavior to Radix.
+- Faber mirrors Radix target features at the product crate level. Default
+  builds enable `full-targets`; smaller installs can use
+  `--no-default-features --features hir-rust` or another explicit `hir-*` /
+  `mir-*` set. Keep Faber feature names aligned with Radix feature names.
 
 `faber format` is author-source formatting. It remains distinct from generated
 target-source postprocessing. Longer-term Faber/Forma consolidation is tracked
