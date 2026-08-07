@@ -1,0 +1,83 @@
+# Faber release manifest — companion example.
+#
+# Human-readable companion to the machine schema `release-manifest.schema.json`
+# (JSON Schema draft 2020-12), which is derived section-by-section from
+# `release-manifest-schema.md` §2–§7. This file is a valid instance of the
+# schema: run
+#   ./scripta/validate-release-manifest docs/release/release-manifest.example.yaml
+# The committed **instance** for a real release lives at
+# `faber/release-manifest.yaml` (repo root — it is build input, not
+# documentation). The SHAs and digests below are shape-valid placeholders.
+#
+# Freeze-artifact semantics (schema §7): the instance is updated ONLY as part
+# of the release prepare step under the authority model in authority.md.
+# Ad-hoc edits outside a release intent are rejected; the manifest is a freeze
+# artifact, not a living config file.
+
+schemaVersion: "1"          # schema revision; instance format (schema §2)
+manifestName: faber-release # stable manifest name (schema §3)
+preparedAt: 2026-08-07      # prepare date of the freeze artifact (schema §7)
+releaseIntent:              # the release intent every field records (§3)
+  component: faber          # faber | radix | cista (release-contract.md §3)
+  version: "1.5.0"          # the release version
+  channel: stable           # development|candidate|stable|lts|hotfix (§4)
+  line: "1.x"               # explicit major line per policy.md
+pinnedInputs:               # exact immutable inputs (§4 source, §6 packs)
+  source:                   # §4 — source repos at exact immutable commits
+    - name: faber           # the release itself: own source tag commit
+      commit: 3f1a2b4c5d6e7f8091a2b3c4d5e6f708192a3b4c
+      tag: v1.5.0
+    - name: radix           # private repo — source pin only, never leaks source
+      commit: 5bbdbbd49c0d1e2f3a4b5c6d7e8f9001a2b3c4d5
+    - name: cista
+      commit: 99acb1e2f3a4b5c6d7e8f90a1b2c3d4e5f607182
+    - name: faber-runtime   # core-support assembly (core-support-manifest.txt)
+      commit: 57493dc1e2f3a4b5c6d7e8f90a1b2c3d4e5f60718
+    - name: hosts           # core-support assembly (core-support-manifest.txt)
+      commit: ced40f81a2b3c4d5e6f708192a3b4c5d6e7f8091
+  packs:                    # §6 — dev-kit payload section (onboarding payload)
+    - name: launcher
+      component: faber
+      version: "1.5.0"
+      digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      compatibility: "1.x"  # major-lane / ABI bound decided by onboarding
+      license: MIT
+      destination: bin/faber
+    - name: core-support
+      component: faber
+      version: "1.5.0"
+      digest: sha256:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
+      compatibility: "1.x"
+      license: MIT
+      destination: share/faber/core-support/
+    - name: reference-pack
+      component: reference
+      version: "1.5.0"
+      digest: sha256:0000111122223333444455556666777788889999aaaabbbbccccddddeeeeffff
+      compatibility: "1.x"
+      license: MIT
+      destination: share/faber/reference/
+versionSources:             # §5 — authoritative version sources (gates enforce)
+  - component: faber
+    manifest: Cargo.toml
+    version: "1.5.0"
+  - component: radix
+    manifest: crates/radix/Cargo.toml
+    version: "0.80.0"
+  - component: cista
+    manifest: Cargo.toml
+    version: "0.2.0"
+exclusions:                 # §5 — intentional exclusions stay at 0.1.0
+  - component: faber
+    path: crates/hygiene-ratchet
+    reason: not release-aligned; stays 0.1.0
+  - component: radix
+    path: crates/hygiene-ratchet
+    reason: not release-aligned; stays 0.1.0
+  - component: cista
+    path: crates/hygiene-ratchet
+    reason: not release-aligned; stays 0.1.0
+publication:                # §3 — identity, host, latest rule
+  releaseTag: faber-v1.5.0  # component-prefixed public release tag (§5.1)
+  host: faberlang/releases  # single public host (release-contract.md §8)
+  advancesGlobalLatest: true # only promoted Faber product releases (§4.2)

@@ -1,0 +1,184 @@
+#!/usr/bin/env python3
+"""Regenerate and verify the faber Cargo.lock for a release (F2).
+
+The observed failure mode F2 (stage0-baseline.md §5) is tagging a commit
+whose lockfile is stale — `--locked` then fails with "cannot update the lock
+file". This helper closes that gap:
+
+    ./scripta/regen-lock            # cargo update, then verify freshness
+    ./scripta/regen-lock --check    # verify freshness only, never writes
+
+`--offline` caveat: `cargo update --offline` regenerates the lock from the
+local registry cache only. On a cold machine (cache missing the required
+crates) the update fails; use `--online` (network index fetch) in that case.
+The default is `--offline` because the release workflow is local-first and
+dry-run-only (faber/docs/release/process-local-first.md §1).
+
+Freshness verification is a pure-local, cargo-free check: every workspace
+member's `[package] version` must match its Cargo.lock entry. A mismatch
+means the lock is stale versus the manifests and `--locked` would fail.
+
+Stdlib-only python3 (faber scripta convention). Exit codes: 0 = fresh /
+regenerated, 1 = stale or update failure, 2 = usage error.
+"""
+
+from __future__ import annotations
+
+import argparse
+import glob
+import subprocess
+import sys
+import tomllib
+from pathlib import Path
+
+REPO_NAME = "faber"
+
+# Module-level alias so unit tests can mock the cargo invocation.
+subprocess_run = subprocess.run
+
+
+def repo_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def workspace_member_manifests(root: Path) -> list[Path]:
+    """Return the Cargo.toml paths of workspace member packages."""
+    root_manifest = root / "Cargo.toml"
+    manifests: list[Path] = []
+    if not root_manifest.exists():
+        return manifests
+    data = tomllib.loads(root_manifest.read_text(encoding="utf-8"))
+    ws = data.get("workspace") or {}
+    if "package" in data:
+        manifests.append(root_manifest)
+    for entry in ws.get("members", []):
+        if entry == ".":
+            manifests.append(root_manifest)
+        elif "*" in entry:
+            for match in sorted(glob.glob(str((root / entry) / "Cargo.toml"))):
+                manifests.append(Path(match))
+        else:
+            member_toml = root / entry / "Cargo.toml"
+            if member_toml.exists():
+                manifests.append(member_toml)
+    return sorted({m.resolve() for m in manifests})
+
+
+def member_versions(root: Path) -> list[tuple[str, str, Path]]:
+    """Return (name, version, manifest) for every workspace member."""
+    out: list[tuple[str, str, Path]] = []
+    for manifest in workspace_member_manifests(root):
+        data = tomllib.loads(manifest.read_text(encoding="utf-8"))
+        pkg = data.get("package")
+        if not pkg or "name" not in pkg or "version" not in pkg:
+            raise ValueError(f"{manifest}: no [package] name/version")
+        out.append((pkg["name"], pkg["version"], manifest))
+    return out
+
+
+def lock_versions(root: Path) -> dict[str, str] | None:
+    """Return {package name: version} from Cargo.lock, or None if absent."""
+    lock = root / "Cargo.lock"
+    if not lock.exists():
+        return None
+    data = tomllib.loads(lock.read_text(encoding="utf-8"))
+    return {pkg["name"]: pkg.get("version") for pkg in data.get("package", [])}
+
+
+def check_fresh(root: Path) -> list[str]:
+    """Return staleness issues (empty = lock is fresh vs the manifests)."""
+    issues: list[str] = []
+    lock = lock_versions(root)
+    if lock is None:
+        return [f"no Cargo.lock at {root / 'Cargo.lock'}"]
+    try:
+        members = member_versions(root)
+    except ValueError as exc:
+        return [str(exc)]
+    for name, version, manifest in members:
+        locked = lock.get(name)
+        if locked is None:
+            issues.append(
+                f"lock has no entry for workspace member {name} ({manifest})"
+            )
+        elif locked != version:
+            issues.append(
+                f"lock stale: {name} lock={locked} manifest={version} ({manifest})"
+            )
+    return issues
+
+
+def regen(root: Path, cargo: str, offline: bool) -> tuple[int, str]:
+    """Run cargo update, then verify freshness. Returns (exit_code, message)."""
+    cmd = [cargo, "update"]
+    if offline:
+        cmd.append("--offline")
+    res = subprocess_run(cmd, cwd=str(root), text=True, capture_output=True)
+    if res.returncode != 0:
+        detail = (res.stderr or res.stdout or "").strip()
+        return 1, f"cargo update failed ({detail or 'unknown'})"
+    issues = check_fresh(root)
+    if issues:
+        return 1, "lock still stale after cargo update:\n  " + "\n  ".join(issues)
+    return 0, "ok: Cargo.lock regenerated and fresh"
+
+
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog="regen-lock",
+        description=f"Regenerate and verify the {REPO_NAME} Cargo.lock.",
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="verify lock freshness only; never writes and never runs cargo",
+    )
+    network = parser.add_mutually_exclusive_group()
+    network.add_argument(
+        "--offline",
+        action="store_true",
+        default=True,
+        help="regenerate from the local registry cache only (default)",
+    )
+    network.add_argument(
+        "--online",
+        action="store_true",
+        dest="offline",
+        help="allow a network index fetch during cargo update",
+    )
+    parser.add_argument(
+        "--cargo",
+        default="cargo",
+        help="cargo binary to invoke (default: cargo from PATH)",
+    )
+    parser.add_argument(
+        "--root",
+        default=str(repo_root()),
+        help=f"{REPO_NAME} repo root (default: scripta parent)",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv or sys.argv[1:])
+    root = Path(args.root).resolve()
+    if not (root / "Cargo.toml").exists():
+        print(f"error: {root} is not a Cargo workspace root", file=sys.stderr)
+        return 2
+    if args.check:
+        issues = check_fresh(root)
+        if not issues:
+            print("ok: Cargo.lock is fresh versus the manifests")
+            return 0
+        for issue in issues:
+            print(f"  stale: {issue}", file=sys.stderr)
+        print("FAIL: Cargo.lock is stale (F2) — run ./scripta/regen-lock",
+              file=sys.stderr)
+        return 1
+    code, message = regen(root, args.cargo, args.offline)
+    print(message, file=sys.stderr if code != 0 else sys.stdout)
+    return code
+
+
+if __name__ == "__main__":
+    sys.exit(main())

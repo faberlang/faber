@@ -1,0 +1,326 @@
+#!/usr/bin/env python3
+"""Validate a release-manifest.yaml instance against the machine schema.
+
+The machine schema is `faber/docs/release/release-manifest.schema.json`
+(JSON Schema draft 2020-12), derived section-by-section from
+`faber/docs/release/release-manifest-schema.md` §2–§7. Any mismatch is a
+hard stop: exit 1 with named reasons.
+
+The instance is a committed freeze artifact (`faber/release-manifest.yaml`,
+release-manifest-schema.md §7) produced by the release prepare step
+(`generate-release-manifest`). It must also accept the faber-onboarding
+Stage-2 instance shape (the `pinnedInputs.packs` rows per schema §6).
+
+YAML parsing: stdlib-only (radix scripta convention), so this script parses
+the documented manifest YAML subset — the exact structure the schema defines
+(top-level map; one nested map level such as pinnedInputs; lists of scalar
+maps for source rows, pack rows, versionSources and exclusions; scalar
+values incl. quoted strings, booleans, integers, and `sha256:...` digests).
+Constructs outside that subset are rejected as malformed input. JSON is
+accepted too (YAML is a superset of JSON; json.loads is tried first).
+
+Exit codes: 0 = valid, 1 = invalid (named reasons), 2 = error (schema or
+instance unreadable).
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from pathlib import Path
+
+SCHEMA = Path(__file__).resolve().parents[1] / "docs/release/release-manifest.schema.json"
+
+
+class ManifestParseError(ValueError):
+    """Raised when the instance is not parseable by the YAML subset parser."""
+
+
+# ---------------------------------------------------------------------------
+# Scoped YAML subset parser (stdlib-only; see module docstring)
+# ---------------------------------------------------------------------------
+
+def _strip_comment(line: str) -> str:
+    """Strip a '#' comment outside quotes (YAML-comment-like behaviour)."""
+    in_dq = False
+    in_sq = False
+    for i, ch in enumerate(line):
+        if ch == '"' and not in_sq:
+            in_dq = not in_dq
+        elif ch == "'" and not in_dq:
+            in_sq = not in_sq
+        elif ch == "#" and not in_dq and not in_sq:
+            if i == 0 or line[i - 1].isspace():
+                return line[:i].rstrip()
+    return line.rstrip()
+
+
+def _parse_scalar(raw: str):
+    s = raw.strip()
+    if s == "" or s in ("null", "Null", "NULL", "~"):
+        return None
+    if s in ("true", "True", "TRUE"):
+        return True
+    if s in ("false", "False", "FALSE"):
+        return False
+    if len(s) >= 2 and s[0] == '"' and s[-1] == '"':
+        return s[1:-1].replace('\\"', '"').replace("\\\\", "\\")
+    if len(s) >= 2 and s[0] == "'" and s[-1] == "'":
+        return s[1:-1].replace("''", "'")
+    if re.fullmatch(r"[-+]?[0-9]+", s):
+        return int(s)
+    if re.fullmatch(r"[-+]?([0-9]+\.[0-9]*|\.[0-9]+)([eE][-+]?[0-9]+)?", s):
+        return float(s)
+    return s
+
+
+def _parse_block(lines: list[tuple[int, str]], idx: int, indent: int):
+    """Parse the block starting at lines[idx]. Returns (value, next_idx)."""
+    _, cur = lines[idx]
+    if cur.startswith("- "):
+        return _parse_list(lines, idx, indent)
+    return _parse_map(lines, idx, indent)
+
+
+def _parse_map(lines: list[tuple[int, str]], idx: int, indent: int):
+    result: dict = {}
+    while idx < len(lines):
+        cur_indent, cur = lines[idx]
+        if cur_indent < indent:
+            break
+        if cur_indent != indent:
+            raise ManifestParseError(f"bad indentation (line {idx + 1})")
+        if cur.startswith("- "):
+            raise ManifestParseError(f"unexpected list item (line {idx + 1})")
+        key, sep, rest = cur.partition(":")
+        key = key.strip()
+        if not sep or not key:
+            raise ManifestParseError(f"expected 'key: value' (line {idx + 1})")
+        idx += 1
+        if rest.strip():
+            result[key] = _parse_scalar(rest.strip())
+            continue
+        if idx < len(lines) and lines[idx][0] > indent:
+            value, idx = _parse_block(lines, idx, lines[idx][0])
+        else:
+            value = None
+        result[key] = value
+    return result, idx
+
+
+def _parse_list(lines: list[tuple[int, str]], idx: int, indent: int):
+    result: list = []
+    while idx < len(lines):
+        cur_indent, cur = lines[idx]
+        if cur_indent < indent:
+            break
+        if cur_indent != indent:
+            raise ManifestParseError(f"bad list indentation (line {idx + 1})")
+        if not cur.startswith("- "):
+            raise ManifestParseError(f"expected list item (line {idx + 1})")
+        content = cur[2:].strip()
+        idx += 1
+        if not content:
+            if idx < len(lines) and lines[idx][0] > indent:
+                value, idx = _parse_block(lines, idx, lines[idx][0])
+            else:
+                value = None
+            result.append(value)
+            continue
+        if ":" not in content:
+            result.append(_parse_scalar(content))
+            continue
+        item: dict = {}
+        while True:
+            key, sep, rest = content.partition(":")
+            key = key.strip()
+            if not sep or not key:
+                raise ManifestParseError("expected 'key: value' in list item")
+            if rest.strip():
+                item[key] = _parse_scalar(rest.strip())
+            else:
+                if idx < len(lines) and lines[idx][0] > indent:
+                    value, idx = _parse_block(lines, idx, lines[idx][0])
+                else:
+                    value = None
+                item[key] = value
+            if idx < len(lines) and lines[idx][0] > indent and not lines[idx][1].startswith("- "):
+                content = lines[idx][1].strip()
+                idx += 1
+                continue
+            break
+        result.append(item)
+    return result, idx
+
+
+def parse_manifest(text: str):
+    """Parse the manifest YAML subset (or JSON) into Python objects."""
+    stripped = text.lstrip()
+    if stripped.startswith("{"):
+        return json.loads(text)
+    lines: list[tuple[int, str]] = []
+    for lineno, raw in enumerate(text.splitlines(), start=1):
+        if "\t" in raw:
+            raise ManifestParseError(f"tabs are not supported (line {lineno})")
+        cleaned = _strip_comment(raw)
+        if not cleaned.strip():
+            continue
+        if cleaned.strip() in ("---", "..."):
+            continue
+        content = cleaned.lstrip(" ")
+        lines.append((len(cleaned) - len(content), content))
+    if not lines:
+        return None
+    value, idx = _parse_block(lines, 0, lines[0][0])
+    if idx != len(lines):
+        raise ManifestParseError(f"unexpected trailing content (line {idx + 1})")
+    return value
+
+
+# ---------------------------------------------------------------------------
+# JSON Schema subset engine (draft 2020-12 keywords used by the schema)
+# ---------------------------------------------------------------------------
+
+def _type_name(value: object) -> str:
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, int):
+        return "integer"
+    if isinstance(value, float):
+        return "number"
+    if isinstance(value, str):
+        return "string"
+    if isinstance(value, list):
+        return "array"
+    if isinstance(value, dict):
+        return "object"
+    return type(value).__name__
+
+
+def _matches_type(value: object, t: str) -> bool:
+    if t == "object":
+        return isinstance(value, dict)
+    if t == "array":
+        return isinstance(value, list)
+    if t == "string":
+        return isinstance(value, str)
+    if t == "boolean":
+        return isinstance(value, bool)
+    if t == "integer":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if t == "number":
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    if t == "null":
+        return value is None
+    return True
+
+
+def validate_schema(instance: object, schema: dict, path: str = "$",
+                    errors: list[str] | None = None) -> list[str]:
+    """Validate instance against the JSON-Schema subset. Returns errors."""
+    if errors is None:
+        errors = []
+    if not isinstance(schema, dict):
+        errors.append(f"{path}: schema node is not an object")
+        return errors
+    t = schema.get("type")
+    if t is not None:
+        if not _matches_type(instance, t):
+            errors.append(f"{path}: expected {t}, got {_type_name(instance)}")
+            return errors
+    if "const" in schema and instance != schema["const"]:
+        errors.append(f"{path}: expected const {schema['const']!r}, got {instance!r}")
+    if "enum" in schema and instance not in schema["enum"]:
+        errors.append(f"{path}: expected one of {schema['enum']!r}, got {instance!r}")
+    if "pattern" in schema and isinstance(instance, str):
+        if re.search(schema["pattern"], instance) is None:
+            errors.append(
+                f"{path}: {instance!r} does not match pattern {schema['pattern']!r}"
+            )
+    if isinstance(instance, dict):
+        for key, value in instance.items():
+            key_schema = schema.get("properties", {}).get(key)
+            if key_schema is not None:
+                validate_schema(value, key_schema, f"{path}.{key}", errors)
+            elif schema.get("additionalProperties") is False:
+                errors.append(f"{path}: additional property {key!r} is not allowed")
+        for key in schema.get("required", []):
+            if key not in instance:
+                errors.append(f"{path}: missing required property {key!r}")
+    if isinstance(instance, list):
+        if "minItems" in schema and len(instance) < schema["minItems"]:
+            errors.append(
+                f"{path}: expected at least {schema['minItems']} items, "
+                f"got {len(instance)}"
+            )
+        items_schema = schema.get("items")
+        if items_schema is not None:
+            for i, item in enumerate(instance):
+                validate_schema(item, items_schema, f"{path}[{i}]", errors)
+    return errors
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+def load_schema(path: Path = SCHEMA) -> dict:
+    if not path.exists():
+        raise FileNotFoundError(f"schema not found: {path}")
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def validate_instance_file(instance_path: Path, schema_path: Path = SCHEMA) -> list[str]:
+    """Validate an instance file. Returns a list of errors (empty = valid)."""
+    text = instance_path.read_text(encoding="utf-8")
+    try:
+        instance = parse_manifest(text)
+    except (json.JSONDecodeError, ManifestParseError) as exc:
+        return [f"{instance_path}: malformed manifest: {exc}"]
+    schema = load_schema(schema_path)
+    return validate_schema(instance, schema)
+
+
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog="validate-release-manifest",
+        description="Validate a release-manifest.yaml against the machine schema.",
+    )
+    parser.add_argument("instance", help="path to the release-manifest.yaml instance")
+    parser.add_argument(
+        "--schema",
+        default=str(SCHEMA),
+        help="path to release-manifest.schema.json (default: faber/docs/release)",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv or sys.argv[1:])
+    instance_path = Path(args.instance).resolve()
+    if not instance_path.exists():
+        print(f"error: instance not found: {instance_path}", file=sys.stderr)
+        return 2
+    try:
+        errors = validate_instance_file(instance_path, Path(args.schema).resolve())
+    except FileNotFoundError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    except json.JSONDecodeError as exc:
+        print(f"error: schema is not valid JSON: {exc}", file=sys.stderr)
+        return 2
+    if errors:
+        for error in errors:
+            print(f"  invalid: {error}", file=sys.stderr)
+        print("FAIL: release-manifest instance does not validate", file=sys.stderr)
+        return 1
+    print(f"ok: {instance_path} validates against release-manifest.schema.json")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

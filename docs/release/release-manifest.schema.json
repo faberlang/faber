@@ -1,0 +1,199 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://faberlang.dev/schemas/release-manifest.schema.json",
+  "title": "Faber release manifest",
+  "description": "Machine-readable input/pin manifest for a Faber product release. Derived section-by-section from faber/docs/release/release-manifest-schema.md §2–§7 (release pins, authoritative version sources, intentional exclusions, dev-kit payload packs, update authority). The instance lives at faber/release-manifest.yaml; a manifest that fails validation is a hard stop at prepare time and in CI.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "manifestName",
+    "releaseIntent",
+    "pinnedInputs",
+    "versionSources",
+    "exclusions",
+    "publication"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "description": "Schema revision; the instance format version (schema §2).",
+      "const": "1"
+    },
+    "manifestName": {
+      "description": "Stable name of this manifest (schema §3).",
+      "const": "faber-release"
+    },
+    "preparedAt": {
+      "description": "Prepare date of the freeze artifact, YYYY-MM-DD (schema §7: the manifest is updated only at the release prepare step).",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "releaseIntent": {
+      "description": "The release intent every other field records (schema §3). The manifest records, it does not re-decide.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component", "version", "channel", "line"],
+      "properties": {
+        "component": {
+          "description": "The release unit (release-contract.md §3).",
+          "enum": ["faber", "radix", "cista"]
+        },
+        "version": {
+          "description": "The release version (SemVer-shaped; policy.md lanes).",
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$"
+        },
+        "channel": {
+          "description": "Release-lifecycle channel (release-contract.md §4).",
+          "enum": ["development", "candidate", "stable", "lts", "hotfix"]
+        },
+        "line": {
+          "description": "Explicit major line per policy.md (e.g. \"1.x\").",
+          "type": "string",
+          "pattern": "^[0-9]+\\.x$"
+        }
+      }
+    },
+    "pinnedInputs": {
+      "description": "Exact immutable inputs the release locks to (schema §4 source repos, §6 dev-kit payload packs).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "packs"],
+      "properties": {
+        "source": {
+          "description": "Source repos at exact immutable commits (schema §4). A Faber product release pins all five.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "commit"],
+            "properties": {
+              "name": {
+                "enum": ["faber", "radix", "cista", "faber-runtime", "hosts"]
+              },
+              "commit": {
+                "description": "Immutable commit SHA (tagged commit, or the explicit commit where no tag exists).",
+                "type": "string",
+                "pattern": "^[0-9a-fA-F]{7,64}$"
+              },
+              "tag": {
+                "description": "Source tag when the pin is a tag (e.g. v1.5.0).",
+                "type": "string"
+              }
+            }
+          }
+        },
+        "packs": {
+          "description": "Dev-kit payload section (schema §6): release-owned packs with component / version / digest / compatibility / license / destination. Authored by the faber-onboarding assemble-dev-kit receipt under the process contract's review.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "component",
+              "version",
+              "digest",
+              "compatibility",
+              "license",
+              "destination"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "component": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string",
+                "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$"
+              },
+              "digest": {
+                "description": "SHA-256 digest of the released artifact (schema §6: digest: sha256:...).",
+                "type": "string",
+                "pattern": "^sha256:[0-9a-fA-F]{64}$"
+              },
+              "compatibility": {
+                "description": "Major-lane / ABI compatibility bound decided by onboarding.",
+                "type": "string"
+              },
+              "license": {
+                "type": "string"
+              },
+              "destination": {
+                "description": "Install/prefix path decided by onboarding.",
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "versionSources": {
+      "description": "Authoritative version sources — the component manifests the version-validation gates already enforce (schema §5).",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["component", "manifest", "version"],
+        "properties": {
+          "component": {
+            "type": "string"
+          },
+          "manifest": {
+            "description": "Repo-relative manifest path (e.g. Cargo.toml, crates/radix/Cargo.toml).",
+            "type": "string"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$"
+          }
+        }
+      }
+    },
+    "exclusions": {
+      "description": "Intentional exclusions — non-release-aligned members (schema §5): crates/hygiene-ratchet in each workspace stays 0.1.0.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["component", "path", "reason"],
+        "properties": {
+          "component": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "publication": {
+      "description": "Publication identity and discovery (schema §3; release-contract.md §4.2, §5.1, §8).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["releaseTag", "host", "advancesGlobalLatest"],
+      "properties": {
+        "releaseTag": {
+          "description": "Component-prefixed public release tag (release-contract.md §5.1).",
+          "type": "string",
+          "pattern": "^(faber|radix|cista)-v[0-9]+\\.[0-9]+\\.[0-9]+"
+        },
+        "host": {
+          "description": "Single public host (release-contract.md §8).",
+          "const": "faberlang/releases"
+        },
+        "advancesGlobalLatest": {
+          "description": "Only promoted Faber product releases advance the shared repo's global Latest (release-contract.md §4.2).",
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
