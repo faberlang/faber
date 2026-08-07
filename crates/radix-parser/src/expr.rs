@@ -1257,7 +1257,14 @@ impl Parser {
                     });
                 }
                 let ident = self.parse_primary_ident()?;
-                if self.interner.resolve(ident.name) == "vacua" {
+                // Locale-aware `vacua` claim (R4): route through the keyword
+                // latin-key map so a localized empty-collection spelling (an
+                // owned pack row) resolves to the Latin identity before
+                // semantics. Latin mode has no row, so the helper falls back
+                // to the source text — behavior unchanged. Acceptance is
+                // bounded: only spellings mapped in the active pack are
+                // claimed; unmapped spellings stay ordinary identifiers.
+                if self.identifier_text_or_keyword_latin_key(ident.name) == "vacua" {
                     ExprKind::Vacua(ident.span)
                 } else if let Some(constructor) =
                     self.try_parse_qualified_typed_constructor(&ident)?
