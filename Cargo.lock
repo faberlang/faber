@@ -306,6 +306,7 @@ dependencies = [
  "radix",
  "radix-mir",
  "radix-mir-fmir",
+ "radix-types",
  "serde",
  "serde_json",
  "sha2",
