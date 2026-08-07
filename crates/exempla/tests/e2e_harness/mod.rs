@@ -41,5 +41,3 @@ pub(crate) mod wasm_external;
 pub(crate) mod wasm_ledger;
 #[path = "../../src/exempla_e2e/wasm_product.rs"]
 pub(crate) mod wasm_product;
-#[path = "../../src/exempla_e2e/wasm_package.rs"]
-pub(crate) mod wasm_package;

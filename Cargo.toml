@@ -46,11 +46,6 @@ fs2 = "0.4"
 sha2 = "0.10"
 tar = "0.4"
 zstd = "0.13"
-# Package-Wasm lane (U6-D): the package-wasm builder converts each emitted
-# package-aware WAT module to wasm bytes for the product host
-# (`faber-host-wasm` `run_package`). Same crate the host's WAT→binary path
-# uses; no separate toolchain.
-wat = "1"
 
 [build-dependencies]
 sha2 = "0.10"

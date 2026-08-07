@@ -13,10 +13,8 @@ use radix::syntax::{ImportDecl, ImportKind, StmtKind};
 use radix::CompileResult;
 #[cfg(feature = "hir-go")]
 use radix::GoOutput;
-#[cfg(any(feature = "hir-go", feature = "mir-wasm"))]
+#[cfg(feature = "hir-go")]
 use radix::Output;
-#[cfg(feature = "mir-wasm")]
-use radix::WasmOutput;
 #[cfg(feature = "hir-go")]
 use std::collections::HashMap;
 use std::collections::{BTreeMap, BTreeSet};
@@ -77,24 +75,9 @@ pub(crate) struct PackageCompileResult {
     /// populated only for `Target::HirGo` packages that reached codegen.
     #[cfg(feature = "hir-go")]
     pub(crate) go_modules: Vec<(String, String)>,
-    /// Package-aware Wasm modules (entry + sibling units), populated only for
-    /// `Target::MirWasmBinary` packages that reached codegen.
-    #[cfg(feature = "mir-wasm")]
-    pub(crate) wasm_modules: Vec<WasmPackageModuleFile>,
 }
 
-/// One package-aware Wasm module file produced for a package unit.
-#[cfg(feature = "mir-wasm")]
-pub(crate) struct WasmPackageModuleFile {
-    pub(crate) module_segments: Vec<String>,
-    pub(crate) is_entry: bool,
-    /// Emitted package-aware WAT (canonical sibling exports applied).
-    pub(crate) wat: String,
-    /// Compiled wasm bytes for the module.
-    pub(crate) bytes: Vec<u8>,
-}
-
-/// Failed compile: no output, no Go/Wasm modules.
+/// Failed compile: no output, no Go modules.
 fn compile_failure(diagnostics: Vec<Diagnostic>) -> PackageCompileResult {
     PackageCompileResult {
         compile_result: CompileResult {
@@ -103,8 +86,6 @@ fn compile_failure(diagnostics: Vec<Diagnostic>) -> PackageCompileResult {
         },
         #[cfg(feature = "hir-go")]
         go_modules: Vec::new(),
-        #[cfg(feature = "mir-wasm")]
-        wasm_modules: Vec::new(),
     }
 }
 
@@ -245,23 +226,6 @@ pub(crate) fn compile_package_go(config: &Config, input: &Path) -> PackageCompil
     PackageCompileResult {
         compile_result: finalize_package_compile_result(result.compile_result, &config.warn_policy),
         go_modules: result.go_modules,
-        #[cfg(feature = "mir-wasm")]
-        wasm_modules: result.wasm_modules,
-    }
-}
-
-/// Compile a Wasm-targeted package, returning the entry module output and the
-/// explicit per-unit module collection in one result (no hidden thread-local
-/// side channel).
-///
-/// The `config` must target `Target::MirWasmBinary`; other targets leave
-/// [`PackageCompileResult::wasm_modules`] empty.
-#[cfg(feature = "mir-wasm")]
-pub(crate) fn compile_package_wasm(config: &Config, input: &Path) -> PackageCompileResult {
-    let result = compile_package_internal(config, input, None, false, None);
-    PackageCompileResult {
-        compile_result: finalize_package_compile_result(result.compile_result, &config.warn_policy),
-        wasm_modules: result.wasm_modules,
     }
 }
 
@@ -429,36 +393,6 @@ fn compile_package_internal(
                 .with_arg("target", plan.target)]);
             }
             return generate_package_go_result(&package, input);
-        }
-    }
-
-    // U6-D: the package-aware Wasm path accepts Target::MirWasmBinary and
-    // emits one module per unit through the package-to-Wasm builder (entry +
-    // sibling units, canonical `faber_external` symbol linking).
-    if config.target == Target::MirWasmBinary {
-        #[cfg(not(feature = "mir-wasm"))]
-        return compile_failure(vec![crate::package_diagnostic_error(
-            "target `wasm` is not available in this faber build; rebuild with feature `mir-wasm`",
-        )
-        .with_file(input.display().to_string())
-        .with_arg("issue", "package_target_unavailable")
-        .with_arg("target", "wasm")]);
-
-        #[cfg(feature = "mir-wasm")]
-        {
-            let plan = super::artifact_plan::plan_package(&package, Target::MirWasmBinary);
-            if !plan.supported {
-                return compile_failure(vec![crate::package_diagnostic_error(
-                    plan.rejection.unwrap_or_else(|| {
-                        "package compilation does not support this target".to_owned()
-                    }),
-                )
-                .with_file(input.display().to_string())
-                .with_arg("issue", "package_target_unsupported")
-                .with_arg("target", plan.target)]);
-            }
-            let mut package = package;
-            return generate_package_wasm_result(&mut package, input);
         }
     }
 
@@ -730,55 +664,6 @@ fn generate_package_go_result(package: &AnalyzedPackage, input: &Path) -> Packag
             diagnostics,
         },
         go_modules: module_files,
-        #[cfg(feature = "mir-wasm")]
-        wasm_modules: Vec::new(),
-    }
-}
-
-/// U6-D — emit a package's Wasm through the reusable package-to-Wasm builder.
-///
-/// The entry module's bytes are the compile result output; every unit module
-/// (entry + siblings) travels in [`PackageCompileResult::wasm_modules`] with
-/// its package-aware WAT (canonical sibling exports applied) and compiled
-/// bytes, so the product host can instantiate the module set together
-/// (`WasmRtV1Host::run_package`).
-#[cfg(feature = "mir-wasm")]
-fn generate_package_wasm_result(
-    package: &mut AnalyzedPackage,
-    _input: &Path,
-) -> PackageCompileResult {
-    let options = super::wasm::PackageWasmOptions::new(
-        package
-            .spec
-            .package_root
-            .join("target")
-            .join("faber")
-            .join("wasm"),
-    );
-    let build = match super::wasm::build_package_wasm_from_graph(package, &options) {
-        Ok(build) => build,
-        Err(diagnostics) => return compile_failure(diagnostics),
-    };
-    let wasm_modules = build
-        .modules
-        .into_iter()
-        .map(|module| WasmPackageModuleFile {
-            module_segments: module.module_segments,
-            is_entry: module.is_entry,
-            wat: module.wat,
-            bytes: module.bytes,
-        })
-        .collect::<Vec<_>>();
-    PackageCompileResult {
-        compile_result: CompileResult {
-            output: Some(Output::Wasm(WasmOutput {
-                bytes: build.manifest.entry_bytes,
-            })),
-            diagnostics: Vec::new(),
-        },
-        wasm_modules,
-        #[cfg(feature = "hir-go")]
-        go_modules: Vec::new(),
     }
 }
 

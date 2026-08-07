@@ -73,22 +73,9 @@ fn plan_package_go_and_ts_are_supported_seams() {
 #[test]
 fn plan_or_reject_fails_closed_for_unsupported_targets() {
     let package = empty_package("/tmp/g4-plan-reject");
-    let err = plan_or_reject(&package, Target::MirWgsl).expect_err("wgsl package unsupported");
+    let err =
+        plan_or_reject(&package, Target::MirWasmBinary).expect_err("wasm package unsupported");
     assert_eq!(err.issue(), Some("package_target_unsupported"));
-}
-
-#[test]
-fn plan_package_wasm_is_supported_and_no_longer_rejected() {
-    let package = empty_package("g4-plan-wasm");
-    let plan = plan_package(&package, Target::MirWasmBinary);
-    assert!(plan.supported);
-    assert_eq!(plan.target, "wasm");
-    assert!(plan.rejection.is_none());
-    let result = plan_or_reject(&package, Target::MirWasmBinary);
-    assert!(
-        result.is_ok(),
-        "wasm package must no longer be rejected as package_target_unsupported"
-    );
 }
 
 #[test]
