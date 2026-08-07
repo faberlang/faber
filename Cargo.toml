@@ -11,7 +11,7 @@ path = "src/lib.rs"
 
 [dependencies]
 # Private compiler workspace (local org layout). Not published with this crate.
-radix = { path = "../radix/crates/radix", default-features = false, features = ["full-targets"] }
+radix = { path = "../radix/crates/radix", default-features = false }
 radix-mir = { path = "../radix/crates/radix-mir" }
 radix-mir-fmir = { path = "../radix/crates/radix-mir-fmir" }
 # Differentiable-GPU campaign (S1-6): the S1-3 device-artifact emitters (Metal
@@ -44,6 +44,13 @@ zstd = "0.13"
 [dev-dependencies]
 hygiene-ratchet = { path = "crates/hygiene-ratchet" }
 tempfile = "3"
+
+[features]
+default = ["full-targets"]
+full-targets = ["hir-faber", "hir-fhir", "mir-fmir"]
+hir-faber = ["radix/hir-faber"]
+hir-fhir = ["radix/hir-fhir"]
+mir-fmir = ["radix/mir-fmir"]
 
 [workspace]
 members = [
