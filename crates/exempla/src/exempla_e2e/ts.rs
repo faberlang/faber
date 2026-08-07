@@ -20,11 +20,18 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 // 310 -> 304, and every tier dropped by exactly 6. The `vector/builtins` seam
 // fix (radix-codegen-ts GPU builtin DefId resolution) then raised emitted,
 // typecheck-valid, and runnable by one each. The iterator/genus fixes raised
-// the live typecheck and runnable counts to 275 and 273.
+// the live typecheck and runnable counts to 275 and 273. Stage 4 ratchet
+// (codex-gap): the TS4-1 modular-word emitter (radix 0ad139a55) and the TS4-2
+// JSON-root FaberJson carrier (radix 3f1d3955) moved the six
+// `operatores/modular-word*.fab` rows and the four JSON-root rows
+// (`conversio/valor-{genus,tensor}.fab`, `json/json.fab`,
+// `destructura/literal.fab`) off `TS_EXPECTED_OUTCOMES` and past the
+// frontend-analyzed tier — measured emitted 289, typecheck-valid 285,
+// runnable 283 (frontend analyzed unchanged at 288).
 const EXPECTED_TS_FRONTEND_ANALYZED_FLOOR: usize = 288;
-const EXPECTED_TS_EMITTED_FLOOR: usize = 279;
-const EXPECTED_TS_TYPECHECK_VALID_FLOOR: usize = 275;
-const EXPECTED_TS_RUNNABLE_FLOOR: usize = 273;
+const EXPECTED_TS_EMITTED_FLOOR: usize = 289;
+const EXPECTED_TS_TYPECHECK_VALID_FLOOR: usize = 285;
+const EXPECTED_TS_RUNNABLE_FLOOR: usize = 283;
 
 #[derive(Debug)]
 struct TsE2eResult {
@@ -70,25 +77,6 @@ const TS_EXPECTED_OUTCOMES: &[ExpectedTsOutcome] = &[
         kind: ExpectedTsKind::TrackedGap,
         bucket: "failable / conversio lowering",
         reason_contains: "Property 'error' does not exist on type 'never'",
-    },
-    ExpectedTsOutcome {
-        path: "conversio/valor-genus.fab",
-        // Reclassified from the pre-wrapper TypecheckValid row: current TS
-        // codegen rejects this JSON-root Valor explicitly, so the lower tier is
-        // an evidenced feature gap rather than hidden coverage debt.
-        highest_tier: TsHighestTier::FrontendAnalyzed,
-        kind: ExpectedTsKind::TrackedGap,
-        bucket: "json valor not supported",
-        reason_contains: "json is not supported for the TypeScript target",
-    },
-    ExpectedTsOutcome {
-        path: "conversio/valor-tensor.fab",
-        // Same explicit JSON-root wrapper gap as valor-genus; do not restore
-        // the stale Runnable classification until the wrapper exists.
-        highest_tier: TsHighestTier::FrontendAnalyzed,
-        kind: ExpectedTsKind::TrackedGap,
-        bucket: "json valor not supported",
-        reason_contains: "json is not supported for the TypeScript target",
     },
     ExpectedTsOutcome {
         path: "discerne/discerne.fab",
@@ -240,22 +228,6 @@ const TS_EXPECTED_OUTCOMES: &[ExpectedTsOutcome] = &[
         reason_contains: "Cannot find module 'norma:tempus'",
     },
     ExpectedTsOutcome {
-        path: "destructura/literal.fab",
-        highest_tier: TsHighestTier::FrontendAnalyzed,
-        kind: ExpectedTsKind::TrackedGap,
-        bucket: "json valor not supported",
-        reason_contains: "json is not supported for the TypeScript target",
-    },
-    ExpectedTsOutcome {
-        path: "json/json.fab",
-        // Y: quarantined 2026-08-06; frontend now admits this split-out row,
-        // but TS JSON-root runtime wrapping is still absent.
-        highest_tier: TsHighestTier::FrontendAnalyzed,
-        kind: ExpectedTsKind::SplitOut,
-        bucket: "json valor not supported",
-        reason_contains: "json is not supported for the TypeScript target",
-    },
-    ExpectedTsOutcome {
         path: "operatores/numerus-overflow.fab",
         // Y: quarantined 2026-08-06; emitted JS number behavior does not
         // preserve Rust/i64 overflow semantics.
@@ -263,48 +235,6 @@ const TS_EXPECTED_OUTCOMES: &[ExpectedTsOutcome] = &[
         kind: ExpectedTsKind::BehaviorFailure,
         bucket: "numeric overflow semantics",
         reason_contains: "stdout mismatch",
-    },
-    ExpectedTsOutcome {
-        path: "operatores/modular-word.fab",
-        highest_tier: TsHighestTier::FrontendAnalyzed,
-        kind: ExpectedTsKind::TrackedGap,
-        bucket: "modular word target gap",
-        reason_contains: "modulus<u32> is not supported by the TypeScript target",
-    },
-    ExpectedTsOutcome {
-        path: "operatores/modular-word-u8.fab",
-        highest_tier: TsHighestTier::FrontendAnalyzed,
-        kind: ExpectedTsKind::TrackedGap,
-        bucket: "modular word target gap",
-        reason_contains: "modulus<u32> is not supported by the TypeScript target",
-    },
-    ExpectedTsOutcome {
-        path: "operatores/modular-word-u16.fab",
-        highest_tier: TsHighestTier::FrontendAnalyzed,
-        kind: ExpectedTsKind::TrackedGap,
-        bucket: "modular word target gap",
-        reason_contains: "modulus<u32> is not supported by the TypeScript target",
-    },
-    ExpectedTsOutcome {
-        path: "operatores/modular-word-u64.fab",
-        highest_tier: TsHighestTier::FrontendAnalyzed,
-        kind: ExpectedTsKind::TrackedGap,
-        bucket: "modular word target gap",
-        reason_contains: "modulus<u32> is not supported by the TypeScript target",
-    },
-    ExpectedTsOutcome {
-        path: "operatores/modular-word-sha-round.fab",
-        highest_tier: TsHighestTier::FrontendAnalyzed,
-        kind: ExpectedTsKind::TrackedGap,
-        bucket: "modular word target gap",
-        reason_contains: "modulus<u32> is not supported by the TypeScript target",
-    },
-    ExpectedTsOutcome {
-        path: "operatores/modular-word-u64-sha-round.fab",
-        highest_tier: TsHighestTier::FrontendAnalyzed,
-        kind: ExpectedTsKind::TrackedGap,
-        bucket: "modular word target gap",
-        reason_contains: "modulus<u32> is not supported by the TypeScript target",
     },
     ExpectedTsOutcome {
         path: "praefixum/praefixum.fab",
