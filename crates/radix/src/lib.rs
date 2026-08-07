@@ -39,7 +39,7 @@
 //! use radix::{Compiler, Config, Target};
 //! use std::path::Path;
 //!
-//! let config = Config::default().with_target(Target::Rust);
+//! let config = Config::default().with_target(Target::HirRust);
 //! let compiler = Compiler::new(config);
 //! let result = compiler.compile(Path::new("example.fab"));
 //!
