@@ -165,7 +165,7 @@ def copy_locale_packs(staging_share: Path) -> None:
         shutil.copytree(source, dest)
 
 
-def assemble_reference_pack(staging_share: Path, version: str) -> None:
+def assemble_reference_pack(staging_share: Path, version: str, radix_commit: str) -> None:
     if not REFERENCE_ASSEMBLER.is_file():
         fail(f"reference pack assembler missing: {REFERENCE_ASSEMBLER}")
     dest = staging_share / "reference"
@@ -177,6 +177,13 @@ def assemble_reference_pack(staging_share: Path, version: str) -> None:
             str(dest),
             "--version",
             version,
+            # Pin the PACK.toml source_commit to the SAME radix commit this
+            # manifest pins, resolved once below. Without it the pack embeds
+            # whatever radix HEAD is at assembly time and the manifest can race
+            # a mid-assembly commit landing (sweep-14 E2): two regenerations
+            # under the same pin produced different pack digests.
+            "--commit",
+            radix_commit,
         ],
         capture_output=True,
         text=True,
@@ -189,6 +196,33 @@ def assemble_reference_pack(staging_share: Path, version: str) -> None:
         )
     if not (dest / "index.toml").is_file() or not (dest / "PACK.toml").is_file():
         fail(f"reference pack assembly produced an incomplete pack at {dest}")
+
+
+def tag_at_commit(repo: Path, commit: str, prefer: str | None = None) -> str | None:
+    """The release tag pointing exactly at `commit`, if any.
+
+    Schema §4 defines a source row's `tag` as "source tag when the pin IS a
+    tag" — the field must not be invented when the pin is a plain commit
+    (sweep-14 E3: faber stamped `tag: v{version}` for a HEAD-commit pin whose
+    real vX.Y.Z tag points elsewhere). `--points-at` matches tag -> commit
+    exactly; annotated tags are resolved through their peeled commit.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "tag", "--points-at", commit],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError) as err:
+        fail(f"cannot resolve tags at {commit[:12]} in {repo}: {err}")
+    tags = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    if not tags:
+        return None
+    if prefer and prefer in tags:
+        return prefer
+    return tags[0]
 
 
 def quote(value: str) -> str:
@@ -271,6 +305,7 @@ def write_manifest(
     *,
     version: str,
     faber_commit: str,
+    radix_commit: str,
     digests: dict[str, str],
 ) -> None:
     today = date.today().isoformat()
@@ -280,13 +315,21 @@ def write_manifest(
         # a git worktree member has `.git` as a file, not a directory
         if not (repo / ".git").exists():
             fail(f"sibling repo for {component} is missing: {repo}")
-        commit = git_commit(repo)
+        # The radix pin is resolved once and reused as the reference-pack
+        # PACK.toml source_commit (sweep-14 E2): the two can never diverge.
+        commit = radix_commit if component == "radix" else git_commit(repo)
         if has_planned_tag:
-            row = (
-                f"    - name: {component}\n"
-                f"      commit: {commit}\n"
-                f"      tag: v{version}\n"
-            )
+            # Schema §4: record the tag only when the pin IS a tag. A HEAD
+            # commit with no exact tag gets no tag row (sweep-14 E3).
+            tag = tag_at_commit(repo, commit, prefer=f"v{version}")
+            if tag:
+                row = (
+                    f"    - name: {component}\n"
+                    f"      commit: {commit}\n"
+                    f"      tag: {tag}\n"
+                )
+            else:
+                row = f"    - name: {component}\n      commit: {commit}\n"
         else:
             row = f"    - name: {component}\n      commit: {commit}\n"
         source_rows.append(row)
@@ -464,7 +507,11 @@ def main() -> int:
     shutil.copy2(binary, bin_dir / "faber")
     (bin_dir / "faber").chmod(0o755)
 
-    assemble_reference_pack(share_dir, args.version)
+    # Resolve the radix source commit ONCE: the reference-pack PACK.toml
+    # source_commit and the manifest's radix pin both come from this value, so
+    # a commit landing mid-assembly cannot split them (sweep-14 E2).
+    radix_commit = git_commit(RADIX)
+    assemble_reference_pack(share_dir, args.version, radix_commit)
     copy_locale_packs(share_dir)
 
     faber_commit = git_commit(ROOT)
@@ -486,7 +533,13 @@ def main() -> int:
     }
 
     manifest_dir = args.manifest.resolve()
-    write_manifest(manifest_dir, version=args.version, faber_commit=faber_commit, digests=digests)
+    write_manifest(
+        manifest_dir,
+        version=args.version,
+        faber_commit=faber_commit,
+        radix_commit=radix_commit,
+        digests=digests,
+    )
     write_receipt(
         args.out.resolve(),
         name,
