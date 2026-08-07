@@ -161,18 +161,30 @@ const SCRIPT_EXPECTED_FAILURES: &[ExpectedScriptFailure] = &[
         "gpu-core-types/matrix-tensor-reject.fab",
         ScriptFailureBucket::FrontendNegative,
     ),
+    // re-bucketed: S5-U5 (codex-gap Stage 5). numerus-overflow.fab is a
+    // checked-arithmetic trap demo (bare numerus = i64; `max + 1` traps with a
+    // `numerus overflow` StepperError instead of wrapping) — the trap is the
+    // intended, observable behavior, not backend debt. Focused stepper proof:
+    // radix mir::stepper_integration_tests::stepper_traps_numerus_overflow_at_i64_width.
+    // Stage 0 ledger §3.2 records the expected-trap re-bucket ruling
+    // (intentional-negative class); the fixture's empty .expected means a
+    // harness "pass" would be a silent run, but checked semantics demand the
+    // trap. Row stays classified as an expected failure, so a wrapping
+    // regression still trips the unexpected-pass ratchet.
     expected(
         "operatores/numerus-overflow.fab",
-        ScriptFailureBucket::UnsupportedMir,
+        ScriptFailureBucket::FrontendNegative,
     ),
-    expected(
-        "script-kernel/glob-import.fab",
-        ScriptFailureBucket::UnsupportedMir,
-    ),
-    expected(
-        "script-kernel/solum-json.fab",
-        ScriptFailureBucket::UnsupportedMir,
-    ),
+    // removed: S5-U5 (codex-gap Stage 5). glob-import.fab + solum-json.fab live
+    // under examples/script-kernel/, outside the Script harness corpus root
+    // (corpus_dir() → radix/corpus/), so these rows never matched a collected
+    // file — unreachable no-op entries. Stage 0 ledger §3.1 records the
+    // corpus-root routing ruling; the debt surfaces (faber:* kernel glob-import;
+    // solum/jsonio/processus kernel-module lowering) stay recorded as
+    // implementation-debt in ledger-stage0/script.md §4.4/§4.5 with full
+    // recipes. Implementing them is a harness/package-path decision outside
+    // S5-U5's non-goals; the rows return when a script-kernel lane collects
+    // examples/script-kernel/ (script_kernel_dir() / FABER_EXAMPLES_HOME).
     expected(
         "immutata/immutata.fab",
         ScriptFailureBucket::NoEntryReference,
