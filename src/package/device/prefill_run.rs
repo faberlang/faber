@@ -27,10 +27,18 @@
 //! GQA causal attention → attn_output → residual → ffn_norm → SwiGLU FFN →
 //! residual) → output_norm → tied-head projection → full-vocab logits
 //! `[9, 49152]`. GQA (15/5 heads) is expressed on the frozen recipe surface
-//! with **host-side weight expansion**: `attn_k`/`attn_v` are repacked to
-//! `[960, 960]` by replicating each KV head's columns across its query-head
-//! group, so the standard matmul recipes compute the consecutive-triples
-//! grouped scores/context without a per-head kernel fan-out.
+//! with **per-head kernel fan-out**: `attn_q`/`attn_output` are split into
+//! the 15 query heads and `attn_k`/`attn_v` into the 5 KV heads, so each
+//! query head's score row is scaled/softmaxed independently (the oracle
+//! softmaxes each query head's scores) and the 15 head outputs fold back
+//! into the `[9, 960]` context.
+//!
+//! **GI3-1 contract amendment (task 74264397):** RoPE rotates **per
+//! position** (the rank-2 `[rows, dim/2]` cos/sin tables; the kernel reads
+//! `table[row · (dim/2) + pair]` — each row at its own position), and the
+//! device K/V path applies the comparator's **f16 register rounding**
+//! (`kv_f16_round`) via the `MirUnOp::F16Round` unary — K after RoPE, V
+//! directly; Q stays f32 (the oracle's application order).
 //!
 //! # Constraints carried in
 //!
@@ -52,7 +60,7 @@ use super::{
     MirFunctionId, MirKernelResourceAccess, MirTensorStorageLayout, MirType, ValidatedMir,
 };
 use faber::dequant::{dequant_tensor, OracleReceipt};
-use faber::gguf::{admit_file, GgmlType};
+use faber::gguf::admit_file;
 use faber::json::Json;
 use faber::prefill::{
     compare_gpu_logits, ExecutableRegime, PrefillComparison, PrefillReceipt, PrefillRegimeFields,
@@ -113,18 +121,27 @@ const LAYER_COUNT: u64 = 32;
 
 /// The declared f32 conversion of one layer's weights.
 ///
-/// Every quantized tensor is dequantized through the GI2-1 dequant semantics
-/// and f16-rounded per the pinned comparator's Metal register arithmetic
-/// (the F32 norms are untouched). `attn_k`/`attn_v` are additionally
-/// **expanded** from `[960, 320]` to `[960, 960]` (each KV head's columns
-/// replicated across its query-head group) so the GQA scores/context are
-/// expressible as plain matmuls on the frozen recipe surface.
+/// Every tensor is dequantized through the GI2-1 dequant semantics and
+/// f16-rounded per the pinned comparator's Metal register arithmetic (the
+/// oracle applies `metal_f16_round_weights` to the embedding and ALL nine
+/// per-layer tensors; only the F32 `output_norm` is unrounded). The
+/// attention weights are **split per head** (`attn_q`/`attn_out` into the 15
+/// query heads, `attn_k`/`attn_v` into the 5 KV heads) so the per-head
+/// attention softmax is expressible on the recipe surface — the oracle
+/// softmaxes each query head's score row independently.
 struct LayerRepack {
     attn_norm: Vec<f32>,
-    attn_q: Vec<f32>,
-    attn_k_exp: Vec<f32>,
-    attn_v_exp: Vec<f32>,
-    attn_output: Vec<f32>,
+    /// 15 query-head K-major slices of `attn_q` `[960, 960]`, each
+    /// `[960, 64]` (the device matmul right operand — the oracle's `dense`
+    /// K-major layout, see [`split_columns`]).
+    attn_q_heads: Vec<Vec<f32>>,
+    /// 5 KV-head K-major slices of `attn_k` `[960, 320]`, each `[960, 64]`.
+    attn_k_heads: Vec<Vec<f32>>,
+    /// 5 KV-head K-major slices of `attn_v` `[960, 320]`, each `[960, 64]`.
+    attn_v_heads: Vec<Vec<f32>>,
+    /// 15 query-head K-major slices of `attn_output` `[960, 960]`, each
+    /// `[64, 960]` (see [`split_rows`]).
+    attn_out_heads: Vec<Vec<f32>>,
     ffn_norm: Vec<f32>,
     ffn_gate: Vec<f32>,
     ffn_up: Vec<f32>,
@@ -145,49 +162,87 @@ fn f16_round(value: f32) -> f32 {
     half_to_f32(faber::cpu_oracle::f32_to_f16_rn(value))
 }
 
-/// Half-precision bits → f32 (the same decoder the oracle uses; local copy
-/// because `faber_runtime::dequant::half_to_f32` is crate-private).
+/// f16 bits -> f32 — the bit-exact decode (identical to the oracle's
+/// `faber_runtime::dequant::half_to_f32`, so the declared-f32 repack's f16
+/// rounding is byte-identical to the CPU oracle's `kv_f16_round`).
 fn half_to_f32(bits: u16) -> f32 {
-    let sign = ((bits >> 15) & 1) as u32;
-    let exponent = ((bits >> 10) & 0x1f) as u32;
-    let mantissa = (bits & 0x3ff) as u32;
-    if exponent == 0 {
-        if mantissa == 0 {
-            0.0f32
+    let sign = u32::from(bits >> 15) & 0x1;
+    let exp = u32::from(bits >> 10) & 0x1f;
+    let frac = u32::from(bits & 0x3ff);
+    let bits32 = if exp == 0 {
+        if frac == 0 {
+            sign << 31 // ±0
         } else {
-            // Subnormal: 2^-14 scale.
-            (mantissa as f32) * 2f32.powi(-24) * if sign == 1 { -1.0 } else { 1.0 }
+            // Subnormal: value = frac × 2^-24, frac ∈ [1, 1023]. Normalize
+            // the leading bit: with p = bit_length(frac), the value is
+            // (frac × 2^(1-p)) × 2^(p-25), so the f32 exponent field is
+            // p - 25 + 127 = p + 102 and the mantissa field is
+            // (frac × 2^(1-p) - 1) × 2^23 = frac × 2^(24-p) - 2^23.
+            let p = 32 - frac.leading_zeros();
+            (sign << 31) | ((p + 102) << 23) | ((frac << (24 - p)) - (1 << 23))
         }
-    } else if exponent == 0x1f {
-        if mantissa == 0 {
-            f32::INFINITY
-        } else {
-            f32::NAN
-        }
+    } else if exp == 0x1f {
+        (sign << 31) | (0xff << 23) | (frac << 13) // ±inf / NaN
     } else {
-        let value = (1.0f32 + mantissa as f32 / 1024.0f32) * 2f32.powi(exponent as i32 - 15);
-        if sign == 1 {
-            -value
-        } else {
-            value
-        }
-    }
+        (sign << 31) | ((exp + 112) << 23) | (frac << 13) // 127 - 15 = 112
+    };
+    f32::from_bits(bits32)
 }
 
-/// Expand a `[in_dim, KV_HEAD_COUNT * HEAD_DIM]` KV weight to the
-/// `[in_dim, HEAD_COUNT * HEAD_DIM]` group-replicated layout:
-/// `expanded[k, h * HEAD_DIM + d] = source[k, (h / QUERY_HEADS_PER_KV) * HEAD_DIM + d]`.
-fn expand_kv_weight(source: &[f32], in_dim: usize) -> Vec<f32> {
-    let kv_out = (KV_HEAD_COUNT * HEAD_DIM) as usize;
-    let expanded_out = (HEAD_COUNT * HEAD_DIM) as usize;
-    let mut out = vec![0.0f32; in_dim * expanded_out];
-    for k in 0..in_dim {
-        for h in 0..HEAD_COUNT as usize {
-            let kv_head = (h as u64 / QUERY_HEADS_PER_KV) as usize;
-            for d in 0..HEAD_DIM as usize {
-                out[k * expanded_out + h * HEAD_DIM as usize + d] =
-                    source[k * kv_out + kv_head * HEAD_DIM as usize + d];
+/// Split a K-major `[in_dim, out_dim]` weight (row-major storage
+/// `data[i + in_dim * j]` = the CPU oracle's `dense` layout — input `i`,
+/// output `j`) into per-head column slices for the device matmul right
+/// operand: head `h` gets the `[in_dim, head_dim]` slice
+/// `slice[k * head_dim + n] = source[k + in_dim * (h * head_dim + n)]` —
+/// output column `(h * head_dim + n)` read K-major, so the device matmul
+/// `a · slice` reproduces the oracle's `q/k/v` head outputs exactly.
+fn split_columns(source: &[f32], in_dim: usize, out_dim: usize, head_dim: usize) -> Vec<Vec<f32>> {
+    let head_count = out_dim / head_dim;
+    (0..head_count)
+        .map(|head| {
+            let mut slice = vec![0.0f32; in_dim * head_dim];
+            for k in 0..in_dim {
+                for n in 0..head_dim {
+                    slice[k * head_dim + n] = source[k + in_dim * (head * head_dim + n)];
+                }
             }
+            slice
+        })
+        .collect()
+}
+
+/// Split a K-major `[in_dim, out_dim]` weight into per-head ROW slices for
+/// the device matmul right operand: head `h` gets the `[head_dim, out_dim]`
+/// slice `slice[k * out_dim + d] = source[d * in_dim + h * head_dim + k]` —
+/// input row `(h * head_dim + k)` read K-major (the attn_output per-head
+/// projection weights).
+fn split_rows(source: &[f32], in_dim: usize, out_dim: usize, head_dim: usize) -> Vec<Vec<f32>> {
+    let head_count = in_dim / head_dim;
+    (0..head_count)
+        .map(|head| {
+            let mut slice = vec![0.0f32; head_dim * out_dim];
+            for k in 0..head_dim {
+                for d in 0..out_dim {
+                    slice[k * out_dim + d] = source[d * in_dim + head * head_dim + k];
+                }
+            }
+            slice
+        })
+        .collect()
+}
+
+/// Transpose a K-major `[in_dim, out_dim]` weight (storage
+/// `data[i + in_dim * j]` — input `i`, output `j`) to the device matmul
+/// right operand's row-major layout `[in_dim, out_dim]`:
+/// `out[k * out_dim + n] = source[k + in_dim * n]`. The FFN matmul weights
+/// (`ffn_gate`/`ffn_up`/`ffn_down`) ride the device right operand directly
+/// (no per-head split), so they need this single transpose to reproduce the
+/// oracle's `dense` (which reads K-major) exactly.
+fn transpose_kmajor(source: &[f32], in_dim: usize, out_dim: usize) -> Vec<f32> {
+    let mut out = vec![0.0f32; in_dim * out_dim];
+    for k in 0..in_dim {
+        for n in 0..out_dim {
+            out[k * out_dim + n] = source[k + in_dim * n];
         }
     }
     out
@@ -240,35 +295,83 @@ impl PrefillWeights {
                     "prefill device run: oracle receipt for `{name}` failed: {error}"
                 ))]
             })?);
-            // Quantized tensors carry the comparator's f16 register rounding
-            // (the pinned Metal matmul path stores dequantized weights as
-            // f16); F32 tensors (the norms) are untouched.
-            if entry.ggml_type == GgmlType::F32 {
-                Ok(values)
-            } else {
-                Ok(values.into_iter().map(f16_round).collect())
-            }
+            // The comparator's f16 register rounding (the pinned Metal
+            // matmul path stores dequantized weights as f16) — the oracle
+            // applies `metal_f16_round_weights` to the embedding and ALL
+            // nine per-layer tensors (including the F32 attn_norm/ffn_norm;
+            // the ONLY unrounded tensor is the F32 `output_norm`, which is
+            // loaded separately below).
+            Ok(values.into_iter().map(f16_round).collect())
         };
+        // `output_norm.weight` is the ONE tensor the oracle does NOT
+        // f16-round (`CpuOracle::build` loads it via plain dequant); its
+        // receipt is appended after the rounding loop (the `tensor` closure
+        // holds `&mut receipts`).
+        let output_norm_entry = view.tensor("output_norm.weight").ok_or_else(|| {
+            vec![Diagnostic::error(
+                "prefill device run: admitted tensor `output_norm.weight` not found in the model",
+            )]
+        })?;
+        let output_norm = dequant_tensor(&view, output_norm_entry).map_err(|error| {
+            vec![Diagnostic::error(format!(
+                "prefill device run: dequant of `output_norm.weight` failed: {error}"
+            ))]
+        })?;
 
         let token_embd = tensor("token_embd.weight")?;
-        let mut layers = Vec::with_capacity(32);
+        let mut layers = Vec::with_capacity(LAYER_COUNT as usize);
         for il in 0..32 {
             let name = |base: &str| format!("blk.{il}.{base}");
+            let attn_q = tensor(&name("attn_q.weight"))?;
             let attn_k = tensor(&name("attn_k.weight"))?;
             let attn_v = tensor(&name("attn_v.weight"))?;
+            let attn_output = tensor(&name("attn_output.weight"))?;
+            // The FFN matmul weights ride the device right operand directly,
+            // so they are transposed from the K-major storage to the matmul
+            // row-major layout (the per-head attention weights are
+            // transposed inside their splits).
+            let ffn_gate = tensor(&name("ffn_gate.weight"))?;
+            let ffn_up = tensor(&name("ffn_up.weight"))?;
+            let ffn_down = tensor(&name("ffn_down.weight"))?;
             layers.push(LayerRepack {
                 attn_norm: tensor(&name("attn_norm.weight"))?,
-                attn_q: tensor(&name("attn_q.weight"))?,
-                attn_k_exp: expand_kv_weight(&attn_k, HIDDEN_SIZE as usize),
-                attn_v_exp: expand_kv_weight(&attn_v, HIDDEN_SIZE as usize),
-                attn_output: tensor(&name("attn_output.weight"))?,
+                attn_q_heads: split_columns(
+                    &attn_q,
+                    HIDDEN_SIZE as usize,
+                    (HEAD_COUNT * HEAD_DIM) as usize,
+                    HEAD_DIM as usize,
+                ),
+                attn_k_heads: split_columns(
+                    &attn_k,
+                    HIDDEN_SIZE as usize,
+                    (KV_HEAD_COUNT * HEAD_DIM) as usize,
+                    HEAD_DIM as usize,
+                ),
+                attn_v_heads: split_columns(
+                    &attn_v,
+                    HIDDEN_SIZE as usize,
+                    (KV_HEAD_COUNT * HEAD_DIM) as usize,
+                    HEAD_DIM as usize,
+                ),
+                attn_out_heads: split_rows(
+                    &attn_output,
+                    HIDDEN_SIZE as usize,
+                    HIDDEN_SIZE as usize,
+                    HEAD_DIM as usize,
+                ),
                 ffn_norm: tensor(&name("ffn_norm.weight"))?,
-                ffn_gate: tensor(&name("ffn_gate.weight"))?,
-                ffn_up: tensor(&name("ffn_up.weight"))?,
-                ffn_down: tensor(&name("ffn_down.weight"))?,
+                ffn_gate: transpose_kmajor(&ffn_gate, HIDDEN_SIZE as usize, FFN_SIZE as usize),
+                ffn_up: transpose_kmajor(&ffn_up, HIDDEN_SIZE as usize, FFN_SIZE as usize),
+                ffn_down: transpose_kmajor(&ffn_down, FFN_SIZE as usize, HIDDEN_SIZE as usize),
             });
         }
-        let output_norm = tensor("output_norm.weight")?;
+        receipts.push(
+            OracleReceipt::for_tensor(&view, output_norm_entry).map_err(|error| {
+                vec![Diagnostic::error(format!(
+                    "prefill device run: oracle receipt for `output_norm.weight` failed: {error}"
+                ))]
+            })?,
+        );
         Ok((
             Self {
                 token_embd,
@@ -287,10 +390,30 @@ impl PrefillWeights {
         for (il, layer) in self.layers.iter().enumerate() {
             let name = |base: &str| format!("blk.{il}.{base}");
             map.insert(name("attn_norm.weight"), layer.attn_norm.clone());
-            map.insert(name("attn_q.weight"), layer.attn_q.clone());
-            map.insert(name("attn_k.weight"), layer.attn_k_exp.clone());
-            map.insert(name("attn_v.weight"), layer.attn_v_exp.clone());
-            map.insert(name("attn_output.weight"), layer.attn_output.clone());
+            for (head, slice) in layer.attn_q_heads.iter().enumerate() {
+                map.insert(
+                    format!("blk.{il}.attn_q.h{head}.weight"),
+                    slice.clone(),
+                );
+            }
+            for (head, slice) in layer.attn_k_heads.iter().enumerate() {
+                map.insert(
+                    format!("blk.{il}.attn_k.g{head}.weight"),
+                    slice.clone(),
+                );
+            }
+            for (head, slice) in layer.attn_v_heads.iter().enumerate() {
+                map.insert(
+                    format!("blk.{il}.attn_v.g{head}.weight"),
+                    slice.clone(),
+                );
+            }
+            for (head, slice) in layer.attn_out_heads.iter().enumerate() {
+                map.insert(
+                    format!("blk.{il}.attn_output.h{head}.weight"),
+                    slice.clone(),
+                );
+            }
             map.insert(name("ffn_norm.weight"), layer.ffn_norm.clone());
             map.insert(name("ffn_gate.weight"), layer.ffn_gate.clone());
             map.insert(name("ffn_up.weight"), layer.ffn_up.clone());
@@ -491,15 +614,16 @@ fn rms_norm_function(types: &mut TypeTable, id: u32, dims: [u64; 2]) -> MirFunct
 }
 
 /// The RoPE function (llama-arch NORM consecutive-pair rotation): the
-/// cos/sin tables are host-precomputed per position and are the kernel's two
-/// extra inputs; `pos`/`dim` are the CCI-1 const operands. For the pinned
-/// 960-wide rows the recipe rotates the whole row as consecutive pairs; the
-/// host tables are periodic with the 64-wide per-head angle sequence so the
-/// 15 heads rotate with their own local pair indices (see [`rope_tables`]).
+/// cos/sin tables are host-precomputed and are the kernel's two extra
+/// inputs; `pos`/`dim` are the CCI-1 const operands. **Per-position mode**
+/// (the GI3-1 contract amendment): the tables are rank-2 `[rows, dim/2]` and
+/// the kernel rotates each row at its own position; the plan resolution
+/// detects the mode from the table shapes.
 fn rope_function(types: &mut TypeTable, id: u32, dims: [u64; 2], pos: i64, dim: i64) -> MirFunction {
     let x_ty = tensor_ty(types, &dims);
+    let rows = dims[0];
     let table_len = u64::try_from(dim / 2).expect("rope table length must be nonnegative");
-    let table_ty = tensor_ty(types, &[table_len]);
+    let table_ty = tensor_ty(types, &[rows, table_len]);
     let u32_ty = MirType::semantic(types.sized_numeric(Primitive::Numerus, NumericWidth::U32));
     let vacuum_ty = MirType::semantic(types.primitive(Primitive::Vacuum));
     MirFunction {
@@ -651,10 +775,13 @@ fn transpose_function(types: &mut TypeTable, id: u32, dims: [u64; 2]) -> MirFunc
 enum ElementwiseUnary {
     Neg,
     Exp,
+    /// The half-precision round trip (the comparator's `kv_f16_round` K/V
+    /// register rounding): `f16_round(x)`.
+    F16Round,
 }
 
-/// A single-input elementwise function (TensorNeg / the Exp unary):
-/// `out = op(x)`.
+/// A single-input elementwise function (TensorNeg / the Exp unary / the
+/// F16Round unary): `out = op(x)`.
 fn elementwise_unary_function(
     types: &mut TypeTable,
     id: u32,
@@ -670,6 +797,21 @@ fn elementwise_unary_function(
             ty,
         ),
         ElementwiseUnary::Exp => exp_statement(0, 1, ty),
+        ElementwiseUnary::F16Round => MirStatement {
+            kind: MirStatementKind::Assign {
+                place: MirPlace::local(MirLocalId(1)),
+                value: MirValue {
+                    id: MirValueId(0),
+                    kind: MirValueKind::Unary {
+                        op: MirUnOp::F16Round,
+                        operand: place(0),
+                    },
+                    ty,
+                    span: span(),
+                },
+            },
+            span: span(),
+        },
     };
     MirFunction {
         id: MirFunctionId(id),
@@ -993,34 +1135,37 @@ fn build_prefill_program() -> Result<PrefillProgramArtifact, Vec<Diagnostic>> {
         rms_norm_function(types, id, [PROMPT_TOKEN_COUNT, HIDDEN_SIZE])
     });
     let rope_fn = intern(&mut types, &mut functions, &mut next_function, |types, id| {
-        // Single-position rotation over the full 960-wide row; the tables
-        // are periodic with the per-head angle sequence (see `rope_tables`).
-        rope_function(types, id, [PROMPT_TOKEN_COUNT, HIDDEN_SIZE], 8, 960)
+        // Per-position rotation over the 64-wide per-head rows (the
+        // per-head attention fan-out; see `rope_tables`).
+        rope_function(types, id, [PROMPT_TOKEN_COUNT, HEAD_DIM], 8, HEAD_DIM as i64)
     });
     let causal_fn = intern(&mut types, &mut functions, &mut next_function, |types, id| {
         causal_softmax_function(types, id, [PROMPT_TOKEN_COUNT, PROMPT_TOKEN_COUNT])
     });
     let transpose_k_fn = intern(&mut types, &mut functions, &mut next_function, |types, id| {
-        transpose_function(types, id, [PROMPT_TOKEN_COUNT, HIDDEN_SIZE])
+        transpose_function(types, id, [PROMPT_TOKEN_COUNT, HEAD_DIM])
     });
     let transpose_embd_fn =
         intern(&mut types, &mut functions, &mut next_function, |types, id| {
             transpose_function(types, id, [VOCAB_SIZE, HIDDEN_SIZE])
         });
-    let mm_960 = intern(&mut types, &mut functions, &mut next_function, |types, id| {
-        matmul_function(types, id, PROMPT_TOKEN_COUNT, HIDDEN_SIZE, HIDDEN_SIZE)
+    let mm_qkv = intern(&mut types, &mut functions, &mut next_function, |types, id| {
+        matmul_function(types, id, PROMPT_TOKEN_COUNT, HIDDEN_SIZE, HEAD_DIM)
+    });
+    let mm_scores = intern(&mut types, &mut functions, &mut next_function, |types, id| {
+        matmul_function(types, id, PROMPT_TOKEN_COUNT, HEAD_DIM, PROMPT_TOKEN_COUNT)
+    });
+    let mm_ctx = intern(&mut types, &mut functions, &mut next_function, |types, id| {
+        matmul_function(types, id, PROMPT_TOKEN_COUNT, PROMPT_TOKEN_COUNT, HEAD_DIM)
+    });
+    let mm_out = intern(&mut types, &mut functions, &mut next_function, |types, id| {
+        matmul_function(types, id, PROMPT_TOKEN_COUNT, HEAD_DIM, HIDDEN_SIZE)
     });
     let mm_2560 = intern(&mut types, &mut functions, &mut next_function, |types, id| {
         matmul_function(types, id, PROMPT_TOKEN_COUNT, HIDDEN_SIZE, FFN_SIZE)
     });
     let mm_down = intern(&mut types, &mut functions, &mut next_function, |types, id| {
         matmul_function(types, id, PROMPT_TOKEN_COUNT, FFN_SIZE, HIDDEN_SIZE)
-    });
-    let mm_scores = intern(&mut types, &mut functions, &mut next_function, |types, id| {
-        matmul_function(types, id, PROMPT_TOKEN_COUNT, HIDDEN_SIZE, PROMPT_TOKEN_COUNT)
-    });
-    let mm_ctx = intern(&mut types, &mut functions, &mut next_function, |types, id| {
-        matmul_function(types, id, PROMPT_TOKEN_COUNT, PROMPT_TOKEN_COUNT, HIDDEN_SIZE)
     });
     let mm_tied = intern(&mut types, &mut functions, &mut next_function, |types, id| {
         matmul_function(types, id, PROMPT_TOKEN_COUNT, HIDDEN_SIZE, VOCAB_SIZE)
@@ -1030,6 +1175,12 @@ fn build_prefill_program() -> Result<PrefillProgramArtifact, Vec<Diagnostic>> {
     });
     let swiglu_exp = intern(&mut types, &mut functions, &mut next_function, |types, id| {
         elementwise_unary_function(types, id, &[PROMPT_TOKEN_COUNT, FFN_SIZE], ElementwiseUnary::Exp)
+    });
+    // The device K/V f16 rounding unary (the GI3-1 amendment — the
+    // comparator's `kv_f16_round` register rounding, applied post-RoPE to K
+    // and directly to V; Q stays f32 per the oracle).
+    let f16_round_fn = intern(&mut types, &mut functions, &mut next_function, |types, id| {
+        elementwise_unary_function(types, id, &[PROMPT_TOKEN_COUNT, HEAD_DIM], ElementwiseUnary::F16Round)
     });
     let swiglu_add1 = intern(&mut types, &mut functions, &mut next_function, |types, id| {
         elementwise_scalar_function(
@@ -1106,44 +1257,73 @@ fn build_prefill_program() -> Result<PrefillProgramArtifact, Vec<Diagnostic>> {
     let mut assembler = KernelAssembler::new();
     assembler.register_input("token_embd.weight");
     assembler.register_input("prompt_tokens");
-    for il in 0..32usize {
-        for base in [
-            "attn_norm.weight",
-            "attn_q.weight",
-            "attn_k.weight",
-            "attn_v.weight",
-            "attn_output.weight",
-            "ffn_norm.weight",
-            "ffn_gate.weight",
-            "ffn_up.weight",
-            "ffn_down.weight",
-        ] {
-            assembler.register_input(&format!("blk.{il}.{base}"));
+    for il in 0..LAYER_COUNT as usize {
+        assembler.register_input(&format!("blk.{il}.attn_norm.weight"));
+        for hq in 0..HEAD_COUNT as usize {
+            assembler.register_input(&format!("blk.{il}.attn_q.h{hq}.weight"));
+            assembler.register_input(&format!("blk.{il}.attn_output.h{hq}.weight"));
         }
+        for g in 0..KV_HEAD_COUNT as usize {
+            assembler.register_input(&format!("blk.{il}.attn_k.g{g}.weight"));
+            assembler.register_input(&format!("blk.{il}.attn_v.g{g}.weight"));
+        }
+        assembler.register_input(&format!("blk.{il}.ffn_norm.weight"));
+        assembler.register_input(&format!("blk.{il}.ffn_gate.weight"));
+        assembler.register_input(&format!("blk.{il}.ffn_up.weight"));
+        assembler.register_input(&format!("blk.{il}.ffn_down.weight"));
     }
     assembler.register_input("output_norm.weight");
 
-    // The kernel graph follows the CPU oracle's forward path exactly.
+    // The kernel graph follows the CPU oracle's forward path exactly: the
+    // per-head attention fan-out (each query head's score row is scaled and
+    // softmaxed independently — the oracle's `attention_gqa` softmaxes per
+    // query head — then the 15 head outputs fold back into the `[9, 960]`
+    // context).
     let mut h = push_gather_kernel(&mut assembler, &mir, &validation, gather_fn)?;
-    for il in 0..32usize {
+    for il in 0..LAYER_COUNT as usize {
         let entry = |base: &str| format!("prefill_blk_{il}_{base}");
         let attn_norm_w = assembler.input_facts(&format!("blk.{il}.attn_norm.weight"));
         let a = push_rms_norm_kernel(&mut assembler, &mir, &validation, rms_norm_fn, h.clone(), attn_norm_w, &format!("prefill.blk{il}.a"), &entry("attn_norm"))?;
-        let attn_q_w = assembler.input_facts(&format!("blk.{il}.attn_q.weight"));
-        let q = push_matmul_kernel(&mut assembler, &mir, &validation, mm_960, a.clone(), attn_q_w, &format!("prefill.blk{il}.q"), &entry("attn_q"))?;
-        let attn_k_w = assembler.input_facts(&format!("blk.{il}.attn_k.weight"));
-        let k = push_matmul_kernel(&mut assembler, &mir, &validation, mm_960, a.clone(), attn_k_w, &format!("prefill.blk{il}.k_exp"), &entry("attn_k"))?;
-        let attn_v_w = assembler.input_facts(&format!("blk.{il}.attn_v.weight"));
-        let v = push_matmul_kernel(&mut assembler, &mir, &validation, mm_960, a, attn_v_w, &format!("prefill.blk{il}.v_exp"), &entry("attn_v"))?;
-        let qr = push_rope_kernel(&mut assembler, &mir, &validation, rope_fn, q, &format!("prefill.blk{il}.qr"), &entry("rope_q"))?;
-        let kr = push_rope_kernel(&mut assembler, &mir, &validation, rope_fn, k, &format!("prefill.blk{il}.kr"), &entry("rope_k"))?;
-        let kr_t = push_transpose_kernel(&mut assembler, &mir, &validation, transpose_k_fn, kr, &format!("prefill.blk{il}.kr_t"), &entry("transpose_k"))?;
-        let scores = push_matmul_kernel(&mut assembler, &mir, &validation, mm_scores, qr, kr_t, &format!("prefill.blk{il}.scores"), &entry("scores"))?;
-        let scaled = push_elementwise_scalar_kernel(&mut assembler, &mir, &validation, scale_scores, scores, &format!("prefill.blk{il}.scores_scaled"), &entry("scale_scores"))?;
-        let probs = push_causal_softmax_kernel(&mut assembler, &mir, &validation, causal_fn, scaled, &format!("prefill.blk{il}.probs"), &entry("causal_softmax"))?;
-        let ctx = push_matmul_kernel(&mut assembler, &mir, &validation, mm_ctx, probs, v, &format!("prefill.blk{il}.ctx"), &entry("context"))?;
-        let attn_out_w = assembler.input_facts(&format!("blk.{il}.attn_output.weight"));
-        let o = push_matmul_kernel(&mut assembler, &mir, &validation, mm_960, ctx, attn_out_w, &format!("prefill.blk{il}.o"), &entry("attn_output"))?;
+        // Per-query-head Q projections + per-position RoPE (Q stays f32).
+        let mut q_rot = Vec::with_capacity(HEAD_COUNT as usize);
+        for hq in 0..HEAD_COUNT as usize {
+            let attn_q_w = assembler.input_facts(&format!("blk.{il}.attn_q.h{hq}.weight"));
+            let q = push_matmul_kernel(&mut assembler, &mir, &validation, mm_qkv, a.clone(), attn_q_w, &format!("prefill.blk{il}.q{hq}"), &entry(&format!("attn_q_h{hq}")))?;
+            q_rot.push(push_rope_kernel(&mut assembler, &mir, &validation, rope_fn, q, &format!("prefill.blk{il}.qr{hq}"), &entry(&format!("rope_q_h{hq}")))?);
+        }
+        // Per-KV-head K/V projections; K gets RoPE then the f16 register
+        // rounding (the GI3-1 amendment — the comparator's `kv_f16_round`,
+        // K after RoPE, V directly) then transposes; V gets the rounding
+        // directly.
+        let mut k_t = Vec::with_capacity(KV_HEAD_COUNT as usize);
+        let mut v_h16 = Vec::with_capacity(KV_HEAD_COUNT as usize);
+        for g in 0..KV_HEAD_COUNT as usize {
+            let attn_k_w = assembler.input_facts(&format!("blk.{il}.attn_k.g{g}.weight"));
+            let kk = push_matmul_kernel(&mut assembler, &mir, &validation, mm_qkv, a.clone(), attn_k_w, &format!("prefill.blk{il}.k{g}"), &entry(&format!("attn_k_g{g}")))?;
+            let kr = push_rope_kernel(&mut assembler, &mir, &validation, rope_fn, kk, &format!("prefill.blk{il}.kr{g}"), &entry(&format!("rope_k_g{g}")))?;
+            let kr_h16 = push_elementwise_scalar_kernel(&mut assembler, &mir, &validation, f16_round_fn, kr, &format!("prefill.blk{il}.kr{g}_h16"), &entry(&format!("kv_f16_round_k_g{g}")))?;
+            k_t.push(push_transpose_kernel(&mut assembler, &mir, &validation, transpose_k_fn, kr_h16, &format!("prefill.blk{il}.kt{g}"), &entry(&format!("transpose_k_g{g}")))?);
+            let attn_v_w = assembler.input_facts(&format!("blk.{il}.attn_v.g{g}.weight"));
+            let vv = push_matmul_kernel(&mut assembler, &mir, &validation, mm_qkv, a.clone(), attn_v_w, &format!("prefill.blk{il}.v{g}"), &entry(&format!("attn_v_g{g}")))?;
+            v_h16.push(push_elementwise_scalar_kernel(&mut assembler, &mir, &validation, f16_round_fn, vv, &format!("prefill.blk{il}.v{g}_h16"), &entry(&format!("kv_f16_round_v_g{g}")))?);
+        }
+        // Per-query-head causal attention + output projection; fold the 15
+        // head outputs into the `[9, 960]` context.
+        let mut o = None;
+        for (hq, qr) in q_rot.iter().enumerate() {
+            let g = hq / QUERY_HEADS_PER_KV as usize;
+            let scores = push_matmul_kernel(&mut assembler, &mir, &validation, mm_scores, qr.clone(), k_t[g].clone(), &format!("prefill.blk{il}.scores{hq}"), &entry(&format!("scores_h{hq}")))?;
+            let scaled = push_elementwise_scalar_kernel(&mut assembler, &mir, &validation, scale_scores, scores, &format!("prefill.blk{il}.scaled{hq}"), &entry(&format!("scale_scores_h{hq}")))?;
+            let probs = push_causal_softmax_kernel(&mut assembler, &mir, &validation, causal_fn, scaled, &format!("prefill.blk{il}.probs{hq}"), &entry(&format!("causal_softmax_h{hq}")))?;
+            let ctx = push_matmul_kernel(&mut assembler, &mir, &validation, mm_ctx, probs, v_h16[g].clone(), &format!("prefill.blk{il}.ctx{hq}"), &entry(&format!("context_h{hq}")))?;
+            let attn_out_w = assembler.input_facts(&format!("blk.{il}.attn_output.h{hq}.weight"));
+            let oh = push_matmul_kernel(&mut assembler, &mir, &validation, mm_out, ctx, attn_out_w, &format!("prefill.blk{il}.o{hq}"), &entry(&format!("attn_output_h{hq}")))?;
+            o = Some(match o {
+                None => oh,
+                Some(acc) => push_elementwise_binary_kernel(&mut assembler, &mir, &validation, residual_add, acc, oh, &format!("prefill.blk{il}.o"), &entry(&format!("sum_o_h{hq}")))?,
+            });
+        }
+        let o = o.expect("at least one query head");
         let h2 = push_elementwise_binary_kernel(&mut assembler, &mir, &validation, residual_add, h, o, &format!("prefill.blk{il}.h2"), &entry("residual_attn"))?;
         let ffn_norm_w = assembler.input_facts(&format!("blk.{il}.ffn_norm.weight"));
         let f = push_rms_norm_kernel(&mut assembler, &mir, &validation, rms_norm_fn, h2.clone(), ffn_norm_w, &format!("prefill.blk{il}.f"), &entry("ffn_norm"))?;
@@ -1402,9 +1582,9 @@ fn push_rope_kernel(
     )
 }
 
-/// The RoPE cos/sin table buffers (PerProgram inputs): each `dim/2` entries,
-/// in order `[cos, sin]` — the host-precomputed angle tables for the single
-/// position the kernel rotates at (see [`rope_tables`]).
+/// The RoPE cos/sin table buffers (PerProgram inputs): the rank-2
+/// `[rows, dim/2]` per-position tables, in order `[cos, sin]` — the
+/// host-precomputed angle tables each row rotates at (see [`rope_tables`]).
 fn rope_table_buffers(assembler: &mut KernelAssembler) -> (BufferFacts, BufferFacts) {
     let _ = assembler.register_input("prefill.rope.cos");
     let _ = assembler.register_input("prefill.rope.sin");
@@ -1663,22 +1843,21 @@ fn build_semantics(program: &DeviceProgram) -> DeviceSemantics {
 // Section assembly + the device run
 // ---------------------------------------------------------------------------
 
-/// The host-precomputed RoPE angle tables for one position over the pinned
-/// 960-wide row (`dim = 960`, table length 480). The tables are **periodic
-/// with the per-head 64-wide angle sequence**: the recipe rotates every
-/// consecutive pair of the row, and the pairs of head `h` (`h·32 + p`) read
-/// the head-local angle `theta[p] = pos · freq_base^(−2p/64)` — the same
-/// angles the CPU oracle's `rope_all_heads` applies per head.
-fn rope_tables(pos: u64, freq_base: f64) -> (Vec<f32>, Vec<f32>) {
-    let pairs = (HIDDEN_SIZE / 2) as usize;
-    let per_head_pairs = (HEAD_DIM / 2) as usize;
-    let mut cos = Vec::with_capacity(pairs);
-    let mut sin = Vec::with_capacity(pairs);
-    for pair in 0..pairs {
-        let local = (pair % per_head_pairs) as f64;
-        let theta = pos as f64 * freq_base.powf(-(2.0 * local) / HEAD_DIM as f64);
-        cos.push(theta.cos() as f32);
-        sin.push(theta.sin() as f32);
+/// The host-precomputed RoPE angle tables for **per-position** rotation over
+/// `dim`-wide rows (the per-head 64-wide activations). The tables are
+/// `[rows, dim/2]`: row `i` carries the angles for position `positions[i]`,
+/// `theta[p] = pos · freq_base^(−2p/dim)` — the same angles the CPU oracle's
+/// `rope_all_heads` applies per head.
+fn rope_tables(positions: &[u64], dim: u64, freq_base: f64) -> (Vec<f32>, Vec<f32>) {
+    let pairs = (dim / 2) as usize;
+    let mut cos = Vec::with_capacity(positions.len() * pairs);
+    let mut sin = Vec::with_capacity(positions.len() * pairs);
+    for &pos in positions {
+        for pair in 0..pairs {
+            let theta = pos as f64 * freq_base.powf(-(2.0 * pair as f64) / dim as f64);
+            cos.push(theta.cos() as f32);
+            sin.push(theta.sin() as f32);
+        }
     }
     (cos, sin)
 }
@@ -1707,7 +1886,7 @@ fn build_prefill_section(
         })?;
     let mut inputs = weights.declared_inputs();
     inputs.insert("prompt_tokens".to_owned(), prompt_ids_values());
-    let (cos, sin) = rope_tables(8, 100_000.0);
+    let (cos, sin) = rope_tables(&[0, 1, 2, 3, 4, 5, 6, 7, 8], HEAD_DIM, 100_000.0);
     inputs.insert("prefill.rope.cos".to_owned(), cos);
     inputs.insert("prefill.rope.sin".to_owned(), sin);
     let selection = match backend {
@@ -1815,11 +1994,11 @@ fn shape_class() -> String {
 
 /// The S6 representation + algorithm facts of the declared f32 repack.
 fn representation() -> String {
-    "declared f32 conversion (GI2-1 dequant semantics; quantized tensors f16-rounded per the pinned comparator's Metal register arithmetic; attn_k/attn_v group-expanded to [960,960]; never direct GGUF quantized execution)".to_owned()
+    "declared f32 conversion (GI2-1 dequant semantics; quantized tensors f16-rounded per the pinned comparator's Metal register arithmetic; K-major weights transposed to the device matmul row-major layout — attention weights split per head (q/o into the 15 query heads, k/v into the 5 KV heads) so the per-head attention softmax is expressible on the recipe surface; never direct GGUF quantized execution)".to_owned()
 }
 
 fn algorithm() -> String {
-    "Gather / RmsNormalization / Rope (single-position, periodic per-head tables) / CausalMaskedSoftmax / declared-f32 TiledMatMul / SiLU elementwise composition".to_owned()
+    "Gather / RmsNormalization / Rope (per-position, periodic per-head tables) / CausalMaskedSoftmax / declared-f32 TiledMatMul / SiLU elementwise composition / device K/V f16 rounding (kv_f16_round)".to_owned()
 }
 
 /// The workspace facts of the executed program.
@@ -1920,7 +2099,7 @@ pub(crate) fn run_prefill_device_route(
     };
     let mut evidence = evidence_dir.to_path_buf();
     evidence.push("gi3-prefill-comparison.json");
-    let record = comparison_record_json(&outcome, &model_path);
+    let record = comparison_record_json(&outcome, model_path);
     std::fs::write(&evidence, record).map_err(|error| {
         vec![Diagnostic::error(format!(
             "prefill device run: cannot write the comparison record `{}`: {error}",

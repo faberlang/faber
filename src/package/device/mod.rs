@@ -132,7 +132,7 @@ pub(crate) use program::device_program_for_lowered;
 // The Q1-default prefill device-run driver (GI3-5). The burgus Metal device
 // run is the gated consumer step (env-gated integration test); the lib build
 // keeps the seam for the route + tests.
-#[allow(dead_code)]
+#[allow(dead_code, unused_imports)] // seam kept for the gated device-run consumer
 pub(crate) use prefill_run::run_prefill_device_route;
 pub(crate) use run::execute_device_route;
 pub(crate) use section::{artifact_for_backend, descriptor_for_backend};
