@@ -1,6 +1,7 @@
 //! Package-local namespace-call linking and rewrite passes.
 
 use super::*;
+use radix::hir::visit::{HirVisitorMut, walk_expr_mut};
 
 struct PackageMirLinkAccumulator {
     targets: NamespaceCallTargets,
@@ -569,6 +570,12 @@ pub(super) fn rewrite_analysis_namespace_calls(
     data_member_targets: &NamespaceDataMemberTargets,
     namespaces: &NamespaceExports,
 ) -> Result<(), Vec<Diagnostic>> {
+    // S1 U2 VALUE members (operator ruling O1): namespace enum-variant value
+    // references (`module.VARIANT`) rewrite to the consumer variant `Path`
+    // before lowering, riding the nominal remap. The consumer analysis
+    // registered the imported enum variants (with their consumer defs) when
+    // it installed the file interface.
+    rewrite_namespace_variant_members(analysis);
     let mut diagnostics = Vec::new();
     if let Some(entry) = &mut analysis.hir.entry {
         rewrite_block(
@@ -1150,6 +1157,52 @@ pub(super) fn namespace_receiver_path(
         }
         _ => None,
     }
+}
+
+/// Rewrite namespace enum-variant value references (`module.VARIANT`) into
+/// `Path(consumer variant def)` before lowering (codex-gap S1 U2, operator
+/// ruling O1 VALUE members).
+///
+/// The entry's HIR carries `Field(Path(namespace), variant)` for variant
+/// value references (the resolve/lower path only special-cases enum variants
+/// reached through a local enum identifier). The consumer analysis registered
+/// the imported enum's variants — with their consumer `DefId`s — when it
+/// installed the module's file interface, so the rewrite resolves the variant
+/// through the analysis resolver and lowers through the entry's variant
+/// aggregate seam.
+fn rewrite_namespace_variant_members(analysis: &mut radix::driver::AnalyzedUnit) {
+    struct VariantMemberRewriter<'a> {
+        resolver: &'a Resolver,
+    }
+
+    impl HirVisitorMut for VariantMemberRewriter<'_> {
+        fn visit_expr_mut(&mut self, expr: &mut HirExpression) {
+            if let HirExpressionKind::Field(object, field) = &expr.kind {
+                if let HirExpressionKind::Path(namespace_def) = &object.kind {
+                    if let Some(namespace) = self
+                        .resolver
+                        .get_symbol(*namespace_def)
+                        .map(|symbol| symbol.name)
+                    {
+                        if let Some((variant_def, _ty)) =
+                            self.resolver.namespace_file_variant(namespace, *field)
+                        {
+                            // The typechecker already assigned the variant's
+                            // value type (`Type::Enum(consumer enum def)`) to
+                            // the field expression; `lower_path` needs that
+                            // type to construct the consumer variant, so the
+                            // rewritten path keeps the expression's type.
+                            expr.kind = HirExpressionKind::Path(variant_def);
+                        }
+                    }
+                }
+            }
+            walk_expr_mut(self, expr);
+        }
+    }
+
+    let mut rewriter = VariantMemberRewriter { resolver: &analysis.resolver };
+    rewriter.visit_program_mut(&mut analysis.hir);
 }
 
 pub(super) fn rewrite_call_args(

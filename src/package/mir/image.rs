@@ -2,6 +2,151 @@
 
 use super::*;
 
+/// Struct/variant validation metadata carried by in-memory package FMIR
+/// images (codex-gap S1 U2 VALUE members).
+///
+/// The source-built run path re-validates the merged program inside
+/// [`run_fmir_package_image`] with a fresh [`radix::mir::MirValidationContext`].
+/// Enum-variant constructs require the merged variant surface (parent
+/// metadata, variant lists, variant field types) to validate — an empty
+/// context errors with "enum variant is missing parent metadata". The image
+/// therefore carries the maps the merge proved; the decoded-artifact routes
+/// (fmir / fmir-text wire formats) do not serialize this section and keep the
+/// previous empty-metadata behavior for those images.
+#[derive(Debug, Clone, Default)]
+pub(super) struct FmirValidationMetadata {
+    pub struct_fields: HashMap<DefId, HashMap<Symbol, MirType>>,
+    pub struct_type_params: HashMap<DefId, Vec<Symbol>>,
+    pub enum_type_params: HashMap<DefId, Vec<Symbol>>,
+    pub optional_struct_fields: HashMap<DefId, HashSet<Symbol>>,
+    pub nullable_struct_fields: HashMap<DefId, HashSet<Symbol>>,
+    pub opaque_structs: HashSet<DefId>,
+    pub json_struct_field_keys: HashMap<DefId, HashMap<Symbol, String>>,
+    pub variant_parents: HashMap<DefId, DefId>,
+    pub enum_variants: HashMap<DefId, Vec<DefId>>,
+    pub variant_positions: HashMap<DefId, usize>,
+    pub variant_fields: HashMap<DefId, HashMap<Symbol, MirType>>,
+}
+
+/// Snapshot the merged program's struct/variant validation surface from a
+/// validated context (defs are stable across the merged type table).
+fn snapshot_validation_metadata(
+    validation: &radix::mir::MirValidationContext<'_>,
+) -> FmirValidationMetadata {
+    FmirValidationMetadata {
+        struct_fields: validation
+            .struct_fields
+            .iter()
+            .map(|(def, fields)| (*def, fields.iter().map(|(name, ty)| (*name, *ty)).collect()))
+            .collect(),
+        struct_type_params: validation
+            .struct_type_params
+            .iter()
+            .map(|(def, params)| (*def, params.clone()))
+            .collect(),
+        enum_type_params: validation
+            .enum_type_params
+            .iter()
+            .map(|(def, params)| (*def, params.clone()))
+            .collect(),
+        optional_struct_fields: validation
+            .optional_struct_fields
+            .iter()
+            .map(|(def, fields)| (*def, fields.iter().copied().collect()))
+            .collect(),
+        nullable_struct_fields: validation
+            .nullable_struct_fields
+            .iter()
+            .map(|(def, fields)| (*def, fields.iter().copied().collect()))
+            .collect(),
+        opaque_structs: validation.opaque_structs.iter().copied().collect(),
+        json_struct_field_keys: validation
+            .json_struct_field_keys
+            .iter()
+            .map(|(def, keys)| (*def, keys.iter().map(|(key, value)| (*key, value.clone())).collect()))
+            .collect(),
+        variant_parents: validation
+            .variant_parents
+            .iter()
+            .map(|(variant, parent)| (*variant, *parent))
+            .collect(),
+        enum_variants: validation
+            .enum_variants
+            .iter()
+            .map(|(enum_def, variants)| (*enum_def, variants.clone()))
+            .collect(),
+        variant_positions: validation
+            .variant_positions
+            .iter()
+            .map(|(variant, position)| (*variant, *position))
+            .collect(),
+        variant_fields: validation
+            .variant_fields
+            .iter()
+            .map(|(def, fields)| (*def, fields.iter().map(|(name, ty)| (*name, *ty)).collect()))
+            .collect(),
+    }
+}
+
+/// Apply carried struct/variant metadata to a freshly built validation
+/// context before re-validating the merged program.
+fn apply_validation_metadata(
+    context: &mut radix::mir::MirValidationContext<'_>,
+    metadata: &FmirValidationMetadata,
+) {
+    context.struct_fields = metadata
+        .struct_fields
+        .iter()
+        .map(|(def, fields)| (*def, fields.iter().map(|(name, ty)| (*name, *ty)).collect()))
+        .collect();
+    context.struct_type_params = metadata
+        .struct_type_params
+        .iter()
+        .map(|(def, params)| (*def, params.clone()))
+        .collect();
+    context.enum_type_params = metadata
+        .enum_type_params
+        .iter()
+        .map(|(def, params)| (*def, params.clone()))
+        .collect();
+    context.optional_struct_fields = metadata
+        .optional_struct_fields
+        .iter()
+        .map(|(def, fields)| (*def, fields.iter().copied().collect()))
+        .collect();
+    context.nullable_struct_fields = metadata
+        .nullable_struct_fields
+        .iter()
+        .map(|(def, fields)| (*def, fields.iter().copied().collect()))
+        .collect();
+    context.opaque_structs = metadata.opaque_structs.iter().copied().collect();
+    context.json_struct_field_keys = metadata
+        .json_struct_field_keys
+        .iter()
+        .map(|(def, keys)| (*def, keys.iter().map(|(key, value)| (*key, value.clone())).collect()))
+        .collect();
+    context.variant_parents = metadata
+        .variant_parents
+        .iter()
+        .map(|(variant, parent)| (*variant, *parent))
+        .collect();
+    context.enum_variants = metadata
+        .enum_variants
+        .iter()
+        .map(|(enum_def, variants)| (*enum_def, variants.clone()))
+        .collect();
+    context.variant_positions = metadata
+        .variant_positions
+        .iter()
+        .map(|(variant, position)| (*variant, *position))
+        .collect();
+    context.variant_fields = metadata
+        .variant_fields
+        .iter()
+        .map(|(def, fields)| (*def, fields.iter().map(|(name, ty)| (*name, *ty)).collect()))
+        .collect();
+}
+
 /// Construct the packaged device section for a prepared package, when the
 /// package declares a `[device]` surface (S1-6): the device-program
 /// constructor scans the lowered MIR for `@ nucleum` compute kernels, emits
@@ -229,6 +374,7 @@ pub(super) fn fmir_package_image_from_lowered(
         program: lowered.program.clone(),
         device,
         source_hashes,
+        validation: snapshot_validation_metadata(lowered.validated.validation()),
     })
 }
 
@@ -259,6 +405,7 @@ pub(super) fn run_fmir_package_image<H: Host + ?Sized>(
     )?;
     let mut validation = radix::mir::MirValidationContext::new(&types);
     validation.interner = Some(&interner);
+    apply_validation_metadata(&mut validation, &image.validation);
     let validated =
         radix::mir::ValidatedMir::new(image.program.clone(), validation).map_err(|errors| {
             errors
@@ -568,6 +715,7 @@ where
         program,
         device,
         source_hashes,
+        validation: FmirValidationMetadata::default(),
     })
 }
 

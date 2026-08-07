@@ -1,6 +1,7 @@
 //! Plan package CLI dispatch: root entry, argument parsing, and subcommands.
 
 use super::*;
+use radix::driver::AnalyzedUnit;
 
 pub(super) fn plan_cli_package(
     package: &mut AnalyzedPackage,
@@ -804,20 +805,131 @@ pub(super) fn import_semantic_type(
     ty: TypeId,
     imported: &mut HashMap<TypeId, TypeId>,
 ) -> TypeId {
+    import_semantic_type_with_nominal(source, target, ty, imported, None)
+}
+
+/// Context for mapping source-analysis nominal `DefId`s through the canonical
+/// module-qualified nominal-identity key into the entry analysis (codex-gap
+/// S1 U2 nominal identity).
+///
+/// The same nominal referenced from a library analysis (`Type::Struct(lib
+/// def)`) and from the consumer analysis (`Type::Struct(consumer def)`) must
+/// unify to ONE semantic type in the merged package MIR program. `nominal_map`
+/// is the prebuilt source nominal def → unified entry `TypeId` mapping,
+/// computed from the source resolver + module identity against the entry's
+/// canonical imported-nominal table before lowering mutates the source.
+pub(super) struct NominalImportContext<'a> {
+    /// Source nominal `DefId` → unified entry `TypeId`.
+    pub nominal_map: &'a HashMap<DefId, TypeId>,
+}
+
+/// Build the canonical nominal remap for one source unit (sibling or linked
+/// library) into the entry analysis.
+///
+/// Every nominal type id in the source type table is resolved to its canonical
+/// key (kind + source module identity + export name) and looked up in the
+/// entry's canonical imported-nominal table. Nominal defs the entry does not
+/// know (genuinely entry-local types referenced from a sibling) are omitted —
+/// the import falls back to interning the source-local def as-is.
+pub(super) fn build_nominal_remap(
+    source_types: &TypeTable,
+    source_interner: &Interner,
+    source_resolver: &Resolver,
+    source_identity: Option<&InterfaceLibraryIdentity>,
+    entry: &AnalyzedUnit,
+) -> HashMap<DefId, TypeId> {
+    let mut map = HashMap::new();
+    let mut target_interner = entry.interner.clone();
+    for index in 0..source_types.type_count() {
+        let kind = match source_types.get(TypeId(index as u32)) {
+            Type::Struct(def_id) => Some((*def_id, InterfaceNominalKind::Struct)),
+            Type::Enum(def_id) => Some((*def_id, InterfaceNominalKind::Enum)),
+            Type::Interface(def_id) => Some((*def_id, InterfaceNominalKind::Interface)),
+            _ => None,
+        };
+        let Some((def_id, kind)) = kind else {
+            continue;
+        };
+        if map.contains_key(&def_id) {
+            continue;
+        }
+        let Some(symbol) = source_resolver.get_symbol(def_id) else {
+            continue;
+        };
+        let name = target_interner.intern(source_interner.resolve(symbol.name));
+        if let Some(entry_ty) =
+            entry
+                .resolver
+                .imported_nominal_type_by_identity(kind, source_identity, name)
+        {
+            map.insert(def_id, entry_ty);
+        }
+    }
+    map
+}
+
+/// Build the canonical enum-variant remap for one source unit into the entry
+/// analysis (codex-gap S1 U2 VALUE members): source variant `DefId` → consumer
+/// variant `DefId`.
+///
+/// Each source variant resolves through its parent enum (source resolver
+/// `variant_parents`) to the canonical enum key (Enum + source module
+/// identity + enum export name), which maps to the consumer enum `DefId`; the
+/// consumer variant then resolves by name through `variant_child`. Variants of
+/// enums the entry does not know are omitted — those program fragments keep
+/// their source-local defs (entry-local types referenced from a sibling).
+pub(super) fn build_variant_remap(
+    source_interner: &Interner,
+    source_resolver: &Resolver,
+    source_identity: Option<&InterfaceLibraryIdentity>,
+    entry: &AnalyzedUnit,
+) -> HashMap<DefId, DefId> {
+    let mut map = HashMap::new();
+    let mut target_interner = entry.interner.clone();
+    for (variant_def, enum_def) in source_resolver.variant_parents_all() {
+        let Some(enum_symbol) = source_resolver.get_symbol(enum_def) else {
+            continue;
+        };
+        let enum_name = target_interner.intern(source_interner.resolve(enum_symbol.name));
+        let Some(entry_enum_def) = entry.resolver.imported_nominal_def_id(
+            InterfaceNominalKind::Enum,
+            source_identity,
+            enum_name,
+        ) else {
+            continue;
+        };
+        let Some(variant_symbol) = source_resolver.get_symbol(variant_def) else {
+            continue;
+        };
+        let variant_name = target_interner.intern(source_interner.resolve(variant_symbol.name));
+        if let Some(entry_variant_def) = entry.resolver.variant_child(entry_enum_def, variant_name) {
+            map.insert(variant_def, entry_variant_def);
+        }
+    }
+    map
+}
+
+pub(super) fn import_semantic_type_with_nominal(
+    source: &TypeTable,
+    target: &mut TypeTable,
+    ty: TypeId,
+    imported: &mut HashMap<TypeId, TypeId>,
+    nominal: Option<&NominalImportContext<'_>>,
+) -> TypeId {
     if let Some(existing) = imported.get(&ty).copied() {
         return existing;
     }
     let imported_ty = match source.get(ty).clone() {
         Type::Primitive(primitive) => target.primitive(primitive),
         Type::Array(inner) => {
-            let inner = import_semantic_type(source, target, inner, imported);
+            let inner = import_semantic_type_with_nominal(source, target, inner, imported, nominal);
             target
                 .find_array(inner)
                 .unwrap_or_else(|| target.array(inner))
         }
         Type::Map(key, value) => {
-            let key = import_semantic_type(source, target, key, imported);
-            let value = import_semantic_type(source, target, value, imported);
+            let key = import_semantic_type_with_nominal(source, target, key, imported, nominal);
+            let value = import_semantic_type_with_nominal(source, target, value, imported, nominal);
             target.map(key, value)
         }
         Type::Record(fields) => {
@@ -826,119 +938,134 @@ pub(super) fn import_semantic_type(
                 .map(|(name, field_ty)| {
                     (
                         name,
-                        import_semantic_type(source, target, field_ty, imported),
+                        import_semantic_type_with_nominal(source, target, field_ty, imported, nominal),
                     )
                 })
                 .collect();
             target.intern(Type::Record(fields))
         }
         Type::Set(inner) => {
-            let inner = import_semantic_type(source, target, inner, imported);
+            let inner = import_semantic_type_with_nominal(source, target, inner, imported, nominal);
             target.set(inner)
         }
         Type::Promissum(inner) => {
-            let inner = import_semantic_type(source, target, inner, imported);
+            let inner = import_semantic_type_with_nominal(source, target, inner, imported, nominal);
             target.promissum(inner)
         }
         Type::PromissumFailable(success, alternate) => {
-            let success = import_semantic_type(source, target, success, imported);
-            let alternate = import_semantic_type(source, target, alternate, imported);
+            let success = import_semantic_type_with_nominal(source, target, success, imported, nominal);
+            let alternate = import_semantic_type_with_nominal(source, target, alternate, imported, nominal);
             target.promissum_failable(success, alternate)
         }
         Type::Cursor(inner) => {
-            let inner = import_semantic_type(source, target, inner, imported);
+            let inner = import_semantic_type_with_nominal(source, target, inner, imported, nominal);
             target.cursor(inner)
         }
         Type::AsyncCursor(item, alternate) => {
-            let item = import_semantic_type(source, target, item, imported);
-            let alternate = import_semantic_type(source, target, alternate, imported);
+            let item = import_semantic_type_with_nominal(source, target, item, imported, nominal);
+            let alternate = import_semantic_type_with_nominal(source, target, alternate, imported, nominal);
             target.async_cursor(item, alternate)
         }
         Type::Tensor(inner, shape) => {
-            let inner = import_semantic_type(source, target, inner, imported);
+            let inner = import_semantic_type_with_nominal(source, target, inner, imported, nominal);
             let shape = import_index_expr(source, target, shape);
             target.tensor_with_shape(inner, shape)
         }
         Type::Vector(inner, width) => {
-            let inner = import_semantic_type(source, target, inner, imported);
+            let inner = import_semantic_type_with_nominal(source, target, inner, imported, nominal);
             let width = import_index_expr(source, target, width);
             target.vector_with_width(inner, width)
         }
         Type::Matrix(inner, shape) => {
-            let inner = import_semantic_type(source, target, inner, imported);
+            let inner = import_semantic_type_with_nominal(source, target, inner, imported, nominal);
             let shape = import_index_expr(source, target, shape);
             target.matrix_with_shape(inner, shape)
         }
         Type::Sparsa(inner, shape) => {
-            let inner = import_semantic_type(source, target, inner, imported);
+            let inner = import_semantic_type_with_nominal(source, target, inner, imported, nominal);
             let shape = import_index_expr(source, target, shape);
             target.sparsa_with_shape(inner, shape)
         }
         Type::Atomic(inner) => {
-            let inner = import_semantic_type(source, target, inner, imported);
+            let inner = import_semantic_type_with_nominal(source, target, inner, imported, nominal);
             target.atomic(inner)
         }
         Type::Intervallum(inner) => {
-            let inner = import_semantic_type(source, target, inner, imported);
+            let inner = import_semantic_type_with_nominal(source, target, inner, imported, nominal);
             target.intern(Type::Intervallum(inner))
         }
         Type::SizedNumeric(primitive, width) => target.sized_numeric(primitive, width),
         Type::ModularWord(width) => target.intern(Type::ModularWord(width)),
         Type::SizedInstans(precision) => target.intern(Type::SizedInstans(precision)),
         Type::Option(inner) => {
-            let inner = import_semantic_type(source, target, inner, imported);
+            let inner = import_semantic_type_with_nominal(source, target, inner, imported, nominal);
             target.option(inner)
         }
         Type::Ref(mutability, inner) => {
-            let inner = import_semantic_type(source, target, inner, imported);
+            let inner = import_semantic_type_with_nominal(source, target, inner, imported, nominal);
             target.reference(mutability, inner)
         }
         Type::Alias(def_id, inner) => {
-            let inner = import_semantic_type(source, target, inner, imported);
+            let inner = import_semantic_type_with_nominal(source, target, inner, imported, nominal);
             target.intern(Type::Alias(def_id, inner))
         }
         Type::Func(mut sig) => {
             for param in &mut sig.params {
-                param.ty = import_semantic_type(source, target, param.ty, imported);
+                param.ty = import_semantic_type_with_nominal(source, target, param.ty, imported, nominal);
             }
-            sig.ret = import_semantic_type(source, target, sig.ret, imported);
+            sig.ret = import_semantic_type_with_nominal(source, target, sig.ret, imported, nominal);
             if let Some(error_ty) = sig.err {
-                sig.err = Some(import_semantic_type(source, target, error_ty, imported));
+                sig.err = Some(import_semantic_type_with_nominal(source, target, error_ty, imported, nominal));
             }
             target.function(sig)
         }
         Type::Applied(base, args) => {
-            let base = import_semantic_type(source, target, base, imported);
+            let base = import_semantic_type_with_nominal(source, target, base, imported, nominal);
             let args = args
                 .into_iter()
-                .map(|arg| import_semantic_type(source, target, arg, imported))
+                .map(|arg| import_semantic_type_with_nominal(source, target, arg, imported, nominal))
                 .collect();
             target.intern(Type::Applied(base, args))
         }
         Type::Union(members) => {
             let members = members
                 .into_iter()
-                .map(|member| import_semantic_type(source, target, member, imported))
+                .map(|member| import_semantic_type_with_nominal(source, target, member, imported, nominal))
                 .collect();
             target.intern(Type::Union(members))
         }
         Type::Tuple(members) => {
             let members = members
                 .into_iter()
-                .map(|member| import_semantic_type(source, target, member, imported))
+                .map(|member| import_semantic_type_with_nominal(source, target, member, imported, nominal))
                 .collect();
             target.intern(Type::Tuple(members))
         }
-        other @ (Type::Struct(_)
-        | Type::Enum(_)
-        | Type::Interface(_)
-        | Type::Param(_)
-        | Type::Infer(_)
-        | Type::InferUnion(_)
-        | Type::Error) => target.intern(other),
+        other @ (Type::Struct(_) | Type::Enum(_) | Type::Interface(_)) => {
+            import_nominal_by_canonical_key(&other, nominal).unwrap_or_else(|| target.intern(other))
+        }
+        other @ (Type::Param(_) | Type::Infer(_) | Type::InferUnion(_) | Type::Error) => target.intern(other),
     };
     imported.insert(ty, imported_ty);
     imported_ty
+}
+
+/// Map one source-analysis nominal through the canonical nominal-identity
+/// remap into the entry type table (codex-gap S1 U2).
+///
+/// Returns `None` when the source def has no canonical entry mapping — the
+/// caller falls back to interning the source-local def as-is (pre-U2
+/// behavior, preserved for genuinely entry-local nominal references).
+fn import_nominal_by_canonical_key(
+    ty: &Type,
+    nominal: Option<&NominalImportContext<'_>>,
+) -> Option<TypeId> {
+    let ctx = nominal?;
+    let def_id = match ty {
+        Type::Struct(def_id) | Type::Enum(def_id) | Type::Interface(def_id) => *def_id,
+        _ => return None,
+    };
+    ctx.nominal_map.get(&def_id).copied()
 }
 
 pub(super) fn import_index_expr(

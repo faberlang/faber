@@ -42,17 +42,36 @@ pub(super) fn lower_package_units<'a>(
     for unit in before.iter_mut().chain(after.iter_mut()) {
         let unit_path = unit.path.clone();
         let source_interner = unit.analysis.interner.clone();
+        // S1 U2 nominal identity: build the canonical nominal remap while the
+        // source analysis is freely borrowable (lowering mutates it below).
+        let nominal_map = build_nominal_remap(
+            &unit.analysis.types,
+            &unit.analysis.interner,
+            &unit.analysis.resolver,
+            unit.file_interface.identity.as_ref(),
+            &entry.analysis,
+        );
+        // S1 U2 VALUE members: variant definitions ride the same remap.
+        let variant_remap = build_variant_remap(
+            &unit.analysis.interner,
+            &unit.analysis.resolver,
+            unit.file_interface.identity.as_ref(),
+            &entry.analysis,
+        );
         let mut lowered = lower_unit(unit, &cli_plan.entry_records, no_fuse)?;
         remap_program_text_symbols(
             &mut lowered.program,
             &lowered.interner,
             &mut entry.analysis.interner,
         );
+        let nominal = NominalImportContext { nominal_map: &nominal_map };
         let source_to_entry_types = import_lowered_semantic_types(
             lowered.validated.validation().types,
             &mut entry.analysis.types,
+            Some(&nominal),
         );
         rewrite_lowered_type_ids(&mut lowered, &source_to_entry_types);
+        rewrite_lowered_variant_defs(&mut lowered, &variant_remap);
         if let Some(rewrite) = cli_plan
             .dispatch
             .as_ref()
@@ -90,7 +109,7 @@ pub(super) fn lower_package_units<'a>(
             &library.import,
             library_resolver,
             library_cache,
-            |analysis, _cache| {
+            |analysis, cache| {
                 if let Err(errors) = rewrite_analysis_namespace_calls(
                     &library.path,
                     analysis,
@@ -101,6 +120,31 @@ pub(super) fn lower_package_units<'a>(
                     diagnostics.extend(errors);
                     return Ok(());
                 }
+                // S1 U2 nominal identity: build the canonical nominal remap
+                // while the library analysis is freely borrowable (the entry
+                // registered the library's file interface under the same
+                // module identity during analysis).
+                let source_identity = library_cached_file_interface(
+                    &library.import,
+                    library_resolver,
+                    cache,
+                )
+                .ok()
+                .and_then(|interface| interface.identity);
+                let nominal_map = build_nominal_remap(
+                    &analysis.types,
+                    &analysis.interner,
+                    &analysis.resolver,
+                    source_identity.as_ref(),
+                    &entry.analysis,
+                );
+                // S1 U2 VALUE members: variant definitions ride the same remap.
+                let variant_remap = build_variant_remap(
+                    &analysis.interner,
+                    &analysis.resolver,
+                    source_identity.as_ref(),
+                    &entry.analysis,
+                );
                 let bundle = match radix::driver::prepare_air_backward_bundle(analysis) {
                     Ok(bundle) => bundle,
                     Err(err) => {
@@ -132,11 +176,14 @@ pub(super) fn lower_package_units<'a>(
                     &lowered.interner,
                     &mut entry.analysis.interner,
                 );
+                let nominal = NominalImportContext { nominal_map: &nominal_map };
                 let source_to_entry_types = import_lowered_semantic_types(
                     lowered.validated.validation().types,
                     &mut entry.analysis.types,
+                    Some(&nominal),
                 );
                 rewrite_lowered_type_ids(&mut lowered, &source_to_entry_types);
+                rewrite_lowered_variant_defs(&mut lowered, &variant_remap);
                 rewrite_program_sources(&mut lowered.program, &library.path, &source_rewrites);
                 extend_unmapped_library_sources(
                     &lowered.program,
@@ -230,19 +277,31 @@ fn inject_package_data_members(
             .iter()
             .chain(after.iter())
             .find(|unit| unit.path == member.source_path)
-            .map(|unit| (unit.analysis.interner.clone(), &unit.analysis.types))
+            .map(|unit| {
+                (
+                    unit.analysis.interner.clone(),
+                    &unit.analysis.types,
+                    &unit.analysis.resolver,
+                    unit.file_interface.identity.clone(),
+                )
+            })
             .or_else(|| {
-                links
+                let library = links
                     .libraries
                     .iter()
-                    .find(|library| library.path == member.source_path)
-                    .and_then(|library| {
-                        library_cached_analysis(&library.import, library_resolver, library_cache)
-                            .ok()
-                            .map(|analysis| (analysis.interner.clone(), &analysis.types))
-                    })
+                    .find(|library| library.path == member.source_path)?;
+                let identity = library_cached_file_interface(
+                    &library.import,
+                    library_resolver,
+                    library_cache,
+                )
+                .ok()
+                .and_then(|interface| interface.identity);
+                let analysis = library_cached_analysis(&library.import, library_resolver, library_cache)
+                    .ok()?;
+                Some((analysis.interner.clone(), &analysis.types, &analysis.resolver, identity))
             });
-        let Some((source_interner, source_types)) = source else {
+        let Some((source_interner, source_types, source_resolver, source_identity)) = source else {
             diagnostics.push(mir_issue_diag(
                 &entry_path,
                 "package_mir_data_member_unsupported",
@@ -257,6 +316,8 @@ fn inject_package_data_members(
             member,
             &source_interner,
             source_types,
+            source_resolver,
+            source_identity.as_ref(),
             entry,
         ) {
             Ok(item) => item,
@@ -285,15 +346,36 @@ fn transplant_data_member(
     member: &DataMemberLink,
     source_interner: &Interner,
     source_types: &TypeTable,
+    source_resolver: &Resolver,
+    source_identity: Option<&InterfaceLibraryIdentity>,
     entry: &mut AnalyzedPackageUnit,
 ) -> Result<HirItem, String> {
     let mut imported = HashMap::new();
+    // S1 U2 nominal identity: build the canonical nominal remap so const
+    // types/initializers referencing library nominals unify with the entry's
+    // semantic types (the linked source module's identity is the key).
+    let nominal_map = build_nominal_remap(
+        source_types,
+        source_interner,
+        source_resolver,
+        source_identity,
+        &entry.analysis,
+    );
+    let nominal = NominalImportContext { nominal_map: &nominal_map };
     let konst = HirConst {
         name: remap_symbol(member.konst.name, source_interner, &mut entry.analysis.interner),
         ty: member
             .konst
             .ty
-            .map(|ty| import_semantic_type(source_types, &mut entry.analysis.types, ty, &mut imported)),
+            .map(|ty| {
+                import_semantic_type_with_nominal(
+                    source_types,
+                    &mut entry.analysis.types,
+                    ty,
+                    &mut imported,
+                    Some(&nominal),
+                )
+            }),
         value: transplant_expr(
             &member.konst.value,
             source_interner,
@@ -301,6 +383,7 @@ fn transplant_data_member(
             &mut entry.analysis.interner,
             &mut entry.analysis.types,
             &mut imported,
+            Some(&nominal),
         )?,
         mutable: member.konst.mutable,
         is_await: member.konst.is_await,
@@ -333,10 +416,11 @@ fn transplant_expr(
     entry_interner: &mut Interner,
     entry_types: &mut TypeTable,
     imported: &mut HashMap<TypeId, TypeId>,
+    nominal: Option<&NominalImportContext<'_>>,
 ) -> Result<HirExpression, String> {
     let ty = expr
         .ty
-        .map(|ty| import_semantic_type(source_types, entry_types, ty, imported));
+        .map(|ty| import_semantic_type_with_nominal(source_types, entry_types, ty, imported, nominal));
     let kind = match &expr.kind {
         HirExpressionKind::Literal(literal) => {
             HirExpressionKind::Literal(transplant_literal(literal, source_interner, entry_interner))
@@ -344,22 +428,22 @@ fn transplant_expr(
         HirExpressionKind::Vacua => HirExpressionKind::Vacua,
         HirExpressionKind::Binary(op, lhs, rhs) => HirExpressionKind::Binary(
             *op,
-            Box::new(transplant_expr(lhs, source_interner, source_types, entry_interner, entry_types, imported)?),
-            Box::new(transplant_expr(rhs, source_interner, source_types, entry_interner, entry_types, imported)?),
+            Box::new(transplant_expr(lhs, source_interner, source_types, entry_interner, entry_types, imported, nominal)?),
+            Box::new(transplant_expr(rhs, source_interner, source_types, entry_interner, entry_types, imported, nominal)?),
         ),
         HirExpressionKind::Unary(op, inner) => HirExpressionKind::Unary(
             *op,
-            Box::new(transplant_expr(inner, source_interner, source_types, entry_interner, entry_types, imported)?),
+            Box::new(transplant_expr(inner, source_interner, source_types, entry_interner, entry_types, imported, nominal)?),
         ),
         HirExpressionKind::Array(elements) => {
             let mut transplanted = Vec::with_capacity(elements.len());
             for element in elements {
                 transplanted.push(match element {
                     radix::hir::HirArrayElement::Expr(element) => radix::hir::HirArrayElement::Expr(
-                        transplant_expr(element, source_interner, source_types, entry_interner, entry_types, imported)?,
+                        transplant_expr(element, source_interner, source_types, entry_interner, entry_types, imported, nominal)?,
                     ),
                     radix::hir::HirArrayElement::Spread(element) => radix::hir::HirArrayElement::Spread(
-                        transplant_expr(element, source_interner, source_types, entry_interner, entry_types, imported)?,
+                        transplant_expr(element, source_interner, source_types, entry_interner, entry_types, imported, nominal)?,
                     ),
                 });
             }
@@ -375,13 +459,14 @@ fn transplant_expr(
                     entry_interner,
                     entry_types,
                     imported,
+                    nominal,
                 )?);
             }
             let type_args = type_args
                 .as_ref()
                 .map(|args| {
                     args.iter()
-                        .map(|ty| import_semantic_type(source_types, entry_types, *ty, imported))
+                        .map(|ty| import_semantic_type_with_nominal(source_types, entry_types, *ty, imported, nominal))
                         .collect()
                 });
             HirExpressionKind::Tuple(transplanted, type_args)
@@ -396,6 +481,7 @@ fn transplant_expr(
                     entry_interner,
                     entry_types,
                     imported,
+                    nominal,
                 )?);
             }
             HirExpressionKind::Scriptum(
@@ -413,6 +499,7 @@ fn transplant_expr(
                     entry_interner,
                     entry_types,
                     imported,
+                    nominal,
                 )?);
             }
             HirExpressionKind::Scribe(*kind, transplanted)
@@ -490,12 +577,13 @@ pub(super) fn selected_cli_dispatch_function(
 pub(super) fn import_lowered_semantic_types(
     source: &TypeTable,
     target: &mut TypeTable,
+    nominal: Option<&NominalImportContext<'_>>,
 ) -> Vec<(TypeId, TypeId)> {
     let mut imported = HashMap::new();
     let mut rewrites = Vec::new();
     for index in 0..source.type_count() {
         let source_ty = TypeId(index as u32);
-        let target_ty = import_semantic_type(source, target, source_ty, &mut imported);
+        let target_ty = import_semantic_type_with_nominal(source, target, source_ty, &mut imported, nominal);
         push_type_rewrite(&mut rewrites, source_ty, target_ty);
     }
     rewrites
@@ -574,6 +662,200 @@ pub(super) fn rewrite_statement_type_id(
 
 pub(super) fn rewrite_value_type_id(value: &mut MirValue, rewrites: &[(TypeId, TypeId)]) {
     rewrite_type_id(&mut value.ty, rewrites);
+}
+
+/// Rewrite a lowered source program's enum-variant definitions to the
+/// consumer analysis's variant identities (codex-gap S1 U2 VALUE members).
+///
+/// A library unit constructs and projects its variants under its own variant
+/// `DefId`s; the merged program's variant metadata and the stepper's variant
+/// tags are keyed by the *consumer* variant defs, so every
+/// `EnumVariant`/`VariantField` reference in the lowered source program must
+/// ride the nominal remap. Variant defs without a consumer mapping keep their
+/// source-local value (entry-local types referenced from a sibling).
+pub(super) fn rewrite_lowered_variant_defs(
+    lowered: &mut LoweredMirUnit<'_>,
+    variant_remap: &HashMap<DefId, DefId>,
+) {
+    if variant_remap.is_empty() {
+        return;
+    }
+    for function in &mut lowered.program.functions {
+        for block in &mut function.blocks {
+            for statement in &mut block.statements {
+                rewrite_statement_variant_defs(statement, variant_remap);
+            }
+            rewrite_terminator_variant_defs(&mut block.terminator, variant_remap);
+        }
+    }
+}
+
+fn rewrite_statement_variant_defs(
+    statement: &mut MirStatement,
+    variant_remap: &HashMap<DefId, DefId>,
+) {
+    match &mut statement.kind {
+        MirStatementKind::Assign { value, .. } => {
+            rewrite_value_variant_defs(value, variant_remap);
+        }
+        MirStatementKind::Call { callee: _, args, .. } => {
+            for arg in args {
+                rewrite_operand_variant_defs(arg, variant_remap);
+            }
+        }
+        MirStatementKind::RuntimeCall { call, .. } => {
+            for arg in &mut call.args {
+                rewrite_operand_variant_defs(arg, variant_remap);
+            }
+        }
+        MirStatementKind::Construct { aggregate, .. } => {
+            if let MirAggregateKind::EnumVariant(def_id) = &mut aggregate.kind {
+                if let Some(rewritten) = variant_remap.get(def_id) {
+                    aggregate.kind = MirAggregateKind::EnumVariant(*rewritten);
+                }
+            }
+            rewrite_aggregate_variant_defs(aggregate, variant_remap);
+        }
+    }
+}
+
+fn rewrite_terminator_variant_defs(
+    terminator: &mut MirTerminator,
+    variant_remap: &HashMap<DefId, DefId>,
+) {
+    match &mut terminator.kind {
+        MirTerminatorKind::Return(Some(operand)) | MirTerminatorKind::ReturnError(operand) => {
+            rewrite_operand_variant_defs(operand, variant_remap);
+        }
+        MirTerminatorKind::TryCall {
+            callee: _, args, ..
+        } => {
+            for arg in args {
+                rewrite_operand_variant_defs(arg, variant_remap);
+            }
+        }
+        MirTerminatorKind::Branch { condition, .. } => {
+            rewrite_operand_variant_defs(condition, variant_remap);
+        }
+        MirTerminatorKind::Switch { value, .. } => {
+            rewrite_operand_variant_defs(value, variant_remap);
+        }
+        MirTerminatorKind::Return(None)
+        | MirTerminatorKind::Goto(_)
+        | MirTerminatorKind::Unreachable => {}
+    }
+}
+
+fn rewrite_value_variant_defs(value: &mut MirValue, variant_remap: &HashMap<DefId, DefId>) {
+    match &mut value.kind {
+        MirValueKind::Operand(operand) => rewrite_operand_variant_defs(operand, variant_remap),
+        MirValueKind::Closure(closure) => {
+            rewrite_operand_variant_defs(&mut closure.environment, variant_remap);
+        }
+        MirValueKind::Unary { operand, .. } => {
+            rewrite_operand_variant_defs(operand, variant_remap);
+        }
+        MirValueKind::Binary { lhs, rhs, .. } => {
+            rewrite_operand_variant_defs(lhs, variant_remap);
+            rewrite_operand_variant_defs(rhs, variant_remap);
+        }
+        MirValueKind::Option(op) => rewrite_option_variant_defs(op, variant_remap),
+    }
+}
+
+fn rewrite_operand_variant_defs(operand: &mut MirOperand, variant_remap: &HashMap<DefId, DefId>) {
+    if let MirOperand::Place(place) = operand {
+        rewrite_place_variant_defs(place, variant_remap);
+    }
+}
+
+fn rewrite_place_variant_defs(place: &mut MirPlace, variant_remap: &HashMap<DefId, DefId>) {
+    for projection in &mut place.projections {
+        match projection {
+            MirProjection::VariantField { variant, .. } => {
+                if let Some(rewritten) = variant_remap.get(variant) {
+                    *variant = *rewritten;
+                }
+            }
+            MirProjection::Index(operand) => {
+                rewrite_operand_variant_defs(operand, variant_remap);
+            }
+            MirProjection::Field(_)
+            | MirProjection::ClosureCapture { .. }
+            | MirProjection::VectorLane(_)
+            | MirProjection::MatrixCell { .. } => {}
+        }
+    }
+}
+
+fn rewrite_aggregate_variant_defs(
+    aggregate: &mut MirAggregate,
+    variant_remap: &HashMap<DefId, DefId>,
+) {
+    match &mut aggregate.fields {
+        MirAggregateFields::Ordered(items) => {
+            for item in items {
+                match item {
+                    MirAggregateItem::Operand(operand) | MirAggregateItem::Spread(operand) => {
+                        rewrite_operand_variant_defs(operand, variant_remap);
+                    }
+                }
+            }
+        }
+        MirAggregateFields::Named(items) => {
+            for item in items {
+                rewrite_operand_variant_defs(&mut item.value, variant_remap);
+            }
+        }
+        MirAggregateFields::Keyed(items) => {
+            for item in items {
+                rewrite_operand_variant_defs(&mut item.key, variant_remap);
+                rewrite_operand_variant_defs(&mut item.value, variant_remap);
+            }
+        }
+    }
+}
+
+fn rewrite_option_variant_defs(op: &mut MirOptionOp, variant_remap: &HashMap<DefId, DefId>) {
+    match op {
+        MirOptionOp::Some(operand)
+        | MirOptionOp::IsNil(operand)
+        | MirOptionOp::IsNotNil(operand)
+        | MirOptionOp::Unwrap { value: operand, .. } => {
+            rewrite_operand_variant_defs(operand, variant_remap);
+        }
+        MirOptionOp::Coalesce { value, fallback } => {
+            rewrite_operand_variant_defs(value, variant_remap);
+            rewrite_operand_variant_defs(fallback, variant_remap);
+        }
+        MirOptionOp::Chain { base, link } => {
+            rewrite_operand_variant_defs(base, variant_remap);
+            rewrite_option_chain_variant_defs(link, variant_remap);
+        }
+        MirOptionOp::None => {}
+    }
+}
+
+fn rewrite_option_chain_variant_defs(
+    link: &mut MirOptionChainLink,
+    variant_remap: &HashMap<DefId, DefId>,
+) {
+    match link {
+        MirOptionChainLink::VariantField { variant, .. } => {
+            if let Some(rewritten) = variant_remap.get(variant) {
+                *variant = *rewritten;
+            }
+        }
+        MirOptionChainLink::Index(operand) => {
+            rewrite_operand_variant_defs(operand, variant_remap);
+        }
+        MirOptionChainLink::Call { callee: _, args } => {
+            for arg in args {
+                rewrite_operand_variant_defs(arg, variant_remap);
+            }
+        }
+        MirOptionChainLink::Field(_) => {}
+    }
 }
 
 pub(super) fn install_cli_dispatch_entry(

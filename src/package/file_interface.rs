@@ -1,15 +1,14 @@
 use radix::diagnostics::{Diagnostic, DiagnosticPhase};
 use radix::driver::AnalyzedUnit;
 use radix::file_interface::{
-    snapshot_interface_callable_with_resolver, snapshot_interface_type_with_resolver, FileExport,
+    snapshot_interface_callable_with_identity, snapshot_interface_type_with_identity, FileExport,
     FileExportKind, FileInterface, FileInterfaceError, InterfaceAnnotationContract,
-    InterfaceAnnotationContractField, InterfaceLibraryIdentity, InterfaceMethodExport,
-    InterfaceNominalExport, InterfaceQualifiedIdentity, InterfaceStructExport,
-    InterfaceStructField,
+    InterfaceAnnotationContractField, InterfaceEnumVariant, InterfaceLibraryIdentity, InterfaceMethodExport,
+    InterfaceNominalExport, InterfaceQualifiedIdentity, InterfaceStructExport, InterfaceStructField,
 };
 use radix::hir::{
-    DefId, HirConst, HirFunction, HirInterface, HirInterfaceMethod, HirItemKind, HirParamMode,
-    HirStruct, HirTypeParamConstraint,
+    DefId, HirConst, HirEnum, HirFunction, HirInterface, HirInterfaceMethod, HirItemKind,
+    HirParamMode, HirStruct, HirTypeParamConstraint,
 };
 use radix::semantic::{FuncSig, ParamType, SemanticParamMode, Type, TypeParamConstraint};
 use std::collections::BTreeSet;
@@ -53,7 +52,7 @@ pub(crate) fn extract_callable_contracts(
                 return None;
             }
             Some(
-                snapshot_function(function, analysis, file_label).map(|callable| {
+                snapshot_function(function, analysis, file_label, None).map(|callable| {
                     AnalyzedCallableContract {
                         def_id: item.def_id,
                         span: item.span,
@@ -93,14 +92,15 @@ pub(crate) fn extract_file_interface_with_identity(
 
         let kind = match &item.kind {
             HirItemKind::Function(func) => {
-                FileExportKind::Function(snapshot_function(func, analysis, file_label)?)
+                FileExportKind::Function(snapshot_function(func, analysis, file_label, export_identity)?)
             }
             HirItemKind::TypeAlias(alias) => FileExportKind::TypeAlias(
-                snapshot_interface_type_with_resolver(
+                snapshot_interface_type_with_identity(
                     alias.ty,
                     &analysis.types,
                     &analysis.interner,
                     &analysis.resolver,
+                    export_identity.map(identity_for).as_ref(),
                 )
                 .map_err(|err| interface_error(file_label, &name, err))?,
             ),
@@ -112,15 +112,17 @@ pub(crate) fn extract_file_interface_with_identity(
                 item.def_id,
                 export_identity,
             )?),
-            HirItemKind::Enum(enm) => FileExportKind::Enum(InterfaceNominalExport {
-                name: analysis.interner.resolve(enm.name).to_owned(),
-                methods: Vec::new(),
-            }),
+            HirItemKind::Enum(enm) => FileExportKind::Enum(snapshot_enum(
+                enm,
+                analysis,
+                file_label,
+                export_identity,
+            )?),
             HirItemKind::Interface(interface_decl) => FileExportKind::Interface(
-                snapshot_interface(interface_decl, analysis, file_label, &name)?,
+                snapshot_interface(interface_decl, analysis, file_label, &name, export_identity)?,
             ),
             HirItemKind::Constant(konst) => {
-                FileExportKind::Const(snapshot_const(konst, analysis, file_label, &name)?)
+                FileExportKind::Const(snapshot_const(konst, analysis, file_label, &name, export_identity)?)
             }
             HirItemKind::Import(_) => continue,
         };
@@ -150,11 +152,12 @@ pub(crate) fn extract_file_interface_with_identity(
         let Type::Func(sig) = analysis.types.get(ty) else {
             continue;
         };
-        let callable = snapshot_interface_callable_with_resolver(
+        let callable = snapshot_interface_callable_with_identity(
             sig,
             &analysis.types,
             &analysis.interner,
             &analysis.resolver,
+            export_identity.map(identity_for).as_ref(),
         )
         .map_err(|err| interface_error(file_label, &name, err))?;
         interface.insert(FileExport {
@@ -171,6 +174,7 @@ fn snapshot_interface(
     analysis: &AnalyzedUnit,
     file_label: &str,
     name: &str,
+    export_identity: Option<&ExportIdentityContext>,
 ) -> Result<InterfaceNominalExport, Diagnostic> {
     let methods = interface
         .methods
@@ -178,7 +182,7 @@ fn snapshot_interface(
         .map(|method| {
             Ok(InterfaceMethodExport {
                 name: analysis.interner.resolve(method.name).to_owned(),
-                callable: snapshot_interface_method(method, analysis, file_label, name)?,
+                callable: snapshot_interface_method(method, analysis, file_label, name, export_identity)?,
             })
         })
         .collect::<Result<Vec<_>, Diagnostic>>()?;
@@ -186,7 +190,67 @@ fn snapshot_interface(
     Ok(InterfaceNominalExport {
         name: analysis.interner.resolve(interface.name).to_owned(),
         methods,
+        variants: Vec::new(),
     })
+}
+
+/// Snapshot an exported enum: name + variant declarations (name + optional
+/// payload field types). Variants ride the file interface so consumers can
+/// reference and construct library enum variants as values (codex-gap S1 U2,
+/// operator ruling O1).
+fn snapshot_enum(
+    enm: &HirEnum,
+    analysis: &AnalyzedUnit,
+    file_label: &str,
+    export_identity: Option<&ExportIdentityContext>,
+) -> Result<InterfaceNominalExport, Diagnostic> {
+    let variants = enm
+        .variants
+        .iter()
+        .map(|variant| {
+            let fields = variant
+                .fields
+                .iter()
+                .map(|field| {
+                    snapshot_interface_type_with_identity(
+                        field.ty,
+                        &analysis.types,
+                        &analysis.interner,
+                        &analysis.resolver,
+                        export_identity.map(identity_for).as_ref(),
+                    )
+                    .map(|ty| InterfaceStructField {
+                        name: analysis.interner.resolve(field.name).to_owned(),
+                        ty,
+                        optional: false,
+                        required: true,
+                    })
+                    .map_err(|err| interface_error(file_label, &variant_name(analysis, variant), err))
+                })
+                .collect::<Result<Vec<_>, Diagnostic>>()?;
+            Ok(InterfaceEnumVariant {
+                name: analysis.interner.resolve(variant.name).to_owned(),
+                fields,
+            })
+        })
+        .collect::<Result<Vec<_>, Diagnostic>>()?;
+    Ok(InterfaceNominalExport {
+        name: analysis.interner.resolve(enm.name).to_owned(),
+        methods: Vec::new(),
+        variants,
+    })
+}
+
+fn variant_name(analysis: &AnalyzedUnit, variant: &radix::hir::HirVariant) -> String {
+    analysis.interner.resolve(variant.name).to_owned()
+}
+
+fn identity_for(ctx: &ExportIdentityContext) -> InterfaceLibraryIdentity {
+    InterfaceLibraryIdentity {
+        provider: ctx.provider.clone(),
+        package: ctx.package.clone(),
+        module_path: ctx.module_path.clone(),
+    }
 }
 
 fn snapshot_interface_method(
@@ -194,6 +258,7 @@ fn snapshot_interface_method(
     analysis: &AnalyzedUnit,
     file_label: &str,
     interface_name: &str,
+    export_identity: Option<&ExportIdentityContext>,
 ) -> Result<radix::file_interface::InterfaceCallable, Diagnostic> {
     let ret = method
         .ret_ty
@@ -215,11 +280,12 @@ fn snapshot_interface_method(
         is_async: false,
         is_generator: false,
     };
-    snapshot_interface_callable_with_resolver(
+    snapshot_interface_callable_with_identity(
         &sig,
         &analysis.types,
         &analysis.interner,
         &analysis.resolver,
+        export_identity.map(identity_for).as_ref(),
     )
     .map_err(|err| interface_error(file_label, interface_name, err))
 }
@@ -238,11 +304,12 @@ fn snapshot_struct(
         .map(|field| {
             Ok(InterfaceStructField {
                 name: analysis.interner.resolve(field.name).to_owned(),
-                ty: snapshot_interface_type_with_resolver(
+                ty: snapshot_interface_type_with_identity(
                     field.ty,
                     &analysis.types,
                     &analysis.interner,
                     &analysis.resolver,
+                    export_identity.map(identity_for).as_ref(),
                 )
                 .map_err(|err| interface_error(file_label, name, err))?,
                 optional: field.sponte,
@@ -259,7 +326,7 @@ fn snapshot_struct(
         .map(|method| {
             Ok(InterfaceMethodExport {
                 name: analysis.interner.resolve(method.func.name).to_owned(),
-                callable: snapshot_struct_method(method, analysis, file_label, name)?,
+                callable: snapshot_struct_method(method, analysis, file_label, name, export_identity)?,
             })
         })
         .collect::<Result<Vec<_>, Diagnostic>>()?;
@@ -277,6 +344,7 @@ fn snapshot_struct_method(
     analysis: &AnalyzedUnit,
     file_label: &str,
     struct_name: &str,
+    export_identity: Option<&ExportIdentityContext>,
 ) -> Result<radix::file_interface::InterfaceCallable, Diagnostic> {
     let ret = method
         .func
@@ -310,11 +378,12 @@ fn snapshot_struct_method(
         is_async: method.func.is_async,
         is_generator: method.func.is_generator,
     };
-    snapshot_interface_callable_with_resolver(
+    snapshot_interface_callable_with_identity(
         &sig,
         &analysis.types,
         &analysis.interner,
         &analysis.resolver,
+        export_identity.map(identity_for).as_ref(),
     )
     .map_err(|err| interface_error(file_label, struct_name, err))
 }
@@ -365,6 +434,7 @@ fn snapshot_function(
     func: &HirFunction,
     analysis: &AnalyzedUnit,
     file_label: &str,
+    export_identity: Option<&ExportIdentityContext>,
 ) -> Result<radix::file_interface::InterfaceCallable, Diagnostic> {
     let name = analysis.interner.resolve(func.name);
     let ret = func.ret_ty.ok_or_else(|| {
@@ -395,11 +465,12 @@ fn snapshot_function(
         is_async: func.is_async,
         is_generator: func.is_generator,
     };
-    snapshot_interface_callable_with_resolver(
+    snapshot_interface_callable_with_identity(
         &sig,
         &analysis.types,
         &analysis.interner,
         &analysis.resolver,
+        export_identity.map(identity_for).as_ref(),
     )
     .map_err(|err| interface_error(file_label, name, err))
 }
@@ -409,6 +480,7 @@ fn snapshot_const(
     analysis: &AnalyzedUnit,
     file_label: &str,
     name: &str,
+    export_identity: Option<&ExportIdentityContext>,
 ) -> Result<radix::file_interface::InterfaceTypeSnapshot, Diagnostic> {
     let ty = konst.ty.or(konst.value.ty).ok_or_else(|| {
         crate::package_diagnostic_error(format!(
@@ -417,11 +489,12 @@ fn snapshot_const(
         .with_phase(DiagnosticPhase::Analysis)
         .with_file(file_label.to_owned())
     })?;
-    snapshot_interface_type_with_resolver(
+    snapshot_interface_type_with_identity(
         ty,
         &analysis.types,
         &analysis.interner,
         &analysis.resolver,
+        export_identity.map(identity_for).as_ref(),
     )
     .map_err(|err| interface_error(file_label, name, err))
 }

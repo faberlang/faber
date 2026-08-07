@@ -35,6 +35,7 @@ use radix::cli::{
 };
 use radix::diagnostics::{Diagnostic, DiagnosticPhase};
 use radix::driver::Config;
+use radix::file_interface::{InterfaceLibraryIdentity, InterfaceNominalKind};
 use radix::hir::{
     DefId, HirBlock, HirCallArg, HirCape, HirCasuArm, HirConst, HirExpression, HirExpressionKind,
     HirId, HirItem, HirItemKind, HirLiteral, HirObjectField, HirOptionalChainKind, HirStatement,
@@ -52,7 +53,7 @@ use radix::mir::{
     MirStatementKind, MirSwitchCase, MirTerminator, MirTerminatorKind, MirType, MirValue,
     MirValueKind, StepperError,
 };
-use radix::semantic::{IndexExpr, Primitive, Type, TypeId, TypeTable, TypeTableSnapshot};
+use radix::semantic::{IndexExpr, Primitive, Resolver, Type, TypeId, TypeTable, TypeTableSnapshot};
 use radix_mir_fmir::{
     decode_binary_image, decode_text_image, encode_binary_image, encode_text_image, fnv1a64,
     is_known_host_requirement, FmirBinaryImageFile, FmirDeviceBackend, FmirDeviceSection,
@@ -158,6 +159,11 @@ struct FmirPackageImage {
     /// Source-identity hashes (the A10 identity's source half; consumed by
     /// the device route's complete-program identity).
     source_hashes: Vec<String>,
+    /// Struct/variant validation metadata for the merged program (S1 U2
+    /// VALUE members): carried in memory by source-built/loaded images so the
+    /// run path re-validates with the merged variant surface. Decoded
+    /// artifact images carry the default (empty) metadata.
+    validation: FmirValidationMetadata,
 }
 
 #[derive(Clone, Copy)]
@@ -311,6 +317,10 @@ pub(crate) use routes::run_package_mir_from_loaded;
 #[cfg(test)]
 #[path = "mir_test.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "nominal_test.rs"]
+mod nominal_tests;
 
 #[cfg(test)]
 #[path = "test_support.rs"]
