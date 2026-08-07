@@ -22,20 +22,30 @@ pub(crate) const WASM_EXPECTED_TIER_FLOORS: &[(&str, WasmTier)] = &[
     ("assignatio/assignatio.fab", WasmTier::CompileValid),
     ("aut/aut.fab", WasmTier::CompileValid),
     ("binarius/binarius.fab", WasmTier::CompileValid),
-    // Y: quarantined 2026-08-06; cursor-stream materialization landed on the
-    // closed-set v1 row (U6-A, __faber_rt_v1_cursor_stream); exempla floor kept
-    // at MirLowered (single-module probe lane, no per-exemplum re-ratchet).
-    ("cede/cede.fab", WasmTier::MirLowered),
+    // Y: promoted U6-F — cursor-stream materialization landed end-to-end
+    // (U6-A emitter on the closed-set v1 row __faber_rt_v1_cursor_stream;
+    // U6-B product host binds materialization + the cede yield channel). The
+    // e2e lane's product-runner boost runs the emitted module and matches the
+    // sibling .expected oracle ([1, 2]). Recipe: fixture
+    // radix/corpus/cede/cede.fab -> e2e wasm lane -> OutputChecked (product
+    // boost, stdout match) -> source radix-mir-wasm/src/calls.rs +
+    // hosts/wasm/src/imports.rs -> done oracle [1, 2].
+    ("cede/cede.fab", WasmTier::OutputChecked),
     ("ceteri/ceteri.fab", WasmTier::CompileValid),
     ("clausa/clausa.fab", WasmTier::Runnable),
     ("clausura/clausura.fab", WasmTier::Runnable),
     ("cli/cli.fab", WasmTier::FrontendAnalyzed),
     ("conversio/conversio.fab", WasmTier::MirLowered),
     ("conversio/octeti.fab", WasmTier::FrontendAnalyzed),
-    // Y: quarantined 2026-08-06; cursor-stream materialization landed on the
-    // closed-set v1 row (U6-A, __faber_rt_v1_cursor_stream); exempla floor kept
-    // at MirLowered (single-module probe lane, no per-exemplum re-ratchet).
-    ("cursor/cursor.fab", WasmTier::MirLowered),
+    // Y: promoted U6-F — cursor-stream materialization landed end-to-end
+    // (U6-A emitter on the closed-set v1 row __faber_rt_v1_cursor_stream;
+    // U6-B product host binds materialization + the cede yield channel). The
+    // e2e lane's product-runner boost runs the emitted module and matches the
+    // sibling .expected oracle ([1, 2]). Recipe: fixture
+    // radix/corpus/cursor/cursor.fab -> e2e wasm lane -> OutputChecked
+    // (product boost, stdout match) -> source radix-mir-wasm/src/calls.rs +
+    // hosts/wasm/src/imports.rs -> done oracle [1, 2].
+    ("cursor/cursor.fab", WasmTier::OutputChecked),
     ("cura/cura.fab", WasmTier::FrontendAnalyzed),
     ("cura/nidificatus.fab", WasmTier::FrontendAnalyzed),
     ("custodi/custodi.fab", WasmTier::CompileValid),
@@ -83,10 +93,18 @@ pub(crate) const WASM_EXPECTED_TIER_FLOORS: &[(&str, WasmTier)] = &[
     ),
     ("iace/functio-fallibilis.fab", WasmTier::MirLowered),
     ("iace/iace.fab", WasmTier::Runnable),
-    ("importa/auxilium.fab", WasmTier::FrontendAnalyzed),
-    // Y: quarantined 2026-08-06; package-aware wasm lane landed (U6-C emit,
-    // U6-D product package path); the exempla single-module probe keeps its
-    // fail-closed diagnostic for package fixtures.
+    // Y: promoted U6-F — standalone-runnable package helper (measured
+    // output-checked in the wasm-host-parity ledger; the product host W11/W12
+    // text surface renders `Salve, auxilium!`). The package role
+    // (importa:auxilium:saluta) is Faber-owned linking; the package link+run
+    // proof lands on the carrier-typed importa-wasm fixture (U6-D/E).
+    ("importa/auxilium.fab", WasmTier::OutputChecked),
+    // Y: reconciled U6-F — the single-module probe keeps its fail-closed D-PA4
+    // diagnostic (mir_wasm_rejected_provider_capability, `auxilium:saluta`)
+    // for same-package cross-module identities; the package-aware lane landed
+    // (U6-C emit, U6-D product path, U6-E host resolution) and proves the
+    // package link+run on the carrier-typed importa-wasm fixture. Floor stays
+    // at the measured MirLowered tier of this probe lane.
     ("importa/importa.fab", WasmTier::MirLowered),
     ("implet/implet.fab", WasmTier::CompileValid),
     ("incipiet/incipiet.fab", WasmTier::Runnable),

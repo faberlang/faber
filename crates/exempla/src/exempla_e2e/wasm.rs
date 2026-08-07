@@ -48,12 +48,17 @@ struct WasmToolchain {
     stub_host_note: &'static str,
 }
 
+// Aggregate tier floors (minimum ratchets; U6-F raised tiers A–D by the
+// measured delta of the cursor-stream promotion: cede/cede.fab +
+// cursor/cursor.fab reach output-checked through the product-runner boost,
+// +2 on tiers A/B/C/D. Frontend/MIR are unchanged — the rows already counted
+// there; no floor rises by reclassification without its focused proof).
 const EXPECTED_FRONTEND_ANALYZED_FLOOR: usize = 210;
 const EXPECTED_MIR_LOWERED_FLOOR: usize = 194;
-const EXPECTED_WASM_TIER_A_EMITTED_FLOOR: usize = 184;
-const EXPECTED_WASM_TIER_B_COMPILE_VALID_FLOOR: usize = 180;
-const EXPECTED_WASM_TIER_C_RUNNABLE_FLOOR: usize = 157;
-const EXPECTED_WASM_TIER_D_OUTPUT_CHECKED_FLOOR: usize = 12;
+const EXPECTED_WASM_TIER_A_EMITTED_FLOOR: usize = 186;
+const EXPECTED_WASM_TIER_B_COMPILE_VALID_FLOOR: usize = 182;
+const EXPECTED_WASM_TIER_C_RUNNABLE_FLOOR: usize = 159;
+const EXPECTED_WASM_TIER_D_OUTPUT_CHECKED_FLOOR: usize = 14;
 
 #[test]
 #[ignore = "slow wasm e2e; run: cargo test -p exempla --test e2e_harness exempla_wasm_e2e -- --ignored --nocapture"]
