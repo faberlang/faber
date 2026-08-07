@@ -1,7 +1,10 @@
 use serde::{Deserialize, Serialize};
 
 use super::distributed::FmirDistributedExecutionSection;
-use super::wire::WireDeviceProgram;
+use super::wire::{
+    WireDeviceProgram, WireInvocationMode, WireKvCacheLayout, WireSessionInput,
+    WireSessionObservationCadence,
+};
 
 // ---------------------------------------------------------------------------
 // Device payload (N1.7 / architecture record §7)
@@ -48,6 +51,17 @@ pub struct FmirDeviceSection {
     /// ("distributed execution requires MD3") until MD3. Old consumers
     /// reject the new field via `deny_unknown_fields` (fail-closed, A7).
     pub distributed: Option<FmirDistributedExecutionSection>,
+    /// The optional cadence/session section (GI4-2). `None` for packages
+    /// without an inference-session surface — single-device packages do not
+    /// require the section (the MD-A15 precedent; the wire-7 single-device
+    /// path, the A10 identity, and the nested
+    /// `WIRE_DEVICE_PROGRAM_VERSION = 7` bytes are untouched). `Some` for
+    /// session-carrying images: the section carries its OWN version ratchet
+    /// ([`crate::schema::WIRE_SESSION_SECTION_VERSION`]) and is admitted
+    /// fail-closed at load (the MD2-W1 sibling-field precedent — no
+    /// `WIRE_DEVICE_PROGRAM_VERSION` bump). The MD2 `distributed` sibling
+    /// section files are never co-edited.
+    pub session: Option<FmirSessionSection>,
 }
 
 /// The typed device-program section (S3-A4 / N3.3): the opaque payload string
@@ -140,4 +154,46 @@ pub enum FmirDeviceBackend {
     Metal,
     /// NVIDIA CUDA (PTX text).
     Cuda,
+}
+
+/// The version ratchet of the optional cadence/session section (GI4-2; CTO
+/// S12). The section carries its OWN nested version, admitted fail-closed
+/// **before field interpretation** (the `admit_device_section` pattern, FC4)
+/// — independently of the nested device-program wire version and the outer
+/// image version. The first session-section shape is v1; the nested
+/// `WIRE_DEVICE_PROGRAM_VERSION = 7` and the outer
+/// `PACKAGE_MIR_ARTIFACT_VERSION = 6` stay untouched (the MD2-W1
+/// sibling-field precedent — no `WIRE_DEVICE_PROGRAM_VERSION` bump).
+pub const WIRE_SESSION_SECTION_VERSION: u32 = 1;
+
+/// The optional cadence/session section of an FMIR device image (GI4-2).
+///
+/// Carries the GI4-1-frozen inference-session facts on the accepted wire
+/// version as a versioned session surface with its own ratchet + admission:
+/// the per-invocation input cadence (`WireInputUpdateCadence` per declared
+/// session/host-input slot — which inputs update per token vs stay
+/// resident), the workload modes ([`WireInvocationMode`] — `prefill` /
+/// `scalar_decode`), the observation cadence
+/// ([`WireSessionObservationCadence`]), and the typed [`WireKvCacheLayout`]
+/// carriage (GI4-1 §3). Absent (`None`) for packages without an
+/// inference-session surface — single-device packages do not require the
+/// section (the MD-A15 precedent). The MD2 `distributed` sibling section is
+/// never co-edited (single schema owner; lane queue §2/§5).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FmirSessionSection {
+    /// The section's OWN version ratchet (A7): admitted fail-closed before
+    /// any field-level interpretation, independently of the nested
+    /// device-program wire version and the outer image version.
+    pub v: u32,
+    /// Declared session/host-input slots with their per-invocation input
+    /// cadence.
+    pub inputs: Vec<WireSessionInput>,
+    /// The workload modes this session executes (`prefill` / `scalar_decode`
+    /// — the regime labels for engine receipts, S6 regime schema).
+    pub invocation_modes: Vec<WireInvocationMode>,
+    /// The declared observation cadence of the session's observation.
+    pub observation_cadence: WireSessionObservationCadence,
+    /// The typed KV-cache layout carriage (GI4-1 §3).
+    pub kv_layout: WireKvCacheLayout,
 }

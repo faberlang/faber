@@ -1,8 +1,10 @@
+use super::device::FmirSessionSection;
 use super::distributed::FmirDistributedExecutionSection;
 use super::wire::{
     WireBroadcastDeclaration, WireBufferIdentity, WireBufferLifetime, WireCollectionKernelPlan,
-    WireDeviceProgram, WireInitializationPolicy, WireObservationCadence, WireProgramLifetime,
-    WireResourceAccess,
+    WireDeviceProgram, WireInitializationPolicy, WireInputUpdateCadence, WireInvocationMode,
+    WireKvCacheDtype, WireObservationCadence, WireProgramLifetime, WireResourceAccess,
+    WireSessionObservationCadence,
 };
 use super::SHA256_IDENTITY_PREFIX;
 
@@ -634,4 +636,154 @@ pub(crate) fn validate_wire_distributed_section(
 /// A focused `DistributedSectionInvalid` admission error.
 fn distributed_invalid(detail: String) -> crate::error::FmirImageError {
     crate::error::FmirImageError::DistributedSectionInvalid { detail }
+}
+
+// ---------------------------------------------------------------------------
+// Wire-level session-section validation (GI4-2)
+// ---------------------------------------------------------------------------
+
+/// Wire-level validation of the optional cadence/session section (GI4-2):
+/// the carried session facts are admitted fail-closed against the carried
+/// single-device program — the equivalence-gate discipline (admission
+/// inspects the actually-delivered session facts, never a self-declared
+/// hash). Rules, in order:
+///
+/// 1. **KV layout dims** — every dimension is positive (a zero
+///    slot/context/layer/head layout is not a layout; it would silently
+///    produce a zero-byte KV — the `KvCacheLayout::new` mirror);
+/// 2. **KV dtype** — closed to `f32` (a dtype change is a contract revision,
+///    never a silent widening);
+/// 3. **invocation modes** — non-empty and duplicate-free (a session that
+///    executes no workload mode is a contradiction);
+/// 4. **session-input slots** — unique, and every slot resolves against a
+///    buffer the carried single-device program actually declares;
+/// 5. **cadence vs buffer facts** — a `Resident` input names a `PerProgram`
+///    buffer (a resident input is allocated once for the whole session), and
+///    a once-init (`PerProgram` + `HostProvided`) buffer named as a session
+///    input is `Resident` (a per-invocation cadence on a once-init buffer is
+///    the `SingleRun` re-copy semantic the GI4-1 discovery proved
+///    infeasible);
+/// 6. **observation cadence** — a session executing `scalar_decode` declares
+///    a per-invocation observation cadence (per-token decode reads back its
+///    observation per token).
+pub(crate) fn validate_wire_session_section(
+    section: &FmirSessionSection,
+    wire: &WireDeviceProgram,
+) -> Result<(), crate::error::FmirImageError> {
+    // Rule 1: the KV layout dims are all positive.
+    let kv = &section.kv_layout;
+    if kv.slots == 0 {
+        return Err(session_invalid(
+            "kv layout declares `slots` 0; a zero-slot layout is not a layout (it would silently produce a zero-byte KV)".to_owned(),
+        ));
+    }
+    if kv.context_length == 0 {
+        return Err(session_invalid(
+            "kv layout declares `context_length` 0; a zero-context layout is not a layout (it would silently produce a zero-byte KV)".to_owned(),
+        ));
+    }
+    if kv.layer_count == 0 {
+        return Err(session_invalid(
+            "kv layout declares `layer_count` 0; a zero-layer layout is not a layout (it would silently produce a zero-byte KV)".to_owned(),
+        ));
+    }
+    if kv.kv_head_count == 0 {
+        return Err(session_invalid(
+            "kv layout declares `kv_head_count` 0; a zero-head layout is not a layout (it would silently produce a zero-byte KV)".to_owned(),
+        ));
+    }
+    if kv.head_dim == 0 {
+        return Err(session_invalid(
+            "kv layout declares `head_dim` 0; a zero-dim layout is not a layout (it would silently produce a zero-byte KV)".to_owned(),
+        ));
+    }
+    // Rule 2: the dtype is closed.
+    if !matches!(kv.dtype, WireKvCacheDtype::F32) {
+        return Err(session_invalid(format!(
+            "kv layout declares dtype {kv:?}; the dtype surface is closed to f32 (a dtype change is a contract revision, never a silent widening)"
+        )));
+    }
+    // Rule 3: at least one workload mode, no duplicates.
+    if section.invocation_modes.is_empty() {
+        return Err(session_invalid(
+            "session declares no invocation mode; a session that executes no workload mode is a contradiction"
+                .to_owned(),
+        ));
+    }
+    for (index, mode) in section.invocation_modes.iter().enumerate() {
+        if section.invocation_modes[index + 1..].contains(mode) {
+            return Err(session_invalid(format!(
+                "session declares invocation mode {} more than once",
+                mode.spelling()
+            )));
+        }
+    }
+    // Rule 4: unique session-input slots that resolve against the carried
+    // program.
+    let buffers = wire_buffers(wire);
+    for (index, input) in section.inputs.iter().enumerate() {
+        if section.inputs[index + 1..]
+            .iter()
+            .any(|other| other.slot == input.slot)
+        {
+            return Err(session_invalid(format!(
+                "session declares input slot {} more than once; one cadence per slot",
+                input.slot
+            )));
+        }
+        if !buffers.iter().any(|buffer| buffer.id == input.slot) {
+            return Err(session_invalid(format!(
+                "session input slot {} does not resolve against a buffer the carried single-device program declares",
+                input.slot
+            )));
+        }
+    }
+    // Rule 5: cadence vs the carried buffer facts.
+    for input in &section.inputs {
+        let Some(buffer) = buffers.iter().find(|buffer| buffer.id == input.slot) else {
+            continue;
+        };
+        match input.cadence {
+            WireInputUpdateCadence::Resident
+                if buffer.lifetime != WireBufferLifetime::PerProgram =>
+            {
+                return Err(session_invalid(format!(
+                    "session input slot {} (buffer '{}') declares cadence resident, but the buffer is {}; a resident input is uploaded once at session creation and lives for the session (per-program)",
+                    input.slot,
+                    buffer.name,
+                    buffer.lifetime.spelling()
+                )));
+            }
+            WireInputUpdateCadence::PerInvocation
+                if buffer.lifetime == WireBufferLifetime::PerProgram
+                    && wire_buffer_init_policy(wire, buffer.id)
+                        == Some(WireInitializationPolicy::HostProvided) =>
+            {
+                return Err(session_invalid(format!(
+                    "session input slot {} (buffer '{}') declares cadence per_invocation, but the buffer is a once-init per-program host-provided buffer; a per-invocation cadence on a once-init buffer is the SingleRun re-copy semantic the GI4-1 discovery proved infeasible (weights would re-upload per invocation)",
+                    input.slot,
+                    buffer.name
+                )));
+            }
+            _ => {}
+        }
+    }
+    // Rule 6: a scalar-decode session observes per invocation.
+    if section
+        .invocation_modes
+        .contains(&WireInvocationMode::ScalarDecode)
+        && section.observation_cadence != WireSessionObservationCadence::PerInvocation
+    {
+        return Err(session_invalid(format!(
+            "session executes {} (a one-token decode step) but declares observation cadence {}; per-token decode reads back its observation per token (the full-vocab logits are sampled host-side on every invocation)",
+            WireInvocationMode::ScalarDecode.spelling(),
+            section.observation_cadence.spelling()
+        )));
+    }
+    Ok(())
+}
+
+/// A focused `SessionSectionInvalid` admission error.
+fn session_invalid(detail: String) -> crate::error::FmirImageError {
+    crate::error::FmirImageError::SessionSectionInvalid { detail }
 }

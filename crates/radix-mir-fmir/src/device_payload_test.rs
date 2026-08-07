@@ -187,6 +187,10 @@ fn sample_device_section() -> FmirDeviceSection {
         // MD2-W1: absent for single-device packages (MD-A15) — the
         // independent single-device path.
         distributed: None,
+        // GI4-2: absent for packages without an inference-session surface
+        // (single-device packages do not require the section — the MD-A15
+        // precedent).
+        session: None,
     }
 }
 

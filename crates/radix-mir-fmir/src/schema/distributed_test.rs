@@ -300,6 +300,9 @@ fn device_section_with_distributed(
         declared_inputs: Vec::new(),
         runtime_requirements: Vec::new(),
         distributed,
+        // GI4-2: the single-device fixture carries no cadence/session
+        // section (single-device packages do not require it — MD-A15).
+        session: None,
     }
 }
 

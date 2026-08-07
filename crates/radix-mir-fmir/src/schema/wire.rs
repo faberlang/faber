@@ -708,3 +708,145 @@ pub enum WireReduceOp {
     Sum,
     Mean,
 }
+
+// ---------------------------------------------------------------------------
+// Session/cadence wire surface (GI4-2)
+// ---------------------------------------------------------------------------
+//
+// The versioned cadence/session wire revision (GI4-2; CTO S12; lane queue
+// §2/§5): the GI4-1-frozen session facts ride the accepted wire version as a
+// versioned session surface with its own ratchet + admission — the MD2-W1
+// sibling-field precedent. `WIRE_DEVICE_PROGRAM_VERSION = 7` and the outer
+// `PACKAGE_MIR_ARTIFACT_VERSION = 6` stay untouched; the MD2 `distributed`
+// section files are never co-edited. The wire types here mirror the GI4-1
+// frozen faber-runtime facts field-for-field (the `session.rs` / `kv_cache.rs`
+// types): the per-invocation input cadence, the workload modes, the session
+// observation cadence, and the typed `KvCacheLayout` carriage.
+
+/// The per-invocation input cadence wire mirror (GI4-2; the GI4-1
+/// [`faber_runtime::session::InputUpdateCadence`] freeze — which inputs
+/// update per token versus stay resident across the session).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireInputUpdateCadence {
+    /// Uploaded once at session creation; never re-copied per invocation
+    /// (weights, KV K/V).
+    Resident,
+    /// Updated on every invocation (decode token id, the per-position RoPE
+    /// table — a per-invocation updated input, never a plan change).
+    PerInvocation,
+}
+
+/// The workload-mode wire mirror (GI4-2; the GI4-1
+/// [`faber_runtime::session::InvocationMode`] freeze): one prefill step or
+/// one scalar-decode step — the regime label for engine receipts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireInvocationMode {
+    /// A prefill step (consumes the next prompt token; writes one KV
+    /// generation per layer at the current position).
+    Prefill,
+    /// A one-token scalar decode step (consumes the fed-back token; writes
+    /// the single new score row into KV).
+    ScalarDecode,
+}
+
+impl WireInvocationMode {
+    /// Stable diagnostic spelling (`"prefill"` / `"scalar_decode"`).
+    #[must_use]
+    pub const fn spelling(self) -> &'static str {
+        match self {
+            Self::Prefill => "prefill",
+            Self::ScalarDecode => "scalar_decode",
+        }
+    }
+}
+
+/// The observation cadence of the session's declared observation (GI4-2;
+/// lane queue §2) — WHEN the session surface reads its observation back.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireSessionObservationCadence {
+    /// Read back on every invocation (the per-token full-vocab logits
+    /// readback of a decode loop, sampled host-side).
+    PerInvocation,
+    /// Read back once at session teardown.
+    PerSession,
+}
+
+impl WireSessionObservationCadence {
+    /// Stable diagnostic spelling.
+    #[must_use]
+    pub const fn spelling(self) -> &'static str {
+        match self {
+            Self::PerInvocation => "per-invocation",
+            Self::PerSession => "per-session",
+        }
+    }
+}
+
+/// The KV cache element dtype wire mirror (GI4-1 §3): the dtype is **closed**
+/// — a dtype change is a contract revision, never a silent widening.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireKvCacheDtype {
+    /// IEEE-754 binary32 (4 bytes per element) — the declared-conversion
+    /// representation for the GI4 row.
+    F32,
+}
+
+impl WireKvCacheDtype {
+    /// Stable diagnostic spelling.
+    #[must_use]
+    pub const fn spelling(self) -> &'static str {
+        match self {
+            Self::F32 => "f32",
+        }
+    }
+}
+
+/// The KV reserve policy wire mirror (GI4-1 §3): the declared headroom on
+/// top of the deterministic storage figure — a separate fact, never folded
+/// silently into storage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireKvReservePolicy {
+    /// The reserved bytes, on top of the deterministic storage figure.
+    pub bytes: u64,
+}
+
+/// The typed KV-cache layout carriage (GI4-2; GI4-1 §3 / lane queue §2): the
+/// five layout facts (`slots`, `context_length`, `layer_count`,
+/// `kv_head_count`, `head_dim`) plus `dtype` and `reserve_policy`. The
+/// storage byte figure is the layout's own authority (consumed, never
+/// re-derived from dims — `faber-runtime/src/partition.rs`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireKvCacheLayout {
+    /// The sequence-slot count (GI4 begins with 1).
+    pub slots: u32,
+    /// The maximum context length per slot (the pinned row: ctx 8192).
+    pub context_length: u32,
+    /// The transformer layer count (the pinned row: 32).
+    pub layer_count: u32,
+    /// The KV head count per layer (the pinned row: 5, GQA 15/5).
+    pub kv_head_count: u32,
+    /// The head dimension (the pinned row: 64).
+    pub head_dim: u32,
+    /// The element dtype (closed to `f32` for GI4).
+    pub dtype: WireKvCacheDtype,
+    /// The declared reserve policy.
+    pub reserve_policy: WireKvReservePolicy,
+}
+
+/// One declared session/host-input slot (GI4-2; lane queue §2 `HostInput{slot}`):
+/// the program buffer slot the session inputs at, plus its per-invocation
+/// input cadence.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireSessionInput {
+    /// The program buffer slot this input targets (the wire buffer id).
+    pub slot: u32,
+    /// The per-invocation input cadence of this slot.
+    pub cadence: WireInputUpdateCadence,
+}

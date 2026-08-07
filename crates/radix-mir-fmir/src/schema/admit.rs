@@ -1,4 +1,4 @@
-use super::device::FmirDeviceSection;
+use super::device::{FmirDeviceSection, FmirSessionSection, WIRE_SESSION_SECTION_VERSION};
 use super::distributed::{
     expected_plan_for_section, wire_plan_to_plan, FmirDistributedExecutionSection,
 };
@@ -7,7 +7,8 @@ use super::requirements::is_known_device_requirement;
 use super::wire::WireDeviceProgram;
 use super::{
     logical_distributed_plan_hash, validate_wire_distributed_section, validate_wire_program,
-    PACKAGE_MIR_ARTIFACT_VERSION, WIRE_DEVICE_PROGRAM_VERSION, WIRE_DISTRIBUTED_SECTION_VERSION,
+    validate_wire_session_section, PACKAGE_MIR_ARTIFACT_VERSION, WIRE_DEVICE_PROGRAM_VERSION,
+    WIRE_DISTRIBUTED_SECTION_VERSION,
 };
 
 /// Fail-closed artifact-version gate. Versions ratchet as clean breaks;
@@ -126,6 +127,45 @@ pub(crate) fn admit_device_section(
     if let Some(distributed) = &device.distributed {
         admit_distributed_section(distributed, &device.device_program.program)?;
     }
+    // GI4-2: the optional cadence/session section is admitted fail-closed at
+    // load — its own version ratchet (the MD2-W1 sibling-field precedent; no
+    // `WIRE_DEVICE_PROGRAM_VERSION` bump) + the wire-level session-facts
+    // validation. Absent for packages without an inference-session surface
+    // (single-device packages do not require the section — MD-A15).
+    if let Some(session) = &device.session {
+        admit_session_section(session, &device.device_program.program)?;
+    }
+    Ok(())
+}
+
+/// Fail-closed admission of the optional cadence/session section (GI4-2),
+/// run when the section is present, in order:
+///
+/// 1. **version ratchet** (A7) — [`WIRE_SESSION_SECTION_VERSION`] is checked
+///    before any field interpretation (the `admit_device_section` pattern,
+///    FC4), independently of the nested device-program wire version and the
+///    outer image version;
+/// 2. **wire-level session-facts validation** — the carried session facts
+///    are admitted fail-closed against the carried single-device program
+///    ([`validate_wire_session_section`] — the equivalence-gate discipline:
+///    admission inspects the actually-delivered session facts, never a
+///    self-declared hash).
+pub(crate) fn admit_session_section(
+    section: &FmirSessionSection,
+    wire_program: &WireDeviceProgram,
+) -> Result<(), crate::error::FmirImageError> {
+    // A7: the section's own version ratchet fails closed BEFORE any field
+    // interpretation — independently of the nested device-program wire
+    // version and the outer image version.
+    if section.v != WIRE_SESSION_SECTION_VERSION {
+        return Err(
+            crate::error::FmirImageError::UnsupportedSessionSectionVersion {
+                actual: section.v,
+                expected: WIRE_SESSION_SECTION_VERSION,
+            },
+        );
+    }
+    validate_wire_session_section(section, wire_program)?;
     Ok(())
 }
 

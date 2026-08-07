@@ -60,6 +60,14 @@ mod distributed_identity_test;
 #[path = "distributed_test.rs"]
 mod distributed_test;
 
+#[cfg(test)]
+#[path = "session_test.rs"]
+mod session_test;
+
+#[cfg(test)]
+#[path = "wire_test.rs"]
+mod wire_test;
+
 /// Image schema version. Ratchets as clean breaks; there is no compatibility
 /// decoder (A7). `3 → 4` clean break adds the optional `device` section
 /// (canonical device-program payload, selection, backend artifacts, device

@@ -121,6 +121,30 @@ pub enum FmirImageError {
         /// The hash recomputed from the delivered logical plan.
         recomputed: String,
     },
+
+    /// The nested session-section version is unsupported (GI4-2 A7). The
+    /// cadence/session section carries its OWN version ratchet, admitted
+    /// fail-closed before any field-level interpretation — independently of
+    /// the nested device-program wire version and the outer image version.
+    UnsupportedSessionSectionVersion {
+        /// Version encoded in the session section.
+        actual: u32,
+        /// Version this loader accepts.
+        expected: u32,
+    },
+
+    /// A cadence/session section violates a fail-closed rule (GI4-2): a
+    /// wire-level section check — a zero KV-layout dimension, a dtype outside
+    /// the closed surface, a missing or duplicate workload mode, an
+    /// unresolvable or duplicate session-input slot, a cadence that
+    /// contradicts the carried program's buffer facts, or an observation
+    /// cadence that contradicts a decode invocation mode. The detail carries
+    /// the focused diagnostic naming the violated class and the exact
+    /// failing fact.
+    SessionSectionInvalid {
+        /// The focused rule violation.
+        detail: String,
+    },
 }
 
 impl fmt::Display for FmirImageError {
@@ -189,6 +213,15 @@ impl fmt::Display for FmirImageError {
                     f,
                     "distributed-section logical-plan hash {expected} does not match the delivered plan (recomputed {recomputed})"
                 )
+            }
+            Self::UnsupportedSessionSectionVersion { actual, expected } => {
+                write!(
+                    f,
+                    "unsupported session-section version {actual}; expected {expected}"
+                )
+            }
+            Self::SessionSectionInvalid { detail } => {
+                write!(f, "invalid session section: {detail}")
             }
         }
     }
