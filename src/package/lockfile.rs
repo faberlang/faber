@@ -83,6 +83,10 @@ pub(crate) fn read_lock(package_root: &Path) -> Result<Option<FaberLock>, Box<Di
         )
     })?;
     if let Err(mut diagnostics) = lock_index(&path, &lock) {
+        // Static invariant (safe by construction): `lock_index` returns `Err`
+        // only with a non-empty diagnostics vector — it collects duplicate
+        // package-name findings and errors only when at least one exists — so
+        // popping the last finding is always sound.
         let diagnostic = diagnostics
             .pop()
             .expect("duplicate lock diagnostics must be non-empty");

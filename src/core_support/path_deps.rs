@@ -238,10 +238,12 @@ target_fixture = { path = "../target-fixture" }
             manifest: PathBuf::from("faber-runtime/Cargo.toml"),
             raw_path: "../radix/crates/radix-runtime-contract".to_owned(),
         };
-        let resolved = resolve_against(&dep).expect("should resolve");
+        // The fixture path always resolves below the manifest root; assert the
+        // full result so a resolution failure reports the observed Option.
+        let resolved = resolve_against(&dep);
         assert_eq!(
             resolved,
-            PathBuf::from("radix/crates/radix-runtime-contract")
+            Some(PathBuf::from("radix/crates/radix-runtime-contract"))
         );
     }
 

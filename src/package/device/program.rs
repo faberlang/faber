@@ -1203,6 +1203,9 @@ pub(crate) fn device_program_for_lowered(
         let kernel_index = program.kernels.len();
         let mut resources: Vec<DeviceResource> = Vec::with_capacity(build.resources.len());
         for slot in build.resources {
+            // Static invariant (safe by construction): the unification pass
+            // registered every buffer referenced by a slot in `builds`, so the
+            // id lookup always succeeds.
             let entry = buffers
                 .iter()
                 .find(|entry| entry.id == slot.buffer_id)

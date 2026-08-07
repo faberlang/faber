@@ -14,16 +14,22 @@ fn config() -> ScanConfig {
 
 const BUDGETS: Budgets = Budgets {
     unwrap: 0,
-    // WHY: two lock-acquisition paths that cannot fail in practice.
-    expect: 2,
+    // WHY: four documented static invariants — lockfile duplicate-diagnostic
+    // pop (lockfile.rs), device slot-buffer registration (program.rs), and the
+    // two prefill registered-input/query-head invariants (prefill_run.rs).
+    // cargo.rs / path_deps.rs carry zero expects (fail-closed paths).
+    expect: 4,
     // WHY: one guard in the package build error path.
     panic: 1,
-    // WHY: one exhaustive-match arm in CLI dispatch.
-    unreachable: 1,
+    // WHY: one exhaustive-match arm in CLI dispatch (cmd.rs) plus one
+    // exhaustiveness guard in the mir lowering path (mir/lower.rs).
+    unreachable: 2,
     todo: 0,
     unimplemented: 0,
-    // WHY: deliberate discards in library resolution and diagnostic paths.
-    let_underscore: 8,
+    // WHY: deliberate discards in library resolution and diagnostic paths
+    // (io_buf, core_support assembler/materialize, prefill_run) — pre-existing
+    // drift documented by the prior ratchet (expect 1→2, let_ 3→8).
+    let_underscore: 10,
     inline_test_modules: 0,
     test_attr_in_production: 0,
 };

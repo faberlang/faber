@@ -256,9 +256,9 @@ pub(super) fn toml_string(value: &str) -> String {
             '\r' => quoted.push_str("\\r"),
             '\t' => quoted.push_str("\\t"),
             character if character.is_control() => {
-                use std::fmt::Write;
-                write!(&mut quoted, "\\u{:04X}", character as u32)
-                    .expect("writing to a string cannot fail");
+                // `format!` over a u32 is infallible — the escape is built
+                // without a fallible write, so no panic is possible here.
+                quoted.push_str(&format!("\\u{:04X}", character as u32));
             }
             character => quoted.push(character),
         }
