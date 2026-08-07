@@ -418,9 +418,10 @@ fn transplant_expr(
             HirExpressionKind::Scribe(*kind, transplanted)
         }
         _ => {
-            return Err(format!(
+            return Err(
                 "package MIR cannot transplant const data member initializer with unsupported expression shape"
-            ));
+                    .to_string(),
+            );
         }
     };
     Ok(HirExpression {
