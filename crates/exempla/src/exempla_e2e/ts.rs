@@ -19,12 +19,12 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 // (emitte, negativum, nonnihil, nonnulla, nulla, positivum): corpus denominator
 // 310 -> 304, and every tier dropped by exactly 6. The `vector/builtins` seam
 // fix (radix-codegen-ts GPU builtin DefId resolution) then raised emitted,
-// typecheck-valid, and runnable by one each. All four floors below are the
-// measured live values on that run (see ledger.md for the lineage).
+// typecheck-valid, and runnable by one each. The iterator/genus fixes raised
+// the live typecheck and runnable counts to 275 and 273.
 const EXPECTED_TS_FRONTEND_ANALYZED_FLOOR: usize = 288;
 const EXPECTED_TS_EMITTED_FLOOR: usize = 279;
-const EXPECTED_TS_TYPECHECK_VALID_FLOOR: usize = 269;
-const EXPECTED_TS_RUNNABLE_FLOOR: usize = 267;
+const EXPECTED_TS_TYPECHECK_VALID_FLOOR: usize = 275;
+const EXPECTED_TS_RUNNABLE_FLOOR: usize = 273;
 
 #[derive(Debug)]
 struct TsE2eResult {
@@ -201,13 +201,6 @@ const TS_EXPECTED_OUTCOMES: &[ExpectedTsOutcome] = &[
     },
 
     ExpectedTsOutcome {
-        path: "sub/sub.fab",
-        highest_tier: TsHighestTier::TypeScriptEmitted,
-        kind: ExpectedTsKind::TrackedGap,
-        bucket: "class/genus declaration shape",
-        reason_contains: "error TS2612: Property 'nomen' will overwrite the base property in 'Animal'",
-    },
-    ExpectedTsOutcome {
         path: "tensor/arithmetic-reject.fab",
         highest_tier: TsHighestTier::FrontendRejected,
         kind: ExpectedTsKind::CompileFail,
@@ -254,13 +247,6 @@ const TS_EXPECTED_OUTCOMES: &[ExpectedTsOutcome] = &[
         reason_contains: "json is not supported for the TypeScript target",
     },
     ExpectedTsOutcome {
-        path: "itera/de.fab",
-        highest_tier: TsHighestTier::TypeScriptEmitted,
-        kind: ExpectedTsKind::TrackedGap,
-        bucket: "tabula index type",
-        reason_contains: "Element implicitly has an 'any' type",
-    },
-    ExpectedTsOutcome {
         path: "json/json.fab",
         // Y: quarantined 2026-08-06; frontend now admits this split-out row,
         // but TS JSON-root runtime wrapping is still absent.
@@ -268,14 +254,6 @@ const TS_EXPECTED_OUTCOMES: &[ExpectedTsOutcome] = &[
         kind: ExpectedTsKind::SplitOut,
         bucket: "json valor not supported",
         reason_contains: "json is not supported for the TypeScript target",
-    },
-    ExpectedTsOutcome {
-        path: "membrum/membrum.fab",
-        // Y: quarantined 2026-08-06 during full Radix e2e.
-        highest_tier: TsHighestTier::TypeScriptEmitted,
-        kind: ExpectedTsKind::TrackedGap,
-        bucket: "reserved JavaScript identifier",
-        reason_contains: "'void' is not allowed as a variable declaration name",
     },
     ExpectedTsOutcome {
         path: "operatores/numerus-overflow.fab",

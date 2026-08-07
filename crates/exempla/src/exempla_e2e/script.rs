@@ -114,7 +114,6 @@ const SCRIPT_EXPECTED_FAILURES: &[ExpectedScriptFailure] = &[
         "sparsa/non-numeric-reject.fab",
         ScriptFailureBucket::FrontendNegative,
     ),
-    expected("sparsa/conversio.fab", ScriptFailureBucket::UnsupportedMir),
     expected(
         "tensor/arithmetic-reject.fab",
         ScriptFailureBucket::FrontendNegative,
@@ -162,10 +161,6 @@ const SCRIPT_EXPECTED_FAILURES: &[ExpectedScriptFailure] = &[
     ),
     expected(
         "operatores/numerus-overflow.fab",
-        ScriptFailureBucket::UnsupportedMir,
-    ),
-    expected(
-        "operatores/numeric-value-eq.fab",
         ScriptFailureBucket::UnsupportedMir,
     ),
     expected(

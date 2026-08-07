@@ -20,9 +20,6 @@ const GO_EXPECTED_FAILURES: &[&str] = &[
     "ad/sermo-vacuum.fab",
     "ad/solum-lege-generic.fab",
     "conversio/collectiones.fab",
-    "conversio/lista-tensor-shaped.fab",
-    "conversio/rectangular-lista-literal-tensor.fab",
-    "conversio/tensor.fab",
     "conversio/valor-boxing.fab",
     "conversio/valor-tensor.fab",
     // Y: quarantined 2026-08-06 during full Radix e2e. Kernel proof rows are
@@ -37,12 +34,7 @@ const GO_EXPECTED_FAILURES: &[&str] = &[
     "instans/instans.fab",
     "intervallum/algebra.fab",
     "intervallum/conversio.fab",
-    "intrinseca/vacua-ascribere.fab",
-    "itera/in-functione.fab",
-    "si/ergo-redde.fab",
-    "sparsa/conversio.fab",
     "tensor/bracket-access.fab",
-    "tensor/method-errors.fab",
     "type-hole-union/type-hole-union.fab",
     "vector/builtins.fab",
     "vector/cross.fab",
@@ -53,8 +45,13 @@ const GO_EXPECTED_FAILURES: &[&str] = &[
     "vector/sugar.fab",
     "vector/swizzle.fab",
 ];
-const GO_EXPECTED_RUNTIME_FAILURES: &[(&str, &str)] =
-    &[("operatores/numerus-overflow.fab", "panic: numerus overflow")];
+const GO_EXPECTED_RUNTIME_FAILURES: &[(&str, &str)] = &[
+    ("operatores/numerus-overflow.fab", "panic: numerus overflow"),
+    (
+        "tensor/method-errors.fab",
+        "panic: tensor structa element count does not match shape",
+    ),
+];
 
 const GO_EXPECTED_COMPILE_FAILURES: &[(&str, &str)] = &[
     (
@@ -166,9 +163,9 @@ const GO_DECLARATION_ONLY_FIXTURES: &[&str] = &[
 // byte-identical since pin 27a6459, 0 unexpected failures. Triage in
 // radix/docs/factory/go-canonical/ledger.md.
 //
-// Y: quarantined 2026-08-06 during full Radix e2e; measured pass count is 243
-// after eight newly tracked Go e2e failures. Restore to 247 when those rows are fixed.
-const EXPECTED_GO_PASS_FLOOR: usize = 243;
+// 2026-08-07: target-safe bindings and tensor/sparse conversions raised the
+// live signed corpus to 251 runnable cases.
+const EXPECTED_GO_PASS_FLOOR: usize = 251;
 const EXPECTED_GO_ACCEPTED_OUTCOME_FLOOR: usize = 304;
 // WHY: Remaining expected failures are tracked Go lowering gaps with
 // per-path reopen contracts in docs/factory/go-e2e-failures-matrix/baseline.md.
