@@ -43,8 +43,9 @@ pub enum TensorOperationFloorFamily {
     /// Gradient handles provide create/accumulate/read/zero operations for
     /// accumulating parameter gradients on a host. Unlike other floor families
     /// (which track tensor operations), this family tracks gradient handle
-    /// delivery across backends. The LLVM and WGSL backends both implement
-    /// gradient handles; Wasm is deferred.
+    /// delivery across backends. The MIR stepper implements gradient handles
+    /// in-process (S5-U1); the LLVM and WGSL backends both implement gradient
+    /// handles; Wasm is deferred.
     ///
     /// `mir_ops()` returns an empty slice — gradient handles are not `MirCollectionOp`
     /// variants. This family serves a documentation and tracking role, matching the
@@ -434,8 +435,8 @@ pub const TENSOR_OPERATION_FLOOR_ROWS: &[TensorOperationFloorRow] = &[
     TensorOperationFloorRow {
         family: TensorOperationFloorFamily::GradientHandles,
         target: TensorOperationFloorTarget::MirStepper,
-        status: TensorOperationFloorStatus::CheckedDebt,
-        evidence: "LLVM: radix-mir-llvm/src/gradient.rs + llvm_verifier.rs; WGSL: radix-mir-wgsl/src/gradient.rs + hosts/webgpu-browser/public/src/gradient-handle-check.mjs; Wasm: deferred",
+        status: TensorOperationFloorStatus::MirExecutable,
+        evidence: "crates/radix-mir-stepper/src/runtime.rs::eval_gradient — in-process gradient-handle dispatch (Create/Accumulate/Read/Zero over opaque handle storage); proof: crates/radix-mir-stepper/src/lib_test.rs::stepper_gradient_handle_create_accumulate_read_zero_round_trip",
     },
 ];
 
