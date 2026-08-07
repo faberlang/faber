@@ -126,10 +126,12 @@ const SCRIPT_EXPECTED_FAILURES: &[ExpectedScriptFailure] = &[
         "tensor/placement-execution-v1.fab",
         ScriptFailureBucket::FrontendNegative,
     ),
-    expected(
-        "type-hole-union/type-hole-union.fab",
-        ScriptFailureBucket::UnsupportedMir,
-    ),
+    // removed: S5-U4 focused stepper proof
+    // (radix mir::stepper_integration_tests::stepper_runs_type_hole_union_fixture)
+    // — type-hole-union/type-hole-union.fab now runs through the MIR stepper and
+    // matches type-hole-union.expected (union-typed slots + match over them,
+    // list<∪>, T ∪ nihil); Stage 0 classifies as implementation-debt; row
+    // promoted out of UnsupportedMir.
     expected(
         "fragilis/fragilis.fab",
         ScriptFailureBucket::NoEntryReference,
