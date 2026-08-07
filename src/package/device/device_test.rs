@@ -9,14 +9,16 @@ use faber_host_macos_arm64::device_descriptor::{
 use faber_host_macos_arm64::device_host::DeviceRuntime;
 use faber_host_macos_arm64::MetalHostSession;
 use radix::mir::LoweredMirUnit;
-use radix_mir::abi::{MirBroadcastDeclaration, MirRankExtensionBroadcast};
+use radix_mir::abi::{
+    MirBroadcastDeclaration, MirRankExtensionBroadcast, ReducedProjection,
+};
 use radix_mir::device_program::DataFlowPair;
 use radix_mir::kernel_plan::{AxisReductionPlan, LayerNormalizationPlan, ReduceOp, RowSoftmaxPlan};
 use radix_mir_fmir::schema::{
     FmirSessionSection, WireAxisReductionPlan, WireBroadcastDeclaration, WireBroadcastFact,
     WireInputUpdateCadence, WireInvocationMode, WireKvCacheDtype, WireKvCacheLayout,
-    WireKvReservePolicy, WireLayerNormalizationPlan, WireRowSoftmaxPlan, WireSessionInput,
-    WireSessionObservationCadence, WIRE_SESSION_SECTION_VERSION,
+    WireKvReservePolicy, WireLayerNormalizationPlan, WireReducedProjection, WireRowSoftmaxPlan,
+    WireSessionInput, WireSessionObservationCadence, WIRE_SESSION_SECTION_VERSION,
 };
 // The S6-C2 producer variant is not on the device-root re-export list (the
 // ordinary producer is the seam); the test reaches it through the wire
@@ -2080,6 +2082,7 @@ fn double_write_carries_two_explicit_generations() {
         version: 1,
         element_ty,
         element_count: 4,
+        reduced_projection: None,
     };
     let launch_plan = KernelLaunchPlan {
         workgroup: radix_mir::abi::MirWorkgroupSize { x: 1, y: 1, z: 1 },
@@ -3274,10 +3277,18 @@ fn frozen_recipe_variant_plans_produce_real_wire_mirrors() {
             CollectionKernelPlan::AxisReduction(AxisReductionPlan {
                 op: ReduceOp::Sum,
                 axis: 1,
+                projection: ReducedProjection {
+                    axis_extent: 8,
+                    inner_stride: 1,
+                },
             }),
             WireCollectionKernelPlan::AxisReduction(WireAxisReductionPlan {
                 op: WireReduceOp::Sum,
                 axis: 1,
+                projection: WireReducedProjection {
+                    axis_extent: 8,
+                    inner_stride: 1,
+                },
             }),
         ),
         (

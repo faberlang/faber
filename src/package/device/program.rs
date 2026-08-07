@@ -563,6 +563,9 @@ pub(crate) fn device_program_for_lowered(
         buffer_id: BufferId,
         element_ty: MirType,
         element_count: u64,
+        /// The producer-defined reduced-buffer projection (council-8 CB-3):
+        /// carried from the signature resource onto the buffer version.
+        reduced_projection: Option<radix_mir::abi::ReducedProjection>,
     }
 
     // Pass 1: derive signatures/plans and unify cross-kernel buffer identity.
@@ -908,6 +911,11 @@ pub(crate) fn device_program_for_lowered(
                     buffer_id,
                     element_ty: resource.element_ty,
                     element_count: resource.element_count,
+                    // The producer-defined reduced-resource projection
+                    // (council-8 CB-3) rides the slot from the signature
+                    // resource — the consumed reduced buffer keeps the
+                    // producer's mapping fact.
+                    reduced_projection: resource.reduced_projection,
                 });
             }
             // The launch binds buffers in binding order (inputs first, output
@@ -1228,6 +1236,10 @@ pub(crate) fn device_program_for_lowered(
                     version: 1,
                     element_ty: slot.element_ty,
                     element_count: slot.element_count,
+                    // The carried reduced-resource projection (council-8
+                    // CB-3) flows onto the buffer version so the wire
+                    // carries the producer's mapping fact.
+                    reduced_projection: slot.reduced_projection,
                 },
                 binding: Binding {
                     group: slot.group,
@@ -1470,6 +1482,7 @@ fn declared_result_rows(
                 version: 1,
                 element_ty: buffer.element_ty,
                 element_count: buffer.element_count,
+                reduced_projection: None,
             },
             role: buffer.role,
             produced_by,

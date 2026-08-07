@@ -11,7 +11,7 @@
 //! consume), emits the Metal artifact, and executes a **`SingleRun`** prefill
 //! on the device route through the existing `ProgramSession` — runtime
 //! weight values supplied at session execution, **no wire-schema change**
-//! (`WIRE_DEVICE_PROGRAM_VERSION = 7` and the `FmirDeviceSection` stay
+//! (`WIRE_DEVICE_PROGRAM_VERSION` and the `FmirDeviceSection` stay
 //! untouched).
 //!
 //! The GPU prompt-final logits are then compared against the committed GI2-3
@@ -1099,6 +1099,10 @@ impl KernelAssembler {
                     version: 1,
                     element_ty: resource.element_ty,
                     element_count: resource.element_count,
+                    // The carried reduced-resource projection (council-8
+                    // CB-3) rides the wire version from the signature
+                    // resource — never reconstructed from element count.
+                    reduced_projection: resource.reduced_projection,
                 },
                 binding: Binding {
                     group: resource.group,
@@ -1747,6 +1751,9 @@ fn push_logits_kernel(
             version: 1,
             element_ty: signature_ref.output.element_ty,
             element_count: signature_ref.output.element_count,
+            // The carried reduced-resource projection (council-8 CB-3)
+            // rides the result version from the output resource.
+            reduced_projection: signature_ref.output.reduced_projection,
         },
         role: BufferRole::Output,
         produced_by,

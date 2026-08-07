@@ -23,8 +23,8 @@ use radix_mir::abi::{MirBroadcastDeclaration, MirRankExtensionBroadcast};
 use radix_mir_fmir::schema::{
     WireAxisReductionPlan, WireBroadcastDeclaration, WireBroadcastFact,
     WireCausalMaskedSoftmaxPlan, WireGatherPlan, WireInputUpdateCadence, WireInvocationMode,
-    WireKvCacheDtype, WireLayerNormalizationPlan, WireRmsNormalizationPlan, WireRopePlan,
-    WireRowSoftmaxPlan, WireSessionObservationCadence, WIRE_SESSION_SECTION_VERSION,
+    WireKvCacheDtype, WireLayerNormalizationPlan, WireReducedProjection, WireRmsNormalizationPlan,
+    WireRopePlan, WireRowSoftmaxPlan, WireSessionObservationCadence, WIRE_SESSION_SECTION_VERSION,
 };
 // Doc-link surface: the carried generation type appears only in an
 // intra-doc link here; the import keeps the link resolvable from this module.
@@ -79,7 +79,18 @@ use super::ValueGeneration;
 /// broadcast facts are admitted fail-closed here (a shape mismatch rejects)
 /// and at the radix decode boundary (A7). Bumped in lockstep with
 /// [`radix_mir_fmir::WIRE_DEVICE_PROGRAM_VERSION`].
-pub(crate) const DEVICE_RUN_PLAN_VERSION: u32 = 7;
+///
+/// **v7 → v8 (council-7/council-8 CB-2/CB-3, the GI3-1-visible +
+/// reduced-projection clean break):** the wire records the GI3-1 shape
+/// changes that landed inside wire-7 without a ratchet (`WireRopePlan.per_row`
+/// / `rows`, the `MirUnOp::F16Round` unary — wire-7 was an unpublished clean
+/// break, no pre-GI3-1 wire-7 artifact escaped the repo), and every
+/// `AxisReduction` plan + reduced buffer version carries the
+/// producer-defined **reduced-resource projection** (`axis_extent` +
+/// `inner_stride`) so keep-dims consumers never reconstruct the reduced
+/// buffer mapping from element count. Bumped in lockstep with
+/// [`radix_mir_fmir::WIRE_DEVICE_PROGRAM_VERSION`].
+pub(crate) const DEVICE_RUN_PLAN_VERSION: u32 = 8;
 
 /// Fail-closed wire admission (S3-A4): the wire version is read FIRST,
 /// before any field-level interpretation, so an old (or unknown) codec
@@ -674,6 +685,14 @@ fn wire_buffer_version(version: &BufferVersion) -> WireBufferVersion {
         version: version.version,
         element_ty: data_type_spelling(version.element_ty),
         element_count: version.element_count,
+        // The producer-defined reduced-buffer projection (council-8 CB-3)
+        // rides the wire version explicitly — never defaulted.
+        reduced_projection: version.reduced_projection.map(|projection| {
+            WireReducedProjection {
+                axis_extent: projection.axis_extent,
+                inner_stride: projection.inner_stride,
+            }
+        }),
     }
 }
 
@@ -786,6 +805,12 @@ fn wire_plan(
             WireCollectionKernelPlan::AxisReduction(WireAxisReductionPlan {
                 op: wire_reduce_op(plan.op),
                 axis: plan.axis,
+                // The producer-defined reduced-resource projection
+                // (council-8 CB-3) is carried field-for-field.
+                projection: WireReducedProjection {
+                    axis_extent: plan.projection.axis_extent,
+                    inner_stride: plan.projection.inner_stride,
+                },
             })
         }
         CollectionKernelPlan::RowSoftmax(plan) => {
