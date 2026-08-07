@@ -39,6 +39,7 @@ docs/factory/check-state-consistency.sh
 
 | Campaign | Status | Entry |
 | --- | --- | --- |
+| Faber onboarding and first-run experience | planned — Stage 0 inventory next; Cista/registry as references only | [`faber-onboarding/CAMPAIGN.md`](faber-onboarding/CAMPAIGN.md) |
 | Tabular data access (census, SQLite, ViviLite) | proposed — prerequisite facts refreshed; not selected | [`tabular-data-access/CAMPAIGN.md`](tabular-data-access/CAMPAIGN.md) |
 
 ## Completed campaigns
