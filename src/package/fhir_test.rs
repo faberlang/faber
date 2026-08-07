@@ -36,6 +36,16 @@ fn dev_norma_library_home() -> PathBuf {
 const LOCAL_MAIN: &str = "importa ex \"./util\" privata * ut utilModule\n\nfunctio run() → textus {\n    redde utilModule.salutare()\n}\n\nincipit {\n    nota utilModule.salutare()\n}\n";
 const LOCAL_UTIL: &str = "functio salutare() → textus {\n    redde \"salve\"\n}\n";
 
+const CONST_MEMBER_MAIN: &str = "importa ex \"./util\" privata * ut utilModule\n\nfunctio run() → textus {\n    redde utilModule.VALUE\n}\n\nincipit {\n    nota utilModule.VALUE\n}\n";
+const CONST_MEMBER_UTIL: &str = "const textus VALUE ← \"salve\"\n";
+
+const LIBRARY_CONST_MAIN: &str = "importa ex \"constlib:vals\" privata vals\n\nfunctio run() → textus {\n    redde vals.LIBRARY_VALUE\n}\n\nincipit {\n    nota vals.LIBRARY_VALUE\n}\n";
+const LIBRARY_CONST_VALS: &str = "const textus LIBRARY_VALUE ← \"salve\"\n";
+
+/// Entry that CALLS a const data member — an unsupported shape that must
+/// keep the non-function fail-closed diagnostic (U1 done_when 4).
+const CONST_MEMBER_CALL_MAIN: &str = "importa ex \"./util\" privata * ut utilModule\n\nincipit {\n    nota utilModule.VALUE()\n}\n";
+
 const LOCAL_LOCALE_MAIN: &str = "importa ex \"./util\" privata * ut utilModule\n\nfunctio run() → textus {\n    redde utilModule.greet()\n}\n\nincipit {\n    nota utilModule.greet()\n}\n";
 const LOCAL_LOCALE_UTIL: &str = "functio salutare() → textus {\n    redde \"salve\"\n}\n";
 
@@ -65,6 +75,79 @@ kind = "bin"
     .expect("write faber.toml");
     fs::write(src.join("util.fab"), LOCAL_UTIL).expect("write util.fab");
     fs::write(src.join("main.fab"), LOCAL_MAIN).expect("write main.fab");
+    src.join("main.fab")
+}
+
+/// Two-module package whose sibling exports a const data member the entry
+/// references through its namespace binding (U1 s1-data-member-abi mutation).
+fn write_const_member_package(dir: &std::path::Path) -> std::path::PathBuf {
+    let src = dir.join("src");
+    fs::create_dir_all(&src).expect("create package src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "fhir-const-member"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+"#,
+    )
+    .expect("write faber.toml");
+    fs::write(src.join("util.fab"), CONST_MEMBER_UTIL).expect("write util.fab");
+    fs::write(src.join("main.fab"), CONST_MEMBER_MAIN).expect("write main.fab");
+    src.join("main.fab")
+}
+
+/// Package whose entry imports a const data member from a lock-resolved
+/// library fixture (`constlib:vals`), proving library const members link and
+/// execute through package MIR (U1 done_when 2). The library lives under a
+/// config library home (`libhome/constlib/src`) so both the analysis phase
+/// (lock resolver) and the package-MIR link phase (config home resolver)
+/// resolve `constlib:vals`.
+fn write_library_const_package(dir: &std::path::Path) -> std::path::PathBuf {
+    let src = dir.join("src");
+    let libhome = dir.join("libhome");
+    let library = libhome.join("constlib");
+    fs::create_dir_all(&src).expect("create package src");
+    fs::create_dir_all(library.join("src")).expect("create library src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "fhir-const-library"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+
+[dependencies]
+constlib = "1.0.0"
+"#,
+    )
+    .expect("write faber.toml");
+    let library_display = library.display();
+    let lock = format!(
+        "[[package]]\nname = \"constlib\"\nversion = \"1.0.0\"\nsource = \"path:{library_display}\"\npackage_root = \"{library_display}\"\nkind = \"source\"\ntarget_language = \"\"\ntarget_triple = \"\"\ntarget_manifest = \"\"\ninterface_root = \"{library_display}/src\"\nartifact = \"\"\ncrate = \"\"\nrustc = \"\"\n"
+    );
+    fs::write(dir.join("faber.lock"), lock).expect("write faber.lock");
+    fs::write(
+        library.join("src/vals.fab"),
+        LIBRARY_CONST_VALS,
+    )
+    .expect("write library const module");
+    fs::write(src.join("main.fab"), LIBRARY_CONST_MAIN).expect("write main.fab");
     src.join("main.fab")
 }
 
@@ -640,6 +723,101 @@ fn loaded_package_fmir_run_parity_matches_direct() {
         loaded_host.stdout_lines, direct_lines,
         "loaded FHIR package FMIR run must match direct run"
     );
+}
+
+#[test]
+fn loaded_package_const_data_member_parity() {
+    let dir = test_temp_dir("fhir-const-member");
+    let entry = write_const_member_package(&dir);
+    let config = Config::default();
+
+    // S1 data-member ABI: the entry references `utilModule.VALUE` (a const
+    // data member exported by the sibling `util.fab`). The direct and loaded
+    // package-MIR paths must both link the const member, lower it through the
+    // merged program, and match the direct-execution oracle.
+    let mut direct_host = BufferHost::default();
+    run_package_mir(&config, &entry, &mut direct_host).expect("direct FMIR run");
+    let direct_lines = direct_host.stdout_lines.clone();
+
+    let artifact = build_package_fhir(&config, &entry).expect("build FHIR package");
+    let loaded = load_package_fhir(&artifact.package_path).expect("load FHIR package");
+    let mut loaded_host = BufferHost::default();
+    run_loaded_package_fhir(&config, loaded, &artifact.root, &mut loaded_host)
+        .expect("loaded FMIR run");
+
+    assert_eq!(
+        loaded_host.stdout_lines, direct_lines,
+        "loaded FHIR package const-member FMIR run must match direct run"
+    );
+    assert_eq!(
+        direct_lines,
+        vec!["salve".to_owned()],
+        "const data member must print its value oracle"
+    );
+}
+
+#[test]
+fn loaded_package_library_const_data_member_runs() {
+    let dir = test_temp_dir("fhir-library-const");
+    let entry = write_library_const_package(&dir);
+    // The package-MIR link phase resolves library imports through the config
+    // library home; the fixture library lives under `libhome/constlib/src`.
+    let config = Config::default().with_stdlib(dir.join("libhome"));
+
+    // U1 done_when (2): a linked-library const data member links and executes
+    // through the direct package-MIR path.
+    let mut host = BufferHost::default();
+    run_package_mir(&config, &entry, &mut host).expect("library const FMIR run");
+    assert_eq!(
+        host.stdout_lines,
+        vec!["salve".to_owned()],
+        "library const data member must print its value oracle"
+    );
+}
+
+#[test]
+fn package_mir_non_function_member_call_fails_closed() {
+    let dir = test_temp_dir("fhir-non-function-shape");
+    let src = dir.join("src");
+    fs::create_dir_all(&src).expect("create package src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "fhir-non-function"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+"#,
+    )
+    .expect("write faber.toml");
+    fs::write(src.join("util.fab"), CONST_MEMBER_UTIL).expect("write util.fab");
+    fs::write(src.join("main.fab"), CONST_MEMBER_CALL_MAIN).expect("write main.fab");
+
+    // U1 done_when (4): calling a const data member (`utilModule.VALUE()`) is
+    // an unsupported shape and must keep the non-function fail-closed
+    // diagnostic instead of linking or passing silently. The const member is
+    // never a callable verb: it lives only in the data-member target table.
+    let mut host = BufferHost::default();
+    let result = run_package_mir(&Config::default(), &src.join("main.fab"), &mut host);
+    match result {
+        Err(diagnostics) => {
+            assert!(
+                diagnostics.iter().any(|diag| {
+                    diag.message
+                        .contains("package MIR does not yet support non-function namespace member `VALUE`")
+                }),
+                "expected non-function namespace member diagnostic, got {diagnostics:?}"
+            );
+        }
+        Ok(()) => panic!("call to a const data member must fail closed"),
+    }
 }
 
 #[test]

@@ -36,8 +36,9 @@ use radix::cli::{
 use radix::diagnostics::{Diagnostic, DiagnosticPhase};
 use radix::driver::Config;
 use radix::hir::{
-    DefId, HirBlock, HirCallArg, HirCape, HirCasuArm, HirExpression, HirExpressionKind,
-    HirItemKind, HirObjectField, HirOptionalChainKind, HirStatement, HirStatementKind,
+    DefId, HirBlock, HirCallArg, HirCape, HirCasuArm, HirConst, HirExpression, HirExpressionKind,
+    HirId, HirItem, HirItemKind, HirLiteral, HirObjectField, HirOptionalChainKind, HirStatement,
+    HirStatementKind,
 };
 use radix::lexer::{Interner, Symbol};
 use radix::mir::{
@@ -68,6 +69,10 @@ use std::path::{Path, PathBuf};
 type NamespaceCallTargets = HashMap<(PathBuf, DefId, String), DefId>;
 type NamespaceExports = HashMap<(PathBuf, DefId), BTreeSet<String>>;
 type SourceRewrites = HashMap<(PathBuf, DefId), DefId>;
+/// Linked const data-member member references: `(caller path, import DefId,
+/// member name) → synthetic def id`. Distinct from [`NamespaceCallTargets`]
+/// so the call rewrite never mistakes a const member for a callable verb.
+type NamespaceDataMemberTargets = HashMap<(PathBuf, DefId, String), DefId>;
 type CliRecordFieldsByLocal = HashMap<Symbol, Vec<MirRuntimeRecordField>>;
 type CliEntryRecords = HashMap<PathBuf, CliRecordFieldsByLocal>;
 
@@ -216,6 +221,31 @@ struct PackageMirLinks {
     /// alongside package units; its exported functions (including `@ radix
     /// backward` companions) are reachable through synthetic definition ids.
     libraries: Vec<LibraryLinkTarget>,
+    /// Linked const data-member member references: `(caller path, import
+    /// DefId, member name) → synthetic def id`. The entry rewrite turns a
+    /// `Field(Path(namespace), member)` value reference into `Path(synthetic)`
+    /// so the const materializes through the entry's top-level-const seam.
+    data_member_targets: NamespaceDataMemberTargets,
+    /// Const data members linked into the package MIR program (sibling units
+    /// and linked libraries). Each carries its synthetic def id and the source
+    /// const declaration; the entry lowering transplants the const value into
+    /// the entry analysis before the entry lowers.
+    data_members: Vec<DataMemberLink>,
+}
+
+/// One linked const data member. The linker allocates a synthetic def id in
+/// the package-MIR range ([`PACKAGE_MIR_SYNTHETIC_DEF_BASE`] discipline); the
+/// lowering pass transplants the const's value into the entry analysis so a
+/// rewritten `Path(synthetic_def)` member reference materializes through the
+/// existing top-level-const seam.
+struct DataMemberLink {
+    /// Synthetic def id for the const member (no HIR/function-range collision).
+    synthetic: DefId,
+    /// Source unit path declaring the const (sibling unit or library module).
+    source_path: PathBuf,
+    /// The const declaration, cloned from the source analysis (source-interner
+    /// symbols and source-analysis type ids).
+    konst: HirConst,
 }
 
 /// One library module lowered into the package MIR program.

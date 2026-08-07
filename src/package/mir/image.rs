@@ -697,6 +697,23 @@ pub(super) fn fmir_image_decode_error(
                 "distributed section logical-plan hash {expected} does not match the delivered plan (recomputed {recomputed})"
             ),
         )],
+        // GI4-2: the cadence/session section is admitted fail-closed with its
+        // own version ratchet, independently of the device-program wire and
+        // outer image versions.
+        FmirImageError::UnsupportedSessionSectionVersion { actual, expected } => vec![
+            mir_issue_diag(
+                path,
+                "fmir_image_session_section_version_unsupported",
+                format!("unsupported session-section version {actual}; expected {expected}"),
+            )
+            .with_arg("actual", actual.to_string())
+            .with_arg("expected", expected.to_string()),
+        ],
+        FmirImageError::SessionSectionInvalid { detail } => vec![mir_issue_diag(
+            path,
+            "fmir_image_session_section_invalid",
+            format!("invalid session section in image: {detail}"),
+        )],
     }
 }
 

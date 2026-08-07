@@ -20,6 +20,18 @@ pub(super) fn lower_package_units<'a>(
     let Some((entry, after)) = rest.split_first_mut() else {
         unreachable!("entry index selected from package units");
     };
+    // Linked const data members (sibling units + libraries) are transplanted
+    // into the entry analysis before the entry lowers: the entry's rewritten
+    // `Path(synthetic_def)` member references then materialize through the
+    // entry's existing top-level-const seam.
+    inject_package_data_members(
+        entry,
+        &*before,
+        &*after,
+        links,
+        library_resolver,
+        library_cache,
+    )?;
     let entry_path = entry.path.clone();
     let mut pending = Vec::new();
     // Mutable copy of the link sources: the library-lowering pass extends it
@@ -83,6 +95,7 @@ pub(super) fn lower_package_units<'a>(
                     &library.path,
                     analysis,
                     &links.calls,
+                    &links.data_member_targets,
                     &links.namespaces,
                 ) {
                     diagnostics.extend(errors);
@@ -183,6 +196,268 @@ pub(super) fn lower_package_units<'a>(
     }
 
     Ok(merged)
+}
+
+/// Transplant linked const data members into the entry analysis before the
+/// entry unit lowers (S1 data-member ABI).
+///
+/// Each linked const is re-interned into the entry interner and its type is
+/// imported into the entry type table, then injected as a synthetic
+/// `HirItemKind::Constant` item under the member's synthetic def id. The
+/// entry lowering context then records it in `top_level_consts`, so rewritten
+/// `Path(synthetic_def)` member references materialize through the existing
+/// top-level-const seam.
+fn inject_package_data_members(
+    entry: &mut AnalyzedPackageUnit,
+    before: &[AnalyzedPackageUnit],
+    after: &[AnalyzedPackageUnit],
+    links: &PackageMirLinks,
+    library_resolver: &LibraryResolver,
+    library_cache: &mut LibraryInterfaceCache,
+) -> Result<(), Vec<Diagnostic>> {
+    let mut diagnostics = Vec::new();
+    let entry_path = entry.path.clone();
+    for member in &links.data_members {
+        if member.source_path == entry_path {
+            // Same-unit consts already lower through the entry's own
+            // top-level-const seam; the linker never registers those.
+            continue;
+        }
+        // The source analysis is borrowed from the sibling slices (disjoint
+        // from `entry`) or the library cache; only the interner needs cloning
+        // (the entry borrow must not conflict with the package-unit borrow).
+        let source = before
+            .iter()
+            .chain(after.iter())
+            .find(|unit| unit.path == member.source_path)
+            .map(|unit| (unit.analysis.interner.clone(), &unit.analysis.types))
+            .or_else(|| {
+                links
+                    .libraries
+                    .iter()
+                    .find(|library| library.path == member.source_path)
+                    .and_then(|library| {
+                        library_cached_analysis(&library.import, library_resolver, library_cache)
+                            .ok()
+                            .map(|analysis| (analysis.interner.clone(), &analysis.types))
+                    })
+            });
+        let Some((source_interner, source_types)) = source else {
+            diagnostics.push(mir_issue_diag(
+                &entry_path,
+                "package_mir_data_member_unsupported",
+                format!(
+                    "package MIR could not find const data member source unit `{}`",
+                    member.source_path.display()
+                ),
+            ));
+            continue;
+        };
+        let item = match transplant_data_member(
+            member,
+            &source_interner,
+            source_types,
+            entry,
+        ) {
+            Ok(item) => item,
+            Err(message) => {
+                diagnostics.push(mir_issue_diag(
+                    &entry_path,
+                    "package_mir_data_member_unsupported",
+                    message,
+                ));
+                continue;
+            }
+        };
+        entry.analysis.hir.items.push(item);
+    }
+    if diagnostics.is_empty() {
+        Ok(())
+    } else {
+        Err(diagnostics)
+    }
+}
+
+/// Build the synthetic `HirItemKind::Constant` item for one linked const,
+/// re-interning the const name + initializer symbols into the entry interner
+/// and importing the const (and initializer) types into the entry type table.
+fn transplant_data_member(
+    member: &DataMemberLink,
+    source_interner: &Interner,
+    source_types: &TypeTable,
+    entry: &mut AnalyzedPackageUnit,
+) -> Result<HirItem, String> {
+    let mut imported = HashMap::new();
+    let konst = HirConst {
+        name: remap_symbol(member.konst.name, source_interner, &mut entry.analysis.interner),
+        ty: member
+            .konst
+            .ty
+            .map(|ty| import_semantic_type(source_types, &mut entry.analysis.types, ty, &mut imported)),
+        value: transplant_expr(
+            &member.konst.value,
+            source_interner,
+            source_types,
+            &mut entry.analysis.interner,
+            &mut entry.analysis.types,
+            &mut imported,
+        )?,
+        mutable: member.konst.mutable,
+        is_await: member.konst.is_await,
+    };
+    Ok(HirItem {
+        // The synthetic def id doubles as a unique item/expression id; no
+        // entry HIR id range collides with the package-MIR synthetic range.
+        id: HirId(member.synthetic.0),
+        def_id: member.synthetic,
+        kind: HirItemKind::Constant(konst),
+        span: member.konst.value.span,
+    })
+}
+
+/// Re-intern one text symbol into the target interner. Symbols outside the
+/// source string table are compiler-generated identity tokens and stay as-is.
+fn remap_symbol(symbol: Symbol, source: &Interner, target: &mut Interner) -> Symbol {
+    remap_optional_symbol(Some(symbol), source, target).unwrap_or(symbol)
+}
+
+/// Transplant a const initializer expression into the entry analysis:
+/// re-intern text symbols and import every semantic type. Expression shapes
+/// that reference cross-analysis definitions (paths, calls, fields, struct
+/// literals, …) fail closed — those are the nominal/value-member surfaces U2
+/// carries, not the U1 const-value ABI.
+fn transplant_expr(
+    expr: &HirExpression,
+    source_interner: &Interner,
+    source_types: &TypeTable,
+    entry_interner: &mut Interner,
+    entry_types: &mut TypeTable,
+    imported: &mut HashMap<TypeId, TypeId>,
+) -> Result<HirExpression, String> {
+    let ty = expr
+        .ty
+        .map(|ty| import_semantic_type(source_types, entry_types, ty, imported));
+    let kind = match &expr.kind {
+        HirExpressionKind::Literal(literal) => {
+            HirExpressionKind::Literal(transplant_literal(literal, source_interner, entry_interner))
+        }
+        HirExpressionKind::Vacua => HirExpressionKind::Vacua,
+        HirExpressionKind::Binary(op, lhs, rhs) => HirExpressionKind::Binary(
+            *op,
+            Box::new(transplant_expr(lhs, source_interner, source_types, entry_interner, entry_types, imported)?),
+            Box::new(transplant_expr(rhs, source_interner, source_types, entry_interner, entry_types, imported)?),
+        ),
+        HirExpressionKind::Unary(op, inner) => HirExpressionKind::Unary(
+            *op,
+            Box::new(transplant_expr(inner, source_interner, source_types, entry_interner, entry_types, imported)?),
+        ),
+        HirExpressionKind::Array(elements) => {
+            let mut transplanted = Vec::with_capacity(elements.len());
+            for element in elements {
+                transplanted.push(match element {
+                    radix::hir::HirArrayElement::Expr(element) => radix::hir::HirArrayElement::Expr(
+                        transplant_expr(element, source_interner, source_types, entry_interner, entry_types, imported)?,
+                    ),
+                    radix::hir::HirArrayElement::Spread(element) => radix::hir::HirArrayElement::Spread(
+                        transplant_expr(element, source_interner, source_types, entry_interner, entry_types, imported)?,
+                    ),
+                });
+            }
+            HirExpressionKind::Array(transplanted)
+        }
+        HirExpressionKind::Tuple(items, type_args) => {
+            let mut transplanted = Vec::with_capacity(items.len());
+            for item in items {
+                transplanted.push(transplant_expr(
+                    item,
+                    source_interner,
+                    source_types,
+                    entry_interner,
+                    entry_types,
+                    imported,
+                )?);
+            }
+            let type_args = type_args
+                .as_ref()
+                .map(|args| {
+                    args.iter()
+                        .map(|ty| import_semantic_type(source_types, entry_types, *ty, imported))
+                        .collect()
+                });
+            HirExpressionKind::Tuple(transplanted, type_args)
+        }
+        HirExpressionKind::Scriptum(template, items) => {
+            let mut transplanted = Vec::with_capacity(items.len());
+            for item in items {
+                transplanted.push(transplant_expr(
+                    item,
+                    source_interner,
+                    source_types,
+                    entry_interner,
+                    entry_types,
+                    imported,
+                )?);
+            }
+            HirExpressionKind::Scriptum(
+                remap_symbol(*template, source_interner, entry_interner),
+                transplanted,
+            )
+        }
+        HirExpressionKind::Scribe(kind, items) => {
+            let mut transplanted = Vec::with_capacity(items.len());
+            for item in items {
+                transplanted.push(transplant_expr(
+                    item,
+                    source_interner,
+                    source_types,
+                    entry_interner,
+                    entry_types,
+                    imported,
+                )?);
+            }
+            HirExpressionKind::Scribe(*kind, transplanted)
+        }
+        _ => {
+            return Err(format!(
+                "package MIR cannot transplant const data member initializer with unsupported expression shape"
+            ));
+        }
+    };
+    Ok(HirExpression {
+        id: expr.id,
+        kind,
+        ty,
+        span: expr.span,
+    })
+}
+
+fn transplant_literal(
+    literal: &HirLiteral,
+    source_interner: &Interner,
+    entry_interner: &mut Interner,
+) -> HirLiteral {
+    match literal {
+        HirLiteral::String(symbol) => {
+            HirLiteral::String(remap_symbol(*symbol, source_interner, entry_interner))
+        }
+        HirLiteral::Ascii(symbol) => {
+            HirLiteral::Ascii(remap_symbol(*symbol, source_interner, entry_interner))
+        }
+        HirLiteral::Octeti(symbol) => {
+            HirLiteral::Octeti(remap_symbol(*symbol, source_interner, entry_interner))
+        }
+        HirLiteral::Regex(pattern, flags) => HirLiteral::Regex(
+            remap_symbol(*pattern, source_interner, entry_interner),
+            flags
+                .as_ref()
+                .map(|flags| remap_symbol(*flags, source_interner, entry_interner)),
+        ),
+        HirLiteral::Int(value) => HirLiteral::Int(*value),
+        HirLiteral::Float(value) => HirLiteral::Float(*value),
+        HirLiteral::JsonValor(value) => HirLiteral::JsonValor(value.clone()),
+        HirLiteral::Bool(value) => HirLiteral::Bool(*value),
+        HirLiteral::Nil => HirLiteral::Nil,
+    }
 }
 
 pub(super) fn selected_cli_dispatch_function(

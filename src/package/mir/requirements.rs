@@ -105,7 +105,8 @@ pub(super) fn collect_runtime_call_requirement(
         | MirIntrinsic::Sermo(_)
         | MirIntrinsic::Cede
         | MirIntrinsic::GpuBuiltin(_)
-        | MirIntrinsic::Gradient(_) => {}
+        | MirIntrinsic::Gradient(_)
+        | MirIntrinsic::TypeCheck(_) => {}
         MirIntrinsic::ReadLine => {
             requirements.insert("host:stdin".to_owned());
         }

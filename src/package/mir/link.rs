@@ -4,6 +4,8 @@ use super::*;
 
 struct PackageMirLinkAccumulator {
     targets: NamespaceCallTargets,
+    data_member_targets: NamespaceDataMemberTargets,
+    data_members: Vec<DataMemberLink>,
     namespaces: NamespaceExports,
     source_rewrites: SourceRewrites,
     next_synthetic: u32,
@@ -15,6 +17,8 @@ impl Default for PackageMirLinkAccumulator {
     fn default() -> Self {
         Self {
             targets: HashMap::new(),
+            data_member_targets: HashMap::new(),
+            data_members: Vec::new(),
             namespaces: HashMap::new(),
             source_rewrites: HashMap::new(),
             next_synthetic: PACKAGE_MIR_SYNTHETIC_DEF_BASE,
@@ -98,6 +102,9 @@ pub(super) fn local_namespace_call_targets(
                             synthetic,
                         );
                     }
+                    for member in exported_top_level_consts(sibling, &exports) {
+                        link_const_member(&mut links, &unit.path, import_item.def_id, &sibling.path, &member);
+                    }
                 }
                 continue;
             }
@@ -136,6 +143,15 @@ pub(super) fn local_namespace_call_targets(
                             links.targets.insert(
                                 (unit.path.clone(), import_item.def_id, function.name),
                                 synthetic,
+                            );
+                        }
+                        for member in exported_top_level_consts(sibling, &exports) {
+                            link_const_member(
+                                &mut links,
+                                &unit.path,
+                                import_item.def_id,
+                                &sibling.path,
+                                &member,
                             );
                         }
                     }
@@ -200,6 +216,8 @@ pub(super) fn local_namespace_call_targets(
 
     Ok(PackageMirLinks {
         calls: links.targets,
+        data_member_targets: links.data_member_targets,
+        data_members: links.data_members,
         namespaces: links.namespaces,
         sources: links.source_rewrites,
         next_synthetic: links.next_synthetic,
@@ -274,6 +292,32 @@ fn link_library_import_site(
             return;
         }
     };
+    let consts = match library_cached_analysis(&import, library_resolver, library_cache) {
+        Ok(analysis) => analysis
+            .hir
+            .items
+            .iter()
+            .filter_map(|item| {
+                let HirItemKind::Constant(konst) = &item.kind else {
+                    return None;
+                };
+                Some(ExportedConst {
+                    name: analysis.interner.resolve(konst.name).to_owned(),
+                    def_id: item.def_id,
+                    konst: konst.clone(),
+                })
+            })
+            .collect::<Vec<_>>(),
+        Err(_) => {
+            push_library_import_unsupported(
+                &mut links.diagnostics,
+                &site.caller_path,
+                &site.import_path,
+                PackageMirConsumer::Interpreted,
+            );
+            return;
+        }
+    };
     let exports = interface.exports.keys().cloned().collect::<BTreeSet<_>>();
     let library_path = module.interface_path.clone();
 
@@ -297,6 +341,11 @@ fn link_library_import_site(
                     (site.caller_path.clone(), item.def_id, function.name.clone()),
                     synthetic,
                 );
+            }
+        }
+        for member in &consts {
+            if exports.contains(&member.name) {
+                link_const_member(links, &site.caller_path, item.def_id, &library_path, member);
             }
         }
     }
@@ -438,18 +487,86 @@ pub(super) fn exported_top_level_functions(
         .collect()
 }
 
+pub(super) struct ExportedConst {
+    name: String,
+    def_id: DefId,
+    konst: HirConst,
+}
+
+/// Top-level const data members a sibling/library unit exports. Like
+/// [`exported_top_level_functions`], this walks the analysis HIR so the
+/// synthetic def id and the const's value travel together.
+pub(super) fn exported_top_level_consts(
+    unit: &AnalyzedPackageUnit,
+    exports: &BTreeSet<String>,
+) -> Vec<ExportedConst> {
+    unit.analysis
+        .hir
+        .items
+        .iter()
+        .filter_map(|item| {
+            let HirItemKind::Constant(konst) = &item.kind else {
+                return None;
+            };
+            let name = unit.analysis.interner.resolve(konst.name).to_owned();
+            exports.contains(&name).then(|| ExportedConst {
+                name,
+                def_id: item.def_id,
+                konst: konst.clone(),
+            })
+        })
+        .collect()
+}
+
+/// Link one exported const data member: allocate a synthetic def id in the
+/// package-MIR range (same discipline as function sources), register the
+/// member reference target, and carry the const declaration for the entry
+/// lowering's transplant.
+fn link_const_member(
+    links: &mut PackageMirLinkAccumulator,
+    caller_path: &Path,
+    import_def_id: DefId,
+    source_path: &Path,
+    member: &ExportedConst,
+) {
+    let synthetic = *links
+        .source_rewrites
+        .entry((source_path.to_path_buf(), member.def_id))
+        .or_insert_with(|| {
+            let def_id = DefId(links.next_synthetic);
+            links.next_synthetic += 1;
+            def_id
+        });
+    links
+        .data_member_targets
+        .insert((caller_path.to_path_buf(), import_def_id, member.name.clone()), synthetic);
+    links.data_members.push(DataMemberLink {
+        synthetic,
+        source_path: source_path.to_path_buf(),
+        konst: member.konst.clone(),
+    });
+}
+
 pub(super) fn rewrite_unit_namespace_calls(
     unit: &mut AnalyzedPackageUnit,
     targets: &NamespaceCallTargets,
+    data_member_targets: &NamespaceDataMemberTargets,
     namespaces: &NamespaceExports,
 ) -> Result<(), Vec<Diagnostic>> {
-    rewrite_analysis_namespace_calls(&unit.path, &mut unit.analysis, targets, namespaces)
+    rewrite_analysis_namespace_calls(
+        &unit.path,
+        &mut unit.analysis,
+        targets,
+        data_member_targets,
+        namespaces,
+    )
 }
 
 pub(super) fn rewrite_analysis_namespace_calls(
     unit_path: &Path,
     analysis: &mut radix::driver::AnalyzedUnit,
     targets: &NamespaceCallTargets,
+    data_member_targets: &NamespaceDataMemberTargets,
     namespaces: &NamespaceExports,
 ) -> Result<(), Vec<Diagnostic>> {
     let mut diagnostics = Vec::new();
@@ -459,6 +576,7 @@ pub(super) fn rewrite_analysis_namespace_calls(
             entry,
             &analysis.interner,
             targets,
+            data_member_targets,
             namespaces,
             &mut diagnostics,
         );
@@ -471,6 +589,7 @@ pub(super) fn rewrite_analysis_namespace_calls(
                     body,
                     &analysis.interner,
                     targets,
+                    data_member_targets,
                     namespaces,
                     &mut diagnostics,
                 );
@@ -494,14 +613,31 @@ pub(super) fn rewrite_block(
     block: &mut HirBlock,
     interner: &Interner,
     targets: &NamespaceCallTargets,
+    data_member_targets: &NamespaceDataMemberTargets,
     namespaces: &NamespaceExports,
     diagnostics: &mut Vec<String>,
 ) {
     for stmt in &mut block.statements {
-        rewrite_stmt(unit_path, stmt, interner, targets, namespaces, diagnostics);
+        rewrite_stmt(
+            unit_path,
+            stmt,
+            interner,
+            targets,
+            data_member_targets,
+            namespaces,
+            diagnostics,
+        );
     }
     if let Some(expr) = &mut block.expr {
-        rewrite_expr(unit_path, expr, interner, targets, namespaces, diagnostics);
+        rewrite_expr(
+            unit_path,
+            expr,
+            interner,
+            targets,
+            data_member_targets,
+            namespaces,
+            diagnostics,
+        );
     }
 }
 
@@ -510,26 +646,52 @@ pub(super) fn rewrite_stmt(
     stmt: &mut HirStatement,
     interner: &Interner,
     targets: &NamespaceCallTargets,
+    data_member_targets: &NamespaceDataMemberTargets,
     namespaces: &NamespaceExports,
     diagnostics: &mut Vec<String>,
 ) {
     match &mut stmt.kind {
         HirStatementKind::Local(local) => {
             if let Some(init) = &mut local.init {
-                rewrite_expr(unit_path, init, interner, targets, namespaces, diagnostics);
+                rewrite_expr(
+                    unit_path,
+                    init,
+                    interner,
+                    targets,
+                    data_member_targets,
+                    namespaces,
+                    diagnostics,
+                );
             }
         }
         HirStatementKind::Expr(expr) => {
-            rewrite_expr(unit_path, expr, interner, targets, namespaces, diagnostics);
+            rewrite_expr(
+                unit_path,
+                expr,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
         }
         HirStatementKind::Redde(Some(expr)) => {
-            rewrite_expr(unit_path, expr, interner, targets, namespaces, diagnostics)
+            rewrite_expr(
+                unit_path,
+                expr,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            )
         }
         HirStatementKind::IncDec(inc_dec) => rewrite_expr(
             unit_path,
             &mut inc_dec.target,
             interner,
             targets,
+            data_member_targets,
             namespaces,
             diagnostics,
         ),
@@ -540,6 +702,7 @@ pub(super) fn rewrite_stmt(
                     &mut clause.cond,
                     interner,
                     targets,
+                    data_member_targets,
                     namespaces,
                     diagnostics,
                 );
@@ -548,6 +711,7 @@ pub(super) fn rewrite_stmt(
                     &mut clause.body,
                     interner,
                     targets,
+                    data_member_targets,
                     namespaces,
                     diagnostics,
                 );
@@ -565,13 +729,14 @@ pub(super) fn rewrite_expr(
     expr: &mut HirExpression,
     interner: &Interner,
     targets: &NamespaceCallTargets,
+    data_member_targets: &NamespaceDataMemberTargets,
     namespaces: &NamespaceExports,
     diagnostics: &mut Vec<String>,
 ) {
     match &mut expr.kind {
         HirExpressionKind::Binary(_, lhs, rhs) | HirExpressionKind::Assign(lhs, rhs) => {
-            rewrite_expr(unit_path, lhs, interner, targets, namespaces, diagnostics);
-            rewrite_expr(unit_path, rhs, interner, targets, namespaces, diagnostics);
+            rewrite_expr(unit_path, lhs, interner, targets, data_member_targets, namespaces, diagnostics);
+            rewrite_expr(unit_path, rhs, interner, targets, data_member_targets, namespaces, diagnostics);
         }
         HirExpressionKind::Unary(_, inner)
         | HirExpressionKind::Cede(inner)
@@ -581,10 +746,10 @@ pub(super) fn rewrite_expr(
         | HirExpressionKind::Panic(inner)
         | HirExpressionKind::Throw(inner)
         | HirExpressionKind::Praefixum(inner) => {
-            rewrite_expr(unit_path, inner, interner, targets, namespaces, diagnostics)
+            rewrite_expr(unit_path, inner, interner, targets, data_member_targets, namespaces, diagnostics)
         }
         HirExpressionKind::Call(callee, type_args, args) => {
-            rewrite_call_args(unit_path, args, interner, targets, namespaces, diagnostics);
+            rewrite_call_args(unit_path, args, interner, targets, data_member_targets, namespaces, diagnostics);
             if let HirExpressionKind::Field(receiver, method) = &callee.kind {
                 if let Some(target_def) =
                     namespace_call_target(unit_path, receiver, *method, interner, targets)
@@ -618,6 +783,7 @@ pub(super) fn rewrite_expr(
                 callee,
                 interner,
                 targets,
+                data_member_targets,
                 namespaces,
                 diagnostics,
             );
@@ -628,10 +794,11 @@ pub(super) fn rewrite_expr(
                 receiver,
                 interner,
                 targets,
+                data_member_targets,
                 namespaces,
                 diagnostics,
             );
-            rewrite_call_args(unit_path, args, interner, targets, namespaces, diagnostics);
+            rewrite_call_args(unit_path, args, interner, targets, data_member_targets, namespaces, diagnostics);
             if let Some(target_def) =
                 namespace_call_target(unit_path, receiver, *method, interner, targets)
             {
@@ -655,24 +822,40 @@ pub(super) fn rewrite_expr(
                 diagnostics.push(message);
             }
         }
-        HirExpressionKind::Field(object, _) => rewrite_expr(
-            unit_path,
-            object,
-            interner,
-            targets,
-            namespaces,
-            diagnostics,
-        ),
+        HirExpressionKind::Field(object, field) => {
+            // Const data members: `utilModule.VALUE` is a value reference
+            // (`Field(Path(namespace), member)`), not a call. When the linker
+            // registered a data-member target for the member, rewrite the
+            // reference to the member's synthetic def so the entry lowering
+            // materializes the const through the top-level-const seam.
+            if let Some(target_def) =
+                namespace_data_member_target(unit_path, object, *field, interner, data_member_targets)
+            {
+                expr.kind = HirExpressionKind::Path(target_def);
+                expr.ty = None;
+                return;
+            }
+            rewrite_expr(
+                unit_path,
+                object,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
+        }
         HirExpressionKind::Index(object, index) => {
             rewrite_expr(
                 unit_path,
                 object,
                 interner,
                 targets,
+                data_member_targets,
                 namespaces,
                 diagnostics,
             );
-            rewrite_expr(unit_path, index, interner, targets, namespaces, diagnostics);
+            rewrite_expr(unit_path, index, interner, targets, data_member_targets, namespaces, diagnostics);
         }
         HirExpressionKind::OptionalChain(object, chain) => {
             rewrite_expr(
@@ -680,10 +863,11 @@ pub(super) fn rewrite_expr(
                 object,
                 interner,
                 targets,
+                data_member_targets,
                 namespaces,
                 diagnostics,
             );
-            rewrite_optional_chain(unit_path, chain, interner, targets, namespaces, diagnostics);
+            rewrite_optional_chain(unit_path, chain, interner, targets, data_member_targets, namespaces, diagnostics);
         }
         HirExpressionKind::NonNull(object, chain) => {
             rewrite_expr(
@@ -691,13 +875,14 @@ pub(super) fn rewrite_expr(
                 object,
                 interner,
                 targets,
+                data_member_targets,
                 namespaces,
                 diagnostics,
             );
-            rewrite_non_null_chain(unit_path, chain, interner, targets, namespaces, diagnostics);
+            rewrite_non_null_chain(unit_path, chain, interner, targets, data_member_targets, namespaces, diagnostics);
         }
         HirExpressionKind::Block(block) | HirExpressionKind::Loop(block) => {
-            rewrite_block(unit_path, block, interner, targets, namespaces, diagnostics);
+            rewrite_block(unit_path, block, interner, targets, data_member_targets, namespaces, diagnostics);
         }
         HirExpressionKind::Si {
             cond,
@@ -705,20 +890,21 @@ pub(super) fn rewrite_expr(
             then_catch,
             else_block,
         } => {
-            rewrite_expr(unit_path, cond, interner, targets, namespaces, diagnostics);
+            rewrite_expr(unit_path, cond, interner, targets, data_member_targets, namespaces, diagnostics);
             rewrite_block(
                 unit_path,
                 then_block,
                 interner,
                 targets,
+                data_member_targets,
                 namespaces,
                 diagnostics,
             );
             if let Some(cape) = then_catch {
-                rewrite_cape(unit_path, cape, interner, targets, namespaces, diagnostics);
+                rewrite_cape(unit_path, cape, interner, targets, data_member_targets, namespaces, diagnostics);
             }
             if let Some(block) = else_block {
-                rewrite_block(unit_path, block, interner, targets, namespaces, diagnostics);
+                rewrite_block(unit_path, block, interner, targets, data_member_targets, namespaces, diagnostics);
             }
         }
         HirExpressionKind::Discerne {
@@ -730,17 +916,18 @@ pub(super) fn rewrite_expr(
                     scrutinee,
                     interner,
                     targets,
+                    data_member_targets,
                     namespaces,
                     diagnostics,
                 );
             }
             for arm in arms {
-                rewrite_casu_arm(unit_path, arm, interner, targets, namespaces, diagnostics);
+                rewrite_casu_arm(unit_path, arm, interner, targets, data_member_targets, namespaces, diagnostics);
             }
         }
         HirExpressionKind::Dum(cond, block) => {
-            rewrite_expr(unit_path, cond, interner, targets, namespaces, diagnostics);
-            rewrite_block(unit_path, block, interner, targets, namespaces, diagnostics);
+            rewrite_expr(unit_path, cond, interner, targets, data_member_targets, namespaces, diagnostics);
+            rewrite_block(unit_path, block, interner, targets, data_member_targets, namespaces, diagnostics);
         }
         HirExpressionKind::Itera(_, _, _, iterable, block) => {
             rewrite_expr(
@@ -748,18 +935,19 @@ pub(super) fn rewrite_expr(
                 iterable,
                 interner,
                 targets,
+                data_member_targets,
                 namespaces,
                 diagnostics,
             );
-            rewrite_block(unit_path, block, interner, targets, namespaces, diagnostics);
+            rewrite_block(unit_path, block, interner, targets, data_member_targets, namespaces, diagnostics);
         }
         HirExpressionKind::Intervallum {
             start, end, step, ..
         } => {
-            rewrite_expr(unit_path, start, interner, targets, namespaces, diagnostics);
-            rewrite_expr(unit_path, end, interner, targets, namespaces, diagnostics);
+            rewrite_expr(unit_path, start, interner, targets, data_member_targets, namespaces, diagnostics);
+            rewrite_expr(unit_path, end, interner, targets, data_member_targets, namespaces, diagnostics);
             if let Some(step) = step {
-                rewrite_expr(unit_path, step, interner, targets, namespaces, diagnostics);
+                rewrite_expr(unit_path, step, interner, targets, data_member_targets, namespaces, diagnostics);
             }
         }
         HirExpressionKind::Array(elements) => {
@@ -767,42 +955,51 @@ pub(super) fn rewrite_expr(
                 match element {
                     radix::hir::HirArrayElement::Expr(expr)
                     | radix::hir::HirArrayElement::Spread(expr) => {
-                        rewrite_expr(unit_path, expr, interner, targets, namespaces, diagnostics);
+                        rewrite_expr(
+                            unit_path,
+                            expr,
+                            interner,
+                            targets,
+                            data_member_targets,
+                            namespaces,
+                            diagnostics,
+                        );
                     }
                 }
             }
         }
         HirExpressionKind::Struct(_, fields) => {
             for (_, value) in fields {
-                rewrite_expr(unit_path, value, interner, targets, namespaces, diagnostics);
+                rewrite_expr(unit_path, value, interner, targets, data_member_targets, namespaces, diagnostics);
             }
         }
         HirExpressionKind::Tuple(items, _)
         | HirExpressionKind::Scribe(_, items)
         | HirExpressionKind::Scriptum(_, items) => {
             for item in items {
-                rewrite_expr(unit_path, item, interner, targets, namespaces, diagnostics);
+                rewrite_expr(unit_path, item, interner, targets, data_member_targets, namespaces, diagnostics);
             }
         }
         HirExpressionKind::Adfirma(cond, message) => {
-            rewrite_expr(unit_path, cond, interner, targets, namespaces, diagnostics);
+            rewrite_expr(unit_path, cond, interner, targets, data_member_targets, namespaces, diagnostics);
             if let Some(message) = message {
                 rewrite_expr(
                     unit_path,
                     message,
                     interner,
                     targets,
+                    data_member_targets,
                     namespaces,
                     diagnostics,
                 );
             }
         }
         HirExpressionKind::Handled { body, catch } => {
-            rewrite_block(unit_path, body, interner, targets, namespaces, diagnostics);
-            rewrite_cape(unit_path, catch, interner, targets, namespaces, diagnostics);
+            rewrite_block(unit_path, body, interner, targets, data_member_targets, namespaces, diagnostics);
+            rewrite_cape(unit_path, catch, interner, targets, data_member_targets, namespaces, diagnostics);
         }
         HirExpressionKind::Clausura(_, _, _, body) => {
-            rewrite_expr(unit_path, body, interner, targets, namespaces, diagnostics)
+            rewrite_expr(unit_path, body, interner, targets, data_member_targets, namespaces, diagnostics)
         }
         HirExpressionKind::Verte {
             source, entries, ..
@@ -812,6 +1009,7 @@ pub(super) fn rewrite_expr(
                 source,
                 interner,
                 targets,
+                data_member_targets,
                 namespaces,
                 diagnostics,
             );
@@ -822,6 +1020,7 @@ pub(super) fn rewrite_expr(
                         entry,
                         interner,
                         targets,
+                        data_member_targets,
                         namespaces,
                         diagnostics,
                     );
@@ -836,6 +1035,7 @@ pub(super) fn rewrite_expr(
                 source,
                 interner,
                 targets,
+                data_member_targets,
                 namespaces,
                 diagnostics,
             );
@@ -845,6 +1045,7 @@ pub(super) fn rewrite_expr(
                     recovery,
                     interner,
                     targets,
+                    data_member_targets,
                     namespaces,
                     diagnostics,
                 );
@@ -857,16 +1058,17 @@ pub(super) fn rewrite_expr(
                     opener,
                     interner,
                     targets,
+                    data_member_targets,
                     namespaces,
                     diagnostics,
                 );
             }
         }
         HirExpressionKind::Ref(_, inner) | HirExpressionKind::Deref(inner) => {
-            rewrite_expr(unit_path, inner, interner, targets, namespaces, diagnostics);
+            rewrite_expr(unit_path, inner, interner, targets, data_member_targets, namespaces, diagnostics);
         }
         HirExpressionKind::TypeCheck { expr: inner, .. } => {
-            rewrite_expr(unit_path, inner, interner, targets, namespaces, diagnostics);
+            rewrite_expr(unit_path, inner, interner, targets, data_member_targets, namespaces, diagnostics);
         }
         HirExpressionKind::Path(_)
         | HirExpressionKind::Literal(_)
@@ -889,6 +1091,24 @@ pub(super) fn namespace_call_target(
     let method_name = interner.resolve(method).to_owned();
     targets
         .get(&(unit_path.to_path_buf(), *namespace_def, method_name))
+        .copied()
+}
+
+/// Resolve a linked const data-member reference (`Field(Path(namespace),
+/// member)` value position) to its synthetic def id.
+pub(super) fn namespace_data_member_target(
+    unit_path: &Path,
+    receiver: &HirExpression,
+    member: Symbol,
+    interner: &Interner,
+    targets: &NamespaceDataMemberTargets,
+) -> Option<DefId> {
+    let HirExpressionKind::Path(namespace_def) = &receiver.kind else {
+        return None;
+    };
+    let member_name = interner.resolve(member).to_owned();
+    targets
+        .get(&(unit_path.to_path_buf(), *namespace_def, member_name))
         .copied()
 }
 
@@ -937,6 +1157,7 @@ pub(super) fn rewrite_call_args(
     args: &mut [HirCallArg],
     interner: &Interner,
     targets: &NamespaceCallTargets,
+    data_member_targets: &NamespaceDataMemberTargets,
     namespaces: &NamespaceExports,
     diagnostics: &mut Vec<String>,
 ) {
@@ -946,6 +1167,7 @@ pub(super) fn rewrite_call_args(
             &mut arg.expr,
             interner,
             targets,
+            data_member_targets,
             namespaces,
             diagnostics,
         );
@@ -957,6 +1179,7 @@ pub(super) fn rewrite_cape(
     cape: &mut HirCape,
     interner: &Interner,
     targets: &NamespaceCallTargets,
+    data_member_targets: &NamespaceDataMemberTargets,
     namespaces: &NamespaceExports,
     diagnostics: &mut Vec<String>,
 ) {
@@ -965,6 +1188,7 @@ pub(super) fn rewrite_cape(
         &mut cape.body,
         interner,
         targets,
+        data_member_targets,
         namespaces,
         diagnostics,
     );
@@ -975,17 +1199,27 @@ pub(super) fn rewrite_casu_arm(
     arm: &mut HirCasuArm,
     interner: &Interner,
     targets: &NamespaceCallTargets,
+    data_member_targets: &NamespaceDataMemberTargets,
     namespaces: &NamespaceExports,
     diagnostics: &mut Vec<String>,
 ) {
     if let Some(guard) = &mut arm.guard {
-        rewrite_expr(unit_path, guard, interner, targets, namespaces, diagnostics);
+        rewrite_expr(
+            unit_path,
+            guard,
+            interner,
+            targets,
+            data_member_targets,
+            namespaces,
+            diagnostics,
+        );
     }
     rewrite_expr(
         unit_path,
         &mut arm.body,
         interner,
         targets,
+        data_member_targets,
         namespaces,
         diagnostics,
     );
@@ -996,17 +1230,34 @@ pub(super) fn rewrite_object_field(
     field: &mut HirObjectField,
     interner: &Interner,
     targets: &NamespaceCallTargets,
+    data_member_targets: &NamespaceDataMemberTargets,
     namespaces: &NamespaceExports,
     diagnostics: &mut Vec<String>,
 ) {
     match &mut field.key {
         radix::hir::HirObjectKey::Computed(key) | radix::hir::HirObjectKey::Spread(key) => {
-            rewrite_expr(unit_path, key, interner, targets, namespaces, diagnostics);
+            rewrite_expr(
+                unit_path,
+                key,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
         }
         radix::hir::HirObjectKey::Ident(_) | radix::hir::HirObjectKey::String(_) => {}
     }
     if let Some(value) = &mut field.value {
-        rewrite_expr(unit_path, value, interner, targets, namespaces, diagnostics);
+        rewrite_expr(
+            unit_path,
+            value,
+            interner,
+            targets,
+            data_member_targets,
+            namespaces,
+            diagnostics,
+        );
     }
 }
 
@@ -1015,16 +1266,33 @@ pub(super) fn rewrite_optional_chain(
     chain: &mut HirOptionalChainKind,
     interner: &Interner,
     targets: &NamespaceCallTargets,
+    data_member_targets: &NamespaceDataMemberTargets,
     namespaces: &NamespaceExports,
     diagnostics: &mut Vec<String>,
 ) {
     match chain {
         HirOptionalChainKind::Member(_) => {}
         HirOptionalChainKind::Index(index) => {
-            rewrite_expr(unit_path, index, interner, targets, namespaces, diagnostics)
+            rewrite_expr(
+                unit_path,
+                index,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            )
         }
         HirOptionalChainKind::Call(args) => {
-            rewrite_call_args(unit_path, args, interner, targets, namespaces, diagnostics)
+            rewrite_call_args(
+                unit_path,
+                args,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            )
         }
     }
 }
@@ -1034,16 +1302,33 @@ pub(super) fn rewrite_non_null_chain(
     chain: &mut radix::hir::HirNonNullKind,
     interner: &Interner,
     targets: &NamespaceCallTargets,
+    data_member_targets: &NamespaceDataMemberTargets,
     namespaces: &NamespaceExports,
     diagnostics: &mut Vec<String>,
 ) {
     match chain {
         radix::hir::HirNonNullKind::Member(_) => {}
         radix::hir::HirNonNullKind::Index(index) => {
-            rewrite_expr(unit_path, index, interner, targets, namespaces, diagnostics)
+            rewrite_expr(
+                unit_path,
+                index,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            )
         }
         radix::hir::HirNonNullKind::Call(args) => {
-            rewrite_call_args(unit_path, args, interner, targets, namespaces, diagnostics)
+            rewrite_call_args(
+                unit_path,
+                args,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            )
         }
     }
 }
