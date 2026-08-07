@@ -22,7 +22,9 @@ pub(crate) const WASM_EXPECTED_TIER_FLOORS: &[(&str, WasmTier)] = &[
     ("assignatio/assignatio.fab", WasmTier::CompileValid),
     ("aut/aut.fab", WasmTier::CompileValid),
     ("binarius/binarius.fab", WasmTier::CompileValid),
-    // Y: quarantined 2026-08-06; cursor_stream runtime call is not encoded by the Wasm backend yet.
+    // Y: quarantined 2026-08-06; cursor-stream materialization landed on the
+    // closed-set v1 row (U6-A, __faber_rt_v1_cursor_stream); exempla floor kept
+    // at MirLowered (single-module probe lane, no per-exemplum re-ratchet).
     ("cede/cede.fab", WasmTier::MirLowered),
     ("ceteri/ceteri.fab", WasmTier::CompileValid),
     ("clausa/clausa.fab", WasmTier::Runnable),
@@ -30,7 +32,9 @@ pub(crate) const WASM_EXPECTED_TIER_FLOORS: &[(&str, WasmTier)] = &[
     ("cli/cli.fab", WasmTier::FrontendAnalyzed),
     ("conversio/conversio.fab", WasmTier::MirLowered),
     ("conversio/octeti.fab", WasmTier::FrontendAnalyzed),
-    // Y: quarantined 2026-08-06; cursor_stream runtime call is not encoded by the Wasm backend yet.
+    // Y: quarantined 2026-08-06; cursor-stream materialization landed on the
+    // closed-set v1 row (U6-A, __faber_rt_v1_cursor_stream); exempla floor kept
+    // at MirLowered (single-module probe lane, no per-exemplum re-ratchet).
     ("cursor/cursor.fab", WasmTier::MirLowered),
     ("cura/cura.fab", WasmTier::FrontendAnalyzed),
     ("cura/nidificatus.fab", WasmTier::FrontendAnalyzed),
@@ -80,7 +84,9 @@ pub(crate) const WASM_EXPECTED_TIER_FLOORS: &[(&str, WasmTier)] = &[
     ("iace/functio-fallibilis.fab", WasmTier::MirLowered),
     ("iace/iace.fab", WasmTier::Runnable),
     ("importa/auxilium.fab", WasmTier::FrontendAnalyzed),
-    // Y: quarantined 2026-08-06; package helper call auxilium:saluta is not encoded by the Wasm backend yet.
+    // Y: quarantined 2026-08-06; package-aware wasm lane landed (U6-C emit,
+    // U6-D product package path); the exempla single-module probe keeps its
+    // fail-closed diagnostic for package fixtures.
     ("importa/importa.fab", WasmTier::MirLowered),
     ("implet/implet.fab", WasmTier::CompileValid),
     ("incipiet/incipiet.fab", WasmTier::Runnable),
