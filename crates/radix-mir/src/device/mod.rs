@@ -907,8 +907,7 @@ mod tests {
         let verdict = classify_device_safe_for_target_entry(&validated, &device);
         assert!(
             verdict.is_capable(),
-            "the decomposed companion's kept result-tuple temp must pass the gate, got: {ververt:?}",
-            ververt = verdict
+            "the decomposed companion's kept result-tuple temp must pass the gate, got: {verdict:?}"
         );
     }
 

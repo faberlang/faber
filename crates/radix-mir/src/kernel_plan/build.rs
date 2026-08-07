@@ -670,16 +670,16 @@ fn rms_norm_const_facts(
     let MirOperand::Constant(MirConstant::Float(epsilon)) = &args[2] else {
         return None;
     };
+    // WHY: the device recipe stores the operation-precision f32 bits; reject
+    // overflow and underflow after the IEEE-754 narrowing below.
+    #[allow(clippy::cast_possible_truncation)]
     let epsilon = *epsilon as f32;
     if !epsilon.is_finite() || epsilon <= 0.0 {
         return None;
     }
-    let Some(norm_index) = usize::try_from(axis)
+    let norm_index = usize::try_from(axis)
         .ok()
-        .filter(|index| *index < dims.len())
-    else {
-        return None;
-    };
+        .filter(|index| *index < dims.len())?;
     let norm_dim = dims[norm_index];
     // Gamma is the mandatory affine peer (args[3]); the CCI-1 source
     // contract enforces a rank-1 tensor of the normalization dimension.
@@ -708,12 +708,9 @@ fn rope_const_facts(function: &MirFunction, dims: &[u64], axis: u64) -> Option<(
     if dim == 0 || dim % 2 != 0 {
         return None;
     }
-    let Some(axis_index) = usize::try_from(axis)
+    let axis_index = usize::try_from(axis)
         .ok()
-        .filter(|index| *index < dims.len())
-    else {
-        return None;
-    };
+        .filter(|index| *index < dims.len())?;
     let width = dims[axis_index];
     if dim > width {
         return None;
@@ -721,7 +718,7 @@ fn rope_const_facts(function: &MirFunction, dims: &[u64], axis: u64) -> Option<(
     Some((pos, dim, width))
 }
 
-/// A non-negative integer const operand (the pos/dim consts of RoPE and the
+/// A non-negative integer const operand (the pos/dim consts of `RoPE` and the
 /// axis consts of the transformer recipes).
 fn const_non_negative(operand: &MirOperand) -> Option<u64> {
     match operand {

@@ -1780,7 +1780,7 @@ fn causal_masked_softmax_decomposition_function(types: &mut TypeTable) -> MirFun
 }
 
 /// A compound inference body: `n = rms_norm(x, 1, 1e-5, gamma); m = n @ w` —
-/// the RMSNorm recipe followed by a matmul recipe splits into two
+/// the `RMSNorm` recipe followed by a matmul recipe splits into two
 /// single-recipe subchain kernels.
 fn rms_norm_then_matmul_decomposition_function(types: &mut TypeTable) -> MirFunction {
     let r2 = rank2_tensor_ty(types, [2, 960]);

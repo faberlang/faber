@@ -22,6 +22,7 @@ pub mod kernel_decomposition;
 pub mod kernel_module;
 pub mod kernel_plan;
 pub mod layout;
+pub mod literal_indexed_access;
 mod local_ty;
 pub mod names;
 pub mod nodes;

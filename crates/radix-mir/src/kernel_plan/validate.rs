@@ -483,7 +483,7 @@ pub enum PlanValidationError {
     /// The RMS-normalization recipe requires a positive normalization width
     /// (a zero width dispatches an empty row pass).
     RmsNormalizationZeroWidth { width: u64 },
-    /// The RoPE recipe requires a positive rotated width and a positive row
+    /// The `RoPE` recipe requires a positive rotated width and a positive row
     /// width (a zero width admits no rotation pair).
     RopeZeroDimension { pos: u64, dim: u64, width: u64 },
     /// The causal masked-softmax recipe requires positive row/column extents

@@ -26,9 +26,9 @@
 //! unification is inert for every reachable body.
 
 use crate::{
-    MirAggregate, MirAggregateFields, MirAggregateItem, MirFunction, MirLocalId, MirOperand,
-    MirOptionOp, MirPlace, MirPlaceBase, MirStatement, MirStatementKind, MirTempId,
-    MirTerminatorKind, MirValue, MirValueKind,
+    MirAggregate, MirAggregateFields, MirAggregateItem, MirCollectionOp, MirFunction, MirIntrinsic,
+    MirLocalId, MirOperand, MirOptionOp, MirPlace, MirPlaceBase, MirStatement, MirStatementKind,
+    MirTempId, MirTerminatorKind, MirValue, MirValueKind,
 };
 use rustc_hash::FxHashSet;
 
@@ -55,7 +55,19 @@ pub(crate) fn statement_read_locals(statement: &MirStatement) -> Vec<MirLocalId>
             value_read_locals(value, &mut read);
         }
         MirStatementKind::RuntimeCall { call, .. } => {
-            read.extend(call.args.iter().filter_map(operand_local));
+            // TensorFill's first operand is a shape receiver only. The
+            // device emitters derive the output extent from the destination
+            // type and consume only the scalar fill operand, so a folded
+            // vacua seed used solely in this position is not a live value.
+            let args = if matches!(
+                call.intrinsic,
+                MirIntrinsic::Collection(MirCollectionOp::TensorFill)
+            ) {
+                call.args.get(1..).unwrap_or_default()
+            } else {
+                &call.args
+            };
+            read.extend(args.iter().filter_map(operand_local));
         }
         MirStatementKind::Call { args, .. } => {
             read.extend(args.iter().filter_map(operand_local));
@@ -341,5 +353,33 @@ fn operand_reads_temp(operand: &MirOperand, temp: MirTempId) -> bool {
         MirOperand::Temp(t) => *t == temp,
         MirOperand::Place(place) => matches!(place.base, MirPlaceBase::Temp(t) if t == temp),
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{MirRuntimeCall, MirType};
+    use radix_lexer::Span;
+    use radix_types::TypeId;
+
+    #[test]
+    fn tensor_fill_shape_receiver_is_not_a_value_read() {
+        let statement = MirStatement {
+            kind: MirStatementKind::RuntimeCall {
+                destination: Some(MirPlace::local(MirLocalId(2))),
+                call: MirRuntimeCall {
+                    intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorFill),
+                    args: vec![
+                        MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                        MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                    ],
+                    return_ty: MirType::semantic(TypeId(0)),
+                },
+            },
+            span: Span::default(),
+        };
+
+        assert_eq!(statement_read_locals(&statement), vec![MirLocalId(1)]);
     }
 }

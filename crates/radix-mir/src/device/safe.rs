@@ -15,6 +15,7 @@ use crate::control::{
     is_structured_scalar_switch, is_structured_value_join_branch,
 };
 use crate::kernel_decomposition::ResultAggregationSlots;
+use crate::literal_indexed_access::{LiteralIndexedAccessPlan, MirSlot};
 use crate::visit::MirVisitor;
 use crate::{
     MirAggregate, MirAggregateKind, MirCollectionOp, MirFunction, MirIntrinsic, MirLayoutKind,
@@ -319,6 +320,10 @@ struct DeviceSafeClassifier<'a> {
     /// (non-constant) non-kernel scalar stays fail-closed with the layout
     /// diagnostics.
     dead_const_copy_slots: DeadConstCopySlots,
+    /// Literal-coordinate tensor accesses whose compile-time index carriers,
+    /// optional get carriers, and complete output coverage were proven by the
+    /// shared MIR analysis.
+    literal_indexed_access: Option<LiteralIndexedAccessPlan>,
     gaps: Vec<CapabilityGap>,
 }
 
@@ -351,6 +356,7 @@ impl<'a> DeviceSafeClassifier<'a> {
             result_aggregation_slots: ResultAggregationSlots::default(),
             dead_fold_artifact_slots: FoldArtifactSlots::default(),
             dead_const_copy_slots: DeadConstCopySlots::default(),
+            literal_indexed_access: None,
             gaps: Vec::new(),
         }
     }
@@ -754,6 +760,8 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             // admit them exactly as the emitters' dead-skip does (Metal
             // 26424928f Gap 1; NVVM emits the harmless native-i64 store).
             self.dead_const_copy_slots = dead_non_kernel_scalar_const_slots(function, self.layouts);
+            self.literal_indexed_access =
+                LiteralIndexedAccessPlan::for_function(function, self.types);
             // S5A-U4: the output-set tuple aggregation slots of this function
             // (its own result-tuple return aggregation plus a decomposed
             // multi-output source's kept result-tuple local) — the ONLY
@@ -769,6 +777,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
 
         self.dead_fold_artifact_slots = FoldArtifactSlots::default();
         self.dead_const_copy_slots = DeadConstCopySlots::default();
+        self.literal_indexed_access = None;
         self.result_aggregation_slots = ResultAggregationSlots::default();
         self.in_device_function = was_in_device_function;
         self.allows_structured_return_branch = previous_allows_structured_return_branch;
@@ -814,6 +823,10 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                 .contains(&MirPlaceBase::Local(local.id))
             && !self.dead_fold_artifact_slots.locals.contains(&local.id)
             && !self.dead_const_copy_slots.locals.contains(&local.id)
+            && !self.literal_indexed_access.as_ref().is_some_and(|plan| {
+                plan.is_index_slot(&MirPlace::local(local.id))
+                    || plan.is_get_slot(MirSlot::Local(local.id))
+            })
         {
             self.check_device_type(local.ty);
         }
@@ -826,6 +839,10 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                 .contains(&MirPlaceBase::Temp(temp.id))
             && !self.dead_fold_artifact_slots.temps.contains(&temp.id)
             && !self.dead_const_copy_slots.temps.contains(&temp.id)
+            && !self.literal_indexed_access.as_ref().is_some_and(|plan| {
+                plan.is_index_slot(&MirPlace::temp(temp.id))
+                    || plan.is_get_slot(MirSlot::Temp(temp.id))
+            })
         {
             self.check_device_type(temp.ty);
         }
@@ -872,6 +889,28 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                 if matches!(call.intrinsic, MirIntrinsic::GpuBuiltin(_)) =>
             {
                 crate::visit::walk_stmt(self, stmt);
+            }
+            MirStatementKind::RuntimeCall {
+                destination,
+                call:
+                    MirRuntimeCall {
+                        intrinsic:
+                            MirIntrinsic::Collection(
+                                MirCollectionOp::TensorGet | MirCollectionOp::TensorSet,
+                            ),
+                        args,
+                        ..
+                    },
+            } if self.literal_indexed_access.is_some() => {
+                if let Some(destination) = destination {
+                    self.visit_place(destination);
+                }
+                if let Some(receiver) = args.first() {
+                    self.visit_operand(receiver);
+                }
+                if args.len() == 3 {
+                    self.visit_operand(&args[2]);
+                }
             }
             MirStatementKind::RuntimeCall {
                 call:
@@ -994,6 +1033,14 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                 // unplannable kernel aggregate and stays fail-closed with
                 // the aggregate diagnostics (the statement and its
                 // aggregate type are both skipped from classification).
+                let literal_index = self
+                    .literal_indexed_access
+                    .as_ref()
+                    .is_some_and(|plan| plan.is_index_slot(destination));
+                if literal_index {
+                    self.visit_place(destination);
+                    return;
+                }
                 let dead_fold_artifact = self.dead_fold_artifact_slots.contains(&destination.base)
                     && matches!(
                         aggregate.kind,
@@ -1107,6 +1154,16 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                 }
                 _ => false,
             };
+            let is_literal_get_alias = match &value.kind {
+                MirValueKind::Operand(operand) => {
+                    MirSlot::from_operand(operand).is_some_and(|slot| {
+                        self.literal_indexed_access
+                            .as_ref()
+                            .is_some_and(|plan| plan.is_get_slot(slot))
+                    })
+                }
+                _ => false,
+            };
             // S6-P2: an admitted TENSOR unary assign (`MirUnOp::Exp` /
             // `Sqrt` — the softmax exp and the LayerNorm sqrt lanes, plus
             // the pre-existing Tanh/Relu/Gelu) skips the value-type check
@@ -1118,7 +1175,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             // the admitted set, stays fail-closed with the value-type
             // diagnostics.
             let admitted_tensor_unary = is_admitted_tensor_unary_value(self.types, value);
-            if !is_result_aggregation && !admitted_tensor_unary {
+            if !is_result_aggregation && !is_literal_get_alias && !admitted_tensor_unary {
                 self.check_device_type(value.ty);
             }
             crate::visit::walk_value(self, value);
