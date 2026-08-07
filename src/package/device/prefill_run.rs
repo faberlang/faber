@@ -580,7 +580,9 @@ fn rms_norm_function(types: &mut TypeTable, id: u32, dims: [u64; 2]) -> MirFunct
     let gamma_ty = tensor_ty(types, &[dims[1]]);
     let u32_ty = MirType::semantic(types.sized_numeric(Primitive::Numerus, NumericWidth::U32));
     let vacuum_ty = MirType::semantic(types.primitive(Primitive::Vacuum));
-    let axis = i64::try_from(dims.len() as u64 - 1).expect("small rank");
+    // `dims` is always the two-dimensional activation shape here, so the
+    // norm axis is statically 1 — safe by construction (no fallible cast).
+    let axis = (dims.len() - 1) as i64;
     MirFunction {
         id: MirFunctionId(id),
         source: None,
@@ -622,7 +624,9 @@ fn rms_norm_function(types: &mut TypeTable, id: u32, dims: [u64; 2]) -> MirFunct
 fn rope_function(types: &mut TypeTable, id: u32, dims: [u64; 2], pos: i64, dim: i64) -> MirFunction {
     let x_ty = tensor_ty(types, &dims);
     let rows = dims[0];
-    let table_len = u64::try_from(dim / 2).expect("rope table length must be nonnegative");
+    // `dim` is the pinned per-head width (`HEAD_DIM`, a compile-time const),
+    // so `dim / 2` is a small non-negative value — safe by construction.
+    let table_len = (dim / 2) as u64;
     let table_ty = tensor_ty(types, &[rows, table_len]);
     let u32_ty = MirType::semantic(types.sized_numeric(Primitive::Numerus, NumericWidth::U32));
     let vacuum_ty = MirType::semantic(types.primitive(Primitive::Vacuum));
@@ -1035,7 +1039,11 @@ impl KernelAssembler {
         id
     }
 
-    /// Look up an input buffer's facts (panic-free: registered inputs exist).
+    /// Look up a registered input buffer's facts.
+    ///
+    /// Static invariant (safe by construction): every name queried here is
+    /// registered by `build_prefill_program` (or `rope_table_buffers`) before
+    /// kernel-graph assembly reaches it, so the lookup always succeeds.
     fn input_facts(&self, name: &str) -> BufferFacts {
         self.known
             .get(name)
@@ -1323,6 +1331,8 @@ fn build_prefill_program() -> Result<PrefillProgramArtifact, Vec<Diagnostic>> {
                 Some(acc) => push_elementwise_binary_kernel(&mut assembler, &mir, &validation, residual_add, acc, oh, &format!("prefill.blk{il}.o"), &entry(&format!("sum_o_h{hq}")))?,
             });
         }
+        // Static invariant (safe by construction): `HEAD_COUNT` is the pinned
+        // const 15 > 0, so the query-head fold loop always yields `Some`.
         let o = o.expect("at least one query head");
         let h2 = push_elementwise_binary_kernel(&mut assembler, &mir, &validation, residual_add, h, o, &format!("prefill.blk{il}.h2"), &entry("residual_attn"))?;
         let ffn_norm_w = assembler.input_facts(&format!("blk.{il}.ffn_norm.weight"));
@@ -1480,8 +1490,14 @@ fn push_kernel(
         .ok_or_else(|| vec![Diagnostic::error("prefill function disappeared")])?;
     let launch = KernelLaunchPlan::from_signature_and_function(signature_ref, function_ref);
     assembler.push_kernel(function, entry.to_owned(), plan, resources, launch);
-    // The kernel's output buffer is the last fact.
-    Ok(facts.last().cloned().expect("kernel has an output buffer"))
+    // The kernel's output buffer is the last fact; every caller appends a
+    // fresh output buffer, but an internal facts-list mismatch is worth a
+    // fail-closed diagnostic rather than a panic.
+    facts.last().cloned().ok_or_else(|| {
+        vec![Diagnostic::error(format!(
+            "prefill device program: kernel `{entry}` has no output buffer in its facts"
+        ))]
+    })
 }
 
 /// The embedding gather kernel.
@@ -1955,36 +1971,66 @@ fn load_golden_logits(golden_dir: &Path) -> Result<Vec<f32>, Vec<Diagnostic>> {
         })?
         .as_valor()
         .clone();
-    let raw = field(field(&root, "raw_logits"), "f32_le_hex");
-    Ok(hex_f32s(text(raw)))
+    let raw = field(&root, "raw_logits")?;
+    let raw = field(raw, "f32_le_hex")?;
+    hex_f32s(text(raw)?)
 }
 
-fn field<'a>(value: &'a Valor, key: &str) -> &'a Valor {
+/// The typed JSON-object field accessor. The golden is a user-supplied
+/// fixture, so a non-object value or a missing key is a fail-closed
+/// diagnostic, never a panic.
+fn field<'a>(value: &'a Valor, key: &str) -> Result<&'a Valor, Vec<Diagnostic>> {
     let Valor::Tabula(fields) = value else {
-        panic!("prefill device run: expected a JSON object field {key:?}")
+        return Err(vec![Diagnostic::error(format!(
+            "prefill device run: expected a JSON object field {key:?}"
+        ))]);
     };
-    fields
-        .get(key)
-        .unwrap_or_else(|| panic!("prefill device run: missing JSON field {key:?}"))
+    fields.get(key).ok_or_else(|| {
+        vec![Diagnostic::error(format!(
+            "prefill device run: missing JSON field {key:?}"
+        ))]
+    })
 }
 
-fn text(value: &Valor) -> &str {
+fn text(value: &Valor) -> Result<&str, Vec<Diagnostic>> {
     let Valor::Textus(s) = value else {
-        panic!("prefill device run: expected a JSON string")
+        return Err(vec![Diagnostic::error(
+            "prefill device run: expected a JSON string",
+        )]);
     };
-    s
+    Ok(s)
 }
 
-/// Parse the golden's `f32_le_hex` byte stream into f32 values.
-fn hex_f32s(hex: &str) -> Vec<f32> {
-    let bytes: Vec<u8> = (0..hex.len())
+/// Parse the golden's `f32_le_hex` byte stream into f32 values. Malformed
+/// hex (odd length, non-hex digits, or a byte count that is not a multiple
+/// of 4) is a fail-closed diagnostic, never a panic.
+fn hex_f32s(hex: &str) -> Result<Vec<f32>, Vec<Diagnostic>> {
+    if hex.len() % 2 != 0 {
+        return Err(vec![Diagnostic::error(
+            "prefill device run: the golden f32_le_hex byte stream has an odd length",
+        )]);
+    }
+    let bytes = (0..hex.len())
         .step_by(2)
-        .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).expect("hex byte"))
-        .collect();
-    bytes
+        .map(|i| {
+            u8::from_str_radix(&hex[i..i + 2], 16).map_err(|error| {
+                Diagnostic::error(format!(
+                    "prefill device run: malformed golden f32_le_hex byte stream: {error}"
+                ))
+            })
+        })
+        .collect::<Result<Vec<u8>, Diagnostic>>()
+        .map_err(|error| vec![error])?;
+    if bytes.len() % 4 != 0 {
+        return Err(vec![Diagnostic::error(format!(
+            "prefill device run: the golden f32_le_hex byte stream is {} bytes, expected a multiple of 4",
+            bytes.len()
+        ))]);
+    }
+    Ok(bytes
         .chunks_exact(4)
         .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
-        .collect()
+        .collect())
 }
 
 /// The S6 shape-class label of the executed prefill.
@@ -2099,7 +2145,7 @@ pub(crate) fn run_prefill_device_route(
     };
     let mut evidence = evidence_dir.to_path_buf();
     evidence.push("gi3-prefill-comparison.json");
-    let record = comparison_record_json(&outcome, model_path);
+    let record = comparison_record_json(&outcome, model_path)?;
     std::fs::write(&evidence, record).map_err(|error| {
         vec![Diagnostic::error(format!(
             "prefill device run: cannot write the comparison record `{}`: {error}",
@@ -2110,7 +2156,10 @@ pub(crate) fn run_prefill_device_route(
 }
 
 /// The committed comparison record (schema `gi3-prefill-comparison-v1`).
-fn comparison_record_json(outcome: &PrefillRunOutcome, model_path: &Path) -> String {
+fn comparison_record_json(
+    outcome: &PrefillRunOutcome,
+    model_path: &Path,
+) -> Result<String, Vec<Diagnostic>> {
     let mut root = StdBTreeMap::new();
     root.insert("schema".to_owned(), Valor::from("gi3-prefill-comparison-v1"));
     root.insert(
@@ -2174,8 +2223,12 @@ fn comparison_record_json(outcome: &PrefillRunOutcome, model_path: &Path) -> Str
         "first_invocation_us".to_owned(),
         Valor::from(outcome.receipt.first_invocation_us as i64),
     );
-    let json = Json::from_object(root).expect("prefill comparison record JSON is valid");
-    format!("{}\n", json.to_wire())
+    let json = Json::from_object(root).map_err(|error| {
+        vec![Diagnostic::error(format!(
+            "prefill device run: cannot serialize the comparison record: {error}"
+        ))]
+    })?;
+    Ok(format!("{}\n", json.to_wire()))
 }
 
 /// The outcome of a prefill device run.
