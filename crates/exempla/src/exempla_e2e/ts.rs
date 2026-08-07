@@ -27,11 +27,21 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 // (`conversio/valor-{genus,tensor}.fab`, `json/json.fab`,
 // `destructura/literal.fab`) off `TS_EXPECTED_OUTCOMES` and past the
 // frontend-analyzed tier — measured emitted 289, typecheck-valid 285,
-// runnable 283 (frontend analyzed unchanged at 288).
+// runnable 283 (frontend analyzed unchanged at 288). Stage 4 ratchet 2
+// (codex-gap TS4-3, radix fd5b8da9b): the failable/narrowing/control-flow
+// emitter seams — cape bindings on textus/ignotum error values lower to the
+// value itself, breakable `fac {}` bodies wrap in `while (true) {}`, bare
+// `↦` conversions inside failable returns are try/caught into an
+// `{ ok:false, error }` channel, and statement-only non-void bodies end in
+// an explicit tail return of the type's natural zero — moved the five
+// `conversio/fallibilis.fab`, `discerne/discerne.fab`, `fac/fac-cape.fab`,
+// `rumpe/fac-dum-rumpe.fab`, `rumpe/fac-si-rumpe.fab` rows off
+// `TS_EXPECTED_OUTCOMES` and past the typecheck-valid tier — measured
+// typecheck-valid 290, runnable 288 (emitted unchanged at 289).
 const EXPECTED_TS_FRONTEND_ANALYZED_FLOOR: usize = 288;
 const EXPECTED_TS_EMITTED_FLOOR: usize = 289;
-const EXPECTED_TS_TYPECHECK_VALID_FLOOR: usize = 285;
-const EXPECTED_TS_RUNNABLE_FLOOR: usize = 283;
+const EXPECTED_TS_TYPECHECK_VALID_FLOOR: usize = 290;
+const EXPECTED_TS_RUNNABLE_FLOOR: usize = 288;
 
 #[derive(Debug)]
 struct TsE2eResult {
@@ -70,27 +80,6 @@ const TS_EXPECTED_OUTCOMES: &[ExpectedTsOutcome] = &[
         kind: ExpectedTsKind::TrackedGap,
         bucket: "missing type/variant binding",
         reason_contains: "error TS2304: Cannot find name 'args'",
-    },
-    ExpectedTsOutcome {
-        path: "conversio/fallibilis.fab",
-        highest_tier: TsHighestTier::TypeScriptEmitted,
-        kind: ExpectedTsKind::TrackedGap,
-        bucket: "failable / conversio lowering",
-        reason_contains: "Property 'error' does not exist on type 'never'",
-    },
-    ExpectedTsOutcome {
-        path: "discerne/discerne.fab",
-        highest_tier: TsHighestTier::TypeScriptEmitted,
-        kind: ExpectedTsKind::TrackedGap,
-        bucket: "expression-valued control-flow lowering",
-        reason_contains: "error TS2355: A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value",
-    },
-    ExpectedTsOutcome {
-        path: "fac/fac-cape.fab",
-        highest_tier: TsHighestTier::TypeScriptEmitted,
-        kind: ExpectedTsKind::TrackedGap,
-        bucket: "unreachable cape branch narrowing",
-        reason_contains: "Property 'error' does not exist on type 'never'",
     },
     ExpectedTsOutcome {
         path: "gpu-core-types/atomic-element-reject.fab",
@@ -150,20 +139,6 @@ const TS_EXPECTED_OUTCOMES: &[ExpectedTsOutcome] = &[
         kind: ExpectedTsKind::CompileFail,
         bucket: "expected compile-fail / frontend policy",
         reason_contains: "protecta_reserved",
-    },
-    ExpectedTsOutcome {
-        path: "rumpe/fac-dum-rumpe.fab",
-        highest_tier: TsHighestTier::TypeScriptEmitted,
-        kind: ExpectedTsKind::TrackedGap,
-        bucket: "unreachable cape branch narrowing",
-        reason_contains: "Property 'error' does not exist on type 'never'",
-    },
-    ExpectedTsOutcome {
-        path: "rumpe/fac-si-rumpe.fab",
-        highest_tier: TsHighestTier::TypeScriptEmitted,
-        kind: ExpectedTsKind::TrackedGap,
-        bucket: "break/continue closure lowering",
-        reason_contains: "Jump target cannot cross function boundary",
     },
     ExpectedTsOutcome {
         path: "rumpe/rumpe-top-level-error.fab",
