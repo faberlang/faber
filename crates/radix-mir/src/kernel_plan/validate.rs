@@ -187,12 +187,21 @@ pub(super) fn validate_transpose_plan(plan: &TransposePlan) -> Result<(), PlanVa
 /// means). The axis value, its in-range check, and the input/output element
 /// counts are resolution-time typed-fact checks
 /// ([`super::CollectionKernelPlan::from_transformer_op`] — the plan carries
-/// only the resolved axis), so the static check pins the closed op set.
+/// only the resolved axis), so the static check pins the closed op set and
+/// the carried reduced-resource projection (council-8 CB-3): a zero axis
+/// extent or inner stride would make the producer-defined projection
+/// degenerate.
 pub(super) fn validate_axis_reduction_plan(
     plan: &AxisReductionPlan,
 ) -> Result<(), PlanValidationError> {
     if !matches!(plan.op, ReduceOp::Sum) {
         return Err(PlanValidationError::AxisReductionUnsupportedOp { op: plan.op });
+    }
+    if plan.projection.axis_extent == 0 || plan.projection.inner_stride == 0 {
+        return Err(PlanValidationError::AxisReductionZeroProjection {
+            axis_extent: plan.projection.axis_extent,
+            inner_stride: plan.projection.inner_stride,
+        });
     }
     Ok(())
 }
@@ -473,6 +482,10 @@ pub enum PlanValidationError {
     /// The axis-reduction recipe's v1 closed op set is `Sum` only — a
     /// mean-over-axis is not part of the transformer surface.
     AxisReductionUnsupportedOp { op: ReduceOp },
+    /// The carried reduced-resource projection (council-8 CB-3) must be
+    /// positive in both facts — a zero axis extent or inner stride would
+    /// make the producer-defined projection degenerate.
+    AxisReductionZeroProjection { axis_extent: u64, inner_stride: u64 },
     /// The row-gather recipe requires positive table dims and a positive id
     /// count (a zero dimension dispatches an empty grid and the gather remap
     /// would be degenerate).
@@ -583,6 +596,13 @@ impl fmt::Display for PlanValidationError {
             Self::AxisReductionUnsupportedOp { op } => write!(
                 f,
                 "axis-reduction recipe v1 admits only Sum, got {op:?}"
+            ),
+            Self::AxisReductionZeroProjection {
+                axis_extent,
+                inner_stride,
+            } => write!(
+                f,
+                "axis-reduction reduced-resource projection must be positive, got axis extent {axis_extent}, inner stride {inner_stride}"
             ),
             Self::GatherZeroDimension {
                 table_rows,

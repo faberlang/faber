@@ -55,6 +55,7 @@ fn runtime_extent_resource(binding: u32, extent_ty: TypeId) -> MirKernelResource
         element_count: 1,
         source_local: None,
         source_name: Some(RUNTIME_EXTENT_RESOURCE_NAME.to_owned()),
+        reduced_projection: None,
     }
 }
 
@@ -373,6 +374,7 @@ impl MirKernelSignature {
                 element_count,
                 source_local: Some(input.local),
                 source_name: param_source_name(input, interner),
+                reduced_projection: None,
             });
             next_binding += 1;
         }
@@ -413,6 +415,7 @@ impl MirKernelSignature {
                     .as_ref()
                     .and_then(|fields| fields.get(index).copied()),
                 source_name: None,
+                reduced_projection: None,
             });
         }
         let output = outputs.remove(0);
@@ -551,6 +554,7 @@ impl MirKernelSignature {
                 element_count,
                 source_local: Some(input.local),
                 source_name: param_source_name(input, interner),
+                reduced_projection: None,
             });
             next_binding += 1;
         }
@@ -575,6 +579,7 @@ impl MirKernelSignature {
                 element_count: partials,
                 source_local: None,
                 source_name: None,
+                reduced_projection: None,
             },
             extra_outputs: Vec::new(),
             accumulation_buffers: Vec::new(),
@@ -655,6 +660,7 @@ impl MirKernelSignature {
                 element_count: param_element_count,
                 source_local: Some(param.local),
                 source_name: param_source_name(param, interner),
+                reduced_projection: None,
             },
             extra_inputs: Vec::new(),
             output: MirKernelResource {
@@ -667,6 +673,7 @@ impl MirKernelSignature {
                 element_count: return_element_count,
                 source_local: None,
                 source_name: None,
+                reduced_projection: None,
             },
             extra_outputs: Vec::new(),
             accumulation_buffers: Vec::new(),
@@ -729,6 +736,7 @@ impl MirKernelSignature {
                 element_count: input_element_count,
                 source_local: Some(input.local),
                 source_name: param_source_name(input, interner),
+                reduced_projection: None,
             });
         }
 
@@ -753,6 +761,7 @@ impl MirKernelSignature {
                 element_count: return_element_count,
                 source_local: None,
                 source_name: None,
+                reduced_projection: None,
             },
             extra_outputs: Vec::new(),
             accumulation_buffers: Vec::new(),
@@ -803,6 +812,7 @@ impl MirKernelSignature {
                 element_count: input_element_count,
                 source_local: Some(input.local),
                 source_name: param_source_name(input, context.interner),
+                reduced_projection: None,
             },
             extra_inputs: Vec::new(),
             output: MirKernelResource {
@@ -815,6 +825,7 @@ impl MirKernelSignature {
                 element_count: output_element_count,
                 source_local: Some(output.local),
                 source_name: param_source_name(output, context.interner),
+                reduced_projection: None,
             },
             extra_outputs: Vec::new(),
             accumulation_buffers: Vec::new(),
@@ -867,6 +878,7 @@ impl MirKernelSignature {
                 element_count: input_element_count,
                 source_local: Some(input.local),
                 source_name: param_source_name(input, context.interner),
+                reduced_projection: None,
             });
         }
 
@@ -891,6 +903,7 @@ impl MirKernelSignature {
                 element_count: output_element_count,
                 source_local: Some(output.local),
                 source_name: param_source_name(output, context.interner),
+                reduced_projection: None,
             },
             extra_outputs: Vec::new(),
             accumulation_buffers: Vec::new(),

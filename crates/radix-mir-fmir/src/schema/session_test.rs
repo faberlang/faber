@@ -11,7 +11,7 @@
 //!
 //! - the session facts round-trip on the wire (session section + cadence +
 //!   invocation mode + KV layout) through admission and the binary codec;
-//! - a wire-7 image WITHOUT the section admits unchanged (single-device
+//! - a wire-8 image WITHOUT the section admits unchanged (single-device
 //!   packages do not require the section — the MD-A15 precedent);
 //! - every mutated session fact fails admission with a typed diagnostic
 //!   naming the violated class + exact failing fact;
@@ -76,16 +76,19 @@ fn wire_program_fixture() -> WireDeviceProgram {
         version: 1,
         element_ty: "f32".to_owned(),
         element_count: 64,
+        reduced_projection: None,
     };
     let v_t = WireBufferVersion {
         version: 1,
         element_ty: "f32".to_owned(),
         element_count: 1,
+        reduced_projection: None,
     };
     let v_o = WireBufferVersion {
         version: 1,
         element_ty: "f32".to_owned(),
         element_count: 32,
+        reduced_projection: None,
     };
     let launch = WireKernelLaunchPlan {
         workgroup: WireWorkgroupSize { x: 8, y: 1, z: 1 },
@@ -292,7 +295,7 @@ fn session_image_round_trips_through_the_binary_codec() {
 
 #[test]
 fn single_device_section_without_session_admits_unchanged() {
-    // A wire-7 device section WITHOUT the cadence/session section admits
+    // A wire-8 device section WITHOUT the cadence/session section admits
     // through the existing device-section admission unchanged (single-device
     // packages do not require the section — the MD-A15 precedent).
     let section = device_section_with_session(None);
@@ -475,7 +478,7 @@ fn session_section_version_ratchet_is_declared() {
     // sibling-field precedent): the first session-section shape is v1 and
     // the accepted wire versions are untouched.
     assert_eq!(WIRE_SESSION_SECTION_VERSION, 1);
-    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 7);
+    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 8);
     assert_eq!(PACKAGE_MIR_ARTIFACT_VERSION, 6);
     assert_eq!(WIRE_DISTRIBUTED_SECTION_VERSION, 1);
 }

@@ -157,6 +157,13 @@ pub struct BufferVersion {
     pub element_ty: MirType,
     /// Element count of this version's shape.
     pub element_count: u64,
+    /// The producer-defined reduced-buffer projection (council-8 CB-3):
+    /// present only when this version is the reduced output of an axis
+    /// reduction — the mapping a keep-dims consumer uses to address the
+    /// reduced buffer (see [`crate::abi::ReducedProjection`]). Carried here
+    /// and on the wire so consumers never reconstruct the projection from
+    /// element count.
+    pub reduced_projection: Option<crate::abi::ReducedProjection>,
 }
 
 /// Target-neutral binding indices for a kernel slot.

@@ -238,6 +238,13 @@ pub struct WireBufferVersion {
     pub element_ty: String,
     /// Element count of this version's shape.
     pub element_count: u64,
+    /// The producer-defined reduced-buffer projection (council-8 CB-3):
+    /// present when this version is the reduced output of an axis
+    /// reduction — the mapping a keep-dims consumer uses to address the
+    /// reduced buffer. Serialized explicitly (no silent default): an
+    /// `AxisReduction` producer stamps it on the reduced buffer version and
+    /// every consumer binding that version reads the carried fact.
+    pub reduced_projection: Option<WireReducedProjection>,
 }
 
 /// Target-neutral binding indices.
@@ -518,6 +525,28 @@ pub struct WireAxisReductionPlan {
     pub op: WireReduceOp,
     /// Axis reduced over (from the trailing const operand).
     pub axis: u64,
+    /// The producer-defined reduced-resource projection (council-8 CB-3):
+    /// `axis_extent` (`dims[axis]`) and `inner_stride` (the dim product
+    /// after the axis). Mirrored from
+    /// `radix_mir::abi::ReducedProjection`; carried on the wire so a
+    /// keep-dims consumer of the reduced buffer never reconstructs the
+    /// projection from element count.
+    pub projection: WireReducedProjection,
+}
+
+/// The wire mirror of the producer-defined reduced-buffer projection
+/// (council-8 CB-3): `axis_extent` is the reduced-axis dimension
+/// (`dims[axis]`) and `inner_stride` is the product of the dims after the
+/// axis (`1` when the axis is last). Distinguishes equal-dim reductions
+/// (a `[4,4]` axis-0 vs axis-1 reduction both produce 4 elements but map
+/// differently).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireReducedProjection {
+    /// The reduced-axis extent (`dims[axis]`).
+    pub axis_extent: u64,
+    /// The product of the dims after the axis (`1` when the axis is last).
+    pub inner_stride: u64,
 }
 
 /// Row-wise softmax recipe plan (wire mirror of `kernel_plan::RowSoftmaxPlan`,
@@ -721,7 +750,7 @@ pub enum WireReduceOp {
 // The versioned cadence/session wire revision (GI4-2; CTO S12; lane queue
 // §2/§5): the GI4-1-frozen session facts ride the accepted wire version as a
 // versioned session surface with its own ratchet + admission — the MD2-W1
-// sibling-field precedent. `WIRE_DEVICE_PROGRAM_VERSION = 7` and the outer
+// sibling-field precedent. `WIRE_DEVICE_PROGRAM_VERSION` and the outer
 // `PACKAGE_MIR_ARTIFACT_VERSION = 6` stay untouched; the MD2 `distributed`
 // section files are never co-edited. The wire types here mirror the GI4-1
 // frozen faber-runtime facts field-for-field (the `session.rs` / `kv_cache.rs`

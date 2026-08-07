@@ -11,14 +11,14 @@
 //! # Contract anchors (md2-delivery §MD2-W1)
 //!
 //! - **Optional sibling, absent for single-device packages** (MD-A15): a
-//!   wire-7 single-device image without the section decodes, admits, and
+//!   single-device image without the section decodes, admits, and
 //!   runs unchanged; the section-level A10 exclusion is proven in
 //!   `distributed_test.rs`. Old consumers reject distributed images via
 //!   `deny_unknown_fields` (fail-closed, A7).
 //! - **Own version ratchet** (`v` + [`WIRE_DISTRIBUTED_SECTION_VERSION`]),
 //!   admitted fail-closed **before field interpretation** (the
 //!   `admit_device_section` pattern, FC4). The nested
-//!   `WIRE_DEVICE_PROGRAM_VERSION = 7` and outer
+//!   `WIRE_DEVICE_PROGRAM_VERSION` and outer
 //!   `PACKAGE_MIR_ARTIFACT_VERSION = 6` stay untouched.
 //! - **Equivalence gate** (admission): re-derives `(program,
 //!   declared_placement)` from the single-device wire program + the declared
@@ -44,6 +44,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use radix_mir::abi::ReducedProjection;
 use radix_mir::abi::{
     MirKernelDispatchSize, MirKernelResourceAccess, MirKernelWorkgroupCount, MirWorkgroupSize,
 };
@@ -455,6 +456,15 @@ fn wire_buffer_version(version: &WireBufferVersion) -> Result<BufferVersion, Fmi
         version: version.version,
         element_ty: mir_type_from_spelling(&version.element_ty)?,
         element_count: version.element_count,
+        // The carried reduced-resource projection (council-8 CB-3) rides the
+        // wire version explicitly — the reverse arm maps it, never defaults
+        // it.
+        reduced_projection: version
+            .reduced_projection
+            .map(|projection| ReducedProjection {
+                axis_extent: projection.axis_extent,
+                inner_stride: projection.inner_stride,
+            }),
     })
 }
 
@@ -558,6 +568,13 @@ fn wire_kernel_plan(plan: &WireCollectionKernelPlan) -> CollectionKernelPlan {
             CollectionKernelPlan::AxisReduction(AxisReductionPlan {
                 op: wire_reduce_op(plan.op),
                 axis: plan.axis,
+                // The carried reduced-resource projection maps back
+                // field-for-field (council-8 CB-3) — the reverse arm
+                // reconstructs the producer fact, never infers it.
+                projection: ReducedProjection {
+                    axis_extent: plan.projection.axis_extent,
+                    inner_stride: plan.projection.inner_stride,
+                },
             })
         }
         WireCollectionKernelPlan::RowSoftmax(plan) => {

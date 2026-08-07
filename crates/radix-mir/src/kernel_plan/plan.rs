@@ -105,6 +105,15 @@ pub struct AxisReductionPlan {
     pub op: ReduceOp,
     /// Axis reduced over (from the trailing const operand).
     pub axis: u64,
+    /// The producer-defined reduced-resource projection (council-8 CB-3):
+    /// `axis_extent` (`dims[axis]`) and `inner_stride` (the dim product
+    /// after the axis). Carried into each consuming
+    /// [`MirKernelResource`](crate::abi::MirKernelResource) /
+    /// `WireBufferVersion` so consumers never reconstruct the reduced-buffer
+    /// mapping from element count — ambiguous for equal dims (a `[4,4]`
+    /// axis-0 vs axis-1 reduction both produce 4 elements but map
+    /// differently).
+    pub projection: crate::abi::ReducedProjection,
 }
 
 /// Row-wise softmax recipe plan (name frozen by S6-N1; admission, resolution,

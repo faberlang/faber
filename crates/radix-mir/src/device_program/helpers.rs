@@ -70,32 +70,48 @@ pub(super) fn record_identity(
 /// shapes (a shape change must be a new version — no in-place
 /// reinterpretation).
 pub(super) fn record_shape(
-    seen: &mut Vec<(BufferId, u32, MirType, u64)>,
+    seen: &mut Vec<ShapeRecord>,
     buffer: BufferId,
     version: &BufferVersion,
 ) -> Result<(), DeviceProgramError> {
-    if let Some((_, _, first_ty, first_count)) =
-        seen.iter().find(|(seen_buffer, seen_version, _, _)| {
-            *seen_buffer == buffer && *seen_version == version.version
-        })
+    if let Some(first) = seen
+        .iter()
+        .find(|seen| seen.buffer == buffer && seen.version == version.version)
     {
-        if *first_ty != version.element_ty || *first_count != version.element_count {
+        if first.element_ty != version.element_ty
+            || first.element_count != version.element_count
+            // The reduced-resource projection (council-8 CB-3) is part of
+            // the version's shape — two references to one version must
+            // agree on the producer-defined projection too.
+            || first.reduced_projection != version.reduced_projection
+        {
             return Err(DeviceProgramError::VersionShapeConflict {
                 buffer,
                 version: version.version,
-                first: shape_description(*first_ty, *first_count),
+                first: shape_description(first.element_ty, first.element_count),
                 second: shape_description(version.element_ty, version.element_count),
             });
         }
     } else {
-        seen.push((
+        seen.push(ShapeRecord {
             buffer,
-            version.version,
-            version.element_ty,
-            version.element_count,
-        ));
+            version: version.version,
+            element_ty: version.element_ty,
+            element_count: version.element_count,
+            reduced_projection: version.reduced_projection,
+        });
     }
     Ok(())
+}
+
+/// The recorded shape identity of one (buffer, version): element type +
+/// count + the carried reduced-resource projection (council-8 CB-3).
+pub(super) struct ShapeRecord {
+    pub(super) buffer: BufferId,
+    pub(super) version: u32,
+    pub(super) element_ty: MirType,
+    pub(super) element_count: u64,
+    pub(super) reduced_projection: Option<crate::abi::ReducedProjection>,
 }
 
 /// Compact shape description for diagnostics.

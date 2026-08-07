@@ -119,6 +119,7 @@ fn multi_element_shape_has_no_runtime_extent() {
             element_count: 4,
             source_local: Some(MirLocalId(0)),
             source_name: None,
+            reduced_projection: None,
         },
         extra_inputs: Vec::new(),
         output: MirKernelResource {
@@ -131,6 +132,7 @@ fn multi_element_shape_has_no_runtime_extent() {
             element_count: 4,
             source_local: None,
             source_name: None,
+            reduced_projection: None,
         },
         extra_outputs: Vec::new(),
         accumulation_buffers: Vec::new(),
@@ -381,6 +383,7 @@ fn result_tuple_kernel_synthesizes_multi_output_signature() {
         element_count: 4,
         source_local: None,
         source_name: None,
+        reduced_projection: None,
     });
     assert_eq!(signature.accumulation_buffers.len(), 1);
     assert_eq!(signature.accumulation_buffers[0].binding, 4);
@@ -872,6 +875,7 @@ fn transpose_signature_applies_elementwise_style_dispatch() {
             element_count: 16,
             source_local: Some(MirLocalId(0)),
             source_name: None,
+            reduced_projection: None,
         },
         extra_inputs: Vec::new(),
         output: MirKernelResource {
@@ -884,6 +888,7 @@ fn transpose_signature_applies_elementwise_style_dispatch() {
             element_count: 16,
             source_local: None,
             source_name: None,
+            reduced_projection: None,
         },
         extra_outputs: Vec::new(),
         accumulation_buffers: Vec::new(),

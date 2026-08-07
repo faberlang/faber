@@ -230,6 +230,7 @@ impl CollectionKernelPlan {
                 Some(CollectionKernelPlan::AxisReduction(AxisReductionPlan {
                     op: ReduceOp::Sum,
                     axis,
+                    projection: axis_reduction_projection(&dims, axis)?,
                 }))
             }
             MirCollectionOp::TensorSoftmax | MirCollectionOp::TensorLayerNorm => {
@@ -927,4 +928,27 @@ fn dims_without_axis_product(dims: &[u64], axis: u64) -> Option<u64> {
         }
     }
     Some(product)
+}
+
+/// The producer-defined reduced-buffer projection of an axis reduction
+/// (council-8 CB-3): `axis_extent` = `dims[axis]` (the per-row reduction
+/// width) and `inner_stride` = the product of the dims after the axis (`1`
+/// when the axis is last). Carried into each consuming resource/version so
+/// consumers never reconstruct the projection from element count.
+pub(crate) fn axis_reduction_projection(
+    dims: &[u64],
+    axis: u64,
+) -> Option<crate::abi::ReducedProjection> {
+    let axis = usize::try_from(axis).ok()?;
+    if axis >= dims.len() {
+        return None;
+    }
+    let mut inner_stride = 1u64;
+    for &dim in &dims[axis + 1..] {
+        inner_stride = inner_stride.saturating_mul(dim);
+    }
+    Some(crate::abi::ReducedProjection {
+        axis_extent: dims[axis],
+        inner_stride,
+    })
 }

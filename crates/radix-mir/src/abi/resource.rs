@@ -47,6 +47,45 @@ pub struct MirKernelResource {
     pub element_count: u64,
     pub source_local: Option<MirLocalId>,
     pub source_name: Option<String>,
+    /// The producer-defined reduced-buffer projection (council-8 CB-3): the
+    /// axis-reduction fact that maps a keep-dims flat element into this
+    /// resource's REDUCED buffer. `Some` only on a resource that binds a
+    /// reduced-count buffer produced by an `AxisReduction` recipe — carried
+    /// here (and on the wire [`crate::device_program::BufferVersion`]) so
+    /// consumers never reconstruct the projection from element count (which
+    /// is ambiguous for equal dims — a `[4,4]` axis-0 and axis-1 reduction
+    /// both produce 4 elements but map differently). `None` for every other
+    /// resource.
+    pub reduced_projection: Option<ReducedProjection>,
+}
+
+/// The producer-defined linear projection of a reduced buffer
+/// (council-8 CB-3): `axis_extent` is the reduced-axis dimension
+/// (`dims[axis]`, the per-row reduction width) and `inner_stride` is the
+/// product of the dims after the axis (`1` when the axis is last). These two
+/// facts distinguish every reduction mapping — for `[4,4]`, axis 0 carries
+/// `{axis_extent: 4, inner_stride: 4}` (column reduce) and axis 1 carries
+/// `{axis_extent: 4, inner_stride: 1}` (row reduce), even though both
+/// reduced buffers hold 4 elements. A consumer reads a keep-dims flat
+/// element `o` at the reduced-buffer flat index
+/// `(o / (axis_extent · inner_stride)) · inner_stride + (o % inner_stride)`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReducedProjection {
+    /// The reduced-axis extent (`dims[axis]`).
+    pub axis_extent: u64,
+    /// The product of the dims after the axis (`1` when the axis is last).
+    pub inner_stride: u64,
+}
+
+impl ReducedProjection {
+    /// The reduced-buffer flat index for a keep-dims element at flat index
+    /// `flat` (council-8 CB-3): the general prefix/suffix flatten. Axis-last
+    /// (`inner_stride == 1`) simplifies to `flat / axis_extent`.
+    #[must_use]
+    pub fn reduced_index(self, flat: u64) -> u64 {
+        let width = self.axis_extent.saturating_mul(self.inner_stride);
+        (flat / width).saturating_mul(self.inner_stride) + (flat % self.inner_stride)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

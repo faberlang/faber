@@ -311,6 +311,10 @@ pub fn carried_resources_agree(carried: &[DeviceResource], signature: &MirKernel
         }
         if signature_resource.element_ty != resource.version.element_ty
             || signature_resource.element_count != resource.version.element_count
+            // The carried reduced-resource projection (council-8 CB-3) must
+            // agree with the version's — a stale or dropped projection is a
+            // carried-fact disagreement, never silently tolerated.
+            || signature_resource.reduced_projection != resource.version.reduced_projection
         {
             return false;
         }
@@ -698,6 +702,7 @@ fn storage_input(binding: u32, element_ty: MirType, count: u64) -> MirKernelReso
         element_count: count,
         source_local: None,
         source_name: None,
+        reduced_projection: None,
     }
 }
 
@@ -712,6 +717,7 @@ fn storage_output(binding: u32, element_ty: MirType, count: u64) -> MirKernelRes
         element_count: count,
         source_local: None,
         source_name: None,
+        reduced_projection: None,
     }
 }
 
@@ -910,6 +916,15 @@ pub fn transformer_shape_signature(
     };
     signature.input.source_local = Some(operand_local);
     signature.output.source_local = recipe_destination_local_for(function, op);
+    // Council-8 CB-3: the axis-reduction producer stamps its
+    // producer-defined reduced-resource projection on the reduced OUTPUT
+    // resource — the mapping a keep-dims consumer uses to address the
+    // reduced buffer. The fact is carried (plan → resource → wire version),
+    // never reconstructed from element count by a consumer.
+    if op == MirCollectionOp::TensorSumAxis {
+        signature.output.reduced_projection =
+            crate::kernel_plan::axis_reduction_projection(&dims, axis);
+    }
     // GI3-1: the row-gather recipe binds its id vector as the signature's
     // first extra input (binding 1, the kernel-index element type) at the
     // id count resolved from the return-type dims; the output moves to
@@ -1298,15 +1313,17 @@ fn finish_subchain_emission_signature(
         // (function, local) unification would see two shapes for one local
         // (VersionShapeConflict). The producing SumAxis statement lives in an
         // earlier subchain, so it is scanned from the SOURCE function.
+        // Council-8 CB-3: the producer-defined reduced-resource projection
+        // rides the consumer input too — the keep-dims read is driven by
+        // the carried fact, never by count-equality inference.
+        let projection = source
+            .and_then(|source| sum_axis_destination_projection(source, param.local, validation));
         let count = source
             .and_then(|source| sum_axis_destination_count(source, param.local, validation))
             .unwrap_or(count);
-        signature.extra_inputs.push(storage_input_with_local(
-            next_binding,
-            element_ty,
-            count,
-            param.local,
-        ));
+        let mut input = storage_input_with_local(next_binding, element_ty, count, param.local);
+        input.reduced_projection = projection;
+        signature.extra_inputs.push(input);
         next_binding = next_binding.saturating_add(1);
     }
     // The primary output (the recipe output) binds after the inputs; each
@@ -1341,6 +1358,41 @@ fn sum_axis_destination_count(
     local: MirLocalId,
     validation: &MirValidationContext<'_>,
 ) -> Option<u64> {
+    let (dims, axis) = sum_axis_destination_shape(source, local, validation)?;
+    Some(
+        dims.iter()
+            .enumerate()
+            .filter(|(index, _)| *index as u64 != axis)
+            .fold(1u64, |acc, (_, &dim)| acc.saturating_mul(dim)),
+    )
+}
+
+/// The producer-defined reduced-resource projection of a `TensorSumAxis`
+/// destination local in the source function (council-8 CB-3): `axis_extent`
+/// (`dims[axis]`) + `inner_stride` (the dim product after the axis). This is
+/// the fact a keep-dims consumer carries on its input resource so the
+/// reduced read is never reconstructed from element count — which is
+/// ambiguous for equal dims (a `[4,4]` axis-0 vs axis-1 reduction both
+/// produce 4 elements but map differently). `None` when the local is not a
+/// `TensorSumAxis` destination.
+fn sum_axis_destination_projection(
+    source: &MirFunction,
+    local: MirLocalId,
+    validation: &MirValidationContext<'_>,
+) -> Option<crate::abi::ReducedProjection> {
+    let (dims, axis) = sum_axis_destination_shape(source, local, validation)?;
+    crate::kernel_plan::axis_reduction_projection(&dims, axis)
+}
+
+/// The operand dims + reduction axis of a `TensorSumAxis` destination local
+/// in the source function — the shared scan behind the reduced count and the
+/// reduced-resource projection (council-8 CB-3). `None` when the local is
+/// not a `TensorSumAxis` destination with resolvable shape facts.
+fn sum_axis_destination_shape(
+    source: &MirFunction,
+    local: MirLocalId,
+    validation: &MirValidationContext<'_>,
+) -> Option<(Vec<u64>, u64)> {
     for block in &source.blocks {
         for statement in &block.statements {
             let MirStatementKind::RuntimeCall {
@@ -1373,12 +1425,7 @@ fn sum_axis_destination_count(
                 MirOperand::Constant(MirConstant::UInt(axis)) => *axis,
                 _ => return None,
             };
-            return Some(
-                dims.iter()
-                    .enumerate()
-                    .filter(|(index, _)| *index as u64 != axis)
-                    .fold(1u64, |acc, (_, &dim)| acc.saturating_mul(dim)),
-            );
+            return Some((dims, axis));
         }
     }
     None

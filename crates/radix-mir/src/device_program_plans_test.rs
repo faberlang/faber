@@ -86,6 +86,7 @@ fn reduction_signature(length: u64, workgroup_x: u32, partials: u64) -> MirKerne
             element_count: length,
             source_local: Some(MirLocalId(0)),
             source_name: None,
+            reduced_projection: None,
         },
         extra_inputs: Vec::new(),
         output: MirKernelResource {
@@ -98,6 +99,7 @@ fn reduction_signature(length: u64, workgroup_x: u32, partials: u64) -> MirKerne
             element_count: partials,
             source_local: None,
             source_name: None,
+            reduced_projection: None,
         },
         extra_outputs: Vec::new(),
         accumulation_buffers: Vec::new(),
@@ -131,6 +133,7 @@ fn matmul_signature(shapes: MatMulShapes, dispatch_x: u64, dispatch_y: u64) -> M
             element_count: shapes.m * shapes.k,
             source_local: Some(MirLocalId(0)),
             source_name: None,
+            reduced_projection: None,
         },
         extra_inputs: vec![MirKernelResource {
             group: 0,
@@ -142,6 +145,7 @@ fn matmul_signature(shapes: MatMulShapes, dispatch_x: u64, dispatch_y: u64) -> M
             element_count: shapes.k * shapes.n,
             source_local: Some(MirLocalId(1)),
             source_name: None,
+            reduced_projection: None,
         }],
         output: MirKernelResource {
             group: 0,
@@ -153,6 +157,7 @@ fn matmul_signature(shapes: MatMulShapes, dispatch_x: u64, dispatch_y: u64) -> M
             element_count: shapes.m * shapes.n,
             source_local: None,
             source_name: None,
+            reduced_projection: None,
         },
         extra_outputs: Vec::new(),
         accumulation_buffers: Vec::new(),
@@ -186,6 +191,7 @@ fn transpose_signature(m: u64, n: u64) -> MirKernelSignature {
             element_count: m * n,
             source_local: Some(MirLocalId(0)),
             source_name: None,
+            reduced_projection: None,
         },
         extra_inputs: Vec::new(),
         output: MirKernelResource {
@@ -198,6 +204,7 @@ fn transpose_signature(m: u64, n: u64) -> MirKernelSignature {
             element_count: m * n,
             source_local: None,
             source_name: None,
+            reduced_projection: None,
         },
         extra_outputs: Vec::new(),
         accumulation_buffers: Vec::new(),
@@ -235,6 +242,7 @@ fn transformer_signature(input_count: u64, output_count: u64) -> MirKernelSignat
             element_count: input_count,
             source_local: Some(MirLocalId(0)),
             source_name: None,
+            reduced_projection: None,
         },
         extra_inputs: Vec::new(),
         output: MirKernelResource {
@@ -247,6 +255,7 @@ fn transformer_signature(input_count: u64, output_count: u64) -> MirKernelSignat
             element_count: output_count,
             source_local: None,
             source_name: None,
+            reduced_projection: None,
         },
         extra_outputs: Vec::new(),
         accumulation_buffers: Vec::new(),
@@ -901,6 +910,7 @@ fn version(number: u32, ty: MirType, count: u64) -> BufferVersion {
         version: number,
         element_ty: ty,
         element_count: count,
+        reduced_projection: None,
     }
 }
 
@@ -1340,6 +1350,10 @@ fn sum_axis_function_resolves_axis_reduction_plan() {
     let carried = CollectionKernelPlan::AxisReduction(crate::kernel_plan::AxisReductionPlan {
         op: crate::kernel_plan::ReduceOp::Sum,
         axis: 1,
+        projection: crate::abi::ReducedProjection {
+            axis_extent: 4,
+            inner_stride: 1,
+        },
     });
     assert!(carried_plan_agrees(&carried, Some(&derived)));
 }
@@ -1553,6 +1567,7 @@ fn kernel_plan_refuses_signature_over_the_buffer_binding_maximum() {
             element_count: 4,
             source_local: None,
             source_name: None,
+            reduced_projection: None,
         });
     }
     let validation = MirValidationContext::new(&types);
@@ -1617,6 +1632,10 @@ fn transformer_recipe_kinds_are_typed() {
             crate::kernel_plan::AxisReductionPlan {
                 op: crate::kernel_plan::ReduceOp::Sum,
                 axis: 1,
+                projection: crate::abi::ReducedProjection {
+                    axis_extent: 4,
+                    inner_stride: 1,
+                },
             }
         )),
         RecipeKind::AxisReduction
@@ -1726,6 +1745,10 @@ fn transformer_subchain_signature_binds_operand_and_output() {
     let carried = CollectionKernelPlan::AxisReduction(crate::kernel_plan::AxisReductionPlan {
         op: crate::kernel_plan::ReduceOp::Sum,
         axis: 1,
+        projection: crate::abi::ReducedProjection {
+            axis_extent: 4,
+            inner_stride: 1,
+        },
     });
     assert!(carried_plan_agrees(&carried, Some(&plan)));
 }
@@ -2629,6 +2652,7 @@ fn gather_signature() -> MirKernelSignature {
             element_count: 960 * 49_152,
             source_local: Some(MirLocalId(0)),
             source_name: None,
+            reduced_projection: None,
         },
         extra_inputs: vec![MirKernelResource {
             group: 0,
@@ -2640,6 +2664,7 @@ fn gather_signature() -> MirKernelSignature {
             element_count: 9,
             source_local: Some(MirLocalId(1)),
             source_name: None,
+            reduced_projection: None,
         }],
         output: MirKernelResource {
             group: 0,
@@ -2651,6 +2676,7 @@ fn gather_signature() -> MirKernelSignature {
             element_count: 9 * 49_152,
             source_local: None,
             source_name: None,
+            reduced_projection: None,
         },
         extra_outputs: Vec::new(),
         accumulation_buffers: Vec::new(),

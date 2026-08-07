@@ -5,12 +5,11 @@ use super::helpers::{
 };
 use super::registry::{BufferRegistry, RegistryBuffer};
 use super::types::{
-    Binding, BufferId, BufferIdentity, BufferLifetime, BufferRole, DeviceProgram,
-    DeviceProgramLifetime, LaunchId, ObservationCadence,
+    Binding, BufferIdentity, BufferLifetime, BufferRole, DeviceProgram, DeviceProgramLifetime,
+    LaunchId, ObservationCadence,
 };
 use crate::abi::MirKernelResourceAccess;
 use crate::device_semantics::DeviceSemantics;
-use crate::MirType;
 
 impl DeviceProgram {
     /// A new, empty device program with the given lifetime regime.
@@ -213,7 +212,7 @@ impl DeviceProgram {
         }
 
         let mut first_identities: Vec<BufferIdentity> = Vec::new();
-        let mut first_shapes: Vec<(BufferId, u32, MirType, u64)> = Vec::new();
+        let mut first_shapes: Vec<super::helpers::ShapeRecord> = Vec::new();
         for kernel in &self.kernels {
             for resource in &kernel.resources {
                 record_identity(&mut first_identities, &resource.buffer)?;

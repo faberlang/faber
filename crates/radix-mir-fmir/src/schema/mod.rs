@@ -89,23 +89,32 @@ pub const PACKAGE_MIR_ARTIFACT_VERSION: u32 = 6;
 /// `5 → 6` by the Stage 5A U1 clean break (S5A-U1: every result row's
 /// observation fact carries the explicit **observation cadence** —
 /// `PerStep`/`EndOfRun` — so the canonical wire bytes change when the
-/// readback cadence changes), and `6 → 7` by the S6-C2 clean break (the
+/// readback cadence changes), `6 → 7` by the S6-C2 clean break (the
 /// S6-N1-frozen recipe variants `AxisReduction`/`RowSoftmax`/
 /// `LayerNormalization` gain real wire mirrors and every kernel carries the
 /// typed rank-extension **broadcast fact** — both change the canonical wire
-/// bytes; admission validates the carried broadcast fail-closed, A7).
+/// bytes; admission validates the carried broadcast fail-closed, A7), and
+/// `7 → 8` by the council-7/council-8 clean break (CB-2/CB-3): the
+/// GI3-1 shape changes become version-visible (`WireRopePlan.per_row`/`rows`
+/// and the `MirUnOp::F16Round` unary variant landed inside wire-7 without a
+/// ratchet — wire-7 is an **unpublished clean break**: no pre-GI3-1 wire-7
+/// artifact escaped the repo, ephemeral same-revision tests only — so the
+/// bump records them retroactively), and every `AxisReduction` plan +
+/// reduced buffer version carries the producer-defined **reduced-resource
+/// projection** (`axis_extent` + `inner_stride`) so consumers never
+/// reconstruct the reduced-buffer mapping from element count).
 /// Admitted independently of the outer image version:
 /// [`admit_device_section`] rejects a mismatched nested version before any
 /// field-level interpretation, with a focused diagnostic
 /// ([`UnsupportedDeviceProgramVersion`](crate::error::FmirImageError::UnsupportedDeviceProgramVersion)).
-pub const WIRE_DEVICE_PROGRAM_VERSION: u32 = 7;
+pub const WIRE_DEVICE_PROGRAM_VERSION: u32 = 8;
 
 /// The version ratchet of the optional distributed execution section
 /// (MD2-W1 A7). The section carries its OWN nested version, admitted
 /// fail-closed **before field interpretation** (the `admit_device_section`
 /// pattern, FC4) — independently of the nested device-program wire version
 /// and the outer image version. The first distributed-section shape is v1;
-/// the nested `WIRE_DEVICE_PROGRAM_VERSION = 7` and the outer
+/// the nested `WIRE_DEVICE_PROGRAM_VERSION = 8` and the outer
 /// `PACKAGE_MIR_ARTIFACT_VERSION = 6` stay untouched (FC1).
 pub const WIRE_DISTRIBUTED_SECTION_VERSION: u32 = 1;
 
@@ -147,29 +156,34 @@ mod tests {
     }
 
     #[test]
-    fn device_program_wire_version_is_7_after_the_broadcast_fact_break() {
+    fn device_program_wire_version_is_8_after_the_gi3_projection_break() {
         // Stage 3R U1 bumped the nested device-program wire version 3 → 4
         // (S1); S5-U5b bumps it 4 → 5 (the declared RepeatingStep step count
         // rides the lifetime variant); S5A-U1 bumps it 5 → 6 (every result
         // row's observation fact carries the explicit PerStep/EndOfRun
         // cadence); S6-C2 bumps it 6 → 7 (the recipe-variant wire mirrors and
         // the typed rank-extension broadcast fact change the canonical wire
-        // bytes). The nested wire version ratchets independently of the
-        // outer image version (S8) — it currently does NOT coincide
-        // numerically with `PACKAGE_MIR_ARTIFACT_VERSION`; the two are
-        // admitted by separate gates.
-        assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 7);
+        // bytes); council-7/council-8 (CB-2/CB-3) bumps it 7 → 8 (the GI3-1
+        // shape changes become version-visible — wire-7 was an unpublished
+        // clean break, no pre-GI3-1 wire-7 artifact escaped the repo — and
+        // every AxisReduction plan + reduced buffer version carries the
+        // producer-defined reduced-resource projection). The nested wire
+        // version ratchets independently of the outer image version (S8) —
+        // it currently does NOT coincide numerically with
+        // `PACKAGE_MIR_ARTIFACT_VERSION`; the two are admitted by separate
+        // gates.
+        assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 8);
     }
 
     #[test]
     fn distributed_section_versions_leave_the_accepted_wire_untouched() {
-        // MD2-W1 (A7): the distributed section rides the accepted wire 7 as
+        // MD2-W1 (A7): the distributed section rides the accepted wire 8 as
         // an optional sibling field with its OWN version ratchet. The nested
         // device-program wire version, the outer image version, and the
         // section's own version are admitted by separate gates; none of the
         // frozen version constants changes with the distributed section.
         assert_eq!(WIRE_DISTRIBUTED_SECTION_VERSION, 1);
-        assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 7);
+        assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 8);
         assert_eq!(PACKAGE_MIR_ARTIFACT_VERSION, 6);
     }
 

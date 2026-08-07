@@ -26,11 +26,11 @@ use crate::schema::{
     WireCompanionSelectedOutput, WireDependencyEdge, WireDeviceProgram, WireDeviceResource,
     WireDispatchSize, WireGatherPlan, WireInitializationPolicy, WireKernelLaunchPlan,
     WireKernelUnit, WireLaunchUnit, WireLayerNormalizationPlan, WireObservationCadence,
-    WireObservationFact, WireProgramLifetime, WireReduceOp, WireResourceAccess, WireResultBuffer,
-    WireRmsNormalizationPlan, WireRopePlan, WireRowSoftmaxPlan, WireSemanticValue,
-    WireSemanticValueOrigin, WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize,
-    FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION,
-    WIRE_DEVICE_PROGRAM_VERSION,
+    WireObservationFact, WireProgramLifetime, WireReduceOp, WireReducedProjection,
+    WireResourceAccess, WireResultBuffer, WireRmsNormalizationPlan, WireRopePlan,
+    WireRowSoftmaxPlan, WireSemanticValue, WireSemanticValueOrigin, WireStorageLayout,
+    WireWorkgroupCount, WireWorkgroupSize, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME,
+    PACKAGE_MIR_ARTIFACT_VERSION, WIRE_DEVICE_PROGRAM_VERSION,
 };
 use radix_mir::MirProgram;
 use radix_types::TypeTable;
@@ -73,6 +73,7 @@ fn sample_wire_program() -> WireDeviceProgram {
                         version: 1,
                         element_ty: "f32".to_owned(),
                         element_count: 4,
+                        reduced_projection: None,
                     },
                     binding: WireBinding {
                         group: 0,
@@ -88,6 +89,7 @@ fn sample_wire_program() -> WireDeviceProgram {
                         version: 1,
                         element_ty: "f32".to_owned(),
                         element_count: 4,
+                        reduced_projection: None,
                     },
                     binding: WireBinding {
                         group: 0,
@@ -115,6 +117,7 @@ fn sample_wire_program() -> WireDeviceProgram {
                 version: 1,
                 element_ty: "f32".to_owned(),
                 element_count: 4,
+                reduced_projection: None,
             },
             role: WireBufferRole::Output,
             produced_by: 1,
@@ -345,6 +348,97 @@ fn device_section_with_no_artifacts_round_trips() {
     let decoded = decode_text_image(&encode_text_image(&image).unwrap(), TOOLCHAIN)
         .expect("decode with empty artifacts");
     assert!(decoded.device.unwrap().artifacts.artifact.is_empty());
+}
+
+#[test]
+fn reduced_projection_program_decodes_under_the_new_wire_version() {
+    // Council-8 CB-3 decode-path coverage: a device program carrying the
+    // new wire-8 reduced-resource projection facts — the `AxisReduction`
+    // plan projection AND the reduced buffer version's carried projection —
+    // decodes through BOTH codec paths (the text `fmir-text` codec and the
+    // binary postcard codec) under the accepted wire version, with the
+    // carried facts intact. The wire bump must not regress either decode
+    // path, and the new facts must survive both.
+    let mut program = sample_wire_program();
+    program.kernels[0].plan = WireCollectionKernelPlan::AxisReduction(WireAxisReductionPlan {
+        op: WireReduceOp::Sum,
+        axis: 0,
+        projection: WireReducedProjection {
+            axis_extent: 4,
+            inner_stride: 4,
+        },
+    });
+    // The reduced output buffer version carries the same producer-defined
+    // projection on the wire version itself.
+    program.results[0].version.reduced_projection = Some(WireReducedProjection {
+        axis_extent: 4,
+        inner_stride: 4,
+    });
+    program.kernels[0].resources[1].version.reduced_projection = Some(WireReducedProjection {
+        axis_extent: 4,
+        inner_stride: 4,
+    });
+    let mut section = sample_device_section();
+    section.device_program.program = program;
+
+    // Text decode path (the `fmir-text` TOML codec).
+    let text_image = text_image_with_device(Some(section.clone()));
+    let text_decoded = decode_text_image(&encode_text_image(&text_image).unwrap(), TOOLCHAIN)
+        .expect("wire-8 program decodes through the text codec");
+    let text_device = text_decoded.device.expect("device section present");
+    assert_eq!(text_device.device_program.v, WIRE_DEVICE_PROGRAM_VERSION);
+    assert_eq!(
+        text_device.device_program.program.kernels[0].plan,
+        WireCollectionKernelPlan::AxisReduction(WireAxisReductionPlan {
+            op: WireReduceOp::Sum,
+            axis: 0,
+            projection: WireReducedProjection {
+                axis_extent: 4,
+                inner_stride: 4,
+            },
+        }),
+        "the axis-reduction plan projection survives the text decode"
+    );
+    assert_eq!(
+        text_device.device_program.program.results[0]
+            .version
+            .reduced_projection,
+        Some(WireReducedProjection {
+            axis_extent: 4,
+            inner_stride: 4,
+        }),
+        "the reduced buffer version's projection survives the text decode"
+    );
+
+    // Binary decode path (the postcard codec).
+    let binary_image = binary_image_with_device(Some(section));
+    let binary_decoded =
+        decode_binary_image(&encode_binary_image(&binary_image).unwrap(), TOOLCHAIN)
+            .expect("wire-8 program decodes through the postcard codec");
+    let binary_device = binary_decoded.device.expect("device section present");
+    assert_eq!(binary_device.device_program.v, WIRE_DEVICE_PROGRAM_VERSION);
+    assert_eq!(
+        binary_device.device_program.program.kernels[0].plan,
+        WireCollectionKernelPlan::AxisReduction(WireAxisReductionPlan {
+            op: WireReduceOp::Sum,
+            axis: 0,
+            projection: WireReducedProjection {
+                axis_extent: 4,
+                inner_stride: 4,
+            },
+        }),
+        "the axis-reduction plan projection survives the postcard decode"
+    );
+    assert_eq!(
+        binary_device.device_program.program.results[0]
+            .version
+            .reduced_projection,
+        Some(WireReducedProjection {
+            axis_extent: 4,
+            inner_stride: 4,
+        }),
+        "the reduced buffer version's projection survives the postcard decode"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -587,6 +681,46 @@ fn decode_rejects_old_wire_version_in_binary_image() {
 }
 
 #[test]
+fn mixed_wire_version_fails_with_the_named_incompatible_diagnostic() {
+    // Council-8 CB-3 (the 7 → 8 clean break): a device section carrying the
+    // immediately-previous wire version is a MIXED-version payload and must
+    // fail closed with the NAMED "incompatible wire version" diagnostic —
+    // the focused `UnsupportedDeviceProgramVersion` error whose display
+    // names the incompatibility — never an opaque decode failure and never
+    // a generic field-level error that hides the version gate.
+    let mut section = sample_device_section();
+    section.device_program.v = WIRE_DEVICE_PROGRAM_VERSION - 1;
+    let image = text_image_with_device(Some(section.clone()));
+    let text = encode_text_image(&image).expect("encode text image");
+    match decode_text_image(&text, TOOLCHAIN) {
+        Err(FmirImageError::UnsupportedDeviceProgramVersion { actual, expected }) => {
+            assert_eq!(actual, WIRE_DEVICE_PROGRAM_VERSION - 1);
+            assert_eq!(expected, WIRE_DEVICE_PROGRAM_VERSION);
+            let message =
+                FmirImageError::UnsupportedDeviceProgramVersion { actual, expected }.to_string();
+            assert!(
+                message.contains("incompatible") && message.contains("wire version"),
+                "the diagnostic must name the incompatible wire version, got: {message}"
+            );
+        }
+        other => panic!("expected the named incompatible-wire-version error, got {other:?}"),
+    }
+
+    // The binary (postcard) codec surfaces the SAME named diagnostic.
+    let binary_image = binary_image_with_device(Some(section));
+    let bytes = encode_binary_image(&binary_image).expect("encode binary image");
+    assert!(
+        matches!(
+            decode_binary_image(&bytes, TOOLCHAIN),
+            Err(FmirImageError::UnsupportedDeviceProgramVersion { actual, expected })
+                if actual == WIRE_DEVICE_PROGRAM_VERSION - 1
+                    && expected == WIRE_DEVICE_PROGRAM_VERSION
+        ),
+        "the binary codec must reject the mixed-version payload with the same focused diagnostic"
+    );
+}
+
+#[test]
 fn decode_rejects_outer_version_independently_of_nested_version() {
     // The outer gate is also independent: a v5 image whose nested device
     // program is already the current v4 still fails on the OUTER version
@@ -778,6 +912,7 @@ fn two_kernel_chain_program() -> WireDeviceProgram {
                         version: 1,
                         element_ty: "f32".to_owned(),
                         element_count: 4,
+                        reduced_projection: None,
                     },
                     binding: WireBinding {
                         group: 0,
@@ -804,6 +939,7 @@ fn two_kernel_chain_program() -> WireDeviceProgram {
                             version: 1,
                             element_ty: "f32".to_owned(),
                             element_count: 4,
+                            reduced_projection: None,
                         },
                         binding: WireBinding {
                             group: 0,
@@ -819,6 +955,7 @@ fn two_kernel_chain_program() -> WireDeviceProgram {
                             version: 1,
                             element_ty: "f32".to_owned(),
                             element_count: 4,
+                            reduced_projection: None,
                         },
                         binding: WireBinding {
                             group: 0,
@@ -853,6 +990,7 @@ fn two_kernel_chain_program() -> WireDeviceProgram {
                 version: 1,
                 element_ty: "f32".to_owned(),
                 element_count: 4,
+                reduced_projection: None,
             },
             role: WireBufferRole::Output,
             produced_by: 2,
@@ -1021,6 +1159,7 @@ fn faber_projected_two_kernel_wire() -> WireDeviceProgram {
         version: 1,
         element_ty: "f32".to_owned(),
         element_count: 4,
+        reduced_projection: None,
     };
     WireDeviceProgram {
         kernels: vec![
@@ -1458,6 +1597,10 @@ fn frozen_recipe_variant_plans_round_trip_on_the_wire() {
         WireCollectionKernelPlan::AxisReduction(WireAxisReductionPlan {
             op: WireReduceOp::Sum,
             axis: 1,
+            projection: WireReducedProjection {
+                axis_extent: 8,
+                inner_stride: 1,
+            },
         }),
         WireCollectionKernelPlan::RowSoftmax(WireRowSoftmaxPlan { axis: 1 }),
         WireCollectionKernelPlan::LayerNormalization(WireLayerNormalizationPlan { axis: 1 }),

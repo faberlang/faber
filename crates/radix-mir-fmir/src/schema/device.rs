@@ -42,9 +42,9 @@ pub struct FmirDeviceSection {
     /// package load ([`crate::schema::check_device_requirements`]).
     pub runtime_requirements: Vec<String>,
     /// The optional distributed execution section (MD2-W1). `None` for
-    /// single-device packages (MD-A15) — wire-7 single-device images keep
+    /// single-device packages (MD-A15) — single-device images keep
     /// the independent single-device path (the A10 identity and the nested
-    /// `WIRE_DEVICE_PROGRAM_VERSION = 7` bytes are untouched). `Some` for
+    /// `WIRE_DEVICE_PROGRAM_VERSION` bytes are untouched). `Some` for
     /// distributed images: the section carries its OWN version ratchet
     /// ([`crate::schema::WIRE_DISTRIBUTED_SECTION_VERSION`]) and is admitted
     /// fail-closed at load; the single-device run route rejects it
@@ -53,9 +53,9 @@ pub struct FmirDeviceSection {
     pub distributed: Option<FmirDistributedExecutionSection>,
     /// The optional cadence/session section (GI4-2). `None` for packages
     /// without an inference-session surface — single-device packages do not
-    /// require the section (the MD-A15 precedent; the wire-7 single-device
+    /// require the section (the MD-A15 precedent; the single-device
     /// path, the A10 identity, and the nested
-    /// `WIRE_DEVICE_PROGRAM_VERSION = 7` bytes are untouched). `Some` for
+    /// `WIRE_DEVICE_PROGRAM_VERSION` bytes are untouched). `Some` for
     /// session-carrying images: the section carries its OWN version ratchet
     /// ([`crate::schema::WIRE_SESSION_SECTION_VERSION`]) and is admitted
     /// fail-closed at load (the MD2-W1 sibling-field precedent — no
@@ -161,7 +161,7 @@ pub enum FmirDeviceBackend {
 /// **before field interpretation** (the `admit_device_section` pattern, FC4)
 /// — independently of the nested device-program wire version and the outer
 /// image version. The first session-section shape is v1; the nested
-/// `WIRE_DEVICE_PROGRAM_VERSION = 7` and the outer
+/// `WIRE_DEVICE_PROGRAM_VERSION` and the outer
 /// `PACKAGE_MIR_ARTIFACT_VERSION = 6` stay untouched (the MD2-W1
 /// sibling-field precedent — no `WIRE_DEVICE_PROGRAM_VERSION` bump).
 pub const WIRE_SESSION_SECTION_VERSION: u32 = 1;

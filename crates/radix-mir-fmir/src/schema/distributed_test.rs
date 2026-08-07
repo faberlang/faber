@@ -5,7 +5,7 @@
 //!
 //! Proves the MD2-W1 done-when:
 //!
-//! - a wire-7 single-device image WITHOUT the section decodes, admits, and
+//! - a wire-8 single-device image WITHOUT the section decodes, admits, and
 //!   runs unchanged (the section is `None` — the independent single-device
 //!   path; `admit_device_section` admits it and `device_identity_hash` is
 //!   unchanged);
@@ -76,16 +76,19 @@ fn wire_program_fixture() -> WireDeviceProgram {
         version: 1,
         element_ty: "f32".to_owned(),
         element_count: 64,
+        reduced_projection: None,
     };
     let v_m = WireBufferVersion {
         version: 1,
         element_ty: "f32".to_owned(),
         element_count: 128,
+        reduced_projection: None,
     };
     let v_o = WireBufferVersion {
         version: 1,
         element_ty: "f32".to_owned(),
         element_count: 32,
+        reduced_projection: None,
     };
     let launch = WireKernelLaunchPlan {
         workgroup: WireWorkgroupSize { x: 8, y: 1, z: 1 },
@@ -655,7 +658,7 @@ fn unknown_element_type_spelling_fails_closed() {
 
 #[test]
 fn single_device_section_without_distributed_admits_unchanged() {
-    // A wire-7 device section WITHOUT the distributed section admits through
+    // A wire-8 device section WITHOUT the distributed section admits through
     // the existing device-section admission unchanged (the independent
     // single-device path; MD-A15).
     let section = device_section_with_distributed(None);

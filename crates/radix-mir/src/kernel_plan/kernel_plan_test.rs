@@ -3,6 +3,7 @@ use super::*;
 use crate::abi::{
     CollectionOpContract, MirKernelDispatchSize, MirKernelResource, MirKernelResourceAccess,
     MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature, MirWorkgroupSize,
+    ReducedProjection,
 };
 use crate::{
     MirBlock, MirBlockId, MirCollectionOp, MirConstant, MirFunction, MirFunctionId, MirIntrinsic,
@@ -57,6 +58,7 @@ fn reduction_signature(length: u64, workgroup_x: u32, partials: u64) -> MirKerne
             element_count: length,
             source_local: Some(MirLocalId(0)),
             source_name: None,
+            reduced_projection: None,
         },
         extra_inputs: Vec::new(),
         output: MirKernelResource {
@@ -69,6 +71,7 @@ fn reduction_signature(length: u64, workgroup_x: u32, partials: u64) -> MirKerne
             element_count: partials,
             source_local: None,
             source_name: None,
+            reduced_projection: None,
         },
         extra_outputs: Vec::new(),
         accumulation_buffers: Vec::new(),
@@ -106,6 +109,7 @@ fn matmul_signature(shapes: MatMulShapes, dispatch_x: u64, dispatch_y: u64) -> M
             element_count: shapes.m * shapes.k,
             source_local: Some(MirLocalId(0)),
             source_name: None,
+            reduced_projection: None,
         },
         extra_inputs: vec![MirKernelResource {
             group: 0,
@@ -117,6 +121,7 @@ fn matmul_signature(shapes: MatMulShapes, dispatch_x: u64, dispatch_y: u64) -> M
             element_count: shapes.k * shapes.n,
             source_local: Some(MirLocalId(1)),
             source_name: None,
+            reduced_projection: None,
         }],
         output: MirKernelResource {
             group: 0,
@@ -128,6 +133,7 @@ fn matmul_signature(shapes: MatMulShapes, dispatch_x: u64, dispatch_y: u64) -> M
             element_count: shapes.m * shapes.n,
             source_local: None,
             source_name: None,
+            reduced_projection: None,
         },
         extra_outputs: Vec::new(),
         accumulation_buffers: Vec::new(),
@@ -177,6 +183,7 @@ fn transpose_signature(m: u64, n: u64) -> MirKernelSignature {
             element_count: m * n,
             source_local: Some(MirLocalId(0)),
             source_name: None,
+            reduced_projection: None,
         },
         extra_inputs: Vec::new(),
         output: MirKernelResource {
@@ -189,6 +196,7 @@ fn transpose_signature(m: u64, n: u64) -> MirKernelSignature {
             element_count: m * n,
             source_local: None,
             source_name: None,
+            reduced_projection: None,
         },
         extra_outputs: Vec::new(),
         accumulation_buffers: Vec::new(),
@@ -1045,6 +1053,7 @@ fn transformer_signature(input_count: u64, output_count: u64) -> MirKernelSignat
             element_count: input_count,
             source_local: Some(MirLocalId(0)),
             source_name: None,
+            reduced_projection: None,
         },
         extra_inputs: Vec::new(),
         output: MirKernelResource {
@@ -1057,6 +1066,7 @@ fn transformer_signature(input_count: u64, output_count: u64) -> MirKernelSignat
             element_count: output_count,
             source_local: None,
             source_name: None,
+            reduced_projection: None,
         },
         extra_outputs: Vec::new(),
         accumulation_buffers: Vec::new(),
@@ -1346,6 +1356,10 @@ fn axis_reduction_plan_validate_rejects_non_sum_op() {
     let plan = CollectionKernelPlan::AxisReduction(AxisReductionPlan {
         op: ReduceOp::Mean,
         axis: 1,
+        projection: ReducedProjection {
+            axis_extent: 8,
+            inner_stride: 1,
+        },
     });
     assert_eq!(
         plan.validate().expect_err("mean-over-axis must fail"),
@@ -1364,9 +1378,65 @@ fn transformer_plans_validate() {
     CollectionKernelPlan::AxisReduction(AxisReductionPlan {
         op: ReduceOp::Sum,
         axis: 1,
+        projection: ReducedProjection {
+            axis_extent: 8,
+            inner_stride: 1,
+        },
     })
     .validate()
     .expect("axis-reduction plan validates");
+    CollectionKernelPlan::AxisReduction(AxisReductionPlan {
+        op: ReduceOp::Sum,
+        axis: 1,
+        projection: ReducedProjection {
+            axis_extent: 0,
+            inner_stride: 1,
+        },
+    })
+    .validate()
+    .expect_err("a zero axis extent makes the projection degenerate");
+}
+
+#[test]
+fn equal_dim_reductions_select_different_reduced_buffer_indices() {
+    // Council-8 CB-3 (the [4,4] proof): reducing `[4,4]` over axis 0 vs
+    // axis 1 both produce a 4-element reduced buffer — element count cannot
+    // decide the projection. The producer-defined reduced-resource
+    // projection distinguishes them, and the keep-dims flat element at
+    // `keep_dims_flat` maps to a DIFFERENT reduced-buffer index under each
+    // reduction.
+    let dims = [4u64, 4u64];
+    let axis0 = super::build::axis_reduction_projection(&dims, 0).expect("axis-0 projection");
+    let axis1 = super::build::axis_reduction_projection(&dims, 1).expect("axis-1 projection");
+    assert_eq!(
+        axis0,
+        ReducedProjection {
+            axis_extent: 4,
+            inner_stride: 4
+        }
+    );
+    assert_eq!(
+        axis1,
+        ReducedProjection {
+            axis_extent: 4,
+            inner_stride: 1
+        }
+    );
+    assert_ne!(
+        axis0, axis1,
+        "equal dims [4,4] must not conflate the axis-0 and axis-1 projections"
+    );
+    // The keep-dims flat element (row 1, column 2) of the operand: axis-0
+    // reduces columns (reduced index = column), axis-1 reduces rows
+    // (reduced index = row) — different reduced-buffer indices.
+    let keep_dims_flat = 1 * 4 + 2;
+    assert_eq!(axis0.reduced_index(keep_dims_flat), 2);
+    assert_eq!(axis1.reduced_index(keep_dims_flat), 1);
+    assert_ne!(
+        axis0.reduced_index(keep_dims_flat),
+        axis1.reduced_index(keep_dims_flat),
+        "[4,4] axis-0 vs axis-1 must select different reduced-buffer indices"
+    );
 }
 
 #[test]
@@ -1387,6 +1457,7 @@ fn multi_output_contract_rejects_colliding_output_slots() {
             element_count: 4,
             source_local: Some(MirLocalId(0)),
             source_name: None,
+            reduced_projection: None,
         },
         extra_inputs: Vec::new(),
         output: MirKernelResource {
@@ -1399,6 +1470,7 @@ fn multi_output_contract_rejects_colliding_output_slots() {
             element_count: 4,
             source_local: None,
             source_name: None,
+            reduced_projection: None,
         },
         extra_outputs: vec![MirKernelResource {
             group: 0,
@@ -1410,6 +1482,7 @@ fn multi_output_contract_rejects_colliding_output_slots() {
             element_count: 4,
             source_local: None,
             source_name: None,
+            reduced_projection: None,
         }],
         accumulation_buffers: Vec::new(),
         builtin_inputs: Vec::new(),

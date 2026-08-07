@@ -40,6 +40,7 @@ fn version(number: u32, ty: MirType, count: u64) -> BufferVersion {
         version: number,
         element_ty: ty,
         element_count: count,
+        reduced_projection: None,
     }
 }
 
@@ -61,6 +62,7 @@ fn reduction_signature(length: u64, workgroup_x: u32, partials: u64) -> MirKerne
             element_count: length,
             source_local: Some(MirLocalId(0)),
             source_name: None,
+            reduced_projection: None,
         },
         extra_inputs: Vec::new(),
         output: MirKernelResource {
@@ -73,6 +75,7 @@ fn reduction_signature(length: u64, workgroup_x: u32, partials: u64) -> MirKerne
             element_count: partials,
             source_local: None,
             source_name: None,
+            reduced_projection: None,
         },
         extra_outputs: Vec::new(),
         accumulation_buffers: Vec::new(),
@@ -108,6 +111,7 @@ fn elementwise_signature(length: u64, workgroup_x: u32) -> MirKernelSignature {
             element_count: length,
             source_local: Some(MirLocalId(0)),
             source_name: None,
+            reduced_projection: None,
         },
         extra_inputs: Vec::new(),
         output: MirKernelResource {
@@ -120,6 +124,7 @@ fn elementwise_signature(length: u64, workgroup_x: u32) -> MirKernelSignature {
             element_count: length,
             source_local: None,
             source_name: None,
+            reduced_projection: None,
         },
         extra_outputs: Vec::new(),
         accumulation_buffers: Vec::new(),
@@ -156,6 +161,7 @@ fn matmul_signature(m: u64, k: u64, n: u64) -> MirKernelSignature {
             element_count: m * k,
             source_local: Some(MirLocalId(0)),
             source_name: None,
+            reduced_projection: None,
         },
         extra_inputs: vec![MirKernelResource {
             group: 0,
@@ -167,6 +173,7 @@ fn matmul_signature(m: u64, k: u64, n: u64) -> MirKernelSignature {
             element_count: k * n,
             source_local: Some(MirLocalId(1)),
             source_name: None,
+            reduced_projection: None,
         }],
         output: MirKernelResource {
             group: 0,
@@ -178,6 +185,7 @@ fn matmul_signature(m: u64, k: u64, n: u64) -> MirKernelSignature {
             element_count: m * n,
             source_local: None,
             source_name: None,
+            reduced_projection: None,
         },
         extra_outputs: Vec::new(),
         accumulation_buffers: Vec::new(),
@@ -545,6 +553,7 @@ fn test_resources_map_from_kernel_resource() {
         element_count: 16,
         source_local: None,
         source_name: None,
+        reduced_projection: None,
     };
     let buffer = identity(0, "x", BufferRole::Input, BufferLifetime::PerStep);
     let mapped =
@@ -571,6 +580,7 @@ fn test_resources_map_from_kernel_resource() {
         element_count: 1,
         source_local: None,
         source_name: Some("runtime_extent".to_owned()),
+        reduced_projection: None,
     };
     assert!(
         DeviceResource::from_kernel_resource(buffer, version(1, element_ty, 1), &extent).is_none()

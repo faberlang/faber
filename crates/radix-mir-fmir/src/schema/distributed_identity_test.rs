@@ -221,6 +221,7 @@ fn single_device_wire_program() -> WireDeviceProgram {
                         version: 1,
                         element_ty: "f32".to_owned(),
                         element_count: 4,
+                        reduced_projection: None,
                     },
                     binding: WireBinding {
                         group: 0,
@@ -236,6 +237,7 @@ fn single_device_wire_program() -> WireDeviceProgram {
                         version: 1,
                         element_ty: "f32".to_owned(),
                         element_count: 4,
+                        reduced_projection: None,
                     },
                     binding: WireBinding {
                         group: 0,
@@ -263,6 +265,7 @@ fn single_device_wire_program() -> WireDeviceProgram {
                 version: 1,
                 element_ty: "f32".to_owned(),
                 element_count: 4,
+                reduced_projection: None,
             },
             role: WireBufferRole::Output,
             produced_by: 1,

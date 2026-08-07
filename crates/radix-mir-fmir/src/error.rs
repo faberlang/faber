@@ -190,7 +190,7 @@ impl fmt::Display for FmirImageError {
             Self::UnsupportedDeviceProgramVersion { actual, expected } => {
                 write!(
                     f,
-                    "unsupported device-program wire version {actual}; expected {expected}"
+                    "incompatible device-program wire version {actual}; this loader accepts wire version {expected} — the serialized device program was produced by a different (incompatible) radix wire revision"
                 )
             }
             Self::WireProgramInvalid { detail } => {
