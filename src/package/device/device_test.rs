@@ -13,8 +13,10 @@ use radix_mir::abi::{MirBroadcastDeclaration, MirRankExtensionBroadcast};
 use radix_mir::device_program::DataFlowPair;
 use radix_mir::kernel_plan::{AxisReductionPlan, LayerNormalizationPlan, ReduceOp, RowSoftmaxPlan};
 use radix_mir_fmir::schema::{
-    WireAxisReductionPlan, WireBroadcastDeclaration, WireBroadcastFact, WireLayerNormalizationPlan,
-    WireRowSoftmaxPlan,
+    FmirSessionSection, WireAxisReductionPlan, WireBroadcastDeclaration, WireBroadcastFact,
+    WireInputUpdateCadence, WireInvocationMode, WireKvCacheDtype, WireKvCacheLayout,
+    WireKvReservePolicy, WireLayerNormalizationPlan, WireRowSoftmaxPlan, WireSessionInput,
+    WireSessionObservationCadence, WIRE_SESSION_SECTION_VERSION,
 };
 // The S6-C2 producer variant is not on the device-root re-export list (the
 // ordinary producer is the seam); the test reaches it through the wire
@@ -135,6 +137,9 @@ fn section_for_program(program: &DeviceProgram, semantics: &DeviceSemantics) -> 
         // MD2-W1: the single-device constructor passes the optional
         // distributed section through as `None` (MD-A15).
         distributed: None,
+        // GI4-2: the single-device constructor carries no cadence/session
+        // section (single-device packages do not require it — MD-A15).
+        session: None,
     }
 }
 
@@ -3042,6 +3047,218 @@ fn admit_device_program_section_rejects_mismatched_broadcast_fact() {
         "the fail-closed diagnostic names the shape mismatch: {}",
         error[0].message
     );
+}
+
+// ── GI4-2: the versioned cadence/session wire surface ─────────────────────
+
+/// Build a device section carrying the honest cadence/session section for
+/// the summa-proof fixture program (a `PerProgram` `HostProvided` input
+/// buffer — the once-init resident analog — plus an `ObservationPoint`
+/// output). The session facts are consistent with the carried program, so
+/// the section admits at the faber boundary and the radix decode boundary.
+fn session_carrying_section() -> FmirDeviceSection {
+    let (program, semantics) =
+        device_program_and_semantics_from_corpus_fixture("cuda/summa-proof.fab");
+    let mut section = section_for_program(&program, &semantics);
+    let input_slot = section.device_program.program.kernels[0].resources[0].buffer.id;
+    section.session = Some(FmirSessionSection {
+        v: WIRE_SESSION_SECTION_VERSION,
+        inputs: vec![WireSessionInput {
+            slot: input_slot,
+            cadence: WireInputUpdateCadence::Resident,
+        }],
+        invocation_modes: vec![WireInvocationMode::Prefill],
+        observation_cadence: WireSessionObservationCadence::PerSession,
+        kv_layout: WireKvCacheLayout {
+            slots: 1,
+            context_length: 8192,
+            layer_count: 32,
+            kv_head_count: 5,
+            head_dim: 64,
+            dtype: WireKvCacheDtype::F32,
+            reserve_policy: WireKvReservePolicy { bytes: 0 },
+        },
+    });
+    section
+}
+
+/// GI4-2: the ordinary producer carries NO cadence/session section — a
+/// wire-7 single-device package without the section admits unchanged through
+/// the faber boundary AND the radix decode boundary (single-device packages
+/// do not require the section — the MD-A15 precedent).
+#[test]
+fn ordinary_producer_carries_no_session_section() {
+    let (program, semantics) =
+        device_program_and_semantics_from_corpus_fixture("cuda/summa-proof.fab");
+    let section = section_for_program(&program, &semantics);
+    assert!(section.session.is_none(), "no session surface → no section");
+    admit_session_section(&section).expect("the no-op admission passes at the faber boundary");
+    let admitted = wire_admits_through_radix_decode(section);
+    assert!(
+        matches!(
+            admitted.kernels[0].plan,
+            WireCollectionKernelPlan::TreeReduction(_)
+        ),
+        "the single-device wire admits unchanged at the radix decode boundary"
+    );
+}
+
+/// GI4-2: the honest cadence/session section admits at the faber boundary
+/// (version ratchet + the carried session facts, validated against the
+/// carried program) and survives the radix decode admission with all facts
+/// intact.
+#[test]
+fn honest_session_section_admits_and_survives_the_radix_decode() {
+    let section = session_carrying_section();
+    admit_session_section(&section)
+        .expect("the honest session section admits at the faber boundary");
+    // The codec consumption boundary (descriptor construction) admits it too.
+    let artifact = FmirDeviceArtifact {
+        backend: FmirDeviceBackend::Metal,
+        blob: "kernel void p(device float* a [[buffer(0)]]) {}".to_owned(),
+        hash: radix_mir_fmir::fnv1a64_blob_hash(
+            b"kernel void p(device float* a [[buffer(0)]]) {}",
+        ),
+        symbols: Vec::new(),
+    };
+    let mut with_artifact = section;
+    with_artifact.artifacts.artifact = vec![artifact];
+    descriptor_for_backend(&with_artifact, DeviceBackend::Metal, b"kernel void p(device float* a [[buffer(0)]]) {}")
+        .expect("the honest session section admits at the codec consumption boundary");
+    let wire = wire_admits_through_radix_decode(with_artifact);
+    assert_eq!(wire.kernels.len(), 1);
+}
+
+/// GI4-2: the faber boundary admission inspects the actually-delivered
+/// session facts — every mutated fact class fails closed with a focused
+/// diagnostic naming the violated class + exact failing fact.
+#[test]
+fn mutated_session_facts_fail_the_faber_boundary_admission() {
+    // Flipped cadence: the once-init input can never be per-invocation.
+    let mut section = session_carrying_section();
+    let input_slot = section.device_program.program.kernels[0].resources[0].buffer.id;
+    section.session.as_mut().unwrap().inputs[0].cadence = WireInputUpdateCadence::PerInvocation;
+    let error = admit_session_section(&section)
+        .expect_err("a flipped cadence on the once-init input fails admission");
+    assert!(
+        error[0].message.contains("once-init"),
+        "the diagnostic names the violated class + failing fact: {}",
+        error[0].message
+    );
+
+    // Altered KV layout: a zero dimension is not a layout.
+    let mut section = session_carrying_section();
+    section.session.as_mut().unwrap().kv_layout.context_length = 0;
+    let error = admit_session_section(&section)
+        .expect_err("a zero KV layout dimension fails admission");
+    assert!(
+        error[0].message.contains("context_length"),
+        "the diagnostic names the exact failing fact: {}",
+        error[0].message
+    );
+
+    // Mutated invocation mode: no workload mode is a contradiction.
+    let mut section = session_carrying_section();
+    section.session.as_mut().unwrap().invocation_modes = Vec::new();
+    let error = admit_session_section(&section)
+        .expect_err("an empty invocation-mode set fails admission");
+    assert!(
+        error[0].message.contains("no invocation mode"),
+        "the diagnostic names the violated class: {}",
+        error[0].message
+    );
+
+    // Unresolved input slot: the slot must resolve against the carried
+    // program's buffers.
+    let mut section = session_carrying_section();
+    section.session.as_mut().unwrap().inputs[0].slot = 999;
+    let error = admit_session_section(&section)
+        .expect_err("an unresolvable session-input slot fails admission");
+    assert!(
+        error[0].message.contains("slot 999"),
+        "the diagnostic names the exact failing fact: {}",
+        error[0].message
+    );
+    // The slot is the buffer id the program declares — for the summa fixture
+    // the input slot is `input_slot` (never 999).
+    assert_ne!(input_slot, 999);
+}
+
+/// GI4-2: the session-section version ratchet is enforced at the faber
+/// boundary — a stale version fails closed before any field interpretation
+/// (the same pattern the radix decode boundary runs).
+#[test]
+fn stale_session_section_version_fails_the_faber_boundary() {
+    let mut section = session_carrying_section();
+    section.session.as_mut().unwrap().v = WIRE_SESSION_SECTION_VERSION + 1;
+    let error = admit_session_section(&section)
+        .expect_err("a stale session-section version fails the faber boundary");
+    assert!(
+        error[0].message.contains("session section version"),
+        "the diagnostic names the version gate: {}",
+        error[0].message
+    );
+}
+
+/// GI4-2: a mutated serialized byte in the session section fails the radix
+/// decode admission closed — the equivalence gate inspects the delivered
+/// facts (the flipped cadence contradicts the carried once-init buffer).
+#[test]
+fn mutated_serialized_session_byte_fails_the_radix_decode() {
+    let section = session_carrying_section();
+    let session_bytes =
+        postcard::to_allocvec(section.session.as_ref().unwrap()).expect("session serializes");
+    // The section layout: [v][inputs len][slot][cadence 0]… — flip the first
+    // input's cadence tag Resident → PerInvocation. The input slot varint is
+    // one byte for the fixture's small buffer ids, so the cadence tag sits at
+    // offset 3.
+    assert_eq!(session_bytes[0], 0x01, "version varint is 1");
+    assert_eq!(session_bytes[3], 0x00, "the first input's cadence is resident");
+    let mut mutated = session_bytes.clone();
+    mutated[3] = 0x01;
+    assert_ne!(mutated, session_bytes);
+    let decoded: FmirSessionSection =
+        postcard::from_bytes(&mutated).expect("mutated session section still decodes");
+    let mut section = section;
+    section.session = Some(decoded);
+
+    // Encode the full binary image with the mutated section and decode it:
+    // the radix decode admission fails closed, inspecting the delivered
+    // cadence against the carried once-init buffer.
+    let image = radix_mir_fmir::FmirBinaryImageFile {
+        version: radix_mir_fmir::PACKAGE_MIR_ARTIFACT_VERSION,
+        target: radix_mir_fmir::FMIR_TARGET_NAME.to_owned(),
+        package_root: ".".to_owned(),
+        entry: "main.fab".to_owned(),
+        entry_function: "run_entry".to_owned(),
+        toolchain: radix_mir_fmir::FmirTextToolchainSection {
+            faber_cli_version: env!("CARGO_PKG_VERSION").to_owned(),
+        },
+        runtime: radix_mir_fmir::FmirTextRuntimeSection {
+            requirement: vec!["host:argv".to_owned()],
+        },
+        sources: radix_mir_fmir::FmirTextSourcesSection { source: Vec::new() },
+        cli: None,
+        exit_code: None,
+        types: radix_mir_fmir::FmirTextTypesSection {
+            table: radix::semantic::TypeTable::new().snapshot(),
+        },
+        interner: Vec::new(),
+        program: radix::mir::MirProgram::new(),
+        device: Some(section),
+    };
+    let bytes = radix_mir_fmir::encode_binary_image(&image).expect("encode binary image");
+    match radix_mir_fmir::decode_binary_image(&bytes, env!("CARGO_PKG_VERSION")) {
+        Err(error) => {
+            let detail = error.to_string();
+            assert!(
+                detail.contains("invalid session section")
+                    || detail.contains("once-init"),
+                "the decode admission fails closed with the session-facts diagnostic: {detail}"
+            );
+        }
+        Ok(_) => panic!("a mutated session cadence must fail the radix decode admission"),
+    }
 }
 
 /// S6-C2: the S6-N1-frozen recipe variants carry their real wire mirrors on

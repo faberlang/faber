@@ -1,16 +1,16 @@
 // Sibling + root items: explicit `use super` lists carry the seams the mir/
 // split routes through `use super::*` (wildcard imports are denied).
 use super::{
-    device_diag, function_has_shape_construction, wire_program_for_program, BTreeMap, BTreeSet,
-    DescriptorBuffer, DescriptorBufferVersion, DescriptorEndOfRunResult, DescriptorKernel,
-    DescriptorLaunch, DescriptorResult, DeviceBackend, DeviceBufferInitialization,
-    DeviceBufferLifetime, DeviceBufferRole, DeviceDataType, DeviceDescriptor, DeviceProgram,
-    DeviceSelection, DeviceSemantics, Diagnostic, FmirDeviceArtifact, FmirDeviceArtifactsSection,
-    FmirDeviceBackend, FmirDeviceInput, FmirDeviceProgramSection, FmirDeviceSection,
-    FmirDeviceSelection, FmirDeviceSymbol, HostDescriptorDataFlow, HostDeviceProgramLifetime,
-    Interner, MirFunctionId, ValidatedMir, WireBufferLifetime, WireBufferRole, WireDeviceProgram,
-    WireInitializationPolicy, WireObservationCadence, WireProgramLifetime, WireResourceAccess,
-    DEVICE_RUN_PLAN_VERSION,
+    admit_session_section, device_diag, function_has_shape_construction, wire_program_for_program,
+    BTreeMap, BTreeSet, DescriptorBuffer, DescriptorBufferVersion, DescriptorEndOfRunResult,
+    DescriptorKernel, DescriptorLaunch, DescriptorResult, DeviceBackend,
+    DeviceBufferInitialization, DeviceBufferLifetime, DeviceBufferRole, DeviceDataType,
+    DeviceDescriptor, DeviceProgram, DeviceSelection, DeviceSemantics, Diagnostic, FmirDeviceArtifact,
+    FmirDeviceArtifactsSection, FmirDeviceBackend, FmirDeviceInput, FmirDeviceProgramSection,
+    FmirDeviceSection, FmirDeviceSelection, FmirDeviceSymbol, HostDescriptorDataFlow,
+    HostDeviceProgramLifetime, Interner, MirFunctionId, ValidatedMir, WireBufferLifetime,
+    WireBufferRole, WireDeviceProgram, WireInitializationPolicy, WireObservationCadence,
+    WireProgramLifetime, WireResourceAccess, DEVICE_RUN_PLAN_VERSION,
 };
 // Doc-link surface: the host session/descriptor types appear only in
 // intra-doc links here (their code uses live in run.rs); the import keeps
@@ -193,6 +193,11 @@ pub(crate) fn device_section_for_program(
         // construction is a later campaign unit (MD3 bound-plan wiring); the
         // codec decode side is the shared schema types.
         distributed: None,
+        // GI4-2: the ordinary producer carries no cadence/session section —
+        // single-device packages do not require it (the MD-A15 precedent);
+        // the session-carrying constructor surface is GI4-4's (the decode
+        // driver + the bounded host session writer).
+        session: None,
     })
 }
 
@@ -236,6 +241,11 @@ pub(crate) fn descriptor_for_backend(
     backend: DeviceBackend,
     blob: &[u8],
 ) -> Result<DeviceDescriptor, Vec<Diagnostic>> {
+    // GI4-2: the cadence/session section is admitted fail-closed at the
+    // faber codec boundary too (the version ratchet + the carried session
+    // facts, the same rule set the radix decode boundary runs). Absent for
+    // single-device packages (no session surface — a no-op).
+    admit_session_section(device)?;
     let wire = &device.device_program.program;
     validate_wire_results(wire)?;
     let mut kernels = Vec::with_capacity(wire.kernels.len());

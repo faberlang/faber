@@ -3,14 +3,14 @@
 use super::{
     BufferId, BufferIdentity, BufferLifetime, BufferRole, BufferVersion, CollectionKernelPlan,
     DeviceProgram, DeviceProgramLifetime, DeviceResource, DeviceSemantics, Diagnostic,
-    FmirDeviceProgramSection, InitializationPolicy, LaunchId, LosslessMirCompanionEntry,
-    MirCompanionDerivativeKind, MirKernelResourceAccess, MirTensorStorageLayout, MirType,
-    SemanticValueOrigin, WireBarrierPhase, WireBarrierPoint, WireBinding, WireBufferIdentity,
-    WireBufferLifetime, WireBufferRole, WireBufferVersion, WireCollectionKernelPlan,
-    WireCompanionDerivativeKind, WireCompanionRelation, WireCompanionSelectedInput,
-    WireCompanionSelectedOutput, WireDependencyEdge, WireDeviceProgram, WireDeviceResource,
-    WireDispatchSize, WireInitializationPolicy, WireKernelLaunchPlan, WireKernelUnit,
-    WireLaunchUnit, WireMatMulPlan, WireMatMulSharedMemory, WireObservationCadence,
+    FmirDeviceProgramSection, FmirDeviceSection, InitializationPolicy, LaunchId,
+    LosslessMirCompanionEntry, MirCompanionDerivativeKind, MirKernelResourceAccess,
+    MirTensorStorageLayout, MirType, SemanticValueOrigin, WireBarrierPhase, WireBarrierPoint,
+    WireBinding, WireBufferIdentity, WireBufferLifetime, WireBufferRole, WireBufferVersion,
+    WireCollectionKernelPlan, WireCompanionDerivativeKind, WireCompanionRelation,
+    WireCompanionSelectedInput, WireCompanionSelectedOutput, WireDependencyEdge, WireDeviceProgram,
+    WireDeviceResource, WireDispatchSize, WireInitializationPolicy, WireKernelLaunchPlan,
+    WireKernelUnit, WireLaunchUnit, WireMatMulPlan, WireMatMulSharedMemory, WireObservationCadence,
     WireObservationFact, WireOobPaddingPolicy, WireProgramLifetime, WireReduceOp,
     WireReductionPlan, WireResourceAccess, WireResultBuffer, WireSemanticValue,
     WireSemanticValueOrigin, WireSharedMemoryLayout, WireStorageLayout, WireTransposePlan,
@@ -22,8 +22,9 @@ use super::{
 use radix_mir::abi::{MirBroadcastDeclaration, MirRankExtensionBroadcast};
 use radix_mir_fmir::schema::{
     WireAxisReductionPlan, WireBroadcastDeclaration, WireBroadcastFact,
-    WireCausalMaskedSoftmaxPlan, WireGatherPlan, WireLayerNormalizationPlan,
-    WireRmsNormalizationPlan, WireRopePlan, WireRowSoftmaxPlan,
+    WireCausalMaskedSoftmaxPlan, WireGatherPlan, WireInputUpdateCadence, WireInvocationMode,
+    WireKvCacheDtype, WireLayerNormalizationPlan, WireRmsNormalizationPlan, WireRopePlan,
+    WireRowSoftmaxPlan, WireSessionObservationCadence, WIRE_SESSION_SECTION_VERSION,
 };
 // Doc-link surface: the carried generation type appears only in an
 // intra-doc link here; the import keeps the link resolvable from this module.
@@ -151,6 +152,192 @@ pub(crate) fn admit_device_program_section(
         }
     }
     Ok(())
+}
+
+/// GI4-2: the faber boundary admission of the optional cadence/session
+/// section (the codec arm for the session surface). The session-section
+/// version ratchet is gated BEFORE any field-level interpretation (the same
+/// pattern as [`admit_device_program_section`]), then the carried session
+/// facts are validated fail-closed against the carried single-device program
+/// — the same rule set the radix decode boundary runs (the equivalence-gate
+/// discipline: admission inspects the actually-delivered session facts,
+/// never a self-declared hash).
+///
+/// Absent for packages without an inference-session surface (`None` — the
+/// single-device default; single-device packages do not require the section,
+/// the MD-A15 precedent). The session section carries its OWN version ratchet
+/// on the accepted wire version — no `DEVICE_RUN_PLAN_VERSION` /
+/// `WIRE_DEVICE_PROGRAM_VERSION` bump (the MD2-W1 sibling-field precedent).
+///
+/// # Errors
+/// Fail-closed when the section carries an unsupported version, a zero KV
+/// layout dimension, a dtype outside the closed `f32` surface, a missing or
+/// duplicate workload mode, an unresolvable or duplicate session-input slot,
+/// a cadence that contradicts the carried program's buffer facts, or an
+/// observation cadence that contradicts a decode invocation mode.
+pub(crate) fn admit_session_section(device: &FmirDeviceSection) -> Result<(), Vec<Diagnostic>> {
+    let Some(section) = &device.session else {
+        return Ok(());
+    };
+    if section.v != WIRE_SESSION_SECTION_VERSION {
+        return Err(vec![Diagnostic::error(format!(
+            "session section version {} is not supported (expected {})",
+            section.v, WIRE_SESSION_SECTION_VERSION
+        ))
+        .with_arg("issue", "E_DEVICE_SESSION_SECTION")
+        .with_arg("session_version", section.v.to_string())]);
+    }
+    // The typed KV-layout carriage: every dimension positive (a zero
+    // slot/context/layer/head layout is not a layout — it would silently
+    // produce a zero-byte KV, the `KvCacheLayout::new` mirror).
+    let kv = &section.kv_layout;
+    if kv.slots == 0 {
+        return Err(session_section_invalid(
+            "kv layout declares `slots` 0; a zero-slot layout is not a layout",
+        ));
+    }
+    if kv.context_length == 0 {
+        return Err(session_section_invalid(
+            "kv layout declares `context_length` 0; a zero-context layout is not a layout",
+        ));
+    }
+    if kv.layer_count == 0 {
+        return Err(session_section_invalid(
+            "kv layout declares `layer_count` 0; a zero-layer layout is not a layout",
+        ));
+    }
+    if kv.kv_head_count == 0 {
+        return Err(session_section_invalid(
+            "kv layout declares `kv_head_count` 0; a zero-head layout is not a layout",
+        ));
+    }
+    if kv.head_dim == 0 {
+        return Err(session_section_invalid(
+            "kv layout declares `head_dim` 0; a zero-dim layout is not a layout",
+        ));
+    }
+    // The dtype surface is closed (a dtype change is a contract revision).
+    if !matches!(kv.dtype, WireKvCacheDtype::F32) {
+        return Err(session_section_invalid(format!(
+            "kv layout declares dtype {:?}; the dtype surface is closed to f32 (a dtype change is a contract revision, never a silent widening)",
+            kv.dtype
+        )));
+    }
+    // At least one workload mode, no duplicates (a session that executes no
+    // workload mode is a contradiction).
+    if section.invocation_modes.is_empty() {
+        return Err(session_section_invalid(
+            "session declares no invocation mode; a session that executes no workload mode is a contradiction",
+        ));
+    }
+    for (index, mode) in section.invocation_modes.iter().enumerate() {
+        if section.invocation_modes[index + 1..].contains(mode) {
+            return Err(session_section_invalid(format!(
+                "session declares invocation mode {} more than once",
+                mode.spelling()
+            )));
+        }
+    }
+    // Session-input slots: unique + every slot resolves against the carried
+    // program's buffers.
+    for (index, input) in section.inputs.iter().enumerate() {
+        if section.inputs[index + 1..]
+            .iter()
+            .any(|other| other.slot == input.slot)
+        {
+            return Err(session_section_invalid(format!(
+                "session declares input slot {} more than once; one cadence per slot",
+                input.slot
+            )));
+        }
+        if session_buffer_fact(device, input.slot).is_none() {
+            return Err(session_section_invalid(format!(
+                "session input slot {} does not resolve against a buffer the carried single-device program declares",
+                input.slot
+            )));
+        }
+    }
+    // Cadence vs the carried buffer facts: a resident input names a
+    // PerProgram buffer, and a once-init (PerProgram + HostProvided) buffer
+    // named as a session input is resident — a per-invocation cadence on a
+    // once-init buffer is the SingleRun re-copy semantic the GI4-1 discovery
+    // proved infeasible.
+    for input in &section.inputs {
+        let Some(fact) = session_buffer_fact(device, input.slot) else {
+            continue;
+        };
+        match input.cadence {
+            WireInputUpdateCadence::Resident
+                if fact.lifetime != WireBufferLifetime::PerProgram =>
+            {
+                return Err(session_section_invalid(format!(
+                    "session input slot {} (buffer '{}') declares cadence resident, but the buffer is {}; a resident input is uploaded once at session creation and lives for the session (per-program)",
+                    input.slot,
+                    fact.name,
+                    fact.lifetime.spelling()
+                )));
+            }
+            WireInputUpdateCadence::PerInvocation
+                if fact.lifetime == WireBufferLifetime::PerProgram
+                    && fact.initialization == WireInitializationPolicy::HostProvided =>
+            {
+                return Err(session_section_invalid(format!(
+                    "session input slot {} (buffer '{}') declares cadence per_invocation, but the buffer is a once-init per-program host-provided buffer; a per-invocation cadence on a once-init buffer is the SingleRun re-copy semantic the GI4-1 discovery proved infeasible (weights would re-upload per invocation)",
+                    input.slot,
+                    fact.name
+                )));
+            }
+            _ => {}
+        }
+    }
+    // Observation cadence: a scalar-decode session observes per invocation
+    // (the full-vocab logits are sampled host-side on every invocation).
+    if section
+        .invocation_modes
+        .contains(&WireInvocationMode::ScalarDecode)
+        && section.observation_cadence != WireSessionObservationCadence::PerInvocation
+    {
+        return Err(session_section_invalid(format!(
+            "session executes {} (a one-token decode step) but declares observation cadence {}; per-token decode reads back its observation per token",
+            WireInvocationMode::ScalarDecode.spelling(),
+            section.observation_cadence.spelling()
+        )));
+    }
+    Ok(())
+}
+
+/// The carried buffer facts of one wire buffer slot (identity, lifetime,
+/// initialization) — what the session admission resolves the declared
+/// session-input slots and cadence facts against.
+struct SessionBufferFact<'a> {
+    name: &'a str,
+    lifetime: WireBufferLifetime,
+    initialization: WireInitializationPolicy,
+}
+
+/// The first carried buffer fact for a slot id in the device section's wire
+/// program (the equivalence-gate resolution surface for the session-input
+/// slots).
+fn session_buffer_fact(device: &FmirDeviceSection, slot: u32) -> Option<SessionBufferFact<'_>> {
+    let wire = &device.device_program.program;
+    wire.kernels
+        .iter()
+        .flat_map(|kernel| kernel.resources.iter())
+        .find(|resource| resource.buffer.id == slot)
+        .map(|resource| SessionBufferFact {
+            name: &resource.buffer.name,
+            lifetime: resource.buffer.lifetime,
+            initialization: resource.initialization,
+        })
+}
+
+/// A focused faber-boundary diagnostic for a session-section admission
+/// failure (the session-surface issue code).
+fn session_section_invalid(detail: impl Into<String>) -> Vec<Diagnostic> {
+    vec![
+        Diagnostic::error(format!("session section: {}", detail.into()))
+            .with_arg("issue", "E_DEVICE_SESSION_SECTION"),
+    ]
 }
 
 /// Build the typed complete-program wire from a constructed device program

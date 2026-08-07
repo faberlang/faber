@@ -133,7 +133,8 @@ pub(crate) use section::{artifact_for_backend, descriptor_for_backend};
 pub(crate) use section::{device_section_for_program, DeviceSectionBuild};
 pub(crate) use training::{training_plan_facts, tuple_return_locals, DEFAULT_TRAINING_STEPS};
 pub(crate) use wire::{
-    admit_device_program_section, wire_program_for_program, DEVICE_RUN_PLAN_VERSION,
+    admit_device_program_section, admit_session_section, wire_program_for_program,
+    DEVICE_RUN_PLAN_VERSION,
 };
 
 // Test surface: device_test.rs's `use super::*` resolves the constructor's
