@@ -8,6 +8,7 @@
 //! counts toward its output-checked floor. Rung 0 (`rung-0-matmul`) closed that
 //! path 2026-08-07 (U-05 receipt, radix a88fc4933); rungs 1–4 stay pinned at
 //! zero until their producer tracks supply launch/run capability.
+//! PROVISIONAL pending U-05 re-verification (u05-rerun-nonce1, hand-9): rung-0's 0→1 output-checked promotion is held until the re-verified receipt lands; floor constants unchanged.
 
 use super::common::{
     collect_exempla_files, command_available, format_ceiling_line, format_diagnostic_messages,

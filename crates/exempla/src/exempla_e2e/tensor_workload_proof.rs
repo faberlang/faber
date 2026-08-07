@@ -5,6 +5,7 @@
 //! move output floors by themselves. Rung 0 closed the CUDA-route
 //! `LaunchContractFailed` blocker 2026-08-07 with the U-05 device-execution
 //! receipt (radix a88fc4933) and now carries the output-checked claim.
+//! PROVISIONAL pending U-05 re-verification (u05-rerun-nonce1, hand-9): the rung-0 output-checked claim is held until the re-verified receipt lands; row constants unchanged.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum TensorWorkloadProofTier {
