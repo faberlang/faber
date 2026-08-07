@@ -3,9 +3,9 @@
 
 use super::*;
 use crate::package::codegen::assemble_crate;
-use crate::package::compile::generate_package_rust;
 use crate::package::library_resolver_from_config;
 use crate::package::run_package_mir;
+use crate::package::rust_target::generate_package_rust;
 use crate::package::test_support::test_temp_dir;
 use faber_hir_rust::RustFieldNamePolicy;
 use radix::codegen::{generate_from_analyzed, Target};

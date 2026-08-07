@@ -18,12 +18,13 @@ use radix::hir::HirItemKind;
 use super::artifact_plan::native_library_deps;
 use super::binding::verify_library_binding_shapes;
 use super::codegen::ModuleNode;
-use super::compile::{generate_library_unit_rust, AnalyzedPackageUnit};
+use super::compile::AnalyzedPackageUnit;
 use super::discovery::sanitize_crate_name;
 use super::member_path::resolve_package_member;
 use super::runtime_dependency::{
     parse_dependency_requirement, runtime_path_for_target_dependencies,
 };
+use super::rust_target::generate_library_unit_rust;
 use super::{analyze_package, BuildLayout};
 
 /// One generated library crate ready for a path dependency.

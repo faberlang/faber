@@ -63,6 +63,8 @@ mod modules;
 mod paths;
 mod product;
 mod runtime_dependency;
+#[cfg(feature = "hir-rust")]
+pub(crate) mod rust_target;
 mod source_files;
 mod test_source_filter;
 

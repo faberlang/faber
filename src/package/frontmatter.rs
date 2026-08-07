@@ -6,7 +6,7 @@ use radix::driver::FileFrontmatter;
 use super::{FaberManifest, PackageSpec, MANIFEST_FILE};
 
 #[cfg(feature = "hir-rust")]
-use faber_hir_rust::TestSelection as RustTestSelection;
+pub(super) use faber_hir_rust::TestSelection as RustTestSelection;
 
 #[cfg(not(feature = "hir-rust"))]
 #[derive(Clone)]
