@@ -28,10 +28,10 @@ fn tensor_workload_proof_selects_rung0_matmul() {
 fn tensor_workload_proof_rung0_is_output_checked_with_receipt() {
     let row = tensor_workload_proof_rows()[0];
 
-    // U-06 ratchet (codex-gap Stage 2, task 8199e91d): the rung-0 row moved
+    // U-06 ratchet re-anchored (codex-gap Stage 2): the rung-0 row moved
     // off the CUDA launch-contract blocker onto OutputChecked, evidenced by
-    // the U-05 device-execution receipt (radix a88fc4933) — never by a CPU or
-    // staged-LLVM fallback.
+    // the re-verified U-05 device-execution receipt (radix 7f520f067, run
+    // u05-rerun-nonce1) — never by a CPU or staged-LLVM fallback.
     assert_eq!(row.tier, TensorWorkloadProofTier::OutputChecked);
     assert_eq!(row.bucket, None);
     assert!(row.output_checked);
@@ -39,7 +39,8 @@ fn tensor_workload_proof_rung0_is_output_checked_with_receipt() {
     assert_eq!(row.blocker_issue, "");
     // The historical blocker (absent device executor; sermo_open collision
     // fixed in radix 663cbfe58) is resolved and preserved in the receipt.
-    assert!(row.evidence.contains("a88fc4933"));
+    assert!(row.evidence.contains("7f520f067"));
+    assert!(row.evidence.contains("u05-rerun-nonce-bound-evidence.md"));
     assert!(row.evidence.contains("u05-rung0-matmul-evidence.md"));
     assert!(row.evidence.contains("dc-a100"));
     assert!(row.evidence.contains("worst delta 0"));
@@ -75,7 +76,8 @@ fn tensor_workload_proof_cites_ledger_ratchet_and_receipt() {
         .contains("gpu-workload-floor/baseline-ledger.md"));
     assert!(row.evidence.contains("baseline-ledger.md"));
     assert!(row.evidence.contains("rung-0 floor 0→1"));
-    assert!(row.evidence.contains("a88fc4933"));
+    assert!(row.evidence.contains("7f520f067"));
+    assert!(row.evidence.contains("u05-rerun-nonce-bound-evidence.md"));
     assert!(row.evidence.contains("u05-rung0-matmul-evidence.md"));
     assert!(row.evidence.contains("receipt.md"));
     // The stale launch-contract blocker phrasing is gone from the claim.
