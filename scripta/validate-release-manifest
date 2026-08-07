@@ -6,6 +6,26 @@ The machine schema is `faber/docs/release/release-manifest.schema.json`
 `faber/docs/release/release-manifest-schema.md` §2–§7. Any mismatch is a
 hard stop: exit 1 with named reasons.
 
+Implemented JSON-Schema subset — the enforced contract:
+
+    type  const  enum  pattern
+    properties  additionalProperties  required
+    minItems  items
+
+Non-semantic keywords tolerated as annotations (no validation weight):
+`$schema`, `$id`, `$comment`, `title`, `description`, `default`,
+`examples`, `deprecated`, `readOnly`, `writeOnly`.
+
+Everything else is UNSUPPORTED and a hard error naming the offending
+keyword and its path: `$ref`, `oneOf`/`anyOf`/`allOf`, `if`/`then`/`else`,
+`minimum`/`maximum`, `minLength`/`maxLength`, `format`, `uniqueItems`,
+`patternProperties`, `$defs`, ... (any keyword outside the two lists
+above). The subset is intentional (stdlib-only scripta convention), and
+silent ignore is never acceptable for the machine schema: a future schema
+edit using an unimplemented keyword must fail loudly, not validate by
+accident. `check_schema_keywords` enforces this gate before instance
+validation.
+
 The instance is a committed freeze artifact (`faber/release-manifest.yaml`,
 release-manifest-schema.md §7) produced by the release prepare step
 (`generate-release-manifest`). It must also accept the faber-onboarding
@@ -183,6 +203,57 @@ def parse_manifest(text: str):
 # JSON Schema subset engine (draft 2020-12 keywords used by the schema)
 # ---------------------------------------------------------------------------
 
+# Validation keywords this engine implements (see module docstring). Any
+# other keyword in the schema is a hard error — silent ignore is not allowed
+# for the machine schema.
+_SUPPORTED_KEYWORDS = frozenset({
+    "type", "const", "enum", "pattern",
+    "properties", "additionalProperties", "required",
+    "minItems", "items",
+})
+
+# Non-semantic keywords tolerated as annotations: they carry no validation
+# weight and never change the outcome. Everything else must be explicit or
+# validation fails with a named error.
+_TOLERATED_KEYWORDS = frozenset({
+    "$schema", "$id", "$comment",
+    "title", "description", "default", "examples",
+    "deprecated", "readOnly", "writeOnly",
+})
+
+
+def check_schema_keywords(schema: dict, path: str = "$",
+                          errors: list[str] | None = None) -> list[str]:
+    """Reject any schema keyword outside the implemented subset.
+
+    Walks the whole schema (properties and items nodes) independent of the
+    instance, so an unsupported keyword anywhere is a named hard error even
+    when the instance would otherwise validate. The walk does not descend
+    into other applicator containers: their keywords are themselves
+    unsupported, so the node where they appear already fails.
+    """
+    if errors is None:
+        errors = []
+    if not isinstance(schema, dict):
+        return errors
+    for key in schema:
+        if key in _SUPPORTED_KEYWORDS or key in _TOLERATED_KEYWORDS:
+            continue
+        errors.append(
+            f"{path}: unsupported schema keyword {key!r} "
+            f"(supported: {', '.join(sorted(_SUPPORTED_KEYWORDS))}; "
+            f"tolerated annotations: {', '.join(sorted(_TOLERATED_KEYWORDS))})"
+        )
+    props = schema.get("properties")
+    if isinstance(props, dict):
+        for name, subschema in props.items():
+            check_schema_keywords(subschema, f"{path}.properties.{name}", errors)
+    items_schema = schema.get("items")
+    if isinstance(items_schema, dict):
+        check_schema_keywords(items_schema, f"{path}.items", errors)
+    return errors
+
+
 def _type_name(value: object) -> str:
     if value is None:
         return "null"
@@ -275,13 +346,21 @@ def load_schema(path: Path = SCHEMA) -> dict:
 
 
 def validate_instance_file(instance_path: Path, schema_path: Path = SCHEMA) -> list[str]:
-    """Validate an instance file. Returns a list of errors (empty = valid)."""
+    """Validate an instance file. Returns a list of errors (empty = valid).
+
+    The schema well-formedness gate (unsupported-keyword check) runs before
+    instance validation: a schema edit using an unimplemented JSON-Schema
+    keyword fails loudly with a named error, never silently.
+    """
     text = instance_path.read_text(encoding="utf-8")
     try:
         instance = parse_manifest(text)
     except (json.JSONDecodeError, ManifestParseError) as exc:
         return [f"{instance_path}: malformed manifest: {exc}"]
     schema = load_schema(schema_path)
+    errors = check_schema_keywords(schema)
+    if errors:
+        return errors
     return validate_schema(instance, schema)
 
 

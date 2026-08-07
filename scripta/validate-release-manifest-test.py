@@ -220,6 +220,51 @@ class ValidateReleaseManifestTest(unittest.TestCase):
         errors = self.errors(text)
         self.assertTrue(any("license" in e for e in errors), errors)
 
+    def test_unsupported_schema_keyword_hard_fails(self) -> None:
+        # head-cxo RR-2: silent ignore is a hard error. A $ref anywhere in
+        # the schema fails with a named keyword, even for a valid instance.
+        schema = self.module.load_schema()
+        schema["$ref"] = "#/$defs/anything"
+        schema_path = self.dir / "ref.schema.json"
+        schema_path.write_text(json.dumps(schema), encoding="utf-8")
+        instance_path = self.write_instance(VALID_INSTANCE)
+        errors = self.module.validate_instance_file(instance_path, schema_path)
+        self.assertTrue(
+            any("unsupported schema keyword" in e and "'$ref'" in e
+                for e in errors),
+            errors,
+        )
+
+    def test_unsupported_schema_keyword_nested_names_path(self) -> None:
+        # The gate is schema-driven and names the offending keyword + path.
+        schema = self.module.load_schema()
+        schema["properties"]["preparedAt"]["minimum"] = "2026-01-01"
+        schema_path = self.dir / "minimum.schema.json"
+        schema_path.write_text(json.dumps(schema), encoding="utf-8")
+        instance_path = self.write_instance(VALID_INSTANCE)
+        errors = self.module.validate_instance_file(instance_path, schema_path)
+        self.assertTrue(
+            any("unsupported schema keyword" in e and "'minimum'" in e
+                and "preparedAt" in e for e in errors),
+            errors,
+        )
+
+    def test_unsupported_schema_keyword_cli_exit_1(self) -> None:
+        schema = self.module.load_schema()
+        schema["properties"]["preparedAt"]["minLength"] = 10
+        schema_path = self.dir / "minlength.schema.json"
+        schema_path.write_text(json.dumps(schema), encoding="utf-8")
+        path = self.write_instance(VALID_INSTANCE)
+        res = subprocess.run(
+            [sys.executable, str(SCRIPT), str(path), "--schema", str(schema_path)],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 1, res.stdout + res.stderr)
+        self.assertIn("unsupported schema keyword", res.stderr)
+        self.assertIn("minLength", res.stderr)
+
     def test_schema_section_anchors(self) -> None:
         # Section-by-section mapping guard: the schema JSON carries the §2–§7
         # decisions. Assert the decisions the docs pin.
