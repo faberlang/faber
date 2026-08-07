@@ -19,16 +19,18 @@ in [`docs/archived/`](../archived/README.md).
 ## Summary
 
 - goals scanned: 19
-- active: 3
+- active: 5
 - planned: 7
 - done: 4
-- unknown: 5
+- unknown: 3
 - archived (moved to `docs/archived/`): 1
 
 ## Open and in progress
 
 | Goal | Status | Done | goal | campaign | delivery | ledger | council | evidence | other |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| [component-release-streamline](component-release-streamline/CAMPAIGN.md) | active | — | 0 | 1 | 2 | 0 | 0 | 0 | 1 |
+| [faber-onboarding](faber-onboarding/CAMPAIGN.md) | active | — | 0 | 1 | 2 | 0 | 0 | 0 | 1 |
 | [faber-script-e2e-hardening](faber-script-e2e-hardening/goal.md) | active | — | 1 | 0 | 0 | 1 | 0 | 0 | 34 |
 | [sqlite-library-package](sqlite-library-package/goal.md) | active | — | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
 | [unified-package-manifest](unified-package-manifest/goal.md) | active | — | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -59,7 +61,5 @@ in [`docs/archived/`](../archived/README.md).
 | Goal | Status | Done | goal | campaign | delivery | ledger | council | evidence | other |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | autograd-equivalent-roadmap | unknown | — | 0 | 0 | 0 | 0 | 0 | 0 | 1 |
-| [component-release-streamline](component-release-streamline/CAMPAIGN.md) | unknown | — | 0 | 1 | 1 | 0 | 0 | 0 | 1 |
 | [core-support-radix-runtime-contract](core-support-radix-runtime-contract/goal.md) | unknown | — | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
-| [faber-onboarding](faber-onboarding/CAMPAIGN.md) | unknown | — | 0 | 1 | 1 | 0 | 0 | 0 | 1 |
 | pure-lib-browser-resolve | unknown | — | 0 | 0 | 1 | 0 | 0 | 0 | 0 |

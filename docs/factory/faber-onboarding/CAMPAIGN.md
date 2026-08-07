@@ -1,6 +1,6 @@
 # Campaign: Faber Onboarding And First-Run Experience
 
-**Status**: planned — Stage 0 inventory, then Stage 1 distribution-contract decisions
+**Status**: active — Stage 0 delivered (36e6880); Stage 1 delivery lowered, ready for delivery
 **Created**: 2026-08-07
 **Mode**: routing artifact — does not implement code directly
 **Control-plane repo**: `/Users/ianzepp/work/faberlang/faber`
