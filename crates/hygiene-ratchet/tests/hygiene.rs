@@ -34,7 +34,6 @@ fn production_hygiene_budgets() {
 }
 
 #[test]
-#[ignore = "Y: quarantined 2026-08-06; radix-mir-python diagnostic prose assertions need structured code/issue/arg migration"]
 fn non_renderer_tests_do_not_assert_diagnostic_text() {
     let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()

@@ -1539,8 +1539,8 @@ fn broadcast_fact_with_wrong_result_shape_fails_admission_closed() {
     );
 }
 
-/// GI3-1: the inference-recipe wire mirrors (Gather / RmsNormalization /
-/// Rope / CausalMaskedSoftmax) serialize and round-trip through the text
+/// GI3-1: the inference-recipe wire mirrors (Gather / `RmsNormalization` /
+/// Rope / `CausalMaskedSoftmax`) serialize and round-trip through the text
 /// codec under the accepted wire version — the F1 mechanical mirror arms,
 /// no `FmirDeviceSection` field change, no version bump.
 #[test]
@@ -1553,7 +1553,7 @@ fn gi3_inference_recipe_plans_round_trip_on_the_wire() {
         }),
         WireCollectionKernelPlan::RmsNormalization(WireRmsNormalizationPlan {
             axis: 1,
-            epsilon_bits: (1e-5_f64 as f32).to_bits(),
+            epsilon_bits: 1e-5_f32.to_bits(),
             width: 960,
         }),
         WireCollectionKernelPlan::Rope(WireRopePlan {
