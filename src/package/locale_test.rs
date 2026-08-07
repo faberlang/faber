@@ -163,7 +163,7 @@ fn installed_locale_pack_resolves_install_prefix() {
     let exe = prefix.join("bin/faber");
     fs::create_dir_all(exe.parent().expect("bin dir")).expect("bin dir");
 
-    let resolved = installed_locale_pack_path_in(Some(&exe), Some(&prefix), "la");
+    let resolved = installed_locale_pack_path_in(Some(&exe), Some(&prefix), false, "la");
     assert_eq!(
         resolved,
         pack.canonicalize().unwrap_or(pack.clone()),
@@ -181,7 +181,7 @@ fn installed_locale_pack_dev_fallback_resolves_sibling_radix() {
     fs::create_dir_all(pack.parent().expect("pack dir")).expect("pack dir");
     fs::write(&pack, "ignored content").expect("pack");
 
-    let resolved = installed_locale_pack_path_in(None, Some(&faber_dir), "en");
+    let resolved = installed_locale_pack_path_in(None, Some(&faber_dir), true, "en");
     assert_eq!(
         resolved,
         pack.canonicalize().unwrap_or(pack.clone()),
@@ -198,7 +198,7 @@ fn installed_locale_pack_fails_closed_with_nonexistent_path() {
 
     // Installed binary with no pack and no sibling checkout: the resolved path
     // must not exist and must name the install layout (fail closed, E5).
-    let resolved = installed_locale_pack_path_in(Some(&exe), Some(&hermetic), "zz");
+    let resolved = installed_locale_pack_path_in(Some(&exe), Some(&hermetic), false, "zz");
     assert!(!resolved.is_file(), "resolved path must not exist");
     let display = resolved.display().to_string();
     assert!(
@@ -218,7 +218,7 @@ fn installed_locale_pack_resolves_both_layout_suffixes() {
     let exe = prefix.join("bin/faber");
     fs::create_dir_all(exe.parent().expect("bin dir")).expect("bin dir");
 
-    let resolved = installed_locale_pack_path_in(Some(&exe), Some(&prefix), "th-TH");
+    let resolved = installed_locale_pack_path_in(Some(&exe), Some(&prefix), false, "th-TH");
     assert_eq!(
         resolved,
         pack.canonicalize().unwrap_or(pack.clone()),
@@ -240,10 +240,10 @@ fn dev_walkup_is_never_an_installed_binary_fallback() {
     fs::write(&pack, "ignored content").expect("pack");
     let exe = work.join("faber/bin/faber");
 
-    let installed = installed_locale_pack_path_in(Some(&exe), Some(&faber_dir), "en");
+    let installed = installed_locale_pack_path_in(Some(&exe), Some(&faber_dir), false, "en");
     assert!(!installed.is_file(), "installed binary must not resolve a stray checkout");
 
-    let dev = installed_locale_pack_path_in(None, Some(&faber_dir), "en");
+    let dev = installed_locale_pack_path_in(None, Some(&faber_dir), true, "en");
     assert_eq!(
         dev,
         pack.canonicalize().unwrap_or(pack.clone()),

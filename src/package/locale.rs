@@ -217,6 +217,7 @@ pub(crate) fn installed_locale_pack_path(locale: &str) -> PathBuf {
     installed_locale_pack_path_in(
         std::env::current_exe().ok().as_deref(),
         std::env::current_dir().ok().as_deref(),
+        cfg!(debug_assertions),
         locale,
     )
 }
@@ -229,15 +230,20 @@ pub(crate) fn installed_locale_pack_path(locale: &str) -> PathBuf {
 /// back to a sibling `radix/stdlib/locale/<locale>/pack.toml`. When no pack is
 /// found the returned path does not exist; callers turn the load failure into
 /// a nonzero, actionable error naming the missing pack and one next action.
+///
+/// `dev_tree_allowed` is `cfg!(debug_assertions)` in production: only
+/// development builds may walk up to a sibling checkout; a released binary
+/// resolves strictly from the install prefix.
 pub(crate) fn installed_locale_pack_path_in(
     exe: Option<&Path>,
     cwd: Option<&Path>,
+    dev_tree_allowed: bool,
     locale: &str,
 ) -> PathBuf {
     if let Some(path) = install_locale_pack(exe, locale) {
         return path;
     }
-    if cfg!(debug_assertions) {
+    if dev_tree_allowed {
         if let Some(path) = dev_locale_pack(cwd, exe, locale) {
             return path;
         }
