@@ -324,3 +324,36 @@ fn canonical_nominal_identity_key_shape_is_module_qualified() {
         "canonical nominal key = identity + export name"
     );
 }
+
+// Fail-closed fixture (council-11 correct_before_next_phase): the library
+// exports an enum whose variant payload references a nominal from a module the
+// consumer never imports. The consumer analysis SKIPS the enum export (the
+// nested nominal's identity is unknown there), so the merge must NOT silently
+// keep the library's source-local enum/variant identity — it must fail closed
+// with an unknown-identity diagnostic.
+const NOMINAL_VARIANT_OTHER: &str = "genus Weird {\n    numerus gradus\n}\n";
+const NOMINAL_VARIANT_UTIL: &str = "importa ex \"./other\" privata * ut otherModule\n\ngenus Gradus {\n    numerus gradus\n}\n\ndiscretio Color {\n    rubrum,\n    caeruleum { otherModule.Weird gradus }\n}\n\nfunctio primus() → Color {\n    redde Color.rubrum\n}\n";
+const NOMINAL_VARIANT_MAIN: &str = "importa ex \"./util\" privata * ut utilModule\n\nincipit {\n    nota 1\n}\n";
+
+#[test]
+fn identity_bearing_enum_variant_canonical_miss_fails_closed() {
+    let dir = crate::package::test_support::test_temp_dir("s1u2-variant-fail-closed");
+    let entry = write_three_module_package(
+        dir.as_ref(),
+        NOMINAL_VARIANT_UTIL,
+        NOMINAL_VARIANT_OTHER,
+        NOMINAL_VARIANT_MAIN,
+    );
+    let config = Config::default();
+
+    let errors = with_interpreted_lowered_package_mir(&config, &entry, |_| {}).expect_err(
+        "identity-bearing enum with a consumer canonical miss must fail closed",
+    );
+    let messages: Vec<String> = errors.iter().map(|diag| diag.message.clone()).collect();
+    assert!(
+        messages
+            .iter()
+            .any(|message| message.contains("identity-bearing nominal `Color`")),
+        "expected an unknown-identity fail-closed diagnostic, got: {messages:?}"
+    );
+}

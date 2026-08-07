@@ -1,6 +1,7 @@
 //! Lower package units (and libraries) into the merged package MIR program.
 
 use super::*;
+use radix::file_interface::FileInterface;
 
 pub(super) fn lower_package_units<'a>(
     package: &'a mut AnalyzedPackage,
@@ -42,22 +43,43 @@ pub(super) fn lower_package_units<'a>(
     for unit in before.iter_mut().chain(after.iter_mut()) {
         let unit_path = unit.path.clone();
         let source_interner = unit.analysis.interner.clone();
+        let source_exports = exported_nominal_names(&unit.file_interface);
         // S1 U2 nominal identity: build the canonical nominal remap while the
         // source analysis is freely borrowable (lowering mutates it below).
-        let nominal_map = build_nominal_remap(
+        let nominal_map = match build_nominal_remap(
             &unit.analysis.types,
             &unit.analysis.interner,
             &unit.analysis.resolver,
             unit.file_interface.identity.as_ref(),
+            &source_exports,
             &entry.analysis,
-        );
+        ) {
+            Ok(map) => map,
+            Err(message) => {
+                return Err(vec![mir_issue_diag(
+                    &unit_path,
+                    "package_mir_nominal_identity_unknown",
+                    message,
+                )]);
+            }
+        };
         // S1 U2 VALUE members: variant definitions ride the same remap.
-        let variant_remap = build_variant_remap(
+        let variant_remap = match build_variant_remap(
             &unit.analysis.interner,
             &unit.analysis.resolver,
             unit.file_interface.identity.as_ref(),
+            &source_exports,
             &entry.analysis,
-        );
+        ) {
+            Ok(remap) => remap,
+            Err(message) => {
+                return Err(vec![mir_issue_diag(
+                    &unit_path,
+                    "package_mir_variant_identity_unknown",
+                    message,
+                )]);
+            }
+        };
         let mut lowered = lower_unit(unit, &cli_plan.entry_records, no_fuse)?;
         remap_program_text_symbols(
             &mut lowered.program,
@@ -124,27 +146,49 @@ pub(super) fn lower_package_units<'a>(
                 // while the library analysis is freely borrowable (the entry
                 // registered the library's file interface under the same
                 // module identity during analysis).
-                let source_identity = library_cached_file_interface(
-                    &library.import,
-                    library_resolver,
-                    cache,
-                )
-                .ok()
-                .and_then(|interface| interface.identity);
-                let nominal_map = build_nominal_remap(
+                let cached_interface =
+                    library_cached_file_interface(&library.import, library_resolver, cache).ok();
+                let source_identity = cached_interface.as_ref().and_then(|interface| interface.identity.clone());
+                let source_exports = cached_interface
+                    .as_ref()
+                    .map(exported_nominal_names)
+                    .unwrap_or_default();
+                let nominal_map = match build_nominal_remap(
                     &analysis.types,
                     &analysis.interner,
                     &analysis.resolver,
                     source_identity.as_ref(),
+                    &source_exports,
                     &entry.analysis,
-                );
+                ) {
+                    Ok(map) => map,
+                    Err(message) => {
+                        diagnostics.push(mir_issue_diag(
+                            &library.path,
+                            "package_mir_nominal_identity_unknown",
+                            message,
+                        ));
+                        return Ok(());
+                    }
+                };
                 // S1 U2 VALUE members: variant definitions ride the same remap.
-                let variant_remap = build_variant_remap(
+                let variant_remap = match build_variant_remap(
                     &analysis.interner,
                     &analysis.resolver,
                     source_identity.as_ref(),
+                    &source_exports,
                     &entry.analysis,
-                );
+                ) {
+                    Ok(remap) => remap,
+                    Err(message) => {
+                        diagnostics.push(mir_issue_diag(
+                            &library.path,
+                            "package_mir_variant_identity_unknown",
+                            message,
+                        ));
+                        return Ok(());
+                    }
+                };
                 let bundle = match radix::driver::prepare_air_backward_bundle(analysis) {
                     Ok(bundle) => bundle,
                     Err(err) => {
@@ -282,7 +326,7 @@ fn inject_package_data_members(
                     unit.analysis.interner.clone(),
                     &unit.analysis.types,
                     &unit.analysis.resolver,
-                    unit.file_interface.identity.clone(),
+                    unit.file_interface.clone(),
                 )
             })
             .or_else(|| {
@@ -290,18 +334,17 @@ fn inject_package_data_members(
                     .libraries
                     .iter()
                     .find(|library| library.path == member.source_path)?;
-                let identity = library_cached_file_interface(
+                let interface = library_cached_file_interface(
                     &library.import,
                     library_resolver,
                     library_cache,
                 )
-                .ok()
-                .and_then(|interface| interface.identity);
+                .ok()?;
                 let analysis = library_cached_analysis(&library.import, library_resolver, library_cache)
                     .ok()?;
-                Some((analysis.interner.clone(), &analysis.types, &analysis.resolver, identity))
+                Some((analysis.interner.clone(), &analysis.types, &analysis.resolver, interface))
             });
-        let Some((source_interner, source_types, source_resolver, source_identity)) = source else {
+        let Some((source_interner, source_types, source_resolver, source_interface)) = source else {
             diagnostics.push(mir_issue_diag(
                 &entry_path,
                 "package_mir_data_member_unsupported",
@@ -317,7 +360,7 @@ fn inject_package_data_members(
             &source_interner,
             source_types,
             source_resolver,
-            source_identity.as_ref(),
+            &source_interface,
             entry,
         ) {
             Ok(item) => item,
@@ -347,10 +390,11 @@ fn transplant_data_member(
     source_interner: &Interner,
     source_types: &TypeTable,
     source_resolver: &Resolver,
-    source_identity: Option<&InterfaceLibraryIdentity>,
+    source_interface: &FileInterface,
     entry: &mut AnalyzedPackageUnit,
 ) -> Result<HirItem, String> {
     let mut imported = HashMap::new();
+    let source_exports = exported_nominal_names(source_interface);
     // S1 U2 nominal identity: build the canonical nominal remap so const
     // types/initializers referencing library nominals unify with the entry's
     // semantic types (the linked source module's identity is the key).
@@ -358,9 +402,10 @@ fn transplant_data_member(
         source_types,
         source_interner,
         source_resolver,
-        source_identity,
+        source_interface.identity.as_ref(),
+        &source_exports,
         &entry.analysis,
-    );
+    )?;
     let nominal = NominalImportContext { nominal_map: &nominal_map };
     let konst = HirConst {
         name: remap_symbol(member.konst.name, source_interner, &mut entry.analysis.interner),

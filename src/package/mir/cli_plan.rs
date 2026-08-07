@@ -2,6 +2,23 @@
 
 use super::*;
 use radix::driver::AnalyzedUnit;
+use radix::file_interface::{FileExportKind, FileInterface};
+
+/// Names of the nominal exports (struct/enum/interface) declared by a source
+/// unit's own file interface — the identity-bearing nominals whose canonical
+/// home-module key is the source module's own identity.
+pub(super) fn exported_nominal_names(interface: &FileInterface) -> BTreeSet<String> {
+    interface
+        .exports
+        .values()
+        .filter_map(|export| match &export.kind {
+            FileExportKind::Struct(_) | FileExportKind::Enum(_) | FileExportKind::Interface(_) => {
+                Some(export.name.clone())
+            }
+            FileExportKind::Function(_) | FileExportKind::TypeAlias(_) | FileExportKind::Const(_) => None,
+        })
+        .collect()
+}
 
 pub(super) fn plan_cli_package(
     package: &mut AnalyzedPackage,
@@ -827,17 +844,25 @@ pub(super) struct NominalImportContext<'a> {
 /// library) into the entry analysis.
 ///
 /// Every nominal type id in the source type table is resolved to its canonical
-/// key (kind + source module identity + export name) and looked up in the
-/// entry's canonical imported-nominal table. Nominal defs the entry does not
-/// know (genuinely entry-local types referenced from a sibling) are omitted —
-/// the import falls back to interning the source-local def as-is.
+/// key (kind + home-module identity + export name) and looked up in the
+/// entry's canonical imported-nominal table. The home-module identity is the
+/// nominal's own module identity (mirror of the snapshot side); for the source
+/// unit's own exported nominals that is the source module identity.
+///
+/// Fail-closed (council-11 correct_before_next_phase): an identity-bearing
+/// nominal of a module the entry analysis knows must never silently keep its
+/// source-local identity — a canonical-table miss for such a nominal returns
+/// an unknown-identity error. Modules the entry never imported, identity-less
+/// legacy sources, and private source-local nominals keep the legacy
+/// source-local fallback (the def is interned as-is).
 pub(super) fn build_nominal_remap(
     source_types: &TypeTable,
     source_interner: &Interner,
     source_resolver: &Resolver,
     source_identity: Option<&InterfaceLibraryIdentity>,
+    source_exports: &BTreeSet<String>,
     entry: &AnalyzedUnit,
-) -> HashMap<DefId, TypeId> {
+) -> Result<HashMap<DefId, TypeId>, String> {
     let mut map = HashMap::new();
     let mut target_interner = entry.interner.clone();
     for index in 0..source_types.type_count() {
@@ -856,16 +881,36 @@ pub(super) fn build_nominal_remap(
         let Some(symbol) = source_resolver.get_symbol(def_id) else {
             continue;
         };
-        let name = target_interner.intern(source_interner.resolve(symbol.name));
+        let name_text = source_interner.resolve(symbol.name);
+        let name = target_interner.intern(name_text);
+        let home_identity = source_resolver
+            .nominal_module_identity(def_id)
+            .or_else(|| {
+                source_exports
+                    .contains(name_text)
+                    .then(|| source_identity.cloned())
+                    .flatten()
+            });
         if let Some(entry_ty) =
             entry
                 .resolver
-                .imported_nominal_type_by_identity(kind, source_identity, name)
+                .imported_nominal_type_by_identity(kind, home_identity.as_ref(), name)
         {
             map.insert(def_id, entry_ty);
+        } else if home_identity
+            .as_ref()
+            .is_some_and(|identity| entry.resolver.canonical_identity_known(identity))
+        {
+            return Err(format!(
+                "identity-bearing nominal `{name_text}` (kind {kind:?}) from module `{}` is not known to the entry analysis; it must not retain a source-local identity",
+                home_identity
+                    .as_ref()
+                    .map(InterfaceLibraryIdentity::display_key)
+                    .unwrap_or_default(),
+            ));
         }
     }
-    map
+    Ok(map)
 }
 
 /// Build the canonical enum-variant remap for one source unit into the entry
@@ -873,40 +918,75 @@ pub(super) fn build_nominal_remap(
 /// variant `DefId`.
 ///
 /// Each source variant resolves through its parent enum (source resolver
-/// `variant_parents`) to the canonical enum key (Enum + source module
-/// identity + enum export name), which maps to the consumer enum `DefId`; the
-/// consumer variant then resolves by name through `variant_child`. Variants of
-/// enums the entry does not know are omitted — those program fragments keep
-/// their source-local defs (entry-local types referenced from a sibling).
+/// `variant_parents`) to the canonical enum key (Enum + home-module identity +
+/// enum export name), which maps to the consumer enum `DefId`; the consumer
+/// variant then resolves by name through `variant_child`.
+///
+/// Fail-closed (council-11 correct_before_next_phase): an identity-bearing
+/// variant of an enum whose module the entry analysis knows must never
+/// silently retain its source-local identity — an unresolved consumer variant
+/// returns an unknown-identity error. Enums of modules the entry never
+/// imported, identity-less legacy sources, and private enums keep their
+/// source-local defs, as before.
 pub(super) fn build_variant_remap(
     source_interner: &Interner,
     source_resolver: &Resolver,
     source_identity: Option<&InterfaceLibraryIdentity>,
+    source_exports: &BTreeSet<String>,
     entry: &AnalyzedUnit,
-) -> HashMap<DefId, DefId> {
+) -> Result<HashMap<DefId, DefId>, String> {
     let mut map = HashMap::new();
     let mut target_interner = entry.interner.clone();
     for (variant_def, enum_def) in source_resolver.variant_parents_all() {
-        let Some(enum_symbol) = source_resolver.get_symbol(enum_def) else {
-            continue;
-        };
-        let enum_name = target_interner.intern(source_interner.resolve(enum_symbol.name));
-        let Some(entry_enum_def) = entry.resolver.imported_nominal_def_id(
-            InterfaceNominalKind::Enum,
-            source_identity,
-            enum_name,
-        ) else {
-            continue;
-        };
         let Some(variant_symbol) = source_resolver.get_symbol(variant_def) else {
             continue;
         };
-        let variant_name = target_interner.intern(source_interner.resolve(variant_symbol.name));
+        let Some(enum_symbol) = source_resolver.get_symbol(enum_def) else {
+            continue;
+        };
+        let enum_name_text = source_interner.resolve(enum_symbol.name);
+        let variant_name_text = source_interner.resolve(variant_symbol.name);
+        let enum_name = target_interner.intern(enum_name_text);
+        let enum_home = source_resolver
+            .nominal_module_identity(enum_def)
+            .or_else(|| {
+                source_exports
+                    .contains(enum_name_text)
+                    .then(|| source_identity.cloned())
+                    .flatten()
+            });
+        let Some(entry_enum_def) = entry.resolver.imported_nominal_def_id(
+            InterfaceNominalKind::Enum,
+            enum_home.as_ref(),
+            enum_name,
+        ) else {
+            if enum_home
+                .as_ref()
+                .is_some_and(|identity| entry.resolver.canonical_identity_known(identity))
+            {
+                return Err(format!(
+                    "identity-bearing enum `{enum_name_text}` (module `{}`) is not known to the entry analysis; variant `{variant_name_text}` must not retain a source-local identity",
+                    enum_home
+                        .as_ref()
+                        .map(InterfaceLibraryIdentity::display_key)
+                        .unwrap_or_default(),
+                ));
+            }
+            continue;
+        };
+        let variant_name = target_interner.intern(variant_name_text);
         if let Some(entry_variant_def) = entry.resolver.variant_child(entry_enum_def, variant_name) {
             map.insert(variant_def, entry_variant_def);
+        } else if enum_home
+            .as_ref()
+            .is_some_and(|identity| entry.resolver.canonical_identity_known(identity))
+        {
+            return Err(format!(
+                "identity-bearing enum `{enum_name_text}` variant `{variant_name_text}` is not resolvable in the consumer analysis; it must not retain a source-local identity",
+            ));
         }
     }
-    map
+    Ok(map)
 }
 
 pub(super) fn import_semantic_type_with_nominal(
