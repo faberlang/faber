@@ -37,8 +37,10 @@ use super::{
 pub(crate) struct AnalyzedPackage {
     pub(crate) spec: super::PackageSpec,
     pub(crate) units: Vec<AnalyzedPackageUnit>,
+    // Entry frontmatter feeds the hir-rust test-selection merge (rust_target)
+    // and the hir-fhir writer. `allow(dead_code)`: dead only in builds with
+    // neither `hir-rust` nor `hir-fhir` enabled (minimal target leaves).
     #[allow(dead_code)]
-    // retained for FHIR/frontmatter metadata even when optional target leaves are disabled
     pub(crate) entry_frontmatter: Option<radix::driver::FileFrontmatter>,
     pub(crate) diagnostics: Vec<Diagnostic>,
     /// Provider → Cargo crate name for native-binding library path deps (G4).
@@ -46,7 +48,9 @@ pub(crate) struct AnalyzedPackage {
 }
 
 impl AnalyzedPackage {
-    #[allow(dead_code)] // Stage 2 package MIR linking consumes the entry unit directly.
+    // Go package assembly (`generate_package_go_result`) consumes the entry
+    // unit directly. `allow(dead_code)`: dead only in builds without `hir-go`.
+    #[allow(dead_code)]
     pub(crate) fn entry_unit(&self) -> Option<&AnalyzedPackageUnit> {
         self.units.iter().find(|unit| unit.is_entry)
     }
@@ -57,10 +61,8 @@ pub(crate) struct AnalyzedPackageUnit {
     pub(crate) module_segments: Vec<String>,
     pub(crate) is_entry: bool,
     pub(crate) analysis: AnalyzedUnit,
-    #[allow(dead_code)] // Stage 3 consumes extracted interfaces during import lookup/typecheck.
     pub(crate) file_interface: radix::file_interface::FileInterface,
     pub(crate) export_names: Vec<String>,
-    #[allow(dead_code)] // Stage 2 uses namespace exports to link package MIR calls.
     pub(crate) namespace_exports: BTreeMap<String, Vec<String>>,
     pub(crate) expanded_library_imports: Vec<LibraryImportBinding>,
 }
@@ -85,9 +87,10 @@ pub(crate) struct PackageCompileResult {
 
 /// One package-aware Wasm module file produced for a package unit.
 ///
-/// `allow(dead_code)`: the faber binary routes package wasm builds through the
-/// package-wasm builder directly, so the fields only the emit-path consumer
-/// reads are flagged by the bin target's dead-code analysis.
+/// `allow(dead_code)`: the faber binary routes package wasm builds through
+/// `wasm::build_package_wasm` directly (U6-D), so the compile-result module
+/// collection is only read by a future emit-path consumer; the fields are
+/// flagged by the bin target's dead-code analysis.
 #[allow(dead_code)]
 #[cfg(feature = "mir-wasm")]
 pub(crate) struct WasmPackageModuleFile {
@@ -261,7 +264,10 @@ pub(crate) fn compile_package_go(config: &Config, input: &Path) -> PackageCompil
 ///
 /// The `config` must target `Target::MirWasmBinary`; other targets leave
 /// [`PackageCompileResult::wasm_modules`] empty.
-#[allow(dead_code)] // emit-path seam; the binary routes package wasm builds directly.
+// `allow(dead_code)`: emit-path seam with no in-crate caller — the binary
+// routes package wasm builds through `wasm::build_package_wasm` directly
+// (cmd.rs), so this compile-result entry is only a future emit-path consumer.
+#[allow(dead_code)]
 #[cfg(feature = "mir-wasm")]
 pub(crate) fn compile_package_wasm(config: &Config, input: &Path) -> PackageCompileResult {
     let result = compile_package_internal(config, input, None, false, None);
@@ -782,7 +788,9 @@ fn generate_package_wasm_result(
             output: Some(Output::Wasm(WasmOutput {
                 bytes: build.manifest.entry_bytes,
             })),
-            diagnostics: Vec::new(),
+            // Carry package-analysis diagnostics (warnings) forward like the
+            // Go path; `build_package_wasm_from_graph` only surfaces errors.
+            diagnostics: package.diagnostics.clone(),
         },
         wasm_modules,
         #[cfg(feature = "hir-go")]
