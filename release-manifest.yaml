@@ -15,7 +15,7 @@ releaseIntent:
 pinnedInputs:
   source:
     - name: faber
-      commit: 0c5b235e2294c736d2d29c0c74ba0a2fdf1c7f66
+      commit: 0afed65a788570b49253080719de57165b3e7b63
       tag: v1.4.0
     - name: radix
       commit: b1b3a0a9bc40cceff42325710732c65d465bf2a4
@@ -44,7 +44,7 @@ pinnedInputs:
     - name: reference-pack
       component: reference
       version: "1.4.0"
-      digest: sha256:3eb799efff12da26779c0e269a81709008aac9497998df9bab2705edcbe624a7
+      digest: sha256:c95571617f59a2fe631704cafd141804831cf43b8336d2167b9a2c7ee6d10afd
       compatibility: "faber 1.x major lane; pack_version_skew enforced at load"
       license: MIT
       destination: share/faber/reference
