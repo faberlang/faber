@@ -88,6 +88,8 @@ pub(super) fn compile_package_rust(
         },
         #[cfg(feature = "hir-go")]
         go_modules: Vec::new(),
+        #[cfg(feature = "mir-wasm")]
+        wasm_modules: Vec::new(),
     }
 }
 
@@ -141,6 +143,8 @@ fn compile_failure(diagnostics: Vec<Diagnostic>) -> PackageCompileResult {
         },
         #[cfg(feature = "hir-go")]
         go_modules: Vec::new(),
+        #[cfg(feature = "mir-wasm")]
+        wasm_modules: Vec::new(),
     }
 }
 

@@ -10,7 +10,7 @@ const EXTERNAL_SALUTA: &str =
     "__faber_external_product_importa_wasm_module_auxilium_func_saluta";
 
 const FIXTURE_ENTRY: &str = r#"# importa-wasm entry — carrier-typed sibling import (U6-D)
-import from "./auxilium" private auxilium
+importa ex "./auxilium" privata auxilium
 
 main {
     print auxilium.saluta(41)
@@ -163,7 +163,7 @@ fn package_wasm_build_links_and_runs_through_product_host() {
 fn package_wasm_plan_supports_the_representable_fixture() {
     let dir = test_temp_dir("wasm-plan");
     let entry = write_importa_wasm_fixture(&dir);
-    let mut package = crate::package::compile::analyze_package(&wasm_config(), &entry)
+    let package = crate::package::compile::analyze_package(&wasm_config(), &entry)
         .expect("importa-wasm package must analyze");
     let plan = crate::package::artifact_plan::plan_package(&package, Target::MirWasmBinary);
     assert!(plan.supported, "wasm package plan must be supported");

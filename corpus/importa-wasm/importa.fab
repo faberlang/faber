@@ -12,10 +12,14 @@
 # `faber_external` symbol binding resolves (the U6-E carrier proof: 41 → 42 →
 # stdout). The textus-handle limitation is a recorded residual of this unit.
 #
+# The import uses the grammar-native `importa ex` form (the corpus `import
+# from` spelling is the keyword-exemplum frontmatter alias, which needs the
+# `aliases` frontmatter to lex).
+#
 # EXPECTED OUTPUT:
 #   "42" on successful package link + run through the product host.
 
-import from "./auxilium" private auxilium
+importa ex "./auxilium" privata auxilium
 
 main {
     print auxilium.saluta(41)

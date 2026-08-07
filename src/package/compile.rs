@@ -84,6 +84,11 @@ pub(crate) struct PackageCompileResult {
 }
 
 /// One package-aware Wasm module file produced for a package unit.
+///
+/// `allow(dead_code)`: the faber binary routes package wasm builds through the
+/// package-wasm builder directly, so the fields only the emit-path consumer
+/// reads are flagged by the bin target's dead-code analysis.
+#[allow(dead_code)]
 #[cfg(feature = "mir-wasm")]
 pub(crate) struct WasmPackageModuleFile {
     pub(crate) module_segments: Vec<String>,
@@ -256,12 +261,15 @@ pub(crate) fn compile_package_go(config: &Config, input: &Path) -> PackageCompil
 ///
 /// The `config` must target `Target::MirWasmBinary`; other targets leave
 /// [`PackageCompileResult::wasm_modules`] empty.
+#[allow(dead_code)] // emit-path seam; the binary routes package wasm builds directly.
 #[cfg(feature = "mir-wasm")]
 pub(crate) fn compile_package_wasm(config: &Config, input: &Path) -> PackageCompileResult {
     let result = compile_package_internal(config, input, None, false, None);
     PackageCompileResult {
         compile_result: finalize_package_compile_result(result.compile_result, &config.warn_policy),
         wasm_modules: result.wasm_modules,
+        #[cfg(feature = "hir-go")]
+        go_modules: result.go_modules,
     }
 }
 

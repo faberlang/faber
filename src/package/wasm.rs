@@ -332,7 +332,7 @@ fn emit_unit_module(
                 diagnostics
                     .into_iter()
                     .map(|diag| diag.with_file(unit.path.display().to_string()))
-                    .collect()
+                    .collect::<Vec<_>>()
             },
         )?;
     }
@@ -366,7 +366,7 @@ fn add_canonical_sibling_exports(
         interner,
     );
     let mut out = wat.to_owned();
-    for function in validated.program().functions {
+    for function in &validated.program().functions {
         let Some(source) = function.source else {
             continue;
         };
