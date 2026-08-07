@@ -399,7 +399,7 @@ fn write_crate_snapshot(
 }
 
 fn format_package_rust_source(source: &str) -> String {
-    radix::tool::format_generated_code(Target::HirRust, source)
+    crate::postprocess::format_generated_code(Target::HirRust, source)
         .unwrap_or_else(|_| source.to_owned())
 }
 

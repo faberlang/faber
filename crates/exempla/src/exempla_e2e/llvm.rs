@@ -994,8 +994,9 @@ fn stage8_rust_lane(
             .into_owned();
         let code = super::rust::compile_rust_exemplum(&compiler, path, corpus_root)
             .unwrap_or_else(|reason| panic!("Rust oracle compile failed for {relative}: {reason}"));
-        let code = radix::tool::format_generated_code(radix::codegen::Target::HirRust, &code)
-            .unwrap_or(code);
+        let code =
+            crate::postprocess::format_generated_code(radix::codegen::Target::HirRust, &code)
+                .unwrap_or(code);
         let stem = path
             .file_stem()
             .and_then(|value| value.to_str())

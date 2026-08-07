@@ -11,6 +11,7 @@ mod input_shape;
 mod io_buf;
 mod library;
 mod package;
+mod postprocess;
 mod script;
 
 #[cfg(test)]

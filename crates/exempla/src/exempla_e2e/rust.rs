@@ -145,10 +145,10 @@ fn exempla_rust_e2e() {
 
         let tc = std::time::Instant::now();
         let compiled = compile_rust_exemplum(&compiler, file, &exempla_dir).map(|code| {
-            // Clippy --fix is intentionally omitted (see tool/commands/postprocess.rs):
-            // it spun a second temp Cargo crate per exemplum. Canonicality is the
-            // rust-canonical RC-003 tier, not an e2e correctness gate.
-            radix::tool::format_generated_code(radix::codegen::Target::HirRust, &code)
+            // Clippy --fix is intentionally omitted here because it spins a
+            // second temp Cargo crate per exemplum. Canonicality is the
+            // rust-canonical RC-003 tier, not this e2e correctness gate.
+            crate::postprocess::format_generated_code(radix::codegen::Target::HirRust, &code)
                 .unwrap_or(code)
         });
         let t_compile = tc.elapsed();

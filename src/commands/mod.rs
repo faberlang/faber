@@ -93,23 +93,25 @@ fn dispatch(command: Command) {
             );
             let target_explicit = args.target.is_some();
             validate_deny_codes(&args.deny);
-            package::cmd_build(BuildCommand {
-                input: args.input,
-                out_dir: args.out_dir,
-                package: args.package,
-                release: args.release,
-                target: args
-                    .target
-                    .unwrap_or(radix::tool::CliTarget::HirRust)
-                    .into(),
-                target_explicit,
-                format: args.format,
-                linter: args.linter,
-                deny_warnings: args.deny_warnings,
-                deny_codes: args.deny,
-                locale: args.locale,
-                diagnostic_locale: args.diagnostic_locale,
-            });
+            package::cmd_build(
+                BuildCommand {
+                    input: args.input,
+                    out_dir: args.out_dir,
+                    package: args.package,
+                    release: args.release,
+                    target: args
+                        .target
+                        .unwrap_or(radix::tool::CliTarget::HirRust)
+                        .into(),
+                    target_explicit,
+                    deny_warnings: args.deny_warnings,
+                    deny_codes: args.deny,
+                    locale: args.locale,
+                    diagnostic_locale: args.diagnostic_locale,
+                },
+                args.format,
+                args.linter,
+            );
         }
         Command::Targets => cmd_targets(),
         Command::Check(args) => {
@@ -172,8 +174,6 @@ fn dispatch(command: Command) {
                 input: args.input,
                 package: args.package,
                 target: args.target.to_radix(),
-                format: args.format,
-                linter: args.linter,
                 reflection: args.reflection,
                 output: args.output,
                 diagnostic_mode: diagnostic_mode(args.diagnostics),
@@ -185,7 +185,7 @@ fn dispatch(command: Command) {
                 cuda_descriptor: None,
             };
             if emit::is_faber_emit(args.target) {
-                emit::cmd_emit_faber(emit_command);
+                emit::cmd_emit_faber(emit_command, args.format, args.linter);
             } else if package::use_package_compiler_from_args(
                 emit_command.target,
                 &emit_command.input,
@@ -196,14 +196,14 @@ fn dispatch(command: Command) {
                     &emit_command.input,
                     emit_command.package,
                 );
-                package::cmd_emit_package(emit_command);
+                package::cmd_emit_package(emit_command, args.format, args.linter);
             } else {
                 reject_reader_locale_without_package(
                     emit_command.locale.as_deref(),
                     &emit_command.input,
                     emit_command.package,
                 );
-                emit::cmd_emit_with_locale(emit_command);
+                emit::cmd_emit_with_locale(emit_command, args.format, args.linter);
             }
         }
         Command::Format(args) => cmd_format(&format::FormatCommand {

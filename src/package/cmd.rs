@@ -25,7 +25,7 @@ use super::{
 /// production to Cargo. Direct-file builds and non-Rust targets keep the legacy
 /// single-output behavior so package ergonomics do not change unrelated command
 /// paths.
-pub fn cmd_build(command: radix::tool::BuildCommand) {
+pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool) {
     use std::fs;
     use std::path::PathBuf;
 
@@ -423,6 +423,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand) {
         });
     }
 
+    let code = crate::postprocess::postprocess_code(code, target, format, linter);
     fs::write(&output_path, &code).unwrap_or_else(|err| {
         eprintln!(
             "error: failed to write '{}': {}",
@@ -690,7 +691,7 @@ pub fn cmd_check_package(command: radix::tool::CheckCommand) {
 ///
 /// Unlike `cmd_build`, this command does not materialize the generated Cargo
 /// crate. It is a compiler-inspection surface for the assembled backend output.
-pub fn cmd_emit_package(command: radix::tool::EmitCommand) {
+pub fn cmd_emit_package(command: radix::tool::EmitCommand, format: bool, linter: bool) {
     let (result, locale_pack) = compile_package_input(
         &command.input,
         command.package,
@@ -731,22 +732,12 @@ pub fn cmd_emit_package(command: radix::tool::EmitCommand) {
     }
 
     if let Some(path) = command.output {
-        radix::tool::write_output_artifact(
-            &path,
-            output,
-            command.target,
-            command.format,
-            command.linter,
-        );
+        crate::postprocess::write_output_artifact(&path, output, command.target, format, linter);
         return;
     }
 
-    let code = radix::tool::postprocess_code(
-        output_code(output),
-        command.target,
-        command.format,
-        command.linter,
-    );
+    let code =
+        crate::postprocess::postprocess_code(output_code(output), command.target, format, linter);
     print!("{code}");
 }
 

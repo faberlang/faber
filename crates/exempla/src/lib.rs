@@ -9,6 +9,8 @@
 //! integration test binary (`tests/e2e_harness.rs`).
 
 pub mod paths;
+#[cfg(test)]
+pub(crate) mod postprocess;
 
 /// Path to the language keyword corpus root (resolved at runtime).
 ///

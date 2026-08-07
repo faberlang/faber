@@ -269,7 +269,7 @@ fn exempla_go_e2e() {
             }
         };
 
-        let gofmt = radix::tool::format_generated_code(radix::codegen::Target::HirGo, &code);
+        let gofmt = crate::postprocess::format_generated_code(radix::codegen::Target::HirGo, &code);
         let code = match gofmt {
             Ok(code) => code,
             Err(err) => {

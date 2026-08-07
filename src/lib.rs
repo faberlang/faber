@@ -23,6 +23,7 @@ mod reference_parse;
 pub mod diagnostic_explain;
 pub mod explain;
 pub mod package;
+pub mod postprocess;
 pub mod reference;
 
 pub(crate) const PACKAGE_DIAGNOSTIC_CODE: &str = "PKG001";

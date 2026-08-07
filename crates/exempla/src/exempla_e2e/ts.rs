@@ -956,7 +956,7 @@ fn run_ts_format_tier(toolchain: &TsToolchain, code: &str) -> (TierState, String
             "formatted skipped: no prettier or deno".to_owned(),
         ),
         TsFormatter::Prettier | TsFormatter::Deno => {
-            match radix::tool::format_generated_code(Target::HirTypeScript, code) {
+            match crate::postprocess::format_generated_code(Target::HirTypeScript, code) {
                 Ok(formatted) => (TierState::Passed, formatted, String::new()),
                 Err(err) => (
                     TierState::Failed,
@@ -976,7 +976,7 @@ fn run_ts_lint_tier(toolchain: &TsToolchain, code: &str) -> (TierState, String, 
             "linted skipped: no biome or eslint".to_owned(),
         ),
         TsLinter::Biome | TsLinter::Eslint => {
-            match radix::tool::lint_generated_code(Target::HirTypeScript, code) {
+            match crate::postprocess::lint_generated_code(Target::HirTypeScript, code) {
                 Ok(fixed) => (TierState::Passed, fixed, String::new()),
                 Err(err) => (
                     TierState::Failed,
