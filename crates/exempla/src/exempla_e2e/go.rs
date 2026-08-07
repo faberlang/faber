@@ -11,17 +11,12 @@ use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 const GO_EXPECTED_FAILURES: &[&str] = &[
+    // Provider-gated async routes + generic solum:lege (norma Go host shims
+    // are faber/provider work, not the Go emitter; codex-gap Stage 3 U3
+    // residual).
     "ad/async-solum-leget.fab",
     "ad/async-tempus-dormiet.fab",
-    "ad/sermo-conversio.fab",
-    "ad/sermo-live-directional.fab",
-    "ad/sermo-recovery.fab",
-    "ad/sermo-tuus.fab",
-    "ad/sermo-vacuum.fab",
     "ad/solum-lege-generic.fab",
-    "conversio/collectiones.fab",
-    "conversio/valor-boxing.fab",
-    "conversio/valor-tensor.fab",
     // Y: quarantined 2026-08-06 during full Radix e2e. Kernel proof rows are
     // not yet valid Go host executables.
     "cuda/addita-proof.fab",
@@ -31,11 +26,13 @@ const GO_EXPECTED_FAILURES: &[&str] = &[
     // Y: quarantined 2026-08-06 during full Radix e2e. Go package/import and
     // generated syntax issues need codegen triage outside this validation pass.
     "importa/importa.fab",
+    // Norma-gated (tempus/toml/valor host shims are faber/provider work); the
+    // U2 JSON/valor carriers do not lift the norma import resolution.
     "instans/instans.fab",
-    "intervallum/algebra.fab",
-    "intervallum/conversio.fab",
-    "tensor/bracket-access.fab",
-    "type-hole-union/type-hole-union.fab",
+    // The JSON literal carrier (U2) makes the fixture compile, but the
+    // norma:json wire encode/decode host surface (`json.pange`/`solve`/
+    // `tempta`) is not materialized on Go — provider-gated like instans.
+    "json/json.fab",
     "vector/builtins.fab",
     "vector/cross.fab",
     "vector/decl.fab",
@@ -70,14 +67,11 @@ const GO_EXPECTED_COMPILE_FAILURES: &[(&str, &str)] = &[
     ),
     ("gpu-core-types/f16-bf16-reject.fab", "unknown_type"),
     ("gpu-core-types/f16-width.fab", "go_type_unsupported"),
-    ("conversio/valor-genus.fab", "go_json_unsupported"),
-    ("destructura/literal.fab", "go_json_unsupported"),
     // Async stream posture on Go is fail-closed until a channel carrier lands.
     (
         "itera/cursor-iteratio.fab",
         "go_target_async_stream_unsupported",
     ),
-    ("json/json.fab", "go_json_unsupported"),
     (
         "gpu-core-types/matrix-tensor-reject.fab",
         "expression_type_mismatch",
@@ -165,8 +159,23 @@ const GO_DECLARATION_ONLY_FIXTURES: &[&str] = &[
 //
 // 2026-08-07: target-safe bindings and tensor/sparse conversions raised the
 // live signed corpus to 251 runnable cases.
-const EXPECTED_GO_PASS_FLOOR: usize = 251;
-const EXPECTED_GO_ACCEPTED_OUTCOME_FLOOR: usize = 304;
+//
+// 2026-08-07 (codex-gap Stage 3 Go ratchet): U1/U2/U3 carriers moved twelve
+// expected-failure rows and two go_json_unsupported compile-failure rows off
+// the ledgers, each cited to its proof commit:
+//  - U1 (radix 18e88216c): intervallum/{algebra,conversio}.fab,
+//    tensor/bracket-access.fab, type-hole-union/type-hole-union.fab.
+//  - U2 (radix f30b3c5f6): conversio/{collectiones,valor-boxing,valor-tensor,
+//    valor-genus}.fab + the map[string]any JSON object-root carrier
+//    (destructura/literal.fab compiles and runs).
+//  - U3 (radix ba23d6e09): ad/sermo-{conversio,live-directional,recovery,tuus,
+//    vacuum}.fab via the in-process radixSermo frame shim.
+// json/json.fab compiles under the U2 carrier but stays a tracked failure:
+// the norma:json wire encode/decode host surface (pange/solve/tempta) is not
+// materialized on Go (provider-gated, like instans/instans.fab).
+// Measured live after the ratchet: pass 265, accepted 308.
+const EXPECTED_GO_PASS_FLOOR: usize = 265;
+const EXPECTED_GO_ACCEPTED_OUTCOME_FLOOR: usize = 308;
 // WHY: Remaining expected failures are tracked Go lowering gaps with
 // per-path reopen contracts in docs/factory/go-e2e-failures-matrix/baseline.md.
 const EXPECTED_GO_EXPECTED_FAILURE_CEILING: usize = 51;
