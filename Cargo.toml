@@ -16,6 +16,11 @@ path = "src/main.rs"
 [dependencies]
 # Private compiler workspace (local org layout). Not published with this crate.
 radix = { path = "../radix/crates/radix", default-features = false }
+# GI3-5 (gpu-inference-gguf): the Q1-default prefill device-run driver
+# constructs the prefill MIR program programmatically (tensor types via the
+# shared TypeTable / IndexExpr surface — the same typed-fact construction the
+# emitter fixtures use). radix-types is the leaf crate radix re-exports from.
+radix-types = { path = "../radix/crates/radix-types" }
 faber-hir-rust = { path = "crates/faber-hir-rust", optional = true }
 radix-mir = { path = "../radix/crates/radix-mir" }
 radix-mir-fmir = { path = "../radix/crates/radix-mir-fmir" }

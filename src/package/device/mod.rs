@@ -113,6 +113,7 @@ fn device_diag(context: &str, message: impl Into<String>) -> Diagnostic {
 }
 
 mod program;
+mod prefill_run;
 mod run;
 mod section;
 mod training;
@@ -128,6 +129,11 @@ use section::{inputs_by_buffer_id, wire_buffer_name};
 // device root; the sibling seams (program → training, section → wire,
 // run → section/wire/training) resolve through the same re-exports.
 pub(crate) use program::device_program_for_lowered;
+// The Q1-default prefill device-run driver (GI3-5). The burgus Metal device
+// run is the gated consumer step (env-gated integration test); the lib build
+// keeps the seam for the route + tests.
+#[allow(dead_code)]
+pub(crate) use prefill_run::run_prefill_device_route;
 pub(crate) use run::execute_device_route;
 pub(crate) use section::{artifact_for_backend, descriptor_for_backend};
 pub(crate) use section::{device_section_for_program, DeviceSectionBuild};
