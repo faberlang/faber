@@ -49,9 +49,7 @@ fn i64_param_const_copy_function(types: &mut TypeTable) -> MirFunction {
                         place: MirPlace::local(MirLocalId(0)),
                         value: MirValue {
                             id: MirValueId(0),
-                            kind: MirValueKind::Operand(MirOperand::Constant(
-                                MirConstant::Int(1),
-                            )),
+                            kind: MirValueKind::Operand(MirOperand::Constant(MirConstant::Int(1))),
                             ty: i64,
                             span,
                         },
@@ -145,9 +143,7 @@ fn i64_output_projection_const_store_function(types: &mut TypeTable) -> MirFunct
                         place: MirPlace::local(MirLocalId(3)),
                         value: MirValue {
                             id: MirValueId(0),
-                            kind: MirValueKind::Operand(MirOperand::Constant(
-                                MirConstant::Int(1),
-                            )),
+                            kind: MirValueKind::Operand(MirOperand::Constant(MirConstant::Int(1))),
                             ty: i64,
                             span,
                         },
@@ -259,9 +255,7 @@ fn i64_projected_store_into_dead_array_function(types: &mut TypeTable) -> MirFun
                         },
                         value: MirValue {
                             id: MirValueId(0),
-                            kind: MirValueKind::Operand(MirOperand::Constant(
-                                MirConstant::Int(1),
-                            )),
+                            kind: MirValueKind::Operand(MirOperand::Constant(MirConstant::Int(1))),
                             ty: i64,
                             span,
                         },
@@ -374,9 +368,7 @@ fn dead_i64_place_copy_function(types: &mut TypeTable) -> MirFunction {
                         place: MirPlace::local(MirLocalId(3)),
                         value: MirValue {
                             id: MirValueId(0),
-                            kind: MirValueKind::Operand(MirOperand::Constant(
-                                MirConstant::Int(1),
-                            )),
+                            kind: MirValueKind::Operand(MirOperand::Constant(MirConstant::Int(1))),
                             ty: i64,
                             span,
                         },
@@ -451,9 +443,7 @@ fn dead_i64_place_copy_not_admitted_target_entry_gate() {
 /// reads would treat the slot as dead; the gate's read set counts
 /// terminator reads (regression 5), so the local stays live and its
 /// declaration keeps the layout diagnostic.
-fn dead_i64_const_copy_read_by_switch_terminator_function(
-    types: &mut TypeTable,
-) -> MirFunction {
+fn dead_i64_const_copy_read_by_switch_terminator_function(types: &mut TypeTable) -> MirFunction {
     let i64 = i64_ty(types);
     let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
     let span = test_span();

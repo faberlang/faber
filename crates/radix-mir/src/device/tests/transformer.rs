@@ -7,8 +7,8 @@ use crate::validate::ValidatedMir;
 use crate::{
     MirBlock, MirBlockId, MirCollectionOp, MirConstant, MirFunction, MirFunctionId, MirIntrinsic,
     MirLocal, MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace, MirRuntimeCall,
-    MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind, MirUnOp, MirValidationContext,
-    MirValue, MirValueId, MirValueKind,
+    MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind, MirUnOp,
+    MirValidationContext, MirValue, MirValueId, MirValueKind,
 };
 use radix_types::TypeTable;
 use rustc_hash::FxHashMap;
@@ -116,9 +116,7 @@ fn transformer_device_function(types: &mut TypeTable) -> MirFunction {
                     kind: MirStatementKind::RuntimeCall {
                         destination: Some(MirPlace::local(MirLocalId(5))),
                         call: MirRuntimeCall {
-                            intrinsic: MirIntrinsic::Collection(
-                                MirCollectionOp::TensorLayerNorm,
-                            ),
+                            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorLayerNorm),
                             args: vec![
                                 MirOperand::Place(MirPlace::local(MirLocalId(1))),
                                 MirOperand::Constant(MirConstant::Int(1)),
@@ -221,9 +219,7 @@ fn unplannable_collection_op_still_fails_target_entry_gate() {
                 kind: MirStatementKind::RuntimeCall {
                     destination: Some(MirPlace::local(MirLocalId(2))),
                     call: MirRuntimeCall {
-                        intrinsic: MirIntrinsic::Collection(
-                            MirCollectionOp::TensorCruxEntropia,
-                        ),
+                        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorCruxEntropia),
                         args: vec![
                             MirOperand::Place(MirPlace::local(MirLocalId(0))),
                             MirOperand::Place(MirPlace::local(MirLocalId(1))),

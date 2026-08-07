@@ -1429,7 +1429,7 @@ fn equal_dim_reductions_select_different_reduced_buffer_indices() {
     // The keep-dims flat element (row 1, column 2) of the operand: axis-0
     // reduces columns (reduced index = column), axis-1 reduces rows
     // (reduced index = row) — different reduced-buffer indices.
-    let keep_dims_flat = 1 * 4 + 2;
+    let keep_dims_flat = 4 + 2;
     assert_eq!(axis0.reduced_index(keep_dims_flat), 2);
     assert_eq!(axis1.reduced_index(keep_dims_flat), 1);
     assert_ne!(

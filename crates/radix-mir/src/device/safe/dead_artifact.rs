@@ -43,7 +43,10 @@ impl FoldArtifactSlots {
 /// statement reads it). The emitters skip exactly these slots; a live
 /// `Array`/`Tensor` construct or slot stays fail-closed with the aggregate
 /// diagnostics.
-pub(super) fn dead_fold_artifact_slots(function: &MirFunction, types: &TypeTable) -> FoldArtifactSlots {
+pub(super) fn dead_fold_artifact_slots(
+    function: &MirFunction,
+    types: &TypeTable,
+) -> FoldArtifactSlots {
     let read_locals = crate::read_analysis::function_read_locals(function);
     let mut dead = FoldArtifactSlots::default();
     for local in &function.locals {

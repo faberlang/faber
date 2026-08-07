@@ -2,7 +2,7 @@
 //! regressions 1–2.
 //!
 //! The Metal emitter skips a DEAD const-copy Assign whose value is a scalar
-//! the kernel surface cannot express (26424928f Gap 1 — the LayerNorm
+//! the kernel surface cannot express (26424928f Gap 1 — the `LayerNorm`
 //! lowering's i64 axis const); the NVVM emitter emits it as a harmless
 //! native-i64 slot store. The production CUDA artifact path runs the shared
 //! gate BEFORE the emitter, so the gate must agree: a DEAD const-copy
@@ -85,9 +85,7 @@ fn layernorm_dead_axis_const_function(types: &mut TypeTable, read_axis: bool) ->
                 place: MirPlace::local(MirLocalId(4)),
                 value: MirValue {
                     id: MirValueId(1),
-                    kind: MirValueKind::Operand(MirOperand::Place(MirPlace::local(
-                        MirLocalId(3),
-                    ))),
+                    kind: MirValueKind::Operand(MirOperand::Place(MirPlace::local(MirLocalId(3)))),
                     ty: i64,
                     span,
                 },

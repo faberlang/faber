@@ -13,7 +13,6 @@ use crate::{
 };
 use radix_types::TypeTable;
 
-
 /// The S5-U2c `train_step` artifact shape the emitters see AFTER the
 /// static-shape fold: a DEAD `Array` shape-list construct whose temp
 /// destination forwards into an unread `lista` local (the fold's
@@ -101,12 +100,12 @@ fn dead_fold_artifact_train_step(types: &mut TypeTable) -> MirFunction {
                             kind: MirAggregateKind::Array,
                             ty: lista,
                             fields: MirAggregateFields::Ordered(vec![
-                                MirAggregateItem::Operand(MirOperand::Constant(
-                                    MirConstant::Int(4),
-                                )),
-                                MirAggregateItem::Operand(MirOperand::Constant(
-                                    MirConstant::Int(4),
-                                )),
+                                MirAggregateItem::Operand(MirOperand::Constant(MirConstant::Int(
+                                    4,
+                                ))),
+                                MirAggregateItem::Operand(MirOperand::Constant(MirConstant::Int(
+                                    4,
+                                ))),
                             ]),
                         },
                     },
@@ -148,11 +147,9 @@ fn dead_fold_artifact_train_step(types: &mut TypeTable) -> MirFunction {
                         aggregate: MirAggregate {
                             kind: MirAggregateKind::Tuple,
                             ty: tuple,
-                            fields: MirAggregateFields::Ordered(vec![
-                                MirAggregateItem::Operand(MirOperand::Place(MirPlace::local(
-                                    MirLocalId(2),
-                                ))),
-                            ]),
+                            fields: MirAggregateFields::Ordered(vec![MirAggregateItem::Operand(
+                                MirOperand::Place(MirPlace::local(MirLocalId(2))),
+                            )]),
                         },
                     },
                     span,

@@ -157,11 +157,9 @@ fn tuple_returning_source_with_live_unrelated_tuple_temp(types: &mut TypeTable) 
                         aggregate: MirAggregate {
                             kind: MirAggregateKind::Tuple,
                             ty: one_tuple,
-                            fields: MirAggregateFields::Ordered(vec![
-                                MirAggregateItem::Operand(MirOperand::Place(MirPlace::local(
-                                    MirLocalId(2),
-                                ))),
-                            ]),
+                            fields: MirAggregateFields::Ordered(vec![MirAggregateItem::Operand(
+                                MirOperand::Place(MirPlace::local(MirLocalId(2))),
+                            )]),
                         },
                     },
                     span,
@@ -358,11 +356,9 @@ fn tuple_returning_source_with_live_unrelated_tuple(types: &mut TypeTable) -> Mi
                         aggregate: MirAggregate {
                             kind: MirAggregateKind::Tuple,
                             ty: one_tuple,
-                            fields: MirAggregateFields::Ordered(vec![
-                                MirAggregateItem::Operand(MirOperand::Place(MirPlace::local(
-                                    MirLocalId(2),
-                                ))),
-                            ]),
+                            fields: MirAggregateFields::Ordered(vec![MirAggregateItem::Operand(
+                                MirOperand::Place(MirPlace::local(MirLocalId(2))),
+                            )]),
                         },
                     },
                     span,
