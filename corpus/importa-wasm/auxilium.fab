@@ -1,0 +1,11 @@
+# importa-wasm auxilium — sibling helper module for the package-aware Wasm
+# proof (U6-D).
+#
+# Exported `saluta(numerus) → numerus` consumed via
+# `import from "./auxilium" private auxilium`; the entry calls it with a
+# plain i64 carrier so the cross-module symbol resolution + invocation runs
+# through the product host (separate module instances, shared host arena).
+
+functio saluta(numerus n) → numerus {
+    return n + 1
+}

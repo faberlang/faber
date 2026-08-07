@@ -10042,7 +10042,9 @@ entry = "main.fab"
     )
     .expect("manifest");
     fs::write(dir.join("src/main.fab"), "incipit { }\n").expect("entry");
-    let result = compile_package(&Config::default().with_target(Target::MirWasmBinary), &dir);
+    // Wasm is now a supported package target (U6-D); wgsl stays a rejected
+    // package target for the fail-closed seam.
+    let result = compile_package(&Config::default().with_target(Target::MirWgsl), &dir);
     assert!(!result.success());
     assert!(result.diagnostics.iter().any(|d| diagnostic_has_issue(
         d,

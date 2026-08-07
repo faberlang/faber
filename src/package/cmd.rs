@@ -196,6 +196,49 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
         return;
     }
 
+    // U6-D: package Wasm builds emit one package-aware module per unit and
+    // print the module output directory. Linking/running is the product
+    // host's job (`faber-host-wasm::WasmRtV1Host::run_package`); the build
+    // artifact is the module set + link manifest.
+    if is_package && target == Target::MirWasmBinary {
+        #[cfg(not(feature = "mir-wasm"))]
+        {
+            eprintln!(
+                "error: target `wasm` is not available in this faber build; rebuild with feature `mir-wasm`"
+            );
+            std::process::exit(1);
+        }
+        #[cfg(feature = "mir-wasm")]
+        {
+            let output_dir = match discover_build_layout(&input_path) {
+                Ok(layout) => layout
+                    .package_root
+                    .join("target")
+                    .join("faber")
+                    .join("wasm"),
+                Err(d) => {
+                    eprintln!("error: {}", d.message);
+                    std::process::exit(1);
+                }
+            };
+            let options = super::wasm::PackageWasmOptions::new(output_dir);
+            let build = match super::wasm::build_package_wasm(&config, &input_path, &options) {
+                Ok(build) => build,
+                Err(diagnostics) => {
+                    radix::tool::print_diagnostics(
+                        &diagnostics,
+                        DiagnosticMode::Normal,
+                        locale_pack.as_ref(),
+                    );
+                    eprintln!("wasm package build failed");
+                    std::process::exit(1);
+                }
+            };
+            println!("{}", build.manifest.output.display());
+            return;
+        }
+    }
+
     if is_package && target == Target::HirTypeScript {
         let layout = match discover_build_layout(&input_path) {
             Ok(l) => l,
@@ -302,6 +345,38 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
         eprintln!("compilation failed");
         std::process::exit(1);
     };
+
+    // Binary wasm output cannot travel the text `output_code` path: write the
+    // module bytes to the output path (single-file wasm builds and any other
+    // `Output::Wasm` producer). Package wasm builds are routed above.
+    if let Output::Wasm(out) = &output {
+        let output_path = radix::tool::build_output_path(
+            &command.out_dir,
+            &input_path,
+            target,
+            is_package,
+        );
+        if let Some(parent) = output_path.parent() {
+            fs::create_dir_all(parent).unwrap_or_else(|err| {
+                eprintln!(
+                    "error: failed to create '{}': {}",
+                    parent.display(),
+                    err
+                );
+                std::process::exit(1);
+            });
+        }
+        fs::write(&output_path, &out.bytes).unwrap_or_else(|err| {
+            eprintln!(
+                "error: failed to write '{}': {}",
+                output_path.display(),
+                err
+            );
+            std::process::exit(1);
+        });
+        println!("{}", output_path.display());
+        return;
+    }
 
     // Package Rust builds own a generated crate under target/faber/ and let
     // Cargo place artifacts in sibling debug/release directories.
@@ -575,6 +650,7 @@ pub fn use_package_compiler(target: Target, path: &std::path::Path, force_packag
                 | Target::MirFmirBundle
                 | Target::HirFhir
                 | Target::MirLlvmHost
+                | Target::MirWasmBinary
         );
     }
     false
@@ -755,9 +831,28 @@ pub fn cmd_emit_package(command: radix::tool::EmitCommand, format: bool, linter:
         return;
     }
 
-    let code =
-        crate::postprocess::postprocess_code(output_code(output), command.target, format, linter);
-    print!("{code}");
+    // Binary wasm output has no text form: emit the entry module bytes to
+    // stdout (the same behavior the single-file emit command uses).
+    match output {
+        Output::Wasm(out) => {
+            use std::io::Write;
+            std::io::stdout()
+                .write_all(&out.bytes)
+                .unwrap_or_else(|err| {
+                    eprintln!("error: failed to write wasm bytes to stdout: {err}");
+                    std::process::exit(1);
+                });
+        }
+        output => {
+            let code = crate::postprocess::postprocess_code(
+                output_code(output),
+                command.target,
+                format,
+                linter,
+            );
+            print!("{code}");
+        }
+    }
 }
 
 fn compile_package_input(
@@ -803,7 +898,15 @@ fn output_code(output: Output) -> String {
         Output::TypeScript(out) => out.code,
         Output::Go(out) => out.code,
         Output::WasmText(out) => out.code,
-        Output::Wasm(_) => panic!("binary Wasm output is not supported in faber package builds"),
+        // Unreachable: `cmd_build` writes binary wasm module bytes to the
+        // output path, package wasm builds route through the package-wasm
+        // builder, and `cmd_emit_package` rejects binary wasm on the stdout
+        // path with a recorded diagnostic — binary bytes never reach this
+        // text-only extractor.
+        Output::Wasm(_) => unreachable!(
+            "binary Wasm output is routed before output_code: package builds use the \
+             package-wasm path, emit uses `--output`, build writes module bytes"
+        ),
         Output::LlvmText(out) => out.code,
         Output::MetalText(out) => out.code,
         Output::WgslText(out) => out.code,
