@@ -582,7 +582,10 @@ impl TypeTable {
         self.indices.len()
     }
 
-    /// Internal bridge shape for legacy `tensor<T>` until grammar supplies `Figura`.
+    /// Allocate the memoized unspecified-shape marker (`IndexExpr::Unspecified`).
+    ///
+    /// Used by interface index snapshots and unsupported-type lowering where a
+    /// shape slot has no concrete value.
     pub fn unspecified_shape(&mut self) -> IndexId {
         if let Some(id) = self.unspecified_shape {
             return id;
