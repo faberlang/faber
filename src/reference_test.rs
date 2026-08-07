@@ -1,10 +1,138 @@
 use crate::explain::{render_list, render_plain, Lookup, Registry};
 use crate::reference::{
-    pack_version_skew, parse_release_version, resolve_reference_root, PackMetadata,
-    ReferenceLayout, ReferencePack, ResolvedTerm, REFERENCE_ROOT_ENV,
+    pack_version_skew, parse_release_version, resolve_reference_root, resolve_reference_root_in,
+    PackMetadata, ReferenceLayout, ReferencePack, ResolvedTerm, REFERENCE_ROOT_ENV,
 };
 use crate::reference_pack_test_support::{env_lock, repo_exempla_root};
 use crate::reference_parse::entry_from_exempla;
+use std::fs;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+static NEXT_TEMP_DIR: AtomicU64 = AtomicU64::new(0);
+
+/// Unique scratch dir under the platform temp root (never inside a workspace).
+fn temp_dir(label: &str) -> PathBuf {
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let serial = NEXT_TEMP_DIR.fetch_add(1, Ordering::Relaxed);
+    let dir = std::env::temp_dir().join(format!("{label}-{nonce}-{serial}"));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).expect("temp dir");
+    dir
+}
+
+/// Minimal valid corpus index.toml that would satisfy the old dev walk-up.
+const FAKE_INDEX: &str = "generated_on = \"2026-08-07\"\nfab_count = 0\nregistry_terms = 0\nterms = []\n";
+
+#[test]
+fn release_mode_fails_closed_beside_stray_sibling_checkout() {
+    // E5 regression: a hermetic directory containing a stray `radix/corpus`
+    // checkout must NOT satisfy an installed (release-shaped) binary.
+    let hermetic = temp_dir("faber-e5-stray");
+    let stray = hermetic.join("radix/corpus");
+    fs::create_dir_all(&stray).expect("stray corpus dir");
+    fs::write(stray.join("index.toml"), FAKE_INDEX).expect("stray index");
+    let exe = hermetic.join("bin/faber");
+    fs::create_dir_all(exe.parent().expect("bin dir")).expect("bin dir");
+
+    let err = resolve_reference_root_in(Some(&exe), Some(&hermetic), false)
+        .expect_err("installed binary must fail closed");
+    assert!(err.message.contains("reference pack not found"), "{}", err.message);
+    assert!(
+        err.message.contains("share/faber/reference"),
+        "error must name the install location: {}",
+        err.message
+    );
+    let _ = fs::remove_dir_all(&hermetic);
+}
+
+#[test]
+fn release_mode_fails_closed_in_hermetic_dir_without_packs() {
+    let hermetic = temp_dir("faber-e5-empty");
+    let exe = hermetic.join("bin/faber");
+    fs::create_dir_all(exe.parent().expect("bin dir")).expect("bin dir");
+
+    let err = resolve_reference_root_in(Some(&exe), Some(&hermetic), false)
+        .expect_err("installed binary must fail closed");
+    assert!(err.message.contains("reference pack not found"), "{}", err.message);
+    let _ = fs::remove_dir_all(&hermetic);
+}
+
+#[test]
+fn install_sibling_resolves_share_faber_reference() {
+    let prefix = temp_dir("faber-install-share");
+    let root = prefix.join("share/faber/reference");
+    fs::create_dir_all(&root).expect("pack root");
+    fs::write(root.join("index.toml"), FAKE_INDEX).expect("index");
+    let exe = prefix.join("bin/faber");
+    fs::create_dir_all(exe.parent().expect("bin dir")).expect("bin dir");
+
+    let resolved = resolve_reference_root_in(Some(&exe), Some(&prefix), false)
+        .expect("install-sibling resolution");
+    assert_eq!(
+        resolved,
+        root.canonicalize().unwrap_or(root.clone()),
+        "resolved must match the canonicalized pack root"
+    );
+    let _ = fs::remove_dir_all(&prefix);
+}
+
+#[test]
+fn install_sibling_resolves_lib_faber_reference() {
+    let prefix = temp_dir("faber-install-lib");
+    let root = prefix.join("lib/faber/reference");
+    fs::create_dir_all(&root).expect("pack root");
+    fs::write(root.join("index.toml"), FAKE_INDEX).expect("index");
+    let exe = prefix.join("bin/faber");
+    fs::create_dir_all(exe.parent().expect("bin dir")).expect("bin dir");
+
+    let resolved = resolve_reference_root_in(Some(&exe), Some(&prefix), false)
+        .expect("install-sibling resolution");
+    assert_eq!(
+        resolved,
+        root.canonicalize().unwrap_or(root.clone()),
+        "resolved must match the canonicalized pack root"
+    );
+    let _ = fs::remove_dir_all(&prefix);
+}
+
+#[test]
+fn dev_walkup_resolves_sibling_radix_tree() {
+    // Development builds may walk up from the cwd to a sibling radix checkout.
+    let work = temp_dir("faber-dev-tree");
+    let faber_dir = work.join("faber");
+    fs::create_dir_all(&faber_dir).expect("faber dir");
+    let corpus = work.join("radix/corpus");
+    fs::create_dir_all(&corpus).expect("corpus dir");
+    fs::write(corpus.join("index.toml"), FAKE_INDEX).expect("index");
+
+    let resolved = resolve_reference_root_in(None, Some(&faber_dir), true)
+        .expect("dev walk-up resolves sibling radix");
+    assert_eq!(resolved, corpus);
+    let _ = fs::remove_dir_all(&work);
+}
+
+#[test]
+fn dev_walkup_does_not_resolve_when_disabled() {
+    let work = temp_dir("faber-dev-disabled");
+    let faber_dir = work.join("faber");
+    fs::create_dir_all(&faber_dir).expect("faber dir");
+    let corpus = work.join("radix/corpus");
+    fs::create_dir_all(&corpus).expect("corpus dir");
+    fs::write(corpus.join("index.toml"), FAKE_INDEX).expect("index");
+
+    // A release-shaped binary does not get the dev walk-up even when a sibling
+    // checkout exists above the hermetic cwd (E5).
+    let exe = work.join("faber/bin/faber");
+    let err = resolve_reference_root_in(Some(&exe), Some(&faber_dir), false)
+        .expect_err("no dev walk-up for installed binaries");
+    assert!(err.message.contains("reference pack not found"), "{}", err.message);
+    let _ = fs::remove_dir_all(&work);
+}
 
 #[test]
 fn dev_fallback_loads_repo_exempla_index() {

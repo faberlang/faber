@@ -241,6 +241,11 @@ pub use locale::locale_pack_for_emit;
 pub(crate) use locale::{
     config_with_locale, default_config_with_locale, load_locale_pack_for_input,
 };
+/// Installed reader-pack path resolution shared by lib surfaces
+/// (`diagnostic_explain`) and package code-locale lookup. Used by the lib
+/// crate only; the bin's copy is legitimately unused.
+#[allow(unused_imports)]
+pub(crate) use locale::installed_locale_pack_path;
 
 pub(super) const MANIFEST_FILE: &str = "faber.toml";
 

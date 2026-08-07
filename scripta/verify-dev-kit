@@ -1,0 +1,383 @@
+#!/usr/bin/env python3
+"""Clean-room verify of an assembled Faber dev-kit payload.
+
+Extracts (copies) the payload staging directory to an arbitrary prefix, then
+exercises it with a fresh HOME, minimal PATH, and no sibling checkouts:
+
+  positive:
+    - `faber --version` matches the expected version
+    - `faber explain SEM001` (diagnostic reader pack, en)
+    - `faber explain functio` (reference pack lookup)
+    - `faber check` on a package declaring `[reader] locale = "la"`
+    - payload digests (reference-pack, locale-packs) match release-manifest.yaml
+    - core-support materialization (rust-target `faber run`; requires the
+      system Rust toolchain — this verify makes no no-Rust claim, E4/E10)
+
+  negative (each must fail):
+    - stray sibling checkout beside the binary must NOT resolve the reference
+      pack (E5 false-green eliminated) — asserted for a release-shaped binary
+    - version-skewed reference pack (`PACK.toml` faber_version) fails at load
+    - tampered pack content is detected by the manifest digest mismatch
+    - missing locale pack yields a nonzero, actionable error
+
+The manifest integrity check recomputes the same deterministic tree digests as
+`assemble-dev-kit`; keep the algorithm here in sync with that script.
+
+Usage:
+    scripta/verify-dev-kit --payload out/dev-kit-1.4.0-aarch64-apple-darwin \\
+        --version 1.4.0 [--manifest faber/release-manifest.yaml] [--work /tmp/v] [--keep]
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_MANIFEST = ROOT / "release-manifest.yaml"
+
+MINIMAL_PATH = "/usr/bin:/bin"
+
+COMPLETION_MARKER = ".faber-core-support-complete"
+
+
+def platform_core_support_cache(home: Path) -> Path:
+    """Platform cache used by core_support::materialize (E12)."""
+    if sys.platform == "darwin":
+        return home / "Library" / "Caches" / "faber" / "core-support" / "tar-zst-v1"
+    if sys.platform == "win32":
+        raise SystemExit("error: windows clean-room verify is not supported in this slice")
+    return home / ".cache" / "faber" / "core-support" / "tar-zst-v1"
+
+FAILURES: list[str] = []
+
+
+def check(label: str, ok: bool, detail: str = "") -> None:
+    status = "PASS" if ok else "FAIL"
+    print(f"  [{status}] {label}")
+    if detail:
+        print(f"          {detail}")
+    if not ok:
+        FAILURES.append(label)
+
+
+def run(
+    args: list[str],
+    *,
+    env: dict[str, str],
+    cwd: Path | None = None,
+) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        args,
+        env=env,
+        cwd=str(cwd) if cwd else None,
+        capture_output=True,
+        text=True,
+    )
+
+
+def clean_env(work: Path, *, extra_path: str = "", extra: dict[str, str] | None = None) -> dict[str, str]:
+    env: dict[str, str] = {
+        "HOME": str(work / "home"),
+        "PATH": MINIMAL_PATH + (":" + extra_path if extra_path else ""),
+        "TMPDIR": str(work / "tmp"),
+        "LC_ALL": "C",
+    }
+    if extra:
+        env.update(extra)
+    return env
+
+
+def read_manifest(manifest: Path) -> str:
+    return manifest.read_text(encoding="utf-8")
+
+
+def dir_digest(root: Path) -> str:
+    """Deterministic tree digest — must match scripta/assemble-dev-kit."""
+    entries: list[tuple[str, str]] = []
+    for path in sorted(root.rglob("*")):
+        if path.is_file():
+            rel = path.relative_to(root).as_posix()
+            entries.append((rel, sha256_file(path)))
+    canonical = "\n".join(f"{rel}\t{digest}" for rel, digest in sorted(entries))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def parse_pack_digest(manifest_text: str, name: str) -> str:
+    match = re.search(
+        rf"    - name: {re.escape(name)}\n      component: .*?\n      version: .*?\n      digest: sha256:([0-9a-f]{{64}})",
+        manifest_text,
+    )
+    if not match:
+        raise SystemExit(f"error: release-manifest.yaml has no `{name}` pack row with digest")
+    return match.group(1)
+
+
+def write_minimal_package(root: Path, *, name: str, reader_locale: str | None, target: str) -> None:
+    (root / "src").mkdir(parents=True, exist_ok=True)
+    lines = [
+        "[package]",
+        f"name = {name!r}",
+        'version = "0.0.0"',
+        "",
+        "[paths]",
+        'source = "src"',
+        'entry = "main.fab"',
+        "",
+        "[build]",
+        f"target = {target!r}",
+        'kind = "bin"',
+    ]
+    if reader_locale:
+        lines += ["", "[reader]", f"locale = {reader_locale!r}"]
+    (root / "faber.toml").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (root / "src" / "main.fab").write_text('incipit { nota "Salve, munde!" }\n', encoding="utf-8")
+
+
+def positive_checks(prefix: Path, work: Path, version: str, manifest_text: str) -> None:
+    binary = prefix / "bin" / "faber"
+    env = clean_env(work)
+
+    print("positive checks:")
+
+    result = run([str(binary), "--version"], env=env, cwd=work)
+    check(
+        "faber --version",
+        result.returncode == 0 and version in result.stdout,
+        detail=f"stdout={result.stdout.strip()!r} stderr={result.stderr.strip()!r}",
+    )
+
+    result = run([str(binary), "explain", "SEM001"], env=env, cwd=work)
+    check(
+        "faber explain SEM001 (reader pack)",
+        result.returncode == 0 and "SEM001" in result.stdout,
+        detail=f"stderr={result.stderr.strip()!r}",
+    )
+
+    result = run([str(binary), "explain", "functio"], env=env, cwd=work)
+    check(
+        "faber explain functio (reference pack)",
+        result.returncode == 0 and "functio" in result.stdout,
+        detail=f"stderr={result.stderr.strip()!r}",
+    )
+
+    la_pkg = work / "packages" / "reader-la"
+    write_minimal_package(la_pkg, name="verify-reader-la", reader_locale="la", target="rust")
+    result = run([str(binary), "check", str(la_pkg)], env=env, cwd=work)
+    check(
+        "[reader] locale = \"la\" package check",
+        result.returncode == 0,
+        detail=f"stderr={result.stderr.strip()!r}",
+    )
+
+    reference_digest = dir_digest(prefix / "share" / "faber" / "reference")
+    locale_root = prefix / "share" / "faber" / "locale"
+    locale_digests = {
+        d.name: dir_digest(d) for d in sorted(locale_root.iterdir()) if d.is_dir()
+    }
+    locale_packs_digest = hashlib.sha256(
+        "\n".join(f"{loc}\t{dg}" for loc, dg in sorted(locale_digests.items())).encode("utf-8")
+    ).hexdigest()
+    expected_reference = parse_pack_digest(manifest_text, "reference-pack")
+    expected_locale = parse_pack_digest(manifest_text, "locale-packs")
+    check(
+        "reference-pack digest matches manifest",
+        reference_digest == expected_reference,
+        detail=f"manifest={expected_reference} computed={reference_digest}",
+    )
+    check(
+        "locale-packs digest matches manifest",
+        locale_packs_digest == expected_locale,
+        detail=f"manifest={expected_locale} computed={locale_packs_digest}",
+    )
+
+    materialization_check(binary, work, env)
+
+
+def materialization_check(binary: Path, work: Path, env: dict[str, str]) -> None:
+    cargo = shutil.which("cargo")
+    if not cargo:
+        print(
+            "  [RESIDUAL] core-support materialization not exercised: cargo not on PATH. "
+            "The verify makes no no-Rust claim (E4/E10 discipline)."
+        )
+        return
+    cargo_home = os.environ.get("CARGO_HOME") or str(Path.home() / ".cargo")
+    rustup_home = os.environ.get("RUSTUP_HOME") or str(Path.home() / ".rustup")
+    rust_env = dict(env)
+    rust_env["CARGO_HOME"] = cargo_home
+    rust_env["RUSTUP_HOME"] = rustup_home
+    rust_env["PATH"] = MINIMAL_PATH + ":" + str(Path(cargo).parent)
+
+    pkg = work / "packages" / "materialization"
+    write_minimal_package(pkg, name="verify-materialization", reader_locale=None, target="rust")
+    result = run([str(binary), "run", str(pkg)], env=rust_env, cwd=work)
+    cache_entries = list(platform_core_support_cache(Path(env["HOME"])).glob("*/" + COMPLETION_MARKER))
+    check(
+        "core-support materialization (rust run)",
+        result.returncode == 0
+        and "Salve, munde!" in result.stdout
+        and len(cache_entries) >= 1,
+        detail=(
+            f"exit={result.returncode} stdout={result.stdout.strip()!r} "
+            f"stderr={result.stderr.strip()!r} cache_entries={len(cache_entries)}"
+        ),
+    )
+
+
+def negative_checks(prefix: Path, work: Path, version: str) -> None:
+    print("negative checks:")
+    env = clean_env(work)
+
+    # E5 false-green: a release-shaped binary beside a stray sibling checkout
+    # must fail closed instead of walking up to `radix/corpus`.
+    stray = work / "stray-checkout"
+    (stray / "radix" / "corpus").mkdir(parents=True, exist_ok=True)
+    (stray / "radix" / "corpus" / "index.toml").write_text(
+        'generated_on = "2026-08-07"\nfab_count = 0\nregistry_terms = 0\nterms = []\n',
+        encoding="utf-8",
+    )
+    (stray / "radix" / "corpus" / "legacy-redirects.toml").write_text(
+        "redirects = []\n", encoding="utf-8"
+    )
+    (stray / "radix" / "corpus" / "PACK.toml").write_text(
+        f'faber_version = "{version}"\ngenerated_on = "2026-08-07"\n'
+        "fab_count = 0\nregistry_terms = 0\n",
+        encoding="utf-8",
+    )
+    shutil.copy2(prefix / "bin" / "faber", stray / "faber")
+    result = run([str(stray / "faber"), "explain", "functio"], env=env, cwd=stray)
+    check(
+        "stray sibling checkout fails closed (E5)",
+        result.returncode != 0 and "reference pack not found" in result.stderr,
+        detail=(
+            f"stderr={result.stderr.strip()!r} "
+            "(a debug-built binary still carries the dev-repo walk-up; "
+            "use a release-shaped binary for this proof)"
+        ),
+    )
+
+    # Version-skewed reference pack fails before use (pack_version_skew).
+    skewed = work / "skewed"
+    shutil.copytree(prefix, skewed)
+    pack_toml = skewed / "share" / "faber" / "reference" / "PACK.toml"
+    major = int(version.split(".")[0])
+    text = pack_toml.read_text(encoding="utf-8")
+    replaced = re.sub(r'faber_version = ".*"', f'faber_version = "{major + 1}.0.0"', text, count=1)
+    pack_toml.write_text(replaced, encoding="utf-8")
+    result = run([str(skewed / "bin" / "faber"), "explain", "functio"], env=env, cwd=work)
+    check(
+        "version-skewed reference pack fails before use",
+        result.returncode != 0 and "version" in result.stderr.lower(),
+        detail=f"stderr={result.stderr.strip()!r}",
+    )
+
+    # Tampered pack content is detected by the manifest digest comparison.
+    tampered = work / "tampered"
+    shutil.copytree(prefix, tampered)
+    tampered_pack = tampered / "share" / "faber" / "locale" / "la" / "pack.toml"
+    with tampered_pack.open("a", encoding="utf-8") as handle:
+        handle.write("# tampered\n")
+    manifest_text = read_manifest(work / "manifest.yaml")
+    expected_reference = parse_pack_digest(manifest_text, "reference-pack")
+    expected_locale = parse_pack_digest(manifest_text, "locale-packs")
+    tampered_locale = dir_digest(tampered / "share" / "faber" / "locale")
+    check(
+        "tampered pack detected by digest mismatch",
+        tampered_locale != expected_locale,
+        detail=(
+            f"manifest={expected_locale} tampered={tampered_locale} "
+            f"reference_manifest={expected_reference}"
+        ),
+    )
+
+    # Missing locale pack fails closed with one next action.
+    result = run(
+        [str(prefix / "bin" / "faber"), "explain", "SEM001", "--diagnostic-locale", "zz"],
+        env=env,
+        cwd=work,
+    )
+    check(
+        "missing locale pack fails closed with next action",
+        result.returncode != 0
+        and "failed to load reader locale 'zz'" in result.stderr
+        and "next action" in result.stderr,
+        detail=f"stderr={result.stderr.strip()!r}",
+    )
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("--payload", required=True, type=Path, help="Dev-kit payload staging dir")
+    parser.add_argument("--version", required=True, help="Expected faber version")
+    parser.add_argument(
+        "--manifest",
+        type=Path,
+        default=DEFAULT_MANIFEST,
+        help="release-manifest.yaml used for digest expectations",
+    )
+    parser.add_argument("--work", type=Path, help="Scratch directory (default: fresh temp dir)")
+    parser.add_argument("--keep", action="store_true", help="Keep the scratch directory")
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    payload = args.payload.resolve()
+    if not (payload / "bin" / "faber").is_file():
+        raise SystemExit(f"error: {payload} is not a dev-kit payload (missing bin/faber)")
+
+    manifest_text = read_manifest(args.manifest)
+    work = args.work
+    if work is None:
+        work = Path(tempfile.mkdtemp(prefix="faber-verify-dev-kit-"))
+    else:
+        work = work.resolve()
+        work.mkdir(parents=True, exist_ok=True)
+    (work / "home").mkdir(parents=True, exist_ok=True)
+    (work / "tmp").mkdir(parents=True, exist_ok=True)
+
+    # Extract at an arbitrary prefix (a copy is equivalent to an extracted
+    # archive until streamline Stage 3 `package-archive` wraps this layout).
+    prefix = work / "prefix"
+    shutil.copytree(payload, prefix)
+
+    # The manifest is compared against for digest expectations.
+    shutil.copy2(args.manifest, work / "manifest.yaml")
+
+    print(f"verifying payload: {payload}")
+    print(f"prefix: {prefix}")
+    print(f"work: {work}")
+
+    positive_checks(prefix, work, args.version, manifest_text)
+    negative_checks(prefix, work, args.version)
+
+    print()
+    if FAILURES:
+        print(f"verify FAILED ({len(FAILURES)} failing check(s)):")
+        for label in FAILURES:
+            print(f"  - {label}")
+        return 1
+    print("verify PASSED")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

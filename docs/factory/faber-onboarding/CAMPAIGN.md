@@ -1,6 +1,6 @@
 # Campaign: Faber Onboarding And First-Run Experience
 
-**Status**: active — Stage 0 delivered (36e6880); Stage 1 delivered (97101a8); Stage 2 delivery lowered, ready for delivery
+**Status**: active — Stage 0 delivered (36e6880); Stage 1 delivered (97101a8); Stage 2 delivered (canonical payload slice: packs + resolver + verify + manifest instance)
 **Created**: 2026-08-07
 **Mode**: routing artifact — does not implement code directly
 **Control-plane repo**: `/Users/ianzepp/work/faberlang/faber`

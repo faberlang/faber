@@ -179,3 +179,42 @@ fn diagnostic_json_render_for_code_only_includes_all_fields() {
     assert_eq!(json["message"], "CODE_MSG");
     assert_eq!(json["help"], "CODE_HELP");
 }
+
+#[test]
+fn missing_locale_pack_fails_closed_with_next_action() {
+    // D6: explain on a missing locale produces a nonzero, actionable error
+    // naming the missing pack and one next action.
+    let err = lookup_installed_diagnostic("SEM001", Some("zz"))
+        .expect_err("missing locale pack must fail closed");
+    let message = &err.message;
+    assert!(
+        message.contains("failed to load reader locale 'zz'"),
+        "unexpected message: {message}"
+    );
+    assert!(
+        message.contains("next action"),
+        "error must carry one next action: {message}"
+    );
+    assert!(
+        message.contains("share/faber/locale/zz/pack.toml"),
+        "error must name the installed pack location: {message}"
+    );
+}
+
+#[test]
+fn installed_locale_pack_dev_resolution_loads_english_pack() {
+    // Development builds resolve the English reader pack from the sibling
+    // radix tree; lookup must succeed and report the requested locale.
+    let explanation = lookup_installed_diagnostic("SEM001", Some("en"))
+        .expect("diagnostic lookup")
+        .expect("SEM001 explanation");
+    assert_eq!(explanation.locale, "en");
+    assert_eq!(explanation.code, "SEM001");
+}
+
+#[test]
+fn empty_diagnostic_locale_is_rejected() {
+    let err = lookup_installed_diagnostic("SEM001", Some("   "))
+        .expect_err("empty locale must fail");
+    assert!(err.message.contains("--locale must not be empty"));
+}

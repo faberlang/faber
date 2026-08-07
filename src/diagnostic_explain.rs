@@ -8,7 +8,7 @@ use crate::explain::ExplainError;
 use crate::io_buf::writeln_buf;
 use radix::locale::{DiagnosticTemplate, LocalePack};
 use serde::Serialize;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 const DEFAULT_READER_LOCALE: &str = "en";
 
@@ -173,9 +173,12 @@ fn load_installed_locale_pack(locale: &str) -> Result<LocalePack, ExplainError> 
     let path = installed_locale_pack_path(locale.trim());
     let pack = LocalePack::from_toml_path(&path).map_err(|err| {
         ExplainError::new(format!(
-            "failed to load reader locale '{}' pack '{}': {err}",
+            "failed to load reader locale '{}' pack '{}': {err}\n\
+             next action: reinstall the matching faber dev kit so the pack ships at \
+             share/faber/locale/{}/pack.toml beside the faber binary",
             locale,
-            path.display()
+            path.display(),
+            locale
         ))
     })?;
     if pack.metadata.id != locale {
@@ -189,18 +192,15 @@ fn load_installed_locale_pack(locale: &str) -> Result<LocalePack, ExplainError> 
     Ok(pack)
 }
 
+/// Resolve the installed reader-pack path for `locale`.
+///
+/// Installed binaries resolve `<prefix>/share/faber/locale/<locale>/pack.toml`
+/// relative to the running binary — never a `CARGO_MANIFEST_DIR`-baked build
+/// path (E8) and never an ambient walk-up (E5/G2). Development builds fall back
+/// to a sibling `radix/stdlib/locale/<locale>/pack.toml`. See
+/// [`crate::package::locale::installed_locale_pack_path_in`] for the pure core.
 fn installed_locale_pack_path(locale: &str) -> PathBuf {
-    normalize_path(
-        &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../radix/stdlib")
-            .join("locale")
-            .join(locale)
-            .join("pack.toml"),
-    )
-}
-
-fn normalize_path(path: &Path) -> PathBuf {
-    path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
+    crate::package::installed_locale_pack_path(locale)
 }
 
 impl DiagnosticLookupKey {

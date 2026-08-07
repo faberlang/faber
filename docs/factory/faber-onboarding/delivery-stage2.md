@@ -1,6 +1,6 @@
 # Delivery — Faber Onboarding Stage 2: Canonical Payload, Packs, Resolver, And Clean-Room Verify
 
-**Status**: ready — bounded first implementation slice; faber product code + scripta helpers + manifest instance
+**Status**: done — bounded first implementation slice delivered (packs + resolver + verify + manifest instance); stages 3–10 staged per §6
 **Campaign**: [faber-onboarding](CAMPAIGN.md) — Stage 2 of 10
 **Unit title**: `faber-onboarding-stage2-canonical-payload-packs-resolver-verify`
 **Control plane**: `/Users/ianzepp/work/faberlang/faber`

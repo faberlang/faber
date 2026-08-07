@@ -376,7 +376,20 @@ impl ReferencePack {
     }
 }
 
-/// Resolve the reference pack root using env, install layout, then repo fallback.
+/// Resolve the reference pack root.
+///
+/// Resolution order for **installed binaries** (release builds):
+///
+/// 1. `FABER_REFERENCE_ROOT` — explicit, documented developer-only override.
+/// 2. Install prefix relative to the running binary (`<prefix>/share/faber/
+///    reference`, `<prefix>/lib/faber/reference`).
+/// 3. Fail closed. Installed binaries never fall back to the
+///    `CARGO_MANIFEST_DIR`-baked build path (E8) and never walk up from the
+///    ambient cwd / exe parent (E5/G2 false green).
+///
+/// Development (debug) builds additionally resolve a sibling radix checkout
+/// (`dev_repo_root`), so `cargo run` and the test suite keep working from the
+/// workspace.
 pub fn resolve_reference_root() -> Result<PathBuf, ReferenceError> {
     if let Ok(path) = std::env::var(REFERENCE_ROOT_ENV) {
         let root = PathBuf::from(path);
@@ -389,19 +402,39 @@ pub fn resolve_reference_root() -> Result<PathBuf, ReferenceError> {
         )));
     }
 
-    if let Some(root) = install_sibling_root() {
+    resolve_reference_root_in(
+        std::env::current_exe().ok().as_deref(),
+        std::env::current_dir().ok().as_deref(),
+        cfg!(debug_assertions),
+    )
+}
+
+/// The pure resolution core, injectable for tests.
+///
+/// `dev_tree_allowed` is `cfg!(debug_assertions)` in production: only
+/// development builds may walk up to a sibling checkout; a released binary
+/// resolves strictly from the install prefix (the explicit env override is
+/// checked by the caller).
+pub(crate) fn resolve_reference_root_in(
+    exe: Option<&Path>,
+    cwd: Option<&Path>,
+    dev_tree_allowed: bool,
+) -> Result<PathBuf, ReferenceError> {
+    if let Some(root) = install_sibling_root(exe) {
         return Ok(root);
     }
 
-    if let Some(root) = dev_repo_root() {
-        return Ok(root);
+    if dev_tree_allowed {
+        if let Some(root) = dev_repo_root(cwd, exe) {
+            return Ok(root);
+        }
     }
 
     Err(ReferenceError::new(format!(
         "Faber reference pack not found\n\
-         hint: set {REFERENCE_ROOT_ENV} to a directory containing index.toml\n\
          hint: install the reference pack at share/faber/reference beside the faber binary\n\
-         hint: development trees should run from the faber repository checkout"
+         hint: set {REFERENCE_ROOT_ENV} to a directory containing index.toml (explicit developer override)\n\
+         hint: development builds resolve the pack from a sibling radix checkout"
     )))
 }
 
@@ -483,9 +516,8 @@ fn read_legacy_redirects(root: &Path) -> Result<Vec<LegacyRedirect>, ReferenceEr
         .collect())
 }
 
-fn install_sibling_root() -> Option<PathBuf> {
-    let exe = std::env::current_exe().ok()?;
-    let bin_dir = exe.parent()?;
+fn install_sibling_root(exe: Option<&Path>) -> Option<PathBuf> {
+    let bin_dir = exe?.parent()?;
     for relative in ["../share/faber/reference", "../lib/faber/reference"] {
         let candidate = bin_dir.join(relative);
         if candidate.join("index.toml").is_file() {
@@ -544,15 +576,18 @@ pub(crate) fn parse_release_version(value: &str) -> Option<(u32, u32, u32)> {
     Some((major, minor, patch))
 }
 
-fn dev_repo_root() -> Option<PathBuf> {
+/// Dev-tree walk-up from the cwd and the running binary's directory.
+///
+/// Deliberately does **not** start from `CARGO_MANIFEST_DIR`: the resolver must
+/// not bake the build path (E8). Development builds run from the workspace so
+/// the cwd/exe-parent walk-up reaches the sibling `radix/corpus` tree; released
+/// binaries never call this (dev-tree resolution is gated on debug builds).
+fn dev_repo_root(cwd: Option<&Path>, exe: Option<&Path>) -> Option<PathBuf> {
     let mut starts = Vec::new();
-    if let Ok(manifest) = std::env::var("CARGO_MANIFEST_DIR") {
-        starts.push(PathBuf::from(manifest));
+    if let Some(cwd) = cwd {
+        starts.push(cwd.to_path_buf());
     }
-    if let Ok(cwd) = std::env::current_dir() {
-        starts.push(cwd);
-    }
-    if let Ok(exe) = std::env::current_exe() {
+    if let Some(exe) = exe {
         if let Some(parent) = exe.parent() {
             starts.push(parent.to_path_buf());
         }
