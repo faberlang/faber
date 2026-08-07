@@ -105,7 +105,14 @@ const SCRIPT_EXPECTED_FAILURES: &[ExpectedScriptFailure] = &[
         ScriptFailureBucket::NoEntryReference,
     ),
     expected("errata/errata.fab", ScriptFailureBucket::NoEntryReference),
-    expected("est/est.fab", ScriptFailureBucket::UnsupportedMir),
+    // removed: S5-U3 focused stepper proof
+    // (radix mir::stepper_integration_tests::stepper_runs_est_fixture, radix
+    // 8daa0dc9b) — est/est.fab now runs through the MIR stepper and matches
+    // est.expected (`est <type>` / `non est <type>` lower to a stepper-
+    // dispatched MirIntrinsic::TypeCheck carrying the target type — runtime
+    // variant-tag type checks without extraction); Stage 0 classifies as
+    // implementation-debt (ledger-stage0/script.md §4.1); row promoted out of
+    // UnsupportedMir.
     expected(
         "sparsa/conversio-reject.fab",
         ScriptFailureBucket::FrontendNegative,
@@ -166,7 +173,8 @@ const SCRIPT_EXPECTED_FAILURES: &[ExpectedScriptFailure] = &[
     // `numerus overflow` StepperError instead of wrapping) — the trap is the
     // intended, observable behavior, not backend debt. Focused stepper proof:
     // radix mir::stepper_integration_tests::stepper_traps_numerus_overflow_at_i64_width.
-    // Stage 0 ledger §3.2 records the expected-trap re-bucket ruling
+    // ledger-stage0/script.md §3 (re-bucket decision 2) records the
+    // expected-trap re-bucket ruling
     // (intentional-negative class); the fixture's empty .expected means a
     // harness "pass" would be a silent run, but checked semantics demand the
     // trap. Row stays classified as an expected failure, so a wrapping
@@ -178,8 +186,9 @@ const SCRIPT_EXPECTED_FAILURES: &[ExpectedScriptFailure] = &[
     // removed: S5-U5 (codex-gap Stage 5). glob-import.fab + solum-json.fab live
     // under examples/script-kernel/, outside the Script harness corpus root
     // (corpus_dir() → radix/corpus/), so these rows never matched a collected
-    // file — unreachable no-op entries. Stage 0 ledger §3.1 records the
-    // corpus-root routing ruling; the debt surfaces (faber:* kernel glob-import;
+    // file — unreachable no-op entries. ledger-stage0/script.md §3 (re-bucket
+    // decision 1) records the corpus-root routing ruling; the debt surfaces
+    // (faber:* kernel glob-import;
     // solum/jsonio/processus kernel-module lowering) stay recorded as
     // implementation-debt in ledger-stage0/script.md §4.4/§4.5 with full
     // recipes. Implementing them is a harness/package-path decision outside
