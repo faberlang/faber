@@ -5,12 +5,12 @@ use radix::driver::FileFrontmatter;
 
 use super::{FaberManifest, PackageSpec, MANIFEST_FILE};
 
-#[cfg(feature = "hir-rust")]
-pub(super) use faber_hir_rust::TestSelection as RustTestSelection;
-
-#[cfg(not(feature = "hir-rust"))]
-#[derive(Clone)]
-pub struct RustTestSelection;
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct RustTestSelection {
+    pub name: Option<String>,
+    pub suite: Option<String>,
+    pub tag: Option<String>,
+}
 
 pub(super) fn manifest_path_for_spec(spec: &PackageSpec) -> Option<PathBuf> {
     let direct = spec.source_root.join(MANIFEST_FILE);
@@ -129,7 +129,7 @@ pub(super) fn validate_frontmatter_against_manifest(
     None
 }
 
-#[cfg(feature = "hir-rust")]
+#[allow(dead_code)] // used by the optional Rust package target; no-rust builds still parse the type
 pub(super) fn merge_entry_test_selection(
     cli: Option<&RustTestSelection>,
     entry: Option<&FileFrontmatter>,

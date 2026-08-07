@@ -610,6 +610,7 @@ fn generate_rust_code_for_analysis(
 ) -> Result<String, radix::codegen::CodegenError> {
     let cli_program = analysis.cli_program.as_ref();
     let module_mode = !is_entry;
+    let codegen_test_selection = rust_codegen_test_selection(test_selection);
     if is_entry {
         if let Some(cli_program) = cli_program {
             let mut codegen =
@@ -617,7 +618,7 @@ fn generate_rust_code_for_analysis(
                     &analysis.hir,
                     &analysis.interner,
                     &analysis.libraries,
-                    test_selection.cloned(),
+                    codegen_test_selection.clone(),
                     Some(&analysis.types),
                 );
             if let Some(params) = imported_function_params {
@@ -651,7 +652,7 @@ fn generate_rust_code_for_analysis(
             types: &analysis.types,
             interner: &analysis.interner,
             libraries: &analysis.libraries,
-            test_selection: test_selection.cloned(),
+            test_selection: codegen_test_selection,
             module_mode,
             cli_program: cli_ir_ref,
             imported_function_params,
@@ -662,6 +663,16 @@ fn generate_rust_code_for_analysis(
         },
     )
     .map(|output| output.code)
+}
+
+fn rust_codegen_test_selection(
+    selection: Option<&RustTestSelection>,
+) -> Option<faber_hir_rust::TestSelection> {
+    selection.map(|selection| faber_hir_rust::TestSelection {
+        name: selection.name.clone(),
+        suite: selection.suite.clone(),
+        tag: selection.tag.clone(),
+    })
 }
 
 fn package_field_name_policy(

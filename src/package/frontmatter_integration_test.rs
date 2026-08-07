@@ -6,12 +6,12 @@
 //!
 //! Unit-level frontmatter tests live in `frontmatter_test.rs`.
 
+use super::frontmatter::RustTestSelection as TestSelection;
 use super::test_support::{diagnostic_has_arg, diagnostic_has_issue, test_temp_dir};
 use super::{
     compile_package, compile_package_with_test_options, compile_package_with_test_selection,
     discover_package, library_resolver_from_config, load_package,
 };
-use faber_hir_rust::TestSelection;
 use radix::driver::Config;
 use radix::Output;
 use std::fs;
