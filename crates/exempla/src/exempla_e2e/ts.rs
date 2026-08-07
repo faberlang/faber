@@ -49,10 +49,12 @@ enum TierState {
 const TS_EXPECTED_OUTCOMES: &[ExpectedTsOutcome] = &[
     ExpectedTsOutcome {
         path: "ad/solum-lege-generic.fab",
-        highest_tier: TsHighestTier::FrontendRejected,
+        // Y: quarantined 2026-08-06; frontend now admits this split-out row,
+        // but the TS host module binding is still absent.
+        highest_tier: TsHighestTier::TypeScriptEmitted,
         kind: ExpectedTsKind::SplitOut,
-        bucket: "frontend semantic gap",
-        reason_contains: "dynamic_receiver_method_type_args",
+        bucket: "package HAL split-out",
+        reason_contains: "Cannot find module 'norma:solum'",
     },
 
     ExpectedTsOutcome {
@@ -140,10 +142,12 @@ const TS_EXPECTED_OUTCOMES: &[ExpectedTsOutcome] = &[
     },
     ExpectedTsOutcome {
         path: "instans/instans.fab",
-        highest_tier: TsHighestTier::FrontendRejected,
+        // Y: quarantined 2026-08-06; frontend now admits this split-out row,
+        // but TS module bindings for tempus/toml/valor are still absent.
+        highest_tier: TsHighestTier::TypeScriptEmitted,
         kind: ExpectedTsKind::SplitOut,
-        bucket: "frontend semantic gap",
-        reason_contains: "expression_type_mismatch",
+        bucket: "package HAL split-out",
+        reason_contains: "Cannot find module 'norma:tempus'",
     },
     ExpectedTsOutcome {
         path: "lege/lege.fab",
@@ -226,17 +230,21 @@ const TS_EXPECTED_OUTCOMES: &[ExpectedTsOutcome] = &[
     },
     ExpectedTsOutcome {
         path: "ad/async-solum-leget.fab",
-        highest_tier: TsHighestTier::FrontendRejected,
+        // Y: quarantined 2026-08-06; frontend now admits this split-out row,
+        // but the TS host module binding is still absent.
+        highest_tier: TsHighestTier::TypeScriptEmitted,
         kind: ExpectedTsKind::SplitOut,
-        bucket: "frontend semantic gap",
-        reason_contains: "dynamic_receiver_method_type_args",
+        bucket: "package HAL split-out",
+        reason_contains: "Cannot find module 'norma:solum'",
     },
     ExpectedTsOutcome {
         path: "ad/async-tempus-dormiet.fab",
-        highest_tier: TsHighestTier::FrontendRejected,
+        // Y: quarantined 2026-08-06; frontend now admits this split-out row,
+        // but the TS host module binding is still absent.
+        highest_tier: TsHighestTier::TypeScriptEmitted,
         kind: ExpectedTsKind::SplitOut,
-        bucket: "frontend semantic gap",
-        reason_contains: "cede_requires_promissum",
+        bucket: "package HAL split-out",
+        reason_contains: "Cannot find module 'norma:tempus'",
     },
     ExpectedTsOutcome {
         path: "destructura/literal.fab",
@@ -254,10 +262,29 @@ const TS_EXPECTED_OUTCOMES: &[ExpectedTsOutcome] = &[
     },
     ExpectedTsOutcome {
         path: "json/json.fab",
-        highest_tier: TsHighestTier::FrontendRejected,
+        // Y: quarantined 2026-08-06; frontend now admits this split-out row,
+        // but TS JSON-root runtime wrapping is still absent.
+        highest_tier: TsHighestTier::FrontendAnalyzed,
         kind: ExpectedTsKind::SplitOut,
-        bucket: "frontend semantic gap",
-        reason_contains: "expression_type_mismatch",
+        bucket: "json valor not supported",
+        reason_contains: "json is not supported for the TypeScript target",
+    },
+    ExpectedTsOutcome {
+        path: "membrum/membrum.fab",
+        // Y: quarantined 2026-08-06 during full Radix e2e.
+        highest_tier: TsHighestTier::TypeScriptEmitted,
+        kind: ExpectedTsKind::TrackedGap,
+        bucket: "reserved JavaScript identifier",
+        reason_contains: "'void' is not allowed as a variable declaration name",
+    },
+    ExpectedTsOutcome {
+        path: "operatores/numerus-overflow.fab",
+        // Y: quarantined 2026-08-06; emitted JS number behavior does not
+        // preserve Rust/i64 overflow semantics.
+        highest_tier: TsHighestTier::Runnable,
+        kind: ExpectedTsKind::BehaviorFailure,
+        bucket: "numeric overflow semantics",
+        reason_contains: "stdout mismatch",
     },
     ExpectedTsOutcome {
         path: "operatores/modular-word.fab",

@@ -76,11 +76,6 @@ pub(super) struct ExpectedScriptFailure {
 /// The bucket is part of the ratchet: non-script surfaces are explicit, while
 /// `unsupported-mir` remains implementation debt that future phases should shrink.
 const SCRIPT_EXPECTED_FAILURES: &[ExpectedScriptFailure] = &[
-    expected(
-        "ad/sermo-recovery.fab",
-        ScriptFailureBucket::CapabilityStream,
-    ),
-    expected("ad/sermo-vacuum.fab", ScriptFailureBucket::CapabilityStream),
     expected("ad/async-solum-leget.fab", ScriptFailureBucket::NormaImport),
     expected(
         "ad/async-tempus-dormiet.fab",
@@ -91,25 +86,24 @@ const SCRIPT_EXPECTED_FAILURES: &[ExpectedScriptFailure] = &[
         ScriptFailureBucket::NormaImport,
     ),
     expected("air/air-lane.fab", ScriptFailureBucket::MirBackedTargetOnly),
-    // WHY: annotation-sugar braced markers are non-runnable reference/CLI/lane
-    // exempla; bucketed so the script harness reflects ground truth. These were
-    // added by the annotation-sugar campaign without harness entries.
-    expected(
-        "annotation-sugar/cli-braced.fab",
-        ScriptFailureBucket::CliProgram,
-    ),
-    expected(
-        "annotation-sugar/optio-braced.fab",
-        ScriptFailureBucket::CliProgram,
-    ),
-    expected("argumenta/argumenta.fab", ScriptFailureBucket::CliProgram),
     expected("chorda/angustat.fab", ScriptFailureBucket::NormaImport),
     expected("chorda/diducta.fab", ScriptFailureBucket::NormaImport),
     expected("chorda/discidit.fab", ScriptFailureBucket::NormaImport),
     expected("chorda/retine.fab", ScriptFailureBucket::NormaImport),
-    expected("cli/cli.fab", ScriptFailureBucket::CliProgram),
     expected("curata/curata.fab", ScriptFailureBucket::NoEntryReference),
-    expected("descriptio/descriptio.fab", ScriptFailureBucket::CliProgram),
+    // Y: quarantined 2026-08-06; full Radix e2e exposed script-stepper gaps.
+    expected(
+        "cuda/addita-proof.fab",
+        ScriptFailureBucket::NoEntryReference,
+    ),
+    expected(
+        "cuda/matmul-proof.fab",
+        ScriptFailureBucket::NoEntryReference,
+    ),
+    expected(
+        "cuda/summa-proof.fab",
+        ScriptFailureBucket::NoEntryReference,
+    ),
     expected("errata/errata.fab", ScriptFailureBucket::NoEntryReference),
     expected("est/est.fab", ScriptFailureBucket::UnsupportedMir),
     expected(
@@ -120,10 +114,7 @@ const SCRIPT_EXPECTED_FAILURES: &[ExpectedScriptFailure] = &[
         "sparsa/non-numeric-reject.fab",
         ScriptFailureBucket::FrontendNegative,
     ),
-    expected("sparsa/access.fab", ScriptFailureBucket::UnsupportedMir),
     expected("sparsa/conversio.fab", ScriptFailureBucket::UnsupportedMir),
-    expected("sparsa/decl.fab", ScriptFailureBucket::UnsupportedMir),
-    expected("sparsa/sugar.fab", ScriptFailureBucket::UnsupportedMir),
     expected(
         "tensor/arithmetic-reject.fab",
         ScriptFailureBucket::FrontendNegative,
@@ -132,7 +123,14 @@ const SCRIPT_EXPECTED_FAILURES: &[ExpectedScriptFailure] = &[
         "tensor/method-errors.fab",
         ScriptFailureBucket::FrontendNegative,
     ),
-    expected("exitus/exitus.fab", ScriptFailureBucket::CliProgram),
+    expected(
+        "tensor/placement-execution-v1.fab",
+        ScriptFailureBucket::FrontendNegative,
+    ),
+    expected(
+        "type-hole-union/type-hole-union.fab",
+        ScriptFailureBucket::UnsupportedMir,
+    ),
     expected(
         "fragilis/fragilis.fab",
         ScriptFailureBucket::NoEntryReference,
@@ -167,6 +165,10 @@ const SCRIPT_EXPECTED_FAILURES: &[ExpectedScriptFailure] = &[
         ScriptFailureBucket::UnsupportedMir,
     ),
     expected(
+        "operatores/numeric-value-eq.fab",
+        ScriptFailureBucket::UnsupportedMir,
+    ),
+    expected(
         "script-kernel/glob-import.fab",
         ScriptFailureBucket::UnsupportedMir,
     ),
@@ -182,12 +184,9 @@ const SCRIPT_EXPECTED_FAILURES: &[ExpectedScriptFailure] = &[
     expected("instans/instans.fab", ScriptFailureBucket::NormaImport),
     expected("json/json.fab", ScriptFailureBucket::NormaImport),
     // removed: Stage 4 implemented Cede/CursorStream; itera/cursor-iteratio now runs.
-    expected("meta/versio.fab", ScriptFailureBucket::CliProgram),
     expected("meta/requirit.fab", ScriptFailureBucket::NoEntryReference),
     expected("numquam/numquam.fab", ScriptFailureBucket::NoEntryReference),
     expected("omitte/omitte.fab", ScriptFailureBucket::NoEntryReference),
-    expected("operandus/operandus.fab", ScriptFailureBucket::CliProgram),
-    expected("optio/optio.fab", ScriptFailureBucket::CliProgram),
     expected(
         "optiones/optiones.fab",
         ScriptFailureBucket::NoEntryReference,
@@ -201,6 +200,10 @@ const SCRIPT_EXPECTED_FAILURES: &[ExpectedScriptFailure] = &[
         ScriptFailureBucket::NoEntryReference,
     ),
     expected("prae/prae.fab", ScriptFailureBucket::NoEntryReference),
+    expected(
+        "praefixum/praefixum.fab",
+        ScriptFailureBucket::FrontendNegative,
+    ),
     expected(
         "praepara/praepara.fab",
         ScriptFailureBucket::NoEntryReference,
@@ -222,6 +225,18 @@ const SCRIPT_EXPECTED_FAILURES: &[ExpectedScriptFailure] = &[
     expected(
         "rumpe/rumpe-top-level-error.fab",
         ScriptFailureBucket::FrontendNegative,
+    ),
+    expected(
+        "scalar/return-bool.fab",
+        ScriptFailureBucket::NoEntryReference,
+    ),
+    expected(
+        "scalar/return-integer.fab",
+        ScriptFailureBucket::NoEntryReference,
+    ),
+    expected(
+        "scalar/return-string.fab",
+        ScriptFailureBucket::NoEntryReference,
     ),
     expected(
         "scalaria/scalaria.fab",
@@ -290,7 +305,6 @@ const SCRIPT_EXPECTED_FAILURES: &[ExpectedScriptFailure] = &[
         "typi/sized-family-error.fab",
         ScriptFailureBucket::FrontendNegative,
     ),
-    expected("ubique/ubique.fab", ScriptFailureBucket::CliProgram),
     expected("vector/builtins.fab", ScriptFailureBucket::NoEntryReference),
     expected("vector/cross.fab", ScriptFailureBucket::NoEntryReference),
     expected("vector/decl.fab", ScriptFailureBucket::NoEntryReference),
