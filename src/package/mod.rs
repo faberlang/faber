@@ -219,8 +219,8 @@ pub(crate) use library::{
 };
 #[cfg(feature = "hir-rust")]
 pub(crate) use library::{
-    library_cached_expanded_imports, library_generates_rust_module,
-    library_imported_function_params, library_module_segments, with_library_cached_analysis_mut,
+    library_cached_expanded_imports, library_generates_rust_module, library_module_segments,
+    with_library_cached_analysis_mut,
 };
 pub use locale::locale_pack_for_emit;
 #[allow(unused_imports)]

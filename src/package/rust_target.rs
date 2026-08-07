@@ -13,7 +13,7 @@ use faber_hir_rust::{
     SiblingModuleExports,
 };
 use radix::diagnostics::Diagnostic;
-use radix::hir::HirItemKind;
+use radix::hir::{DefId, HirItemKind, LibraryItemKind};
 use radix::lexer::Interner;
 use radix::{CompileResult, Output, RustOutput};
 
@@ -23,8 +23,8 @@ use super::frontmatter::{manifest_path_for_spec, merge_entry_test_selection, Rus
 use super::import_graph::{resolve_import, ImportResolution};
 use super::{
     library_cached_analysis, library_cached_expanded_imports, library_generates_rust_module,
-    library_imported_function_params, library_module_segments, read_manifest,
-    with_library_cached_analysis_mut, LibraryImportBinding, LibraryInterfaceCache,
+    library_module_segments, read_manifest, with_library_cached_analysis_mut, LibraryImportBinding,
+    LibraryInterfaceCache,
 };
 
 /// Result of Rust package assembly before final crate rendering.
@@ -208,6 +208,15 @@ pub(super) fn generate_package_rust(
     }
 }
 
+pub(super) fn render_binding_probe(
+    analysis: &radix::driver::AnalyzedUnit,
+    def_id: DefId,
+    symbol: &str,
+    probe_name: &str,
+) -> Result<String, radix::codegen::CodegenError> {
+    faber_hir_rust::render_binding_probe(analysis, def_id, symbol, probe_name)
+}
+
 fn generate_package_unit_rust(
     unit: &mut AnalyzedPackageUnit,
     siblings: &[SiblingModuleExports<'_>],
@@ -337,14 +346,41 @@ fn extend_library_function_params<'entry>(
 ) -> Result<(), radix::codegen::CodegenError> {
     for import in imports {
         let library_params =
-            library_imported_function_params(import, entry_types, library_resolver, library_cache)
-                .map_err(|diag| radix::codegen::CodegenError {
-                    message: diag.message,
-                    args: diag.args,
-                })?;
+            library_imported_function_params(import, entry_types, library_resolver, library_cache)?;
         params.extend(library_params);
     }
     Ok(())
+}
+
+fn library_imported_function_params<'entry>(
+    import: &LibraryImportBinding,
+    entry_types: &mut radix::semantic::TypeTable,
+    library_resolver: &crate::library::LibraryResolver,
+    library_cache: &mut LibraryInterfaceCache,
+) -> Result<ImportedFunctionParams<'entry>, radix::codegen::CodegenError> {
+    let analysis =
+        library_cached_analysis(import, library_resolver, library_cache).map_err(|diag| {
+            radix::codegen::CodegenError {
+                message: diag.message,
+                args: diag.args,
+            }
+        })?;
+    let mut params = ImportedFunctionParams::default();
+    for item in &analysis.hir.items {
+        let HirItemKind::Function(func) = &item.kind else {
+            continue;
+        };
+        let name = analysis.interner.resolve(func.name);
+        params.insert(
+            super::library::synthetic_library_item_def_id(
+                &import.module,
+                name,
+                &LibraryItemKind::Function,
+            ),
+            remap_function_param_info(func, entry_types, &analysis.types),
+        );
+    }
+    Ok(params)
 }
 
 fn insert_generated_library_modules(
@@ -593,5 +629,8 @@ fn package_field_name_policy(
         return Ok(RustFieldNamePolicy::Preserve);
     };
     let manifest = read_manifest(&path)?;
-    Ok(manifest.build.rust_field_names.into())
+    Ok(match manifest.build.rust_field_names {
+        super::ManifestRustFieldNames::Preserve => RustFieldNamePolicy::Preserve,
+        super::ManifestRustFieldNames::SnakeCase => RustFieldNamePolicy::SnakeCase,
+    })
 }

@@ -16,8 +16,6 @@ use radix::hir::{
 };
 use radix::lexer::Interner;
 use radix::parser;
-#[cfg(feature = "hir-rust")]
-use radix::semantic::TypeTable;
 use radix::syntax::{
     walk_expr, AnnotationKind, Expr, ExprKind, Program, StmtKind, Visibility, Visitor,
 };
@@ -28,9 +26,6 @@ use super::import_graph::{
 };
 use super::{LibraryImportBinding, PackageFile};
 use radix::diagnostics::DiagnosticConvert;
-
-#[cfg(feature = "hir-rust")]
-use faber_hir_rust::{remap_function_param_info, ImportedFunctionParams};
 
 struct LibraryInterfaceItem {
     exported_name: String,
@@ -117,7 +112,7 @@ fn library_identity_key(identity: &LibraryIdentity) -> LibraryIdentityKey {
     }
 }
 
-fn synthetic_library_item_def_id(
+pub(super) fn synthetic_library_item_def_id(
     module: &ResolvedLibraryModule,
     exported_name: &str,
     kind: &LibraryItemKind,
@@ -522,28 +517,6 @@ pub(crate) fn library_generates_rust_module(
                     | StmtKind::Var(_)
             )
     }))
-}
-
-#[cfg(feature = "hir-rust")]
-pub(crate) fn library_imported_function_params<'entry>(
-    import: &LibraryImportBinding,
-    entry_types: &mut TypeTable,
-    library_resolver: &LibraryResolver,
-    library_cache: &mut LibraryInterfaceCache,
-) -> Result<ImportedFunctionParams<'entry>, Diagnostic> {
-    let analysis = library_cached_analysis(import, library_resolver, library_cache)?;
-    let mut params = ImportedFunctionParams::default();
-    for item in &analysis.hir.items {
-        let HirItemKind::Function(func) = &item.kind else {
-            continue;
-        };
-        let name = analysis.interner.resolve(func.name);
-        params.insert(
-            synthetic_library_item_def_id(&import.module, name, &LibraryItemKind::Function),
-            remap_function_param_info(func, entry_types, &analysis.types),
-        );
-    }
-    Ok(params)
 }
 
 fn analyze_cached_library_interface(

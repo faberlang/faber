@@ -353,7 +353,7 @@ fn prove_rust_bindings(
             continue;
         };
         let unit = &package.units[declaration.unit_index];
-        match faber_hir_rust::render_binding_probe(
+        match super::rust_target::render_binding_probe(
             &unit.analysis,
             declaration.def_id,
             &binding.symbol,

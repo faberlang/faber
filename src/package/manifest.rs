@@ -6,9 +6,6 @@ use radix::codegen::Target;
 use radix::diagnostics::Diagnostic;
 use serde::Deserialize;
 
-#[cfg(feature = "hir-rust")]
-use faber_hir_rust::RustFieldNamePolicy;
-
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FaberManifest {
@@ -276,16 +273,6 @@ pub enum ManifestRustFieldNames {
     #[default]
     Preserve,
     SnakeCase,
-}
-
-#[cfg(feature = "hir-rust")]
-impl From<ManifestRustFieldNames> for RustFieldNamePolicy {
-    fn from(value: ManifestRustFieldNames) -> Self {
-        match value {
-            ManifestRustFieldNames::Preserve => RustFieldNamePolicy::Preserve,
-            ManifestRustFieldNames::SnakeCase => RustFieldNamePolicy::SnakeCase,
-        }
-    }
 }
 
 impl Default for ManifestPaths {

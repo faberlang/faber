@@ -24,7 +24,7 @@ use super::member_path::resolve_package_member;
 use super::runtime_dependency::{
     parse_dependency_requirement, runtime_path_for_target_dependencies,
 };
-use super::rust_target::generate_library_unit_rust;
+use super::rust_target::{generate_library_unit_rust, render_binding_probe};
 use super::{analyze_package, BuildLayout};
 
 /// One generated library crate ready for a path dependency.
@@ -197,18 +197,13 @@ fn generate_linked_unit_rust(
         let Some(binding) = binding_for_function(bindings, &module, name) else {
             continue;
         };
-        let probe = faber_hir_rust::render_binding_probe(
-            &unit.analysis,
-            item.def_id,
-            &binding.symbol,
-            name,
-        )
-        .map_err(|err| {
-            Diagnostic::codegen_error(&err.message)
-                .with_file(unit.path.display().to_string())
-                .with_args(err.args)
-                .with_arg("issue", "library_binding_wrapper_failed")
-        })?;
+        let probe = render_binding_probe(&unit.analysis, item.def_id, &binding.symbol, name)
+            .map_err(|err| {
+                Diagnostic::codegen_error(&err.message)
+                    .with_file(unit.path.display().to_string())
+                    .with_args(err.args)
+                    .with_arg("issue", "library_binding_wrapper_failed")
+            })?;
         // Public API for application path-dep consumers. Binding probes emit
         // either `fn name` or `async fn name`; promote the generated wrapper
         // without rewriting its body or attributes.
