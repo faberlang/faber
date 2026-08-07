@@ -247,6 +247,22 @@ abi_string_family! {
         SYMBOL_VALOR_GET_OCTETI = "__faber_rt_v1_valor_get_octeti",
         SYMBOL_VALOR_GET_ARRAY = "__faber_rt_v1_valor_get_array",
         SYMBOL_VALOR_GET_MAP = "__faber_rt_v1_valor_get_map",
+        // P7 (promotion packet valor-genus-field-layout): the closed genus
+        // field-layout + defaulted-extraction ABI contract. `valor ↦ genus`
+        // crosses the host boundary through one named-field descriptor table:
+        // `__faber_rt_v1_valor_get_genus(context, valor, count, names, kinds,
+        // policies, outputs) → status` with parallel arrays in declaration
+        // order — UTF-8 name slices (`names`), `VALUE_KIND_*` codes (`kinds`),
+        // `GENUS_FIELD_POLICY_*` flags (`policies`), and pre-seeded typed
+        // output slots (`outputs`). The emitter seeds every slot with the
+        // field's construction default (declared default or sponte zero); a
+        // missing key with policy DEFAULTABLE keeps the seed, a missing key
+        // with policy MANDATORY fails the whole extraction (STATUS_*
+        // non-ok, latched for `⇥` recovery), and extra JSON keys are ignored.
+        // `__faber_rt_v1_valor_genus` boxes the same table shape. The LLVM
+        // lane binds both rows (stage-4s); the wasm leaf maps
+        // `convert_1_aggregate_to_aggregate` on a genus target to them — no
+        // target-local layout guess.
         SYMBOL_VALOR_GENUS = "__faber_rt_v1_valor_genus",
         SYMBOL_VALOR_GET_GENUS = "__faber_rt_v1_valor_get_genus",
         SYMBOL_ARRAY_NEW = "__faber_rt_v1_array_new",
@@ -388,6 +404,23 @@ abi_string_family! {
         SYMBOL_SERMO_MATERIALIZE_TEXT = "__faber_rt_v1_sermo_materialize_text",
         SYMBOL_SERMO_MATERIALIZE_VALOR = "__faber_rt_v1_sermo_materialize_valor",
         SYMBOL_SERMO_MATERIALIZE_I64_OR = "__faber_rt_v1_sermo_materialize_i64_or",
+    }
+}
+
+// Genus field-layout contract (promotion packet P7, wasm-host-parity).
+//
+// The `defaultable` policy flag of the `valor_get_genus` field-descriptor
+// table. `0`/`GENUS_FIELD_POLICY_MANDATORY` marks a field whose key must be
+// present in the `Valor::Tabula` payload — a missing key fails the whole
+// extraction (non-OK status, latched for `⇥` recovery). `1` /
+// `GENUS_FIELD_POLICY_DEFAULTABLE` marks a field whose pre-seeded output
+// slot the host must retain when the key is missing — the seed is the
+// emitter-supplied construction default (declared default such as
+// `regio = "Roma"`, or the sponte zero/nihil seed for `optional` fields).
+abi_enum_family! {
+    GENUS_FIELD_POLICY_ROWS: type FaberRtGenusFieldPolicyV1 = u8 {
+        GENUS_FIELD_POLICY_MANDATORY = 0,
+        GENUS_FIELD_POLICY_DEFAULTABLE = 1,
     }
 }
 
