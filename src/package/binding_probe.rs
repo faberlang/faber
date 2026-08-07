@@ -14,7 +14,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use radix::diagnostics::Diagnostic;
 
-use super::runtime_dependency::{
+use super::rust_runtime_dependency::{
     normalize_dependency_value, parse_dependency_requirement, runtime_path_for_target_dependencies,
 };
 

@@ -21,7 +21,7 @@ use super::codegen::ModuleNode;
 use super::compile::AnalyzedPackageUnit;
 use super::discovery::sanitize_crate_name;
 use super::member_path::resolve_package_member;
-use super::runtime_dependency::{
+use super::rust_runtime_dependency::{
     parse_dependency_requirement, runtime_path_for_target_dependencies,
 };
 use super::rust_target::{generate_library_unit_rust, render_binding_probe};
