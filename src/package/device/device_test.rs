@@ -14,6 +14,18 @@ use radix_mir::abi::{
 };
 use radix_mir::device_program::DataFlowPair;
 use radix_mir::kernel_plan::{AxisReductionPlan, LayerNormalizationPlan, ReduceOp, RowSoftmaxPlan};
+
+/// The S3-A2 companion probe: a nucleum forward kernel (`loss`) whose `@ radix
+/// backward` companion (`loss_backward`) carries the VJP over the two selected
+/// inputs `x`/`w` (reverse-mode, device-resident). Shared by the three
+/// companion-relation tests; written into a pid-keyed temp dir by
+/// [`with_inline_package`] — no external fixture.
+const S3A2_COMPANION_PROBE: &str = r#"@ nucleum
+@ radix lane "air"
+@ radix backward "loss_backward"
+functio loss(tf32[2] x, tf32[2] w) → tf32[2] {
+    redde x.multiplica(w)
+}"#;
 use radix_mir_fmir::schema::{
     FmirSessionSection, WireAxisReductionPlan, WireBroadcastDeclaration, WireBroadcastFact,
     WireInputUpdateCadence, WireInvocationMode, WireKvCacheDtype, WireKvCacheLayout,
@@ -1181,12 +1193,9 @@ fn device_repeat_count_is_fail_closed() {
 /// inputs unify with the forward's device-resident buffers (S2-5 identity).
 #[test]
 fn companion_forward_and_backward_kernel_set_and_order() {
-    let entry = PathBuf::from("/tmp/s3a2probe/src/probe.fab");
-    let (program, semantics) = super::super::with_lowered_package_mir(
-        &radix::driver::Config::default()
-            .with_stdlib(dev_norma_library_home())
-            .with_target(radix::codegen::Target::MirFmirBinary),
-        &entry,
+    let (program, semantics) = with_inline_package(
+        "s3a2-companion-probe",
+        S3A2_COMPANION_PROBE,
         |lowered| {
             device_program_for_lowered(
                 &lowered.validated,
@@ -1254,47 +1263,47 @@ fn companion_forward_and_backward_kernel_set_and_order() {
 /// relation facts are the routing surface — never a name heuristic).
 #[test]
 fn companion_carrier_round_trips_and_missing_companion_fails_closed() {
-    let entry = PathBuf::from("/tmp/s3a2probe/src/probe.fab");
-    let config = radix::driver::Config::default()
-        .with_stdlib(dev_norma_library_home())
-        .with_target(radix::codegen::Target::MirFmirBinary);
-    super::super::with_lowered_package_mir(&config, &entry, |lowered| {
-        // Round-trip: exactly one carried companion, VJP derivative,
-        // device-resident (the primal is a nucleum kernel).
-        let entries: Vec<_> = lowered.companions.iter().collect();
-        assert_eq!(entries.len(), 1);
-        let carried = entries[0];
-        assert_eq!(
-            carried.derivative,
-            radix_mir::device::MirCompanionDerivativeKind::ReverseModeVjp
-        );
-        assert!(
-            carried.device_resident,
-            "the primal carries explicit device intent (@ nucleum), so its companion is device-resident"
-        );
+    with_inline_package(
+        "s3a2-companion-probe",
+        S3A2_COMPANION_PROBE,
+        |lowered| {
+            // Round-trip: exactly one carried companion, VJP derivative,
+            // device-resident (the primal is a nucleum kernel).
+            let entries: Vec<_> = lowered.companions.iter().collect();
+            assert_eq!(entries.len(), 1);
+            let carried = entries[0];
+            assert_eq!(
+                carried.derivative,
+                radix_mir::device::MirCompanionDerivativeKind::ReverseModeVjp
+            );
+            assert!(
+                carried.device_resident,
+                "the primal carries explicit device intent (@ nucleum), so its companion is device-resident"
+            );
 
-        // Fail closed: a carried companion absent from the MIR yields the
-        // typed diagnostic.
-        let mut phantom = lowered.companions.clone();
-        phantom.insert(radix_mir::device::MirCompanionEntry {
-            primal: radix::hir::DefId(9_999),
-            companion: radix::hir::DefId(9_998),
-            derivative: radix_mir::device::MirCompanionDerivativeKind::ReverseModeVjp,
-            device_resident: true,
-        });
-        let error = device_program_for_lowered(
-            &lowered.validated,
-            &lowered.interner,
-            &phantom,
-            DEFAULT_TRAINING_STEPS,
-        )
-            .expect_err("a carried companion missing from the MIR must fail closed");
-        assert!(
-            error.iter().any(|diagnostic| diagnostic.message.contains("missing from the lowered MIR")),
-            "the fail-closed diagnostic names the missing companion: {:?}",
-            error.iter().map(|d| d.message.clone()).collect::<Vec<_>>()
-        );
-    })
+            // Fail closed: a carried companion absent from the MIR yields the
+            // typed diagnostic.
+            let mut phantom = lowered.companions.clone();
+            phantom.insert(radix_mir::device::MirCompanionEntry {
+                primal: radix::hir::DefId(9_999),
+                companion: radix::hir::DefId(9_998),
+                derivative: radix_mir::device::MirCompanionDerivativeKind::ReverseModeVjp,
+                device_resident: true,
+            });
+            let error = device_program_for_lowered(
+                &lowered.validated,
+                &lowered.interner,
+                &phantom,
+                DEFAULT_TRAINING_STEPS,
+            )
+                .expect_err("a carried companion missing from the MIR must fail closed");
+            assert!(
+                error.iter().any(|diagnostic| diagnostic.message.contains("missing from the lowered MIR")),
+                "the fail-closed diagnostic names the missing companion: {:?}",
+                error.iter().map(|d| d.message.clone()).collect::<Vec<_>>()
+            );
+        },
+    )
     .expect("lower");
 }
 
@@ -2280,12 +2289,9 @@ functio collige(tf32[1024] a, tf32[4] medius, u32 id) → vacuum {
 /// serialized wire and admits through the radix decode boundary.
 #[test]
 fn companion_relation_projected_onto_the_wire() {
-    let entry = PathBuf::from("/tmp/s3a2probe/src/probe.fab");
-    let (program, semantics) = super::super::with_lowered_package_mir(
-        &radix::driver::Config::default()
-            .with_stdlib(dev_norma_library_home())
-            .with_target(radix::codegen::Target::MirFmirBinary),
-        &entry,
+    let (program, semantics) = with_inline_package(
+        "s3a2-companion-probe",
+        S3A2_COMPANION_PROBE,
         |lowered| {
             device_program_for_lowered(
                 &lowered.validated,
