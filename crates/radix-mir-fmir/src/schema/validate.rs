@@ -1,9 +1,9 @@
 use super::device::FmirSessionSection;
 use super::distributed::FmirDistributedExecutionSection;
 use super::wire::{
-    WireAxisReductionPlan, WireBroadcastDeclaration, WireBufferIdentity, WireBufferLifetime,
-    WireCollectionKernelPlan, WireDeviceProgram, WireInitializationPolicy, WireInputUpdateCadence,
-    WireInvocationMode, WireKvCacheDtype, WireObservationCadence, WireProgramLifetime,
+    WireBroadcastDeclaration, WireBufferIdentity, WireBufferLifetime, WireCollectionKernelPlan,
+    WireDeviceProgram, WireInitializationPolicy, WireInputUpdateCadence, WireInvocationMode,
+    WireKvCacheDtype, WireObservationCadence, WireProgramLifetime, WireReduceOp,
     WireReducedProjection, WireResourceAccess, WireSessionObservationCadence,
 };
 use super::SHA256_IDENTITY_PREFIX;
@@ -98,7 +98,20 @@ fn validate_wire_broadcast_facts(
 /// 3. **Divisibility** — a reduced buffer's `element_count` is exactly
 ///    divisible by its carried projection's `inner_stride` (the keep-dims
 ///    mapping is `axis_extent` strides of `inner_stride`; a non-divisible
-///    count means the carried fact cannot address the buffer).
+///    count means the carried fact cannot address the buffer);
+/// 4. **Saturation (council-13 cxo CB-W8)** — the block width
+///    `axis_extent · inner_stride` must be representable in `u64` (the
+///    keep-dims consumer divides the flat index by it; an overflowing width
+///    silently saturates and collapses every keep-dims element onto the first
+///    `inner_stride` slots — silent mis-addressing), and a projection-carrying
+///    reduced buffer must hold at least one element (a zero-count carrier
+///    cannot hold any real reduction output and passes divisibility
+///    vacuously);
+/// 5. **Operator (council-13 cxo CB-W8)** — an `AxisReduction` plan admits
+///    `Sum` only: the `TensorSumAxis` resolution and every axis-reduction
+///    emitter (the Metal emitter rejects non-`Sum` explicitly) cover `Sum`
+///    today, so a wire image carrying `Mean`/`Product`/`Max`/`Min` would
+///    pass decode and hit an unimplemented emitter path.
 fn validate_wire_reduced_projections(
     wire: &WireDeviceProgram,
 ) -> Result<(), crate::error::FmirImageError> {
@@ -130,10 +143,37 @@ fn validate_wire_reduced_projections(
         let WireCollectionKernelPlan::AxisReduction(plan) = &kernel.plan else {
             continue;
         };
+        // council-13 cxo CB-W8: only `Sum` is emitted today — the
+        // `TensorSumAxis` resolution (S6-P1) and every axis-reduction
+        // emitter (the Metal emitter rejects non-`Sum` explicitly) cover
+        // `Sum` only, so a non-`Sum` wire op would pass decode and then hit
+        // an unimplemented emitter path. `Mean` is deliberately
+        // tree-reduction-only today; the day an emitter lands a non-`Sum`
+        // axis-reduction op, extend THIS allow-list in lockstep with the
+        // emitter (and the faber boundary admission).
+        if plan.op != WireReduceOp::Sum {
+            return Err(wire_invalid(format!(
+                "kernel '{}' carries an axis-reduction plan with op {:?}; only Sum is emitted today, a non-Sum op would hit an unimplemented emitter path (council-13 cxo CB-W8)",
+                kernel.entry, plan.op
+            )));
+        }
         let projection = plan.projection;
         if projection.axis_extent < 1 || projection.inner_stride < 1 {
             return Err(wire_invalid(format!(
                 "kernel '{}' carries an axis-reduction plan with a non-positive reduced-resource projection ({projection:?}); the mapping is carried positive (council-8 CB-3)",
+                kernel.entry
+            )));
+        }
+        // council-13 cxo CB-W8: the block width must be representable — the
+        // keep-dims consumer divides by it and an overflowing width would
+        // silently saturate to `u64::MAX`, collapsing the addressing.
+        if projection
+            .axis_extent
+            .checked_mul(projection.inner_stride)
+            .is_none()
+        {
+            return Err(wire_invalid(format!(
+                "kernel '{}' carries an axis-reduction plan whose reduced-resource projection {projection:?} saturates u64 (axis_extent · inner_stride overflows); a saturated block width cannot address a real reduction (council-13 cxo CB-W8)",
                 kernel.entry
             )));
         }
@@ -157,10 +197,14 @@ fn validate_wire_reduced_projections(
     Ok(())
 }
 
-/// council-8 CB-3: one carried reduced-resource projection must be positive
-/// and its reduced buffer's element count exactly divisible by its inner
-/// stride — checked BEFORE any arithmetic on the stride, so a zero stride is
-/// rejected rather than panicking the divisibility modulus.
+/// council-8 CB-3 + council-13 cxo CB-W8: one carried reduced-resource
+/// projection must be positive, its reduced buffer's element count exactly
+/// divisible by its inner stride — checked BEFORE any arithmetic on the
+/// stride, so a zero stride is rejected rather than panicking the
+/// divisibility modulus — and neither degenerate nor saturated (a
+/// zero-element reduced buffer cannot hold a real reduction output, and a
+/// block width `axis_extent · inner_stride` that overflows `u64` would
+/// silently saturate the keep-dims consumer's addressing).
 fn validate_carried_reduced_projection(
     carrier: &str,
     element_count: u64,
@@ -169,6 +213,27 @@ fn validate_carried_reduced_projection(
     if projection.axis_extent < 1 || projection.inner_stride < 1 {
         return Err(wire_invalid(format!(
             "{carrier} carries a reduced-resource projection with a non-positive axis extent or inner stride ({projection:?}); the mapping is carried positive (council-8 CB-3)"
+        )));
+    }
+    // council-13 cxo CB-W8: a zero-element reduced buffer cannot address a
+    // real reduction (a keep-dims consumer has nothing to read), and it
+    // passes the divisibility rule vacuously (`0 % inner_stride == 0`).
+    if element_count < 1 {
+        return Err(wire_invalid(format!(
+            "{carrier} carries a reduced-resource projection on a zero-element buffer ({element_count} elements, {projection:?}); a zero-count reduced buffer cannot address a real reduction (council-13 cxo CB-W8)"
+        )));
+    }
+    // council-13 cxo CB-W8: the block width must be representable — the
+    // keep-dims consumer divides the flat index by `axis_extent · inner_stride`
+    // (a saturating multiply would silently collapse every keep-dims element
+    // onto the first `inner_stride` slots).
+    if projection
+        .axis_extent
+        .checked_mul(projection.inner_stride)
+        .is_none()
+    {
+        return Err(wire_invalid(format!(
+            "{carrier} carries a reduced-resource projection whose block width saturates u64 ({projection:?}: axis_extent · inner_stride overflows); a saturated block width cannot address a real reduction (council-13 cxo CB-W8)"
         )));
     }
     if element_count % projection.inner_stride != 0 {
@@ -1096,6 +1161,70 @@ mod tests {
         assert!(
             error.to_string().contains("not divisible"),
             "the fail-closed diagnostic names the divisibility rule: {error}"
+        );
+    }
+
+    /// council-13 cxo CB-W8: an axis-reduction plan admitting only `Sum`
+    /// fails closed on a non-`Sum` op (`Mean` is tree-reduction-only today;
+    /// every axis-reduction emitter covers `Sum` only, so a non-`Sum` wire
+    /// op would pass decode and hit an unimplemented emitter path).
+    #[test]
+    fn non_sum_axis_reduction_op_rejected() {
+        let mut wire = reduced_projection_fixture();
+        let WireCollectionKernelPlan::AxisReduction(plan) = &mut wire.kernels[0].plan else {
+            panic!("fixture carries an axis-reduction plan");
+        };
+        plan.op = WireReduceOp::Mean;
+        let error = validate_wire_program(&wire)
+            .expect_err("a non-Sum axis-reduction op fails the admission closed");
+        assert!(
+            error.to_string().contains("only Sum"),
+            "the fail-closed diagnostic names the op allow-list: {error}"
+        );
+    }
+
+    /// council-13 cxo CB-W8: a saturated projection — a block width
+    /// `axis_extent · inner_stride` that overflows `u64` — fails closed (the
+    /// keep-dims consumer divides by the width; a saturating multiply would
+    /// silently collapse the addressing). Both the plan and the carried
+    /// buffer/result projections are stamped identically so the agreement
+    /// rule does not shadow the saturation rule.
+    #[test]
+    fn saturated_overflowing_projection_rejected() {
+        let mut wire = reduced_projection_fixture();
+        let WireCollectionKernelPlan::AxisReduction(plan) = &mut wire.kernels[0].plan else {
+            panic!("fixture carries an axis-reduction plan");
+        };
+        let saturated = WireReducedProjection {
+            axis_extent: u64::MAX,
+            inner_stride: 2,
+        };
+        plan.projection = saturated;
+        wire.kernels[0].resources[1].version.reduced_projection = Some(saturated);
+        wire.kernels[0].resources[1].version.element_count = u64::MAX;
+        wire.results[0].version.reduced_projection = Some(saturated);
+        wire.results[0].version.element_count = u64::MAX;
+        let error = validate_wire_program(&wire)
+            .expect_err("an overflowing block width fails the projection admission");
+        assert!(
+            error.to_string().contains("saturates u64"),
+            "the fail-closed diagnostic names the saturation rule: {error}"
+        );
+    }
+
+    /// council-13 cxo CB-W8: a degenerate zero-element reduced buffer
+    /// carrying a projection fails closed — a zero-count carrier cannot hold
+    /// any real reduction output (and passes the divisibility rule
+    /// vacuously, so it must be rejected before it).
+    #[test]
+    fn zero_element_reduced_buffer_rejected() {
+        let mut wire = reduced_projection_fixture();
+        wire.kernels[0].resources[1].version.element_count = 0;
+        let error = validate_wire_program(&wire)
+            .expect_err("a zero-element reduced buffer fails the projection admission");
+        assert!(
+            error.to_string().contains("zero-element"),
+            "the fail-closed diagnostic names the degenerate-count rule: {error}"
         );
     }
 }
