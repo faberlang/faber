@@ -1,10 +1,10 @@
 use super::device::FmirSessionSection;
 use super::distributed::FmirDistributedExecutionSection;
 use super::wire::{
-    WireBroadcastDeclaration, WireBufferIdentity, WireBufferLifetime, WireCollectionKernelPlan,
-    WireDeviceProgram, WireInitializationPolicy, WireInputUpdateCadence, WireInvocationMode,
-    WireKvCacheDtype, WireObservationCadence, WireProgramLifetime, WireResourceAccess,
-    WireSessionObservationCadence,
+    WireAxisReductionPlan, WireBroadcastDeclaration, WireBufferIdentity, WireBufferLifetime,
+    WireCollectionKernelPlan, WireDeviceProgram, WireInitializationPolicy, WireInputUpdateCadence,
+    WireInvocationMode, WireKvCacheDtype, WireObservationCadence, WireProgramLifetime,
+    WireReducedProjection, WireResourceAccess, WireSessionObservationCadence,
 };
 use super::SHA256_IDENTITY_PREFIX;
 
@@ -19,7 +19,8 @@ use super::SHA256_IDENTITY_PREFIX;
 // fails admission before host construction or launch.
 
 /// Validate the carried wire facts fail-closed (F1–F7 + the S5-U5b declared
-/// step count + the S6-C2 broadcast fact).
+/// step count + the S6-C2 broadcast fact + the council-8 CB-3 reduced-resource
+/// projection fact).
 pub(crate) fn validate_wire_program(
     wire: &WireDeviceProgram,
 ) -> Result<(), crate::error::FmirImageError> {
@@ -31,6 +32,7 @@ pub(crate) fn validate_wire_program(
     validate_wire_axes(wire, &launches)?;
     validate_wire_step_count(wire)?;
     validate_wire_broadcast_facts(wire)?;
+    validate_wire_reduced_projections(wire)?;
     Ok(())
 }
 
@@ -75,6 +77,105 @@ fn validate_wire_broadcast_facts(
                 kernel.entry, fact.result_shape, *higher
             )));
         }
+    }
+    Ok(())
+}
+
+/// Rule council-8 CB-3 (A7): every carried reduced-resource projection is
+/// admitted fail-closed at the decode boundary — the producer-defined
+/// mapping is carried, never reconstructed, so a producer bug stamping an
+/// impossible projection must fail here (the first keep-dims consumer
+/// trusting the carried fact would otherwise hit a division-by-zero or
+/// silent mis-addressing). Three sub-rules:
+///
+/// 1. **Positivity** — every carried projection (the reduced buffer
+///    version's AND the `AxisReduction` plan's) has `axis_extent >= 1` and
+///    `inner_stride >= 1` (a zero extent/stride is not a mapping);
+/// 2. **Plan ↔ buffer-version agreement** — when an `AxisReduction` plan's
+///    reduced output buffer version also carries a projection, the two MUST
+///    be identical (the plan projection and the buffer version stamp the
+///    SAME producer fact);
+/// 3. **Divisibility** — a reduced buffer's `element_count` is exactly
+///    divisible by its carried projection's `inner_stride` (the keep-dims
+///    mapping is `axis_extent` strides of `inner_stride`; a non-divisible
+///    count means the carried fact cannot address the buffer).
+fn validate_wire_reduced_projections(
+    wire: &WireDeviceProgram,
+) -> Result<(), crate::error::FmirImageError> {
+    for resource in wire
+        .kernels
+        .iter()
+        .flat_map(|kernel| kernel.resources.iter())
+    {
+        let Some(projection) = resource.version.reduced_projection else {
+            continue;
+        };
+        validate_carried_reduced_projection(
+            &format!("buffer '{}'", resource.buffer.name),
+            resource.version.element_count,
+            projection,
+        )?;
+    }
+    for result in &wire.results {
+        let Some(projection) = result.version.reduced_projection else {
+            continue;
+        };
+        validate_carried_reduced_projection(
+            &format!("result buffer '{}'", result.buffer.name),
+            result.version.element_count,
+            projection,
+        )?;
+    }
+    for kernel in &wire.kernels {
+        let WireCollectionKernelPlan::AxisReduction(plan) = &kernel.plan else {
+            continue;
+        };
+        let projection = plan.projection;
+        if projection.axis_extent < 1 || projection.inner_stride < 1 {
+            return Err(wire_invalid(format!(
+                "kernel '{}' carries an axis-reduction plan with a non-positive reduced-resource projection ({projection:?}); the mapping is carried positive (council-8 CB-3)",
+                kernel.entry
+            )));
+        }
+        for resource in &kernel.resources {
+            if !matches!(
+                resource.access,
+                WireResourceAccess::Write | WireResourceAccess::ReadWrite
+            ) {
+                continue;
+            }
+            if let Some(carried) = resource.version.reduced_projection {
+                if carried != projection {
+                    return Err(wire_invalid(format!(
+                        "kernel '{}' carries an axis-reduction plan projection {projection:?} that disagrees with the reduced output buffer's carried projection {carried:?}; the same fact must agree everywhere it is stamped (council-8 CB-3)",
+                        kernel.entry
+                    )));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// council-8 CB-3: one carried reduced-resource projection must be positive
+/// and its reduced buffer's element count exactly divisible by its inner
+/// stride — checked BEFORE any arithmetic on the stride, so a zero stride is
+/// rejected rather than panicking the divisibility modulus.
+fn validate_carried_reduced_projection(
+    carrier: &str,
+    element_count: u64,
+    projection: WireReducedProjection,
+) -> Result<(), crate::error::FmirImageError> {
+    if projection.axis_extent < 1 || projection.inner_stride < 1 {
+        return Err(wire_invalid(format!(
+            "{carrier} carries a reduced-resource projection with a non-positive axis extent or inner stride ({projection:?}); the mapping is carried positive (council-8 CB-3)"
+        )));
+    }
+    if element_count % projection.inner_stride != 0 {
+        return Err(wire_invalid(format!(
+            "{carrier} element count {element_count} is not divisible by its carried projection's inner stride {} ({projection:?}); the keep-dims mapping cannot address the buffer (council-8 CB-3)",
+            projection.inner_stride
+        )));
     }
     Ok(())
 }
@@ -786,4 +887,215 @@ pub(crate) fn validate_wire_session_section(
 /// A focused `SessionSectionInvalid` admission error.
 fn session_invalid(detail: String) -> crate::error::FmirImageError {
     crate::error::FmirImageError::SessionSectionInvalid { detail }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    // The wire types the fixture names directly (the glob above resolves the
+    // validation surface from validate.rs's own imports; the schema's
+    // `pub use wire::*` re-exports are reachable through the explicit path).
+    use super::super::wire::{
+        WireBinding, WireBufferIdentity, WireBufferLifetime, WireBufferRole, WireBufferVersion,
+        WireCollectionKernelPlan, WireDeviceProgram, WireDeviceResource, WireDispatchSize,
+        WireInitializationPolicy, WireKernelLaunchPlan, WireKernelUnit, WireLaunchUnit,
+        WireObservationCadence, WireObservationFact, WireProgramLifetime, WireReduceOp,
+        WireReducedProjection, WireResourceAccess, WireResultBuffer, WireSemanticValue,
+        WireSemanticValueOrigin, WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize,
+        WireAxisReductionPlan,
+    };
+
+    /// The council-8 CB-3 fixture: a one-kernel axis-reduction program
+    /// (`[8, 8]` → 8 elements along axis 0, `Sum`). The reduced output
+    /// buffer version and the `AxisReduction` plan carry the SAME
+    /// producer-defined projection (`axis_extent` 8, `inner_stride` 8);
+    /// the reduced element count (8) is divisible by the stride; and the
+    /// F1–F7 facts mirror the session-section fixture (a read
+    /// host-provided input, a write kernel-initialized observation-point
+    /// output, one root) so the program passes `validate_wire_program`
+    /// apart from the projection under test.
+    fn reduced_projection_fixture() -> WireDeviceProgram {
+        let w = WireBufferIdentity {
+            id: 1,
+            name: "w".to_owned(),
+            role: WireBufferRole::Input,
+            storage: WireStorageLayout::DeviceHandle,
+            lifetime: WireBufferLifetime::PerProgram,
+            semantic_value: 1,
+        };
+        let o = WireBufferIdentity {
+            id: 2,
+            name: "o".to_owned(),
+            role: WireBufferRole::Output,
+            storage: WireStorageLayout::DeviceHandle,
+            lifetime: WireBufferLifetime::ObservationPoint,
+            semantic_value: 2,
+        };
+        let v_w = WireBufferVersion {
+            version: 1,
+            element_ty: "f32".to_owned(),
+            element_count: 64,
+            reduced_projection: None,
+        };
+        let v_o = WireBufferVersion {
+            version: 1,
+            element_ty: "f32".to_owned(),
+            element_count: 8,
+            reduced_projection: Some(WireReducedProjection {
+                axis_extent: 8,
+                inner_stride: 8,
+            }),
+        };
+        let launch = WireKernelLaunchPlan {
+            workgroup: WireWorkgroupSize { x: 8, y: 1, z: 1 },
+            dispatch_size: WireDispatchSize { x: 1, y: 1, z: 1 },
+            workgroup_count: WireWorkgroupCount { x: 1, y: 1, z: 1 },
+        };
+        WireDeviceProgram {
+            kernels: vec![WireKernelUnit {
+                function: 0,
+                entry: "reduce".to_owned(),
+                plan: WireCollectionKernelPlan::AxisReduction(WireAxisReductionPlan {
+                    op: WireReduceOp::Sum,
+                    axis: 0,
+                    projection: WireReducedProjection {
+                        axis_extent: 8,
+                        inner_stride: 8,
+                    },
+                }),
+                resources: vec![
+                    WireDeviceResource {
+                        buffer: w.clone(),
+                        version: v_w.clone(),
+                        binding: WireBinding {
+                            group: 0,
+                            binding: 0,
+                        },
+                        access: WireResourceAccess::Read,
+                        generation: 1,
+                        initialization: WireInitializationPolicy::HostProvided,
+                    },
+                    WireDeviceResource {
+                        buffer: o.clone(),
+                        version: v_o.clone(),
+                        binding: WireBinding {
+                            group: 0,
+                            binding: 1,
+                        },
+                        access: WireResourceAccess::Write,
+                        generation: 1,
+                        initialization: WireInitializationPolicy::KernelInitialized,
+                    },
+                ],
+                launch,
+            }],
+            launches: vec![WireLaunchUnit {
+                id: 1,
+                kernel_index: 0,
+            }],
+            lifetime: WireProgramLifetime::SingleRun,
+            results: vec![WireResultBuffer {
+                buffer: o.clone(),
+                version: v_o.clone(),
+                role: WireBufferRole::Output,
+                produced_by: 1,
+                observation: WireObservationFact {
+                    at_launch: 1,
+                    cadence: WireObservationCadence::PerStep,
+                },
+            }],
+            semantic_values: vec![
+                WireSemanticValue {
+                    id: 1,
+                    name: "w".to_owned(),
+                    origin: WireSemanticValueOrigin::HostInput,
+                },
+                WireSemanticValue {
+                    id: 2,
+                    name: "o".to_owned(),
+                    origin: WireSemanticValueOrigin::Synthetic {
+                        label: "reduce-output".to_owned(),
+                    },
+                },
+            ],
+            roots: vec![1],
+            dependencies: Vec::new(),
+            relations: Vec::new(),
+        }
+    }
+
+    /// council-8 CB-3: a fully consistent reduced-resource projection (plan
+    /// and buffer version agree, both positive, element count divisible by
+    /// the stride) admits at the decode boundary.
+    #[test]
+    fn valid_reduced_projection_admits() {
+        validate_wire_program(&reduced_projection_fixture())
+            .expect("a consistent reduced-resource projection admits fail-closed");
+    }
+
+    /// council-8 CB-3: a non-positive carried projection fails closed — a
+    /// zero `axis_extent` on the plan and a zero `inner_stride` on the
+    /// carried buffer-version projection (which would panic the divisibility
+    /// modulus if it reached it) both reject with the positivity diagnostic.
+    #[test]
+    fn zero_reduced_projection_extent_rejected() {
+        let mut wire = reduced_projection_fixture();
+        let WireCollectionKernelPlan::AxisReduction(plan) = &mut wire.kernels[0].plan else {
+            panic!("fixture carries an axis-reduction plan");
+        };
+        plan.projection.axis_extent = 0;
+        let error = validate_wire_program(&wire)
+            .expect_err("a zero axis extent fails the projection admission closed");
+        assert!(
+            error.to_string().contains("non-positive"),
+            "the fail-closed diagnostic names the positivity rule: {error}"
+        );
+
+        let mut wire = reduced_projection_fixture();
+        wire.kernels[0].resources[1].version.reduced_projection =
+            Some(WireReducedProjection {
+                axis_extent: 8,
+                inner_stride: 0,
+            });
+        let error = validate_wire_program(&wire)
+            .expect_err("a zero inner stride fails the projection admission closed");
+        assert!(
+            error.to_string().contains("non-positive"),
+            "the fail-closed diagnostic names the positivity rule: {error}"
+        );
+    }
+
+    /// council-8 CB-3: a plan projection that disagrees with the reduced
+    /// output buffer version's carried projection fails closed — the SAME
+    /// producer fact must agree everywhere it is stamped.
+    #[test]
+    fn mismatched_plan_vs_buffer_projection_rejected() {
+        let mut wire = reduced_projection_fixture();
+        let WireCollectionKernelPlan::AxisReduction(plan) = &mut wire.kernels[0].plan else {
+            panic!("fixture carries an axis-reduction plan");
+        };
+        plan.projection.inner_stride = 4;
+        let error = validate_wire_program(&wire)
+            .expect_err("a plan projection that disagrees with the buffer version fails closed");
+        assert!(
+            error.to_string().contains("disagrees"),
+            "the fail-closed diagnostic names the plan-vs-buffer mismatch: {error}"
+        );
+    }
+
+    /// council-8 CB-3: a reduced buffer whose element count is not exactly
+    /// divisible by its carried projection's inner stride fails closed — the
+    /// keep-dims mapping (`axis_extent` strides of `inner_stride`) cannot
+    /// address the buffer.
+    #[test]
+    fn non_divisible_reduced_element_count_rejected() {
+        let mut wire = reduced_projection_fixture();
+        wire.kernels[0].resources[1].version.element_count = 9;
+        let error = validate_wire_program(&wire)
+            .expect_err("a non-divisible reduced element count fails the projection admission");
+        assert!(
+            error.to_string().contains("not divisible"),
+            "the fail-closed diagnostic names the divisibility rule: {error}"
+        );
+    }
 }
