@@ -15,8 +15,8 @@ pub struct EmitArgs {
     pub locale: Option<String>,
 
     /// Message language for diagnostics (independent of code locale).
-    #[arg(long = "diagnostic-locale", value_name = "LOCALE")]
-    pub diagnostic_locale: Option<String>,
+    #[arg(long = "diagnostics-locale", value_name = "LOCALE")]
+    pub diagnostics_locale: Option<String>,
 
     /// Output target language
     #[arg(short = 't', long = "target", value_enum, default_value_t = FaberCliTarget::HirRust)]

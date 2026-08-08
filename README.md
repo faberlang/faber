@@ -73,7 +73,7 @@ See `faber --help` and after-help text for the full surface.
 
 Faber source and diagnostics can render in a reader locale. `faber check`,
 `build`, `run`, and `test` accept `--locale <locale>` for the code locale and
-`--diagnostic-locale <locale>` for the message language (independent of the code
+`--diagnostics-locale <locale>` for the message language (independent of the code
 locale); `faber format --locale la` reproduces the former `--canonical` re-emit
 surface. The manifest equivalent is the `faber.toml` `[locale]` table (legacy
 `[reader]` alias still accepted during the rename sweep). Installed packs live

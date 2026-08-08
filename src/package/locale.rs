@@ -30,7 +30,7 @@ pub(crate) fn default_config_with_locale(target: Target) -> Result<Config, Box<D
 /// Build a driver config (code locale) and the pack used for diagnostic rendering.
 ///
 /// Code locale (`cli_locale` / manifest / frontmatter) drives lexing and sits on
-/// `Config::locale_pack`. Diagnostics locale (`cli_diagnostic_locale`) drives
+/// `Config::locale_pack`. Diagnostics locale (`cli_diagnostics_locale`) drives
 /// message templates only. When diagnostics locale is omitted, the code pack is
 /// reused for rendering. When no code locale is selected explicitly, the
 /// product default is the English `en` code pack.
@@ -38,7 +38,7 @@ pub(crate) fn config_with_locale(
     target: Target,
     input: &Path,
     cli_locale: Option<&str>,
-    cli_diagnostic_locale: Option<&str>,
+    cli_diagnostics_locale: Option<&str>,
 ) -> Result<(Config, Option<LocalePack>), Box<Diagnostic>> {
     let code_pack = load_locale_pack_for_input(input, cli_locale)?;
     let config = match code_pack.as_ref() {
@@ -48,23 +48,23 @@ pub(crate) fn config_with_locale(
         None => Config::default().with_target(target),
     };
     let diagnostic_pack =
-        resolve_diagnostic_locale_pack(input, cli_diagnostic_locale, code_pack.as_ref())?;
+        resolve_diagnostics_locale_pack(input, cli_diagnostics_locale, code_pack.as_ref())?;
     Ok((config, diagnostic_pack))
 }
 
 /// Resolve the pack used for diagnostic message rendering.
 ///
-/// Chain: `--diagnostic-locale` → code pack → none (catalog English).
-pub(crate) fn resolve_diagnostic_locale_pack(
+/// Chain: `--diagnostics-locale` → code pack → none (catalog English).
+pub(crate) fn resolve_diagnostics_locale_pack(
     input: &Path,
-    cli_diagnostic_locale: Option<&str>,
+    cli_diagnostics_locale: Option<&str>,
     code_pack: Option<&LocalePack>,
 ) -> Result<Option<LocalePack>, Box<Diagnostic>> {
-    if let Some(locale) = cli_diagnostic_locale {
+    if let Some(locale) = cli_diagnostics_locale {
         let trimmed = locale.trim();
         if trimmed.is_empty() {
             return Err(Box::new(crate::package_diagnostic_error(
-                "--diagnostic-locale must not be empty",
+                "--diagnostics-locale must not be empty",
             )));
         }
         return load_locale_pack_for_input(input, Some(trimmed));

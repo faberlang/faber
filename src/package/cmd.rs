@@ -53,7 +53,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
             target,
             &input_path,
             command.locale.as_deref(),
-            command.diagnostic_locale.as_deref(),
+            command.diagnostics_locale.as_deref(),
         ) {
             Ok((config, pack)) => (config.with_warn_policy(warn_policy), pack),
             Err(diag) => {
@@ -708,7 +708,7 @@ pub fn cmd_check_package(command: radix::tool::CheckCommand) {
         check_target,
         &input_path,
         command.locale.as_deref(),
-        command.diagnostic_locale.as_deref(),
+        command.diagnostics_locale.as_deref(),
     ) {
         Ok((config, pack)) => (
             config.with_warn_policy(radix::driver::WarnPolicy {
@@ -792,7 +792,7 @@ pub fn cmd_emit_package(command: radix::tool::EmitCommand, format: bool, linter:
         command.package,
         command.target,
         command.locale.as_deref(),
-        command.diagnostic_locale.as_deref(),
+        command.diagnostics_locale.as_deref(),
     );
 
     radix::tool::print_diagnostics(
@@ -860,7 +860,7 @@ fn compile_package_input(
     force_package: bool,
     target: Target,
     locale: Option<&str>,
-    diagnostic_locale: Option<&str>,
+    diagnostics_locale: Option<&str>,
 ) -> (CompileResult, Option<radix::locale::LocalePack>) {
     if input.is_empty() || input[0] == "-" {
         eprintln!("error: package compilation requires a path input");
@@ -874,7 +874,7 @@ fn compile_package_input(
         std::process::exit(1);
     }
 
-    let (config, locale_pack) = match config_with_locale(target, &path, locale, diagnostic_locale) {
+    let (config, locale_pack) = match config_with_locale(target, &path, locale, diagnostics_locale) {
         Ok(selection) => selection,
         Err(diag) => {
             eprintln!("error: {}", diag.message);

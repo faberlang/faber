@@ -26,7 +26,7 @@ pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
 
     // Faber owns locale → pack resolution (install layout + package manifests
     // live here, not in radix). Code pack drives emit surface; diagnostic pack
-    // drives message rendering (`--diagnostic-locale` when set).
+    // drives message rendering (`--diagnostics-locale` when set).
     let code_pack =
         match crate::package::locale_pack_for_emit(&command.input, command.locale.as_deref()) {
             Ok(pack) => pack,
@@ -35,7 +35,7 @@ pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
                 std::process::exit(1);
             }
         };
-    let diagnostic_pack = match command.diagnostic_locale.as_deref() {
+    let diagnostic_pack = match command.diagnostics_locale.as_deref() {
         Some(locale) => match crate::package::locale_pack_for_emit(&command.input, Some(locale)) {
             Ok(pack) => pack,
             Err(message) => {

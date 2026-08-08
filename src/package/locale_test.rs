@@ -87,7 +87,7 @@ fn direct_default_config_uses_english_pack() {
 }
 
 #[test]
-fn diagnostic_locale_defaults_to_code_pack() {
+fn diagnostics_locale_defaults_to_code_pack() {
     let (_root, entry) = temp_package_entry();
     let (config, diagnostic_pack) =
         config_with_locale(Target::HirRust, &entry, Some("zh-Hans"), None).expect("locale config");
@@ -99,7 +99,7 @@ fn diagnostic_locale_defaults_to_code_pack() {
 }
 
 #[test]
-fn diagnostic_locale_can_differ_from_code_locale() {
+fn diagnostics_locale_can_differ_from_code_locale() {
     let (_root, entry) = temp_package_entry();
     let (config, diagnostic_pack) =
         config_with_locale(Target::HirRust, &entry, Some("zh-Hans"), Some("th-TH"))
@@ -112,13 +112,13 @@ fn diagnostic_locale_can_differ_from_code_locale() {
 }
 
 #[test]
-fn empty_diagnostic_locale_is_rejected() {
+fn empty_diagnostics_locale_is_rejected() {
     let (_root, entry) = temp_package_entry();
     let err = config_with_locale(Target::HirRust, &entry, Some("zh-Hans"), Some("   "))
-        .expect_err("empty diagnostic locale");
+        .expect_err("empty diagnostics locale");
     assert!(
         err.message
-            .contains("--diagnostic-locale must not be empty"),
+            .contains("--diagnostics-locale must not be empty"),
         "unexpected message: {}",
         err.message
     );

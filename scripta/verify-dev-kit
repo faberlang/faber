@@ -324,7 +324,7 @@ def negative_checks(prefix: Path, work: Path, version: str) -> None:
 
     # Missing locale pack fails closed with one next action.
     result = run(
-        [str(prefix / "bin" / "faber"), "explain", "SEM001", "--diagnostic-locale", "zz"],
+        [str(prefix / "bin" / "faber"), "explain", "SEM001", "--diagnostics-locale", "zz"],
         env=env,
         cwd=work,
     )

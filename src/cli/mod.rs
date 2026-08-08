@@ -174,8 +174,8 @@ pub struct BuildArgs {
     pub locale: Option<String>,
 
     /// Message language for diagnostics (independent of code locale).
-    #[arg(long = "diagnostic-locale", value_name = "LOCALE")]
-    pub diagnostic_locale: Option<String>,
+    #[arg(long = "diagnostics-locale", value_name = "LOCALE")]
+    pub diagnostics_locale: Option<String>,
 
     /// Input file or package path
     #[arg(value_name = "INPUT")]
@@ -194,8 +194,8 @@ pub struct CheckArgs {
     pub locale: Option<String>,
 
     /// Message language for diagnostics (independent of code locale).
-    #[arg(long = "diagnostic-locale", value_name = "LOCALE")]
-    pub diagnostic_locale: Option<String>,
+    #[arg(long = "diagnostics-locale", value_name = "LOCALE")]
+    pub diagnostics_locale: Option<String>,
 
     /// Downgrade unresolved/import-driven semantic errors to warnings
     #[arg(long)]
@@ -273,12 +273,12 @@ pub struct ExplainArgs {
 
     /// Message language for diagnostic explanation text
     #[arg(
-        long = "diagnostic-locale",
+        long = "diagnostics-locale",
         value_name = "LOCALE",
         requires = "term",
         conflicts_with_all = ["search", "list", "category"]
     )]
-    pub diagnostic_locale: Option<String>,
+    pub diagnostics_locale: Option<String>,
 
     /// Search across explain entries and show ranked matches
     #[arg(long, conflicts_with_all = ["list", "category", "term", "json"])]
@@ -317,8 +317,8 @@ pub struct RunArgs {
     pub locale: Option<String>,
 
     /// Message language for diagnostics (independent of code locale).
-    #[arg(long = "diagnostic-locale", value_name = "LOCALE")]
-    pub diagnostic_locale: Option<String>,
+    #[arg(long = "diagnostics-locale", value_name = "LOCALE")]
+    pub diagnostics_locale: Option<String>,
 
     /// Runtime target to build and execute. When omitted, the manifest
     /// `[build] target` wins; otherwise the implicit portable default
@@ -434,8 +434,8 @@ pub struct TestArgs {
     pub locale: Option<String>,
 
     /// Message language for diagnostics (independent of code locale).
-    #[arg(long = "diagnostic-locale", value_name = "LOCALE")]
-    pub diagnostic_locale: Option<String>,
+    #[arg(long = "diagnostics-locale", value_name = "LOCALE")]
+    pub diagnostics_locale: Option<String>,
 
     /// Promote all warning diagnostics to errors
     #[arg(long)]

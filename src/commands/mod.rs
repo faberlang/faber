@@ -107,7 +107,7 @@ fn dispatch(command: Command) {
                     deny_warnings: args.deny_warnings,
                     deny_codes: args.deny,
                     locale: args.locale,
-                    diagnostic_locale: args.diagnostic_locale,
+                    diagnostics_locale: args.diagnostics_locale,
                 },
                 args.format,
                 args.linter,
@@ -125,9 +125,9 @@ fn dispatch(command: Command) {
                     deny_warnings: args.deny_warnings,
                     deny_codes: args.deny,
                     diagnostic_mode: diagnostic_mode(args.diagnostics),
-                    locale_pack: None,
+                    diagnostics_locale_pack: None,
                     locale: args.locale,
-                    diagnostic_locale: args.diagnostic_locale,
+                    diagnostics_locale: args.diagnostics_locale,
                 });
             } else {
                 tool::cmd_check(CheckCommand {
@@ -137,9 +137,9 @@ fn dispatch(command: Command) {
                     deny_warnings: args.deny_warnings,
                     deny_codes: args.deny,
                     diagnostic_mode: diagnostic_mode(args.diagnostics),
-                    locale_pack: None,
+                    diagnostics_locale_pack: None,
                     locale: None,
-                    diagnostic_locale: args.diagnostic_locale,
+                    diagnostics_locale: args.diagnostics_locale,
                 });
             }
         }
@@ -177,9 +177,9 @@ fn dispatch(command: Command) {
                 reflection: args.reflection,
                 output: args.output,
                 diagnostic_mode: diagnostic_mode(args.diagnostics),
-                locale_pack: None,
+                diagnostics_locale_pack: None,
                 locale: args.locale,
-                diagnostic_locale: args.diagnostic_locale,
+                diagnostics_locale: args.diagnostics_locale,
                 output_mode: radix::codegen::OutputMode::Application,
                 module_name: None,
                 cuda_descriptor: None,

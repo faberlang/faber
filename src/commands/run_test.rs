@@ -160,7 +160,7 @@ fn run_args(
     RunArgs {
         path,
         locale,
-        diagnostic_locale: None,
+        diagnostics_locale: None,
         target: Some(target),
         backend: None,
         release: false,

@@ -234,7 +234,7 @@ pub struct ManifestReader {
     /// Locale id such as `en`, `la`, `th-TH`, or `zh-Hans`.
     pub locale: Option<String>,
 
-    /// Optional locale-pack path relative to the package root.
+    /// Optional locale pack path relative to the package root.
     pub pack: Option<String>,
 }
 

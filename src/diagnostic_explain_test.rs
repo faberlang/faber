@@ -213,7 +213,7 @@ fn installed_locale_pack_dev_resolution_loads_english_pack() {
 }
 
 #[test]
-fn empty_diagnostic_locale_is_rejected() {
+fn empty_diagnostics_locale_is_rejected() {
     let err = lookup_installed_diagnostic("SEM001", Some("   "))
         .expect_err("empty locale must fail");
     assert!(err.message.contains("--locale must not be empty"));

@@ -248,10 +248,10 @@ fn run_config(
     target: Target,
     input_path: &Path,
     locale: Option<&str>,
-    diagnostic_locale: Option<&str>,
+    diagnostics_locale: Option<&str>,
     warn_policy: radix::driver::WarnPolicy,
 ) -> Result<radix::driver::Config, Box<Diagnostic>> {
-    package::config_with_locale(target, input_path, locale, diagnostic_locale)
+    package::config_with_locale(target, input_path, locale, diagnostics_locale)
         .map(|(config, _locale_pack)| config.with_warn_policy(warn_policy))
 }
 
@@ -259,10 +259,10 @@ fn run_config_or_exit(
     target: Target,
     input_path: &Path,
     locale: Option<&str>,
-    diagnostic_locale: Option<&str>,
+    diagnostics_locale: Option<&str>,
     warn_policy: radix::driver::WarnPolicy,
 ) -> radix::driver::Config {
-    match run_config(target, input_path, locale, diagnostic_locale, warn_policy) {
+    match run_config(target, input_path, locale, diagnostics_locale, warn_policy) {
         Ok(config) => config,
         Err(diag) => {
             eprintln!("error: {}", diag.message);
@@ -288,7 +288,7 @@ fn cmd_run_go(_args: &RunArgs) {
             Target::HirGo,
             &input_path,
             args.locale.as_deref(),
-            args.diagnostic_locale.as_deref(),
+            args.diagnostics_locale.as_deref(),
             warn_policy_from_args(args),
         );
         let result = package::compile_package_go(&config, &input_path);
@@ -341,7 +341,7 @@ fn cmd_run_scena(args: RunArgs) {
         Target::MirScena,
         &input_path,
         args.locale.as_deref(),
-        args.diagnostic_locale.as_deref(),
+        args.diagnostics_locale.as_deref(),
         warn_policy,
     );
     let artifact = match package::build_package_mir_artifact(&config, &input_path, &argumenta) {
@@ -367,7 +367,7 @@ fn cmd_run_fmir_text(args: RunArgs, selection: DeviceSelection) {
         Target::MirFmir,
         &input_path,
         args.locale.as_deref(),
-        args.diagnostic_locale.as_deref(),
+        args.diagnostics_locale.as_deref(),
         warn_policy,
     );
     let image = match package::build_package_fmir_text_image(&config, &input_path, &[]) {
@@ -399,7 +399,7 @@ fn cmd_run_fmir(args: RunArgs, selection: DeviceSelection) {
         Target::MirFmirBinary,
         &input_path,
         args.locale.as_deref(),
-        args.diagnostic_locale.as_deref(),
+        args.diagnostics_locale.as_deref(),
         warn_policy,
     );
     let image = match package::build_package_fmir_image(&config, &input_path, &[]) {
@@ -443,7 +443,7 @@ fn cmd_run_fhir(_args: RunArgs) {
             Target::HirFhir,
             &input_path,
             args.locale.as_deref(),
-            args.diagnostic_locale.as_deref(),
+            args.diagnostics_locale.as_deref(),
             warn_policy,
         );
         let artifact = match package::build_package_fhir(&config, &input_path) {
@@ -482,7 +482,7 @@ fn cmd_run_llvm_host(args: &RunArgs) {
         Target::MirLlvmHost,
         &input_path,
         args.locale.as_deref(),
-        args.diagnostic_locale.as_deref(),
+        args.diagnostics_locale.as_deref(),
         warn_policy_from_args(args),
     );
     let profile = if args.release {
@@ -507,7 +507,7 @@ fn cmd_run_fmir_bin(args: &RunArgs, selection: DeviceSelection) {
         Target::MirFmirBundle,
         &input_path,
         args.locale.as_deref(),
-        args.diagnostic_locale.as_deref(),
+        args.diagnostics_locale.as_deref(),
         warn_policy_from_args(args),
     );
     let bundle =
@@ -622,7 +622,7 @@ fn cmd_run_compiled(args: &RunArgs) {
         Target::HirRust,
         &input_path,
         args.locale.as_deref(),
-        args.diagnostic_locale.as_deref(),
+        args.diagnostics_locale.as_deref(),
         warn_policy_from_args(args),
     );
     let result = package::compile_package(&config, &input_path);

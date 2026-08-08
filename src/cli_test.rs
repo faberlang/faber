@@ -383,17 +383,17 @@ fn cli_parses_locale_on_check() {
         panic!("expected check subcommand");
     };
     assert_eq!(args.locale.as_deref(), Some("zh-Hans"));
-    assert_eq!(args.diagnostic_locale.as_deref(), None);
+    assert_eq!(args.diagnostics_locale.as_deref(), None);
 }
 
 #[test]
-fn cli_parses_diagnostic_locale_on_check() {
+fn cli_parses_diagnostics_locale_on_check() {
     let check = Cli::try_parse_from([
         "faber",
         "check",
         "--locale",
         "zh-Hans",
-        "--diagnostic-locale",
+        "--diagnostics-locale",
         "th-TH",
         "main.fab",
     ])
@@ -402,30 +402,30 @@ fn cli_parses_diagnostic_locale_on_check() {
         panic!("expected check subcommand");
     };
     assert_eq!(args.locale.as_deref(), Some("zh-Hans"));
-    assert_eq!(args.diagnostic_locale.as_deref(), Some("th-TH"));
+    assert_eq!(args.diagnostics_locale.as_deref(), Some("th-TH"));
 }
 
 #[test]
-fn cli_parses_diagnostic_locale_on_build_run_test_emit() {
+fn cli_parses_diagnostics_locale_on_build_run_test_emit() {
     for (cmd, argv) in [
         (
             "build",
-            vec!["faber", "build", "--diagnostic-locale", "en", "main.fab"],
+            vec!["faber", "build", "--diagnostics-locale", "en", "main.fab"],
         ),
         (
             "run",
-            vec!["faber", "run", "--diagnostic-locale", "en", "main.fab"],
+            vec!["faber", "run", "--diagnostics-locale", "en", "main.fab"],
         ),
         (
             "test",
-            vec!["faber", "test", "--diagnostic-locale", "en", "main.fab"],
+            vec!["faber", "test", "--diagnostics-locale", "en", "main.fab"],
         ),
         (
             "emit",
             vec![
                 "faber",
                 "emit",
-                "--diagnostic-locale",
+                "--diagnostics-locale",
                 "en",
                 "-t",
                 "rust",
@@ -436,16 +436,16 @@ fn cli_parses_diagnostic_locale_on_build_run_test_emit() {
         let parsed = Cli::try_parse_from(argv).unwrap_or_else(|e| panic!("parse {cmd}: {e}"));
         match (cmd, parsed.command) {
             ("build", Some(crate::cli::Command::Build(args))) => {
-                assert_eq!(args.diagnostic_locale.as_deref(), Some("en"));
+                assert_eq!(args.diagnostics_locale.as_deref(), Some("en"));
             }
             ("run", Some(crate::cli::Command::Run(args))) => {
-                assert_eq!(args.diagnostic_locale.as_deref(), Some("en"));
+                assert_eq!(args.diagnostics_locale.as_deref(), Some("en"));
             }
             ("test", Some(crate::cli::Command::Test(args))) => {
-                assert_eq!(args.diagnostic_locale.as_deref(), Some("en"));
+                assert_eq!(args.diagnostics_locale.as_deref(), Some("en"));
             }
             ("emit", Some(crate::cli::Command::Emit(args))) => {
-                assert_eq!(args.diagnostic_locale.as_deref(), Some("en"));
+                assert_eq!(args.diagnostics_locale.as_deref(), Some("en"));
             }
             other => panic!("unexpected parse for {cmd}: {other:?}"),
         }
@@ -553,11 +553,11 @@ fn cli_rejects_conflicting_format_output_modes() {
 }
 
 #[test]
-fn cli_parses_diagnostic_locale_on_explain() {
+fn cli_parses_diagnostics_locale_on_explain() {
     let explain = Cli::try_parse_from([
         "faber",
         "explain",
-        "--diagnostic-locale",
+        "--diagnostics-locale",
         "zh-Hans",
         "SEM010.initializer_annotation_mismatch",
     ])
@@ -565,7 +565,7 @@ fn cli_parses_diagnostic_locale_on_explain() {
     let Some(crate::cli::Command::Explain(args)) = explain.command else {
         panic!("expected explain subcommand");
     };
-    assert_eq!(args.diagnostic_locale.as_deref(), Some("zh-Hans"));
+    assert_eq!(args.diagnostics_locale.as_deref(), Some("zh-Hans"));
     assert_eq!(
         args.term.as_deref(),
         Some("SEM010.initializer_annotation_mismatch")
@@ -649,45 +649,45 @@ fn cli_rejects_explain_search_and_category() {
 }
 
 #[test]
-fn cli_rejects_explain_list_and_diagnostic_locale() {
+fn cli_rejects_explain_list_and_diagnostics_locale() {
     let list_locale =
-        Cli::try_parse_from(["faber", "explain", "--list", "--diagnostic-locale", "la"])
+        Cli::try_parse_from(["faber", "explain", "--list", "--diagnostics-locale", "la"])
             .expect_err("list and diagnostic locale should conflict");
     let list_locale_rendered = list_locale.to_string();
     assert!(list_locale_rendered.contains("--list"));
-    assert!(list_locale_rendered.contains("--diagnostic-locale"));
+    assert!(list_locale_rendered.contains("--diagnostics-locale"));
 }
 
 #[test]
-fn cli_rejects_explain_search_and_diagnostic_locale() {
+fn cli_rejects_explain_search_and_diagnostics_locale() {
     let search_locale = Cli::try_parse_from([
         "faber",
         "explain",
         "--search",
         "host",
-        "--diagnostic-locale",
+        "--diagnostics-locale",
         "la",
     ])
     .expect_err("search and diagnostic locale should conflict");
     let search_locale_rendered = search_locale.to_string();
     assert!(search_locale_rendered.contains("--search"));
-    assert!(search_locale_rendered.contains("--diagnostic-locale"));
+    assert!(search_locale_rendered.contains("--diagnostics-locale"));
 }
 
 #[test]
-fn cli_rejects_explain_category_and_diagnostic_locale() {
+fn cli_rejects_explain_category_and_diagnostics_locale() {
     let category_locale = Cli::try_parse_from([
         "faber",
         "explain",
         "--category",
         "diagnostics",
-        "--diagnostic-locale",
+        "--diagnostics-locale",
         "la",
     ])
     .expect_err("category and diagnostic locale should conflict");
     let category_locale_rendered = category_locale.to_string();
     assert!(category_locale_rendered.contains("--category"));
-    assert!(category_locale_rendered.contains("--diagnostic-locale"));
+    assert!(category_locale_rendered.contains("--diagnostics-locale"));
 }
 
 #[test]
@@ -700,8 +700,8 @@ fn cli_rejects_explain_json_without_term() {
 }
 
 #[test]
-fn cli_rejects_explain_diagnostic_locale_without_term() {
-    let error = Cli::try_parse_from(["faber", "explain", "--diagnostic-locale", "la"])
+fn cli_rejects_explain_diagnostics_locale_without_term() {
+    let error = Cli::try_parse_from(["faber", "explain", "--diagnostics-locale", "la"])
         .expect_err("diagnostic locale requires a term");
     let rendered = error.to_string();
     assert!(rendered.contains("required arguments were not provided"));
@@ -709,13 +709,13 @@ fn cli_rejects_explain_diagnostic_locale_without_term() {
 }
 
 #[test]
-fn cli_parses_explain_diagnostic_locale_with_term() {
-    let cli = Cli::try_parse_from(["faber", "explain", "--diagnostic-locale", "th-TH", "SEM010"])
+fn cli_parses_explain_diagnostics_locale_with_term() {
+    let cli = Cli::try_parse_from(["faber", "explain", "--diagnostics-locale", "th-TH", "SEM010"])
         .expect("parse explain diagnostic locale");
     let Some(crate::cli::Command::Explain(args)) = cli.command else {
         panic!("expected explain subcommand");
     };
-    assert_eq!(args.diagnostic_locale.as_deref(), Some("th-TH"));
+    assert_eq!(args.diagnostics_locale.as_deref(), Some("th-TH"));
     assert_eq!(args.term.as_deref(), Some("SEM010"));
 }
 
