@@ -961,13 +961,13 @@ mod tests {
     // validation surface from validate.rs's own imports; the schema's
     // `pub use wire::*` re-exports are reachable through the explicit path).
     use super::super::wire::{
-        WireBinding, WireBufferIdentity, WireBufferLifetime, WireBufferRole, WireBufferVersion,
-        WireCollectionKernelPlan, WireDeviceProgram, WireDeviceResource, WireDispatchSize,
-        WireInitializationPolicy, WireKernelLaunchPlan, WireKernelUnit, WireLaunchUnit,
-        WireObservationCadence, WireObservationFact, WireProgramLifetime, WireReduceOp,
-        WireReducedProjection, WireResourceAccess, WireResultBuffer, WireSemanticValue,
-        WireSemanticValueOrigin, WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize,
-        WireAxisReductionPlan,
+        WireAxisReductionPlan, WireBinding, WireBufferIdentity, WireBufferLifetime, WireBufferRole,
+        WireBufferVersion, WireCollectionKernelPlan, WireDeviceProgram, WireDeviceResource,
+        WireDispatchSize, WireInitializationPolicy, WireKernelLaunchPlan, WireKernelUnit,
+        WireLaunchUnit, WireObservationCadence, WireObservationFact, WireProgramLifetime,
+        WireReduceOp, WireReducedProjection, WireResourceAccess, WireResultBuffer,
+        WireSemanticValue, WireSemanticValueOrigin, WireStorageLayout, WireWorkgroupCount,
+        WireWorkgroupSize,
     };
 
     /// The council-8 CB-3 fixture: a one-kernel axis-reduction program
@@ -1117,11 +1117,10 @@ mod tests {
         );
 
         let mut wire = reduced_projection_fixture();
-        wire.kernels[0].resources[1].version.reduced_projection =
-            Some(WireReducedProjection {
-                axis_extent: 8,
-                inner_stride: 0,
-            });
+        wire.kernels[0].resources[1].version.reduced_projection = Some(WireReducedProjection {
+            axis_extent: 8,
+            inner_stride: 0,
+        });
         let error = validate_wire_program(&wire)
             .expect_err("a zero inner stride fails the projection admission closed");
         assert!(
