@@ -1,14 +1,16 @@
-# NGAB0 Composite Contract — Package graph and ownership matrix
+# NGAB0 Composite Contract — Composite artifact and ownership contract
 
-**Unit**: NGAB0-U2–U5 (package graph + ownership matrix; host/device partition
+**Unit**: NGAB0-U2–U7 (package graph + ownership matrix; host/device partition
 + entry/call ABI; manifest schema + resource identity + verification; backend
-variants + artifact layout + admission) — see `ngab0-delivery.md` NGAB0-U2
-through NGAB0-U5.
-**Status**: frozen (U2–U5) — §PackageGraph + §OwnershipMatrix + §Partition +
+variants + artifact layout + admission; build/run UX + error taxonomy; seams +
+unsupported behavior + version authority) — see `ngab0-delivery.md` NGAB0-U2
+through NGAB0-U7.
+**Status**: frozen (U2–U7) — §PackageGraph + §OwnershipMatrix + §Partition +
 §Abi + §Manifest + §ResourceIdentity + §Verification + §BackendVariants +
-§ArtifactLayout + §Admission. Further sections (§Ux/§Errors,
-§FrozenVsReserved/§Unsupported/§Versioning) are added by NGAB0-U6–U7; the
-version authority and change procedure freeze at NGAB0-U7.
+§ArtifactLayout + §Admission + §Ux + §Errors + §FrozenVsReserved + §Unsupported
++ §Versioning. The version authority and change procedure freeze at NGAB0-U7
+(§Versioning); the three operator decision gates are recorded in §Admission
+and remain open until NGAB0-U12 phase closeout.
 **Authority order**: live source/tests and live `faber targets` → accepted
 artifact schemas + hardware receipts → this packet's frozen contracts →
 campaign prose.
@@ -625,3 +627,163 @@ Error facts (frozen):
   joint cross-repo receipt schema (NGAB0-U10) so a later auditor reproduces
   and re-verifies the failure rather than trusting this packet's claim
   (§Verification receipt alignment).
+
+## FrozenVsReserved
+
+The frozen-now vs reserved-seam split, closed at NGAB0-U7. Every surface of
+the composite contract is either **frozen-now** (NGAB1–NGAB3 build against it
+identically) or a **named reserved seam** (deliberately left open with a
+recorded owner and opening condition). The split mirrors the paired Gradus
+packet's frozen-now vs reserved-seam field split
+(`gradus/docs/factory/production-ml-library/pml0-interface-packet.md` §7).
+
+Frozen-now (change route: §Versioning change procedure):
+
+- §PackageGraph + §OwnershipMatrix — one source package → one native
+  executable; owner-per-surface single authority; hot-path serialization list.
+- §Partition + §Abi — one host function calls one device kernel through the
+  versioned typed boundary; facts never reconstructed from emitted text;
+  invalid cross-boundary values fail at compile time.
+- §Manifest + §ResourceIdentity + §Verification — content-addressed manifest
+  (SHA-256 default), session-bound resource identity, verification before
+  backend selection, tamper → pre-launch failure, model-to-kernel binding.
+- §BackendVariants + §ArtifactLayout + §Admission — variant rows
+  (`msl-source`/`metallib`/`ptx`), one-executable layout, fail-closed
+  admission, no CPU fallback.
+- §Ux + §Errors — `faber build/run` product surface; typed fail-closed error
+  taxonomy; cpo/cxo design rules (NGAB5 adapter over Gradus
+  generation-config; backend/device selection is operator override, not
+  default UX).
+- §Unsupported — the explicit non-goal list is frozen and **non-revisable**
+  under the §Versioning rejection policy.
+
+Reserved seams (named surfaces, not holes in the contract):
+
+| Seam | Owner | Opening condition | Note |
+| --- | --- | --- | --- |
+| `metallib` variant row | faber (assembly) | Operator decision on Metal embedding — open question 2, §Admission gates | Default: MSL source first; metallib reserved until the gate closes |
+| PTX arch set (NGAB6 minimum) | radix (emission) | Operator confirmation at NGAB0-U12 — open question 3, §Admission gates | `ptx_target` working target until confirmed; `ptx` row admitted only for it |
+| Compile-time enforcement of cross-boundary validity | NGAB1 | NGAB1 | Contract frozen here (§Partition/§Abi); enforcement is NGAB1's fixture negative proof |
+| Composite build/link implementation | faber (assembly) | NGAB2 | Contract shape frozen here (§PackageGraph/§ArtifactLayout); implementation is NGAB2 |
+| Host session implementation (dispatch/observe/teardown) | hosts (effects/sessions) | NGAB3 | `ProgramSession` contract frozen here (§Verification/§Abi); implementation is NGAB3 |
+| Tuning surface | faber (product workflow) | NGAB5 | Adapter over Gradus generation-config; never a second authority (§Ux design rules) |
+| Serving / HTTP / inference-product repo | inference product repo (later, separate) | When that repo is drafted | §OwnershipMatrix "Inference product repo" row; no HTTP policy in this packet |
+
+Seam facts (frozen):
+
+- A reserved seam is **a permission to change through the normal revision
+  procedure within PML1/NGAB1, not a promise to fill** (PML0 §7 rule of
+  thumb): if a later stage does not need it, it stays closed.
+- No seam opens before its recorded condition: a seam whose condition is an
+  operator gate closes only when that gate closes (§Admission); a seam whose
+  condition is a stage opens at that stage. A surface that is neither
+  frozen-now nor a named seam is unsupported behavior (§Unsupported) and
+  fails closed.
+- The operator decision gates (§Admission) are the **only** decision gates in
+  this packet; reserved seams add no new gates.
+
+## Unsupported
+
+Explicit unsupported behavior, closed at NGAB0-U7. **Unsupported** means a
+closed path: requesting it fails closed with a typed diagnostic
+(§Admission/§Errors) or is out of scope entirely. The list is this packet's
+non-goal / exclusion clause, mirroring the paired Gradus packet's exclusion
+clause (`pml0-interface-packet.md` §8), and is **non-revisable** under the
+§Versioning rejection policy.
+
+Unsupported behavior list (frozen):
+
+- **No weights embedded**: the composite native executable embeds device
+  artifacts and the manifest, never model weights. Model identity is bound at
+  the session via `ModelInstance` (model id + SHA-256 + byte length, §Abi
+  session facts) and verified against the manifest (§Verification
+  model-to-kernel binding); weights are loaded by the host at session
+  creation, never shipped inside the executable.
+- **No server/HTTP**: no serving, HTTP, request scheduling, batching,
+  deployment, or network surface anywhere in this packet. Serving/HTTP
+  belongs to the separate inference-product repo (§OwnershipMatrix row),
+  never to faber, radix, hosts, or this executable.
+- **No distributed placement**: multi-device work consumes this single-device
+  executable contract but does not block it (campaign Dependency Rule 7);
+  distributed placement, cross-device scheduling, and multi-node execution
+  are not part of NGAB0–NGAB5 and are not named seams (§FrozenVsReserved).
+- **No external spend**: building and running a composite application incurs
+  no external monetary spend — no paid cloud/API services, no third-party
+  billing, no network-required payments. Everything admits and executes
+  locally on the user's admitted hardware (§Admission).
+- **No CPU/subprocess-compiler/llama.cpp fallback**: Rust, CPU, a subprocess
+  compiler, `llama.cpp`, or a separately installed kernel are all closed
+  paths (§Admission enumerated closed paths, §Errors no-fallback rule). A
+  failing variant never degrades to another backend or to CPU.
+
+Unsupported facts (frozen):
+
+- The list is exhaustive for NGAB0: any surface not frozen-now and not named
+  as a reserved seam (§FrozenVsReserved) is unsupported by default.
+- Unsupported requests fail closed with a typed pre-launch diagnostic
+  (§Admission/§Errors); unsupported behavior never silently degrades, never
+  opens a seam, and never waits for a decision gate.
+- The list is **non-revisable**: no packet revision may open a non-goal
+  (mirroring PML0 §6.4 R5). Opening one is a new packet, not a revision.
+
+## Versioning
+
+Named version authority + change procedure for this packet, closed at
+NGAB0-U7 (council C4). This packet is **revisable through PML1/NGAB1** — it
+precedes compiled proof; revision happens at the PML1/NGAB1 boundary under
+the authority below, never silently and never by a single owner.
+
+### Version authority (named owner)
+
+- **Version owner**: the joint interface-packet authority — the PML campaign
+  Mind and the NGAB campaign Mind acting together; the **operator** is the
+  binding decision owner for disputed bumps (delivery §Open Questions
+  decision owner: binding decisions route through a Vivi need to
+  `reviewer`/`operator@`; recorded defaults proceed until overridden).
+- The paired Gradus packet freezes its own authority and change procedure in
+  `pml0-interface-packet.md` §6 ("Version-bump authority, rejection, and
+  migration policy"); both campaigns must accept a bump that touches a shared
+  surface — one side cannot unilaterally change a surface both packets
+  reference. This packet's authority coordinates with that freeze.
+
+### Change procedure
+
+- **Revisable through PML1/NGAB1**: revision is the intended path at the
+  PML1/NGAB1 boundary, not an emergency mechanism. Reserved seams change
+  through this normal procedure (§FrozenVsReserved).
+- **Revision, not silent edit**: the packet is revised by revision, never
+  edited in place; no implementation may drift from it silently (NGAB1
+  delivery C4 disposition: ABI/schema drift vs the packet is recorded as a
+  need, not silent).
+- **Bump semantics** (mirroring PML0 §6.2 and the manifest schema ratchet):
+  - **Patch**: clarification or example only; no vocabulary or rule change.
+  - **Minor**: vocabulary expansion or added reserved-seam detail; existing
+    facts remain valid under the previous revision.
+  - **Major**: field removal/renaming, meaning change, or a fail-closed rule
+    change — every consumer re-validates under the new revision and the
+    admitted manifest version is re-pinned (§Manifest schema version).
+- **Frozen-now fields**: any change to a frozen-now fact requires a **major
+  bump** and full re-validation across both campaigns, with a recorded reason
+  (S6-N1 naming-freeze precedent: "a spelling change after this freeze needs
+  a recorded reason").
+- **Manifest relationship**: the composite link manifest records the packet
+  revision the artifact was built against; a mismatch between the artifact's
+  recorded packet revision and the runtime's admitted revision fails closed
+  at admission (§Admission; PML0 §5.3 mirror). The manifest never silently
+  upgrades — a manifest carrying a rejected packet revision is rejected at
+  admission, not coerced.
+- **Decision gates**: the three operator questions (§Admission operator
+  decision gates) close at NGAB0-U12; their answers fold into the packet or
+  are deferred with recorded defaults. No revision replaces a recorded
+  default without the change procedure.
+
+### Rejection policy
+
+- A proposed revision is rejected when it changes a frozen-now fact without a
+  recorded reason, opens the §Unsupported exclusion, or is rejected by either
+  campaign Mind or the operator.
+- A rejected revision leaves the current packet revision in force; consumers
+  keep building against it.
+- Rejected proposals and the recorded reason/default are documented in the
+  joint cross-repo receipt schema (NGAB0-U10) as evidence, so the next
+  revision attempt re-verifies rather than re-litigating from scratch.
