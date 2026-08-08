@@ -1,11 +1,11 @@
 # NGAB0 Composite Contract — Package graph and ownership matrix
 
-**Unit**: NGAB0-U2 (package graph + ownership matrix) — see
-`ngab0-delivery.md` NGAB0-U2.
-**Status**: frozen (U2) — §PackageGraph + §OwnershipMatrix. Further sections
-(§Partition/§Abi, §Manifest/§ResourceIdentity/§Verification,
+**Unit**: NGAB0-U2–U3 (package graph + ownership matrix; host/device partition
++ entry/call ABI) — see `ngab0-delivery.md` NGAB0-U2 and NGAB0-U3.
+**Status**: frozen (U2–U3) — §PackageGraph + §OwnershipMatrix + §Partition +
+§Abi. Further sections (§Manifest/§ResourceIdentity/§Verification,
 §BackendVariants/§ArtifactLayout/§Admission, §Ux/§Errors,
-§FrozenVsReserved/§Unsupported/§Versioning) are added by NGAB0-U3–U7; the
+§FrozenVsReserved/§Unsupported/§Versioning) are added by NGAB0-U4–U7; the
 version authority and change procedure freeze at NGAB0-U7.
 **Authority order**: live source/tests and live `faber targets` → accepted
 artifact schemas + hardware receipts → this packet's frozen contracts →
@@ -101,3 +101,101 @@ The serialization homes named above are the live baselines from
 and NGAB1–NGAB3 implement against it. Ownership of every surface is single
 and non-transferable by later stages without the packet change procedure
 (§Versioning, NGAB0-U7).
+
+## Partition
+
+The host/device partition, frozen at NGAB0-U3. Shape: **one host function
+calls one device kernel through a versioned typed boundary**. The partition is
+the static split that survives lowering, assembly, and launch — the same split
+as the §PackageGraph nodes and §OwnershipMatrix rows, owned from their
+separate surfaces.
+
+```text
+Host side — one native executable
+  ordinary Faber host functions (MIR -> LLVM host modules)
+  composite session surface: dispatch / observe / teardown over ProgramSession
+        |
+        |  versioned typed boundary  (one call, one device kernel)
+        v
+Device side
+  one device kernel per call; typed, target-neutral DeviceProgram
+  backend serializations: MSL/metallib and NVVM/PTX (admitted variants, U5)
+```
+
+Partition facts (frozen):
+
+- The host side is the one native executable of §PackageGraph; it owns the
+  composite session surface and capability admission. Per §OwnershipMatrix,
+  effects/sessions belong to hosts, assembly/UX to faber, emission facts to
+  radix — the partition binds the same ownership, never a second authority.
+- The device side is one typed device kernel per call, emitted from the
+  target-neutral device program; backend variants are serialization choices of
+  one program, never separate programs (§PackageGraph invariant).
+- The boundary admits exactly one call shape: **one host function invokes one
+  device kernel**. No host function reaches a kernel except through a declared
+  cross-boundary call; anything else fails closed in NGAB1.
+- Identity, type, and lifetime facts survive lowering; they are **never
+  reconstructed from emitted text** — neither LLVM/MSL/PTX text nor naming
+  conventions (NGAB1 rule; frozen here, no seam in NGAB0).
+- Invalid cross-boundary values fail at compile time — before composite
+  build/link and before launch. Enforcement is NGAB1's; the compile-time
+  failure is the contract this packet freezes.
+- The partition is stable across the hot-path serialization list
+  (§OwnershipMatrix): DeviceProgram, wire versions, materializer, host
+  construction, and package admission cross the same boundary, never a
+  parallel unversioned channel.
+
+## Abi
+
+The versioned typed entry/call boundary, frozen at NGAB0-U3. The call/entry
+surface matches the GI4 session facts referenced by U8
+(`radix/docs/factory/gpu-inference-gguf/gi4-contract.md` — U8 keeps those
+session facts as compiler evidence); nothing on this boundary contradicts an
+accepted GI4 fact.
+
+Boundary rules (frozen):
+
+- **Versioned**: the boundary is a versioned surface with its own ratchet
+  (MD2-W1 sibling-field precedent); it rides the accepted wire version and
+  requires no `WIRE_DEVICE_PROGRAM_VERSION` bump. Wire revisions of the
+  session surface are GI4-2's, not this packet's.
+- **Typed**: every value crossing the boundary carries its type fact. Types
+  are carried in the serialized form (§OwnershipMatrix hot-path list); they
+  are never re-derived from emitted LLVM/MSL/PTX text or naming conventions —
+  identity/type/lifetime facts are **never reconstructed from emitted text**
+  (NGAB1 rule, frozen here).
+- **One call**: one host function → one device kernel. Call and entry are the
+  same typed operation seen from either side.
+
+Entry surface (host → device):
+
+| Surface | Fact | GI4 contract source |
+| --- | --- | --- |
+| Call | One invocation per call; declared inputs and declared output | `gi4-contract.md` §2.4 (`Invocation`) |
+| Invocation inputs | token id + absolute position (per-invocation only; resident inputs never ride an invocation) | §2.4 |
+| Invocation output | full-vocab logits `[49152]` (tied-head projection) or the selected token | §2.4 |
+| Workload mode | exactly one `InvocationMode`: `Prefill` or `ScalarDecode`; regime labels reported separately | §4 |
+| Reuse | `ReuseKey` = `(session, sequence, epoch)`; resident resources reusable iff all three match | §6 |
+
+Session facts that stay resident (never per-call):
+
+| Fact | Carriage | GI4 contract source |
+| --- | --- | --- |
+| `ModelInstance` | model id + SHA-256 + byte length; load-once at session creation | §2.1 |
+| `ExecutionSession` | binds one `ModelInstance`, typed `KvCacheLayout`, current `SequenceState`, minting `ReuseKey`; resident weights + KV uploaded once, never re-copied | §2.2 |
+| `SequenceState` | position, token history, KV generations; advances only through a committed `TokenCommit` | §2.3 |
+| `KvCacheLayout` | `slots`, `context_length`, `layer_count`, `kv_head_count`, `head_dim`, `dtype`, `reserve_policy`; byte accounting consumed, not re-derived | §3 |
+| Token mutation | `TokenCommit` advances token id, position, KV generations, visible output together; no retry without deterministic replay from the last committed generation | §5 |
+
+Cross-boundary validity (frozen):
+
+- Invalid cross-boundary values — wrong type, wrong shape, out-of-order
+  position, KV-generation gap, unknown workload mode, mismatched `ReuseKey` —
+  fail at compile time for static facts and at admission/commit time for
+  session facts; neither class silently reaches launch. Enforcement is NGAB1's;
+  the contract is NGAB0.
+- This packet adds no host-session surface (`faber-runtime/src/device.rs`,
+  hosts) — the GI4-4 bounded session writer owns that; the boundary here
+  carries the versioned facts the session writer consumes.
+- Boundary typing binds to the composite session (§Manifest/§ResourceIdentity
+  freeze at U4); no value crosses the boundary without a carried identity.
