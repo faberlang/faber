@@ -152,7 +152,7 @@ fn keyword_registry_specs_lex_to_current_tokens() {
             // contextual scope is the lookup path; they have no token
             // identity and therefore must not acquire a Latin-key entry.
             assert!(
-                result.reader_keyword_latin_keys.get(spec.text).is_none(),
+                !result.reader_keyword_latin_keys.contains_key(spec.text),
                 "tokenless identifier '{}' must not record a token latin key",
                 spec.text
             );
