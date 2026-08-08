@@ -220,10 +220,10 @@ jobs:
           component-prefixed tags.
           EOF
           if gh release view "$release_tag" --repo "$RELEASE_REPO" >/dev/null 2>&1; then
-            gh release upload "$release_tag" dist/* --repo "$RELEASE_REPO" --clobber
-          else
-            gh release create "$release_tag" dist/* \
-              --repo "$RELEASE_REPO" \
-              --title "Faber ${version}" \
-              --notes-file "$notes"
+            echo "Stable release $release_tag already exists; refusing to overwrite assets" >&2
+            exit 1
           fi
+          gh release create "$release_tag" dist/* \
+            --repo "$RELEASE_REPO" \
+            --title "Faber ${version}" \
+            --notes-file "$notes"
