@@ -83,7 +83,7 @@ use radix_mir::device_program_plans::{
 };
 use radix_mir::device_semantics::{DependencyEdge, DeviceSemantics};
 use radix_mir_fmir::schema::WireBufferRole;
-use radix_types::{IndexExpr, NumericWidth};
+use radix_types::{DefId, IndexExpr, NumericWidth};
 use std::collections::BTreeMap as StdBTreeMap;
 use std::path::Path;
 use std::time::Instant;
@@ -114,6 +114,17 @@ const ATTENTION_SCALE: f64 = 0.125;
 const QUERY_HEADS_PER_KV: u64 = HEAD_COUNT / KV_HEAD_COUNT;
 /// The layer count.
 const LAYER_COUNT: u64 = 32;
+/// Typed source-identity base for the hand-assembled prefill kernels
+/// (the NVVM emitter resolves kernel roles by `MirFunction.source` —
+/// `radix-mir-llvm` `nvvm/artifact.rs` requires a source def id on every
+/// device-program kernel — so the prefill program builder gives each
+/// synthesized function a typed synthetic `DefId` from this documented
+/// provenance range instead of `source: None`). The range is reserved for
+/// hand-assembled prefill kernels: real user def-ids start at
+/// `USER_DEF_ID_BASE` (`0x1000`) and grow upward, and faber's library
+/// synthetic range uses the `0x8000_0000` high bit, so `0x6000_0000`
+/// marks this provenance unambiguously without colliding with either.
+const PREFILL_KERNEL_DEF_ID_BASE: u32 = 0x6000_0000;
 
 // ---------------------------------------------------------------------------
 // Weight loading + the declared f32 repack (GI3-2)
@@ -1132,8 +1143,15 @@ fn build_prefill_program() -> Result<PrefillProgramArtifact, Vec<Diagnostic>> {
                       next: &mut u32,
                       build: fn(&mut TypeTable, u32) -> MirFunction|
      -> MirFunctionId {
-        let function = build(types, *next);
+        let mut function = build(types, *next);
         *next += 1;
+        // The NVVM emitter resolves kernel roles by `MirFunction.source`
+        // (`nvvm/artifact.rs` fails closed on a kernel without a source def
+        // id), so every synthesized prefill kernel carries a typed synthetic
+        // def-id from the documented provenance range (`PREFILL_KERNEL_DEF_ID_BASE`)
+        // — never `source: None`. The id mirrors the function id (unique per
+        // function), so the identity is deterministic and collision-free.
+        function.source = Some(DefId(PREFILL_KERNEL_DEF_ID_BASE + function.id.0));
         let id = function.id;
         functions.push(function);
         id
