@@ -1201,6 +1201,46 @@ pub(crate) fn device_program_for_lowered(
     // assigned in declaration order; the launch SEQUENCE is re-ordered
     // afterwards to follow the carried dependency graph (F3) — declaration
     // order is never an execution authority.
+    //
+    // Council-8 CB-3 (the wire-8 bert-tiny regression): the
+    // reduced-resource projection is a fact of the BUFFER VERSION, defined
+    // by its producing SumAxis slot. The per-function signature seam stamps
+    // it only on the producer's own function (the subchain whose body
+    // contains the SumAxis); a CROSS-FUNCTION consumer — e.g. a train_step
+    // reading a companion's reduced gradient buffer through the
+    // gradient-alias join — derives `None` from its own body. If its slot
+    // then carried `None` while the producer's slot carried `Some`, the
+    // same (buffer, version) would have two different shapes and the
+    // version-shape check would fail closed. Reconcile to ONE fact per
+    // (buffer, version): every slot referencing the version carries the
+    // producer's projection. Two distinct `Some` facts for one version is a
+    // genuine conflict and fails closed here (never silently resolved).
+    let mut buffer_projection: BTreeMap<
+        BufferId,
+        Option<radix_mir::abi::ReducedProjection>,
+    > = BTreeMap::new();
+    for build in &builds {
+        for slot in &build.resources {
+            let Some(projection) = slot.reduced_projection else {
+                continue;
+            };
+            match buffer_projection.get(&slot.buffer_id) {
+                Some(prior) if *prior != Some(projection) => {
+                    return Err(vec![device_diag(
+                        "reduced projection",
+                        format!(
+                            "buffer {} version 1 is referenced by slots carrying conflicting reduced-resource projections ({prior:?} vs {projection:?}); one producer-defined fact per buffer version (council-8 CB-3)",
+                            slot.buffer_id.0
+                        ),
+                    )]);
+                }
+                Some(_) => {}
+                None => {
+                    buffer_projection.insert(slot.buffer_id, Some(projection));
+                }
+            }
+        }
+    }
     let lifetime = if training.is_some() {
         DeviceProgramLifetime::RepeatingStep
     } else {
@@ -1238,8 +1278,15 @@ pub(crate) fn device_program_for_lowered(
                     element_count: slot.element_count,
                     // The carried reduced-resource projection (council-8
                     // CB-3) flows onto the buffer version so the wire
-                    // carries the producer's mapping fact.
-                    reduced_projection: slot.reduced_projection,
+                    // carries the producer's mapping fact — reconciled to
+                    // ONE fact per (buffer, version): a cross-function
+                    // consumer slot that could not derive the projection
+                    // from its own body adopts the producer's fact instead
+                    // of carrying `None`.
+                    reduced_projection: buffer_projection
+                        .get(&slot.buffer_id)
+                        .copied()
+                        .flatten(),
                 },
                 binding: Binding {
                     group: slot.group,
@@ -1290,6 +1337,7 @@ pub(crate) fn device_program_for_lowered(
     program.results = declared_result_rows(
         &program,
         &buffers,
+        &buffer_projection,
         training.is_some(),
         per_step_observation,
         &train_step_gradients,
@@ -1439,6 +1487,7 @@ fn producing_launch(program: &DeviceProgram, buffer: BufferId) -> Option<LaunchI
 fn declared_result_rows(
     program: &DeviceProgram,
     buffers: &[ProgramBuffer],
+    buffer_projection: &BTreeMap<BufferId, Option<radix_mir::abi::ReducedProjection>>,
     training_program: bool,
     per_step_observation: Option<BufferId>,
     train_step_gradients: &BTreeSet<BufferId>,
@@ -1482,7 +1531,10 @@ fn declared_result_rows(
                 version: 1,
                 element_ty: buffer.element_ty,
                 element_count: buffer.element_count,
-                reduced_projection: None,
+                reduced_projection: buffer_projection
+                    .get(&buffer.id)
+                    .copied()
+                    .flatten(),
             },
             role: buffer.role,
             produced_by,
