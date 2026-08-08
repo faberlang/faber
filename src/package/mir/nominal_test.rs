@@ -327,10 +327,14 @@ fn canonical_nominal_identity_key_shape_is_module_qualified() {
 
 // Fail-closed fixture (council-11 correct_before_next_phase): the library
 // exports an enum whose variant payload references a nominal from a module the
-// consumer never imports. The consumer analysis SKIPS the enum export (the
-// nested nominal's identity is unknown there), so the merge must NOT silently
-// keep the library's source-local enum/variant identity — it must fail closed
-// with an unknown-identity diagnostic.
+// consumer never imports. The consumer analysis registers the enum shell
+// canonically (Color is identity-bearing, home module util, which the entry
+// imports) but the unresolvable variant drops the export — the entry's Color
+// carries only the resolvable variants (rubrum). The merge must therefore NOT
+// silently keep the library's source-local variant identity: build_variant_remap
+// fails closed on the unresolved variant (`caeruleum`) with an unknown-identity
+// diagnostic. (The nominal-level check in build_nominal_remap does not fire here
+// because Color IS present in the entry's canonical imported-nominal table.)
 const NOMINAL_VARIANT_OTHER: &str = "genus Weird {\n    numerus gradus\n}\n";
 const NOMINAL_VARIANT_UTIL: &str = "importa ex \"./other\" privata * ut otherModule\n\ngenus Gradus {\n    numerus gradus\n}\n\ndiscretio Color {\n    rubrum,\n    caeruleum { otherModule.Weird gradus }\n}\n\nfunctio primus() → Color {\n    redde Color.rubrum\n}\n";
 const NOMINAL_VARIANT_MAIN: &str = "importa ex \"./util\" privata * ut utilModule\n\nincipit {\n    nota 1\n}\n";
@@ -353,7 +357,7 @@ fn identity_bearing_enum_variant_canonical_miss_fails_closed() {
     assert!(
         messages
             .iter()
-            .any(|message| message.contains("identity-bearing nominal `Color`")),
+            .any(|message| message.contains("identity-bearing enum `Color` variant `caeruleum`")),
         "expected an unknown-identity fail-closed diagnostic, got: {messages:?}"
     );
 }
