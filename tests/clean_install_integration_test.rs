@@ -13,11 +13,31 @@ fn temp_dir(label: &str) -> TempDir {
     TempDir::new("faber-clean-install", label)
 }
 
+fn copy_tree(source: &Path, destination: &Path) {
+    fs::create_dir_all(destination).expect("create installed payload directory");
+    for entry in fs::read_dir(source).expect("read installed payload source") {
+        let entry = entry.expect("read installed payload entry");
+        let target = destination.join(entry.file_name());
+        if entry.file_type().expect("read installed payload type").is_dir() {
+            copy_tree(&entry.path(), &target);
+        } else {
+            fs::copy(entry.path(), target).expect("copy installed payload file");
+        }
+    }
+}
+
 fn installed_faber(root: &Path) -> PathBuf {
-    let install = root.join("install").join("bin");
-    fs::create_dir_all(&install).expect("create install bin");
-    let executable = install.join("faber");
+    let prefix = root.join("install");
+    let bin = prefix.join("bin");
+    fs::create_dir_all(&bin).expect("create install bin");
+    let executable = bin.join("faber");
     fs::copy(env!("CARGO_BIN_EXE_faber"), &executable).expect("copy installed Faber executable");
+
+    let locale_source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../radix/stdlib/locale");
+    for locale in ["en", "la"] {
+        let destination = prefix.join("share/faber/locale").join(locale);
+        copy_tree(&locale_source.join(locale), &destination);
+    }
     executable
 }
 
