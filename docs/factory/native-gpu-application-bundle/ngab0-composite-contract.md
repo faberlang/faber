@@ -501,3 +501,127 @@ any of these dangle.
    operator-confirmed at NGAB0-U12; until then the `ptx_target` carried by the
    FMIR device section (`device/section.rs`) is the working target and the
    `ptx` row is admitted only for it. **Operator decision gate**: NGAB0-U12.
+
+## Ux
+
+Build/run UX for the composite path, frozen at NGAB0-U6. The composite
+application is a **product surface of `faber build` and `faber run`**, not a
+separate kernel-toolchain workflow: the user builds one package and runs one
+native executable, and the embedded-artifact assembly, verification, backend
+selection, and session lifecycle are product steps the executable performs
+itself (§PackageGraph, §ArtifactLayout, §Verification, §Admission).
+
+```text
+faber build <package>            composite build: one native executable
+                                   + embedded content-addressed artifacts
+                                   + embedded manifest + inspectable build dir
+faber run <package>              identity verification -> capability admission
+                                   -> backend selection -> persistent session
+                                   -> dispatch / observe / teardown
+```
+
+UX facts (frozen):
+
+- **Build surface**: `faber build` produces the composite artifact of
+  §ArtifactLayout — one native executable with embedded device artifacts and
+  manifest, plus the inspectable `target/faber-llvm/{debug|release}/` build
+  directory (link manifest, runtime identity, device-artifact copies). No
+  user step compiles, locates, or launches a kernel artifact; the build plan
+  joins the LLVM host link with the emitted device rows (§PackageGraph).
+- **Run surface**: `faber run` on a composite package executes the product
+  path of §Verification → §Admission → backend selection → session, mirroring
+  the live `device/run.rs` `ProgramSession` lifecycle (`DeviceBackend`,
+  dispatch reports, step-run reports, teardown). Ordinary Faber host code
+  owns CLI, files, and control flow; device effects stay with hosts
+  (§OwnershipMatrix).
+- **`--backend` is capability admission, not default UX**: the default run
+  path admits the backend the machine provides — one admitted variant row
+  (§BackendVariants), fail-closed (§Admission) — and opens the required
+  Metal or CUDA host internally. `--backend` names a specific variant and
+  remains admission-gated: a backend the manifest does not carry fails closed
+  as a missing declared artifact (§Admission); it never silently switches
+  backends.
+- **No default-UX device choice**: the normal user never chooses a device or
+  backend; capability decides (design rule 2 below).
+- **Build/run separation of duties**: faber owns the build plan, assembly,
+  and product commands; hosts owns session effects; radix owns emission
+  facts; the run path consumes only manifest-carried identity (§Manifest) and
+  never reconstructs facts from the inspectable build directory
+  (§ArtifactLayout).
+- **Receipt alignment**: build and run record exact commands, content
+  digests, and dirty-state declarations into the joint cross-repo receipt
+  schema (NGAB0-U10), so a later auditor re-verifies rather than trusting
+  this packet's claim (§Verification).
+
+### Design rules (cpo/cxo, recorded verbatim)
+
+Frozen as product design rules for NGAB5 and later stages. These are unit
+outputs of NGAB0-U6 — contract, not code.
+
+> **NGAB5 tuning surface is an adapter over the Gradus generation-config
+> contract, never a second authority** — the composite product's bounded
+> tuning parameters (model path, prompt, context length, prompt batch size,
+> maximum generated tokens, seed, temperature, top-k, top-p, min-p,
+> repetition penalty; campaign NGAB5 gate) map onto the Gradus
+> generation-config contract (`gradus/docs/factory/production-ml-library/`).
+> Faber's CLI/config surface adapts that one contract; it defines no second
+> tuning schema, no second authority, and no independent parameter semantics.
+> Gradus owns the semantics; the adapter follows.
+
+> **backend/device selection is an operator/diagnostic override, not default
+> UX** — the default product experience selects the admitted backend
+> automatically and opens the required host internally. Explicit backend or
+> device selection exists for operators and diagnostics (isolating a failure,
+> forcing a variant for receipts, §Admission operator gates); it is never
+> advertised as, nor promoted to, default user UX.
+
+## Errors
+
+Error taxonomy, frozen at NGAB0-U6. Every composite-path failure belongs to
+exactly one failure class, fixed by **where it fires** — before launch, in
+session, or at teardown — never by severity. Each class fails **typed,
+reported, and closed**; no class degrades to a CPU or alternate-backend run
+(campaign Development Posture; §Admission no-CPU-fallback rule).
+
+| Class | Fires | Trigger examples | Live precedent |
+| --- | --- | --- | --- |
+| Identity | pre-launch | digest mismatch, wire-version mismatch, manifest-schema mismatch, model-to-kernel binding mismatch, missing/unexpected manifest row | §Verification (tamper/mismatch → pre-launch failure) |
+| Admission | pre-launch | unsupported host arch/os, unsupported hardware, driver/version mismatch, dtype/quant/capability outside the admitted row, missing declared artifact | `E_LLVMHOST_UNSUPPORTED_HOST` (`llvm_host.rs`); §Admission fail-closed gates |
+| Capability | pre-launch, before session | driver discovery failure, module loading failure, device absent, runtime capability probe fails | fail-closed wire admission (`device/run.rs`, S3-A4); `Diagnostic::error` |
+| Session | mid-session | dispatch failure, transfer/resource failure, synchronization/observation failure, generation mismatch, invalid session-bound cross-boundary value, device fault/reset | `device/run.rs` `ProgramSession` dispatch/step-run reports; §Abi session-commit-time validity |
+| Teardown | teardown | resource release failure, incomplete teardown, cancellation path | §ResourceIdentity lifetimes; §Abi session facts |
+
+Error facts (frozen):
+
+- **Class is fixed by timing, not severity**: identity, admission, and
+  capability classes fire before launch and are pre-launch failures
+  (§Verification, §Admission); session failures fire mid-session and bind to
+  the session and generation they occurred at; teardown failures fire during
+  resource release. A failure never re-classifies by consequence.
+- **Typed and reported**: every failure is a typed diagnostic carrying its
+  class and code plus the carried identity facts (§Manifest) and, for
+  session/teardown classes, its session identity and generation
+  (§ResourceIdentity observations — evidence, never identity inputs).
+- **Fail-closed, no fallback**: identity/admission/capability failures close
+  the run before any backend selection, module load, or session; session
+  failures close the session and proceed to teardown; teardown failures are
+  reported with best-effort full release. No class falls back to Rust, CPU,
+  a subprocess compiler, `llama.cpp`, or a separately installed kernel
+  (§Admission enumerated closed paths).
+- **Boundary violations are classified by where they surface**: static
+  cross-boundary violations are compile-time (NGAB1 enforcement, §Abi);
+  session-bound violations (generation gap, out-of-order position, mismatched
+  `ReuseKey`) surface at admission/commit time as session-class failures —
+  neither class reaches launch silently (§Abi cross-boundary validity).
+- **Teardown is unconditional**: every session must release every resource it
+  owns on success, error, and cancellation (§ResourceIdentity lifetimes —
+  no resource outlives its session). Teardown failure never leaks silently;
+  the release is completed best-effort and the failure reported.
+- **Observations are evidence**: error reports are observations bound to
+  (session, generation) and cannot be attributed to another session or
+  generation (§ResourceIdentity); they are evidence for receipts, not inputs
+  to identity.
+- **Receipt alignment**: failures record exact commands and digests in the
+  joint cross-repo receipt schema (NGAB0-U10) so a later auditor reproduces
+  and re-verifies the failure rather than trusting this packet's claim
+  (§Verification receipt alignment).
