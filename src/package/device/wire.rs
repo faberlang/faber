@@ -162,6 +162,92 @@ pub(crate) fn admit_device_program_section(
             ))]);
         }
     }
+    // council-8 CB-3 (A7): every carried reduced-resource projection is
+    // admitted fail-closed at the faber boundary too — the same three rules
+    // the radix decode boundary runs. A producer bug stamping a zero
+    // `axis_extent`/`inner_stride`, a plan projection that disagrees with
+    // the reduced buffer version's carried projection, or a reduced buffer
+    // whose element count is not divisible by its inner stride is rejected
+    // before host construction (a keep-dims consumer trusting the carried
+    // fact would otherwise hit a division-by-zero or silent mis-addressing).
+    for resource in section
+        .program
+        .kernels
+        .iter()
+        .flat_map(|kernel| kernel.resources.iter())
+    {
+        let Some(projection) = resource.version.reduced_projection else {
+            continue;
+        };
+        admit_carried_reduced_projection(
+            &format!("buffer '{}'", resource.buffer.name),
+            resource.version.element_count,
+            projection,
+        )?;
+    }
+    for result in &section.program.results {
+        let Some(projection) = result.version.reduced_projection else {
+            continue;
+        };
+        admit_carried_reduced_projection(
+            &format!("result buffer '{}'", result.buffer.name),
+            result.version.element_count,
+            projection,
+        )?;
+    }
+    for kernel in &section.program.kernels {
+        let WireCollectionKernelPlan::AxisReduction(plan) = &kernel.plan else {
+            continue;
+        };
+        let projection = plan.projection;
+        if projection.axis_extent < 1 || projection.inner_stride < 1 {
+            return Err(vec![Diagnostic::error(format!(
+                "kernel '{}' carries an axis-reduction plan with a non-positive reduced-resource projection ({projection:?}); the mapping is carried positive (council-8 CB-3)",
+                kernel.entry
+            ))]);
+        }
+        for resource in &kernel.resources {
+            if !matches!(
+                resource.access,
+                WireResourceAccess::Write | WireResourceAccess::ReadWrite
+            ) {
+                continue;
+            }
+            if let Some(carried) = resource.version.reduced_projection {
+                if carried != projection {
+                    return Err(vec![Diagnostic::error(format!(
+                        "kernel '{}' carries an axis-reduction plan projection {projection:?} that disagrees with the reduced output buffer's carried projection {carried:?}; the same fact must agree everywhere it is stamped (council-8 CB-3)",
+                        kernel.entry
+                    ))]);
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// council-8 CB-3: one carried reduced-resource projection must be positive
+/// and its reduced buffer's element count exactly divisible by its inner
+/// stride — checked BEFORE any arithmetic on the stride, so a zero stride is
+/// rejected rather than panicking the divisibility modulus. The plan ↔
+/// buffer-version agreement runs separately over the `AxisReduction`
+/// kernels.
+fn admit_carried_reduced_projection(
+    carrier: &str,
+    element_count: u64,
+    projection: WireReducedProjection,
+) -> Result<(), Vec<Diagnostic>> {
+    if projection.axis_extent < 1 || projection.inner_stride < 1 {
+        return Err(vec![Diagnostic::error(format!(
+            "{carrier} carries a reduced-resource projection with a non-positive axis extent or inner stride ({projection:?}); the mapping is carried positive (council-8 CB-3)"
+        ))]);
+    }
+    if element_count % projection.inner_stride != 0 {
+        return Err(vec![Diagnostic::error(format!(
+            "{carrier} element count {element_count} is not divisible by its carried projection's inner stride {} ({projection:?}); the keep-dims mapping cannot address the buffer (council-8 CB-3)",
+            projection.inner_stride
+        ))]);
+    }
     Ok(())
 }
 

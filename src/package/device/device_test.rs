@@ -18,7 +18,8 @@ use radix_mir_fmir::schema::{
     FmirSessionSection, WireAxisReductionPlan, WireBroadcastDeclaration, WireBroadcastFact,
     WireInputUpdateCadence, WireInvocationMode, WireKvCacheDtype, WireKvCacheLayout,
     WireKvReservePolicy, WireLayerNormalizationPlan, WireReducedProjection, WireRowSoftmaxPlan,
-    WireSessionInput, WireSessionObservationCadence, WIRE_SESSION_SECTION_VERSION,
+    WireSessionInput, WireSessionObservationCadence, WIRE_DEVICE_PROGRAM_VERSION,
+    WIRE_SESSION_SECTION_VERSION,
 };
 // The S6-C2 producer variant is not on the device-root re-export list (the
 // ordinary producer is the seam); the test reaches it through the wire
@@ -3048,6 +3049,139 @@ fn admit_device_program_section_rejects_mismatched_broadcast_fact() {
             .message
             .contains("mismatched rank-extension broadcast fact"),
         "the fail-closed diagnostic names the shape mismatch: {}",
+        error[0].message
+    );
+}
+
+// ── council-13 CB-3: the reduced-resource projection admission ────────────
+
+/// council-13 (need 5b8ec084): the faber-owned constructor ratchet and the
+/// radix decode-boundary ratchet ratchet in LOCKSTEP — a one-sided bump is a
+/// representation mismatch that must fail the build (both are wire 8).
+#[test]
+fn device_run_plan_version_tracks_the_wire_program_version() {
+    assert_eq!(DEVICE_RUN_PLAN_VERSION, WIRE_DEVICE_PROGRAM_VERSION);
+    assert_eq!(DEVICE_RUN_PLAN_VERSION, 8);
+    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 8);
+}
+
+/// council-8 CB-3: the reduced-projection wire fixture on the summa-proof
+/// program — an `AxisReduction` plan (`[16, 16]` → 16 along axis 0) whose
+/// producer-defined projection is stamped identically on the reduced output
+/// buffer version and the result row (fully consistent: positive, agreeing,
+/// element count divisible by the stride).
+fn reduced_projection_section() -> FmirDeviceSection {
+    let (program, semantics) =
+        device_program_and_semantics_from_corpus_fixture("cuda/summa-proof.fab");
+    let mut section = section_for_program(&program, &semantics);
+    section.device_program.program.kernels[0].plan =
+        WireCollectionKernelPlan::AxisReduction(WireAxisReductionPlan {
+            op: WireReduceOp::Sum,
+            axis: 0,
+            projection: WireReducedProjection {
+                axis_extent: 16,
+                inner_stride: 16,
+            },
+        });
+    for version in [
+        &mut section.device_program.program.kernels[0].resources[1].version,
+        &mut section.device_program.program.results[0].version,
+    ] {
+        version.element_count = 16;
+        version.reduced_projection = Some(WireReducedProjection {
+            axis_extent: 16,
+            inner_stride: 16,
+        });
+    }
+    section
+}
+
+/// council-8 CB-3: a fully consistent reduced-resource projection admits at
+/// the faber boundary and survives the radix decode admission (the same
+/// carried fact passes both fail-closed gates).
+#[test]
+fn valid_reduced_projection_admits() {
+    let section = reduced_projection_section();
+    admit_device_program_section(&section.device_program)
+        .expect("a consistent reduced-resource projection admits at the faber boundary");
+    let admitted = wire_admits_through_radix_decode(section);
+    assert!(matches!(
+        admitted.kernels[0].plan,
+        WireCollectionKernelPlan::AxisReduction(_)
+    ));
+}
+
+/// council-8 CB-3: a non-positive carried projection fails the faber
+/// boundary admission closed — a zero `axis_extent` on the plan and a zero
+/// `inner_stride` on the carried buffer-version projection (which would
+/// panic the divisibility modulus if it reached it) both reject with the
+/// positivity diagnostic.
+#[test]
+fn admit_device_program_section_rejects_zero_reduced_projection() {
+    let mut section = reduced_projection_section();
+    let WireCollectionKernelPlan::AxisReduction(plan) =
+        &mut section.device_program.program.kernels[0].plan
+    else {
+        panic!("fixture carries an axis-reduction plan");
+    };
+    plan.projection.axis_extent = 0;
+    let error = admit_device_program_section(&section.device_program)
+        .expect_err("a zero axis extent fails the faber boundary admission");
+    assert!(
+        error[0].message.contains("non-positive"),
+        "the fail-closed diagnostic names the positivity rule: {}",
+        error[0].message
+    );
+
+    let mut section = reduced_projection_section();
+    section.device_program.program.kernels[0].resources[1].version.reduced_projection =
+        Some(WireReducedProjection {
+            axis_extent: 16,
+            inner_stride: 0,
+        });
+    let error = admit_device_program_section(&section.device_program)
+        .expect_err("a zero inner stride fails the faber boundary admission");
+    assert!(
+        error[0].message.contains("non-positive"),
+        "the fail-closed diagnostic names the positivity rule: {}",
+        error[0].message
+    );
+}
+
+/// council-8 CB-3: a plan projection that disagrees with the reduced output
+/// buffer version's carried projection fails the faber boundary admission
+/// closed — the SAME producer fact must agree everywhere it is stamped.
+#[test]
+fn admit_device_program_section_rejects_mismatched_plan_vs_buffer_projection() {
+    let mut section = reduced_projection_section();
+    let WireCollectionKernelPlan::AxisReduction(plan) =
+        &mut section.device_program.program.kernels[0].plan
+    else {
+        panic!("fixture carries an axis-reduction plan");
+    };
+    plan.projection.inner_stride = 4;
+    let error = admit_device_program_section(&section.device_program)
+        .expect_err("a plan projection that disagrees with the buffer version fails closed");
+    assert!(
+        error[0].message.contains("disagrees"),
+        "the fail-closed diagnostic names the plan-vs-buffer mismatch: {}",
+        error[0].message
+    );
+}
+
+/// council-8 CB-3: a reduced buffer whose element count is not exactly
+/// divisible by its carried projection's inner stride fails the faber
+/// boundary admission closed — the keep-dims mapping (`axis_extent` strides
+/// of `inner_stride`) cannot address the buffer.
+#[test]
+fn admit_device_program_section_rejects_non_divisible_reduced_element_count() {
+    let mut section = reduced_projection_section();
+    section.device_program.program.kernels[0].resources[1].version.element_count = 17;
+    let error = admit_device_program_section(&section.device_program)
+        .expect_err("a non-divisible reduced element count fails the faber boundary admission");
+    assert!(
+        error[0].message.contains("not divisible"),
+        "the fail-closed diagnostic names the divisibility rule: {}",
         error[0].message
     );
 }
