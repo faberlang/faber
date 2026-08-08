@@ -313,8 +313,16 @@ pub fn carried_resources_agree(carried: &[DeviceResource], signature: &MirKernel
             || signature_resource.element_count != resource.version.element_count
             // The carried reduced-resource projection (council-8 CB-3) must
             // agree with the version's — a stale or dropped projection is a
-            // carried-fact disagreement, never silently tolerated.
-            || signature_resource.reduced_projection != resource.version.reduced_projection
+            // carried-fact disagreement, never silently tolerated. A
+            // signature that DERIVES a projection (the kernel's own body
+            // contains the producing SumAxis) must carry the same fact as
+            // the version. A signature that derives NO projection is a
+            // cross-function consumer (the producing SumAxis lives in
+            // another kernel's source); it cannot reconstruct the producer's
+            // fact and trusts the carried version — the mapping is carried,
+            // never re-derived by a consumer.
+            || (signature_resource.reduced_projection.is_some()
+                && signature_resource.reduced_projection != resource.version.reduced_projection)
         {
             return false;
         }
