@@ -19,8 +19,8 @@ in [`docs/archived/`](../archived/README.md).
 ## Summary
 
 - goals scanned: 20
-- active: 5
-- planned: 8
+- active: 6
+- planned: 7
 - done: 4
 - unknown: 3
 - archived (moved to `docs/archived/`): 1
@@ -32,6 +32,7 @@ in [`docs/archived/`](../archived/README.md).
 | [component-release-streamline](component-release-streamline/CAMPAIGN.md) | active | — | 0 | 1 | 4 | 0 | 0 | 0 | 1 |
 | [faber-onboarding](faber-onboarding/CAMPAIGN.md) | active | — | 0 | 1 | 3 | 1 | 0 | 0 | 5 |
 | [faber-script-e2e-hardening](faber-script-e2e-hardening/goal.md) | active | — | 1 | 0 | 0 | 1 | 0 | 0 | 34 |
+| [native-gpu-application-bundle](native-gpu-application-bundle/CAMPAIGN.md) | active | 75% | 0 | 1 | 8 | 0 | 0 | 1 | 5 |
 | [sqlite-library-package](sqlite-library-package/goal.md) | active | — | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
 | [unified-package-manifest](unified-package-manifest/goal.md) | active | — | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 
@@ -42,7 +43,6 @@ in [`docs/archived/`](../archived/README.md).
 | [faber-format-lossless](faber-format-lossless/goal.md) | planned | — | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | [faber-polish](faber-polish/goal.md) | planned | — | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | [inference-session-boundary](inference-session-boundary/goal.md) | planned | — | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
-| [native-gpu-application-bundle](native-gpu-application-bundle/CAMPAIGN.md) | planned | 75% | 0 | 1 | 8 | 0 | 0 | 1 | 5 |
 | [pytorch-session-continuation](pytorch-session-continuation/goal.md) | planned | 0% | 1 | 0 | 2 | 0 | 0 | 0 | 2 |
 | release-and-portable-default | planned | — | 0 | 0 | 1 | 0 | 0 | 0 | 0 |
 | [tabular-data-access](tabular-data-access/CAMPAIGN.md) | planned | — | 0 | 1 | 0 | 0 | 0 | 0 | 0 |

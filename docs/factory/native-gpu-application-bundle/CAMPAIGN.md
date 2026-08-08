@@ -1,6 +1,6 @@
 # Campaign: Native GPU Application Bundle
 
-**Status**: planned pre-implementation — ready for delivery; NGAB0 composite artifact contract is selected
+**Status**: active — NGAB0 accepted (2026-08-08, NGAB0-U12 closeout); NGAB1–NGAB7 planned — after NGAB0
 **Created**: 2026-08-08
 **Mode**: routing artifact — draft/maintain; does not implement code directly
 **Control-plane repo**: `/Users/ianzepp/work/faberlang/faber`
@@ -12,7 +12,7 @@ native device execution; `examples` for generic and LLM capstones
 **Consumes**: live `llvm-host`, FMIR device sections, Metal/CUDA host sessions,
 and accepted GPU-inference GI3 compiler evidence
 **Lowers to**: `delivery` then `factory`
-**Campaign readiness**: **READY FOR DELIVERY — NGAB0 SELECTED**
+**Campaign readiness**: **NGAB0 ACCEPTED (2026-08-08) — NGAB1–NGAB7 planned**
 
 ## Summary
 
@@ -234,7 +234,7 @@ multi-device work follow the local single-device proof.
 
 ### NGAB0 — Composite artifact and ownership contract
 
-**Status**: planned — selected
+**Status**: accepted — NGAB0-U12 phase closeout (2026-08-08)
 **Owner**: Faber; Radix owns compiler inputs, hosts own execution inputs, and
 Gradus owns the paired semantic interface.
 **Source**: this campaign, live Faber LLVM/device builders, Radix device schema,
@@ -250,6 +250,39 @@ migration map in `radix/docs/factory/gpu-inference-gguf/`. NGAB0 cannot close
 while GI4+ remains a competing runtime/server control plane.
 **Batch posture**: discovery-first.
 **Lowers to**: `delivery` then `factory`.
+
+**Notes** (NGAB0-U12 phase closeout, 2026-08-08):
+
+- **Units**: U1–U11 all landed (snapshot, packet sections U2–U7, radix
+  ownership amendment U8, claim register U9, receipt schema + audit
+  entrypoint U10, fixture contract U11). Required outputs delivered:
+  `ngab0-composite-contract.md` (frozen packet, U2–U7),
+  `ngab0-receipt-schema.md` + `scripta/check-factory-goal-status` (U10),
+  `ngab0-claim-register.md` (U9), `ngab0-fixture-contract.md` (U11),
+  `evidence/ngab0-snapshot.md` (U1), and the committed gguf ownership
+  amendment `radix/docs/factory/gpu-inference-gguf/gi4-ownership-amendment.md`
+  + MD3I gate amendment (U8). The Gradus `pml0-gradus-contract.md` exchange is
+  confirmed via the paired PML0 packet (U2 §OwnershipMatrix + §PackageGraph
+  cite `pml0-gradus-contract.md`; U8 re-lowers the GI4+ authority under
+  Gradus PML5 + NGAB composite session facts).
+- **Operator open questions — DEFERRED with recorded defaults** (per
+  `ngab0-delivery.md` §Open Questions; defaults recorded in
+  `ngab0-composite-contract.md` §Admission "Operator decision gates"): (1)
+  **llvm-host identity** — retain the stable user-facing selector `llvm-host`
+  and extend its capability with the embedded-device section (broader identity
+  is a packet change under the §Versioning procedure); (2) **Metal embedding**
+  — MSL source first (matches current FMIR-carried MSL), `metallib` reserved
+  until the operator decision closes; (3) **CUDA PTX arch set** — the admitted
+  row's arch set, with `ptx_target` carried by the FMIR device section as the
+  working target until operator-confirmed. **The phase does not claim the full
+  gate while these dangle** — each default holds until the named gate closes
+  (operator decision), and each is recorded in the packet §Admission +
+  §FrozenVsReserved decision-gate list.
+- **C7 gate**: the Faber-scoped audit entrypoint `scripta/check-factory-goal-status`
+  (U10, thin wrapper over `radix/scripta/audit-factory-goal-status.py`
+  `--factory-root docs/factory`) and the joint receipt schema
+  `ngab0-receipt-schema.md` are referenced from the campaign Validation
+  section below.
 
 ### NGAB1 — Radix host/device partition and callable device boundary
 
@@ -408,10 +441,19 @@ python3 ../radix/scripta/generate-factory-readme.py --factory-root docs/factory 
 git diff --check -- docs/factory/native-gpu-application-bundle docs/factory/README.md
 ```
 
-The shared status-audit script is hard-bound to Radix's `docs/factory` and has
-no `--factory-root`. The sibling README generator uses the same status parser,
-so `--check` is the current Faber campaign-index gate. NGAB0 must add or select
-a Faber-scoped audit entrypoint before claiming the full status-audit gate.
+The sibling README generator and the shared status-audit script
+(`radix/scripta/audit-factory-goal-status.py`) accept `--factory-root`
+(drift corrected by U1, `evidence/ngab0-snapshot.md` §5), so `--check` plus
+the scoped audit entrypoint form the current Faber campaign-index gate.
+NGAB0 must add or select a Faber-scoped audit entrypoint before claiming the
+full status-audit gate. The Faber-scoped entrypoint is
+`scripta/check-factory-goal-status` (NGAB0-U10, council C7): a thin wrapper
+that invokes the shared `radix/scripta/audit-factory-goal-status.py` against
+faber's own `docs/factory` root. The joint cross-repo receipt schema is frozen
+in `native-gpu-application-bundle/ngab0-receipt-schema.md` (U10) — aligned
+with the composite contract's §Manifest/§Verification (identity + digest +
+dirty-state declarations + exact commands). The status-audit gate for this
+campaign is the faber-scoped entrypoint exiting 0.
 
 Implementation validation is named by each delivery. Cheap owner-repo checks
 run first. Metal/CUDA hardware receipts, RunPod use, broad parity suites, and
