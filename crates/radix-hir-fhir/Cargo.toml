@@ -1,6 +1,6 @@
 [package]
 name = "radix-hir-fhir"
-version = "0.79.0"
+version = "0.80.0"
 edition = "2021"
 description = "Portable analyzed-HIR artifact (FHIR) schema, codec, and validation for Radix"
 license = "MIT"
