@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+"""Faber-scoped factory goal-status audit entrypoint (NGAB0-U10, council C7).
+
+Thin wrapper over the shared radix audit script
+(`radix/scripta/audit-factory-goal-status.py`) run against faber's own
+`docs/factory` root, mirroring the README generator's `--factory-root`
+selection. Wrapper only: classification, findings, and exit codes all live in
+the shared audit script (single source of truth); this file selects the faber
+scope and passes every other argument through.
+
+Selection rationale (recorded in
+`docs/factory/native-gpu-application-bundle/ngab0-receipt-schema.md`): the
+radix-bound shared status audit is container-level bookkeeping, not artifact
+proof for faber (council C7). The shared script already accepts
+`--factory-root` (consumed at line 591, per the U1 snapshot correction), so a
+faber-scoped entrypoint reuses the same audit machinery against faber's own
+inventory instead of forking a second classifier.
+
+Stdlib-only python3. Exit codes are the shared audit script's.
+"""
+
+from __future__ import annotations
+
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+CONTAINER = ROOT.parent
+AUDIT = CONTAINER / "radix" / "scripta" / "audit-factory-goal-status.py"
+FACTORY_ROOT = ROOT / "docs" / "factory"
+
+
+def main() -> int:
+    if not AUDIT.is_file():
+        print(
+            f"error: shared audit script not found: {AUDIT} "
+            "(expected a radix sibling checkout next to faber)",
+            file=sys.stderr,
+        )
+        return 2
+    if not FACTORY_ROOT.is_dir():
+        print(f"error: faber factory root not found: {FACTORY_ROOT}", file=sys.stderr)
+        return 2
+    cmd = [sys.executable, str(AUDIT), "--factory-root", str(FACTORY_ROOT)]
+    cmd.extend(sys.argv[1:])
+    return subprocess.call(cmd)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
