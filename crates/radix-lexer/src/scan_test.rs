@@ -138,12 +138,30 @@ fn keyword_registry_specs_lex_to_current_tokens() {
             "keyword '{}' must lex as an identifier",
             spec.text
         );
-        assert_eq!(
-            result.reader_keyword_latin_keys.get(spec.text),
-            Some(&spec.text.to_string()),
-            "latin key not recorded for '{}'",
-            spec.text
-        );
+        if spec.token_kind.is_some() {
+            // Identity-backed rows record their Latin spelling so the parser
+            // can claim the identifier by the registry token identity.
+            assert_eq!(
+                result.reader_keyword_latin_keys.get(spec.text),
+                Some(&spec.text.to_string()),
+                "latin key not recorded for token-backed keyword '{}'",
+                spec.text
+            );
+        } else {
+            // Tokenless rows are ordinary identifiers. Their parser-owned
+            // contextual scope is the lookup path; they have no token
+            // identity and therefore must not acquire a Latin-key entry.
+            assert!(
+                result.reader_keyword_latin_keys.get(spec.text).is_none(),
+                "tokenless identifier '{}' must not record a token latin key",
+                spec.text
+            );
+            assert!(
+                matches!(spec.scope, KeywordScope::Contextual(owners) if !owners.is_empty()),
+                "tokenless identifier '{}' must retain a contextual parser owner",
+                spec.text
+            );
+        }
     }
 }
 
