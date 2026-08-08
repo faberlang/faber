@@ -236,7 +236,7 @@ fn validate_carried_reduced_projection(
             "{carrier} carries a reduced-resource projection whose block width saturates u64 ({projection:?}: axis_extent · inner_stride overflows); a saturated block width cannot address a real reduction (council-13 cxo CB-W8)"
         )));
     }
-    if element_count % projection.inner_stride != 0 {
+    if !element_count.is_multiple_of(projection.inner_stride) {
         return Err(wire_invalid(format!(
             "{carrier} element count {element_count} is not divisible by its carried projection's inner stride {} ({projection:?}); the keep-dims mapping cannot address the buffer (council-8 CB-3)",
             projection.inner_stride
