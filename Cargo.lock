@@ -176,9 +176,9 @@ checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
 name = "cc"
-version = "1.4.0"
+version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5add81bb678e6cb321aff7fa0dc7689ad82b112dbc032cea19f91d6b8e3582b9"
+checksum = "9066c49992464636f92905fa096ec58baaa4d57ec19a5c096c68d3e25ef3d136"
 dependencies = [
  "find-msvc-tools",
  "jobserver",
@@ -206,9 +206,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.6.5"
+version = "4.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "301b56658598e48f3648647ac6fc887be7e7108eddfa4e9b63fcf3ec58c0cadf"
+checksum = "473c7e07f409a8d772161724aa8db6a765a2532a70f9667eeb7b49d3d02fbdca"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -216,9 +216,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.6.5"
+version = "4.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94a65403d1a1bd28f7dc68eb8506e8874808ee5eecb59298de588e2e1407a078"
+checksum = "7b48fea5a88e9ae728a2dcbedbfc0e730f7d60da42e1cb049a83c9fb8b789889"
 dependencies = [
  "anstream",
  "anstyle",
@@ -628,7 +628,7 @@ dependencies = [
 
 [[package]]
 name = "faber"
-version = "1.4.0"
+version = "1.5.0"
 dependencies = [
  "cista",
  "clap",
@@ -715,9 +715,9 @@ dependencies = [
 
 [[package]]
 name = "find-msvc-tools"
-version = "0.1.9"
+version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5baebc0774151f905a1a2cc41989300b1e6fbb29aff0ceffa1064fdd3088d582"
+checksum = "26b73573e6edcd2af0cdf47bd6cb58f0b3839491263c314eaad1ccf24430e1de"
 
 [[package]]
 name = "fixedbitset"
@@ -1451,7 +1451,7 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
 name = "radix"
-version = "0.79.0"
+version = "0.80.0"
 dependencies = [
  "ariadne",
  "clap",
@@ -1498,7 +1498,7 @@ dependencies = [
 
 [[package]]
 name = "radix-air"
-version = "0.79.0"
+version = "0.80.0"
 dependencies = [
  "radix-hir",
  "radix-lexer",
@@ -1509,7 +1509,7 @@ dependencies = [
 
 [[package]]
 name = "radix-codegen-shared"
-version = "0.79.0"
+version = "0.80.0"
 dependencies = [
  "radix-diagnostics",
  "radix-hir",
@@ -1520,14 +1520,14 @@ dependencies = [
 
 [[package]]
 name = "radix-diagnostics"
-version = "0.79.0"
+version = "0.80.0"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "radix-hir"
-version = "0.79.0"
+version = "0.80.0"
 dependencies = [
  "postcard",
  "radix-lexer",
@@ -1539,7 +1539,7 @@ dependencies = [
 
 [[package]]
 name = "radix-hir-faber"
-version = "0.79.0"
+version = "0.80.0"
 dependencies = [
  "radix-codegen-shared",
  "radix-diagnostics",
@@ -1552,7 +1552,7 @@ dependencies = [
 
 [[package]]
 name = "radix-hir-fhir"
-version = "0.79.0"
+version = "0.80.0"
 dependencies = [
  "postcard",
  "radix-hir",
@@ -1564,7 +1564,7 @@ dependencies = [
 
 [[package]]
 name = "radix-hir-go"
-version = "0.79.0"
+version = "0.80.0"
 dependencies = [
  "radix-codegen-shared",
  "radix-diagnostics",
@@ -1577,7 +1577,7 @@ dependencies = [
 
 [[package]]
 name = "radix-hir-rust"
-version = "0.79.0"
+version = "0.80.0"
 dependencies = [
  "radix-codegen-shared",
  "radix-diagnostics",
@@ -1590,7 +1590,7 @@ dependencies = [
 
 [[package]]
 name = "radix-hir-swift"
-version = "0.79.0"
+version = "0.80.0"
 dependencies = [
  "radix-codegen-shared",
  "radix-diagnostics",
@@ -1603,7 +1603,7 @@ dependencies = [
 
 [[package]]
 name = "radix-hir-ts"
-version = "0.79.0"
+version = "0.80.0"
 dependencies = [
  "radix-codegen-shared",
  "radix-diagnostics",
@@ -1616,11 +1616,11 @@ dependencies = [
 
 [[package]]
 name = "radix-host-abi"
-version = "0.79.0"
+version = "0.80.0"
 
 [[package]]
 name = "radix-lexer"
-version = "0.79.0"
+version = "0.80.0"
 dependencies = [
  "radix-diagnostics",
  "rustc-hash",
@@ -1631,7 +1631,7 @@ dependencies = [
 
 [[package]]
 name = "radix-mir"
-version = "0.79.0"
+version = "0.80.0"
 dependencies = [
  "radix-codegen-shared",
  "radix-diagnostics",
@@ -1645,7 +1645,7 @@ dependencies = [
 
 [[package]]
 name = "radix-mir-coverage"
-version = "0.79.0"
+version = "0.80.0"
 dependencies = [
  "radix-lexer",
  "radix-mir",
@@ -1658,7 +1658,7 @@ dependencies = [
 
 [[package]]
 name = "radix-mir-fmir"
-version = "0.79.0"
+version = "0.80.0"
 dependencies = [
  "postcard",
  "radix-mir",
@@ -1671,7 +1671,7 @@ dependencies = [
 
 [[package]]
 name = "radix-mir-llvm"
-version = "0.79.0"
+version = "0.80.0"
 dependencies = [
  "radix-codegen-shared",
  "radix-hir",
@@ -1686,7 +1686,7 @@ dependencies = [
 
 [[package]]
 name = "radix-mir-metal"
-version = "0.79.0"
+version = "0.80.0"
 dependencies = [
  "radix-codegen-shared",
  "radix-hir",
@@ -1699,7 +1699,7 @@ dependencies = [
 
 [[package]]
 name = "radix-mir-sexp"
-version = "0.79.0"
+version = "0.80.0"
 dependencies = [
  "radix-codegen-shared",
  "radix-hir",
@@ -1711,7 +1711,7 @@ dependencies = [
 
 [[package]]
 name = "radix-mir-stepper"
-version = "0.79.0"
+version = "0.80.0"
 dependencies = [
  "getrandom 0.2.17",
  "radix-hir",
@@ -1727,7 +1727,7 @@ dependencies = [
 
 [[package]]
 name = "radix-mir-wasm"
-version = "0.79.0"
+version = "0.80.0"
 dependencies = [
  "radix-codegen-shared",
  "radix-hir",
@@ -1741,7 +1741,7 @@ dependencies = [
 
 [[package]]
 name = "radix-mir-wgsl"
-version = "0.79.0"
+version = "0.80.0"
 dependencies = [
  "radix-codegen-shared",
  "radix-hir",
@@ -1755,7 +1755,7 @@ dependencies = [
 
 [[package]]
 name = "radix-parser"
-version = "0.79.0"
+version = "0.80.0"
 dependencies = [
  "radix-diagnostics",
  "radix-lexer",
@@ -1765,11 +1765,11 @@ dependencies = [
 
 [[package]]
 name = "radix-runtime-contract"
-version = "0.79.0"
+version = "0.80.0"
 
 [[package]]
 name = "radix-syntax"
-version = "0.79.0"
+version = "0.80.0"
 dependencies = [
  "radix-lexer",
  "serde",
@@ -1777,7 +1777,7 @@ dependencies = [
 
 [[package]]
 name = "radix-types"
-version = "0.79.0"
+version = "0.80.0"
 dependencies = [
  "radix-lexer",
  "radix-syntax",
@@ -3099,18 +3099,18 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
-version = "0.8.55"
+version = "0.8.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5a105cd7b140f6eeec8acff2ea38135d3cab283ada58540f629fe51e46696eb"
+checksum = "556764e583adb45a9f8d413c2a147fa7e8d821e48e12b14fd560b607998b75eb"
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.55"
+version = "0.8.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fe976fb70c78cd64cccfe3a6fc142244e8a77b70959b30faf9d0ac37ee228eb"
+checksum = "f2ab42fc20575779bd240faa45f94a74256f755c0fa9e89f0ede20d91d0cdfc1"
 dependencies = [
  "proc-macro2",
  "quote",
