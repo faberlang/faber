@@ -1,12 +1,13 @@
 # NGAB0 Composite Contract — Package graph and ownership matrix
 
-**Unit**: NGAB0-U2–U4 (package graph + ownership matrix; host/device partition
-+ entry/call ABI; manifest schema + resource identity + verification) — see
-`ngab0-delivery.md` NGAB0-U2, NGAB0-U3, and NGAB0-U4.
-**Status**: frozen (U2–U4) — §PackageGraph + §OwnershipMatrix + §Partition +
-§Abi + §Manifest + §ResourceIdentity + §Verification. Further sections
-(§BackendVariants/§ArtifactLayout/§Admission, §Ux/§Errors,
-§FrozenVsReserved/§Unsupported/§Versioning) are added by NGAB0-U5–U7; the
+**Unit**: NGAB0-U2–U5 (package graph + ownership matrix; host/device partition
++ entry/call ABI; manifest schema + resource identity + verification; backend
+variants + artifact layout + admission) — see `ngab0-delivery.md` NGAB0-U2
+through NGAB0-U5.
+**Status**: frozen (U2–U5) — §PackageGraph + §OwnershipMatrix + §Partition +
+§Abi + §Manifest + §ResourceIdentity + §Verification + §BackendVariants +
+§ArtifactLayout + §Admission. Further sections (§Ux/§Errors,
+§FrozenVsReserved/§Unsupported/§Versioning) are added by NGAB0-U6–U7; the
 version authority and change procedure freeze at NGAB0-U7.
 **Authority order**: live source/tests and live `faber targets` → accepted
 artifact schemas + hardware receipts → this packet's frozen contracts →
@@ -346,3 +347,157 @@ Verification facts (frozen):
   and dirty-state declarations in the joint cross-repo receipt schema
   (NGAB0-U10, §Manifest/§Verification-aligned), so a later auditor
   re-verifies rather than trusting this packet's claim.
+
+## BackendVariants
+
+The backend variant matrix for the composite native executable, frozen at
+NGAB0-U5. U5 fixes the variant rows of the §Manifest `artifact_kind` field
+(`msl-source` | `metallib` | `ptx`). Variants are **serialization choices of
+one typed device program** — never separate programs (§PackageGraph invariant)
+— emitted by radix and carried through the hot-path serialization list
+(§OwnershipMatrix hot-path #2: FMIR device wire + MSL/PTX artifacts).
+
+| Variant | `artifact_kind` | Backend | Admitted state (frozen) | Live baseline |
+| --- | --- | --- | --- | --- |
+| MSL source | `msl-source` | Metal | **Admitted first** — matches the current FMIR-carried MSL | `faber/src/package/device/section.rs`: Metal MSL always emitted through the S1-3 emitters |
+| metallib | `metallib` | Metal | **Reserved** — no admitted row until the operator decision on Metal embedding (gate below) | Not produced by the live pipeline; Metal toolchain path only |
+| PTX | `ptx` | CUDA | **Admitted** only when a build-time clang NVPTX compiler is present; otherwise the composite carries no CUDA artifact | `device/section.rs`: `compile_nvvm_to_ptx`; the packaged CUDA artifact is PTX (N1.3 §3.1), provenance hash covers the PTX blob, not the NVVM source |
+
+Variant facts (frozen):
+
+- **One program, many serializations**: every variant row is a serialization
+  of the same typed, target-neutral `DeviceProgram`. Emitting or omitting a
+  row never changes the program; admission (below) decides which rows may
+  reach a session.
+- **Launch identity rides the artifact**: Metal launches by the logical entry
+  (the emitted MSL kernel name); CUDA launches by the emitted PTX `.entry`
+  symbol carried as per-artifact metadata (N3.3). The CUDA logical-entry →
+  symbol mapping is an artifact fact, never a program semantic, and never
+  reconstructed from emitted text (§Partition/§Abi).
+- **Best-effort emission, fail-closed execution**: MSL is always emitted;
+  CUDA PTX emission is build-time best-effort (S3-A7 emitter surface or
+  missing clang NVPTX). A composite that carries no CUDA artifact makes
+  `--backend cuda` fail closed at run time as a missing declared artifact —
+  it never silently falls back to Metal or CPU (§Admission).
+- **Target binding**: each variant row binds the `target` fact of the §Manifest
+  row (Metal / CUDA); verification precedes backend selection (§Verification),
+  so the row is verified before any variant is admitted.
+- **Defaults are frozen until an operator decision fires**: the Metal
+  source-first default and the admitted PTX arch set are operator decision
+  gates (see §Admission); no implementation admits a variant outside its
+  default before its gate closes.
+
+## ArtifactLayout
+
+The composite artifact layout, frozen at NGAB0-U5. Shape: **one native
+executable + embedded artifacts + inspectable build directory**, following the
+live `target/faber-llvm/{debug|release}/` precedent (`faber/src/package/
+llvm_host.rs`: one `.ll` per unit, `llvm-as` verify, pinned `opt -O2` in
+release, `clang` link, inspectable link manifest + runtime identity).
+
+```text
+target/faber-llvm/{debug|release}/          build profile root (precedent)
+  <product>/                                composite build root per product
+    modules/          one .ll per host unit (llvm-as verified)
+    optimized/        pinned opt -O2 outputs (release only)
+    device/           embedded-artifact copies + embedded manifest
+                      (msl-source; metallib reserved; ptx when emitted)
+    link-manifest.toml  inspectable link manifest (host triple, profile,
+                        runtime archive, composite variant rows)
+    runtime/          runtime identity file
+    <product>         ONE native executable (composite binary)
+```
+
+Layout facts (frozen):
+
+- **One native executable**: exactly one composite binary per composite build
+  (§PackageGraph invariant). The binary embeds the content-addressed device
+  artifacts and the embedded manifest (§Manifest) plus the host LLVM image;
+  it is the only artifact that launches.
+- **Embedded artifacts + manifest**: the device artifacts and the manifest
+  travel inside the executable. The inspectable build directory records the
+  same identity facts (link manifest, runtime identity, device-artifact copies)
+  for inspection and receipts — but identity is **never reconstructed from the
+  build directory** on the runtime path (§Manifest/§Verification): the
+  embedded manifest in the binary is the sole identity carrier.
+- **Inspectable build dir**: `target/faber-llvm/{debug|release}/` precedent
+  is extended by a `device/` directory carrying the emitted artifact copies
+  and the manifest. Debug and release are separate profile roots; the profile
+  (debug = `-g`, no `opt`; release = pinned `opt -O2`) is recorded in the
+  link manifest.
+- **No loose developer-tree kernel paths** (campaign Dependency Rule 3): hosts
+  never depend on files in the inspectable build directory at run time. The
+  build directory is an inspection/receipt surface, not a runtime dependency.
+- **Receipt alignment**: the build directory contents (link manifest, runtime
+  identity, artifact copies, digests) feed the joint cross-repo receipt schema
+  (NGAB0-U10); they are evidence, not identity inputs.
+
+## Admission
+
+Capability admission for the composite executable, frozen at NGAB0-U5.
+Unsupported hardware, driver, version, architecture, dtype, quantization, or
+kernel capability fails **fail-closed** — a typed, reported, pre-launch
+failure with **no CPU fallback** (campaign Development Posture; §PackageGraph
+and §Verification already freeze the no-CPU-fallback rule at the variant and
+verification layers; this section freezes the admission gate itself).
+
+```text
+identity verification + model-to-kernel binding (§Verification, in order)
+  -> capability admission (this section)
+       -> backend selection
+       -> device session (dispatch / observe / teardown)
+```
+
+Admission facts (frozen):
+
+- **Fail-closed by default**: every admission gate (hardware, driver, version,
+  arch, dtype, quant, capability) admits only when positively known and
+  matching the admitted row. Unknown, unsupported, or mismatched → pre-launch
+  failure, typed and reported. There is no degradation path.
+- **Hardware / arch**: the native host set follows the
+  `E_LLVMHOST_UNSUPPORTED_HOST` precedent (`llvm_host.rs`): aarch64/x86_64
+  macOS + aarch64/x86_64 Linux, native host builds only, no cross compile.
+  Device admission is per-backend: Metal on macOS, CUDA on Linux; an
+  unsupported device or arch fails closed before any module load.
+- **Driver / version**: driver and module versions must match the admitted
+  row. Driver discovery and module-loading failures fail closed before launch
+  (`device/run.rs` fail-closed wire admission precedent, S3-A4).
+- **dtype / quant / capability**: dtype, quantization, and kernel-capability
+  requests outside the admitted row fail closed at admission, before any
+  session opens.
+- **Missing declared artifact**: a variant the manifest does not carry (for
+  example no `ptx` row because the build-time clang NVPTX compiler was absent)
+  makes the corresponding backend request fail closed as a missing declared
+  artifact — never a silent switch to the other backend.
+- **Admission after verification**: identity is verified (§Verification) and
+  the model-to-kernel binding checked **before** capability admission;
+  admission precedes backend selection and session. Admission verifies and
+  admits; it does not mutate artifacts, open sessions, or mint identities.
+- **No CPU fallback, enumerated**: Rust, CPU, a subprocess compiler,
+  `llama.cpp`, or a separately installed kernel are all closed paths. The only
+  admitted paths are the verified variant rows of §BackendVariants.
+
+### Operator decision gates (frozen defaults)
+
+The three operator open questions from `ngab0-delivery.md` §Open Questions are
+recorded here with their frozen defaults and explicit operator decision gates.
+Each default holds until the named gate closes; the gate closes by operator
+decision at NGAB0-U12 phase closeout (U12 folds the answers or defers with
+these recorded defaults). The packet cannot claim the full phase gate while
+any of these dangle.
+
+1. **Artifact identity** — keep the stable user-facing selector `llvm-host`
+   with an embedded-device capability, or define a broader application
+   artifact identity with `llvm-host` as the host lane? **Default**: retain
+   `llvm-host`, extend capability. **Operator decision gate**: NGAB0-U12; a
+   broader identity is a packet change under the §Versioning change procedure
+   (NGAB0-U7).
+2. **Metal embedding** — MSL source, metallib, or both for the first admitted
+   macOS row? **Default**: source first (matches the current FMIR-carried
+   MSL), metallib reserved. **Operator decision gate**: NGAB0-U12; the
+   `metallib` variant row may not be admitted before this decision.
+3. **CUDA PTX arch set** — the minimum portable PTX architecture set for
+   NGAB6. **Default**: the admitted row's arch set recorded and
+   operator-confirmed at NGAB0-U12; until then the `ptx_target` carried by the
+   FMIR device section (`device/section.rs`) is the working target and the
+   `ptx` row is admitted only for it. **Operator decision gate**: NGAB0-U12.
