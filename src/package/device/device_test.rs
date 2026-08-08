@@ -3186,6 +3186,78 @@ fn admit_device_program_section_rejects_non_divisible_reduced_element_count() {
     );
 }
 
+/// council-13 cxo CB-W8: the faber boundary admits axis-reduction plans with
+/// `Sum` only — `Mean` is tree-reduction-only today and every axis-reduction
+/// emitter covers `Sum` only, so a non-`Sum` wire op would pass decode and
+/// hit an unimplemented emitter path.
+#[test]
+fn admit_device_program_section_rejects_non_sum_axis_reduction_op() {
+    let mut section = reduced_projection_section();
+    let WireCollectionKernelPlan::AxisReduction(plan) =
+        &mut section.device_program.program.kernels[0].plan
+    else {
+        panic!("fixture carries an axis-reduction plan");
+    };
+    plan.op = WireReduceOp::Mean;
+    let error = admit_device_program_section(&section.device_program)
+        .expect_err("a non-Sum axis-reduction op fails the faber boundary admission");
+    assert!(
+        error[0].message.contains("only Sum"),
+        "the fail-closed diagnostic names the op allow-list: {}",
+        error[0].message
+    );
+}
+
+/// council-13 cxo CB-W8: a saturated projection — a block width
+/// `axis_extent · inner_stride` that overflows `u64` — fails the faber
+/// boundary admission closed (the keep-dims consumer divides by the width; a
+/// saturating multiply would silently collapse the addressing). Both the
+/// plan and the carried buffer/result projections are stamped identically so
+/// the agreement rule does not shadow the saturation rule.
+#[test]
+fn admit_device_program_section_rejects_saturated_overflowing_projection() {
+    let mut section = reduced_projection_section();
+    let WireCollectionKernelPlan::AxisReduction(plan) =
+        &mut section.device_program.program.kernels[0].plan
+    else {
+        panic!("fixture carries an axis-reduction plan");
+    };
+    let saturated = WireReducedProjection {
+        axis_extent: u64::MAX,
+        inner_stride: 2,
+    };
+    plan.projection = saturated;
+    section.device_program.program.kernels[0].resources[1].version.reduced_projection =
+        Some(saturated);
+    section.device_program.program.kernels[0].resources[1].version.element_count = u64::MAX;
+    section.device_program.program.results[0].version.reduced_projection = Some(saturated);
+    section.device_program.program.results[0].version.element_count = u64::MAX;
+    let error = admit_device_program_section(&section.device_program)
+        .expect_err("an overflowing block width fails the faber boundary admission");
+    assert!(
+        error[0].message.contains("saturates u64"),
+        "the fail-closed diagnostic names the saturation rule: {}",
+        error[0].message
+    );
+}
+
+/// council-13 cxo CB-W8: a degenerate zero-element reduced buffer carrying a
+/// projection fails the faber boundary admission closed — a zero-count
+/// carrier cannot hold any real reduction output (and passes the
+/// divisibility rule vacuously, so it must be rejected before it).
+#[test]
+fn admit_device_program_section_rejects_zero_element_reduced_buffer() {
+    let mut section = reduced_projection_section();
+    section.device_program.program.kernels[0].resources[1].version.element_count = 0;
+    let error = admit_device_program_section(&section.device_program)
+        .expect_err("a zero-element reduced buffer fails the faber boundary admission");
+    assert!(
+        error[0].message.contains("zero-element"),
+        "the fail-closed diagnostic names the degenerate-count rule: {}",
+        error[0].message
+    );
+}
+
 // ── GI4-2: the versioned cadence/session wire surface ─────────────────────
 
 /// Build a device section carrying the honest cadence/session section for
