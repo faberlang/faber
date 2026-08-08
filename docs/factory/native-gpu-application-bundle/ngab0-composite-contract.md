@@ -1,11 +1,12 @@
 # NGAB0 Composite Contract — Package graph and ownership matrix
 
-**Unit**: NGAB0-U2–U3 (package graph + ownership matrix; host/device partition
-+ entry/call ABI) — see `ngab0-delivery.md` NGAB0-U2 and NGAB0-U3.
-**Status**: frozen (U2–U3) — §PackageGraph + §OwnershipMatrix + §Partition +
-§Abi. Further sections (§Manifest/§ResourceIdentity/§Verification,
-§BackendVariants/§ArtifactLayout/§Admission, §Ux/§Errors,
-§FrozenVsReserved/§Unsupported/§Versioning) are added by NGAB0-U4–U7; the
+**Unit**: NGAB0-U2–U4 (package graph + ownership matrix; host/device partition
++ entry/call ABI; manifest schema + resource identity + verification) — see
+`ngab0-delivery.md` NGAB0-U2, NGAB0-U3, and NGAB0-U4.
+**Status**: frozen (U2–U4) — §PackageGraph + §OwnershipMatrix + §Partition +
+§Abi + §Manifest + §ResourceIdentity + §Verification. Further sections
+(§BackendVariants/§ArtifactLayout/§Admission, §Ux/§Errors,
+§FrozenVsReserved/§Unsupported/§Versioning) are added by NGAB0-U5–U7; the
 version authority and change procedure freeze at NGAB0-U7.
 **Authority order**: live source/tests and live `faber targets` → accepted
 artifact schemas + hardware receipts → this packet's frozen contracts →
@@ -199,3 +200,149 @@ Cross-boundary validity (frozen):
   carries the versioned facts the session writer consumes.
 - Boundary typing binds to the composite session (§Manifest/§ResourceIdentity
   freeze at U4); no value crosses the boundary without a carried identity.
+
+## Manifest
+
+The versioned, **content-addressed** embedded-artifact manifest, frozen at
+NGAB0-U4. The manifest is the sole carrier of embedded device-artifact
+identity from assembly (§PackageGraph materializer node) to the composite
+session (§Verification) — matching §OwnershipMatrix hot-path serialization #3
+(materializer): artifact identity is a serialized fact, never re-derived at
+launch.
+
+```text
+composite native executable
+  -> one embedded manifest (versioned schema)          faber assembly
+       -> per-artifact row: kind, wire version, digest, bounds
+            MSL source artifact    (Metal; source-first default, U5)
+            metallib artifact      (Metal; reserved, U5)
+            NVVM/PTX artifact      (CUDA; admitted arch set, U5)
+  -> identity verification gate (before backend selection; §Verification)
+  -> backend admission + device session
+```
+
+Manifest facts (frozen):
+
+- **Versioned schema**: the manifest conforms to a versioned schema with its
+  own ratchet (MD2-W1 sibling-field precedent, as §Abi). The schema version is
+  part of the manifest's identity surface; a schema change is a packet change
+  under the §Versioning change procedure (NGAB0-U7).
+- **Content-addressed**: each artifact row is identified by a digest computed
+  over the embedded artifact bytes alone. Artifact identity is the digest —
+  nothing else; a digest is the key the row is admitted and later verified
+  under (§Verification).
+- **Canonical digest algorithm named**: default **SHA-256**, matching the
+  MD-A9 collision-resistant precedent (`radix/docs/factory/gpu-inference-
+  multi-device/CAMPAIGN.md`, MD-A9 row: non-cryptographic provenance hashes are
+  not cache/identity authorization) and the PML0 capsule contract default
+  (`gradus/docs/factory/production-ml-library/pml0-model-capsule-contract.md`
+  §3.2, field 2). Operator confirms the algorithm choice at NGAB0-U12; until
+  then SHA-256 is the frozen default and no other algorithm may be admitted.
+- **Never reconstructed**: manifest and artifact identity is **never
+  reconstructed from emitted text or path conventions** — neither from
+  LLVM/MSL/PTX text, nor file names, nor directory layout, nor link-manifest
+  provenance strings (campaign Dependency Rule 2; the same rule §Abi and
+  §Partition freeze for the boundary). A path may be recorded for provenance;
+  it is locator metadata only.
+- **Bounds recorded**: per-artifact byte length and structural ceilings are
+  recorded in the manifest at assembly time; downstream admission checks
+  recorded bounds before any allocation sized by them (PML0 capsule bounds
+  precedent — bounds precede allocation).
+- **One manifest per executable**: exactly one embedded manifest per composite
+  native executable; no artifact reaches a device session without a manifest
+  row, and no manifest row exists without an embedded artifact.
+
+Manifest row shape (frozen shape, schema version `manifest-1.0.0`; U5 fixes
+the variant rows, U7 fixes version authority):
+
+| Row field | Carries | Rule |
+| --- | --- | --- |
+| `artifact_kind` | `msl-source` \| `metallib` \| `ptx` (admitted variants per U5) | Kind is a serialization choice of one device program, never a separate program |
+| `artifact_id` | Content digest over artifact bytes (default **SHA-256**) | Identity is derived from bytes only; mismatch → pre-launch failure (§Verification) |
+| `device_program_version` | Wire version of the typed `DeviceProgram` (§OwnershipMatrix hot-path #1) | Rides the accepted wire version; no unversioned artifact |
+| `bounds` | Byte length + structural ceilings (e.g. PTX cap size, MSL source size) | Recorded, not re-derived; checked before allocation |
+| `target` | Backend target the artifact is emitted for (Metal / CUDA) | Verified before backend selection (§Verification) |
+
+## ResourceIdentity
+
+Resource identity for the composite session, frozen at NGAB0-U4. Resource
+identity — buffers, lifetimes, generations, observations — is **bound to the
+composite session**: the session is the identity root, and no resource fact
+exists outside the session that minted it.
+
+Resource identity facts (frozen):
+
+- **Buffers**: every buffer is identified by a session-scoped logical handle —
+  never by a GPU pointer value, driver resource ID, or path-derived label. A
+  buffer handle is valid only within the session that minted it; it carries
+  its type fact and shape (§Abi: every value crossing the boundary carries its
+  type fact) and is never reconstructed from emitted text.
+- **Lifetimes**: buffer and session-resource lifetimes are scoped to the
+  composite session — allocation and release are session operations, and
+  teardown releases every resource the session owns. No resource outlives its
+  session; no session outlives its executable (§PackageGraph one-executable
+  invariant).
+- **Generations**: generation-bearing facts (KV generations, sequence
+  position, token history) advance only through a committed mutation
+  (`TokenCommit` precedent, §Abi session facts, GI4 §5). Generation identity
+  is `(session, sequence, epoch)` per the `ReuseKey` fact (§Abi); a resource
+  is reusable iff all three match, and a generation gap is an invalid
+  cross-boundary value (§Abi cross-boundary validity).
+- **Observations**: observations (dispatch reports, step-run reports, teardown
+  reports) are bound to the session and to the generation they were taken at.
+  An observation records its session identity and the generation/commit it
+  observes; it can never be attributed to a different session or generation.
+  Observations are evidence, not identity inputs — no observation can alter a
+  resource's identity (identity is derived from bytes and the manifest only,
+  §Manifest).
+- **Session binding**: resource identity is composite-session-bound — the same
+  logical buffer/generation/observation referenced outside its minting session
+  is a different, invalid resource. No cross-session resource alias exists in
+  NGAB0.
+
+## Verification
+
+The verification order and tamper/mismatch behavior, frozen at NGAB0-U4
+(council C8). Identity is verified **before backend selection**: verification
+precedes every downstream selection, load, or backend binding.
+
+```text
+embedded manifest + artifacts -> identity verification
+        |  (digest match, wire-version match, model-to-kernel binding match)
+        v
+backend selection (admitted capability; U5)     <- never earlier
+        v
+device session / dispatch / observe / teardown
+```
+
+Verification facts (frozen):
+
+- **Order fixed**: artifact identity is verified **before backend selection**.
+  No backend is selected, no driver/module load happens, and no device session
+  opens until every embedded artifact verifies against the manifest —
+  identity verification, then model-to-kernel binding, then capability
+  admission, then session, in that order.
+- **Tamper/mismatch → pre-launch failure**: any digest mismatch, wire-version
+  mismatch, manifest-schema mismatch, or model-to-kernel binding mismatch is a
+  **pre-launch failure** — typed, reported, and closed. The executable does
+  not reach a device session and does not fall back to CPU or another backend
+  (campaign Development Posture; no CPU fallback, matching §PackageGraph and
+  the PML0 capsule fail-closed behavior).
+- **Model-to-kernel compatibility binding**: the manifest binds the model
+  identity (model id + SHA-256 + byte length, §Abi session facts / GI4 §2.1)
+  to the kernel identity (device-program version + artifact digests). A
+  composite application may only run the kernel the manifest binds to its
+  model; a model/kernel pair from different manifest rows is a compatibility
+  failure at verification, before launch.
+- **Never reconstructed**: verification consumes only manifest-carried facts
+  and artifact bytes; it never reconstructs identity from emitted text or path
+  conventions (§Manifest; campaign Dependency Rule 2). A manifest missing an
+  expected row, or carrying an unexpected row, fails verification.
+- **Read-only gate**: verification verifies and admits; it does not mutate
+  artifacts, rewrite the manifest, or mint new identities. Embedded artifacts
+  are immutable bytes, so post-verification tampering cannot be silent — any
+  change re-fails verification on the next launch.
+- **Receipt alignment**: verification records exact commands, content digests,
+  and dirty-state declarations in the joint cross-repo receipt schema
+  (NGAB0-U10, §Manifest/§Verification-aligned), so a later auditor
+  re-verifies rather than trusting this packet's claim.
