@@ -26,14 +26,14 @@ prose. Evidence refs below point at committed artifacts only.
   §OwnershipMatrix); non-owners excluded.
 - **evidence ref** — committed artifact (frozen contract section, snapshot,
   live source) that supports the claim.
-- **status** — current truth: contract frozen / in progress / implemented /
+- **claim state** — current truth: contract frozen / in progress / implemented /
   planned, naming the unit or campaign that owns it.
 - **surface** — product surface the claim lands on.
 - **campaign** — source campaign; arrows mark the lower-to chain.
 
 ## Rows — Faber composite executable surface
 
-| claim | capability | owner | evidence ref | status | surface | campaign |
+| claim | capability | owner | evidence ref | claim state | surface | campaign |
 | --- | --- | --- | --- | --- | --- | --- |
 | `faber build` produces one native executable per composite application (one source package → one binary) | Composite build/link: host LLVM modules + embedded device artifacts assembled into one native executable with an inspectable build dir + link manifest | faber (assembly) | `ngab0-composite-contract.md` §PackageGraph ("one native executable per composite build"; node "One native executable"); `evidence/ngab0-snapshot.md` §2 (`llvm_host.rs` `link-manifest.toml` + `write_runtime_identity` precedent) | Contract frozen (U2); implementation planned — NGAB2 | composite executable (build) | NGAB0 → NGAB2 |
 | The composite binary embeds content-addressed device artifacts (MSL/metallib, PTX) and a versioned manifest; artifact identity is never reconstructed from emitted text or path conventions | Embedded-artifact manifest assembly; digest-addressed artifact identity; target-neutral `DeviceProgram` serialization | faber (assembly); radix (device-program emission/serialization) | `ngab0-composite-contract.md` §PackageGraph ("embedded content-addressed device artifacts + manifest"; hot-path serialization list #1/#3); `evidence/ngab0-snapshot.md` §2 (`section.rs`, `mir/image.rs` artifacts) | Contract frozen (U2, §PackageGraph); §Manifest/§ResourceIdentity/§Verification frozen at U4 — landed (ngab0-composite-contract.md §Manifest/§ResourceIdentity/§Verification, U4) | composite executable (artifact layout) | NGAB0 (U4) → NGAB2 |

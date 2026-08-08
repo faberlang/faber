@@ -1,5 +1,7 @@
 # Goal: Core-Support Cache Must Bundle Radix Runtime-Contract Crates
 
+**Status**: done — faber core-support manifest bundles `radix/crates/radix-runtime-contract` (75fad19, same-day fix); shipped in faber v1.5.0 (tag 2026-08-07)
+
 ## Summary
 
 `faber test` fails because the embedded core-support cache bundles `faber-runtime`

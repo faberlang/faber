@@ -21,8 +21,8 @@ in [`docs/archived/`](../archived/README.md).
 - goals scanned: 20
 - active: 6
 - planned: 7
-- done: 4
-- unknown: 3
+- done: 5
+- unknown: 2
 - archived (moved to `docs/archived/`): 1
 
 ## Open and in progress
@@ -32,7 +32,7 @@ in [`docs/archived/`](../archived/README.md).
 | [component-release-streamline](component-release-streamline/CAMPAIGN.md) | active | — | 0 | 1 | 4 | 0 | 0 | 0 | 1 |
 | [faber-onboarding](faber-onboarding/CAMPAIGN.md) | active | — | 0 | 1 | 3 | 1 | 0 | 0 | 5 |
 | [faber-script-e2e-hardening](faber-script-e2e-hardening/goal.md) | active | — | 1 | 0 | 0 | 1 | 0 | 0 | 34 |
-| [native-gpu-application-bundle](native-gpu-application-bundle/CAMPAIGN.md) | active | 75% | 0 | 1 | 8 | 0 | 0 | 1 | 5 |
+| [native-gpu-application-bundle](native-gpu-application-bundle/CAMPAIGN.md) | active | — | 0 | 1 | 8 | 0 | 0 | 1 | 5 |
 | [sqlite-library-package](sqlite-library-package/goal.md) | active | — | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
 | [unified-package-manifest](unified-package-manifest/goal.md) | active | — | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 
@@ -53,6 +53,7 @@ in [`docs/archived/`](../archived/README.md).
 | Goal | Status | Done | goal | campaign | delivery | ledger | council | evidence | other |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | [aer-purgatus](aer-purgatus/CAMPAIGN.md) | done | 100% | 0 | 1 | 4 | 0 | 0 | 0 | 0 |
+| [core-support-radix-runtime-contract](core-support-radix-runtime-contract/goal.md) | done | 100% | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | [mir-library-imports](mir-library-imports/goal.md) | done | 100% | 1 | 0 | 1 | 0 | 0 | 0 | 0 |
 | [proba-test-sources](proba-test-sources/goal.md) | done | 100% | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | [stepper-faber-test](stepper-faber-test/goal.md) | done | 100% | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
@@ -62,5 +63,4 @@ in [`docs/archived/`](../archived/README.md).
 | Goal | Status | Done | goal | campaign | delivery | ledger | council | evidence | other |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | autograd-equivalent-roadmap | unknown | — | 0 | 0 | 0 | 0 | 0 | 0 | 1 |
-| [core-support-radix-runtime-contract](core-support-radix-runtime-contract/goal.md) | unknown | — | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | pure-lib-browser-resolve | unknown | — | 0 | 0 | 1 | 0 | 0 | 0 | 0 |
