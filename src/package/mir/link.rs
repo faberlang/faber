@@ -1909,3 +1909,126 @@ pub(super) fn rewrite_non_null_chain(
         }
     }
 }
+
+#[cfg(test)]
+mod shadowed_alias_tests {
+    use super::*;
+    use radix::semantic::{Resolver, Symbol, SymbolKind};
+
+    /// The `forma`-shadowing shape (fd0c939 guard positive condition): a
+    /// receiver def in the HIR-generated range (>= 1_000_000) whose symbol is
+    /// a Local whose name appears in the unit's imports resolves to the
+    /// registered synthetic namespace target — the rewrite still fires.
+    #[test]
+    fn shadowing_receiver_rewrites_when_local_name_is_in_imports() {
+        let mut interner = Interner::default();
+        let mut resolver = Resolver::new();
+        let unit_path = PathBuf::from("<shadowed-alias-test>.fab");
+
+        // The shadowing receiver: a HIR-generated local def whose symbol is a
+        // Local named `forma` — the exact name of an import binding.
+        let receiver_def = DefId(1_000_000);
+        let forma = interner.intern("forma");
+        resolver
+            .define(Symbol {
+                def_id: receiver_def,
+                name: forma,
+                kind: SymbolKind::Local,
+                ty: None,
+                mutable: false,
+                span: Default::default(),
+            })
+            .expect("define the shadowing local symbol");
+
+        // The import binding `forma` → the imported module's item def, plus a
+        // registered namespace-call target for `forma.quantitas(...)`.
+        let import_def = DefId(42);
+        let mut imports = HashMap::new();
+        imports.insert("forma".to_owned(), import_def);
+        let synthetic = DefId(2_000_000_000);
+        let mut targets: NamespaceCallTargets = HashMap::new();
+        targets.insert((unit_path.clone(), import_def, "quantitas".to_owned()), synthetic);
+
+        let receiver = HirExpression {
+            id: HirId(0),
+            kind: HirExpressionKind::Path(receiver_def),
+            ty: None,
+            span: Default::default(),
+        };
+
+        let mut diagnostics = Vec::new();
+        let rewriter = ShadowedAliasRewriter {
+            unit_path: &unit_path,
+            resolver: &resolver,
+            interner: &interner,
+            targets: &targets,
+            imports: &imports,
+            diagnostics: &mut diagnostics,
+        };
+        let method = interner.intern("quantitas");
+        assert_eq!(
+            rewriter.import_target(&receiver, method),
+            Some(synthetic),
+            "the forma-shadowing receiver (Local def >= 1_000_000 whose name appears in the imports) must resolve to the synthetic namespace target"
+        );
+    }
+
+    /// The `h1b.gelu()` false-positive exclusion (fd0c939): a local def in the
+    /// HIR-generated range whose name does NOT appear in the unit's imports is
+    /// NOT rewritten — even when the method name matches an imported module's
+    /// export (`nn` exports `gelu`). Without the guard this call was rewritten
+    /// into a synthetic-path namespace call and corrupted AIR-lane library
+    /// functions at lowering.
+    #[test]
+    fn plain_local_method_call_is_not_rewritten() {
+        let mut interner = Interner::default();
+        let mut resolver = Resolver::new();
+        let unit_path = PathBuf::from("<plain-local-test>.fab");
+
+        let receiver_def = DefId(1_000_001);
+        let h1b = interner.intern("h1b");
+        resolver
+            .define(Symbol {
+                def_id: receiver_def,
+                name: h1b,
+                kind: SymbolKind::Local,
+                ty: None,
+                mutable: false,
+                span: Default::default(),
+            })
+            .expect("define the h1b local symbol");
+
+        // The unit imports a module (`nn`) that DOES export `gelu` and the
+        // target is registered — the guard must still skip the h1b receiver
+        // because the local's name does not shadow an import binding.
+        let import_def = DefId(7);
+        let mut imports = HashMap::new();
+        imports.insert("nn".to_owned(), import_def);
+        let synthetic = DefId(2_000_000_000);
+        let mut targets: NamespaceCallTargets = HashMap::new();
+        targets.insert((unit_path.clone(), import_def, "gelu".to_owned()), synthetic);
+
+        let receiver = HirExpression {
+            id: HirId(0),
+            kind: HirExpressionKind::Path(receiver_def),
+            ty: None,
+            span: Default::default(),
+        };
+
+        let mut diagnostics = Vec::new();
+        let rewriter = ShadowedAliasRewriter {
+            unit_path: &unit_path,
+            resolver: &resolver,
+            interner: &interner,
+            targets: &targets,
+            imports: &imports,
+            diagnostics: &mut diagnostics,
+        };
+        let method = interner.intern("gelu");
+        assert_eq!(
+            rewriter.import_target(&receiver, method),
+            None,
+            "h1b.gelu() must not be rewritten: the local name does not shadow an import binding"
+        );
+    }
+}

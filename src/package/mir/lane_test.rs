@@ -18,6 +18,38 @@ use std::path::PathBuf;
 const METHOD_LIB: &str = "genus Punctum {\n    numerus x\n\n    functio dupla() → numerus {\n        redde ego.x * 2\n    }\n}\n\nfunctio structa(numerus x) → Punctum {\n    redde Punctum { x = x }\n}\n";
 const METHOD_MAIN: &str = "importa ex \"methlib:lib\" privata lib\n\nincipit {\n    fixum lib.Punctum p ← lib.structa(21)\n    nota p.dupla()\n}\n";
 
+// The forma-shadowing guard (fd0c939) false-positive exclusion: a local
+// `h1b` whose method call `h1b.gelu()` must NOT be rewritten into a
+// synthetic-path namespace call to the imported `nn.gelu()` just because the
+// unit imports a module that exports `gelu`. Pre-guard, the method-name sweep
+// rewrote ANY HIR-generated receiver def (>= 1_000_000), so `h1b.gelu()` was
+// rewritten to `nn.gelu(h1b)` — an arity-corrupting synthetic-path call.
+const GELU_LIB: &str = "functio gelu() → numerus {\n    redde 7\n}\n";
+const GELU_MAIN: &str = "importa ex \"gelulib:lib\" privata nn\n\ngenus H1B {\n    numerus x\n\n    functio gelu() → numerus {\n        redde ego.x * 2\n    }\n}\n\nfunctio structa(numerus x) → H1B {\n    redde H1B { x = x }\n}\n\nincipit {\n    fixum numerus nn_value ← nn.gelu()\n    fixum H1B h1b ← structa(21)\n    nota h1b.gelu()\n    nota nn_value\n}\n";
+
+/// The `forma`-shadowing guard (fd0c939) excludes the `h1b.gelu()` false
+/// positive: an ordinary method call on a local is NOT rewritten into a
+/// synthetic-path namespace call when the method name happens to match an
+/// imported module's export. The guard's three conditions (def.0 >= 1_000_000
+/// AND SymbolKind::Local AND local-name in the imports) make `h1b` ineligible
+/// (its name does not shadow an import binding), so the call runs as the local
+/// genus method. Without the guard, the method-name sweep rewrites `h1b.gelu()`
+/// → `nn.gelu(h1b)` and the package MIR fails — this test would fail.
+#[test]
+fn package_mir_shadowed_alias_rewrite_skips_plain_local_method_calls() {
+    let dir = crate::package::test_support::test_temp_dir("shadowed-alias-skip");
+    let entry = write_library_package(dir.as_ref(), "gelulib", GELU_LIB, GELU_MAIN);
+    let config = Config::default().with_stdlib(dir.join("libhome"));
+
+    let mut host = BufferHost::default();
+    run_package_mir(&config, &entry, &mut host).expect("h1b.gelu() must not be rewritten into a namespace call");
+    assert_eq!(
+        host.stdout_lines,
+        vec!["42".to_owned(), "7".to_owned()],
+        "h1b.gelu() must run as the local genus method (42), nn.gelu() as the namespace call (7)"
+    );
+}
+
 const VERTE_CONST_LIB: &str = "const f32 GELU_ALPHA ← (0.7978845608028654 ∷ f32)\n";
 const VERTE_CONST_MAIN: &str = "importa ex \"verteclib:lib\" privata vals\n\nincipit {\n    nota vals.GELU_ALPHA\n}\n";
 
