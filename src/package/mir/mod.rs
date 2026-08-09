@@ -311,7 +311,11 @@ impl FmirPackageImage {
     /// (fallback `auto` when the image carries none). An unknown selection id
     /// recorded on the image is representable on the packet but rejected
     /// fail-closed here — never silently remapped to `auto` or a compiled-in
-    /// backend (DDCP2 gate bullet 4).
+    /// backend (DDCP2 gate bullet 4). The same holds for an explicit `amd`
+    /// selection (AMD-A3): AMDGPU is a radix compiler leaf, not a productized
+    /// faber backend — the product backend set stays Metal + Cuda
+    /// (amd-gpu-target goal boundary) until the operator authorizes the
+    /// product-backend stage, so `amd` fails closed at selection resolution.
     fn route_selection(&self) -> Result<DeviceSelection, Vec<Diagnostic>> {
         let Some(device) = &self.device else {
             return Ok(DeviceSelection::Auto);
@@ -320,6 +324,11 @@ impl FmirPackageImage {
             FmirDeviceSelection::Auto => Ok(DeviceSelection::Auto),
             FmirDeviceSelection::Metal => Ok(DeviceSelection::Metal),
             FmirDeviceSelection::Cuda => Ok(DeviceSelection::Cuda),
+            FmirDeviceSelection::Amd => Err(vec![mir_diag(
+                &self.diagnostic_path,
+                "device section records an explicit `amd` backend selection; faber's productized backend set is `metal` + `cuda` (AMDGPU is a compiler leaf, not a product backend — amd-gpu-target boundary); an explicit selection must name a productized backend or `auto` (never guessed, never silently remapped)"
+                    .to_owned(),
+            )]),
             FmirDeviceSelection::Unknown(id) => Err(vec![mir_diag(
                 &self.diagnostic_path,
                 format!(
