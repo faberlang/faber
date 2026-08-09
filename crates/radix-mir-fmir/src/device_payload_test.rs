@@ -15,7 +15,7 @@ use crate::codec::{
 use crate::error::FmirImageError;
 use crate::schema::{
     canonical_program_bytes, canonical_unpadded_base64, content_sha256, device_identity_hash,
-    DeviceArtifactFormat, DevicePayloadEncoding, DeviceTargetId, FmirBinaryImageFile,
+    packet_sha256, DeviceArtifactFormat, DevicePayloadEncoding, DeviceTargetId, FmirBinaryImageFile,
     FmirDeviceArtifact, FmirDeviceArtifactsSection, FmirDeviceBackend, FmirDeviceInput,
     FmirDeviceProgramSection, FmirDeviceSection, FmirDeviceSelection, FmirDeviceSymbol,
     FmirTextCliRootSection, FmirTextCliSection, FmirTextImageFile, FmirTextProgramSection,
@@ -692,6 +692,198 @@ fn decode_rejects_unknown_device_program_key() {
         decode_text_image(&text, TOOLCHAIN),
         Err(FmirImageError::Parse(_))
     ));
+}
+
+/// The DDCP0-U6 fixture-01 MSL payload text (the canonical UTF-8 text
+/// payload; content_sha256 60b43333… is over these exact bytes).
+const FIXTURE_MSL_TEXT: &str = "// DDCP0-U6 round-trip fixture — canonical UTF-8 text payload
+// Scale kernel MSL source (NGAB0-U11 minimal one-prepared-region fixture:
+// one host call → one prepared submission region containing one kernel).
+// Text payloads are canonical UTF-8: valid UTF-8, no BOM, no alternative-
+// encoding disguise; the canonical representation is the byte sequence itself.
+// content_sha256 is the SHA-256 over these exact bytes — nothing else.
+#include <metal_stdlib>
+using namespace metal;
+
+// oracle(x) = x * 2.0f + 1.0f
+kernel void scale_kernel(device const float* in  [[buffer(0)]],
+                         device       float* out [[buffer(1)]],
+                         uint id [[thread_position_in_grid]]) {
+    out[id] = in[id] * 2.0f + 1.0f;
+}
+";
+
+/// The DDCP0-U6 fixture-02b decoded binary payload bytes
+/// (`metallib-stub-v1`, 16 bytes; the `binary:metallib:16:bWV0Y…` spelling).
+const FIXTURE_METALLIB_BYTES: &[u8] = b"metallib-stub-v1";
+
+/// Round-trip `section` through both codecs and assert the decoded packet's
+/// canonical decoded bytes + identity digests are byte-identical to the
+/// source (DDCP2-U4 gate bullet 1: encode → decode → admit with identical
+/// canonical decoded bytes and identical `content_sha256`/`packet_sha256`
+/// across the wire).
+fn assert_packet_round_trips(section: FmirDeviceSection, artifact_index: usize) {
+    let source = &section.artifacts.artifact[artifact_index];
+    let source_bytes = source.bytes.clone();
+    let source_content = source.content_sha256.clone();
+    let source_packet = source.packet_sha256.clone();
+
+    let text_image = text_image_with_device(Some(section.clone()));
+    let text = encode_text_image(&text_image).expect("encode text image");
+    let decoded_text = decode_text_image(&text, TOOLCHAIN).expect("decode text image");
+    let text_artifact = &decoded_text.device.expect("device section").artifacts.artifact[artifact_index];
+    assert_eq!(text_artifact.bytes, source_bytes, "text codec preserves the decoded bytes");
+    assert_eq!(text_artifact.content_sha256, source_content, "text codec preserves content_sha256");
+    assert_eq!(text_artifact.packet_sha256, source_packet, "text codec preserves packet_sha256");
+
+    let binary_image = binary_image_with_device(Some(section));
+    let bytes = encode_binary_image(&binary_image).expect("encode binary image");
+    let decoded_binary = decode_binary_image(&bytes, TOOLCHAIN).expect("decode binary image");
+    let binary_artifact = &decoded_binary.device.expect("device section").artifacts.artifact[artifact_index];
+    assert_eq!(binary_artifact.bytes, source_bytes, "binary codec preserves the decoded bytes");
+    assert_eq!(binary_artifact.content_sha256, source_content, "binary codec preserves content_sha256");
+    assert_eq!(binary_artifact.packet_sha256, source_packet, "binary codec preserves packet_sha256");
+}
+
+#[test]
+fn fixture_01_msl_text_payload_round_trips_with_identical_digests() {
+    // DDCP0-U6 fixture-01 retarget: the canonical UTF-8 MSL text payload
+    // round-trips through both codecs with identical canonical decoded bytes
+    // and identical content/packet digests; the recorded content digest
+    // (plain sha256 over the decoded bytes) recomputes under the schema.
+    let mut section = sample_device_section();
+    section.artifacts.artifact = vec![metal_artifact(FIXTURE_MSL_TEXT)];
+    assert_eq!(
+        section.artifacts.artifact[0].compute_content_sha256(),
+        "sha256:60b433339e212477ee083722fbedb69d5f57520853ea6fa989f6cacfb1feae8b",
+        "fixture-01 content_sha256 recomputes under the schema"
+    );
+    assert_packet_round_trips(section, 0);
+}
+
+#[test]
+fn fixture_ptx_text_payload_round_trips_with_identical_digests() {
+    // The PTX text payload (the CUDA artifact spelling) round-trips through
+    // both codecs with identical decoded bytes + digests.
+    let ptx = ".version 8.7\n.target sm_120\n.entry scale_kernel\n";
+    let mut section = sample_device_section();
+    section.artifacts.artifact = vec![cuda_artifact(ptx)];
+    assert_packet_round_trips(section, 0);
+}
+
+#[test]
+fn fixture_02_binary_payload_round_trips_with_declared_spelling() {
+    // DDCP0-U6 fixture-02/02b retarget: the binary payload (16 decoded
+    // bytes `metallib-stub-v1`) round-trips through both codecs with the
+    // declared `binary:metallib:16:bWV0Y…` transport spelling; the recorded
+    // content digest recomputes over the DECODED bytes.
+    let mut section = sample_device_section();
+    let artifact = with_computed_digests(FmirDeviceArtifact {
+        format: DeviceArtifactFormat::Unknown("metallib".to_owned()),
+        encoding: DevicePayloadEncoding::Binary {
+            encoding_tag: "metallib".to_owned(),
+            decoded_byte_length: 16,
+            canonical_unpadded_base64: canonical_unpadded_base64(FIXTURE_METALLIB_BYTES),
+        },
+        bytes: FIXTURE_METALLIB_BYTES.to_vec(),
+        ..metal_artifact("")
+    });
+    assert_eq!(
+        artifact.binary_payload_spelling(),
+        "binary:metallib:16:bWV0YWxsaWItc3R1Yi12MQ",
+        "the schema produces the fixture's declared transport spelling"
+    );
+    assert_eq!(
+        artifact.compute_content_sha256(),
+        "sha256:84433df026a63d867a6e10c08d574e887d0d315006fd8f0b1a48dbcbbebcd8a7",
+        "fixture-02 content_sha256 recomputes over the DECODED bytes"
+    );
+    section.artifacts.artifact = vec![artifact];
+    assert_packet_round_trips(section, 0);
+}
+
+#[test]
+fn content_sha256_covers_decoded_bytes_never_the_base64_spelling() {
+    // DDCP2-U4 gate bullet 3 / contract §IdentityDomains rule 3: hashes
+    // cover canonical decoded bytes, never the transport spelling — the
+    // content digest is over the decoded bytes, and the base64 spelling
+    // (padded vs unpadded) is transport, not payload.
+    let decoded = FIXTURE_METALLIB_BYTES;
+    let base64_string = "bWV0YWxsaWItc3R1Yi12MQ=="; // the PADDED spelling of the same bytes
+    assert_eq!(
+        content_sha256(decoded),
+        "sha256:84433df026a63d867a6e10c08d574e887d0d315006fd8f0b1a48dbcbbebcd8a7"
+    );
+    assert_ne!(
+        content_sha256(decoded),
+        content_sha256(base64_string.as_bytes()),
+        "the digest of the base64 STRING differs from the digest of the decoded bytes"
+    );
+    // The artifact's content digest is over its decoded bytes only: a
+    // different (padded) spelling in the encoding declaration does NOT
+    // change the computed content digest.
+    let artifact = with_computed_digests(FmirDeviceArtifact {
+        format: DeviceArtifactFormat::Unknown("metallib".to_owned()),
+        encoding: DevicePayloadEncoding::Binary {
+            encoding_tag: "metallib".to_owned(),
+            decoded_byte_length: 16,
+            canonical_unpadded_base64: base64_string.to_owned(),
+        },
+        bytes: decoded.to_vec(),
+        ..metal_artifact("")
+    });
+    assert_eq!(
+        artifact.compute_content_sha256(),
+        "sha256:84433df026a63d867a6e10c08d574e887d0d315006fd8f0b1a48dbcbbebcd8a7",
+        "content_sha256 is over the decoded bytes, never the transport spelling"
+    );
+}
+
+#[test]
+fn fixture_04_and_06_packet_digests_recompute_under_the_schema() {
+    // DDCP0-U6 evidence retarget: the fixture-04 compiler-input packet and
+    // the fixture-06 finalized packet recompute under the schema's canonical
+    // serialization — including the compiler_input_packet_sha256 fire-2 #5
+    // fold (the parent packet is part of the finalized packet's OWN
+    // identity; provenance is never silently replaced).
+    let compiler_input = packet_sha256(
+        8,
+        "metal",
+        "msl",
+        MaterializationStage::CompilerInput,
+        "macos-arm64",
+        &[],
+        &[FmirDeviceSymbol {
+            entry: "scale_kernel".to_owned(),
+            symbol: "scale_kernel".to_owned(),
+        }],
+        "sha256:60b433339e212477ee083722fbedb69d5f57520853ea6fa989f6cacfb1feae8b",
+        None,
+    );
+    assert_eq!(
+        compiler_input,
+        "sha256:ce6abbcc288b78bb53bae05edd5676f9a634d036195794c99587753434d5470e",
+        "fixture-04 packet_sha256 recomputes under the schema"
+    );
+    let finalized = packet_sha256(
+        8,
+        "metal",
+        "metallib",
+        MaterializationStage::FinalizedBinary,
+        "macos-arm64",
+        &[],
+        &[FmirDeviceSymbol {
+            entry: "scale_kernel".to_owned(),
+            symbol: "_scale_kernel".to_owned(),
+        }],
+        "sha256:84433df026a63d867a6e10c08d574e887d0d315006fd8f0b1a48dbcbbebcd8a7",
+        Some(&compiler_input),
+    );
+    assert_eq!(
+        finalized,
+        "sha256:d46fa0db02b221c001e9c760bfb3dcf564953c9e171732eeb198ab410d4787b1",
+        "fixture-06 packet_sha256 recomputes under the schema with the parent fold"
+    );
 }
 
 #[test]

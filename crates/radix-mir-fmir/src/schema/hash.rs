@@ -1,30 +1,25 @@
-use crate::schema::MaterializationStage;
 use crate::schema::FmirDeviceSymbol;
+use crate::schema::MaterializationStage;
 
-/// SHA-256 digest with a domain tag, canonical `sha256:<64-hex>` spelling
-/// (DDCP2-U3 / contract §IdentityDomains digest rules). Digests cover
-/// decoded bytes, never the transport spelling — the base64 spelling, the
-/// length prefix, and the encoding tag are transport, not payload.
+/// SHA-256 digest, canonical `sha256:<64-hex>` spelling (DDCP2-U3 / contract
+/// §IdentityDomains digest rules). Digests cover decoded bytes, never the
+/// transport spelling — the base64 spelling, the length prefix, and the
+/// encoding tag are transport, not payload.
 #[must_use]
-pub fn sha256_digest(domain: &str, bytes: &[u8]) -> String {
+pub fn sha256_digest(bytes: &[u8]) -> String {
     use sha2::{Digest, Sha256};
-    let mut hasher = Sha256::new();
-    hasher.update((domain.len() as u64).to_le_bytes());
-    hasher.update(domain.as_bytes());
-    hasher.update((bytes.len() as u64).to_le_bytes());
-    hasher.update(bytes);
-    let digest = hasher.finalize();
+    let digest = Sha256::digest(bytes);
     format!("sha256:{digest:x}")
 }
 
 /// `content_sha256` (DDCP2-U3 / contract §IdentityDomains rule 1): the
-/// digest over the **canonical decoded raw payload bytes only** — never the
-/// transport spelling (the unpadded base64 spelling, the length prefix, and
-/// the encoding tag are transport, not payload). This is the artifact's
-/// content identity.
+/// plain SHA-256 over the **canonical decoded raw payload bytes only** —
+/// never the transport spelling (the unpadded base64 spelling, the length
+/// prefix, and the encoding tag are transport, not payload). This is the
+/// artifact's content identity.
 #[must_use]
 pub fn content_sha256(bytes: &[u8]) -> String {
-    sha256_digest("content", bytes)
+    sha256_digest(bytes)
 }
 
 /// `packet_sha256` (DDCP2-U3 / contract §IdentityDomains rule 1): the
@@ -65,7 +60,7 @@ pub fn packet_sha256(
     if let Some(parent) = compiler_input_packet_sha256 {
         push_field(&mut canonical, "parent-packet-sha256", parent.as_bytes());
     }
-    sha256_digest("packet", &canonical)
+    sha256_digest(&canonical)
 }
 
 /// Length-prefixed, domain-tagged field of the canonical packet byte stream
