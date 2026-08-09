@@ -28,7 +28,7 @@ use crate::{
 use crate::boundary_abi::HOST_CALL_ABI_VERSION;
 use crate::device_program::Binding;
 use radix_lexer::{Interner, Span};
-use radix_types::{NumericWidth, Primitive, TypeTable};
+use radix_types::{IndexExpr, NumericWidth, Primitive, TypeTable};
 
 /// f32 (`fractus<f32>`) — the fixture's scalar surface.
 fn f32(types: &mut TypeTable) -> MirType {
@@ -51,6 +51,42 @@ fn param(local_id: u32, ty: MirType) -> MirParam {
         name: None,
         ty,
         mode: MirParamMode::Owned,
+        span: Span::default(),
+    }
+}
+
+/// `tensor<f32, [n]>` — a literal-shaped device view (the vector call shape).
+fn view(types: &mut TypeTable, element: MirType, count: u64) -> MirType {
+    let shape = types.intern_index(IndexExpr::Literal(count));
+    MirType::semantic(types.tensor_with_shape(element.semantic_id(), shape))
+}
+
+/// A return-buffer kernel unit: `id`'s only param (local `id*10`) is returned
+/// as-is. The ABI synthesis derives the resources from the param/return types.
+fn kernel_unit(id: u32, name: &str, ty: MirType, interner: &mut Interner) -> MirFunction {
+    MirFunction {
+        id: MirFunctionId(id),
+        source: None,
+        name: Some(interner.intern(name)),
+        params: vec![param(id * 10, ty)],
+        locals: vec![local(id * 10, ty)],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: Vec::new(),
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(id * 10),
+                )))),
+                span: Span::default(),
+            },
+            span: Span::default(),
+        }],
+        return_ty: ty,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: Some(MirKernelShaderStage::Compute),
         span: Span::default(),
     }
 }
@@ -326,4 +362,199 @@ fn boundary_abi_and_entry_identity_survive() {
     );
     assert_eq!(partition.device_kernels, vec![MirFunctionId(1)]);
     assert!(!partition.host_functions.contains(&MirFunctionId(1)));
+}
+
+// ── NGAB1-U4: batch compatible call shapes ────────────────────────────────
+//
+// After the first accepted call shape (the scalar), compatible shapes batch
+// through the same ABI without new mechanisms: the vector/2D extents resolve
+// through the shared extent synthesis (the `MirLayoutKind` variant dispatch —
+// the extensible table, never per-shape code), and the prepared region is
+// the call's submission unit (NGAB0-R1), carrying the batch's kernels rather
+// than one ABI row per kernel.
+
+/// The vector call shape derives through the full partition: a 4-element
+/// device-view argument crosses the versioned ABI gate (the shape check
+/// resolves the view's literal extent) and the element-count fact survives
+/// into the derived device program's resources.
+#[test]
+fn vector_arg_shape_survives_derive() {
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let f32_ty = f32(&mut types);
+    let vector_ty = view(&mut types, f32_ty, 4);
+    let program = MirProgram {
+        functions: vec![
+            MirFunction {
+                id: MirFunctionId(1),
+                source: None,
+                name: Some(interner.intern("vec_kernel")),
+                params: vec![param(10, vector_ty)],
+                locals: vec![local(10, vector_ty)],
+                temps: Vec::new(),
+                blocks: vec![MirBlock {
+                    id: MirBlockId(0),
+                    statements: Vec::new(),
+                    terminator: MirTerminator {
+                        kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                            MirLocalId(10),
+                        )))),
+                        span: Span::default(),
+                    },
+                    span: Span::default(),
+                }],
+                return_ty: vector_ty,
+                error_ty: None,
+                is_async: false,
+                is_generator: false,
+                shader_stage: Some(MirKernelShaderStage::Compute),
+                span: Span::default(),
+            },
+            MirFunction {
+                id: MirFunctionId(2),
+                source: None,
+                name: Some(interner.intern("run_vec")),
+                params: vec![param(20, vector_ty)],
+                locals: vec![local(20, vector_ty), local(30, vector_ty)],
+                temps: Vec::new(),
+                blocks: vec![MirBlock {
+                    id: MirBlockId(0),
+                    statements: vec![MirStatement {
+                        kind: MirStatementKind::Call {
+                            destination: Some(MirPlace::local(MirLocalId(30))),
+                            callee: MirCallee::Function(MirFunctionId(1)),
+                            args: vec![MirOperand::Place(MirPlace::local(MirLocalId(20)))],
+                        },
+                        span: Span::default(),
+                    }],
+                    terminator: MirTerminator {
+                        kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                            MirLocalId(30),
+                        )))),
+                        span: Span::default(),
+                    },
+                    span: Span::default(),
+                }],
+                return_ty: vector_ty,
+                error_ty: None,
+                is_async: false,
+                is_generator: false,
+                shader_stage: None,
+                span: Span::default(),
+            },
+        ],
+    };
+    let context = MirValidationContext::new(&types);
+    let validated = ValidatedMir::new(program, context).expect("the vector fixture MIR validates");
+    let partition =
+        derive_host_partition(&validated, &interner).expect("the vector partition derives");
+
+    // One boundary call; the gate accepted the exact 4-element crossing.
+    assert_eq!(partition.boundary_calls.len(), 1);
+    assert_eq!(partition.boundary_calls[0].region.kernels, vec![MirFunctionId(1)]);
+    assert_eq!(partition.call_abi_version, HOST_CALL_ABI_VERSION);
+
+    // The vector element-count fact survives into the derived device program.
+    let kernel = &partition.device_program.kernels[0];
+    assert_eq!(kernel.entry, "vec_kernel");
+    assert_eq!(kernel.resources.len(), 2);
+    assert_eq!(kernel.resources[0].version.element_count, 4);
+    assert_eq!(kernel.resources[1].version.element_count, 4);
+    assert_eq!(
+        kernel.resources[0].version.element_ty, kernel.resources[1].version.element_ty,
+        "in/out ride one element type — the carried f32 fact"
+    );
+}
+
+/// Two-kernel composition derives as ONE boundary call → ONE prepared region
+/// containing the batch's kernels (in invocation order) — the region, not the
+/// kernel, is the call's submission unit; there are no per-kernel ABI rows.
+/// Both kernels' typed facts (identity, ordered launches, declared
+/// observations) survive into the derived device program.
+#[test]
+fn two_kernel_composition_derives_one_region() {
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let f32_ty = f32(&mut types);
+    let program = MirProgram {
+        functions: vec![
+            kernel_unit(1, "scale_kernel", f32_ty, &mut interner),
+            kernel_unit(3, "offset_kernel", f32_ty, &mut interner),
+            MirFunction {
+                id: MirFunctionId(2),
+                source: None,
+                name: Some(interner.intern("run_batch")),
+                params: vec![param(20, f32_ty)],
+                locals: vec![local(20, f32_ty), local(30, f32_ty), local(31, f32_ty)],
+                temps: Vec::new(),
+                blocks: vec![MirBlock {
+                    id: MirBlockId(0),
+                    statements: vec![
+                        MirStatement {
+                            kind: MirStatementKind::Call {
+                                destination: Some(MirPlace::local(MirLocalId(30))),
+                                callee: MirCallee::Function(MirFunctionId(1)),
+                                args: vec![MirOperand::Place(MirPlace::local(MirLocalId(20)))],
+                            },
+                            span: Span::default(),
+                        },
+                        MirStatement {
+                            kind: MirStatementKind::Call {
+                                destination: Some(MirPlace::local(MirLocalId(31))),
+                                callee: MirCallee::Function(MirFunctionId(3)),
+                                args: vec![MirOperand::Place(MirPlace::local(MirLocalId(30)))],
+                            },
+                            span: Span::default(),
+                        },
+                    ],
+                    terminator: MirTerminator {
+                        kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                            MirLocalId(31),
+                        )))),
+                        span: Span::default(),
+                    },
+                    span: Span::default(),
+                }],
+                return_ty: f32_ty,
+                error_ty: None,
+                is_async: false,
+                is_generator: false,
+                shader_stage: None,
+                span: Span::default(),
+            },
+        ],
+    };
+    let context = MirValidationContext::new(&types);
+    let validated = ValidatedMir::new(program, context).expect("the two-kernel MIR validates");
+    let partition =
+        derive_host_partition(&validated, &interner).expect("the two-kernel partition derives");
+
+    // The batch rides ONE boundary call → ONE prepared region, in invocation
+    // order — never per-kernel ABI rows (NGAB0-R1 granularity).
+    assert_eq!(partition.device_kernels, vec![MirFunctionId(1), MirFunctionId(3)]);
+    assert_eq!(partition.boundary_calls.len(), 1);
+    let call = &partition.boundary_calls[0];
+    assert_eq!(call.host, MirFunctionId(2));
+    assert_eq!(
+        call.region.kernels,
+        vec![MirFunctionId(1), MirFunctionId(3)],
+        "the batch's kernels ride one prepared region"
+    );
+    assert!(!call.region.is_minimal());
+
+    // Both kernels derive into the typed device program with their entry
+    // identities, ordered launches, and declared observations.
+    let program = &partition.device_program;
+    assert_eq!(program.kernels.len(), 2);
+    assert_eq!(program.kernels[0].entry, "scale_kernel");
+    assert_eq!(program.kernels[1].entry, "offset_kernel");
+    assert_eq!(program.launches.len(), 2);
+    assert_eq!(program.launches[0].kernel_index, 0);
+    assert_eq!(program.launches[1].kernel_index, 1);
+    assert_eq!(program.results.len(), 2);
+    assert_eq!(program.results[0].produced_by, program.launches[0].id);
+    assert_eq!(program.results[1].produced_by, program.launches[1].id);
+    program
+        .validate()
+        .expect("the derived program passes the shared schema");
 }

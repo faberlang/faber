@@ -33,6 +33,14 @@ fn view(types: &mut TypeTable, element: MirType, count: u64) -> MirType {
     MirType::semantic(types.tensor_with_shape(element.semantic_id(), shape))
 }
 
+/// `tensor<f32, [rows, cols]>` — a rank-2 literal-shaped device view.
+fn view2d(types: &mut TypeTable, element: MirType, rows: u64, cols: u64) -> MirType {
+    let row = types.intern_index(IndexExpr::Literal(rows));
+    let col = types.intern_index(IndexExpr::Literal(cols));
+    let shape = types.intern_index(IndexExpr::Tuple(vec![row, col]));
+    MirType::semantic(types.tensor_with_shape(element.semantic_id(), shape))
+}
+
 fn local(id: u32, ty: MirType) -> MirLocal {
     MirLocal {
         id: MirLocalId(id),
@@ -322,4 +330,209 @@ fn boundary_abi_version_is_carried() {
     assert!(!partition.has_device());
     assert_eq!(partition.call_abi_version, HOST_CALL_ABI_VERSION);
     assert!(partition.boundary_calls.is_empty());
+}
+
+// ── NGAB1-U4: batch compatible call shapes ────────────────────────────────
+//
+// After the first accepted call shape (the scalar), compatible shapes batch
+// through the same ABI without new mechanisms. The gate's type/shape checks
+// dispatch on the layout kind (`MirLayoutKind::Scalar | DeviceView`) — the
+// extensible variant table, never per-shape special-casing (R3) — so the
+// vector and 2D shapes resolve through the shared extent synthesis, and the
+// prepared region is already the call's submission unit (NGAB0-R1), carrying
+// the batch's kernels rather than one ABI row per kernel.
+
+/// Green: a 4-element vector call shape crosses an exact 4-element boundary —
+/// the shape gate resolves the view's literal extent through the layout
+/// dispatch and accepts the carried count.
+#[test]
+fn boundary_abi_accepts_exact_vector_call() {
+    let result = validate_case(|types| {
+        let element = f32(types);
+        (
+            view(types, element, 4),
+            view(types, element, 4),
+            vec![call_stmt(
+                1,
+                Some(30),
+                vec![MirOperand::Place(MirPlace::local(MirLocalId(20)))],
+            )],
+        )
+    });
+    result.expect("the exact 4-element vector call is valid");
+}
+
+/// Red: a 2-element vector crossing a 4-element vector boundary is a shape
+/// violation — the count check is exact over the carried extents.
+#[test]
+fn boundary_abi_rejects_wrong_vector_shape() {
+    let result = validate_case(|types| {
+        let element = f32(types);
+        (
+            view(types, element, 4),
+            view(types, element, 2),
+            vec![call_stmt(
+                1,
+                Some(30),
+                vec![MirOperand::Place(MirPlace::local(MirLocalId(20)))],
+            )],
+        )
+    });
+    match result {
+        Err(BoundaryAbiError::Shape {
+            expected_count: 4,
+            found_count: Some(2),
+            ..
+        }) => {}
+        other => panic!("expected a typed Shape violation, got {other:?}"),
+    }
+}
+
+/// Green: a [2,3] 2D tensor call shape — the element-count check resolves the
+/// rank-2 literal shape through the shared extent synthesis (`IndexExpr::Tuple`
+/// → product) with no 2D-specific code in the boundary.
+#[test]
+fn boundary_abi_accepts_2d_tensor_call() {
+    let result = validate_case(|types| {
+        let element = f32(types);
+        (
+            view2d(types, element, 2, 3),
+            view2d(types, element, 2, 3),
+            vec![call_stmt(
+                1,
+                Some(30),
+                vec![MirOperand::Place(MirPlace::local(MirLocalId(20)))],
+            )],
+        )
+    });
+    result.expect("the exact [2,3] 2D tensor call is valid");
+}
+
+/// Red: a [2,3] boundary (6 elements) crossed by a 4-element value is a shape
+/// violation whose expected count is the resolved 2D extent.
+#[test]
+fn boundary_abi_rejects_2d_shape_mismatch() {
+    let result = validate_case(|types| {
+        let element = f32(types);
+        (
+            view2d(types, element, 2, 3),
+            view(types, element, 4),
+            vec![call_stmt(
+                1,
+                Some(30),
+                vec![MirOperand::Place(MirPlace::local(MirLocalId(20)))],
+            )],
+        )
+    });
+    match result {
+        Err(BoundaryAbiError::Shape {
+            expected_count: 6,
+            found_count: Some(4),
+            ..
+        }) => {}
+        other => panic!("expected a typed Shape violation, got {other:?}"),
+    }
+}
+
+/// Green: two-kernel composition batches through ONE prepared submission
+/// region — one boundary call whose region carries the batch's kernels in
+/// invocation order (NGAB0-R1: the region is the call's submission unit, not
+/// the kernel; never per-kernel ABI rows). The composition's value-flow — the
+/// first kernel's output feeding the second kernel's input — is legal: the
+/// observation rule is per-kernel, and a cross-kernel feed observes no
+/// unlaunched work.
+#[test]
+fn boundary_abi_accepts_two_kernel_composition_region() {
+    let mut types = TypeTable::default();
+    let f32_ty = f32(&mut types);
+    let program = MirProgram {
+        functions: vec![
+            kernel(1, vec![param(10, f32_ty)], f32_ty),
+            kernel(3, vec![param(12, f32_ty)], f32_ty),
+            host_with_calls(
+                2,
+                vec![param(20, f32_ty)],
+                vec![local(30, f32_ty), local(31, f32_ty)],
+                vec![
+                    // scale_kernel(x) → _30
+                    call_stmt(
+                        1,
+                        Some(30),
+                        vec![MirOperand::Place(MirPlace::local(MirLocalId(20)))],
+                    ),
+                    // offset_kernel(_30) → _31 — the composition's feed.
+                    call_stmt(
+                        3,
+                        Some(31),
+                        vec![MirOperand::Place(MirPlace::local(MirLocalId(30)))],
+                    ),
+                ],
+                f32_ty,
+            ),
+        ],
+    };
+    let context = MirValidationContext::new(&types);
+    let calls = derive_boundary_calls(&program, &[MirFunctionId(1), MirFunctionId(3)]);
+
+    // One host call → one prepared region containing the batch's two kernels,
+    // in invocation order — no per-kernel ABI rows.
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0].host, MirFunctionId(2));
+    assert_eq!(
+        calls[0].region.kernels,
+        vec![MirFunctionId(1), MirFunctionId(3)],
+        "the batch's kernels ride one region, in invocation order"
+    );
+    assert!(!calls[0].region.is_minimal());
+
+    validate_boundary_abi(&program, &calls, &context)
+        .expect("the two-kernel composition is valid");
+}
+
+/// Red: a two-kernel host still enforces the boundary rules — a call inside
+/// the composition that writes its output into its own read-only input
+/// storage is rejected with the typed Mutation class (batched shapes get no
+/// loosening).
+#[test]
+fn boundary_abi_rejects_mutation_inside_two_kernel_composition() {
+    let mut types = TypeTable::default();
+    let f32_ty = f32(&mut types);
+    let program = MirProgram {
+        functions: vec![
+            kernel(1, vec![param(10, f32_ty)], f32_ty),
+            kernel(3, vec![param(12, f32_ty)], f32_ty),
+            host_with_calls(
+                2,
+                vec![param(20, f32_ty)],
+                vec![local(30, f32_ty), local(31, f32_ty)],
+                vec![
+                    // scale_kernel(x) → _30
+                    call_stmt(
+                        1,
+                        Some(30),
+                        vec![MirOperand::Place(MirPlace::local(MirLocalId(20)))],
+                    ),
+                    // offset_kernel(_30) → _30 — in-place, mutates the input.
+                    call_stmt(
+                        3,
+                        Some(30),
+                        vec![MirOperand::Place(MirPlace::local(MirLocalId(30)))],
+                    ),
+                ],
+                f32_ty,
+            ),
+        ],
+    };
+    let context = MirValidationContext::new(&types);
+    let calls = derive_boundary_calls(&program, &[MirFunctionId(1), MirFunctionId(3)]);
+    assert_eq!(calls.len(), 1);
+    assert_eq!(
+        calls[0].region.kernels,
+        vec![MirFunctionId(1), MirFunctionId(3)]
+    );
+
+    match validate_boundary_abi(&program, &calls, &context) {
+        Err(BoundaryAbiError::Mutation { local, .. }) => assert_eq!(local, MirLocalId(30)),
+        other => panic!("expected a typed Mutation violation, got {other:?}"),
+    }
 }
