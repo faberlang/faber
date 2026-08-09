@@ -18,9 +18,9 @@ in [`docs/archived/`](../archived/README.md).
 
 ## Summary
 
-- goals scanned: 20
+- goals scanned: 21
 - active: 6
-- planned: 7
+- planned: 8
 - done: 5
 - unknown: 2
 - archived (moved to `docs/archived/`): 1
@@ -40,6 +40,7 @@ in [`docs/archived/`](../archived/README.md).
 
 | Goal | Status | Done | goal | campaign | delivery | ledger | council | evidence | other |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| [direct-device-product-pipeline](direct-device-product-pipeline/CAMPAIGN.md) | planned | — | 0 | 1 | 0 | 0 | 0 | 0 | 0 |
 | [faber-format-lossless](faber-format-lossless/goal.md) | planned | — | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | [faber-polish](faber-polish/goal.md) | planned | — | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | [inference-session-boundary](inference-session-boundary/goal.md) | planned | — | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
