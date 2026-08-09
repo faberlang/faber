@@ -565,7 +565,7 @@ fn should_treat_as_package(path: &std::path::Path) -> bool {
 /// targets so `norma:*` imports resolve through the package graph. MIR
 /// probe targets and HIR inspection targets (`go`, `ts`) use the radix
 /// single-file path, matching `radix emit`.
-fn use_package_compiler(target: Target, path: &std::path::Path, force_package: bool) -> bool {
+pub fn use_package_compiler(target: Target, path: &std::path::Path, force_package: bool) -> bool {
     if force_package {
         return true;
     }

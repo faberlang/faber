@@ -1713,6 +1713,12 @@ fn build_prefill_program() -> Result<PrefillProgramArtifact, Vec<Diagnostic>> {
         results: assembler.results,
     };
     let semantics = build_semantics(&program);
+    // DDCP1-U6 / ddpp1-U6: the prefill device program materializes through
+    // the same device/AIR legality gate as the ordinary materializer — a
+    // prefill device function carrying `ad`/Sermo/cancellation/unresolved
+    // host effects rejects with the named structured diagnostic (a legal
+    // prefill carries no device effect fact).
+    super::program::enforce_device_legality(&program, &mir.functions.functions)?;
     Ok(PrefillProgramArtifact {
         program,
         semantics,

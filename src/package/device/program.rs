@@ -14,6 +14,11 @@ use super::{
     ObservationFact, SemanticValue, SemanticValueId, SemanticValueOrigin, TypeTable, ValidatedMir,
     ValueBinding, ValueGeneration, VecDeque,
 };
+// DDCP1-U6 / ddpp1-U6: the device/AIR legality record (radix-owned surface —
+// the materializer populates + enforces it, never re-decides it).
+use radix_mir::device_semantics::{
+    DeviceEffectBoundaryKind, DeviceEffectFact, DeviceLegalityFacts,
+};
 
 // ---------------------------------------------------------------------------
 // Device-program constructor
@@ -343,6 +348,82 @@ fn dependency_ordered_launches(
     let mut sorted: Vec<LaunchUnit> = program.launches.to_vec();
     sorted.sort_by_key(|launch| position.get(&launch.id).copied().unwrap_or(usize::MAX));
     Ok(sorted)
+}
+
+// ---------------------------------------------------------------------------
+// DDCP1-U6 / ddpp1-U6 — device/AIR legality (the materializer wiring
+// residual, ddcp1-closeout §5.1)
+// ---------------------------------------------------------------------------
+
+/// The device/AIR legality gate. Populates the carried effect-boundary facts
+/// ([`DeviceLegalityFacts`]) from each device function's MIR body and
+/// rejects fail-closed with the named structured diagnostic — a device
+/// function carrying `ad`, Sermo, cancellation, or an unresolved host effect
+/// never materializes (ddcp0-reconciliation §3.1 / DDCP1-U6). Ordinary CPU
+/// host `ad` through Sermo is outside the device launch universe: a CPU
+/// function records no device effect fact and runs unchanged (the
+/// preservation arm of the DDCP1 hard gate, §3.2).
+pub(super) fn enforce_device_legality(
+    program: &DeviceProgram,
+    functions: &[MirFunction],
+) -> Result<(), Vec<Diagnostic>> {
+    let launches: Vec<LaunchId> = program.launches.iter().map(|launch| launch.id).collect();
+    let mut facts = DeviceLegalityFacts::default();
+    for launch in &program.launches {
+        let Some(kernel) = program.kernels.get(launch.kernel_index) else {
+            continue;
+        };
+        let Some(function) = functions.iter().find(|function| function.id == kernel.function)
+        else {
+            continue;
+        };
+        for block in &function.blocks {
+            for statement in &block.statements {
+                let MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
+                    continue;
+                };
+                if let Some(kind) = device_hostile_effect_kind(&call.intrinsic) {
+                    facts.device_effects.push(DeviceEffectFact {
+                        launch: launch.id,
+                        kind,
+                    });
+                }
+            }
+        }
+    }
+    facts.validate(&launches).map_err(|error| {
+        vec![device_legality_diag(format!(
+            "device function fails the device/AIR legality gate: {error}"
+        ))]
+    })
+}
+
+/// Map a device-hostile intrinsic to the recorded effect-boundary kind.
+/// Ordinary `ad` lowers through Sermo's `ad`-conversation opener
+/// ([`MirIntrinsic::SermoOpen`] — ddcp0-reconciliation §3); Sermo
+/// operations, cancellation (`cede`), and host-only runtime calls with no
+/// device lowering are recorded explicitly. Everything else has a device
+/// lowering or is outside the proven host-effect surface — the radix-side
+/// gate is never re-decided here.
+fn device_hostile_effect_kind(intrinsic: &MirIntrinsic) -> Option<DeviceEffectBoundaryKind> {
+    match intrinsic {
+        MirIntrinsic::SermoOpen => Some(DeviceEffectBoundaryKind::Ad),
+        MirIntrinsic::SermoSetOpener | MirIntrinsic::Sermo(_) => {
+            Some(DeviceEffectBoundaryKind::Sermo)
+        }
+        MirIntrinsic::Cede => Some(DeviceEffectBoundaryKind::Cancellation),
+        MirIntrinsic::ReadLine => Some(DeviceEffectBoundaryKind::UnresolvedHostEffect),
+        _ => None,
+    }
+}
+
+/// Stable structured diagnostic for the device/AIR legality gate: a device
+/// function carrying a device-hostile effect (`ad`/Sermo/cancellation/
+/// unresolved host effect) rejects with the named class — never an ad-hoc
+/// error (DDCP1-U6).
+fn device_legality_diag(message: impl Into<String>) -> Diagnostic {
+    Diagnostic::error(format!("device program device legality: {}", message.into()))
+        .with_arg("issue", "E_DEVICE_HOSTILE_EFFECT")
 }
 
 /// Mint the carried semantic facts (F1–F6) of a materialized program, in
@@ -1354,6 +1435,15 @@ pub(crate) fn device_program_for_lowered(
                 format!("constructed device program is inconsistent: {error}"),
             )]
         })?;
+    // DDCP1-U6 / ddpp1-U6 (the materializer wiring residual, ddcp1-closeout
+    // §5.1): the device/AIR legality gate. The materializer populates the
+    // carried effect-boundary facts from each device function's MIR body and
+    // rejects fail-closed with the named structured diagnostic — a device
+    // function carrying `ad`/Sermo/cancellation/unresolved host effects
+    // never materializes. Ordinary CPU host `ad` through Sermo is outside
+    // the device launch universe: a CPU function records no device effect
+    // fact and runs unchanged (ddcp0-reconciliation §3.2).
+    enforce_device_legality(&program, validated.program().functions.as_slice())?;
     // The effective declared step count (S5-U5b): the admitted training-plan
     // count when the program is a RepeatingStep training program; otherwise
     // the caller's declared value (ignored — the wire only carries the count
@@ -1543,3 +1633,7 @@ fn declared_result_rows(
     }
     rows
 }
+
+#[cfg(test)]
+#[path = "legality_test.rs"]
+mod tests;
