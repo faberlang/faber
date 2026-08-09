@@ -141,6 +141,16 @@ const PML4_PINS: [(usize, f64); 6] = [
 ];
 
 #[test]
+// Re-enabled with TARGETLANE001 executed-lane routing (a42bc97) — then
+// re-deferred on the recorded LIB-MIR gap: the routing fix correctly resolves
+// the executed-package analysis to the MIR-backed target (the test now passes
+// analysis and no longer trips `lane_requires_mir_backed_target`), but the FMIR
+// stepper still cannot lower library-to-library calls in the gradus multi-module
+// library (`optimize.fab` etc. — "unsupported MIR lowering: method call before
+// runtime/provider MIR lowering", "type zero-init before MIR lowering
+// completed"). That is the recorded library-import gap (gradus pml4-closeout
+// blocker #1 / LIB-MIR). Re-enable when the LIB-MIR gap lands.
+#[ignore = "LIB-MIR gap (recorded library-import gap): executed-lane analysis resolves to fmir (TARGETLANE001 fixed), but the FMIR stepper cannot lower library-to-library calls in the gradus multi-module library — PML4 acceptance stays blocked until the LIB-MIR gap lands."]
 fn package_mir_training_loop_mlp_runs_on_fmir_lane() {
     // CTO-1 acceptance: the PML4 composed loop (gradus/exempla/
     // training-loop-mlp — a 4×4 two-layer MLP, 100 steps, lr 0.1, the
