@@ -485,8 +485,7 @@ fn boundary_abi_accepts_two_kernel_composition_region() {
     );
     assert!(!calls[0].region.is_minimal());
 
-    validate_boundary_abi(&program, &calls, &context)
-        .expect("the two-kernel composition is valid");
+    validate_boundary_abi(&program, &calls, &context).expect("the two-kernel composition is valid");
 }
 
 /// Red: a two-kernel host still enforces the boundary rules — a call inside

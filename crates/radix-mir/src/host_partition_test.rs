@@ -19,14 +19,14 @@
 //! of truth, so nothing is self-confirmed by the partition step).
 
 use super::*;
+use crate::boundary_abi::HOST_CALL_ABI_VERSION;
+use crate::device_program::Binding;
 use crate::{
     MirBlock, MirBlockId, MirCallee, MirFunction, MirFunctionId, MirKernelShaderStage, MirLocal,
     MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace, MirProgram, MirStatement,
     MirStatementKind, MirTerminator, MirTerminatorKind, MirType, MirValidationContext,
     ValidatedMir,
 };
-use crate::boundary_abi::HOST_CALL_ABI_VERSION;
-use crate::device_program::Binding;
 use radix_lexer::{Interner, Span};
 use radix_types::{IndexExpr, NumericWidth, Primitive, TypeTable};
 
@@ -183,16 +183,20 @@ fn resource_identity_and_mutation_rules_survive_to_device_program() {
     let program = u11_program(&mut types, &mut interner);
     let context = MirValidationContext::new(&types);
     let validated = ValidatedMir::new(program, context).expect("the U11 MIR fixture validates");
-    let kernel = validated.program().function_by_id(MirFunctionId(1)).unwrap();
+    let kernel = validated
+        .program()
+        .function_by_id(MirFunctionId(1))
+        .unwrap();
 
     // The semantic facts: the shared ABI synthesis from the kernel function
     // (the source of truth — the same typed path the emitters consume).
-    let signature = crate::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
-        kernel,
-        validated.validation(),
-        &interner,
-    )
-    .expect("the U11 kernel's ABI synthesizes");
+    let signature =
+        crate::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+            kernel,
+            validated.validation(),
+            &interner,
+        )
+        .expect("the U11 kernel's ABI synthesizes");
 
     let partition =
         derive_host_partition(&validated, &interner).expect("the U11 partition derives");
@@ -202,9 +206,7 @@ fn resource_identity_and_mutation_rules_survive_to_device_program() {
     // binding order, with exact typed values.
     let semantic: Vec<_> = signature
         .resources()
-        .filter(|resource| {
-            resource.kind == crate::abi::MirKernelResourceKind::StorageBuffer
-        })
+        .filter(|resource| resource.kind == crate::abi::MirKernelResourceKind::StorageBuffer)
         .collect();
     assert_eq!(derived.resources.len(), semantic.len());
     for (derived_slot, resource) in derived.resources.iter().zip(&semantic) {
@@ -342,7 +344,10 @@ fn boundary_abi_and_entry_identity_survive() {
 
     // Entry identity: the kernel's logical entry name is the carried source
     // name fact — the only String fact on the typed program.
-    assert_eq!(partition.device_program.kernels[0].function, MirFunctionId(1));
+    assert_eq!(
+        partition.device_program.kernels[0].function,
+        MirFunctionId(1)
+    );
     assert_eq!(
         partition.device_program.kernels[0].entry, "scale_kernel",
         "the entry identity is the carried logical name, not a text-derived symbol"
@@ -451,7 +456,10 @@ fn vector_arg_shape_survives_derive() {
 
     // One boundary call; the gate accepted the exact 4-element crossing.
     assert_eq!(partition.boundary_calls.len(), 1);
-    assert_eq!(partition.boundary_calls[0].region.kernels, vec![MirFunctionId(1)]);
+    assert_eq!(
+        partition.boundary_calls[0].region.kernels,
+        vec![MirFunctionId(1)]
+    );
     assert_eq!(partition.call_abi_version, HOST_CALL_ABI_VERSION);
 
     // The vector element-count fact survives into the derived device program.
@@ -531,7 +539,10 @@ fn two_kernel_composition_derives_one_region() {
 
     // The batch rides ONE boundary call → ONE prepared region, in invocation
     // order — never per-kernel ABI rows (NGAB0-R1 granularity).
-    assert_eq!(partition.device_kernels, vec![MirFunctionId(1), MirFunctionId(3)]);
+    assert_eq!(
+        partition.device_kernels,
+        vec![MirFunctionId(1), MirFunctionId(3)]
+    );
     assert_eq!(partition.boundary_calls.len(), 1);
     let call = &partition.boundary_calls[0];
     assert_eq!(call.host, MirFunctionId(2));
