@@ -55,10 +55,18 @@ pub(super) fn cmd_test(args: &TestArgs) {
         deny_codes: args.deny.clone(),
     };
 
-    // Target-neutral analysis config. The stepper never emits product targets;
-    // any Target variant is only used for session/policy construction.
+    // ONE-EFFECTIVE-TARGET SEAM (TARGETLANE001 executed-lane routing;
+    // authoritative decision record `radix/docs/factory/
+    // executed-lane-target-decision.md`): the stepper analysis target resolves
+    // to a MIR-backed target — the manifest `[build] target` when present,
+    // else the executed-lane default `fmir` — so air-lane packages (e.g.
+    // gradus) pass the lane policy at analysis instead of tripping
+    // `lane_requires_mir_backed_target` under the old HIR-direct placeholder.
+    // The stepper never emits product targets; the target only selects the
+    // analysis lane-policy posture.
+    let analysis_target = package::executed_lane_analysis_target(&Config::default(), &input_path);
     let config = match package::config_with_locale(
-        radix::Target::HirTypeScript,
+        analysis_target,
         &input_path,
         args.locale.as_deref(),
         args.diagnostics_locale.as_deref(),

@@ -222,12 +222,71 @@ pub(crate) use mir::{build_package_mir_artifact, run_package_mir, run_package_mi
 pub(crate) use discovery::{discover_package, is_manifest_backed_or_directory_package_input};
 
 use crate::library::LibraryResolver;
+use radix::codegen::Target;
 use radix::diagnostics::Diagnostic;
+use radix::driver::Config;
 use radix::driver::FileFrontmatter;
 use radix::lexer::Interner;
 use radix::syntax::{Program, StmtKind, Visibility};
 use std::collections::{BTreeSet, VecDeque};
 use std::path::{Path, PathBuf};
+
+/// ONE-EFFECTIVE-TARGET SEAM — executed lane (TARGETLANE001 executed-lane
+/// routing; authoritative decision record
+/// `radix/docs/factory/executed-lane-target-decision.md`).
+///
+/// Resolve the effective analysis target for an executed package:
+///   1. **Explicit `-t <target>`** — an explicitly configured MIR-backed
+///      config target is authoritative and is never rerouted. The CLI `-t`
+///      surfaces through the run-route dispatch *before* the package-MIR path
+///      (`faber run -t rust` compiles via the HIR route and never reaches
+///      this seam), so a non-MIR-backed config target here means "no executed
+///      target chosen".
+///   2. **Manifest `[build] target`** — propagated to the analysis target when
+///      the caller did not name an executed target. The package's declared
+///      target is the ABI source of truth for analysis and execution alike;
+///      this propagation is the routing fix that stops `TARGETLANE001`
+///      firing at analysis on the executed path.
+///   3. **Executed-lane default `fmir`** (`Target::MirFmirBinary`) when no
+///      target is named — the source-independent package-MIR binary image the
+///      in-process stepper consumes.
+///
+/// The seam is single-valued and never ambient: analysis and execution resolve
+/// from the same source, so the two targets cannot diverge (ABI source-of-
+/// truth invariant). The radix-side TARGETLANE001 guard is unchanged — this
+/// only fixes the executed route's target selection.
+pub(crate) fn executed_lane_analysis_target(config: &Config, input: &Path) -> Target {
+    if is_mir_backed_target(config.target) {
+        return config.target;
+    }
+    manifest::manifest_build_target_for_input(input)
+        .ok()
+        .flatten()
+        .unwrap_or(Target::MirFmirBinary)
+}
+
+/// Whether a compiler target is MIR-backed (the executed-lane positive set;
+/// the mirror of the radix `TARGETLANE001` guard's HIR-direct reject list in
+/// `crates/radix/src/driver/mod.rs`). `HirFhir` is deliberately excluded: it
+/// is a portable HIR artifact surface, not a MIR-backed executed target, and
+/// the executed lane resolves to `fmir`, not `fhir`.
+fn is_mir_backed_target(target: Target) -> bool {
+    matches!(
+        target,
+        Target::MirStepper
+            | Target::MirWasm
+            | Target::MirWasmBinary
+            | Target::MirLlvm
+            | Target::MirLlvmHost
+            | Target::MirMetal
+            | Target::MirWgsl
+            | Target::MirSexp
+            | Target::MirScena
+            | Target::MirFmir
+            | Target::MirFmirBinary
+            | Target::MirFmirBundle
+    )
+}
 
 pub(crate) use discovery::PackageSpec;
 use import_graph::{

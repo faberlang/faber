@@ -85,6 +85,26 @@ pub(super) fn with_prepared_package_mir_with_cli_mode_and_consumer<R>(
     consumer: PackageMirConsumer,
     run: impl for<'a> FnOnce(&PreparedPackageMir<'a>, &LoweredMirUnit<'a>) -> Result<R, Vec<Diagnostic>>,
 ) -> Result<R, Vec<Diagnostic>> {
+    // ONE-EFFECTIVE-TARGET SEAM (TARGETLANE001 executed-lane routing,
+    // `radix/docs/factory/executed-lane-target-decision.md`): the interpreted
+    // (executed) package resolves its analysis target to a MIR-backed target —
+    // an explicit MIR-backed config target > the manifest `[build] target` >
+    // the executed-lane default `fmir`. Air-lane packages stop tripping
+    // `lane_requires_mir_backed_target` at analysis because the executed route
+    // selects its own MIR-backed target, not because the radix-side guard
+    // relaxed. The same effective config feeds analysis and the run (ABI
+    // source of truth — analysis and execution cannot diverge). External-
+    // target probes keep the caller's config unchanged (decision §5).
+    let effective_config;
+    let config = match consumer {
+        PackageMirConsumer::Interpreted => {
+            effective_config = config
+                .clone()
+                .with_target(crate::package::executed_lane_analysis_target(config, input));
+            &effective_config
+        }
+        PackageMirConsumer::ExternalTarget => config,
+    };
     let package = analyze_package(config, input)?;
     prepare_package_mir(
         package,

@@ -368,6 +368,27 @@ pub(crate) fn manifest_build_target(
     }
 }
 
+/// Resolve the manifest `[build] target` for an input path, returning `None`
+/// when no package layout is discoverable and when the manifest names no
+/// target. A readable manifest naming an unsupported target propagates (fail
+/// closed): the package's declared target is authoritative for the executed
+/// lane and is never silently ignored in favor of the default.
+pub(crate) fn manifest_build_target_for_input(
+    input: &Path,
+) -> Result<Option<Target>, Box<Diagnostic>> {
+    let Ok(layout) = super::discover_build_layout(input) else {
+        return Ok(None);
+    };
+    if !layout.manifest_path.exists() {
+        return Ok(None);
+    }
+    let manifest = read_manifest(&layout.manifest_path)?;
+    match manifest.build.target.as_deref() {
+        Some(target) => manifest_build_target(Some(target), &layout.manifest_path).map(Some),
+        None => Ok(None),
+    }
+}
+
 /// Map a manifest `[device] backend` value to a backend selection request
 /// (N1.1). `None` when the key is absent — the caller applies the portable
 /// default `auto`. An unsupported spelling fails closed with a structured

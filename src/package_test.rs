@@ -45,6 +45,79 @@ fn diagnostic_has_arg(diag: &Diagnostic, name: &'static str, value: impl Into<St
     diag.args.contains(&DiagnosticArg::new(name, value))
 }
 
+#[test]
+fn executed_lane_analysis_target_seam_is_single_valued() {
+    // TARGETLANE001 executed-lane routing (authoritative decision record
+    // `radix/docs/factory/executed-lane-target-decision.md`): the executed-
+    // package analysis target resolves to a MIR-backed target with single-
+    // valued precedence — explicit MIR-backed config target > manifest
+    // `[build] target` > executed-lane default `fmir`. The seam is never
+    // ambient and never divergent between analysis and execution.
+    let dir = test_temp_dir("lane-seam");
+    fs::create_dir_all(dir.join("src")).expect("src");
+    fs::write(dir.join("src/main.fab"), "incipit {}\n").expect("source");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "lane-seam"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+target = "fmir"
+kind = "bin"
+"#,
+    )
+    .expect("manifest");
+
+    // A default (HIR-direct) config resolves to the manifest target: the
+    // package's declared `fmir` is propagated to the analysis target.
+    assert_eq!(
+        super::executed_lane_analysis_target(&Config::default(), dir.path()),
+        Target::MirFmirBinary,
+        "manifest `[build] target = \"fmir\"` must propagate to the analysis target"
+    );
+
+    // An explicit MIR-backed config target is authoritative (explicit `-t`).
+    assert_eq!(
+        super::executed_lane_analysis_target(
+            &Config::default().with_target(Target::MirFmir),
+            dir.path()
+        ),
+        Target::MirFmir,
+        "explicit MIR-backed target must stay authoritative over the manifest"
+    );
+
+    // No manifest target → executed-lane default `fmir`.
+    let bare = test_temp_dir("lane-seam-bare");
+    fs::create_dir_all(bare.join("src")).expect("src");
+    fs::write(bare.join("src/main.fab"), "incipit {}\n").expect("source");
+    fs::write(
+        bare.join("faber.toml"),
+        r#"
+[package]
+name = "lane-seam-bare"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("manifest");
+    assert_eq!(
+        super::executed_lane_analysis_target(&Config::default(), bare.path()),
+        Target::MirFmirBinary,
+        "the executed-lane default for an un-targeted package must be `fmir`"
+    );
+}
+
 #[derive(Debug)]
 struct ExitPanic(i32);
 

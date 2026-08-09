@@ -141,7 +141,6 @@ const PML4_PINS: [(usize, f64); 6] = [
 ];
 
 #[test]
-#[ignore = "TARGETLANE001 (recorded deferral, CTO-1 non-goal): gradus.fab's @ radix lane \"air\" requires a MIR-backed target, but the package pipeline resolves the lane to HIR-direct 'rust'. The PML4 acceptance run stays blocked until that deferral lands."]
 fn package_mir_training_loop_mlp_runs_on_fmir_lane() {
     // CTO-1 acceptance: the PML4 composed loop (gradus/exempla/
     // training-loop-mlp — a 4×4 two-layer MLP, 100 steps, lr 0.1, the
@@ -150,11 +149,11 @@ fn package_mir_training_loop_mlp_runs_on_fmir_lane() {
     // train.proba U6 pins. This is the executed-evidence prerequisite for the
     // auditor-owned runtime-evidence gate.
     //
-    // Currently blocked at analysis time by TARGETLANE001 (the recorded
-    // deferral): `@ radix lane "air"` on gradus.fab functions requires a
-    // MIR-backed target, and the pipeline's lane routing resolves the
-    // package to target 'rust' (HIR-direct). Not part of this slice's
-    // scope; re-enable when the deferral lands.
+    // Re-enabled with TARGETLANE001 executed-lane routing: the executed-
+    // package analysis resolves to a MIR-backed target — the manifest
+    // `[build] target = "fmir"` propagated to the analysis config — so the
+    // air-lane functions pass the lane policy at analysis instead of tripping
+    // `lane_requires_mir_backed_target` under the old default `HirRust`.
     let exemplum =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../gradus/exempla/training-loop-mlp");
     let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
