@@ -1,6 +1,6 @@
 use super::types::{BufferId, BufferLifetime, BufferRole, LaunchId, ObservationCadence, RegionId};
 use crate::abi::MirKernelResourceAccess;
-use crate::device_semantics::{DependencyEdge, SemanticValueId};
+use crate::device_semantics::{DependencyEdge, DeviceEffectBoundaryKind, SemanticValueId};
 use crate::kernel_plan::PlanValidationError;
 use radix_hir::DefId;
 use std::fmt;
@@ -271,6 +271,18 @@ pub enum DeviceProgramError {
     /// A launch is not assigned to exactly one prepared submission region —
     /// an incomplete or overlapping region partition (contract rules 1/4).
     RegionUnassignedLaunch { launch: LaunchId },
+    // ── DDCP1-U6: device/AIR legality ────────────────────────────────────
+    /// A device effect-boundary fact names a launch outside the device
+    /// program — a malformed legality record (DDCP1-U6).
+    UnknownDeviceEffectLaunch { launch: LaunchId },
+    /// A device function (launch) carries a device-hostile effect — `ad`,
+    /// Sermo, cancellation, or an unresolved host (CPU) effect. Stable
+    /// structured rejection with the named effect (DDCP1-U6 / contract
+    /// §ad/Sermo legality).
+    DeviceFunctionHostileEffect {
+        launch: LaunchId,
+        kind: DeviceEffectBoundaryKind,
+    },
 }
 
 impl fmt::Display for DeviceProgramError {
@@ -574,6 +586,15 @@ impl fmt::Display for DeviceProgramError {
             Self::RegionUnassignedLaunch { launch } => write!(
                 f,
                 "launch {launch} is not assigned to exactly one prepared submission region — an incomplete or overlapping region partition fails closed (prepared submission regions rules 1/4)"
+            ),
+            Self::UnknownDeviceEffectLaunch { launch } => write!(
+                f,
+                "device effect-boundary fact names launch {launch}, which is not in the device program (device/AIR legality)"
+            ),
+            Self::DeviceFunctionHostileEffect { launch, kind } => write!(
+                f,
+                "device function (launch {launch}) carries the device-hostile effect {} — device functions cannot contain ad, Sermo, cancellation, or unresolved host-effect operations (device/AIR legality)",
+                kind.spelling()
             ),
         }
     }

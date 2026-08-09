@@ -36,6 +36,22 @@
 //! the shared dispatch extent never overruns or under-fills heterogeneous
 //! outputs — **per-output** extents are derived (`device_program_plans.rs`)
 //! or the program fails closed (contract §Per-output bounds).
+//!
+//! # DDCP1-U6 — Device/AIR legality + CPU host-`ad` preservation
+//!
+//! Device functions (every launch of a device program) must not carry `ad`,
+//! Sermo, cancellation, or unresolved host effect operations. The
+//! materializer records the effect-boundary facts
+//! ([`DeviceLegalityFacts`]/[`DeviceEffectFact`]) from each kernel
+//! function's MIR body; [`DeviceLegalityFacts::validate`] rejects any of
+//! them with stable named diagnostics — deterministic rejection, never an
+//! ad-hoc error (the DDCP1 hard gate). Ordinary CPU host `ad` through
+//! Sermo is untouched: a CPU function is outside the device launch universe
+//! and records no device effect fact. These partition facts complete the
+//! boundary set DDCP1-U5 deferred — they are the region-boundary sources
+//! for `ad`/Sermo/cancellation/CPU-effect boundaries, and because the gate
+//! rejects them before region formation, no prepared submission region can
+//! ever cross such a boundary (the U5 fail-closed envelope).
 
 use crate::device::MirCompanionDerivativeKind;
 use crate::device_program::{BufferId, DeviceProgramError, LaunchId, PreparedRegion, RegionId};
@@ -207,6 +223,108 @@ pub struct ObservationFact {
     pub version: u32,
     /// The launch whose completion boundary makes the observation valid.
     pub at_launch: LaunchId,
+}
+
+/// The device-hostile effect kinds the device/AIR legality gate rejects
+/// inside device functions (DDCP1-U6 / contract §ad/Sermo legality). The
+/// materializer records which of these a device kernel's function body
+/// carries; the gate rejects any of them with a stable named diagnostic —
+/// deterministic rejection, never an ad-hoc error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeviceEffectBoundaryKind {
+    /// An automatic-differentiation operation — the `ad` Sermo conversation
+    /// (a Sermo open with an `ad` frame) or a gradient-handle runtime
+    /// operation inside the function body.
+    Ad,
+    /// A Sermo stream operation (open/send/receive/finish/view/cursor) —
+    /// non-`ad` Sermo machinery inside the function body.
+    Sermo,
+    /// A cancellation boundary (async suspend / cancellation point) inside
+    /// the function body.
+    Cancellation,
+    /// An unresolved host effect — a host-only (CPU) runtime call with no
+    /// device lowering inside the function body.
+    UnresolvedHostEffect,
+}
+
+impl DeviceEffectBoundaryKind {
+    /// Stable diagnostic spelling.
+    #[must_use]
+    pub fn spelling(self) -> &'static str {
+        match self {
+            Self::Ad => "ad",
+            Self::Sermo => "sermo",
+            Self::Cancellation => "cancellation",
+            Self::UnresolvedHostEffect => "unresolved-host-effect",
+        }
+    }
+}
+
+/// One carried effect-boundary fact (DDCP1-U6): the kernel of `launch`
+/// contains a device-hostile effect. These are the host/device partition
+/// facts that record effect boundaries explicitly — the `ad`/Sermo/
+/// cancellation/unresolved host effect boundary facts DDCP1-U5 deferred.
+/// The legality gate rejects a fact on any device launch, so a legal
+/// program carries none of them and no prepared submission region can
+/// cross such a boundary (the U5 fail-closed envelope, made concrete).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DeviceEffectFact {
+    /// The launch whose kernel carries the effect.
+    pub launch: LaunchId,
+    /// The recorded device-hostile effect kind.
+    pub kind: DeviceEffectBoundaryKind,
+}
+
+/// The carried host/device partition effect-boundary record (DDCP1-U6).
+///
+/// The materializer builds this record from each kernel function's MIR body
+/// (a device function containing `ad`, Sermo, cancellation, or an
+/// unresolved host effect is recorded here) and hands it to
+/// [`Self::validate`]. The record is the explicit effect-boundary
+/// accounting the direct device ABI needs: it is the ONLY Sermo/effect
+/// surface in the carrier, and a legal device program carries no facts.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DeviceLegalityFacts {
+    /// The recorded device-effect boundary facts, one per offending launch.
+    pub device_effects: Vec<DeviceEffectFact>,
+}
+
+impl DeviceLegalityFacts {
+    /// DDCP1-U6 / contract §ad/Sermo legality — the device/AIR legality
+    /// gate.
+    ///
+    /// Rejects `ad`, Sermo, cancellation, and unresolved host effect facts
+    /// recorded on device-function launches with stable structured
+    /// diagnostics ([`DeviceProgramError::DeviceFunctionHostileEffect`]) —
+    /// deterministic, named rejection, never an ad-hoc error. A fact
+    /// naming a launch outside the device program is a malformed record
+    /// and fails closed ([`DeviceProgramError::UnknownDeviceEffectLaunch`]).
+    ///
+    /// Ordinary CPU host `ad` through Sermo is untouched: a CPU function is
+    /// outside the device launch universe and records no device effect
+    /// fact, so preservation and rejection never trade against each other
+    /// (reconciliation §3.2). Because this gate runs before prepared-region
+    /// formation, a legal program carries no device-hostile fact and no
+    /// prepared submission region can cross an `ad`/Sermo/cancellation/CPU-
+    /// effect boundary (reconciliation §3.3; the U5 fail-closed envelope).
+    ///
+    /// # Errors
+    ///
+    /// Returns the first [`DeviceProgramError`] the record violates.
+    pub fn validate(&self, launches: &[LaunchId]) -> Result<(), DeviceProgramError> {
+        for fact in &self.device_effects {
+            if !launches.contains(&fact.launch) {
+                return Err(DeviceProgramError::UnknownDeviceEffectLaunch {
+                    launch: fact.launch,
+                });
+            }
+            return Err(DeviceProgramError::DeviceFunctionHostileEffect {
+                launch: fact.launch,
+                kind: fact.kind,
+            });
+        }
+        Ok(())
+    }
 }
 
 /// One selected differentiable input of the primal (F4): the gradient-to-primal

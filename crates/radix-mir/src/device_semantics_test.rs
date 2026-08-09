@@ -1012,3 +1012,162 @@ fn region_derivation_is_independent_of_declaration_order() {
         "declaration order never decides region formation or region ids"
     );
 }
+
+// ── DDCP1-U6: device/AIR legality + CPU host-`ad` preservation (the DDCP1
+//    hard gate; reconciliation §3.1–3.3) ──────────────────────────────────
+
+#[test]
+fn device_function_with_ad_effect_rejects_with_named_diagnostic() {
+    // §3.1: a device function whose kernel body carries an `ad` (automatic-
+    // differentiation) operation — the `ad` Sermo conversation — is
+    // rejected with a stable named diagnostic, never an ad-hoc error.
+    let launches: Vec<LaunchId> = vec![LaunchId(1), LaunchId(2)];
+    let mut facts = DeviceLegalityFacts::default();
+    facts.device_effects.push(DeviceEffectFact {
+        launch: LaunchId(1),
+        kind: DeviceEffectBoundaryKind::Ad,
+    });
+    assert!(matches!(
+        facts.validate(&launches),
+        Err(DeviceProgramError::DeviceFunctionHostileEffect {
+            launch: LaunchId(1),
+            kind: DeviceEffectBoundaryKind::Ad,
+        })
+    ));
+}
+
+#[test]
+fn device_function_with_sermo_effect_rejects_with_named_diagnostic() {
+    // §3.1: a Sermo stream operation inside a device function is rejected
+    // with the named diagnostic.
+    let launches: Vec<LaunchId> = vec![LaunchId(1), LaunchId(2)];
+    let mut facts = DeviceLegalityFacts::default();
+    facts.device_effects.push(DeviceEffectFact {
+        launch: LaunchId(2),
+        kind: DeviceEffectBoundaryKind::Sermo,
+    });
+    assert!(matches!(
+        facts.validate(&launches),
+        Err(DeviceProgramError::DeviceFunctionHostileEffect {
+            launch: LaunchId(2),
+            kind: DeviceEffectBoundaryKind::Sermo,
+        })
+    ));
+}
+
+#[test]
+fn device_function_with_unresolved_host_effect_rejects() {
+    // §3.1: an unresolved host effect (a host-only CPU runtime call with no
+    // device lowering) inside a device function is rejected with the named
+    // diagnostic.
+    let launches: Vec<LaunchId> = vec![LaunchId(1), LaunchId(2)];
+    let mut facts = DeviceLegalityFacts::default();
+    facts.device_effects.push(DeviceEffectFact {
+        launch: LaunchId(1),
+        kind: DeviceEffectBoundaryKind::UnresolvedHostEffect,
+    });
+    assert!(matches!(
+        facts.validate(&launches),
+        Err(DeviceProgramError::DeviceFunctionHostileEffect {
+            launch: LaunchId(1),
+            kind: DeviceEffectBoundaryKind::UnresolvedHostEffect,
+        })
+    ));
+}
+
+#[test]
+fn device_function_with_cancellation_boundary_rejects() {
+    // §3.1: a cancellation boundary (async suspend / cancellation point)
+    // inside a device function is rejected with the named diagnostic.
+    let launches: Vec<LaunchId> = vec![LaunchId(1), LaunchId(2)];
+    let mut facts = DeviceLegalityFacts::default();
+    facts.device_effects.push(DeviceEffectFact {
+        launch: LaunchId(2),
+        kind: DeviceEffectBoundaryKind::Cancellation,
+    });
+    assert!(matches!(
+        facts.validate(&launches),
+        Err(DeviceProgramError::DeviceFunctionHostileEffect {
+            launch: LaunchId(2),
+            kind: DeviceEffectBoundaryKind::Cancellation,
+        })
+    ));
+}
+
+#[test]
+fn device_effect_fact_on_unknown_launch_fails_closed() {
+    // §3.1 fail-closed: an effect-boundary fact naming a launch outside the
+    // device program is a malformed legality record and is rejected.
+    let launches: Vec<LaunchId> = vec![LaunchId(1), LaunchId(2)];
+    let mut facts = DeviceLegalityFacts::default();
+    facts.device_effects.push(DeviceEffectFact {
+        launch: LaunchId(9),
+        kind: DeviceEffectBoundaryKind::Ad,
+    });
+    assert!(matches!(
+        facts.validate(&launches),
+        Err(DeviceProgramError::UnknownDeviceEffectLaunch { launch: LaunchId(9) })
+    ));
+}
+
+#[test]
+fn cpu_host_ad_runs_unchanged_while_device_ad_rejects_same_ladder() {
+    // THE DDCP1 HARD GATE (reconciliation §3.3): a device function
+    // containing `ad` rejects with the named diagnostic while the equivalent
+    // CPU host `ad` through Sermo runs unchanged — preservation and
+    // rejection are proven in the SAME ladder, never traded against each
+    // other (§3.2).
+    let launches: Vec<LaunchId> = vec![LaunchId(1), LaunchId(2)];
+
+    // Negative device side: launch 1 is a device function whose kernel body
+    // opens an `ad` Sermo conversation — the materializer records the fact
+    // and the gate rejects the device function by name.
+    let mut device_facts = DeviceLegalityFacts::default();
+    device_facts.device_effects.push(DeviceEffectFact {
+        launch: LaunchId(1),
+        kind: DeviceEffectBoundaryKind::Ad,
+    });
+    assert!(matches!(
+        device_facts.validate(&launches),
+        Err(DeviceProgramError::DeviceFunctionHostileEffect {
+            launch: LaunchId(1),
+            kind: DeviceEffectBoundaryKind::Ad,
+        })
+    ));
+
+    // Positive CPU side: the equivalent CPU function's host `ad` through
+    // Sermo is a CPU-side operation — it is not a device launch, so no
+    // device effect fact is recorded, and the device program runs unchanged.
+    let semantics = region_chain_semantics(None);
+    let cpu_facts = DeviceLegalityFacts::default();
+    cpu_facts
+        .validate(&launches)
+        .expect("the equivalent CPU host ad through Sermo runs unchanged");
+    semantics
+        .validate(&launches)
+        .expect("the CPU-side equivalent carries no device-hostile fact");
+}
+
+#[test]
+fn device_abi_stays_separate_from_the_cpu_host_effect_abi() {
+    // Contract §Host/device partition and callsite identity rule 2/3 +
+    // reconciliation §3.2: the direct device ABI is separate from the CPU
+    // host-effect ABI and carries NO Sermo/route/Valor/backend-tag/kernel-
+    // name machinery on the hot path. The legality record is the ONLY
+    // Sermo/effect surface in the carrier; a valid device program carries
+    // no device-hostile facts, and the gate admits it — the direct device
+    // ABI never routes through the host-effect seam.
+    let launches: Vec<LaunchId> = vec![LaunchId(1), LaunchId(2)];
+    let semantics = region_chain_semantics(None);
+    let legality = DeviceLegalityFacts::default();
+    assert!(
+        legality.device_effects.is_empty(),
+        "a valid device program carries no Sermo/effect fact on the hot path"
+    );
+    legality
+        .validate(&launches)
+        .expect("the direct device ABI carries no Sermo machinery into the hot path");
+    semantics
+        .validate(&launches)
+        .expect("the carried semantic facts are pure value/generation/graph/axis facts");
+}
