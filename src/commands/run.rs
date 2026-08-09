@@ -164,8 +164,9 @@ fn resolve_route_selection(
 /// Apply the one host-construction policy to a route before launch (N1.1/
 /// N1.5): resolve the route's backend selection against the machine's
 /// admitted backends and fail closed with a structured diagnostic before any
-/// launch when the resolution fails (N1.4). Returns `Some(backend)` when a
-/// device session must be constructed and `None` for the CPU-only route.
+/// launch when the resolution fails (N1.4). The resolution value is
+/// deliberately dropped (DDPP1-U2 C2 isolation): callers only need the
+/// fail-closed side effect.
 fn resolve_route_backend_or_exit(selection: DeviceSelection, requires_device: bool) {
     // DDPP1-U2 (C2 feature isolation): the composite-host backend resolution
     // compiles only under `device-runtime`; without it an explicit device

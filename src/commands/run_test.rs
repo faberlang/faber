@@ -436,10 +436,12 @@ fn route_selection_invalid_manifest_with_cli_flag_is_ignored() {
 // ── S1-5 route decision: CPU route stays unchanged ───────────────────────
 
 #[test]
-fn cpu_route_decision_returns_none_for_auto_without_device_program() {
+fn cpu_route_resolution_stays_on_the_cpu_route_without_device_program() {
     // `auto` + no device program resolves to the CPU-only route on any
     // machine (the admitted-list probe is irrelevant when no device program
-    // is required).
-    let backend = resolve_route_backend_or_exit(DeviceSelection::Auto, false);
-    assert_eq!(backend, None);
+    // is required). The resolution value is deliberately dropped since
+    // DDPP1-U2 (the fail-closed exit is the only observable side effect);
+    // this test pins that the call does NOT fail closed for the CPU-only
+    // route — an exit would terminate the test process.
+    resolve_route_backend_or_exit(DeviceSelection::Auto, false);
 }
