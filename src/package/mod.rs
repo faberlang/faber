@@ -157,6 +157,11 @@ pub(crate) use device::{
     admit_device_program_section, device_program_for_lowered, device_section_for_program,
     execute_device_route,
 };
+// NGAB1-U1 host-partition wire: the typed host/device partition + device
+// program of a lowered package (faber-owned ABI crossing; radix owns the
+// derivation facts).
+#[allow(unused_imports)]
+pub(crate) use device::host_partition_for_lowered;
 #[allow(unused_imports)] // the one host-construction policy for the run routes.
 pub(crate) use host_factory::{
     admitted_backends, construct_composite_host, create_program_session, discovery_receipt,
@@ -526,6 +531,10 @@ pub(crate) fn load_package_with_locale_pack(
 
 #[cfg(test)]
 mod test_support;
+
+#[cfg(test)]
+#[path = "ngab1_host_partition_test.rs"]
+mod ngab1_host_partition_test;
 
 #[cfg(test)]
 mod frontmatter_integration_test;

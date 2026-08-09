@@ -525,7 +525,15 @@ fn emit_unit_module(
                 &lowered.interner,
                 plan,
             ),
-            None => radix::mir::emit_llvm_text_probe_with_device_roles_and_exit(
+            // NGAB1-U1 host-partition lane: a package that carries device
+            // kernels emits its HOST side here — device-role functions lower
+            // as ordinary host-callable functions so the host-side boundary
+            // call links and executes through the native host path. The
+            // typed device contract (identity, resources, launches,
+            // lifetimes, observations) lives in the derived
+            // `radix_mir::HostPartition` device program, never reconstructed
+            // from this module's text (NGAB0 §Partition/§Abi).
+            None => radix::mir::emit_llvm_text_probe_host_partition(
                 &device_roles,
                 &lowered.validated,
                 &lowered.interner,

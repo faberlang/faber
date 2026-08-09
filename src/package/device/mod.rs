@@ -129,6 +129,26 @@ use section::{inputs_by_buffer_id, wire_buffer_name};
 // device root; the sibling seams (program → training, section → wire,
 // run → section/wire/training) resolve through the same re-exports.
 pub(crate) use program::device_program_for_lowered;
+
+/// NGAB1-U1 host-partition wire: derive the typed host/device partition of a
+/// lowered package — the host-side functions, the device kernels, the typed,
+/// target-neutral [`radix_mir::HostPartition`] device program, and the
+/// declared cross-boundary calls — from typed MIR facts only (NGAB0
+/// §Partition/§Abi: identity/type/lifetime facts are never reconstructed from
+/// emitted LLVM/MSL/PTX text or naming conventions).
+///
+/// `Ok(None)` when the package carries no device kernels (no device payload),
+/// mirroring [`device_program_for_lowered`].
+#[allow(dead_code, unused_imports)] // seam kept for the NGAB1 host-partition tests/consumers
+pub(crate) fn host_partition_for_lowered(
+    lowered: &radix::mir::LoweredMirUnit<'_>,
+) -> Result<Option<radix_mir::HostPartition>, Vec<Diagnostic>> {
+    match radix_mir::host_partition::derive_host_partition(&lowered.validated, &lowered.interner) {
+        Ok(partition) if partition.has_device() => Ok(Some(partition)),
+        Ok(_) => Ok(None),
+        Err(error) => Err(vec![device_diag("host partition", error.to_string())]),
+    }
+}
 // The Q1-default prefill device-run driver (GI3-5). The burgus Metal device
 // run is the gated consumer step (env-gated integration test); the lib build
 // keeps the seam for the route + tests.
