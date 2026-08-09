@@ -3797,3 +3797,30 @@ fn parses_posture_in_implendum_method_signature() {
     assert!(interface.methods[0].ret.is_some());
     assert!(interface.methods[0].err.is_some());
 }
+
+// =============================================================================
+// CDA-U2 — ↤ (U+21A4) conversion-directed assignment: red decl-parser tests
+// =============================================================================
+// Typed `fixum`/`varia` declarations accept `↤` initializers (goal decision 6).
+// Today every fixture FAILS at the lexer with `unexpected_character` for the
+// U+21A4 glyph — the expected missing-feature reason. U3 lands the token and
+// the initializer grammar; the untargeted-form rejections (`fixum _`, `sit`,
+// destructuring, awaited) are asserted in the semantic cluster.
+
+#[test]
+fn conversio_assign_typed_fixum_and_varia_initializers_parse() {
+    let result = parse_ok("fixum numerus n ↤ \"42\"\nvaria numerus count ↤ raw ⇥ 0");
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 2);
+    for stmt in &program.statements {
+        let StmtKind::Var(var) = &stmt.kind else {
+            panic!("expected variable declaration");
+        };
+        let expr = var.init.as_deref().expect("initializer");
+        assert!(
+            matches!(expr.kind, ExprKind::Assign(_)),
+            "↤ initializer must parse as an assignment expression, got {:?}",
+            expr.kind
+        );
+    }
+}

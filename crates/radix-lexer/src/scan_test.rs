@@ -998,6 +998,117 @@ fn bare_cr_in_ascii_literal_rejected() {
     assert_eq!(first_ascii_string_payload(&result), "salve");
 }
 
+// =============================================================================
+// CDA-U2 — ↤ (U+21A4) conversion-directed assignment: red lexer tests
+// =============================================================================
+// These tests encode the U+21A4 lexer contract before the token exists (U3).
+// The positive assertions FAIL today with the expected missing-feature reason:
+// the glyph is unknown and lexes as `unexpected_character`. The confusion
+// tests pin scalar distinctness against the neighbor glyphs ← ↦ ⇥ ⇇ and must
+// stay green (U+21C7 remains unowned by the planned exact-output-transfer goal
+// per OQ3).
+
+#[test]
+fn lexes_conversio_assign_glyph_as_dedicated_token() {
+    // RED (CDA-U2): `↤` must lex as its own token kind. Today the glyph is an
+    // unknown character → UnexpectedCharacter, so this test fails for the
+    // expected missing-feature reason. U3 adds the token and this turns green.
+    let result = lex("x ↤ y");
+    assert!(
+        result.errors.is_empty(),
+        "U+21A4 must lex as a dedicated token; errors: {:?}",
+        result.errors
+    );
+    assert!(
+        !result
+            .tokens
+            .iter()
+            .any(|t| t.kind == TokenKind::Error),
+        "U+21A4 must not produce an Error recovery token"
+    );
+}
+
+#[test]
+fn conversio_assign_glyph_does_not_scan_as_existing_arrow() {
+    // RED (CDA-U2): the raw ↤ scalar must scan as its own token kind, never
+    // as `←` / `↦` / `⇥` / `→`. Today the glyph is unknown, so the failure is
+    // the expected unexpected_character (the glyph is not aliased).
+    let result = lex("\u{21A4}");
+    assert!(
+        result.errors.is_empty(),
+        "U+21A4 must not be rejected or aliased; errors: {:?}",
+        result.errors
+    );
+    for token in result.tokens.iter().filter(|t| t.kind != TokenKind::Eof) {
+        assert!(
+            !matches!(
+                token.kind,
+                TokenKind::Assign
+                    | TokenKind::Conversio
+                    | TokenKind::ExitArrow
+                    | TokenKind::Arrow
+            ),
+            "U+21A4 must not alias an existing arrow token, got {:?}",
+            token.kind
+        );
+    }
+}
+
+#[test]
+fn leftward_arrow_never_scans_as_conversio_assign() {
+    // Confusion (protection): `←` (U+2190) remains the ordinary Assign token;
+    // it is never the future ↤ token.
+    let result = lex("←");
+    assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+    assert_eq!(result.tokens[0].kind, TokenKind::Assign);
+}
+
+#[test]
+fn conversio_arrow_never_scans_as_conversio_assign() {
+    // Confusion (protection): `↦` (U+21A6) remains the Conversio token.
+    let result = lex("↦");
+    assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+    assert_eq!(result.tokens[0].kind, TokenKind::Conversio);
+}
+
+#[test]
+fn exit_arrow_never_scans_as_conversio_assign() {
+    // Confusion (protection): `⇥` (U+21E5) remains the ExitArrow token.
+    let result = lex("⇥");
+    assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+    assert_eq!(result.tokens[0].kind, TokenKind::ExitArrow);
+}
+
+#[test]
+fn leftwards_pair_arrow_never_scans_as_conversio_assign() {
+    // Confusion (OQ3 pin): `⇇` (U+21C7) is the planned exact-output-transfer
+    // glyph and is NOT a live token. It must never be aliased into the ↤ token
+    // (or any other arrow); it reports its exact scalar as an unknown
+    // character. Passes today and stays green after U3 (⇇ stays unowned until
+    // exact-output-transfer lands).
+    let result = lex("\u{21C7}");
+    let err = result
+        .errors
+        .iter()
+        .find(|err| err.kind == LexErrorKind::UnexpectedCharacter)
+        .expect("U+21C7 must be an unknown character");
+    assert!(
+        has_arg(err, "char", &format!("'{}'", '\u{21C7}'.escape_default())),
+        "{:?}",
+        err.args
+    );
+    for token in result.tokens.iter().filter(|t| t.kind != TokenKind::Eof) {
+        assert!(
+            !matches!(
+                token.kind,
+                TokenKind::Assign | TokenKind::Conversio | TokenKind::ExitArrow
+            ),
+            "U+21C7 must not alias an arrow token, got {:?}",
+            token.kind
+        );
+    }
+}
+
 #[test]
 fn escaped_cr_in_string_literal_rejected() {
     let result = lex("\"salve\\\rfixum x ← 1");

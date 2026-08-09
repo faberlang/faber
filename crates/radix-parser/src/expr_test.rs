@@ -9,7 +9,8 @@ use crate::test_support::args_have_no_legacy_message;
 use crate::test_support::parse_ok;
 use radix_lexer::lex;
 use radix_syntax::{
-    BinOp, ConversioTarget, ExprKind, FiguraExpr, JsonValue, Literal, StmtKind, TypeExprKind,
+    AssignOp, BinOp, ConversioTarget, ExprKind, FiguraExpr, JsonValue, Literal, StmtKind,
+    TypeExprKind,
 };
 
 #[test]
@@ -803,4 +804,109 @@ fn ascii_comparison_parses_as_lt_during_migration() {
         panic!("expected binary expression, got {:?}", expr.kind);
     };
     assert_eq!(binary.op, BinOp::Lt);
+}
+
+// =============================================================================
+// CDA-U2 — ↤ (U+21A4) conversion-directed assignment: red parser tests
+// =============================================================================
+// These tests encode the `↤` grammar contract — assignment-level precedence,
+// right associativity, `⇥` recovery legal only on `↤` — before the parser
+// implements it (U3). Every fixture FAILS today at the lexer with
+// `unexpected_character` for the U+21A4 glyph, the expected missing-feature
+// reason. A red test that passes at this stage is a defect and must be
+// corrected.
+
+fn assign_expr(expr: &radix_syntax::Expr) -> &radix_syntax::AssignExpr {
+    let ExprKind::Assign(assign) = &expr.kind else {
+        panic!("expected assignment expression, got {:?}", expr.kind);
+    };
+    assign
+}
+
+fn expr_stmt(program: &radix_syntax::Program) -> &radix_syntax::ExprStmt {
+    let StmtKind::Expr(stmt) = &program.statements[0].kind else {
+        panic!("expected expression statement");
+    };
+    stmt
+}
+
+#[test]
+fn conversio_assign_typed_fixum_initializer_parses_as_assignment() {
+    let result = parse_ok(r#"fixum numerus n ↤ "42""#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let assign = assign_expr(expr);
+    // The parser must preserve which operator was written: `↤` is a distinct
+    // assign operator, never erased into the ordinary `←`.
+    assert!(
+        !matches!(assign.op, AssignOp::Assign),
+        "the ↤ operator must be preserved as a distinct assign op"
+    );
+    assert!(matches!(assign.target.kind, ExprKind::Ident(_)));
+}
+
+#[test]
+fn conversio_assign_typed_varia_initializer_parses_as_assignment() {
+    let result = parse_ok(r#"varia numerus n ↤ "42""#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    assert!(
+        matches!(expr.kind, ExprKind::Assign(_)),
+        "↤ initializer must parse as an assignment expression, got {:?}",
+        expr.kind
+    );
+}
+
+#[test]
+fn conversio_assign_has_same_precedence_as_assign() {
+    // `a ← b ↤ c` must bind as `a ← (b ↤ c)`: `↤` sits at the same
+    // precedence level as `←`.
+    let result = parse_ok("a ← b ↤ c");
+    let program = result.program.as_ref().expect("program");
+    let outer = assign_expr(&expr_stmt(program).expr);
+    assert!(
+        matches!(outer.op, AssignOp::Assign),
+        "the outer written operator is `←`, so its op must stay Assign"
+    );
+    assert!(matches!(outer.target.kind, ExprKind::Ident(_)));
+    let inner = assign_expr(&outer.value);
+    assert!(
+        !matches!(inner.op, AssignOp::Assign),
+        "the inner operator is `↤` and must be preserved as a distinct op"
+    );
+}
+
+#[test]
+fn conversio_assign_is_right_associative() {
+    // `a ↤ b ↤ c` must bind as `a ↤ (b ↤ c)` — right-associative like `←`.
+    let result = parse_ok("a ↤ b ↤ c");
+    let program = result.program.as_ref().expect("program");
+    let outer = assign_expr(&expr_stmt(program).expr);
+    assert!(matches!(outer.target.kind, ExprKind::Ident(_)));
+    let inner = assign_expr(&outer.value);
+    assert!(matches!(inner.target.kind, ExprKind::Ident(_)));
+    assert!(
+        !matches!(inner.op, AssignOp::Assign),
+        "the inner operator is `↤` and must be preserved as a distinct op"
+    );
+}
+
+#[test]
+fn conversio_assign_recovery_attaches_to_nearest_conversio_assign_in_chain() {
+    // Contract (AC4/AC9): `a ↤ b ↤ c ⇥ d` must parse with `⇥ d` attached to
+    // the NEAREST `↤` in the right-associated chain (the `b ↤ (c ⇥ d)` step),
+    // and `⇥` stays illegal on ordinary `←`. U3 implements the attachment;
+    // today this fails at the lexer with the expected unexpected_character.
+    let result = parse_ok("a ↤ b ↤ c ⇥ d");
+    let program = result.program.as_ref().expect("program");
+    let outer = assign_expr(&expr_stmt(program).expr);
+    assert!(matches!(outer.target.kind, ExprKind::Ident(_)));
+    let inner = assign_expr(&outer.value);
+    assert!(matches!(inner.target.kind, ExprKind::Ident(_)));
 }
