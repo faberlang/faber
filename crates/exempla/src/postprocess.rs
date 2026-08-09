@@ -25,7 +25,8 @@ pub(crate) fn format_generated_code(target: Target, code: &str) -> Result<String
         | Target::MirFmir
         | Target::MirFmirBinary
         | Target::MirFmirBundle
-        | Target::MirStepper => Ok(code.to_string()),
+        | Target::MirStepper
+        | Target::MirAmd => Ok(code.to_string()),
     }
 }
 
@@ -47,7 +48,8 @@ pub(crate) fn lint_generated_code(target: Target, code: &str) -> Result<String, 
         | Target::MirFmir
         | Target::MirFmirBinary
         | Target::MirFmirBundle
-        | Target::MirStepper => Ok(code.to_string()),
+        | Target::MirStepper
+        | Target::MirAmd => Ok(code.to_string()),
     }
 }
 
