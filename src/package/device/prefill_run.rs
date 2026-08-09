@@ -54,13 +54,13 @@
 use super::{
     admit_device_program_section, artifact_for_backend, descriptor_for_backend,
     device_section_for_program, inputs_by_buffer_id, BTreeMap, BufferId, BufferIdentity,
-    BufferLifetime, BufferRole, BufferVersion, CollectionKernelPlan, DeviceBackend,
-    DeviceProgram, DeviceProgramLifetime, DeviceResource, DeviceSectionBuild, DeviceSelection,
-    Diagnostic, FmirDeviceSection, Interner, KernelLaunchPlan, LaunchId, LaunchUnit, MirFunction,
+    BufferLifetime, BufferRole, BufferVersion, CollectionKernelPlan, DeviceBackend, DeviceProgram,
+    DeviceProgramLifetime, DeviceResource, DeviceSectionBuild, DeviceSelection, Diagnostic,
+    FmirDeviceSection, Interner, KernelLaunchPlan, LaunchId, LaunchUnit, MirFunction,
     MirFunctionId, MirKernelResourceAccess, MirTensorStorageLayout, MirType, ValidatedMir,
 };
-use faber::dequant::{dequant_tensor, OracleReceipt};
-use faber::gguf::admit_file;
+use faber::model_widen::{widen_tensor, OracleReceipt};
+use faber::model_format::admit_pinned_file;
 use faber::json::Json;
 use faber::prefill::{
     compare_gpu_logits, ExecutableRegime, PrefillComparison, PrefillReceipt, PrefillRegimeFields,
@@ -72,15 +72,13 @@ use radix::lexer::Span;
 use radix::mir::{
     MirBlock, MirBlockId, MirConstant, MirIntrinsic, MirLocal, MirLocalId, MirOperand, MirParam,
     MirParamMode, MirPlace, MirProgram, MirRuntimeCall, MirStatement, MirStatementKind,
-    MirTerminator, MirTerminatorKind, MirUnOp, MirValue, MirValueId, MirValueKind,
-    MirValidationContext,
+    MirTerminator, MirTerminatorKind, MirUnOp, MirValidationContext, MirValue, MirValueId,
+    MirValueKind,
 };
 use radix::semantic::{Primitive, Type, TypeTable};
 use radix_mir::abi::{MirKernelResourceKind, MirKernelSignature};
 use radix_mir::device_program::{Binding, KernelUnit, ObservationCadence, ResultBuffer};
-use radix_mir::device_program_plans::{
-    kernel_plan_for_function, transformer_shape_signature,
-};
+use radix_mir::device_program_plans::{kernel_plan_for_function, transformer_shape_signature};
 use radix_mir::device_semantics::{DependencyEdge, DeviceSemantics};
 use radix_mir_fmir::schema::WireBufferRole;
 use radix_types::{DefId, IndexExpr, NumericWidth};
@@ -174,7 +172,7 @@ fn f16_round(value: f32) -> f32 {
 }
 
 /// f16 bits -> f32 — the bit-exact decode (identical to the oracle's
-/// `faber_runtime::dequant::half_to_f32`, so the declared-f32 repack's f16
+/// `faber_runtime::model_widen::half_to_f32`, so the declared-f32 repack's f16
 /// rounding is byte-identical to the CPU oracle's `kv_f16_round`).
 fn half_to_f32(bits: u16) -> f32 {
     let sign = u32::from(bits >> 15) & 0x1;
@@ -270,7 +268,7 @@ impl PrefillWeights {
                 path.display()
             ))]
         })?;
-        let admission = admit_file(path).map_err(|error| {
+        let admission = admit_pinned_file(path).map_err(|error| {
             vec![Diagnostic::error(format!(
                 "prefill device run: GGUF admission failed for `{}`: {error}",
                 path.display()
@@ -296,7 +294,7 @@ impl PrefillWeights {
                 ))
                 .with_arg("issue", "E_PREFILL_TENSOR_MISSING")]
             })?;
-            let values = dequant_tensor(&view, entry).map_err(|error| {
+            let values = widen_tensor(&view, entry).map_err(|error| {
                 vec![Diagnostic::error(format!(
                     "prefill device run: dequant of `{name}` failed: {error}"
                 ))]
@@ -323,7 +321,7 @@ impl PrefillWeights {
                 "prefill device run: admitted tensor `output_norm.weight` not found in the model",
             )]
         })?;
-        let output_norm = dequant_tensor(&view, output_norm_entry).map_err(|error| {
+        let output_norm = widen_tensor(&view, output_norm_entry).map_err(|error| {
             vec![Diagnostic::error(format!(
                 "prefill device run: dequant of `output_norm.weight` failed: {error}"
             ))]
@@ -402,22 +400,13 @@ impl PrefillWeights {
             let name = |base: &str| format!("blk.{il}.{base}");
             map.insert(name("attn_norm.weight"), layer.attn_norm.clone());
             for (head, slice) in layer.attn_q_heads.iter().enumerate() {
-                map.insert(
-                    format!("blk.{il}.attn_q.h{head}.weight"),
-                    slice.clone(),
-                );
+                map.insert(format!("blk.{il}.attn_q.h{head}.weight"), slice.clone());
             }
             for (head, slice) in layer.attn_k_heads.iter().enumerate() {
-                map.insert(
-                    format!("blk.{il}.attn_k.g{head}.weight"),
-                    slice.clone(),
-                );
+                map.insert(format!("blk.{il}.attn_k.g{head}.weight"), slice.clone());
             }
             for (head, slice) in layer.attn_v_heads.iter().enumerate() {
-                map.insert(
-                    format!("blk.{il}.attn_v.g{head}.weight"),
-                    slice.clone(),
-                );
+                map.insert(format!("blk.{il}.attn_v.g{head}.weight"), slice.clone());
             }
             for (head, slice) in layer.attn_out_heads.iter().enumerate() {
                 map.insert(
@@ -488,7 +477,12 @@ fn typed_local(local: u32, ty: MirType) -> MirLocal {
     }
 }
 
-fn collection_call(op: MirIntrinsic, args: &[MirOperand], dest: u32, return_ty: MirType) -> MirStatement {
+fn collection_call(
+    op: MirIntrinsic,
+    args: &[MirOperand],
+    dest: u32,
+    return_ty: MirType,
+) -> MirStatement {
     MirStatement {
         kind: MirStatementKind::RuntimeCall {
             destination: Some(MirPlace::local(MirLocalId(dest))),
@@ -632,7 +626,13 @@ fn rms_norm_function(types: &mut TypeTable, id: u32, dims: [u64; 2]) -> MirFunct
 /// (the GI3-1 contract amendment): the tables are rank-2 `[rows, dim/2]` and
 /// the kernel rotates each row at its own position; the plan resolution
 /// detects the mode from the table shapes.
-fn rope_function(types: &mut TypeTable, id: u32, dims: [u64; 2], pos: i64, dim: i64) -> MirFunction {
+fn rope_function(
+    types: &mut TypeTable,
+    id: u32,
+    dims: [u64; 2],
+    pos: i64,
+    dim: i64,
+) -> MirFunction {
     let x_ty = tensor_ty(types, &dims);
     let rows = dims[0];
     // `dim` is the pinned per-head width (`HEAD_DIM`, a compile-time const),
@@ -1086,10 +1086,7 @@ impl KernelAssembler {
         });
         let id = LaunchId(self.next_launch);
         self.next_launch += 1;
-        self.launches.push(LaunchUnit {
-            id,
-            kernel_index,
-        });
+        self.launches.push(LaunchUnit { id, kernel_index });
         id
     }
 
@@ -1139,9 +1136,9 @@ fn build_prefill_program() -> Result<PrefillProgramArtifact, Vec<Diagnostic>> {
     let mut functions: Vec<MirFunction> = Vec::new();
     let mut next_function = 0u32;
     let intern = |types: &mut TypeTable,
-                      functions: &mut Vec<MirFunction>,
-                      next: &mut u32,
-                      build: fn(&mut TypeTable, u32) -> MirFunction|
+                  functions: &mut Vec<MirFunction>,
+                  next: &mut u32,
+                  build: fn(&mut TypeTable, u32) -> MirFunction|
      -> MirFunctionId {
         let mut function = build(types, *next);
         *next += 1;
@@ -1158,119 +1155,225 @@ fn build_prefill_program() -> Result<PrefillProgramArtifact, Vec<Diagnostic>> {
     };
 
     // ---- Phase 1: intern every distinct function. ----
-    let gather_fn = intern(&mut types, &mut functions, &mut next_function, |types, id| {
-        gather_function(types, id, PROMPT_TOKEN_COUNT)
-    });
-    let rms_norm_fn = intern(&mut types, &mut functions, &mut next_function, |types, id| {
-        rms_norm_function(types, id, [PROMPT_TOKEN_COUNT, HIDDEN_SIZE])
-    });
-    let rope_fn = intern(&mut types, &mut functions, &mut next_function, |types, id| {
-        // Per-position rotation over the 64-wide per-head rows (the
-        // per-head attention fan-out; see `rope_tables`).
-        rope_function(types, id, [PROMPT_TOKEN_COUNT, HEAD_DIM], 8, HEAD_DIM as i64)
-    });
-    let causal_fn = intern(&mut types, &mut functions, &mut next_function, |types, id| {
-        causal_softmax_function(types, id, [PROMPT_TOKEN_COUNT, PROMPT_TOKEN_COUNT])
-    });
-    let transpose_k_fn = intern(&mut types, &mut functions, &mut next_function, |types, id| {
-        transpose_function(types, id, [PROMPT_TOKEN_COUNT, HEAD_DIM])
-    });
-    let transpose_embd_fn =
-        intern(&mut types, &mut functions, &mut next_function, |types, id| {
-            transpose_function(types, id, [VOCAB_SIZE, HIDDEN_SIZE])
-        });
-    let mm_qkv = intern(&mut types, &mut functions, &mut next_function, |types, id| {
-        matmul_function(types, id, PROMPT_TOKEN_COUNT, HIDDEN_SIZE, HEAD_DIM)
-    });
-    let mm_scores = intern(&mut types, &mut functions, &mut next_function, |types, id| {
-        matmul_function(types, id, PROMPT_TOKEN_COUNT, HEAD_DIM, PROMPT_TOKEN_COUNT)
-    });
-    let mm_ctx = intern(&mut types, &mut functions, &mut next_function, |types, id| {
-        matmul_function(types, id, PROMPT_TOKEN_COUNT, PROMPT_TOKEN_COUNT, HEAD_DIM)
-    });
-    let mm_out = intern(&mut types, &mut functions, &mut next_function, |types, id| {
-        matmul_function(types, id, PROMPT_TOKEN_COUNT, HEAD_DIM, HIDDEN_SIZE)
-    });
-    let mm_2560 = intern(&mut types, &mut functions, &mut next_function, |types, id| {
-        matmul_function(types, id, PROMPT_TOKEN_COUNT, HIDDEN_SIZE, FFN_SIZE)
-    });
-    let mm_down = intern(&mut types, &mut functions, &mut next_function, |types, id| {
-        matmul_function(types, id, PROMPT_TOKEN_COUNT, FFN_SIZE, HIDDEN_SIZE)
-    });
-    let mm_tied = intern(&mut types, &mut functions, &mut next_function, |types, id| {
-        matmul_function(types, id, PROMPT_TOKEN_COUNT, HIDDEN_SIZE, VOCAB_SIZE)
-    });
-    let swiglu_neg = intern(&mut types, &mut functions, &mut next_function, |types, id| {
-        elementwise_unary_function(types, id, &[PROMPT_TOKEN_COUNT, FFN_SIZE], ElementwiseUnary::Neg)
-    });
-    let swiglu_exp = intern(&mut types, &mut functions, &mut next_function, |types, id| {
-        elementwise_unary_function(types, id, &[PROMPT_TOKEN_COUNT, FFN_SIZE], ElementwiseUnary::Exp)
-    });
+    let gather_fn = intern(
+        &mut types,
+        &mut functions,
+        &mut next_function,
+        |types, id| gather_function(types, id, PROMPT_TOKEN_COUNT),
+    );
+    let rms_norm_fn = intern(
+        &mut types,
+        &mut functions,
+        &mut next_function,
+        |types, id| rms_norm_function(types, id, [PROMPT_TOKEN_COUNT, HIDDEN_SIZE]),
+    );
+    let rope_fn = intern(
+        &mut types,
+        &mut functions,
+        &mut next_function,
+        |types, id| {
+            // Per-position rotation over the 64-wide per-head rows (the
+            // per-head attention fan-out; see `rope_tables`).
+            rope_function(
+                types,
+                id,
+                [PROMPT_TOKEN_COUNT, HEAD_DIM],
+                8,
+                HEAD_DIM as i64,
+            )
+        },
+    );
+    let causal_fn = intern(
+        &mut types,
+        &mut functions,
+        &mut next_function,
+        |types, id| causal_softmax_function(types, id, [PROMPT_TOKEN_COUNT, PROMPT_TOKEN_COUNT]),
+    );
+    let transpose_k_fn = intern(
+        &mut types,
+        &mut functions,
+        &mut next_function,
+        |types, id| transpose_function(types, id, [PROMPT_TOKEN_COUNT, HEAD_DIM]),
+    );
+    let transpose_embd_fn = intern(
+        &mut types,
+        &mut functions,
+        &mut next_function,
+        |types, id| transpose_function(types, id, [VOCAB_SIZE, HIDDEN_SIZE]),
+    );
+    let mm_qkv = intern(
+        &mut types,
+        &mut functions,
+        &mut next_function,
+        |types, id| matmul_function(types, id, PROMPT_TOKEN_COUNT, HIDDEN_SIZE, HEAD_DIM),
+    );
+    let mm_scores = intern(
+        &mut types,
+        &mut functions,
+        &mut next_function,
+        |types, id| matmul_function(types, id, PROMPT_TOKEN_COUNT, HEAD_DIM, PROMPT_TOKEN_COUNT),
+    );
+    let mm_ctx = intern(
+        &mut types,
+        &mut functions,
+        &mut next_function,
+        |types, id| matmul_function(types, id, PROMPT_TOKEN_COUNT, PROMPT_TOKEN_COUNT, HEAD_DIM),
+    );
+    let mm_out = intern(
+        &mut types,
+        &mut functions,
+        &mut next_function,
+        |types, id| matmul_function(types, id, PROMPT_TOKEN_COUNT, HEAD_DIM, HIDDEN_SIZE),
+    );
+    let mm_2560 = intern(
+        &mut types,
+        &mut functions,
+        &mut next_function,
+        |types, id| matmul_function(types, id, PROMPT_TOKEN_COUNT, HIDDEN_SIZE, FFN_SIZE),
+    );
+    let mm_down = intern(
+        &mut types,
+        &mut functions,
+        &mut next_function,
+        |types, id| matmul_function(types, id, PROMPT_TOKEN_COUNT, FFN_SIZE, HIDDEN_SIZE),
+    );
+    let mm_tied = intern(
+        &mut types,
+        &mut functions,
+        &mut next_function,
+        |types, id| matmul_function(types, id, PROMPT_TOKEN_COUNT, HIDDEN_SIZE, VOCAB_SIZE),
+    );
+    let swiglu_neg = intern(
+        &mut types,
+        &mut functions,
+        &mut next_function,
+        |types, id| {
+            elementwise_unary_function(
+                types,
+                id,
+                &[PROMPT_TOKEN_COUNT, FFN_SIZE],
+                ElementwiseUnary::Neg,
+            )
+        },
+    );
+    let swiglu_exp = intern(
+        &mut types,
+        &mut functions,
+        &mut next_function,
+        |types, id| {
+            elementwise_unary_function(
+                types,
+                id,
+                &[PROMPT_TOKEN_COUNT, FFN_SIZE],
+                ElementwiseUnary::Exp,
+            )
+        },
+    );
     // The device K/V f16 rounding unary (the GI3-1 amendment — the
     // comparator's `kv_f16_round` register rounding, applied post-RoPE to K
     // and directly to V; Q stays f32 per the oracle).
-    let f16_round_fn = intern(&mut types, &mut functions, &mut next_function, |types, id| {
-        elementwise_unary_function(types, id, &[PROMPT_TOKEN_COUNT, HEAD_DIM], ElementwiseUnary::F16Round)
-    });
-    let swiglu_add1 = intern(&mut types, &mut functions, &mut next_function, |types, id| {
-        elementwise_scalar_function(
-            types,
-            id,
-            &[PROMPT_TOKEN_COUNT, FFN_SIZE],
-            ElementwiseScalarOp::Add,
-            1.0,
-        )
-    });
-    let swiglu_div = intern(&mut types, &mut functions, &mut next_function, |types, id| {
-        elementwise_scalar_function(
-            types,
-            id,
-            &[PROMPT_TOKEN_COUNT, FFN_SIZE],
-            ElementwiseScalarOp::Div,
-            1.0,
-        )
-    });
-    let swiglu_silu = intern(&mut types, &mut functions, &mut next_function, |types, id| {
-        elementwise_binary_function(
-            types,
-            id,
-            &[PROMPT_TOKEN_COUNT, FFN_SIZE],
-            radix_mir::MirCollectionOp::TensorMul,
-        )
-    });
-    let swiglu_up = intern(&mut types, &mut functions, &mut next_function, |types, id| {
-        elementwise_binary_function(
-            types,
-            id,
-            &[PROMPT_TOKEN_COUNT, FFN_SIZE],
-            radix_mir::MirCollectionOp::TensorMul,
-        )
-    });
-    let scale_scores = intern(&mut types, &mut functions, &mut next_function, |types, id| {
-        elementwise_scalar_function(
-            types,
-            id,
-            &[PROMPT_TOKEN_COUNT, PROMPT_TOKEN_COUNT],
-            ElementwiseScalarOp::Mul,
-            ATTENTION_SCALE,
-        )
-    });
-    let residual_add = intern(&mut types, &mut functions, &mut next_function, |types, id| {
-        elementwise_binary_function(
-            types,
-            id,
-            &[PROMPT_TOKEN_COUNT, HIDDEN_SIZE],
-            radix_mir::MirCollectionOp::TensorAdd,
-        )
-    });
+    let f16_round_fn = intern(
+        &mut types,
+        &mut functions,
+        &mut next_function,
+        |types, id| {
+            elementwise_unary_function(
+                types,
+                id,
+                &[PROMPT_TOKEN_COUNT, HEAD_DIM],
+                ElementwiseUnary::F16Round,
+            )
+        },
+    );
+    let swiglu_add1 = intern(
+        &mut types,
+        &mut functions,
+        &mut next_function,
+        |types, id| {
+            elementwise_scalar_function(
+                types,
+                id,
+                &[PROMPT_TOKEN_COUNT, FFN_SIZE],
+                ElementwiseScalarOp::Add,
+                1.0,
+            )
+        },
+    );
+    let swiglu_div = intern(
+        &mut types,
+        &mut functions,
+        &mut next_function,
+        |types, id| {
+            elementwise_scalar_function(
+                types,
+                id,
+                &[PROMPT_TOKEN_COUNT, FFN_SIZE],
+                ElementwiseScalarOp::Div,
+                1.0,
+            )
+        },
+    );
+    let swiglu_silu = intern(
+        &mut types,
+        &mut functions,
+        &mut next_function,
+        |types, id| {
+            elementwise_binary_function(
+                types,
+                id,
+                &[PROMPT_TOKEN_COUNT, FFN_SIZE],
+                radix_mir::MirCollectionOp::TensorMul,
+            )
+        },
+    );
+    let swiglu_up = intern(
+        &mut types,
+        &mut functions,
+        &mut next_function,
+        |types, id| {
+            elementwise_binary_function(
+                types,
+                id,
+                &[PROMPT_TOKEN_COUNT, FFN_SIZE],
+                radix_mir::MirCollectionOp::TensorMul,
+            )
+        },
+    );
+    let scale_scores = intern(
+        &mut types,
+        &mut functions,
+        &mut next_function,
+        |types, id| {
+            elementwise_scalar_function(
+                types,
+                id,
+                &[PROMPT_TOKEN_COUNT, PROMPT_TOKEN_COUNT],
+                ElementwiseScalarOp::Mul,
+                ATTENTION_SCALE,
+            )
+        },
+    );
+    let residual_add = intern(
+        &mut types,
+        &mut functions,
+        &mut next_function,
+        |types, id| {
+            elementwise_binary_function(
+                types,
+                id,
+                &[PROMPT_TOKEN_COUNT, HIDDEN_SIZE],
+                radix_mir::MirCollectionOp::TensorAdd,
+            )
+        },
+    );
 
     let mir = PrefillMirProgram {
         functions: MirProgram { functions },
         types,
     };
     let validation = MirValidationContext::new(&mir.types);
-    let validated = ValidatedMir::new(mir.functions.clone(), validation.clone())
-        .map_err(|errors| {
+    let validated =
+        ValidatedMir::new(mir.functions.clone(), validation.clone()).map_err(|errors| {
             errors
                 .into_iter()
                 .map(|error| {
@@ -1313,13 +1416,39 @@ fn build_prefill_program() -> Result<PrefillProgramArtifact, Vec<Diagnostic>> {
     for il in 0..LAYER_COUNT as usize {
         let entry = |base: &str| format!("prefill_blk_{il}_{base}");
         let attn_norm_w = assembler.input_facts(&format!("blk.{il}.attn_norm.weight"));
-        let a = push_rms_norm_kernel(&mut assembler, &mir, &validation, rms_norm_fn, h.clone(), attn_norm_w, &format!("prefill.blk{il}.a"), &entry("attn_norm"))?;
+        let a = push_rms_norm_kernel(
+            &mut assembler,
+            &mir,
+            &validation,
+            rms_norm_fn,
+            h.clone(),
+            attn_norm_w,
+            &format!("prefill.blk{il}.a"),
+            &entry("attn_norm"),
+        )?;
         // Per-query-head Q projections + per-position RoPE (Q stays f32).
         let mut q_rot = Vec::with_capacity(HEAD_COUNT as usize);
         for hq in 0..HEAD_COUNT as usize {
             let attn_q_w = assembler.input_facts(&format!("blk.{il}.attn_q.h{hq}.weight"));
-            let q = push_matmul_kernel(&mut assembler, &mir, &validation, mm_qkv, a.clone(), attn_q_w, &format!("prefill.blk{il}.q{hq}"), &entry(&format!("attn_q_h{hq}")))?;
-            q_rot.push(push_rope_kernel(&mut assembler, &mir, &validation, rope_fn, q, &format!("prefill.blk{il}.qr{hq}"), &entry(&format!("rope_q_h{hq}")))?);
+            let q = push_matmul_kernel(
+                &mut assembler,
+                &mir,
+                &validation,
+                mm_qkv,
+                a.clone(),
+                attn_q_w,
+                &format!("prefill.blk{il}.q{hq}"),
+                &entry(&format!("attn_q_h{hq}")),
+            )?;
+            q_rot.push(push_rope_kernel(
+                &mut assembler,
+                &mir,
+                &validation,
+                rope_fn,
+                q,
+                &format!("prefill.blk{il}.qr{hq}"),
+                &entry(&format!("rope_q_h{hq}")),
+            )?);
         }
         // Per-KV-head K/V projections; K gets RoPE then the f16 register
         // rounding (the GI3-1 amendment — the comparator's `kv_f16_round`,
@@ -1329,55 +1458,237 @@ fn build_prefill_program() -> Result<PrefillProgramArtifact, Vec<Diagnostic>> {
         let mut v_h16 = Vec::with_capacity(KV_HEAD_COUNT as usize);
         for g in 0..KV_HEAD_COUNT as usize {
             let attn_k_w = assembler.input_facts(&format!("blk.{il}.attn_k.g{g}.weight"));
-            let kk = push_matmul_kernel(&mut assembler, &mir, &validation, mm_qkv, a.clone(), attn_k_w, &format!("prefill.blk{il}.k{g}"), &entry(&format!("attn_k_g{g}")))?;
-            let kr = push_rope_kernel(&mut assembler, &mir, &validation, rope_fn, kk, &format!("prefill.blk{il}.kr{g}"), &entry(&format!("rope_k_g{g}")))?;
-            let kr_h16 = push_elementwise_scalar_kernel(&mut assembler, &mir, &validation, f16_round_fn, kr, &format!("prefill.blk{il}.kr{g}_h16"), &entry(&format!("kv_f16_round_k_g{g}")))?;
-            k_t.push(push_transpose_kernel(&mut assembler, &mir, &validation, transpose_k_fn, kr_h16, &format!("prefill.blk{il}.kt{g}"), &entry(&format!("transpose_k_g{g}")))?);
+            let kk = push_matmul_kernel(
+                &mut assembler,
+                &mir,
+                &validation,
+                mm_qkv,
+                a.clone(),
+                attn_k_w,
+                &format!("prefill.blk{il}.k{g}"),
+                &entry(&format!("attn_k_g{g}")),
+            )?;
+            let kr = push_rope_kernel(
+                &mut assembler,
+                &mir,
+                &validation,
+                rope_fn,
+                kk,
+                &format!("prefill.blk{il}.kr{g}"),
+                &entry(&format!("rope_k_g{g}")),
+            )?;
+            let kr_h16 = push_elementwise_scalar_kernel(
+                &mut assembler,
+                &mir,
+                &validation,
+                f16_round_fn,
+                kr,
+                &format!("prefill.blk{il}.kr{g}_h16"),
+                &entry(&format!("kv_f16_round_k_g{g}")),
+            )?;
+            k_t.push(push_transpose_kernel(
+                &mut assembler,
+                &mir,
+                &validation,
+                transpose_k_fn,
+                kr_h16,
+                &format!("prefill.blk{il}.kt{g}"),
+                &entry(&format!("transpose_k_g{g}")),
+            )?);
             let attn_v_w = assembler.input_facts(&format!("blk.{il}.attn_v.g{g}.weight"));
-            let vv = push_matmul_kernel(&mut assembler, &mir, &validation, mm_qkv, a.clone(), attn_v_w, &format!("prefill.blk{il}.v{g}"), &entry(&format!("attn_v_g{g}")))?;
-            v_h16.push(push_elementwise_scalar_kernel(&mut assembler, &mir, &validation, f16_round_fn, vv, &format!("prefill.blk{il}.v{g}_h16"), &entry(&format!("kv_f16_round_v_g{g}")))?);
+            let vv = push_matmul_kernel(
+                &mut assembler,
+                &mir,
+                &validation,
+                mm_qkv,
+                a.clone(),
+                attn_v_w,
+                &format!("prefill.blk{il}.v{g}"),
+                &entry(&format!("attn_v_g{g}")),
+            )?;
+            v_h16.push(push_elementwise_scalar_kernel(
+                &mut assembler,
+                &mir,
+                &validation,
+                f16_round_fn,
+                vv,
+                &format!("prefill.blk{il}.v{g}_h16"),
+                &entry(&format!("kv_f16_round_v_g{g}")),
+            )?);
         }
         // Per-query-head causal attention + output projection; fold the 15
         // head outputs into the `[9, 960]` context.
         let mut o = None;
         for (hq, qr) in q_rot.iter().enumerate() {
             let g = hq / QUERY_HEADS_PER_KV as usize;
-            let scores = push_matmul_kernel(&mut assembler, &mir, &validation, mm_scores, qr.clone(), k_t[g].clone(), &format!("prefill.blk{il}.scores{hq}"), &entry(&format!("scores_h{hq}")))?;
-            let scaled = push_elementwise_scalar_kernel(&mut assembler, &mir, &validation, scale_scores, scores, &format!("prefill.blk{il}.scaled{hq}"), &entry(&format!("scale_scores_h{hq}")))?;
-            let probs = push_causal_softmax_kernel(&mut assembler, &mir, &validation, causal_fn, scaled, &format!("prefill.blk{il}.probs{hq}"), &entry(&format!("causal_softmax_h{hq}")))?;
-            let ctx = push_matmul_kernel(&mut assembler, &mir, &validation, mm_ctx, probs, v_h16[g].clone(), &format!("prefill.blk{il}.ctx{hq}"), &entry(&format!("context_h{hq}")))?;
+            let scores = push_matmul_kernel(
+                &mut assembler,
+                &mir,
+                &validation,
+                mm_scores,
+                qr.clone(),
+                k_t[g].clone(),
+                &format!("prefill.blk{il}.scores{hq}"),
+                &entry(&format!("scores_h{hq}")),
+            )?;
+            let scaled = push_elementwise_scalar_kernel(
+                &mut assembler,
+                &mir,
+                &validation,
+                scale_scores,
+                scores,
+                &format!("prefill.blk{il}.scaled{hq}"),
+                &entry(&format!("scale_scores_h{hq}")),
+            )?;
+            let probs = push_causal_softmax_kernel(
+                &mut assembler,
+                &mir,
+                &validation,
+                causal_fn,
+                scaled,
+                &format!("prefill.blk{il}.probs{hq}"),
+                &entry(&format!("causal_softmax_h{hq}")),
+            )?;
+            let ctx = push_matmul_kernel(
+                &mut assembler,
+                &mir,
+                &validation,
+                mm_ctx,
+                probs,
+                v_h16[g].clone(),
+                &format!("prefill.blk{il}.ctx{hq}"),
+                &entry(&format!("context_h{hq}")),
+            )?;
             let attn_out_w = assembler.input_facts(&format!("blk.{il}.attn_output.h{hq}.weight"));
-            let oh = push_matmul_kernel(&mut assembler, &mir, &validation, mm_out, ctx, attn_out_w, &format!("prefill.blk{il}.o{hq}"), &entry(&format!("attn_output_h{hq}")))?;
+            let oh = push_matmul_kernel(
+                &mut assembler,
+                &mir,
+                &validation,
+                mm_out,
+                ctx,
+                attn_out_w,
+                &format!("prefill.blk{il}.o{hq}"),
+                &entry(&format!("attn_output_h{hq}")),
+            )?;
             o = Some(match o {
                 None => oh,
-                Some(acc) => push_elementwise_binary_kernel(&mut assembler, &mir, &validation, residual_add, acc, oh, &format!("prefill.blk{il}.o"), &entry(&format!("sum_o_h{hq}")))?,
+                Some(acc) => push_elementwise_binary_kernel(
+                    &mut assembler,
+                    &mir,
+                    &validation,
+                    residual_add,
+                    acc,
+                    oh,
+                    &format!("prefill.blk{il}.o"),
+                    &entry(&format!("sum_o_h{hq}")),
+                )?,
             });
         }
         // Static invariant (safe by construction): `HEAD_COUNT` is the pinned
         // const 15 > 0, so the query-head fold loop always yields `Some`.
         let o = o.expect("at least one query head");
-        let h2 = push_elementwise_binary_kernel(&mut assembler, &mir, &validation, residual_add, h, o, &format!("prefill.blk{il}.h2"), &entry("residual_attn"))?;
+        let h2 = push_elementwise_binary_kernel(
+            &mut assembler,
+            &mir,
+            &validation,
+            residual_add,
+            h,
+            o,
+            &format!("prefill.blk{il}.h2"),
+            &entry("residual_attn"),
+        )?;
         let ffn_norm_w = assembler.input_facts(&format!("blk.{il}.ffn_norm.weight"));
-        let f = push_rms_norm_kernel(&mut assembler, &mir, &validation, rms_norm_fn, h2.clone(), ffn_norm_w, &format!("prefill.blk{il}.f"), &entry("ffn_norm"))?;
+        let f = push_rms_norm_kernel(
+            &mut assembler,
+            &mir,
+            &validation,
+            rms_norm_fn,
+            h2.clone(),
+            ffn_norm_w,
+            &format!("prefill.blk{il}.f"),
+            &entry("ffn_norm"),
+        )?;
         let ffn_gate_w = assembler.input_facts(&format!("blk.{il}.ffn_gate.weight"));
-        let gate = push_matmul_kernel(&mut assembler, &mir, &validation, mm_2560, f.clone(), ffn_gate_w, &format!("prefill.blk{il}.gate"), &entry("ffn_gate"))?;
+        let gate = push_matmul_kernel(
+            &mut assembler,
+            &mir,
+            &validation,
+            mm_2560,
+            f.clone(),
+            ffn_gate_w,
+            &format!("prefill.blk{il}.gate"),
+            &entry("ffn_gate"),
+        )?;
         let ffn_up_w = assembler.input_facts(&format!("blk.{il}.ffn_up.weight"));
-        let up = push_matmul_kernel(&mut assembler, &mir, &validation, mm_2560, f, ffn_up_w, &format!("prefill.blk{il}.up"), &entry("ffn_up"))?;
+        let up = push_matmul_kernel(
+            &mut assembler,
+            &mir,
+            &validation,
+            mm_2560,
+            f,
+            ffn_up_w,
+            &format!("prefill.blk{il}.up"),
+            &entry("ffn_up"),
+        )?;
         let hh = push_swiglu_kernels(
-            &mut assembler, &mir, &validation,
-            swiglu_neg, swiglu_exp, swiglu_add1, swiglu_div, swiglu_silu, swiglu_up,
-            gate, up,
-            &format!("prefill.blk{il}.hh"), &entry,
+            &mut assembler,
+            &mir,
+            &validation,
+            swiglu_neg,
+            swiglu_exp,
+            swiglu_add1,
+            swiglu_div,
+            swiglu_silu,
+            swiglu_up,
+            gate,
+            up,
+            &format!("prefill.blk{il}.hh"),
+            &entry,
         )?;
         let ffn_down_w = assembler.input_facts(&format!("blk.{il}.ffn_down.weight"));
-        let down = push_matmul_kernel(&mut assembler, &mir, &validation, mm_down, hh, ffn_down_w, &format!("prefill.blk{il}.down"), &entry("ffn_down"))?;
-        h = push_elementwise_binary_kernel(&mut assembler, &mir, &validation, residual_add, h2, down, &format!("prefill.blk{il}.h"), &entry("residual_ffn"))?;
+        let down = push_matmul_kernel(
+            &mut assembler,
+            &mir,
+            &validation,
+            mm_down,
+            hh,
+            ffn_down_w,
+            &format!("prefill.blk{il}.down"),
+            &entry("ffn_down"),
+        )?;
+        h = push_elementwise_binary_kernel(
+            &mut assembler,
+            &mir,
+            &validation,
+            residual_add,
+            h2,
+            down,
+            &format!("prefill.blk{il}.h"),
+            &entry("residual_ffn"),
+        )?;
     }
 
     let output_norm_w = assembler.input_facts("output_norm.weight");
-    let hn = push_rms_norm_kernel(&mut assembler, &mir, &validation, rms_norm_fn, h, output_norm_w, "prefill.hn", "prefill_output_norm")?;
+    let hn = push_rms_norm_kernel(
+        &mut assembler,
+        &mir,
+        &validation,
+        rms_norm_fn,
+        h,
+        output_norm_w,
+        "prefill.hn",
+        "prefill_output_norm",
+    )?;
     let embd = assembler.input_facts("token_embd.weight");
-    let embd_t = push_transpose_kernel(&mut assembler, &mir, &validation, transpose_embd_fn, embd, "prefill.token_embd_t", "prefill_transpose_token_embd")?;
+    let embd_t = push_transpose_kernel(
+        &mut assembler,
+        &mir,
+        &validation,
+        transpose_embd_fn,
+        embd,
+        "prefill.token_embd_t",
+        "prefill_transpose_token_embd",
+    )?;
     let logits = push_logits_kernel(&mut assembler, &mir, &validation, mm_tied, hn, embd_t)?;
 
     let program = DeviceProgram {
@@ -1453,18 +1764,17 @@ fn kernel_signature_and_plan(
         }
         // The whole ABI signature is the resource/launch authority when the
         // ABI can express the function (the rms-norm/rope/causal seam).
-        let whole =
-            MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
-                function_ref,
-                validation,
-                &Interner::new(),
-            )
-            .map_err(|error| {
-                vec![Diagnostic::error(format!(
-                    "prefill device program: whole ABI signature failed: {}",
-                    error.message
-                ))]
-            })?;
+        let whole = MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+            function_ref,
+            validation,
+            &Interner::new(),
+        )
+        .map_err(|error| {
+            vec![Diagnostic::error(format!(
+                "prefill device program: whole ABI signature failed: {}",
+                error.message
+            ))]
+        })?;
         return Ok((KernelSignature::Whole(whole), plan));
     }
     // Recipe-op kernels (matmul / transpose) and elementwise-only bodies use
@@ -1501,7 +1811,8 @@ fn push_kernel(
     transformer_op: Option<radix_mir::MirCollectionOp>,
     gather_seam: bool,
 ) -> Result<BufferFacts, Vec<Diagnostic>> {
-    let (signature, plan) = kernel_signature_and_plan(mir, validation, function, transformer_op, gather_seam)?;
+    let (signature, plan) =
+        kernel_signature_and_plan(mir, validation, function, transformer_op, gather_seam)?;
     let signature_ref = signature.resources();
     let resources = assembler.resources_from_signature(signature_ref, facts);
     let function_ref = mir
@@ -1584,14 +1895,7 @@ fn push_matmul_kernel(
     let out = assembler.fresh_activation(out_name);
     let facts = vec![left, right, out];
     push_kernel(
-        assembler,
-        mir,
-        validation,
-        function,
-        entry,
-        &facts,
-        None,
-        false,
+        assembler, mir, validation, function, entry, &facts, None, false,
     )
 }
 
@@ -1645,14 +1949,7 @@ fn push_transpose_kernel(
     let out = assembler.fresh_activation(out_name);
     let facts = vec![input, out];
     push_kernel(
-        assembler,
-        mir,
-        validation,
-        function,
-        entry,
-        &facts,
-        None,
-        false,
+        assembler, mir, validation, function, entry, &facts, None, false,
     )
 }
 
@@ -1693,14 +1990,7 @@ fn push_elementwise_scalar_kernel(
     let out = assembler.fresh_activation(out_name);
     let facts = vec![input, out];
     push_kernel(
-        assembler,
-        mir,
-        validation,
-        function,
-        entry,
-        &facts,
-        None,
-        false,
+        assembler, mir, validation, function, entry, &facts, None, false,
     )
 }
 
@@ -1718,14 +2008,7 @@ fn push_elementwise_binary_kernel(
     let out = assembler.fresh_activation(out_name);
     let facts = vec![left, right, out];
     push_kernel(
-        assembler,
-        mir,
-        validation,
-        function,
-        entry,
-        &facts,
-        None,
-        false,
+        assembler, mir, validation, function, entry, &facts, None, false,
     )
 }
 
@@ -1761,8 +2044,13 @@ fn push_logits_kernel(
         .find(|candidate| candidate.id == function)
         .ok_or_else(|| vec![Diagnostic::error("prefill function disappeared")])?;
     let launch = KernelLaunchPlan::from_signature_and_function(signature_ref, function_ref);
-    let produced_by =
-        assembler.push_kernel(function, "prefill_tied_head".to_owned(), plan, resources, launch);
+    let produced_by = assembler.push_kernel(
+        function,
+        "prefill_tied_head".to_owned(),
+        plan,
+        resources,
+        launch,
+    );
     assembler.results.push(ResultBuffer {
         buffer: out.identity(),
         version: BufferVersion {
@@ -1799,12 +2087,62 @@ fn push_swiglu_kernels(
     out_name: &str,
     entry: &dyn Fn(&str) -> String,
 ) -> Result<BufferFacts, Vec<Diagnostic>> {
-    let neg = push_elementwise_scalar_kernel(assembler, mir, validation, neg_fn, gate.clone(), &format!("{out_name}.neg"), &entry("swiglu_neg"))?;
-    let exp = push_elementwise_scalar_kernel(assembler, mir, validation, exp_fn, neg, &format!("{out_name}.exp"), &entry("swiglu_exp"))?;
-    let add1 = push_elementwise_scalar_kernel(assembler, mir, validation, add1_fn, exp, &format!("{out_name}.add1"), &entry("swiglu_add1"))?;
-    let div = push_elementwise_scalar_kernel(assembler, mir, validation, div_fn, add1, &format!("{out_name}.div"), &entry("swiglu_div"))?;
-    let silu = push_elementwise_binary_kernel(assembler, mir, validation, silu_fn, gate, div, &format!("{out_name}.silu"), &entry("swiglu_silu"))?;
-    push_elementwise_binary_kernel(assembler, mir, validation, up_fn, silu, up, out_name, &entry("swiglu_up"))
+    let neg = push_elementwise_scalar_kernel(
+        assembler,
+        mir,
+        validation,
+        neg_fn,
+        gate.clone(),
+        &format!("{out_name}.neg"),
+        &entry("swiglu_neg"),
+    )?;
+    let exp = push_elementwise_scalar_kernel(
+        assembler,
+        mir,
+        validation,
+        exp_fn,
+        neg,
+        &format!("{out_name}.exp"),
+        &entry("swiglu_exp"),
+    )?;
+    let add1 = push_elementwise_scalar_kernel(
+        assembler,
+        mir,
+        validation,
+        add1_fn,
+        exp,
+        &format!("{out_name}.add1"),
+        &entry("swiglu_add1"),
+    )?;
+    let div = push_elementwise_scalar_kernel(
+        assembler,
+        mir,
+        validation,
+        div_fn,
+        add1,
+        &format!("{out_name}.div"),
+        &entry("swiglu_div"),
+    )?;
+    let silu = push_elementwise_binary_kernel(
+        assembler,
+        mir,
+        validation,
+        silu_fn,
+        gate,
+        div,
+        &format!("{out_name}.silu"),
+        &entry("swiglu_silu"),
+    )?;
+    push_elementwise_binary_kernel(
+        assembler,
+        mir,
+        validation,
+        up_fn,
+        silu,
+        up,
+        out_name,
+        &entry("swiglu_up"),
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -1828,20 +2166,21 @@ fn build_semantics(program: &DeviceProgram) -> DeviceSemantics {
             if resource.access == MirKernelResourceAccess::Read {
                 // Find the latest earlier launch that writes this buffer
                 // version.
-                if let Some(producer) = program
-                    .launches
-                    .iter()
-                    .enumerate()
-                    .take(index)
-                    .rev()
-                    .find(|(_, candidate)| {
-                        let candidate_kernel = &program.kernels[candidate.kernel_index];
-                        candidate_kernel.resources.iter().any(|slot| {
-                            slot.buffer.id == resource.buffer.id
-                                && slot.version.version == resource.version.version
-                                && slot.access != MirKernelResourceAccess::Read
+                if let Some(producer) =
+                    program
+                        .launches
+                        .iter()
+                        .enumerate()
+                        .take(index)
+                        .rev()
+                        .find(|(_, candidate)| {
+                            let candidate_kernel = &program.kernels[candidate.kernel_index];
+                            candidate_kernel.resources.iter().any(|slot| {
+                                slot.buffer.id == resource.buffer.id
+                                    && slot.version.version == resource.version.version
+                                    && slot.access != MirKernelResourceAccess::Read
+                            })
                         })
-                    })
                 {
                     edges.push((
                         producer.1.id,
@@ -1913,8 +2252,8 @@ fn build_prefill_section(
 ) -> Result<(FmirDeviceSection, u32), Vec<Diagnostic>> {
     let artifact = build_prefill_program()?;
     let validation = MirValidationContext::new(&artifact.mir.types);
-    let validated = ValidatedMir::new(artifact.mir.functions.clone(), validation.clone())
-        .map_err(|errors| {
+    let validated = ValidatedMir::new(artifact.mir.functions.clone(), validation.clone()).map_err(
+        |errors| {
             errors
                 .into_iter()
                 .map(|error| {
@@ -1924,7 +2263,8 @@ fn build_prefill_section(
                     ))
                 })
                 .collect::<Vec<_>>()
-        })?;
+        },
+    )?;
     let mut inputs = weights.declared_inputs();
     inputs.insert("prompt_tokens".to_owned(), prompt_ids_values());
     let (cos, sin) = rope_tables(&[0, 1, 2, 3, 4, 5, 6, 7, 8], HEAD_DIM, 100_000.0);
@@ -1957,7 +2297,9 @@ fn execute_prefill_session(
 ) -> Result<faber_host_macos_arm64::composite_host::DeviceExecutionReceipt, Vec<Diagnostic>> {
     admit_device_program_section(&device.device_program)?;
     let artifact = artifact_for_backend(&device.artifacts.artifact, backend).ok_or_else(|| {
-        vec![super::super::host_factory::missing_backend_artifact(backend)]
+        vec![super::super::host_factory::missing_backend_artifact(
+            backend,
+        )]
     })?;
     let descriptor = descriptor_for_backend(device, backend, artifact.blob.as_bytes())?;
     let selection = match backend {
@@ -2186,35 +2528,68 @@ fn comparison_record_json(
     model_path: &Path,
 ) -> Result<String, Vec<Diagnostic>> {
     let mut root = StdBTreeMap::new();
-    root.insert("schema".to_owned(), Valor::from("gi3-prefill-comparison-v1"));
     root.insert(
-        "device_run".to_owned(),
-        Valor::from("completed"),
+        "schema".to_owned(),
+        Valor::from("gi3-prefill-comparison-v1"),
     );
-    root.insert(
-        "backend".to_owned(),
-        Valor::from(outcome.backend.clone()),
-    );
+    root.insert("device_run".to_owned(), Valor::from("completed"));
+    root.insert("backend".to_owned(), Valor::from(outcome.backend.clone()));
     root.insert(
         "model_path".to_owned(),
         Valor::from(model_path.display().to_string()),
     );
     let mut q2 = StdBTreeMap::new();
-    q2.insert("schema".to_owned(), Valor::from("faber-runtime/src/prefill.rs compare_gpu_logits"));
-    q2.insert("top1_matches".to_owned(), Valor::from(outcome.comparison.top1_matches));
-    q2.insert("gpu_top1".to_owned(), Valor::from(outcome.comparison.gpu_top1));
-    q2.insert("golden_top1".to_owned(), Valor::from(outcome.comparison.golden_top1));
-    q2.insert("max_delta".to_owned(), Valor::from(outcome.comparison.max_delta as f64));
-    q2.insert("numeric_matches".to_owned(), Valor::from(outcome.comparison.numeric_matches));
-    q2.insert("all_finite".to_owned(), Valor::from(outcome.comparison.all_finite));
-    q2.insert("divergence".to_owned(), Valor::from(outcome.comparison.divergence_field()));
+    q2.insert(
+        "schema".to_owned(),
+        Valor::from("faber-runtime/src/prefill.rs compare_gpu_logits"),
+    );
+    q2.insert(
+        "top1_matches".to_owned(),
+        Valor::from(outcome.comparison.top1_matches),
+    );
+    q2.insert(
+        "gpu_top1".to_owned(),
+        Valor::from(outcome.comparison.gpu_top1),
+    );
+    q2.insert(
+        "golden_top1".to_owned(),
+        Valor::from(outcome.comparison.golden_top1),
+    );
+    q2.insert(
+        "max_delta".to_owned(),
+        Valor::from(outcome.comparison.max_delta as f64),
+    );
+    q2.insert(
+        "numeric_matches".to_owned(),
+        Valor::from(outcome.comparison.numeric_matches),
+    );
+    q2.insert(
+        "all_finite".to_owned(),
+        Valor::from(outcome.comparison.all_finite),
+    );
+    q2.insert(
+        "divergence".to_owned(),
+        Valor::from(outcome.comparison.divergence_field()),
+    );
     q2.insert("ok".to_owned(), Valor::from(outcome.comparison.ok));
     root.insert("q2".to_owned(), Valor::Tabula(q2));
     let mut s6 = StdBTreeMap::new();
-    s6.insert("shape_class".to_owned(), Valor::from(outcome.receipt.regime_fields.shape_class.clone()));
-    s6.insert("representation".to_owned(), Valor::from(outcome.receipt.regime_fields.representation.clone()));
-    s6.insert("algorithm".to_owned(), Valor::from(outcome.receipt.regime_fields.algorithm.clone()));
-    s6.insert("workspace".to_owned(), Valor::from(outcome.receipt.regime_fields.workspace.clone()));
+    s6.insert(
+        "shape_class".to_owned(),
+        Valor::from(outcome.receipt.regime_fields.shape_class.clone()),
+    );
+    s6.insert(
+        "representation".to_owned(),
+        Valor::from(outcome.receipt.regime_fields.representation.clone()),
+    );
+    s6.insert(
+        "algorithm".to_owned(),
+        Valor::from(outcome.receipt.regime_fields.algorithm.clone()),
+    );
+    s6.insert(
+        "workspace".to_owned(),
+        Valor::from(outcome.receipt.regime_fields.workspace.clone()),
+    );
     root.insert("s6_regime".to_owned(), Valor::Tabula(s6));
     root.insert(
         "transfers".to_owned(),
@@ -2293,8 +2668,16 @@ impl std::fmt::Display for PrefillRunOutcome {
             if self.comparison.all_finite { "PASS" } else { "FAIL" },
             self.comparison.max_delta
         )?;
-        writeln!(formatter, "  divergence: {}", self.comparison.divergence_field())?;
-        writeln!(formatter, "  repacked tensors: {} (declared f32 conversion)", self.receipts)?;
+        writeln!(
+            formatter,
+            "  divergence: {}",
+            self.comparison.divergence_field()
+        )?;
+        writeln!(
+            formatter,
+            "  repacked tensors: {} (declared f32 conversion)",
+            self.receipts
+        )?;
         Ok(())
     }
 }
