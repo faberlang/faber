@@ -153,7 +153,7 @@ pub fn cmd_format(command: &FormatCommand) {
     }
 }
 
-fn format_session(path: &Path, locale: Option<&str>, source: &str) -> Result<Session, String> {
+pub(super) fn format_session(path: &Path, locale: Option<&str>, source: &str) -> Result<Session, String> {
     // An explicit CLI locale wins. Without one, preserve an existing source
     // locale while making an untagged source use the product default (`en`).
     let frontmatter_locale = if locale.is_none() {
