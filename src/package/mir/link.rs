@@ -1548,12 +1548,28 @@ fn rewrite_shadowed_alias_namespace_calls(
             {
                 return None;
             }
-            // A HIR-generated namespace def (import aliases whose semantic
-            // namespace reference carries a generated def instead of the
-            // import item's def — the `forma`-shadowing shape) is absent from
-            // the symbol table, so resolve the METHOD NAME uniquely across the
-            // unit's import bindings instead.
+            // A HIR-generated receiver def (>= 1_000_000) is the
+            // `forma`-shadowing shape ONLY: a LOCAL whose name shadows an
+            // import binding makes the semantic namespace reference carry the
+            // generated def instead of the import item's def. The method-name
+            // sweep across the unit's imports is therefore sound ONLY when the
+            // receiver is a local of that exact name. Without the guard, any
+            // ordinary method call on a local (`h1b.gelu()`) whose method
+            // happens to match an imported module's export (`gradus:nn`
+            // exports `gelu`) was rewritten into a synthetic-path namespace
+            // call — corrupting AIR-lane library functions at lowering
+            // ("non-AIR-lane call callee").
             if def.0 >= 1_000_000 {
+                let Some(symbol) = self.resolver.get_symbol(*def) else {
+                    return None;
+                };
+                if !matches!(symbol.kind, radix::semantic::SymbolKind::Local) {
+                    return None;
+                }
+                let local_name = self.interner.resolve(symbol.name).to_owned();
+                if !self.imports.contains_key(&local_name) {
+                    return None;
+                }
                 let method_name = self.interner.resolve(method).to_owned();
                 let mut found = None;
                 for import_def in self.imports.values() {
