@@ -6,6 +6,11 @@
 use serde::{Deserialize, Serialize};
 
 /// Closed v1 kernel module identity carried on MIR providers.
+///
+/// Adding a variant is a wire-format addition: `KernelModule` is embedded in
+/// `MirProviderKind::Kernel` inside `MirProvider` (both `Serialize`/
+/// `Deserialize`), so new-binary ↔ old-binary image pairs must be
+/// release-paired.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum KernelModule {
     Solum,
@@ -13,6 +18,7 @@ pub enum KernelModule {
     Aleator,
     Json,
     Consolum,
+    Toml,
 }
 
 impl KernelModule {
@@ -24,6 +30,7 @@ impl KernelModule {
             Self::Aleator => "aleator",
             Self::Json => "json",
             Self::Consolum => "consolum",
+            Self::Toml => "toml",
         }
     }
 
@@ -35,6 +42,7 @@ impl KernelModule {
             Self::Aleator => "faber:aleator",
             Self::Json => "faber:json",
             Self::Consolum => "faber:consolum",
+            Self::Toml => "faber:toml",
         }
     }
 }
