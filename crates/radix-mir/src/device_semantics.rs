@@ -38,10 +38,12 @@
 //! or the program fails closed (contract §Per-output bounds).
 
 use crate::device::MirCompanionDerivativeKind;
-use crate::device_program::{BufferId, DeviceProgramError, LaunchId};
+use crate::device_program::{BufferId, DeviceProgramError, LaunchId, PreparedRegion, RegionId};
 use crate::{MirFunctionId, MirType};
 use radix_hir::DefId;
 use radix_types::TypeId;
+use std::cmp::Reverse;
+use std::collections::{BinaryHeap, HashMap};
 use std::fmt;
 
 /// Program-unique stable identity of one semantic device value (F1).
@@ -425,9 +427,18 @@ impl DeviceSemantics {
     /// zero/unset generations are rejected; a (value, generation) has exactly
     /// one producer — a second producer of an existing generation is
     /// rejected (each write is a NEW generation, the per-storage-location
-    /// monotone counter). Declaration order never changes the verdict;
-    /// monotonicity/comparability for consumers is completed by the DDCP1-U2
-    /// consumer-binding cross-check (contract rule 3).
+    /// monotone counter). Declaration order never changes the verdict.
+    /// Generation numbers start at 1 (0 is the rejected unset sentinel), but
+    /// the schema does NOT enforce numeric generation monotonicity — a sole
+    /// generation-2 write is schema-valid by design, so the materializer
+    /// mints monotone generations and the independent radix-air oracle
+    /// catches chain deviations (e.g. `mutation_generation_substituted`);
+    /// consumer comparability is completed by the DDCP1-U2 consumer-binding
+    /// cross-check (contract rule 3).
+    ///
+    /// Residual (auditor-2 fire-7 R3): numeric generation monotonicity is
+    /// materializer + radix-air oracle enforcement, never a schema rule —
+    /// the schema must not pre-empt the independent oracle.
     fn validate_generations(&self) -> Result<(), DeviceProgramError> {
         for generation in &self.generations {
             if generation.generation == 0 {
@@ -744,6 +755,285 @@ impl DeviceSemantics {
         }
         Ok(())
     }
+
+    /// DDCP1-U5 / contract §Prepared submission regions — derive the
+    /// compiler-visible prepared submission regions from the carried
+    /// dependency graph.
+    ///
+    /// A prepared submission region is an ordered group of member launches
+    /// encodable/enqueuable as a single host call (NGAB0-R1 granularity:
+    /// **one host call → one prepared submission region**) without CPU
+    /// observation between members. Boundaries arise ONLY from real sources,
+    /// exhaustively:
+    ///
+    /// - **Real dependencies** (rule 1/4): members of one region are
+    ///   path-connected through the carried dependency edges — each
+    ///   connected component is its own candidate; disconnected launches
+    ///   are separate regions.
+    /// - **Declared observations** (rule 3): a launch carrying a declared
+    ///   observation fact is a CPU readback point; a prepared submission
+    ///   region **cannot cross** an observation boundary, so the candidate
+    ///   group is **split at that point** — the observed launch is the last
+    ///   member of its region and the following members start a new region.
+    ///   A one-member region is the minimal prepared region, not a separate
+    ///   ABI shape.
+    /// - **Host control** (rule 2): declared roots are host submit-entry
+    ///   points and host-provided initialization is a host-upload point —
+    ///   both constrain submission between host calls, never inside a
+    ///   region.
+    ///
+    /// No boundary is ever invented by a generic runtime wrapper, a
+    /// scheduling policy outside the compiler, or to "match" a runtime
+    /// interface. `ad`/Sermo, cancellation, and unresolved CPU-effect
+    /// boundaries are not carried facts of this schema; the device/AIR
+    /// legality surface (DDCP1-U6) rejects programs carrying them before
+    /// region formation — a legal program's regions can never cross them
+    /// (fail-closed envelope). Region identity is compiler-owned and static
+    /// at compile time: ids are minted deterministically from the launch-id
+    /// universe and the carried edge/observation sets, independent of
+    /// declaration order and emitted symbol order.
+    #[must_use]
+    pub fn derive_prepared_regions(&self, launches: &[LaunchId]) -> Vec<PreparedRegion> {
+        let mut next_id = 0u32;
+        let mut regions = Vec::new();
+        for component in self.dependency_components(launches) {
+            let ordered = self.topological_order(&component);
+            for part in split_at_observation_points(&self.observations, ordered) {
+                regions.push(PreparedRegion {
+                    id: RegionId(next_id),
+                    launches: part,
+                });
+                next_id += 1;
+            }
+        }
+        regions
+    }
+
+    /// Connected components of the carried dependency graph over `launches`
+    /// (undirected connectivity: every edge joins its endpoints into one
+    /// component). Canonical — components and their members are keyed on
+    /// [`LaunchId`], never on declaration position.
+    fn dependency_components(&self, launches: &[LaunchId]) -> Vec<Vec<LaunchId>> {
+        let mut sorted: Vec<LaunchId> = launches.to_vec();
+        sorted.sort_unstable();
+        sorted.dedup();
+        let index: HashMap<LaunchId, usize> = sorted
+            .iter()
+            .enumerate()
+            .map(|(position, launch)| (*launch, position))
+            .collect();
+        let mut parent: Vec<usize> = (0..sorted.len()).collect();
+        for edge in &self.dependencies {
+            if let (Some(&producer), Some(&consumer)) =
+                (index.get(&edge.producer), index.get(&edge.consumer))
+            {
+                union_find(&mut parent, producer, consumer);
+            }
+        }
+        let mut groups: HashMap<usize, Vec<LaunchId>> = HashMap::new();
+        for (position, launch) in sorted.iter().enumerate() {
+            groups
+                .entry(find(&mut parent, position))
+                .or_default()
+                .push(*launch);
+        }
+        let mut components: Vec<Vec<LaunchId>> = groups.into_values().collect();
+        for component in &mut components {
+            component.sort_unstable();
+        }
+        components.sort_by_key(|component| component[0]);
+        components
+    }
+
+    /// A deterministic topological order of `component` (producer before
+    /// consumer), tie-breaking on [`LaunchId`] — declaration order never
+    /// decides the member order. On a cyclic graph (already rejected by
+    /// [`validate`](Self::validate)) the un-emitted residue is appended in
+    /// launch-id order so the derivation stays total.
+    fn topological_order(&self, component: &[LaunchId]) -> Vec<LaunchId> {
+        let mut indegree: HashMap<LaunchId, usize> =
+            component.iter().map(|launch| (*launch, 0)).collect();
+        let mut successors: HashMap<LaunchId, Vec<LaunchId>> = HashMap::new();
+        for edge in &self.dependencies {
+            if !component.contains(&edge.producer) || !component.contains(&edge.consumer) {
+                continue;
+            }
+            successors
+                .entry(edge.producer)
+                .or_default()
+                .push(edge.consumer);
+            *indegree.entry(edge.consumer).or_default() += 1;
+        }
+        let mut ready: BinaryHeap<Reverse<LaunchId>> = component
+            .iter()
+            .filter(|launch| indegree.get(launch) == Some(&0))
+            .map(|launch| Reverse(*launch))
+            .collect();
+        let mut order: Vec<LaunchId> = Vec::new();
+        while let Some(Reverse(launch)) = ready.pop() {
+            order.push(launch);
+            if let Some(next) = successors.get(&launch) {
+                for consumer in next {
+                    let count = indegree
+                        .get_mut(consumer)
+                        .expect("consumer is a member of the component");
+                    *count -= 1;
+                    if *count == 0 {
+                        ready.push(Reverse(*consumer));
+                    }
+                }
+            }
+        }
+        // Cyclic residue (impossible for a validated program): keep total.
+        let mut residue: Vec<LaunchId> = component
+            .iter()
+            .filter(|launch| !order.contains(launch))
+            .copied()
+            .collect();
+        residue.sort_unstable();
+        order.extend(residue);
+        order
+    }
+
+    /// DDCP1-U5 / contract §Prepared submission regions — validate a
+    /// prepared-submission-region partition fail-closed.
+    ///
+    /// A prepared submission region **cannot cross** an observation boundary,
+    /// a cancellation boundary, or any other CPU-effect/host-control point;
+    /// any candidate group containing one is split at that point or the
+    /// program fails closed (rule 3). Over the compiler-derived surface this
+    /// cross-check proves:
+    ///
+    /// - **Totality** (rule 1/4): every launch is a member of exactly one
+    ///   region — an unassigned or duplicated launch fails closed.
+    /// - **No-crossing** (rule 3): an observation point in a region's
+    ///   interior (any member except the last) forces a CPU readback
+    ///   between members — the region fails closed.
+    /// - **Connectivity** (rule 1): the members of one region are
+    ///   path-connected through the carried dependency edges.
+    ///
+    /// `ad`/Sermo, cancellation, and unresolved CPU-effect boundaries are
+    /// rejected by the device/AIR legality surface (DDCP1-U6) before region
+    /// formation — the regions of a legal program cannot cross them.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first [`DeviceProgramError`] the partition violates.
+    pub fn validate_regions(
+        &self,
+        launches: &[LaunchId],
+        regions: &[PreparedRegion],
+    ) -> Result<(), DeviceProgramError> {
+        // Totality: every launch is a member of exactly one region.
+        let mut seen: Vec<LaunchId> = Vec::new();
+        for region in regions {
+            for launch in &region.launches {
+                if seen.contains(launch) {
+                    return Err(DeviceProgramError::RegionUnassignedLaunch { launch: *launch });
+                }
+                seen.push(*launch);
+            }
+        }
+        for launch in launches {
+            if !seen.contains(launch) {
+                return Err(DeviceProgramError::RegionUnassignedLaunch { launch: *launch });
+            }
+        }
+
+        for region in regions {
+            // No-crossing: no interior member may be an observation point.
+            let member_count = region.launches.len();
+            for (position, launch) in region.launches.iter().enumerate() {
+                let observed = self
+                    .observations
+                    .iter()
+                    .any(|observation| observation.at_launch == *launch);
+                if observed && position + 1 < member_count {
+                    return Err(DeviceProgramError::RegionCrossesBoundary {
+                        region: region.id,
+                        launch: *launch,
+                    });
+                }
+            }
+            // Connectivity: the members form one path-connected group.
+            if !self.members_connected(&region.launches) {
+                return Err(DeviceProgramError::RegionMembersDisconnected {
+                    region: region.id,
+                });
+            }
+        }
+        Ok(())
+    }
+
+    /// Whether `members` are path-connected through the carried dependency
+    /// edges (undirected): every member reachable from the first.
+    fn members_connected(&self, members: &[LaunchId]) -> bool {
+        if members.len() <= 1 {
+            return true;
+        }
+        let mut seen: Vec<LaunchId> = vec![members[0]];
+        let mut frontier: Vec<LaunchId> = vec![members[0]];
+        while let Some(current) = frontier.pop() {
+            for edge in &self.dependencies {
+                let neighbor = if edge.producer == current {
+                    Some(edge.consumer)
+                } else if edge.consumer == current {
+                    Some(edge.producer)
+                } else {
+                    None
+                };
+                let Some(neighbor) = neighbor else { continue };
+                if members.contains(&neighbor) && !seen.contains(&neighbor) {
+                    seen.push(neighbor);
+                    frontier.push(neighbor);
+                }
+            }
+        }
+        seen.len() == members.len()
+    }
+}
+
+/// Union-find over the launch index universe: merge two components.
+fn union_find(parent: &mut [usize], a: usize, b: usize) {
+    let root_a = find(parent, a);
+    let root_b = find(parent, b);
+    if root_a != root_b {
+        parent[root_a] = root_b;
+    }
+}
+
+/// Union-find root with path halving.
+fn find(parent: &mut [usize], mut x: usize) -> usize {
+    while parent[x] != x {
+        parent[x] = parent[parent[x]];
+        x = parent[x];
+    }
+    x
+}
+
+/// Split a topologically-ordered connected component at every declared
+/// observation point: a launch carrying a declared observation is a CPU
+/// readback boundary — it ends its region and the following members start a
+/// new region (contract §Prepared submission regions rule 3).
+fn split_at_observation_points(
+    observations: &[ObservationFact],
+    ordered: Vec<LaunchId>,
+) -> Vec<Vec<LaunchId>> {
+    let mut parts: Vec<Vec<LaunchId>> = Vec::new();
+    let mut current: Vec<LaunchId> = Vec::new();
+    for launch in ordered {
+        current.push(launch);
+        let observed = observations
+            .iter()
+            .any(|observation| observation.at_launch == launch);
+        if observed {
+            parts.push(std::mem::take(&mut current));
+        }
+    }
+    if !current.is_empty() {
+        parts.push(current);
+    }
+    parts
 }
 
 /// The first differing fact between two relation rows for the same primal.

@@ -1,4 +1,4 @@
-use super::types::{BufferId, BufferLifetime, BufferRole, LaunchId, ObservationCadence};
+use super::types::{BufferId, BufferLifetime, BufferRole, LaunchId, ObservationCadence, RegionId};
 use crate::abi::MirKernelResourceAccess;
 use crate::device_semantics::{DependencyEdge, SemanticValueId};
 use crate::kernel_plan::PlanValidationError;
@@ -255,6 +255,22 @@ pub enum DeviceProgramError {
         primal: DefId,
         reason: &'static str,
     },
+    // ── DDCP1-U5: prepared submission regions ────────────────────────────
+    /// A prepared submission region contains a declared observation point in
+    /// its interior — the host would have to read back between members, a
+    /// CPU observation the region's single host call forbids (contract
+    /// §Prepared submission regions rule 3).
+    RegionCrossesBoundary {
+        region: RegionId,
+        launch: LaunchId,
+    },
+    /// A prepared submission region's members are not path-connected through
+    /// the carried dependency graph — a candidate group spanning disconnected
+    /// launches (contract rule 1).
+    RegionMembersDisconnected { region: RegionId },
+    /// A launch is not assigned to exactly one prepared submission region —
+    /// an incomplete or overlapping region partition (contract rules 1/4).
+    RegionUnassignedLaunch { launch: LaunchId },
 }
 
 impl fmt::Display for DeviceProgramError {
@@ -547,6 +563,18 @@ impl fmt::Display for DeviceProgramError {
                 "the companion declared for primal DefId({}) is a missing companion fact: {reason} (companion identity rule 6; a forward-only program declares no companions and needs none)",
                 primal.0
             ),
+            Self::RegionCrossesBoundary { region, launch } => write!(
+                f,
+                "prepared submission region {region} contains the observation point at launch {launch} in its interior — a prepared submission region cannot cross an observation boundary; the candidate group is split at that point or the program fails closed (prepared submission regions rule 3)"
+            ),
+            Self::RegionMembersDisconnected { region } => write!(
+                f,
+                "prepared submission region {region} has members that are not path-connected through the carried dependency graph — a candidate group spanning disconnected launches fails closed (prepared submission regions rule 1)"
+            ),
+            Self::RegionUnassignedLaunch { launch } => write!(
+                f,
+                "launch {launch} is not assigned to exactly one prepared submission region — an incomplete or overlapping region partition fails closed (prepared submission regions rules 1/4)"
+            ),
         }
     }
 }
@@ -562,5 +590,11 @@ impl fmt::Display for BufferId {
 impl fmt::Display for LaunchId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "LaunchId({})", self.0)
+    }
+}
+
+impl fmt::Display for RegionId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RegionId({})", self.0)
     }
 }

@@ -300,6 +300,35 @@ pub struct LaunchUnit {
     pub kernel_index: usize,
 }
 
+/// Program-unique identity of one prepared submission region.
+///
+/// Region identity is compiler-owned and static at compile time: the id is
+/// minted deterministically by
+/// [`DeviceSemantics::derive_prepared_regions`](crate::device_semantics::DeviceSemantics::derive_prepared_regions)
+/// from the carried dependency graph — never recovered from names, bindings,
+/// or launch positions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct RegionId(pub u32);
+
+/// A prepared submission region (contract §Prepared submission regions).
+///
+/// One compiler-visible ordered group of member launches that can be encoded
+/// and enqueued as a single host call (NGAB0-R1: one host call → one
+/// prepared submission region) without CPU observation between its members.
+/// Boundaries arise only from real sources — real dependencies, host
+/// control, cancellation, effects, or declared observations — never from a
+/// generic runtime wrapper and never to "match" a runtime interface.
+/// `launches` is the member enqueue order (topological on the carried
+/// dependency graph); the minimal region is the one-kernel case, not a
+/// separate ABI shape.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PreparedRegion {
+    /// Compiler-owned, static region identity.
+    pub id: RegionId,
+    /// Member launches in enqueue order.
+    pub launches: Vec<LaunchId>,
+}
+
 /// The observation cadence of a result row (S5A-U1): WHEN a declared
 /// observation is read back. The cadence is an explicit carried fact of the
 /// observation — never derived from the buffer's shape, role, or lifetime.

@@ -836,3 +836,179 @@ fn relation_with_no_companion_facts_fails_closed_as_missing() {
             if primal == DefId(1)
     ));
 }
+
+// ── DDCP1-U5: prepared submission regions (contract §Prepared submission
+//    regions rules 1–4; NGAB0-R1 granularity) ─────────────────────────────
+
+/// A two-launch chain semantics: launch 1 produces generation 1 of value 1
+/// (buffer 1); launch 2 consumes it. `observe_at` optionally declares an
+/// observation fact at that launch.
+fn region_chain_semantics(observe_at: Option<LaunchId>) -> DeviceSemantics {
+    let mut semantics = DeviceSemantics {
+        values: vec![value(
+            1,
+            "x",
+            SemanticValueOrigin::MirLocal {
+                function: MirFunctionId(0),
+                local: 0,
+            },
+        )],
+        bindings: vec![ValueBinding {
+            value: SemanticValueId(1),
+            buffer: BufferId(1),
+        }],
+        generations: vec![ValueGeneration {
+            value: SemanticValueId(1),
+            generation: 1,
+            element_ty: f32(),
+            element_count: 4,
+            produced_by: LaunchId(1),
+        }],
+        roots: vec![LaunchId(1)],
+        dependencies: vec![DependencyEdge {
+            producer: LaunchId(1),
+            consumer: LaunchId(2),
+            buffer: BufferId(1),
+            version: 1,
+        }],
+        ..DeviceSemantics::default()
+    };
+    if let Some(at_launch) = observe_at {
+        semantics.observations.push(ObservationFact {
+            buffer: BufferId(1),
+            version: 1,
+            at_launch,
+        });
+    }
+    semantics
+}
+
+#[test]
+fn prepared_regions_derive_from_dependency_connectivity() {
+    // Rule 1/4: connected launches form one prepared submission region —
+    // boundaries come from real dependencies, and one host call enqueues the
+    // whole connected group (NGAB0-R1).
+    let launches: Vec<LaunchId> = vec![LaunchId(1), LaunchId(2)];
+    let semantics = region_chain_semantics(None);
+    let regions = semantics.derive_prepared_regions(&launches);
+    assert_eq!(
+        regions,
+        vec![PreparedRegion {
+            id: RegionId(0),
+            launches: vec![LaunchId(1), LaunchId(2)],
+        }],
+        "a connected chain is one prepared submission region (NGAB0-R1)"
+    );
+    semantics
+        .validate_regions(&launches, &regions)
+        .expect("the derived partition is total, crossing-free, and connected");
+}
+
+#[test]
+fn prepared_region_splits_at_observation_boundary() {
+    // Rule 3: a prepared submission region cannot cross an observation
+    // boundary; the candidate group is split at that point — the observed
+    // launch ends its region and the following member starts a new one.
+    let launches: Vec<LaunchId> = vec![LaunchId(1), LaunchId(2)];
+    let semantics = region_chain_semantics(Some(LaunchId(1)));
+    let regions = semantics.derive_prepared_regions(&launches);
+    assert_eq!(
+        regions,
+        vec![
+            PreparedRegion {
+                id: RegionId(0),
+                launches: vec![LaunchId(1)],
+            },
+            PreparedRegion {
+                id: RegionId(1),
+                launches: vec![LaunchId(2)],
+            },
+        ],
+        "the observed launch l1 ends its region; l2 starts a new region"
+    );
+    semantics
+        .validate_regions(&launches, &regions)
+        .expect("the split partition validates");
+}
+
+#[test]
+fn region_with_interior_observation_fails_closed() {
+    // Rule 3 fail-closed: a region whose interior contains an observation
+    // point would force a CPU readback between its members — rejected.
+    let launches: Vec<LaunchId> = vec![LaunchId(1), LaunchId(2)];
+    let semantics = region_chain_semantics(Some(LaunchId(1)));
+    let bad = vec![PreparedRegion {
+        id: RegionId(0),
+        launches: vec![LaunchId(1), LaunchId(2)],
+    }];
+    assert!(matches!(
+        semantics.validate_regions(&launches, &bad),
+        Err(DeviceProgramError::RegionCrossesBoundary {
+            region: RegionId(0),
+            launch: LaunchId(1),
+        })
+    ));
+}
+
+#[test]
+fn region_with_disconnected_members_fails_closed() {
+    // Rule 1 fail-closed: members of one region must be path-connected
+    // through the carried dependency graph — even with total coverage.
+    let launches: Vec<LaunchId> = vec![LaunchId(1), LaunchId(2), LaunchId(3), LaunchId(4)];
+    let mut semantics = region_chain_semantics(None); // edge l1 → l2
+    semantics.dependencies.push(DependencyEdge {
+        producer: LaunchId(3),
+        consumer: LaunchId(4),
+        buffer: BufferId(1),
+        version: 1,
+    });
+    let bad = vec![
+        PreparedRegion {
+            id: RegionId(0),
+            launches: vec![LaunchId(1), LaunchId(2), LaunchId(3)],
+        },
+        PreparedRegion {
+            id: RegionId(1),
+            launches: vec![LaunchId(4)],
+        },
+    ];
+    assert!(matches!(
+        semantics.validate_regions(&launches, &bad),
+        Err(DeviceProgramError::RegionMembersDisconnected { region: RegionId(0) })
+    ));
+}
+
+#[test]
+fn launch_outside_region_partition_fails_closed() {
+    // Rules 1/4 fail-closed: every launch is a member of exactly one region.
+    let launches: Vec<LaunchId> = vec![LaunchId(1), LaunchId(2)];
+    let semantics = region_chain_semantics(None);
+    let partial = vec![PreparedRegion {
+        id: RegionId(0),
+        launches: vec![LaunchId(1)],
+    }];
+    assert!(matches!(
+        semantics.validate_regions(&launches, &partial),
+        Err(DeviceProgramError::RegionUnassignedLaunch { launch: LaunchId(2) })
+    ));
+}
+
+#[test]
+fn region_derivation_is_independent_of_declaration_order() {
+    // Rule 4 fixture: identical edge/observation sets with permuted
+    // declaration order (and a permuted launch-universe order) derive
+    // identical regions and identical compiler-owned ids.
+    let launches_forward: Vec<LaunchId> = vec![LaunchId(1), LaunchId(2)];
+    let launches_reversed: Vec<LaunchId> = vec![LaunchId(2), LaunchId(1)];
+    let mut forward = region_chain_semantics(Some(LaunchId(1)));
+    let mut reversed = region_chain_semantics(Some(LaunchId(1)));
+    forward.dependencies.reverse();
+    reversed.generations.reverse();
+    reversed.observations.reverse();
+    let forward_regions = forward.derive_prepared_regions(&launches_forward);
+    let reversed_regions = reversed.derive_prepared_regions(&launches_reversed);
+    assert_eq!(
+        forward_regions, reversed_regions,
+        "declaration order never decides region formation or region ids"
+    );
+}

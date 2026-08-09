@@ -256,6 +256,14 @@ impl DeviceProgram {
     /// cross-check is the one declared coupling — that a result IS an
     /// explicit observation point (F6).
     ///
+    /// Finally the compiler derives the **prepared submission regions**
+    /// ([`DeviceSemantics::derive_prepared_regions`]) from the carried
+    /// dependency graph and validates the partition fail-closed — every
+    /// launch in exactly one region, no region crossing an observation
+    /// boundary, every region path-connected (contract §Prepared submission
+    /// regions rules 1–4; NGAB0-R1: one host call → one prepared submission
+    /// region).
+    ///
     /// # Errors
     /// Returns the first [`DeviceProgramError`] the program or its carried
     /// facts violate.
@@ -305,6 +313,14 @@ impl DeviceProgram {
         // declared allocation lifetime fails closed, and per-output bounds/
         // index domains never under-fill under the shared dispatch extent.
         self.validate_resource_axes(semantics)?;
+        // DDCP1-U5 / contract §Prepared submission regions: the compiler
+        // derives the compiler-visible prepared submission regions from the
+        // carried dependency graph (one host call → one region; NGAB0-R1)
+        // and validates the partition fail-closed — every launch assigned to
+        // exactly one region, no region crossing an observation boundary,
+        // every region path-connected through the carried edges.
+        let regions = semantics.derive_prepared_regions(&launches);
+        semantics.validate_regions(&launches, &regions)?;
         Ok(())
     }
 

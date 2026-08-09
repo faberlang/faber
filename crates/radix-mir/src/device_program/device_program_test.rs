@@ -2026,3 +2026,295 @@ fn forward_only_program_never_trips_stale_or_missing_rules() {
         .validate_with_semantics(&semantics)
         .expect("a forward-only program needs no companion facts; newer writes are ordinary");
 }
+
+// -----------------------------------------------------------------------
+// DDCP1-U5: prepared submission regions (contract §Prepared submission
+// regions rules 1–4; NGAB0-R1 granularity) — the compiler-visible region
+// surface over the carried dependency graph.
+// -----------------------------------------------------------------------
+
+/// A three-launch chain program with a declared observation at the middle
+/// launch: kernel 0 writes buffer 0, kernel 1 reads it and writes buffer 1,
+/// kernel 2 reads buffer 1 and writes buffer 2; launches l0 → l1 → l2 with
+/// a result row + observation fact at l1 (the loss-trace pattern — a CPU
+/// readback between l1 and l2). The derived prepared submission regions are
+/// [l0, l1] and [l2].
+fn three_chain_program_with_middle_observation() -> (DeviceProgram, DeviceSemantics) {
+    let mut types = TypeTable::new();
+    let element_ty = f32_ty(&mut types);
+
+    let launch_plan = |x: u64| KernelLaunchPlan {
+        workgroup: MirWorkgroupSize {
+            x: u32::try_from(x).expect("workgroup fits u32"),
+            y: 1,
+            z: 1,
+        },
+        dispatch_size: MirKernelDispatchSize { x, y: 1, z: 1 },
+        workgroup_count: MirKernelWorkgroupCount { x: 1, y: 1, z: 1 },
+    };
+
+    let b0 = identity(0, "mid0", BufferRole::InOut, BufferLifetime::PerStep);
+    let b1 = identity(
+        1,
+        "mid1",
+        BufferRole::InOut,
+        BufferLifetime::ObservationPoint,
+    );
+    let b2 = identity(2, "out", BufferRole::Output, BufferLifetime::PerStep);
+
+    let mut program = DeviceProgram::new(DeviceProgramLifetime::SingleRun);
+    program.kernels = vec![
+        KernelUnit {
+            function: MirFunctionId(0),
+            entry: "k0".to_owned(),
+            plan: CollectionKernelPlan::Elementwise,
+            resources: vec![DeviceResource {
+                buffer: b0.clone(),
+                version: version(1, element_ty.clone(), 4),
+                binding: Binding { group: 0, binding: 0 },
+                access: MirKernelResourceAccess::Write,
+            }],
+            launch: launch_plan(4),
+        },
+        KernelUnit {
+            function: MirFunctionId(1),
+            entry: "k1".to_owned(),
+            plan: CollectionKernelPlan::Elementwise,
+            resources: vec![
+                DeviceResource {
+                    buffer: b0,
+                    version: version(1, element_ty.clone(), 4),
+                    binding: Binding { group: 0, binding: 0 },
+                    access: MirKernelResourceAccess::Read,
+                },
+                DeviceResource {
+                    buffer: b1.clone(),
+                    version: version(1, element_ty.clone(), 4),
+                    binding: Binding { group: 0, binding: 1 },
+                    access: MirKernelResourceAccess::Write,
+                },
+            ],
+            launch: launch_plan(4),
+        },
+        KernelUnit {
+            function: MirFunctionId(2),
+            entry: "k2".to_owned(),
+            plan: CollectionKernelPlan::Elementwise,
+            resources: vec![
+                DeviceResource {
+                    buffer: b1,
+                    version: version(1, element_ty.clone(), 4),
+                    binding: Binding { group: 0, binding: 0 },
+                    access: MirKernelResourceAccess::Read,
+                },
+                DeviceResource {
+                    buffer: b2,
+                    version: version(1, element_ty.clone(), 4),
+                    binding: Binding { group: 0, binding: 1 },
+                    access: MirKernelResourceAccess::Write,
+                },
+            ],
+            launch: launch_plan(4),
+        },
+    ];
+    program.launches = vec![
+        LaunchUnit { id: LaunchId(0), kernel_index: 0 },
+        LaunchUnit { id: LaunchId(1), kernel_index: 1 },
+        LaunchUnit { id: LaunchId(2), kernel_index: 2 },
+    ];
+    program.results.push(ResultBuffer {
+        buffer: identity(
+            1,
+            "mid1",
+            BufferRole::InOut,
+            BufferLifetime::ObservationPoint,
+        ),
+        version: version(1, element_ty.clone(), 4),
+        role: BufferRole::InOut,
+        produced_by: LaunchId(1),
+        cadence: ObservationCadence::PerStep,
+    });
+
+    let semantics = DeviceSemantics {
+        values: vec![
+            SemanticValue {
+                id: SemanticValueId(1),
+                name: "mid0".to_owned(),
+                element_ty: element_ty.clone(),
+                element_count: 4,
+                origin: SemanticValueOrigin::MirLocal {
+                    function: MirFunctionId(0),
+                    local: 0,
+                },
+            },
+            SemanticValue {
+                id: SemanticValueId(2),
+                name: "mid1".to_owned(),
+                element_ty: element_ty.clone(),
+                element_count: 4,
+                origin: SemanticValueOrigin::MirLocal {
+                    function: MirFunctionId(1),
+                    local: 0,
+                },
+            },
+            SemanticValue {
+                id: SemanticValueId(3),
+                name: "out".to_owned(),
+                element_ty: element_ty.clone(),
+                element_count: 4,
+                origin: SemanticValueOrigin::Synthetic {
+                    label: "three-chain-output".to_owned(),
+                },
+            },
+        ],
+        bindings: vec![
+            ValueBinding { value: SemanticValueId(1), buffer: BufferId(0) },
+            ValueBinding { value: SemanticValueId(2), buffer: BufferId(1) },
+            ValueBinding { value: SemanticValueId(3), buffer: BufferId(2) },
+        ],
+        generations: vec![
+            ValueGeneration {
+                value: SemanticValueId(1),
+                generation: 1,
+                element_ty: element_ty.clone(),
+                element_count: 4,
+                produced_by: LaunchId(0),
+            },
+            ValueGeneration {
+                value: SemanticValueId(2),
+                generation: 1,
+                element_ty: element_ty.clone(),
+                element_count: 4,
+                produced_by: LaunchId(1),
+            },
+            ValueGeneration {
+                value: SemanticValueId(3),
+                generation: 1,
+                element_ty: element_ty.clone(),
+                element_count: 4,
+                produced_by: LaunchId(2),
+            },
+        ],
+        roots: vec![LaunchId(0)],
+        dependencies: vec![
+            DependencyEdge {
+                producer: LaunchId(0),
+                consumer: LaunchId(1),
+                buffer: BufferId(0),
+                version: 1,
+            },
+            DependencyEdge {
+                producer: LaunchId(1),
+                consumer: LaunchId(2),
+                buffer: BufferId(1),
+                version: 1,
+            },
+        ],
+        initializations: vec![
+            InitializationFact {
+                buffer: BufferId(0),
+                policy: InitializationPolicy::KernelInitialized,
+            },
+            InitializationFact {
+                buffer: BufferId(1),
+                policy: InitializationPolicy::KernelInitialized,
+            },
+            InitializationFact {
+                buffer: BufferId(2),
+                policy: InitializationPolicy::KernelInitialized,
+            },
+        ],
+        observations: vec![ObservationFact {
+            buffer: BufferId(1),
+            version: 1,
+            at_launch: LaunchId(1),
+        }],
+        ..DeviceSemantics::default()
+    };
+
+    program
+        .validate_with_semantics(&semantics)
+        .expect("three-launch chain + carried semantics validate together");
+    (program, semantics)
+}
+
+#[test]
+fn chain_program_is_one_prepared_region_without_observation() {
+    // NGAB0-R1: two dependent launches with no observation between them form
+    // ONE prepared submission region — one host call enqueues both, with no
+    // CPU observation between members.
+    let (program, semantics) = chain_program_with_semantics();
+    let launches: Vec<LaunchId> = program.launches.iter().map(|launch| launch.id).collect();
+    let regions = semantics.derive_prepared_regions(&launches);
+    assert_eq!(
+        regions,
+        vec![PreparedRegion {
+            id: RegionId(0),
+            launches: vec![LaunchId(0), LaunchId(1)],
+        }]
+    );
+}
+
+#[test]
+fn prepared_regions_split_at_the_middle_observation() {
+    // Rules 1/3/4 + NGAB0-R1: the connected chain l0 → l1 → l2 is one
+    // candidate, and the declared observation at l1 (a CPU readback point)
+    // is split at that point — [l0, l1] and [l2].
+    let (program, semantics) = three_chain_program_with_middle_observation();
+    let launches: Vec<LaunchId> = program.launches.iter().map(|launch| launch.id).collect();
+    let regions = semantics.derive_prepared_regions(&launches);
+    assert_eq!(
+        regions,
+        vec![
+            PreparedRegion {
+                id: RegionId(0),
+                launches: vec![LaunchId(0), LaunchId(1)],
+            },
+            PreparedRegion {
+                id: RegionId(1),
+                launches: vec![LaunchId(2)],
+            },
+        ],
+        "the observed launch l1 ends its region; l2 starts the next region"
+    );
+}
+
+#[test]
+fn one_kernel_program_is_the_minimal_prepared_region() {
+    // NGAB0-R1: the one-kernel case is the minimal prepared region, not a
+    // separate ABI shape — a single observed launch is one region of one
+    // member.
+    let (program, semantics) = reduction_program_with_semantics();
+    let launches: Vec<LaunchId> = program.launches.iter().map(|launch| launch.id).collect();
+    let regions = semantics.derive_prepared_regions(&launches);
+    assert_eq!(
+        regions,
+        vec![PreparedRegion {
+            id: RegionId(0),
+            launches: vec![LaunchId(0)],
+        }]
+    );
+    program
+        .validate_with_semantics(&semantics)
+        .expect("the observed single-kernel program still validates with regions");
+}
+
+#[test]
+fn prepared_region_derivation_is_order_independent() {
+    // Rule 4 fixture: permuted launch/edge/generation declaration order
+    // derives identical regions and identical compiler-owned ids.
+    let (mut program_a, semantics_a) = chain_program_with_semantics();
+    let (mut program_b, mut semantics_b) = chain_program_with_semantics();
+    program_a.launches.swap(0, 1);
+    program_b.launches.swap(0, 1);
+    semantics_b.dependencies.reverse();
+    semantics_b.generations.reverse();
+    let launches_a: Vec<LaunchId> = program_a.launches.iter().map(|launch| launch.id).collect();
+    let launches_b: Vec<LaunchId> = program_b.launches.iter().map(|launch| launch.id).collect();
+    let regions_a = semantics_a.derive_prepared_regions(&launches_a);
+    let regions_b = semantics_b.derive_prepared_regions(&launches_b);
+    assert_eq!(
+        regions_a, regions_b,
+        "declaration order never decides region formation or region ids"
+    );
+}
