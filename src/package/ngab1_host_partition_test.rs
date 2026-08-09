@@ -398,3 +398,88 @@ incipit {
         "observation",
     );
 }
+
+// ── NGAB1-U4: batch compatible call shapes ────────────────────────────────
+//
+// After the first accepted call shape (the scalar), compatible shapes batch
+// through the same ABI without new mechanisms. Batched shapes are MULTIPLE
+// KERNELS PER PREPARED SUBMISSION REGION — one host call → one region
+// containing the batch's kernels, never per-kernel ABI rows (NGAB0-R1: the
+// region is the call's submission unit, not the kernel).
+
+/// The two-kernel composition (scale → offset, the first kernel's output
+/// feeding the second kernel's input) lowers through the real product path
+/// and derives as ONE boundary call → ONE prepared submission region carrying
+/// the batch's two kernels in invocation order — no per-kernel ABI rows.
+/// Both kernels' typed facts (entry identity, ordered launches, declared
+/// observations) survive into the derived device program.
+const NGAB1_U4_TWO_KERNEL_FIXTURE: &str = r#"@ nucleum
+functio scale_kernel(fractus<f32> x) → fractus<f32> {
+    redde x * 2.0 + 1.0
+}
+
+@ nucleum
+functio offset_kernel(fractus<f32> x) → fractus<f32> {
+    redde x + 5.0
+}
+
+functio run_batch(fractus<f32> x) → fractus<f32> {
+    varia fractus<f32> y ← scale_kernel(x)
+    redde offset_kernel(y)
+}
+
+incipit {
+    nota run_batch(3.0 ∷ fractus<f32>)
+}"#;
+
+#[test]
+fn ngab1_two_kernel_composition_derives_one_region_per_call() {
+    let dir = test_temp_dir("ngab1-two-kernel-composition");
+    let package_dir = dir.join("fixture-scalar-kernel");
+    fs::create_dir_all(&package_dir).expect("create fixture dir");
+    let entry = package_dir.join("fixture-scalar-kernel.fab");
+    fs::write(&entry, NGAB1_U4_TWO_KERNEL_FIXTURE).expect("write fixture");
+
+    with_lowered_package_mir(&llvm_host_config(), &entry, |lowered| {
+        let partition = host_partition_for_lowered(lowered)
+            .expect("host partition derives")
+            .expect("the fixture carries a device program");
+
+        // Two device kernels (scale → offset in declaration order); the host
+        // side is every other function.
+        assert_eq!(partition.device_kernels.len(), 2);
+        let scale_id = partition.device_kernels[0];
+        let offset_id = partition.device_kernels[1];
+        assert!(!partition.host_functions.contains(&scale_id));
+        assert!(!partition.host_functions.contains(&offset_id));
+
+        // ONE declared boundary call → ONE prepared region carrying the
+        // batch's two kernels in invocation order (never per-kernel rows).
+        assert_eq!(partition.boundary_calls.len(), 1);
+        let call = &partition.boundary_calls[0];
+        assert_ne!(call.host, scale_id, "the boundary call's caller is a host function");
+        assert_eq!(call.region.kernels, vec![scale_id, offset_id]);
+        assert!(
+            !call.region.is_minimal(),
+            "the batch region carries the composition's two kernels"
+        );
+        assert_eq!(partition.call_abi_version, HOST_CALL_ABI_VERSION);
+
+        // Both kernels derive with their typed facts: entry identity, ordered
+        // launches, declared observations.
+        let program = &partition.device_program;
+        assert_eq!(program.kernels.len(), 2);
+        assert_eq!(program.kernels[0].entry, "scale_kernel");
+        assert_eq!(program.kernels[1].entry, "offset_kernel");
+        assert_eq!(program.launches.len(), 2);
+        assert_eq!(program.launches[0].kernel_index, 0);
+        assert_eq!(program.launches[1].kernel_index, 1);
+        assert_eq!(program.results.len(), 2);
+        assert_eq!(program.results[0].produced_by, program.launches[0].id);
+        assert_eq!(program.results[1].produced_by, program.launches[1].id);
+        program
+            .validate()
+            .expect("derived program passes the shared schema");
+    })
+    .expect("fixture lowers and analyzes");
+}
