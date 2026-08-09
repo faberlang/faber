@@ -215,6 +215,10 @@ pub enum FmirDeviceSelection {
     Metal,
     /// NVIDIA CUDA.
     Cuda,
+    /// AMD (the OQ1 backend-id default — AMD-A3): the explicit selection of
+    /// the AMDGPU leaf; admission requires an `amd` artifact for the
+    /// selection (never a silent fallback).
+    Amd,
     /// Any other declared backend-selection id. Representable; rejected
     /// honestly at selection resolution (no compiled-in leaf matches).
     Unknown(String),
@@ -228,6 +232,7 @@ impl FmirDeviceSelection {
             Self::Auto => "auto".to_owned(),
             Self::Metal => "metal".to_owned(),
             Self::Cuda => "cuda".to_owned(),
+            Self::Amd => "amd".to_owned(),
             Self::Unknown(id) => id.clone(),
         }
     }
@@ -465,11 +470,15 @@ pub enum FmirDeviceBackend {
     Cuda,
     /// AMD GPU via the AMDGPU/HIP variant of the LLVM emitter family
     /// (AMDGPU LLVM IR compiler input; ROCm clang → HSACO ELF — the third
-    /// conformance leaf, goal `amd-gpu-target`). The variant is ADDITIVE:
-    /// the `Unknown` representable-backend path is unchanged, and any
-    /// pre-existing `Unknown("amd")`/`Unknown("rocm")` spelling round-trips
-    /// exactly as before.
-    Amdgpu,
+    /// conformance leaf, goal `amd-gpu-target`). The backend-id spelling is
+    /// the OQ1 default **`amd`** (goal open question Q1 — one decision,
+    /// recorded; the seed's `amdgpu` id is aligned to it). The variant is
+    /// ADDITIVE: the `Unknown` representable-backend path is unchanged, and
+    /// any genuinely-unknown spelling (`Unknown("rocm")`, a future WebGPU
+    /// id, …) round-trips exactly as before — an `amd` id now DECODES to
+    /// this explicit variant (the same wire value as the seed, admitted as
+    /// the compiled-in leaf) instead of `Unknown`.
+    Amd,
     /// Any other backend id (e.g. a future WebGPU leaf). Representable;
     /// rejected honestly at admission with a stable structured diagnostic.
     Unknown(String),
@@ -482,7 +491,7 @@ impl FmirDeviceBackend {
         match self {
             Self::Metal => "metal".to_owned(),
             Self::Cuda => "cuda".to_owned(),
-            Self::Amdgpu => "amdgpu".to_owned(),
+            Self::Amd => "amd".to_owned(),
             Self::Unknown(id) => id.clone(),
         }
     }

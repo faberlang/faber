@@ -65,14 +65,17 @@ pub struct ArtifactCompatibilityTable {
 }
 
 /// The FMIR default compatibility table (DDCP3-U0 (e)): the current
-/// Metal/CUDA facts as data — Metal artifacts carry `msl` (compiler-input)
+/// Metal/CUDA/AMD facts as data — Metal artifacts carry `msl` (compiler-input)
 /// / `metallib` (finalized-binary) for target `macos-arm64` with the
 /// `metal`/`macos-arm64` features; CUDA artifacts carry `ptx` for target
-/// `sm_120` with the `cuda`/`sm_80`/`sm_120` features. Kept as the
-/// mid-flight default so faber's `admit_device_section` decode path does not
-/// break; the leaf-owned rows are the same facts exported by the leaf
-/// crates for caller-supplied assembly (removal = recorded residual, not
-/// this unit).
+/// `sm_120` with the `cuda`/`sm_80`/`sm_120` features; AMD artifacts carry
+/// `llvm-ir` for the explicit `gfx942` target with the
+/// `amdgpu`/`cdna3`/`gfx942` features (the AMD-A3 `amd` backend row — the
+/// OQ1 backend-id spelling, mirroring the leaf's
+/// `amdgpu_compatibility_rows`). Kept as the mid-flight default so faber's
+/// `admit_device_section` decode path does not break; the leaf-owned rows
+/// are the same facts exported by the leaf crates for caller-supplied
+/// assembly (removal = recorded residual, not this unit).
 #[must_use]
 pub fn default_compatibility_table() -> ArtifactCompatibilityTable {
     ArtifactCompatibilityTable {
@@ -104,6 +107,13 @@ pub fn default_compatibility_table() -> ArtifactCompatibilityTable {
                 stage: "finalized-binary",
                 target: "sm_120",
                 features: &["cuda", "sm_80", "sm_120"],
+            },
+            ArtifactCompatibilityRow {
+                backend: "amd",
+                format: "llvm-ir",
+                stage: "compiler-input",
+                target: "gfx942",
+                features: &["amdgpu", "cdna3", "gfx942"],
             },
         ],
     }

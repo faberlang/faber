@@ -202,19 +202,21 @@ pub(crate) fn check_artifact_entrypoints(
 }
 
 /// Fail-closed backend-selection admission (DDCP2-U3; DDCP3-U0 (f) /
-/// CTO9-6 f): an explicit selection (Metal/Cuda) must have an artifact for
-/// the selected backend — a missing artifact fails closed with the named
-/// rule. `Auto` is admitted (selection resolves at run time); an **explicit
-/// selection of an unknown backend fails at selection resolution** with
-/// [`FmirImageError::UnsupportedSelectedBackend`] — aligned with faber's
-/// landed fail-closed `Unknown(_)` arm. Unknown backend ARTIFACTS are
-/// preserved-until-selection (admitted at load, rejected at selection use);
-/// never silently remapped.
+/// CTO9-6 f): an explicit selection (Metal/Cuda/Amd) must have an artifact
+/// for the selected backend — a missing artifact fails closed with the
+/// named rule. `Auto` is admitted (selection resolves at run time); an
+/// **explicit selection of an unknown backend fails at selection
+/// resolution** with [`FmirImageError::UnsupportedSelectedBackend`] —
+/// aligned with faber's landed fail-closed `Unknown(_)` arm. Unknown
+/// backend ARTIFACTS are preserved-until-selection (admitted at load,
+/// rejected at selection use); never silently remapped.
 pub(crate) fn check_selection_artifacts(
     device: &FmirDeviceSection,
 ) -> Result<(), crate::error::FmirImageError> {
     match &device.selection {
-        crate::schema::FmirDeviceSelection::Metal | crate::schema::FmirDeviceSelection::Cuda => {
+        crate::schema::FmirDeviceSelection::Metal
+        | crate::schema::FmirDeviceSelection::Cuda
+        | crate::schema::FmirDeviceSelection::Amd => {
             let selected = device.selection.spelling();
             let present = device
                 .artifacts

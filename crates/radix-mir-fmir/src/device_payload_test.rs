@@ -657,8 +657,11 @@ fn unknown_backend_artifact_preserved_until_selection() {
         .artifacts
         .artifact
         .push(with_computed_digests(FmirDeviceArtifact {
-            backend: FmirDeviceBackend::Unknown("amd".to_owned()),
-            ..metal_artifact("amd kernel")
+            // AMD-A3: `amd` is now the explicit compiled-in backend-id (OQ1
+            // default) — the unknown-backend example uses a genuinely-unknown
+            // id (`webgpu`); `Unknown` is kept for other ids.
+            backend: FmirDeviceBackend::Unknown("webgpu".to_owned()),
+            ..metal_artifact("webgpu kernel")
         }));
     let image = text_image_with_device(Some(section));
     let text = encode_text_image(&image).expect("encode text image");
@@ -1200,13 +1203,15 @@ fn unknown_backend_artifact_skips_leaf_combination_rules() {
     // global known-feature check + digest re-verification still apply.
     let mut section = sample_device_section();
     section.artifacts.artifact = vec![with_computed_digests(FmirDeviceArtifact {
-        backend: FmirDeviceBackend::Unknown("amd".to_owned()),
+        // AMD-A3: `amd` is now the explicit compiled-in backend-id (OQ1
+        // default) — the unknown-backend example uses a genuinely-unknown id.
+        backend: FmirDeviceBackend::Unknown("webgpu".to_owned()),
         format: DeviceArtifactFormat::Unknown("amdgcn".to_owned()),
         target: DeviceTargetId {
             id: "gfx1100".to_owned(),
-            required_features: vec!["amd".to_owned()],
+            required_features: vec!["amdgpu".to_owned()],
         },
-        ..metal_artifact("amd kernel")
+        ..metal_artifact("webgpu kernel")
     })];
     let image = text_image_with_device(Some(section));
     let text = encode_text_image(&image).expect("encode text image");
@@ -1405,6 +1410,155 @@ fn unknown_backend_is_representable_and_preserved_at_load() {
 
     // The same unknown-backend ARTIFACT under an explicit unknown SELECTION
     // fails admission at selection resolution.
+    let mut section = sample_device_section();
+    section.selection = FmirDeviceSelection::Unknown("rocm".to_owned());
+    section
+        .artifacts
+        .artifact
+        .push(with_computed_digests(FmirDeviceArtifact {
+            backend: FmirDeviceBackend::Unknown("rocm".to_owned()),
+            ..metal_artifact("rocm kernel")
+        }));
+    let image = text_image_with_device(Some(section));
+    let text = encode_text_image(&image).expect("encode text image");
+    assert!(matches!(
+        decode_text_image(&text, TOOLCHAIN),
+        Err(FmirImageError::UnsupportedSelectedBackend { backend }) if backend == "rocm"
+    ));
+}
+
+// ── AMD-A3: the explicit `amd` backend-id (OQ1 spelling default) ───────────
+
+/// The AMD artifact fixture: format `llvm-ir`, stage `compiler-input`,
+/// target `gfx942`, CDNA3 feature set — the admission table's `amd` row.
+fn amd_artifact(blob: &str) -> FmirDeviceArtifact {
+    with_computed_digests(FmirDeviceArtifact {
+        backend: FmirDeviceBackend::Amd,
+        format: DeviceArtifactFormat::LlvmIr,
+        stage: MaterializationStage::CompilerInput,
+        target: DeviceTargetId {
+            id: "gfx942".to_owned(),
+            required_features: vec![
+                "amdgpu".to_owned(),
+                "cdna3".to_owned(),
+                "gfx942".to_owned(),
+            ],
+        },
+        ..metal_artifact(blob)
+    })
+}
+
+#[test]
+fn amd_artifact_admits_and_round_trips_both_codecs() {
+    // AMD-A3 done_when (b): the `_ =>` admission
+    // (`check_artifact_targets`) admits an
+    // `amd`/`llvm-ir`/`compiler-input`/`gfx942` artifact honestly with the
+    // default-table amd row, and the artifact + explicit `Amd` selection
+    // round-trip through both codecs (wire round-trip green — the additive
+    // variant posture the seed established; no carrier-version bump).
+    let mut section = sample_device_section();
+    section.selection = FmirDeviceSelection::Amd;
+    section.artifacts.artifact.push(amd_artifact("; amd module"));
+    let image = text_image_with_device(Some(section));
+    let text = encode_text_image(&image).expect("encode text image");
+    let decoded = decode_text_image(&text, TOOLCHAIN)
+        .expect("the amd artifact is admitted with the gfx942 row");
+    let device = decoded.device.expect("device section present");
+    let amd = device.artifacts.artifact.last().expect("amd artifact present");
+    assert_eq!(amd.backend, FmirDeviceBackend::Amd);
+    assert_eq!(amd.backend.spelling(), "amd");
+    assert_eq!(amd.format, DeviceArtifactFormat::LlvmIr);
+    assert_eq!(amd.target.id, "gfx942");
+    assert_eq!(device.selection, FmirDeviceSelection::Amd);
+    assert_eq!(device.selection.spelling(), "amd");
+
+    // Binary codec round-trip too.
+    let mut section = sample_device_section();
+    section.selection = FmirDeviceSelection::Amd;
+    section.artifacts.artifact.push(amd_artifact("; amd module"));
+    let image = binary_image_with_device(Some(section));
+    let bytes = encode_binary_image(&image).expect("encode binary image");
+    decode_binary_image(&bytes, TOOLCHAIN)
+        .expect("the amd artifact + Amd selection round-trip through the binary codec");
+}
+
+#[test]
+fn amd_artifact_mismatched_target_fails_closed() {
+    // AMD-A3 done_when (b): a mismatched target/format combination fails
+    // closed with the named rule — the amd row pins the explicit `gfx942`
+    // target.
+    let mut section = sample_device_section();
+    section.artifacts.artifact = vec![with_computed_digests(FmirDeviceArtifact {
+        backend: FmirDeviceBackend::Amd,
+        format: DeviceArtifactFormat::LlvmIr,
+        stage: MaterializationStage::CompilerInput,
+        target: DeviceTargetId {
+            id: "sm_120".to_owned(),
+            required_features: vec![
+                "amdgpu".to_owned(),
+                "cdna3".to_owned(),
+                "gfx942".to_owned(),
+            ],
+        },
+        ..metal_artifact("; amd module")
+    })];
+    let image = text_image_with_device(Some(section));
+    let text = encode_text_image(&image).expect("encode text image");
+    assert!(matches!(
+        decode_text_image(&text, TOOLCHAIN),
+        Err(FmirImageError::IncompatibleTargetId { backend, target, .. })
+            if backend == "amd" && target == "sm_120"
+    ));
+}
+
+#[test]
+fn amd_artifact_wrong_format_fails_closed() {
+    // AMD-A3 done_when (b): the amd leaf admits `llvm-ir` (compiler-input)
+    // only — a mismatched format fails closed with the named rule.
+    let mut section = sample_device_section();
+    section.artifacts.artifact = vec![with_computed_digests(FmirDeviceArtifact {
+        backend: FmirDeviceBackend::Amd,
+        format: DeviceArtifactFormat::Ptx,
+        stage: MaterializationStage::CompilerInput,
+        target: DeviceTargetId {
+            id: "gfx942".to_owned(),
+            required_features: vec![
+                "amdgpu".to_owned(),
+                "cdna3".to_owned(),
+                "gfx942".to_owned(),
+            ],
+        },
+        ..metal_artifact("; amd module")
+    })];
+    let image = text_image_with_device(Some(section));
+    let text = encode_text_image(&image).expect("encode text image");
+    assert!(matches!(
+        decode_text_image(&text, TOOLCHAIN),
+        Err(FmirImageError::IncompatibleArtifactCombination { backend, .. }) if backend == "amd"
+    ));
+}
+
+#[test]
+fn amd_selection_requires_an_amd_artifact() {
+    // AMD-A3: the selection table admits the amd combination fail-closed —
+    // an explicit `Amd` selection without an `amd` artifact fails with
+    // `MissingArtifactForSelection` (never a silent fallback lane).
+    let mut section = sample_device_section();
+    section.selection = FmirDeviceSelection::Amd;
+    let image = text_image_with_device(Some(section));
+    let text = encode_text_image(&image).expect("encode text image");
+    assert!(matches!(
+        decode_text_image(&text, TOOLCHAIN),
+        Err(FmirImageError::MissingArtifactForSelection { selection }) if selection == "amd"
+    ));
+}
+
+#[test]
+fn amd_spelling_round_trips_as_explicit_variant_not_unknown() {
+    // AMD-A3 done_when (a)+(c): the OQ1 `amd` id decodes to the explicit
+    // `Amd` variant (the same wire value as the seed's `amdgpu` id), while a
+    // genuinely-unknown id (`rocm`) still decodes as `Unknown` and rejects
+    // honestly at selection — never remapped, never fallback-laned.
     let mut section = sample_device_section();
     section.selection = FmirDeviceSelection::Unknown("rocm".to_owned());
     section
