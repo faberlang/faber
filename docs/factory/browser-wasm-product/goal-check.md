@@ -58,11 +58,18 @@ Stage 0 must record, so they do not block this goal.
   `public/src/backend/webgpu-runtime.js` + engine/, checked-in generated
   `kernel.wgsl`/`reflection.json`/`graphics.*`, and `scripta/
   webgpu-browser-proof {generate|check|serve}` (serve at
-  http://127.0.0.1:8787/). Triga corpus adds engine JS under `_host/public`.
+  http://127.0.0.1:8787/). `hosts/webgpu-browser/public/src/` is the
+  engine-JS source of truth; demos copy from it via their `tests/run.sh`
+  (`HOST_DIR=$WORKSPACE/hosts/webgpu-browser`). `triga/corpus/_host/`
+  contains only a superseded-pointer `README.md` (DS-S2 extraction), not live
+  engine JS.
   Three.js is present as `vendor/three@0.180` (presentation chrome per README).
 - **Wasm Host Parity matches its campaign state:** active; Stage 1 baseline
-  complete (ledger `baseline-gap-ledger.toml`: 307 corpus fixtures, 30 parity,
-  264 gap, 13 contract-reject). "Bounded MIR subset" in the CAMPAIGN Current
+  complete (live ledger `baseline-gap-ledger.toml`: 308 rows — 160 parity,
+  132 gap, 13 contract-reject, 3 n/a — regenerated 2026-08-06/07; the
+  2026-08-05 baseline of 307 rows / 30 parity / 264 gap / 13 contract-reject
+  is recorded historically in `stage-1-baseline-status.md`). "Bounded MIR
+  subset" in the CAMPAIGN Current
   Tracks table is accurate; the browser controller + Triga shape gaps are the
   real Stage 1 work. `hosts/wasm` is the v1 host owner; no browser packaging
   there.

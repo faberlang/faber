@@ -78,13 +78,21 @@ Live tree state (verified 2026-08-09; all sibling repos clean, faber `main`
   `public/generated/{kernel.wgsl,reflection.json,graphics.wgsl,
   graphics-reflection.json,graphics-*.bin,draw.json}`, `vendor/three@0.180`,
   `scripta/webgpu-browser-proof {generate|check|serve}` (serve
-  http://127.0.0.1:8787/). Triga corpus: `triga/corpus/_host/public/*` engine
-  JS synced into each demo's `public/`, plus `triga/corpus/serve.sh`
+  http://127.0.0.1:8787/). Triga corpus: engine JS is **not** stored under
+  `triga/corpus/_host/` — that directory holds only a superseded-pointer
+  `README.md` (DS-S2 extraction, commit 24376cc); the engine-JS source of
+  truth is `hosts/webgpu-browser/public/src/`, synced into each demo's
+  `public/` via the demo's `tests/run.sh` (`HOST_DIR=$WORKSPACE/
+  hosts/webgpu-browser`). Plus `triga/corpus/serve.sh`
   (http://127.0.0.1:8780/).
 - **Predecessors:** wasm-host-parity active — Stage 1 oracle baseline complete
-  (`baseline-gap-ledger.toml`, 307 rows: 30 parity / 264 gap / 13
-  contract-reject), Stages 2–8 planned; DDPP DDPP0 delivered 2026-08-08
-  (submission-region boundary locked), DDPP1 waits on DDCP2.
+  (`baseline-gap-ledger.toml` live ledger, 308 rows: 160 parity / 132 gap /
+  13 contract-reject / 3 n/a — regenerated 2026-08-06/07 in commits
+  1b5fc0c59/24881453a/38002fae7/5614335ae; `stage-1-baseline-status.md`
+  records the earlier 2026-08-05 baseline of 307 rows: 30 parity / 264 gap /
+  13 contract-reject, and radix/corpus has since grown to 309 `.fab`),
+  Stages 2–8 planned; DDPP DDPP0 delivered 2026-08-08 (submission-region
+  boundary locked), DDPP1 waits on DDCP2.
 - **Known stale claims (must be recorded in D3):** `faber targets` / radix
   `tool/commands/targets.rs` `wasm` row `run=no package=no` vs live package
   wasm build; `manifest_build_target` rejects `[build] target = "wasm"`;
@@ -98,17 +106,24 @@ All units are **evidence-only**. Write scope is strictly
 artifacts). Sibling repos are read-only.
 
 ```text
-U0 (inventory) ─┬─ U1 (ts reference) ─┐
-                ├─ U2 (wasm baseline) ─┤
-                ├─ U3 (conflict ledger) ┤
-                ├─ U4 (host allowlist) ─┼─ U7 (closeout + boundary review)
-                ├─ U5 (async ledger) ──┤
-                └─ U6 (triga selection) ┘
+U0 (inventory) ─┬─ U1 (ts reference) ───────────┐
+                ├─ U2 (wasm baseline) ─┬────────┤
+                ├─ U3 (conflict ledger) ─┘ (a) ─┤
+                ├─ U4 (host allowlist) ─────────┤
+                ├─ U5 (async ledger) ───────────┤
+                └─ U6 (triga selection) ────────┴─ U7 (closeout + boundary review)
+
+(a) U3 depends_on U2 (probe evidence); soft edge — see Serialization boundary.
 ```
 
 - **Serialization boundary:** U0 is the only unit with a write to the master
-  inventory; all later units cite its paths/counts. U1–U6 are mutually
-  independent (disjoint write files) and may run in parallel lanes after U0.
+  inventory; all later units cite its paths/counts. U1–U6 are otherwise
+  mutually independent (disjoint write files) and may run in parallel lanes
+  after U0. **One soft ordering edge:** the U3 unit table sets
+  `depends_on: U0, U2` because its done_when row 2 cites U2's live CLI probe
+  as authority; the edge is soft — U3 may re-run the prebuilt-binary probe
+  itself (`./target/debug/faber targets`, no cargo) and then has no ordering
+  constraint, so U3 can dispatch alongside U2.
   U7 is strictly last. **Zero cross-repo writes**, so no repo-level
   serialization beyond the Cargo lock rule below.
 - **Cargo discipline (tugboat):** every cargo invocation is `-p`-scoped, run
@@ -126,7 +141,7 @@ U0 (inventory) ─┬─ U1 (ts reference) ─┐
 | `id` | `bwp-s0-u0-artifact-inventory` |
 | `outcome` | One checked-in inventory (`evidence/artifact-inventory.md`) names every generated and authored `.ts`/`.tsx`, `.js`, `.json`, `.wgsl`, `.wasm`, and `.wat` artifact in the current browser route with: producer, consumer, owner, runtime-required (yes/no), and intended disposition (keep / move / remove). |
 | `write_scope` | `faber/docs/factory/browser-wasm-product/evidence/artifact-inventory.md` (new) |
-| `read_scope` | `examples/browser-app/`, `examples/web-canvas2d-smoke/`, `faber-web/` (`src/`, `runtime/`, `bindings/`, `tests/`, `tsconfig.json`), `hosts/webgpu-browser/public/` (incl. `generated/`, `vendor/`), `triga/corpus/webgl-geometries/` + `webgl-geometry-terrain/` + `webgl-animation-orbit/` + `webgl-animation-terrain/` + `webgl-animation-water/` (incl. `_host/`, `faber.lock`, `faber.toml`), `faber/src/package/product/` (recipe emitters: `ts_render.rs`, `assets.rs`) |
+| `read_scope` | `examples/browser-app/`, `examples/web-canvas2d-smoke/`, `faber-web/` (`src/`, `runtime/`, `bindings/`, `tests/`, `tsconfig.json`), `hosts/webgpu-browser/public/` (incl. `generated/`, `vendor/`), `triga/corpus/webgl-geometries/` + `webgl-geometry-terrain/` + `webgl-animation-orbit/` + `webgl-animation-terrain/` + `webgl-animation-water/` (incl. `_host/README.md` superseded-pointer note — no live engine JS there; `faber.lock`, `faber.toml`), `faber/src/package/product/` (recipe emitters: `ts_render.rs`, `assets.rs`) |
 | `done_when` | Every artifact class from the CAMPAIGN §Stage 0 gate ("generated and authored TypeScript, JavaScript, JSON, WGSL, and Wasm") has a row; each row has all five named fields; per-class counts are measured by the exact commands in `validation` (never copied from campaign prose); the inventory's disposition column is consistent with the CAMPAIGN JS boundary budget and product budget (e.g. `controllers.json`, `draw.json`, reflection JSON → remove-at-closeout; `webgpu-runtime.js` engine lanes → shrink-to-thunks; WGSL + reflection → keep). |
 | `validation` | `rg --files examples/browser-app faber-web hosts/webgpu-browser/public triga/corpus | grep -E '\.(ts|tsx|js|json|wgsl|wasm|wat)$'` (note: no cargo needed); recount commands re-run idempotent; inventory table cross-checked against `triga/corpus/webgl-geometries/faber.toml` + `examples/browser-app/faber.toml` product blocks. |
 | `est_work_tokens` | 4 000 – 7 000 |
@@ -186,9 +201,9 @@ U0 (inventory) ─┬─ U1 (ts reference) ─┐
 | `id` | `bwp-s0-u4-host-js-allowlist` |
 | `outcome` | `evidence/host-js-allowlist.md` enumerates every authored JS/TS host file in the browser route, measures line + byte totals per file, classifies each against the CAMPAIGN semantic budget (allowed thunk: module loading / handle map / callback transport / raw DOM+WebGPU calls / declared asset fetch; **not allowed**: app/controller/Triga policy, renderer policy, shader/layout selection, source-semantics recovery), and records the exact initial allowlist as the Stage 0 hard gate (per CAMPAIGN "The semantic allowlist, not an arbitrary total-size promise, is its first hard gate"). |
 | `write_scope` | `faber/docs/factory/browser-wasm-product/evidence/host-js-allowlist.md` (new) |
-| `read_scope` | `hosts/webgpu-browser/public/src/` (all `*.js` incl. `backend/webgpu-runtime.js`, `engine/`, `contract/`, `product/`, `presentation/`), `triga/corpus/_host/public/`, `triga/corpus/*/public/` (generated copies, noted as generated), `faber-web/runtime/*.ts` (shims — TS side of the same budget) |
+| `read_scope` | `hosts/webgpu-browser/public/src/` (all `*.js` incl. `backend/webgpu-runtime.js`, `engine/`, `contract/`, `product/`, `presentation/` — the engine-JS source of truth), `triga/corpus/_host/README.md` (superseded-pointer note only; engine JS no longer lives under `_host/` — DS-S2 extraction), `triga/corpus/*/public/` (generated copies, noted as generated), `faber-web/runtime/*.ts` (shims — TS side of the same budget) |
 | `done_when` | Every authored host file has a row: path, bytes, lines (measured via `wc -c`/`wc -l`), budget class (allowed-thunk / not-allowed / generated-copy), and rationale against the CAMPAIGN §JavaScript Boundary Budget. Per-file byte totals plus the shared-host total are recorded (this is the "current bytes and modules" Stage 0 baseline the CAMPAIGN requires). The doc calls out that today's `engine/` + `scene-extractor.js` + `renderGreyboxSceneFrame` etc. are *reference JS policy* that the allowlist must shrink or relocate. |
-| `validation` | `wc -c -l hosts/webgpu-browser/public/src/**/*.js triga/corpus/_host/public/**/*.js` (and explicit file list); `rg --files …` cross-check against inventory (U0); no cargo. |
+| `validation` | `wc -c -l hosts/webgpu-browser/public/src/**/*.js` (engine-JS source of truth; no `triga/corpus/_host/public/**/*.js` term — that directory does not exist, see `_host/README.md` pointer note) (and explicit file list); `rg --files …` cross-check against inventory (U0); no cargo. |
 | `est_work_tokens` | 2 500 – 4 500 |
 | `tool_latency` | wc/rg < 15 s; no cargo |
 | `depends_on` | U0 |
