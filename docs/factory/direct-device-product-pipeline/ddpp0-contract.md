@@ -1,15 +1,17 @@
 # DDPP0 Contract — Product shape, identity domains, canonical encoding, FNV removal
 
-**Unit**: DDPP0-U2 (contract core — the contract-spine root for `ddpp0-contract.md`).
-**Date**: 2026-08-08.
+**Units**: DDPP0-U2 (contract core — the contract-spine root for `ddpp0-contract.md`),
+DDPP0-U3 (performance invariants + prepared-region policy + selection + evidence tiers).
+**Date**: 2026-08-08 (U3 appended 2026-08-09).
 **Repo**: faber (control plane). `faber-runtime/` read-only; no product code; no cargo.
 **Paired contract**: Radix DDCP0-U3 §ArtifactPacket/§IdentityDomains/§HotPathGate
 (`radix/docs/factory/direct-device-compilation-pipeline/ddcp0-delivery.md`).
 **Sections frozen here**: `## ProductShape`, `## IdentityDomains`,
-`## CanonicalEncoding`, `## FnvRemoval`, `## RoundTripFixture`. The remaining
-sections of this contract are frozen by DDPP0-U3 (§PerformanceInvariants,
-§PreparedRegion, §SelectionPolicy, §EvidenceTiers) and DDPP0-U4
-(§PartitionOwnership, §GeneratedRustSupport, §DeletionRule, §ChildRouting).
+`## CanonicalEncoding`, `## FnvRemoval`, `## RoundTripFixture` (U2);
+`## PerformanceInvariants`, `## PreparedRegion`, `## SelectionPolicy`,
+`## EvidenceTiers` (U3). The remaining sections of this contract are frozen by
+DDPP0-U4 (§PartitionOwnership, §GeneratedRustSupport, §DeletionRule,
+§ChildRouting).
 
 **Authority order** (campaign §Repo-Aware Baseline): live source/tests and live
 `faber targets` → accepted artifact schemas + hardware receipts → **this phase's
@@ -337,3 +339,253 @@ prepared-region granularity is the NGAB0 major revision applied by DDPP0-U6).
 The full fixture files with recorded SHA-256s land in the DDCP0 fixture evidence
 (`radix/.../ddcp0-fixtures.md` + `evidence/fixtures/`); this section is the
 product-side schema fixture with the worked canonical-encoding example.
+
+---
+
+## PerformanceInvariants
+
+**Frozen** (DDPP0-U3): prepared-submission and explicit-observation performance
+invariants. This is the product-side reading of the DDCP0 §SemanticProgram
+prepared-submission-region rules and the DDCP0-U3 §HotPathGate (C2) mechanical
+gate; the compiler-side authority text lives in
+`radix/docs/factory/direct-device-compilation-pipeline/ddcp0-contract.md`
+(§SemanticProgram landed; §ArtifactPacket/§IdentityDomains/§HotPathGate in
+flight at DDCP0-U3). The two contracts agree field-by-field at the DDPP0 phase
+gate; any field not yet landed in DDCP0 is recorded `PENDING-AGREEMENT` by
+DDPP0-U6, never silently reconciled.
+
+### Preparation runs once
+
+1. **Prepared submission = once-per-session preparation.** The selected backend
+   leaf **loads modules, resolves functions/pipelines, allocates persistent
+   state, and prepares native argument/submission layouts once** — before the
+   hot loop. Nothing is re-resolved, re-looked-up, or re-allocated per call
+   (DDCP0-U3 §HotPathGate preparation counters; DDPP2 gate: module/function/
+   pipeline preparation measured once per session).
+2. **One host call → one prepared submission region.** A host call enqueues one
+   prepared submission region containing **one or more kernels**. The region is
+   the NGAB0 major-revision call granularity (H1; DDPP0-U6); the one-kernel
+   fixture remains the minimal case, not the ABI limit
+   (§RoundTripFixture).
+3. **Synchronize/readback only at declared boundaries.** The hot path enqueues
+   a prepared region and synchronizes/readbacks only at an **explicit
+   observation, cancellation, dependency, or product boundary** — never per
+   kernel, never per launch, never on a timer or a generic runtime wrapper
+   (DDCP0 §SemanticProgram prepared-submission-region rules 1–3; DDPP2 gate: a
+   multi-kernel region submits on one Metal command buffer and one CUDA stream
+   respectively). Synchronization counts derive from declared observations,
+   never from kernel count (DDCP0-U3 §HotPathGate).
+4. **No name/map lookup on the hot path.** The emitted hot call carries no
+   route string, no `Valor`, no descriptor map, no backend tag, and no kernel
+   name (§ProductShape host/device call facts; DDCP0-U3 §HotPathGate zero
+   post-prepare name/map/kernel lookup).
+5. **Regions cannot cross effect boundaries.** A prepared region cannot cross an
+   `ad`/Sermo boundary, an observation boundary, a cancellation boundary, or any
+   other CPU-effect/host-control point; a candidate group containing one is
+   split there or the program **fails closed** (DDCP0 §SemanticProgram rule 3;
+   §ProductShape effect/capability requirements).
+6. **Observation is an explicit declared fact.** A write does not imply
+   observability; readback is a deliberate declared observation (DDCP0
+   §SemanticProgram observation/readback axis; §ProductShape submission-region
+   facts).
+
+### The hot path, canonically
+
+```text
+prepare    (once, before hot loop): load modules → resolve functions/pipelines
+            → allocate persistent state → prepare native argument/submission
+            layouts (names, maps, dimensions, layout all fixed here)
+hot loop   (per host call): enqueue one prepared region (bounded numeric
+            invocation fields only) → no lookup, no map construction, no sync
+sync/readback: only at explicit observation, cancellation, dependency, or
+            product boundary
+```
+
+The invariant is: the hot loop **enqueues and finishes**; everything else is
+preparation or a declared observation. Where the invariant would be violated
+(undeclared per-kernel synchronization, post-prepare name lookup, generic
+handle-map work, runtime kernel interpretation), the product **fails closed**
+rather than degrading (campaign Stop Conditions; DDCP0-U3 §HotPathGate).
+
+### Layer targets
+
+- **DDPP1** proves the package-build path (materialization emits the fixed
+  region identities and prepared layouts; build planning imports no Hosts
+  driver implementation and reparses no emitted text).
+- **DDPP2** proves the invariants in physical leaves: one prepared region → one
+  Metal command buffer / one CUDA stream; sync only at declared observations;
+  preparation measured once per session.
+
+---
+
+## PreparedRegion
+
+**Frozen** (DDPP0-U3): prepared-region regime/shape-class identity, bounded
+dynamic invocation fields, cache keys, bounds checks, and cache-miss behavior
+(campaign freeze list item 6; DDCP0 §SemanticProgram prepared-submission-region
+rules 4–5). The concrete regime/shape-class **enumeration is deferred** — the
+principle is frozen here and in DDCP0 (DDCP0-U3 C5 deferral recorded: regime/
+shape-class enumeration lands at a later stage; tagged-sibling decision → DDCP6).
+
+### Region identity
+
+1. **Compiler-owned, static.** A prepared region has a **compiler-owned
+   regime/shape-class identity**: static at compile time, derived from the
+   dependency graph by the compiler, never composed at run time from strings,
+   maps, or emitted names. The compiler owns region formation; a region is
+   never introduced by a generic runtime wrapper or a runtime scheduling policy
+   (§ProductShape submission-region facts; DDCP0 §SemanticProgram rule 4).
+2. **One or more kernels per region.** A prepared submission region contains
+   one or more kernels; the one-kernel fixture proves the minimal one-region
+   case, not the ABI limit (NGAB0 major revision, DDPP0-U6).
+3. **Shape class.** The shape class is the compile-time regime family a region's
+   layouts are prepared for. Bounds and argument layouts are compiled into the
+   region; the invocation carries only the dynamic extent, validated against
+   the compiled bounds. A call outside the prepared shape class is a cache miss
+   (below), never a silent re-layout on the hot path.
+
+### Bounded dynamic invocation fields
+
+1. **Only bounded numeric fields.** A prepared-region invocation carries only
+   **bounded numeric dynamic fields** — active prompt length, dispatch extent,
+   and comparable bounded extents. These are the only **bounded dynamic** values
+   on the hot path; everything else (symbols, resources, dimensions, argument
+   layouts, effect/capability requirements) is fixed at prepare time
+   (§PerformanceInvariants rule 4).
+2. **Validated against compiled bounds.** Each dynamic field is validated
+   against the region's compiled bounds before enqueue — per-output bounds and
+   index domains, never a shared extent that could overrun or under-fill
+   heterogeneous outputs (DDCP0 §SemanticProgram §Per-output bounds and index
+   domains). An out-of-bounds extent **fails closed** with a stable structured
+   diagnostic.
+3. **No name lookup, no map construction.** Validation is arithmetic against
+   compiled bounds, not a lookup: no kernel name, no route string, no descriptor
+   map, no handle-map construction on the hot path (DDCP0-U3 §HotPathGate).
+
+### Cache keys and bounds checks
+
+1. **Cache key = (artifact identity, region identity, shape class).** Cache keys
+   are the triple of artifact identity (`content_sha256`/`packet_sha256` per
+   §IdentityDomains), compiler-owned region identity, and shape class — semantic
+   and artifact facts, never kernel-name or descriptor lookups (DDCP0
+   §SemanticProgram rule 5).
+2. **Cache admission is never FNV64-only** (§IdentityDomains rule 5); it uses a
+   collision-resistant digest or canonical-descriptor equality.
+3. **Bounds checks before allocation.** Compiled bounds are checked before any
+   allocation or enqueue; allocation uses the recorded structural ceilings
+   (artifact packet `bounds`; DDCP0-U3 §ArtifactPacket), never re-derived sizes
+   from emitted text or binary.
+
+### Cache miss
+
+1. **Prepare outside the hot loop or fail closed.** A cache miss **prepares
+   outside the hot loop or fails closed**. The miss is a prepared-region
+   preparation event off the hot path (the same once-per-session prepare path),
+   reported with a stable structured diagnostic; if the off-path prepare is not
+   available, the call **fails closed**.
+2. **It never interprets a kernel.** Cache miss never interprets a kernel — no
+   runtime kernel interpretation, no re-derivation of compiler facts from
+   emitted text or binary (§ProductShape assembly rule; campaign Stop
+   Conditions).
+
+---
+
+## SelectionPolicy
+
+**Frozen** (DDPP0-U3): release selection policy (council disposition C1). The
+v1 release is **single-backend by default**; optional fat products select once
+at startup; the host×device matrix is **capability truth, not a shipping
+promise** — every product cell needs its own residency + performance receipt.
+The defaults below are resolved here in DDPP0, not left to Hands; operator
+gates are named per decision.
+
+### Release defaults (v1)
+
+1. **Single-backend default release.** A v1 release builds with **one backend
+   leaf at build time**; the shipped product is single-backend by default.
+   Fat binaries are **deferred** (campaign OQ2 — no fat-product promise in v1).
+2. **Optional fat products select once at startup.** If a fat product ships
+   (deferred, not planned for v1), it selects the backend leaf **once at
+   startup** — one selection, fixed for the process lifetime, never per call,
+   never on the hot path (campaign Desired End State #4; §ProductShape
+   `DeviceArtifact[]`).
+3. **Capability truth, not a shipping promise.** The host×device matrix is
+   **capability truth** — the host/device pairs the compiler and product can
+   express — not a promise that every pair ships. Every product cell
+   (host×device pair) needs its own **residency + performance receipt** before
+   it is claimed as shipped; an unclaimed pair is capability truth (T1) but not
+   a shipping claim (§EvidenceTiers).
+4. **Pair validation before toolchain work.** Faber validates the requested
+   host/device pair and enabled features before any toolchain work; an
+   unsupported pair rejects during planning and acquires no unrelated target
+   dependencies (§ProductShape assembly rule). `faber targets` reports matching
+   capability truth (DDPP1 gate proof, DDPP0-U7).
+
+### Backend artifact defaults
+
+| Decision | Default | Status / gate |
+| --- | --- | --- |
+| PTX vs cubin (campaign OQ3) | **PTX** — driver JIT per TR7 Stage-0 contract (`cuModuleLoadData`; no NVCC/NVVM at runtime) | cubin deferred; startup-preparation tradeoff resolved here |
+| MSL vs metallib (campaign OQ4) | **MSL source first** — NGAB0 precedent (`msl-source` admitted first) | metallib reserved (NGAB0 reserved row); operator gate on Metal embedding |
+| AMD identity (campaign OQ5) | **`amd` + HSA-native** — no HIP, no CUDA-translation identity | first-leaf API default **HSA/ROCr**; operator gate at DDPP5 |
+| Fat binaries | **deferred** | not a v1 shipping promise (OQ2) |
+
+1. **PTX default.** The CUDA artifact default is **PTX**: the driver
+   JIT-compiles PTX at module load (`cuModuleLoadData`), consistent with the
+   TR7 Stage-0 clean-install contract (only the NVIDIA driver required at
+   runtime; no toolkit, no clang, no NVCC). cubin is **deferred** until
+   delivery evidence requires it.
+2. **MSL source first.** The Metal artifact default is **MSL source**, following
+   the NGAB0 admitted-first `msl-source` row (§`artifact_kind`); metallib stays
+   **reserved** until an operator decision on Metal embedding (NGAB0 reserved
+   row / operator gate).
+3. **AMD stays `amd` + HSA-native.** AMD identity stays **`amd` + HSA-native**;
+   there is no HIP identity and no CUDA-translation identity. The first-leaf
+   API default is **HSA/ROCr** (the pinned external materializer path,
+   §ProductShape `DeviceArtifact[]`), with an **operator gate at DDPP5** before
+   any first AMD product leaf.
+4. **No translation identities.** Selection never introduces cross-backend
+   translation identities (no HIP-from-CUDA, no PTX→AMDGPU translation); each
+   leaf is materialized by its own backend from the shared target-neutral
+   `DeviceProgram` (§ProductShape; campaign Stop Condition: a generic
+   abstraction that erases backend-specific memory/queue/target requirements).
+
+---
+
+## EvidenceTiers
+
+**Frozen** (DDPP0-U3): evidence-tier labels (council disposition C5). Every
+product claim carries a tier label + a named receipt. The four labels:
+
+| Tier | Label | Meaning | Receipt example |
+| --- | --- | --- | --- |
+| T1 | **compiler emission** | the compiler emits/claims the fact | DDCP/DDPP contract fixtures; `faber targets` feature/capability truth |
+| T2 | **materialization** | the artifact was materialized with verifiable identity | `content_sha256`/`packet_sha256` receipts (§IdentityDomains); build-plan receipt; round-trip fixture (§RoundTripFixture) |
+| T3 | **physical execution** | it ran on a named physical device | NGAB/DDPP device receipts; TR7 receipts with the device + driver/toolchain envelope |
+| T4 | **performance** | measured performance on a named cell | residency + performance receipt per product cell (C1, §SelectionPolicy) |
+
+### Rules
+
+1. **Every claim carries a tier + a named receipt.** Every product claim is
+   labeled with one of the four evidence tiers and tied to a **named receipt**
+   (contract section, fixture, build receipt, device receipt, performance
+   receipt). An unlabeled claim is not a product claim.
+2. **Tier monotonicity.** A claim is never promoted to a higher tier without its
+   own receipt at that tier: compiler emission is not materialization,
+   materialization is not physical execution, physical execution is not
+   performance.
+3. **Capability truth is T1.** The host×device matrix and `faber targets` output
+   are capability truth (T1, compiler emission) until each product cell earns a
+   residency + performance receipt (T4, §SelectionPolicy). Over-claims on
+   "direct GPU execution" (AMD/WebGPU/prepared path) are caught at the tier
+   label (council review recorded risk; TR7: consume each fact at its recorded
+   evidence tier).
+4. **Physical and performance tiers are named-device receipts.** T3/T4 claims
+   are named-device receipts with their environment envelope (device, driver,
+   toolchain, OS) — never generic claims.
+5. **Identity-bearing receipts are hash-bound.** Artifact-level claims cite
+   `content_sha256`/`packet_sha256` receipts (§IdentityDomains); performance
+   claims cite their measurement receipt.
+6. **Cross-reference.** DDPP0-U8 records the C5 migration-note requirement
+   (before DDPP8 release work); this section is the label authority every DDPP
+   artifact cites.
