@@ -22,14 +22,21 @@ radix-mir-fmir = { path = "../radix/crates/radix-mir-fmir" }
 # Differentiable-GPU campaign (S1-6): the S1-3 device-artifact emitters (Metal
 # MSL + CUDA NVVM/PTX) the faber device-program constructor consumes through
 # the shared radix-mir surface. Build-time only — never a runtime dependency.
+# DDPP1-U2 (C2 feature isolation): gated `optional`, pulled only by `mir-metal`.
+# DDPP1-U2 (C2 feature isolation): gated `optional`, pulled only by `mir-llvm`.
 # Package-store library: Faber product composition may depend on cista the same
 # way it depends on radix (docs/design/product-composition-radix-cista.md).
 # Differentiable-GPU campaign (S1-5): packaged device runtime types (the
 # `faber::device` surface) and the composite host. Hosts owns the native
 # Metal/CUDA sessions; faber owns the host factory that calls the composite
 # host's one host-construction decision.
+# DDPP1-U2 (C2 feature isolation): gated `optional`, pulled only by
+# `device-runtime` (the device-runtime modules compile only under it).
+# DDPP1-U2 (C2 feature isolation): gated `optional`, pulled only by
+# `host-macos-arm64` (the native Metal/CUDA host leaf).
 # Portable product runner (Stage 2 wasm-host-parity): the single v1
 # product-host owner; Faber packaging consumes the same API later.
+# DDPP1-U2 (C2 feature isolation): gated `optional`, pulled only by `host-wasm`.
 clap = { version = "4.5", features = ["derive"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1"
