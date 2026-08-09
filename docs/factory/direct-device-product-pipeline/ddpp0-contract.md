@@ -11,15 +11,18 @@ DDPP0-U4 (partition ownership + generated-Rust support destination + deletion ru
 `## CanonicalEncoding`, `## FnvRemoval`, `## RoundTripFixture` (U2);
 `## PerformanceInvariants`, `## PreparedRegion`, `## SelectionPolicy`,
 `## EvidenceTiers` (U3); `## PartitionOwnership`, `## GeneratedRustSupport`,
-`## DeletionRule`, `## ChildRouting` (U4). All contract spine sections are
-frozen as of DDPP0-U4.
+`## DeletionRule`, `## ChildRouting` (U4); `## DDCP0Agreement` (U6). All
+contract spine sections are frozen as of DDPP0-U4; the field-by-field
+agreement checklist with the DDCP0 amendment is recorded by DDPP0-U6
+(`## DDCP0Agreement`).
 
 **Authority order** (campaign §Repo-Aware Baseline): live source/tests and live
 `faber targets` → accepted artifact schemas + hardware receipts → **this phase's
 frozen contracts** → campaign prose. Where a field is also frozen by DDCP0, the
 DDCP0 contract text is the compiler-side authority and this contract records the
-product-side reading of the same field; the two must agree field-by-field (DDPP0
-phase gate; U6 records `PENDING-AGREEMENT` for any field that has not yet landed).
+product-side reading of the same field; the two must agree field-by-field
+(DDPP0 phase gate; the agreement is recorded per field in `## DDCP0Agreement`
+by DDPP0-U6 as `LANDED`/`PENDING-AGREEMENT`, never silently reconciled).
 
 ---
 
@@ -111,8 +114,9 @@ Hosts driver implementation and never reparses emitted target text.
 **Frozen**: exactly six identity domains. The table below is **field-for-field
 the shared normative table** of the campaign §Artifact identity and of DDCP0-U3
 §IdentityDomains: the same six domain names, the same authority-and-inputs, the
-same migration rule. Any landed difference in DDCP0's table is caught at the
-U6/U9 field-by-field agreement gate and recorded, never silently reconciled.
+same migration rule. The field-by-field agreement with DDCP0 is recorded in
+`## DDCP0Agreement` (DDPP0-U6): every identity field `LANDED`, none contradicts,
+nothing silently reconciled.
 
 | Identity domain | Authority and inputs | Migration rule |
 | --- | --- | --- |
@@ -336,7 +340,9 @@ admission) → identity verification against the declared value**. Concretely:
 | Hosts admission | canonical bytes loaded from the embedded payload | hash-bound identity; load failure or identity mismatch fails closed |
 
 The one-kernel fixture remains the minimal case, not the ABI limit (the
-prepared-region granularity is the NGAB0 major revision applied by DDPP0-U6).
+prepared-region granularity is the NGAB0 major revision **NGAB0-R1**, landed by
+DDCP0-U4/U5 — `native-gpu-application-bundle/ngab0-major-revision-ddcp0.md` —
+and consumed by DDPP0-U6 in `## DDCP0Agreement`).
 The full fixture files with recorded SHA-256s land in the DDCP0 fixture evidence
 (`radix/.../ddcp0-fixtures.md` + `evidence/fixtures/`); this section is the
 product-side schema fixture with the worked canonical-encoding example.
@@ -350,10 +356,12 @@ invariants. This is the product-side reading of the DDCP0 §SemanticProgram
 prepared-submission-region rules and the DDCP0-U3 §HotPathGate (C2) mechanical
 gate; the compiler-side authority text lives in
 `radix/docs/factory/direct-device-compilation-pipeline/ddcp0-contract.md`
-(§SemanticProgram landed; §ArtifactPacket/§IdentityDomains/§HotPathGate in
-flight at DDCP0-U3). The two contracts agree field-by-field at the DDPP0 phase
-gate; any field not yet landed in DDCP0 is recorded `PENDING-AGREEMENT` by
-DDPP0-U6, never silently reconciled.
+(§SemanticProgram landed at DDCP0-U2 `a140c3482`; §ArtifactPacket,
+§IdentityDomains, §HotPathGate landed at DDCP0-U3 `1a50474de`; the NGAB0-R1
+amendment landed at DDCP0-U4 `1dc4513` + DDCP0-U5 `36e8c2f`). The
+field-by-field agreement with DDCP0 is recorded `LANDED` in
+`## DDCP0Agreement` (DDPP0-U6); no field remains `PENDING-AGREEMENT` and no
+field is silently reconciled.
 
 ### Preparation runs once
 
@@ -730,13 +738,19 @@ Campaigns routing + §Scope Routing; NGAB amendment path; H1).
    NGAB contract as a **historical record with amended call granularity** —
    the one-call/one-kernel ABI is amended to **one host call → one prepared
    submission region containing one or more kernels** (§ProductShape
-   submission-region facts; DDPP0-U6 applies the major revision). NGAB0's
-   operator gates (llvm-host identity, MSL source-first, PTX arch set) are
-   retained and extended, never silently changed (NGAB0 §Versioning).
+   submission-region facts). The amendment is **LANDED** as NGAB0-R1
+   (DDCP0-U4 `1dc4513` + DDCP0-U5 `36e8c2f`;
+   `native-gpu-application-bundle/ngab0-major-revision-ddcp0.md`) under the
+   joint PML/NGAB packet authority, and consumed by DDPP0-U6 in
+   `## DDCP0Agreement`. NGAB0's operator gates (llvm-host identity, MSL
+   source-first, PTX arch set) are retained and extended, never silently
+   changed (NGAB0 §Versioning).
 2. **NGAB1–NGAB4 → DDPP3 child packets.** NGAB1–NGAB4 lower and implement only
    as **DDPP3 child packets**, not as a parallel authority (campaign routing;
-   H1 hold). DDPP0-U6 un-holds NGAB1; NGAB1–NGAB4 do not start implementation
-   until the amendment lands.
+   H1 hold). The amendment **has landed** (NGAB0-R1; DDCP0-U4/U5): the H1
+   NGAB1-HOLD is lifted and NGAB1–NGAB4 may be filed, with the one-kernel
+   fixture proving the **minimal one-prepared-region** case — never a
+   per-kernel ABI (`ngab0-fixture-contract.md`; `ngab1-delivery.md` U1/U4).
 3. **NGAB5 → DDPP7 capstone.** NGAB5 remains the native ML capstone and feeds
    **DDPP7** (Gradus inference/training device integration proofs; gated on
    accepted PML stages).
@@ -756,3 +770,73 @@ Campaigns routing + §Scope Routing; NGAB amendment path; H1).
      session/artifact-handoff goal preserves only its valid metadata
      boundaries; runtime/model/serving ownership is superseded through DDPP and
      Gradus (campaign §Related Campaigns).
+
+---
+
+## DDCP0Agreement
+
+**Frozen** (DDPP0-U6): the field-by-field agreement checklist with the DDCP0
+amendment. The DDCP0 amendment is **LANDED**: DDCP0-U2 `a140c3482` (§SemanticProgram)
++ DDCP0-U3 `1a50474de` (§ArtifactPacket/§IdentityDomains/§HotPathGate) froze the
+compiler-side contract fields, and the NGAB0 major revision **NGAB0-R1** was
+recorded by DDCP0-U4 `1dc4513` + DDCP0-U5 `36e8c2f`
+(`native-gpu-application-bundle/ngab0-major-revision-ddcp0.md`) under the joint
+PML/NGAB packet authority. DDPP0 is the **consumer** of that revision
+(single-writer = DDCP0 for the compiler-facts surfaces); this section records
+the product-side reading and the agreement result per field. Every agreed field
+cites its DDCP0 contract field name; **all fields are `LANDED`** — none
+contradicts the DDCP0 contract text and none is silently reconciled.
+
+### Agreement checklist
+
+| Field | DDCP0 contract field (compiler-side authority) | Amended NGAB0 packet reference | Status |
+| --- | --- | --- | --- |
+| Region granularity (call meaning) | `HostDeviceCall.prepared submission-region identity` (DDCP0-U3 §ArtifactPacket) + §SemanticProgram prepared submission regions — one host call → one prepared submission region containing one or more kernels; the region is the call's submission unit, not the kernel | NGAB0 §Partition / §Abi (NGAB0-R1): one call → one prepared submission region, one or more kernels; one-kernel case = minimal region, not a separate ABI (§FrozenVsReserved) | **LANDED** |
+| Identity domains | `content_sha256` (digest over canonical decoded payload bytes only), `packet_sha256` (packet/admission identity over versioned artifact metadata + `content_sha256`; never semantic identity), `compiler_input_packet_sha256` (hash-bound parent provenance on finalized-binary rows) — DDCP0-U3 §IdentityDomains six-domain normative table | NGAB0 §Manifest (`artifact_id` → `content_sha256`; new `packet_sha256` row; `compiler_input_packet_sha256` parent provenance on finalized-binary rows) / §Verification (packet identity admission before backend selection) | **LANDED** |
+| Canonical encoding | §ArtifactPacket payload encoding: text = canonical UTF-8; binary in `fmir-text` = `binary:<encoding-tag>:<decoded-byte-length>:<canonical-unpadded-base64>`; §IdentityDomains digest rules 2–3 (digest over decoded bytes, never the transport spelling) | NGAB0 §Manifest content-addressed rule (`content_sha256` over canonical decoded payload bytes only) | **LANDED** |
+| Version authority (manifest re-pin) | NGAB0 §Versioning major-bump semantics + joint PML/NGAB packet authority (recorded in the DDCP0 amendment's authority sign-off); admitted manifest version re-pinned `manifest-1.0.0` → **`manifest-2.0.0`**; a manifest carrying a rejected packet revision is rejected at admission, not coerced | NGAB0 §Manifest (row shape, schema `manifest-2.0.0`) / §Versioning §Recorded revisions (NGAB0-R1) | **LANDED** |
+| Verification order | §Verification — artifact identity (`content_sha256`) and packet identity admission (`packet_sha256`) verified **before backend selection**; tamper/mismatch → pre-launch failure, no CPU fallback | NGAB0 §Verification / §FrozenVsReserved (content-addressed manifest + admission identity frozen-now) | **LANDED** |
+
+### DDPP0-side reading (where each field freezes here)
+
+- Region granularity — §ProductShape submission-region facts,
+  §PerformanceInvariants rule 2, §PreparedRegion.
+- Identity domains — §IdentityDomains (field-for-field the same six-domain
+  normative table) and §FnvRemoval (`content_sha256` replacement).
+- Canonical encoding — §CanonicalEncoding and §RoundTripFixture (worked
+  `binary:` spelling + declared digests).
+- Version authority — §ChildRouting rule 1 (operator gates retained and
+  extended, never silently changed) + §SelectionPolicy defaults.
+
+### Cross-reference verification (against the amended NGAB0 packet)
+
+The DDPP0 contract's cross-references to the NGAB0-R1 surfaces were verified
+against the amended packet (read first, per the unit spec):
+
+- **Receipt schema** (`ngab0-receipt-schema.md` Block 4) re-roles
+  `artifact_id` → `content_sha256` with the new `packet_sha256` +
+  `compiler_input_packet_sha256` rows and the support-archive identity row
+  (TR7 touch point, not NGAB0 ownership) — matches the §RoundTripFixture
+  NGAB-manifest-row cross-ref and §IdentityDomains row 6.
+- **Fixture contract** (`ngab0-fixture-contract.md`) proves the **minimal
+  one-prepared-region** case (one host call → one prepared submission region
+  containing one kernel) — matches the §RoundTripFixture / §PreparedRegion
+  wording that the one-kernel fixture remains the minimal case, not the ABI
+  limit.
+- **NGAB1 delivery** (`ngab1-delivery.md`) U1/U4 retarget to the
+  prepared-region granularity (U1 = minimal one-region vertical slice; U4 =
+  batch-compatible multiple kernels per prepared submission region, never
+  per-kernel ABI rows) — matches §ChildRouting rule 2.
+- **NGAB2 delivery** (`ngab2-delivery.md`) materialization/verification
+  receipts carry `content_sha256`/`packet_sha256` with
+  `compiler_input_packet_sha256` parent provenance and identity verification
+  before backend selection — matches §RoundTripFixture cross-surface table and
+  the checklist's verification-order field.
+
+### U9 gate
+
+No field is `PENDING-AGREEMENT`: the DDCP0 amendment is fully in, every agreed
+field above is `LANDED`, and **nothing blocks the U9 closeout gate** on the
+DDCP0 agreement front. The regime/shape-class **enumeration** deferral
+(§PreparedRegion; DDCP0-U3 §ArtifactPacket "principle only") is a recorded
+shared deferral (C5), not a disagreement.
