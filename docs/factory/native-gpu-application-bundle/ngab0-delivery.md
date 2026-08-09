@@ -8,8 +8,9 @@
 
 NGAB0 is **discovery-first**: freeze the composite native-GPU application
 contract and the cross-campaign ownership facts so NGAB1–NGAB3 can implement
-one vertical slice (one scalar host function calling one embedded device
-kernel). No product code. No runnable composite binary — the executable proof
+one vertical slice (one scalar host function invoking one prepared submission
+region containing one embedded device kernel — the minimal one-prepared-region
+case). No product code. No runnable composite binary — the executable proof
 belongs to NGAB1–NGAB4. Every unit produces a contract/decision/measurement
 artifact with a hard `done_when` and a grep-or-script proof.
 
@@ -33,7 +34,7 @@ Deliver, for the NGAB0 gate:
 | --- | --- | --- |
 | PackageGraph + OwnershipMatrix | package-graph nodes, owner-per-surface table, hot-path serialization list | U2 |
 | Partition + Abi | host/device partition, entry/call ABI, typed boundary, no text reconstruction | U3 |
-| Manifest + ResourceIdentity + Verification | content-addressed manifest schema, resource identity, C8 security freeze | U4 |
+| Manifest + ResourceIdentity + Verification | content-addressed manifest schema (`content_sha256`/`packet_sha256` identity, NGAB0-R1), resource identity, C8 security freeze | U4 |
 | BackendVariants + ArtifactLayout + Admission | variant matrix, binary layout, fail-closed admission, operator decision gates | U5 |
 | Ux + Errors | build/run UX, error taxonomy, cpo/cxo design rules | U6 |
 | FrozenVsReserved + Unsupported + Versioning | seams, explicit unsupported behavior, version authority + change procedure | U7 |
@@ -91,7 +92,7 @@ U1 snapshot/reconcile
 
 ### NGAB0-U3 — Host/device partition + entry/call ABI
 - **title**: Freeze the host/device partition and typed entry/call ABI.
-- **done_when**: §Partition + §Abi frozen: one host function calls one device kernel through a versioned typed boundary; identity/type/lifetime facts survive lowering (never reconstructed from LLVM/MSL/PTX text or naming conventions — NGAB1 rule, frozen here); invalid cross-boundary values fail at compile time (enforcement is NGAB1; contract is NGAB0); call/entry surface matches the GI4 session facts referenced by U8.
+- **done_when**: §Partition + §Abi frozen: one host function calls one device kernel through a versioned typed boundary; identity/type/lifetime facts survive lowering (never reconstructed from LLVM/MSL/PTX text or naming conventions — NGAB1 rule, frozen here); invalid cross-boundary values fail at compile time (enforcement is NGAB1; contract is NGAB0); call/entry surface matches the GI4 session facts referenced by U8. **Amended by the DDCP0 major revision (NGAB0-R1)**: the call granularity is one host call → one prepared submission region containing one or more kernels — the one-kernel case is the minimal prepared region, not a separate ABI.
 - **write_scope**: `ngab0-composite-contract.md` (same file; §Partition, §Abi).
 - **validation**: `grep -n '^## .*Abi'` present; `grep -n 'never reconstructed from emitted text' ngab0-composite-contract.md`; `grep -n 'compile time' ngab0-composite-contract.md`.
 - **est_work_tokens**: 4k–7k.
@@ -101,7 +102,7 @@ U1 snapshot/reconcile
 
 ### NGAB0-U4 — Manifest schema + resource identity + C8 security freeze
 - **title**: Freeze the versioned content-addressed embedded-artifact manifest, resource identity, and verification order.
-- **done_when**: §Manifest + §ResourceIdentity + §Verification frozen: versioned manifest schema over embedded MSL/metallib/PTX artifacts, content-addressed; canonical digest algorithm named (default SHA-256, matching MD-A9 collision-resistant precedent — operator confirm at U12); verification order fixed (identity verified **before** backend selection); model-to-kernel compatibility binding; tamper/mismatch → **pre-launch failure**; manifest identity never reconstructed from emitted text or path conventions; resource identity (buffers, lifetimes, generations, observations) bound to the composite session.
+- **done_when**: §Manifest + §ResourceIdentity + §Verification frozen: versioned manifest schema over embedded MSL/metallib/PTX artifacts, content-addressed; canonical digest algorithm named (default SHA-256, matching MD-A9 collision-resistant precedent — operator confirm at U12); verification order fixed (identity verified **before** backend selection); model-to-kernel compatibility binding; tamper/mismatch → **pre-launch failure**; manifest identity never reconstructed from emitted text or path conventions; resource identity (buffers, lifetimes, generations, observations) bound to the composite session. **Amended by the DDCP0 major revision (NGAB0-R1)**: artifact identity re-roled `artifact_id` → `content_sha256` (canonical payload bytes only), new `packet_sha256` packet/admission identity + `compiler_input_packet_sha256` parent provenance on finalized-binary rows; manifest schema re-pinned `manifest-2.0.0`.
 - **write_scope**: `ngab0-composite-contract.md` (§Manifest, §ResourceIdentity, §Verification).
 - **validation**: `grep -n 'content-addressed' ngab0-composite-contract.md`; `grep -n 'before backend selection' ngab0-composite-contract.md`; `grep -n 'pre-launch' ngab0-composite-contract.md`; `grep -n 'SHA-256\|sha-256' ngab0-composite-contract.md`.
 - **est_work_tokens**: 4k–7k.
@@ -161,7 +162,7 @@ U1 snapshot/reconcile
 
 ### NGAB0-U10 — C7 joint receipt schema + Faber-scoped audit entrypoint
 - **title**: Freeze the joint cross-repo receipt schema and add/select the Faber-scoped audit entrypoint.
-- **done_when**: `ngab0-receipt-schema.md` frozen: fields for compiler, faber, host, gradus, OS, driver, device, artifact identities + content digests + dirty-state declarations + exact commands, aligned with §Manifest/§Verification; **Faber-scoped audit entrypoint added or selected** — default: add `faber/scripta/check-factory-goal-status` (thin wrapper invoking radix `audit-factory-goal-status.py` with faber's `docs/factory` root, mirroring the README generator's `--factory-root`; the only code this phase writes) with selection rationale recorded; entrypoint runs clean and the faber README `--check` passes.
+- **done_when**: `ngab0-receipt-schema.md` frozen: fields for compiler, faber, host, gradus, OS, driver, device, artifact identities + content digests + dirty-state declarations + exact commands, aligned with §Manifest/§Verification; artifact-identity rows carry the amended NGAB0-R1 identity — `content_sha256` per-artifact digest (canonical payload bytes only), `packet_sha256` packet/admission identity, `compiler_input_packet_sha256` parent provenance, plus the recorded support-archive identity row (TR7 touch point, not ownership); **Faber-scoped audit entrypoint added or selected** — default: add `faber/scripta/check-factory-goal-status` (thin wrapper invoking radix `audit-factory-goal-status.py` with faber's `docs/factory` root, mirroring the README generator's `--factory-root`; the only code this phase writes) with selection rationale recorded; entrypoint runs clean and the faber README `--check` passes.
 - **write_scope**: `faber/docs/factory/native-gpu-application-bundle/ngab0-receipt-schema.md` (create); `faber/scripta/check-factory-goal-status` (create, wrapper only); `faber/docs/factory/README.md` (regenerated, never hand-edited).
 - **validation**: `test -f ngab0-receipt-schema.md`; `test -x faber/scripta/check-factory-goal-status`; run `faber/scripta/check-factory-goal-status` (exit 0); `python3 ../radix/scripta/generate-factory-readme.py --factory-root docs/factory --check`.
 - **est_work_tokens**: 3k–6k.
@@ -171,7 +172,7 @@ U1 snapshot/reconcile
 
 ### NGAB0-U11 — Generic fixture contract
 - **title**: Freeze the generic host-plus-device fixture contract for NGAB1 execution.
-- **done_when**: `ngab0-fixture-contract.md` frozen: one scalar host function calling one device kernel; package source sketch (shape, not runnable); CPU oracle definition; expected evidence rows (partition, ABI version, manifest identity, admitted backend, observations); explicit NGAB1 handoff reference. **No runnable code changes** — execution is NGAB1's vertical slice.
+- **done_when**: `ngab0-fixture-contract.md` frozen: one scalar host function invoking one prepared submission region containing one device kernel (the minimal one-prepared-region case, NGAB0-R1 granularity); package source sketch (shape, not runnable); CPU oracle definition; expected evidence rows (partition, ABI version, manifest identity, admitted backend, observations); explicit NGAB1 handoff reference. **No runnable code changes** — execution is NGAB1's vertical slice.
 - **write_scope**: `faber/docs/factory/native-gpu-application-bundle/ngab0-fixture-contract.md` (create).
 - **validation**: `test -f ngab0-fixture-contract.md`; `grep -n 'NGAB1' ngab0-fixture-contract.md`; `grep -n 'oracle' ngab0-fixture-contract.md`.
 - **est_work_tokens**: 2k–4k.

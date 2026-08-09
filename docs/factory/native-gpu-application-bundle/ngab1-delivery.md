@@ -7,14 +7,14 @@
 
 ## Phase Intent
 
-One analyzed package produces validated host MIR/LLVM **and** a typed device program; host code invokes the device boundary through a versioned ABI; resource/lifetime/mutation/observation facts survive lowering; invalid cross-boundary values fail at compile time. **No reconstruction of calls from LLVM, MSL, or PTX text** (extend typed IR/schema before emitters).
+One analyzed package produces validated host MIR/LLVM **and** a typed device program; host code invokes the device boundary — one host call → one prepared submission region — through a versioned ABI; resource/lifetime/mutation/observation facts survive lowering; invalid cross-boundary values fail at compile time. **No reconstruction of calls from LLVM, MSL, or PTX text** (extend typed IR/schema before emitters). The NGAB0-U11 one-kernel fixture proves the **minimal one-region vertical slice** (NGAB0-R1: the one-kernel case is the minimal prepared region, not a separate ABI).
 
 **Entry gate**: NGAB0 closed — including U8 (C1: GI4+ ownership amendment committed; C2: MD3I gate amended). **Non-goals**: packaging/assembly (NGAB2), host loading (NGAB3), model semantics (Gradus), backend performance work.
 
 ## Unit Graph
 
 ### NGAB1-U1 — One vertical slice: host MIR/LLVM + typed device program
-- **done_when**: the NGAB0-U11 fixture (one scalar host function calling one device kernel) is the proof: one analyzed package derives validated host MIR → LLVM AND a typed `DeviceProgram`; device facts (identity, resources, launches, lifetimes, observations) are typed, not text-parsed; the call links and executes through the existing llvm-host path (targeted, narrow test).
+- **done_when**: the NGAB0-U11 fixture (one scalar host function invoking one prepared submission region containing one device kernel — the minimal one-region vertical slice) is the proof: one analyzed package derives validated host MIR → LLVM AND a typed `DeviceProgram`; the prepared submission region carries the kernel and its typed device facts (identity, resources, launches, lifetimes, observations) — typed, not text-parsed; the call links and executes through the existing llvm-host path (targeted, narrow test).
 - **write_scope**: `radix/crates/radix-mir*/` device-program + host-partition surfaces, `faber/src/package/` wire where the ABI crosses. **est_work_tokens**: 20k–40k. **tool_latency**: high (radix + faber check; no cargo build/test in dev loop — `cargo check -p <crate>` only).
 - **dependencies**: NGAB0 packet (partition/ABI), GI3 compiler contracts (read-only).
 - **parallel_children_considered**: none — the vertical slice is the phase's cohesion root; everything else extends it.
@@ -32,7 +32,7 @@ One analyzed package produces validated host MIR/LLVM **and** a typed device pro
 - **parallel_children_considered**: none (facts are the phase thesis).
 
 ### NGAB1-U4 — Batch compatible call shapes
-- **done_when**: after the first accepted call shape, compatible shapes (vector/2D args, two-kernel composition) batch through the same ABI without new mechanisms; each batched shape has a red-green test; no per-shape special-casing in the ABI (R3: extensible variant tables).
+- **done_when**: after the first accepted call shape, compatible shapes (vector/2D args, two-kernel composition) batch through the same ABI without new mechanisms; batched compatible shapes are **multiple kernels per prepared submission region** — one host call → one region containing the batch's kernels, never per-kernel ABI rows (NGAB0-R1 granularity; the region is the call's submission unit, not the kernel); each batched shape has a red-green test; no per-shape special-casing in the ABI (R3: extensible variant tables).
 - **write_scope**: `radix/crates/radix-mir*/`, `faber/src/package/`. **est_work_tokens**: 8k–16k per batch. **tool_latency**: medium.
 - **dependencies**: U2.
 - **parallel_children_considered**: split per call shape after the first accepted pattern.

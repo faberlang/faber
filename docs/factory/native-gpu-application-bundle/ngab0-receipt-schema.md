@@ -75,16 +75,22 @@ omitted for compiler-fact evidence.
 
 ### Block 4 — Artifact identities
 
-Per-artifact rows mirroring the §Manifest row fields exactly.
+Per-artifact rows mirroring the §Manifest row fields exactly, carrying the
+amended **NGAB0-R1** identity — the byte-only `artifact_id` re-roled as
+`content_sha256`, new `packet_sha256` + `compiler_input_packet_sha256` fields,
+and the support-archive identity row (TR7 touch point, not ownership).
 
 | Field | Carries | Rule |
 | --- | --- | --- |
 | `artifact_kind` | `msl-source` \| `metallib` \| `ptx` | §Manifest admitted variants |
-| `artifact_id` | content digest over artifact bytes (SHA-256) | Identity is derived from bytes only; never reconstructed from emitted text, file names, or paths (§Manifest, Dependency Rule 2) |
+| `content_sha256` | SHA-256 over the artifact's canonical decoded payload bytes (the NGAB0-R1 re-role of the byte-only `artifact_id`) | Identity is derived from canonical payload bytes only; never reconstructed from emitted text, file names, or paths (§Manifest, Dependency Rule 2; NGAB0-R1) |
+| `packet_sha256` | digest over versioned artifact metadata + `content_sha256` (schema version, backend, format, materialization stage, target identity, entrypoint map, canonical reflection/requirements) | The packet/admission identity; never semantic identity; verified before backend selection (§Verification; NGAB0-R1) |
+| `compiler_input_packet_sha256` | for finalized-binary rows: `packet_sha256` of the accepted compiler-input packet this artifact replaces | Hash-bound parent provenance; preserves provenance, never silently replaces it (§Manifest; same-artifact evidence rule) |
 | `device_program_version` | wire version of the typed `DeviceProgram` | Rides the accepted wire version; no unversioned artifact |
 | `bounds` | byte length + structural ceilings | Recorded, not re-derived; checked before allocation (§Manifest) |
 | `target` | backend target the artifact is emitted for (Metal / CUDA) | Verified before backend selection (§Verification) |
 | `carrier` | composite executable / manifest row that embeds the artifact | One manifest per executable (§Manifest) |
+| `support_archive_id` | support-archive ABI/content identity — pinned support sources, declared ABI version, SHA-256 content receipt | A separate receipt domain; recorded here as the TR7 touch point, **not owned by NGAB0** (§Versioning; DDCP0 council C3 — routed to DDPP0/TR7) |
 
 ### Block 5 — Exact commands
 
