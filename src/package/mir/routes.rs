@@ -132,7 +132,7 @@ pub(crate) fn build_package_fmir_image(
 pub(crate) fn run_package_fmir_built_image<H: Host + ?Sized>(
     config: &Config,
     input: &Path,
-    selection: faber::device::DeviceSelection,
+    selection: DeviceSelection,
     host: &mut H,
 ) -> Result<(), Vec<Diagnostic>> {
     with_prepared_package_mir_with_cli_mode(
