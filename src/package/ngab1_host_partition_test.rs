@@ -1,6 +1,7 @@
-//! NGAB1-U1 vertical-slice tests: one analyzed package derives a typed
+//! NGAB1-U1/U2 vertical-slice tests: one analyzed package derives a typed
 //! host/device partition AND executes its boundary call through the existing
-//! llvm-host path.
+//! llvm-host path; the versioned call ABI rejects invalid cross-boundary
+//! values at compile time with typed diagnostics.
 //!
 //! The fixture is the frozen NGAB0-U11 shape (`ngab0-fixture-contract.md`):
 //! one scalar host function `run_scale(x: f32) -> f32` calling one device
@@ -9,16 +10,25 @@
 //! exercised at the declared input `x = 3.0` → `7.0`.
 //!
 //! Evidence rows covered here (frozen contract): the **partition** (row 1 —
-//! one host function, one device kernel, one boundary call), the **typed
-//! device program** (identity, resources, launches, lifetimes, observations —
-//! all typed facts, never text-parsed), and the **execution** of the call
-//! through the existing llvm-host path (`build_host_program`). The
-//! toolchain-dependent execution proof runs only when a coherent LLVM
+//! one host function, one prepared submission region, one device kernel, one
+//! boundary call — the minimal one-prepared-region case, NGAB0-R1), the
+//! **typed device program** (identity, resources, launches, lifetimes,
+//! observations — all typed facts, never text-parsed), the **execution** of
+//! the call through the existing llvm-host path (`build_host_program`), and
+//! NGAB1-U2's **versioned call ABI** (the boundary rides
+//! `HOST_CALL_ABI_VERSION`, asserted against the accepted wire version) with
+//! its **compile-time rejection** of invalid cross-boundary values (wrong
+//! type, shape, lifetime, mutation of a read-only resource, observation of
+//! unlaunched work) — typed diagnostics, no launch.
+//!
+//! The toolchain-dependent execution proof runs only when a coherent LLVM
 //! toolchain is discoverable (the `llvm_host_test.rs` convention).
 
 use super::*;
+use crate::package::device::DEVICE_RUN_PLAN_VERSION;
 use crate::package::test_support::{test_temp_dir, TestDir};
 use radix::codegen::Target;
+use radix_mir::boundary_abi::HOST_CALL_ABI_VERSION;
 use radix_mir::device_program::{
     BufferLifetime, BufferRole, DeviceProgramLifetime, ObservationCadence,
 };
@@ -93,13 +103,28 @@ fn ngab1_host_partition_derives_typed_device_program() {
             "host side carries run_scale + the entry"
         );
 
-        // One declared boundary call: a host function → the device kernel.
+        // One declared boundary call: a host function → the prepared region
+        // containing the device kernel (NGAB0-R1: one host call → one
+        // prepared submission region; the one-kernel region is the minimal
+        // case, not a separate ABI shape).
         assert_eq!(partition.boundary_calls.len(), 1);
-        assert_eq!(partition.boundary_calls[0].kernel, scale_kernel_id);
+        assert_eq!(
+            partition.boundary_calls[0].region.kernels,
+            vec![scale_kernel_id]
+        );
+        assert!(
+            partition.boundary_calls[0].region.is_minimal(),
+            "the fixture's prepared region is the minimal one-kernel case"
+        );
         assert_ne!(
             partition.boundary_calls[0].host, scale_kernel_id,
             "the boundary call's caller is a host function"
         );
+
+        // The versioned typed boundary (NGAB1-U2): the partition carries the
+        // call-ABI ratchet; the faber wire seam asserts it rides the accepted
+        // device-program wire version.
+        assert_eq!(partition.call_abi_version, HOST_CALL_ABI_VERSION);
 
         // ── Typed device-program facts (never text-parsed) ────────────────
         program
@@ -193,5 +218,183 @@ fn ngab1_host_partition_executes_boundary_call_via_llvm_host() {
         String::from_utf8_lossy(&run.stdout),
         expected,
         "built binary stdout must match the CPU oracle run_scale(3.0) = 7.0"
+    );
+}
+
+// ── NGAB1-U2: versioned call ABI + compile-time rejection ─────────────────
+
+/// The versioned boundary rides the accepted wire version (NGAB0 §Abi: the
+/// boundary is a versioned surface with its own ratchet that rides the
+/// accepted wire version — no `WIRE_DEVICE_PROGRAM_VERSION` bump; the MD2-W1
+/// sibling-field precedent).
+#[test]
+fn ngab1_call_abi_rides_the_accepted_wire_version() {
+    assert_eq!(
+        HOST_CALL_ABI_VERSION, DEVICE_RUN_PLAN_VERSION,
+        "the versioned call ABI rides the accepted device-program wire version"
+    );
+    assert_eq!(HOST_CALL_ABI_VERSION, 8);
+}
+
+/// Lower a negative fixture and assert the boundary ABI rejects it at compile
+/// time with the typed `E_DEVICE_BOUNDARY_ABI` diagnostic of the expected
+/// class. The fixture must pass source lowering + general MIR validation
+/// (rejection is the *boundary* gate's, not a parse/type error), and nothing
+/// is built or launched.
+fn expect_boundary_rejection(source: &str, class: &'static str) {
+    let dir = test_temp_dir("ngab1-boundary-negative");
+    let package_dir = dir.join("fixture-scalar-kernel");
+    fs::create_dir_all(&package_dir).expect("create fixture dir");
+    let entry = package_dir.join("fixture-scalar-kernel.fab");
+    fs::write(&entry, source).expect("write fixture");
+    let rejection = with_lowered_package_mir(&llvm_host_config(), &entry, |lowered| {
+        host_partition_for_lowered(lowered)
+    });
+    match rejection {
+        Ok(Err(diagnostics)) => {
+            let boundary = diagnostics.iter().find(|diag| {
+                diag.args
+                    .iter()
+                    .any(|arg| arg.name == "issue" && arg.value == "E_DEVICE_BOUNDARY_ABI")
+            });
+            let boundary = boundary.unwrap_or_else(|| {
+                panic!("expected an E_DEVICE_BOUNDARY_ABI diagnostic; got {diagnostics:?}")
+            });
+            assert!(
+                boundary
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "class" && arg.value == class),
+                "expected the {class} boundary class; got {boundary:?}"
+            );
+        }
+        Ok(Ok(_)) => panic!(
+            "the negative fixture must be rejected at compile time (class {class}); the partition derived"
+        ),
+        Err(diagnostics) => panic!(
+            "the negative fixture must pass lowering/general validation (rejection is the boundary gate's); got {diagnostics:?}"
+        ),
+    }
+}
+
+/// Wrong type: an `fractus<f16>` value crosses a boundary that declares
+/// `fractus<f32>`. General MIR allows the widening; the versioned typed
+/// boundary requires the exact carried element type fact (every crossing
+/// value carries its type fact — §Abi).
+#[test]
+fn ngab1_boundary_rejects_wrong_type() {
+    expect_boundary_rejection(
+        r#"@ nucleum
+functio scale_kernel(fractus<f32> x) → fractus<f32> {
+    redde x * 2.0 + 1.0
+}
+
+functio run_scale(fractus<f16> x) → fractus<f32> {
+    redde scale_kernel(x)
+}
+
+incipit {
+    nota run_scale(1.0 ∷ fractus<f16>)
+}"#,
+        "type",
+    );
+}
+
+/// Wrong lifetime: the boundary call's output must not land in caller-owned
+/// parameter storage. At the source level this pattern is already blocked by
+/// the semantic analyzer (SEM020 — parameters are immutable), so the faber
+/// fixture cannot express it; the typed `Lifetime` diagnostic of the boundary
+/// gate is proven at the MIR level by `radix-mir`'s
+/// `boundary_abi_rejects_output_into_host_parameter` unit test. The gate
+/// still guards MIR-level producers that write a call's output into a host
+/// parameter (`Assign { place: param, value: <call output> }`).
+#[test]
+fn ngab1_boundary_rejects_output_into_parameter_guarded() {
+    // The source-language guard fires first: reassigning a parameter is
+    // SEM020 (immutable second assignment), a compile-time rejection without
+    // a launch — the same outcome the boundary gate produces for MIR-level
+    // producers.
+    let dir = test_temp_dir("ngab1-boundary-lifetime");
+    let package_dir = dir.join("fixture-scalar-kernel");
+    fs::create_dir_all(&package_dir).expect("create fixture dir");
+    let entry = package_dir.join("fixture-scalar-kernel.fab");
+    fs::write(
+        &entry,
+        r#"@ nucleum
+functio scale_kernel(fractus<f32> x) → fractus<f32> {
+    redde x * 2.0 + 1.0
+}
+
+functio run_scale(fractus<f32> x) → fractus<f32> {
+    x ← scale_kernel(1.0 ∷ fractus<f32>)
+    redde x
+}
+
+incipit {
+    nota run_scale(3.0 ∷ fractus<f32>)
+}"#,
+    )
+    .expect("write fixture");
+    let rejection = with_lowered_package_mir(&llvm_host_config(), &entry, |lowered| {
+        host_partition_for_lowered(lowered)
+    });
+    match rejection {
+        Err(diagnostics) => {
+            assert!(
+                diagnostics
+                    .iter()
+                    .any(|diag| diag.message.contains("immutable_second_assignment")),
+                "the source-level lifetime guard rejects writing into the parameter; got {diagnostics:?}"
+            );
+        }
+        Ok(Ok(_)) | Ok(Err(_)) => {
+            panic!("the lifetime-negative fixture must be rejected at compile time (SEM020) without a launch")
+        }
+    }
+}
+
+/// Mutation of a read-only resource: the call writes its output into the same
+/// storage as its input value — the device input slot is read-only.
+#[test]
+fn ngab1_boundary_rejects_in_place_mutation() {
+    expect_boundary_rejection(
+        r#"@ nucleum
+functio scale_kernel(fractus<f32> x) → fractus<f32> {
+    redde x * 2.0 + 1.0
+}
+
+functio run_scale(fractus<f32> x) → fractus<f32> {
+    varia fractus<f32> y ← x
+    y ← scale_kernel(y)
+    redde y
+}
+
+incipit {
+    nota run_scale(3.0 ∷ fractus<f32>)
+}"#,
+        "mutation",
+    );
+}
+
+/// Observation of unlaunched work: a second call passes the first call's
+/// output (the kernel's region result) back in as an input; the program's
+/// single launch for the kernel is both producer and consumer.
+#[test]
+fn ngab1_boundary_rejects_observing_unlaunched_work() {
+    expect_boundary_rejection(
+        r#"@ nucleum
+functio scale_kernel(fractus<f32> x) → fractus<f32> {
+    redde x * 2.0 + 1.0
+}
+
+functio run_scale(fractus<f32> x) → fractus<f32> {
+    varia fractus<f32> y ← scale_kernel(x)
+    redde scale_kernel(y)
+}
+
+incipit {
+    nota run_scale(3.0 ∷ fractus<f32>)
+}"#,
+        "observation",
     );
 }

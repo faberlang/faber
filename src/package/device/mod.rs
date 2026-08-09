@@ -112,8 +112,19 @@ fn device_diag(context: &str, message: impl Into<String>) -> Diagnostic {
         .with_arg("issue", "E_DEVICE_DESCRIPTOR")
 }
 
-mod program;
+/// NGAB1-U2: the typed diagnostic for a rejected cross-boundary value. The
+/// versioned call-ABI gate (radix-mir `boundary_abi`) fails at compile time
+/// with one typed class — wrong type, shape, lifetime, mutation of a
+/// read-only resource, or observation of unlaunched work — carried on the
+/// diagnostic so a fixture can assert rejection without a launch.
+fn boundary_abi_diag(class: &'static str, message: impl Into<String>) -> Diagnostic {
+    Diagnostic::error(format!("boundary call ABI: {}", message.into()))
+        .with_arg("issue", "E_DEVICE_BOUNDARY_ABI")
+        .with_arg("class", class)
+}
+
 mod prefill_run;
+mod program;
 mod run;
 mod section;
 mod training;
@@ -143,9 +154,15 @@ pub(crate) use program::device_program_for_lowered;
 pub(crate) fn host_partition_for_lowered(
     lowered: &radix::mir::LoweredMirUnit<'_>,
 ) -> Result<Option<radix_mir::HostPartition>, Vec<Diagnostic>> {
+    use radix_mir::boundary_abi::BoundaryAbiClass;
+    use radix_mir::host_partition::HostPartitionError;
     match radix_mir::host_partition::derive_host_partition(&lowered.validated, &lowered.interner) {
         Ok(partition) if partition.has_device() => Ok(Some(partition)),
         Ok(_) => Ok(None),
+        Err(HostPartitionError::Boundary(error)) => Err(vec![boundary_abi_diag(
+            error.class().spelling(),
+            error.to_string(),
+        )]),
         Err(error) => Err(vec![device_diag("host partition", error.to_string())]),
     }
 }
