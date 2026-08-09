@@ -57,7 +57,7 @@ Both heads agree on the core architecture; this is the merged product shape.
 | What should it DO? | Opinionated deterministic layout pass: stable blocks/indentation, width-aware wrapping at syntax boundaries, fit-if-possible calls/records, bounded blank lines, comment preservation. No semantic rewriting, no alignment. |
 | What flags? | Keep existing surface; add `--write` + `--stdin`; `--config` later (same schema). No `--line-width` / `--indent-width` / `--trailing-comma` / per-rule toggles in v1. |
 | What config surface? | `[format] policy = "pretty-v1"` in `faber.toml`. Default `normalise-v1` until migration. No `[forma]`, no `forma.toml`. |
-| Output shape? | 4-space indent, 100-col soft width, brace-attached blocks, `si`/`sin`/`secus` chains as one chain with non-cuddled branch heads (operator decision 2026-08-09), one-arg-per-line when wrapped, no field alignment, ≤1 blank line between top-level decls, author blank lines inside bodies preserved. |
+| Output shape? | 4-space indent, 100-col soft width, brace-attached blocks, `si`/`sin`/`secus` and `tempta`/`cape`/`demum` chains as one chain with non-cuddled brace-attached constructs — every chain keyword starts on its own line after the closing brace (operator decision 2026-08-09), one-arg-per-line when wrapped, no field alignment, ≤1 blank line between top-level decls, author blank lines inside bodies preserved. |
 | Rollout? | Golden corpus first → one migration switch → advisory `--check` → one dedicated rebaseline commit → default flip after migration window. |
 | Complexity line? | No alignment, no config sprawl, no import sorting, no comment reflow, no quote/trailing-comma policy, no per-file rule lists, no environment-dependent behavior, unknown slugs fail clearly. |
 
@@ -70,14 +70,16 @@ switch, not a matrix). Exact spelling is a lowering decision.
 ## Rule set (`pretty-v1`), prioritized
 
 **P0 — blocks and indentation.** One statement per line inside a block; four
-spaces per nesting level; no tabs; braces attached to the owning construct;
-`si … sin … secus` chains rendered as one readable chain with **non-cuddled
-branch heads** (operator style decision 2026-08-09): the closing brace of a
-branch sits on its own line and `sin` / `secus` begin on a fresh line — never
-`} sin … {` on one line. Compact one-statement forms stay compact when they
-fit (`si code ≡ 1 ergo redde prima()`); if a compact arm exceeds the width,
-expand it into a block. Empty blocks stay compact. Indentation is structural,
-not configurable in v1.
+spaces per nesting level; no tabs; braces attached to the owning construct.
+**No cuddled braces anywhere** (operator style decision 2026-08-09): any
+construct that attaches to the end of an earlier block — `sin`, `secus`,
+`cape`, `demum`, and any future chain keyword — starts on its own line after
+the closing brace, never `} sin … {`, `} cape … {`, etc. This applies to
+every brace-attached construct, not just conditional chains: `cape` attaches
+to the end of an earlier block, so it is on its own line too. Compact
+one-statement forms stay compact when they fit (`si code ≡ 1 ergo redde
+prima()`); if a compact arm exceeds the width, expand it into a block. Empty
+blocks stay compact. Indentation is structural, not configurable in v1.
 
 **P0 — width-aware wrapping.** 100-column soft limit (a wrapping trigger, not
 an absolute promise). Break only at syntactic boundaries: function parameters,
@@ -188,6 +190,22 @@ sin code ≡ 2 {
 }
 secus {
     redde fallback()
+}
+```
+
+The same non-cuddled rule applies to every brace-attached construct — `cape`
+attaches to the end of an earlier block, so it sits on its own line too
+(`tempta`/`cape`/`demum` chain):
+
+```fab
+tempta {
+    iace "err"
+}
+cape err {
+    scribe err
+}
+demum {
+    scribe "demum"
 }
 ```
 
