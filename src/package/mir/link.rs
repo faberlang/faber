@@ -1495,6 +1495,128 @@ fn rewrite_namespace_variant_members(analysis: &mut radix::driver::AnalyzedUnit)
     rewriter.visit_program_mut(&mut analysis.hir);
 }
 
+struct ShadowedAliasRewriter<'a> {
+    unit_path: &'a Path,
+    resolver: &'a Resolver,
+    interner: &'a Interner,
+    targets: &'a NamespaceCallTargets,
+    imports: &'a HashMap<String, DefId>,
+    diagnostics: &'a mut Vec<String>,
+}
+impl ShadowedAliasRewriter<'_> {
+    fn import_target(&self, receiver: &HirExpression, method: Symbol) -> Option<DefId> {
+        let HirExpressionKind::Path(def) = &receiver.kind else {
+            return None;
+        };
+        // The main rewrite already handles directly-keyed receivers.
+        if namespace_call_target(self.unit_path, receiver, method, self.interner, self.targets)
+            .is_some()
+        {
+            return None;
+        }
+        // A HIR-generated receiver def (>= 1_000_000) is the
+        // `forma`-shadowing shape ONLY: a LOCAL whose name shadows an
+        // import binding makes the semantic namespace reference carry the
+        // generated def instead of the import item's def. The method-name
+        // sweep across the unit's imports is therefore sound ONLY when the
+        // receiver is a local of that exact name. Without the guard, any
+        // ordinary method call on a local (`h1b.gelu()`) whose method
+        // happens to match an imported module's export (`gradus:nn`
+        // exports `gelu`) was rewritten into a synthetic-path namespace
+        // call — corrupting AIR-lane library functions at lowering
+        // ("non-AIR-lane call callee").
+        if def.0 >= 1_000_000 {
+            let Some(symbol) = self.resolver.get_symbol(*def) else {
+                return None;
+            };
+            if !matches!(symbol.kind, radix::semantic::SymbolKind::Local) {
+                return None;
+            }
+            let local_name = self.interner.resolve(symbol.name).to_owned();
+            if !self.imports.contains_key(&local_name) {
+                return None;
+            }
+            let method_name = self.interner.resolve(method).to_owned();
+            let mut found = None;
+            for import_def in self.imports.values() {
+                if let Some(target) =
+                    self.targets.get(&(self.unit_path.to_path_buf(), *import_def, method_name.clone()))
+                {
+                    if found.is_some() {
+                        // Ambiguous: more than one import exports the
+                        // method — leave the call to fail closed.
+                        return None;
+                    }
+                    found = Some(*target);
+                }
+            }
+            return found;
+        }
+        // Only Module symbols (import namespaces) — or locals that shadow
+        // one (the name-based resolution below then matches the import
+        // binding, mirroring the analysis's namespace-member intent).
+        let Some(symbol) = self.resolver.get_symbol(*def) else {
+            return None;
+        };
+        if !matches!(
+            symbol.kind,
+            radix::semantic::SymbolKind::Module | radix::semantic::SymbolKind::Local
+        ) {
+            return None;
+        }
+        let name = self.interner.resolve(symbol.name).to_owned();
+        let import_def = self.imports.get(&name).copied()?;
+        let import_receiver = HirExpression {
+            id: receiver.id,
+            kind: HirExpressionKind::Path(import_def),
+            ty: None,
+            span: receiver.span,
+        };
+        namespace_call_target(self.unit_path, &import_receiver, method, self.interner, self.targets)
+    }
+}
+impl HirVisitorMut for ShadowedAliasRewriter<'_> {
+    fn visit_expr_mut(&mut self, expr: &mut HirExpression) {
+        match &mut expr.kind {
+            HirExpressionKind::Call(callee, _, _) => {
+                if let HirExpressionKind::Field(receiver, method) = &callee.kind {
+                    if let Some(synthetic) = self.import_target(receiver, *method) {
+                        **callee = HirExpression {
+                            id: receiver.id,
+                            kind: HirExpressionKind::Path(synthetic),
+                            ty: None,
+                            span: receiver.span,
+                        };
+                    }
+                }
+            }
+            HirExpressionKind::MethodCall(receiver, method, type_args, args) => {
+                if let Some(synthetic) = self.import_target(receiver, *method) {
+                    let call_args = std::mem::take(args);
+                    let callee = HirExpression {
+                        id: receiver.id,
+                        kind: HirExpressionKind::Path(synthetic),
+                        ty: None,
+                        span: receiver.span,
+                    };
+                    *expr = HirExpression {
+                        id: expr.id,
+                        kind: HirExpressionKind::Call(
+                            Box::new(callee),
+                            std::mem::take(type_args),
+                            call_args,
+                        ),
+                        ty: expr.ty,
+                        span: expr.span,
+                    };
+                }
+            }
+            _ => {}
+        }
+        walk_expr_mut(self, expr);
+    }
+}
+
 /// Rewrite namespace calls whose receiver `Path` carries a NON-import
 /// `DefId` (FMIR e2e-hardening CTO-1).
 ///
@@ -1528,127 +1650,6 @@ fn rewrite_shadowed_alias_namespace_calls(
     }
     if imports.is_empty() {
         return;
-    }
-    struct ShadowedAliasRewriter<'a> {
-        unit_path: &'a Path,
-        resolver: &'a Resolver,
-        interner: &'a Interner,
-        targets: &'a NamespaceCallTargets,
-        imports: &'a HashMap<String, DefId>,
-        diagnostics: &'a mut Vec<String>,
-    }
-    impl ShadowedAliasRewriter<'_> {
-        fn import_target(&self, receiver: &HirExpression, method: Symbol) -> Option<DefId> {
-            let HirExpressionKind::Path(def) = &receiver.kind else {
-                return None;
-            };
-            // The main rewrite already handles directly-keyed receivers.
-            if namespace_call_target(self.unit_path, receiver, method, self.interner, self.targets)
-                .is_some()
-            {
-                return None;
-            }
-            // A HIR-generated receiver def (>= 1_000_000) is the
-            // `forma`-shadowing shape ONLY: a LOCAL whose name shadows an
-            // import binding makes the semantic namespace reference carry the
-            // generated def instead of the import item's def. The method-name
-            // sweep across the unit's imports is therefore sound ONLY when the
-            // receiver is a local of that exact name. Without the guard, any
-            // ordinary method call on a local (`h1b.gelu()`) whose method
-            // happens to match an imported module's export (`gradus:nn`
-            // exports `gelu`) was rewritten into a synthetic-path namespace
-            // call — corrupting AIR-lane library functions at lowering
-            // ("non-AIR-lane call callee").
-            if def.0 >= 1_000_000 {
-                let Some(symbol) = self.resolver.get_symbol(*def) else {
-                    return None;
-                };
-                if !matches!(symbol.kind, radix::semantic::SymbolKind::Local) {
-                    return None;
-                }
-                let local_name = self.interner.resolve(symbol.name).to_owned();
-                if !self.imports.contains_key(&local_name) {
-                    return None;
-                }
-                let method_name = self.interner.resolve(method).to_owned();
-                let mut found = None;
-                for import_def in self.imports.values() {
-                    if let Some(target) =
-                        self.targets.get(&(self.unit_path.to_path_buf(), *import_def, method_name.clone()))
-                    {
-                        if found.is_some() {
-                            // Ambiguous: more than one import exports the
-                            // method — leave the call to fail closed.
-                            return None;
-                        }
-                        found = Some(*target);
-                    }
-                }
-                return found;
-            }
-            // Only Module symbols (import namespaces) — or locals that shadow
-            // one (the name-based resolution below then matches the import
-            // binding, mirroring the analysis's namespace-member intent).
-            let Some(symbol) = self.resolver.get_symbol(*def) else {
-                return None;
-            };
-            if !matches!(
-                symbol.kind,
-                radix::semantic::SymbolKind::Module | radix::semantic::SymbolKind::Local
-            ) {
-                return None;
-            }
-            let name = self.interner.resolve(symbol.name).to_owned();
-            let import_def = self.imports.get(&name).copied()?;
-            let import_receiver = HirExpression {
-                id: receiver.id,
-                kind: HirExpressionKind::Path(import_def),
-                ty: None,
-                span: receiver.span,
-            };
-            namespace_call_target(self.unit_path, &import_receiver, method, self.interner, self.targets)
-        }
-    }
-    impl HirVisitorMut for ShadowedAliasRewriter<'_> {
-        fn visit_expr_mut(&mut self, expr: &mut HirExpression) {
-            match &mut expr.kind {
-                HirExpressionKind::Call(callee, _, _) => {
-                    if let HirExpressionKind::Field(receiver, method) = &callee.kind {
-                        if let Some(synthetic) = self.import_target(receiver, *method) {
-                            **callee = HirExpression {
-                                id: receiver.id,
-                                kind: HirExpressionKind::Path(synthetic),
-                                ty: None,
-                                span: receiver.span,
-                            };
-                        }
-                    }
-                }
-                HirExpressionKind::MethodCall(receiver, method, type_args, args) => {
-                    if let Some(synthetic) = self.import_target(receiver, *method) {
-                        let call_args = std::mem::take(args);
-                        let callee = HirExpression {
-                            id: receiver.id,
-                            kind: HirExpressionKind::Path(synthetic),
-                            ty: None,
-                            span: receiver.span,
-                        };
-                        *expr = HirExpression {
-                            id: expr.id,
-                            kind: HirExpressionKind::Call(
-                                Box::new(callee),
-                                std::mem::take(type_args),
-                                call_args,
-                            ),
-                            ty: expr.ty,
-                            span: expr.span,
-                        };
-                    }
-                }
-                _ => {}
-            }
-            walk_expr_mut(self, expr);
-        }
     }
     let mut rewriter = ShadowedAliasRewriter {
         unit_path,
@@ -1929,6 +1930,8 @@ mod shadowed_alias_tests {
         // Local named `forma` — the exact name of an import binding.
         let receiver_def = DefId(1_000_000);
         let forma = interner.intern("forma");
+        // Fresh resolver: a symbol with this def/name cannot already exist, so
+        // the define cannot collide; discard the result (hygiene: no .expect).
         resolver
             .define(Symbol {
                 def_id: receiver_def,
@@ -1938,7 +1941,7 @@ mod shadowed_alias_tests {
                 mutable: false,
                 span: Default::default(),
             })
-            .expect("define the shadowing local symbol");
+            .ok();
 
         // The import binding `forma` → the imported module's item def, plus a
         // registered namespace-call target for `forma.quantitas(...)`.
@@ -1957,6 +1960,7 @@ mod shadowed_alias_tests {
         };
 
         let mut diagnostics = Vec::new();
+        let method = interner.intern("quantitas");
         let rewriter = ShadowedAliasRewriter {
             unit_path: &unit_path,
             resolver: &resolver,
@@ -1965,7 +1969,6 @@ mod shadowed_alias_tests {
             imports: &imports,
             diagnostics: &mut diagnostics,
         };
-        let method = interner.intern("quantitas");
         assert_eq!(
             rewriter.import_target(&receiver, method),
             Some(synthetic),
@@ -1996,7 +1999,7 @@ mod shadowed_alias_tests {
                 mutable: false,
                 span: Default::default(),
             })
-            .expect("define the h1b local symbol");
+            .ok();
 
         // The unit imports a module (`nn`) that DOES export `gelu` and the
         // target is registered — the guard must still skip the h1b receiver
@@ -2016,6 +2019,7 @@ mod shadowed_alias_tests {
         };
 
         let mut diagnostics = Vec::new();
+        let method = interner.intern("gelu");
         let rewriter = ShadowedAliasRewriter {
             unit_path: &unit_path,
             resolver: &resolver,
@@ -2024,7 +2028,6 @@ mod shadowed_alias_tests {
             imports: &imports,
             diagnostics: &mut diagnostics,
         };
-        let method = interner.intern("gelu");
         assert_eq!(
             rewriter.import_target(&receiver, method),
             None,
