@@ -1,7 +1,7 @@
 //! Package-local namespace-call linking and rewrite passes.
 
 use super::*;
-use radix::hir::visit::{HirVisitorMut, walk_expr_mut};
+use radix::hir::visit::{HirVisitor, HirVisitorMut, walk_expr_mut};
 
 struct PackageMirLinkAccumulator {
     targets: NamespaceCallTargets,
@@ -1501,10 +1501,27 @@ pub(super) struct ShadowedAliasRewriter<'a> {
     pub(super) interner: &'a Interner,
     pub(super) targets: &'a NamespaceCallTargets,
     pub(super) imports: &'a HashMap<String, DefId>,
+    /// DefId → binding name for every definition introduced by HIR lowering
+    /// (params, locals, itera/cape/pattern bindings, closure params, entry
+    /// args). These synthetic defs (>= 1_000_000) are never registered in the
+    /// resolver's symbol table, so this HIR-derived map is the only way to
+    /// recover a synthetic receiver's name.
+    pub(super) local_names: &'a HashMap<DefId, Symbol>,
+    pub(super) types: &'a TypeTable,
+    /// `(owner def, method symbol)` pairs for the unit's own genus/interface
+    /// methods: a synthetic receiver whose method resolves on its own type is
+    /// a genuine method call and must never be rewritten into a namespace
+    /// call, even when the receiver's name shadows an import binding.
+    pub(super) genus_methods: &'a HashSet<(DefId, Symbol)>,
     pub(super) diagnostics: &'a mut Vec<String>,
 }
 impl ShadowedAliasRewriter<'_> {
-    pub(super) fn import_target(&self, receiver: &HirExpression, method: Symbol) -> Option<DefId> {
+    pub(super) fn import_target(
+        &self,
+        receiver: &HirExpression,
+        method: Symbol,
+        arg_count: usize,
+    ) -> Option<DefId> {
         let HirExpressionKind::Path(def) = &receiver.kind else {
             return None;
         };
@@ -1514,43 +1531,36 @@ impl ShadowedAliasRewriter<'_> {
         {
             return None;
         }
-        // A HIR-generated receiver def (>= 1_000_000) is the
-        // `forma`-shadowing shape ONLY: a LOCAL whose name shadows an
-        // import binding makes the semantic namespace reference carry the
-        // generated def instead of the import item's def. The method-name
-        // sweep across the unit's imports is therefore sound ONLY when the
-        // receiver is a local of that exact name. Without the guard, any
-        // ordinary method call on a local (`h1b.gelu()`) whose method
-        // happens to match an imported module's export (`gradus:nn`
-        // exports `gelu`) was rewritten into a synthetic-path namespace
-        // call — corrupting AIR-lane library functions at lowering
-        // ("non-AIR-lane call callee").
+        // A HIR-generated receiver def (>= 1_000_000) is a synthetic binding
+        // introduced by HIR lowering. The `forma`-shadowing shape is exactly a
+        // LOCAL whose name shadows an import binding: the semantic namespace
+        // reference then carries the local's synthetic def instead of the
+        // import item's def. Synthetic defs are absent from the resolver
+        // symbol table, so the binding name is recovered from the HIR
+        // def→name map and resolved to the receiver's OWN import binding —
+        // never a name sweep across the unit's imports (which rewrites any
+        // ordinary method call on a local whose method happens to match an
+        // imported module's export, e.g. `h1b.gelu()` → `nn.gelu(h1b)`).
         if def.0 >= 1_000_000 {
-            let Some(symbol) = self.resolver.get_symbol(*def) else {
+            let Some(binding_name) = self.local_names.get(def).copied() else {
                 return None;
             };
-            if !matches!(symbol.kind, radix::semantic::SymbolKind::Local) {
+            let local_name = self.interner.resolve(binding_name).to_owned();
+            let Some(import_def) = self.imports.get(&local_name).copied() else {
                 return None;
-            }
-            let local_name = self.interner.resolve(symbol.name).to_owned();
-            if !self.imports.contains_key(&local_name) {
+            };
+            // Guard: a genuine method call on the receiver's own type is not
+            // a namespace reference and must not be rewritten, even when the
+            // receiver's name shadows an import binding and the module exports
+            // the same method name.
+            if self.method_resolves_on_receiver_type(receiver, method, arg_count) {
                 return None;
             }
             let method_name = self.interner.resolve(method).to_owned();
-            let mut found = None;
-            for import_def in self.imports.values() {
-                if let Some(target) =
-                    self.targets.get(&(self.unit_path.to_path_buf(), *import_def, method_name.clone()))
-                {
-                    if found.is_some() {
-                        // Ambiguous: more than one import exports the
-                        // method — leave the call to fail closed.
-                        return None;
-                    }
-                    found = Some(*target);
-                }
-            }
-            return found;
+            return self
+                .targets
+                .get(&(self.unit_path.to_path_buf(), import_def, method_name))
+                .copied();
         }
         // Only Module symbols (import namespaces) — or locals that shadow
         // one (the name-based resolution below then matches the import
@@ -1574,13 +1584,44 @@ impl ShadowedAliasRewriter<'_> {
         };
         namespace_call_target(self.unit_path, &import_receiver, method, self.interner, self.targets)
     }
+
+    /// Whether `method` resolves as a genuine method on `receiver`'s type:
+    /// the promoted intrinsic registry, or a genus/interface method on the
+    /// receiver's (normalized) struct type.
+    fn method_resolves_on_receiver_type(
+        &self,
+        receiver: &HirExpression,
+        method: Symbol,
+        arg_count: usize,
+    ) -> bool {
+        let Some(ty) = receiver.ty else {
+            return false;
+        };
+        let method_name = self.interner.resolve(method).to_owned();
+        let normalized = match self.types.get(ty) {
+            Type::Alias(_, inner) => self.types.get(*inner),
+            other => other,
+        };
+        if radix::intrinsics::lookup_method_for_type(normalized, &method_name, arg_count).is_some() {
+            return true;
+        }
+        let struct_def = match normalized {
+            Type::Struct(def_id) => Some(*def_id),
+            Type::Applied(base, _) => match self.types.get(*base) {
+                Type::Struct(def_id) => Some(*def_id),
+                _ => None,
+            },
+            _ => None,
+        };
+        struct_def.map_or(false, |def| self.genus_methods.contains(&(def, method)))
+    }
 }
 impl HirVisitorMut for ShadowedAliasRewriter<'_> {
     fn visit_expr_mut(&mut self, expr: &mut HirExpression) {
         match &mut expr.kind {
-            HirExpressionKind::Call(callee, _, _) => {
+            HirExpressionKind::Call(callee, _, args) => {
                 if let HirExpressionKind::Field(receiver, method) = &callee.kind {
-                    if let Some(synthetic) = self.import_target(receiver, *method) {
+                    if let Some(synthetic) = self.import_target(receiver, *method, args.len()) {
                         **callee = HirExpression {
                             id: receiver.id,
                             kind: HirExpressionKind::Path(synthetic),
@@ -1591,7 +1632,7 @@ impl HirVisitorMut for ShadowedAliasRewriter<'_> {
                 }
             }
             HirExpressionKind::MethodCall(receiver, method, type_args, args) => {
-                if let Some(synthetic) = self.import_target(receiver, *method) {
+                if let Some(synthetic) = self.import_target(receiver, *method, args.len()) {
                     let call_args = std::mem::take(args);
                     let callee = HirExpression {
                         id: receiver.id,
@@ -1651,15 +1692,61 @@ fn rewrite_shadowed_alias_namespace_calls(
     if imports.is_empty() {
         return;
     }
+    // Synthetic HIR bindings (params, locals, itera/cape/pattern bindings,
+    // closure params) are allocated >= 1_000_000 by HIR lowering and are never
+    // registered in the resolver's symbol table, so their names must be
+    // recovered from the HIR itself: every definition introduction in the
+    // program (items, params, locals, patterns, handlers, loop bindings).
+    let mut local_names: HashMap<DefId, Symbol> = HashMap::new();
+    {
+        let mut collector = LocalNameCollector { names: &mut local_names };
+        collector.visit_program(&analysis.hir);
+    }
+    // Genus/interface methods on the unit's own types: a synthetic receiver
+    // whose method resolves on its own type is a genuine method call and must
+    // not be rewritten into a namespace call.
+    let mut genus_methods: HashSet<(DefId, Symbol)> = HashSet::new();
+    for item in &analysis.hir.items {
+        match &item.kind {
+            HirItemKind::Struct(strukt) => {
+                for method in &strukt.methods {
+                    genus_methods.insert((item.def_id, method.func.name));
+                }
+            }
+            HirItemKind::Interface(interface) => {
+                for method in &interface.methods {
+                    genus_methods.insert((item.def_id, method.name));
+                }
+            }
+            _ => {}
+        }
+    }
     let mut rewriter = ShadowedAliasRewriter {
         unit_path,
         resolver: &analysis.resolver,
         interner: &analysis.interner,
         targets,
         imports: &imports,
+        local_names: &local_names,
+        types: &analysis.types,
+        genus_methods: &genus_methods,
         diagnostics,
     };
     rewriter.visit_program_mut(&mut analysis.hir);
+}
+
+/// Collect every `DefId → Symbol` definition introduction in a program.
+///
+/// The HIR visitor's `visit_def` fires for items, parameters, locals,
+/// patterns, imports, methods, fields, handlers, and loop bindings — exactly
+/// the bindings a synthetic method-call receiver can carry.
+struct LocalNameCollector<'a> {
+    names: &'a mut HashMap<DefId, Symbol>,
+}
+impl radix::hir::visit::HirVisitor for LocalNameCollector<'_> {
+    fn visit_def(&mut self, def_id: DefId, name: Symbol) {
+        self.names.insert(def_id, name);
+    }
 }
 
 /// Rewrite method calls on linked library nominals into synthetic-path calls
