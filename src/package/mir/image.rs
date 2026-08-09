@@ -851,6 +851,59 @@ pub(super) fn fmir_image_decode_error(
                 style.label
             ),
         )],
+        // DDCP3-U0: artifact admission and selection-resolution failure
+        // classes mapped to focused diagnostics (exact-match clean break).
+        FmirImageError::UnsupportedArtifactAbiVersion {
+            backend,
+            actual,
+            accepted,
+        } => vec![mir_issue_diag(
+            path,
+            "fmir_image_artifact_abi_version_unsupported",
+            format!(
+                "{} image device artifact `{backend}` declares ABI version {actual}; the accepted version is {accepted} — exact-match clean break",
+                style.label
+            ),
+        )
+        .with_arg("backend", backend)
+        .with_arg("actual", actual.to_string())
+        .with_arg("accepted", accepted.to_string())],
+        FmirImageError::IncompatibleArtifactCombination { backend, detail } => vec![
+            mir_issue_diag(
+                path,
+                "fmir_image_artifact_combination_incompatible",
+                format!(
+                    "{} image device artifact `{backend}` combination is incompatible: {detail}",
+                    style.label
+                ),
+            )
+            .with_arg("backend", backend),
+        ],
+        FmirImageError::DuplicateRequiredFeature { feature } => vec![mir_issue_diag(
+            path,
+            "fmir_image_artifact_duplicate_required_feature",
+            format!(
+                "{} image device artifact declares target feature `{feature}` more than once — duplicate required features fail admission",
+                style.label
+            ),
+        )],
+        FmirImageError::DuplicateEntrypoint { entry } => vec![mir_issue_diag(
+            path,
+            "fmir_image_artifact_duplicate_entrypoint",
+            format!(
+                "{} image device artifact declares entrypoint `{entry}` more than once — duplicate entrypoint identities fail admission",
+                style.label
+            ),
+        )],
+        FmirImageError::UnsupportedSelectedBackend { backend } => vec![mir_issue_diag(
+            path,
+            "fmir_image_selected_backend_unsupported",
+            format!(
+                "{} image device selection `{backend}` names an unknown backend — selection resolution fails closed (DDCP3-U0 preserve-until-selection)",
+                style.label
+            ),
+        )
+        .with_arg("backend", backend)],
         FmirImageError::UnsupportedDeviceProgramVersion { actual, expected } => vec![
             mir_issue_diag(
                 path,

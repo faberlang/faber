@@ -32,9 +32,11 @@ pub(crate) struct DeviceSectionBuild<'a> {
 }
 
 /// The declared ABI/schema version of faber's emitted device artifacts — an
-/// input to the `packet_sha256` identity (DDCP2-U3). Matches the radix
-/// producer/closeout convention.
-const DEVICE_ARTIFACT_ABI_VERSION: u32 = 1;
+/// input to the `packet_sha256` identity (DDCP2-U3). Exact-match with the
+/// radix producer's `ARTIFACT_ABI_VERSION` (currently 8): radix admission is
+/// an exact-match clean break, so faber emitting a stale version would be
+/// rejected at load.
+const DEVICE_ARTIFACT_ABI_VERSION: u32 = 8;
 
 /// Compute the canonical `content_sha256`/`packet_sha256` identity digests of
 /// a declared device artifact over its canonical decoded bytes (DDCP2-U3; the
@@ -164,6 +166,7 @@ pub(crate) fn device_section_for_program(
         content_sha256: String::new(),
         packet_sha256: String::new(),
         compiler_input_packet_sha256: None,
+        reflection: None,
     })];
     if let Some(cuda_artifact) = &cuda_artifact {
         match radix_mir_llvm::compile_nvvm_to_ptx(&cuda_artifact.source, ptx_target) {
@@ -186,6 +189,7 @@ pub(crate) fn device_section_for_program(
                     content_sha256: String::new(),
                     packet_sha256: String::new(),
                     compiler_input_packet_sha256: None,
+                    reflection: None,
                 }));
             }
             Err(error) => {

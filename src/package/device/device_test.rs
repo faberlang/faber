@@ -25,10 +25,10 @@ functio loss(tf32[2] x, tf32[2] w) → tf32[2] {
     redde x.multiplica(w)
 }"#;
 use radix_mir_fmir::schema::{
-    FmirSessionSection, WireAxisReductionPlan, WireBroadcastDeclaration, WireBroadcastFact,
-    WireInputUpdateCadence, WireInvocationMode, WireKvCacheDtype, WireKvCacheLayout,
-    WireKvReservePolicy, WireLayerNormalizationPlan, WireReducedProjection, WireRowSoftmaxPlan,
-    WireSessionInput, WireSessionObservationCadence, WIRE_DEVICE_PROGRAM_VERSION,
+    ARTIFACT_ABI_VERSION, FmirSessionSection, WireAxisReductionPlan, WireBroadcastDeclaration,
+    WireBroadcastFact, WireInputUpdateCadence, WireInvocationMode, WireKvCacheDtype,
+    WireKvCacheLayout, WireKvReservePolicy, WireLayerNormalizationPlan, WireReducedProjection,
+    WireRowSoftmaxPlan, WireSessionInput, WireSessionObservationCadence, WIRE_DEVICE_PROGRAM_VERSION,
     WIRE_SESSION_SECTION_VERSION,
 };
 // The S6-C2 producer variant is not on the device-root re-export list (the
@@ -191,13 +191,14 @@ fn test_device_artifact(
             id: target_id.to_owned(),
             required_features,
         },
-        abi_version: 1,
+        abi_version: ARTIFACT_ABI_VERSION,
         bytes: bytes.to_vec(),
         encoding: DevicePayloadEncoding::Text,
         entrypoints,
         content_sha256: String::new(),
         packet_sha256: String::new(),
         compiler_input_packet_sha256: None,
+        reflection: None,
     };
     artifact.content_sha256 = artifact.compute_content_sha256();
     artifact.packet_sha256 = artifact.compute_packet_sha256();
