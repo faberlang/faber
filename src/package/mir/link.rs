@@ -12,6 +12,7 @@ struct PackageMirLinkAccumulator {
     next_synthetic: u32,
     diagnostics: Vec<Diagnostic>,
     libraries: Vec<LibraryLinkTarget>,
+    method_targets: MethodCallTargets,
 }
 
 impl Default for PackageMirLinkAccumulator {
@@ -25,6 +26,7 @@ impl Default for PackageMirLinkAccumulator {
             next_synthetic: PACKAGE_MIR_SYNTHETIC_DEF_BASE,
             diagnostics: Vec::new(),
             libraries: Vec::new(),
+            method_targets: HashMap::new(),
         }
     }
 }
@@ -211,6 +213,14 @@ pub(super) fn local_namespace_call_targets(
         link_nested_library_imports(&mut links, library_resolver, library_cache);
     }
 
+    if consumer == PackageMirConsumer::Interpreted {
+        // FMIR e2e-hardening (CTO-1): link genus-method call targets for
+        // methods on linked library nominals (receiver.method(args) →
+        // Path(synthetic)(receiver, args)). Runs after the library closure is
+        // final so every library that can receive method calls is registered.
+        link_library_method_targets(&mut links, package, library_resolver, library_cache);
+    }
+
     if !links.diagnostics.is_empty() {
         return Err(links.diagnostics);
     }
@@ -223,6 +233,7 @@ pub(super) fn local_namespace_call_targets(
         sources: links.source_rewrites,
         next_synthetic: links.next_synthetic,
         libraries: links.libraries,
+        method_targets: links.method_targets,
     })
 }
 
@@ -497,6 +508,134 @@ fn nested_library_import_sites(
         .collect())
 }
 
+/// Link genus-method call targets for methods on linked library nominals
+/// (FMIR e2e-hardening CTO-1).
+///
+/// Every linked library's public struct methods get a package-MIR synthetic
+/// source (same discipline as top-level functions, so cross-library def-id
+/// collisions stay impossible and S1 U3 reachability prunes unused methods),
+/// and each method call is registered per caller: key = the caller's
+/// entry-side nominal `DefId` for the library's struct (the receiver type
+/// every caller analysis carries after the canonical nominal import) +
+/// method name → the synthetic. The rewrite pass then lowers
+/// `receiver.method(args)` to `Path(synthetic)(receiver, args)`, which the
+/// merged program resolves to the library's lowered method function.
+fn link_library_method_targets(
+    links: &mut PackageMirLinkAccumulator,
+    package: &AnalyzedPackage,
+    library_resolver: &LibraryResolver,
+    library_cache: &mut LibraryInterfaceCache,
+) {
+    // Phase 1: extract the source library struct → method tables. The
+    // library cache borrows are released after each extraction (the caller
+    // pass below re-borrows the cache per caller, one at a time).
+    struct SourceStruct {
+        library_path: PathBuf,
+        identity: Option<radix::file_interface::InterfaceLibraryIdentity>,
+        /// (struct export name, method name, method def id)
+        methods: Vec<(String, String, DefId)>,
+    }
+    let mut sources: Vec<SourceStruct> = Vec::new();
+    for library in &links.libraries {
+        let Ok(interface) = library_cached_file_interface(&library.import, library_resolver, library_cache)
+        else {
+            continue;
+        };
+        let Ok(analysis) = library_cached_analysis(&library.import, library_resolver, library_cache)
+        else {
+            continue;
+        };
+        let mut methods = Vec::new();
+        for export in interface.exports.values() {
+            let radix::file_interface::FileExportKind::Struct(struct_export) = &export.kind else {
+                continue;
+            };
+            // Find the library's struct item (methods carry the def ids).
+            let Some(struct_item) = analysis.hir.items.iter().find(|item| {
+                let HirItemKind::Struct(strukt) = &item.kind else {
+                    return false;
+                };
+                analysis.interner.resolve(strukt.name) == struct_export.name
+            }) else {
+                continue;
+            };
+            let HirItemKind::Struct(strukt) = &struct_item.kind else {
+                continue;
+            };
+            for method in &strukt.methods {
+                methods.push((
+                    struct_export.name.clone(),
+                    analysis.interner.resolve(method.func.name).to_owned(),
+                    method.def_id,
+                ));
+            }
+        }
+        sources.push(SourceStruct {
+            library_path: library.path.clone(),
+            identity: interface.identity.clone(),
+            methods,
+        });
+    }
+
+    // Phase 2: per caller (package units, then linked libraries — a library
+    // can call methods on ANOTHER linked library's nominals), register the
+    // method targets that resolve through the caller's canonical nominal
+    // table.
+    let register_caller = |links: &mut PackageMirLinkAccumulator,
+                               caller_path: &Path,
+                               resolver: &radix::semantic::Resolver,
+                               interner: &Interner| {
+        for source in &sources {
+            if source.library_path == caller_path {
+                continue;
+            }
+            let Some(identity) = source.identity.as_ref() else {
+                continue;
+            };
+            for (struct_name, method_name, method_def_id) in &source.methods {
+                let Some(entry_nominal_def) = resolver.imported_nominal_def_id_by_name(
+                    radix::file_interface::InterfaceNominalKind::Struct,
+                    Some(identity),
+                    struct_name,
+                    interner,
+                ) else {
+                    continue;
+                };
+                let synthetic = *links
+                    .source_rewrites
+                    .entry((source.library_path.clone(), *method_def_id))
+                    .or_insert_with(|| {
+                        let def_id = DefId(links.next_synthetic);
+                        links.next_synthetic += 1;
+                        def_id
+                    });
+                links
+                    .method_targets
+                    .entry(caller_path.to_path_buf())
+                    .or_default()
+                    .insert((entry_nominal_def, method_name.clone()), synthetic);
+            }
+        }
+    };
+
+    for unit in &package.units {
+        register_caller(links, &unit.path, &unit.analysis.resolver, &unit.analysis.interner);
+    }
+    // The linked-library caller loop needs `&mut links` for synthetic
+    // allocation while iterating the closure, so the target list is cloned
+    // first (LibraryImportBinding is Clone).
+    let library_targets: Vec<(PathBuf, LibraryImportBinding)> = links
+        .libraries
+        .iter()
+        .map(|target| (target.path.clone(), target.import.clone()))
+        .collect();
+    for (path, import) in &library_targets {
+        if let Ok(analysis) = library_cached_analysis(import, library_resolver, library_cache) {
+            register_caller(links, path, &analysis.resolver, &analysis.interner);
+        }
+    }
+}
+
 /// Fail-closed diagnostic for a library import the MIR package path cannot
 /// link. Preserves the `package_mir_library_imports_unsupported` identity;
 /// external-target consumers keep the previous silent-skip behavior.
@@ -635,6 +774,7 @@ pub(super) fn rewrite_unit_namespace_calls(
     targets: &NamespaceCallTargets,
     data_member_targets: &NamespaceDataMemberTargets,
     namespaces: &NamespaceExports,
+    method_targets: &MethodCallTargets,
 ) -> Result<(), Vec<Diagnostic>> {
     rewrite_analysis_namespace_calls(
         &unit.path,
@@ -642,6 +782,7 @@ pub(super) fn rewrite_unit_namespace_calls(
         targets,
         data_member_targets,
         namespaces,
+        method_targets,
     )
 }
 
@@ -651,6 +792,7 @@ pub(super) fn rewrite_analysis_namespace_calls(
     targets: &NamespaceCallTargets,
     data_member_targets: &NamespaceDataMemberTargets,
     namespaces: &NamespaceExports,
+    method_targets: &MethodCallTargets,
 ) -> Result<(), Vec<Diagnostic>> {
     // S1 U2 VALUE members (operator ruling O1): namespace enum-variant value
     // references (`module.VARIANT`) rewrite to the consumer variant `Path`
@@ -658,7 +800,38 @@ pub(super) fn rewrite_analysis_namespace_calls(
     // registered the imported enum variants (with their consumer defs) when
     // it installed the file interface.
     rewrite_namespace_variant_members(analysis);
+    // FMIR e2e-hardening (CTO-1): method calls on linked library nominals
+    // rewrite to synthetic-path calls. The library's method is a separate
+    // definition in its own analysis, so the caller's `MethodCall` cannot
+    // resolve through the caller's own genus table — the rewrite makes the
+    // link explicit before lowering.
+    if let Some(methods) = method_targets.get(unit_path) {
+        if !methods.is_empty() {
+            let mut rewriter = LibraryMethodCallRewriter {
+                types: &analysis.types,
+                interner: &analysis.interner,
+                methods,
+                diagnostics: Vec::new(),
+            };
+            radix::hir::visit::walk_program_mut(&mut rewriter, &mut analysis.hir);
+            if !rewriter.diagnostics.is_empty() {
+                return Err(rewriter
+                    .diagnostics
+                    .into_iter()
+                    .map(|message| {
+                        crate::package_diagnostic_error(message)
+                            .with_file(unit_path.display().to_string())
+                    })
+                    .collect());
+            }
+        }
+    }
     let mut diagnostics = Vec::new();
+    // FMIR e2e-hardening (CTO-1): fix up namespace calls whose receiver is
+    // keyed by a non-import `DefId` (an import alias shadowed by a local of
+    // the same name can make the semantic namespace reference carry a
+    // generated def instead of the import item's def).
+    rewrite_shadowed_alias_namespace_calls(unit_path, analysis, targets, &mut diagnostics);
     if let Some(entry) = &mut analysis.hir.entry {
         rewrite_block(
             unit_path,
@@ -1320,6 +1493,224 @@ fn rewrite_namespace_variant_members(analysis: &mut radix::driver::AnalyzedUnit)
 
     let mut rewriter = VariantMemberRewriter { resolver: &analysis.resolver };
     rewriter.visit_program_mut(&mut analysis.hir);
+}
+
+/// Rewrite namespace calls whose receiver `Path` carries a NON-import
+/// `DefId` (FMIR e2e-hardening CTO-1).
+///
+/// When an import alias is shadowed by a local of the same name (gradus uses
+/// `importa ex "gradus:shape" … forma` and function params named `forma`),
+/// the semantic analysis can key the namespace reference by a generated def
+/// instead of the import item's def; the main namespace-call rewrite then
+/// misses the target and the call fails with "method call before
+/// runtime/provider MIR lowering" at library lowering. This pass resolves the
+/// receiver's symbol name back to the import binding and rewrites the call to
+/// the linker's synthetic target.
+fn rewrite_shadowed_alias_namespace_calls(
+    unit_path: &Path,
+    analysis: &mut radix::driver::AnalyzedUnit,
+    targets: &NamespaceCallTargets,
+    diagnostics: &mut Vec<String>,
+) {
+    // Import binding name → import item def id.
+    let mut imports: HashMap<String, DefId> = HashMap::new();
+    for item in &analysis.hir.items {
+        let HirItemKind::Import(import) = &item.kind else {
+            continue;
+        };
+        for import_item in &import.items {
+            let binding = analysis
+                .interner
+                .resolve(import_item.alias.unwrap_or(import_item.name))
+                .to_owned();
+            imports.insert(binding, import_item.def_id);
+        }
+    }
+    if imports.is_empty() {
+        return;
+    }
+    struct ShadowedAliasRewriter<'a> {
+        unit_path: &'a Path,
+        resolver: &'a Resolver,
+        interner: &'a Interner,
+        targets: &'a NamespaceCallTargets,
+        imports: &'a HashMap<String, DefId>,
+        diagnostics: &'a mut Vec<String>,
+    }
+    impl ShadowedAliasRewriter<'_> {
+        fn import_target(&self, receiver: &HirExpression, method: Symbol) -> Option<DefId> {
+            let HirExpressionKind::Path(def) = &receiver.kind else {
+                return None;
+            };
+            // The main rewrite already handles directly-keyed receivers.
+            if namespace_call_target(self.unit_path, receiver, method, self.interner, self.targets)
+                .is_some()
+            {
+                return None;
+            }
+            // A HIR-generated namespace def (import aliases whose semantic
+            // namespace reference carries a generated def instead of the
+            // import item's def — the `forma`-shadowing shape) is absent from
+            // the symbol table, so resolve the METHOD NAME uniquely across the
+            // unit's import bindings instead.
+            if def.0 >= 1_000_000 {
+                let method_name = self.interner.resolve(method).to_owned();
+                let mut found = None;
+                for import_def in self.imports.values() {
+                    if let Some(target) =
+                        self.targets.get(&(self.unit_path.to_path_buf(), *import_def, method_name.clone()))
+                    {
+                        if found.is_some() {
+                            // Ambiguous: more than one import exports the
+                            // method — leave the call to fail closed.
+                            return None;
+                        }
+                        found = Some(*target);
+                    }
+                }
+                return found;
+            }
+            // Only Module symbols (import namespaces) — or locals that shadow
+            // one (the name-based resolution below then matches the import
+            // binding, mirroring the analysis's namespace-member intent).
+            let Some(symbol) = self.resolver.get_symbol(*def) else {
+                return None;
+            };
+            if !matches!(
+                symbol.kind,
+                radix::semantic::SymbolKind::Module | radix::semantic::SymbolKind::Local
+            ) {
+                return None;
+            }
+            let name = self.interner.resolve(symbol.name).to_owned();
+            let import_def = self.imports.get(&name).copied()?;
+            let import_receiver = HirExpression {
+                id: receiver.id,
+                kind: HirExpressionKind::Path(import_def),
+                ty: None,
+                span: receiver.span,
+            };
+            namespace_call_target(self.unit_path, &import_receiver, method, self.interner, self.targets)
+        }
+    }
+    impl HirVisitorMut for ShadowedAliasRewriter<'_> {
+        fn visit_expr_mut(&mut self, expr: &mut HirExpression) {
+            match &mut expr.kind {
+                HirExpressionKind::Call(callee, _, _) => {
+                    if let HirExpressionKind::Field(receiver, method) = &callee.kind {
+                        if let Some(synthetic) = self.import_target(receiver, *method) {
+                            **callee = HirExpression {
+                                id: receiver.id,
+                                kind: HirExpressionKind::Path(synthetic),
+                                ty: None,
+                                span: receiver.span,
+                            };
+                        }
+                    }
+                }
+                HirExpressionKind::MethodCall(receiver, method, type_args, args) => {
+                    if let Some(synthetic) = self.import_target(receiver, *method) {
+                        let call_args = std::mem::take(args);
+                        let callee = HirExpression {
+                            id: receiver.id,
+                            kind: HirExpressionKind::Path(synthetic),
+                            ty: None,
+                            span: receiver.span,
+                        };
+                        *expr = HirExpression {
+                            id: expr.id,
+                            kind: HirExpressionKind::Call(
+                                Box::new(callee),
+                                std::mem::take(type_args),
+                                call_args,
+                            ),
+                            ty: expr.ty,
+                            span: expr.span,
+                        };
+                    }
+                }
+                _ => {}
+            }
+            walk_expr_mut(self, expr);
+        }
+    }
+    let mut rewriter = ShadowedAliasRewriter {
+        unit_path,
+        resolver: &analysis.resolver,
+        interner: &analysis.interner,
+        targets,
+        imports: &imports,
+        diagnostics,
+    };
+    rewriter.visit_program_mut(&mut analysis.hir);
+}
+
+/// Rewrite method calls on linked library nominals into synthetic-path calls
+/// (FMIR e2e-hardening CTO-1).
+///
+/// `receiver.method(args)` where `receiver`'s type is a linked library
+/// nominal becomes `Path(synthetic)(receiver, args)`: the receiver becomes
+/// the first positional argument (the library's method function takes the
+/// receiver as its first parameter), and the synthetic def id was allocated
+/// by [`link_library_method_targets`] for the library's method function, so
+/// the merged program resolves the call through the shared source key.
+struct LibraryMethodCallRewriter<'a> {
+    types: &'a radix::semantic::TypeTable,
+    interner: &'a Interner,
+    methods: &'a HashMap<(DefId, String), DefId>,
+    diagnostics: Vec<String>,
+}
+
+impl LibraryMethodCallRewriter<'_> {
+    fn receiver_struct_def(&self, receiver: &HirExpression) -> Option<DefId> {
+        let ty = receiver.ty?;
+        match self.types.get(ty) {
+            Type::Struct(def_id) => Some(*def_id),
+            Type::Applied(base, _) => match self.types.get(*base) {
+                Type::Struct(def_id) => Some(*def_id),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+}
+
+impl HirVisitorMut for LibraryMethodCallRewriter<'_> {
+    fn visit_expr_mut(&mut self, expr: &mut HirExpression) {
+        if let HirExpressionKind::MethodCall(receiver, method, type_args, args) = &mut expr.kind {
+            if let Some(struct_def) = self.receiver_struct_def(receiver) {
+                let method_name = self.interner.resolve(*method).to_owned();
+                if let Some(synthetic) = self.methods.get(&(struct_def, method_name)).copied() {
+                    let mut call_args = std::mem::take(args);
+                    let mut new_args = Vec::with_capacity(call_args.len() + 1);
+                    new_args.push(HirCallArg {
+                        name: None,
+                        spread: false,
+                        expr: receiver.as_ref().clone(),
+                        span: receiver.span,
+                    });
+                    new_args.append(&mut call_args);
+                    let callee = HirExpression {
+                        id: receiver.id,
+                        kind: HirExpressionKind::Path(synthetic),
+                        ty: None,
+                        span: receiver.span,
+                    };
+                    *expr = HirExpression {
+                        id: expr.id,
+                        kind: HirExpressionKind::Call(
+                            Box::new(callee),
+                            std::mem::take(type_args),
+                            new_args,
+                        ),
+                        ty: expr.ty,
+                        span: expr.span,
+                    };
+                }
+            }
+        }
+        walk_expr_mut(self, expr);
+    }
 }
 
 pub(super) fn rewrite_call_args(

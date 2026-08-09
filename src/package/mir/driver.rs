@@ -140,7 +140,13 @@ fn prepare_package_mir<R>(
     let entry_path = package.units[entry_index].path.clone();
     let source_paths = package.units.iter().map(|unit| unit.path.clone()).collect();
     for unit in &mut package.units {
-        rewrite_unit_namespace_calls(unit, &links.calls, &links.data_member_targets, &links.namespaces)?;
+        rewrite_unit_namespace_calls(
+            unit,
+            &links.calls,
+            &links.data_member_targets,
+            &links.namespaces,
+            &links.method_targets,
+        )?;
     }
 
     let mut lowered = lower_package_units(

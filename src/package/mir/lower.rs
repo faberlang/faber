@@ -102,6 +102,12 @@ pub(super) fn lower_package_units<'a>(
         );
         rewrite_lowered_type_ids(&mut lowered, &source_to_entry_types);
         rewrite_lowered_variant_defs(&mut lowered, &variant_remap);
+        // Sibling struct literals constructed in the source analysis carry
+        // the source struct `DefId` in `MirAggregateKind::Struct`; the merged
+        // program's struct metadata is keyed by the entry's canonical nominal
+        // def, so the aggregate kind rides the same remap.
+        let struct_remap = build_struct_def_remap(&nominal_map, &entry.analysis.types);
+        rewrite_lowered_struct_defs(&mut lowered, &struct_remap);
         if let Some(rewrite) = cli_plan
             .dispatch
             .as_ref()
@@ -146,6 +152,7 @@ pub(super) fn lower_package_units<'a>(
                     &links.calls,
                     &links.data_member_targets,
                     &links.namespaces,
+                    &links.method_targets,
                 ) {
                     diagnostics.extend(errors);
                     return Ok(());
@@ -236,6 +243,13 @@ pub(super) fn lower_package_units<'a>(
                 );
                 rewrite_lowered_type_ids(&mut lowered, &source_to_entry_types);
                 rewrite_lowered_variant_defs(&mut lowered, &variant_remap);
+                // Library struct literals (`tensor.Tensor { … }` inside a
+                // gradus module) carry the library struct `DefId` in
+                // `MirAggregateKind::Struct`; the merged program's struct
+                // metadata is keyed by the entry's canonical nominal def, so
+                // the aggregate kind rides the same remap as the variant defs.
+                let struct_remap = build_struct_def_remap(&nominal_map, &entry.analysis.types);
+                rewrite_lowered_struct_defs(&mut lowered, &struct_remap);
                 rewrite_program_sources(&mut lowered.program, &library.path, &source_rewrites);
                 extend_unmapped_library_sources(
                     &lowered.program,
@@ -562,6 +576,97 @@ fn transplant_expr(
             }
             HirExpressionKind::Scribe(*kind, transplanted)
         }
+        // Static type ascription (`∷`): the source expression and the target
+        // type both travel. Const data members across library boundaries use
+        // this shape for typed literals (`fixum f32 GELU_ALPHA ← (0.79… ∷
+        // f32)`), so the transplant must carry it through the entry's
+        // top-level-const seam instead of failing closed.
+        HirExpressionKind::Verte { source, target, entries } => {
+            let source = Box::new(transplant_expr(
+                source,
+                source_interner,
+                source_types,
+                entry_interner,
+                entry_types,
+                imported,
+                nominal,
+            )?);
+            let target = import_semantic_type_with_nominal(
+                source_types,
+                entry_types,
+                *target,
+                imported,
+                nominal,
+            );
+            let entries = match entries {
+                Some(fields) => {
+                    let mut transplanted = Vec::with_capacity(fields.len());
+                    for field in fields {
+                        let key = match &field.key {
+                            radix::hir::HirObjectKey::Ident(symbol) => {
+                                radix::hir::HirObjectKey::Ident(remap_symbol(
+                                    *symbol,
+                                    source_interner,
+                                    entry_interner,
+                                ))
+                            }
+                            radix::hir::HirObjectKey::String(symbol) => {
+                                radix::hir::HirObjectKey::String(remap_symbol(
+                                    *symbol,
+                                    source_interner,
+                                    entry_interner,
+                                ))
+                            }
+                            radix::hir::HirObjectKey::Computed(expr) => {
+                                radix::hir::HirObjectKey::Computed(transplant_expr(
+                                    expr,
+                                    source_interner,
+                                    source_types,
+                                    entry_interner,
+                                    entry_types,
+                                    imported,
+                                    nominal,
+                                )?)
+                            }
+                            radix::hir::HirObjectKey::Spread(expr) => {
+                                radix::hir::HirObjectKey::Spread(transplant_expr(
+                                    expr,
+                                    source_interner,
+                                    source_types,
+                                    entry_interner,
+                                    entry_types,
+                                    imported,
+                                    nominal,
+                                )?)
+                            }
+                        };
+                        let value = field
+                            .value
+                            .as_ref()
+                            .map(|value| {
+                                transplant_expr(
+                                    value,
+                                    source_interner,
+                                    source_types,
+                                    entry_interner,
+                                    entry_types,
+                                    imported,
+                                    nominal,
+                                )
+                            })
+                            .transpose()?;
+                        transplanted.push(HirObjectField { key, value });
+                    }
+                    Some(transplanted)
+                }
+                None => None,
+            };
+            HirExpressionKind::Verte {
+                source,
+                target,
+                entries,
+            }
+        }
         _ => {
             return Err(
                 "package MIR cannot transplant const data member initializer with unsupported expression shape"
@@ -744,6 +849,49 @@ pub(super) fn rewrite_lowered_variant_defs(
                 rewrite_statement_variant_defs(statement, variant_remap);
             }
             rewrite_terminator_variant_defs(&mut block.terminator, variant_remap);
+        }
+    }
+}
+
+/// Project the source nominal-identity remap onto struct aggregate kinds
+/// (FMIR e2e-hardening CTO-1): every nominal the map sends to an entry-side
+/// `Type::Struct(def)` becomes a `(source struct DefId → entry struct DefId)`
+/// rewrite, so struct literals lowered from a sibling/library analysis
+/// validate against the merged program's entry-keyed struct metadata.
+fn build_struct_def_remap(
+    nominal_map: &HashMap<DefId, TypeId>,
+    entry_types: &TypeTable,
+) -> HashMap<DefId, DefId> {
+    nominal_map
+        .iter()
+        .filter_map(|(source_def, entry_ty)| match entry_types.get(*entry_ty) {
+            Type::Struct(entry_def) => Some((*source_def, *entry_def)),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Rewrite `MirAggregateKind::Struct` defs in a lowered program through the
+/// nominal struct-def remap (FMIR e2e-hardening CTO-1).
+fn rewrite_lowered_struct_defs(
+    lowered: &mut LoweredMirUnit<'_>,
+    struct_remap: &HashMap<DefId, DefId>,
+) {
+    if struct_remap.is_empty() {
+        return;
+    }
+    for function in &mut lowered.program.functions {
+        for block in &mut function.blocks {
+            for statement in &mut block.statements {
+                let MirStatementKind::Construct { aggregate, .. } = &mut statement.kind else {
+                    continue;
+                };
+                if let MirAggregateKind::Struct(def_id) = &mut aggregate.kind {
+                    if let Some(rewritten) = struct_remap.get(def_id) {
+                        aggregate.kind = MirAggregateKind::Struct(*rewritten);
+                    }
+                }
+            }
         }
     }
 }

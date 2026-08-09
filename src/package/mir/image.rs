@@ -416,27 +416,6 @@ pub(super) fn run_fmir_package_image<H: Host + ?Sized>(
     let mut validation = radix::mir::MirValidationContext::new(&types);
     validation.interner = Some(&interner);
     apply_validation_metadata(&mut validation, &image.validation);
-    #[cfg(debug_assertions)]
-    {
-        let mut found = 0;
-        for function in &image.program.functions {
-            for block in &function.blocks {
-                for statement in &block.statements {
-                    if let MirStatementKind::Construct { aggregate, .. } = &statement.kind {
-                        if let MirAggregateKind::Struct(def) = &aggregate.kind {
-                            let count = match &aggregate.fields {
-                                MirAggregateFields::Named(items) => items.len(),
-                                _ => 0,
-                            };
-                            eprintln!("DBGRUN struct def#{} named_count={}", def.0, count);
-                            found += 1;
-                        }
-                    }
-                }
-            }
-        }
-        eprintln!("DBGRUN total_struct_aggregates={found}");
-    }
     let validated =
         radix::mir::ValidatedMir::new(image.program.clone(), validation).map_err(|errors| {
             errors
