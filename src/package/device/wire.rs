@@ -419,9 +419,7 @@ pub(crate) fn admit_session_section(device: &FmirDeviceSection) -> Result<(), Ve
             continue;
         };
         match input.cadence {
-            WireInputUpdateCadence::Resident
-                if fact.lifetime != WireBufferLifetime::PerProgram =>
-            {
+            WireInputUpdateCadence::Resident if fact.lifetime != WireBufferLifetime::PerProgram => {
                 return Err(session_section_invalid(format!(
                     "session input slot {} (buffer '{}') declares cadence resident, but the buffer is {}; a resident input is uploaded once at session creation and lives for the session (per-program)",
                     input.slot,
@@ -828,12 +826,12 @@ fn wire_buffer_version(version: &BufferVersion) -> WireBufferVersion {
         element_count: version.element_count,
         // The producer-defined reduced-buffer projection (council-8 CB-3)
         // rides the wire version explicitly — never defaulted.
-        reduced_projection: version.reduced_projection.map(|projection| {
-            WireReducedProjection {
+        reduced_projection: version
+            .reduced_projection
+            .map(|projection| WireReducedProjection {
                 axis_extent: projection.axis_extent,
                 inner_stride: projection.inner_stride,
-            }
-        }),
+            }),
     }
 }
 

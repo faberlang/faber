@@ -237,7 +237,10 @@ fn the_prefill_section_assembles_and_admits_for_metal() {
 
     // Wire 7 unchanged; admission passes; the wire carries the logits result.
     admit_device_program_section(&section.device_program).expect("wire admission passes");
-    assert_eq!(section.device_program.v, super::super::DEVICE_RUN_PLAN_VERSION);
+    assert_eq!(
+        section.device_program.v,
+        super::super::DEVICE_RUN_PLAN_VERSION
+    );
     assert_eq!(section.device_program.program.launches.len(), 5188);
     assert_eq!(
         section.declared_inputs.len(),

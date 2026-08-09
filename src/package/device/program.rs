@@ -1296,10 +1296,8 @@ pub(crate) fn device_program_for_lowered(
     // (buffer, version): every slot referencing the version carries the
     // producer's projection. Two distinct `Some` facts for one version is a
     // genuine conflict and fails closed here (never silently resolved).
-    let mut buffer_projection: BTreeMap<
-        BufferId,
-        Option<radix_mir::abi::ReducedProjection>,
-    > = BTreeMap::new();
+    let mut buffer_projection: BTreeMap<BufferId, Option<radix_mir::abi::ReducedProjection>> =
+        BTreeMap::new();
     for build in &builds {
         for slot in &build.resources {
             let Some(projection) = slot.reduced_projection else {
@@ -1364,10 +1362,7 @@ pub(crate) fn device_program_for_lowered(
                     // consumer slot that could not derive the projection
                     // from its own body adopts the producer's fact instead
                     // of carrying `None`.
-                    reduced_projection: buffer_projection
-                        .get(&slot.buffer_id)
-                        .copied()
-                        .flatten(),
+                    reduced_projection: buffer_projection.get(&slot.buffer_id).copied().flatten(),
                 },
                 binding: Binding {
                     group: slot.group,
@@ -1621,10 +1616,7 @@ fn declared_result_rows(
                 version: 1,
                 element_ty: buffer.element_ty,
                 element_count: buffer.element_count,
-                reduced_projection: buffer_projection
-                    .get(&buffer.id)
-                    .copied()
-                    .flatten(),
+                reduced_projection: buffer_projection.get(&buffer.id).copied().flatten(),
             },
             role: buffer.role,
             produced_by,
