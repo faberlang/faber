@@ -573,6 +573,69 @@ fn cli_rejects_conflicting_format_output_modes() {
 }
 
 #[test]
+fn cli_parses_format_write_flag() {
+    let format = Cli::try_parse_from(["faber", "format", "--write", "main.fab"])
+        .expect("parse format --write");
+    let Some(crate::cli::Command::Format(args)) = format.command else {
+        panic!("expected format subcommand");
+    };
+    assert!(args.write);
+    assert!(!args.stdout);
+    assert_eq!(args.paths, vec![std::path::PathBuf::from("main.fab")]);
+}
+
+#[test]
+fn cli_rejects_format_write_with_stdout() {
+    let error = Cli::try_parse_from(["faber", "format", "--write", "--stdout", "main.fab"])
+        .expect_err("format --write conflicts with --stdout");
+    let rendered = error.to_string();
+    assert!(rendered.contains("--write"));
+    assert!(rendered.contains("--stdout"));
+}
+
+#[test]
+fn cli_parses_format_stdin_flag() {
+    let format = Cli::try_parse_from(["faber", "format", "--stdin"])
+        .expect("parse format --stdin");
+    let Some(crate::cli::Command::Format(args)) = format.command else {
+        panic!("expected format subcommand");
+    };
+    assert!(args.stdin);
+    assert!(args.paths.is_empty());
+}
+
+#[test]
+fn cli_rejects_format_stdin_with_paths() {
+    let error = Cli::try_parse_from(["faber", "format", "--stdin", "main.fab"])
+        .expect_err("format --stdin takes no paths");
+    let rendered = error.to_string();
+    assert!(rendered.contains("--stdin"));
+    assert!(
+        rendered.contains("[PATH]"),
+        "the conflict must name the path argument: {rendered}"
+    );
+}
+
+#[test]
+fn cli_rejects_format_stdin_with_check() {
+    let error = Cli::try_parse_from(["faber", "format", "--stdin", "--check"])
+        .expect_err("format --stdin conflicts with --check");
+    let rendered = error.to_string();
+    assert!(rendered.contains("--stdin"));
+    assert!(rendered.contains("--check"));
+}
+
+#[test]
+fn cli_parses_format_policy() {
+    let format = Cli::try_parse_from(["faber", "format", "--policy", "pretty-v1", "main.fab"])
+        .expect("parse format --policy");
+    let Some(crate::cli::Command::Format(args)) = format.command else {
+        panic!("expected format subcommand");
+    };
+    assert_eq!(args.policy.as_deref(), Some("pretty-v1"));
+}
+
+#[test]
 fn cli_parses_diagnostics_locale_on_explain() {
     let explain = Cli::try_parse_from([
         "faber",

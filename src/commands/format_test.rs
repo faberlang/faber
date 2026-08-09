@@ -5,7 +5,7 @@ use radix::driver::{Config, Session};
 use radix::forma::test_gate::{assert_author_reparses, author_format_once_with_session};
 use radix::locale::LocalePack;
 use std::fs;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
@@ -267,6 +267,243 @@ fn format_cli_comment_fixture_reparses() {
         "CLI must preserve leading comment:\n{formatted}"
     );
     assert_author_reparses(&formatted, "comment CLI --stdout").expect("reparse");
+}
+
+// ── FORMAT-PRETTY S4 steady-state flag surface ────────────────────────────
+
+/// Run `faber format --stdin` feeding `source` on stdin; return (stdout,
+/// stderr, success).
+fn run_faber_format_stdin(source: &str) -> (String, String, bool) {
+    let mut child = Command::new(faber_binary())
+        .args(["format", "--stdin"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn faber format --stdin");
+    child
+        .stdin
+        .take()
+        .expect("stdin")
+        .write_all(source.as_bytes())
+        .expect("write stdin source");
+    let mut stdout = String::new();
+    child
+        .stdout
+        .take()
+        .expect("stdout")
+        .read_to_string(&mut stdout)
+        .expect("read stdout");
+    let mut stderr = String::new();
+    if let Some(mut err) = child.stderr.take() {
+        let _ = err.read_to_string(&mut stderr);
+    }
+    let success = child.wait().expect("wait").success();
+    (stdout, stderr, success)
+}
+
+/// S4: `--stdin` reads exactly one source document from stdin and prints the
+/// formatted result to stdout — byte-identical to `--stdout` on the same
+/// source (the same author pipeline, different input mode).
+#[test]
+fn format_stdin_roundtrip_matches_author_pipeline() {
+    let source = "incipit {\n  nota \"ok\"\n}\n";
+    let fixture = std::env::temp_dir().join("faber-format-stdin-roundtrip.fab");
+    fs::write(&fixture, source).expect("write roundtrip fixture");
+    let expected = run_faber_format_stdout(&fixture);
+    let _ = fs::remove_file(&fixture);
+
+    let (stdout, stderr, success) = run_faber_format_stdin(source);
+    assert!(
+        success,
+        "faber format --stdin must succeed: {stderr}"
+    );
+    assert_eq!(
+        normalize_trailing_newline(&stdout),
+        expected,
+        "--stdin output must match the --stdout author pipeline byte-exactly"
+    );
+    assert!(
+        stdout.contains("incipit {"),
+        "--stdin output must be the formatted source:\n{stdout}"
+    );
+}
+
+/// S4: `--stdout` is tightened to EXACTLY ONE input file — multiple files now
+/// fail clearly instead of printing `=== path ===` separators.
+#[test]
+fn format_stdout_rejects_multiple_files() {
+    let first = std::env::temp_dir().join("faber-format-multi-a.fab");
+    let second = std::env::temp_dir().join("faber-format-multi-b.fab");
+    fs::write(&first, "incipit {\n  nota \"a\"\n}\n").expect("write first fixture");
+    fs::write(&second, "incipit {\n  nota \"b\"\n}\n").expect("write second fixture");
+
+    let output = Command::new(faber_binary())
+        .args(["format", "--stdout"])
+        .arg(&first)
+        .arg(&second)
+        .output()
+        .expect("run faber format --stdout with two files");
+    let _ = fs::remove_file(&first);
+    let _ = fs::remove_file(&second);
+
+    assert!(
+        !output.status.success(),
+        "--stdout with multiple files must fail closed"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("exactly one input file"),
+        "the rejection must name the single-file contract: {stderr}"
+    );
+    assert!(
+        !stderr.contains("==="),
+        "no separator output may survive the tightening: {stderr}"
+    );
+}
+
+/// S4: an unknown `--policy` slug fails clearly, exit nonzero, with a message
+/// distinct from formatting-difference output.
+#[test]
+fn format_unknown_policy_slug_fails_clearly() {
+    let fixture = std::env::temp_dir().join("faber-format-policy-bogus.fab");
+    fs::write(&fixture, "incipit {\n  nota \"ok\"\n}\n").expect("write fixture");
+
+    let output = Command::new(faber_binary())
+        .args(["format", "--policy", "not-a-policy"])
+        .arg(&fixture)
+        .output()
+        .expect("run faber format --policy bogus");
+    let _ = fs::remove_file(&fixture);
+
+    assert!(
+        !output.status.success(),
+        "unknown policy slug must exit nonzero"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("not-a-policy"),
+        "the error must name the offending slug: {stderr}"
+    );
+    assert!(
+        stderr.contains("registered slugs"),
+        "the error must point at the rule-slug registry: {stderr}"
+    );
+}
+
+/// S4: `--policy normalise-v1` is the built-in baseline — output must be
+/// byte-identical to the flagless author pipeline.
+#[test]
+fn format_policy_normalise_v1_matches_default_output() {
+    let fixture = std::env::temp_dir().join("faber-format-policy-normalise.fab");
+    fs::write(&fixture, "functio gradus(numerus x) → numerus {\n    si x ≻ 0 ergo redde x\n    secus ergo redde 0 - x\n}\n")
+        .expect("write fixture");
+
+    let with_policy = run_faber_format_stdout_with_args(&[
+        "format",
+        "--policy",
+        "normalise-v1",
+        "--stdout",
+        fixture.to_str().expect("utf8 path"),
+    ]);
+    let default = run_faber_format_stdout(&fixture);
+    let _ = fs::remove_file(&fixture);
+
+    assert_eq!(
+        with_policy, default,
+        "--policy normalise-v1 must be byte-identical to the default author output"
+    );
+}
+
+/// S4: `--policy pretty-v1` selects the pretty engine and succeeds on a plain
+/// block fixture (the engine may leave constructs unchanged fail-closed, but
+/// must never error on a supported block shape).
+#[test]
+fn format_policy_pretty_v1_succeeds_on_block_fixture() {
+    let fixture = std::env::temp_dir().join("faber-format-policy-pretty.fab");
+    fs::write(&fixture, "incipit {\n    nota \"ok\"\n}\n").expect("write fixture");
+
+    let formatted = run_faber_format_stdout_with_args(&[
+        "format",
+        "--policy",
+        "pretty-v1",
+        "--stdout",
+        fixture.to_str().expect("utf8 path"),
+    ]);
+    let _ = fs::remove_file(&fixture);
+
+    assert!(
+        formatted.contains("incipit {"),
+        "pretty-v1 must emit the formatted block:\n{formatted}"
+    );
+    assert_author_reparses(&formatted, "pretty-v1 block fixture").expect("reparse");
+}
+
+/// S4 locale-interplay contract: `--policy` cannot be honored on the
+/// reader-locale re-emit path (canonical HIR output) — the combination must be
+/// rejected explicitly, never silently downgraded.
+#[test]
+fn format_policy_with_locale_is_rejected() {
+    let fixture = std::env::temp_dir().join("faber-format-policy-locale.fab");
+    fs::write(&fixture, "incipit {\n  nota \"ok\"\n}\n").expect("write fixture");
+
+    let output = Command::new(faber_binary())
+        .args([
+            "format",
+            "--locale",
+            "en",
+            "--policy",
+            "normalise-v1",
+            "--stdout",
+        ])
+        .arg(&fixture)
+        .output()
+        .expect("run faber format --locale --policy");
+    let _ = fs::remove_file(&fixture);
+
+    assert!(
+        !output.status.success(),
+        "--policy with --locale must be rejected, not silently downgraded"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("--policy"),
+        "the rejection must name --policy: {stderr}"
+    );
+    assert!(
+        stderr.contains("--locale"),
+        "the rejection must name --locale: {stderr}"
+    );
+}
+
+/// S4: `--write` is the explicit spelling of the in-place default — it writes
+/// the formatted source back to the file, byte-identical to what `--stdout`
+/// would print for the same file.
+#[test]
+fn format_write_flag_writes_in_place() {
+    let fixture = std::env::temp_dir().join("faber-format-write-flag.fab");
+    let unformatted = "incipit {\n  nota \"ok\"\n}\n";
+    fs::write(&fixture, unformatted).expect("write fixture");
+
+    let expected = run_faber_format_stdout(&fixture);
+    let output = Command::new(faber_binary())
+        .args(["format", "--write"])
+        .arg(&fixture)
+        .output()
+        .expect("run faber format --write");
+    let rewritten = fs::read_to_string(&fixture).expect("read rewritten fixture");
+    let _ = fs::remove_file(&fixture);
+
+    assert!(
+        output.status.success(),
+        "faber format --write must succeed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        normalize_trailing_newline(&rewritten),
+        expected,
+        "--write must write the formatted source back in place"
+    );
 }
 
 #[test]

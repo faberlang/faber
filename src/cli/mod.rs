@@ -124,9 +124,25 @@ pub struct FormatArgs {
     #[arg(long)]
     pub check: bool,
 
-    /// Write formatted output to stdout instead of updating files
+    /// Write formatted output to stdout instead of updating files (exactly one
+    /// input file)
     #[arg(long, conflicts_with = "check")]
     pub stdout: bool,
+
+    /// Write formatted source back to its file (the in-place default; explicit
+    /// spelling for scripts and editors)
+    #[arg(long, conflicts_with = "stdout")]
+    pub write: bool,
+
+    /// Read exactly one source document from stdin and print the formatted
+    /// result to stdout (implies --stdout; incompatible with path arguments)
+    #[arg(long, conflicts_with_all = ["check", "paths"])]
+    pub stdin: bool,
+
+    /// Format policy slug from the rule-slug registry (normalise-v1 |
+    /// pretty-v1); overrides the built-in default
+    #[arg(long, value_name = "SLUG")]
+    pub policy: Option<String>,
 
     /// Path to forma.toml override (schema deferred)
     #[arg(long, value_name = "PATH")]
