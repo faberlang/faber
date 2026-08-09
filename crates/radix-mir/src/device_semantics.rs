@@ -1200,3 +1200,7 @@ fn relation_conflict_field(
 #[cfg(test)]
 #[path = "device_semantics_test.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "ddcp1_fixtures_test.rs"]
+mod ddcp1_fixtures;
