@@ -11,3 +11,7 @@ MyLib.abi.json
 
 # Local cargo config (shared target dir, machine-specific)
 /.cargo/
+
+# Python cache
+__pycache__/
+*.pyc
