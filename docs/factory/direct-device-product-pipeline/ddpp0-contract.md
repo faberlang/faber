@@ -1,17 +1,18 @@
 # DDPP0 Contract — Product shape, identity domains, canonical encoding, FNV removal
 
 **Units**: DDPP0-U2 (contract core — the contract-spine root for `ddpp0-contract.md`),
-DDPP0-U3 (performance invariants + prepared-region policy + selection + evidence tiers).
-**Date**: 2026-08-08 (U3 appended 2026-08-09).
+DDPP0-U3 (performance invariants + prepared-region policy + selection + evidence tiers),
+DDPP0-U4 (partition ownership + generated-Rust support destination + deletion rule + child routing).
+**Date**: 2026-08-08 (U3 appended 2026-08-09; U4 appended 2026-08-09).
 **Repo**: faber (control plane). `faber-runtime/` read-only; no product code; no cargo.
 **Paired contract**: Radix DDCP0-U3 §ArtifactPacket/§IdentityDomains/§HotPathGate
 (`radix/docs/factory/direct-device-compilation-pipeline/ddcp0-delivery.md`).
 **Sections frozen here**: `## ProductShape`, `## IdentityDomains`,
 `## CanonicalEncoding`, `## FnvRemoval`, `## RoundTripFixture` (U2);
 `## PerformanceInvariants`, `## PreparedRegion`, `## SelectionPolicy`,
-`## EvidenceTiers` (U3). The remaining sections of this contract are frozen by
-DDPP0-U4 (§PartitionOwnership, §GeneratedRustSupport, §DeletionRule,
-§ChildRouting).
+`## EvidenceTiers` (U3); `## PartitionOwnership`, `## GeneratedRustSupport`,
+`## DeletionRule`, `## ChildRouting` (U4). All contract spine sections are
+frozen as of DDPP0-U4.
 
 **Authority order** (campaign §Repo-Aware Baseline): live source/tests and live
 `faber targets` → accepted artifact schemas + hardware receipts → **this phase's
@@ -589,3 +590,169 @@ product claim carries a tier label + a named receipt. The four labels:
 6. **Cross-reference.** DDPP0-U8 records the C5 migration-note requirement
    (before DDPP8 release work); this section is the label authority every DDPP
    artifact cites.
+
+---
+
+## PartitionOwnership
+
+**Frozen** (DDPP0-U4): CPU/device partition ownership — the owner-per-surface
+rows below (campaign §Ownership Map, §Scope Routing, §`faber-runtime`
+Decomposition Target; council dispositions C2/C4). Every surface has **exactly
+one owner**; no surface has dual authority, and no owner is re-introduced
+through a forwarding crate or route alias (§DeletionRule).
+
+| Surface | Owner | Product consequence |
+| --- | --- | --- |
+| Faber product/assembly/UX | **Faber** | target pairing, external toolchains, materialization, linking, support selection, product manifests, inspection — one product build plan (§ProductShape assembly rule) |
+| Compiler facts (`DeviceProgram`, value generations, dependencies, lifetimes, observations, target requirements, hashes) | **Radix** (MIR + backend leaves) | consumed as typed facts; never reconstructed from emitted text/binary (§ProductShape; §FnvRemoval) |
+| Physical device leaves + effects/sessions | **Hosts** | backend probe, module load, physical allocation, queue/stream, launch, sync; `ad` effect providers; browser adapter/WebGPU product host |
+| ML semantics (model/tokenizer/forward/decode/logical KV/sampling/prefill) | **Gradus** | inference/training semantics only — **no device handle or driver** |
+| Graphics source facts (shader contracts) | **Triga** (+ Radix shader facts) | source-to-MIR contracts — no WebGPU handles in public types |
+| Generated-Rust support | **Faber**-owned generated-Rust support crate | **Rust-target support only**, no device session behavior (§GeneratedRustSupport) |
+
+### Rules (normative)
+
+1. **CPU partition.** The CPU/host side is Faber product/assembly/UX plus Hosts
+   provider crates for concrete effects. Ordinary `ad` remains the language's
+   IO-bound host-effect seam:
+   `Faber ad` → Radix Sermo MIR → generated-language/LLVM effect ABI → Hosts
+   dispatch/kernel → concrete provider (campaign §Decomposition Target). CPU
+   host execution is not owned by the generated-Rust support crate.
+2. **Device partition.** Physical device ownership lives in Hosts backend
+   leaves (or a later execution coordinator): device handles, discovery,
+   identity, topology, partition, health, transport, transactions, bound plans
+   — no generated-Rust/runtime ownership (campaign Decomposition Target row).
+   Backend-specific lowering/repacking is Radix leaf-owned; physical
+   upload/repacking is Hosts-owned; no model semantics in Hosts.
+3. **Gradus/Triga carry no device handles.** Gradus owns ML semantics and Triga
+   owns graphics source contracts; neither owns driver handles, device handles,
+   or product linking (§Scope Routing). Serving, distributed scheduling,
+   deployments, and provider purchasing remain outside this campaign.
+4. **Single-owner discipline.** The owner-per-surface table is the routing
+   authority for DDPP0-U5's inventory and for later moves. A surface's owner
+   may change only by a contract revision that records the old owner, the new
+   owner, and the migration consequence — never by silent dual ownership.
+5. **No universal runtime owner.** The ownership partition leaves **no
+   universal runtime owner**: the generated-Rust support is explicitly
+   Rust-target support, not a universal runtime (campaign Desired End State
+   #10; §DeletionRule wording requirement).
+
+---
+
+## GeneratedRustSupport
+
+**Frozen** (DDPP0-U4): the generated-Rust support destination (campaign Open
+Question 1 / OQ1; §`faber-runtime` Decomposition Target rows 1–2; council
+disposition C2).
+
+1. **Destination default (OQ1).** The destination is a **Faber-owned support
+   crate with a target-specific name**. The default is recorded here; the final
+   crate name/home is an **operator gate at DDPP1** (campaign Open Questions
+   folded in DDPP0, OQ1). DDPP0-U5 records it as the per-module destination for
+   the generated-Rust families.
+2. **Rust-target support only.** The crate carries the generated-Rust surface:
+   `ascii`, `textus`, `valor`, `json`, `instans`, `intervallum`,
+   display/failable/recovery helpers, CPU `tensor`/`sparsa` semantics needed by
+   generated Rust, Sermo/frame language carriers, generated-Rust client calls,
+   and the Rust `HostDispatch` trait. It has **no device session behavior** —
+   no concrete effect or GPU launch behavior (§PartitionOwnership; campaign
+   Decomposition Target rows 1–2).
+3. **No transitive device or Hosts (C2).** The generated-Rust support crate
+   **must not transitively pull device or Hosts** (council disposition C2;
+   DDPP0-U7 restates this as a DDPP1 gate proof). It is linked only by
+   HIR-Rust products; a small Rust-only build excludes device runtime and
+   physical Hosts leaves.
+4. **Contract split.** Faber owns the generated-Rust support **contract**
+   (`HostDispatch` trait + frame carriers) as a narrow surface; Hosts depends on
+   it and installs an implementation. No concrete effect implementation and no
+   GPU launch behavior lives in the contract or the support crate
+   (§PartitionOwnership; campaign Decomposition Target row 2).
+
+---
+
+## DeletionRule
+
+**Frozen** (DDPP0-U4): the final `faber-runtime` deletion rule (campaign
+Desired End State #10, §`faber-runtime` Decomposition Target closeout, Scope
+Routing, Dependency Rules; council dispositions C3/C4/C5).
+
+1. **Delete only after every listed consumer migrates.** `faber-runtime` is
+   deleted only after **every listed consumer** migrates (module-by-module and
+   import-by-import per DDPP0-U5 `ddpp0-runtime-inventory.md`, each with
+   exactly one destination and a deletion receipt), an **external consumer
+   audit** passes (TR7 included; PML2 GI1 admission migration named as a DDPP8
+   prerequisite; PML0 capsule carriage reconciled), and accepted native/browser
+   capstones land (campaign Dependency Rule 5).
+2. **No forwarding crate / route alias / dual authority (C4).** Deletion must
+   not install a forwarding crate, a route alias, or dual authority that
+   preserves the old architecture. The temporary `faber-runtime` repository is
+   in migration scope; it is **not a forward owner** and **cannot become a
+   containment facade** (campaign §Scope Routing; development posture). No
+   forwarding shims that preserve the old architecture.
+3. **Renaming ≠ decomposition.** Renaming only the crate while leaving the same
+   ownership mix does not satisfy the campaign (campaign Decomposition Target
+   closeout). Decomposition is a per-module/per-import move to one destination
+   + a deletion receipt, not a rename.
+4. **Wording (C5).** Say **"no universal runtime owner"**, not "no runtime"
+   (council disposition C5). The remaining generated-Rust support is explicitly
+   Rust-target support, not a universal runtime (campaign Desired End State
+   #10; §PartitionOwnership rule 5).
+5. **DDPP8 support-ABI/product-version gate surface (C3).** DDPP8's deletion
+   gate checks the full support-ABI / product-version surface. The listed gate
+   items are recorded here (council disposition C3; cross-ref DDPP0-U8):
+
+   | Gate item | Role at the deletion gate |
+   | --- | --- |
+   | `Cargo.toml` | faber + sibling manifests: remove `faber-runtime` dependency/feature edges |
+   | `Cargo.lock` | lockfile entries referencing `faber-runtime` and its dependents |
+   | `core-support-manifest.txt` | faber core-support roots: drop `faber-runtime`, reassemble support |
+   | `build.rs` | core-support assembly (`core-support.tar.zst` + `.sha256` + files sha256) without `faber-runtime` |
+   | generated Cargo manifests | materialized `support.faber_runtime()` + path-links regenerated to new destinations |
+   | CI sibling checkouts | sibling-repo checkouts that ride faber's pinned faber-runtime revision |
+   | release notes | release notes and version pins citing `faber-runtime` |
+   | stale-archive fallback | no stale last-good archive reuse; archive identity fails closed (§IdentityDomains support-archive row; DDPP0-U8) |
+
+   Before DDPP8 release work, a **migration note** is required (DDPP0-U8; C5)
+   covering deletion, support surfaces, feature/toolchain changes,
+   `core-support-manifest`, sibling checkouts, and the no-facade rule.
+6. **Closeout posture.** The deletion gate is a clean break: producers and
+   consumers migrate together, no compatibility fallback survives closeout
+   (§FnvRemoval exemption path; campaign Development Posture).
+
+---
+
+## ChildRouting
+
+**Frozen** (DDPP0-U4): exact child-campaign routing (campaign §Related
+Campaigns routing + §Scope Routing; NGAB amendment path; H1).
+
+1. **NGAB0 stays an accepted historical record.** NGAB0 remains the accepted
+   NGAB contract as a **historical record with amended call granularity** —
+   the one-call/one-kernel ABI is amended to **one host call → one prepared
+   submission region containing one or more kernels** (§ProductShape
+   submission-region facts; DDPP0-U6 applies the major revision). NGAB0's
+   operator gates (llvm-host identity, MSL source-first, PTX arch set) are
+   retained and extended, never silently changed (NGAB0 §Versioning).
+2. **NGAB1–NGAB4 → DDPP3 child packets.** NGAB1–NGAB4 lower and implement only
+   as **DDPP3 child packets**, not as a parallel authority (campaign routing;
+   H1 hold). DDPP0-U6 un-holds NGAB1; NGAB1–NGAB4 do not start implementation
+   until the amendment lands.
+3. **NGAB5 → DDPP7 capstone.** NGAB5 remains the native ML capstone and feeds
+   **DDPP7** (Gradus inference/training device integration proofs; gated on
+   accepted PML stages).
+4. **NGAB6–NGAB7 → DDPP8.** NGAB6–NGAB7 feed **DDPP8** (support decomposition,
+   old-runtime deletion, qualification, release).
+5. **MIR Swarm routes shared MIR writes.** Shared MIR writes route through the
+   Radix **MIR Swarm** (single-writer authority). Hosts, Gradus, Triga, and
+   temporary `faber-runtime` migration work stay in repo-local delivery/factory
+   artifacts (campaign routing rule 4).
+6. **Superseded historical clauses.** The following historical clauses are
+   superseded by this contract:
+   - **Target-build-pipelines GPU/LLVM packaging clauses → DDPP1.** The
+     broader product-build predecessor's GPU/LLVM packaging clauses are
+     absorbed into **DDPP1**; unrelated target-build work stays independent
+     (campaign §Related Campaigns).
+   - **Inference-session-boundary ownership superseded.** The historical
+     session/artifact-handoff goal preserves only its valid metadata
+     boundaries; runtime/model/serving ownership is superseded through DDPP and
+     Gradus (campaign §Related Campaigns).
