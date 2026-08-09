@@ -110,11 +110,71 @@ pub enum FmirImageError {
     },
 
     /// A backend artifact declares a backend id that is not a compiled-in
-    /// leaf. Representable on the packet and rejected honestly — never
-    /// silently dropped, never remapped to a different backend, never given
-    /// a fallback lane (contract §Unknown future backends).
+    /// leaf. Representable on the packet and preserved-until-selection
+    /// (DDCP3-U0 (f)): admission no longer rejects it at load; selection use
+    /// of an unknown backend fails with
+    /// [`FmirImageError::UnsupportedSelectedBackend`]. **Retained as a
+    /// same-boundary compatibility shim** — faber's landed diagnostic
+    /// mapping (`mir/image.rs` §Unknown) still matches this variant; removal
+    /// routes through DDPP1-U5/U6 (recorded residual, not removed here).
     UnsupportedArtifactBackend {
         /// The unknown backend id.
+        backend: String,
+    },
+
+    /// An artifact's declared `abi_version` is not in the accepted set
+    /// (DDCP3-U0 (c) / CTO9-6 c): the default admission rule is an
+    /// **exact-match clean break** against [`crate::schema::ARTIFACT_ABI_VERSION`],
+    /// which rides the coordinated boundary
+    /// (`HOST_CALL_ABI_VERSION == DEVICE_RUN_PLAN_VERSION`). A deliberate
+    /// future minor-compatibility lane is an explicit decision, never a
+    /// silent addition.
+    UnsupportedArtifactAbiVersion {
+        /// Backend of the offending artifact.
+        backend: String,
+        /// ABI/schema version the artifact declares.
+        actual: u32,
+        /// The accepted ABI version.
+        accepted: u32,
+    },
+
+    /// A compiled-in leaf artifact declares a (backend, format, stage,
+    /// feature) combination its backend cannot carry (DDCP3-U0 (d) /
+    /// CTO9-6 d): a known backend cannot carry an incompatible known format
+    /// or an unrelated known feature. The detail names the violated
+    /// combination.
+    IncompatibleArtifactCombination {
+        /// Backend of the offending artifact.
+        backend: String,
+        /// The violated combination, named.
+        detail: String,
+    },
+
+    /// An artifact carries a required target feature more than once
+    /// (DDCP3-U0 (b) / CTO9-6 b): duplicate features are rejected at
+    /// admission with the named rule (the packet identity is the canonical
+    /// SET — duplicates cannot have a well-defined set identity).
+    DuplicateRequiredFeature {
+        /// The duplicated feature id.
+        feature: String,
+    },
+
+    /// An artifact's entrypoint symbol map repeats an entrypoint identity
+    /// (DDCP3-U0 (b) / CTO9-6 b): duplicate entrypoint identities are
+    /// rejected at admission with the named rule.
+    DuplicateEntrypoint {
+        /// The duplicated entrypoint identity.
+        entry: String,
+    },
+
+    /// Backend-selection resolution named an unknown backend (DDCP3-U0 (f) /
+    /// CTO9-6 f): an explicit selection of an unknown backend fails at
+    /// selection resolution with the named rule — aligned with faber's
+    /// landed fail-closed `FmirDeviceSelection::Unknown(_)` arm. Unknown
+    /// backend ARTIFACTS are preserved-until-selection (admitted at load,
+    /// validated as far as their declared fields allow).
+    UnsupportedSelectedBackend {
+        /// The selected backend id.
         backend: String,
     },
 
@@ -266,9 +326,33 @@ impl fmt::Display for FmirImageError {
             Self::UnsupportedArtifactBackend { backend } => {
                 write!(
                     f,
-                    "FMIR device artifact backend `{backend}` is not a compiled-in leaf — representable and rejected honestly, never silently dropped, remapped, or fallback-laned (contract §Unknown future backends)"
+                    "FMIR device artifact backend `{backend}` is not a compiled-in leaf — representable on the packet and preserved-until-selection (DDCP3-U0 (f)); selection use fails closed with `UnsupportedSelectedBackend`, never silently dropped, remapped, or fallback-laned (contract §Unknown future backends)"
                 )
             }
+            Self::UnsupportedArtifactAbiVersion {
+                backend,
+                actual,
+                accepted,
+            } => write!(
+                f,
+                "FMIR device artifact `{backend}` declares ABI version {actual}; the accepted version is {accepted} — exact-match clean break (DDCP3-U0 (c), riding `HOST_CALL_ABI_VERSION == DEVICE_RUN_PLAN_VERSION`)"
+            ),
+            Self::IncompatibleArtifactCombination { backend, detail } => write!(
+                f,
+                "FMIR device artifact `{backend}` combination is incompatible: {detail} (DDCP3-U0 (d) backend/format/stage/feature combination validation)"
+            ),
+            Self::DuplicateRequiredFeature { feature } => write!(
+                f,
+                "FMIR device artifact declares target feature `{feature}` more than once — duplicate required features fail admission (DDCP3-U0 (b) canonical set identity)"
+            ),
+            Self::DuplicateEntrypoint { entry } => write!(
+                f,
+                "FMIR device artifact declares entrypoint `{entry}` more than once — duplicate entrypoint identities fail admission (DDCP3-U0 (b))"
+            ),
+            Self::UnsupportedSelectedBackend { backend } => write!(
+                f,
+                "FMIR device backend selection `{backend}` is unknown — selection resolution fails closed (DDCP3-U0 (f) preserve-until-selection; unknown backend artifacts are admitted at load and rejected at selection use)"
+            ),
             Self::UnsupportedDeviceProgramVersion { actual, expected } => {
                 write!(
                     f,

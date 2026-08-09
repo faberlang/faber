@@ -19,13 +19,17 @@ pub mod schema;
 pub use codec::{decode_binary_image, decode_text_image, encode_binary_image, encode_text_image};
 pub use error::FmirImageError;
 pub use schema::{
-    canonical_program_bytes, canonical_unpadded_base64, content_sha256, device_identity_hash,
-    is_known_host_requirement, is_known_target_feature, packet_sha256, sha256_digest,
-    validate_compiled_in_target, validate_target_features, DeviceArtifactFormat,
-    DevicePayloadEncoding, DevicePayloadEncodingError, DeviceTargetId, FmirBinaryImageFile,
-    FmirDeviceArtifact, FmirDeviceArtifactsSection, FmirDeviceBackend, FmirDeviceInput,
-    FmirDeviceProgramSection, FmirDeviceSection, FmirDeviceSelection, FmirDeviceSymbol,
-    FmirTextCliOperand, FmirTextCliRootSection, FmirTextCliSection,
+    admit_device_section_with_compat, canonical_program_bytes, canonical_unpadded_base64,
+    content_sha256, default_compatibility_table, device_identity_hash, is_known_host_requirement,
+    is_known_target_feature, packet_sha256, packet_sha256_canonical, sha256_digest,
+    validate_artifact_combination, validate_compiled_in_target, validate_duplicate_target_features,
+    validate_target_features, ArtifactCompatibilityRow, ArtifactCompatibilityTable,
+    DeviceArtifactFormat,
+    DevicePayloadEncoding, DevicePayloadEncodingError, DeviceTargetId, FmirArtifactReflection,
+    FmirBinaryImageFile, FmirDeviceArtifact, FmirDeviceArtifactsSection, FmirDeviceBackend,
+    FmirDeviceInput, FmirDeviceProgramSection, FmirDeviceSection, FmirDeviceSelection,
+    FmirDeviceSymbol, FmirReflectedKernel, FmirReflectedResource, FmirTextCliOperand,
+    FmirTextCliRootSection, FmirTextCliSection,
     FmirTextCliValueType, FmirTextImageFile, FmirTextProgramSection, FmirTextRuntimeSection,
     FmirTextSourceIdentity, FmirTextSourcesSection, FmirTextToolchainSection, FmirTextTypesSection,
     MaterializationStage, WireBarrierPhase, WireBarrierPoint, WireBinding, WireBufferIdentity,
@@ -36,7 +40,7 @@ pub use schema::{
     WireProgramLifetime, WireReduceOp, WireReductionPlan, WireResourceAccess, WireResultBuffer,
     WireSemanticValue, WireSemanticValueOrigin, WireSharedMemoryLayout, WireStorageLayout,
     WireTransposePlan, WireWorkgroupCount, WireWorkgroupSize, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME,
-    PACKAGE_MIR_ARTIFACT_VERSION,
+    ARTIFACT_ABI_VERSION, ARTIFACT_REFLECTION_VERSION, PACKAGE_MIR_ARTIFACT_VERSION,
 };
 
 #[cfg(test)]

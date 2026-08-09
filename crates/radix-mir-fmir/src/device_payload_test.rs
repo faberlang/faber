@@ -15,9 +15,10 @@ use crate::codec::{
 use crate::error::FmirImageError;
 use crate::schema::{
     canonical_program_bytes, canonical_unpadded_base64, content_sha256, device_identity_hash,
-    packet_sha256, DeviceArtifactFormat, DevicePayloadEncoding, DeviceTargetId, FmirBinaryImageFile,
-    FmirDeviceArtifact, FmirDeviceArtifactsSection, FmirDeviceBackend, FmirDeviceInput,
-    FmirDeviceProgramSection, FmirDeviceSection, FmirDeviceSelection, FmirDeviceSymbol,
+    packet_sha256_canonical, DeviceArtifactFormat, DevicePayloadEncoding, DeviceTargetId,
+    FmirArtifactReflection, FmirBinaryImageFile, FmirDeviceArtifact, FmirDeviceArtifactsSection,
+    FmirDeviceBackend, FmirDeviceInput, FmirDeviceProgramSection, FmirDeviceSection,
+    FmirDeviceSelection, FmirDeviceSymbol, FmirReflectedKernel, FmirReflectedResource,
     FmirTextCliRootSection, FmirTextCliSection, FmirTextImageFile, FmirTextProgramSection,
     FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection,
     FmirTextToolchainSection, FmirTextTypesSection, MaterializationStage, WireAxisReductionPlan,
@@ -31,8 +32,8 @@ use crate::schema::{
     WireProgramLifetime, WireReduceOp, WireReducedProjection, WireResourceAccess,
     WireResultBuffer, WireRmsNormalizationPlan, WireRopePlan, WireRowSoftmaxPlan,
     WireSemanticValue, WireSemanticValueOrigin, WireStorageLayout, WireWorkgroupCount,
-    WireWorkgroupSize, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION,
-    WIRE_DEVICE_PROGRAM_VERSION,
+    WireWorkgroupSize, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, ARTIFACT_ABI_VERSION,
+    PACKAGE_MIR_ARTIFACT_VERSION, WIRE_DEVICE_PROGRAM_VERSION,
 };
 use radix_mir::MirProgram;
 use radix_types::TypeTable;
@@ -166,13 +167,14 @@ fn metal_artifact(blob: &str) -> FmirDeviceArtifact {
             id: "macos-arm64".to_owned(),
             required_features: Vec::new(),
         },
-        abi_version: 1,
+        abi_version: ARTIFACT_ABI_VERSION,
         bytes: blob.as_bytes().to_vec(),
         encoding: DevicePayloadEncoding::Text,
         entrypoints: Vec::new(),
         content_sha256: String::new(),
         packet_sha256: String::new(),
         compiler_input_packet_sha256: None,
+        reflection: None,
     })
 }
 
@@ -185,7 +187,7 @@ fn cuda_artifact(blob: &str) -> FmirDeviceArtifact {
             id: "sm_120".to_owned(),
             required_features: vec!["sm_120".to_owned()],
         },
-        abi_version: 1,
+        abi_version: ARTIFACT_ABI_VERSION,
         bytes: blob.as_bytes().to_vec(),
         encoding: DevicePayloadEncoding::Text,
         entrypoints: vec![FmirDeviceSymbol {
@@ -195,6 +197,7 @@ fn cuda_artifact(blob: &str) -> FmirDeviceArtifact {
         content_sha256: String::new(),
         packet_sha256: String::new(),
         compiler_input_packet_sha256: None,
+        reflection: None,
     })
 }
 
@@ -637,25 +640,24 @@ fn binary_payload_spelling_is_the_declared_transport_form() {
 }
 
 #[test]
-fn unknown_backend_artifact_rejected_honestly_at_admission() {
-    // Contract §Unknown future backends: an artifact whose backend id is not
-    // a compiled-in leaf is representable on the packet (it DECODES), is
-    // validated as far as its declared fields allow, and is rejected by
-    // admission with a stable structured diagnostic — never silently
-    // dropped, never remapped, never fallback-laned.
+fn unknown_backend_artifact_preserved_until_selection() {
+    // DDCP3-U0 (f) / CTO9-6 f: the blanket load-time rejection is REMOVED —
+    // an artifact whose backend id is not a compiled-in leaf is representable
+    // on the packet, validated as far as its declared fields allow
+    // (encodings + canonical digests re-verified), and **admitted at load**
+    // (preserved-until-selection). Never silently dropped, never remapped,
+    // never fallback-laned.
     let mut section = sample_device_section();
-    section.artifacts.artifact.push(FmirDeviceArtifact {
-        backend: FmirDeviceBackend::Unknown("amd".to_owned()),
-        ..metal_artifact("amd kernel")
-    });
+    section.artifacts.artifact.push(with_computed_digests(
+        FmirDeviceArtifact {
+            backend: FmirDeviceBackend::Unknown("amd".to_owned()),
+            ..metal_artifact("amd kernel")
+        },
+    ));
     let image = text_image_with_device(Some(section));
     let text = encode_text_image(&image).expect("encode text image");
-    match decode_text_image(&text, TOOLCHAIN) {
-        Err(FmirImageError::UnsupportedArtifactBackend { backend }) => {
-            assert_eq!(backend, "amd");
-        }
-        other => panic!("expected UnsupportedArtifactBackend, got {other:?}"),
-    }
+    decode_text_image(&text, TOOLCHAIN)
+        .expect("an unknown-backend artifact is admitted at load (preserve-until-selection)");
 }
 
 // ---------------------------------------------------------------------------
@@ -776,16 +778,24 @@ fn fixture_02_binary_payload_round_trips_with_declared_spelling() {
     // DDCP0-U6 fixture-02/02b retarget: the binary payload (16 decoded
     // bytes `metallib-stub-v1`) round-trips through both codecs with the
     // declared `binary:metallib:16:bWV0Y…` transport spelling; the recorded
-    // content digest recomputes over the DECODED bytes.
+    // content digest recomputes over the DECODED bytes. DDCP3-U0 (d)
+    // coherence: a `metallib` is a finalized binary, so the fixture artifact
+    // carries `stage = finalized-binary` + its hash-bound parent provenance
+    // (the fixture-04 compiler-input packet) — the combination-valid shape.
     let mut section = sample_device_section();
     let artifact = with_computed_digests(FmirDeviceArtifact {
         format: DeviceArtifactFormat::Unknown("metallib".to_owned()),
+        stage: MaterializationStage::FinalizedBinary,
         encoding: DevicePayloadEncoding::Binary {
             encoding_tag: "metallib".to_owned(),
             decoded_byte_length: 16,
             canonical_unpadded_base64: canonical_unpadded_base64(FIXTURE_METALLIB_BYTES),
         },
         bytes: FIXTURE_METALLIB_BYTES.to_vec(),
+        compiler_input_packet_sha256: Some(
+            "sha256:ce6abbcc288b78bb53bae05edd5676f9a634d036195794c99587753434d5470e"
+                .to_owned(),
+        ),
         ..metal_artifact("")
     });
     assert_eq!(
@@ -845,9 +855,15 @@ fn fixture_04_and_06_packet_digests_recompute_under_the_schema() {
     // the fixture-06 finalized packet recompute under the schema's canonical
     // serialization — including the compiler_input_packet_sha256 fire-2 #5
     // fold (the parent packet is part of the finalized packet's OWN
-    // identity; provenance is never silently replaced).
-    let compiler_input = packet_sha256(
-        8,
+    // identity; provenance is never silently replaced). DDCP3-U0 recompute
+    // (truth over safety): the recompute now runs the CANONICAL packet
+    // identity (packet_sha256_canonical — canonical ordering enforced +
+    // the reflection fold). The fixture's inputs are already canonical
+    // (empty required_features, single-entry entrypoint maps, `reflection =
+    // None` folds nothing), so the recorded digests hold unchanged under the
+    // revised hashing — proven here.
+    let compiler_input = packet_sha256_canonical(
+        ARTIFACT_ABI_VERSION,
         "metal",
         "msl",
         MaterializationStage::CompilerInput,
@@ -857,16 +873,17 @@ fn fixture_04_and_06_packet_digests_recompute_under_the_schema() {
             entry: "scale_kernel".to_owned(),
             symbol: "scale_kernel".to_owned(),
         }],
+        None,
         "sha256:60b433339e212477ee083722fbedb69d5f57520853ea6fa989f6cacfb1feae8b",
         None,
     );
     assert_eq!(
         compiler_input,
         "sha256:ce6abbcc288b78bb53bae05edd5676f9a634d036195794c99587753434d5470e",
-        "fixture-04 packet_sha256 recomputes under the schema"
+        "fixture-04 packet_sha256 recomputes under the schema (canonical identity)"
     );
-    let finalized = packet_sha256(
-        8,
+    let finalized = packet_sha256_canonical(
+        ARTIFACT_ABI_VERSION,
         "metal",
         "metallib",
         MaterializationStage::FinalizedBinary,
@@ -876,6 +893,7 @@ fn fixture_04_and_06_packet_digests_recompute_under_the_schema() {
             entry: "scale_kernel".to_owned(),
             symbol: "_scale_kernel".to_owned(),
         }],
+        None,
         "sha256:84433df026a63d867a6e10c08d574e887d0d315006fd8f0b1a48dbcbbebcd8a7",
         Some(&compiler_input),
     );
@@ -886,12 +904,356 @@ fn fixture_04_and_06_packet_digests_recompute_under_the_schema() {
     );
 }
 
+// ---------------------------------------------------------------------------
+// DDCP3-U0 (a)–(f): reflection carrier + hash fold, canonical ordering,
+// ABI-version admission, combination validation, preserve-until-selection
+// ---------------------------------------------------------------------------
+
+#[test]
+fn equivalent_sets_hash_to_identical_packet_identity() {
+    // CTO9-6 (b): canonical ordering is ENFORCED before hashing — equivalent
+    // sets (differing caller order, no duplicates) produce an identical
+    // packet identity. `required_features` and `entrypoints` are sorted
+    // internally; the shared `canonicalize_artifact` helper also normalizes
+    // the stored vectors for producers.
+    let forward = with_computed_digests(FmirDeviceArtifact {
+        target: DeviceTargetId {
+            id: "sm_120".to_owned(),
+            required_features: vec!["cuda".to_owned(), "sm_120".to_owned(), "sm_80".to_owned()],
+        },
+        entrypoints: vec![
+            FmirDeviceSymbol {
+                entry: "beta".to_owned(),
+                symbol: "_Z4beta".to_owned(),
+            },
+            FmirDeviceSymbol {
+                entry: "alpha".to_owned(),
+                symbol: "_Z5alpha".to_owned(),
+            },
+        ],
+        ..cuda_artifact("ir bytes")
+    });
+    let reversed = with_computed_digests(FmirDeviceArtifact {
+        target: DeviceTargetId {
+            id: "sm_120".to_owned(),
+            required_features: vec!["sm_80".to_owned(), "cuda".to_owned(), "sm_120".to_owned()],
+        },
+        entrypoints: vec![
+            FmirDeviceSymbol {
+                entry: "alpha".to_owned(),
+                symbol: "_Z5alpha".to_owned(),
+            },
+            FmirDeviceSymbol {
+                entry: "beta".to_owned(),
+                symbol: "_Z4beta".to_owned(),
+            },
+        ],
+        ..cuda_artifact("ir bytes")
+    });
+    assert_eq!(
+        forward.packet_sha256, reversed.packet_sha256,
+        "equivalent sets (differing caller order, no duplicates) hash to an identical packet identity"
+    );
+    // The stored vectors are normalized by the shared helper. Canonical
+    // feature order is lexicographic: `sm_120` sorts BEFORE `sm_80`.
+    let mut canonicalized = forward;
+    canonicalized.canonicalize_artifact();
+    assert_eq!(
+        canonicalized.target.required_features,
+        vec!["cuda".to_owned(), "sm_120".to_owned(), "sm_80".to_owned()]
+    );
+    assert_eq!(
+        canonicalized.entrypoints.first().unwrap().entry,
+        "alpha"
+    );
+}
+
+#[test]
+fn non_canonical_stored_packet_fails_admission_reverification() {
+    // CTO9-6 (b): a stored packet whose `packet_sha256` was computed over a
+    // NON-canonical order fails admission re-verification — the identity is
+    // the canonical set, so the recomputed digest (canonical) disagrees with
+    // the declared-order digest (the pre-DDCP3-U0 producer behavior).
+    let mut artifact = FmirDeviceArtifact {
+        target: DeviceTargetId {
+            id: "sm_120".to_owned(),
+            // Non-canonical caller order: canonical (lexicographic) sorting
+            // yields ["sm_120", "sm_80"] ("1" < "8").
+            required_features: vec!["sm_80".to_owned(), "sm_120".to_owned()],
+        },
+        ..cuda_artifact("ir bytes")
+    };
+    artifact.content_sha256 = artifact.compute_content_sha256();
+    artifact.packet_sha256 = crate::schema::packet_sha256_in_declared_order(
+        artifact.abi_version,
+        &artifact.backend.spelling(),
+        &artifact.format.spelling(),
+        artifact.stage,
+        &artifact.target.id,
+        &artifact.target.required_features,
+        &artifact.entrypoints,
+        &artifact.content_sha256,
+        artifact.compiler_input_packet_sha256.as_deref(),
+    );
+    let mut section = sample_device_section();
+    section.artifacts.artifact = vec![artifact];
+    let image = text_image_with_device(Some(section));
+    let text = encode_text_image(&image).expect("encode text image");
+    match decode_text_image(&text, TOOLCHAIN) {
+        Err(FmirImageError::ArtifactDigestMismatch {
+            backend,
+            field: "packet_sha256",
+            ..
+        }) => {
+            assert_eq!(backend, "cuda");
+        }
+        other => panic!(
+            "expected packet_sha256 re-verification failure for a non-canonical stored packet, got {other:?}"
+        ),
+    }
+}
+
+#[test]
+fn duplicate_required_features_rejected_at_admission() {
+    // CTO9-6 (b): duplicate required features are rejected at admission with
+    // the named rule (independent of hashing).
+    let artifact = with_computed_digests(FmirDeviceArtifact {
+        target: DeviceTargetId {
+            id: "sm_120".to_owned(),
+            required_features: vec!["sm_120".to_owned(), "sm_120".to_owned()],
+        },
+        ..cuda_artifact("ir bytes")
+    });
+    let mut section = sample_device_section();
+    section.artifacts.artifact = vec![artifact];
+    let image = text_image_with_device(Some(section));
+    let text = encode_text_image(&image).expect("encode text image");
+    assert!(matches!(
+        decode_text_image(&text, TOOLCHAIN),
+        Err(FmirImageError::DuplicateRequiredFeature { feature }) if feature == "sm_120"
+    ));
+}
+
+#[test]
+fn duplicate_entrypoints_rejected_at_admission() {
+    // CTO9-6 (b): duplicate entrypoint identities are rejected at admission
+    // with the named rule.
+    let artifact = with_computed_digests(FmirDeviceArtifact {
+        entrypoints: vec![
+            FmirDeviceSymbol {
+                entry: "addita".to_owned(),
+                symbol: "_Z6addita".to_owned(),
+            },
+            FmirDeviceSymbol {
+                entry: "addita".to_owned(),
+                symbol: "_Z6addita2".to_owned(),
+            },
+        ],
+        ..cuda_artifact("ir bytes")
+    });
+    let mut section = sample_device_section();
+    section.artifacts.artifact = vec![artifact];
+    let image = text_image_with_device(Some(section));
+    let text = encode_text_image(&image).expect("encode text image");
+    assert!(matches!(
+        decode_text_image(&text, TOOLCHAIN),
+        Err(FmirImageError::DuplicateEntrypoint { entry }) if entry == "addita"
+    ));
+}
+
+#[test]
+fn unsupported_artifact_abi_version_rejected_at_admission() {
+    // CTO9-6 (c): an artifact whose `abi_version` is not the accepted
+    // `ARTIFACT_ABI_VERSION` (the coordinated boundary) fails admission with
+    // the named diagnostic — exact-match clean break.
+    let mut artifact = metal_artifact("kernel void add() {}");
+    artifact.abi_version = ARTIFACT_ABI_VERSION - 1;
+    artifact = with_computed_digests(artifact);
+    let mut section = sample_device_section();
+    section.artifacts.artifact = vec![artifact];
+    let image = text_image_with_device(Some(section));
+    let text = encode_text_image(&image).expect("encode text image");
+    match decode_text_image(&text, TOOLCHAIN) {
+        Err(FmirImageError::UnsupportedArtifactAbiVersion {
+            backend,
+            actual,
+            accepted,
+        }) => {
+            assert_eq!(backend, "metal");
+            assert_eq!(actual, ARTIFACT_ABI_VERSION - 1);
+            assert_eq!(accepted, ARTIFACT_ABI_VERSION);
+        }
+        other => panic!("expected UnsupportedArtifactAbiVersion, got {other:?}"),
+    }
+}
+
+#[test]
+fn incompatible_artifact_combination_rejected_at_admission() {
+    // CTO9-6 (d): a known backend cannot carry an incompatible known format
+    // or an unrelated known feature — the (backend, format, stage, feature)
+    // combination is validated against the assembled compatibility table.
+    // metal + elf fails (no metal/elf row).
+    let mut section = sample_device_section();
+    section.artifacts.artifact = vec![with_computed_digests(FmirDeviceArtifact {
+        format: DeviceArtifactFormat::Elf,
+        ..metal_artifact("ir bytes")
+    })];
+    let image = text_image_with_device(Some(section));
+    let text = encode_text_image(&image).expect("encode text image");
+    match decode_text_image(&text, TOOLCHAIN) {
+        Err(FmirImageError::IncompatibleArtifactCombination { backend, detail }) => {
+            assert_eq!(backend, "metal");
+            assert!(
+                detail.contains("elf"),
+                "the diagnostic must name the violated combination, got: {detail}"
+            );
+        }
+        other => panic!("expected IncompatibleArtifactCombination for metal+elf, got {other:?}"),
+    }
+
+    // cuda + msl fails (no cuda/msl row).
+    let mut section = sample_device_section();
+    section.artifacts.artifact = vec![with_computed_digests(FmirDeviceArtifact {
+        format: DeviceArtifactFormat::Msl,
+        ..cuda_artifact("ir bytes")
+    })];
+    let image = text_image_with_device(Some(section));
+    let text = encode_text_image(&image).expect("encode text image");
+    assert!(matches!(
+        decode_text_image(&text, TOOLCHAIN),
+        Err(FmirImageError::IncompatibleArtifactCombination { backend, .. }) if backend == "cuda"
+    ));
+
+    // metal + an unrelated KNOWN feature (sm_120) fails — the feature is
+    // known globally but not permitted for the metal backend.
+    let mut section = sample_device_section();
+    section.artifacts.artifact = vec![with_computed_digests(FmirDeviceArtifact {
+        target: DeviceTargetId {
+            id: "macos-arm64".to_owned(),
+            required_features: vec!["sm_120".to_owned()],
+        },
+        ..metal_artifact("ir bytes")
+    })];
+    let image = text_image_with_device(Some(section));
+    let text = encode_text_image(&image).expect("encode text image");
+    match decode_text_image(&text, TOOLCHAIN) {
+        Err(FmirImageError::IncompatibleArtifactCombination { backend, detail }) => {
+            assert_eq!(backend, "metal");
+            assert!(
+                detail.contains("sm_120"),
+                "the diagnostic must name the unrelated feature, got: {detail}"
+            );
+        }
+        other => panic!(
+            "expected IncompatibleArtifactCombination for an unrelated known feature, got {other:?}"
+        ),
+    }
+
+    // An unknown global feature still fails with the named rule.
+    let mut section = sample_device_section();
+    section.artifacts.artifact = vec![with_computed_digests(FmirDeviceArtifact {
+        target: DeviceTargetId {
+            id: "macos-arm64".to_owned(),
+            required_features: vec!["vulkan".to_owned()],
+        },
+        ..metal_artifact("ir bytes")
+    })];
+    let image = text_image_with_device(Some(section));
+    let text = encode_text_image(&image).expect("encode text image");
+    assert!(matches!(
+        decode_text_image(&text, TOOLCHAIN),
+        Err(FmirImageError::UnsupportedTargetFeature { feature }) if feature == "vulkan"
+    ));
+}
+
+#[test]
+fn unknown_backend_artifact_skips_leaf_combination_rules() {
+    // CTO9-6 (d): unknown-backend artifacts are validated as far as their
+    // declared fields allow — the leaf-specific (backend, format, stage,
+    // feature) combination rules are skipped (no leaf knowledge), while the
+    // global known-feature check + digest re-verification still apply.
+    let mut section = sample_device_section();
+    section.artifacts.artifact = vec![with_computed_digests(FmirDeviceArtifact {
+        backend: FmirDeviceBackend::Unknown("amd".to_owned()),
+        format: DeviceArtifactFormat::Unknown("amdgcn".to_owned()),
+        target: DeviceTargetId {
+            id: "gfx1100".to_owned(),
+            required_features: vec!["amd".to_owned()],
+        },
+        ..metal_artifact("amd kernel")
+    })];
+    let image = text_image_with_device(Some(section));
+    let text = encode_text_image(&image).expect("encode text image");
+    decode_text_image(&text, TOOLCHAIN).expect(
+        "an unknown-backend artifact is admitted as far as its declared fields allow",
+    );
+}
+
+#[test]
+fn reflection_round_trips_and_folds_into_packet_sha256() {
+    // CTO9-6 (a): the typed reflection carrier folds into `packet_sha256`
+    // (canonical order) and round-trips through both codecs. A carried
+    // `None` folds nothing (the DDCP2 identity is preserved for
+    // reflection-less packets); a carried `Some` changes the identity.
+    let mut section = sample_device_section();
+    section.artifacts.artifact = vec![metal_artifact("kernel void add() {}")];
+    let without_reflection = section.artifacts.artifact[0].compute_packet_sha256();
+
+    let reflected = FmirArtifactReflection {
+        v: crate::schema::ARTIFACT_REFLECTION_VERSION,
+        kernels: vec![FmirReflectedKernel {
+            function: "add".to_owned(),
+            entry_name: "add".to_owned(),
+            resources: vec![FmirReflectedResource {
+                name: "buffer0".to_owned(),
+                binding: 0,
+            }],
+        }],
+    };
+    let mut section = sample_device_section();
+    section.artifacts.artifact = vec![with_computed_digests(FmirDeviceArtifact {
+        reflection: Some(reflected.clone()),
+        ..metal_artifact("kernel void add() {}")
+    })];
+    let with_reflection = section.artifacts.artifact[0].compute_packet_sha256();
+    assert_ne!(
+        without_reflection, with_reflection,
+        "a carried reflection changes the packet identity (the reflection fold)"
+    );
+
+    // Reflection round-trips through both codecs with the digests intact.
+    let image = text_image_with_device(Some(section.clone()));
+    let text = encode_text_image(&image).expect("encode text image");
+    let decoded = decode_text_image(&text, TOOLCHAIN).expect("decode text image");
+    let artifact = &decoded
+        .device
+        .expect("device section present")
+        .artifacts
+        .artifact[0];
+    assert_eq!(artifact.reflection, Some(reflected.clone()));
+    assert_eq!(artifact.packet_sha256, with_reflection);
+
+    let binary_image = binary_image_with_device(Some(section));
+    let bytes = encode_binary_image(&binary_image).expect("encode binary image");
+    let decoded = decode_binary_image(&bytes, TOOLCHAIN).expect("decode binary image");
+    let artifact = &decoded
+        .device
+        .expect("device section present")
+        .artifacts
+        .artifact[0];
+    assert_eq!(artifact.reflection, Some(reflected));
+    assert_eq!(artifact.packet_sha256, with_reflection);
+}
+
 #[test]
 fn unknown_selection_is_representable_and_rejected_at_resolution() {
     // DDCP2-U2: the selection enum migrates to backend-id enum semantics —
     // an unknown selection id is `Unknown(id)`, representable on the image
     // (it DECODES), and rejected honestly at selection resolution (no
-    // compiled-in leaf matches), never silently remapped.
+    // compiled-in leaf matches), never silently remapped. DDCP3-U0 (f): an
+    // explicit selection of an unknown backend now fails ADMISSION with
+    // `UnsupportedSelectedBackend` (selection resolution at the radix gate);
+    // unknown-backend ARTIFACTS are preserved-until-selection.
     let image = text_image_with_device(Some(sample_device_section()));
     let mut text = encode_text_image(&image).expect("encode text image");
     text = text.replace(
@@ -899,29 +1261,55 @@ fn unknown_selection_is_representable_and_rejected_at_resolution() {
         "selection = { unknown = \"vulkan\" }",
     );
     match decode_text_image(&text, TOOLCHAIN) {
-        Ok(decoded) => {
-            let device = decoded.device.expect("device section present");
-            assert_eq!(
-                device.selection,
-                FmirDeviceSelection::Unknown("vulkan".to_owned())
-            );
+        Err(FmirImageError::UnsupportedSelectedBackend { backend }) => {
+            assert_eq!(backend, "vulkan");
         }
-        other => panic!("unknown selection must be representable, got {other:?}"),
+        other => panic!("expected UnsupportedSelectedBackend, got {other:?}"),
     }
 }
 
 #[test]
-fn unknown_backend_is_representable_and_rejected_honestly() {
-    // Contract §Unknown future backends: an artifact backend id that is not
-    // a compiled-in leaf DECODES as `Unknown(id)` and is rejected by
-    // admission with a stable structured diagnostic — never silently
-    // dropped, never remapped, never fallback-laned.
-    let image = text_image_with_device(Some(sample_device_section()));
-    let mut text = encode_text_image(&image).expect("encode text image");
-    text = text.replace("backend = \"metal\"", "backend = { unknown = \"rocm\" }");
+fn unknown_backend_is_representable_and_preserved_at_load() {
+    // Contract §Unknown future backends + DDCP3-U0 (f): an artifact backend
+    // id that is not a compiled-in leaf DECODES as `Unknown(id)` and is
+    // **preserved-until-selection** — admitted at load when its declared
+    // fields are well-formed (encodings + canonical digests re-verified),
+    // rejected at selection use. The text-replace trick can no longer probe
+    // a load-time rejection (that path is gone); build the packet through
+    // the typed helpers so the digests are canonical and admission passes.
+    let mut section = sample_device_section();
+    section.artifacts.artifact.push(with_computed_digests(
+        FmirDeviceArtifact {
+            backend: FmirDeviceBackend::Unknown("rocm".to_owned()),
+            ..metal_artifact("rocm kernel")
+        },
+    ));
+    let image = text_image_with_device(Some(section));
+    let text = encode_text_image(&image).expect("encode text image");
+    let decoded = decode_text_image(&text, TOOLCHAIN)
+        .expect("unknown-backend artifact is preserved-until-selection (admitted at load)");
+    let artifact = &decoded
+        .device
+        .expect("device section present")
+        .artifacts
+        .artifact[2];
+    assert_eq!(artifact.backend, FmirDeviceBackend::Unknown("rocm".to_owned()));
+
+    // The same unknown-backend ARTIFACT under an explicit unknown SELECTION
+    // fails admission at selection resolution.
+    let mut section = sample_device_section();
+    section.selection = FmirDeviceSelection::Unknown("rocm".to_owned());
+    section.artifacts.artifact.push(with_computed_digests(
+        FmirDeviceArtifact {
+            backend: FmirDeviceBackend::Unknown("rocm".to_owned()),
+            ..metal_artifact("rocm kernel")
+        },
+    ));
+    let image = text_image_with_device(Some(section));
+    let text = encode_text_image(&image).expect("encode text image");
     assert!(matches!(
         decode_text_image(&text, TOOLCHAIN),
-        Err(FmirImageError::UnsupportedArtifactBackend { backend }) if backend == "rocm"
+        Err(FmirImageError::UnsupportedSelectedBackend { backend }) if backend == "rocm"
     ));
 }
 
@@ -1889,14 +2277,18 @@ fn text_encoded_artifact_with_computed_digests_admits_cleanly() {
 fn packet_digest_re_verified_and_sensitive_to_metadata() {
     // DDCP2-U3: packet_sha256 covers the versioned artifact metadata +
     // content_sha256 (never semantic identity), is re-verified at admission,
-    // and is sensitive to metadata changes — a tampered target fails the
-    // packet digest, never the content digest.
+    // and is sensitive to metadata changes — a tampered entrypoint symbol
+    // fails the packet digest, never the content digest. (DDCP3-U0 note: the
+    // admission order runs target/combination validation BEFORE digest
+    // re-verification, so a tampered TARGET id is caught by the compiled-in
+    // target gate; the entrypoint symbol is metadata only the packet digest
+    // covers — the focused packet-digest-gate proof.)
     let blob = ".version 8.7\n.target sm_120\n";
     let mut section = sample_device_section();
     section.artifacts.artifact = vec![cuda_artifact(blob)];
-    // Tamper with the TARGET id only: content is untouched, the packet
-    // digest no longer matches.
-    section.artifacts.artifact[0].target.id = "sm_80".to_owned();
+    // Tamper with the ENTRYPOINT SYMBOL only: content is untouched, target/
+    // combination/duplicate gates pass, the packet digest no longer matches.
+    section.artifacts.artifact[0].entrypoints[0].symbol = "_Z6additaTAMPERED".to_owned();
     let image = text_image_with_device(Some(section));
     let text = encode_text_image(&image).expect("encode text image");
     match decode_text_image(&text, TOOLCHAIN) {

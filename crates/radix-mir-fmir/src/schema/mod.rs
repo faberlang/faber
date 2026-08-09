@@ -41,6 +41,7 @@ mod validate;
 mod wire;
 
 pub(crate) use admit::*;
+pub use admit::admit_device_section_with_compat;
 pub use device::*;
 pub use distributed::*;
 pub use distributed_identity::*;
@@ -85,6 +86,21 @@ mod wire_test;
 /// `DeviceProgram` semantic field changes). Old version-6 images fail closed
 /// with [`UnsupportedVersion`](crate::error::FmirImageError::UnsupportedVersion).
 pub const PACKAGE_MIR_ARTIFACT_VERSION: u32 = 7;
+
+/// The accepted artifact ABI/schema version of the DeviceArtifact packet
+/// (DDCP3-U0 (c) / CTO9-6 c): the **exact-match** admission set for an
+/// artifact's declared `abi_version`. Rides the coordinated boundary with
+/// `HOST_CALL_ABI_VERSION == DEVICE_RUN_PLAN_VERSION` (both 8) — the
+/// versioned typed-boundary the artifact is produced against. A deliberate
+/// future minor-compatibility lane is an explicit decision, never a silent
+/// addition; a packet whose `abi_version` is not this value fails admission
+/// with [`UnsupportedArtifactAbiVersion`](crate::error::FmirImageError::UnsupportedArtifactAbiVersion).
+///
+/// NOTE (rebaselined at DDCP3-U0): faber's landed
+/// `DEVICE_ARTIFACT_ABI_VERSION` is `1` — a same-boundary divergence from
+/// this coordinated value, recorded with a `fix:` marker for DDPP1-U5/U6 to
+/// align (never silently patched radix-side).
+pub const ARTIFACT_ABI_VERSION: u32 = 8;
 
 /// The faber-owned wire/codec version of the typed device-program section
 /// (the nested `v` field of [`FmirDeviceProgramSection`]). Bumped in lockstep

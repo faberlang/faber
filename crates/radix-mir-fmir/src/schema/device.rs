@@ -103,6 +103,57 @@ pub struct FmirDeviceSymbol {
     /// Emitted `.entry` symbol the host launches by.
     pub symbol: String,
 }
+
+/// The version ratchet of the typed reflection carrier (DDCP3-U0 (a) /
+/// CTO9-6 a). The reflection carrier rides its OWN nested version, admitted
+/// fail-closed **before field interpretation** (the `admit_device_section`
+/// pattern / the MD2-W1 sibling-field precedent) — independently of the
+/// artifact ABI version and the outer packet shape. The first carrier shape
+/// is v1; concrete Metal/CUDA reflection CONTENT lands with DDCP4 leaf
+/// conformance (a content extension bumps this ratchet, never silently).
+pub const ARTIFACT_REFLECTION_VERSION: u32 = 1;
+
+/// The versioned typed reflection carrier of a device artifact (DDCP3-U0 (a)
+/// / CTO9-6 a): the FMIR mirror of the radix-mir `MirGpuReflection` surface
+/// (`crates/radix-mir/src/abi/types.rs`) — the frozen §ArtifactPacket
+/// `backend reflection/requirements` field. Backend reflection facts are
+/// canonical structured facts about bindings/layout the backend requires;
+/// the carrier is folded into `packet_sha256` in **canonical order**. This
+/// shape is the typed carrier + hash fold + round-trip only — concrete
+/// Metal/CUDA reflection content is DDCP4's (DDCP3 non-goal).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FmirArtifactReflection {
+    /// The reflection carrier's OWN version ratchet (A7): admitted
+    /// fail-closed before any field-level interpretation.
+    pub v: u32,
+    /// Reflected kernel rows (canonical order at hash time).
+    pub kernels: Vec<FmirReflectedKernel>,
+}
+
+/// One reflected kernel row of the typed reflection carrier (the FMIR mirror
+/// of `MirKernelReflection`'s identity-bearing fields). Typed facts, never
+/// reconstructed from emitted text.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FmirReflectedKernel {
+    /// The kernel's stable function identity (typed, never name-derived).
+    pub function: String,
+    /// The emitted entry name.
+    pub entry_name: String,
+    /// Declared resource bindings (canonical order at hash time).
+    pub resources: Vec<FmirReflectedResource>,
+}
+
+/// One declared resource binding of a reflected kernel row.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FmirReflectedResource {
+    /// The resource's declared name.
+    pub name: String,
+    /// The declared binding index.
+    pub binding: u32,
+}
 /// Backend selection request recorded in the image (N1.1). Fail-closed: an
 /// unknown value fails at parse time. Migrated to backend-id enum semantics
 /// (DDCP2-U2): an unknown selection id is `Unknown(String)` — representable
@@ -194,6 +245,22 @@ pub struct FmirDeviceArtifact {
     /// rule (`None` for `CompilerInput` artifacts, `Some` canonical spelling
     /// for `FinalizedBinary` artifacts).
     pub compiler_input_packet_sha256: Option<String>,
+    /// Backend reflection/requirements (frozen §ArtifactPacket — the
+    /// `backend reflection/requirements` field; DDCP3-U0 (a) / CTO9-6 a):
+    /// the versioned typed reflection carrier (FMIR mirror of the radix-mir
+    /// `MirGpuReflection` surface), folded into `packet_sha256` (canonical
+    /// order). `None` for artifacts without declared reflection — the
+    /// **add-only `#[serde(default)]` parse-compat field** (the
+    /// same-compatibility-boundary contract with the mid-flight faber
+    /// consumer: an old image without the field still parses; a carried
+    /// `None` folds nothing into the packet identity, so reflection-less
+    /// packets keep the DDCP2 identity). Concrete Metal/CUDA reflection
+    /// CONTENT lands with DDCP4 leaf conformance — this shape is the typed
+    /// carrier + hash fold only. Added LAST (after
+    /// `compiler_input_packet_sha256`) so the binary (postcard) field order
+    /// appends rather than repositions existing fields.
+    #[serde(default)]
+    pub reflection: Option<FmirArtifactReflection>,
 }
 
 impl FmirDeviceArtifact {
@@ -222,15 +289,18 @@ impl FmirDeviceArtifact {
     }
 
     /// The canonical `packet_sha256` over the versioned artifact metadata +
-    /// `content_sha256` (DDCP2-U3 / contract §IdentityDomains rule 1/4):
-    /// ABI/schema version, backend, format, materialization stage, target id
-    /// + required features (canonical order), the entrypoint symbol map
-    /// (canonical order), the content digest, and the parent
-    /// `compiler_input_packet_sha256` provenance when present. Never semantic
-    /// identity.
+    /// `content_sha256` (DDCP2-U3 / contract §IdentityDomains rule 1/4;
+    /// DDCP3-U0 (a)/(b) revision): ABI/schema version, backend, format,
+    /// materialization stage, target id + required features (**canonical
+    /// order**), the entrypoint symbol map (**canonical order**), the typed
+    /// `reflection` (canonical order, when present), the content digest, and
+    /// the parent `compiler_input_packet_sha256` provenance when present.
+    /// Equivalent sets (differing caller order, no duplicates) produce an
+    /// identical packet identity; a stored packet hashed over a non-canonical
+    /// order fails admission re-verification. Never semantic identity.
     #[must_use]
     pub fn compute_packet_sha256(&self) -> String {
-        crate::schema::packet_sha256(
+        crate::schema::packet_sha256_canonical(
             self.abi_version,
             &self.backend.spelling(),
             &self.format.spelling(),
@@ -238,9 +308,35 @@ impl FmirDeviceArtifact {
             &self.target.id,
             &self.target.required_features,
             &self.entrypoints,
+            self.reflection.as_ref(),
             &self.content_sha256,
             self.compiler_input_packet_sha256.as_deref(),
         )
+    }
+
+    /// Canonicalize the artifact's hash-relevant vectors **in place**
+    /// (DDCP3-U0 (b); the shared helper producers call at construction):
+    /// sort `required_features`, `entrypoints`, and the `reflection` rows
+    /// (kernels + resources) so the stored packet carries canonical order
+    /// and its `packet_sha256` is computed over the canonicalized inputs.
+    /// Admission re-verifies over the canonical order regardless, so a
+    /// producer that skips this helper still produces a valid packet —
+    /// equivalent sets always hash to an identical packet identity.
+    pub fn canonicalize_artifact(&mut self) {
+        self.target.required_features.sort();
+        self.entrypoints
+            .sort_by(|left, right| (left.entry.as_str(), left.symbol.as_str()).cmp(&(right.entry.as_str(), right.symbol.as_str())));
+        if let Some(reflection) = &mut self.reflection {
+            reflection.kernels.sort_by(|left, right| {
+                (left.function.as_str(), left.entry_name.as_str())
+                    .cmp(&(right.function.as_str(), right.entry_name.as_str()))
+            });
+            for kernel in &mut reflection.kernels {
+                kernel.resources.sort_by(|left, right| {
+                    (left.binding, left.name.as_str()).cmp(&(right.binding, right.name.as_str()))
+                });
+            }
+        }
     }
 
     /// Validate the explicit payload-encoding declaration against the

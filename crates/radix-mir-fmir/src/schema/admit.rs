@@ -2,13 +2,17 @@ use super::device::{FmirDeviceSection, FmirSessionSection, WIRE_SESSION_SECTION_
 use super::distributed::{
     expected_plan_for_section, wire_plan_to_plan, FmirDistributedExecutionSection,
 };
-use super::requirements::{validate_compiled_in_target, validate_target_features};
+use super::requirements::{
+    default_compatibility_table, validate_artifact_combination, validate_compiled_in_target_in,
+    validate_duplicate_target_features, validate_target_features_in, ArtifactCompatibilityTable,
+};
 use super::wire::WireDeviceProgram;
 use super::{
     logical_distributed_plan_hash, validate_wire_distributed_section, validate_wire_program,
     validate_wire_session_section, FmirDeviceBackend, MaterializationStage,
     PACKAGE_MIR_ARTIFACT_VERSION, WIRE_DEVICE_PROGRAM_VERSION, WIRE_DISTRIBUTED_SECTION_VERSION,
 };
+use crate::schema::ARTIFACT_ABI_VERSION;
 
 /// Fail-closed artifact-version gate. Versions ratchet as clean breaks;
 /// there is no compatibility decoder.
@@ -111,26 +115,97 @@ pub(crate) fn check_artifact_digests(
     Ok(())
 }
 
-/// Fail-closed typed target admission (DDCP2-U3): every required feature of
-/// every artifact must be a known target feature, and the compiled-in leaves
-/// (Metal/CUDA) keep exhaustive target validation against their leaf target
-/// id. Unknown features and incompatible target ids fail closed with the
-/// named rule — never guessed, never silently dropped.
-pub(crate) fn check_artifact_targets(
+/// Fail-closed artifact ABI-version admission (DDCP3-U0 (c) / CTO9-6 c):
+/// every artifact's declared `abi_version` must be in the accepted set —
+/// the default is an **exact-match clean break** against
+/// [`ARTIFACT_ABI_VERSION`], which rides the coordinated boundary
+/// (`HOST_CALL_ABI_VERSION == DEVICE_RUN_PLAN_VERSION`). A deliberately
+/// admitted minor-compatibility lane is an explicit decision, never a
+/// silent addition.
+pub(crate) fn check_artifact_abi_versions(
     device: &FmirDeviceSection,
 ) -> Result<(), crate::error::FmirImageError> {
     for artifact in &device.artifacts.artifact {
-        validate_target_features(&artifact.target)?;
-        validate_compiled_in_target(&artifact.backend, &artifact.target)?;
+        if artifact.abi_version != ARTIFACT_ABI_VERSION {
+            return Err(crate::error::FmirImageError::UnsupportedArtifactAbiVersion {
+                backend: artifact.backend.spelling(),
+                actual: artifact.abi_version,
+                accepted: ARTIFACT_ABI_VERSION,
+            });
+        }
     }
     Ok(())
 }
 
-/// Fail-closed backend-selection admission (DDCP2-U3): an explicit selection
-/// (Metal/Cuda) must have an artifact for the selected backend — a missing
-/// artifact fails closed with the named rule. `Auto` is admitted (selection
-/// resolves at run time); an unknown selection is representable and rejected
-/// honestly at selection resolution, never silently remapped.
+/// Fail-closed typed target admission (DDCP2-U3; DDCP3-U0 (b)/(d)/(e)/(f)):
+/// every required feature of every artifact must be a known feature
+/// (table-driven) with **no duplicates** ([`FmirImageError::DuplicateRequiredFeature`]
+/// — CTO9-6 b), and the compiled-in leaves (Metal/CUDA) keep exhaustive
+/// target validation against their leaf target id + the backend/format/stage/
+/// feature combination rules (the assembled compatibility table — CTO9-6
+/// d/e). Unknown features, incompatible target ids, and incompatible
+/// combinations fail closed with the named rule — never guessed, never
+/// silently dropped. Unknown-backend artifacts are validated as far as their
+/// declared fields allow (CTO9-6 f preserve-until-selection): duplicates are
+/// structurally invalid regardless of backend, but the feature ALLOWLIST and
+/// the leaf-specific combination rules are leaf knowledge and do not apply —
+/// the artifact is admitted at load and rejected at selection use instead.
+pub(crate) fn check_artifact_targets(
+    device: &FmirDeviceSection,
+    table: &ArtifactCompatibilityTable,
+) -> Result<(), crate::error::FmirImageError> {
+    for artifact in &device.artifacts.artifact {
+        match &artifact.backend {
+            FmirDeviceBackend::Unknown(_) => {
+                validate_duplicate_target_features(&artifact.target)?;
+            }
+            _ => {
+                validate_target_features_in(&artifact.target, table)?;
+                validate_compiled_in_target_in(&artifact.backend, &artifact.target, table)?;
+                validate_artifact_combination(
+                    &artifact.backend,
+                    &artifact.format,
+                    artifact.stage,
+                    &artifact.target,
+                    table,
+                )?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Fail-closed entrypoint-identity admission (DDCP3-U0 (b) / CTO9-6 b): the
+/// entrypoint symbol map is canonical-ordered at hash time, so a repeated
+/// entrypoint identity has no well-defined set identity — duplicates are
+/// rejected at admission with the named rule.
+pub(crate) fn check_artifact_entrypoints(
+    device: &FmirDeviceSection,
+) -> Result<(), crate::error::FmirImageError> {
+    for artifact in &device.artifacts.artifact {
+        for (index, entrypoint) in artifact.entrypoints.iter().enumerate() {
+            if artifact.entrypoints[..index]
+                .iter()
+                .any(|seen| seen.entry == entrypoint.entry)
+            {
+                return Err(crate::error::FmirImageError::DuplicateEntrypoint {
+                    entry: entrypoint.entry.clone(),
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Fail-closed backend-selection admission (DDCP2-U3; DDCP3-U0 (f) /
+/// CTO9-6 f): an explicit selection (Metal/Cuda) must have an artifact for
+/// the selected backend — a missing artifact fails closed with the named
+/// rule. `Auto` is admitted (selection resolves at run time); an **explicit
+/// selection of an unknown backend fails at selection resolution** with
+/// [`FmirImageError::UnsupportedSelectedBackend`] — aligned with faber's
+/// landed fail-closed `Unknown(_)` arm. Unknown backend ARTIFACTS are
+/// preserved-until-selection (admitted at load, rejected at selection use);
+/// never silently remapped.
 pub(crate) fn check_selection_artifacts(
     device: &FmirDeviceSection,
 ) -> Result<(), crate::error::FmirImageError> {
@@ -146,7 +221,12 @@ pub(crate) fn check_selection_artifacts(
                 });
             }
         }
-        _ => {}
+        crate::schema::FmirDeviceSelection::Unknown(backend) => {
+            return Err(crate::error::FmirImageError::UnsupportedSelectedBackend {
+                backend: backend.clone(),
+            });
+        }
+        crate::schema::FmirDeviceSelection::Auto => {}
     }
     Ok(())
 }
@@ -172,35 +252,25 @@ pub(crate) fn check_artifact_encodings(
     Ok(())
 }
 
-/// Fail-closed unknown-backend admission (contract §Unknown future
-/// backends): an artifact whose backend id is not a compiled-in leaf is
-/// representable on the packet, validated as far as its declared fields
-/// allow, and rejected here with a stable structured diagnostic — never
-/// silently dropped, never remapped to a different backend, never given a
-/// fallback lane.
-pub(crate) fn check_artifact_backends(
-    device: &FmirDeviceSection,
-) -> Result<(), crate::error::FmirImageError> {
-    for artifact in &device.artifacts.artifact {
-        if let FmirDeviceBackend::Unknown(backend) = &artifact.backend {
-            return Err(crate::error::FmirImageError::UnsupportedArtifactBackend {
-                backend: backend.clone(),
-            });
-        }
-    }
-    Ok(())
-}
-
-/// Combined device-section admission. Run after the version / target /
-/// toolchain gates (a device payload is admitted only from the exact producing
-/// toolchain version — N1.7).
+/// Combined device-section admission with a caller-supplied compatibility
+/// table (DDCP3-U0 (e) / CTO9-6 e): the table the caller assembles from the
+/// compiled-in leaves' rows (`radix-mir-metal::compat::metal_compatibility_rows`
+/// / `radix-mir-llvm::compat::cuda_compatibility_rows`) replaces the FMIR
+/// default table for the target/combination validation. Run after the
+/// version / target / toolchain gates (a device payload is admitted only from
+/// the exact producing toolchain version — N1.7).
 ///
-/// Order (Stage 3R F7/S8): the **nested** device-program wire version is
-/// admitted independently of the outer image version and before any field
-/// interpretation; then the carried F1–F7 semantic facts are validated
-/// fail-closed; then the runtime requirements and artifact provenance.
-pub(crate) fn admit_device_section(
+/// Order (Stage 3R F7/S8; DDCP3-U0 revision): the **nested** device-program
+/// wire version is admitted independently of the outer image version and
+/// before any field interpretation; then the carried F1–F7 semantic facts are
+/// validated fail-closed; then the payload encodings, the artifact ABI
+/// versions (c), the typed targets + combinations (b/d/e), the entrypoint
+/// identity uniqueness (b), the digest re-verification over the **canonical
+/// packet identity** (b — a stored packet hashed over a non-canonical order
+/// fails here), and the backend selection (f).
+pub fn admit_device_section_with_compat(
     device: &FmirDeviceSection,
+    table: &ArtifactCompatibilityTable,
 ) -> Result<(), crate::error::FmirImageError> {
     // S8: the nested device-program version fails closed independently of the
     // outer FMIR version, with a focused diagnostic.
@@ -214,9 +284,10 @@ pub(crate) fn admit_device_section(
     }
     validate_wire_program(&device.device_program.program)?;
     check_artifact_encodings(device)?;
-    check_artifact_backends(device)?;
+    check_artifact_abi_versions(device)?;
+    check_artifact_targets(device, table)?;
+    check_artifact_entrypoints(device)?;
     check_artifact_digests(device)?;
-    check_artifact_targets(device)?;
     check_selection_artifacts(device)?;
     // MD2-W1: the optional distributed execution section is admitted
     // fail-closed at load — its own version ratchet, wire-level section
@@ -234,6 +305,19 @@ pub(crate) fn admit_device_section(
         admit_session_section(session, &device.device_program.program)?;
     }
     Ok(())
+}
+
+/// Combined device-section admission with the FMIR **default** compatibility
+/// table (the current Metal/CUDA facts as data). The mid-flight faber
+/// consumer's decode path (`decode_text_image` / `decode_binary_image`)
+/// admits through here; a caller that assembles the table from the compiled-
+/// in leaves uses [`admit_device_section_with_compat`]. The FMIR default
+/// table's removal + faber caller-supplied assembly is a recorded
+/// same-boundary contract item for DDPP1-U5/U6 + DDCP4 (NOT removed here).
+pub(crate) fn admit_device_section(
+    device: &FmirDeviceSection,
+) -> Result<(), crate::error::FmirImageError> {
+    admit_device_section_with_compat(device, &default_compatibility_table())
 }
 
 /// Fail-closed admission of the optional cadence/session section (GI4-2),
