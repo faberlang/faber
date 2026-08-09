@@ -179,6 +179,35 @@ pub enum DeviceProgramError {
         version: u32,
         at_launch: LaunchId,
     },
+    // ── DDCP1-U2: stable identity + explicit generations + scheduling ──────
+    /// A non-root launch has no incoming dependency edge — a dangling
+    /// consumer with no justifying producer (F3 / contract scheduling rule 2).
+    DanglingConsumer { launch: LaunchId },
+    /// A dependency edge flows a buffer no semantic value is bound to — the
+    /// consumer cannot inherit a value identity (F3 / contract rule 3).
+    UnboundEdgeBuffer { buffer: BufferId },
+    /// A consumer edge references a value its producer launch never writes —
+    /// a missing producer (F3 / contract scheduling rule 3).
+    MissingProducer {
+        producer: LaunchId,
+        value: SemanticValueId,
+    },
+    /// A consumer edge's flowing buffer version has a different shape than
+    /// the producer's carried generation for the value — the consumer cannot
+    /// bind a consistent generation (contract rule 3).
+    EdgeGenerationShapeMismatch {
+        value: SemanticValueId,
+        producer: LaunchId,
+        version: u32,
+    },
+    /// A producer writes the value in more than one generation matching one
+    /// flowing buffer version — the consumer binding is ambiguous (contract
+    /// rule 3).
+    AmbiguousEdgeGeneration {
+        value: SemanticValueId,
+        producer: LaunchId,
+        version: u32,
+    },
 }
 
 impl fmt::Display for DeviceProgramError {
@@ -401,6 +430,34 @@ impl fmt::Display for DeviceProgramError {
             } => write!(
                 f,
                 "observation fact declares buffer {buffer} version {version} read back at launch {at_launch}, but no result row declares it (F6)"
+            ),
+            Self::DanglingConsumer { launch } => write!(
+                f,
+                "launch {launch} is not a declared root and has no incoming dependency edge — a dangling consumer with no justifying producer (F3)"
+            ),
+            Self::UnboundEdgeBuffer { buffer } => write!(
+                f,
+                "dependency edge flows buffer {buffer}, which no semantic value is bound to (F3)"
+            ),
+            Self::MissingProducer { producer, value } => write!(
+                f,
+                "a consumer edge references semantic value {value} but its producer launch {producer} never writes it (missing producer) (F3)"
+            ),
+            Self::EdgeGenerationShapeMismatch {
+                value,
+                producer,
+                version,
+            } => write!(
+                f,
+                "the consumer edge for semantic value {value} flows buffer version {version} whose shape disagrees with the generation launch {producer} writes for the value (contract rule 3)"
+            ),
+            Self::AmbiguousEdgeGeneration {
+                value,
+                producer,
+                version,
+            } => write!(
+                f,
+                "the consumer edge for semantic value {value} cannot bind a generation: launch {producer} writes several generations matching buffer version {version} (contract rule 3)"
             ),
         }
     }

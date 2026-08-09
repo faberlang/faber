@@ -495,6 +495,9 @@ fn observation_naming_unknown_launch_fails_closed() {
             value: SemanticValueId(1),
             buffer: BufferId(1),
         }],
+        // The launch is justified (a declared root) so the graph is total;
+        // the observation still names a launch that does not exist (F5/F6).
+        roots: vec![LaunchId(1)],
         observations: vec![ObservationFact {
             buffer: BufferId(1),
             version: 1,
@@ -508,4 +511,172 @@ fn observation_naming_unknown_launch_fails_closed() {
             launch: LaunchId(9)
         })
     ));
+}
+
+// ── DDCP1-U2: explicit generations + edge-driven scheduling (contract
+//    rules 2/3, scheduling rules 2/3) ─────────────────────────────────────
+
+#[test]
+fn same_producer_duplicate_generation_row_fails_closed() {
+    // Every logical write is a NEW generation (F2): an identical
+    // (value, generation) row carried twice is a duplicated write even when
+    // the same launch claims both copies — never a silent dedupe.
+    let semantics = DeviceSemantics {
+        values: vec![value(
+            1,
+            "x",
+            SemanticValueOrigin::MirLocal {
+                function: MirFunctionId(0),
+                local: 0,
+            },
+        )],
+        generations: vec![
+            ValueGeneration {
+                value: SemanticValueId(1),
+                generation: 1,
+                element_ty: f32(),
+                element_count: 4,
+                produced_by: LaunchId(1),
+            },
+            ValueGeneration {
+                value: SemanticValueId(1),
+                generation: 1,
+                element_ty: f32(),
+                element_count: 4,
+                produced_by: LaunchId(1),
+            },
+        ],
+        ..DeviceSemantics::default()
+    };
+    assert!(matches!(
+        semantics.validate(&[LaunchId(1)]),
+        Err(DeviceProgramError::DuplicateGenerationProducer {
+            value: SemanticValueId(1),
+            generation: 1
+        })
+    ));
+}
+
+#[test]
+fn dangling_consumer_without_incoming_edge_fails_closed() {
+    // Scheduling rule 2: a non-root launch with no justifying incoming
+    // dependency edge is a dangling consumer.
+    let semantics = DeviceSemantics {
+        roots: vec![LaunchId(1)],
+        ..DeviceSemantics::default()
+    };
+    assert!(matches!(
+        semantics.validate(&[LaunchId(1), LaunchId(2)]),
+        Err(DeviceProgramError::DanglingConsumer { launch: LaunchId(2) })
+    ));
+}
+
+#[test]
+fn non_root_launch_with_incoming_edge_is_not_dangling() {
+    // A non-root launch justified by an incoming edge is not a dangling
+    // consumer (positive side of scheduling rule 2).
+    let launches: Vec<LaunchId> = vec![LaunchId(1), LaunchId(2)];
+    let semantics = ordered_chain_semantics(false);
+    semantics
+        .validate(&launches)
+        .expect("a launch with an incoming edge and a reachable root is justified");
+}
+
+#[test]
+fn consumed_value_without_producer_generation_fails_closed() {
+    // Scheduling rule 3: a value that is consumed but has no producer — the
+    // edge's producer launch never writes it (no carried generation).
+    let semantics = DeviceSemantics {
+        values: vec![value(
+            1,
+            "x",
+            SemanticValueOrigin::MirLocal {
+                function: MirFunctionId(0),
+                local: 0,
+            },
+        )],
+        bindings: vec![ValueBinding {
+            value: SemanticValueId(1),
+            buffer: BufferId(1),
+        }],
+        roots: vec![LaunchId(1)],
+        dependencies: vec![DependencyEdge {
+            producer: LaunchId(1),
+            consumer: LaunchId(2),
+            buffer: BufferId(1),
+            version: 1,
+        }],
+        ..DeviceSemantics::default()
+    };
+    assert!(matches!(
+        semantics.validate(&[LaunchId(1), LaunchId(2)]),
+        Err(DeviceProgramError::MissingProducer {
+            producer: LaunchId(1),
+            value: SemanticValueId(1),
+        })
+    ));
+}
+
+#[test]
+fn edge_buffer_without_value_binding_fails_closed() {
+    // Scheduling rule 3 + contract rule 3: an edge flowing a buffer no
+    // semantic value is bound to cannot inherit a value identity.
+    let semantics = DeviceSemantics {
+        roots: vec![LaunchId(1)],
+        dependencies: vec![DependencyEdge {
+            producer: LaunchId(1),
+            consumer: LaunchId(2),
+            buffer: BufferId(9),
+            version: 1,
+        }],
+        ..DeviceSemantics::default()
+    };
+    assert!(matches!(
+        semantics.validate(&[LaunchId(1), LaunchId(2)]),
+        Err(DeviceProgramError::UnboundEdgeBuffer { buffer: BufferId(9) })
+    ));
+}
+
+// ── DDCP1-U2: stable identity is origin-derived, never name-derived ──────
+
+#[test]
+fn rename_cannot_split_one_identity() {
+    // Contract rule 1: identity is derived from carried facts, never from
+    // names. Two values minted from ONE origin with DIFFERENT names still
+    // alias — a rename can never create a second identity.
+    let origin = SemanticValueOrigin::HostInput;
+    let semantics = DeviceSemantics {
+        values: vec![
+            value(1, "x", origin.clone()),
+            value(2, "renamed", origin),
+        ],
+        ..DeviceSemantics::default()
+    };
+    assert!(matches!(
+        semantics.validate(&[]),
+        Err(DeviceProgramError::SemanticOriginAliased {
+            first: SemanticValueId(1),
+            second: SemanticValueId(2),
+            ..
+        })
+    ));
+}
+
+#[test]
+fn identical_fact_sets_validate_identically_across_rebuilds() {
+    // Contract rule 1 (regression): identity is a carried fact, so two
+    // materializations of the same source facts carry the same ids and
+    // validate identically — declaration/rebuild position never changes the
+    // verdict.
+    let first = ordered_chain_semantics(false);
+    let second = ordered_chain_semantics(false);
+    let launches: Vec<LaunchId> = vec![LaunchId(1), LaunchId(2)];
+    first
+        .validate(&launches)
+        .expect("first build validates");
+    second
+        .validate(&launches)
+        .expect("second identical build validates identically");
+    assert_eq!(first.values[0].id, second.values[0].id);
+    assert_eq!(first.values[0].origin, second.values[0].origin);
 }

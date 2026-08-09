@@ -383,7 +383,10 @@ impl DeviceSemantics {
     /// Rule group F2: every logical write produces an explicit generation;
     /// zero/unset generations are rejected; a (value, generation) has exactly
     /// one producer — a second producer of an existing generation is
-    /// rejected.
+    /// rejected (each write is a NEW generation, the per-storage-location
+    /// monotone counter). Declaration order never changes the verdict;
+    /// monotonicity/comparability for consumers is completed by the DDCP1-U2
+    /// consumer-binding cross-check (contract rule 3).
     fn validate_generations(&self) -> Result<(), DeviceProgramError> {
         for generation in &self.generations {
             if generation.generation == 0 {
@@ -397,15 +400,16 @@ impl DeviceSemantics {
                 });
             }
         }
-        for left in &self.generations {
-            for right in &self.generations {
-                if left.value == right.value
-                    && left.generation == right.generation
-                    && left.produced_by != right.produced_by
+        // Every logical write is a NEW generation (F2): a (value, generation)
+        // pair is carried at most once, regardless of which launch claims it.
+        for left in 0..self.generations.len() {
+            for right in (left + 1)..self.generations.len() {
+                if self.generations[left].value == self.generations[right].value
+                    && self.generations[left].generation == self.generations[right].generation
                 {
                     return Err(DeviceProgramError::DuplicateGenerationProducer {
-                        value: left.value,
-                        generation: left.generation,
+                        value: self.generations[left].value,
+                        generation: self.generations[left].generation,
                     });
                 }
             }
@@ -465,6 +469,27 @@ impl DeviceSemantics {
             }
         }
         self.reject_dependency_cycles()?;
+        // DDCP1-U2 / contract scheduling rule 3: a value that is consumed has
+        // a producer — a missing producer fails closed. The edge's buffer
+        // binds exactly one value, and the producer launch must actually
+        // write it (a carried generation).
+        for edge in &self.dependencies {
+            let Some(binding) = self
+                .bindings
+                .iter()
+                .find(|binding| binding.buffer == edge.buffer)
+            else {
+                return Err(DeviceProgramError::UnboundEdgeBuffer { buffer: edge.buffer });
+            };
+            if !self.generations.iter().any(|generation| {
+                generation.value == binding.value && generation.produced_by == edge.producer
+            }) {
+                return Err(DeviceProgramError::MissingProducer {
+                    producer: edge.producer,
+                    value: binding.value,
+                });
+            }
+        }
         // Complete inputs / missing dependency: every producer launch must be
         // reachable from a root through the carried graph; a launch that
         // produces a value but hangs off the graph is a missing dependency.
@@ -474,6 +499,17 @@ impl DeviceSemantics {
                     launch: generation.produced_by,
                     value: generation.value,
                 });
+            }
+        }
+        // DDCP1-U2 / contract scheduling rule 2: every non-root launch must be
+        // justified by an incoming dependency edge — a launch with no
+        // justification is a dangling consumer.
+        for launch in launches {
+            if self.roots.contains(launch) {
+                continue;
+            }
+            if !self.dependencies.iter().any(|edge| edge.consumer == *launch) {
+                return Err(DeviceProgramError::DanglingConsumer { launch: *launch });
             }
         }
         Ok(())

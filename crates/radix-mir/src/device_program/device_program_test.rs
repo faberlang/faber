@@ -5,8 +5,8 @@ use crate::abi::{
     MirWorkgroupSize,
 };
 use crate::device_semantics::{
-    DeviceSemantics, InitializationFact, InitializationPolicy, ObservationFact, SemanticValue,
-    SemanticValueId, SemanticValueOrigin, ValueBinding, ValueGeneration,
+    DependencyEdge, DeviceSemantics, InitializationFact, InitializationPolicy, ObservationFact,
+    SemanticValue, SemanticValueId, SemanticValueOrigin, ValueBinding, ValueGeneration,
 };
 use crate::kernel_plan::{CollectionKernelPlan, ReduceOp};
 use crate::layout::MirTensorStorageLayout;
@@ -1616,4 +1616,210 @@ fn axes_vary_independently_without_cross_rewrite() {
         semantics.generations[0].generation, 2,
         "relabeling a lifetime must not rewrite the generation"
     );
+}
+
+// -----------------------------------------------------------------------
+// DDCP1-U2: consumer binds identity + generation from its producer edge
+// (contract rule 3; scheduling rules 2/3) — the edge↔value↔generation
+// cross-check in DeviceProgram::validate_with_semantics.
+// -----------------------------------------------------------------------
+
+/// A two-kernel chain: kernel 0 writes intermediate buffer 0 version 1;
+/// kernel 1 reads it and writes output buffer 1 version 1. Launches
+/// l0 → l1. The carried semantics bind value 1 to buffer 0 (generation 1
+/// produced by l0, shape (f32, 4)) and value 2 to buffer 1 (generation 1
+/// produced by l1, shape (f32, 2)); root l0; one edge l0→l1 flowing
+/// buffer 0 version 1. The pair validates together; tests mutate exactly
+/// one fact to prove each fail-closed rule.
+fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
+    let mut types = TypeTable::new();
+    let element_ty = f32_ty(&mut types);
+
+    let launch_plan = |x: u64| KernelLaunchPlan {
+        workgroup: MirWorkgroupSize {
+            x: u32::try_from(x).expect("workgroup fits u32"),
+            y: 1,
+            z: 1,
+        },
+        dispatch_size: MirKernelDispatchSize { x, y: 1, z: 1 },
+        workgroup_count: MirKernelWorkgroupCount { x: 1, y: 1, z: 1 },
+    };
+
+    let intermediate = identity(0, "intermediate", BufferRole::InOut, BufferLifetime::PerStep);
+    let output = identity(1, "output", BufferRole::Output, BufferLifetime::ObservationPoint);
+
+    let mut program = DeviceProgram::new(DeviceProgramLifetime::SingleRun);
+    program.kernels = vec![
+        KernelUnit {
+            function: MirFunctionId(0),
+            entry: "chain_producer".to_owned(),
+            plan: CollectionKernelPlan::Elementwise,
+            resources: vec![DeviceResource {
+                buffer: intermediate.clone(),
+                version: version(1, element_ty.clone(), 4),
+                binding: Binding { group: 0, binding: 0 },
+                access: MirKernelResourceAccess::Write,
+            }],
+            launch: launch_plan(4),
+        },
+        KernelUnit {
+            function: MirFunctionId(1),
+            entry: "chain_consumer".to_owned(),
+            plan: CollectionKernelPlan::Elementwise,
+            resources: vec![
+                DeviceResource {
+                    buffer: intermediate.clone(),
+                    version: version(1, element_ty.clone(), 4),
+                    binding: Binding { group: 0, binding: 0 },
+                    access: MirKernelResourceAccess::Read,
+                },
+                DeviceResource {
+                    buffer: output.clone(),
+                    version: version(1, element_ty.clone(), 2),
+                    binding: Binding { group: 0, binding: 1 },
+                    access: MirKernelResourceAccess::Write,
+                },
+            ],
+            launch: launch_plan(2),
+        },
+    ];
+    program.launches = vec![
+        LaunchUnit { id: LaunchId(0), kernel_index: 0 },
+        LaunchUnit { id: LaunchId(1), kernel_index: 1 },
+    ];
+
+    let semantics = DeviceSemantics {
+        values: vec![
+            SemanticValue {
+                id: SemanticValueId(1),
+                name: "intermediate".to_owned(),
+                element_ty: element_ty.clone(),
+                element_count: 4,
+                origin: SemanticValueOrigin::MirLocal {
+                    function: MirFunctionId(0),
+                    local: 0,
+                },
+            },
+            SemanticValue {
+                id: SemanticValueId(2),
+                name: "output".to_owned(),
+                element_ty: element_ty.clone(),
+                element_count: 2,
+                origin: SemanticValueOrigin::Synthetic {
+                    label: "chain-output".to_owned(),
+                },
+            },
+        ],
+        bindings: vec![
+            ValueBinding { value: SemanticValueId(1), buffer: BufferId(0) },
+            ValueBinding { value: SemanticValueId(2), buffer: BufferId(1) },
+        ],
+        generations: vec![
+            ValueGeneration {
+                value: SemanticValueId(1),
+                generation: 1,
+                element_ty: element_ty.clone(),
+                element_count: 4,
+                produced_by: LaunchId(0),
+            },
+            ValueGeneration {
+                value: SemanticValueId(2),
+                generation: 1,
+                element_ty: element_ty.clone(),
+                element_count: 2,
+                produced_by: LaunchId(1),
+            },
+        ],
+        roots: vec![LaunchId(0)],
+        dependencies: vec![DependencyEdge {
+            producer: LaunchId(0),
+            consumer: LaunchId(1),
+            buffer: BufferId(0),
+            version: 1,
+        }],
+        ..DeviceSemantics::default()
+    };
+
+    program
+        .validate_with_semantics(&semantics)
+        .expect("chain program + carried semantics validate together");
+    (program, semantics)
+}
+
+#[test]
+fn consumer_edge_binds_value_and_generation() {
+    // Contract rule 3 (positive): the consumer edge inherits the value
+    // identity (buffer 0 → value 1) and the generation produced by its
+    // producer edge (generation 1, produced by launch 0) unambiguously.
+    let (program, semantics) = chain_program_with_semantics();
+    program
+        .validate_with_semantics(&semantics)
+        .expect("the consumer binding is unambiguous and consistent");
+}
+
+#[test]
+fn consumer_edge_missing_producer_fails_closed() {
+    // Scheduling rule 3: an edge flowing a buffer version the program never
+    // produces is a missing producer.
+    let (program, mut semantics) = chain_program_with_semantics();
+    semantics.dependencies[0].version = 2;
+    assert!(matches!(
+        program.validate_with_semantics(&semantics),
+        Err(DeviceProgramError::MissingProducer {
+            producer: LaunchId(0),
+            value: SemanticValueId(1),
+        })
+    ));
+}
+
+#[test]
+fn edge_generation_shape_mismatch_fails_closed() {
+    // Contract rule 3: the producer's carried generation must match the
+    // flowing buffer version's shape; a mismatch cannot bind a consistent
+    // generation.
+    let (program, mut semantics) = chain_program_with_semantics();
+    semantics.generations[0].element_count = 8;
+    assert!(matches!(
+        program.validate_with_semantics(&semantics),
+        Err(DeviceProgramError::EdgeGenerationShapeMismatch {
+            value: SemanticValueId(1),
+            producer: LaunchId(0),
+            version: 1,
+        })
+    ));
+}
+
+#[test]
+fn ambiguous_edge_generation_fails_closed() {
+    // Contract rule 3: two generations of the value written by the producer
+    // both matching the flowing version make the consumer binding ambiguous.
+    let (program, mut semantics) = chain_program_with_semantics();
+    semantics.generations.push(ValueGeneration {
+        value: SemanticValueId(1),
+        generation: 2,
+        element_ty: semantics.generations[0].element_ty.clone(),
+        element_count: 4,
+        produced_by: LaunchId(0),
+    });
+    assert!(matches!(
+        program.validate_with_semantics(&semantics),
+        Err(DeviceProgramError::AmbiguousEdgeGeneration {
+            value: SemanticValueId(1),
+            producer: LaunchId(0),
+            version: 1,
+        })
+    ));
+}
+
+#[test]
+fn scheduling_is_driven_by_edges_not_launch_declaration_order() {
+    // Scheduling rule 1 (regression): the same edge set with a permuted
+    // launch declaration order and a permuted edge declaration order
+    // validates identically — declaration order never decides scheduling.
+    let (mut program, mut semantics) = chain_program_with_semantics();
+    program.launches.swap(0, 1);
+    semantics.dependencies.reverse();
+    program
+        .validate_with_semantics(&semantics)
+        .expect("permuted launch/edge declaration order validates identically");
 }

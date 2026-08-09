@@ -294,6 +294,94 @@ impl DeviceProgram {
                 });
             }
         }
+        // DDCP1-U2 / contract rule 3: a consumer binds the identity and
+        // generation produced by its producer edge — inherited unambiguously
+        // from the dependency graph (the value's buffer binding, the
+        // producer's carried generation, and the program's version chain must
+        // agree on exactly one generation).
+        self.validate_edge_bindings(semantics)?;
+        Ok(())
+    }
+
+    /// DDCP1-U2 / contract rule 3 — consumer binding cross-check.
+    ///
+    /// For every carried dependency edge the consumer's logical value is
+    /// inherited unambiguously: the edge's buffer binds exactly one value,
+    /// the producer launch actually wrote the flowing buffer version (program
+    /// version chain), and exactly one of the producer's carried generations
+    /// for that value matches the flowing version's shape. Zero matches is a
+    /// missing producer (or a shape contradiction), more than one is an
+    /// ambiguous binding — both fail closed.
+    fn validate_edge_bindings(&self, semantics: &DeviceSemantics) -> Result<(), DeviceProgramError> {
+        let registry = self.buffer_registry();
+        for edge in &semantics.dependencies {
+            let Some(binding) = semantics
+                .bindings
+                .iter()
+                .find(|binding| binding.buffer == edge.buffer)
+            else {
+                return Err(DeviceProgramError::UnboundEdgeBuffer { buffer: edge.buffer });
+            };
+            let value = binding.value;
+
+            let Some(entry) = registry.buffer(edge.buffer) else {
+                return Err(DeviceProgramError::MissingProducer {
+                    producer: edge.producer,
+                    value,
+                });
+            };
+            let Some(version) = entry.versions.iter().find(|version| version.version.version == edge.version)
+            else {
+                return Err(DeviceProgramError::MissingProducer {
+                    producer: edge.producer,
+                    value,
+                });
+            };
+            if !version.produced_by.contains(&edge.producer) {
+                return Err(DeviceProgramError::MissingProducer {
+                    producer: edge.producer,
+                    value,
+                });
+            }
+
+            let matching: Vec<u32> = semantics
+                .generations
+                .iter()
+                .filter(|generation| {
+                    generation.value == value
+                        && generation.produced_by == edge.producer
+                        && generation.element_ty == version.version.element_ty
+                        && generation.element_count == version.version.element_count
+                })
+                .map(|generation| generation.generation)
+                .collect();
+            match matching.len() {
+                0 => {
+                    let producer_writes_value = semantics.generations.iter().any(|generation| {
+                        generation.value == value && generation.produced_by == edge.producer
+                    });
+                    if producer_writes_value {
+                        return Err(DeviceProgramError::EdgeGenerationShapeMismatch {
+                            value,
+                            producer: edge.producer,
+                            version: edge.version,
+                        });
+                    }
+                    return Err(DeviceProgramError::MissingProducer {
+                        producer: edge.producer,
+                        value,
+                    });
+                }
+                1 => {}
+                _ => {
+                    return Err(DeviceProgramError::AmbiguousEdgeGeneration {
+                        value,
+                        producer: edge.producer,
+                        version: edge.version,
+                    });
+                }
+            }
+        }
         Ok(())
     }
 }
