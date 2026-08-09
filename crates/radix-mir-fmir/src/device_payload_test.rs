@@ -1271,6 +1271,85 @@ fn reflection_round_trips_and_folds_into_packet_sha256() {
 }
 
 #[test]
+fn reflection_content_folds_in_canonical_order_invariant() {
+    // DDCP4-U4 content: the reflection fold is over the CANONICAL order of
+    // the carrier rows — two packets whose reflected kernels carry the same
+    // facts in different orders produce an identical packet identity after
+    // `canonicalize_artifact` (equivalent sets always hash to the same
+    // identity; admission re-verifies the canonical order regardless).
+    let reflection_a = FmirArtifactReflection {
+        v: crate::schema::ARTIFACT_REFLECTION_VERSION,
+        kernels: vec![
+            FmirReflectedKernel {
+                function: "add".to_owned(),
+                entry_name: "add".to_owned(),
+                resources: vec![
+                    FmirReflectedResource {
+                        name: "z".to_owned(),
+                        binding: 1,
+                    },
+                    FmirReflectedResource {
+                        name: "a".to_owned(),
+                        binding: 0,
+                    },
+                ],
+            },
+            FmirReflectedKernel {
+                function: "mul".to_owned(),
+                entry_name: "mul".to_owned(),
+                resources: vec![FmirReflectedResource {
+                    name: "b".to_owned(),
+                    binding: 0,
+                }],
+            },
+        ],
+    };
+    let reflection_b = FmirArtifactReflection {
+        v: crate::schema::ARTIFACT_REFLECTION_VERSION,
+        kernels: vec![
+            FmirReflectedKernel {
+                function: "mul".to_owned(),
+                entry_name: "mul".to_owned(),
+                resources: vec![FmirReflectedResource {
+                    name: "b".to_owned(),
+                    binding: 0,
+                }],
+            },
+            FmirReflectedKernel {
+                function: "add".to_owned(),
+                entry_name: "add".to_owned(),
+                resources: vec![
+                    FmirReflectedResource {
+                        name: "a".to_owned(),
+                        binding: 0,
+                    },
+                    FmirReflectedResource {
+                        name: "z".to_owned(),
+                        binding: 1,
+                    },
+                ],
+            },
+        ],
+    };
+
+    let mut packet_a = with_computed_digests(FmirDeviceArtifact {
+        reflection: Some(reflection_a),
+        ..metal_artifact("kernel void add() {}")
+    });
+    packet_a.canonicalize_artifact();
+    let mut packet_b = with_computed_digests(FmirDeviceArtifact {
+        reflection: Some(reflection_b),
+        ..metal_artifact("kernel void add() {}")
+    });
+    packet_b.canonicalize_artifact();
+
+    assert_eq!(
+        packet_a.packet_sha256, packet_b.packet_sha256,
+        "equivalent reflection content in different orders must fold to one packet identity"
+    );
+}
+
+#[test]
 fn unknown_selection_is_representable_and_rejected_at_resolution() {
     // DDCP2-U2: the selection enum migrates to backend-id enum semantics —
     // an unknown selection id is `Unknown(id)`, representable on the image

@@ -15,6 +15,13 @@ serde_json = "1"
 sha2 = "0.10"
 toml = "1.1.2"
 
+[dev-dependencies]
+# DDCP4-U4 shared conformance fixture: drives ONE canonical DeviceProgram
+# through BOTH leaf emitters. The dev-dependency cycle (the leaves depend on
+# radix-mir-fmir) is the cargo-supported test-only exception.
+radix-hir = { path = "../radix-hir" }
+radix-lexer = { path = "../radix-lexer" }
+
 [lints.clippy]
 # Group first at lower priority so per-lint allows below win package-wide.
 pedantic = { level = "deny", priority = -1 }

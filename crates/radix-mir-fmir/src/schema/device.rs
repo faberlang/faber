@@ -145,6 +145,53 @@ pub struct FmirReflectedKernel {
     pub resources: Vec<FmirReflectedResource>,
 }
 
+impl FmirArtifactReflection {
+    /// Fold the leaf-produced typed reflection (`MirGpuReflection`) into the
+    /// carrier (DDCP4-U4 content): one row per reflected kernel, mapping the
+    /// identity-bearing fields — kernel function identity, emitted entry
+    /// name, and declared resource name/binding.
+    ///
+    /// WHY the version stays at [`ARTIFACT_REFLECTION_VERSION`]: the leaf
+    /// content fills the existing v1 carrier shape exactly; it does not
+    /// extend it (the DDCP3-U0 (a) ratchet rule — bump only on shape
+    /// extension, never on content fill). Both leaves today emit the kernel
+    /// unit's logical entry as the entry symbol (Metal: identity map; CUDA:
+    /// entry → emitted symbol), so the logical entry is the kernel's stable
+    /// function identity in the FMIR image — the mapping never derives it
+    /// from emitted text.
+    #[must_use]
+    pub fn from_mir_reflection(reflection: &radix_mir::abi::MirGpuReflection) -> Self {
+        Self {
+            v: ARTIFACT_REFLECTION_VERSION,
+            kernels: reflection
+                .kernels
+                .iter()
+                .map(FmirReflectedKernel::from_mir_kernel)
+                .collect(),
+        }
+    }
+}
+
+impl FmirReflectedKernel {
+    fn from_mir_kernel(kernel: &radix_mir::abi::MirKernelReflection) -> Self {
+        Self {
+            function: kernel.entry_name.clone(),
+            entry_name: kernel.entry_name.clone(),
+            resources: kernel
+                .resources
+                .iter()
+                .map(|resource| FmirReflectedResource {
+                    name: resource
+                        .source_name
+                        .clone()
+                        .unwrap_or_else(|| format!("binding:{}", resource.binding)),
+                    binding: resource.binding,
+                })
+                .collect(),
+        }
+    }
+}
+
 /// One declared resource binding of a reflected kernel row.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

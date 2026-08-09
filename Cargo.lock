@@ -1215,6 +1215,8 @@ name = "radix-mir-fmir"
 version = "0.80.0"
 dependencies = [
  "postcard",
+ "radix-hir",
+ "radix-lexer",
  "radix-mir",
  "radix-types",
  "serde",

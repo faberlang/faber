@@ -4,9 +4,37 @@
 //! never silently widened.
 
 use super::{
+    FmirArtifactReflection, FmirReflectedKernel, FmirReflectedResource,
     WireInputUpdateCadence, WireInvocationMode, WireKvCacheDtype, WireKvCacheLayout,
     WireKvReservePolicy, WireSessionInput, WireSessionObservationCadence,
 };
+
+#[test]
+fn reflection_carrier_content_round_trips_through_the_wire() {
+    // DDCP4-U4 content: the reflection carrier (with the leaf-mapped content
+    // shape) survives the binary wire verbatim with its own version ratchet.
+    let reflection = FmirArtifactReflection {
+        v: super::super::ARTIFACT_REFLECTION_VERSION,
+        kernels: vec![FmirReflectedKernel {
+            function: "addita".to_owned(),
+            entry_name: "addita".to_owned(),
+            resources: vec![
+                FmirReflectedResource {
+                    name: "x".to_owned(),
+                    binding: 0,
+                },
+                FmirReflectedResource {
+                    name: "y".to_owned(),
+                    binding: 1,
+                },
+            ],
+        }],
+    };
+    let bytes = postcard::to_allocvec(&reflection).expect("reflection serializes");
+    let decoded: FmirArtifactReflection = postcard::from_bytes(&bytes).expect("reflection decodes");
+    assert_eq!(decoded, reflection);
+    assert_eq!(decoded.v, super::super::ARTIFACT_REFLECTION_VERSION);
+}
 
 #[test]
 fn session_wire_types_round_trip_through_postcard() {
