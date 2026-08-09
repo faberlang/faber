@@ -1076,12 +1076,16 @@ impl Validator<'_, '_> {
                     "numeric rounding result is not numerus",
                 );
                 if let Some(receiver_ty) = first_arg_ty {
-                    self.require_exact(
-                        receiver_ty,
-                        self.primitive(Primitive::Fractus),
-                        span,
-                        "numeric rounding receiver is not fractus",
-                    );
+                    if !matches!(
+                        self.type_kind(receiver_ty),
+                        Type::Primitive(Primitive::Fractus)
+                            | Type::SizedNumeric(Primitive::Fractus, _)
+                    ) {
+                        self.error(
+                            span,
+                            "numeric rounding receiver is not fractus",
+                        );
+                    }
                 }
             }
             MirCollectionOp::TensorShape => {

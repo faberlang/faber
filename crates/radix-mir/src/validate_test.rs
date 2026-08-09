@@ -2598,6 +2598,76 @@ fn array_mty(types: &mut TypeTable) -> MirType {
     MirType::semantic(types.array(types.primitive(Primitive::Numerus)))
 }
 
+/// A single rounding-op program: one scalar receiver local at local 0 and a
+/// destination local typed with the distinct rounding result type (rounding
+/// maps fractus-family receivers to the plain `numerus` result).
+fn rounding_collection_program(
+    types: &mut TypeTable,
+    op: MirCollectionOp,
+    receiver_ty: MirType,
+    return_ty: MirType,
+) -> MirProgram {
+    let locals = vec![
+        MirLocal {
+            id: MirLocalId(0),
+            ty: receiver_ty,
+            name: None,
+            mutable: false,
+            span: Span::default(),
+        },
+        // Destination local for the non-vacuum rounding result.
+        MirLocal {
+            id: MirLocalId(2),
+            ty: return_ty,
+            name: None,
+            mutable: false,
+            span: Span::default(),
+        },
+    ];
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals,
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: Some(MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(2)),
+                            projections: vec![],
+                        }),
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Collection(op),
+                            args: vec![MirOperand::Place(MirPlace {
+                                base: MirPlaceBase::Local(MirLocalId(0)),
+                                projections: vec![],
+                            })],
+                            return_ty,
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    }
+}
+
 #[test]
 fn test_rms_norm_valid_rank2_consts_and_gamma() {
     let mut types = TypeTable::new();
@@ -2695,6 +2765,74 @@ fn test_gather_valid_ids_array_operand() {
     });
     let errors = validate(&program, &types);
     assert!(errors.is_empty(), "expected no errors, got: {errors:?}");
+}
+
+// ── Rounding intrinsics: fractus-family receivers ──────────────────────
+// The registry deliberately maps sized-fractus receivers (f32/f64) to the
+// `Fractus` receiver slot for the rounding helpers; MIR validation must
+// accept a `SizedNumeric(Fractus, _)` receiver (sibling to the
+// Minimum/Maximum arm) while keeping the plain `numerus` result.
+
+const ROUNDING_OPS: [MirCollectionOp; 4] = [
+    MirCollectionOp::Round,
+    MirCollectionOp::Floor,
+    MirCollectionOp::Ceiling,
+    MirCollectionOp::Truncate,
+];
+
+fn f32_receiver_mty(types: &mut TypeTable) -> MirType {
+    MirType::semantic(types.sized_numeric(Primitive::Fractus, radix_types::NumericWidth::F32))
+}
+
+fn numerus_mty(types: &mut TypeTable) -> MirType {
+    MirType::semantic(types.primitive(Primitive::Numerus))
+}
+
+#[test]
+fn test_rounding_f32_receiver_valid_for_all_rounding_ops() {
+    for op in ROUNDING_OPS {
+        let mut types = TypeTable::new();
+        let receiver_ty = f32_receiver_mty(&mut types);
+        let return_ty = numerus_mty(&mut types);
+        let program = rounding_collection_program(&mut types, op, receiver_ty, return_ty);
+        let errors = validate(&program, &types);
+        assert!(
+            errors.is_empty(),
+            "expected a valid f32 receiver for {op:?}, got: {errors:?}"
+        );
+    }
+}
+
+#[test]
+fn test_rounding_plain_fractus_receiver_valid_for_all_rounding_ops() {
+    for op in ROUNDING_OPS {
+        let mut types = TypeTable::new();
+        let receiver_ty = MirType::semantic(types.primitive(Primitive::Fractus));
+        let return_ty = numerus_mty(&mut types);
+        let program = rounding_collection_program(&mut types, op, receiver_ty, return_ty);
+        let errors = validate(&program, &types);
+        assert!(
+            errors.is_empty(),
+            "expected a valid fractus receiver for {op:?}, got: {errors:?}"
+        );
+    }
+}
+
+#[test]
+fn test_rounding_rejects_numerus_receiver() {
+    for op in ROUNDING_OPS {
+        let mut types = TypeTable::new();
+        let receiver_ty = numerus_mty(&mut types);
+        let return_ty = numerus_mty(&mut types);
+        let program = rounding_collection_program(&mut types, op, receiver_ty, return_ty);
+        let errors = validate(&program, &types);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("numeric rounding receiver is not fractus")),
+            "expected the fractus-receiver diagnostic for {op:?}, got: {errors:?}"
+        );
+    }
 }
 
 // -----------------------------------------------------------------------
