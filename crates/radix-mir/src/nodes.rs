@@ -985,6 +985,9 @@ pub enum MirCollectionOp {
     Keys,
     /// Map value snapshot used by `itera ex` over `tabula<K,V>`.
     Values,
+    /// Regex `consentit`: whether the `regex` receiver's pattern matches a
+    /// `textus` argument (the Rust `regex` crate `is_match` semantics).
+    RegexMatches,
 }
 
 /// Provider classification for host dispatch routing.

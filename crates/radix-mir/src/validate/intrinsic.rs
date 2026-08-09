@@ -514,7 +514,8 @@ impl Validator<'_, '_> {
             | MirCollectionOp::TensorMatMul
             | MirCollectionOp::TensorCruxEntropia
             | MirCollectionOp::TensorGather
-            | MirCollectionOp::TensorDiv => 2,
+            | MirCollectionOp::TensorDiv
+            | MirCollectionOp::RegexMatches => 2,
             MirCollectionOp::SparseGet
             | MirCollectionOp::IntervalIntersect
             | MirCollectionOp::IntervalUnion
@@ -890,6 +891,32 @@ impl Validator<'_, '_> {
                             self.primitive(Primitive::Textus),
                             span,
                             "text predicate argument is not textus",
+                        );
+                    }
+                }
+            }
+            MirCollectionOp::RegexMatches => {
+                self.require_exact(
+                    call.return_ty,
+                    self.primitive(Primitive::Bivalens),
+                    span,
+                    "regex consentit result is not bivalens",
+                );
+                if let Some(receiver_ty) = first_arg_ty {
+                    self.require_exact(
+                        receiver_ty,
+                        self.primitive(Primitive::Regex),
+                        span,
+                        "regex consentit receiver is not regex",
+                    );
+                }
+                if let Some(arg) = call.args.get(1) {
+                    if let Some(arg_ty) = self.validate_operand(scope, arg, span) {
+                        self.require_exact(
+                            arg_ty,
+                            self.primitive(Primitive::Textus),
+                            span,
+                            "regex consentit argument is not textus",
                         );
                     }
                 }

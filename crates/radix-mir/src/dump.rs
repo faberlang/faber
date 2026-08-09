@@ -635,6 +635,7 @@ fn collection_op(op: MirCollectionOp) -> &'static str {
         MirCollectionOp::IntervalMaterialize => "interval_materialize",
         MirCollectionOp::Keys => "keys",
         MirCollectionOp::Values => "values",
+        MirCollectionOp::RegexMatches => "regex_matches",
     }
 }
 
