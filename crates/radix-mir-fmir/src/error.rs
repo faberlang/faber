@@ -42,9 +42,57 @@ pub enum FmirImageError {
     /// A device runtime requirement is not a known `device:` capability
     /// (`device:metal`, `device:cuda`). Unknown `device:` requirements fail
     /// admission at package load (N1.7).
-    UnsupportedRuntimeRequirement {
-        /// The rejected requirement string.
-        requirement: String,
+    /// A backend artifact's stored identity digest disagrees with the
+    /// recomputed digest (contract §IdentityDomains rule 5; B3): the
+    /// `content_sha256` is re-verified against the canonical decoded raw
+    /// payload bytes, the `packet_sha256` against the versioned artifact
+    /// metadata + `content_sha256`. Provenance is verified, not decorative.
+    ArtifactDigestMismatch {
+        /// Backend the mismatched artifact declares.
+        backend: String,
+        /// The digest field at fault (`content_sha256` or `packet_sha256`).
+        field: &'static str,
+        /// Digest stored in the image.
+        stored: String,
+        /// Digest recomputed from the artifact.
+        computed: String,
+    },
+
+    /// The stage/provenance rule is violated: a `FinalizedBinary` artifact
+    /// must carry its hash-bound parent `compiler_input_packet_sha256`
+    /// (never silently replaced), a `CompilerInput` artifact must not.
+    CompilerInputProvenance {
+        /// Backend of the offending artifact.
+        backend: String,
+        /// The provenance rule violated.
+        detail: String,
+    },
+
+    /// An artifact's typed target feature is not known to the compiled-in
+    /// leaves (DDCP2-U3). Unknown features are rejected honestly, never
+    /// guessed, never silently dropped.
+    UnsupportedTargetFeature {
+        /// The unknown feature id.
+        feature: String,
+    },
+
+    /// A compiled-in leaf artifact declares a target id that is not its
+    /// leaf's target (exhaustive compiled-in validation).
+    IncompatibleTargetId {
+        /// Backend of the offending artifact.
+        backend: String,
+        /// Target id the artifact declares.
+        target: String,
+        /// The compiled-in leaf's expected target id.
+        expected: String,
+    },
+
+    /// An explicit backend selection names no artifact of the selected
+    /// backend (DDCP2-U3): a missing artifact fails closed with the named
+    /// rule.
+    MissingArtifactForSelection {
+        /// The selected backend id.
+        selection: String,
     },
 
     /// A backend artifact's explicit payload-encoding declaration is
@@ -180,9 +228,34 @@ impl fmt::Display for FmirImageError {
                     "unsupported FMIR image toolchain {found}; expected {expected}"
                 )
             }
-            Self::UnsupportedRuntimeRequirement { requirement } => write!(
+            Self::ArtifactDigestMismatch {
+                backend,
+                field,
+                stored,
+                computed,
+            } => write!(
                 f,
-                "unsupported FMIR device runtime requirement `{requirement}` (expected `device:metal` or `device:cuda`)"
+                "FMIR device artifact `{backend}` {field} mismatch (stored {stored}, recomputed {computed}) — digests cover decoded bytes, never the transport spelling (contract §IdentityDomains rule 5)"
+            ),
+            Self::CompilerInputProvenance { backend, detail } => write!(
+                f,
+                "FMIR device artifact `{backend}` provenance rule violated: {detail}"
+            ),
+            Self::UnsupportedTargetFeature { feature } => write!(
+                f,
+                "FMIR device artifact declares target feature `{feature}`, which is not known to the compiled-in leaves — representable and rejected honestly, never guessed (DDCP2-U3 typed target features)"
+            ),
+            Self::IncompatibleTargetId {
+                backend,
+                target,
+                expected,
+            } => write!(
+                f,
+                "FMIR device artifact `{backend}` declares target id `{target}`, but the compiled-in leaf's target is `{expected}` — exhaustive compiled-in validation fails closed"
+            ),
+            Self::MissingArtifactForSelection { selection } => write!(
+                f,
+                "FMIR device backend selection `{selection}` has no artifact of that backend — a missing artifact fails closed (DDCP2-U3 selection validation)"
             ),
             Self::ArtifactEncodingMismatch { backend, detail } => {
                 write!(

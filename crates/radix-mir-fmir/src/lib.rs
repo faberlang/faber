@@ -19,22 +19,24 @@ pub mod schema;
 pub use codec::{decode_binary_image, decode_text_image, encode_binary_image, encode_text_image};
 pub use error::FmirImageError;
 pub use schema::{
-    canonical_program_bytes, device_identity_hash, fnv1a64, fnv1a64_blob_hash,
-    is_known_device_requirement, is_known_host_requirement, is_known_requirement,
-    FmirBinaryImageFile, FmirDeviceArtifact, FmirDeviceArtifactsSection, FmirDeviceBackend,
-    FmirDeviceInput, FmirDeviceProgramSection, FmirDeviceSection, FmirDeviceSelection,
-    FmirDeviceSymbol, FmirTextCliOperand, FmirTextCliRootSection, FmirTextCliSection,
+    canonical_program_bytes, canonical_unpadded_base64, content_sha256, device_identity_hash,
+    is_known_host_requirement, is_known_target_feature, packet_sha256, sha256_digest,
+    validate_compiled_in_target, validate_target_features, DeviceArtifactFormat,
+    DevicePayloadEncoding, DevicePayloadEncodingError, DeviceTargetId, FmirBinaryImageFile,
+    FmirDeviceArtifact, FmirDeviceArtifactsSection, FmirDeviceBackend, FmirDeviceInput,
+    FmirDeviceProgramSection, FmirDeviceSection, FmirDeviceSelection, FmirDeviceSymbol,
+    FmirTextCliOperand, FmirTextCliRootSection, FmirTextCliSection,
     FmirTextCliValueType, FmirTextImageFile, FmirTextProgramSection, FmirTextRuntimeSection,
     FmirTextSourceIdentity, FmirTextSourcesSection, FmirTextToolchainSection, FmirTextTypesSection,
-    WireBarrierPhase, WireBarrierPoint, WireBinding, WireBufferIdentity, WireBufferLifetime,
-    WireBufferRole, WireBufferVersion, WireCollectionKernelPlan, WireDependencyEdge,
-    WireDeviceProgram, WireDeviceResource, WireDispatchSize, WireInitializationPolicy,
-    WireKernelLaunchPlan, WireKernelUnit, WireLaunchUnit, WireMatMulPlan, WireMatMulSharedMemory,
-    WireObservationCadence, WireObservationFact, WireOobPaddingPolicy, WireProgramLifetime,
-    WireReduceOp, WireReductionPlan, WireResourceAccess, WireResultBuffer, WireSemanticValue,
-    WireSemanticValueOrigin, WireSharedMemoryLayout, WireStorageLayout, WireTransposePlan,
-    WireWorkgroupCount, WireWorkgroupSize, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, FNV1A64_OFFSET,
-    FNV1A64_PRIME, PACKAGE_MIR_ARTIFACT_VERSION,
+    MaterializationStage, WireBarrierPhase, WireBarrierPoint, WireBinding, WireBufferIdentity,
+    WireBufferLifetime, WireBufferRole, WireBufferVersion, WireCollectionKernelPlan,
+    WireDependencyEdge, WireDeviceProgram, WireDeviceResource, WireDispatchSize,
+    WireInitializationPolicy, WireKernelLaunchPlan, WireKernelUnit, WireLaunchUnit, WireMatMulPlan,
+    WireMatMulSharedMemory, WireObservationCadence, WireObservationFact, WireOobPaddingPolicy,
+    WireProgramLifetime, WireReduceOp, WireReductionPlan, WireResourceAccess, WireResultBuffer,
+    WireSemanticValue, WireSemanticValueOrigin, WireSharedMemoryLayout, WireStorageLayout,
+    WireTransposePlan, WireWorkgroupCount, WireWorkgroupSize, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME,
+    PACKAGE_MIR_ARTIFACT_VERSION,
 };
 
 #[cfg(test)]

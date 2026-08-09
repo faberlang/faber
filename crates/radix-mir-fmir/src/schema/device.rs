@@ -12,8 +12,9 @@ use super::wire::{
 
 /// The optional `device` section on an FMIR image (N1.7). Absent for pure
 /// CPU/FMIR packages. Carries the canonical backend-neutral device program,
-/// the backend selection request, the declared backend artifacts (each with
-/// its own FNV-1a provenance hash), and the device runtime requirements.
+/// the backend selection request, and the declared backend artifacts (each a
+/// versioned DeviceArtifact packet with content/packet identity digests and
+/// its typed target features).
 ///
 /// The section is shared verbatim between the text (`fmir-text`, TOML) and
 /// binary (`fmir`, postcard) images so Metal and CUDA routes derive identical
@@ -27,20 +28,16 @@ pub struct FmirDeviceSection {
     pub device_program: FmirDeviceProgramSection,
     /// Backend selection request (from `--backend` / manifest / `auto`).
     pub selection: FmirDeviceSelection,
-    /// Declared backend artifacts (Metal MSL, CUDA PTX) + per-blob FNV-1a
-    /// provenance hashes (§3.4). The CUDA artifact carries its
-    /// logical-entry → symbol mapping as per-artifact metadata. Blobs are
-    /// **excluded** from the same-package identity; each carries its own
-    /// provenance hash for A9 receipts.
+    /// Declared backend artifacts (Metal MSL, CUDA PTX) — each a versioned
+    /// DeviceArtifact packet with its `content_sha256`/`packet_sha256`
+    /// identity digests, its typed target identity + required features, and
+    /// the entrypoint symbol map. Blobs are **excluded** from the
+    /// same-package identity; each artifact carries its own identity
+    /// digests.
     pub artifacts: FmirDeviceArtifactsSection,
     /// Declared host input values for the program's input buffers (run data,
     /// NOT program semantics — excluded from the canonical program bytes).
     pub declared_inputs: Vec<FmirDeviceInput>,
-    /// Device runtime requirements. Extends the
-    /// [`crate::schema::is_known_host_requirement`] allowlist with `device:metal`,
-    /// `device:cuda`. Unknown `device:` requirements fail admission at
-    /// package load ([`crate::schema::check_device_requirements`]).
-    pub runtime_requirements: Vec<String>,
     /// The optional distributed execution section (MD2-W1). `None` for
     /// single-device packages (MD-A15) — single-device images keep
     /// the independent single-device path (the A10 identity and the nested
@@ -125,6 +122,19 @@ pub enum FmirDeviceSelection {
     Unknown(String),
 }
 
+impl FmirDeviceSelection {
+    /// Stable diagnostic spelling.
+    #[must_use]
+    pub fn spelling(&self) -> String {
+        match self {
+            Self::Auto => "auto".to_owned(),
+            Self::Metal => "metal".to_owned(),
+            Self::Cuda => "cuda".to_owned(),
+            Self::Unknown(id) => id.clone(),
+        }
+    }
+}
+
 /// Declared backend artifacts list (N1.7 / §3.4).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -175,8 +185,15 @@ pub struct FmirDeviceArtifact {
     pub content_sha256: String,
     /// Packet digest over the versioned artifact metadata + `content_sha256`
     /// (never semantic identity; canonical `sha256:<64-hex>`). Computed and
-    /// re-verified by the hashing/identity unit (DDCP2-U3).
+    /// re-verified by admission ([`FmirDeviceArtifact::compute_packet_sha256`]).
     pub packet_sha256: String,
+    /// The hash-bound parent provenance of a `FinalizedBinary` artifact: the
+    /// `compiler_input_packet_sha256` of the `CompilerInput` artifact this
+    /// packet was finalized from. Preserved, never silently replaced —
+    /// admission re-verifies the packet identity and the stage/provenance
+    /// rule (`None` for `CompilerInput` artifacts, `Some` canonical spelling
+    /// for `FinalizedBinary` artifacts).
+    pub compiler_input_packet_sha256: Option<String>,
 }
 
 impl FmirDeviceArtifact {
@@ -194,6 +211,36 @@ impl FmirDeviceArtifact {
                 canonical_unpadded_base64(&self.bytes)
             ),
         }
+    }
+
+    /// The canonical `content_sha256` over the artifact's canonical decoded
+    /// raw payload bytes only — never the transport spelling (DDCP2-U3 /
+    /// contract §IdentityDomains rule 1/3).
+    #[must_use]
+    pub fn compute_content_sha256(&self) -> String {
+        crate::schema::content_sha256(&self.bytes)
+    }
+
+    /// The canonical `packet_sha256` over the versioned artifact metadata +
+    /// `content_sha256` (DDCP2-U3 / contract §IdentityDomains rule 1/4):
+    /// ABI/schema version, backend, format, materialization stage, target id
+    /// + required features (canonical order), the entrypoint symbol map
+    /// (canonical order), the content digest, and the parent
+    /// `compiler_input_packet_sha256` provenance when present. Never semantic
+    /// identity.
+    #[must_use]
+    pub fn compute_packet_sha256(&self) -> String {
+        crate::schema::packet_sha256(
+            self.abi_version,
+            &self.backend.spelling(),
+            &self.format.spelling(),
+            self.stage,
+            &self.target.id,
+            &self.target.required_features,
+            &self.entrypoints,
+            &self.content_sha256,
+            self.compiler_input_packet_sha256.as_deref(),
+        )
     }
 
     /// Validate the explicit payload-encoding declaration against the
@@ -329,6 +376,17 @@ pub enum MaterializationStage {
     CompilerInput,
     /// The linked final artifact the host loads.
     FinalizedBinary,
+}
+
+impl MaterializationStage {
+    /// Stable diagnostic spelling.
+    #[must_use]
+    pub fn spelling(self) -> &'static str {
+        match self {
+            Self::CompilerInput => "compiler-input",
+            Self::FinalizedBinary => "finalized-binary",
+        }
+    }
 }
 
 /// The typed target identity of a device artifact (DDCP2-U2): the declared

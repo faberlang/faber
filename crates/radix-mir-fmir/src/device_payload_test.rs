@@ -14,7 +14,7 @@ use crate::codec::{
 };
 use crate::error::FmirImageError;
 use crate::schema::{
-    canonical_program_bytes, canonical_unpadded_base64, device_identity_hash,
+    canonical_program_bytes, canonical_unpadded_base64, content_sha256, device_identity_hash,
     DeviceArtifactFormat, DevicePayloadEncoding, DeviceTargetId, FmirBinaryImageFile,
     FmirDeviceArtifact, FmirDeviceArtifactsSection, FmirDeviceBackend, FmirDeviceInput,
     FmirDeviceProgramSection, FmirDeviceSection, FmirDeviceSelection, FmirDeviceSymbol,
@@ -148,15 +148,17 @@ fn sample_wire_program() -> WireDeviceProgram {
     }
 }
 
-/// A canonical `sha256:<64-hex>`-shaped digest string for test artifacts
-/// (the hashing/identity unit computes and re-verifies real digests; the
-/// frozen packet shape carries the fields from DDCP2-U2).
-fn canonical_digest(tag: &str) -> String {
-    format!("sha256:{tag}")
+/// Compute the canonical digests of a test artifact (DDCP2-U3: the packet
+/// carries the REAL content/packet digests, computed and re-verified at
+/// admission).
+fn with_computed_digests(mut artifact: FmirDeviceArtifact) -> FmirDeviceArtifact {
+    artifact.content_sha256 = artifact.compute_content_sha256();
+    artifact.packet_sha256 = artifact.compute_packet_sha256();
+    artifact
 }
 
 fn metal_artifact(blob: &str) -> FmirDeviceArtifact {
-    FmirDeviceArtifact {
+    with_computed_digests(FmirDeviceArtifact {
         backend: FmirDeviceBackend::Metal,
         format: DeviceArtifactFormat::Msl,
         stage: MaterializationStage::CompilerInput,
@@ -168,13 +170,14 @@ fn metal_artifact(blob: &str) -> FmirDeviceArtifact {
         bytes: blob.as_bytes().to_vec(),
         encoding: DevicePayloadEncoding::Text,
         entrypoints: Vec::new(),
-        content_sha256: canonical_digest("metal-content"),
-        packet_sha256: canonical_digest("metal-packet"),
-    }
+        content_sha256: String::new(),
+        packet_sha256: String::new(),
+        compiler_input_packet_sha256: None,
+    })
 }
 
 fn cuda_artifact(blob: &str) -> FmirDeviceArtifact {
-    FmirDeviceArtifact {
+    with_computed_digests(FmirDeviceArtifact {
         backend: FmirDeviceBackend::Cuda,
         format: DeviceArtifactFormat::Ptx,
         stage: MaterializationStage::CompilerInput,
@@ -189,13 +192,16 @@ fn cuda_artifact(blob: &str) -> FmirDeviceArtifact {
             entry: "addita".to_owned(),
             symbol: "_Z6additaPU3AS1fS0_".to_owned(),
         }],
-        content_sha256: canonical_digest("cuda-content"),
-        packet_sha256: canonical_digest("cuda-packet"),
-    }
+        content_sha256: String::new(),
+        packet_sha256: String::new(),
+        compiler_input_packet_sha256: None,
+    })
 }
 
-/// A device section with both backends declared, the frozen device
-/// requirements, a declared input, and the typed complete program.
+/// A device section with both backends declared, a declared input, and the
+/// typed complete program. Each artifact carries the computed content/packet
+/// digests; the typed target features replace the old `runtime_requirements`
+/// string allowlist.
 fn sample_device_section() -> FmirDeviceSection {
     FmirDeviceSection {
         device_program: FmirDeviceProgramSection {
@@ -213,7 +219,6 @@ fn sample_device_section() -> FmirDeviceSection {
             name: "x".to_owned(),
             values: vec![1.0, 2.0, 3.0, 4.0],
         }],
-        runtime_requirements: vec!["device:metal".to_owned(), "device:cuda".to_owned()],
         // MD2-W1: absent for single-device packages (MD-A15) — the
         // independent single-device path.
         distributed: None,
@@ -330,8 +335,12 @@ fn device_section_round_trips_through_text_image() {
         }]
     );
     assert_eq!(
-        device.runtime_requirements,
-        vec!["device:metal".to_owned(), "device:cuda".to_owned()]
+        device.artifacts.artifact[0].target.required_features,
+        Vec::<String>::new()
+    );
+    assert_eq!(
+        device.artifacts.artifact[1].target.required_features,
+        vec!["sm_120".to_owned()]
     );
 }
 
@@ -490,33 +499,38 @@ fn image_without_device_section_round_trips_no_regression() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn decode_rejects_unknown_device_requirement() {
+fn decode_rejects_unknown_target_feature() {
+    // DDCP2-U3: the typed target features replace the `runtime_requirements`
+    // allowlist — an unknown required feature fails closed with the named
+    // rule, never guessed, never silently dropped.
     let mut section = sample_device_section();
-    section
-        .runtime_requirements
-        .push("device:vulkan".to_owned());
+    section.artifacts.artifact[1].target.required_features.push("vulkan".to_owned());
+    section.artifacts.artifact[1].packet_sha256 =
+        section.artifacts.artifact[1].compute_packet_sha256();
     let image = text_image_with_device(Some(section));
     let text = encode_text_image(&image).expect("encode text image");
     match decode_text_image(&text, TOOLCHAIN) {
-        Err(FmirImageError::UnsupportedRuntimeRequirement { requirement }) => {
-            assert_eq!(requirement, "device:vulkan");
+        Err(FmirImageError::UnsupportedTargetFeature { feature }) => {
+            assert_eq!(feature, "vulkan");
         }
-        other => panic!("expected UnsupportedRuntimeRequirement, got {other:?}"),
+        other => panic!("expected UnsupportedTargetFeature, got {other:?}"),
     }
 }
 
 #[test]
-fn decode_rejects_misplaced_host_requirement_in_device_section() {
-    // Host requirements belong in the top-level runtime section; a `host:`
-    // entry in the device section is not a known device requirement and fails
-    // admission.
+fn decode_rejects_incompatible_compiled_in_target() {
+    // DDCP2-U3: compiled-in leaves keep exhaustive target validation — a
+    // Metal artifact declaring the CUDA leaf's target id fails closed with
+    // the named rule.
     let mut section = sample_device_section();
-    section.runtime_requirements.push("host:fs".to_owned());
+    section.artifacts.artifact[0].target.id = "sm_120".to_owned();
+    section.artifacts.artifact[0].packet_sha256 =
+        section.artifacts.artifact[0].compute_packet_sha256();
     let image = binary_image_with_device(Some(section));
     let bytes = encode_binary_image(&image).expect("encode binary image");
     assert!(matches!(
         decode_binary_image(&bytes, TOOLCHAIN),
-        Err(FmirImageError::UnsupportedRuntimeRequirement { requirement }) if requirement == "host:fs"
+        Err(FmirImageError::IncompatibleTargetId { backend, .. }) if backend == "metal"
     ));
 }
 
@@ -600,7 +614,7 @@ fn binary_payload_spelling_is_the_declared_transport_form() {
     // Contract §Payload encoding rule 1: a binary payload's transport
     // spelling is `binary:<encoding-tag>:<decoded-byte-length>:<canonical-
     // unpadded-base64>`, and it round-trips through both codecs.
-    let artifact = FmirDeviceArtifact {
+    let artifact = with_computed_digests(FmirDeviceArtifact {
         encoding: DevicePayloadEncoding::Binary {
             encoding_tag: "elf".to_owned(),
             decoded_byte_length: 4,
@@ -608,7 +622,7 @@ fn binary_payload_spelling_is_the_declared_transport_form() {
         },
         bytes: vec![1, 2, 3, 4],
         ..cuda_artifact("")
-    };
+    });
     assert_eq!(
         artifact.binary_payload_spelling(),
         format!("binary:elf:4:{}", canonical_unpadded_base64(&[1, 2, 3, 4]))
@@ -1662,27 +1676,110 @@ fn device_identity_hash_is_collision_free_across_concatenation() {
 }
 
 #[test]
-fn text_encoded_artifact_with_canonical_digests_admits_cleanly() {
+fn text_encoded_artifact_with_computed_digests_admits_cleanly() {
     // Positive admission: a text-encoded artifact whose encoding declaration
-    // is canonical UTF-8 and whose identity fields carry the canonical
-    // sha256 spelling admits cleanly (the hashing/identity unit re-verifies
-    // the digests; the packet shape carries them from DDCP2-U2).
+    // is canonical UTF-8 and whose content/packet digests are the COMPUTED
+    // values re-verified at admission (DDCP2-U3).
     let blob = ".version 8.7\n.target sm_120\n";
     let mut section = sample_device_section();
-    section.artifacts.artifact = vec![FmirDeviceArtifact {
-        encoding: DevicePayloadEncoding::Text,
-        bytes: blob.as_bytes().to_vec(),
-        content_sha256: canonical_digest("cuda-content"),
-        packet_sha256: canonical_digest("cuda-packet"),
-        ..cuda_artifact(blob)
-    }];
+    section.artifacts.artifact = vec![cuda_artifact(blob)];
     let image = binary_image_with_device(Some(section));
     let bytes = encode_binary_image(&image).expect("encode binary image");
     let decoded = decode_binary_image(&bytes, TOOLCHAIN).expect("admits cleanly");
+    let expected = content_sha256(blob.as_bytes());
     assert_eq!(
         decoded.device.unwrap().artifacts.artifact[0].content_sha256,
-        canonical_digest("cuda-content")
+        expected
     );
+}
+
+#[test]
+fn packet_digest_re_verified_and_sensitive_to_metadata() {
+    // DDCP2-U3: packet_sha256 covers the versioned artifact metadata +
+    // content_sha256 (never semantic identity), is re-verified at admission,
+    // and is sensitive to metadata changes — a tampered target fails the
+    // packet digest, never the content digest.
+    let blob = ".version 8.7\n.target sm_120\n";
+    let mut section = sample_device_section();
+    section.artifacts.artifact = vec![cuda_artifact(blob)];
+    // Tamper with the TARGET id only: content is untouched, the packet
+    // digest no longer matches.
+    section.artifacts.artifact[0].target.id = "sm_80".to_owned();
+    let image = text_image_with_device(Some(section));
+    let text = encode_text_image(&image).expect("encode text image");
+    match decode_text_image(&text, TOOLCHAIN) {
+        Err(FmirImageError::ArtifactDigestMismatch { backend, field, .. }) => {
+            assert_eq!(backend, "cuda");
+            assert_eq!(field, "packet_sha256");
+        }
+        other => panic!("expected packet digest mismatch, got {other:?}"),
+    }
+}
+
+#[test]
+fn content_digest_re_verified_over_decoded_bytes() {
+    // DDCP2-U3 / contract §IdentityDomains rule 3: digests cover decoded
+    // bytes, never the transport spelling — a tampered payload byte changes
+    // the content digest and fails admission.
+    let mut section = sample_device_section();
+    section.artifacts.artifact[0].bytes = b"kernel void sub(...)".to_vec();
+    let image = binary_image_with_device(Some(section));
+    let bytes = encode_binary_image(&image).expect("encode binary image");
+    assert!(matches!(
+        decode_binary_image(&bytes, TOOLCHAIN),
+        Err(FmirImageError::ArtifactDigestMismatch { field: "content_sha256", .. })
+    ));
+}
+
+#[test]
+fn explicit_selection_without_the_selected_artifact_fails_closed() {
+    // DDCP2-U3 selection validation: an explicit Metal selection with no
+    // Metal artifact fails closed with the named rule (missing artifact =
+    // fail closed, never a silent fallback lane).
+    let mut section = sample_device_section();
+    section.selection = FmirDeviceSelection::Metal;
+    section.artifacts.artifact = vec![cuda_artifact("cuda only")];
+    let image = text_image_with_device(Some(section));
+    let text = encode_text_image(&image).expect("encode text image");
+    assert!(matches!(
+        decode_text_image(&text, TOOLCHAIN),
+        Err(FmirImageError::MissingArtifactForSelection { selection })
+            if selection == "metal"
+    ));
+}
+
+#[test]
+fn finalized_artifact_preserves_parent_provenance() {
+    // DDCP2-U3 / contract §IdentityDomains rule 5: a finalized-binary
+    // artifact MUST carry its hash-bound parent compiler_input_packet_sha256
+    // (provenance never silently replaced); a compiler-input artifact must
+    // not. Both directions fail closed with the named diagnostic.
+    let blob = "ptx finalized";
+    let mut section = sample_device_section();
+
+    // Finalized without the parent provenance → fail closed.
+    let mut finalized = cuda_artifact(blob);
+    finalized.stage = MaterializationStage::FinalizedBinary;
+    finalized.packet_sha256 = finalized.compute_packet_sha256();
+    finalized.compiler_input_packet_sha256 = None;
+    section.artifacts.artifact = vec![finalized.clone()];
+    let image = binary_image_with_device(Some(section));
+    let bytes = encode_binary_image(&image).expect("encode binary image");
+    assert!(matches!(
+        decode_binary_image(&bytes, TOOLCHAIN),
+        Err(FmirImageError::CompilerInputProvenance { backend, .. }) if backend == "cuda"
+    ));
+
+    // Finalized WITH the canonical parent provenance → admits cleanly.
+    let mut with_parent = finalized;
+    with_parent.compiler_input_packet_sha256 =
+        Some(content_sha256(b"parent-compiler-input-packet"));
+    with_parent.packet_sha256 = with_parent.compute_packet_sha256();
+    let mut section2 = sample_device_section();
+    section2.artifacts.artifact = vec![with_parent];
+    let image2 = binary_image_with_device(Some(section2));
+    let bytes2 = encode_binary_image(&image2).expect("encode binary image");
+    decode_binary_image(&bytes2, TOOLCHAIN).expect("finalized artifact with parent provenance admits");
 }
 
 // ---------------------------------------------------------------------------

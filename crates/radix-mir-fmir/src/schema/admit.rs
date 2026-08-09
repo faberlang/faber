@@ -2,12 +2,12 @@ use super::device::{FmirDeviceSection, FmirSessionSection, WIRE_SESSION_SECTION_
 use super::distributed::{
     expected_plan_for_section, wire_plan_to_plan, FmirDistributedExecutionSection,
 };
-use super::requirements::is_known_device_requirement;
+use super::requirements::{validate_compiled_in_target, validate_target_features};
 use super::wire::WireDeviceProgram;
 use super::{
     logical_distributed_plan_hash, validate_wire_distributed_section, validate_wire_program,
-    validate_wire_session_section, FmirDeviceBackend, PACKAGE_MIR_ARTIFACT_VERSION,
-    WIRE_DEVICE_PROGRAM_VERSION, WIRE_DISTRIBUTED_SECTION_VERSION,
+    validate_wire_session_section, FmirDeviceBackend, MaterializationStage,
+    PACKAGE_MIR_ARTIFACT_VERSION, WIRE_DEVICE_PROGRAM_VERSION, WIRE_DISTRIBUTED_SECTION_VERSION,
 };
 
 /// Fail-closed artifact-version gate. Versions ratchet as clean breaks;
@@ -56,22 +56,97 @@ pub(crate) fn check_toolchain(
     }
 }
 
-/// Fail-closed device runtime-requirement admission (N1.7): every requirement
-/// in the device section must be a known `device:` capability
-/// ([`is_known_device_requirement`]). Host requirements belong in the top-level
-/// `runtime` section; an unknown `device:` (or misplaced `host:`) requirement
-/// fails admission at package load.
-pub(crate) fn check_device_requirements(
+/// Fail-closed artifact digest admission (DDCP2-U3 / contract §IdentityDomains
+/// rule 5; B3): each artifact's stored `content_sha256` is re-verified
+/// against the canonical decoded raw payload bytes, and its stored
+/// `packet_sha256` against the versioned artifact metadata + `content_sha256`
+/// — provenance is verified, not decorative; a tampered or miscomputed
+/// digest fails admission. The stage/provenance rule is enforced too: a
+/// `FinalizedBinary` artifact MUST carry its hash-bound parent
+/// `compiler_input_packet_sha256` (never silently replaced), a
+/// `CompilerInput` artifact MUST NOT.
+pub(crate) fn check_artifact_digests(
     device: &FmirDeviceSection,
 ) -> Result<(), crate::error::FmirImageError> {
-    for requirement in &device.runtime_requirements {
-        if !is_known_device_requirement(requirement) {
-            return Err(
-                crate::error::FmirImageError::UnsupportedRuntimeRequirement {
-                    requirement: requirement.clone(),
-                },
-            );
+    for artifact in &device.artifacts.artifact {
+        let backend = artifact.backend.spelling();
+        let computed_content = artifact.compute_content_sha256();
+        if artifact.content_sha256 != computed_content {
+            return Err(crate::error::FmirImageError::ArtifactDigestMismatch {
+                backend,
+                field: "content_sha256",
+                stored: artifact.content_sha256.clone(),
+                computed: computed_content,
+            });
         }
+        let computed_packet = artifact.compute_packet_sha256();
+        if artifact.packet_sha256 != computed_packet {
+            return Err(crate::error::FmirImageError::ArtifactDigestMismatch {
+                backend,
+                field: "packet_sha256",
+                stored: artifact.packet_sha256.clone(),
+                computed: computed_packet,
+            });
+        }
+        match artifact.stage {
+            MaterializationStage::FinalizedBinary => match &artifact.compiler_input_packet_sha256 {
+                Some(parent) if parent.starts_with("sha256:") => {}
+                _ => {
+                    return Err(crate::error::FmirImageError::CompilerInputProvenance {
+                        backend,
+                        detail: "a finalized-binary artifact must carry its hash-bound parent compiler_input_packet_sha256 (never silently replaced)".to_owned(),
+                    });
+                }
+            },
+            MaterializationStage::CompilerInput => {
+                if artifact.compiler_input_packet_sha256.is_some() {
+                    return Err(crate::error::FmirImageError::CompilerInputProvenance {
+                        backend,
+                        detail: "a compiler-input artifact must not carry a parent packet provenance".to_owned(),
+                    });
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Fail-closed typed target admission (DDCP2-U3): every required feature of
+/// every artifact must be a known target feature, and the compiled-in leaves
+/// (Metal/CUDA) keep exhaustive target validation against their leaf target
+/// id. Unknown features and incompatible target ids fail closed with the
+/// named rule — never guessed, never silently dropped.
+pub(crate) fn check_artifact_targets(
+    device: &FmirDeviceSection,
+) -> Result<(), crate::error::FmirImageError> {
+    for artifact in &device.artifacts.artifact {
+        validate_target_features(&artifact.target)?;
+        validate_compiled_in_target(&artifact.backend, &artifact.target)?;
+    }
+    Ok(())
+}
+
+/// Fail-closed backend-selection admission (DDCP2-U3): an explicit selection
+/// (Metal/Cuda) must have an artifact for the selected backend — a missing
+/// artifact fails closed with the named rule. `Auto` is admitted (selection
+/// resolves at run time); an unknown selection is representable and rejected
+/// honestly at selection resolution, never silently remapped.
+pub(crate) fn check_selection_artifacts(
+    device: &FmirDeviceSection,
+) -> Result<(), crate::error::FmirImageError> {
+    match &device.selection {
+        crate::schema::FmirDeviceSelection::Metal | crate::schema::FmirDeviceSelection::Cuda => {
+            let selected = device.selection.spelling();
+            let present = device.artifacts.artifact.iter().any(|artifact| {
+                artifact.backend.spelling() == selected
+            });
+            if !present {
+                return Err(crate::error::FmirImageError::MissingArtifactForSelection {
+                    selection: selected,
+                });
+            }
+        }
+        _ => {}
     }
     Ok(())
 }
@@ -138,9 +213,11 @@ pub(crate) fn admit_device_section(
         );
     }
     validate_wire_program(&device.device_program.program)?;
-    check_device_requirements(device)?;
     check_artifact_encodings(device)?;
     check_artifact_backends(device)?;
+    check_artifact_digests(device)?;
+    check_artifact_targets(device)?;
+    check_selection_artifacts(device)?;
     // MD2-W1: the optional distributed execution section is admitted
     // fail-closed at load — its own version ratchet, wire-level section
     // validation, MD2-V1's gate on the reconstructed plan, the equivalence

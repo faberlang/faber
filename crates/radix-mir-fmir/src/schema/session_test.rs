@@ -226,7 +226,6 @@ fn device_section_with_session(session: Option<FmirSessionSection>) -> FmirDevic
             artifact: Vec::new(),
         },
         declared_inputs: Vec::new(),
-        runtime_requirements: Vec::new(),
         distributed: None,
         session,
     }
