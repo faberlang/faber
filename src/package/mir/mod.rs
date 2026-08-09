@@ -323,5 +323,9 @@ mod tests;
 mod nominal_tests;
 
 #[cfg(test)]
+#[path = "reachability_test.rs"]
+mod reachability_tests;
+
+#[cfg(test)]
 #[path = "test_support.rs"]
 pub(crate) mod test_support;

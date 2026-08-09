@@ -17,6 +17,14 @@ pub(super) fn lower_package_units<'a>(
         dispatch_function: Option<MirFunctionId>,
     }
 
+    // S1 U3 reachability seed: the package's rewritten unit HIR references
+    // linked library functions through package-MIR synthetic def ids
+    // (`Path(synthetic)` namespace-call targets and const data-member
+    // references). That set seeds the library-function reachability closure
+    // below, so linked library functions are lowered only when reachable from
+    // the entry's call graph (default = pruning, delivery §4.3).
+    let mut reachable_seed = collect_package_synthetic_references(package);
+
     let (before, rest) = package.units.split_at_mut(entry_index);
     let Some((entry, after)) = rest.split_first_mut() else {
         unreachable!("entry index selected from package units");
@@ -251,6 +259,11 @@ pub(super) fn lower_package_units<'a>(
             return Err(diagnostics);
         }
     }
+
+    // S1 U3 reachability (default = pruning): linked library functions that
+    // are unreachable from the package's synthetic call graph are dropped
+    // before they merge into the program (delivery §4.3).
+    prune_unreachable_library_functions(&mut library_parts, &mut reachable_seed);
 
     let mut merged = lower_unit(entry, &cli_plan.entry_records, no_fuse)?;
     ensure_unique_definition_sources(&merged.program, &entry_path)?;
@@ -1285,4 +1298,314 @@ pub(super) fn shift_function_id(id: &mut MirFunctionId, offset: u32) {
 
 pub(super) fn shift_environment_id(id: &mut MirClosureEnvironmentId, offset: u32) {
     id.0 += offset;
+}
+
+// ── S1 U3 reachability: linked library functions are lowered only when
+//    reachable from the package's synthetic call graph (default = pruning) ──
+
+/// Collect every package-MIR synthetic def id referenced by the package's
+/// rewritten unit HIR. The linker installed these `Path(synthetic)` targets
+/// for used namespace calls (library exports) and const data members, so the
+/// reference set is exactly the entry's call-graph seeds into the linked
+/// libraries.
+fn collect_package_synthetic_references(package: &AnalyzedPackage) -> HashSet<DefId> {
+    let mut references = HashSet::new();
+    for unit in &package.units {
+        let mut collector = SyntheticReferenceCollector::default();
+        radix::hir::visit::walk_program(&mut collector, &unit.analysis.hir);
+        references.extend(collector.references);
+    }
+    references
+}
+
+#[derive(Default)]
+struct SyntheticReferenceCollector {
+    references: HashSet<DefId>,
+}
+
+impl radix::hir::visit::HirVisitor for SyntheticReferenceCollector {
+    fn visit_expr(&mut self, expr: &HirExpression) {
+        if let HirExpressionKind::Path(def_id) = &expr.kind {
+            if def_id.0 >= PACKAGE_MIR_SYNTHETIC_DEF_BASE {
+                self.references.insert(*def_id);
+            }
+        }
+        radix::hir::visit::walk_expr(self, expr);
+    }
+}
+
+/// Drop linked-library functions unreachable from the package's synthetic
+/// call graph (S1 U3 reachability, default = pruning).
+///
+/// The reachable set is a global fixpoint over the linked library programs:
+/// the package units' synthetic references seed the closure, each library's
+/// BFS follows intra-program function edges (direct callees, closure bodies,
+/// function constants) and `MirCallee::Definition { source }` edges (calls
+/// into sibling libraries), and newly discovered definition sources extend
+/// the seed until no library gains a function. Closure environments
+/// referenced by kept functions are kept; unreferenced ones are dropped
+/// alongside their (pruned) functions.
+fn prune_unreachable_library_functions(
+    library_parts: &mut Vec<(MirProgram, Vec<MirClosureEnvironment>)>,
+    reachable_seed: &mut HashSet<DefId>,
+) {
+    if library_parts.is_empty() {
+        return;
+    }
+    loop {
+        let mut new_seed = HashSet::new();
+        let mut keep_sets = Vec::with_capacity(library_parts.len());
+        for (program, _) in library_parts.iter() {
+            let (reachable, definitions) = reachable_library_function_set(program, reachable_seed);
+            keep_sets.push(reachable);
+            new_seed.extend(definitions);
+        }
+        let grew = new_seed
+            .iter()
+            .any(|definition| !reachable_seed.contains(definition));
+        reachable_seed.extend(new_seed);
+        if grew {
+            continue;
+        }
+        // Final keep sets (computed against the settled seed): filter each
+        // library program to its reachable functions and keep only the
+        // closure environments those functions reference.
+        for ((program, environments), keep) in library_parts.iter_mut().zip(keep_sets.iter()) {
+            let mut referenced_environments = HashSet::new();
+            for function_id in keep.iter().copied() {
+                referenced_environments
+                    .extend(scan_mir_function_references(program, function_id).environments);
+            }
+            program.functions.retain(|function| keep.contains(&function.id));
+            environments.retain(|environment| referenced_environments.contains(&environment.id));
+        }
+        break;
+    }
+}
+
+/// Compute the reachable function set of one lowered library program from the
+/// current synthetic-def seed, plus the `MirCallee::Definition` sources those
+/// functions reference (cross-library edges for the fixpoint).
+fn reachable_library_function_set(
+    program: &MirProgram,
+    reachable_seed: &HashSet<DefId>,
+) -> (HashSet<MirFunctionId>, Vec<DefId>) {
+    let mut work: Vec<MirFunctionId> = Vec::new();
+    for function in &program.functions {
+        if let Some(source) = function.source {
+            if reachable_seed.contains(&source) {
+                work.push(function.id);
+            }
+        }
+    }
+    let mut reachable = HashSet::new();
+    let mut definitions = Vec::new();
+    let mut seen_definitions = HashSet::new();
+    while let Some(function_id) = work.pop() {
+        if !reachable.insert(function_id) {
+            continue;
+        }
+        let scan = scan_mir_function_references(program, function_id);
+        work.extend(scan.functions);
+        for definition in scan.definitions {
+            if seen_definitions.insert(definition) {
+                definitions.push(definition);
+            }
+        }
+    }
+    (reachable, definitions)
+}
+
+/// Function, definition, and closure-environment references made by one MIR
+/// function body (S1 U3 reachability edges).
+#[derive(Default)]
+struct MirReferenceScan {
+    functions: Vec<MirFunctionId>,
+    definitions: Vec<DefId>,
+    environments: Vec<MirClosureEnvironmentId>,
+}
+
+fn scan_mir_function_references(
+    program: &MirProgram,
+    function_id: MirFunctionId,
+) -> MirReferenceScan {
+    let mut scan = MirReferenceScan::default();
+    let Some(function) = program
+        .functions
+        .iter()
+        .find(|function| function.id == function_id)
+    else {
+        return scan;
+    };
+    for block in &function.blocks {
+        for statement in &block.statements {
+            scan_statement_references(statement, &mut scan);
+        }
+        scan_terminator_references(&block.terminator, &mut scan);
+    }
+    scan
+}
+
+fn scan_statement_references(statement: &MirStatement, scan: &mut MirReferenceScan) {
+    match &statement.kind {
+        MirStatementKind::Assign { value, .. } => scan_value_references(value, scan),
+        MirStatementKind::Call { callee, args, .. } => {
+            scan_callee_references(callee, scan);
+            for arg in args {
+                scan_operand_references(arg, scan);
+            }
+        }
+        MirStatementKind::RuntimeCall { call, .. } => {
+            for arg in &call.args {
+                scan_operand_references(arg, scan);
+            }
+        }
+        MirStatementKind::Construct { aggregate, .. } => {
+            scan_aggregate_references(aggregate, scan);
+        }
+    }
+}
+
+fn scan_terminator_references(terminator: &MirTerminator, scan: &mut MirReferenceScan) {
+    match &terminator.kind {
+        MirTerminatorKind::Return(Some(operand)) | MirTerminatorKind::ReturnError(operand) => {
+            scan_operand_references(operand, scan);
+        }
+        MirTerminatorKind::TryCall { callee, args, .. } => {
+            scan_callee_references(callee, scan);
+            for arg in args {
+                scan_operand_references(arg, scan);
+            }
+        }
+        MirTerminatorKind::Branch { condition, .. } => {
+            scan_operand_references(condition, scan);
+        }
+        MirTerminatorKind::Switch { value, cases, .. } => {
+            scan_operand_references(value, scan);
+            for case in cases {
+                scan_constant_references(&case.value, scan);
+            }
+        }
+        MirTerminatorKind::Return(None)
+        | MirTerminatorKind::Goto(_)
+        | MirTerminatorKind::Unreachable => {}
+    }
+}
+
+fn scan_value_references(value: &MirValue, scan: &mut MirReferenceScan) {
+    match &value.kind {
+        MirValueKind::Operand(operand) => scan_operand_references(operand, scan),
+        MirValueKind::Closure(closure) => {
+            scan.functions.push(closure.function);
+            scan.environments.push(closure.environment_id);
+            scan_operand_references(&closure.environment, scan);
+        }
+        MirValueKind::Unary { operand, .. } => scan_operand_references(operand, scan),
+        MirValueKind::Binary { lhs, rhs, .. } => {
+            scan_operand_references(lhs, scan);
+            scan_operand_references(rhs, scan);
+        }
+        MirValueKind::Option(op) => scan_option_references(op, scan),
+    }
+}
+
+fn scan_operand_references(operand: &MirOperand, scan: &mut MirReferenceScan) {
+    match operand {
+        MirOperand::Place(place) => scan_place_references(place, scan),
+        MirOperand::Constant(constant) => scan_constant_references(constant, scan),
+        MirOperand::Temp(_) | MirOperand::Value(_) => {}
+    }
+}
+
+fn scan_place_references(place: &MirPlace, scan: &mut MirReferenceScan) {
+    for projection in &place.projections {
+        match projection {
+            MirProjection::ClosureCapture { environment, .. } => {
+                scan.environments.push(*environment);
+            }
+            MirProjection::Index(operand) => scan_operand_references(operand, scan),
+            MirProjection::Field(_)
+            | MirProjection::VariantField { .. }
+            | MirProjection::VectorLane(_)
+            | MirProjection::MatrixCell { .. } => {}
+        }
+    }
+}
+
+fn scan_constant_references(constant: &MirConstant, scan: &mut MirReferenceScan) {
+    if let MirConstant::Function(function_id) = constant {
+        scan.functions.push(*function_id);
+    }
+}
+
+fn scan_callee_references(callee: &MirCallee, scan: &mut MirReferenceScan) {
+    match callee {
+        MirCallee::Function(function_id) => scan.functions.push(*function_id),
+        MirCallee::Closure(closure) => {
+            scan.functions.push(closure.function);
+            scan.environments.push(closure.environment_id);
+            scan_operand_references(&closure.environment, scan);
+        }
+        MirCallee::Value(operand) => scan_operand_references(operand, scan),
+        MirCallee::Definition { source, .. } => scan.definitions.push(*source),
+    }
+}
+
+fn scan_aggregate_references(aggregate: &MirAggregate, scan: &mut MirReferenceScan) {
+    if let MirAggregateKind::ClosureEnvironment(environment_id) = &aggregate.kind {
+        scan.environments.push(*environment_id);
+    }
+    match &aggregate.fields {
+        MirAggregateFields::Ordered(items) => {
+            for item in items {
+                match item {
+                    MirAggregateItem::Operand(operand) | MirAggregateItem::Spread(operand) => {
+                        scan_operand_references(operand, scan);
+                    }
+                }
+            }
+        }
+        MirAggregateFields::Named(items) => {
+            for item in items {
+                scan_operand_references(&item.value, scan);
+            }
+        }
+        MirAggregateFields::Keyed(items) => {
+            for item in items {
+                scan_operand_references(&item.key, scan);
+                scan_operand_references(&item.value, scan);
+            }
+        }
+    }
+}
+
+fn scan_option_references(op: &MirOptionOp, scan: &mut MirReferenceScan) {
+    match op {
+        MirOptionOp::Some(operand)
+        | MirOptionOp::IsNil(operand)
+        | MirOptionOp::IsNotNil(operand)
+        | MirOptionOp::Unwrap { value: operand, .. } => scan_operand_references(operand, scan),
+        MirOptionOp::Coalesce { value, fallback } => {
+            scan_operand_references(value, scan);
+            scan_operand_references(fallback, scan);
+        }
+        MirOptionOp::Chain { base, link } => {
+            scan_operand_references(base, scan);
+            scan_option_chain_references(link, scan);
+        }
+        MirOptionOp::None => {}
+    }
+}
+
+fn scan_option_chain_references(link: &MirOptionChainLink, scan: &mut MirReferenceScan) {
+    match link {
+        MirOptionChainLink::Field(_) | MirOptionChainLink::VariantField { .. } => {}
+        MirOptionChainLink::Index(operand) => scan_operand_references(operand, scan),
+        MirOptionChainLink::Call { callee, args } => {
+            scan_callee_references(callee, scan);
+            for arg in args {
+                scan_operand_references(arg, scan);
+            }
+        }
+    }
 }
