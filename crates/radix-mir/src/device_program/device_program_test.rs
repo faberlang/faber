@@ -4,9 +4,12 @@ use crate::abi::{
     MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature, MirKernelWorkgroupCount,
     MirWorkgroupSize,
 };
+use crate::device::MirCompanionDerivativeKind;
 use crate::device_semantics::{
-    DependencyEdge, DeviceSemantics, InitializationFact, InitializationPolicy, ObservationFact,
-    SemanticValue, SemanticValueId, SemanticValueOrigin, ValueBinding, ValueGeneration,
+    DependencyEdge, DeviceSemantics, InitializationFact, InitializationPolicy,
+    LosslessMirCompanionEntry, MirCompanionSelectedInput, MirCompanionSelectedOutput,
+    ObservationFact, SemanticValue, SemanticValueId, SemanticValueOrigin, ValueBinding,
+    ValueGeneration,
 };
 use crate::kernel_plan::{CollectionKernelPlan, ReduceOp};
 use crate::layout::MirTensorStorageLayout;
@@ -14,8 +17,9 @@ use crate::{
     MirBlock, MirBlockId, MirCollectionOp, MirFunction, MirFunctionId, MirIntrinsic, MirLocalId,
     MirRuntimeCall, MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind, MirType,
 };
+use radix_hir::DefId;
 use radix_lexer::Span;
-use radix_types::{NumericWidth, Primitive, TypeTable};
+use radix_types::{NumericWidth, Primitive, TypeId, TypeTable};
 
 // -----------------------------------------------------------------------
 // Fixtures
@@ -1927,4 +1931,98 @@ fn observation_point_buffer_must_be_declared_observed() {
             buffer: BufferId(0)
         })
     ));
+}
+
+// -----------------------------------------------------------------------
+// DDCP1-U4: companion identity + forward/backward coexistence without a
+// runtime tape (contract §Kernel and companion identity rules 2/5/6/7/8).
+// -----------------------------------------------------------------------
+
+/// The chain program paired with one carried companion relation: primal
+/// `DefId(1)` (launch 0, writes value 1) has a generated backward companion
+/// `DefId(2)` (launch 1) that consumes the primal output value 1 and writes
+/// one gradient (value 2). The graph + the relation are the only accounting
+/// — there is no runtime-tape carrier anywhere in the model.
+fn forward_backward_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
+    let (program, mut semantics) = chain_program_with_semantics();
+    semantics.relations = vec![LosslessMirCompanionEntry {
+        primal: DefId(1),
+        companion: DefId(2),
+        derivative: MirCompanionDerivativeKind::ReverseModeVjp,
+        device_resident: true,
+        selected_inputs: vec![MirCompanionSelectedInput {
+            param: DefId(1),
+            position: 0,
+            ty: TypeId(1),
+            gradient_slot: 0,
+        }],
+        selected_outputs: vec![MirCompanionSelectedOutput {
+            position: 0,
+            ty: TypeId(1),
+            upstream_gradient_ty: TypeId(1),
+        }],
+    }];
+    program
+        .validate_with_semantics(&semantics)
+        .expect("forward + generated-backward kernels coexist");
+    (program, semantics)
+}
+
+#[test]
+fn forward_and_backward_coexist_without_runtime_tape() {
+    // Contract rule 8: forward and generated-backward kernels coexist in one
+    // program WITHOUT a runtime tape — the dependency graph and the
+    // companion relations are the only accounting. The frozen four-field
+    // program shape carries no tape, no autograd runtime, and no history
+    // buffer; the semantics carry only values/generations/edges/relations.
+    let (program, semantics) = forward_backward_program_with_semantics();
+    program
+        .validate_with_semantics(&semantics)
+        .expect("the pair validates with graph + relations as the only accounting");
+    assert_eq!(program.kernels.len(), 2, "one forward + one backward kernel");
+    assert_eq!(program.launches.len(), 2);
+    assert_eq!(semantics.relations.len(), 1);
+}
+
+#[test]
+fn stale_companion_consumption_fails_closed() {
+    // Contract rule 5: a consumer binding an OLDER generation while the
+    // producer carries a newer one consumes superseded primal state — a
+    // stale companion fact, fail-closed in companion-bearing programs.
+    let (program, mut semantics) = forward_backward_program_with_semantics();
+    semantics.generations.push(ValueGeneration {
+        value: SemanticValueId(1),
+        generation: 2,
+        element_ty: semantics.generations[0].element_ty.clone(),
+        element_count: 8,
+        produced_by: LaunchId(0),
+    });
+    assert!(matches!(
+        program.validate_with_semantics(&semantics),
+        Err(DeviceProgramError::StaleCompanionFact {
+            value: SemanticValueId(1),
+            bound_generation: 1,
+            latest_generation: 2,
+        })
+    ));
+}
+
+#[test]
+fn forward_only_program_never_trips_stale_or_missing_rules() {
+    // Contract rule 7: forward-only programs (no relations) are immune to
+    // the stale/missing companion rules — a newer write of a consumed value
+    // in a relation-free program is an ordinary superseding write, not a
+    // stale companion.
+    let (program, mut semantics) = chain_program_with_semantics();
+    assert!(semantics.relations.is_empty());
+    semantics.generations.push(ValueGeneration {
+        value: SemanticValueId(1),
+        generation: 2,
+        element_ty: semantics.generations[0].element_ty.clone(),
+        element_count: 8,
+        produced_by: LaunchId(0),
+    });
+    program
+        .validate_with_semantics(&semantics)
+        .expect("a forward-only program needs no companion facts; newer writes are ordinary");
 }

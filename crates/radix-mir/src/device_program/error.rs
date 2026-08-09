@@ -226,6 +226,35 @@ pub enum DeviceProgramError {
         element_count: u64,
         dispatched: u64,
     },
+    // ── DDCP1-U4: companion identity + coexistence ─────────────────────────
+    /// A companion relation carries an upstream gradient shape incompatible
+    /// with the primal output it differentiates — a contradictory companion
+    /// fact vs the primal's recorded facts (contract rule 4).
+    ContradictoryCompanionFact {
+        primal: DefId,
+        field: &'static str,
+        first: String,
+        second: String,
+    },
+    /// A consumer binds an OLDER generation of a value while the producer
+    /// carries a newer one, in a companion-bearing program — a stale
+    /// companion consuming superseded primal state (contract rule 5).
+    StaleCompanionFact {
+        value: SemanticValueId,
+        bound_generation: u32,
+        latest_generation: u32,
+    },
+    /// A declared companion references no companion facts (no selected
+    /// inputs and no selected outputs) — a missing companion fact. A
+    /// forward-only program declares no companions and needs none; the rule
+    /// applies only where companion outputs are actually referenced (contract
+    /// rule 6/7). Graph-direction references (a launch consuming a companion
+    /// output with no relation) are proven by the independent oracle
+    /// (G6 KernelSequence).
+    MissingCompanionFact {
+        primal: DefId,
+        reason: &'static str,
+    },
 }
 
 impl fmt::Display for DeviceProgramError {
@@ -494,6 +523,29 @@ impl fmt::Display for DeviceProgramError {
             } => write!(
                 f,
                 "kernel {kernel} output slot ({group}, {binding}) has its own bounds/index domain of {element_count} elements, but the shared dispatch extent covers only {dispatched} lanes — per-output bounds under-fill fails closed (per-output domains rules 1-3)"
+            ),
+            Self::ContradictoryCompanionFact {
+                primal,
+                field,
+                first,
+                second,
+            } => write!(
+                f,
+                "companion relation for primal DefId({}) is contradictory vs the primal's recorded facts on {field}: first {first}, second {second} (companion identity rule 4)",
+                primal.0
+            ),
+            Self::StaleCompanionFact {
+                value,
+                bound_generation,
+                latest_generation,
+            } => write!(
+                f,
+                "a consumer binds generation {bound_generation} of semantic value {value} while the producer carries the newer generation {latest_generation} — stale companion consumption of superseded primal state fails closed (companion identity rule 5)"
+            ),
+            Self::MissingCompanionFact { primal, reason } => write!(
+                f,
+                "the companion declared for primal DefId({}) is a missing companion fact: {reason} (companion identity rule 6; a forward-only program declares no companions and needs none)",
+                primal.0
             ),
         }
     }

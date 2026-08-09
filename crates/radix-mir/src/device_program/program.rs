@@ -437,7 +437,35 @@ impl DeviceProgram {
                         value,
                     });
                 }
-                1 => {}
+                1 => {
+                    // DDCP1-U4 / contract rule 5 (stale): in a companion-
+                    // bearing program, a consumer binding an OLDER generation
+                    // while the producer carries a newer one consumes
+                    // superseded primal state. A forward-only program
+                    // declares no companions and needs none — the staleness
+                    // rule applies only where companion outputs are actually
+                    // referenced (i.e., where relations are carried).
+                    if !semantics.relations.is_empty() {
+                        let bound = matching[0];
+                        let latest = semantics
+                            .generations
+                            .iter()
+                            .filter(|generation| {
+                                generation.value == value
+                                    && generation.produced_by == edge.producer
+                            })
+                            .map(|generation| generation.generation)
+                            .max()
+                            .unwrap_or(bound);
+                        if bound < latest {
+                            return Err(DeviceProgramError::StaleCompanionFact {
+                                value,
+                                bound_generation: bound,
+                                latest_generation: latest,
+                            });
+                        }
+                    }
+                }
                 _ => {
                     return Err(DeviceProgramError::AmbiguousEdgeGeneration {
                         value,

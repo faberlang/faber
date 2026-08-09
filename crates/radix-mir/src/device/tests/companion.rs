@@ -10,8 +10,30 @@ use crate::{
     MirParam, MirParamMode, MirPlace, MirRuntimeCall, MirStatement, MirStatementKind, MirTemp,
     MirTempId, MirTerminator, MirTerminatorKind, MirType, MirValidationContext,
 };
+use radix_hir::DefId;
 use radix_types::{Primitive, TypeTable};
 use rustc_hash::FxHashMap;
+
+/// A compact primal → companion lossless row for the carrier/identity tests.
+fn lossless_companion(primal: u32, companion: u32) -> LosslessMirCompanionEntry {
+    LosslessMirCompanionEntry {
+        primal: DefId(primal),
+        companion: DefId(companion),
+        derivative: MirCompanionDerivativeKind::ReverseModeVjp,
+        device_resident: true,
+        selected_inputs: vec![MirCompanionSelectedInput {
+            param: DefId(primal),
+            position: 0,
+            ty: radix_types::TypeId(1),
+            gradient_slot: 0,
+        }],
+        selected_outputs: vec![MirCompanionSelectedOutput {
+            position: 0,
+            ty: radix_types::TypeId(1),
+            upstream_gradient_ty: radix_types::TypeId(1),
+        }],
+    }
+}
 
 /// The MLP companion's result-tuple local shape: a tuple-typed local in
 /// the source's local table that the DECOMPOSED subchain synthetics
@@ -320,5 +342,37 @@ fn decomposed_companion_result_tuple_in_temp_passes_target_entry_gate() {
     assert!(
         verdict.is_capable(),
         "the decomposed companion's kept result-tuple temp must pass the gate, got: {verdict:?}"
+    );
+}
+
+// ── DDCP1-U4: companion identity is primal + typed relation (fail-closed
+//    carrier) ────────────────────────────────────────────────────────────
+
+#[test]
+fn companion_identity_is_primal_plus_typed_relation() {
+    // Contract rule 2: the companion identity is derived from the primal
+    // kernel identity PLUS the typed relation (the differentiation point) —
+    // the (primal, derivative) key, never a name or position.
+    let forward = lossless_companion(1, 2);
+    let same = lossless_companion(1, 2);
+    let other_primal = lossless_companion(9, 2);
+    assert_eq!(forward.identity_key(), same.identity_key());
+    assert_ne!(forward.identity_key(), other_primal.identity_key());
+    assert_eq!(
+        forward.identity_key(),
+        (radix_hir::DefId(1), MirCompanionDerivativeKind::ReverseModeVjp)
+    );
+}
+
+#[test]
+fn companion_carrier_rejects_duplicate_identity_facts() {
+    // Contract rule 3: duplicate companion facts for one (primal,
+    // differentiation point) fail closed at the fail-closed carrier — never
+    // an overwrite.
+    let mut carriers = MirCompanionMap::default();
+    carriers.insert(lossless_companion(1, 2));
+    assert_eq!(
+        carriers.try_insert(lossless_companion(1, 2)),
+        Err(MirCompanionInsertError::DuplicatePrimal { primal: DefId(1) })
     );
 }

@@ -238,6 +238,21 @@ pub struct MirCompanionSelectedOutput {
 /// device materialization, and the serialized package. Duplicate or
 /// contradictory rows fail closed at the carrier's insertion boundary
 /// ([`crate::device::MirCompanionMap`]) and at the wire admission boundary.
+///
+/// # DDCP1-U4 companion identity
+///
+/// An AIR-generated backward companion's **identity is derived from its
+/// primal kernel identity plus the typed companion relation** (contract
+/// §Kernel and companion identity rule 2): [`Self::identity_key`] returns the
+/// (primal, differentiation point) pair — never a name, symbol, or position.
+/// Duplicate companion facts for one identity key fail closed; contradictory
+/// companion facts (incompatible shapes vs the primal's recorded facts) fail
+/// closed; a stale companion (consuming a superseded primal write generation)
+/// fails closed; a missing companion (a declared companion whose outputs are
+/// not materialized) fails closed — while a forward-only program declares no
+/// companions and needs none (the missing rule applies only where the
+/// dependency graph or declared observations actually reference companion
+/// outputs).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LosslessMirCompanionEntry {
     /// The differentiable primal function.
@@ -252,6 +267,17 @@ pub struct LosslessMirCompanionEntry {
     pub selected_inputs: Vec<MirCompanionSelectedInput>,
     /// The selected primal outputs.
     pub selected_outputs: Vec<MirCompanionSelectedOutput>,
+}
+
+impl LosslessMirCompanionEntry {
+    /// The companion's stable identity key: the **primal kernel identity plus
+    /// the typed companion relation** — exactly the (primal, differentiation
+    /// point) pair the contract keys duplicate/contradictory detection on.
+    /// Identity is never recovered from names, symbols, or positions.
+    #[must_use]
+    pub fn identity_key(&self) -> (DefId, MirCompanionDerivativeKind) {
+        (self.primal, self.derivative)
+    }
 }
 
 /// The carried semantic facts of a device program (F1–F7).
@@ -594,8 +620,12 @@ impl DeviceSemantics {
         None
     }
 
-    /// Rule group F4: relation rows are unique per primal and internally
-    /// well-formed; duplicate or contradictory rows fail closed.
+    /// Rule group F4: relation rows are unique per companion identity and
+    /// internally well-formed; duplicate, contradictory, and missing
+    /// companion facts fail closed. Duplicate detection is keyed on the
+    /// companion identity ([`LosslessMirCompanionEntry::identity_key`] — the
+    /// primal plus the typed differentiation point); a forward-only program
+    /// declares no companions and needs none.
     fn validate_relations(&self) -> Result<(), DeviceProgramError> {
         for relation in &self.relations {
             if relation.primal == relation.companion {
@@ -624,17 +654,46 @@ impl DeviceSemantics {
                 }
                 output_positions.push(selected.position);
             }
+            // DDCP1-U4 / contract rule 4 (contradictory): the companion's
+            // upstream gradient shape must match the primal output it
+            // differentiates — an incompatible shape is a contradictory
+            // companion fact vs the primal's recorded facts.
+            for selected in &relation.selected_outputs {
+                if selected.upstream_gradient_ty != selected.ty {
+                    return Err(DeviceProgramError::ContradictoryCompanionFact {
+                        primal: relation.primal,
+                        field: "upstream-gradient-type",
+                        first: format!("{:?}", selected.ty),
+                        second: format!("{:?}", selected.upstream_gradient_ty),
+                    });
+                }
+            }
+            // DDCP1-U4 / contract rule 6 (missing companion, reference-
+            // scoped): a declared companion must reference its companion
+            // facts — a relation with neither selected inputs nor selected
+            // outputs declares a companion with no outputs, a missing
+            // companion fact. A forward-only program declares no companions
+            // and needs none (rule 7); graph-direction references (a launch
+            // consuming a companion output with no declared relation) are
+            // proven by the independent oracle (G6 KernelSequence).
+            if relation.selected_inputs.is_empty() && relation.selected_outputs.is_empty() {
+                return Err(DeviceProgramError::MissingCompanionFact {
+                    primal: relation.primal,
+                    reason: "the relation declares no selected inputs and no selected outputs",
+                });
+            }
         }
         for relation in &self.relations {
+            let key = relation.identity_key();
             if self
                 .relations
                 .iter()
-                .filter(|candidate| candidate.primal == relation.primal)
+                .filter(|candidate| candidate.identity_key() == key)
                 .count()
                 > 1
             {
                 let conflict = self.relations.iter().find_map(|other| {
-                    (other.primal == relation.primal)
+                    (other.identity_key() == key)
                         .then(|| relation_conflict_field(relation, other))?
                 });
                 if let Some((field, first, second)) = conflict {

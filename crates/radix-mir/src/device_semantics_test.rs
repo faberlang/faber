@@ -744,3 +744,95 @@ fn write_does_not_imply_observability() {
         .validate(&[LaunchId(1)])
         .expect("a write without an observation fact validates; observability is explicit");
 }
+
+// ── DDCP1-U4: companion identity + duplicate/contradictory fail-closed ──
+
+#[test]
+fn companion_identity_key_derives_from_primal_and_typed_relation() {
+    // Contract rule 2: an AIR-generated backward companion's identity is
+    // derived from its primal kernel identity PLUS the typed companion
+    // relation (the differentiation point) — never from a name or position.
+    let forward = lossless_entry(1, 2);
+    let same_identity = lossless_entry(1, 2);
+    let other_primal = lossless_entry(2, 3);
+    let mut other_relation = lossless_entry(1, 3);
+    other_relation.derivative = MirCompanionDerivativeKind::ReverseModeVjp;
+    assert_eq!(forward.identity_key(), same_identity.identity_key());
+    assert_ne!(forward.identity_key(), other_primal.identity_key());
+    assert_eq!(
+        forward.identity_key(),
+        (DefId(1), MirCompanionDerivativeKind::ReverseModeVjp)
+    );
+    assert_eq!(forward.identity_key(), other_relation.identity_key());
+}
+
+#[test]
+fn duplicate_companion_facts_fail_closed_on_identity_key() {
+    // Contract rule 3: duplicate companion facts for one (primal,
+    // differentiation point) fail closed — keyed on the companion identity,
+    // not on a name or position.
+    let semantics = DeviceSemantics {
+        relations: vec![lossless_entry(1, 2), lossless_entry(1, 2)],
+        ..DeviceSemantics::default()
+    };
+    assert!(matches!(
+        semantics.validate(&[]),
+        Err(DeviceProgramError::DuplicateRelationRow { primal })
+            if primal == DefId(1)
+    ));
+}
+
+#[test]
+fn contradictory_upstream_gradient_type_fails_closed() {
+    // Contract rule 4: a companion fact whose upstream gradient shape is
+    // incompatible with the primal output it differentiates is contradictory
+    // vs the primal's recorded facts.
+    let mut entry = lossless_entry(1, 2);
+    entry.selected_outputs[0].upstream_gradient_ty = TypeId(2);
+    let semantics = DeviceSemantics {
+        relations: vec![entry],
+        ..DeviceSemantics::default()
+    };
+    assert!(matches!(
+        semantics.validate(&[]),
+        Err(DeviceProgramError::ContradictoryCompanionFact {
+            primal,
+            field: "upstream-gradient-type",
+            ..
+        }) if primal == DefId(1)
+    ));
+}
+
+#[test]
+fn forward_only_program_declares_no_companions_and_needs_none() {
+    // Contract rule 7: a forward-only program carries no relations and
+    // validates without any companion facts — the missing rule applies only
+    // where companion outputs are actually referenced.
+    let semantics = DeviceSemantics {
+        relations: Vec::new(),
+        ..DeviceSemantics::default()
+    };
+    semantics
+        .validate(&[])
+        .expect("a forward-only program needs no companion facts");
+}
+
+#[test]
+fn relation_with_no_companion_facts_fails_closed_as_missing() {
+    // Contract rule 6 (reference-scoped): a declared companion must
+    // reference its companion facts — a relation with no selected inputs and
+    // no selected outputs declares a companion whose outputs are missing. A
+    // forward-only program declares no companions and needs none (rule 7).
+    let mut entry = lossless_entry(1, 2);
+    entry.selected_inputs.clear();
+    entry.selected_outputs.clear();
+    let semantics = DeviceSemantics {
+        relations: vec![entry],
+        ..DeviceSemantics::default()
+    };
+    assert!(matches!(
+        semantics.validate(&[]),
+        Err(DeviceProgramError::MissingCompanionFact { primal, .. })
+            if primal == DefId(1)
+    ));
+}

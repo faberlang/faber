@@ -412,3 +412,196 @@ fn unrelated_live_tuple_aggregate_in_tuple_returning_source_fails_target_entry_g
         "the unrelated tuple aggregate must fail with the aggregate diagnostic, got: {gaps:?}"
     );
 }
+
+// ── DDCP1-U4: forward + generated-backward coexist without a runtime tape ──
+
+/// A compact primal kernel: one elementwise tensor copy (forward).
+fn primal_elementwise_kernel(types: &mut TypeTable) -> MirFunction {
+    let r2 = rank2_tensor_ty(types, [4, 4]);
+    let span = test_span();
+    MirFunction {
+        id: MirFunctionId(0),
+        source: Some(radix_hir::DefId(1)),
+        name: None,
+        params: vec![MirParam {
+            local: MirLocalId(0),
+            name: None,
+            ty: r2,
+            mode: MirParamMode::Owned,
+            span,
+        }],
+        locals: vec![MirLocal {
+            id: MirLocalId(0),
+            name: None,
+            ty: r2,
+            mutable: false,
+            span,
+        }],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: Vec::new(),
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(0),
+                )))),
+                span,
+            },
+            span,
+        }],
+        return_ty: r2,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    }
+}
+
+/// A compact generated-backward companion: two gradient matmuls into
+/// locals 6..=7, then the multi-output result aggregation into TEMP(0)
+/// (the S5A-U4 kept result-tuple shape — the tuple IS the aggregation, not
+/// an unrelated live aggregate).
+fn companion_result_tuple_two_gradients(types: &mut TypeTable) -> MirFunction {
+    let r2 = rank2_tensor_ty(types, [4, 4]);
+    let tuple = MirType::semantic(types.intern(Type::Tuple(vec![r2.semantic_id(); 2])));
+    let span = test_span();
+    let mut statements = Vec::new();
+    for dest in 6..8u32 {
+        let a = MirLocalId((dest - 6) % 2);
+        let b = MirLocalId((dest - 5) % 2);
+        statements.push(MirStatement {
+            kind: MirStatementKind::RuntimeCall {
+                destination: Some(MirPlace::local(MirLocalId(dest))),
+                call: MirRuntimeCall {
+                    intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorMatMul),
+                    args: vec![
+                        MirOperand::Place(MirPlace::local(a)),
+                        MirOperand::Place(MirPlace::local(b)),
+                    ],
+                    return_ty: r2,
+                },
+            },
+            span,
+        });
+    }
+    statements.push(MirStatement {
+        kind: MirStatementKind::Construct {
+            destination: MirPlace::temp(MirTempId(0)),
+            aggregate: MirAggregate {
+                kind: MirAggregateKind::Tuple,
+                ty: tuple,
+                fields: MirAggregateFields::Ordered(
+                    (6..8u32)
+                        .map(|local| {
+                            MirAggregateItem::Operand(MirOperand::Place(MirPlace::local(
+                                MirLocalId(local),
+                            )))
+                        })
+                        .collect(),
+                ),
+            },
+        },
+        span,
+    });
+    MirFunction {
+        id: MirFunctionId(0),
+        source: Some(radix_hir::DefId(2)),
+        name: None,
+        params: (0..2u32)
+            .map(|local| MirParam {
+                local: MirLocalId(local),
+                name: None,
+                ty: r2,
+                mode: MirParamMode::Owned,
+                span,
+            })
+            .collect(),
+        locals: (0..8u32)
+            .map(|local| MirLocal {
+                id: MirLocalId(local),
+                name: None,
+                ty: r2,
+                mutable: false,
+                span,
+            })
+            .collect(),
+        temps: vec![MirTemp {
+            id: MirTempId(0),
+            ty: tuple,
+            span,
+        }],
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements,
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::temp(
+                    MirTempId(0),
+                )))),
+                span,
+            },
+            span,
+        }],
+        return_ty: tuple,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    }
+}
+
+#[test]
+fn forward_and_backward_kernels_share_one_program_without_tape() {
+    // Contract rule 8: the forward primal and the generated-backward
+    // companion (decomposed result-tuple aggregation) share one MIR
+    // program and both pass the device-safe gate. The graph and companion
+    // relations are the only accounting — neither kernel carries runtime
+    // tape/autograd machinery on the device path.
+    let mut types = TypeTable::new();
+    let primal = primal_elementwise_kernel(&mut types);
+
+    // The generated-backward companion: tuple-returning, decomposed into
+    // single-output subchains whose kept result tuple is the aggregation.
+    let companion = companion_result_tuple_two_gradients(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let decomposition =
+        crate::kernel_decomposition::decompose_kernel_function(&companion, &validation)
+            .expect("the tuple-returning companion decomposes");
+    let mut subchain_types =
+        TypeTable::from_snapshot(types.snapshot()).expect("a live table always restores");
+    decomposition.intern_output_tuple_types(&companion, &mut subchain_types);
+    let subchain_validation = validation.with_types(&subchain_types);
+    let mut synthetics = Vec::new();
+    for position in 0..decomposition.subchains.len() {
+        let mut synthetic =
+            decomposition.subchain_function(&companion, position, subchain_validation.types);
+        if matches!(
+            synthetic.blocks[0].terminator.kind,
+            MirTerminatorKind::Return(None)
+        ) {
+            synthetic.return_ty =
+                MirType::semantic(subchain_validation.types.primitive(Primitive::Vacuum));
+        }
+        synthetic.id = MirFunctionId(u32::try_from(synthetics.len() + 1).unwrap_or(u32::MAX));
+        synthetic.source = Some(radix_hir::DefId(2));
+        synthetics.push(synthetic);
+    }
+
+    let mut program = crate::MirProgram {
+        functions: vec![primal],
+    };
+    program.functions.extend(synthetics);
+    let validated = ValidatedMir::new(program, subchain_validation)
+        .expect("primal + decomposed companion validate as one MIR program");
+    let device = MirDeviceContext::from_hir_roles(FxHashMap::from_iter([
+        (radix_hir::DefId(1), MirDeviceRole::Kernel),
+        (radix_hir::DefId(2), MirDeviceRole::Kernel),
+    ]));
+
+    let verdict = classify_device_safe_for_target_entry(&validated, &device);
+    assert!(
+        verdict.is_capable(),
+        "forward + generated-backward kernels coexist without a runtime tape, got: {verdict:?}"
+    );
+}
