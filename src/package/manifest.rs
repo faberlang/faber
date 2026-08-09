@@ -6,6 +6,11 @@ use radix::codegen::Target;
 use radix::diagnostics::Diagnostic;
 use serde::Deserialize;
 
+// DDPP1-U2 (C2 feature isolation): the shared route-selection request type
+// (the packaged runtime's `faber::device::DeviceSelection` under
+// `device-runtime`, a local equivalent in the small build).
+use super::DeviceSelection;
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FaberManifest {
@@ -370,21 +375,19 @@ pub(crate) fn manifest_build_target(
 pub(crate) fn manifest_backend_selection(
     backend: Option<&str>,
     path: &Path,
-) -> Result<Option<faber::device::DeviceSelection>, Box<Diagnostic>> {
+) -> Result<Option<DeviceSelection>, Box<Diagnostic>> {
     match backend.map(str::trim) {
         None => Ok(None),
-        Some(spelling) => {
-            match faber::device::DeviceSelection::from_spelling(spelling) {
-                Some(selection) => Ok(Some(selection)),
-                None => Err(Box::new(
-                    crate::package_diagnostic_error(format!(
-                        "faber.toml device.backend '{spelling}' is not supported; use 'auto', 'metal', or 'cuda'"
-                    ))
-                    .with_file(path.display().to_string())
-                    .with_arg("issue", "package_device_backend_unsupported")
-                    .with_arg("backend", spelling.to_owned()),
-                )),
-            }
+        Some(spelling) => match DeviceSelection::from_spelling(spelling) {
+            Some(selection) => Ok(Some(selection)),
+            None => Err(Box::new(
+                crate::package_diagnostic_error(format!(
+                    "faber.toml device.backend '{spelling}' is not supported; use 'auto', 'metal', or 'cuda'"
+                ))
+                .with_file(path.display().to_string())
+                .with_arg("issue", "package_device_backend_unsupported")
+                .with_arg("backend", spelling.to_owned()),
+            )),
         }
     }
 }

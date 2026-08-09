@@ -29,7 +29,40 @@ use super::library::{
 use super::library_resolver_from_config;
 use super::LibraryImportBinding;
 use crate::library::LibraryResolver;
-use faber::device::DeviceSelection;
+/// Device-selection request used by the route-selection plumbing. With
+/// `device-runtime` compiled in, this is the packaged runtime's
+/// [`faber::device::DeviceSelection`]; without it the small build carries the
+/// same request shape locally so the plumbing compiles without pulling
+/// `faber-runtime` into the build graph (DDPP1-U2 / C2 feature isolation).
+#[cfg(feature = "device-runtime")]
+pub(crate) use faber::device::DeviceSelection;
+
+#[cfg(not(feature = "device-runtime"))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum DeviceSelection {
+    /// Resolve against host capability probes; fail closed when the machine
+    /// admits zero or more than one backend.
+    Auto,
+    /// Select Metal explicitly; never silently falls back.
+    Metal,
+    /// Select CUDA explicitly; never silently falls back.
+    Cuda,
+}
+
+#[cfg(not(feature = "device-runtime"))]
+impl DeviceSelection {
+    /// Parse a selection from its stable spelling (`auto` / `metal` / `cuda`).
+    #[must_use]
+    pub(crate) fn from_spelling(spelling: &str) -> Option<Self> {
+        match spelling {
+            "auto" => Some(Self::Auto),
+            "metal" => Some(Self::Metal),
+            "cuda" => Some(Self::Cuda),
+            _ => None,
+        }
+    }
+}
+
 use radix::cli::{
     CliCommand, CliDefault, CliExit, CliMode, CliOperand, CliOption, CliProgram, CliType,
 };
@@ -124,7 +157,7 @@ struct PreparedPackageMir<'a> {
     /// S1-6 vertical-slice device inputs (`[device] inputs`, mapped to f32).
     device_inputs: BTreeMap<String, Vec<f32>>,
     /// S1-6 device backend request (`[device] backend`), if declared.
-    device_backend: Option<faber::device::DeviceSelection>,
+    device_backend: Option<DeviceSelection>,
     /// S5-U5b declared training step count (`[device] steps`), if declared.
     /// Absent selects the portable default [`DEFAULT_TRAINING_STEPS`].
     device_steps: Option<u32>,
@@ -137,7 +170,7 @@ struct PreparedPackageMir<'a> {
 #[derive(Default)]
 struct DeviceManifestConfig {
     inputs: BTreeMap<String, Vec<f32>>,
-    backend: Option<faber::device::DeviceSelection>,
+    backend: Option<DeviceSelection>,
     steps: Option<u32>,
     declared: bool,
 }
@@ -268,14 +301,14 @@ impl FmirPackageImage {
     /// recorded on the image is representable on the packet but rejected
     /// fail-closed here — never silently remapped to `auto` or a compiled-in
     /// backend (DDCP2 gate bullet 4).
-    fn route_selection(&self) -> Result<faber::device::DeviceSelection, Vec<Diagnostic>> {
+    fn route_selection(&self) -> Result<DeviceSelection, Vec<Diagnostic>> {
         let Some(device) = &self.device else {
-            return Ok(faber::device::DeviceSelection::Auto);
+            return Ok(DeviceSelection::Auto);
         };
         match &device.selection {
-            FmirDeviceSelection::Auto => Ok(faber::device::DeviceSelection::Auto),
-            FmirDeviceSelection::Metal => Ok(faber::device::DeviceSelection::Metal),
-            FmirDeviceSelection::Cuda => Ok(faber::device::DeviceSelection::Cuda),
+            FmirDeviceSelection::Auto => Ok(DeviceSelection::Auto),
+            FmirDeviceSelection::Metal => Ok(DeviceSelection::Metal),
+            FmirDeviceSelection::Cuda => Ok(DeviceSelection::Cuda),
             FmirDeviceSelection::Unknown(id) => Err(vec![mir_diag(
                 &self.diagnostic_path,
                 format!(

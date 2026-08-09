@@ -154,6 +154,10 @@ fn apply_validation_metadata(
 /// canonical payload + selection + runtime requirements. `None` for packages
 /// without a device declaration (no device payload; the CPU route is
 /// unchanged).
+// DDPP1-U2 (C2 feature isolation): the device-section builder compiles only
+// under `device-runtime` (it consumes the excluded `package/device` subtree);
+// without it a package never carries a device payload.
+#[cfg(feature = "device-runtime")]
 pub(super) fn package_device_section(
     prepared: &PreparedPackageMir<'_>,
     lowered: &LoweredMirUnit<'_>,
@@ -332,6 +336,7 @@ pub(super) fn package_device_section(
 /// JIT-compiled by the driver at module load (N1.3 §3.1), so the `.target`
 /// is a minimum-arch declaration: `sm_90` PTX runs on sm_120 exactly as the
 /// G4/G5 pharos receipt's default-target PTX did.
+#[cfg(feature = "device-runtime")]
 pub(super) const S1_6_PTX_TARGET: &str = "sm_90";
 
 pub(super) fn fmir_package_image_from_lowered(
@@ -340,7 +345,12 @@ pub(super) fn fmir_package_image_from_lowered(
     diagnostic_path: PathBuf,
     format: FmirPackageImageFormat,
 ) -> Result<FmirPackageImage, Vec<Diagnostic>> {
+    // DDPP1-U2 (C2 feature isolation): without `device-runtime` the device
+    // section builder is not compiled and no package carries a device payload.
+    #[cfg(feature = "device-runtime")]
     let device = package_device_section(prepared, lowered, &diagnostic_path)?;
+    #[cfg(not(feature = "device-runtime"))]
+    let device = None::<FmirDeviceSection>;
     // Source identities ride the image when the package carries a device
     // payload (the A10 identity's source half): the source-format route has
     // the real package files on disk. The FHIR-loaded route reconstructs a
@@ -406,6 +416,27 @@ pub(super) fn run_fmir_package_image<H: Host + ?Sized>(
     let mut validation = radix::mir::MirValidationContext::new(&types);
     validation.interner = Some(&interner);
     apply_validation_metadata(&mut validation, &image.validation);
+    #[cfg(debug_assertions)]
+    {
+        let mut found = 0;
+        for function in &image.program.functions {
+            for block in &function.blocks {
+                for statement in &block.statements {
+                    if let MirStatementKind::Construct { aggregate, .. } = &statement.kind {
+                        if let MirAggregateKind::Struct(def) = &aggregate.kind {
+                            let count = match &aggregate.fields {
+                                MirAggregateFields::Named(items) => items.len(),
+                                _ => 0,
+                            };
+                            eprintln!("DBGRUN struct def#{} named_count={}", def.0, count);
+                            found += 1;
+                        }
+                    }
+                }
+            }
+        }
+        eprintln!("DBGRUN total_struct_aggregates={found}");
+    }
     let validated =
         radix::mir::ValidatedMir::new(image.program.clone(), validation).map_err(|errors| {
             errors
@@ -476,7 +507,12 @@ pub(super) fn fmir_image_header(
         .map(|path| source_identity(path, package_root))
         .collect::<Result<Vec<_>, _>>()?;
     sources.sort_by(|left, right| left.file.cmp(&right.file));
+    // DDPP1-U2 (C2 feature isolation): without `device-runtime` the device
+    // section builder is not compiled and no package carries a device payload.
+    #[cfg(feature = "device-runtime")]
     let device = package_device_section(prepared, lowered, &prepared.entry_path)?;
+    #[cfg(not(feature = "device-runtime"))]
+    let device = None::<FmirDeviceSection>;
     let (types, interner) = snapshot_context(lowered);
     Ok(FmirImageHeader {
         version: PACKAGE_MIR_ARTIFACT_VERSION,

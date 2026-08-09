@@ -27,8 +27,10 @@ radix-mir-fmir = { path = "../radix/crates/radix-mir-fmir" }
 # Differentiable-GPU campaign (S1-6): the S1-3 device-artifact emitters (Metal
 # MSL + CUDA NVVM/PTX) the faber device-program constructor consumes through
 # the shared radix-mir surface. Build-time only — never a runtime dependency.
-radix-mir-metal = { path = "../radix/crates/radix-mir-metal" }
-radix-mir-llvm = { path = "../radix/crates/radix-mir-llvm" }
+# DDPP1-U2 (C2 feature isolation): gated `optional`, pulled only by `mir-metal`.
+radix-mir-metal = { path = "../radix/crates/radix-mir-metal", optional = true }
+# DDPP1-U2 (C2 feature isolation): gated `optional`, pulled only by `mir-llvm`.
+radix-mir-llvm = { path = "../radix/crates/radix-mir-llvm", optional = true }
 # Package-store library: Faber product composition may depend on cista the same
 # way it depends on radix (docs/design/product-composition-radix-cista.md).
 cista = { path = "../cista" }
@@ -36,11 +38,16 @@ cista = { path = "../cista" }
 # `faber::device` surface) and the composite host. Hosts owns the native
 # Metal/CUDA sessions; faber owns the host factory that calls the composite
 # host's one host-construction decision.
-faber = { package = "faber-runtime", path = "../faber-runtime" }
-faber-host-macos-arm64 = { path = "../hosts/macos-arm64" }
+# DDPP1-U2 (C2 feature isolation): gated `optional`, pulled only by
+# `device-runtime` (the device-runtime modules compile only under it).
+faber = { package = "faber-runtime", path = "../faber-runtime", optional = true }
+# DDPP1-U2 (C2 feature isolation): gated `optional`, pulled only by
+# `host-macos-arm64` (the native Metal/CUDA host leaf).
+faber-host-macos-arm64 = { path = "../hosts/macos-arm64", optional = true }
 # Portable product runner (Stage 2 wasm-host-parity): the single v1
 # product-host owner; Faber packaging consumes the same API later.
-faber-host-wasm = { path = "../hosts/wasm" }
+# DDPP1-U2 (C2 feature isolation): gated `optional`, pulled only by `host-wasm`.
+faber-host-wasm = { path = "../hosts/wasm", optional = true }
 clap = { version = "4.5", features = ["derive"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1"
@@ -82,6 +89,9 @@ full-targets = [
     "mir-llvm",
     "mir-wasm",
     "mir-coverage",
+    "device-runtime",
+    "host-macos-arm64",
+    "host-wasm",
 ]
 hir-rust = ["radix/hir-rust", "dep:faber-hir-rust"]
 hir-faber = ["radix/hir-faber"]
@@ -91,11 +101,21 @@ hir-swift = ["radix/hir-swift"]
 hir-fhir = ["radix/hir-fhir"]
 mir-fmir = ["radix/mir-fmir"]
 mir-sexp = ["radix/mir-sexp"]
-mir-metal = ["radix/mir-metal"]
+mir-metal = ["radix/mir-metal", "dep:radix-mir-metal"]
 mir-wgsl = ["radix/mir-wgsl"]
-mir-llvm = ["radix/mir-llvm"]
+mir-llvm = ["radix/mir-llvm", "dep:radix-mir-llvm"]
 mir-wasm = ["radix/mir-wasm"]
 mir-coverage = ["radix/mir-coverage"]
+# DDPP1-U2 (C2 feature isolation): the device-runtime surface (package
+# `faber-runtime` + the `package/device/*` / `host_factory.rs` modules)
+# compiles only under this feature. It implies the device-artifact emitters
+# because the device section builder consumes them (a device runtime without
+# the emitters is not a buildable configuration).
+device-runtime = ["dep:faber", "mir-metal", "mir-llvm"]
+# DDPP1-U2 (C2 feature isolation): physical Hosts leaves compile only under
+# their host features (a small build compiles no native/wasm host session code).
+host-macos-arm64 = ["dep:faber-host-macos-arm64"]
+host-wasm = ["dep:faber-host-wasm"]
 
 [workspace]
 members = [".", "crates/exempla", "crates/faber-hir-rust", "crates/hygiene-ratchet"]

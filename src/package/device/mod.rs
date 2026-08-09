@@ -124,6 +124,10 @@ fn boundary_abi_diag(class: &'static str, message: impl Into<String>) -> Diagnos
         .with_arg("class", class)
 }
 
+// DDPP1-U2 (C2 feature isolation): `prefill_run` is the named runtime-import
+// site (`faber::dequant`/`gguf`/`prefill`); it is gated explicitly so the
+// small build never compiles it even if the outer device-runtime gate regresses.
+#[cfg(feature = "device-runtime")]
 mod prefill_run;
 mod program;
 mod run;

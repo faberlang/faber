@@ -378,13 +378,15 @@ pub enum BackendSelection {
 }
 
 impl BackendSelection {
-    /// Convert to the packaged `faber::device` selection request.
+    /// Convert to the packaged `faber::device` selection request (the shared
+    /// route-selection type; a local equivalent in a build without
+    /// `device-runtime`, DDPP1-U2 / C2 feature isolation).
     #[must_use]
-    pub fn selection(self) -> faber::device::DeviceSelection {
+    pub fn selection(self) -> crate::package::DeviceSelection {
         match self {
-            Self::Auto => faber::device::DeviceSelection::Auto,
-            Self::Metal => faber::device::DeviceSelection::Metal,
-            Self::Cuda => faber::device::DeviceSelection::Cuda,
+            Self::Auto => crate::package::DeviceSelection::Auto,
+            Self::Metal => crate::package::DeviceSelection::Metal,
+            Self::Cuda => crate::package::DeviceSelection::Cuda,
         }
     }
 }

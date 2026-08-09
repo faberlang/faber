@@ -38,6 +38,7 @@ mod cmd;
 #[cfg(feature = "hir-rust")]
 mod codegen;
 mod compile;
+#[cfg(feature = "device-runtime")]
 mod device;
 mod discovery;
 mod dispatch;
@@ -47,6 +48,7 @@ mod file_interface;
 mod frontmatter;
 #[cfg(feature = "hir-go")]
 mod go_build;
+#[cfg(feature = "device-runtime")]
 mod host_factory;
 mod import_graph;
 mod library;
@@ -152,6 +154,7 @@ pub(crate) use product::build_browser_product_with_postprocess;
 #[cfg(test)]
 pub(crate) use product::{build_browser_product, build_browser_product_static_assets};
 // binary-only package interpretation route consumes this through `commands`.
+#[cfg(feature = "device-runtime")]
 #[allow(unused_imports)] // the S1-6 device-route seam (constructor + execution).
 pub(crate) use device::{
     admit_device_program_section, device_program_for_lowered, device_section_for_program,
@@ -160,8 +163,10 @@ pub(crate) use device::{
 // NGAB1-U1 host-partition wire: the typed host/device partition + device
 // program of a lowered package (faber-owned ABI crossing; radix owns the
 // derivation facts).
+#[cfg(feature = "device-runtime")]
 #[allow(unused_imports)]
 pub(crate) use device::host_partition_for_lowered;
+#[cfg(feature = "device-runtime")]
 #[allow(unused_imports)] // the one host-construction policy for the run routes.
 pub(crate) use host_factory::{
     admitted_backends, construct_composite_host, create_program_session, discovery_receipt,
@@ -198,6 +203,10 @@ pub use mir::run_fmir_image_bytes_with_stdio;
 pub(super) use mir::test_support::{fmir_image_test_summary, fmir_text_image_test_summary};
 #[allow(unused_imports)] // External backend harnesses consume the public package-MIR callback.
 pub use mir::with_lowered_package_mir;
+/// Shared device-selection request type for the route-selection plumbing: the
+/// packaged runtime's [`faber::device::DeviceSelection`] under `device-runtime`,
+/// a local equivalent in the small build (DDPP1-U2 / C2 feature isolation).
+pub(crate) use mir::DeviceSelection;
 #[allow(unused_imports)] // FMIR stages consume this crate-visible image API.
 pub(crate) use mir::{
     build_package_fmir_binary_bundle, build_package_fmir_image, build_package_fmir_text_image,
@@ -533,6 +542,7 @@ pub(crate) fn load_package_with_locale_pack(
 mod test_support;
 
 #[cfg(test)]
+#[cfg(feature = "device-runtime")]
 #[path = "ngab1_host_partition_test.rs"]
 mod ngab1_host_partition_test;
 
@@ -552,3 +562,10 @@ mod tests;
 #[cfg(test)]
 #[path = "../package_text_contract_test.rs"]
 mod text_contract_tests;
+
+// DDPP1-U2 (C2 feature isolation): the small-build surface proof — these tests
+// compile and run only without `device-runtime`, exercising the CPU-only
+// route-selection plumbing in the build that excludes the device runtime.
+#[cfg(all(test, not(feature = "device-runtime")))]
+#[path = "feature_isolation_test.rs"]
+mod feature_isolation_test;

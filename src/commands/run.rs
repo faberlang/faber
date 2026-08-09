@@ -11,7 +11,7 @@
 use crate::cli::{BackendSelection, FmirRunArgs, RunArgs};
 use crate::input_shape::locale_without_package_error;
 use crate::package;
-use faber::device::{DeviceBackend, DeviceSelection};
+use crate::package::DeviceSelection;
 use fs2::FileExt;
 use radix::codegen::Target;
 use radix::diagnostics::Diagnostic;
@@ -147,7 +147,18 @@ fn resolve_route_selection(
         manifest.device.backend.as_deref(),
         &layout.manifest_path,
     )?;
-    Ok(package::effective_backend_selection(None, manifest_backend))
+    // DDPP1-U2 (C2 feature isolation): with `device-runtime` the portable
+    // default is applied by the host factory; without it the same semantics
+    // (`cli override > manifest backend > auto`) resolve locally — a small
+    // build can never reach a device route.
+    #[cfg(feature = "device-runtime")]
+    {
+        return Ok(package::effective_backend_selection(None, manifest_backend));
+    }
+    #[cfg(not(feature = "device-runtime"))]
+    {
+        return Ok(manifest_backend.unwrap_or(DeviceSelection::Auto));
+    }
 }
 
 /// Apply the one host-construction policy to a route before launch (N1.1/
@@ -155,16 +166,31 @@ fn resolve_route_selection(
 /// admitted backends and fail closed with a structured diagnostic before any
 /// launch when the resolution fails (N1.4). Returns `Some(backend)` when a
 /// device session must be constructed and `None` for the CPU-only route.
-fn resolve_route_backend_or_exit(
-    selection: DeviceSelection,
-    requires_device: bool,
-) -> Option<DeviceBackend> {
-    let admitted = package::admitted_backends();
-    match package::resolve_backend_selection(selection, requires_device, &admitted) {
-        Ok(backend) => backend,
-        Err(diagnostic) => {
-            eprint_route_diagnostics(&[diagnostic]);
-            eprintln!("backend selection failed; aborting before launch");
+fn resolve_route_backend_or_exit(selection: DeviceSelection, requires_device: bool) {
+    // DDPP1-U2 (C2 feature isolation): the composite-host backend resolution
+    // compiles only under `device-runtime`; without it an explicit device
+    // request fails closed before launch (never silently falls back to CPU).
+    // The resolution value is deliberately dropped (callers only need the
+    // fail-closed side effect); returning it would pin the function to the
+    // `device-runtime`-only `DeviceBackend` type.
+    #[cfg(feature = "device-runtime")]
+    {
+        let admitted = package::admitted_backends();
+        match package::resolve_backend_selection(selection, requires_device, &admitted) {
+            Ok(_) => {}
+            Err(diagnostic) => {
+                eprint_route_diagnostics(&[diagnostic]);
+                eprintln!("backend selection failed; aborting before launch");
+                std::process::exit(1);
+            }
+        }
+    }
+    #[cfg(not(feature = "device-runtime"))]
+    {
+        if selection != DeviceSelection::Auto || requires_device {
+            eprintln!(
+                "error: a device route was requested, but this faber build compiles no `device-runtime`; rebuild with the `device-runtime` feature"
+            );
             std::process::exit(1);
         }
     }

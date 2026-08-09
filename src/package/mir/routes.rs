@@ -239,25 +239,41 @@ pub(super) fn run_loaded_fmir_image_route<H: Host + ?Sized>(
 /// selection > `auto`).
 pub(super) fn run_loaded_fmir_image_route_with_selection<H: Host + ?Sized>(
     image: FmirPackageImage,
-    selection: faber::device::DeviceSelection,
+    selection: DeviceSelection,
     host: &mut H,
 ) -> Result<(), Vec<Diagnostic>> {
     let requires_device = image.device.is_some();
-    match super::super::host_factory::resolve_backend_selection(
-        selection,
-        requires_device,
-        &super::super::host_factory::admitted_backends(),
-    ) {
-        Err(diagnostic) => Err(vec![diagnostic]),
-        Ok(None) => run_fmir_package_image(image, host),
-        Ok(Some(backend)) => {
-            let device = image.device.as_ref().ok_or_else(|| {
-                vec![super::super::host_factory::missing_device_descriptor(
-                    backend,
-                )]
-            })?;
-            super::super::device::execute_device_route(device, backend, &image.source_hashes)
+    // DDPP1-U2 (C2 feature isolation): the device route is compiled only under
+    // `device-runtime`; without it an explicit backend request or a
+    // device-bearing image fails closed (never silently runs CPU).
+    #[cfg(feature = "device-runtime")]
+    {
+        match super::super::host_factory::resolve_backend_selection(
+            selection,
+            requires_device,
+            &super::super::host_factory::admitted_backends(),
+        ) {
+            Err(diagnostic) => Err(vec![diagnostic]),
+            Ok(None) => run_fmir_package_image(image, host),
+            Ok(Some(backend)) => {
+                let device = image.device.as_ref().ok_or_else(|| {
+                    vec![super::super::host_factory::missing_device_descriptor(
+                        backend,
+                    )]
+                })?;
+                super::super::device::execute_device_route(device, backend, &image.source_hashes)
+            }
         }
+    }
+    #[cfg(not(feature = "device-runtime"))]
+    {
+        if selection != DeviceSelection::Auto || requires_device {
+            return Err(vec![mir_diag(
+                &image.diagnostic_path,
+                "device section or explicit backend selection present, but this faber build compiles no `device-runtime`; rebuild with the `device-runtime` feature to execute device routes",
+            )]);
+        }
+        run_fmir_package_image(image, host)
     }
 }
 
@@ -272,7 +288,7 @@ pub(crate) fn run_fmir_image_path<H: Host + ?Sized>(
 /// optional selection override (the image-runner `--backend` flag).
 pub(crate) fn run_fmir_image_path_with_selection<H: Host + ?Sized>(
     image_path: &Path,
-    selection_override: Option<faber::device::DeviceSelection>,
+    selection_override: Option<DeviceSelection>,
     host: &mut H,
 ) -> Result<(), Vec<Diagnostic>> {
     let image_bytes = fs::read(image_path).map_err(|error| {
@@ -299,7 +315,7 @@ pub(crate) struct FmirImageRouteDecision {
     pub(crate) requires_device: bool,
     /// The selection request recorded in the image's `device` section
     /// (fallback `auto` when the image carries none).
-    pub(crate) declared_selection: faber::device::DeviceSelection,
+    pub(crate) declared_selection: DeviceSelection,
     /// Declared backend artifacts (canonical bytes + `content_sha256`
     /// digest), empty for CPU-only images. Re-verified against their
     /// canonical decoded bytes at image admission (DDCP2-U3).
@@ -341,32 +357,48 @@ pub fn run_fmir_image_bytes_with_stdio(
     let loaded = load_fmir_image(image_bytes, diagnostic_path)?;
     let requires_device = loaded.device.is_some();
     let selection = loaded.route_selection()?;
-    // The one host-construction policy (N1.1/N1.5): the image-runner route
-    // resolves its backend through the composite host's single decision
-    // before any launch. `auto` + a payload-less image keeps the CPU route
-    // unchanged; an explicit request that cannot be served fails closed and
-    // never silently falls back to CPU.
-    match super::super::host_factory::resolve_backend_selection(
-        selection,
-        requires_device,
-        &super::super::host_factory::admitted_backends(),
-    ) {
-        Err(diagnostic) => Err(vec![diagnostic]),
-        Ok(None) => {
-            let mut host = radix::mir::StdioHost::with_argumenta(argumenta);
-            run_fmir_package_image(loaded, &mut host)
+    // DDPP1-U2 (C2 feature isolation): the composite-host device route is
+    // compiled only under `device-runtime`; without it an explicit backend
+    // request or a device-bearing image fails closed (never silently runs
+    // CPU). With the runtime, the one host-construction policy applies (N1.1/
+    // N1.5): `auto` + a payload-less image keeps the CPU route unchanged; an
+    // explicit request that cannot be served fails closed and never silently
+    // falls back to CPU.
+    #[cfg(feature = "device-runtime")]
+    {
+        match super::super::host_factory::resolve_backend_selection(
+            selection,
+            requires_device,
+            &super::super::host_factory::admitted_backends(),
+        ) {
+            Err(diagnostic) => Err(vec![diagnostic]),
+            Ok(None) => {
+                let mut host = radix::mir::StdioHost::with_argumenta(argumenta);
+                run_fmir_package_image(loaded, &mut host)
+            }
+            Ok(Some(backend)) => {
+                // Device route: the image carries a device program and the
+                // backend is admitted. Run it through the composite host's
+                // device route (S1-6 launch seam); fail-before-launch applies
+                // inside the descriptor validation.
+                let device = loaded.device.as_ref().ok_or_else(|| {
+                    vec![super::super::host_factory::missing_device_descriptor(
+                        backend,
+                    )]
+                })?;
+                super::super::device::execute_device_route(device, backend, &loaded.source_hashes)
+            }
         }
-        Ok(Some(backend)) => {
-            // Device route: the image carries a device program and the
-            // backend is admitted. Run it through the composite host's
-            // device route (S1-6 launch seam); fail-before-launch applies
-            // inside the descriptor validation.
-            let device = loaded.device.as_ref().ok_or_else(|| {
-                vec![super::super::host_factory::missing_device_descriptor(
-                    backend,
-                )]
-            })?;
-            super::super::device::execute_device_route(device, backend, &loaded.source_hashes)
+    }
+    #[cfg(not(feature = "device-runtime"))]
+    {
+        if selection != DeviceSelection::Auto || requires_device {
+            return Err(vec![mir_diag(
+                diagnostic_path,
+                "device section or explicit backend selection present, but this faber build compiles no `device-runtime`; rebuild with the `device-runtime` feature to execute device routes",
+            )]);
         }
+        let mut host = radix::mir::StdioHost::with_argumenta(argumenta);
+        run_fmir_package_image(loaded, &mut host)
     }
 }
