@@ -18,6 +18,9 @@ wait-timeout = "0.2"
 [dev-dependencies]
 # Package MIR lower/compile for norma:* and multi-file package exempla.
 faber = { path = "../.." }
+# Module-boundary full profile: reuse the cheap-profile engine (consumer
+# generation) + walk/policy classification for the emit-lane parity mode.
+radix-module-boundary = { path = "../../../radix/crates/radix-module-boundary" }
 # Stage 2 product-runner adapter: the portable faber-host-wasm host is the
 # product evidence boundary replacing the stub host and external handle maps.
 faber-host-wasm = { path = "../../../hosts/wasm" }

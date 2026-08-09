@@ -17,6 +17,10 @@ mod llvm;
 mod llvm_runtime;
 mod mir;
 mod mir_target_matrix;
+// Module-boundary full profile (emit-lane parity on generated consumers,
+// wave 1 rust lane — see delivery MB-U4 / goal AC5). Opt-in ignored tests;
+// nothing here runs in the default suite.
+mod module_boundary;
 mod oracle;
 mod parity;
 mod rust;
