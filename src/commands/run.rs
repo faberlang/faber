@@ -208,6 +208,7 @@ fn run_target_name(target: Target) -> &'static str {
         Target::MirWasmBinary => "wasm",
         Target::MirLlvm => "llvm-text",
         Target::MirLlvmHost => "llvm-host",
+        Target::MirAmd => "amd",
         Target::MirMetal => "metal-text",
         Target::MirWgsl => "wgsl-text",
         Target::MirSexp => "sexp",

@@ -107,7 +107,8 @@ pub fn format_generated_code(target: Target, code: &str) -> Result<String, Strin
         | Target::MirScena
         | Target::MirFmir
         | Target::MirFmirBinary
-        | Target::MirFmirBundle => Ok(code.to_string()),
+        | Target::MirFmirBundle
+        | Target::MirAmd => Ok(code.to_string()),
     }
 }
 
@@ -135,7 +136,8 @@ pub fn lint_generated_code(target: Target, code: &str) -> Result<String, String>
         | Target::MirScena
         | Target::MirFmir
         | Target::MirFmirBinary
-        | Target::MirFmirBundle => Ok(code.to_string()),
+        | Target::MirFmirBundle
+        | Target::MirAmd => Ok(code.to_string()),
     }
 }
 
