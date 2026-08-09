@@ -328,7 +328,7 @@ impl fmt::Display for BoundaryAbiError {
             ),
             Self::UnsupportedCallsiteShape { host, kernel } => write!(
                 f,
-                "boundary call f{} → kernel f{} goes through a callee the direct region-call ABI cannot lower (Definition/value/indirect callee) — the prepared-region direct call is the only emitted boundary form (unsupported callsite shape)",
+                "boundary call f{} → kernel f{} goes through a callee the direct region-call ABI cannot lower (a Definition or non-function Value callee) — the prepared-region direct call is the only emitted boundary form (unsupported callsite shape)",
                 host.0, kernel.0
             ),
         }
