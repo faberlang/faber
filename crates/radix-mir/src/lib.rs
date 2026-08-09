@@ -6,6 +6,7 @@
 
 pub mod abi;
 pub mod ai_workbench_stage5;
+pub mod boundary_abi;
 pub mod capability;
 mod collection_ops;
 pub mod control;
@@ -79,6 +80,10 @@ pub use ai_workbench_stage5::{
     ai_workbench_stage5_native_status, ai_workbench_stage5_rows, AiWorkbenchStage5Facet,
     AiWorkbenchStage5Row, AiWorkbenchStage5Status,
 };
+pub use boundary_abi::{
+    validate_boundary_abi, BoundaryAbiClass, BoundaryAbiError, BoundaryCall, PreparedRegion,
+    HOST_CALL_ABI_VERSION,
+};
 pub use capability::{CapabilityGap, Lowerability};
 pub use device::{
     classify_device_safe, classify_device_safe_for_target_entry, device_roles_from_hir,
@@ -100,9 +105,7 @@ pub use generic::{
     bind_generic_type_witness, instantiate_existing_generic_type, type_contains_param,
     MirGenericBindings,
 };
-pub use host_partition::{
-    derive_host_partition, BoundaryCall, HostPartition, HostPartitionError,
-};
+pub use host_partition::{derive_host_partition, HostPartition, HostPartitionError};
 pub use inference_blocker_matrix::{
     inference_blocker_rows, inference_non_claims, InferenceBlockerCategory, InferenceBlockerRow,
     InferenceBlockerStatus, InferenceNonClaim, InferenceNonClaimKind,

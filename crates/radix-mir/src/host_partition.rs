@@ -26,10 +26,15 @@
 //!   in/out around the single run).
 //! - **Observations**: an explicit [`ResultBuffer`] row for each output-role
 //!   buffer, read back at [`ObservationCadence::EndOfRun`].
-//! - **Boundary calls**: the declared cross-boundary calls — a host function
-//!   whose body calls a device kernel ([`BoundaryCall`]). This is the NGAB0
-//!   §Partition "one host function calls one device kernel" surface, derived
-//!   from MIR call statements (typed), never from emitted text.
+//! - **Boundary calls**: the declared cross-boundary calls — one host
+//!   function invokes one prepared submission region containing one or more
+//!   kernels ([`BoundaryCall`], NGAB0-R1 granularity). This is the NGAB0
+//!   §Partition "one host call → one prepared region" surface, derived from
+//!   MIR call statements (typed), never from emitted text. Every boundary
+//!   call passes the versioned call-ABI gate
+//!   ([`validate_boundary_abi`](crate::boundary_abi::validate_boundary_abi));
+//!   invalid cross-boundary values fail at compile time with typed
+//!   diagnostics (NGAB1-U2).
 //!
 //! The derived program is validated through the shared schema
 //! ([`DeviceProgram::validate`]) before it is returned — a derived program
@@ -38,6 +43,9 @@
 
 use crate::abi::{
     MirKernelResource, MirKernelResourceKind, MirKernelShaderStage, MirKernelSignature,
+};
+use crate::boundary_abi::{
+    derive_boundary_calls, validate_boundary_abi, BoundaryAbiError, BoundaryCall,
 };
 use crate::device_program::{
     BufferId, BufferIdentity, BufferLifetime, BufferRole, BufferVersion, DeviceProgram,
@@ -48,8 +56,7 @@ use crate::device_program_plans::kernel_plan_for_function;
 use crate::kernel_plan::CollectionKernelPlan;
 use crate::layout::MirTensorStorageLayout;
 use crate::{
-    MirCallee, MirConstant, MirFunction, MirFunctionId, MirOperand, MirProgram,
-    MirStatementKind, ValidatedMir,
+    MirCallee, MirConstant, MirFunction, MirFunctionId, MirOperand, MirProgram, ValidatedMir,
 };
 use radix_lexer::Interner;
 use std::fmt;
@@ -86,6 +93,11 @@ pub enum HostPartitionError {
     },
     /// The derived device program violates the shared schema rules.
     Program(DeviceProgramError),
+    /// The cross-boundary call surface violates the versioned call ABI
+    /// (NGAB1-U2): an invalid cross-boundary value — wrong type, shape,
+    /// lifetime, mutation of a read-only resource, or observation of
+    /// unlaunched work — fails at compile time with a typed diagnostic.
+    Boundary(BoundaryAbiError),
 }
 
 impl fmt::Display for HostPartitionError {
@@ -108,28 +120,21 @@ impl fmt::Display for HostPartitionError {
                 function.0
             ),
             Self::Program(error) => write!(f, "derived device program failed validation: {error}"),
+            Self::Boundary(error) => write!(f, "boundary call ABI: {error}"),
         }
     }
 }
 
 impl std::error::Error for HostPartitionError {}
 
-/// One declared cross-boundary call: a host function invoking a device kernel
-/// (NGAB0 §Partition — one host function, one device kernel, one call).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BoundaryCall {
-    /// The calling host-side function.
-    pub host: MirFunctionId,
-    /// The invoked device kernel.
-    pub kernel: MirFunctionId,
-}
-
 /// The host/device partition of one analyzed program (NGAB0 §Partition).
 ///
 /// `device_program` is the typed, target-neutral device side; `host_functions`
 /// and `device_kernels` are the partition's two sides (MIR function ids — the
 /// static split that survives lowering); `boundary_calls` is the declared
-/// cross-boundary call surface.
+/// cross-boundary call surface (one host call → one prepared region, NGAB0-R1);
+/// `call_abi_version` is the versioned typed boundary every call rides
+/// ([`HOST_CALL_ABI_VERSION`](crate::boundary_abi::HOST_CALL_ABI_VERSION)).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostPartition {
     /// The device side: every explicit device kernel in the program.
@@ -138,8 +143,10 @@ pub struct HostPartition {
     pub host_functions: Vec<MirFunctionId>,
     /// The typed, target-neutral device program derived from `device_kernels`.
     pub device_program: DeviceProgram,
-    /// The declared cross-boundary calls (host → device kernel).
+    /// The declared cross-boundary calls (one host call → one prepared region).
     pub boundary_calls: Vec<BoundaryCall>,
+    /// The versioned host→device call ABI the boundary rides.
+    pub call_abi_version: u32,
 }
 
 impl HostPartition {
@@ -193,9 +200,14 @@ pub fn derive_host_partition(
     if kernel_functions.is_empty() {
         return Ok(HostPartition {
             device_kernels: Vec::new(),
-            host_functions: program.functions.iter().map(|function| function.id).collect(),
+            host_functions: program
+                .functions
+                .iter()
+                .map(|function| function.id)
+                .collect(),
             device_program: DeviceProgram::new(DeviceProgramLifetime::SingleRun),
             boundary_calls: Vec::new(),
+            call_abi_version: crate::boundary_abi::HOST_CALL_ABI_VERSION,
         });
     }
 
@@ -206,16 +218,15 @@ pub fn derive_host_partition(
     let mut next_buffer_id = 1u32;
 
     for (index, function) in kernel_functions.iter().enumerate() {
-        let signature =
-            MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
-                function,
-                validated.validation(),
-                interner,
-            )
-            .map_err(|error| HostPartitionError::KernelAbi {
-                function: function.id,
-                detail: error.message.clone(),
-            })?;
+        let signature = MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+            function,
+            validated.validation(),
+            interner,
+        )
+        .map_err(|error| HostPartitionError::KernelAbi {
+            function: function.id,
+            detail: error.message.clone(),
+        })?;
         let plan = kernel_plan_for_function(function, &signature, validated.validation())
             .map_err(|error| HostPartitionError::KernelPlan {
                 function: function.id,
@@ -231,12 +242,14 @@ pub fn derive_host_partition(
             .resources()
             .filter(|resource| resource.kind == MirKernelResourceKind::StorageBuffer)
         {
-            let role = BufferRole::from_abi_role(resource.role, resource.access)
-                .ok_or_else(|| HostPartitionError::BufferRole {
-                    function: function.id,
-                    binding: resource.binding,
-                    role: format!("{:?}", resource.role),
-                    access: format!("{:?}", resource.access),
+            let role =
+                BufferRole::from_abi_role(resource.role, resource.access).ok_or_else(|| {
+                    HostPartitionError::BufferRole {
+                        function: function.id,
+                        binding: resource.binding,
+                        role: format!("{:?}", resource.role),
+                        access: format!("{:?}", resource.access),
+                    }
                 })?;
             let identity = BufferIdentity {
                 id: BufferId(next_buffer_id),
@@ -299,11 +312,20 @@ pub fn derive_host_partition(
         .collect();
     let boundary_calls = derive_boundary_calls(program, &device_kernels);
 
+    // NGAB1-U2: the versioned call-ABI gate. Invalid cross-boundary values
+    // (wrong type, shape, lifetime, mutation of a read-only resource,
+    // observation of unlaunched work) fail here — at compile time, before any
+    // composite build/link or launch — with a typed diagnostic (NGAB0 §Abi
+    // cross-boundary validity). No boundary call reaches a consumer unvalidated.
+    validate_boundary_abi(program, &boundary_calls, validated.validation())
+        .map_err(HostPartitionError::Boundary)?;
+
     Ok(HostPartition {
         device_kernels,
         host_functions,
         device_program,
         boundary_calls,
+        call_abi_version: crate::boundary_abi::HOST_CALL_ABI_VERSION,
     })
 }
 
@@ -321,7 +343,11 @@ fn kernel_entry_name(function: &MirFunction, interner: &Interner) -> String {
 /// present, else the param name of the slot's source local, else a
 /// role/binding-based fallback. The name is a diagnostic/wire label — the
 /// identity key is the [`BufferId`], never the name or the emitted text.
-fn buffer_slot_name(function: &MirFunction, interner: &Interner, resource: &MirKernelResource) -> String {
+fn buffer_slot_name(
+    function: &MirFunction,
+    interner: &Interner,
+    resource: &MirKernelResource,
+) -> String {
     if let Some(name) = &resource.source_name {
         return name.clone();
     }
@@ -347,8 +373,12 @@ fn buffer_slot_name(function: &MirFunction, interner: &Interner, resource: &MirK
 /// A `Definition` callee carries a semantic def id; the referenced MIR
 /// function(s) are found by their carried `source` fact (a decomposition may
 /// have produced several). A direct `Function` or constant-function callee
-/// carries the id itself.
-fn callee_function_ids<'a>(callee: &MirCallee, program: &'a MirProgram) -> Vec<MirFunctionId> {
+/// carries the id itself. Shared by the host-partition boundary derivation
+/// and the boundary-ABI validation gate.
+pub(crate) fn callee_function_ids<'a>(
+    callee: &MirCallee,
+    program: &'a MirProgram,
+) -> Vec<MirFunctionId> {
     match callee {
         MirCallee::Function(id) => vec![*id],
         MirCallee::Value(MirOperand::Constant(MirConstant::Function(id))) => vec![*id],
@@ -361,37 +391,4 @@ fn callee_function_ids<'a>(callee: &MirCallee, program: &'a MirProgram) -> Vec<M
             .collect(),
         MirCallee::Value(_) => Vec::new(),
     }
-}
-
-/// Derive the declared cross-boundary calls: every host function whose body
-/// contains a call statement targeting a device kernel.
-///
-/// The call surface is a typed MIR fact (the call statement's callee), never
-/// reconstructed from emitted text or naming conventions.
-fn derive_boundary_calls(
-    program: &MirProgram,
-    device_kernels: &[MirFunctionId],
-) -> Vec<BoundaryCall> {
-    let mut calls = Vec::new();
-    for function in &program.functions {
-        if device_kernels.contains(&function.id) {
-            continue;
-        }
-        for block in &function.blocks {
-            for statement in &block.statements {
-                let MirStatementKind::Call { callee, .. } = &statement.kind else {
-                    continue;
-                };
-                for target in callee_function_ids(callee, program) {
-                    if device_kernels.contains(&target) {
-                        calls.push(BoundaryCall {
-                            host: function.id,
-                            kernel: target,
-                        });
-                    }
-                }
-            }
-        }
-    }
-    calls
 }
