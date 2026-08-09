@@ -74,12 +74,15 @@ use crate::device_program::{
     LaunchId, LaunchUnit, ObservationCadence, ResultBuffer,
 };
 use crate::device_program_plans::kernel_plan_for_function;
+use crate::device_semantics::{DeviceEffectBoundaryKind, DeviceLegalityFacts};
 use crate::kernel_plan::CollectionKernelPlan;
 use crate::layout::MirTensorStorageLayout;
 use crate::{
-    MirCallee, MirConstant, MirFunction, MirFunctionId, MirOperand, MirProgram, ValidatedMir,
+    MirBlockId, MirCallee, MirConstant, MirFunction, MirFunctionId, MirOperand, MirProgram,
+    MirStatementKind, ValidatedMir,
 };
 use radix_lexer::Interner;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Fail-closed error for host-partition derivation.
@@ -347,6 +350,257 @@ pub fn derive_host_partition(
         device_program,
         boundary_calls,
         call_abi_version: crate::boundary_abi::HOST_CALL_ABI_VERSION,
+    })
+}
+
+/// One function's role in the host/device partition (DDCP3-U3 gate bullet 1:
+/// exact membership — every function is exactly one of host or device).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PartitionRole {
+    /// A host-side function (ordinary CPU function outside the device launch
+    /// universe).
+    Host,
+    /// A device-side function (an explicit compute kernel).
+    Device,
+}
+
+impl PartitionRole {
+    /// Stable diagnostic spelling.
+    #[must_use]
+    pub fn spelling(self) -> &'static str {
+        match self {
+            Self::Host => "host",
+            Self::Device => "device",
+        }
+    }
+}
+
+/// Exact membership of one function in the partition (DDCP3-U3 gate bullet 1).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PartitionMember {
+    /// The MIR function id.
+    pub function: MirFunctionId,
+    /// The function's partition role.
+    pub role: PartitionRole,
+    /// The device member's logical entrypoint identity (the kernel's source
+    /// name — a carried typed fact); `None` for host members.
+    pub entry: Option<String>,
+}
+
+/// Stable identity of one host callsite (the fire-13 region-identity
+/// addendum): product/module (the record's `module` scope) + host function +
+/// block + statement. Derived from typed MIR facts — never from emitted text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CallsiteId {
+    /// The calling host-side function.
+    pub host: MirFunctionId,
+    /// The block containing the call statement.
+    pub block: MirBlockId,
+    /// The statement index within the block.
+    pub statement: u32,
+}
+
+/// One prepared submission region of the record. The `region` index is the
+/// **stable region identity**: the boundary call's 1-based position in the
+/// derived partition (program order) — the same compiler-owned index the
+/// host-partition lane's direct region symbols carry
+/// (`__faber_prepared_region_{index}`, DDCP3-U2), so the record cross-checks
+/// against the emitted module's direct calls.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RegionRecord {
+    /// Stable region identity (1-based; the emitted region-symbol suffix).
+    pub region: u32,
+    /// The region's member kernels (MIR function ids, in invocation order).
+    pub member_kernels: Vec<MirFunctionId>,
+    /// The region's member logical entrypoint identities (typed facts).
+    pub member_entries: Vec<String>,
+}
+
+/// One host callsite's mapping into its prepared submission region
+/// (DDCP3-U3 gate bullet 1: host callsite → prepared region → member
+/// kernel/entrypoint identities).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CallsiteRecord {
+    /// The stable callsite identity.
+    pub callsite: CallsiteId,
+    /// The prepared region the callsite submits (stable region identity).
+    pub region: u32,
+    /// The region's member kernel identities.
+    pub member_kernels: Vec<MirFunctionId>,
+    /// The region's member logical entrypoint identities.
+    pub member_entries: Vec<String>,
+}
+
+/// One explicit effect-boundary row of the partition record (DDCP3-U3 gate
+/// bullet 2). Derived from the landed [`DeviceLegalityFacts`] surface —
+/// `launch` is the launch id and `kind` is the typed
+/// [`DeviceEffectBoundaryKind`], never a text-derived fact.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EffectBoundaryRecord {
+    /// The launch whose kernel carries the effect.
+    pub launch: u32,
+    /// The recorded device-hostile effect kind.
+    pub kind: DeviceEffectBoundaryKind,
+}
+
+/// The typed, serializable partition/callsite record (DDCP3-U3 — the
+/// compiler artifact proving gate bullets 1 + 2). Produced by the compiler
+/// from typed facts only, never from emitted text.
+///
+/// Stable identity (head-cto fire-13 addendum): `module` is the
+/// product/module scope, regions carry the stable compiler-minted region
+/// identity, and callsites carry the stable (host, block, statement)
+/// identity. **Support boundary**: one analyzed module per record —
+/// separately-linked multi-module shapes are explicitly OUT of the DDCP3
+/// claim (recorded in the DDCP3 evidence); this record is not a general
+/// multi-module ABI promise.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PartitionRecord {
+    /// Product/module scope of the record (the fire-13 stable identity
+    /// scope). One analyzed module per record.
+    pub module: String,
+    /// Exact CPU/device membership — every function exactly one role.
+    pub membership: Vec<PartitionMember>,
+    /// The prepared submission regions (stable region identity + members).
+    pub regions: Vec<RegionRecord>,
+    /// Host callsite → prepared region → member kernel/entrypoint identities.
+    pub callsites: Vec<CallsiteRecord>,
+    /// The explicit effect boundaries the partition records (derived from
+    /// the landed `DeviceLegalityFacts` surface; empty for a legal program —
+    /// the fail-closed envelope).
+    pub effect_boundaries: Vec<EffectBoundaryRecord>,
+}
+
+/// Derive the typed, serializable partition/callsite record (DDCP3-U3).
+///
+/// Extends [`derive_host_partition`]: the exact host/device membership, the
+/// prepared submission regions, and the host callsite mapping (host callsite
+/// → prepared region → member kernel/entrypoint identities) are derived from
+/// the typed partition facts — never from emitted text (gate bullet 1). The
+/// record's effect-boundary section is derived from the landed
+/// [`DeviceLegalityFacts`] surface, and the legality gate runs at derivation
+/// (gate bullet 2): a device-hostile fact on any device launch fails closed
+/// with the named rule (DDCP1-U6) — a candidate region can never cross an
+/// `ad`/Sermo/cancellation/host-effect boundary.
+///
+/// `module` is the product/module scope of the stable region/callsite
+/// identity (fire-13 addendum); separately-linked multi-module shapes are
+/// out of the DDCP3 claim.
+///
+/// # Errors
+///
+/// Returns a [`HostPartitionError`] when the base partition cannot be
+/// derived or the legality record fails the named-rule gate.
+pub fn derive_partition_record(
+    validated: &ValidatedMir<'_>,
+    interner: &Interner,
+    module: &str,
+    legality: &DeviceLegalityFacts,
+) -> Result<PartitionRecord, HostPartitionError> {
+    let partition = derive_host_partition(validated, interner)?;
+
+    // Effect boundaries explicit (gate bullet 2): the legality gate runs over
+    // the program's launch universe. A hostile fact on any device launch
+    // fails closed with the named rule — the record only derives for programs
+    // the legality gate admits, so no prepared region can cross an
+    // `ad`/Sermo/cancellation/host-effect boundary.
+    let launches: Vec<LaunchId> = partition
+        .device_program
+        .launches
+        .iter()
+        .map(|launch| launch.id)
+        .collect();
+    legality
+        .validate(&launches)
+        .map_err(HostPartitionError::Program)?;
+
+    let program = validated.program();
+    let mut membership: Vec<PartitionMember> = partition
+        .host_functions
+        .iter()
+        .map(|function| PartitionMember {
+            function: *function,
+            role: PartitionRole::Host,
+            entry: None,
+        })
+        .chain(partition.device_kernels.iter().map(|function| {
+            let entry = program
+                .function_by_id(*function)
+                .map(|function| kernel_entry_name(function, interner));
+            PartitionMember {
+                function: *function,
+                role: PartitionRole::Device,
+                entry,
+            }
+        }))
+        .collect();
+    membership.sort_by_key(|member| member.function);
+
+    let mut regions = Vec::with_capacity(partition.boundary_calls.len());
+    let mut callsites = Vec::new();
+    for (index, call) in partition.boundary_calls.iter().enumerate() {
+        let region = u32::try_from(index + 1).unwrap_or(u32::MAX);
+        let member_entries: Vec<String> = call
+            .region
+            .kernels
+            .iter()
+            .map(|kernel| {
+                program
+                    .function_by_id(*kernel)
+                    .map_or_else(
+                        || format!("kernel{}", kernel.0),
+                        |function| kernel_entry_name(function, interner),
+                    )
+            })
+            .collect();
+        regions.push(RegionRecord {
+            region,
+            member_kernels: call.region.kernels.clone(),
+            member_entries: member_entries.clone(),
+        });
+        // The callsite mapping: every call statement of the host function
+        // that targets a member kernel of this region (typed MIR fact).
+        if let Some(host) = program.function_by_id(call.host) {
+            for block in &host.blocks {
+                for (statement_index, statement) in block.statements.iter().enumerate() {
+                    let MirStatementKind::Call { callee, .. } = &statement.kind else {
+                        continue;
+                    };
+                    let targets_region = callee_function_ids(callee, program)
+                        .iter()
+                        .any(|target| call.region.kernels.contains(target));
+                    if targets_region {
+                        callsites.push(CallsiteRecord {
+                            callsite: CallsiteId {
+                                host: call.host,
+                                block: block.id,
+                                statement: u32::try_from(statement_index).unwrap_or(u32::MAX),
+                            },
+                            region,
+                            member_kernels: call.region.kernels.clone(),
+                            member_entries: member_entries.clone(),
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    let effect_boundaries = legality
+        .device_effects
+        .iter()
+        .map(|fact| EffectBoundaryRecord {
+            launch: fact.launch.0,
+            kind: fact.kind,
+        })
+        .collect();
+
+    Ok(PartitionRecord {
+        module: module.to_owned(),
+        membership,
+        regions,
+        callsites,
+        effect_boundaries,
     })
 }
 

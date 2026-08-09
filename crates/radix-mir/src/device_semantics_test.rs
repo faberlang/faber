@@ -1171,3 +1171,95 @@ fn device_abi_stays_separate_from_the_cpu_host_effect_abi() {
         .validate(&launches)
         .expect("the carried semantic facts are pure value/generation/graph/axis facts");
 }
+
+// ── DDCP3-U3 (b): effect-boundary re-derivation of region formation over the
+//    landed DeviceLegalityFacts/DeviceFunctionHostileEffect surface (additive)
+//    ─────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn region_formation_candidate_crossing_an_effect_boundary_fails_closed() {
+    // DDCP3-U3 gate bullet 2: region formation is re-derived over the
+    // legality surface — a candidate region whose member launch carries a
+    // device-hostile effect (here `ad`) crosses an effect boundary and
+    // FAILS CLOSED with the named rule (DeviceFunctionHostileEffect). This
+    // is a rejection, not a split: DDCP1-U6 semantics are not re-decided.
+    let launches: Vec<LaunchId> = vec![LaunchId(1), LaunchId(2)];
+    let semantics = region_chain_semantics(None);
+    let mut legality = DeviceLegalityFacts::default();
+    legality.device_effects.push(DeviceEffectFact {
+        launch: LaunchId(1),
+        kind: DeviceEffectBoundaryKind::Ad,
+    });
+    assert!(matches!(
+        semantics.derive_prepared_regions_with_effect_boundaries(&launches, &legality),
+        Err(DeviceProgramError::DeviceFunctionHostileEffect {
+            launch: LaunchId(1),
+            kind: DeviceEffectBoundaryKind::Ad,
+        })
+    ));
+}
+
+#[test]
+fn region_formation_candidate_crossing_a_sermo_effect_fails_closed() {
+    // The same named-rule rejection for the Sermo boundary kind (gate 2).
+    let launches: Vec<LaunchId> = vec![LaunchId(1), LaunchId(2)];
+    let semantics = region_chain_semantics(None);
+    let mut legality = DeviceLegalityFacts::default();
+    legality.device_effects.push(DeviceEffectFact {
+        launch: LaunchId(2),
+        kind: DeviceEffectBoundaryKind::Sermo,
+    });
+    assert!(matches!(
+        semantics.derive_prepared_regions_with_effect_boundaries(&launches, &legality),
+        Err(DeviceProgramError::DeviceFunctionHostileEffect {
+            launch: LaunchId(2),
+            kind: DeviceEffectBoundaryKind::Sermo,
+        })
+    ));
+}
+
+#[test]
+fn region_formation_with_unknown_effect_launch_fails_closed() {
+    // A malformed legality record naming a launch outside the program fails
+    // closed with the universe rule (UnknownDeviceEffectLaunch).
+    let launches: Vec<LaunchId> = vec![LaunchId(1), LaunchId(2)];
+    let semantics = region_chain_semantics(None);
+    let mut legality = DeviceLegalityFacts::default();
+    legality.device_effects.push(DeviceEffectFact {
+        launch: LaunchId(9),
+        kind: DeviceEffectBoundaryKind::Cancellation,
+    });
+    assert!(matches!(
+        semantics.derive_prepared_regions_with_effect_boundaries(&launches, &legality),
+        Err(DeviceProgramError::UnknownDeviceEffectLaunch {
+            launch: LaunchId(9)
+        })
+    ));
+}
+
+#[test]
+fn region_formation_cpu_host_ad_positive_fixture_stays_valid() {
+    // DDCP3-U3 gate bullet 2 positive fixture: ordinary CPU host `ad` through
+    // Sermo records no device effect fact (the CPU side is outside the device
+    // launch universe), so region formation over the legality surface derives
+    // the same regions as the base derivation and carries no boundary rows —
+    // preservation and rejection never trade (reconciliation §3.2).
+    let launches: Vec<LaunchId> = vec![LaunchId(1), LaunchId(2)];
+    let semantics = region_chain_semantics(None);
+    let legality = DeviceLegalityFacts::default();
+    let derivation = semantics
+        .derive_prepared_regions_with_effect_boundaries(&launches, &legality)
+        .expect("the CPU host ad shape stays valid through the effect-boundary re-derivation");
+    assert_eq!(
+        derivation.regions,
+        semantics.derive_prepared_regions(&launches),
+        "a legal program's regions are unchanged by the re-derivation"
+    );
+    assert!(
+        derivation.effect_boundaries.is_empty(),
+        "the explicit effect-boundary section is empty for a legal program (the fail-closed envelope)"
+    );
+    semantics
+        .validate_regions(&launches, &derivation.regions)
+        .expect("the re-derived partition validates");
+}

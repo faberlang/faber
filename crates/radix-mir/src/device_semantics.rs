@@ -58,6 +58,7 @@ use crate::device_program::{BufferId, DeviceProgramError, LaunchId, PreparedRegi
 use crate::{MirFunctionId, MirType};
 use radix_hir::DefId;
 use radix_types::TypeId;
+use serde::{Deserialize, Serialize};
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap};
 use std::fmt;
@@ -230,7 +231,12 @@ pub struct ObservationFact {
 /// materializer records which of these a device kernel's function body
 /// carries; the gate rejects any of them with a stable named diagnostic —
 /// deterministic rejection, never an ad-hoc error.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// Serialize/Deserialize (added DDCP3-U3, additive): the DDCP3 partition/
+/// callsite record's effect-boundary section carries this typed surface
+/// directly (no mirror enum — the record rides the legality surface
+/// read-only).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DeviceEffectBoundaryKind {
     /// An automatic-differentiation operation — the `ad` Sermo conversation
     /// (a Sermo open with an `ad` frame) or a gradient-handle runtime
@@ -325,6 +331,22 @@ impl DeviceLegalityFacts {
         }
         Ok(())
     }
+}
+
+/// The result of effect-boundary-aware region derivation (DDCP3-U3 (b)): the
+/// re-derived prepared submission regions plus the explicit effect-boundary
+/// rows the derivation consumed. Additive to the landed
+/// [`DeviceLegalityFacts`] surface — no legality type is renamed or reshaped.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PreparedRegionDerivation {
+    /// The re-derived prepared submission regions (same derivation rules as
+    /// [`DeviceSemantics::derive_prepared_regions`], cross-checked against
+    /// the recorded device-effect facts).
+    pub regions: Vec<PreparedRegion>,
+    /// The explicit effect-boundary rows (device-hostile facts) the
+    /// derivation consumed — empty for a legal program (the fail-closed
+    /// envelope).
+    pub effect_boundaries: Vec<DeviceEffectFact>,
 }
 
 /// One selected differentiable input of the primal (F4): the gradient-to-primal
@@ -925,6 +947,74 @@ impl DeviceSemantics {
             }
         }
         regions
+    }
+
+    /// DDCP3-U3 (b) — re-derive region formation over the landed
+    /// [`DeviceLegalityFacts`]/[`DeviceEffectFact`] surface (additive: the
+    /// base [`Self::derive_prepared_regions`] and the legality surface are
+    /// untouched). The result carries the re-derived regions plus the
+    /// explicit effect-boundary rows the derivation consumed.
+    ///
+    /// Candidates form exactly as the base derivation (dependency components
+    /// → topological order → observation splits). Each candidate region's
+    /// member launches are then cross-checked against the recorded
+    /// device-effect facts:
+    ///
+    /// - an **observation** boundary splits the region at that point (the
+    ///   base rule 3 — a prepared submission region cannot cross a CPU
+    ///   readback point);
+    /// - an `ad`/Sermo/cancellation/unresolved-host-effect fact on a member
+    ///   launch **fails closed with the named rule**
+    ///   ([`DeviceProgramError::DeviceFunctionHostileEffect`] — the DDCP1-U6
+    ///   gate): a device function carrying such an effect is illegal on the
+    ///   device side, so a candidate region can never cross that boundary
+    ///   (the U5 fail-closed envelope, made concrete at region formation).
+    ///   This is a rejection, not a split — DDCP1 semantics are not
+    ///   re-decided here; a genuinely ambiguous case is recorded + escalated,
+    ///   never gate-weakened.
+    ///
+    /// The consumed effect-boundary rows are returned in
+    /// [`PreparedRegionDerivation::effect_boundaries`] so the DDCP3
+    /// partition/callsite record carries them explicitly (empty for a legal
+    /// program).
+    ///
+    /// # Errors
+    ///
+    /// Returns the first [`DeviceProgramError`] a candidate region violates:
+    /// a hostile effect on a member launch
+    /// ([`DeviceFunctionHostileEffect`](DeviceProgramError::DeviceFunctionHostileEffect)),
+    /// or a malformed legality record naming a launch outside the program
+    /// ([`UnknownDeviceEffectLaunch`](DeviceProgramError::UnknownDeviceEffectLaunch)).
+    pub fn derive_prepared_regions_with_effect_boundaries(
+        &self,
+        launches: &[LaunchId],
+        legality: &DeviceLegalityFacts,
+    ) -> Result<PreparedRegionDerivation, DeviceProgramError> {
+        let regions = self.derive_prepared_regions(launches);
+        // Region-formation-level cross-check: a candidate region whose member
+        // launch carries a hostile effect crosses an effect boundary — fail
+        // closed with the named rule.
+        for region in &regions {
+            for launch in &region.launches {
+                if let Some(fact) = legality
+                    .device_effects
+                    .iter()
+                    .find(|fact| fact.launch == *launch)
+                {
+                    return Err(DeviceProgramError::DeviceFunctionHostileEffect {
+                        launch: *launch,
+                        kind: fact.kind,
+                    });
+                }
+            }
+        }
+        // The legality record's universe rule: an effect fact naming a launch
+        // outside the program is a malformed record and fails closed.
+        legality.validate(launches)?;
+        Ok(PreparedRegionDerivation {
+            regions,
+            effect_boundaries: legality.device_effects.clone(),
+        })
     }
 
     /// Connected components of the carried dependency graph over `launches`

@@ -16,6 +16,12 @@ radix-types = { path = "../radix-types" }
 rustc-hash = "2"
 serde = { version = "1", features = ["derive"] }
 
+[dev-dependencies]
+# DDCP3-U3 (c): the partition/callsite record's serialization round-trip proof
+# (the record is a compiler artifact, serialized/round-tripped — a sibling-crate
+# precedent: radix-mir-fmir / radix-mir-llvm both depend on serde_json).
+serde_json = "1"
+
 [lints.clippy]
 # Group first at lower priority so per-lint allows below win package-wide.
 pedantic = { level = "deny", priority = -1 }

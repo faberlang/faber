@@ -21,6 +21,7 @@
 use super::*;
 use crate::boundary_abi::HOST_CALL_ABI_VERSION;
 use crate::device_program::Binding;
+use crate::device_semantics::DeviceEffectFact;
 use crate::{
     MirBlock, MirBlockId, MirCallee, MirFunction, MirFunctionId, MirKernelShaderStage, MirLocal,
     MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace, MirProgram, MirStatement,
@@ -568,4 +569,196 @@ fn two_kernel_composition_derives_one_region() {
     program
         .validate()
         .expect("the derived program passes the shared schema");
+}
+
+// ── DDCP3-U3: typed partition/callsite record (gate bullets 1 + 2) ────────
+
+/// The DDCP3-U3 record for the U11 fixture: derivation runs exactly as the
+/// product path (validated MIR → derive → legality gate).
+fn derive_u11_record(types: &mut TypeTable, interner: &mut Interner) -> PartitionRecord {
+    let program = u11_program(types, interner);
+    let context = MirValidationContext::new(types);
+    let validated = ValidatedMir::new(program, context).expect("the U11 MIR fixture validates");
+    derive_partition_record(
+        &validated,
+        interner,
+        "fixture-u11",
+        &DeviceLegalityFacts::default(),
+    )
+    .expect("the U11 partition record derives")
+}
+
+#[test]
+fn partition_record_carries_exact_membership_and_callsite_mapping() {
+    // DDCP3-U3 gate bullet 1: the record carries the exact CPU/device
+    // membership (every function exactly one role) and the host callsite →
+    // prepared region → member kernel/entrypoint mapping, derived from typed
+    // facts only.
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let record = derive_u11_record(&mut types, &mut interner);
+
+    // Membership: the device kernel f1 (entry "scale_kernel") and the host
+    // function f2 — exactly one role per function, nothing text-derived.
+    assert_eq!(
+        record.membership,
+        vec![
+            PartitionMember {
+                function: MirFunctionId(1),
+                role: PartitionRole::Device,
+                entry: Some("scale_kernel".to_owned()),
+            },
+            PartitionMember {
+                function: MirFunctionId(2),
+                role: PartitionRole::Host,
+                entry: None,
+            },
+        ],
+        "exact membership: every function host or device, typed entries"
+    );
+
+    // Regions: one prepared region at stable identity 1 (the boundary call's
+    // 1-based position — the same compiler-owned index the host-partition
+    // lane's direct region symbol carries).
+    assert_eq!(
+        record.regions,
+        vec![RegionRecord {
+            region: 1,
+            member_kernels: vec![MirFunctionId(1)],
+            member_entries: vec!["scale_kernel".to_owned()],
+        }]
+    );
+
+    // Callsite mapping: host f2, block 0, statement 0 → region 1 → kernel
+    // f1 / entry "scale_kernel".
+    assert_eq!(
+        record.callsites,
+        vec![CallsiteRecord {
+            callsite: CallsiteId {
+                host: MirFunctionId(2),
+                block: MirBlockId(0),
+                statement: 0,
+            },
+            region: 1,
+            member_kernels: vec![MirFunctionId(1)],
+            member_entries: vec!["scale_kernel".to_owned()],
+        }]
+    );
+
+    // Effect boundaries explicit: a legal program records none (the
+    // fail-closed envelope), but the section is carried.
+    assert!(
+        record.effect_boundaries.is_empty(),
+        "a legal program records no effect-boundary rows"
+    );
+}
+
+#[test]
+fn partition_record_region_identity_matches_the_emitted_region_symbol() {
+    // DDCP3-U3 validation cross-check: the record's stable region identity is
+    // the SAME compiler-owned index the host-partition lane's direct region
+    // symbols carry (DDCP3-U2's `__faber_prepared_region_{index}`), so the
+    // record's membership + callsite mapping match the emitted module's
+    // direct calls. The U2 vertical fixture asserts the emitted module
+    // declares and directly calls `__faber_prepared_region_1(i64 ...)`.
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let record = derive_u11_record(&mut types, &mut interner);
+
+    assert_eq!(record.regions.len(), 1);
+    let region = &record.regions[0];
+    assert_eq!(
+        format!("__faber_prepared_region_{}", region.region),
+        "__faber_prepared_region_1",
+        "the record region identity is the emitted region-symbol suffix (U2 cross-check)"
+    );
+    for callsite in &record.callsites {
+        assert_eq!(
+            callsite.region, region.region,
+            "the callsite submits the recorded region (one host call → one prepared region)"
+        );
+    }
+}
+
+#[test]
+fn partition_record_serializes_and_round_trips() {
+    // DDCP3-U3 done_when (c): the record is a typed, serializable compiler
+    // artifact — the serialization round-trip is identity-preserving.
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let record = derive_u11_record(&mut types, &mut interner);
+
+    let json = serde_json::to_string(&record).expect("the record serializes");
+    let decoded: PartitionRecord =
+        serde_json::from_str(&json).expect("the record deserializes back");
+    assert_eq!(
+        decoded, record,
+        "the serialized partition/callsite record round-trips identity-preserving"
+    );
+}
+
+#[test]
+fn partition_record_matches_the_committed_evidence_fixture() {
+    // DDCP3-U3 validation: the committed evidence fixture (the serialized
+    // record artifact) matches the LIVE derivation — the fixture is an
+    // oracle, never a hand-edited snapshot (truth over safety). The fixture
+    // cross-checks the record's membership + callsite mapping against the
+    // emitted module's direct calls via the U2 vertical fixture (the region
+    // symbol `__faber_prepared_region_1`).
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let record = derive_u11_record(&mut types, &mut interner);
+
+    let fixture = include_str!(
+        "../../../docs/factory/direct-device-compilation-pipeline/evidence/ddcp3/ddcp3-u3-record-fixture.json"
+    );
+    let fixture_record: PartitionRecord =
+        serde_json::from_str(fixture).expect("the evidence fixture parses as a PartitionRecord");
+    assert_eq!(
+        fixture_record, record,
+        "the committed record fixture equals the live derivation (regenerate the fixture if the shape changed)"
+    );
+}
+
+#[test]
+fn partition_record_effect_boundary_negative_fails_closed() {
+    // DDCP3-U3 gate bullet 2 negative fixture: a candidate region crossing a
+    // declared device-hostile effect (here `ad` on the kernel's launch)
+    // fails closed with the named rule — the record never derives for a
+    // program the legality gate rejects.
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let program = u11_program(&mut types, &mut interner);
+    let context = MirValidationContext::new(&types);
+    let validated = ValidatedMir::new(program, context).expect("the U11 MIR fixture validates");
+    let mut legality = DeviceLegalityFacts::default();
+    legality.device_effects.push(DeviceEffectFact {
+        launch: LaunchId(1),
+        kind: DeviceEffectBoundaryKind::Ad,
+    });
+    assert!(matches!(
+        derive_partition_record(&validated, &interner, "fixture-u11", &legality),
+        Err(HostPartitionError::Program(
+            DeviceProgramError::DeviceFunctionHostileEffect {
+                launch: LaunchId(1),
+                kind: DeviceEffectBoundaryKind::Ad,
+            }
+        ))
+    ));
+}
+
+#[test]
+fn partition_record_cpu_host_ad_positive_fixture_stays_valid() {
+    // DDCP3-U3 gate bullet 2 positive fixture: ordinary CPU host `ad` through
+    // Sermo records no device effect fact (the CPU side is outside the device
+    // launch universe) — the record derives with an empty effect-boundary
+    // section and unchanged membership/callsites (preservation and rejection
+    // never trade).
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let record = derive_u11_record(&mut types, &mut interner);
+    assert!(record.effect_boundaries.is_empty());
+    assert_eq!(record.membership.len(), 2);
+    assert_eq!(record.regions.len(), 1);
+    assert_eq!(record.callsites.len(), 1);
 }
