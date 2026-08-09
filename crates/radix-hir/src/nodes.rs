@@ -1057,6 +1057,22 @@ pub enum HirExpressionKind {
     /// Assignment.
     Assign(Box<HirExpression>, Box<HirExpression>),
 
+    /// Conversion-directed assignment (`↤`, U+21A4).
+    ///
+    /// `target ↤ source` evaluates `source`, converts it to the statically
+    /// known type of `target` through the `↦` conversion route, then stores
+    /// once. `recovery` is the optional `⇥ fallback`, legal only on this form;
+    /// the fallback satisfies the same target-type rule as explicit `↦`
+    /// recovery. Lowering preserves the operator (never erasing it into
+    /// [`HirExpressionKind::Assign`]); typecheck resolves the destination type
+    /// from the left place through the ordinary lvalue rules and records it on
+    /// this node's `ty`.
+    ConversioAssign {
+        target: Box<HirExpression>,
+        source: Box<HirExpression>,
+        recovery: Option<Box<HirExpression>>,
+    },
+
     /// Array literal.
     Array(Vec<HirArrayElement>),
 

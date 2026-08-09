@@ -298,6 +298,13 @@ pub fn walk_expr<V: HirVisitor>(visitor: &mut V, expr: &HirExpression) {
             visitor.visit_expr(lhs);
             visitor.visit_expr(rhs);
         }
+        HirExpressionKind::ConversioAssign { target, source, recovery } => {
+            visitor.visit_expr(target);
+            visitor.visit_expr(source);
+            if let Some(recovery) = recovery {
+                visitor.visit_expr(recovery);
+            }
+        }
         HirExpressionKind::Unary(_, operand)
         | HirExpressionKind::Cede(operand)
         | HirExpressionKind::Reddet(operand)
@@ -770,6 +777,13 @@ pub fn walk_expr_mut<V: HirVisitorMut>(visitor: &mut V, expr: &mut HirExpression
         HirExpressionKind::Binary(_, lhs, rhs) | HirExpressionKind::Assign(lhs, rhs) => {
             visitor.visit_expr_mut(lhs);
             visitor.visit_expr_mut(rhs);
+        }
+        HirExpressionKind::ConversioAssign { target, source, recovery } => {
+            visitor.visit_expr_mut(target);
+            visitor.visit_expr_mut(source);
+            if let Some(recovery) = recovery {
+                visitor.visit_expr_mut(recovery);
+            }
         }
         HirExpressionKind::Unary(_, operand)
         | HirExpressionKind::Cede(operand)
