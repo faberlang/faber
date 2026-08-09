@@ -242,9 +242,7 @@ symbol = "webDomAttrSet"
     )
     .expect("write binding manifest");
 
-    assert!(
-        load_ts_library_bindings(pkg)
-            .expect("load bindings")
-            .is_none()
-    );
+    assert!(load_ts_library_bindings(pkg)
+        .expect("load bindings")
+        .is_none());
 }
