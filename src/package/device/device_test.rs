@@ -179,6 +179,9 @@ fn test_device_artifact(
             "sm_120",
             vec!["sm_120".to_owned()],
         ),
+        FmirDeviceBackend::Amdgpu => {
+            panic!("test fixtures use compiled-in backends only")
+        }
         FmirDeviceBackend::Unknown(_) => {
             panic!("test fixtures use compiled-in backends only")
         }
