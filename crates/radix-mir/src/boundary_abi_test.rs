@@ -315,6 +315,90 @@ fn boundary_abi_rejects_observing_own_output() {
     }
 }
 
+// ── DDCP3-U5 (gate 6): unsupported callsite shapes ─────────────────────────
+
+/// Red: a boundary call through a `Definition` callee — a callee the direct
+/// region-call ABI cannot lower to the prepared-region symbol. The lane
+/// emits exactly ONE boundary form (the direct call to the region symbol
+/// with bounded numeric fields); a callsite shape it cannot map to that form
+/// is rejected before emission (never a module that calls a never-emitted
+/// kernel body).
+#[test]
+fn boundary_abi_rejects_definition_callee_callsite_shape() {
+    let mut types = TypeTable::default();
+    let f32_ty = f32(&mut types);
+    let program = MirProgram {
+        functions: vec![
+            MirFunction {
+                source: Some(radix_hir::DefId(1)),
+                ..kernel(1, vec![param(10, f32_ty)], f32_ty)
+            },
+            host_with_calls(
+                2,
+                vec![param(20, f32_ty)],
+                vec![local(30, f32_ty)],
+                vec![MirStatement {
+                    kind: MirStatementKind::Call {
+                        destination: Some(MirPlace::local(MirLocalId(30))),
+                        callee: MirCallee::Definition {
+                            source: radix_hir::DefId(1),
+                            type_args: Vec::new(),
+                        },
+                        args: vec![MirOperand::Place(MirPlace::local(MirLocalId(20)))],
+                    },
+                    span: Span::default(),
+                }],
+                f32_ty,
+            ),
+        ],
+    };
+    let context = MirValidationContext::new(&types);
+    let calls = derive_boundary_calls(&program, &[MirFunctionId(1)]);
+
+    // The Definition callee resolves to the kernel, so the boundary derives
+    // one call through it — and the gate rejects the unsupported shape.
+    assert_eq!(calls.len(), 1);
+    match validate_boundary_abi(&program, &calls, &context) {
+        Err(BoundaryAbiError::UnsupportedCallsiteShape { kernel, .. }) => {
+            assert_eq!(kernel, MirFunctionId(1));
+        }
+        other => panic!("expected a CallsiteShape violation, got {other:?}"),
+    }
+}
+
+/// Green: a function-constant value callee (`call kernel(_0)` lowered as a
+/// value) IS a direct-call shape — the direct region-call ABI lowers it, so
+/// the callsite-shape check admits it.
+#[test]
+fn boundary_abi_accepts_function_constant_value_callee() {
+    let mut types = TypeTable::default();
+    let f32_ty = f32(&mut types);
+    let mut program = MirProgram {
+        functions: vec![kernel(1, vec![param(10, f32_ty)], f32_ty)],
+    };
+    program.functions.push(host_with_calls(
+        2,
+        vec![param(20, f32_ty)],
+        vec![local(30, f32_ty)],
+        vec![MirStatement {
+            kind: MirStatementKind::Call {
+                destination: Some(MirPlace::local(MirLocalId(30))),
+                callee: MirCallee::Value(MirOperand::Constant(MirConstant::Function(
+                    MirFunctionId(1),
+                ))),
+                args: vec![MirOperand::Place(MirPlace::local(MirLocalId(20)))],
+            },
+            span: Span::default(),
+        }],
+        f32_ty,
+    ));
+    let context = MirValidationContext::new(&types);
+    let calls = derive_boundary_calls(&program, &[MirFunctionId(1)]);
+    assert_eq!(calls.len(), 1);
+    validate_boundary_abi(&program, &calls, &context)
+        .expect("the function-constant callee is valid");
+}
+
 /// The versioned call-ABI surface: the boundary carries its own ratchet (the
 /// faber wire seam asserts it rides the accepted wire version), and the
 /// no-kernel partition still derives with the versioned surface.

@@ -72,9 +72,9 @@ use crate::host_partition::{callee_function_ids, CallsiteId, HostPartition, Part
 use crate::layout::MirLayoutKind;
 use crate::ty::constant_ty;
 use crate::{
-    MirBlockId, MirFunction, MirFunctionId, MirLocalId, MirOperand, MirPlace, MirPlaceBase,
-    MirProgram, MirStatementKind, MirTempId, MirType, MirValidationContext, MirValueId,
-    MirValueKind,
+    MirBlockId, MirCallee, MirConstant, MirFunction, MirFunctionId, MirLocalId, MirOperand,
+    MirPlace, MirPlaceBase, MirProgram, MirStatementKind, MirTempId, MirType, MirValidationContext,
+    MirValueId, MirValueKind,
 };
 use radix_types::Type;
 use rustc_hash::FxHashMap;
@@ -132,6 +132,12 @@ pub enum BoundaryAbiClass {
     Mutation,
     /// The host observes a region result before its producing work launched.
     Observation,
+    /// The boundary call's callee shape cannot be lowered to the prepared
+    /// region's direct call — a `Definition`/value/indirect callee targeting
+    /// a device kernel. The direct region call is the ONLY emitted boundary
+    /// form (DDCP3-U5 / gate 6); a callsite the lane cannot map to it is
+    /// rejected before emission.
+    CallsiteShape,
 }
 
 impl BoundaryAbiClass {
@@ -144,6 +150,7 @@ impl BoundaryAbiClass {
             Self::Lifetime => "lifetime",
             Self::Mutation => "mutation",
             Self::Observation => "observation",
+            Self::CallsiteShape => "callsite-shape",
         }
     }
 }
@@ -226,6 +233,18 @@ pub enum BoundaryAbiError {
         /// The local holding the earlier call's output.
         local: MirLocalId,
     },
+    /// A boundary call whose callee the direct region-call ABI cannot lower
+    /// — a `Definition` or value/indirect callee targeting a device kernel.
+    /// The host-partition lane emits exactly ONE boundary form (the direct
+    /// call to the prepared-region symbol); a callsite shape it cannot map
+    /// to that form is rejected before emission (DDCP3-U5 / gate 6) — never
+    /// a malformed module with a call to a never-emitted kernel body.
+    UnsupportedCallsiteShape {
+        /// The calling host-side function.
+        host: MirFunctionId,
+        /// The invoked device kernel.
+        kernel: MirFunctionId,
+    },
 }
 
 impl BoundaryAbiError {
@@ -238,6 +257,7 @@ impl BoundaryAbiError {
             Self::Lifetime { .. } => BoundaryAbiClass::Lifetime,
             Self::Mutation { .. } => BoundaryAbiClass::Mutation,
             Self::Observation { .. } => BoundaryAbiClass::Observation,
+            Self::UnsupportedCallsiteShape { .. } => BoundaryAbiClass::CallsiteShape,
         }
     }
 }
@@ -301,6 +321,11 @@ impl fmt::Display for BoundaryAbiError {
                 f,
                 "boundary call f{} → kernel f{} passes the kernel's own output (from _{} ) back in as an input; the region result is observed before the producing launch ran (observation of unlaunched work)",
                 host.0, kernel.0, local.0
+            ),
+            Self::UnsupportedCallsiteShape { host, kernel } => write!(
+                f,
+                "boundary call f{} → kernel f{} goes through a callee the direct region-call ABI cannot lower (Definition/value/indirect callee) — the prepared-region direct call is the only emitted boundary form (unsupported callsite shape)",
+                host.0, kernel.0
             ),
         }
     }
@@ -768,6 +793,27 @@ fn validate_host_calls(
                         continue;
                     }
                     let destination_local = destination.as_ref().and_then(place_base_local);
+
+                    // ── Unsupported callsite shape (DDCP3-U5 / gate 6) ─────
+                    // The host-partition lane emits exactly ONE boundary form
+                    // (the direct call to the prepared-region symbol with
+                    // bounded numeric fields). A boundary call whose callee
+                    // is not a direct-call shape — `Function`, a
+                    // function-constant value, or a closure — cannot be
+                    // lowered to that form, so it fails closed here, before
+                    // emission, instead of producing a module that calls a
+                    // never-emitted kernel body.
+                    if !matches!(
+                        callee,
+                        MirCallee::Function(_)
+                            | MirCallee::Value(MirOperand::Constant(MirConstant::Function(_)))
+                            | MirCallee::Closure(_)
+                    ) {
+                        return Err(BoundaryAbiError::UnsupportedCallsiteShape {
+                            host: host.id,
+                            kernel: kernel.id,
+                        });
+                    }
 
                     // ── Wrong call shape (arity) ────────────────────────────
                     if args.len() != kernel.params.len() {
