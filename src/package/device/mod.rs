@@ -93,8 +93,9 @@ use radix_mir_fmir::schema::{
     WireCompanionSelectedOutput,
 };
 use radix_mir_fmir::{
-    FmirDeviceArtifact, FmirDeviceArtifactsSection, FmirDeviceBackend, FmirDeviceInput,
-    FmirDeviceProgramSection, FmirDeviceSection, FmirDeviceSelection, FmirDeviceSymbol,
+    DeviceArtifactFormat, DevicePayloadEncoding, DeviceTargetId, FmirDeviceArtifact,
+    FmirDeviceArtifactsSection, FmirDeviceBackend, FmirDeviceInput, FmirDeviceProgramSection,
+    FmirDeviceSection, FmirDeviceSelection, FmirDeviceSymbol, MaterializationStage,
     WireBarrierPhase, WireBarrierPoint, WireBinding, WireBufferIdentity, WireBufferLifetime,
     WireBufferRole, WireBufferVersion, WireCollectionKernelPlan, WireDependencyEdge,
     WireDeviceProgram, WireDeviceResource, WireDispatchSize, WireInitializationPolicy,

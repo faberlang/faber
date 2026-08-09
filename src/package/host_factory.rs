@@ -199,8 +199,9 @@ pub struct BackendDiscoveryReceipt {
     pub backend: DeviceBackend,
     /// Selected-hardware name from the admission probe.
     pub device_name: String,
-    /// FNV-1a provenance hash of the selected backend's declared artifact
-    /// (verified against its blob at image admission).
+    /// `content_sha256` content digest of the selected backend's declared
+    /// artifact (canonical `sha256:<64-hex>`; re-verified against its
+    /// canonical decoded bytes at image admission, DDCP2-U3).
     pub artifact_hash: String,
 }
 
@@ -239,7 +240,7 @@ pub fn discovery_receipt(
     Some(BackendDiscoveryReceipt {
         backend,
         device_name: backend_device_name(backend),
-        artifact_hash: artifact.hash.clone(),
+        artifact_hash: artifact.content_sha256.clone(),
     })
 }
 

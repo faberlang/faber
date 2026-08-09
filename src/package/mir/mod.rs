@@ -55,8 +55,8 @@ use radix::mir::{
 };
 use radix::semantic::{IndexExpr, Primitive, Resolver, Type, TypeId, TypeTable, TypeTableSnapshot};
 use radix_mir_fmir::{
-    decode_binary_image, decode_text_image, encode_binary_image, encode_text_image, fnv1a64,
-    is_known_host_requirement, FmirBinaryImageFile, FmirDeviceBackend, FmirDeviceSection,
+    decode_binary_image, decode_text_image, encode_binary_image, encode_text_image,
+    is_known_host_requirement, FmirBinaryImageFile, FmirDeviceSection,
     FmirDeviceSelection, FmirImageError, FmirTextCliOperand, FmirTextCliRootSection,
     FmirTextCliSection, FmirTextCliValueType, FmirTextImageFile, FmirTextProgramSection,
     FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection,
@@ -264,17 +264,43 @@ struct LibraryLinkTarget {
 
 impl FmirPackageImage {
     /// The selection request recorded in the image's `device` section
-    /// (fallback `auto` when the image carries none).
-    fn route_selection(&self) -> faber::device::DeviceSelection {
-        self.device
-            .as_ref()
-            .map(|device| match device.selection {
-                FmirDeviceSelection::Auto => faber::device::DeviceSelection::Auto,
-                FmirDeviceSelection::Metal => faber::device::DeviceSelection::Metal,
-                FmirDeviceSelection::Cuda => faber::device::DeviceSelection::Cuda,
-            })
-            .unwrap_or(faber::device::DeviceSelection::Auto)
+    /// (fallback `auto` when the image carries none). An unknown selection id
+    /// recorded on the image is representable on the packet but rejected
+    /// fail-closed here — never silently remapped to `auto` or a compiled-in
+    /// backend (DDCP2 gate bullet 4).
+    fn route_selection(&self) -> Result<faber::device::DeviceSelection, Vec<Diagnostic>> {
+        let Some(device) = &self.device else {
+            return Ok(faber::device::DeviceSelection::Auto);
+        };
+        match &device.selection {
+            FmirDeviceSelection::Auto => Ok(faber::device::DeviceSelection::Auto),
+            FmirDeviceSelection::Metal => Ok(faber::device::DeviceSelection::Metal),
+            FmirDeviceSelection::Cuda => Ok(faber::device::DeviceSelection::Cuda),
+            FmirDeviceSelection::Unknown(id) => Err(vec![mir_diag(
+                &self.diagnostic_path,
+                format!(
+                    "device section records unknown backend selection `{id}`; an explicit selection must name a compiled-in backend (never guessed, never silently remapped)"
+                ),
+            )]),
+        }
     }
+}
+
+/// FNV-1a 64-bit idiom for the S1/S2 SOURCE-identity surface only
+/// ([`bin_runner::fnv64_hex`] — the embedded-image fingerprint and the A10
+/// identity's source half). This is the separate source-identity FNV surface
+/// explicitly preserved by ddpp0-contract §FnvRemoval; it is NOT the removed
+/// backend-artifact FNV provenance (B1–B7). Standard FNV-1a, identical to the
+/// deleted `radix_mir_fmir::fnv1a64`.
+pub(super) fn fnv1a64(bytes: &[u8]) -> u64 {
+    const FNV1A64_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
+    const FNV1A64_PRIME: u64 = 0x0000_0100_0000_01b3;
+    let mut hash = FNV1A64_OFFSET;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(FNV1A64_PRIME);
+    }
+    hash
 }
 
 // Submodule items are imported here (sibling modules reach each other

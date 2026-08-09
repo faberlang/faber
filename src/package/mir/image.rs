@@ -778,26 +778,64 @@ pub(super) fn fmir_image_decode_error(
                 style.label
             ),
         )],
-        FmirImageError::UnsupportedRuntimeRequirement { requirement } => vec![mir_diag(
+        FmirImageError::ArtifactDigestMismatch {
+            backend,
+            field,
+            stored,
+            computed,
+        } => vec![mir_diag(
             path,
             format!(
-                "unsupported {} image device runtime requirement `{requirement}` (expected `device:metal` or `device:cuda`)",
+                "{} image device artifact `{backend}` digest `{field}` mismatch (stored {stored}, recomputed {computed})",
                 style.label
             ),
         )],
-        FmirImageError::ArtifactHashMismatch { backend, expected, actual } => {
-            let backend = match backend {
-                FmirDeviceBackend::Metal => "metal",
-                FmirDeviceBackend::Cuda => "cuda",
-            };
-            vec![mir_diag(
-                path,
-                format!(
-                    "{} image device artifact hash mismatch for backend `{backend}` (stored {expected}, recomputed {actual})",
-                    style.label
-                ),
-            )]
-        }
+        FmirImageError::CompilerInputProvenance { backend, detail } => vec![mir_diag(
+            path,
+            format!(
+                "{} image device artifact `{backend}` provenance violation: {detail}",
+                style.label
+            ),
+        )],
+        FmirImageError::UnsupportedTargetFeature { feature } => vec![mir_diag(
+            path,
+            format!(
+                "{} image device artifact requires unknown target feature `{feature}`",
+                style.label
+            ),
+        )],
+        FmirImageError::IncompatibleTargetId {
+            backend,
+            target,
+            expected,
+        } => vec![mir_diag(
+            path,
+            format!(
+                "{} image device artifact `{backend}` declares target `{target}`; expected `{expected}`",
+                style.label
+            ),
+        )],
+        FmirImageError::MissingArtifactForSelection { selection } => vec![mir_diag(
+            path,
+            format!(
+                "{} image device selection `{selection}` names no declared artifact of that backend",
+                style.label
+            ),
+        )],
+        FmirImageError::ArtifactEncodingMismatch { backend, detail } => vec![mir_diag(
+            path,
+            format!(
+                "{} image device artifact `{backend}` payload-encoding mismatch: {detail}",
+                style.label
+            ),
+        )],
+        FmirImageError::UnsupportedArtifactBackend { backend } => vec![mir_diag(
+            path,
+            format!(
+                "{} image device artifact backend `{backend}` is not a compiled-in leaf",
+                style.label
+            ),
+        )],
         FmirImageError::UnsupportedDeviceProgramVersion { actual, expected } => vec![
             mir_issue_diag(
                 path,

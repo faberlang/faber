@@ -214,7 +214,7 @@ pub(crate) fn execute_device_route(
     discovery.print();
     // The host consumes the WIRE: the descriptor is derived exclusively from
     // the carried program facts (never a thinned slot list).
-    let descriptor = descriptor_for_backend(device, backend, artifact.blob.as_bytes())?;
+    let descriptor = descriptor_for_backend(device, backend, &artifact.bytes)?;
     // Fail-before-launch: the descriptor is validated by the composite host
     // before any kernel is dispatched.
     let selection = match backend {
@@ -287,14 +287,18 @@ pub(crate) fn execute_device_route(
 
     // A9 observed lifecycle events of the last execution (R9): real
     // synchronization operations, the exact readback count, and the
-    // completion boundary the receipt states. The descriptor hash printed
-    // here is the EXECUTION-descriptor hash (S5A-U3): it inlines the
-    // backend entry-name bytes (`kernel.entry`), so it is backend-entry-
-    // inclusive and is NOT a semantic-identity claim — the backend-neutral
-    // semantic identity of the complete program is the A10 identity printed
-    // above.
+    // completion boundary the receipt states. The module/execution hashes
+    // printed here are the HOST's observed execution-identity hashes (the
+    // host receipt's u64 values, printed as plain hex) — they are NOT the
+    // removed FNV backend-artifact provenance and NOT `content_sha256`
+    // digests (the FNV provenance label was removed with ddpp0-contract
+    // §FnvRemoval B6). The descriptor hash is the EXECUTION-descriptor hash
+    // (S5A-U3): it inlines the backend entry-name bytes (`kernel.entry`), so
+    // it is backend-entry-inclusive and is NOT a semantic-identity claim —
+    // the backend-neutral semantic identity of the complete program is the
+    // A10 identity printed above.
     println!(
-        "device: module hash fnv64:{:016x} execution descriptor hash fnv64:{:016x} launches {} syncs {} transfers {} readbacks {} releases {} allocated {}",
+        "device: module hash {:016x} execution descriptor hash {:016x} launches {} syncs {} transfers {} readbacks {} releases {} allocated {}",
         receipt.module_hash,
         receipt.execution_descriptor_hash,
         receipt.launches,

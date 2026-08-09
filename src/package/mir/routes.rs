@@ -230,7 +230,7 @@ pub(super) fn run_loaded_fmir_image_route<H: Host + ?Sized>(
     image: FmirPackageImage,
     host: &mut H,
 ) -> Result<(), Vec<Diagnostic>> {
-    let selection = image.route_selection();
+    let selection = image.route_selection()?;
     run_loaded_fmir_image_route_with_selection(image, selection, host)
 }
 
@@ -282,7 +282,10 @@ pub(crate) fn run_fmir_image_path_with_selection<H: Host + ?Sized>(
         )]
     })?;
     let loaded = load_fmir_image(&image_bytes, image_path)?;
-    let selection = selection_override.unwrap_or_else(|| loaded.route_selection());
+    let selection = match selection_override {
+        Some(selection) => selection,
+        None => loaded.route_selection()?,
+    };
     run_loaded_fmir_image_route_with_selection(loaded, selection, host)
 }
 
@@ -297,8 +300,9 @@ pub(crate) struct FmirImageRouteDecision {
     /// The selection request recorded in the image's `device` section
     /// (fallback `auto` when the image carries none).
     pub(crate) declared_selection: faber::device::DeviceSelection,
-    /// Declared backend artifacts (blob + FNV-1a provenance hash), empty for
-    /// CPU-only images. Verified against their blobs at image admission.
+    /// Declared backend artifacts (canonical bytes + `content_sha256`
+    /// digest), empty for CPU-only images. Re-verified against their
+    /// canonical decoded bytes at image admission (DDCP2-U3).
     pub(crate) declared_artifacts: Vec<radix_mir_fmir::FmirDeviceArtifact>,
 }
 
@@ -316,7 +320,7 @@ pub(crate) fn fmir_image_route_decision(
     })?;
     let loaded = load_fmir_image(&image_bytes, image_path)?;
     let requires_device = loaded.device.is_some();
-    let declared_selection = loaded.route_selection();
+    let declared_selection = loaded.route_selection()?;
     let declared_artifacts = loaded
         .device
         .as_ref()
@@ -336,7 +340,7 @@ pub fn run_fmir_image_bytes_with_stdio(
 ) -> Result<(), Vec<Diagnostic>> {
     let loaded = load_fmir_image(image_bytes, diagnostic_path)?;
     let requires_device = loaded.device.is_some();
-    let selection = loaded.route_selection();
+    let selection = loaded.route_selection()?;
     // The one host-construction policy (N1.1/N1.5): the image-runner route
     // resolves its backend through the composite host's single decision
     // before any launch. `auto` + a payload-less image keeps the CPU route

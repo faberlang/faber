@@ -2302,7 +2302,7 @@ fn execute_prefill_session(
             backend,
         )]
     })?;
-    let descriptor = descriptor_for_backend(device, backend, artifact.blob.as_bytes())?;
+    let descriptor = descriptor_for_backend(device, backend, &artifact.bytes)?;
     let selection = match backend {
         DeviceBackend::Metal => DeviceSelection::Metal,
         DeviceBackend::Cuda => DeviceSelection::Cuda,

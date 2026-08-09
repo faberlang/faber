@@ -3,14 +3,15 @@
 use super::{
     admit_session_section, device_diag, function_has_shape_construction, wire_program_for_program,
     BTreeMap, BTreeSet, DescriptorBuffer, DescriptorBufferVersion, DescriptorEndOfRunResult,
-    DescriptorKernel, DescriptorLaunch, DescriptorResult, DeviceBackend,
+    DescriptorKernel, DescriptorLaunch, DescriptorResult, DeviceArtifactFormat, DeviceBackend,
     DeviceBufferInitialization, DeviceBufferLifetime, DeviceBufferRole, DeviceDataType,
-    DeviceDescriptor, DeviceProgram, DeviceSelection, DeviceSemantics, Diagnostic, FmirDeviceArtifact,
-    FmirDeviceArtifactsSection, FmirDeviceBackend, FmirDeviceInput, FmirDeviceProgramSection,
-    FmirDeviceSection, FmirDeviceSelection, FmirDeviceSymbol, HostDescriptorDataFlow,
-    HostDeviceProgramLifetime, Interner, MirFunctionId, ValidatedMir, WireBufferLifetime,
-    WireBufferRole, WireDeviceProgram, WireInitializationPolicy, WireObservationCadence,
-    WireProgramLifetime, WireResourceAccess, DEVICE_RUN_PLAN_VERSION,
+    DeviceDescriptor, DevicePayloadEncoding, DeviceProgram, DeviceSelection, DeviceSemantics,
+    DeviceTargetId, Diagnostic, FmirDeviceArtifact, FmirDeviceArtifactsSection, FmirDeviceBackend,
+    FmirDeviceInput, FmirDeviceProgramSection, FmirDeviceSection, FmirDeviceSelection,
+    FmirDeviceSymbol, HostDescriptorDataFlow, HostDeviceProgramLifetime, Interner,
+    MaterializationStage, MirFunctionId, ValidatedMir, WireBufferLifetime, WireBufferRole,
+    WireDeviceProgram, WireInitializationPolicy, WireObservationCadence, WireProgramLifetime,
+    WireResourceAccess, DEVICE_RUN_PLAN_VERSION,
 };
 // Doc-link surface: the host session/descriptor types appear only in
 // intra-doc links here (their code uses live in run.rs); the import keeps
@@ -28,6 +29,21 @@ pub(crate) struct DeviceSectionBuild<'a> {
     pub(crate) inputs: &'a BTreeMap<String, Vec<f32>>,
     pub(crate) ptx_target: &'a str,
     pub(crate) repeating_steps: u32,
+}
+
+/// The declared ABI/schema version of faber's emitted device artifacts — an
+/// input to the `packet_sha256` identity (DDCP2-U3). Matches the radix
+/// producer/closeout convention.
+const DEVICE_ARTIFACT_ABI_VERSION: u32 = 1;
+
+/// Compute the canonical `content_sha256`/`packet_sha256` identity digests of
+/// a declared device artifact over its canonical decoded bytes (DDCP2-U3; the
+/// same convention the radix fixtures use). Admission re-verifies both digests
+/// against the carried bytes and metadata (B3).
+fn device_artifact_with_digests(mut artifact: FmirDeviceArtifact) -> FmirDeviceArtifact {
+    artifact.content_sha256 = artifact.compute_content_sha256();
+    artifact.packet_sha256 = artifact.compute_packet_sha256();
+    artifact
 }
 
 /// Assemble the FMIR `device` section for a constructed device program.
@@ -125,24 +141,52 @@ pub(crate) fn device_section_for_program(
         })
         .unwrap_or_default();
 
-    let mut artifact = vec![FmirDeviceArtifact {
+    // The declared artifacts are versioned DeviceArtifact packets (DDCP2-U2):
+    // canonical raw bytes + explicit payload encoding, the typed target id +
+    // required features, the entrypoint symbol map, and the
+    // `content_sha256`/`packet_sha256` identity digests (DDCP2-U3). Both
+    // payloads are compiler-input text artifacts (MSL source; PTX text), so
+    // `content_sha256` covers the canonical decoded bytes — never a transport
+    // spelling. The FNV backend-artifact provenance is removed
+    // (ddpp0-contract §FnvRemoval, B4/B5): content identity replaces it.
+    let mut artifact = vec![device_artifact_with_digests(FmirDeviceArtifact {
         backend: FmirDeviceBackend::Metal,
-        blob: metal_artifact.source,
-        hash: metal_artifact.hash,
-        symbols: Vec::new(),
-    }];
+        format: DeviceArtifactFormat::Msl,
+        stage: MaterializationStage::CompilerInput,
+        target: DeviceTargetId {
+            id: "macos-arm64".to_owned(),
+            required_features: Vec::new(),
+        },
+        abi_version: DEVICE_ARTIFACT_ABI_VERSION,
+        bytes: metal_artifact.source.into_bytes(),
+        encoding: DevicePayloadEncoding::Text,
+        entrypoints: Vec::new(),
+        content_sha256: String::new(),
+        packet_sha256: String::new(),
+        compiler_input_packet_sha256: None,
+    })];
     if let Some(cuda_artifact) = &cuda_artifact {
         match radix_mir_llvm::compile_nvvm_to_ptx(&cuda_artifact.source, ptx_target) {
             Ok(ptx) => {
-                // The packaged CUDA artifact is PTX (N1.3 §3.1); its provenance
-                // hash covers the PTX blob, not the NVVM source.
-                let ptx_hash = radix_mir_fmir::fnv1a64_blob_hash(ptx.as_bytes());
-                artifact.push(FmirDeviceArtifact {
+                // The packaged CUDA artifact is PTX (N1.3 §3.1); its content
+                // digest covers the canonical PTX bytes, not the NVVM source
+                // (B5: `fnv1a64_blob_hash` → `content_sha256`).
+                artifact.push(device_artifact_with_digests(FmirDeviceArtifact {
                     backend: FmirDeviceBackend::Cuda,
-                    blob: ptx,
-                    hash: ptx_hash,
-                    symbols: cuda_symbols,
-                });
+                    format: DeviceArtifactFormat::Ptx,
+                    stage: MaterializationStage::CompilerInput,
+                    target: DeviceTargetId {
+                        id: "sm_120".to_owned(),
+                        required_features: vec!["sm_120".to_owned()],
+                    },
+                    abi_version: DEVICE_ARTIFACT_ABI_VERSION,
+                    bytes: ptx.into_bytes(),
+                    encoding: DevicePayloadEncoding::Text,
+                    entrypoints: cuda_symbols,
+                    content_sha256: String::new(),
+                    packet_sha256: String::new(),
+                    compiler_input_packet_sha256: None,
+                }));
             }
             Err(error) => {
                 // Build-time PTX compile unavailable (clang NVPTX missing): the
@@ -164,16 +208,6 @@ pub(crate) fn device_section_for_program(
         })
         .collect();
 
-    let mut runtime_requirements = Vec::new();
-    for artifact_entry in &artifact {
-        match artifact_entry.backend {
-            FmirDeviceBackend::Metal => runtime_requirements.push("device:metal".to_owned()),
-            FmirDeviceBackend::Cuda => runtime_requirements.push("device:cuda".to_owned()),
-        }
-    }
-    runtime_requirements.sort();
-    runtime_requirements.dedup();
-
     Ok(FmirDeviceSection {
         device_program: FmirDeviceProgramSection {
             v: DEVICE_RUN_PLAN_VERSION,
@@ -186,7 +220,10 @@ pub(crate) fn device_section_for_program(
         },
         artifacts: FmirDeviceArtifactsSection { artifact },
         declared_inputs,
-        runtime_requirements,
+        // The device `runtime_requirements` field is gone with the FNV
+        // migration (B4/B5): the packet carries the typed target id +
+        // required features per artifact instead of the `device:*` string
+        // allowlist, and the backend capability is the artifact's backend id.
         // MD2-W1 (FC16): the single-device constructor passes the optional
         // distributed section through as `None` — single-device packages
         // never require the multi-device section (MD-A15). Distributed-image
@@ -259,7 +296,7 @@ pub(crate) fn descriptor_for_backend(
                 .find(|artifact| artifact.backend == FmirDeviceBackend::Cuda)
                 .and_then(|artifact| {
                     artifact
-                        .symbols
+                        .entrypoints
                         .iter()
                         .find(|identity| identity.entry == kernel.entry)
                         .map(|identity| identity.symbol.clone())
