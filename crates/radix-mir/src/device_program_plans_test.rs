@@ -5,9 +5,9 @@ use crate::abi::{
     MirWorkgroupSize,
 };
 use crate::device_program::{
-    BufferId, BufferIdentity, BufferLifetime, BufferVersion, DeviceProgram, DeviceProgramLifetime,
-    DeviceResource, KernelLaunchPlan, KernelUnit, LaunchId, LaunchUnit, ObservationCadence,
-    ResultBuffer,
+    BufferId, BufferIdentity, BufferLifetime, BufferVersion, DeviceProgram, DeviceProgramError,
+    DeviceProgramLifetime, DeviceResource, KernelLaunchPlan, KernelUnit, LaunchId, LaunchUnit,
+    ObservationCadence, ResultBuffer,
 };
 use crate::kernel_plan::{
     MatMulShapes, MatMulSharedMemory, OobPaddingPolicy, ReduceOp, SharedMemoryLayout,
@@ -3135,4 +3135,108 @@ fn silu_composition_is_elementwise_on_the_admitted_surface() {
             "the SiLU composition op {op:?} must be elementwise-admitted"
         );
     }
+}
+
+// -----------------------------------------------------------------------
+// DDCP1-U3: per-output bounds/index domains (contract §Per-output bounds).
+// -----------------------------------------------------------------------
+
+/// A kernel writing two outputs of different extents (4 and 2 elements)
+/// under one dispatch sized for 4 lanes.
+fn dual_output_kernel_program() -> DeviceProgram {
+    let mut types = TypeTable::new();
+    let element_ty = f32_ty(&mut types);
+    let first = identity(1, "out.a", BufferRole::Output);
+    let second = identity(2, "out.b", BufferRole::Output);
+    let kernel = KernelUnit {
+        function: MirFunctionId(0),
+        entry: "dual_output".to_owned(),
+        plan: CollectionKernelPlan::Elementwise,
+        resources: vec![
+            resource(
+                first,
+                version(1, element_ty.clone(), 4),
+                1,
+                MirKernelResourceAccess::Write,
+            ),
+            resource(
+                second,
+                version(1, element_ty, 2),
+                2,
+                MirKernelResourceAccess::Write,
+            ),
+        ],
+        launch: KernelLaunchPlan {
+            workgroup: MirWorkgroupSize { x: 4, y: 1, z: 1 },
+            dispatch_size: MirKernelDispatchSize { x: 4, y: 1, z: 1 },
+            workgroup_count: MirKernelWorkgroupCount { x: 1, y: 1, z: 1 },
+        },
+    };
+    DeviceProgram {
+        kernels: vec![kernel],
+        launches: vec![LaunchUnit {
+            id: LaunchId(1),
+            kernel_index: 0,
+        }],
+        lifetime: DeviceProgramLifetime::SingleRun,
+        results: Vec::new(),
+    }
+}
+
+#[test]
+fn per_output_domains_derived_per_output() {
+    // Contract §Per-output bounds rule 1: every output has its OWN
+    // bounds/index domain — heterogeneous outputs are not collapsed into a
+    // single shared extent.
+    let program = dual_output_kernel_program();
+    let domains = per_output_domains(&program.kernels[0]);
+    assert_eq!(domains.len(), 2, "one derived domain per output slot");
+    assert_eq!(domains[0].element_count, 4);
+    assert_eq!(domains[1].element_count, 2);
+    assert_ne!(
+        domains[0].element_count, domains[1].element_count,
+        "heterogeneous outputs keep distinct per-output extents"
+    );
+}
+
+#[test]
+fn launch_descriptor_carries_per_output_domains() {
+    // The launch descriptor exposes each output's own domain so hosts
+    // dispatch per output (rule 2/3: no guessed shared extent).
+    let program = dual_output_kernel_program();
+    let descriptors = launch_descriptors(&program);
+    assert_eq!(descriptors[0].output_domains.len(), 2);
+    assert_eq!(descriptors[0].output_domains[0].element_count, 4);
+    assert_eq!(descriptors[0].output_domains[1].element_count, 2);
+}
+
+#[test]
+fn valid_program_with_covered_outputs_validates() {
+    // A shared dispatch covering every output's own domain is legal.
+    let program = elementwise_device_program();
+    validate_per_output_domains(&program)
+        .expect("an output covered by the dispatched lanes validates");
+}
+
+#[test]
+fn underfilled_output_fails_closed() {
+    // Contract §Per-output bounds rules 2/3: no shared dispatch extent may
+    // under-fill an output — an output larger than the dispatched lanes
+    // fails closed.
+    let mut program = dual_output_kernel_program();
+    program.kernels[0].launch = KernelLaunchPlan {
+        workgroup: MirWorkgroupSize { x: 2, y: 1, z: 1 },
+        dispatch_size: MirKernelDispatchSize { x: 1, y: 1, z: 1 },
+        workgroup_count: MirKernelWorkgroupCount { x: 1, y: 1, z: 1 },
+    };
+    assert!(matches!(
+        validate_per_output_domains(&program),
+        Err(DeviceProgramError::OutputExtentUnderfilled {
+            kernel: 0,
+            group: 0,
+            binding: 1,
+            element_count: 4,
+            dispatched: 2,
+        })
+    ));
 }

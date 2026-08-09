@@ -680,3 +680,67 @@ fn identical_fact_sets_validate_identically_across_rebuilds() {
     assert_eq!(first.values[0].id, second.values[0].id);
     assert_eq!(first.values[0].origin, second.values[0].origin);
 }
+
+// ── DDCP1-U3: the resource axes are separate, independent facts ──────────
+
+#[test]
+fn initialization_axis_is_declared_independently() {
+    // An initialization fact rides alone — it neither requires nor implies
+    // an observation, a generation, or a mutation fact (five separate axes,
+    // never collapsed into one buffer flag).
+    let semantics = DeviceSemantics {
+        values: vec![value(
+            1,
+            "x",
+            SemanticValueOrigin::MirLocal {
+                function: MirFunctionId(0),
+                local: 0,
+            },
+        )],
+        bindings: vec![ValueBinding {
+            value: SemanticValueId(1),
+            buffer: BufferId(1),
+        }],
+        initializations: vec![InitializationFact {
+            buffer: BufferId(1),
+            policy: InitializationPolicy::HostProvided,
+        }],
+        ..DeviceSemantics::default()
+    };
+    semantics
+        .validate(&[])
+        .expect("an initialization fact is an independent axis");
+}
+
+#[test]
+fn write_does_not_imply_observability() {
+    // A carried write (generation) with no observation fact is valid — a
+    // write never implies observability, and an observation never implies a
+    // result at the semantic layer.
+    let semantics = DeviceSemantics {
+        values: vec![value(
+            1,
+            "x",
+            SemanticValueOrigin::MirLocal {
+                function: MirFunctionId(0),
+                local: 0,
+            },
+        )],
+        bindings: vec![ValueBinding {
+            value: SemanticValueId(1),
+            buffer: BufferId(1),
+        }],
+        generations: vec![ValueGeneration {
+            value: SemanticValueId(1),
+            generation: 1,
+            element_ty: f32(),
+            element_count: 4,
+            produced_by: LaunchId(1),
+        }],
+        roots: vec![LaunchId(1)],
+        ..DeviceSemantics::default()
+    };
+    semantics
+        .validate(&[LaunchId(1)])
+        .expect("a write without an observation fact validates; observability is explicit");
+}

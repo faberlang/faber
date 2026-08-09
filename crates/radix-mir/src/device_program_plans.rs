@@ -42,7 +42,10 @@ use crate::abi::{
     MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature,
     MAX_STORAGE_BUFFERS_PER_KERNEL,
 };
-use crate::device_program::{Binding, BufferRole, DeviceProgram, DeviceResource, KernelUnit};
+use crate::device_program::{
+    Binding, BufferRole, DeviceProgram, DeviceProgramError, DeviceResource, KernelLaunchPlan,
+    KernelUnit,
+};
 use crate::kernel_plan::{CollectionKernelPlan, MatMulShapes, SharedMemoryLayout};
 use crate::layout::MirTensorStorageLayout;
 use crate::{
@@ -423,6 +426,11 @@ pub struct KernelLaunchDescriptor {
     pub slots: Vec<LaunchBufferSlot>,
     /// Shared-memory footprint in bytes (0 for elementwise kernels).
     pub shared_memory_bytes: u64,
+    /// Per-output bounds/index domains (DDCP1-U3, contract §Per-output
+    /// bounds): each Write/ReadWrite slot's own extent. Heterogeneous
+    /// outputs each carry their own derived domain — hosts dispatch per
+    /// output, never under one guessed shared extent.
+    pub output_domains: Vec<PerOutputDomain>,
 }
 
 impl KernelLaunchDescriptor {
@@ -438,6 +446,7 @@ impl KernelLaunchDescriptor {
             workgroup_count: kernel.launch.workgroup_count,
             slots: kernel.resources.iter().map(launch_buffer_slot).collect(),
             shared_memory_bytes: plan_shared_memory_bytes(&kernel.plan),
+            output_domains: per_output_domains(kernel),
         }
     }
 }
@@ -462,6 +471,80 @@ fn launch_buffer_slot(resource: &DeviceResource) -> LaunchBufferSlot {
         role: resource.buffer.role,
         storage: resource.buffer.storage,
     }
+}
+
+/// The per-output bounds/index domain of one kernel output slot
+/// (DDCP1-U3, contract §Per-output bounds rule 1): every output has its
+/// OWN extent — never inferred from the shared dispatch and never taken
+/// from another output's shape.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PerOutputDomain {
+    /// The output slot's target-neutral binding indices.
+    pub binding: Binding,
+    /// The output's own element extent.
+    pub element_count: u64,
+}
+
+/// Derive each kernel output's own bounds/index domain (DDCP1-U3).
+///
+/// Output slots are the kernel's Write and ReadWrite resources — each one
+/// gets its own extent from its bound version's element count. The derivation
+/// is a pure function over carried program facts (A3: never text).
+#[must_use]
+pub fn per_output_domains(kernel: &KernelUnit) -> Vec<PerOutputDomain> {
+    kernel
+        .resources
+        .iter()
+        .filter(|resource| {
+            matches!(
+                resource.access,
+                MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
+            )
+        })
+        .map(|resource| PerOutputDomain {
+            binding: resource.binding,
+            element_count: resource.version.element_count,
+        })
+        .collect()
+}
+
+/// Validate per-output bounds/index domains fail-closed (DDCP1-U3, contract
+/// §Per-output bounds rules 1–3).
+///
+/// Every kernel output must be covered by the kernel's dispatched lanes —
+/// no shared dispatch extent may under-fill a heterogeneous or single
+/// output. A single dispatch extent is legal only where the member outputs
+/// provably share one domain (identical extents); heterogeneous outputs are
+/// legal only because each output carries its own derived domain (the
+/// launch descriptor exposes [`PerOutputDomain`] per output).
+///
+/// # Errors
+/// Returns [`DeviceProgramError::OutputExtentUnderfilled`] when an output's
+/// own domain exceeds the dispatched lanes.
+pub fn validate_per_output_domains(program: &DeviceProgram) -> Result<(), DeviceProgramError> {
+    for (kernel_index, kernel) in program.kernels.iter().enumerate() {
+        let dispatched = dispatched_lanes(&kernel.launch);
+        for domain in per_output_domains(kernel) {
+            if domain.element_count > dispatched {
+                return Err(DeviceProgramError::OutputExtentUnderfilled {
+                    kernel: kernel_index,
+                    group: domain.binding.group,
+                    binding: domain.binding.binding,
+                    element_count: domain.element_count,
+                    dispatched,
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+/// The total lanes the shared dispatch launches: workgroup count ×
+/// workgroup size across all three axes.
+fn dispatched_lanes(launch: &KernelLaunchPlan) -> u64 {
+    u64::from(launch.workgroup_count.x) * u64::from(launch.workgroup.x)
+        * u64::from(launch.workgroup_count.y) * u64::from(launch.workgroup.y)
+        * u64::from(launch.workgroup_count.z) * u64::from(launch.workgroup.z)
 }
 
 /// The recipe's shared-memory footprint in bytes (the host sizes the

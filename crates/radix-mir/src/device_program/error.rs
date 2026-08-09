@@ -208,6 +208,24 @@ pub enum DeviceProgramError {
         producer: LaunchId,
         version: u32,
     },
+    // ── DDCP1-U3: resource axes + explicit observations + per-output ───────
+    /// A buffer is read by a kernel before any initialization is declared —
+    /// a first read before initialization (contract §Resource axes rule 1).
+    UninitializedBufferRead { buffer: BufferId, launch: LaunchId },
+    /// A buffer declares the read-back lifetime class (`ObservationPoint`)
+    /// but is never declared observed — a use outside the declared
+    /// allocation lifetime (contract §Resource axes rule 3).
+    ObservationPointBufferNotObserved { buffer: BufferId },
+    /// A kernel output's own bounds/index domain is not covered by the
+    /// shared dispatch extent — an under-fill of a heterogeneous or single
+    /// output (contract §Per-output bounds rules 1–3).
+    OutputExtentUnderfilled {
+        kernel: usize,
+        group: u32,
+        binding: u32,
+        element_count: u64,
+        dispatched: u64,
+    },
 }
 
 impl fmt::Display for DeviceProgramError {
@@ -458,6 +476,24 @@ impl fmt::Display for DeviceProgramError {
             } => write!(
                 f,
                 "the consumer edge for semantic value {value} cannot bind a generation: launch {producer} writes several generations matching buffer version {version} (contract rule 3)"
+            ),
+            Self::UninitializedBufferRead { buffer, launch } => write!(
+                f,
+                "launch {launch} reads buffer {buffer} before any initialization is declared — a first read before initialization fails closed (resource axes rule 1)"
+            ),
+            Self::ObservationPointBufferNotObserved { buffer } => write!(
+                f,
+                "buffer {buffer} declares the read-back lifetime class but is never declared observed — a use outside its declared allocation lifetime fails closed (resource axes rule 3)"
+            ),
+            Self::OutputExtentUnderfilled {
+                kernel,
+                group,
+                binding,
+                element_count,
+                dispatched,
+            } => write!(
+                f,
+                "kernel {kernel} output slot ({group}, {binding}) has its own bounds/index domain of {element_count} elements, but the shared dispatch extent covers only {dispatched} lanes — per-output bounds under-fill fails closed (per-output domains rules 1-3)"
             ),
         }
     }

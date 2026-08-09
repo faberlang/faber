@@ -21,6 +21,21 @@
 //! carrier that survives AIR → MIR → device materialization → serialized
 //! package (F4); [`crate::device::MirCompanionMap`] stores these entries with
 //! fail-closed insertion (duplicate or contradictory rows error).
+//!
+//! # DDCP1-U3 — Resource axes, explicit observations, per-output domains
+//!
+//! The five resource axes are **separate** facts — initialization, access
+//! mode, allocation lifetime, mutation generation, and observation/readback
+//! are declared and validated independently, never collapsed into a single
+//! buffer flag (contract §Resource axes). Persistent parameters, optimizer
+//! state, model state, and logical-cache state are **never automatically
+//! results**: a value becomes a result only through an explicit declared output
+//! (an observation/readback fact); results/readbacks are
+//! never inferred from writable buffers (contract §Persistent state never
+//! automatically results). Every output has its **own bounds**/index domain;
+//! the shared dispatch extent never overruns or under-fills heterogeneous
+//! outputs — **per-output** extents are derived (`device_program_plans.rs`)
+//! or the program fails closed (contract §Per-output bounds).
 
 use crate::device::MirCompanionDerivativeKind;
 use crate::device_program::{BufferId, DeviceProgramError, LaunchId};

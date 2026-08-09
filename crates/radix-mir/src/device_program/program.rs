@@ -300,7 +300,72 @@ impl DeviceProgram {
         // producer's carried generation, and the program's version chain must
         // agree on exactly one generation).
         self.validate_edge_bindings(semantics)?;
+        // DDCP1-U3 / contract §Resource axes: the five axes are separate —
+        // a first read before initialization fails closed, a use outside the
+        // declared allocation lifetime fails closed, and per-output bounds/
+        // index domains never under-fill under the shared dispatch extent.
+        self.validate_resource_axes(semantics)?;
         Ok(())
+    }
+
+    /// DDCP1-U3 / contract §Resource axes — independent-axis validation.
+    ///
+    /// - **Initialization axis**: a buffer read (read or read-write) by any
+    ///   kernel must have a declared initialization fact (zero, host-provided,
+    ///   or kernel-initialized) — a first read before initialization fails
+    ///   closed. Initialization stays a separate axis from access, lifetime,
+    ///   mutation, and observation: no other fact implies or replaces it.
+    /// - **Allocation-lifetime axis**: a buffer declaring the read-back
+    ///   lifetime class (`ObservationPoint`) must actually be declared
+    ///   observed (a result row; the F6 coupling then requires its
+    ///   observation fact) — a use outside the declared lifetime fails
+    ///   closed. Per-step/per-program classes ride their own declarations.
+    /// - **Per-output domains** (`crate::device_program_plans::
+    ///   validate_per_output_domains`): every output has its own bounds/
+    ///   index domain; no shared dispatch extent under-fills an output.
+    fn validate_resource_axes(&self, semantics: &DeviceSemantics) -> Result<(), DeviceProgramError> {
+        for (kernel_index, kernel) in self.kernels.iter().enumerate() {
+            for resource in &kernel.resources {
+                let reading = matches!(
+                    resource.access,
+                    MirKernelResourceAccess::Read | MirKernelResourceAccess::ReadWrite
+                );
+                if !reading {
+                    continue;
+                }
+                let initialized = semantics.initializations.iter().any(|fact| {
+                    fact.buffer == resource.buffer.id
+                });
+                if !initialized {
+                    let launch = self
+                        .launches
+                        .iter()
+                        .find(|launch| launch.kernel_index == kernel_index)
+                        .map(|launch| launch.id)
+                        .unwrap_or(LaunchId(0));
+                    return Err(DeviceProgramError::UninitializedBufferRead {
+                        buffer: resource.buffer.id,
+                        launch,
+                    });
+                }
+            }
+        }
+        for kernel in &self.kernels {
+            for resource in &kernel.resources {
+                if resource.buffer.lifetime != BufferLifetime::ObservationPoint {
+                    continue;
+                }
+                let observed = self.results.iter().any(|result| {
+                    result.buffer.id == resource.buffer.id
+                });
+                if !observed {
+                    return Err(DeviceProgramError::ObservationPointBufferNotObserved {
+                        buffer: resource.buffer.id,
+                    });
+                }
+            }
+        }
+        crate::device_program_plans::validate_per_output_domains(self)
     }
 
     /// DDCP1-U2 / contract rule 3 — consumer binding cross-check.

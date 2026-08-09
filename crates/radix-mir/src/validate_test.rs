@@ -2737,3 +2737,39 @@ fn test_causal_masked_softmax_rejects_wrong_arity() {
         "expected the arity diagnostic for a 2-arg causal masked-softmax call, got: {errors:?}"
     );
 }
+
+// ── DDCP1-U3: access-mode axis — role/access pairs fail closed ───────────
+
+#[test]
+fn access_mode_axis_rejects_incoherent_role_access_pairs() {
+    // Contract §Resource axes rule 2: access mode is declared per
+    // resource/launch (read, write, read-write) and validated independently.
+    // An access outside the declared mode fails closed at the ABI→program
+    // role mapping: writing an input role or reading an output role has no
+    // coherent program role and yields `None`.
+    use crate::abi::{MirKernelResourceAccess, MirKernelResourceRole};
+    use crate::device_program::BufferRole;
+
+    assert_eq!(
+        BufferRole::from_abi_role(MirKernelResourceRole::Input, MirKernelResourceAccess::Read),
+        Some(BufferRole::Input)
+    );
+    assert_eq!(
+        BufferRole::from_abi_role(MirKernelResourceRole::Output, MirKernelResourceAccess::Write),
+        Some(BufferRole::Output)
+    );
+    assert_eq!(
+        BufferRole::from_abi_role(MirKernelResourceRole::Input, MirKernelResourceAccess::ReadWrite),
+        Some(BufferRole::InOut)
+    );
+    // Incoherent pairs: writing an input, reading an output — an access
+    // outside the declared mode, rejected (no silent role collapse).
+    assert_eq!(
+        BufferRole::from_abi_role(MirKernelResourceRole::Input, MirKernelResourceAccess::Write),
+        None
+    );
+    assert_eq!(
+        BufferRole::from_abi_role(MirKernelResourceRole::Output, MirKernelResourceAccess::Read),
+        None
+    );
+}

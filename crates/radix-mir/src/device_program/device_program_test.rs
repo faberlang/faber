@@ -1500,6 +1500,19 @@ fn reduction_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
             produced_by: LaunchId(0),
         }],
         roots: vec![LaunchId(0)],
+        // The five axes are declared independently (DDCP1-U3): the input is
+        // host-provided, the output kernel-initialized — each buffer's read
+        // is preceded by a declared initialization fact.
+        initializations: vec![
+            InitializationFact {
+                buffer: BufferId(0),
+                policy: InitializationPolicy::HostProvided,
+            },
+            InitializationFact {
+                buffer: BufferId(1),
+                policy: InitializationPolicy::KernelInitialized,
+            },
+        ],
         observations: vec![ObservationFact {
             buffer: BufferId(1),
             version: 1,
@@ -1646,7 +1659,7 @@ fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
     };
 
     let intermediate = identity(0, "intermediate", BufferRole::InOut, BufferLifetime::PerStep);
-    let output = identity(1, "output", BufferRole::Output, BufferLifetime::ObservationPoint);
+    let output = identity(1, "output", BufferRole::Output, BufferLifetime::PerStep);
 
     let mut program = DeviceProgram::new(DeviceProgramLifetime::SingleRun);
     program.kernels = vec![
@@ -1737,6 +1750,19 @@ fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
             buffer: BufferId(0),
             version: 1,
         }],
+        // Independent initialization axis (DDCP1-U3): the intermediate is
+        // kernel-initialized (launch 0 writes it before launch 1 reads it),
+        // the output kernel-initialized by launch 1.
+        initializations: vec![
+            InitializationFact {
+                buffer: BufferId(0),
+                policy: InitializationPolicy::KernelInitialized,
+            },
+            InitializationFact {
+                buffer: BufferId(1),
+                policy: InitializationPolicy::KernelInitialized,
+            },
+        ],
         ..DeviceSemantics::default()
     };
 
@@ -1822,4 +1848,83 @@ fn scheduling_is_driven_by_edges_not_launch_declaration_order() {
     program
         .validate_with_semantics(&semantics)
         .expect("permuted launch/edge declaration order validates identically");
+}
+
+// -----------------------------------------------------------------------
+// DDCP1-U3: independent resource axes + persistent-state rule + per-output
+// domains (contract §Resource axes, §Persistent state, §Per-output bounds).
+// -----------------------------------------------------------------------
+
+#[test]
+fn first_read_before_initialization_fails_closed() {
+    // Resource axes rule 1: a buffer read by a kernel must have a declared
+    // initialization fact — the initialization axis is separate and never
+    // implied by access, lifetime, generation, or observation facts.
+    let (program, mut semantics) = chain_program_with_semantics();
+    semantics.initializations.clear();
+    assert!(matches!(
+        program.validate_with_semantics(&semantics),
+        Err(DeviceProgramError::UninitializedBufferRead {
+            buffer: BufferId(0),
+            launch: LaunchId(1),
+        })
+    ));
+}
+
+#[test]
+fn initialization_axis_is_independent_of_observation() {
+    // Resource axes: the initialization policy changes alone (kernel- to
+    // host-provided) without touching access, lifetime, generation, or
+    // observation facts, and no observation is implied by any initialization
+    // — a write never implies observability.
+    let (program, mut semantics) = chain_program_with_semantics();
+    semantics.initializations[0].policy = InitializationPolicy::HostProvided;
+    program
+        .validate_with_semantics(&semantics)
+        .expect("the initialization axis varies alone; observability is a separate declared fact");
+    assert!(
+        semantics.observations.is_empty(),
+        "initialization never implies an observation fact"
+    );
+}
+
+#[test]
+fn persistent_writable_state_never_automatically_results() {
+    // Persistent-state rule: a per-program writable buffer with no declared
+    // observation produces NO result — results are never inferred from
+    // writable buffers or `results` presence alone.
+    let (mut program, mut semantics) = chain_program_with_semantics();
+    program.kernels[0].resources[0].buffer.lifetime = BufferLifetime::PerProgram;
+    program.kernels[1].resources[0].buffer.lifetime = BufferLifetime::PerProgram;
+    semantics.initializations.clear();
+    semantics.initializations.push(InitializationFact {
+        buffer: BufferId(0),
+        policy: InitializationPolicy::HostProvided,
+    });
+    assert!(
+        program.results.is_empty(),
+        "precondition: no result rows are declared"
+    );
+    program
+        .validate_with_semantics(&semantics)
+        .expect("a writable persistent buffer with no declared observation is never an automatic result");
+    assert!(
+        program.buffer_registry().buffer(BufferId(0)).is_some(),
+        "the persistent writable buffer stays in the program"
+    );
+}
+
+#[test]
+fn observation_point_buffer_must_be_declared_observed() {
+    // Resource axes rule 3: a buffer declaring the read-back lifetime class
+    // (ObservationPoint) but never declared observed is a use outside its
+    // declared allocation lifetime.
+    let (mut program, semantics) = reduction_program_with_semantics();
+    program.kernels[0].resources[0].buffer.lifetime = BufferLifetime::ObservationPoint;
+    assert!(matches!(
+        program.validate_with_semantics(&semantics),
+        Err(DeviceProgramError::ObservationPointBufferNotObserved {
+            buffer: BufferId(0)
+        })
+    ));
 }
