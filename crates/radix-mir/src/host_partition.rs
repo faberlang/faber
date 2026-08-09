@@ -401,14 +401,19 @@ pub struct CallsiteId {
 }
 
 /// One prepared submission region of the record. The `region` index is the
-/// **stable region identity**: the boundary call's 1-based position in the
-/// derived partition (program order) — the same compiler-owned index the
-/// host-partition lane's direct region symbols carry
-/// (`__faber_prepared_region_{index}`, DDCP3-U2), so the record cross-checks
-/// against the emitted module's direct calls.
+/// **stable region identity within one analyzed module ordering**: the
+/// boundary call's 1-based position in the derived partition (program order)
+/// — the same compiler-owned index the host-partition lane's direct region
+/// symbols carry (`__faber_prepared_region_{index}`, DDCP3-U2), so the record
+/// cross-checks against the emitted module's direct calls. The index is a
+/// program-order position, stable only within that module ordering — NOT a
+/// durable cross-build/cross-module identity (fire-16 PIC-U2); a stronger
+/// semantic-ID scheme (out of scope) is the path to durable identity.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RegionRecord {
-    /// Stable region identity (1-based; the emitted region-symbol suffix).
+    /// Stable region identity within one analyzed module ordering (1-based;
+    /// the emitted region-symbol suffix). Not durable cross-build /
+    /// cross-module.
     pub region: u32,
     /// The region's member kernels (MIR function ids, in invocation order).
     pub member_kernels: Vec<MirFunctionId>,
@@ -423,7 +428,8 @@ pub struct RegionRecord {
 pub struct CallsiteRecord {
     /// The stable callsite identity.
     pub callsite: CallsiteId,
-    /// The prepared region the callsite submits (stable region identity).
+    /// The prepared region the callsite submits (stable region identity
+    /// within one analyzed module ordering).
     pub region: u32,
     /// The region's member kernel identities.
     pub member_kernels: Vec<MirFunctionId>,
@@ -449,11 +455,13 @@ pub struct EffectBoundaryRecord {
 ///
 /// Stable identity (head-cto fire-13 addendum): `module` is the
 /// product/module scope, regions carry the stable compiler-minted region
-/// identity, and callsites carry the stable (host, block, statement)
-/// identity. **Support boundary**: one analyzed module per record —
-/// separately-linked multi-module shapes are explicitly OUT of the DDCP3
-/// claim (recorded in the DDCP3 evidence); this record is not a general
-/// multi-module ABI promise.
+/// identity **within one analyzed module ordering**, and callsites carry the
+/// stable (host, block, statement) identity. **Support boundary**: one
+/// analyzed module per record — separately-linked multi-module shapes are
+/// explicitly OUT of the DDCP3 claim (recorded in the DDCP3 evidence); this
+/// record is not a general multi-module ABI promise. Region indices are
+/// program-order positions, stable only within that module ordering — NOT
+/// durable cross-build/cross-module identities (fire-16 PIC-U2).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PartitionRecord {
     /// Product/module scope of the record (the fire-13 stable identity
@@ -461,7 +469,8 @@ pub struct PartitionRecord {
     pub module: String,
     /// Exact CPU/device membership — every function exactly one role.
     pub membership: Vec<PartitionMember>,
-    /// The prepared submission regions (stable region identity + members).
+    /// The prepared submission regions (stable region identity within one
+    /// analyzed module ordering + members).
     pub regions: Vec<RegionRecord>,
     /// Host callsite → prepared region → member kernel/entrypoint identities.
     pub callsites: Vec<CallsiteRecord>,
@@ -484,8 +493,9 @@ pub struct PartitionRecord {
 /// `ad`/Sermo/cancellation/host-effect boundary.
 ///
 /// `module` is the product/module scope of the stable region/callsite
-/// identity (fire-13 addendum); separately-linked multi-module shapes are
-/// out of the DDCP3 claim.
+/// identity (fire-13 addendum) — region indices are stable only within one
+/// analyzed module ordering (PIC-U2); separately-linked multi-module shapes
+/// are out of the DDCP3 claim.
 ///
 /// # Errors
 ///
