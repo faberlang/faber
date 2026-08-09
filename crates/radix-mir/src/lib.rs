@@ -6,6 +6,7 @@
 
 pub mod abi;
 pub mod ai_workbench_stage5;
+pub mod artifact_completeness;
 pub mod boundary_abi;
 pub mod capability;
 mod collection_ops;

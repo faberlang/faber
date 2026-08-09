@@ -23,7 +23,7 @@
 //!
 //! # The five boundary classes
 //!
-//! Each class is a typed diagnostic named in the NGAB1-U2 done_when:
+//! Each class is a typed diagnostic named in the NGAB1-U2 `done_when`:
 //!
 //! - **Type** — a crossing value's element type does not exactly equal the
 //!   kernel's declared boundary element type. The boundary is typed-exact
@@ -36,7 +36,7 @@
 //!   prove is a shape violation.
 //! - **Lifetime** — the boundary call's output is written into a host
 //!   **function parameter**: the region's output would land in caller-owned
-//!   storage, escaping the program's session lifetime (§ResourceIdentity: no
+//!   storage, escaping the program's session lifetime (`§ResourceIdentity`: no
 //!   resource outlives its session; the region owns its outputs). At the
 //!   source level the semantic analyzer already blocks parameter writes
 //!   (SEM020); the gate guards MIR-level producers.
@@ -66,15 +66,19 @@
 //! are proven by the radix-mir unit tests.
 
 use crate::abi::device_view_element_count;
-use crate::host_partition::callee_function_ids;
+use crate::device_program::{BufferRole, LaunchId};
+use crate::device_semantics::DeviceEffectBoundaryKind;
+use crate::host_partition::{callee_function_ids, CallsiteId, HostPartition, PartitionRecord};
 use crate::layout::MirLayoutKind;
 use crate::ty::constant_ty;
 use crate::{
-    MirFunction, MirFunctionId, MirLocalId, MirOperand, MirPlace, MirPlaceBase, MirProgram,
-    MirStatementKind, MirTempId, MirType, MirValidationContext, MirValueId, MirValueKind,
+    MirBlockId, MirFunction, MirFunctionId, MirLocalId, MirOperand, MirPlace, MirPlaceBase,
+    MirProgram, MirStatementKind, MirTempId, MirType, MirValidationContext, MirValueId,
+    MirValueKind,
 };
 use radix_types::Type;
 use rustc_hash::FxHashMap;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// The versioned host→device call-ABI ratchet (NGAB0 §Abi — "Versioned").
@@ -273,9 +277,10 @@ impl fmt::Display for BoundaryAbiError {
                 "boundary call f{} → kernel f{} argument {position} carries element count {}{} but the boundary declares {expected_count} (wrong shape)",
                 host.0,
                 kernel.0,
-                found_count
-                    .map(|count| count.to_string())
-                    .unwrap_or_else(|| "unresolvable".to_owned()),
+                found_count.map_or_else(
+                    || "unresolvable".to_owned(),
+                    |count| count.to_string(),
+                ),
                 if found_count.is_some() { "" } else { " " }
             ),
             Self::Lifetime {
@@ -309,6 +314,7 @@ impl std::error::Error for BoundaryAbiError {}
 ///
 /// The call surface is a typed MIR fact (the call statement's callee), never
 /// reconstructed from emitted text or naming conventions.
+#[must_use]
 pub fn derive_boundary_calls(
     program: &MirProgram,
     device_kernels: &[MirFunctionId],
@@ -337,6 +343,361 @@ pub fn derive_boundary_calls(
                 region: PreparedRegion { kernels: region },
             });
         }
+    }
+    calls
+}
+
+// ── DDCP3-U4: the typed `§ArtifactPacket` `HostDeviceCall` surface ──────────
+
+/// The bounded numeric invocation-field layout of one prepared region's
+/// direct call (the typed `§ArtifactPacket` `HostDeviceCall` argument-layout
+/// fact; `§HotPathGate` rules 1 + 3). The layout is **bounded numeric fields
+/// only** — the direct call carries the dispatch extent against the static
+/// region symbol, never a string, map, `Valor`, route/backend tag, or tensor
+/// payload. Every field value is fixed at preparation time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RegionArgumentLayout {
+    /// The region's dispatch extent (total work-items) — the bounded numeric
+    /// invocation field the direct call carries.
+    pub dispatch_extent: u64,
+}
+
+/// One member kernel/entrypoint identity of a typed [`HostDeviceCall`]
+/// (DDCP3-U4): the region's member kernels plus their typed logical
+/// entrypoint identities — carried facts, never reconstructed from emitted
+/// text.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MemberKernel {
+    /// The member kernel's MIR function identity.
+    pub kernel: MirFunctionId,
+    /// The member kernel's logical entrypoint identity (typed fact).
+    pub entry: String,
+}
+
+/// The program-level role of one typed [`CallBinding`] — the wire/typed
+/// mirror of [`BufferRole`] (DDCP3-U4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum CallBindingRole {
+    /// Host-provided input; every slot accesses it read-only.
+    Input,
+    /// Device-produced result; read back at an observation point.
+    Output,
+    /// Device-resident intermediate shared across kernels.
+    InOut,
+}
+
+impl CallBindingRole {
+    /// Short diagnostic spelling.
+    #[must_use]
+    pub fn spelling(self) -> &'static str {
+        match self {
+            Self::Input => "input",
+            Self::Output => "output",
+            Self::InOut => "in-out",
+        }
+    }
+
+    /// The canonical domain tag used by the execution-descriptor bytes.
+    fn domain_tag(self) -> u8 {
+        match self {
+            Self::Input => 1,
+            Self::Output => 2,
+            Self::InOut => 3,
+        }
+    }
+}
+
+impl From<BufferRole> for CallBindingRole {
+    fn from(role: BufferRole) -> Self {
+        match role {
+            BufferRole::Input => Self::Input,
+            BufferRole::Output => Self::Output,
+            BufferRole::InOut => Self::InOut,
+        }
+    }
+}
+
+/// One typed input/output/resource binding of a call's prepared region
+/// (DDCP3-U4 / `§ArtifactPacket` `HostDeviceCall` — typed input/output/resource
+/// bindings; nothing on the `§HotPathGate` ABI denylist). Typed facts, never
+/// reconstructed from emitted text.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CallBinding {
+    /// The program buffer identity (`BufferId` value — the identity key,
+    /// never the buffer name).
+    pub buffer: u32,
+    /// The buffer's program role.
+    pub role: CallBindingRole,
+    /// The slot's target-neutral first-level binding index.
+    pub group: u32,
+    /// The slot's second-level binding index within the group.
+    pub binding: u32,
+    /// The slot's element count (shape fact).
+    pub element_count: u64,
+    /// The slot's element type (semantic type id — a typed fact).
+    pub element_type: u32,
+}
+
+/// The recorded failure/cancellation behavior of a typed call (DDCP3-U4 /
+/// `§ArtifactPacket` `HostDeviceCall` — failure/cancellation behavior):
+/// recorded and decided before the hot loop, never on the hot path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum CallFailureBehavior {
+    /// The region is prepared outside the hot loop; a cache miss prepares
+    /// before the hot call (`§ArtifactPacket` cache-miss behavior; `§HotPathGate`
+    /// rules 3 + 5).
+    PrepareOutsideHotLoop,
+    /// The hot call fails closed on a miss — the hot path never interprets a
+    /// kernel on a cache miss (`§ArtifactPacket`; `§HotPathGate` rule 5).
+    FailClosed,
+}
+
+impl CallFailureBehavior {
+    /// The canonical domain tag used by the execution-descriptor bytes.
+    fn domain_tag(self) -> u8 {
+        match self {
+            Self::PrepareOutsideHotLoop => 1,
+            Self::FailClosed => 2,
+        }
+    }
+}
+
+/// The execution-descriptor domain tag — the typed call/region-descriptor
+/// identity domain (`§IdentityDomains` row 4; CTO9-5). Folded into the
+/// canonical descriptor bytes so the execution-descriptor domain can never
+/// collide with an artifact digest domain (`content_sha256`/`packet_sha256`).
+const EXECUTION_DESCRIPTOR_DOMAIN_TAG: &[u8] = b"faber.execution-descriptor.v1\0";
+
+/// The typed `§ArtifactPacket` `HostDeviceCall` shape (radix side; DDCP3-U4).
+///
+/// The frozen field table as typed facts (ddcp0-contract `§ArtifactPacket`):
+/// host callsite identity (static — no route string, `Valor`, descriptor
+/// map, backend tag, or kernel name on the hot path), prepared
+/// submission-region identity, typed input/output/resource bindings (nothing
+/// on the `§HotPathGate` ABI denylist), the bounded numeric argument layout,
+/// the recorded effect/observation boundary, and the failure/cancellation
+/// behavior (recorded and decided before the hot loop). The `region`
+/// identity is the compiler-owned stable region index — the SAME index the
+/// host-partition lane's direct region symbols carry
+/// (`__faber_prepared_region_{index}`, DDCP3-U2).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HostDeviceCall {
+    /// Host callsite identity (the stable (host, block, statement) identity —
+    /// the region's first callsite in the partition record; the canonical
+    /// callsite of the boundary call).
+    pub callsite: CallsiteId,
+    /// Prepared submission-region identity (stable 1-based region index).
+    pub region: u32,
+    /// The region's member kernel/entrypoint identities (typed facts).
+    pub members: Vec<MemberKernel>,
+    /// Typed input/output/resource bindings of the region.
+    pub bindings: Vec<CallBinding>,
+    /// The bounded numeric argument layout of the region's direct call
+    /// (fixed at preparation; `§HotPathGate` rule 3).
+    pub argument_layout: RegionArgumentLayout,
+    /// The recorded effect/observation boundary kinds of the region's member
+    /// launches (empty for a legal program — the fail-closed envelope; a
+    /// prepared region never crosses `ad`/Sermo/observation/cancellation).
+    pub effect_boundary: Vec<DeviceEffectBoundaryKind>,
+    /// Failure/cancellation behavior — recorded and decided before the hot
+    /// loop.
+    pub failure_behavior: CallFailureBehavior,
+}
+
+impl HostDeviceCall {
+    /// The canonical descriptor bytes of this typed call — the
+    /// canonical-descriptor-equality substrate (`§IdentityDomains` rule 6 /
+    /// `§HotPathGate` rule 6) and the input to
+    /// [`execution_descriptor_hash`]. The bytes begin with the
+    /// execution-descriptor domain tag, so the execution-descriptor domain is
+    /// type-level distinct from the artifact digest domains.
+    #[must_use]
+    pub fn canonical_descriptor_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(EXECUTION_DESCRIPTOR_DOMAIN_TAG);
+        bytes.extend_from_slice(&self.region.to_le_bytes());
+        bytes.extend_from_slice(&self.argument_layout.dispatch_extent.to_le_bytes());
+        for member in &self.members {
+            bytes.extend_from_slice(&member.kernel.0.to_le_bytes());
+            push_len_prefixed_bytes(&mut bytes, member.entry.as_bytes());
+        }
+        for binding in &self.bindings {
+            bytes.extend_from_slice(&binding.buffer.to_le_bytes());
+            bytes.push(binding.role.domain_tag());
+            bytes.extend_from_slice(&binding.group.to_le_bytes());
+            bytes.extend_from_slice(&binding.binding.to_le_bytes());
+            bytes.extend_from_slice(&binding.element_count.to_le_bytes());
+            bytes.extend_from_slice(&binding.element_type.to_le_bytes());
+        }
+        for kind in &self.effect_boundary {
+            push_len_prefixed_bytes(&mut bytes, kind.spelling().as_bytes());
+        }
+        bytes.push(self.failure_behavior.domain_tag());
+        bytes
+    }
+
+    /// The typed execution-descriptor identity of this call — the distinct
+    /// typed domain of `§IdentityDomains` row 4 (CTO9-5). Computed over the
+    /// canonical descriptor bytes; identical typed calls always produce
+    /// identical descriptors (canonical), and the digest is a
+    /// collision-resistant SHA-256 — never FNV.
+    #[must_use]
+    pub fn execution_descriptor(&self) -> ExecutionDescriptor {
+        ExecutionDescriptor(execution_descriptor_hash(
+            &self.canonical_descriptor_bytes(),
+        ))
+    }
+}
+
+/// The typed execution-descriptor identity of one host→device call
+/// (CTO9-5 / `§IdentityDomains` row 4 — `execution_descriptor_hash`).
+///
+/// **Type-level distinction from artifact identity:** this is a newtype over
+/// the descriptor digest, never a bare artifact-digest string — it can never
+/// be passed where a `content_sha256`/`packet_sha256` artifact identity is
+/// expected (and vice versa). The descriptor identifies the typed call/region
+/// descriptor (its call semantics); artifact materialization can never change
+/// its call semantics. Loaded-module + artifact cache/session identity
+/// consumes `content_sha256`/`packet_sha256` — never this type and never FNV.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ExecutionDescriptor(String);
+
+impl ExecutionDescriptor {
+    /// The canonical `sha256:<64-hex>` digest spelling.
+    #[must_use]
+    pub fn digest(&self) -> &str {
+        &self.0
+    }
+}
+
+/// The collision-resistant digest of the execution-descriptor domain
+/// (CTO9-5 / `§IdentityDomains` row 4): a SHA-256 over the canonical descriptor
+/// bytes, canonical `sha256:<64-hex>` spelling — never FNV. The
+/// execution-descriptor identity is a **distinct typed domain/purpose** from
+/// artifact identity (`content_sha256`/`packet_sha256`): it identifies the
+/// typed call/region descriptor so artifact materialization can never change
+/// its call semantics; loaded-module + artifact cache/session identity
+/// consumes `content_sha256`/`packet_sha256`, never this value and never FNV.
+#[must_use]
+pub fn execution_descriptor_hash(canonical_descriptor_bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::digest(canonical_descriptor_bytes);
+    format!("sha256:{digest:x}")
+}
+
+/// Length-prefixed canonical byte encoding of one descriptor field (the
+/// canonical-descriptor-equality substrate).
+fn push_len_prefixed_bytes(out: &mut Vec<u8>, field: &[u8]) {
+    let len = u32::try_from(field.len()).unwrap_or(u32::MAX);
+    out.extend_from_slice(&len.to_le_bytes());
+    out.extend_from_slice(field);
+}
+
+/// The launch ids of the member kernels of a prepared region (typed launch
+/// facts — the observation/effect-boundary mapping source).
+pub(crate) fn region_launch_ids(
+    partition: &HostPartition,
+    member_kernels: &[MirFunctionId],
+) -> Vec<LaunchId> {
+    partition
+        .device_program
+        .launches
+        .iter()
+        .filter(|launch| {
+            partition
+                .device_program
+                .kernels
+                .get(launch.kernel_index)
+                .is_some_and(|unit| member_kernels.contains(&unit.function))
+        })
+        .map(|launch| launch.id)
+        .collect()
+}
+
+/// Derive the typed `§ArtifactPacket` `HostDeviceCall` rows of a partition
+/// (DDCP3-U4): one row per derived boundary call, from typed partition +
+/// record facts — never reconstructed from emitted text. The bounded numeric
+/// argument layout (dispatch extent), member kernel/entrypoint identities,
+/// typed bindings, callsite identity, and the recorded effect-boundary kinds
+/// all come from the typed surfaces. The callsite fallback (the boundary
+/// call's host function with a sentinel block/statement) and the zero extent
+/// are recorded defensive defaults for a record/partition that are
+/// inconsistent with each other — the completeness gate
+/// ([`crate::artifact_completeness::check_preparation_completeness`])
+/// rejects such a shape; derived partitions always carry the real facts.
+#[must_use]
+pub fn derive_host_device_calls(
+    partition: &HostPartition,
+    record: &PartitionRecord,
+) -> Vec<HostDeviceCall> {
+    let mut calls = Vec::with_capacity(partition.boundary_calls.len());
+    for (index, boundary) in partition.boundary_calls.iter().enumerate() {
+        let region = u32::try_from(index + 1).unwrap_or(u32::MAX);
+        let mut members = Vec::new();
+        let mut bindings = Vec::new();
+        let mut dispatch_extent = 0;
+        for (position, kernel) in boundary.region.kernels.iter().enumerate() {
+            let Some(unit) = partition
+                .device_program
+                .kernels
+                .iter()
+                .find(|unit| unit.function == *kernel)
+            else {
+                continue;
+            };
+            members.push(MemberKernel {
+                kernel: *kernel,
+                entry: unit.entry.clone(),
+            });
+            for resource in &unit.resources {
+                bindings.push(CallBinding {
+                    buffer: resource.buffer.id.0,
+                    role: CallBindingRole::from(resource.buffer.role),
+                    group: resource.binding.group,
+                    binding: resource.binding.binding,
+                    element_count: resource.version.element_count,
+                    element_type: resource.version.element_ty.semantic_id().0,
+                });
+            }
+            if position == 0 {
+                // The bounded numeric dispatch extent of the region's first
+                // member kernel launch (the DDCP3-U2-frozen direct-call ABI).
+                dispatch_extent =
+                    unit.launch.workgroup_count.x * u64::from(unit.launch.workgroup.x);
+            }
+        }
+        let callsite = record
+            .callsites
+            .iter()
+            .find(|row| row.region == region)
+            .map_or_else(
+                || CallsiteId {
+                    host: boundary.host,
+                    block: MirBlockId(u32::MAX),
+                    statement: u32::MAX,
+                },
+                |row| row.callsite,
+            );
+        let effect_boundary = record
+            .effect_boundaries
+            .iter()
+            .filter(|row| {
+                region_launch_ids(partition, &boundary.region.kernels)
+                    .contains(&LaunchId(row.launch))
+            })
+            .map(|row| row.kind)
+            .collect();
+        calls.push(HostDeviceCall {
+            callsite,
+            region,
+            members,
+            bindings,
+            argument_layout: RegionArgumentLayout { dispatch_extent },
+            effect_boundary,
+            failure_behavior: CallFailureBehavior::PrepareOutsideHotLoop,
+        });
     }
     calls
 }
@@ -406,9 +767,7 @@ fn validate_host_calls(
                     if !targets.contains(&kernel.id) {
                         continue;
                     }
-                    let destination_local = destination
-                        .as_ref()
-                        .and_then(|place| place_base_local(place));
+                    let destination_local = destination.as_ref().and_then(place_base_local);
 
                     // ── Wrong call shape (arity) ────────────────────────────
                     if args.len() != kernel.params.len() {
@@ -532,10 +891,7 @@ fn validate_host_calls(
 
                     // Record the call's pending output for the value-flow
                     // checks (the temp destination, or the direct local).
-                    match destination
-                        .as_ref()
-                        .and_then(|place| place_base_temp(place))
-                    {
+                    match destination.as_ref().and_then(place_base_temp) {
                         Some(temp) => {
                             pending_outputs
                                 .insert(temp, arg_locals.iter().flatten().copied().collect());

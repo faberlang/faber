@@ -15,6 +15,11 @@ radix-syntax = { path = "../radix-syntax" }
 radix-types = { path = "../radix-types" }
 rustc-hash = "2"
 serde = { version = "1", features = ["derive"] }
+# DDCP3-U4 (c): the execution-descriptor identity domain is a distinct typed
+# domain from artifact identity — a collision-resistant digest (never FNV).
+# sha2 is already in the workspace lock via radix-mir-fmir; this adds the
+# edge to radix-mir's own identity surface (no new locked crate).
+sha2 = "0.10"
 
 [dev-dependencies]
 # DDCP3-U3 (c): the partition/callsite record's serialization round-trip proof
