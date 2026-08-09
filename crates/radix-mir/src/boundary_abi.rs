@@ -133,10 +133,12 @@ pub enum BoundaryAbiClass {
     /// The host observes a region result before its producing work launched.
     Observation,
     /// The boundary call's callee shape cannot be lowered to the prepared
-    /// region's direct call — a `Definition`/value/indirect callee targeting
-    /// a device kernel. The direct region call is the ONLY emitted boundary
-    /// form (DDCP3-U5 / gate 6); a callsite the lane cannot map to it is
-    /// rejected before emission.
+    /// region's direct call — a `Definition` or non-function `Value` callee
+    /// targeting a device kernel. The direct region call is the ONLY emitted
+    /// boundary form (DDCP3-U5 / gate 6); the gate admits exactly the
+    /// direct-call shapes (`Function`, a function-constant `Value`, or a
+    /// `Closure`) and rejects a callsite the lane cannot map to that form
+    /// before emission.
     CallsiteShape,
 }
 
@@ -234,11 +236,13 @@ pub enum BoundaryAbiError {
         local: MirLocalId,
     },
     /// A boundary call whose callee the direct region-call ABI cannot lower
-    /// — a `Definition` or value/indirect callee targeting a device kernel.
-    /// The host-partition lane emits exactly ONE boundary form (the direct
-    /// call to the prepared-region symbol); a callsite shape it cannot map
-    /// to that form is rejected before emission (DDCP3-U5 / gate 6) — never
-    /// a malformed module with a call to a never-emitted kernel body.
+    /// — a `Definition` or non-function `Value` callee targeting a device
+    /// kernel. The host-partition lane emits exactly ONE boundary form (the
+    /// direct call to the prepared-region symbol); only the direct-call
+    /// shapes (`Function`, a function-constant `Value`, or a `Closure` —
+    /// each mapping to the kernel id) lower to that form, so any other
+    /// callee is rejected before emission (DDCP3-U5 / gate 6) — never a
+    /// malformed module with a call to a never-emitted kernel body.
     UnsupportedCallsiteShape {
         /// The calling host-side function.
         host: MirFunctionId,
