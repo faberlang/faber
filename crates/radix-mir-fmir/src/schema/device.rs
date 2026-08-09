@@ -416,7 +416,14 @@ pub enum FmirDeviceBackend {
     Metal,
     /// NVIDIA CUDA (PTX text).
     Cuda,
-    /// Any other backend id (e.g. a future AMD/WebGPU leaf). Representable;
+    /// AMD GPU via the AMDGPU/HIP variant of the LLVM emitter family
+    /// (AMDGPU LLVM IR compiler input; ROCm clang → HSACO ELF — the third
+    /// conformance leaf, goal `amd-gpu-target`). The variant is ADDITIVE:
+    /// the `Unknown` representable-backend path is unchanged, and any
+    /// pre-existing `Unknown("amd")`/`Unknown("rocm")` spelling round-trips
+    /// exactly as before.
+    Amdgpu,
+    /// Any other backend id (e.g. a future WebGPU leaf). Representable;
     /// rejected honestly at admission with a stable structured diagnostic.
     Unknown(String),
 }
@@ -428,6 +435,7 @@ impl FmirDeviceBackend {
         match self {
             Self::Metal => "metal".to_owned(),
             Self::Cuda => "cuda".to_owned(),
+            Self::Amdgpu => "amdgpu".to_owned(),
             Self::Unknown(id) => id.clone(),
         }
     }
