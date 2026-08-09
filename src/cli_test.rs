@@ -86,6 +86,26 @@ fn cli_parses_targets_subcommand() {
 }
 
 #[test]
+fn targets_table_reports_capability_truth_for_the_default_build() {
+    // The cli_test binary builds under default features (full-targets): the
+    // rust host lane and the compiled device/host-leaf/device-runtime
+    // capability rows must be present (compiled-only capability rows).
+    let table = crate::commands::targets::rendered_targets_table();
+    assert!(
+        table.contains("rust available=yes"),
+        "rust host lane must be reported as available:\n{table}"
+    );
+    for row_name in ["device-runtime", "host-macos-arm64", "host-wasm"] {
+        assert!(
+            table
+                .lines()
+                .any(|line| line.starts_with(&format!("{row_name} "))),
+            "missing {row_name} capability row under the default build:\n{table}"
+        );
+    }
+}
+
+#[test]
 fn cli_parses_script_subcommand_with_forwarded_args() {
     let cli = Cli::try_parse_from(["faber", "script", "pkg", "--", "--flag", "value"])
         .expect("parse script");

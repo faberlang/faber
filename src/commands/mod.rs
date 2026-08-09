@@ -19,7 +19,7 @@ mod install_test;
 mod model;
 mod run;
 mod script;
-mod targets;
+pub(crate) mod targets;
 mod test;
 
 use crate::cli::Command;
