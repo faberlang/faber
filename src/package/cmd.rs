@@ -1,7 +1,8 @@
 use radix::codegen::Target;
 use radix::tool::DiagnosticMode;
 use radix::{CompileResult, Output};
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use crate::input_shape::locale_without_package_error;
 
@@ -14,13 +15,36 @@ use super::cargo::{
 use super::compile_package_go;
 #[cfg(feature = "hir-go")]
 use super::go_build::{emit_go_module_with_postprocess, invoke_go_build, GoBuildLayout};
-use super::manifest::manifest_build_target;
+use super::manifest::{manifest_build_target, FaberManifest};
 use super::{
     build_host_program, build_package_fmir_binary_bundle, build_package_fmir_image,
     build_package_fmir_text_image, build_package_mir_artifact, check_package, compile_package,
     config_with_locale, discover_build_layout, package_host_selection_diagnostic,
     package_rust_runtime_plan, read_manifest, BuildLayout, LlvmHostProfile, MANIFEST_FILE,
 };
+
+/// Print `message` and terminate.
+fn fail(message: &str) -> ! {
+    eprintln!("{message}");
+    std::process::exit(1);
+}
+
+/// Report a diagnostic's message and terminate.
+fn fail_with_diagnostic(diag: &radix::Diagnostic) -> ! {
+    eprintln!("error: {}", diag.message);
+    std::process::exit(1);
+}
+
+/// Print `diagnostics` in normal mode, then terminate with `message`.
+fn report_diagnostics_and_exit(
+    diagnostics: &[radix::Diagnostic],
+    locale_pack: Option<&radix::locale::LocalePack>,
+    message: &str,
+) -> ! {
+    radix::tool::print_diagnostics(diagnostics, DiagnosticMode::Normal, locale_pack);
+    eprintln!("{message}");
+    std::process::exit(1);
+}
 
 /// Execute the user-facing `faber build` command.
 ///
@@ -29,9 +53,6 @@ use super::{
 /// single-output behavior so package ergonomics do not change unrelated command
 /// paths.
 pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool) {
-    use std::fs;
-    use std::path::PathBuf;
-
     if let Some(message) = locale_without_package_error(
         command.locale.as_deref(),
         std::slice::from_ref(&command.input),
@@ -56,18 +77,12 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
             command.diagnostics_locale.as_deref(),
         ) {
             Ok((config, pack)) => (config.with_warn_policy(warn_policy), pack),
-            Err(diag) => {
-                eprintln!("error: {}", diag.message);
-                std::process::exit(1);
-            }
+            Err(diag) => fail_with_diagnostic(&diag),
         }
     } else {
         let config = match super::locale::default_config_with_locale(target) {
             Ok(config) => config.with_dev_stdlib().with_warn_policy(warn_policy),
-            Err(diag) => {
-                eprintln!("error: {}", diag.message);
-                std::process::exit(1);
-            }
+            Err(diag) => fail_with_diagnostic(&diag),
         };
         let locale_pack = config.locale_pack.clone();
         (config, locale_pack)
@@ -76,15 +91,11 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
     if is_package && target == Target::MirScena {
         let artifact = match build_package_mir_artifact(&config, &input_path, &[]) {
             Ok(artifact) => artifact,
-            Err(diagnostics) => {
-                radix::tool::print_diagnostics(
-                    &diagnostics,
-                    DiagnosticMode::Normal,
-                    locale_pack.as_ref(),
-                );
-                eprintln!("scena artifact build failed");
-                std::process::exit(1);
-            }
+            Err(diagnostics) => report_diagnostics_and_exit(
+                &diagnostics,
+                locale_pack.as_ref(),
+                "scena artifact build failed",
+            ),
         };
         println!("{}", artifact.manifest_path.display());
         return;
@@ -93,15 +104,11 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
     if is_package && target == Target::MirFmir {
         let image = match build_package_fmir_text_image(&config, &input_path, &[]) {
             Ok(image) => image,
-            Err(diagnostics) => {
-                radix::tool::print_diagnostics(
-                    &diagnostics,
-                    DiagnosticMode::Normal,
-                    locale_pack.as_ref(),
-                );
-                eprintln!("fmir-text image build failed");
-                std::process::exit(1);
-            }
+            Err(diagnostics) => report_diagnostics_and_exit(
+                &diagnostics,
+                locale_pack.as_ref(),
+                "fmir-text image build failed",
+            ),
         };
         println!("{}", image.image_path.display());
         return;
@@ -110,15 +117,11 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
     if is_package && target == Target::MirFmirBinary {
         let image = match build_package_fmir_image(&config, &input_path, &[]) {
             Ok(image) => image,
-            Err(diagnostics) => {
-                radix::tool::print_diagnostics(
-                    &diagnostics,
-                    DiagnosticMode::Normal,
-                    locale_pack.as_ref(),
-                );
-                eprintln!("fmir image build failed");
-                std::process::exit(1);
-            }
+            Err(diagnostics) => report_diagnostics_and_exit(
+                &diagnostics,
+                locale_pack.as_ref(),
+                "fmir image build failed",
+            ),
         };
         println!("{}", image.image_path.display());
         return;
@@ -128,15 +131,11 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
         let bundle =
             match build_package_fmir_binary_bundle(&config, &input_path, &[], command.release) {
                 Ok(bundle) => bundle,
-                Err(diagnostics) => {
-                    radix::tool::print_diagnostics(
-                        &diagnostics,
-                        DiagnosticMode::Normal,
-                        locale_pack.as_ref(),
-                    );
-                    eprintln!("fmir-bin bundle build failed");
-                    std::process::exit(1);
-                }
+                Err(diagnostics) => report_diagnostics_and_exit(
+                    &diagnostics,
+                    locale_pack.as_ref(),
+                    "fmir-bin bundle build failed",
+                ),
             };
         println!("{}", bundle.entrypoint_path.display());
         return;
@@ -153,15 +152,11 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
         #[cfg(feature = "hir-fhir")]
         let artifact = match build_package_fhir(&config, &input_path) {
             Ok(artifact) => artifact,
-            Err(diagnostics) => {
-                radix::tool::print_diagnostics(
-                    &diagnostics,
-                    DiagnosticMode::Normal,
-                    locale_pack.as_ref(),
-                );
-                eprintln!("fhir package build failed");
-                std::process::exit(1);
-            }
+            Err(diagnostics) => report_diagnostics_and_exit(
+                &diagnostics,
+                locale_pack.as_ref(),
+                "fhir package build failed",
+            ),
         };
         #[cfg(feature = "hir-fhir")]
         println!("{}", artifact.package_path.display());
@@ -182,15 +177,11 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
         };
         let build = match build_host_program(&config, &input_path, profile) {
             Ok(build) => build,
-            Err(diagnostics) => {
-                radix::tool::print_diagnostics(
-                    &diagnostics,
-                    DiagnosticMode::Normal,
-                    locale_pack.as_ref(),
-                );
-                eprintln!("llvm-host build failed");
-                std::process::exit(1);
-            }
+            Err(diagnostics) => report_diagnostics_and_exit(
+                &diagnostics,
+                locale_pack.as_ref(),
+                "llvm-host build failed",
+            ),
         };
         println!("{}", build.binary_path.display());
         return;
@@ -216,23 +207,16 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
                     .join("target")
                     .join("faber")
                     .join("wasm"),
-                Err(d) => {
-                    eprintln!("error: {}", d.message);
-                    std::process::exit(1);
-                }
+                Err(d) => fail_with_diagnostic(&d),
             };
             let options = super::wasm::PackageWasmOptions::new(output_dir);
             let build = match super::wasm::build_package_wasm(&config, &input_path, &options) {
                 Ok(build) => build,
-                Err(diagnostics) => {
-                    radix::tool::print_diagnostics(
-                        &diagnostics,
-                        DiagnosticMode::Normal,
-                        locale_pack.as_ref(),
-                    );
-                    eprintln!("wasm package build failed");
-                    std::process::exit(1);
-                }
+                Err(diagnostics) => report_diagnostics_and_exit(
+                    &diagnostics,
+                    locale_pack.as_ref(),
+                    "wasm package build failed",
+                ),
             };
             println!("{}", build.manifest.output.display());
             return;
@@ -242,16 +226,11 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
     if is_package && target == Target::HirTypeScript {
         let layout = match discover_build_layout(&input_path) {
             Ok(l) => l,
-            Err(d) => {
-                eprintln!("error: {}", d.message);
-                std::process::exit(1);
-            }
+            Err(d) => fail_with_diagnostic(&d),
         };
         if layout.manifest_path.exists() {
-            let manifest = read_manifest(&layout.manifest_path).unwrap_or_else(|diag| {
-                eprintln!("error: {}", diag.message);
-                std::process::exit(1);
-            });
+            let manifest = read_manifest(&layout.manifest_path)
+                .unwrap_or_else(|diag| fail_with_diagnostic(&diag));
             if let Some(product) = manifest.product.as_ref() {
                 match super::build_browser_product_with_postprocess(
                     &config,
@@ -264,10 +243,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
                         println!("{}", build.esm_entry.display());
                         return;
                     }
-                    Err(diag) => {
-                        eprintln!("error: {}", diag.message);
-                        std::process::exit(1);
-                    }
+                    Err(diag) => fail_with_diagnostic(&diag),
                 }
             }
         }
@@ -293,15 +269,11 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
                 locale_pack.as_ref(),
             );
             let Some(output) = go_result.compile_result.output else {
-                eprintln!("compilation failed");
-                std::process::exit(1);
+                fail("compilation failed");
             };
             let layout = match discover_build_layout(&input_path) {
                 Ok(l) => l,
-                Err(d) => {
-                    eprintln!("error: {}", d.message);
-                    std::process::exit(1);
-                }
+                Err(d) => fail_with_diagnostic(&d),
             };
             let go_layout = GoBuildLayout::from_package(&layout);
             let code = output_code(output);
@@ -312,18 +284,14 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
                 format,
                 linter,
             ) {
-                eprintln!("error: {}", d.message);
-                std::process::exit(1);
+                fail_with_diagnostic(&d);
             }
             match invoke_go_build(&go_layout) {
                 Ok(binary_path) => {
                     println!("{}", binary_path.display());
                     return;
                 }
-                Err(d) => {
-                    eprintln!("error: {}", d.message);
-                    std::process::exit(1);
-                }
+                Err(d) => fail_with_diagnostic(&d),
             }
         }
     }
@@ -342,8 +310,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
     );
 
     let Some(output) = result.output else {
-        eprintln!("compilation failed");
-        std::process::exit(1);
+        fail("compilation failed");
     };
 
     // Binary wasm output cannot travel the text `output_code` path: write the
@@ -356,24 +323,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
             target,
             is_package,
         );
-        if let Some(parent) = output_path.parent() {
-            fs::create_dir_all(parent).unwrap_or_else(|err| {
-                eprintln!(
-                    "error: failed to create '{}': {}",
-                    parent.display(),
-                    err
-                );
-                std::process::exit(1);
-            });
-        }
-        fs::write(&output_path, &out.bytes).unwrap_or_else(|err| {
-            eprintln!(
-                "error: failed to write '{}': {}",
-                output_path.display(),
-                err
-            );
-            std::process::exit(1);
-        });
+        write_output_file(&output_path, &out.bytes);
         println!("{}", output_path.display());
         return;
     }
@@ -383,10 +333,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
     if is_package && target == radix::codegen::Target::HirRust {
         let layout = match discover_build_layout(&input_path) {
             Ok(l) => l,
-            Err(d) => {
-                eprintln!("error: {}", d.message);
-                std::process::exit(1);
-            }
+            Err(d) => fail_with_diagnostic(&d),
         };
         // FBR-P2-004: the per-package advisory lock spans the full emit + cargo
         // sequence (library crates, generated crate snapshot, Cargo invocation)
@@ -394,10 +341,7 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
         // different runtime plans. Dropped when the block ends.
         let _build_lock = match lock_generated_crate_build(&layout) {
             Ok(lock) => lock,
-            Err(d) => {
-                eprintln!("error: {}", d.message);
-                std::process::exit(1);
-            }
+            Err(d) => fail_with_diagnostic(&d),
         };
         let meta = if layout.manifest_path.exists() {
             read_manifest(&layout.manifest_path).ok()
@@ -406,26 +350,20 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
         };
         let mut runtime_plan = match package_rust_runtime_plan(&config, &input_path) {
             Ok(plan) => plan,
-            Err(diagnostics) => {
-                radix::tool::print_diagnostics(
-                    &diagnostics,
-                    DiagnosticMode::Normal,
-                    locale_pack.as_ref(),
-                );
-                eprintln!("runtime plan failed");
-                std::process::exit(1);
-            }
+            Err(diagnostics) => report_diagnostics_and_exit(
+                &diagnostics,
+                locale_pack.as_ref(),
+                "runtime plan failed",
+            ),
         };
         if let Some(diagnostic) =
             package_host_selection_diagnostic(&runtime_plan, &layout.manifest_path)
         {
-            radix::tool::print_diagnostics(
+            report_diagnostics_and_exit(
                 &[diagnostic],
-                DiagnosticMode::Normal,
                 locale_pack.as_ref(),
+                "runtime plan failed",
             );
-            eprintln!("runtime plan failed");
-            std::process::exit(1);
         }
         // G4: emit native-binding library crates before the application crate links them.
         match super::library_link::emit_linked_library_crates(&layout.package_root, &layout) {
@@ -435,40 +373,23 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
                     .map(|lib| (lib.crate_name, lib.crate_root))
                     .collect();
             }
-            Err(diagnostics) => {
-                radix::tool::print_diagnostics(
-                    &diagnostics,
-                    DiagnosticMode::Normal,
-                    locale_pack.as_ref(),
-                );
-                eprintln!("library dependency graph failed");
-                std::process::exit(1);
-            }
+            Err(diagnostics) => report_diagnostics_and_exit(
+                &diagnostics,
+                locale_pack.as_ref(),
+                "library dependency graph failed",
+            ),
         }
         let package_code =
             crate::postprocess::postprocess_code(output_code(output), target, format, linter);
-        match emit_generated_crate_with_runtime_plan(
+        let binary_path = emit_crate_and_build(
             &layout,
             &package_code,
             meta.as_ref(),
             &runtime_plan,
-        ) {
-            Ok(_crate_root) => {
-                let binary_path = match invoke_cargo_build(&layout, command.release) {
-                    Ok(p) => p,
-                    Err(d) => {
-                        eprintln!("error: {}", d.message);
-                        std::process::exit(1);
-                    }
-                };
-                println!("{}", binary_path.display());
-                return;
-            }
-            Err(d) => {
-                eprintln!("error: {}", d.message);
-                std::process::exit(1);
-            }
-        }
+            command.release,
+        );
+        println!("{}", binary_path.display());
+        return;
     }
 
     let code = output_code(output);
@@ -490,56 +411,71 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
                 // sequence shares `target/faber/` under the current directory.
                 let _build_lock = match lock_generated_crate_build(&layout) {
                     Ok(lock) => lock,
-                    Err(d) => {
-                        eprintln!("error: {}", d.message);
-                        std::process::exit(1);
-                    }
+                    Err(d) => fail_with_diagnostic(&d),
                 };
                 let generated_code =
                     crate::postprocess::postprocess_code(code.clone(), target, format, linter);
-                match emit_generated_crate_with_runtime_plan(&layout, &generated_code, None, &plan)
-                {
-                    Ok(_) => match invoke_cargo_build(&layout, command.release) {
-                        Ok(binary_path) => {
-                            println!("{}", binary_path.display());
-                            return;
-                        }
-                        Err(d) => {
-                            eprintln!("error: {}", d.message);
-                            std::process::exit(1);
-                        }
-                    },
-                    Err(d) => {
-                        eprintln!("error: {}", d.message);
-                        std::process::exit(1);
-                    }
-                }
+                let binary_path = emit_crate_and_build(
+                    &layout,
+                    &generated_code,
+                    None,
+                    &plan,
+                    command.release,
+                );
+                println!("{}", binary_path.display());
+                return;
             }
             Ok(_) => {}
-            Err(diagnostics) => {
-                radix::tool::print_diagnostics(
-                    &diagnostics,
-                    DiagnosticMode::Normal,
-                    locale_pack.as_ref(),
-                );
-                eprintln!("runtime plan failed");
-                std::process::exit(1);
-            }
+            Err(diagnostics) => report_diagnostics_and_exit(
+                &diagnostics,
+                locale_pack.as_ref(),
+                "runtime plan failed",
+            ),
         }
     }
 
     // Legacy single-file path (direct .fab files, other targets, or --out-dir override cases)
     let output_path =
         radix::tool::build_output_path(&command.out_dir, &input_path, target, is_package);
+
+    let code = crate::postprocess::postprocess_code(code, target, format, linter);
+    write_output_file(&output_path, code.as_bytes());
+
+    println!("{}", output_path.display());
+}
+
+/// Emit the generated crate with its runtime plan and delegate binary
+/// production to Cargo, returning the produced binary path.
+fn emit_crate_and_build(
+    layout: &BuildLayout,
+    code: &str,
+    meta: Option<&FaberManifest>,
+    plan: &super::RustRuntimePlan,
+    release: bool,
+) -> PathBuf {
+    if let Err(d) = emit_generated_crate_with_runtime_plan(layout, code, meta, plan) {
+        fail_with_diagnostic(&d);
+    }
+    match invoke_cargo_build(layout, release) {
+        Ok(path) => path,
+        Err(d) => fail_with_diagnostic(&d),
+    }
+}
+
+/// Create the output path's parent and write `bytes`, exiting with a
+/// structured error message on failure.
+fn write_output_file(output_path: &Path, bytes: &[u8]) {
     if let Some(parent) = output_path.parent() {
         fs::create_dir_all(parent).unwrap_or_else(|err| {
-            eprintln!("error: failed to create '{}': {}", parent.display(), err);
+            eprintln!(
+                "error: failed to create '{}': {}",
+                parent.display(),
+                err
+            );
             std::process::exit(1);
         });
     }
-
-    let code = crate::postprocess::postprocess_code(code, target, format, linter);
-    fs::write(&output_path, &code).unwrap_or_else(|err| {
+    fs::write(output_path, bytes).unwrap_or_else(|err| {
         eprintln!(
             "error: failed to write '{}': {}",
             output_path.display(),
@@ -547,8 +483,6 @@ pub fn cmd_build(command: radix::tool::BuildCommand, format: bool, linter: bool)
         );
         std::process::exit(1);
     });
-
-    println!("{}", output_path.display());
 }
 
 /// Structured runtime plan for a single `.fab` file (no package manifest).
@@ -573,6 +507,9 @@ fn single_file_rust_runtime_plan(
     .with_arg("target", "rust")])
 }
 
+/// Resolve the build target: an explicit CLI target wins, otherwise the
+/// package manifest's `build.target`. Unlike [`resolve_check_target`], a
+/// manifest read failure is fatal here rather than silently falling back.
 fn resolve_build_target(command: &radix::tool::BuildCommand, input_path: &Path) -> Target {
     if command.target_explicit {
         return command.target;
@@ -585,15 +522,10 @@ fn resolve_build_target(command: &radix::tool::BuildCommand, input_path: &Path) 
         return command.target;
     }
 
-    let manifest = read_manifest(&layout.manifest_path).unwrap_or_else(|diag| {
-        eprintln!("error: {}", diag.message);
-        std::process::exit(1);
-    });
+    let manifest = read_manifest(&layout.manifest_path)
+        .unwrap_or_else(|diag| fail_with_diagnostic(&diag));
     manifest_build_target(manifest.build.target.as_deref(), &layout.manifest_path).unwrap_or_else(
-        |diag| {
-            eprintln!("error: {}", diag.message);
-            std::process::exit(1);
-        },
+        |diag| fail_with_diagnostic(&diag),
     )
 }
 
@@ -633,7 +565,7 @@ fn should_treat_as_package(path: &std::path::Path) -> bool {
 /// targets so `norma:*` imports resolve through the package graph. MIR
 /// probe targets and HIR inspection targets (`go`, `ts`) use the radix
 /// single-file path, matching `radix emit`.
-pub fn use_package_compiler(target: Target, path: &std::path::Path, force_package: bool) -> bool {
+fn use_package_compiler(target: Target, path: &std::path::Path, force_package: bool) -> bool {
     if force_package {
         return true;
     }
@@ -717,10 +649,7 @@ pub fn cmd_check_package(command: radix::tool::CheckCommand) {
             }),
             pack,
         ),
-        Err(diag) => {
-            eprintln!("error: {}", diag.message);
-            std::process::exit(1);
-        }
+        Err(diag) => fail_with_diagnostic(&diag),
     };
     let mut diagnostics = check_package(&config, &input_path);
     radix::apply_warn_policy(&mut diagnostics, &config.warn_policy);
@@ -802,8 +731,7 @@ pub fn cmd_emit_package(command: radix::tool::EmitCommand, format: bool, linter:
     );
 
     let Some(output) = result.output else {
-        eprintln!("compilation failed");
-        std::process::exit(1);
+        fail("compilation failed");
     };
 
     if command.reflection {
@@ -876,10 +804,7 @@ fn compile_package_input(
 
     let (config, locale_pack) = match config_with_locale(target, &path, locale, diagnostics_locale) {
         Ok(selection) => selection,
-        Err(diag) => {
-            eprintln!("error: {}", diag.message);
-            std::process::exit(1);
-        }
+        Err(diag) => fail_with_diagnostic(&diag),
     };
     (compile_package(&config, &path), locale_pack)
 }
