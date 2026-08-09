@@ -428,20 +428,16 @@ fn cmd_run_fmir(args: RunArgs, selection: DeviceSelection) {
         args.diagnostics_locale.as_deref(),
         warn_policy,
     );
-    let image = match package::build_package_fmir_image(&config, &input_path, &[]) {
-        Ok(image) => image,
-        Err(diagnostics) => {
-            eprint_route_diagnostics(&diagnostics);
-            eprintln!("fmir image build failed");
-            std::process::exit(1);
-        }
-    };
     // The one host-construction policy against the built image's device
     // section (S1-6, resolving the S1-5 open question: source-built images
     // now carry the device section and the route flips to check it). A
     // device-bearing image runs through the composite host's device route.
+    // The run consumes the IN-MEMORY source-built image (FMIR e2e-hardening
+    // CTO-1): the image-file round-trip drops the merged program's
+    // struct/variant validation metadata, which library-backed packages need
+    // for struct literals, method calls, and field projections.
     if let Err(diagnostics) =
-        package::run_package_fmir_image_with_selection(&image, selection, &mut host)
+        package::run_package_fmir_built_image(&config, &input_path, selection, &mut host)
     {
         eprint_route_diagnostics(&diagnostics);
         eprintln!("fmir image execution failed");

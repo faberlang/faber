@@ -211,8 +211,8 @@ pub(crate) use mir::DeviceSelection;
 pub(crate) use mir::{
     build_package_fmir_binary_bundle, build_package_fmir_image, build_package_fmir_text_image,
     fmir_image_route_decision, run_fmir_image_path, run_fmir_image_path_with_selection,
-    run_package_fmir_image, run_package_fmir_image_with_selection, run_package_fmir_text_image,
-    run_package_fmir_text_image_with_selection,
+    run_package_fmir_built_image, run_package_fmir_image, run_package_fmir_image_with_selection,
+    run_package_fmir_text_image, run_package_fmir_text_image_with_selection,
 };
 #[allow(unused_imports)]
 pub(crate) use mir::{build_package_mir_artifact, run_package_mir, run_package_mir_artifact};

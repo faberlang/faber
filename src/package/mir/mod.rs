@@ -107,6 +107,14 @@ type SourceRewrites = HashMap<(PathBuf, DefId), DefId>;
 /// member name) → synthetic def id`. Distinct from [`NamespaceCallTargets`]
 /// so the call rewrite never mistakes a const member for a callable verb.
 type NamespaceDataMemberTargets = HashMap<(PathBuf, DefId, String), DefId>;
+/// Linked library genus-method call targets (FMIR e2e-hardening CTO-1): per
+/// caller unit, `(entry-side nominal struct DefId, method name) → synthetic
+/// def id` for methods on linked library nominals. The rewrite pass turns
+/// `receiver.method(args)` into `Path(synthetic)(receiver, args)` so the
+/// library's lowered method function (source = the same synthetic) resolves
+/// in the merged program. Keyed per caller path because each unit's imported
+/// nominal carries its own canonical entry-side DefId.
+type MethodCallTargets = HashMap<PathBuf, HashMap<(DefId, String), DefId>>;
 type CliRecordFieldsByLocal = HashMap<Symbol, Vec<MirRuntimeRecordField>>;
 type CliEntryRecords = HashMap<PathBuf, CliRecordFieldsByLocal>;
 
@@ -270,6 +278,9 @@ struct PackageMirLinks {
     /// const declaration; the entry lowering transplants the const value into
     /// the entry analysis before the entry lowers.
     data_members: Vec<DataMemberLink>,
+    /// Library genus-method call targets keyed by caller unit path
+    /// (FMIR e2e-hardening CTO-1).
+    method_targets: MethodCallTargets,
 }
 
 /// One linked const data member. The linker allocates a synthetic def id in
@@ -364,8 +375,8 @@ pub use routes::run_fmir_image_bytes_with_stdio;
 pub(crate) use routes::{
     build_package_fmir_binary_bundle, build_package_fmir_image, build_package_fmir_text_image,
     fmir_image_route_decision, run_fmir_image_path, run_fmir_image_path_with_selection,
-    run_package_fmir_image, run_package_fmir_image_with_selection, run_package_fmir_text_image,
-    run_package_fmir_text_image_with_selection,
+    run_package_fmir_built_image, run_package_fmir_image, run_package_fmir_image_with_selection,
+    run_package_fmir_text_image, run_package_fmir_text_image_with_selection,
 };
 #[allow(unused_imports)]
 pub(crate) use routes::{build_package_mir_artifact, run_package_mir, run_package_mir_artifact};
@@ -384,6 +395,10 @@ mod nominal_tests;
 #[cfg(test)]
 #[path = "reachability_test.rs"]
 mod reachability_tests;
+
+#[cfg(test)]
+#[path = "lane_test.rs"]
+mod lane_tests;
 
 #[cfg(test)]
 #[path = "test_support.rs"]

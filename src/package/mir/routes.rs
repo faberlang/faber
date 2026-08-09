@@ -121,6 +121,46 @@ pub(crate) fn build_package_fmir_image(
     )
 }
 
+/// Build the FMIR binary image AND run it from the in-memory image (FMIR
+/// e2e-hardening CTO-1): the source-built image carries the merged program's
+/// struct/variant validation metadata (`FmirValidationMetadata`), which the
+/// image-FILE round-trip drops — so `faber run -t fmir` on a library-backed
+/// package (struct literals, method calls, field projections) failed at run
+/// with missing field metadata. The image file is still written so the
+/// artifact surface is unchanged; the run consumes the in-memory image under
+/// the same host-construction policy (CPU stepper vs device route).
+pub(crate) fn run_package_fmir_built_image<H: Host + ?Sized>(
+    config: &Config,
+    input: &Path,
+    selection: faber::device::DeviceSelection,
+    host: &mut H,
+) -> Result<(), Vec<Diagnostic>> {
+    with_prepared_package_mir_with_cli_mode(
+        config,
+        input,
+        &[],
+        CliPlanningMode::FmirTextRuntime,
+        |prepared, lowered| {
+            let package_root = package_artifact_root(input)?;
+            let artifact_root = package_artifact_dir(&package_root, &prepared.entry_path, "")?;
+            let image = fmir_package_image_from_lowered(
+                prepared,
+                lowered,
+                prepared.entry_path.clone(),
+                FmirPackageImageFormat::Source,
+            )?;
+            let encoded = package_fmir_binary_image(prepared, lowered, &package_root)?;
+            write_package_image(
+                &artifact_root,
+                &prepared.entry_path,
+                FMIR_IMAGE_FILE,
+                encoded,
+            )?;
+            run_loaded_fmir_image_route_with_selection(image, selection, host)
+        },
+    )
+}
+
 pub(crate) fn build_package_fmir_binary_bundle(
     config: &Config,
     input: &Path,
