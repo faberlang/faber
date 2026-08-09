@@ -17,6 +17,7 @@ pub mod distributed;
 pub mod dump;
 pub mod generic;
 pub mod gradient;
+pub mod host_partition;
 pub mod inference_blocker_matrix;
 pub mod kernel_decomposition;
 pub mod kernel_module;
@@ -98,6 +99,9 @@ pub use dump::dump_program;
 pub use generic::{
     bind_generic_type_witness, instantiate_existing_generic_type, type_contains_param,
     MirGenericBindings,
+};
+pub use host_partition::{
+    derive_host_partition, BoundaryCall, HostPartition, HostPartitionError,
 };
 pub use inference_blocker_matrix::{
     inference_blocker_rows, inference_non_claims, InferenceBlockerCategory, InferenceBlockerRow,

@@ -1,0 +1,397 @@
+//! Host/device partition surface (NGAB1-U1 — the NGAB1 vertical-slice root).
+//!
+//! Given one analyzed and validated MIR program, this surface partitions the
+//! package into the **host side** (ordinary functions that become the native
+//! executable) and the **device side** (explicit device kernels — functions
+//! whose `shader_stage` is [`MirKernelShaderStage::Compute`], the `@ nucleum`
+//! entry surface), and derives one **typed, target-neutral
+//! [`DeviceProgram`]** for the device side from typed facts only (NGAB0
+//! §Partition/§Abi: identity/type/lifetime facts are never reconstructed from
+//! emitted LLVM/MSL/PTX text or naming conventions).
+//!
+//! # What is derived and why it is typed
+//!
+//! - **Device kernels**: the functions a package declares as device
+//!   computation. Identity is the MIR function id plus the logical entry name
+//!   (the function's source name) — a carried fact, never a text-derived
+//!   symbol.
+//! - **Resources**: one typed storage-buffer slot per ABI kernel resource
+//!   (`MirKernelResource` → [`DeviceResource`] via the shared ABI synthesis
+//!   [`MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry`]).
+//!   Every slot carries its element type, element count, binding indices,
+//!   role, and access as typed facts.
+//! - **Launches**: the ordered launch sequence over the device kernels.
+//! - **Lifetimes**: program lifetime [`DeviceProgramLifetime::SingleRun`];
+//!   per-buffer lifetime `PerProgram` (one-shot boundary call, host copies
+//!   in/out around the single run).
+//! - **Observations**: an explicit [`ResultBuffer`] row for each output-role
+//!   buffer, read back at [`ObservationCadence::EndOfRun`].
+//! - **Boundary calls**: the declared cross-boundary calls — a host function
+//!   whose body calls a device kernel ([`BoundaryCall`]). This is the NGAB0
+//!   §Partition "one host function calls one device kernel" surface, derived
+//!   from MIR call statements (typed), never from emitted text.
+//!
+//! The derived program is validated through the shared schema
+//! ([`DeviceProgram::validate`]) before it is returned — a derived program
+//! that violates the schema rules fails closed with the shared typed error
+//! instead of reaching a consumer.
+
+use crate::abi::{
+    MirKernelResource, MirKernelResourceKind, MirKernelShaderStage, MirKernelSignature,
+};
+use crate::device_program::{
+    BufferId, BufferIdentity, BufferLifetime, BufferRole, BufferVersion, DeviceProgram,
+    DeviceProgramError, DeviceProgramLifetime, DeviceResource, KernelLaunchPlan, KernelUnit,
+    LaunchId, LaunchUnit, ObservationCadence, ResultBuffer,
+};
+use crate::device_program_plans::kernel_plan_for_function;
+use crate::kernel_plan::CollectionKernelPlan;
+use crate::layout::MirTensorStorageLayout;
+use crate::{
+    MirCallee, MirConstant, MirFunction, MirFunctionId, MirOperand, MirProgram,
+    MirStatementKind, ValidatedMir,
+};
+use radix_lexer::Interner;
+use std::fmt;
+
+/// Fail-closed error for host-partition derivation.
+///
+/// Every variant names the typed fact that failed; nothing is text-parsed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HostPartitionError {
+    /// A device kernel's storage-buffer ABI signature could not be synthesized.
+    KernelAbi {
+        /// The offending kernel's MIR function id.
+        function: MirFunctionId,
+        /// The ABI synthesis detail.
+        detail: String,
+    },
+    /// A device kernel's algorithmic plan could not be resolved.
+    KernelPlan {
+        /// The offending kernel's MIR function id.
+        function: MirFunctionId,
+        /// The plan-resolution detail.
+        detail: String,
+    },
+    /// An ABI slot has no coherent program buffer role.
+    BufferRole {
+        /// The offending kernel's MIR function id.
+        function: MirFunctionId,
+        /// The slot's binding index.
+        binding: u32,
+        /// The ABI role/access pair that has no coherent program role.
+        role: String,
+        /// The ABI access of the slot.
+        access: String,
+    },
+    /// The derived device program violates the shared schema rules.
+    Program(DeviceProgramError),
+}
+
+impl fmt::Display for HostPartitionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::KernelAbi { function, detail } => {
+                write!(f, "kernel {} ABI synthesis failed: {detail}", function.0)
+            }
+            Self::KernelPlan { function, detail } => {
+                write!(f, "kernel {} plan resolution failed: {detail}", function.0)
+            }
+            Self::BufferRole {
+                function,
+                binding,
+                role,
+                access,
+            } => write!(
+                f,
+                "kernel {} binding {binding} has no coherent program buffer role ({role} {access})",
+                function.0
+            ),
+            Self::Program(error) => write!(f, "derived device program failed validation: {error}"),
+        }
+    }
+}
+
+impl std::error::Error for HostPartitionError {}
+
+/// One declared cross-boundary call: a host function invoking a device kernel
+/// (NGAB0 §Partition — one host function, one device kernel, one call).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BoundaryCall {
+    /// The calling host-side function.
+    pub host: MirFunctionId,
+    /// The invoked device kernel.
+    pub kernel: MirFunctionId,
+}
+
+/// The host/device partition of one analyzed program (NGAB0 §Partition).
+///
+/// `device_program` is the typed, target-neutral device side; `host_functions`
+/// and `device_kernels` are the partition's two sides (MIR function ids — the
+/// static split that survives lowering); `boundary_calls` is the declared
+/// cross-boundary call surface.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HostPartition {
+    /// The device side: every explicit device kernel in the program.
+    pub device_kernels: Vec<MirFunctionId>,
+    /// The host side: every other function in the program.
+    pub host_functions: Vec<MirFunctionId>,
+    /// The typed, target-neutral device program derived from `device_kernels`.
+    pub device_program: DeviceProgram,
+    /// The declared cross-boundary calls (host → device kernel).
+    pub boundary_calls: Vec<BoundaryCall>,
+}
+
+impl HostPartition {
+    /// Whether the program declares any device kernel.
+    #[must_use]
+    pub fn has_device(&self) -> bool {
+        !self.device_kernels.is_empty()
+    }
+}
+
+/// Derive the host/device partition of a validated MIR program.
+///
+/// The device side is every function whose `shader_stage` is
+/// [`MirKernelShaderStage::Compute`] (the `@ nucleum` entry surface); the host
+/// side is every other function. A package with no compute kernels yields an
+/// empty partition (`has_device() == false`) — no device payload.
+///
+/// The typed [`DeviceProgram`] is composed from the shared ABI synthesis, the
+/// shared plan pass, and the shared schema — never from emitted text:
+///
+/// - per kernel: [`MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry`]
+///   (typed storage-buffer slots), [`kernel_plan_for_function`] (the typed
+///   `MirCollectionOp → CollectionKernelPlan` bridge; a body with no recipe
+///   op resolves to [`CollectionKernelPlan::Elementwise`]), and
+///   [`KernelLaunchPlan::from_signature_and_function`] (the shared
+///   workgroup/dispatch/launch derivation);
+/// - resources: [`DeviceResource::from_kernel_resource`] maps each ABI
+///   storage-buffer resource onto a typed device-program slot (role from
+///   [`BufferRole::from_abi_role`], element type/count carried from the
+///   resource);
+/// - observations: one [`ResultBuffer`] per output-role buffer, produced by
+///   its kernel's launch at [`ObservationCadence::EndOfRun`];
+/// - the composed program passes [`DeviceProgram::validate`] or derivation
+///   fails closed.
+///
+/// # Errors
+///
+/// Returns a [`HostPartitionError`] when a kernel's ABI signature or plan
+/// cannot be derived, an ABI slot has no coherent program role, or the
+/// composed device program fails the shared schema validation.
+pub fn derive_host_partition(
+    validated: &ValidatedMir<'_>,
+    interner: &Interner,
+) -> Result<HostPartition, HostPartitionError> {
+    let program = validated.program();
+    let kernel_functions: Vec<&MirFunction> = program
+        .functions
+        .iter()
+        .filter(|function| function.shader_stage == Some(MirKernelShaderStage::Compute))
+        .collect();
+    if kernel_functions.is_empty() {
+        return Ok(HostPartition {
+            device_kernels: Vec::new(),
+            host_functions: program.functions.iter().map(|function| function.id).collect(),
+            device_program: DeviceProgram::new(DeviceProgramLifetime::SingleRun),
+            boundary_calls: Vec::new(),
+        });
+    }
+
+    let mut device_program = DeviceProgram::new(DeviceProgramLifetime::SingleRun);
+    let mut device_kernels = Vec::with_capacity(kernel_functions.len());
+    let mut launches = Vec::with_capacity(kernel_functions.len());
+    let mut results = Vec::new();
+    let mut next_buffer_id = 1u32;
+
+    for (index, function) in kernel_functions.iter().enumerate() {
+        let signature =
+            MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+                function,
+                validated.validation(),
+                interner,
+            )
+            .map_err(|error| HostPartitionError::KernelAbi {
+                function: function.id,
+                detail: error.message.clone(),
+            })?;
+        let plan = kernel_plan_for_function(function, &signature, validated.validation())
+            .map_err(|error| HostPartitionError::KernelPlan {
+                function: function.id,
+                detail: error.message.clone(),
+            })?
+            .unwrap_or(CollectionKernelPlan::Elementwise);
+        let entry = kernel_entry_name(function, interner);
+        let launch = KernelLaunchPlan::from_signature_and_function(&signature, function);
+        let launch_id = LaunchId(u32::try_from(index + 1).unwrap_or(u32::MAX));
+
+        let mut resources = Vec::new();
+        for resource in signature
+            .resources()
+            .filter(|resource| resource.kind == MirKernelResourceKind::StorageBuffer)
+        {
+            let role = BufferRole::from_abi_role(resource.role, resource.access)
+                .ok_or_else(|| HostPartitionError::BufferRole {
+                    function: function.id,
+                    binding: resource.binding,
+                    role: format!("{:?}", resource.role),
+                    access: format!("{:?}", resource.access),
+                })?;
+            let identity = BufferIdentity {
+                id: BufferId(next_buffer_id),
+                name: buffer_slot_name(function, interner, resource),
+                role,
+                storage: MirTensorStorageLayout::DeviceHandle,
+                lifetime: BufferLifetime::PerProgram,
+            };
+            next_buffer_id += 1;
+            let version = BufferVersion {
+                version: 1,
+                element_ty: resource.element_ty,
+                element_count: resource.element_count,
+                reduced_projection: resource.reduced_projection,
+            };
+            if let Some(device_resource) =
+                DeviceResource::from_kernel_resource(identity.clone(), version.clone(), resource)
+            {
+                resources.push(device_resource);
+            }
+            // A device-produced output read back once at the end of the run:
+            // the explicit observation row (NGAB0 §Abi observations are
+            // declared, never inferred).
+            if role == BufferRole::Output {
+                results.push(ResultBuffer {
+                    buffer: identity,
+                    version,
+                    role: BufferRole::Output,
+                    produced_by: launch_id,
+                    cadence: ObservationCadence::EndOfRun,
+                });
+            }
+        }
+
+        device_kernels.push(function.id);
+        device_program.kernels.push(KernelUnit {
+            function: function.id,
+            entry,
+            plan,
+            resources,
+            launch,
+        });
+        launches.push(LaunchUnit {
+            id: launch_id,
+            kernel_index: index,
+        });
+    }
+
+    device_program.launches = launches;
+    device_program.results = results;
+    device_program
+        .validate()
+        .map_err(HostPartitionError::Program)?;
+
+    let host_functions = program
+        .functions
+        .iter()
+        .filter(|function| !device_kernels.contains(&function.id))
+        .map(|function| function.id)
+        .collect();
+    let boundary_calls = derive_boundary_calls(program, &device_kernels);
+
+    Ok(HostPartition {
+        device_kernels,
+        host_functions,
+        device_program,
+        boundary_calls,
+    })
+}
+
+/// The target-neutral logical entry name of a kernel function: the function's
+/// source name when it carries one, else the kernel index-based fallback.
+fn kernel_entry_name(function: &MirFunction, interner: &Interner) -> String {
+    function
+        .name
+        .map(|symbol| interner.resolve(symbol))
+        .map(str::to_owned)
+        .unwrap_or_else(|| format!("kernel{}", function.id.0))
+}
+
+/// The buffer-slot name for one ABI resource: the carried source name when
+/// present, else the param name of the slot's source local, else a
+/// role/binding-based fallback. The name is a diagnostic/wire label — the
+/// identity key is the [`BufferId`], never the name or the emitted text.
+fn buffer_slot_name(function: &MirFunction, interner: &Interner, resource: &MirKernelResource) -> String {
+    if let Some(name) = &resource.source_name {
+        return name.clone();
+    }
+    if let Some(local) = resource.source_local {
+        if let Some(name) = function
+            .params
+            .iter()
+            .find(|param| param.local == local)
+            .and_then(|param| param.name)
+            .map(|symbol| interner.resolve(symbol))
+        {
+            return name.to_owned();
+        }
+    }
+    match resource.role {
+        crate::abi::MirKernelResourceRole::Input => format!("input_{}", resource.binding),
+        crate::abi::MirKernelResourceRole::Output => format!("output_{}", resource.binding),
+    }
+}
+
+/// Resolve a call statement's callee to the MIR function ids it may refer to.
+///
+/// A `Definition` callee carries a semantic def id; the referenced MIR
+/// function(s) are found by their carried `source` fact (a decomposition may
+/// have produced several). A direct `Function` or constant-function callee
+/// carries the id itself.
+fn callee_function_ids<'a>(callee: &MirCallee, program: &'a MirProgram) -> Vec<MirFunctionId> {
+    match callee {
+        MirCallee::Function(id) => vec![*id],
+        MirCallee::Value(MirOperand::Constant(MirConstant::Function(id))) => vec![*id],
+        MirCallee::Closure(closure) => vec![closure.function],
+        MirCallee::Definition { source, .. } => program
+            .functions
+            .iter()
+            .filter(|function| function.source == Some(*source))
+            .map(|function| function.id)
+            .collect(),
+        MirCallee::Value(_) => Vec::new(),
+    }
+}
+
+/// Derive the declared cross-boundary calls: every host function whose body
+/// contains a call statement targeting a device kernel.
+///
+/// The call surface is a typed MIR fact (the call statement's callee), never
+/// reconstructed from emitted text or naming conventions.
+fn derive_boundary_calls(
+    program: &MirProgram,
+    device_kernels: &[MirFunctionId],
+) -> Vec<BoundaryCall> {
+    let mut calls = Vec::new();
+    for function in &program.functions {
+        if device_kernels.contains(&function.id) {
+            continue;
+        }
+        for block in &function.blocks {
+            for statement in &block.statements {
+                let MirStatementKind::Call { callee, .. } = &statement.kind else {
+                    continue;
+                };
+                for target in callee_function_ids(callee, program) {
+                    if device_kernels.contains(&target) {
+                        calls.push(BoundaryCall {
+                            host: function.id,
+                            kernel: target,
+                        });
+                    }
+                }
+            }
+        }
+    }
+    calls
+}
