@@ -12747,6 +12747,89 @@ incipit {
 }
 
 #[test]
+fn package_mir_linking_fails_closed_on_unresolvable_companion() {
+    // codex-gap S1 U4 s1-companion-fail-closed: a declared `@ radix backward`
+    // companion with no resolvable symbol in the library analysis fails
+    // closed at link time with the stable `package_mir_companion_unresolved`
+    // identity instead of silently skipping the companion (which previously
+    // surfaced as an unstable stepper-internal `missing MIR function` error).
+    // The primal here has no tensor parameter, so radix's reverse-AD snapshot
+    // pass skips it and no companion function is ever generated.
+    let dir = test_temp_dir("package-mir-companion-unresolved");
+    let lib_root = dir.join("lib");
+    fs::create_dir_all(lib_root.join("testgrad/src")).expect("create library");
+    fs::write(
+        lib_root.join("testgrad/faber.toml"),
+        r#"[package]
+name = "testgrad"
+version = "0.1.0"
+edition = "2026"
+
+[library]
+provider = "testgrad"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+target = "fmir"
+targets = ["fmir"]
+"#,
+    )
+    .expect("write library manifest");
+    fs::write(
+        lib_root.join("testgrad/src/gradient.fab"),
+        r#"functio nil() → vacuum {
+    tacet
+}
+
+@ radix lane "air"
+@ radix backward "ghost"
+functio simple_add(numerus a, numerus b) → numerus {
+    redde a + b
+}
+"#,
+    )
+    .expect("write library module");
+
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+importa ex "testgrad:gradient" privata gradient
+
+incipit {
+    fixum _ g ← gradient.ghost(gradient.nil(), 5)
+    nota "companion-ran"
+}
+"#,
+    )
+    .expect("write entry");
+
+    let config = radix::driver::Config::default()
+        .with_target(radix::codegen::Target::MirFmirBinary)
+        .with_stdlib(lib_root);
+    let mut host = BufferHost::default();
+    let diagnostics = run_package_mir(&config, &entry, &mut host)
+        .expect_err("unresolvable companion should fail closed at link time");
+
+    assert!(host.stdout_lines.is_empty());
+    assert!(
+        diagnostics.iter().any(|diag| {
+            diagnostic_has_issue(diag, "package_mir_companion_unresolved")
+                && diagnostic_has_arg(diag, "companion", "ghost")
+                && diagnostic_has_arg(diag, "import", "testgrad:gradient")
+        }),
+        "expected package_mir_companion_unresolved diagnostic, got {:?}",
+        diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn package_mir_executes_library_function_that_calls_nested_library() {
     let dir = test_temp_dir("package-mir-nested-library-call");
     let lib_root = dir.join("lib");

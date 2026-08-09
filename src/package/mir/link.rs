@@ -272,15 +272,30 @@ fn link_library_import_site(
                 .collect::<Vec<_>>();
             // Compiler-generated companions have no HIR item, but their source
             // DefId is the identity carried by their generated MIR function.
-            functions.extend(analysis.radix_lanes.iter_backward().map(|(_, backward)| {
-                ExportedFunction {
-                    name: analysis
-                        .interner
-                        .resolve(backward.companion_name)
-                        .to_owned(),
-                    def_id: backward.companion_def_id,
+            // A declared companion with no resolvable symbol fails closed
+            // here (stable `package_mir_companion_unresolved` identity)
+            // instead of silently vanishing from the link and surfacing later
+            // as an unstable stepper-internal error.
+            for (primal_def_id, backward) in analysis.radix_lanes.iter_backward() {
+                let name = analysis
+                    .interner
+                    .resolve(backward.companion_name)
+                    .to_owned();
+                if !companion_resolves(analysis, primal_def_id, backward) {
+                    push_companion_unresolved(
+                        &mut links.diagnostics,
+                        &site.caller_path,
+                        &site.import_path,
+                        &name,
+                        PackageMirConsumer::Interpreted,
+                    );
+                    continue;
                 }
-            }));
+                functions.push(ExportedFunction {
+                    name,
+                    def_id: backward.companion_def_id,
+                });
+            }
             functions
         }
         Err(_) => {
@@ -361,6 +376,48 @@ fn link_library_import_site(
             import,
         });
     }
+}
+
+/// Whether a declared `@ radix backward` companion can be linked by the
+/// package-MIR path.
+///
+/// The companion must carry a typed resolver symbol — the same gate the
+/// file-interface extractor applies, since the interface only declares
+/// companions whose symbol resolves (`file_interface.rs` companion loop) —
+/// and its primal must be a valid reverse-AD companion candidate (present in
+/// HIR with a return type and at least one tensor parameter). Without the
+/// latter, radix's snapshot pass skips the primal and no companion function
+/// is generated, so the link target would dangle into an unstable
+/// stepper-internal `missing MIR function` error.
+fn companion_resolves(
+    analysis: &radix::driver::AnalyzedUnit,
+    primal_def_id: DefId,
+    backward: &radix::semantic::RadixBackward,
+) -> bool {
+    let Some(symbol) = analysis.resolver.get_symbol(backward.companion_def_id) else {
+        return false;
+    };
+    if symbol.ty.is_none() {
+        return false;
+    }
+    let Some(function) = analysis
+        .hir
+        .items
+        .iter()
+        .find_map(|item| (item.def_id == primal_def_id).then_some(&item.kind))
+    else {
+        return false;
+    };
+    let HirItemKind::Function(function) = function else {
+        return false;
+    };
+    if function.ret_ty.is_none() {
+        return false;
+    }
+    function
+        .params
+        .iter()
+        .any(|param| radix::air::reverse_ad::is_tensor_type(param.ty, &analysis.types))
 }
 
 fn link_nested_library_imports(
@@ -459,6 +516,31 @@ pub(super) fn push_library_import_unsupported(
         .with_file(unit_path.display().to_string())
         .with_arg("issue", "package_mir_library_imports_unsupported")
         .with_arg("import", import_path),
+    );
+}
+
+/// Fail-closed diagnostic for a declared `@ radix backward` companion that
+/// has no resolvable symbol in the library analysis. Stable identity
+/// `package_mir_companion_unresolved`; external-target consumers keep the
+/// previous silent-skip behavior.
+pub(super) fn push_companion_unresolved(
+    diagnostics: &mut Vec<Diagnostic>,
+    unit_path: &Path,
+    import_path: &str,
+    companion_name: &str,
+    consumer: PackageMirConsumer,
+) {
+    if consumer != PackageMirConsumer::Interpreted {
+        return;
+    }
+    diagnostics.push(
+        crate::package_diagnostic_error(format!(
+            "companion `{companion_name}` declared by library `{import_path}` has no resolvable symbol in the analysis; package MIR cannot link it"
+        ))
+        .with_file(unit_path.display().to_string())
+        .with_arg("issue", "package_mir_companion_unresolved")
+        .with_arg("import", import_path)
+        .with_arg("companion", companion_name),
     );
 }
 
@@ -744,6 +826,41 @@ pub(super) fn rewrite_expr(
         HirExpressionKind::Binary(_, lhs, rhs) | HirExpressionKind::Assign(lhs, rhs) => {
             rewrite_expr(unit_path, lhs, interner, targets, data_member_targets, namespaces, diagnostics);
             rewrite_expr(unit_path, rhs, interner, targets, data_member_targets, namespaces, diagnostics);
+        }
+        HirExpressionKind::ConversioAssign {
+            target,
+            source,
+            recovery,
+        } => {
+            rewrite_expr(
+                unit_path,
+                target,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
+            rewrite_expr(
+                unit_path,
+                source,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
+            if let Some(recovery) = recovery {
+                rewrite_expr(
+                    unit_path,
+                    recovery,
+                    interner,
+                    targets,
+                    data_member_targets,
+                    namespaces,
+                    diagnostics,
+                );
+            }
         }
         HirExpressionKind::Unary(_, inner)
         | HirExpressionKind::Cede(inner)
