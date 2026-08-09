@@ -479,6 +479,6 @@ fn session_section_version_ratchet_is_declared() {
     // the accepted wire versions are untouched.
     assert_eq!(WIRE_SESSION_SECTION_VERSION, 1);
     assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 8);
-    assert_eq!(PACKAGE_MIR_ARTIFACT_VERSION, 6);
+    assert_eq!(PACKAGE_MIR_ARTIFACT_VERSION, 7);
     assert_eq!(WIRE_DISTRIBUTED_SECTION_VERSION, 1);
 }

@@ -77,9 +77,16 @@ mod wire_test;
 /// CUDA symbols + host inputs to metadata. `5 → 6` clean break (Stage 3R U1)
 /// carries the F1–F7 semantic facts (semantic value identity, generations,
 /// roots, dependencies, lossless relation, initialization/observation axes).
-/// Old version-5 images fail closed with
-/// [`UnsupportedVersion`](crate::error::FmirImageError::UnsupportedVersion).
-pub const PACKAGE_MIR_ARTIFACT_VERSION: u32 = 6;
+/// `6 → 7` clean break (DDCP2-U2) migrates `FmirDeviceArtifact` to the frozen
+/// **DeviceArtifact packet** (typed backend id with the unknown-representable
+/// case, explicit format id, materialization stage, typed target id +
+/// required features, ABI/schema version, canonical raw bytes, explicit
+/// text/binary payload encoding, the entrypoint symbol map, and the
+/// `content_sha256`/`packet_sha256` identity fields; FNV artifact provenance
+/// removed). The nested device-program wire version is untouched (no
+/// `DeviceProgram` semantic field changes). Old version-6 images fail closed
+/// with [`UnsupportedVersion`](crate::error::FmirImageError::UnsupportedVersion).
+pub const PACKAGE_MIR_ARTIFACT_VERSION: u32 = 7;
 
 /// The faber-owned wire/codec version of the typed device-program section
 /// (the nested `v` field of [`FmirDeviceProgramSection`]). Bumped in lockstep
@@ -115,7 +122,7 @@ pub const WIRE_DEVICE_PROGRAM_VERSION: u32 = 8;
 /// pattern, FC4) — independently of the nested device-program wire version
 /// and the outer image version. The first distributed-section shape is v1;
 /// the nested `WIRE_DEVICE_PROGRAM_VERSION = 8` and the outer
-/// `PACKAGE_MIR_ARTIFACT_VERSION = 6` stay untouched (FC1).
+/// `PACKAGE_MIR_ARTIFACT_VERSION = 7` stay untouched (FC1).
 pub const WIRE_DISTRIBUTED_SECTION_VERSION: u32 = 1;
 
 /// Text image `target` tag.
@@ -151,8 +158,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn artifact_version_is_6_for_the_carried_semantics_schema() {
-        assert_eq!(PACKAGE_MIR_ARTIFACT_VERSION, 6);
+    fn artifact_version_is_7_for_the_device_artifact_packet_schema() {
+        assert_eq!(PACKAGE_MIR_ARTIFACT_VERSION, 7);
     }
 
     #[test]
@@ -184,7 +191,7 @@ mod tests {
         // frozen version constants changes with the distributed section.
         assert_eq!(WIRE_DISTRIBUTED_SECTION_VERSION, 1);
         assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 8);
-        assert_eq!(PACKAGE_MIR_ARTIFACT_VERSION, 6);
+        assert_eq!(PACKAGE_MIR_ARTIFACT_VERSION, 7);
     }
 
     #[test]

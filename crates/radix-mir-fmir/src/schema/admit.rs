@@ -2,13 +2,12 @@ use super::device::{FmirDeviceSection, FmirSessionSection, WIRE_SESSION_SECTION_
 use super::distributed::{
     expected_plan_for_section, wire_plan_to_plan, FmirDistributedExecutionSection,
 };
-use super::hash::fnv1a64_blob_hash;
 use super::requirements::is_known_device_requirement;
 use super::wire::WireDeviceProgram;
 use super::{
     logical_distributed_plan_hash, validate_wire_distributed_section, validate_wire_program,
-    validate_wire_session_section, PACKAGE_MIR_ARTIFACT_VERSION, WIRE_DEVICE_PROGRAM_VERSION,
-    WIRE_DISTRIBUTED_SECTION_VERSION,
+    validate_wire_session_section, FmirDeviceBackend, PACKAGE_MIR_ARTIFACT_VERSION,
+    WIRE_DEVICE_PROGRAM_VERSION, WIRE_DISTRIBUTED_SECTION_VERSION,
 };
 
 /// Fail-closed artifact-version gate. Versions ratchet as clean breaks;
@@ -77,19 +76,40 @@ pub(crate) fn check_device_requirements(
     Ok(())
 }
 
-/// Fail-closed backend-artifact admission (A9): each artifact's stored FNV-1a
-/// hash must match its blob. Provenance is verified, not decorative — a
-/// tampered or miscomputed hash fails admission at package load.
-pub(crate) fn check_artifact_hashes(
+/// Fail-closed payload-encoding admission (contract §Payload encoding):
+/// every artifact's explicit encoding declaration must be consistent with
+/// its canonical raw bytes — text payloads canonical UTF-8 (valid UTF-8, no
+/// BOM, no alternative-encoding disguise); binary payloads the declared
+/// `binary:<encoding-tag>:<decoded-byte-length>:<canonical-unpadded-base64>`
+/// spelling. No binary is smuggled through UTF-8 or base64 without this
+/// schema-level declaration.
+pub(crate) fn check_artifact_encodings(
     device: &FmirDeviceSection,
 ) -> Result<(), crate::error::FmirImageError> {
     for artifact in &device.artifacts.artifact {
-        let actual = fnv1a64_blob_hash(artifact.blob.as_bytes());
-        if actual != artifact.hash {
-            return Err(crate::error::FmirImageError::ArtifactHashMismatch {
-                backend: artifact.backend,
-                expected: artifact.hash.clone(),
-                actual,
+        artifact.validate_encoding().map_err(|error| {
+            crate::error::FmirImageError::ArtifactEncodingMismatch {
+                backend: artifact.backend.spelling(),
+                detail: error.to_string(),
+            }
+        })?;
+    }
+    Ok(())
+}
+
+/// Fail-closed unknown-backend admission (contract §Unknown future
+/// backends): an artifact whose backend id is not a compiled-in leaf is
+/// representable on the packet, validated as far as its declared fields
+/// allow, and rejected here with a stable structured diagnostic — never
+/// silently dropped, never remapped to a different backend, never given a
+/// fallback lane.
+pub(crate) fn check_artifact_backends(
+    device: &FmirDeviceSection,
+) -> Result<(), crate::error::FmirImageError> {
+    for artifact in &device.artifacts.artifact {
+        if let FmirDeviceBackend::Unknown(backend) = &artifact.backend {
+            return Err(crate::error::FmirImageError::UnsupportedArtifactBackend {
+                backend: backend.clone(),
             });
         }
     }
@@ -119,7 +139,8 @@ pub(crate) fn admit_device_section(
     }
     validate_wire_program(&device.device_program.program)?;
     check_device_requirements(device)?;
-    check_artifact_hashes(device)?;
+    check_artifact_encodings(device)?;
+    check_artifact_backends(device)?;
     // MD2-W1: the optional distributed execution section is admitted
     // fail-closed at load — its own version ratchet, wire-level section
     // validation, MD2-V1's gate on the reconstructed plan, the equivalence

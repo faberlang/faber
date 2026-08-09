@@ -234,8 +234,8 @@ mod tests {
 
     #[test]
     fn decode_rejects_unsupported_version() {
-        // A pre-break version-5 image fails closed under the 5→6 clean break
-        // (Stage 3R U1: the wire carries the F1–F7 semantic facts).
+        // A pre-break version-5 image fails closed under the clean-break
+        // ratchet (the image schema now carries the DeviceArtifact packet).
         let mut image = text_image();
         image.version = 5;
         let text = encode_text_image(&image).expect("encode text image");
@@ -243,7 +243,7 @@ mod tests {
             decode_text_image(&text, "0.79.0"),
             Err(FmirImageError::UnsupportedVersion {
                 actual: 5,
-                expected: 6
+                expected: PACKAGE_MIR_ARTIFACT_VERSION
             })
         ));
     }

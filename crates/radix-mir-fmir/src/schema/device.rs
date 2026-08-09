@@ -93,20 +93,25 @@ pub struct FmirDeviceInput {
     pub values: Vec<f32>,
 }
 
-/// One logical-entry → backend-symbol identity for the CUDA artifact
-/// (per-artifact metadata, NOT a program semantic). Metal artifacts carry no
-/// mapping: the logical entry IS the launch name.
+/// One logical-entrypoint → emitted-symbol identity for a backend artifact
+/// (the **entrypoint symbol map** — the DDCP2-U2 migration of
+/// `FmirDeviceSymbol.entry/.symbol`; per-artifact metadata, NOT a program
+/// semantic). The map is resolved at preparation, never on the hot path.
+/// Metal artifacts carry no mapping: the logical entry IS the launch name.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FmirDeviceSymbol {
-    /// Logical entry (a kernel-unit fact of the program).
+    /// Logical entrypoint identity (a kernel-unit fact of the program).
     pub entry: String,
-    /// Emitted NVVM/PTX `.entry` symbol the host launches by.
+    /// Emitted `.entry` symbol the host launches by.
     pub symbol: String,
 }
 /// Backend selection request recorded in the image (N1.1). Fail-closed: an
-/// unknown value fails at parse time.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// unknown value fails at parse time. Migrated to backend-id enum semantics
+/// (DDCP2-U2): an unknown selection id is `Unknown(String)` — representable
+/// on the image and rejected honestly at selection resolution, never
+/// silently remapped to a compiled-in backend.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum FmirDeviceSelection {
     /// Automatic backend resolution at run time.
@@ -115,6 +120,9 @@ pub enum FmirDeviceSelection {
     Metal,
     /// NVIDIA CUDA.
     Cuda,
+    /// Any other declared backend-selection id. Representable; rejected
+    /// honestly at selection resolution (no compiled-in leaf matches).
+    Unknown(String),
 }
 
 /// Declared backend artifacts list (N1.7 / §3.4).
@@ -124,36 +132,302 @@ pub struct FmirDeviceArtifactsSection {
     pub artifact: Vec<FmirDeviceArtifact>,
 }
 
-/// One declared backend artifact: a backend blob (MSL source for Metal, PTX
-/// text for CUDA) plus its FNV-1a provenance hash. Both packaged artifacts are
-/// text; there is no binary blob in Stages 0–6 (N1.3).
+/// One declared device artifact: the frozen **DeviceArtifact packet**
+/// (DDCP2-U2). A versioned, encoded, identity-bound artifact fact — typed
+/// backend id (unknown-representable), explicit format id, materialization
+/// stage, typed target + features, ABI/schema version, canonical raw bytes,
+/// explicit payload encoding, the entrypoint symbol map, and the
+/// `content_sha256`/`packet_sha256` identity fields.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FmirDeviceArtifact {
-    /// Backend the blob targets. `auto` is not a backend.
+    /// Typed backend identity — compiled-in leaves plus the representable
+    /// unknown case ([`FmirDeviceBackend::Unknown`]). Unknown backends are
+    /// rejected honestly at admission (contract §Unknown future backends),
+    /// never silently dropped, remapped, or fallback-laned.
     pub backend: FmirDeviceBackend,
-    /// Backend blob text (MSL for `metal`, PTX for `cuda`).
-    pub blob: String,
-    /// FNV-1a 64-bit provenance hash of `blob`, canonical `fnv64:<16-hex>`
-    /// spelling (computed by [`crate::schema::fnv1a64_blob_hash`]). Verified on admission.
-    pub hash: String,
-    /// Per-artifact logical-entry → symbol mapping (N3.3 / S3-A4): the CUDA
-    /// artifact's `.entry` symbol identities the host launches by. Empty for
-    /// Metal (the logical entry IS the launch name). This is artifact
-    /// metadata, NOT program semantics — absent from the canonical program
-    /// bytes.
-    pub symbols: Vec<FmirDeviceSymbol>,
+    /// Explicit format id — declared, never inferred from blob content.
+    pub format: DeviceArtifactFormat,
+    /// Materialization stage (`compiler-input` | `finalized-binary`).
+    pub stage: MaterializationStage,
+    /// Typed target identity + required features (the typed replacement for
+    /// the string `runtime_requirements` allowlist).
+    pub target: DeviceTargetId,
+    /// ABI/schema version of the artifact (an input to `packet_sha256`).
+    pub abi_version: u32,
+    /// Canonical raw bytes of the artifact payload — the hashing substrate
+    /// (`content_sha256` covers decoded bytes only, never the transport
+    /// spelling).
+    pub bytes: Vec<u8>,
+    /// Explicit payload-encoding declaration (`text` = canonical UTF-8;
+    /// `binary` = the declared `binary:<encoding-tag>:<decoded-byte-length>:
+    /// <canonical-unpadded-base64>` spelling). No binary is smuggled through
+    /// UTF-8 or base64 without this declaration.
+    pub encoding: DevicePayloadEncoding,
+    /// Entrypoint symbol map: logical entrypoint identity → emitted symbol
+    /// (per-artifact metadata, NOT a program semantic; resolved at
+    /// preparation, never on the hot path). Empty for Metal (the logical
+    /// entry IS the launch name).
+    pub entrypoints: Vec<FmirDeviceSymbol>,
+    /// Content digest of the canonical decoded raw payload bytes (canonical
+    /// `sha256:<64-hex>`). Computed and re-verified by the hashing/identity
+    /// unit (DDCP2-U3); the field is part of the frozen packet shape.
+    pub content_sha256: String,
+    /// Packet digest over the versioned artifact metadata + `content_sha256`
+    /// (never semantic identity; canonical `sha256:<64-hex>`). Computed and
+    /// re-verified by the hashing/identity unit (DDCP2-U3).
+    pub packet_sha256: String,
+}
+
+impl FmirDeviceArtifact {
+    /// The declared binary transport spelling
+    /// (`binary:<encoding-tag>:<decoded-byte-length>:<canonical-unpadded-base64>`)
+    /// for a binary-encoded artifact; empty for text-encoded payloads
+    /// (contract §Payload encoding).
+    #[must_use]
+    pub fn binary_payload_spelling(&self) -> String {
+        match &self.encoding {
+            DevicePayloadEncoding::Text => String::new(),
+            DevicePayloadEncoding::Binary { encoding_tag, .. } => format!(
+                "binary:{encoding_tag}:{}:{}",
+                self.bytes.len(),
+                canonical_unpadded_base64(&self.bytes)
+            ),
+        }
+    }
+
+    /// Validate the explicit payload-encoding declaration against the
+    /// canonical raw bytes (contract §Payload encoding): text payloads are
+    /// canonical UTF-8 (valid UTF-8, no BOM, no alternative-encoding
+    /// disguise); binary payloads carry the declared
+    /// `binary:<encoding-tag>:<decoded-byte-length>:<canonical-unpadded-base64>`
+    /// spelling with a decoded byte length equal to the artifact bytes and a
+    /// canonical unpadded base64 that re-encodes the artifact bytes. No
+    /// binary is smuggled through UTF-8 or base64 without this schema-level
+    /// declaration.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first [`DevicePayloadEncodingError`] the declaration
+    /// violates.
+    pub fn validate_encoding(&self) -> Result<(), DevicePayloadEncodingError> {
+        match &self.encoding {
+            DevicePayloadEncoding::Text => {
+                let text = std::str::from_utf8(&self.bytes).map_err(|error| {
+                    DevicePayloadEncodingError::NonCanonicalUtf8 {
+                        detail: error.to_string(),
+                    }
+                })?;
+                if text.starts_with('\u{feff}') {
+                    return Err(DevicePayloadEncodingError::Utf8Bom {
+                        detail: "text payload begins with a UTF-8 BOM".to_owned(),
+                    });
+                }
+                Ok(())
+            }
+            DevicePayloadEncoding::Binary {
+                encoding_tag,
+                decoded_byte_length,
+                canonical_unpadded_base64: declared_base64,
+            } => {
+                if encoding_tag.is_empty() {
+                    return Err(DevicePayloadEncodingError::EmptyEncodingTag);
+                }
+                if *decoded_byte_length != self.bytes.len() as u64 {
+                    return Err(DevicePayloadEncodingError::DecodedByteLengthMismatch {
+                        declared: *decoded_byte_length,
+                        actual: self.bytes.len(),
+                    });
+                }
+                let canonical = canonical_unpadded_base64(&self.bytes);
+                if canonical != *declared_base64 {
+                    return Err(DevicePayloadEncodingError::NonCanonicalBase64 {
+                        detail: format!(
+                            "declared `{declared_base64}` is not the canonical unpadded base64 (`{canonical}`) of the decoded bytes"
+                        ),
+                    });
+                }
+                Ok(())
+            }
+        }
+    }
 }
 
 /// Backend a declared artifact targets (N1.3). `auto` is a selection, not a
-/// backend. Fail-closed: an unknown value fails at parse time.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// backend. Migrated to backend-id enum semantics (DDCP2-U2): the
+/// compiled-in leaves are the unit variants; any other backend id is
+/// `Unknown(id)` — representable on the artifact packet and rejected
+/// honestly by admission, never silently dropped, never remapped to a
+/// different backend, never given a fallback lane (contract §Unknown future
+/// backends).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum FmirDeviceBackend {
     /// Apple Metal (MSL source).
     Metal,
     /// NVIDIA CUDA (PTX text).
     Cuda,
+    /// Any other backend id (e.g. a future AMD/WebGPU leaf). Representable;
+    /// rejected honestly at admission with a stable structured diagnostic.
+    Unknown(String),
+}
+
+impl FmirDeviceBackend {
+    /// Stable diagnostic spelling.
+    #[must_use]
+    pub fn spelling(&self) -> String {
+        match self {
+            Self::Metal => "metal".to_owned(),
+            Self::Cuda => "cuda".to_owned(),
+            Self::Unknown(id) => id.clone(),
+        }
+    }
+}
+
+/// The explicit artifact format id (DDCP2-U2 / contract §ArtifactPacket) —
+/// a declared fact, never inferred from blob content. Unknown formats are
+/// representable and rejected honestly, like unknown backends.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum DeviceArtifactFormat {
+    /// Metal Shading Language source.
+    Msl,
+    /// NVIDIA PTX text.
+    Ptx,
+    /// WGSL source.
+    Wgsl,
+    /// LLVM IR text.
+    LlvmIr,
+    /// A linked ELF code object.
+    Elf,
+    /// Any other declared format id.
+    Unknown(String),
+}
+
+impl DeviceArtifactFormat {
+    /// Stable diagnostic spelling.
+    #[must_use]
+    pub fn spelling(&self) -> String {
+        match self {
+            Self::Msl => "msl".to_owned(),
+            Self::Ptx => "ptx".to_owned(),
+            Self::Wgsl => "wgsl".to_owned(),
+            Self::LlvmIr => "llvm-ir".to_owned(),
+            Self::Elf => "elf".to_owned(),
+            Self::Unknown(id) => id.clone(),
+        }
+    }
+}
+
+/// The materialization stage of a device artifact (DDCP2-U2 / contract
+/// §ArtifactPacket): `compiler-input` is the materializer's pre-lowering
+/// text input; `finalized-binary` is the linked executable artifact.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum MaterializationStage {
+    /// The materializer's compiler input (pre-lowering text).
+    CompilerInput,
+    /// The linked final artifact the host loads.
+    FinalizedBinary,
+}
+
+/// The typed target identity of a device artifact (DDCP2-U2): the declared
+/// target id plus the required feature ids — the typed replacement for the
+/// string `runtime_requirements` allowlist. Unknown target/feature facts are
+/// representable and rejected honestly, never guessed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DeviceTargetId {
+    /// The declared target id (e.g. `macos-arm64`, `sm_120`).
+    pub id: String,
+    /// Required feature ids (typed).
+    pub required_features: Vec<String>,
+}
+
+/// The explicit payload-encoding declaration (DDCP2-U2 / contract §Payload
+/// encoding). Text payloads are canonical UTF-8 (valid UTF-8, no BOM, no
+/// alternative-encoding disguise). Binary payloads use the declared transport
+/// spelling
+/// `binary:<encoding-tag>:<decoded-byte-length>:<canonical-unpadded-base64>`
+/// — no binary is smuggled through UTF-8 or base64 without this schema-level
+/// declaration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum DevicePayloadEncoding {
+    /// Text payload: the artifact bytes are the canonical UTF-8 payload.
+    Text,
+    /// Binary payload with the declared transport spelling.
+    Binary {
+        /// The encoding tag (e.g. `llvm-ir`, `elf`).
+        encoding_tag: String,
+        /// The decoded byte length (must equal the artifact bytes' length).
+        decoded_byte_length: u64,
+        /// The canonical unpadded base64 of the decoded bytes.
+        canonical_unpadded_base64: String,
+    },
+}
+
+/// A payload-encoding declaration inconsistent with the artifact's canonical
+/// raw bytes (contract §Payload encoding). Stable structured diagnostics;
+/// admission rejects with [`crate::error::FmirImageError::ArtifactEncodingMismatch`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DevicePayloadEncodingError {
+    /// A text-encoded payload's bytes are not valid UTF-8.
+    NonCanonicalUtf8 { detail: String },
+    /// A text-encoded payload begins with a UTF-8 BOM.
+    Utf8Bom { detail: String },
+    /// A binary-encoded payload carries an empty encoding tag.
+    EmptyEncodingTag,
+    /// The declared decoded byte length disagrees with the artifact bytes.
+    DecodedByteLengthMismatch { declared: u64, actual: usize },
+    /// The declared base64 is not the canonical unpadded base64 of the bytes.
+    NonCanonicalBase64 { detail: String },
+}
+
+impl std::fmt::Display for DevicePayloadEncodingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NonCanonicalUtf8 { detail } => {
+                write!(f, "text payload is not canonical UTF-8: {detail}")
+            }
+            Self::Utf8Bom { detail } => write!(f, "{detail}"),
+            Self::EmptyEncodingTag => {
+                write!(f, "binary payload carries an empty encoding tag")
+            }
+            Self::DecodedByteLengthMismatch { declared, actual } => write!(
+                f,
+                "binary payload declares {declared} decoded bytes but the artifact carries {actual}"
+            ),
+            Self::NonCanonicalBase64 { detail } => write!(f, "{detail}"),
+        }
+    }
+}
+
+/// Canonical unpadded base64 (standard alphabet, no padding) of `bytes` —
+/// the base64 of the binary transport spelling
+/// (`binary:<encoding-tag>:<decoded-byte-length>:<canonical-unpadded-base64>`).
+/// Hand-rolled (no base64 crate dependency; radix-mir-fmir keeps its
+/// dependency surface).
+#[must_use]
+pub fn canonical_unpadded_base64(bytes: &[u8]) -> String {
+    const ALPHABET: &[u8; 64] =
+        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = chunk.get(1).copied().unwrap_or(0) as u32;
+        let b2 = chunk.get(2).copied().unwrap_or(0) as u32;
+        let triple = (b0 << 16) | (b1 << 8) | b2;
+        out.push(ALPHABET[(triple >> 18) as usize & 0x3f] as char);
+        out.push(ALPHABET[(triple >> 12) as usize & 0x3f] as char);
+        if chunk.len() > 1 {
+            out.push(ALPHABET[(triple >> 6) as usize & 0x3f] as char);
+        }
+        if chunk.len() > 2 {
+            out.push(ALPHABET[triple as usize & 0x3f] as char);
+        }
+    }
+    out
 }
 
 /// The version ratchet of the optional cadence/session section (GI4-2; CTO
@@ -162,7 +436,7 @@ pub enum FmirDeviceBackend {
 /// — independently of the nested device-program wire version and the outer
 /// image version. The first session-section shape is v1; the nested
 /// `WIRE_DEVICE_PROGRAM_VERSION` and the outer
-/// `PACKAGE_MIR_ARTIFACT_VERSION = 6` stay untouched (the MD2-W1
+/// `PACKAGE_MIR_ARTIFACT_VERSION = 7` stay untouched (the MD2-W1
 /// sibling-field precedent — no `WIRE_DEVICE_PROGRAM_VERSION` bump).
 pub const WIRE_SESSION_SECTION_VERSION: u32 = 1;
 

@@ -47,16 +47,27 @@ pub enum FmirImageError {
         requirement: String,
     },
 
-    /// A backend artifact's stored FNV-1a provenance hash does not match its
-    /// blob. Provenance is verified on admission (A9); a tampered or
-    /// miscomputed hash fails closed.
-    ArtifactHashMismatch {
+    /// A backend artifact's explicit payload-encoding declaration is
+    /// inconsistent with its canonical raw bytes (contract §Payload
+    /// encoding): text payloads must be canonical UTF-8 (no BOM), binary
+    /// payloads must carry the declared
+    /// `binary:<encoding-tag>:<decoded-byte-length>:<canonical-unpadded-base64>`
+    /// spelling. No binary is smuggled through UTF-8 or base64 without this
+    /// schema-level declaration.
+    ArtifactEncodingMismatch {
         /// Backend the mismatched artifact declares.
-        backend: crate::schema::FmirDeviceBackend,
-        /// Hash stored in the image.
-        expected: String,
-        /// Hash recomputed from the blob.
-        actual: String,
+        backend: String,
+        /// The payload-encoding rule violated.
+        detail: String,
+    },
+
+    /// A backend artifact declares a backend id that is not a compiled-in
+    /// leaf. Representable on the packet and rejected honestly — never
+    /// silently dropped, never remapped to a different backend, never given
+    /// a fallback lane (contract §Unknown future backends).
+    UnsupportedArtifactBackend {
+        /// The unknown backend id.
+        backend: String,
     },
 
     /// The nested device-program wire version is unsupported. The nested
@@ -173,18 +184,16 @@ impl fmt::Display for FmirImageError {
                 f,
                 "unsupported FMIR device runtime requirement `{requirement}` (expected `device:metal` or `device:cuda`)"
             ),
-            Self::ArtifactHashMismatch {
-                backend,
-                expected,
-                actual,
-            } => {
-                let spelling = match backend {
-                    crate::schema::FmirDeviceBackend::Metal => "metal",
-                    crate::schema::FmirDeviceBackend::Cuda => "cuda",
-                };
+            Self::ArtifactEncodingMismatch { backend, detail } => {
                 write!(
                     f,
-                    "FMIR device artifact hash mismatch for backend `{spelling}` (stored {expected}, recomputed {actual})"
+                    "FMIR device artifact `{backend}` payload-encoding mismatch: {detail} (contract §Payload encoding)"
+                )
+            }
+            Self::UnsupportedArtifactBackend { backend } => {
+                write!(
+                    f,
+                    "FMIR device artifact backend `{backend}` is not a compiled-in leaf — representable and rejected honestly, never silently dropped, remapped, or fallback-laned (contract §Unknown future backends)"
                 )
             }
             Self::UnsupportedDeviceProgramVersion { actual, expected } => {
