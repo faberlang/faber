@@ -108,21 +108,23 @@ and non-transferable by later stages without the packet change procedure
 
 ## Partition
 
-The host/device partition, frozen at NGAB0-U3. Shape: **one host function
-calls one device kernel through a versioned typed boundary**. The partition is
-the static split that survives lowering, assembly, and launch — the same split
-as the §PackageGraph nodes and §OwnershipMatrix rows, owned from their
-separate surfaces.
+The host/device partition, frozen at NGAB0-U3 and amended by the DDCP0 major
+revision (`ngab0-major-revision-ddcp0.md`, NGAB0-R1). Shape: **one host
+function invokes one prepared submission region containing one or more kernels
+through a versioned typed boundary**. The partition is the static split that
+survives lowering, assembly, and launch — the same split as the §PackageGraph
+nodes and §OwnershipMatrix rows, owned from their separate surfaces.
 
 ```text
 Host side — one native executable
   ordinary Faber host functions (MIR -> LLVM host modules)
   composite session surface: dispatch / observe / teardown over ProgramSession
         |
-        |  versioned typed boundary  (one call, one device kernel)
+        |  versioned typed boundary  (one call, one prepared submission region)
         v
 Device side
-  one device kernel per call; typed, target-neutral DeviceProgram
+  one prepared submission region per call, containing one or more kernels;
+  typed, target-neutral DeviceProgram
   backend serializations: MSL/metallib and NVVM/PTX (admitted variants, U5)
 ```
 
@@ -132,12 +134,16 @@ Partition facts (frozen):
   composite session surface and capability admission. Per §OwnershipMatrix,
   effects/sessions belong to hosts, assembly/UX to faber, emission facts to
   radix — the partition binds the same ownership, never a second authority.
-- The device side is one typed device kernel per call, emitted from the
-  target-neutral device program; backend variants are serialization choices of
-  one program, never separate programs (§PackageGraph invariant).
+- The device side is one prepared submission region per call — a
+  compiler-visible ordered group of one or more member kernels that can be
+  encoded and enqueued without CPU observation between its members — emitted
+  from the target-neutral device program; backend variants are serialization
+  choices of one program, never separate programs (§PackageGraph invariant).
 - The boundary admits exactly one call shape: **one host function invokes one
-  device kernel**. No host function reaches a kernel except through a declared
-  cross-boundary call; anything else fails closed in NGAB1.
+  prepared submission region containing one or more kernels**. No host
+  function reaches a kernel except through a declared cross-boundary call into
+  a prepared region; anything else fails closed in NGAB1. The one-kernel case
+  is the minimal prepared region, not a separate ABI.
 - Identity, type, and lifetime facts survive lowering; they are **never
   reconstructed from emitted text** — neither LLVM/MSL/PTX text nor naming
   conventions (NGAB1 rule; frozen here, no seam in NGAB0).
@@ -151,8 +157,9 @@ Partition facts (frozen):
 
 ## Abi
 
-The versioned typed entry/call boundary, frozen at NGAB0-U3. The call/entry
-surface matches the GI4 session facts referenced by U8
+The versioned typed entry/call boundary, frozen at NGAB0-U3 and amended by
+the DDCP0 major revision (`ngab0-major-revision-ddcp0.md`, NGAB0-R1). The
+call/entry surface matches the GI4 session facts referenced by U8
 (`radix/docs/factory/gpu-inference-gguf/gi4-contract.md` — U8 keeps those
 session facts as compiler evidence); nothing on this boundary contradicts an
 accepted GI4 fact.
@@ -168,14 +175,16 @@ Boundary rules (frozen):
   are never re-derived from emitted LLVM/MSL/PTX text or naming conventions —
   identity/type/lifetime facts are **never reconstructed from emitted text**
   (NGAB1 rule, frozen here).
-- **One call**: one host function → one device kernel. Call and entry are the
-  same typed operation seen from either side.
+- **One call**: one host function → one prepared submission region containing
+  one or more kernels. Call and entry are the same typed operation seen from
+  either side; the prepared region is the call's submission unit, not the
+  kernel.
 
 Entry surface (host → device):
 
 | Surface | Fact | GI4 contract source |
 | --- | --- | --- |
-| Call | One invocation per call; declared inputs and declared output | `gi4-contract.md` §2.4 (`Invocation`) |
+| Call | One invocation per call → one prepared submission region (one or more kernels); declared inputs and declared outputs | `gi4-contract.md` §2.4 (`Invocation`) |
 | Invocation inputs | token id + absolute position (per-invocation only; resident inputs never ride an invocation) | §2.4 |
 | Invocation output | full-vocab logits `[49152]` (tied-head projection) or the selected token | §2.4 |
 | Workload mode | exactly one `InvocationMode`: `Prefill` or `ScalarDecode`; regime labels reported separately | §4 |
@@ -207,16 +216,19 @@ Cross-boundary validity (frozen):
 ## Manifest
 
 The versioned, **content-addressed** embedded-artifact manifest, frozen at
-NGAB0-U4. The manifest is the sole carrier of embedded device-artifact
-identity from assembly (§PackageGraph materializer node) to the composite
-session (§Verification) — matching §OwnershipMatrix hot-path serialization #3
-(materializer): artifact identity is a serialized fact, never re-derived at
-launch.
+NGAB0-U4 and amended by the DDCP0 major revision (`ngab0-major-revision-
+ddcp0.md`, NGAB0-R1). The manifest is the sole carrier of embedded
+device-artifact identity from assembly (§PackageGraph materializer node) to
+the composite session (§Verification) — matching §OwnershipMatrix hot-path
+serialization #3 (materializer): artifact identity is a serialized fact, never
+re-derived at launch.
 
 ```text
 composite native executable
   -> one embedded manifest (versioned schema)          faber assembly
-       -> per-artifact row: kind, wire version, digest, bounds
+       -> per-artifact row: kind, wire version, content_sha256, packet_sha256,
+          bounds (compiler_input_packet_sha256 parent provenance on
+          finalized-binary rows)
             MSL source artifact    (Metal; source-first default, U5)
             metallib artifact      (Metal; reserved, U5)
             NVVM/PTX artifact      (CUDA; admitted arch set, U5)
@@ -230,10 +242,23 @@ Manifest facts (frozen):
   own ratchet (MD2-W1 sibling-field precedent, as §Abi). The schema version is
   part of the manifest's identity surface; a schema change is a packet change
   under the §Versioning change procedure (NGAB0-U7).
-- **Content-addressed**: each artifact row is identified by a digest computed
-  over the embedded artifact bytes alone. Artifact identity is the digest —
+- **Content-addressed**: each artifact row is identified by `content_sha256`,
+  a SHA-256 digest computed over the artifact's **canonical decoded payload
+  bytes only** (DDCP0 §IdentityDomains — artifact `content_sha256`; replaces
+  the byte-only `artifact_id` spelling). Artifact identity is the digest —
   nothing else; a digest is the key the row is admitted and later verified
   under (§Verification).
+- **Packet identity**: each row's `packet_sha256` — a digest over versioned
+  artifact metadata plus `content_sha256` (schema version, backend, format,
+  materialization stage, target identity, entrypoint map, canonical
+  reflection/requirements) — is the **packet/admission identity** and is never
+  semantic identity (DDCP0 §IdentityDomains). Admission checks the
+  `packet_sha256` row before backend selection (§Verification).
+- **Parent provenance**: a finalized-binary row records
+  `compiler_input_packet_sha256` — the `packet_sha256` of the accepted
+  compiler-input packet the finalized artifact replaces. Provenance is
+  hash-bound and never silently replaced (same-artifact evidence rule; DDCP0
+  §IdentityDomains digest rule 5).
 - **Canonical digest algorithm named**: default **SHA-256**, matching the
   MD-A9 collision-resistant precedent (`radix/docs/factory/gpu-inference-
   multi-device/CAMPAIGN.md`, MD-A9 row: non-cryptographic provenance hashes are
@@ -255,13 +280,16 @@ Manifest facts (frozen):
   native executable; no artifact reaches a device session without a manifest
   row, and no manifest row exists without an embedded artifact.
 
-Manifest row shape (frozen shape, schema version `manifest-1.0.0`; U5 fixes
-the variant rows, U7 fixes version authority):
+Manifest row shape (frozen shape, schema version **`manifest-2.0.0`** —
+major re-pin under NGAB0-R1; U5 fixes the variant rows, U7 fixes version
+authority):
 
 | Row field | Carries | Rule |
 | --- | --- | --- |
 | `artifact_kind` | `msl-source` \| `metallib` \| `ptx` (admitted variants per U5) | Kind is a serialization choice of one device program, never a separate program |
-| `artifact_id` | Content digest over artifact bytes (default **SHA-256**) | Identity is derived from bytes only; mismatch → pre-launch failure (§Verification) |
+| `content_sha256` | SHA-256 over the artifact's canonical decoded payload bytes only (replaces the byte-only `artifact_id`) | Identity is derived from canonical payload bytes only; mismatch → pre-launch failure (§Verification) |
+| `packet_sha256` | SHA-256 over versioned artifact metadata + `content_sha256` (schema version, backend, format, materialization stage, target identity, entrypoint map, canonical reflection/requirements) | The packet/admission identity; never semantic identity; verified before backend selection (§Verification) |
+| `compiler_input_packet_sha256` | For finalized-binary rows: `packet_sha256` of the accepted compiler-input packet this artifact replaces | Hash-bound parent provenance; preserves provenance, never silently replaces it (same-artifact evidence rule) |
 | `device_program_version` | Wire version of the typed `DeviceProgram` (§OwnershipMatrix hot-path #1) | Rides the accepted wire version; no unversioned artifact |
 | `bounds` | Byte length + structural ceilings (e.g. PTX cap size, MSL source size) | Recorded, not re-derived; checked before allocation |
 | `target` | Backend target the artifact is emitted for (Metal / CUDA) | Verified before backend selection (§Verification) |
@@ -306,12 +334,18 @@ Resource identity facts (frozen):
 ## Verification
 
 The verification order and tamper/mismatch behavior, frozen at NGAB0-U4
-(council C8). Identity is verified **before backend selection**: verification
-precedes every downstream selection, load, or backend binding.
+(council C8) and amended by the DDCP0 major revision (`ngab0-major-revision-
+ddcp0.md`, NGAB0-R1). Artifact identity (`content_sha256`) and **packet
+identity admission** (`packet_sha256`) are verified **before backend
+selection**: verification precedes every downstream selection, load, or
+backend binding.
 
 ```text
 embedded manifest + artifacts -> identity verification
-        |  (digest match, wire-version match, model-to-kernel binding match)
+        |  (content_sha256 digest match, wire-version match,
+        |   model-to-kernel binding match)
+        v
+packet identity admission (packet_sha256)       <- before backend selection
         v
 backend selection (admitted capability; U5)     <- never earlier
         v
@@ -320,12 +354,15 @@ device session / dispatch / observe / teardown
 
 Verification facts (frozen):
 
-- **Order fixed**: artifact identity is verified **before backend selection**.
-  No backend is selected, no driver/module load happens, and no device session
-  opens until every embedded artifact verifies against the manifest —
-  identity verification, then model-to-kernel binding, then capability
-  admission, then session, in that order.
-- **Tamper/mismatch → pre-launch failure**: any digest mismatch, wire-version
+- **Order fixed**: artifact identity (`content_sha256`) and packet identity
+  admission (`packet_sha256`) are verified **before backend selection**. No
+  backend is selected, no driver/module load happens, and no device session
+  opens until every embedded artifact verifies against the manifest and its
+  packet identity admits — identity verification, then packet identity
+  admission, then model-to-kernel binding, then capability admission, then
+  session, in that order.
+- **Tamper/mismatch → pre-launch failure**: any digest mismatch
+  (`content_sha256`), packet identity mismatch (`packet_sha256`), wire-version
   mismatch, manifest-schema mismatch, or model-to-kernel binding mismatch is a
   **pre-launch failure** — typed, reported, and closed. The executable does
   not reach a device session and does not fall back to CPU or another backend
@@ -630,23 +667,29 @@ Error facts (frozen):
 
 ## FrozenVsReserved
 
-The frozen-now vs reserved-seam split, closed at NGAB0-U7. Every surface of
-the composite contract is either **frozen-now** (NGAB1–NGAB3 build against it
-identically) or a **named reserved seam** (deliberately left open with a
-recorded owner and opening condition). The split mirrors the paired Gradus
-packet's frozen-now vs reserved-seam field split
+The frozen-now vs reserved-seam split, closed at NGAB0-U7 and amended by the
+DDCP0 major revision (`ngab0-major-revision-ddcp0.md`, NGAB0-R1). Every
+surface of the composite contract is either **frozen-now** (NGAB1–NGAB3 build
+against it identically) or a **named reserved seam** (deliberately left open
+with a recorded owner and opening condition). The split mirrors the paired
+Gradus packet's frozen-now vs reserved-seam field split
 (`gradus/docs/factory/production-ml-library/pml0-interface-packet.md` §7).
 
 Frozen-now (change route: §Versioning change procedure):
 
 - §PackageGraph + §OwnershipMatrix — one source package → one native
   executable; owner-per-surface single authority; hot-path serialization list.
-- §Partition + §Abi — one host function calls one device kernel through the
-  versioned typed boundary; facts never reconstructed from emitted text;
-  invalid cross-boundary values fail at compile time.
+- §Partition + §Abi — one host function invokes one prepared submission
+  region (containing one or more kernels) through the versioned typed
+  boundary; the one-kernel fixture remains the **minimal case, not the ABI
+  limit**; facts never reconstructed from emitted text; invalid cross-boundary
+  values fail at compile time.
 - §Manifest + §ResourceIdentity + §Verification — content-addressed manifest
-  (SHA-256 default), session-bound resource identity, verification before
-  backend selection, tamper → pre-launch failure, model-to-kernel binding.
+  (`content_sha256` artifact identity + `packet_sha256` admission identity;
+  `compiler_input_packet_sha256` parent provenance on finalized-binary rows),
+  session-bound resource identity, verification + packet identity admission
+  before backend selection, tamper → pre-launch failure, model-to-kernel
+  binding.
 - §BackendVariants + §ArtifactLayout + §Admission — variant rows
   (`msl-source`/`metallib`/`ptx`), one-executable layout, fail-closed
   admission, no CPU fallback.
@@ -729,9 +772,11 @@ Unsupported facts (frozen):
 ## Versioning
 
 Named version authority + change procedure for this packet, closed at
-NGAB0-U7 (council C4). This packet is **revisable through PML1/NGAB1** — it
-precedes compiled proof; revision happens at the PML1/NGAB1 boundary under
-the authority below, never silently and never by a single owner.
+NGAB0-U7 (council C4) and amended by the DDCP0 major revision (NGAB0-R1 —
+recorded in `ngab0-major-revision-ddcp0.md`; see §Recorded revisions). This
+packet is **revisable through PML1/NGAB1** — it precedes compiled proof;
+revision happens at the PML1/NGAB1 boundary under the authority below, never
+silently and never by a single owner.
 
 ### Version authority (named owner)
 
@@ -776,6 +821,26 @@ the authority below, never silently and never by a single owner.
   decision gates) close at NGAB0-U12; their answers fold into the packet or
   are deferred with recorded defaults. No revision replaces a recorded
   default without the change procedure.
+
+### Recorded revisions
+
+- **NGAB0-R1 — major revision (DDCP0; prepared-region granularity + identity
+  amendment)**. Recorded in `ngab0-major-revision-ddcp0.md`. Reason: **call
+  meaning and manifest identity change** — one-call/one-kernel →
+  one host function → **one prepared submission region containing one or more
+  kernels** (§Partition/§Abi), and the manifest byte-only `artifact_id`
+  re-roled as **`content_sha256`** (canonical payload bytes only) with the new
+  **`packet_sha256`** admission identity and **`compiler_input_packet_sha256`**
+  parent provenance for finalized packets (§Manifest/§Verification). Authority:
+  the joint PML/NGAB packet authority — PML campaign Mind + NGAB campaign
+  Mind acting together; the operator is the binding decision owner.
+  **Re-validation requirement**: every consumer re-validates under NGAB0-R1 —
+  no consumer relies on the pre-R1 call shape or byte-only `artifact_id`
+  manifest identity without re-validating; the admitted manifest version is
+  **re-pinned to `manifest-2.0.0`**; NGAB1–NGAB4 lower against the revised
+  surfaces. The NGAB1-HOLD stays in force until the fixture/delivery
+  retargets (DDCP0-U5) land. **No implementation of the pre-R1
+  (one-call/one-kernel) ABI anywhere.**
 
 ### Rejection policy
 
