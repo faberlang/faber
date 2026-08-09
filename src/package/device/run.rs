@@ -164,7 +164,7 @@ pub(crate) fn device_step_count(declared: u32) -> Result<u32, Vec<Diagnostic>> {
 /// the image's canonical payload + declared artifact blob, executes the
 /// full lifecycle (load → allocate → copy-in → launch → sync → readback →
 /// release), and prints the A9 observed events (selected hardware, module
-/// hash, execution descriptor hash, allocations, launches, syncs, transfers,
+/// hash, program graph hash, allocations, launches, syncs, transfers,
 /// readbacks, releases), the
 /// A10 declared logical resource graph (buffer identities, roles, lifetimes,
 /// versions, data-flow edges), and the repeated-execution leak proof.
@@ -287,20 +287,22 @@ pub(crate) fn execute_device_route(
 
     // A9 observed lifecycle events of the last execution (R9): real
     // synchronization operations, the exact readback count, and the
-    // completion boundary the receipt states. The module/execution hashes
-    // printed here are the HOST's observed execution-identity hashes (the
-    // host receipt's u64 values, printed as plain hex) — they are NOT the
-    // removed FNV backend-artifact provenance and NOT `content_sha256`
-    // digests (the FNV provenance label was removed with ddpp0-contract
-    // §FnvRemoval B6). The descriptor hash is the EXECUTION-descriptor hash
-    // (S5A-U3): it inlines the backend entry-name bytes (`kernel.entry`), so
-    // it is backend-entry-inclusive and is NOT a semantic-identity claim —
-    // the backend-neutral semantic identity of the complete program is the
+    // completion boundary the receipt states. The module hash and the
+    // program-graph hash printed here are the HOST's observed
+    // execution-identity facts: the module provenance hash is the u64 FNV
+    // value (plain hex); the program-graph hash is the SHA-256 receipt under
+    // the distinct host-graph domain (OQ1), printed verbatim as
+    // `sha256:<64-hex>`. They are NOT the removed FNV backend-artifact
+    // provenance and NOT `content_sha256` digests (the FNV provenance label
+    // was removed with ddpp0-contract §FnvRemoval B6). The program-graph
+    // hash inlines the backend entry-name bytes (`kernel.entry`), so it is
+    // backend-entry-inclusive and is NOT a semantic-identity claim — the
+    // backend-neutral semantic identity of the complete program is the
     // A10 identity printed above.
     println!(
-        "device: module hash {:016x} execution descriptor hash {:016x} launches {} syncs {} transfers {} readbacks {} releases {} allocated {}",
+        "device: module hash {:016x} program graph hash {} launches {} syncs {} transfers {} readbacks {} releases {} allocated {}",
         receipt.module_hash,
-        receipt.execution_descriptor_hash,
+        receipt.program_graph_hash,
         receipt.launches,
         receipt.syncs,
         receipt.transfers,
