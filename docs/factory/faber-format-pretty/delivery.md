@@ -477,8 +477,13 @@ by the cheap harness only).
   default). `normalise-v1` remains available as a named policy — the
   time-limited legacy-normalizer mode is exactly `--policy normalise-v1` for one
   release if needed; do **not** preserve two permanent formatter products.
-- Reformat faber-owned `.fab` fixtures under the new default (mechanical,
-  same discipline as S7) so the repo's own `--check` is green.
+- **No second broad source rebaseline in S8** (head-cto strategy fire-16):
+  S7 owns ALL source + expectation churn in one boundary; S8 flips the default
+  and updates product-facing documentation only. The faber-owned `.fab`
+  fixtures that must read pretty under the new default are rebaselined in S7
+  (S7's scope includes the repo's own pinned fixtures), so `--check` is green
+  after the flip without new mechanical churn — otherwise S7 and S8 create two
+  high-conflict waves for one transition.
 - Product docs: `faber format` help text, CLI reference, and the AGENTS.md
   direction line ("Faber should own user-facing formatting policy, with rule
   slugs/options") — now implemented; update `$faber` skill currency per the
@@ -526,8 +531,25 @@ diff reviewed. No wider suites.
 - **Unknown slugs fail clearly** — registry-enforced in radix, surfaced by faber
   CLI and manifest validation as distinct errors.
 - **Corpus pinning**: corpus expectations are keyed by policy slug; width/indent
-  are part of the policy identity if ever exposed (decision (b)). `--check`
-  means "matches the current profile".
+  are part of the policy identity if ever exposed (decision (b) — see
+  effective-policy identity below). `--check` means "matches the current
+  profile".
+- **Effective-policy identity (bounded follow-up, head-cto strategy fire-16)**:
+  before any output-affecting `[format.pretty]` values are exposed, the corpus
+  pin must key on more than the slug — a corpus keyed only by `pretty-v2`
+  cannot honestly pin output when packages can choose different widths under
+  the same slug. The effective identity must be either a versioned policy
+  whose output-affecting options are fixed, or a tuple `(policy slug, canonical
+  options fingerprint)`. Engine revision stays rebaseline provenance, never
+  policy identity. `normalise-v1`/`pretty-v1` are immutable semantic
+  identities, not names for whichever defaults are current.
+- **Locale interplay (head-cto strategy fire-16)**: policy selection and locale
+  conversion must not silently override one another — `--policy normalise-v1
+  --locale en` must not quietly switch from the author normalizer to canonical
+  HIR re-emission; if a combination cannot honor both contracts, reject it
+  explicitly. The formatter's `--locale` flag is a dialect/keyword selection,
+  not a lossless source transcode (see the Tela U0 lossless-transcode
+  follow-up).
 - **Locale/layout separation**: locale changes keyword spelling, never
   wrapping/indentation. Design note (residual to confirm at S3): the pretty
   layout rules must be shared by the author (AST+trivia) path and the `--locale`
