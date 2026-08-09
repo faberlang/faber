@@ -773,6 +773,7 @@ dependencies = [
  "radix-types",
  "rustc-hash",
  "serde",
+ "sha2",
 ]
 
 [[package]]
