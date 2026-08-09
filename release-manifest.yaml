@@ -9,7 +9,7 @@ releaseIntent:
 pinnedInputs:
   source:
     - name: faber
-      commit: 094640f205bdac4eb0b4eb7b0931add61d9834e0
+      commit: c74ee7ecbe543798b6e1e6ce2f7eccd32900c9ea
     - name: radix
       commit: f0f475800a4cd4502c89af80440d6367aae38422
     - name: cista
