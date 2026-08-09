@@ -277,9 +277,15 @@ fn discovery_test_artifact(
             "sm_120",
             vec!["sm_120".to_owned()],
         ),
-        radix_mir_fmir::FmirDeviceBackend::Amdgpu => {
-            panic!("test fixtures use compiled-in backends only")
-        }
+        radix_mir_fmir::FmirDeviceBackend::Amd => (
+            radix_mir_fmir::DeviceArtifactFormat::LlvmIr,
+            "gfx942",
+            vec![
+                "amdgpu".to_owned(),
+                "cdna3".to_owned(),
+                "gfx942".to_owned(),
+            ],
+        ),
         radix_mir_fmir::FmirDeviceBackend::Unknown(_) => {
             panic!("test fixtures use compiled-in backends only")
         }
