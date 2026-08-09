@@ -25,7 +25,7 @@ impl super::FaberCodegen {
     /// parent expression.
     pub(super) fn expr_precedence(&self, expr: &HirExpression) -> u8 {
         match &expr.kind {
-            HirExpressionKind::Assign(_, _) => 1,
+            HirExpressionKind::Assign(_, _) | HirExpressionKind::ConversioAssign { .. } => 1,
             HirExpressionKind::Si { .. } | HirExpressionKind::Conversio { .. } => 2,
             HirExpressionKind::Binary(op, _, _) => self.binop_precedence(*op),
             // TypeCheck (`expr est <type>`) behaves like Is (precedence 4):

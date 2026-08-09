@@ -535,8 +535,24 @@ impl super::FaberCodegen {
         }
         writer.write(&self.symbol_to_string(local.name, interner));
         if let Some(init) = &local.init {
-            writer.write(" ← ");
-            self.write_expr(init, types, names, interner, surface, writer);
+            if let HirExpressionKind::ConversioAssign {
+                source, recovery, ..
+            } = &init.kind
+            {
+                // Typed `↤` initializer: lowering stores the binding as the
+                // assignment target, so re-emit as
+                // `binding ↤ source [⇥ recovery]` — never `binding ← binding
+                // ↤ source`.
+                writer.write(" ↤ ");
+                self.write_expr_prec(source, 1, types, names, interner, surface, writer);
+                if let Some(recovery) = recovery {
+                    writer.write(" ⇥ ");
+                    self.write_expr_prec(recovery, 12, types, names, interner, surface, writer);
+                }
+            } else {
+                writer.write(" ← ");
+                self.write_expr(init, types, names, interner, surface, writer);
+            }
         }
         writer.newline();
     }

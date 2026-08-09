@@ -356,6 +356,25 @@ impl super::FaberCodegen {
                 self.write_expr_prec(rhs, 1, types, names, interner, surface, writer);
             }
 
+            HirExpressionKind::ConversioAssign {
+                target,
+                source,
+                recovery,
+            } => {
+                // Conversion-directed assignment: re-emit the exact `↤`
+                // spelling (never `←` or `↦`). `⇥ recovery` is
+                // `inlineRecovery := '⇥' unary`, so the recovery operand is
+                // written at unary precedence to keep parens that let it
+                // reparse attached to this `↤` (the nearest in a chain).
+                self.write_expr_prec(target, 1, types, names, interner, surface, writer);
+                writer.write(" ↤ ");
+                self.write_expr_prec(source, 1, types, names, interner, surface, writer);
+                if let Some(recovery) = recovery {
+                    writer.write(" ⇥ ");
+                    self.write_expr_prec(recovery, 12, types, names, interner, surface, writer);
+                }
+            }
+
             HirExpressionKind::Array(elements) => {
                 writer.write("[");
                 for (idx, elem) in elements.iter().enumerate() {

@@ -21,8 +21,8 @@
 use crate::surface::KeywordSurface;
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{
-    DefId, HirAnnotation, HirAvailability, HirBlock, HirEnum, HirFunction, HirInterface, HirItem,
-    HirItemKind, HirParam, HirStruct, HirTestModifier, HirTypeParam,
+    DefId, HirAnnotation, HirAvailability, HirBlock, HirEnum, HirExpressionKind, HirFunction,
+    HirInterface, HirItem, HirItemKind, HirParam, HirStruct, HirTestModifier, HirTypeParam,
 };
 use radix_lexer::{Interner, Symbol, TokenKind};
 use radix_syntax::{CallablePosture, GenericParamKind};
@@ -84,8 +84,23 @@ impl super::FaberCodegen {
                     writer.write(" ");
                 }
                 writer.write(&self.symbol_to_string(c.name, interner));
-                writer.write(" ← ");
-                self.write_expr(&c.value, types, names, interner, surface, writer);
+                if let HirExpressionKind::ConversioAssign {
+                    source, recovery, ..
+                } = &c.value.kind
+                {
+                    // Typed `↤` constant initializer: lowering stores the
+                    // binding as the assignment target, so re-emit as
+                    // `fixum T name ↤ source [⇥ recovery]`.
+                    writer.write(" ↤ ");
+                    self.write_expr_prec(source, 1, types, names, interner, surface, writer);
+                    if let Some(recovery) = recovery {
+                        writer.write(" ⇥ ");
+                        self.write_expr_prec(recovery, 12, types, names, interner, surface, writer);
+                    }
+                } else {
+                    writer.write(" ← ");
+                    self.write_expr(&c.value, types, names, interner, surface, writer);
+                }
                 writer.newline();
             }
             HirItemKind::Import(import) => {
