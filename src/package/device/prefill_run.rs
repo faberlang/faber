@@ -329,7 +329,7 @@ impl PrefillWeights {
 
         let token_embd = tensor("token_embd.weight")?;
         let mut layers = Vec::with_capacity(LAYER_COUNT as usize);
-        for il in 0..32 {
+        for il in 0..LAYER_COUNT as usize {
             let name = |base: &str| format!("blk.{il}.{base}");
             let attn_q = tensor(&name("attn_q.weight"))?;
             let attn_k = tensor(&name("attn_k.weight"))?;
@@ -975,6 +975,29 @@ struct PrefillMirProgram {
     types: TypeTable,
 }
 
+/// Validate the constructed prefill MIR, failing closed with a diagnostic.
+///
+/// The returned token borrows the program's `TypeTable` (the validator's
+/// context), so it cannot ride the program artifact; callers either use the
+/// token (the section builder) or discard it after the check (the program
+/// builder's pre-assembly guard).
+fn validate_prefill_mir<'a>(
+    mir: &'a PrefillMirProgram,
+) -> Result<ValidatedMir<'a>, Vec<Diagnostic>> {
+    let validation = MirValidationContext::new(&mir.types);
+    ValidatedMir::new(mir.functions.clone(), validation.clone()).map_err(|errors| {
+        errors
+            .into_iter()
+            .map(|error| {
+                Diagnostic::error(format!(
+                    "prefill device program: constructed MIR failed validation: {}",
+                    error.message
+                ))
+            })
+            .collect::<Vec<_>>()
+    })
+}
+
 /// One kernel slot's buffer facts (id/name/role/lifetime).
 #[derive(Debug, Clone)]
 struct BufferFacts {
@@ -1372,19 +1395,11 @@ fn build_prefill_program() -> Result<PrefillProgramArtifact, Vec<Diagnostic>> {
         types,
     };
     let validation = MirValidationContext::new(&mir.types);
-    let validated =
-        ValidatedMir::new(mir.functions.clone(), validation.clone()).map_err(|errors| {
-            errors
-                .into_iter()
-                .map(|error| {
-                    Diagnostic::error(format!(
-                        "prefill device program: constructed MIR failed validation: {}",
-                        error.message
-                    ))
-                })
-                .collect::<Vec<_>>()
-        })?;
-    let _ = &validated;
+    // Fail closed on an invalid constructed MIR before the kernel-graph
+    // assembly (the section builder re-validates the same program for
+    // `device_section_for_program`; the guard here surfaces the error before
+    // the assembly work).
+    validate_prefill_mir(&mir)?;
 
     // ---- Phase 2: assemble the kernel graph. ----
     let mut assembler = KernelAssembler::new();
@@ -1728,6 +1743,20 @@ impl KernelSignature {
     }
 }
 
+/// Resolve one of the phase-1 interned functions by id. Every builder passes
+/// an id the program owns, so a miss is an internal inconsistency — fail
+/// closed rather than panic.
+fn resolve_function(
+    mir: &PrefillMirProgram,
+    function: MirFunctionId,
+) -> Result<&MirFunction, Vec<Diagnostic>> {
+    mir.functions
+        .functions
+        .iter()
+        .find(|candidate| candidate.id == function)
+        .ok_or_else(|| vec![Diagnostic::error("prefill function disappeared")])
+}
+
 /// Derive the signature + plan for one kernel from its function's typed
 /// facts. `transformer_op` is `Some` for the GI3 transformer recipes (no
 /// `CollectionOpContract` variant — resolved via the
@@ -1741,12 +1770,7 @@ fn kernel_signature_and_plan(
     transformer_op: Option<radix_mir::MirCollectionOp>,
     gather_seam: bool,
 ) -> Result<(KernelSignature, CollectionKernelPlan), Vec<Diagnostic>> {
-    let function_ref = mir
-        .functions
-        .functions
-        .iter()
-        .find(|candidate| candidate.id == function)
-        .ok_or_else(|| vec![Diagnostic::error("prefill function disappeared")])?;
+    let function_ref = resolve_function(mir, function)?;
     if let Some(op) = transformer_op {
         let shape = transformer_shape_signature(function_ref, op, validation).map_err(|error| {
             vec![Diagnostic::error(format!(
@@ -1815,12 +1839,7 @@ fn push_kernel(
         kernel_signature_and_plan(mir, validation, function, transformer_op, gather_seam)?;
     let signature_ref = signature.resources();
     let resources = assembler.resources_from_signature(signature_ref, facts);
-    let function_ref = mir
-        .functions
-        .functions
-        .iter()
-        .find(|candidate| candidate.id == function)
-        .ok_or_else(|| vec![Diagnostic::error("prefill function disappeared")])?;
+    let function_ref = resolve_function(mir, function)?;
     let launch = KernelLaunchPlan::from_signature_and_function(signature_ref, function_ref);
     assembler.push_kernel(function, entry.to_owned(), plan, resources, launch);
     // The kernel's output buffer is the last fact; every caller appends a
@@ -1928,8 +1947,8 @@ fn push_rope_kernel(
 /// `[rows, dim/2]` per-position tables, in order `[cos, sin]` — the
 /// host-precomputed angle tables each row rotates at (see [`rope_tables`]).
 fn rope_table_buffers(assembler: &mut KernelAssembler) -> (BufferFacts, BufferFacts) {
-    let _ = assembler.register_input("prefill.rope.cos");
-    let _ = assembler.register_input("prefill.rope.sin");
+    assembler.register_input("prefill.rope.cos");
+    assembler.register_input("prefill.rope.sin");
     (
         assembler.input_facts("prefill.rope.cos"),
         assembler.input_facts("prefill.rope.sin"),
@@ -2037,12 +2056,7 @@ fn push_logits_kernel(
     let (signature, plan) = kernel_signature_and_plan(mir, validation, function, None, false)?;
     let signature_ref = signature.resources();
     let resources = assembler.resources_from_signature(signature_ref, &facts);
-    let function_ref = mir
-        .functions
-        .functions
-        .iter()
-        .find(|candidate| candidate.id == function)
-        .ok_or_else(|| vec![Diagnostic::error("prefill function disappeared")])?;
+    let function_ref = resolve_function(mir, function)?;
     let launch = KernelLaunchPlan::from_signature_and_function(signature_ref, function_ref);
     let produced_by = assembler.push_kernel(
         function,
@@ -2197,7 +2211,7 @@ fn build_semantics(program: &DeviceProgram) -> DeviceSemantics {
         .map(|(producer, consumer, buffer, version)| DependencyEdge {
             producer,
             consumer,
-            buffer: radix_mir::device_program::BufferId(buffer),
+            buffer: BufferId(buffer),
             version,
         })
         .collect();
@@ -2251,20 +2265,7 @@ fn build_prefill_section(
     backend: DeviceBackend,
 ) -> Result<(FmirDeviceSection, u32), Vec<Diagnostic>> {
     let artifact = build_prefill_program()?;
-    let validation = MirValidationContext::new(&artifact.mir.types);
-    let validated = ValidatedMir::new(artifact.mir.functions.clone(), validation.clone()).map_err(
-        |errors| {
-            errors
-                .into_iter()
-                .map(|error| {
-                    Diagnostic::error(format!(
-                        "prefill device program: constructed MIR failed validation: {}",
-                        error.message
-                    ))
-                })
-                .collect::<Vec<_>>()
-        },
-    )?;
+    let validated = validate_prefill_mir(&artifact.mir)?;
     let mut inputs = weights.declared_inputs();
     inputs.insert("prompt_tokens".to_owned(), prompt_ids_values());
     let (cos, sin) = rope_tables(&[0, 1, 2, 3, 4, 5, 6, 7, 8], HEAD_DIM, 100_000.0);
@@ -2473,7 +2474,8 @@ pub(crate) fn run_prefill_device_route(
         ))]);
     }
     let row = VOCAB_SIZE as usize;
-    let prompt_final_logits = &observed[8 * row..9 * row];
+    let prompt_final_logits =
+        &observed[(PROMPT_TOKEN_COUNT as usize - 1) * row..PROMPT_TOKEN_COUNT as usize * row];
 
     let golden = load_golden_logits(golden_dir)?;
     let comparison = compare_gpu_logits(prompt_final_logits, &golden).map_err(|error| {
