@@ -19,8 +19,8 @@ in [`docs/archived/`](../archived/README.md).
 ## Summary
 
 - goals scanned: 21
-- active: 6
-- planned: 8
+- active: 7
+- planned: 7
 - done: 5
 - unknown: 2
 - archived (moved to `docs/archived/`): 1
@@ -30,9 +30,10 @@ in [`docs/archived/`](../archived/README.md).
 | Goal | Status | Done | goal | campaign | delivery | ledger | council | evidence | other |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | [component-release-streamline](component-release-streamline/CAMPAIGN.md) | active | — | 0 | 1 | 4 | 0 | 0 | 0 | 1 |
+| [direct-device-product-pipeline](direct-device-product-pipeline/CAMPAIGN.md) | active | 0% | 0 | 1 | 1 | 0 | 0 | 1 | 5 |
 | [faber-onboarding](faber-onboarding/CAMPAIGN.md) | active | — | 0 | 1 | 3 | 1 | 0 | 0 | 5 |
 | [faber-script-e2e-hardening](faber-script-e2e-hardening/goal.md) | active | — | 1 | 0 | 0 | 1 | 0 | 0 | 34 |
-| [native-gpu-application-bundle](native-gpu-application-bundle/CAMPAIGN.md) | active | — | 0 | 1 | 8 | 0 | 0 | 1 | 5 |
+| [native-gpu-application-bundle](native-gpu-application-bundle/CAMPAIGN.md) | active | — | 0 | 1 | 8 | 0 | 0 | 1 | 6 |
 | [sqlite-library-package](sqlite-library-package/goal.md) | active | — | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
 | [unified-package-manifest](unified-package-manifest/goal.md) | active | — | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 
@@ -40,7 +41,6 @@ in [`docs/archived/`](../archived/README.md).
 
 | Goal | Status | Done | goal | campaign | delivery | ledger | council | evidence | other |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| [direct-device-product-pipeline](direct-device-product-pipeline/CAMPAIGN.md) | planned | — | 0 | 1 | 0 | 0 | 0 | 0 | 0 |
 | [faber-format-lossless](faber-format-lossless/goal.md) | planned | — | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | [faber-polish](faber-polish/goal.md) | planned | — | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | [inference-session-boundary](inference-session-boundary/goal.md) | planned | — | 1 | 0 | 0 | 0 | 0 | 0 | 0 |

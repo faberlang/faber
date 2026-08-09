@@ -1,6 +1,6 @@
 # Campaign: Direct Device Product Pipeline
 
-**Status**: planned pre-implementation — paired architecture grounded; DDPP0 selected for delivery
+**Status**: active — DDPP0 delivered (phase closeout 2026-08-08); DDPP1 next after DDCP2 contract
 **Created**: 2026-08-08
 **Mode**: routing artifact — draft/maintain; does not implement code directly
 **Control-plane repo**: `/Users/ianzepp/work/faberlang/faber`
@@ -461,7 +461,7 @@ or examples oracle caches.
 
 ### DDPP0 — Joint product, ownership, and performance contract
 
-**Status**: planned — selected next stage
+**Status**: delivered — DDPP0 phase closed (closeout 2026-08-08); DDPP1 next after DDCP2 contract
 **Posture**: discovery-first
 **Owner**: Faber planner, paired with the Radix DDCP0 planner
 **Sources**: this campaign; paired DDCP0; accepted NGAB0 contract; current
@@ -514,6 +514,86 @@ Freeze:
 - every current runtime import and route has exactly one destination, with
   ordinary `ad` preserved and GPU submission statically excluded;
 - current foreign dirt is classified and excluded from packet write sets.
+
+**Notes** (DDPP0-U9 phase closeout, 2026-08-08):
+
+- **Units**: U1–U8 all landed (`evidence/ddpp0-snapshot.md`, `ddpp0-contract.md`
+  U2–U4, `ddpp0-runtime-inventory.md` U5, NGAB0-R1 amendment + agreement
+  checklist U6, `ddpp0-feature-isolation.md` U7, `ddpp0-support-archive.md`
+  U8); commits `f4508b4` (U6, latest) and predecessors. No product code
+  written; `faber-runtime/` untouched.
+- **DDCP0 agreement gate — CLOSED.** The field-by-field agreement with the
+  paired DDCP0 amendment is fully `LANDED`: every agreed field in
+  `ddpp0-contract.md` §DDCP0Agreement checklist (region granularity, identity
+  domains, canonical encoding, version authority, verification order) cites
+  its DDCP0 contract field name, **no field is `PENDING-AGREEMENT`**, and
+  §DDCP0Agreement §U9 gate records that nothing blocks this closeout on the
+  agreement front. The regime/shape-class enumeration deferral is a recorded
+  shared deferral (C5), not a disagreement.
+- **Freeze items — satisfied** (each item from the Freeze list above, with
+  artifact + section):
+  1. Product shape `HostArtifact + DeviceProgram + DeviceArtifact[] + call
+     facts` — `ddpp0-contract.md` §ProductShape.
+  2. Backend/format/target/version/hash identity — §IdentityDomains (six
+     domains, SHA-256).
+  3. Release single-backend / fat-product selection policy (C1) — §SelectionPolicy.
+  4. Prepared-submission / explicit-observation performance invariants —
+     §PerformanceInvariants.
+  5. One host call → one prepared submission region (NGAB0 packet, fixture,
+     NGAB1 delivery amended) — §PreparedRegion + NGAB0-R1 (`native-gpu-application-bundle/ngab0-*` amendments) + §DDCP0Agreement.
+  6. Prepared-region regime/shape identity, bounded dynamic fields, cache
+     keys, bounds checks, cache-miss — §PreparedRegion.
+  7. CPU/device partition ownership — §PartitionOwnership.
+  8. Generated-Rust support destination + final runtime deletion rule —
+     §GeneratedRustSupport + §DeletionRule.
+  9. Exact child-campaign routing + superseded historical clauses — §ChildRouting.
+  10. Per-module/runtime-import and per-route destinations — `ddpp0-runtime-inventory.md` (module-by-module, deletion receipts, TR7 row, PML2 prerequisite, PML0 carriage).
+  11. SHA-256 digest domains, canonical text/binary encoding, legacy FNV
+      removal, round-trip fixtures — §IdentityDomains + §CanonicalEncoding +
+      §FnvRemoval + §RoundTripFixture (worked fixture verifiable by `shasum`).
+  12. NGAB0 major-revision updates (Partition/ABI/Manifest/Verification/
+      FrozenVsReserved/Versioning, U4/U10, U11 fixture, NGAB1 U1/U4, NGAB2
+      receipts) under the joint PML/NGAB authority — NGAB0-R1 amendment
+      (DDCP0-U4/U5 `1dc4513`/`36e8c2f`) + §DDCP0Agreement.
+  13. LLVM support-archive ABI version + content identity, no last-good reuse,
+      fail-closed rebuild — `ddpp0-support-archive.md` + §IdentityDomains row 6.
+  14. Exact product features + dependency/module gates for a small Rust-only
+      build (C2) — `ddpp0-feature-isolation.md` (DDPP1 gate proof is a PLAN).
+  15. Clean-install/core-support/CI/release implications (C3/C4/C5) —
+      `ddpp0-support-archive.md` + `ddpp0-runtime-inventory.md` +
+      §DeletionRule DDPP8 gate surface.
+- **Open Questions — folded or explicitly deferred** (defaults recorded, not
+  left to Hands): OQ1 generated-Rust support crate name — default recorded in
+  §GeneratedRustSupport (Faber-owned support crate, target-specific name);
+  OQ2 fat binaries — deferred in §SelectionPolicy (not a v1 promise);
+  OQ3 PTX-vs-cubin — default **PTX** (§SelectionPolicy backend artifact
+  defaults); OQ4 MSL-vs-metallib — default **MSL source first**, metallib
+  reserved (§SelectionPolicy); OQ5 first AMD API — default **HSA/ROCr**
+  (identity stays `amd` + HSA-native; operator gate at DDPP5, §SelectionPolicy);
+  OQ6 stable output layout — deferred to DDPP1 by design (layout requirement
+  classes only, campaign §Product Build Pipeline + `ddpp0-delivery.md`); OQ7
+  external consumers — the external-consumer audit is recorded in §DeletionRule
+  rule 1 as a DDPP8 gate (deferred to the deletion stage). No open question can
+  change payload encoding, ownership, submission granularity, or deletion order.
+- **NGAB0 operator gates — cross-referenced, not silently changed.** §ChildRouting
+  rule 1 + §DDCP0Agreement record that NGAB0's operator gates (llvm-host
+  identity retained+extended, MSL source-first, PTX arch set) survive the U6
+  amendment unchanged; operator decisions stay open at the U12-equivalent
+  DDPP boundaries (Metal embedding → DDPP3-level, PTX arch set → NGAB0-U12
+  gate, AMD first-leaf → DDPP5).
+- **DDPP1 post-DDCP2 route identified.** Delivery route: Faber delivery then
+  factory (campaign §DDPP1 "Lowers to"), filed after the DDCP2 contract lands
+  (Dependency Rule 3). Owner: Faber package/build planning and implementation
+  units (§DDPP1 Owner). Fixture: the §RoundTripFixture text/binary round-trip
+  fixture + the DDPP1 gate proof from `ddpp0-feature-isolation.md`
+  (`cargo check -p faber --no-default-features --features hir-rust` + `faber
+  targets` capability truth). Done oracle: §DDPP1 Gate — text/binary payloads
+  round-trip with hashes over canonical bytes; absent target features and
+  unsupported host/device pairs fail before build; existing CPU-only Rust,
+  FHIR/FMIR, and LLVM products remain deliberately routed or explicitly
+  rejected; build planning imports no Hosts driver implementation.
+- **Phase gate**: faber docs README regenerated; `check-factory-goal-status`
+  exit 0; `git diff --check` clean.
 
 ### DDPP1 — Generic product build plan and artifact materialization
 
