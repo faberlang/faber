@@ -66,11 +66,37 @@ jobs:
           path: faber
           ref: ${{ steps.source.outputs.tag }}
 
+      # Pinned sibling checkouts: resolve the exact source commits from the
+      # committed release-manifest.yaml (schema §4) instead of default-branch
+      # tips, so the CI artifact matches the manifest freeze (the reference
+      # pack's PACK.toml source_commit comes from the radix checkout HEAD).
+      - name: Resolve pinned sibling commits
+        id: pins
+        shell: bash
+        working-directory: faber
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os, re
+          text = open("release-manifest.yaml").read()
+          source_block = text.split("  source:")[1].split("  packs:")[0]
+          rows = re.findall(r"- name: (\S+)\n\s+commit: ([0-9a-f]{40})", source_block)
+          pins = dict(rows)
+          with open(os.environ["GITHUB_OUTPUT"], "a") as fh:
+              for name in ("radix", "cista", "faber-runtime", "hosts"):
+                  if name not in pins:
+                      raise SystemExit(
+                          f"release-manifest.yaml missing pinned commit for {name}"
+                      )
+                  print(f"{name}_sha={pins[name]}", file=fh)
+          PY
+
       - name: Check out Radix (private)
         uses: actions/checkout@v4
         with:
           repository: faberlang/radix
           path: radix
+          ref: ${{ steps.pins.outputs.radix_sha }}
           token: ${{ secrets.FABERLANG_RELEASES_TOKEN }}
 
       - name: Check out Cista
@@ -78,18 +104,21 @@ jobs:
         with:
           repository: faberlang/cista
           path: cista
+          ref: ${{ steps.pins.outputs.cista_sha }}
 
       - name: Check out Faber runtime
         uses: actions/checkout@v4
         with:
           repository: faberlang/faber-runtime
           path: faber-runtime
+          ref: ${{ steps.pins.outputs.faber-runtime_sha }}
 
       - name: Check out hosts monorepo
         uses: actions/checkout@v4
         with:
           repository: mintedgeek/hosts
           path: hosts
+          ref: ${{ steps.pins.outputs.hosts_sha }}
 
       - name: Validate crate version
         shell: bash
@@ -132,27 +161,32 @@ jobs:
           set -euo pipefail
           version="${{ steps.source.outputs.version }}"
           target="${{ matrix.target }}"
-          staging="dist/${COMPONENT}-v${version}-${target}"
-          mkdir -p "$staging"
-          cp "target/${target}/release/${{ matrix.binary }}" "$staging/${COMPONENT}"
-          chmod +x "$staging/${COMPONENT}"
-          cat > "$staging/README.txt" <<EOF
-          ${COMPONENT} v${version}
-          target: ${target}
-          source: https://github.com/faberlang/faber/tree/${{ steps.source.outputs.tag }}
-          EOF
+          # Assemble the dev-kit payload tree (packs beside the binary) from
+          # the pinned sibling checkouts. --manifest points at a scratch dir:
+          # assemble-dev-kit would otherwise regenerate the committed
+          # release-manifest.yaml in the checked-out tree (schema §7 freeze
+          # artifact; the committed instance stays the release record).
+          scratch="$(mktemp -d)"
+          python3 scripta/assemble-dev-kit \
+            --version "$version" \
+            --triple "$target" \
+            --binary "target/${target}/release/${{ matrix.binary }}" \
+            --out dist \
+            --manifest "$scratch"
+          # Clean-room payload proof (positive + negative checks) against the
+          # scratch manifest regenerated from this payload.
+          python3 scripta/verify-dev-kit \
+            --payload "dist/dev-kit-${version}-${target}" \
+            --version "$version" \
+            --manifest "$scratch/release-manifest.yaml"
+          # Deterministic archive + basename-only .sha256 (release-contract.md §5.1).
+          python3 scripta/package-archive \
+            --staging "dist/dev-kit-${version}-${target}" \
+            --component "${{ env.COMPONENT }}" \
+            --version "$version" \
+            --triple "$target" \
+            --out dist
           archive="${COMPONENT}-v${version}-${target}.tar.gz"
-          tar -C dist -czf "dist/${archive}" "${COMPONENT}-v${version}-${target}"
-          if command -v shasum >/dev/null 2>&1; then
-            (cd dist && shasum -a 256 "${archive}" > "${archive}.sha256")
-          else
-            (cd dist && sha256sum "${archive}" > "${archive}.sha256")
-          fi
-          if ! grep -Eq "^[0-9a-f]{64}  ${archive}$" "dist/${archive}.sha256"; then
-            echo "checksum file must contain the archive basename only: ${archive}.sha256" >&2
-            cat "dist/${archive}.sha256" >&2
-            exit 1
-          fi
           echo "archive=dist/${archive}" >> "$GITHUB_OUTPUT"
           echo "checksum=dist/${archive}.sha256" >> "$GITHUB_OUTPUT"
 

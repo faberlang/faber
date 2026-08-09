@@ -9,7 +9,7 @@ releaseIntent:
 pinnedInputs:
   source:
     - name: faber
-      commit: 5d7a3e5d955a63f93d5aaabb15dd00a0498cf056
+      commit: 094640f205bdac4eb0b4eb7b0931add61d9834e0
     - name: radix
       commit: f0f475800a4cd4502c89af80440d6367aae38422
     - name: cista
@@ -22,21 +22,21 @@ pinnedInputs:
     - name: launcher
       component: faber
       version: "1.5.1"
-      digest: sha256:a0026e628e194a5a81393b589d45fd30bb4a80ad0d0ac537cf2eb9b37c7f307e
+      digest: sha256:96a8e75695d82b020265b1f31000829724ff25b8528793f20aa39bff6fcdc46e
       compatibility: faber 1.x; ships with matching reference and locale packs
       license: MIT
       destination: bin/faber
     - name: core-support
       component: faber
       version: "1.5.1"
-      digest: sha256:aff98db17a1425df3590e80f8d8d1b4befa4edab1f3b312493fe1d300c8b8461
+      digest: sha256:462938d654212328894021435178ae5abf875636bdced616ab9441010eb375ad
       compatibility: faber 1.5.1; embedded and materialized to the platform cache (content-hash-keyed)
       license: MIT
       destination: embedded in launcher; materialized to <platform cache>/faber/core-support/tar-zst-v1/<sha256>
     - name: reference-pack
       component: reference
       version: "1.5.1"
-      digest: sha256:bf347923a6fe0eeba592a20588260d25cad8cf4352725b05910450b7d602e195
+      digest: sha256:4ee3e7b2c5206e7f85e82213ec51be6b3364eab5061bd92a2f9eadbf379e76f1
       compatibility: faber 1.x major lane; pack_version_skew enforced at load
       license: MIT
       destination: share/faber/reference
