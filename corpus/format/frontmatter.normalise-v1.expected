@@ -1,0 +1,12 @@
++++
+term = "frontmatter-demo"
+locale = "la"
++++
+# leading doc comment
+functio summa(lista<numerus> valores) → numerus {
+    varia numerus totalis ← 0
+    itera ab valores fixum v {
+        totalis ← totalis + v
+    }
+    redde totalis
+}

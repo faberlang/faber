@@ -1,0 +1,9 @@
+fn monstra(string nomen) → string {
+    print "salve, §!"(nomen)
+    return nomen
+}
+
+fn ianua(int code) → bool {
+    if code ≡ 42 then return true
+    return false
+}
