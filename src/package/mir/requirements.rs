@@ -157,5 +157,7 @@ pub(super) fn collect_kernel_host_requirements(
             }
             _ => {}
         },
+        // TOML parse/serialize is in-process (no host capability).
+        radix::kernel::KernelModule::Toml => {}
     }
 }
