@@ -40,6 +40,27 @@
 //! ([`DeviceProgram::validate`]) before it is returned — a derived program
 //! that violates the schema rules fails closed with the shared typed error
 //! instead of reaching a consumer.
+//!
+//! # Shared hot-path serialization list (NGAB1-U3)
+//!
+//! The NGAB1 phase respects the accepted serialization list — **one named
+//! owner per revision**, no parallel fork:
+//!
+//! | Surface | Named owner | Revision ratchet |
+//! | --- | --- | --- |
+//! | `DeviceProgram` (shared schema) | `radix-mir::device_program` — the single-writer schema authority | schema `validate` gates the derived program |
+//! | FMIR wire (`WireDeviceProgram`) | `radix-mir-fmir::schema::wire` — the field-for-field wire mirror | `WIRE_DEVICE_PROGRAM_VERSION` |
+//! | Materializer | `faber::package::device` — the constructor + host descriptor consumer | `DEVICE_RUN_PLAN_VERSION` (seam-asserted == wire) |
+//!
+//! This surface is a **producer** of the shared `DeviceProgram`: it composes
+//! the schema from typed facts and hands the result to the shared validation
+//! gate. It never forks the schema, the wire, or the materializer, and it
+//! never parses emitted MSL/PTX text for identity/lifetime/mutation/
+//! observation facts. The versioned call-ABI ratchet
+//! (`HOST_CALL_ABI_VERSION`) rides the accepted wire version; the faber wire
+//! seam asserts `HOST_CALL_ABI_VERSION == DEVICE_RUN_PLAN_VERSION`, so one
+//! revision moves the schema, its wire mirror, the materializer, and the ABI
+//! ratchet in lockstep under their named owners.
 
 use crate::abi::{
     MirKernelResource, MirKernelResourceKind, MirKernelShaderStage, MirKernelSignature,
@@ -328,6 +349,10 @@ pub fn derive_host_partition(
         call_abi_version: crate::boundary_abi::HOST_CALL_ABI_VERSION,
     })
 }
+
+#[cfg(test)]
+#[path = "host_partition_test.rs"]
+mod tests;
 
 /// The target-neutral logical entry name of a kernel function: the function's
 /// source name when it carries one, else the kernel index-based fallback.
