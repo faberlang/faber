@@ -258,35 +258,78 @@ fn missing_device_descriptor_is_a_structured_diagnostic() {
 // Discovery receipts (selected device + artifact hash)
 // ---------------------------------------------------------------------------
 
+/// A declared backend artifact as the DDCP2-U2/U3 DeviceArtifact packet for
+/// the discovery-receipt tests: canonical bytes + typed target, with REAL
+/// `content_sha256`/`packet_sha256` digests over the canonical bytes (the
+/// FNV artifact provenance is removed — ddpp0-contract §FnvRemoval, B7).
+fn discovery_test_artifact(
+    backend: radix_mir_fmir::FmirDeviceBackend,
+    bytes: &[u8],
+) -> radix_mir_fmir::FmirDeviceArtifact {
+    let (format, target_id, required_features) = match backend {
+        radix_mir_fmir::FmirDeviceBackend::Metal => (
+            radix_mir_fmir::DeviceArtifactFormat::Msl,
+            "macos-arm64",
+            Vec::new(),
+        ),
+        radix_mir_fmir::FmirDeviceBackend::Cuda => (
+            radix_mir_fmir::DeviceArtifactFormat::Ptx,
+            "sm_120",
+            vec!["sm_120".to_owned()],
+        ),
+        radix_mir_fmir::FmirDeviceBackend::Unknown(_) => {
+            panic!("test fixtures use compiled-in backends only")
+        }
+    };
+    let mut artifact = radix_mir_fmir::FmirDeviceArtifact {
+        backend,
+        format,
+        stage: radix_mir_fmir::MaterializationStage::CompilerInput,
+        target: radix_mir_fmir::DeviceTargetId {
+            id: target_id.to_owned(),
+            required_features,
+        },
+        abi_version: 1,
+        bytes: bytes.to_vec(),
+        encoding: radix_mir_fmir::DevicePayloadEncoding::Text,
+        entrypoints: Vec::new(),
+        content_sha256: String::new(),
+        packet_sha256: String::new(),
+        compiler_input_packet_sha256: None,
+    };
+    artifact.content_sha256 = artifact.compute_content_sha256();
+    artifact.packet_sha256 = artifact.compute_packet_sha256();
+    artifact
+}
+
 #[test]
 fn discovery_receipt_picks_the_matching_artifact_hash() {
     let artifacts = vec![
-        radix_mir_fmir::FmirDeviceArtifact {
-            backend: radix_mir_fmir::FmirDeviceBackend::Metal,
-            blob: "msl source".to_owned(),
-            hash: "fnv64:1111".to_owned(),
-            symbols: Vec::new(),
-        },
-        radix_mir_fmir::FmirDeviceArtifact {
-            backend: radix_mir_fmir::FmirDeviceBackend::Cuda,
-            blob: "ptx text".to_owned(),
-            hash: "fnv64:2222".to_owned(),
-            symbols: Vec::new(),
-        },
+        discovery_test_artifact(
+            radix_mir_fmir::FmirDeviceBackend::Metal,
+            b"msl source",
+        ),
+        discovery_test_artifact(
+            radix_mir_fmir::FmirDeviceBackend::Cuda,
+            b"ptx text",
+        ),
     ];
     let receipt = discovery_receipt(DeviceBackend::Cuda, &artifacts).expect("cuda artifact");
     assert_eq!(receipt.backend, DeviceBackend::Cuda);
-    assert_eq!(receipt.artifact_hash, "fnv64:2222");
+    assert_eq!(receipt.artifact_hash, artifacts[1].content_sha256);
+    assert!(
+        receipt.artifact_hash.starts_with("sha256:"),
+        "receipts spell the artifact content identity as `sha256:` — got {}",
+        receipt.artifact_hash
+    );
 }
 
 #[test]
 fn discovery_receipt_without_matching_artifact_is_missing_descriptor() {
-    let artifacts = vec![radix_mir_fmir::FmirDeviceArtifact {
-        backend: radix_mir_fmir::FmirDeviceBackend::Metal,
-        blob: "msl source".to_owned(),
-        hash: "fnv64:1111".to_owned(),
-        symbols: Vec::new(),
-    }];
+    let artifacts = vec![discovery_test_artifact(
+        radix_mir_fmir::FmirDeviceBackend::Metal,
+        b"msl source",
+    )];
     let receipt = discovery_receipt(DeviceBackend::Cuda, &artifacts);
     assert!(receipt.is_none());
 }

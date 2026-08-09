@@ -1,10 +1,17 @@
 use super::*;
 use radix::lexer::Span;
 use radix::mir::MirTempId;
-use radix_mir_fmir::{fnv1a64, FNV1A64_OFFSET, FNV1A64_PRIME};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
+
+// The SOURCE-IDENTITY FNV-1a 64-bit constants (ddpp0-contract §FnvRemoval
+// "Separate surface" — the S1/S2 source-identity surface, NOT the removed
+// backend-artifact provenance): the local `fnv1a64` in mir/mod.rs uses the
+// standard FNV-1a offset/prime; these test constants pin that standard so
+// the `fnv1a64_*` unit tests below prove the source-identity primitive.
+const FNV1A64_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
+const FNV1A64_PRIME: u64 = 0x0100_0000_01b3;
 
 // ── Constant / configuration tests ──────────────────────────────────────────
 

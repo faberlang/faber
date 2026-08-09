@@ -9,9 +9,7 @@ use faber_host_macos_arm64::device_descriptor::{
 use faber_host_macos_arm64::device_host::DeviceRuntime;
 use faber_host_macos_arm64::MetalHostSession;
 use radix::mir::LoweredMirUnit;
-use radix_mir::abi::{
-    MirBroadcastDeclaration, MirRankExtensionBroadcast, ReducedProjection,
-};
+use radix_mir::abi::{MirBroadcastDeclaration, MirRankExtensionBroadcast, ReducedProjection};
 use radix_mir::device_program::DataFlowPair;
 use radix_mir::kernel_plan::{AxisReductionPlan, LayerNormalizationPlan, ReduceOp, RowSoftmaxPlan};
 
@@ -148,7 +146,6 @@ fn section_for_program(program: &DeviceProgram, semantics: &DeviceSemantics) -> 
             artifact: Vec::new(),
         },
         declared_inputs: Vec::new(),
-        runtime_requirements: Vec::new(),
         // MD2-W1: the single-device constructor passes the optional
         // distributed section through as `None` (MD-A15).
         distributed: None,
@@ -156,6 +153,55 @@ fn section_for_program(program: &DeviceProgram, semantics: &DeviceSemantics) -> 
         // section (single-device packages do not require it — MD-A15).
         session: None,
     }
+}
+
+/// Build a declared backend artifact for a test fixture as the DDCP2-U2/U3
+/// DeviceArtifact packet: canonical bytes + explicit payload encoding, the
+/// typed target id + features, and REAL `content_sha256`/`packet_sha256`
+/// digests computed over the canonical bytes (the producer convention the
+/// radix fixtures use) — so a fixture that reaches radix decode admission is
+/// honest and digest re-verification (B3) stays meaningful. The FNV
+/// backend-artifact provenance is removed (ddpp0-contract §FnvRemoval); these
+/// fixtures carry content identity only.
+fn test_device_artifact(
+    backend: FmirDeviceBackend,
+    bytes: &[u8],
+    entrypoints: Vec<FmirDeviceSymbol>,
+) -> FmirDeviceArtifact {
+    let (format, target_id, required_features) = match backend {
+        FmirDeviceBackend::Metal => (
+            DeviceArtifactFormat::Msl,
+            "macos-arm64",
+            Vec::new(),
+        ),
+        FmirDeviceBackend::Cuda => (
+            DeviceArtifactFormat::Ptx,
+            "sm_120",
+            vec!["sm_120".to_owned()],
+        ),
+        FmirDeviceBackend::Unknown(_) => {
+            panic!("test fixtures use compiled-in backends only")
+        }
+    };
+    let mut artifact = FmirDeviceArtifact {
+        backend,
+        format,
+        stage: MaterializationStage::CompilerInput,
+        target: DeviceTargetId {
+            id: target_id.to_owned(),
+            required_features,
+        },
+        abi_version: 1,
+        bytes: bytes.to_vec(),
+        encoding: DevicePayloadEncoding::Text,
+        entrypoints,
+        content_sha256: String::new(),
+        packet_sha256: String::new(),
+        compiler_input_packet_sha256: None,
+    };
+    artifact.content_sha256 = artifact.compute_content_sha256();
+    artifact.packet_sha256 = artifact.compute_packet_sha256();
+    artifact
 }
 
 /// MD2-W1 (FC16): a distributed image is admitted at load but the
@@ -299,15 +345,14 @@ fn wire_round_trips_deterministically() {
         name: "a".to_owned(),
         values: vec![1.0],
     }];
-    section.artifacts.artifact = vec![FmirDeviceArtifact {
-        backend: FmirDeviceBackend::Cuda,
-        blob: "ptx".to_owned(),
-        hash: "fnv64:0000000000000000".to_owned(),
-        symbols: vec![FmirDeviceSymbol {
+    section.artifacts.artifact = vec![test_device_artifact(
+        FmirDeviceBackend::Cuda,
+        b"ptx",
+        vec![FmirDeviceSymbol {
             entry: "summa".to_owned(),
             symbol: "f0".to_owned(),
         }],
-    }];
+    )];
     assert_eq!(
         radix_mir_fmir::canonical_program_bytes(&section.device_program.program),
         radix_mir_fmir::canonical_program_bytes(&first),
@@ -348,21 +393,15 @@ fn cuda_descriptor_consumes_artifact_symbol_mapping() {
         device_program_and_semantics_from_corpus_fixture("cuda/summa-proof.fab");
     let mut section = section_for_program(&program, &semantics);
     section.artifacts.artifact = vec![
-        FmirDeviceArtifact {
-            backend: FmirDeviceBackend::Metal,
-            blob: "msl".to_owned(),
-            hash: "fnv64:0000000000000000".to_owned(),
-            symbols: Vec::new(),
-        },
-        FmirDeviceArtifact {
-            backend: FmirDeviceBackend::Cuda,
-            blob: "ptx".to_owned(),
-            hash: "fnv64:0000000000000000".to_owned(),
-            symbols: vec![FmirDeviceSymbol {
+        test_device_artifact(FmirDeviceBackend::Metal, b"msl", Vec::new()),
+        test_device_artifact(
+            FmirDeviceBackend::Cuda,
+            b"ptx",
+            vec![FmirDeviceSymbol {
                 entry: "summa".to_owned(),
                 symbol: "f0".to_owned(),
             }],
-        },
+        ),
     ];
 
     let metal = descriptor_for_backend(&section, DeviceBackend::Metal, b"msl blob")
@@ -390,12 +429,11 @@ fn cuda_descriptor_consumes_artifact_symbol_mapping() {
 fn descriptor_maps_wire_lifetimes_onto_host_descriptor() {
     let (program, semantics) = two_kernel_fixture();
     let mut section = section_for_program(&program, &semantics);
-    section.artifacts.artifact = vec![FmirDeviceArtifact {
-        backend: FmirDeviceBackend::Metal,
-        blob: "msl".to_owned(),
-        hash: "fnv64:0000000000000000".to_owned(),
-        symbols: Vec::new(),
-    }];
+    section.artifacts.artifact = vec![test_device_artifact(
+        FmirDeviceBackend::Metal,
+        b"msl",
+        Vec::new(),
+    )];
     // The intermediate remains present in the descriptor as an InOut slot,
     // but this projection test supplies only the supported final observation.
     section
@@ -466,12 +504,11 @@ fn descriptor_maps_wire_lifetimes_onto_host_descriptor() {
 fn descriptor_preserves_wire_launch_order_and_version_keys() {
     let (program, semantics) = two_kernel_fixture();
     let mut section = section_for_program(&program, &semantics);
-    section.artifacts.artifact = vec![FmirDeviceArtifact {
-        backend: FmirDeviceBackend::Metal,
-        blob: "msl".to_owned(),
-        hash: "fnv64:0000000000000000".to_owned(),
-        symbols: Vec::new(),
-    }];
+    section.artifacts.artifact = vec![test_device_artifact(
+        FmirDeviceBackend::Metal,
+        b"msl",
+        Vec::new(),
+    )];
 
     {
         let wire = &mut section.device_program.program;
@@ -648,12 +685,11 @@ fn descriptor_preserves_wire_launch_order_and_version_keys() {
 fn two_kernel_descriptor_admits_on_host_with_carried_graph() {
     let (program, semantics) = two_kernel_fixture();
     let mut section = section_for_program(&program, &semantics);
-    section.artifacts.artifact = vec![FmirDeviceArtifact {
-        backend: FmirDeviceBackend::Metal,
-        blob: "msl".to_owned(),
-        hash: "fnv64:0000000000000000".to_owned(),
-        symbols: Vec::new(),
-    }];
+    section.artifacts.artifact = vec![test_device_artifact(
+        FmirDeviceBackend::Metal,
+        b"msl",
+        Vec::new(),
+    )];
 
     let descriptor = descriptor_for_backend(&section, DeviceBackend::Metal, b"msl blob")
         .expect("the ordinary two-kernel package must construct an admissible host descriptor");
@@ -704,12 +740,11 @@ fn two_kernel_descriptor_admits_on_host_with_carried_graph() {
 fn descriptor_missing_keyed_version_metadata_fails_closed() {
     let (program, semantics) = two_kernel_fixture();
     let mut section = section_for_program(&program, &semantics);
-    section.artifacts.artifact = vec![FmirDeviceArtifact {
-        backend: FmirDeviceBackend::Metal,
-        blob: "msl".to_owned(),
-        hash: "fnv64:0000000000000000".to_owned(),
-        symbols: Vec::new(),
-    }];
+    section.artifacts.artifact = vec![test_device_artifact(
+        FmirDeviceBackend::Metal,
+        b"msl",
+        Vec::new(),
+    )];
     section
         .device_program
         .program
@@ -730,12 +765,11 @@ fn descriptor_rejects_result_only_wire_record() {
     let (program, semantics) =
         device_program_and_semantics_from_corpus_fixture("cuda/summa-proof.fab");
     let mut section = section_for_program(&program, &semantics);
-    section.artifacts.artifact = vec![FmirDeviceArtifact {
-        backend: FmirDeviceBackend::Metal,
-        blob: "msl".to_owned(),
-        hash: "fnv64:0000000000000000".to_owned(),
-        symbols: Vec::new(),
-    }];
+    section.artifacts.artifact = vec![test_device_artifact(
+        FmirDeviceBackend::Metal,
+        b"msl",
+        Vec::new(),
+    )];
     section.device_program.program.results[0].buffer.id = 99;
 
     let error = descriptor_for_backend(&section, DeviceBackend::Metal, b"msl blob")
@@ -749,12 +783,11 @@ fn descriptor_rejects_result_with_contradictory_role() {
     let (program, semantics) =
         device_program_and_semantics_from_corpus_fixture("cuda/summa-proof.fab");
     let mut section = section_for_program(&program, &semantics);
-    section.artifacts.artifact = vec![FmirDeviceArtifact {
-        backend: FmirDeviceBackend::Metal,
-        blob: "msl".to_owned(),
-        hash: "fnv64:0000000000000000".to_owned(),
-        symbols: Vec::new(),
-    }];
+    section.artifacts.artifact = vec![test_device_artifact(
+        FmirDeviceBackend::Metal,
+        b"msl",
+        Vec::new(),
+    )];
     section.device_program.program.results[0].role = WireBufferRole::Input;
 
     let error = descriptor_for_backend(&section, DeviceBackend::Metal, b"msl blob")
@@ -766,12 +799,11 @@ fn descriptor_rejects_result_with_contradictory_role() {
 fn descriptor_rejects_result_with_contradictory_producer() {
     let (program, semantics) = two_kernel_fixture();
     let mut section = section_for_program(&program, &semantics);
-    section.artifacts.artifact = vec![FmirDeviceArtifact {
-        backend: FmirDeviceBackend::Metal,
-        blob: "msl".to_owned(),
-        hash: "fnv64:0000000000000000".to_owned(),
-        symbols: Vec::new(),
-    }];
+    section.artifacts.artifact = vec![test_device_artifact(
+        FmirDeviceBackend::Metal,
+        b"msl",
+        Vec::new(),
+    )];
     section
         .device_program
         .program
@@ -796,12 +828,11 @@ fn descriptor_rejects_result_with_contradictory_producer() {
 fn descriptor_rejects_result_with_contradictory_version_shape() {
     let (program, semantics) = two_kernel_fixture();
     let mut section = section_for_program(&program, &semantics);
-    section.artifacts.artifact = vec![FmirDeviceArtifact {
-        backend: FmirDeviceBackend::Metal,
-        blob: "msl".to_owned(),
-        hash: "fnv64:0000000000000000".to_owned(),
-        symbols: Vec::new(),
-    }];
+    section.artifacts.artifact = vec![test_device_artifact(
+        FmirDeviceBackend::Metal,
+        b"msl",
+        Vec::new(),
+    )];
     section
         .device_program
         .program
@@ -825,12 +856,11 @@ fn descriptor_rejects_result_with_contradictory_version_shape() {
 fn descriptor_rejects_result_with_contradictory_version_number() {
     let (program, semantics) = two_kernel_fixture();
     let mut section = section_for_program(&program, &semantics);
-    section.artifacts.artifact = vec![FmirDeviceArtifact {
-        backend: FmirDeviceBackend::Metal,
-        blob: "msl".to_owned(),
-        hash: "fnv64:0000000000000000".to_owned(),
-        symbols: Vec::new(),
-    }];
+    section.artifacts.artifact = vec![test_device_artifact(
+        FmirDeviceBackend::Metal,
+        b"msl",
+        Vec::new(),
+    )];
     section
         .device_program
         .program
@@ -881,12 +911,11 @@ fn receipt_rendering_uses_host_carried_graph_facts() {
 
 #[test]
 fn descriptor_requires_declared_backend_artifact() {
-    let artifacts = vec![FmirDeviceArtifact {
-        backend: FmirDeviceBackend::Metal,
-        blob: "msl".to_owned(),
-        hash: "fnv64:0000000000000000".to_owned(),
-        symbols: Vec::new(),
-    }];
+    let artifacts = vec![test_device_artifact(
+        FmirDeviceBackend::Metal,
+        b"msl",
+        Vec::new(),
+    )];
     assert!(artifact_for_backend(&artifacts, DeviceBackend::Metal).is_some());
     assert!(
         artifact_for_backend(&artifacts, DeviceBackend::Cuda).is_none(),
@@ -905,12 +934,11 @@ fn descriptor_rejects_unknown_element_type_spelling() {
     section.device_program.program.kernels[0].resources[0]
         .version
         .element_ty = "f64".to_owned();
-    section.artifacts.artifact = vec![FmirDeviceArtifact {
-        backend: FmirDeviceBackend::Metal,
-        blob: "msl".to_owned(),
-        hash: "fnv64:0000000000000000".to_owned(),
-        symbols: Vec::new(),
-    }];
+    section.artifacts.artifact = vec![test_device_artifact(
+        FmirDeviceBackend::Metal,
+        b"msl",
+        Vec::new(),
+    )];
     let error = descriptor_for_backend(&section, DeviceBackend::Metal, b"msl blob")
         .expect_err("unknown element type must fail closed");
     assert!(
@@ -924,12 +952,11 @@ fn descriptor_rejects_unknown_element_type_spelling() {
 fn descriptor_rejects_inout_result_before_host_projection() {
     let (program, semantics) = two_kernel_fixture();
     let mut section = section_for_program(&program, &semantics);
-    section.artifacts.artifact = vec![FmirDeviceArtifact {
-        backend: FmirDeviceBackend::Metal,
-        blob: "msl".to_owned(),
-        hash: "fnv64:0000000000000000".to_owned(),
-        symbols: Vec::new(),
-    }];
+    section.artifacts.artifact = vec![test_device_artifact(
+        FmirDeviceBackend::Metal,
+        b"msl",
+        Vec::new(),
+    )];
     // Inject a PerStep InOut result row (the writable intermediate exposed
     // as a result without an explicit observation declaration). The
     // constructor never produces this form (F6); the host admission must
@@ -966,12 +993,11 @@ fn descriptor_rejects_duplicate_result_buffer_before_host_projection() {
     let (program, semantics) =
         device_program_and_semantics_from_corpus_fixture("cuda/summa-proof.fab");
     let mut section = section_for_program(&program, &semantics);
-    section.artifacts.artifact = vec![FmirDeviceArtifact {
-        backend: FmirDeviceBackend::Metal,
-        blob: "msl".to_owned(),
-        hash: "fnv64:0000000000000000".to_owned(),
-        symbols: Vec::new(),
-    }];
+    section.artifacts.artifact = vec![test_device_artifact(
+        FmirDeviceBackend::Metal,
+        b"msl",
+        Vec::new(),
+    )];
     let duplicate = section
         .device_program
         .program
@@ -1193,10 +1219,8 @@ fn device_repeat_count_is_fail_closed() {
 /// inputs unify with the forward's device-resident buffers (S2-5 identity).
 #[test]
 fn companion_forward_and_backward_kernel_set_and_order() {
-    let (program, semantics) = with_inline_package(
-        "s3a2-companion-probe",
-        S3A2_COMPANION_PROBE,
-        |lowered| {
+    let (program, semantics) =
+        with_inline_package("s3a2-companion-probe", S3A2_COMPANION_PROBE, |lowered| {
             device_program_for_lowered(
                 &lowered.validated,
                 &lowered.interner,
@@ -1206,9 +1230,8 @@ fn companion_forward_and_backward_kernel_set_and_order() {
             .expect("constructor succeeds")
             .map(|(program, semantics, _step_count)| (program, semantics))
             .expect("device package yields a device program")
-        },
-    )
-    .expect("fixture lowers");
+        })
+        .expect("fixture lowers");
     program.validate().expect("program validates");
 
     // F4: the lossless primal/companion relation survives onto the carried
@@ -1777,12 +1800,11 @@ fn wire_axes_vary_independently() {
 fn result_without_explicit_observation_fact_is_rejected() {
     let (program, semantics) = two_kernel_fixture();
     let mut section = section_for_program(&program, &semantics);
-    section.artifacts.artifact = vec![FmirDeviceArtifact {
-        backend: FmirDeviceBackend::Metal,
-        blob: "msl".to_owned(),
-        hash: "fnv64:0000000000000000".to_owned(),
-        symbols: Vec::new(),
-    }];
+    section.artifacts.artifact = vec![test_device_artifact(
+        FmirDeviceBackend::Metal,
+        b"msl",
+        Vec::new(),
+    )];
     section
         .device_program
         .program
@@ -2289,10 +2311,8 @@ functio collige(tf32[1024] a, tf32[4] medius, u32 id) → vacuum {
 /// serialized wire and admits through the radix decode boundary.
 #[test]
 fn companion_relation_projected_onto_the_wire() {
-    let (program, semantics) = with_inline_package(
-        "s3a2-companion-probe",
-        S3A2_COMPANION_PROBE,
-        |lowered| {
+    let (program, semantics) =
+        with_inline_package("s3a2-companion-probe", S3A2_COMPANION_PROBE, |lowered| {
             device_program_for_lowered(
                 &lowered.validated,
                 &lowered.interner,
@@ -2302,9 +2322,8 @@ fn companion_relation_projected_onto_the_wire() {
             .expect("constructor succeeds")
             .map(|(program, semantics, _step_count)| (program, semantics))
             .expect("device package yields a device program")
-        },
-    )
-    .expect("fixture lowers");
+        })
+        .expect("fixture lowers");
 
     // The lossless row rides the carried semantics (F4).
     assert_eq!(semantics.relations.len(), 1);
@@ -2665,12 +2684,11 @@ fn repeating_step_step_count_mismatch_fails_closed() {
 fn repeating_step_wire_and_descriptor_project_params_and_observation() {
     let (program, semantics) = training_fixture_program(TRAINING_LOOP_FIXTURE_100, "s5u5-wire");
     let mut section = section_for_program(&program, &semantics);
-    section.artifacts.artifact = vec![FmirDeviceArtifact {
-        backend: FmirDeviceBackend::Metal,
-        blob: "msl".to_owned(),
-        hash: "fnv64:0000000000000000".to_owned(),
-        symbols: Vec::new(),
-    }];
+    section.artifacts.artifact = vec![test_device_artifact(
+        FmirDeviceBackend::Metal,
+        b"msl",
+        Vec::new(),
+    )];
     section.declared_inputs = vec![
         FmirDeviceInput {
             name: "x".to_owned(),
@@ -3140,11 +3158,12 @@ fn admit_device_program_section_rejects_zero_reduced_projection() {
     );
 
     let mut section = reduced_projection_section();
-    section.device_program.program.kernels[0].resources[1].version.reduced_projection =
-        Some(WireReducedProjection {
-            axis_extent: 16,
-            inner_stride: 0,
-        });
+    section.device_program.program.kernels[0].resources[1]
+        .version
+        .reduced_projection = Some(WireReducedProjection {
+        axis_extent: 16,
+        inner_stride: 0,
+    });
     let error = admit_device_program_section(&section.device_program)
         .expect_err("a zero inner stride fails the faber boundary admission");
     assert!(
@@ -3182,7 +3201,9 @@ fn admit_device_program_section_rejects_mismatched_plan_vs_buffer_projection() {
 #[test]
 fn admit_device_program_section_rejects_non_divisible_reduced_element_count() {
     let mut section = reduced_projection_section();
-    section.device_program.program.kernels[0].resources[1].version.element_count = 17;
+    section.device_program.program.kernels[0].resources[1]
+        .version
+        .element_count = 17;
     let error = admit_device_program_section(&section.device_program)
         .expect_err("a non-divisible reduced element count fails the faber boundary admission");
     assert!(
@@ -3233,11 +3254,18 @@ fn admit_device_program_section_rejects_saturated_overflowing_projection() {
         inner_stride: 2,
     };
     plan.projection = saturated;
-    section.device_program.program.kernels[0].resources[1].version.reduced_projection =
-        Some(saturated);
-    section.device_program.program.kernels[0].resources[1].version.element_count = u64::MAX;
-    section.device_program.program.results[0].version.reduced_projection = Some(saturated);
-    section.device_program.program.results[0].version.element_count = u64::MAX;
+    section.device_program.program.kernels[0].resources[1]
+        .version
+        .reduced_projection = Some(saturated);
+    section.device_program.program.kernels[0].resources[1]
+        .version
+        .element_count = u64::MAX;
+    section.device_program.program.results[0]
+        .version
+        .reduced_projection = Some(saturated);
+    section.device_program.program.results[0]
+        .version
+        .element_count = u64::MAX;
     let error = admit_device_program_section(&section.device_program)
         .expect_err("an overflowing block width fails the faber boundary admission");
     assert!(
@@ -3254,7 +3282,9 @@ fn admit_device_program_section_rejects_saturated_overflowing_projection() {
 #[test]
 fn admit_device_program_section_rejects_zero_element_reduced_buffer() {
     let mut section = reduced_projection_section();
-    section.device_program.program.kernels[0].resources[1].version.element_count = 0;
+    section.device_program.program.kernels[0].resources[1]
+        .version
+        .element_count = 0;
     let error = admit_device_program_section(&section.device_program)
         .expect_err("a zero-element reduced buffer fails the faber boundary admission");
     assert!(
@@ -3275,7 +3305,9 @@ fn session_carrying_section() -> FmirDeviceSection {
     let (program, semantics) =
         device_program_and_semantics_from_corpus_fixture("cuda/summa-proof.fab");
     let mut section = section_for_program(&program, &semantics);
-    let input_slot = section.device_program.program.kernels[0].resources[0].buffer.id;
+    let input_slot = section.device_program.program.kernels[0].resources[0]
+        .buffer
+        .id;
     section.session = Some(FmirSessionSection {
         v: WIRE_SESSION_SECTION_VERSION,
         inputs: vec![WireSessionInput {
@@ -3328,18 +3360,19 @@ fn honest_session_section_admits_and_survives_the_radix_decode() {
     admit_session_section(&section)
         .expect("the honest session section admits at the faber boundary");
     // The codec consumption boundary (descriptor construction) admits it too.
-    let artifact = FmirDeviceArtifact {
-        backend: FmirDeviceBackend::Metal,
-        blob: "kernel void p(device float* a [[buffer(0)]]) {}".to_owned(),
-        hash: radix_mir_fmir::fnv1a64_blob_hash(
-            b"kernel void p(device float* a [[buffer(0)]]) {}",
-        ),
-        symbols: Vec::new(),
-    };
+    let artifact = test_device_artifact(
+        FmirDeviceBackend::Metal,
+        b"kernel void p(device float* a [[buffer(0)]]) {}",
+        Vec::new(),
+    );
     let mut with_artifact = section;
     with_artifact.artifacts.artifact = vec![artifact];
-    descriptor_for_backend(&with_artifact, DeviceBackend::Metal, b"kernel void p(device float* a [[buffer(0)]]) {}")
-        .expect("the honest session section admits at the codec consumption boundary");
+    descriptor_for_backend(
+        &with_artifact,
+        DeviceBackend::Metal,
+        b"kernel void p(device float* a [[buffer(0)]]) {}",
+    )
+    .expect("the honest session section admits at the codec consumption boundary");
     let wire = wire_admits_through_radix_decode(with_artifact);
     assert_eq!(wire.kernels.len(), 1);
 }
@@ -3351,7 +3384,9 @@ fn honest_session_section_admits_and_survives_the_radix_decode() {
 fn mutated_session_facts_fail_the_faber_boundary_admission() {
     // Flipped cadence: the once-init input can never be per-invocation.
     let mut section = session_carrying_section();
-    let input_slot = section.device_program.program.kernels[0].resources[0].buffer.id;
+    let input_slot = section.device_program.program.kernels[0].resources[0]
+        .buffer
+        .id;
     section.session.as_mut().unwrap().inputs[0].cadence = WireInputUpdateCadence::PerInvocation;
     let error = admit_session_section(&section)
         .expect_err("a flipped cadence on the once-init input fails admission");
@@ -3364,8 +3399,8 @@ fn mutated_session_facts_fail_the_faber_boundary_admission() {
     // Altered KV layout: a zero dimension is not a layout.
     let mut section = session_carrying_section();
     section.session.as_mut().unwrap().kv_layout.context_length = 0;
-    let error = admit_session_section(&section)
-        .expect_err("a zero KV layout dimension fails admission");
+    let error =
+        admit_session_section(&section).expect_err("a zero KV layout dimension fails admission");
     assert!(
         error[0].message.contains("context_length"),
         "the diagnostic names the exact failing fact: {}",
@@ -3375,8 +3410,8 @@ fn mutated_session_facts_fail_the_faber_boundary_admission() {
     // Mutated invocation mode: no workload mode is a contradiction.
     let mut section = session_carrying_section();
     section.session.as_mut().unwrap().invocation_modes = Vec::new();
-    let error = admit_session_section(&section)
-        .expect_err("an empty invocation-mode set fails admission");
+    let error =
+        admit_session_section(&section).expect_err("an empty invocation-mode set fails admission");
     assert!(
         error[0].message.contains("no invocation mode"),
         "the diagnostic names the violated class: {}",
@@ -3428,7 +3463,10 @@ fn mutated_serialized_session_byte_fails_the_radix_decode() {
     // one byte for the fixture's small buffer ids, so the cadence tag sits at
     // offset 3.
     assert_eq!(session_bytes[0], 0x01, "version varint is 1");
-    assert_eq!(session_bytes[3], 0x00, "the first input's cadence is resident");
+    assert_eq!(
+        session_bytes[3], 0x00,
+        "the first input's cadence is resident"
+    );
     let mut mutated = session_bytes.clone();
     mutated[3] = 0x01;
     assert_ne!(mutated, session_bytes);
@@ -3467,8 +3505,7 @@ fn mutated_serialized_session_byte_fails_the_radix_decode() {
         Err(error) => {
             let detail = error.to_string();
             assert!(
-                detail.contains("invalid session section")
-                    || detail.contains("once-init"),
+                detail.contains("invalid session section") || detail.contains("once-init"),
                 "the decode admission fails closed with the session-facts diagnostic: {detail}"
             );
         }
