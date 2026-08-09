@@ -203,8 +203,12 @@ pub struct FmirDeviceArtifactsSection {
 #[serde(deny_unknown_fields)]
 pub struct FmirDeviceArtifact {
     /// Typed backend identity — compiled-in leaves plus the representable
-    /// unknown case ([`FmirDeviceBackend::Unknown`]). Unknown backends are
-    /// rejected honestly at admission (contract §Unknown future backends),
+    /// unknown case ([`FmirDeviceBackend::Unknown`]). Unknown-backend
+    /// ARTIFACTS are **preserved-until-selection** (DDCP3-U0 (f) /
+    /// CTO9-6 f, superseding the earlier reject-at-admission stance): they
+    /// are admitted at load with encodings/digests/canonicalization still
+    /// validated as far as their declared fields allow, and rejected at
+    /// selection use ([`FmirImageError::UnsupportedSelectedBackend`]) —
     /// never silently dropped, remapped, or fallback-laned.
     pub backend: FmirDeviceBackend,
     /// Explicit format id — declared, never inferred from blob content.

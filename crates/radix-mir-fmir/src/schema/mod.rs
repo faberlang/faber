@@ -96,10 +96,13 @@ pub const PACKAGE_MIR_ARTIFACT_VERSION: u32 = 7;
 /// addition; a packet whose `abi_version` is not this value fails admission
 /// with [`UnsupportedArtifactAbiVersion`](crate::error::FmirImageError::UnsupportedArtifactAbiVersion).
 ///
-/// NOTE (rebaselined at DDCP3-U0): faber's landed
-/// `DEVICE_ARTIFACT_ABI_VERSION` is `1` — a same-boundary divergence from
-/// this coordinated value, recorded with a `fix:` marker for DDPP1-U5/U6 to
-/// align (never silently patched radix-side).
+/// NOTE (rebaselined at DDCP3-U0; amended at the fire-12/fire-13 cleanup):
+/// faber's landed `DEVICE_ARTIFACT_ABI_VERSION` is **8** (aligned with this
+/// coordinated value — faber `0109453` bumped it as part of the U0 consumer
+/// migration; the earlier record of a same-boundary `1` divergence is
+/// superseded). DDPP1-U5/U6 re-verify the landed value ("summaries are
+/// claims"); any future drift is recorded with a `fix:` marker, never
+/// silently patched radix-side.
 pub const ARTIFACT_ABI_VERSION: u32 = 8;
 
 /// The faber-owned wire/codec version of the typed device-program section
