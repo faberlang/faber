@@ -286,7 +286,7 @@ while GI4+ remains a competing runtime/server control plane.
 
 ### NGAB1 — Radix host/device partition and callable device boundary
 
-**Status**: planned — after NGAB0
+**Status**: accepted — NGAB1-U4 phase closeout (2026-08-09); NGAB2 next after DDCP1/DDCP2 per the DDPP3 absorption + paired DDCP contract
 **Owner**: Radix.
 **Source**: NGAB0, live analyzed-package/MIR lowering, `DeviceProgram`, FMIR
 device schema, and accepted GI3 compiler contracts.
@@ -298,6 +298,27 @@ cross-boundary values fail at compile time.
 calls from LLVM, MSL, or PTX text.
 **Batch posture**: one vertical slice, then batch compatible call shapes.
 **Lowers to**: `delivery` then `factory`.
+
+**Notes** (NGAB1-U4 phase closeout, 2026-08-09):
+
+- **Units**: U1–U4 all landed (U1 `0bb5ebbd6`/`754a8e6`, U2 `3f8541bcb`/`93393cd`,
+  U3 `3001fdd90`, U4 `cb92b4f11`/`4435068`). **Gate met**: one analyzed package
+  produces validated host MIR/LLVM and a typed `DeviceProgram` — the NGAB0-U11
+  fixture proves the minimal one-prepared-region vertical slice (U1); host→device
+  calls go through the versioned call ABI and invalid cross-boundary values fail
+  at compile time with typed diagnostics, proven by a negative fixture without a
+  launch (U2); resource identity, lifetimes, mutation, and observation facts
+  survive lowering (U3); compatible batch shapes submit as multiple kernels per
+  prepared submission region — one host call → one region, never per-kernel ABI
+  rows (U4, NGAB0-R1 granularity).
+- **Routing**: NGAB1–NGAB4 implement as **DDPP3 child packets** per the DDPP0
+  contract §ChildRouting and council H1 (the H1 NGAB1-HOLD was lifted by the
+  NGAB0-R1 amendment). **NGAB2 is next after DDCP1/DDCP2** per the paired DDCP
+  contract — DDCP1/DDCP2 have READY delivery-sized slices (`ddcp0-closeout.md`),
+  and DDPP3's composite-build authority absorbs NGAB1–NGAB4.
+- **Carried questions**: the NGAB0 operator gates (llvm-host identity, MSL
+  source-first, PTX arch set) remain open as recorded in NGAB0 §Admission; U1–U4
+  raised no new unresolved ABI or wire questions.
 
 ### NGAB2 — Faber composite build and embedded artifact assembly
 

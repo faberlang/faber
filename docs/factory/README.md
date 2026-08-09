@@ -33,7 +33,7 @@ in [`docs/archived/`](../archived/README.md).
 | [direct-device-product-pipeline](direct-device-product-pipeline/CAMPAIGN.md) | active | 0% | 0 | 1 | 1 | 0 | 0 | 1 | 5 |
 | [faber-onboarding](faber-onboarding/CAMPAIGN.md) | active | — | 0 | 1 | 3 | 1 | 0 | 0 | 5 |
 | [faber-script-e2e-hardening](faber-script-e2e-hardening/goal.md) | active | — | 1 | 0 | 0 | 1 | 0 | 0 | 34 |
-| [native-gpu-application-bundle](native-gpu-application-bundle/CAMPAIGN.md) | active | — | 0 | 1 | 8 | 0 | 0 | 1 | 6 |
+| [native-gpu-application-bundle](native-gpu-application-bundle/CAMPAIGN.md) | active | — | 0 | 1 | 8 | 0 | 0 | 1 | 7 |
 | [sqlite-library-package](sqlite-library-package/goal.md) | active | — | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
 | [unified-package-manifest](unified-package-manifest/goal.md) | active | — | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 
