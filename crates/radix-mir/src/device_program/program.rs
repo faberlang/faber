@@ -339,7 +339,10 @@ impl DeviceProgram {
     /// - **Per-output domains** (`crate::device_program_plans::
     ///   validate_per_output_domains`): every output has its own bounds/
     ///   index domain; no shared dispatch extent under-fills an output.
-    fn validate_resource_axes(&self, semantics: &DeviceSemantics) -> Result<(), DeviceProgramError> {
+    fn validate_resource_axes(
+        &self,
+        semantics: &DeviceSemantics,
+    ) -> Result<(), DeviceProgramError> {
         for (kernel_index, kernel) in self.kernels.iter().enumerate() {
             for resource in &kernel.resources {
                 let reading = matches!(
@@ -349,9 +352,10 @@ impl DeviceProgram {
                 if !reading {
                     continue;
                 }
-                let initialized = semantics.initializations.iter().any(|fact| {
-                    fact.buffer == resource.buffer.id
-                });
+                let initialized = semantics
+                    .initializations
+                    .iter()
+                    .any(|fact| fact.buffer == resource.buffer.id);
                 if !initialized {
                     let launch = self
                         .launches
@@ -371,9 +375,10 @@ impl DeviceProgram {
                 if resource.buffer.lifetime != BufferLifetime::ObservationPoint {
                     continue;
                 }
-                let observed = self.results.iter().any(|result| {
-                    result.buffer.id == resource.buffer.id
-                });
+                let observed = self
+                    .results
+                    .iter()
+                    .any(|result| result.buffer.id == resource.buffer.id);
                 if !observed {
                     return Err(DeviceProgramError::ObservationPointBufferNotObserved {
                         buffer: resource.buffer.id,
@@ -393,7 +398,10 @@ impl DeviceProgram {
     /// for that value matches the flowing version's shape. Zero matches is a
     /// missing producer (or a shape contradiction), more than one is an
     /// ambiguous binding — both fail closed.
-    fn validate_edge_bindings(&self, semantics: &DeviceSemantics) -> Result<(), DeviceProgramError> {
+    fn validate_edge_bindings(
+        &self,
+        semantics: &DeviceSemantics,
+    ) -> Result<(), DeviceProgramError> {
         let registry = self.buffer_registry();
         for edge in &semantics.dependencies {
             let Some(binding) = semantics
@@ -401,7 +409,9 @@ impl DeviceProgram {
                 .iter()
                 .find(|binding| binding.buffer == edge.buffer)
             else {
-                return Err(DeviceProgramError::UnboundEdgeBuffer { buffer: edge.buffer });
+                return Err(DeviceProgramError::UnboundEdgeBuffer {
+                    buffer: edge.buffer,
+                });
             };
             let value = binding.value;
 
@@ -411,7 +421,10 @@ impl DeviceProgram {
                     value,
                 });
             };
-            let Some(version) = entry.versions.iter().find(|version| version.version.version == edge.version)
+            let Some(version) = entry
+                .versions
+                .iter()
+                .find(|version| version.version.version == edge.version)
             else {
                 return Err(DeviceProgramError::MissingProducer {
                     producer: edge.producer,
@@ -467,8 +480,7 @@ impl DeviceProgram {
                             .generations
                             .iter()
                             .filter(|generation| {
-                                generation.value == value
-                                    && generation.produced_by == edge.producer
+                                generation.value == value && generation.produced_by == edge.producer
                             })
                             .map(|generation| generation.generation)
                             .max()

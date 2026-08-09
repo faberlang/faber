@@ -360,7 +360,10 @@ fn companion_identity_is_primal_plus_typed_relation() {
     assert_ne!(forward.identity_key(), other_primal.identity_key());
     assert_eq!(
         forward.identity_key(),
-        (radix_hir::DefId(1), MirCompanionDerivativeKind::ReverseModeVjp)
+        (
+            radix_hir::DefId(1),
+            MirCompanionDerivativeKind::ReverseModeVjp
+        )
     );
 }
 

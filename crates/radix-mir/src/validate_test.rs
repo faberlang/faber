@@ -2755,11 +2755,17 @@ fn access_mode_axis_rejects_incoherent_role_access_pairs() {
         Some(BufferRole::Input)
     );
     assert_eq!(
-        BufferRole::from_abi_role(MirKernelResourceRole::Output, MirKernelResourceAccess::Write),
+        BufferRole::from_abi_role(
+            MirKernelResourceRole::Output,
+            MirKernelResourceAccess::Write
+        ),
         Some(BufferRole::Output)
     );
     assert_eq!(
-        BufferRole::from_abi_role(MirKernelResourceRole::Input, MirKernelResourceAccess::ReadWrite),
+        BufferRole::from_abi_role(
+            MirKernelResourceRole::Input,
+            MirKernelResourceAccess::ReadWrite
+        ),
         Some(BufferRole::InOut)
     );
     // Incoherent pairs: writing an input, reading an output — an access

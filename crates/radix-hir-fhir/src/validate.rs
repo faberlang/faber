@@ -363,7 +363,11 @@ fn collect_expr_defs(
             collect_expr_defs(lhs, registry);
             collect_expr_defs(rhs, registry);
         }
-        HirExpressionKind::ConversioAssign { target, source, recovery } => {
+        HirExpressionKind::ConversioAssign {
+            target,
+            source,
+            recovery,
+        } => {
             collect_expr_defs(target, registry);
             collect_expr_defs(source, registry);
             if let Some(recovery) = recovery {
@@ -617,7 +621,11 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
                 collect_expr(lhs, registry);
                 collect_expr(rhs, registry);
             }
-            HirExpressionKind::ConversioAssign { target, source, recovery } => {
+            HirExpressionKind::ConversioAssign {
+                target,
+                source,
+                recovery,
+            } => {
                 collect_expr(target, registry);
                 collect_expr(source, registry);
                 if let Some(recovery) = recovery {
@@ -1321,7 +1329,11 @@ pub(crate) fn validate_referential_integrity(
                 validate_expr(lhs, check_symbol, check_def, check_hir, check_type)?;
                 validate_expr(rhs, check_symbol, check_def, check_hir, check_type)?;
             }
-            HirExpressionKind::ConversioAssign { target, source, recovery } => {
+            HirExpressionKind::ConversioAssign {
+                target,
+                source,
+                recovery,
+            } => {
                 validate_expr(target, check_symbol, check_def, check_hir, check_type)?;
                 validate_expr(source, check_symbol, check_def, check_hir, check_type)?;
                 if let Some(recovery) = recovery {

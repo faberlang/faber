@@ -40,8 +40,8 @@ mod requirements;
 mod validate;
 mod wire;
 
-pub(crate) use admit::*;
 pub use admit::admit_device_section_with_compat;
+pub(crate) use admit::*;
 pub use device::*;
 pub use distributed::*;
 pub use distributed_identity::*;

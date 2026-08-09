@@ -280,21 +280,21 @@ pub enum TokenKind {
     Question,   // ?
 
     // === Comparison ===
-    Eq,          // =
-    Assign,      // ←
+    Eq,              // =
+    Assign,          // ←
     ConversioAssign, // ↤ — conversion-directed assignment (U+21A4)
-    EqEq,        // ≡
-    EqEqEq,      // (reserved for future / internal; no source form)
-    ApproxEq,    // ≈
-    ApproxNotEq, // ≉
-    BangEq,      // ≠
-    BangEqEq,    // (reserved for future / internal; no source form)
-    Lt,          // ≺ strict less-than comparison
-    Gt,          // ≻ strict greater-than comparison
-    LtAscii,     // < generic application delimiter (legacy comparison during migration)
-    GtAscii,     // > generic application delimiter (legacy comparison during migration)
-    LtEq,        // ≤
-    GtEq,        // ≥
+    EqEq,            // ≡
+    EqEqEq,          // (reserved for future / internal; no source form)
+    ApproxEq,        // ≈
+    ApproxNotEq,     // ≉
+    BangEq,          // ≠
+    BangEqEq,        // (reserved for future / internal; no source form)
+    Lt,              // ≺ strict less-than comparison
+    Gt,              // ≻ strict greater-than comparison
+    LtAscii,         // < generic application delimiter (legacy comparison during migration)
+    GtAscii,         // > generic application delimiter (legacy comparison during migration)
+    LtEq,            // ≤
+    GtEq,            // ≥
 
     // === Postfix increment/decrement (statement-only) ===
     PostInc, // ⊕

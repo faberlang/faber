@@ -153,7 +153,10 @@ fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
                 resources: vec![DeviceResource {
                     buffer: mid.clone(),
                     version: version(1, element_ty.clone(), 4),
-                    binding: Binding { group: 0, binding: 0 },
+                    binding: Binding {
+                        group: 0,
+                        binding: 0,
+                    },
                     access: MirKernelResourceAccess::Write,
                 }],
                 launch: launch_plan(4),
@@ -166,13 +169,19 @@ fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
                     DeviceResource {
                         buffer: mid,
                         version: version(1, element_ty.clone(), 4),
-                        binding: Binding { group: 0, binding: 0 },
+                        binding: Binding {
+                            group: 0,
+                            binding: 0,
+                        },
                         access: MirKernelResourceAccess::Read,
                     },
                     DeviceResource {
                         buffer: out.clone(),
                         version: version(1, element_ty.clone(), 4),
-                        binding: Binding { group: 0, binding: 1 },
+                        binding: Binding {
+                            group: 0,
+                            binding: 1,
+                        },
                         access: MirKernelResourceAccess::Write,
                     },
                 ],
@@ -180,8 +189,14 @@ fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
             },
         ],
         launches: vec![
-            LaunchUnit { id: LaunchId(0), kernel_index: 0 },
-            LaunchUnit { id: LaunchId(1), kernel_index: 1 },
+            LaunchUnit {
+                id: LaunchId(0),
+                kernel_index: 0,
+            },
+            LaunchUnit {
+                id: LaunchId(1),
+                kernel_index: 1,
+            },
         ],
         lifetime: DeviceProgramLifetime::SingleRun,
         results: Vec::new(),
@@ -210,8 +225,14 @@ fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
             },
         ],
         bindings: vec![
-            ValueBinding { value: SemanticValueId(1), buffer: BufferId(0) },
-            ValueBinding { value: SemanticValueId(2), buffer: BufferId(1) },
+            ValueBinding {
+                value: SemanticValueId(1),
+                buffer: BufferId(0),
+            },
+            ValueBinding {
+                value: SemanticValueId(2),
+                buffer: BufferId(1),
+            },
         ],
         generations: vec![
             ValueGeneration {
@@ -304,7 +325,10 @@ fn oracle_subject() -> (DeviceProgram, DeviceSemantics) {
                 resources: vec![DeviceResource {
                     buffer: mid.clone(),
                     version: version(1, element_ty.clone(), 4),
-                    binding: Binding { group: 0, binding: 0 },
+                    binding: Binding {
+                        group: 0,
+                        binding: 0,
+                    },
                     access: MirKernelResourceAccess::Write,
                 }],
                 launch: launch_plan(4),
@@ -317,13 +341,19 @@ fn oracle_subject() -> (DeviceProgram, DeviceSemantics) {
                     DeviceResource {
                         buffer: mid,
                         version: version(1, element_ty.clone(), 4),
-                        binding: Binding { group: 0, binding: 0 },
+                        binding: Binding {
+                            group: 0,
+                            binding: 0,
+                        },
                         access: MirKernelResourceAccess::Read,
                     },
                     DeviceResource {
                         buffer: grad.clone(),
                         version: version(1, element_ty.clone(), 4),
-                        binding: Binding { group: 0, binding: 1 },
+                        binding: Binding {
+                            group: 0,
+                            binding: 1,
+                        },
                         access: MirKernelResourceAccess::Write,
                     },
                 ],
@@ -331,8 +361,14 @@ fn oracle_subject() -> (DeviceProgram, DeviceSemantics) {
             },
         ],
         launches: vec![
-            LaunchUnit { id: LaunchId(0), kernel_index: 0 },
-            LaunchUnit { id: LaunchId(1), kernel_index: 1 },
+            LaunchUnit {
+                id: LaunchId(0),
+                kernel_index: 0,
+            },
+            LaunchUnit {
+                id: LaunchId(1),
+                kernel_index: 1,
+            },
         ],
         lifetime: DeviceProgramLifetime::SingleRun,
         results: vec![ResultBuffer {
@@ -367,8 +403,14 @@ fn oracle_subject() -> (DeviceProgram, DeviceSemantics) {
             },
         ],
         bindings: vec![
-            ValueBinding { value: SemanticValueId(1), buffer: BufferId(0) },
-            ValueBinding { value: SemanticValueId(2), buffer: BufferId(1) },
+            ValueBinding {
+                value: SemanticValueId(1),
+                buffer: BufferId(0),
+            },
+            ValueBinding {
+                value: SemanticValueId(2),
+                buffer: BufferId(1),
+            },
         ],
         generations: vec![
             ValueGeneration {
@@ -449,8 +491,18 @@ fn fixture_1_multi_output_materializes_and_fails_closed_on_domain_conflict() {
     let mut types = TypeTable::new();
     let element_ty = f32_ty(&mut types);
     let input = identity(0, "in", BufferRole::Input, BufferLifetime::PerStep);
-    let out_a = identity(1, "out_a", BufferRole::Output, BufferLifetime::ObservationPoint);
-    let out_b = identity(2, "out_b", BufferRole::Output, BufferLifetime::ObservationPoint);
+    let out_a = identity(
+        1,
+        "out_a",
+        BufferRole::Output,
+        BufferLifetime::ObservationPoint,
+    );
+    let out_b = identity(
+        2,
+        "out_b",
+        BufferRole::Output,
+        BufferLifetime::ObservationPoint,
+    );
 
     let program = DeviceProgram {
         kernels: vec![KernelUnit {
@@ -461,25 +513,37 @@ fn fixture_1_multi_output_materializes_and_fails_closed_on_domain_conflict() {
                 DeviceResource {
                     buffer: input,
                     version: version(1, element_ty.clone(), 4),
-                    binding: Binding { group: 0, binding: 0 },
+                    binding: Binding {
+                        group: 0,
+                        binding: 0,
+                    },
                     access: MirKernelResourceAccess::Read,
                 },
                 DeviceResource {
                     buffer: out_a.clone(),
                     version: version(1, element_ty.clone(), 4),
-                    binding: Binding { group: 0, binding: 1 },
+                    binding: Binding {
+                        group: 0,
+                        binding: 1,
+                    },
                     access: MirKernelResourceAccess::Write,
                 },
                 DeviceResource {
                     buffer: out_b.clone(),
                     version: version(1, element_ty.clone(), 2),
-                    binding: Binding { group: 0, binding: 2 },
+                    binding: Binding {
+                        group: 0,
+                        binding: 2,
+                    },
                     access: MirKernelResourceAccess::Write,
                 },
             ],
             launch: launch_plan(4),
         }],
-        launches: vec![LaunchUnit { id: LaunchId(0), kernel_index: 0 }],
+        launches: vec![LaunchUnit {
+            id: LaunchId(0),
+            kernel_index: 0,
+        }],
         lifetime: DeviceProgramLifetime::SingleRun,
         results: vec![
             ResultBuffer {
@@ -513,20 +577,33 @@ fn fixture_1_multi_output_materializes_and_fails_closed_on_domain_conflict() {
                 name: "out_a".to_owned(),
                 element_ty: element_ty.clone(),
                 element_count: 4,
-                origin: SemanticValueOrigin::Synthetic { label: "out-a".to_owned() },
+                origin: SemanticValueOrigin::Synthetic {
+                    label: "out-a".to_owned(),
+                },
             },
             SemanticValue {
                 id: SemanticValueId(3),
                 name: "out_b".to_owned(),
                 element_ty: element_ty.clone(),
                 element_count: 2,
-                origin: SemanticValueOrigin::Synthetic { label: "out-b".to_owned() },
+                origin: SemanticValueOrigin::Synthetic {
+                    label: "out-b".to_owned(),
+                },
             },
         ],
         bindings: vec![
-            ValueBinding { value: SemanticValueId(1), buffer: BufferId(0) },
-            ValueBinding { value: SemanticValueId(2), buffer: BufferId(1) },
-            ValueBinding { value: SemanticValueId(3), buffer: BufferId(2) },
+            ValueBinding {
+                value: SemanticValueId(1),
+                buffer: BufferId(0),
+            },
+            ValueBinding {
+                value: SemanticValueId(2),
+                buffer: BufferId(1),
+            },
+            ValueBinding {
+                value: SemanticValueId(3),
+                buffer: BufferId(2),
+            },
         ],
         generations: vec![
             ValueGeneration {
@@ -546,22 +623,39 @@ fn fixture_1_multi_output_materializes_and_fails_closed_on_domain_conflict() {
         ],
         roots: vec![LaunchId(0)],
         initializations: vec![
-            InitializationFact { buffer: BufferId(0), policy: InitializationPolicy::HostProvided },
-            InitializationFact { buffer: BufferId(1), policy: InitializationPolicy::KernelInitialized },
-            InitializationFact { buffer: BufferId(2), policy: InitializationPolicy::KernelInitialized },
+            InitializationFact {
+                buffer: BufferId(0),
+                policy: InitializationPolicy::HostProvided,
+            },
+            InitializationFact {
+                buffer: BufferId(1),
+                policy: InitializationPolicy::KernelInitialized,
+            },
+            InitializationFact {
+                buffer: BufferId(2),
+                policy: InitializationPolicy::KernelInitialized,
+            },
         ],
         observations: vec![
-            ObservationFact { buffer: BufferId(1), version: 1, at_launch: LaunchId(0) },
-            ObservationFact { buffer: BufferId(2), version: 1, at_launch: LaunchId(0) },
+            ObservationFact {
+                buffer: BufferId(1),
+                version: 1,
+                at_launch: LaunchId(0),
+            },
+            ObservationFact {
+                buffer: BufferId(2),
+                version: 1,
+                at_launch: LaunchId(0),
+            },
         ],
         ..DeviceSemantics::default()
     };
 
     // Materialize correctly: both outputs carry their own result row, each
     // backed by its observation fact (F6), each covered by the dispatch.
-    program
-        .validate_with_semantics(&semantics)
-        .expect("multi-output materializes: each output's result row is backed by its observation fact");
+    program.validate_with_semantics(&semantics).expect(
+        "multi-output materializes: each output's result row is backed by its observation fact",
+    );
 
     // Fail closed: heterogeneous outputs under one shared dispatch extent
     // that under-fills the larger output.
@@ -603,7 +697,10 @@ fn fixture_2_shape_change_is_new_version_and_rebind_fails_closed() {
                 resources: vec![DeviceResource {
                     buffer: resized.clone(),
                     version: version(1, element_ty.clone(), 8),
-                    binding: Binding { group: 0, binding: 0 },
+                    binding: Binding {
+                        group: 0,
+                        binding: 0,
+                    },
                     access: MirKernelResourceAccess::Write,
                 }],
                 launch: launch_plan(8),
@@ -615,15 +712,24 @@ fn fixture_2_shape_change_is_new_version_and_rebind_fails_closed() {
                 resources: vec![DeviceResource {
                     buffer: resized,
                     version: version(2, element_ty.clone(), 16),
-                    binding: Binding { group: 0, binding: 0 },
+                    binding: Binding {
+                        group: 0,
+                        binding: 0,
+                    },
                     access: MirKernelResourceAccess::Write,
                 }],
                 launch: launch_plan(16),
             },
         ],
         launches: vec![
-            LaunchUnit { id: LaunchId(0), kernel_index: 0 },
-            LaunchUnit { id: LaunchId(1), kernel_index: 1 },
+            LaunchUnit {
+                id: LaunchId(0),
+                kernel_index: 0,
+            },
+            LaunchUnit {
+                id: LaunchId(1),
+                kernel_index: 1,
+            },
         ],
         lifetime: DeviceProgramLifetime::RepeatingStep,
         results: Vec::new(),
@@ -635,9 +741,15 @@ fn fixture_2_shape_change_is_new_version_and_rebind_fails_closed() {
             name: "resized".to_owned(),
             element_ty: element_ty.clone(),
             element_count: 8,
-            origin: SemanticValueOrigin::MirLocal { function: MirFunctionId(0), local: 0 },
+            origin: SemanticValueOrigin::MirLocal {
+                function: MirFunctionId(0),
+                local: 0,
+            },
         }],
-        bindings: vec![ValueBinding { value: SemanticValueId(1), buffer: BufferId(1) }],
+        bindings: vec![ValueBinding {
+            value: SemanticValueId(1),
+            buffer: BufferId(1),
+        }],
         generations: vec![
             ValueGeneration {
                 value: SemanticValueId(1),
@@ -726,8 +838,18 @@ fn fixture_4_repeated_step_materializes_and_cadence_mismatch_fails_closed() {
     let mut types = TypeTable::new();
     let element_ty = f32_ty(&mut types);
     let weights = identity(0, "weights", BufferRole::Input, BufferLifetime::PerProgram);
-    let trace = identity(1, "loss_trace", BufferRole::InOut, BufferLifetime::ObservationPoint);
-    let final_forward = identity(2, "final_forward", BufferRole::Output, BufferLifetime::PerStep);
+    let trace = identity(
+        1,
+        "loss_trace",
+        BufferRole::InOut,
+        BufferLifetime::ObservationPoint,
+    );
+    let final_forward = identity(
+        2,
+        "final_forward",
+        BufferRole::Output,
+        BufferLifetime::PerStep,
+    );
 
     let program = DeviceProgram {
         kernels: vec![
@@ -739,13 +861,19 @@ fn fixture_4_repeated_step_materializes_and_cadence_mismatch_fails_closed() {
                     DeviceResource {
                         buffer: weights.clone(),
                         version: version(1, element_ty.clone(), 4),
-                        binding: Binding { group: 0, binding: 0 },
+                        binding: Binding {
+                            group: 0,
+                            binding: 0,
+                        },
                         access: MirKernelResourceAccess::Read,
                     },
                     DeviceResource {
                         buffer: trace.clone(),
                         version: version(1, element_ty.clone(), 1),
-                        binding: Binding { group: 0, binding: 1 },
+                        binding: Binding {
+                            group: 0,
+                            binding: 1,
+                        },
                         access: MirKernelResourceAccess::Write,
                     },
                 ],
@@ -759,13 +887,19 @@ fn fixture_4_repeated_step_materializes_and_cadence_mismatch_fails_closed() {
                     DeviceResource {
                         buffer: trace.clone(),
                         version: version(1, element_ty.clone(), 1),
-                        binding: Binding { group: 0, binding: 0 },
+                        binding: Binding {
+                            group: 0,
+                            binding: 0,
+                        },
                         access: MirKernelResourceAccess::Read,
                     },
                     DeviceResource {
                         buffer: final_forward.clone(),
                         version: version(1, element_ty.clone(), 4),
-                        binding: Binding { group: 0, binding: 1 },
+                        binding: Binding {
+                            group: 0,
+                            binding: 1,
+                        },
                         access: MirKernelResourceAccess::Write,
                     },
                 ],
@@ -773,8 +907,14 @@ fn fixture_4_repeated_step_materializes_and_cadence_mismatch_fails_closed() {
             },
         ],
         launches: vec![
-            LaunchUnit { id: LaunchId(0), kernel_index: 0 },
-            LaunchUnit { id: LaunchId(1), kernel_index: 1 },
+            LaunchUnit {
+                id: LaunchId(0),
+                kernel_index: 0,
+            },
+            LaunchUnit {
+                id: LaunchId(1),
+                kernel_index: 1,
+            },
         ],
         lifetime: DeviceProgramLifetime::RepeatingStep,
         results: vec![
@@ -809,20 +949,33 @@ fn fixture_4_repeated_step_materializes_and_cadence_mismatch_fails_closed() {
                 name: "loss_trace".to_owned(),
                 element_ty: element_ty.clone(),
                 element_count: 1,
-                origin: SemanticValueOrigin::Synthetic { label: "loss-trace".to_owned() },
+                origin: SemanticValueOrigin::Synthetic {
+                    label: "loss-trace".to_owned(),
+                },
             },
             SemanticValue {
                 id: SemanticValueId(3),
                 name: "final_forward".to_owned(),
                 element_ty: element_ty.clone(),
                 element_count: 4,
-                origin: SemanticValueOrigin::Synthetic { label: "final-forward".to_owned() },
+                origin: SemanticValueOrigin::Synthetic {
+                    label: "final-forward".to_owned(),
+                },
             },
         ],
         bindings: vec![
-            ValueBinding { value: SemanticValueId(1), buffer: BufferId(0) },
-            ValueBinding { value: SemanticValueId(2), buffer: BufferId(1) },
-            ValueBinding { value: SemanticValueId(3), buffer: BufferId(2) },
+            ValueBinding {
+                value: SemanticValueId(1),
+                buffer: BufferId(0),
+            },
+            ValueBinding {
+                value: SemanticValueId(2),
+                buffer: BufferId(1),
+            },
+            ValueBinding {
+                value: SemanticValueId(3),
+                buffer: BufferId(2),
+            },
         ],
         generations: vec![
             ValueGeneration {
@@ -848,13 +1001,30 @@ fn fixture_4_repeated_step_materializes_and_cadence_mismatch_fails_closed() {
             version: 1,
         }],
         initializations: vec![
-            InitializationFact { buffer: BufferId(0), policy: InitializationPolicy::HostProvided },
-            InitializationFact { buffer: BufferId(1), policy: InitializationPolicy::KernelInitialized },
-            InitializationFact { buffer: BufferId(2), policy: InitializationPolicy::KernelInitialized },
+            InitializationFact {
+                buffer: BufferId(0),
+                policy: InitializationPolicy::HostProvided,
+            },
+            InitializationFact {
+                buffer: BufferId(1),
+                policy: InitializationPolicy::KernelInitialized,
+            },
+            InitializationFact {
+                buffer: BufferId(2),
+                policy: InitializationPolicy::KernelInitialized,
+            },
         ],
         observations: vec![
-            ObservationFact { buffer: BufferId(1), version: 1, at_launch: LaunchId(0) },
-            ObservationFact { buffer: BufferId(2), version: 1, at_launch: LaunchId(1) },
+            ObservationFact {
+                buffer: BufferId(1),
+                version: 1,
+                at_launch: LaunchId(0),
+            },
+            ObservationFact {
+                buffer: BufferId(2),
+                version: 1,
+                at_launch: LaunchId(1),
+            },
         ],
         ..DeviceSemantics::default()
     };
@@ -900,8 +1070,14 @@ fn fixture_5_scheduling_identical_under_permuted_declaration_and_symbol_order() 
     assert_eq!(program_b.kernels[0].entry, "chain_consumer");
     assert_eq!(program_b.kernels[1].entry, "chain_producer");
     program_b.launches = vec![
-        LaunchUnit { id: LaunchId(1), kernel_index: 0 },
-        LaunchUnit { id: LaunchId(0), kernel_index: 1 },
+        LaunchUnit {
+            id: LaunchId(1),
+            kernel_index: 0,
+        },
+        LaunchUnit {
+            id: LaunchId(0),
+            kernel_index: 1,
+        },
     ];
     semantics_b.dependencies.reverse();
     semantics_b.generations.reverse();
@@ -938,7 +1114,11 @@ fn fixture_6_forward_backward_coexist_without_runtime_tape() {
     program
         .validate_with_semantics(&semantics)
         .expect("forward + generated-backward kernels coexist");
-    assert_eq!(program.kernels.len(), 2, "one forward + one backward kernel");
+    assert_eq!(
+        program.kernels.len(),
+        2,
+        "one forward + one backward kernel"
+    );
     assert_eq!(program.launches.len(), 2);
     assert_eq!(semantics.relations.len(), 1);
     // No runtime tape anywhere in the model: the frozen four-field program
@@ -1041,19 +1221,28 @@ fn materialize_recipe_kernel(
                 DeviceResource {
                     buffer: input,
                     version: version(1, element_ty.clone(), input_count),
-                    binding: Binding { group: 0, binding: 0 },
+                    binding: Binding {
+                        group: 0,
+                        binding: 0,
+                    },
                     access: MirKernelResourceAccess::Read,
                 },
                 DeviceResource {
                     buffer: output,
                     version: version(1, element_ty.clone(), output_count),
-                    binding: Binding { group: 0, binding: 1 },
+                    binding: Binding {
+                        group: 0,
+                        binding: 1,
+                    },
                     access: MirKernelResourceAccess::Write,
                 },
             ],
             launch: launch_plan(output_count),
         }],
-        launches: vec![LaunchUnit { id: LaunchId(0), kernel_index: 0 }],
+        launches: vec![LaunchUnit {
+            id: LaunchId(0),
+            kernel_index: 0,
+        }],
         lifetime: DeviceProgramLifetime::SingleRun,
         results: Vec::new(),
     };
@@ -1071,12 +1260,20 @@ fn materialize_recipe_kernel(
                 name: "recipe.out".to_owned(),
                 element_ty: element_ty.clone(),
                 element_count: output_count,
-                origin: SemanticValueOrigin::Synthetic { label: "recipe-out".to_owned() },
+                origin: SemanticValueOrigin::Synthetic {
+                    label: "recipe-out".to_owned(),
+                },
             },
         ],
         bindings: vec![
-            ValueBinding { value: SemanticValueId(1), buffer: BufferId(0) },
-            ValueBinding { value: SemanticValueId(2), buffer: BufferId(1) },
+            ValueBinding {
+                value: SemanticValueId(1),
+                buffer: BufferId(0),
+            },
+            ValueBinding {
+                value: SemanticValueId(2),
+                buffer: BufferId(1),
+            },
         ],
         generations: vec![ValueGeneration {
             value: SemanticValueId(2),
@@ -1087,8 +1284,14 @@ fn materialize_recipe_kernel(
         }],
         roots: vec![LaunchId(0)],
         initializations: vec![
-            InitializationFact { buffer: BufferId(0), policy: InitializationPolicy::HostProvided },
-            InitializationFact { buffer: BufferId(1), policy: InitializationPolicy::KernelInitialized },
+            InitializationFact {
+                buffer: BufferId(0),
+                policy: InitializationPolicy::HostProvided,
+            },
+            InitializationFact {
+                buffer: BufferId(1),
+                policy: InitializationPolicy::KernelInitialized,
+            },
         ],
         ..DeviceSemantics::default()
     };
@@ -1165,8 +1368,18 @@ fn whole_recipe_gather_row() {
         .expect("the Gather whole-recipe plan validates");
     materialize_recipe_kernel(
         plan,
-        identity(0, "embedding_table", BufferRole::Input, BufferLifetime::PerProgram),
-        identity(1, "embedding_rows", BufferRole::Output, BufferLifetime::PerStep),
+        identity(
+            0,
+            "embedding_table",
+            BufferRole::Input,
+            BufferLifetime::PerProgram,
+        ),
+        identity(
+            1,
+            "embedding_rows",
+            BufferRole::Output,
+            BufferLifetime::PerStep,
+        ),
         VOCAB * N_EMBD,
         T * N_EMBD,
     );
@@ -1181,10 +1394,8 @@ fn causal_masked_softmax_whole_and_decomposed_seam() {
     const HEAD_DIM: u64 = 64;
 
     // W — the whole causal masked-row softmax over the [T×T] score matrix.
-    let whole = CollectionKernelPlan::CausalMaskedSoftmax(CausalMaskedSoftmaxPlan {
-        rows: T,
-        cols: T,
-    });
+    let whole =
+        CollectionKernelPlan::CausalMaskedSoftmax(CausalMaskedSoftmaxPlan { rows: T, cols: T });
     whole
         .validate()
         .expect("the CausalMaskedSoftmax whole-recipe plan validates");
@@ -1203,15 +1414,19 @@ fn causal_masked_softmax_whole_and_decomposed_seam() {
     let dispatch_y = T.div_ceil(8);
     let decomposed = CollectionKernelPlan::from_contract(
         &signature,
-        &CollectionOpContract::MatMul { dispatch_x, dispatch_y },
+        &CollectionOpContract::MatMul {
+            dispatch_x,
+            dispatch_y,
+        },
         MirCollectionOp::TensorMatMul,
-        Some(MatMulShapes { m: T, k: T, n: HEAD_DIM }),
+        Some(MatMulShapes {
+            m: T,
+            k: T,
+            n: HEAD_DIM,
+        }),
     )
     .expect("the decomposed seam resolves a TiledMatMul plan");
-    assert!(matches!(
-        &decomposed,
-        CollectionKernelPlan::TiledMatMul(_)
-    ));
+    assert!(matches!(&decomposed, CollectionKernelPlan::TiledMatMul(_)));
     decomposed
         .validate()
         .expect("the decomposed TiledMatMul seam plan validates");
@@ -1224,29 +1439,49 @@ fn causal_masked_softmax_whole_and_decomposed_seam() {
                 DeviceResource {
                     buffer: identity(0, "scores", BufferRole::Input, BufferLifetime::PerStep),
                     version: version(1, signature.input.element_ty.clone(), T * T),
-                    binding: Binding { group: 0, binding: 0 },
+                    binding: Binding {
+                        group: 0,
+                        binding: 0,
+                    },
                     access: MirKernelResourceAccess::Read,
                 },
                 DeviceResource {
                     buffer: identity(1, "v", BufferRole::Input, BufferLifetime::PerStep),
-                    version: version(1, signature.extra_inputs[0].element_ty.clone(), T * HEAD_DIM),
-                    binding: Binding { group: 0, binding: 1 },
+                    version: version(
+                        1,
+                        signature.extra_inputs[0].element_ty.clone(),
+                        T * HEAD_DIM,
+                    ),
+                    binding: Binding {
+                        group: 0,
+                        binding: 1,
+                    },
                     access: MirKernelResourceAccess::Read,
                 },
                 DeviceResource {
                     buffer: identity(2, "attn_out", BufferRole::Output, BufferLifetime::PerStep),
                     version: version(1, signature.output.element_ty.clone(), T * HEAD_DIM),
-                    binding: Binding { group: 0, binding: 2 },
+                    binding: Binding {
+                        group: 0,
+                        binding: 2,
+                    },
                     access: MirKernelResourceAccess::Write,
                 },
             ],
             launch: KernelLaunchPlan {
                 workgroup: MirWorkgroupSize { x: 8, y: 8, z: 1 },
                 dispatch_size: signature.dispatch_size,
-                workgroup_count: MirKernelWorkgroupCount { x: dispatch_x, y: dispatch_y, z: 1 },
+                workgroup_count: MirKernelWorkgroupCount {
+                    x: dispatch_x,
+                    y: dispatch_y,
+                    z: 1,
+                },
             },
         }],
-        launches: vec![LaunchUnit { id: LaunchId(0), kernel_index: 0 }],
+        launches: vec![LaunchUnit {
+            id: LaunchId(0),
+            kernel_index: 0,
+        }],
         lifetime: DeviceProgramLifetime::SingleRun,
         results: Vec::new(),
     };
@@ -1276,13 +1511,24 @@ fn causal_masked_softmax_whole_and_decomposed_seam() {
                 name: "attn_out".to_owned(),
                 element_ty: element_ty.clone(),
                 element_count: T * HEAD_DIM,
-                origin: SemanticValueOrigin::Synthetic { label: "attn-out".to_owned() },
+                origin: SemanticValueOrigin::Synthetic {
+                    label: "attn-out".to_owned(),
+                },
             },
         ],
         bindings: vec![
-            ValueBinding { value: SemanticValueId(1), buffer: BufferId(0) },
-            ValueBinding { value: SemanticValueId(2), buffer: BufferId(1) },
-            ValueBinding { value: SemanticValueId(3), buffer: BufferId(2) },
+            ValueBinding {
+                value: SemanticValueId(1),
+                buffer: BufferId(0),
+            },
+            ValueBinding {
+                value: SemanticValueId(2),
+                buffer: BufferId(1),
+            },
+            ValueBinding {
+                value: SemanticValueId(3),
+                buffer: BufferId(2),
+            },
         ],
         generations: vec![ValueGeneration {
             value: SemanticValueId(3),
@@ -1293,9 +1539,18 @@ fn causal_masked_softmax_whole_and_decomposed_seam() {
         }],
         roots: vec![LaunchId(0)],
         initializations: vec![
-            InitializationFact { buffer: BufferId(0), policy: InitializationPolicy::HostProvided },
-            InitializationFact { buffer: BufferId(1), policy: InitializationPolicy::HostProvided },
-            InitializationFact { buffer: BufferId(2), policy: InitializationPolicy::KernelInitialized },
+            InitializationFact {
+                buffer: BufferId(0),
+                policy: InitializationPolicy::HostProvided,
+            },
+            InitializationFact {
+                buffer: BufferId(1),
+                policy: InitializationPolicy::HostProvided,
+            },
+            InitializationFact {
+                buffer: BufferId(2),
+                policy: InitializationPolicy::KernelInitialized,
+            },
         ],
         ..DeviceSemantics::default()
     };
@@ -1334,18 +1589,30 @@ struct ExpectedProgram {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum EquivalenceViolationKind {
     /// The expected launch execution order disagrees with the subject.
-    LaunchOrder { expected: Vec<LaunchId>, got: Vec<LaunchId> },
+    LaunchOrder {
+        expected: Vec<LaunchId>,
+        got: Vec<LaunchId>,
+    },
     /// The carried dependency edges disagree with the expectation.
-    Dependency { expected: Vec<DependencyEdge>, got: Vec<DependencyEdge> },
+    Dependency {
+        expected: Vec<DependencyEdge>,
+        got: Vec<DependencyEdge>,
+    },
     /// The carried value generations disagree with the expectation.
     Generation {
         expected: Vec<(SemanticValueId, u32, LaunchId)>,
         got: Vec<(SemanticValueId, u32, LaunchId)>,
     },
     /// The declared result/readback set disagrees with the expectation.
-    Result { expected: Vec<BufferId>, got: Vec<BufferId> },
+    Result {
+        expected: Vec<BufferId>,
+        got: Vec<BufferId>,
+    },
     /// The prepared-region partition disagrees with the expectation.
-    Region { expected: Vec<Vec<LaunchId>>, got: Vec<Vec<LaunchId>> },
+    Region {
+        expected: Vec<Vec<LaunchId>>,
+        got: Vec<Vec<LaunchId>>,
+    },
     /// The gradient-to-parameter association disagrees with the expectation.
     GradientAssociation {
         expected: Vec<(DefId, u32, u32)>,
@@ -1362,7 +1629,10 @@ struct EquivalenceViolation {
 
 impl EquivalenceViolation {
     fn new(kind: EquivalenceViolationKind, detail: impl Into<String>) -> Self {
-        Self { kind, detail: detail.into() }
+        Self {
+            kind,
+            detail: detail.into(),
+        }
     }
 }
 
@@ -1400,7 +1670,13 @@ fn assess_materialized_program(
     let got_generations: Vec<(SemanticValueId, u32, LaunchId)> = semantics
         .generations
         .iter()
-        .map(|generation| (generation.value, generation.generation, generation.produced_by))
+        .map(|generation| {
+            (
+                generation.value,
+                generation.generation,
+                generation.produced_by,
+            )
+        })
         .collect();
     if got_generations != expected.generations {
         return Err(EquivalenceViolation::new(
@@ -1411,7 +1687,11 @@ fn assess_materialized_program(
             "the carried value generations disagree with the independent oracle",
         ));
     }
-    let got_results: Vec<BufferId> = program.results.iter().map(|result| result.buffer.id).collect();
+    let got_results: Vec<BufferId> = program
+        .results
+        .iter()
+        .map(|result| result.buffer.id)
+        .collect();
     if got_results != expected.result_buffers {
         return Err(EquivalenceViolation::new(
             EquivalenceViolationKind::Result {
@@ -1544,7 +1824,10 @@ fn oracle_gate_catches_wrong_gradient_association_not_schema() {
     let error = assess_materialized_program(&program, &semantics, &expected_for_oracle_subject())
         .expect_err("the wrong association must fail the gate");
     assert!(
-        matches!(error.kind, EquivalenceViolationKind::GradientAssociation { .. }),
+        matches!(
+            error.kind,
+            EquivalenceViolationKind::GradientAssociation { .. }
+        ),
         "wrong association must be caught as an oracle mismatch, got {error:?}"
     );
 }

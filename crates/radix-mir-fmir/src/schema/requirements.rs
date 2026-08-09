@@ -1,5 +1,7 @@
 use crate::error::FmirImageError;
-use crate::schema::{DeviceArtifactFormat, DeviceTargetId, FmirDeviceBackend, MaterializationStage};
+use crate::schema::{
+    DeviceArtifactFormat, DeviceTargetId, FmirDeviceBackend, MaterializationStage,
+};
 
 /// Whether a runtime requirement is a known `host:*` capability.
 ///
@@ -141,7 +143,10 @@ pub fn is_known_target_feature(feature: &str) -> bool {
 /// duplicate.
 pub fn validate_duplicate_target_features(target: &DeviceTargetId) -> Result<(), FmirImageError> {
     for (index, feature) in target.required_features.iter().enumerate() {
-        if target.required_features[..index].iter().any(|seen| seen == feature) {
+        if target.required_features[..index]
+            .iter()
+            .any(|seen| seen == feature)
+        {
             return Err(FmirImageError::DuplicateRequiredFeature {
                 feature: feature.clone(),
             });

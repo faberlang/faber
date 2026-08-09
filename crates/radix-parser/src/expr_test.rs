@@ -931,10 +931,7 @@ fn conversio_assign_recovery_is_legal_on_conversio_assign() {
         !matches!(outer.op, AssignOp::Assign),
         "the ↤ operator must be preserved as a distinct assign op"
     );
-    assert!(
-        outer.recovery.is_some(),
-        "⇥ c must attach to the ↤ form"
-    );
+    assert!(outer.recovery.is_some(), "⇥ c must attach to the ↤ form");
     assert!(matches!(
         outer.recovery.as_deref().expect("recovery").kind,
         ExprKind::Ident(_)
@@ -946,10 +943,7 @@ fn conversio_recovery_is_rejected_on_ordinary_assign() {
     // `⇥` inline recovery is legal only on `↤` (and after `↦ type`); on an
     // ordinary `←` assignment it is a structured rejection, not a silent
     // leftover-token error.
-    crate::test_support::assert_parse_error_issue(
-        "a ← b ⇥ c",
-        "conversio_recovery_on_assign",
-    );
+    crate::test_support::assert_parse_error_issue("a ← b ⇥ c", "conversio_recovery_on_assign");
 }
 
 #[test]
@@ -970,10 +964,7 @@ fn conversio_assign_bare_json_right_side_is_grammar_driven_not_type_driven() {
         "the ↤ operator must be preserved as a distinct assign op"
     );
     assert!(
-        matches!(
-            assign.value.kind,
-            ExprKind::Literal(Literal::JsonValor(_))
-        ),
+        matches!(assign.value.kind, ExprKind::Literal(Literal::JsonValor(_))),
         "bare {{ ... }} must parse as a JSON literal, got {:?}",
         assign.value.kind
     );

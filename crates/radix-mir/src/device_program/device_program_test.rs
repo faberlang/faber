@@ -1662,7 +1662,12 @@ fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
         workgroup_count: MirKernelWorkgroupCount { x: 1, y: 1, z: 1 },
     };
 
-    let intermediate = identity(0, "intermediate", BufferRole::InOut, BufferLifetime::PerStep);
+    let intermediate = identity(
+        0,
+        "intermediate",
+        BufferRole::InOut,
+        BufferLifetime::PerStep,
+    );
     let output = identity(1, "output", BufferRole::Output, BufferLifetime::PerStep);
 
     let mut program = DeviceProgram::new(DeviceProgramLifetime::SingleRun);
@@ -1674,7 +1679,10 @@ fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
             resources: vec![DeviceResource {
                 buffer: intermediate.clone(),
                 version: version(1, element_ty.clone(), 4),
-                binding: Binding { group: 0, binding: 0 },
+                binding: Binding {
+                    group: 0,
+                    binding: 0,
+                },
                 access: MirKernelResourceAccess::Write,
             }],
             launch: launch_plan(4),
@@ -1687,13 +1695,19 @@ fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
                 DeviceResource {
                     buffer: intermediate.clone(),
                     version: version(1, element_ty.clone(), 4),
-                    binding: Binding { group: 0, binding: 0 },
+                    binding: Binding {
+                        group: 0,
+                        binding: 0,
+                    },
                     access: MirKernelResourceAccess::Read,
                 },
                 DeviceResource {
                     buffer: output.clone(),
                     version: version(1, element_ty.clone(), 2),
-                    binding: Binding { group: 0, binding: 1 },
+                    binding: Binding {
+                        group: 0,
+                        binding: 1,
+                    },
                     access: MirKernelResourceAccess::Write,
                 },
             ],
@@ -1701,8 +1715,14 @@ fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
         },
     ];
     program.launches = vec![
-        LaunchUnit { id: LaunchId(0), kernel_index: 0 },
-        LaunchUnit { id: LaunchId(1), kernel_index: 1 },
+        LaunchUnit {
+            id: LaunchId(0),
+            kernel_index: 0,
+        },
+        LaunchUnit {
+            id: LaunchId(1),
+            kernel_index: 1,
+        },
     ];
 
     let semantics = DeviceSemantics {
@@ -1728,8 +1748,14 @@ fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
             },
         ],
         bindings: vec![
-            ValueBinding { value: SemanticValueId(1), buffer: BufferId(0) },
-            ValueBinding { value: SemanticValueId(2), buffer: BufferId(1) },
+            ValueBinding {
+                value: SemanticValueId(1),
+                buffer: BufferId(0),
+            },
+            ValueBinding {
+                value: SemanticValueId(2),
+                buffer: BufferId(1),
+            },
         ],
         generations: vec![
             ValueGeneration {
@@ -1909,9 +1935,9 @@ fn persistent_writable_state_never_automatically_results() {
         program.results.is_empty(),
         "precondition: no result rows are declared"
     );
-    program
-        .validate_with_semantics(&semantics)
-        .expect("a writable persistent buffer with no declared observation is never an automatic result");
+    program.validate_with_semantics(&semantics).expect(
+        "a writable persistent buffer with no declared observation is never an automatic result",
+    );
     assert!(
         program.buffer_registry().buffer(BufferId(0)).is_some(),
         "the persistent writable buffer stays in the program"
@@ -1979,7 +2005,11 @@ fn forward_and_backward_coexist_without_runtime_tape() {
     program
         .validate_with_semantics(&semantics)
         .expect("the pair validates with graph + relations as the only accounting");
-    assert_eq!(program.kernels.len(), 2, "one forward + one backward kernel");
+    assert_eq!(
+        program.kernels.len(),
+        2,
+        "one forward + one backward kernel"
+    );
     assert_eq!(program.launches.len(), 2);
     assert_eq!(semantics.relations.len(), 1);
 }
@@ -2071,7 +2101,10 @@ fn three_chain_program_with_middle_observation() -> (DeviceProgram, DeviceSemant
             resources: vec![DeviceResource {
                 buffer: b0.clone(),
                 version: version(1, element_ty.clone(), 4),
-                binding: Binding { group: 0, binding: 0 },
+                binding: Binding {
+                    group: 0,
+                    binding: 0,
+                },
                 access: MirKernelResourceAccess::Write,
             }],
             launch: launch_plan(4),
@@ -2084,13 +2117,19 @@ fn three_chain_program_with_middle_observation() -> (DeviceProgram, DeviceSemant
                 DeviceResource {
                     buffer: b0,
                     version: version(1, element_ty.clone(), 4),
-                    binding: Binding { group: 0, binding: 0 },
+                    binding: Binding {
+                        group: 0,
+                        binding: 0,
+                    },
                     access: MirKernelResourceAccess::Read,
                 },
                 DeviceResource {
                     buffer: b1.clone(),
                     version: version(1, element_ty.clone(), 4),
-                    binding: Binding { group: 0, binding: 1 },
+                    binding: Binding {
+                        group: 0,
+                        binding: 1,
+                    },
                     access: MirKernelResourceAccess::Write,
                 },
             ],
@@ -2104,13 +2143,19 @@ fn three_chain_program_with_middle_observation() -> (DeviceProgram, DeviceSemant
                 DeviceResource {
                     buffer: b1,
                     version: version(1, element_ty.clone(), 4),
-                    binding: Binding { group: 0, binding: 0 },
+                    binding: Binding {
+                        group: 0,
+                        binding: 0,
+                    },
                     access: MirKernelResourceAccess::Read,
                 },
                 DeviceResource {
                     buffer: b2,
                     version: version(1, element_ty.clone(), 4),
-                    binding: Binding { group: 0, binding: 1 },
+                    binding: Binding {
+                        group: 0,
+                        binding: 1,
+                    },
                     access: MirKernelResourceAccess::Write,
                 },
             ],
@@ -2118,9 +2163,18 @@ fn three_chain_program_with_middle_observation() -> (DeviceProgram, DeviceSemant
         },
     ];
     program.launches = vec![
-        LaunchUnit { id: LaunchId(0), kernel_index: 0 },
-        LaunchUnit { id: LaunchId(1), kernel_index: 1 },
-        LaunchUnit { id: LaunchId(2), kernel_index: 2 },
+        LaunchUnit {
+            id: LaunchId(0),
+            kernel_index: 0,
+        },
+        LaunchUnit {
+            id: LaunchId(1),
+            kernel_index: 1,
+        },
+        LaunchUnit {
+            id: LaunchId(2),
+            kernel_index: 2,
+        },
     ];
     program.results.push(ResultBuffer {
         buffer: identity(
@@ -2168,9 +2222,18 @@ fn three_chain_program_with_middle_observation() -> (DeviceProgram, DeviceSemant
             },
         ],
         bindings: vec![
-            ValueBinding { value: SemanticValueId(1), buffer: BufferId(0) },
-            ValueBinding { value: SemanticValueId(2), buffer: BufferId(1) },
-            ValueBinding { value: SemanticValueId(3), buffer: BufferId(2) },
+            ValueBinding {
+                value: SemanticValueId(1),
+                buffer: BufferId(0),
+            },
+            ValueBinding {
+                value: SemanticValueId(2),
+                buffer: BufferId(1),
+            },
+            ValueBinding {
+                value: SemanticValueId(3),
+                buffer: BufferId(2),
+            },
         ],
         generations: vec![
             ValueGeneration {

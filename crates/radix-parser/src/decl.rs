@@ -183,7 +183,9 @@ impl Parser {
         let init = if self.eat(&TokenKind::Assign) {
             Some(Box::new(self.parse_expression()?))
         } else if self.check(&TokenKind::ConversioAssign) {
-            Some(Box::new(self.parse_conversio_assign_initializer(&ty, &binding)?))
+            Some(Box::new(
+                self.parse_conversio_assign_initializer(&ty, &binding)?,
+            ))
         } else {
             None
         };
@@ -214,21 +216,20 @@ impl Parser {
         ty: &Option<TypeExpr>,
         binding: &BindingPattern,
     ) -> Result<Expr, ParseError> {
-        let has_concrete_type =
-            ty.as_ref().is_some_and(|t| !matches!(t.kind, TypeExprKind::Infer));
+        let has_concrete_type = ty
+            .as_ref()
+            .is_some_and(|t| !matches!(t.kind, TypeExprKind::Infer));
         let BindingPattern::Ident(ident) = binding else {
-            return Err(ParseError::structured(
-                ParseErrorKind::Unexpected,
-                self.current_span(),
-            )
-            .with_arg("issue", "conversio_assign_requires_concrete_type"));
+            return Err(
+                ParseError::structured(ParseErrorKind::Unexpected, self.current_span())
+                    .with_arg("issue", "conversio_assign_requires_concrete_type"),
+            );
         };
         if !has_concrete_type {
-            return Err(ParseError::structured(
-                ParseErrorKind::Unexpected,
-                self.current_span(),
-            )
-            .with_arg("issue", "conversio_assign_requires_concrete_type"));
+            return Err(
+                ParseError::structured(ParseErrorKind::Unexpected, self.current_span())
+                    .with_arg("issue", "conversio_assign_requires_concrete_type"),
+            );
         }
         // `Ident` is not `Clone`; rebuild the binding name for the target
         // expression from its Copy fields.
@@ -269,11 +270,10 @@ impl Parser {
         // implicit conversion and await ordering needs a separate language
         // decision, so `↤` here is a structured rejection.
         if self.check(&TokenKind::ConversioAssign) {
-            return Err(ParseError::structured(
-                ParseErrorKind::Unexpected,
-                self.current_span(),
-            )
-            .with_arg("issue", "conversio_assign_await_unsupported"));
+            return Err(
+                ParseError::structured(ParseErrorKind::Unexpected, self.current_span())
+                    .with_arg("issue", "conversio_assign_await_unsupported"),
+            );
         }
         self.expect(&TokenKind::Assign, "expected '←' after awaited binding")?;
         let init = Some(Box::new(self.parse_expression()?));
@@ -346,11 +346,10 @@ impl Parser {
         } else if self.check(&TokenKind::ConversioAssign) {
             // `sit` is an inferred binding (≡ `fixum _`): no concrete
             // destination type, so conversion-directed assignment is rejected.
-            return Err(ParseError::structured(
-                ParseErrorKind::Unexpected,
-                self.current_span(),
-            )
-            .with_arg("issue", "conversio_assign_requires_concrete_type"));
+            return Err(
+                ParseError::structured(ParseErrorKind::Unexpected, self.current_span())
+                    .with_arg("issue", "conversio_assign_requires_concrete_type"),
+            );
         } else {
             // WHY: `sit x` is the inferred deferred immutable (≡ `fixum _ x`).
             // We do not peek for a trailing identifier here: newlines are not

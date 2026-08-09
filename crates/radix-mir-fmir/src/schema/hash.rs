@@ -115,15 +115,32 @@ pub fn packet_sha256_canonical(
     if let Some(reflection) = reflection {
         push_field(&mut canonical, "reflection-v", &reflection.v.to_le_bytes());
         let mut kernels: Vec<&FmirReflectedKernel> = reflection.kernels.iter().collect();
-        kernels.sort_unstable_by_key(|kernel| (kernel.function.as_str(), kernel.entry_name.as_str()));
+        kernels
+            .sort_unstable_by_key(|kernel| (kernel.function.as_str(), kernel.entry_name.as_str()));
         for kernel in &kernels {
-            push_field(&mut canonical, "reflected-kernel", kernel.function.as_bytes());
-            push_field(&mut canonical, "reflected-entry", kernel.entry_name.as_bytes());
+            push_field(
+                &mut canonical,
+                "reflected-kernel",
+                kernel.function.as_bytes(),
+            );
+            push_field(
+                &mut canonical,
+                "reflected-entry",
+                kernel.entry_name.as_bytes(),
+            );
             let mut resources: Vec<&FmirReflectedResource> = kernel.resources.iter().collect();
             resources.sort_unstable_by_key(|resource| (resource.binding, resource.name.as_str()));
             for resource in &resources {
-                push_field(&mut canonical, "reflected-resource", resource.name.as_bytes());
-                push_field(&mut canonical, "reflected-binding", &resource.binding.to_le_bytes());
+                push_field(
+                    &mut canonical,
+                    "reflected-resource",
+                    resource.name.as_bytes(),
+                );
+                push_field(
+                    &mut canonical,
+                    "reflected-binding",
+                    &resource.binding.to_le_bytes(),
+                );
             }
         }
     }

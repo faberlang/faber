@@ -85,7 +85,11 @@ impl Parser {
     /// Shared by the expression grammar (ternary LHS) and typed declaration
     /// initializers (binding LHS) so the `↤` contract — same precedence as
     /// `←`, right-associative, `⇥` recovery on `↤` only — lives in one place.
-    pub(super) fn parse_assignment_tail(&mut self, target: Expr, start: Span) -> Result<Expr, ParseError> {
+    pub(super) fn parse_assignment_tail(
+        &mut self,
+        target: Expr,
+        start: Span,
+    ) -> Result<Expr, ParseError> {
         let op = match self.peek().kind {
             TokenKind::Assign => AssignOp::Assign,
             TokenKind::ConversioAssign => AssignOp::ConversioAssign,

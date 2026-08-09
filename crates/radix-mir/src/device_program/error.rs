@@ -251,19 +251,13 @@ pub enum DeviceProgramError {
     /// rule 6/7). Graph-direction references (a launch consuming a companion
     /// output with no relation) are proven by the independent oracle
     /// (G6 KernelSequence).
-    MissingCompanionFact {
-        primal: DefId,
-        reason: &'static str,
-    },
+    MissingCompanionFact { primal: DefId, reason: &'static str },
     // ── DDCP1-U5: prepared submission regions ────────────────────────────
     /// A prepared submission region contains a declared observation point in
     /// its interior — the host would have to read back between members, a
     /// CPU observation the region's single host call forbids (contract
     /// §Prepared submission regions rule 3).
-    RegionCrossesBoundary {
-        region: RegionId,
-        launch: LaunchId,
-    },
+    RegionCrossesBoundary { region: RegionId, launch: LaunchId },
     /// A prepared submission region's members are not path-connected through
     /// the carried dependency graph — a candidate group spanning disconnected
     /// launches (contract rule 1).

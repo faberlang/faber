@@ -567,7 +567,9 @@ fn dangling_consumer_without_incoming_edge_fails_closed() {
     };
     assert!(matches!(
         semantics.validate(&[LaunchId(1), LaunchId(2)]),
-        Err(DeviceProgramError::DanglingConsumer { launch: LaunchId(2) })
+        Err(DeviceProgramError::DanglingConsumer {
+            launch: LaunchId(2)
+        })
     ));
 }
 
@@ -633,7 +635,9 @@ fn edge_buffer_without_value_binding_fails_closed() {
     };
     assert!(matches!(
         semantics.validate(&[LaunchId(1), LaunchId(2)]),
-        Err(DeviceProgramError::UnboundEdgeBuffer { buffer: BufferId(9) })
+        Err(DeviceProgramError::UnboundEdgeBuffer {
+            buffer: BufferId(9)
+        })
     ));
 }
 
@@ -646,10 +650,7 @@ fn rename_cannot_split_one_identity() {
     // alias — a rename can never create a second identity.
     let origin = SemanticValueOrigin::HostInput;
     let semantics = DeviceSemantics {
-        values: vec![
-            value(1, "x", origin.clone()),
-            value(2, "renamed", origin),
-        ],
+        values: vec![value(1, "x", origin.clone()), value(2, "renamed", origin)],
         ..DeviceSemantics::default()
     };
     assert!(matches!(
@@ -671,9 +672,7 @@ fn identical_fact_sets_validate_identically_across_rebuilds() {
     let first = ordered_chain_semantics(false);
     let second = ordered_chain_semantics(false);
     let launches: Vec<LaunchId> = vec![LaunchId(1), LaunchId(2)];
-    first
-        .validate(&launches)
-        .expect("first build validates");
+    first.validate(&launches).expect("first build validates");
     second
         .validate(&launches)
         .expect("second identical build validates identically");
@@ -974,7 +973,9 @@ fn region_with_disconnected_members_fails_closed() {
     ];
     assert!(matches!(
         semantics.validate_regions(&launches, &bad),
-        Err(DeviceProgramError::RegionMembersDisconnected { region: RegionId(0) })
+        Err(DeviceProgramError::RegionMembersDisconnected {
+            region: RegionId(0)
+        })
     ));
 }
 
@@ -989,7 +990,9 @@ fn launch_outside_region_partition_fails_closed() {
     }];
     assert!(matches!(
         semantics.validate_regions(&launches, &partial),
-        Err(DeviceProgramError::RegionUnassignedLaunch { launch: LaunchId(2) })
+        Err(DeviceProgramError::RegionUnassignedLaunch {
+            launch: LaunchId(2)
+        })
     ));
 }
 
@@ -1106,7 +1109,9 @@ fn device_effect_fact_on_unknown_launch_fails_closed() {
     });
     assert!(matches!(
         facts.validate(&launches),
-        Err(DeviceProgramError::UnknownDeviceEffectLaunch { launch: LaunchId(9) })
+        Err(DeviceProgramError::UnknownDeviceEffectLaunch {
+            launch: LaunchId(9)
+        })
     ));
 }
 

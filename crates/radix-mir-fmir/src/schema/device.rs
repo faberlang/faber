@@ -328,8 +328,10 @@ impl FmirDeviceArtifact {
     /// equivalent sets always hash to an identical packet identity.
     pub fn canonicalize_artifact(&mut self) {
         self.target.required_features.sort();
-        self.entrypoints
-            .sort_by(|left, right| (left.entry.as_str(), left.symbol.as_str()).cmp(&(right.entry.as_str(), right.symbol.as_str())));
+        self.entrypoints.sort_by(|left, right| {
+            (left.entry.as_str(), left.symbol.as_str())
+                .cmp(&(right.entry.as_str(), right.symbol.as_str()))
+        });
         if let Some(reflection) = &mut self.reflection {
             reflection.kernels.sort_by(|left, right| {
                 (left.function.as_str(), left.entry_name.as_str())
@@ -568,8 +570,7 @@ impl std::fmt::Display for DevicePayloadEncodingError {
 /// dependency surface).
 #[must_use]
 pub fn canonical_unpadded_base64(bytes: &[u8]) -> String {
-    const ALPHABET: &[u8; 64] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {
         let b0 = chunk[0] as u32;

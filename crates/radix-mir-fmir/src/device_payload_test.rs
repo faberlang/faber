@@ -25,15 +25,15 @@ use crate::schema::{
     WireBinding, WireBroadcastDeclaration, WireBroadcastFact, WireBufferIdentity,
     WireBufferLifetime, WireBufferRole, WireBufferVersion, WireCausalMaskedSoftmaxPlan,
     WireCollectionKernelPlan, WireCompanionDerivativeKind, WireCompanionRelation,
-    WireCompanionSelectedInput, WireCompanionSelectedOutput, WireDependencyEdge,
-    WireDeviceProgram, WireDeviceResource, WireDispatchSize, WireGatherPlan,
-    WireInitializationPolicy, WireKernelLaunchPlan, WireKernelUnit, WireLaunchUnit,
-    WireLayerNormalizationPlan, WireObservationCadence, WireObservationFact,
-    WireProgramLifetime, WireReduceOp, WireReducedProjection, WireResourceAccess,
-    WireResultBuffer, WireRmsNormalizationPlan, WireRopePlan, WireRowSoftmaxPlan,
-    WireSemanticValue, WireSemanticValueOrigin, WireStorageLayout, WireWorkgroupCount,
-    WireWorkgroupSize, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, ARTIFACT_ABI_VERSION,
-    PACKAGE_MIR_ARTIFACT_VERSION, WIRE_DEVICE_PROGRAM_VERSION,
+    WireCompanionSelectedInput, WireCompanionSelectedOutput, WireDependencyEdge, WireDeviceProgram,
+    WireDeviceResource, WireDispatchSize, WireGatherPlan, WireInitializationPolicy,
+    WireKernelLaunchPlan, WireKernelUnit, WireLaunchUnit, WireLayerNormalizationPlan,
+    WireObservationCadence, WireObservationFact, WireProgramLifetime, WireReduceOp,
+    WireReducedProjection, WireResourceAccess, WireResultBuffer, WireRmsNormalizationPlan,
+    WireRopePlan, WireRowSoftmaxPlan, WireSemanticValue, WireSemanticValueOrigin,
+    WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize, ARTIFACT_ABI_VERSION,
+    FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION,
+    WIRE_DEVICE_PROGRAM_VERSION,
 };
 use radix_mir::MirProgram;
 use radix_types::TypeTable;
@@ -507,7 +507,10 @@ fn decode_rejects_unknown_target_feature() {
     // allowlist — an unknown required feature fails closed with the named
     // rule, never guessed, never silently dropped.
     let mut section = sample_device_section();
-    section.artifacts.artifact[1].target.required_features.push("vulkan".to_owned());
+    section.artifacts.artifact[1]
+        .target
+        .required_features
+        .push("vulkan".to_owned());
     section.artifacts.artifact[1].packet_sha256 =
         section.artifacts.artifact[1].compute_packet_sha256();
     let image = text_image_with_device(Some(section));
@@ -630,7 +633,9 @@ fn binary_payload_spelling_is_the_declared_transport_form() {
         artifact.binary_payload_spelling(),
         format!("binary:elf:4:{}", canonical_unpadded_base64(&[1, 2, 3, 4]))
     );
-    artifact.validate_encoding().expect("the declared binary spelling is consistent");
+    artifact
+        .validate_encoding()
+        .expect("the declared binary spelling is consistent");
     // Round-trip through the binary codec (the section carries the artifact).
     let mut section = sample_device_section();
     section.artifacts.artifact[1] = artifact;
@@ -648,12 +653,13 @@ fn unknown_backend_artifact_preserved_until_selection() {
     // (preserved-until-selection). Never silently dropped, never remapped,
     // never fallback-laned.
     let mut section = sample_device_section();
-    section.artifacts.artifact.push(with_computed_digests(
-        FmirDeviceArtifact {
+    section
+        .artifacts
+        .artifact
+        .push(with_computed_digests(FmirDeviceArtifact {
             backend: FmirDeviceBackend::Unknown("amd".to_owned()),
             ..metal_artifact("amd kernel")
-        },
-    ));
+        }));
     let image = text_image_with_device(Some(section));
     let text = encode_text_image(&image).expect("encode text image");
     decode_text_image(&text, TOOLCHAIN)
@@ -733,18 +739,44 @@ fn assert_packet_round_trips(section: FmirDeviceSection, artifact_index: usize) 
     let text_image = text_image_with_device(Some(section.clone()));
     let text = encode_text_image(&text_image).expect("encode text image");
     let decoded_text = decode_text_image(&text, TOOLCHAIN).expect("decode text image");
-    let text_artifact = &decoded_text.device.expect("device section").artifacts.artifact[artifact_index];
-    assert_eq!(text_artifact.bytes, source_bytes, "text codec preserves the decoded bytes");
-    assert_eq!(text_artifact.content_sha256, source_content, "text codec preserves content_sha256");
-    assert_eq!(text_artifact.packet_sha256, source_packet, "text codec preserves packet_sha256");
+    let text_artifact = &decoded_text
+        .device
+        .expect("device section")
+        .artifacts
+        .artifact[artifact_index];
+    assert_eq!(
+        text_artifact.bytes, source_bytes,
+        "text codec preserves the decoded bytes"
+    );
+    assert_eq!(
+        text_artifact.content_sha256, source_content,
+        "text codec preserves content_sha256"
+    );
+    assert_eq!(
+        text_artifact.packet_sha256, source_packet,
+        "text codec preserves packet_sha256"
+    );
 
     let binary_image = binary_image_with_device(Some(section));
     let bytes = encode_binary_image(&binary_image).expect("encode binary image");
     let decoded_binary = decode_binary_image(&bytes, TOOLCHAIN).expect("decode binary image");
-    let binary_artifact = &decoded_binary.device.expect("device section").artifacts.artifact[artifact_index];
-    assert_eq!(binary_artifact.bytes, source_bytes, "binary codec preserves the decoded bytes");
-    assert_eq!(binary_artifact.content_sha256, source_content, "binary codec preserves content_sha256");
-    assert_eq!(binary_artifact.packet_sha256, source_packet, "binary codec preserves packet_sha256");
+    let binary_artifact = &decoded_binary
+        .device
+        .expect("device section")
+        .artifacts
+        .artifact[artifact_index];
+    assert_eq!(
+        binary_artifact.bytes, source_bytes,
+        "binary codec preserves the decoded bytes"
+    );
+    assert_eq!(
+        binary_artifact.content_sha256, source_content,
+        "binary codec preserves content_sha256"
+    );
+    assert_eq!(
+        binary_artifact.packet_sha256, source_packet,
+        "binary codec preserves packet_sha256"
+    );
 }
 
 #[test]
@@ -793,8 +825,7 @@ fn fixture_02_binary_payload_round_trips_with_declared_spelling() {
         },
         bytes: FIXTURE_METALLIB_BYTES.to_vec(),
         compiler_input_packet_sha256: Some(
-            "sha256:ce6abbcc288b78bb53bae05edd5676f9a634d036195794c99587753434d5470e"
-                .to_owned(),
+            "sha256:ce6abbcc288b78bb53bae05edd5676f9a634d036195794c99587753434d5470e".to_owned(),
         ),
         ..metal_artifact("")
     });
@@ -878,8 +909,7 @@ fn fixture_04_and_06_packet_digests_recompute_under_the_schema() {
         None,
     );
     assert_eq!(
-        compiler_input,
-        "sha256:ce6abbcc288b78bb53bae05edd5676f9a634d036195794c99587753434d5470e",
+        compiler_input, "sha256:ce6abbcc288b78bb53bae05edd5676f9a634d036195794c99587753434d5470e",
         "fixture-04 packet_sha256 recomputes under the schema (canonical identity)"
     );
     let finalized = packet_sha256_canonical(
@@ -898,8 +928,7 @@ fn fixture_04_and_06_packet_digests_recompute_under_the_schema() {
         Some(&compiler_input),
     );
     assert_eq!(
-        finalized,
-        "sha256:d46fa0db02b221c001e9c760bfb3dcf564953c9e171732eeb198ab410d4787b1",
+        finalized, "sha256:d46fa0db02b221c001e9c760bfb3dcf564953c9e171732eeb198ab410d4787b1",
         "fixture-06 packet_sha256 recomputes under the schema with the parent fold"
     );
 }
@@ -962,10 +991,7 @@ fn equivalent_sets_hash_to_identical_packet_identity() {
         canonicalized.target.required_features,
         vec!["cuda".to_owned(), "sm_120".to_owned(), "sm_80".to_owned()]
     );
-    assert_eq!(
-        canonicalized.entrypoints.first().unwrap().entry,
-        "alpha"
-    );
+    assert_eq!(canonicalized.entrypoints.first().unwrap().entry, "alpha");
 }
 
 #[test]
@@ -1184,9 +1210,8 @@ fn unknown_backend_artifact_skips_leaf_combination_rules() {
     })];
     let image = text_image_with_device(Some(section));
     let text = encode_text_image(&image).expect("encode text image");
-    decode_text_image(&text, TOOLCHAIN).expect(
-        "an unknown-backend artifact is admitted as far as its declared fields allow",
-    );
+    decode_text_image(&text, TOOLCHAIN)
+        .expect("an unknown-backend artifact is admitted as far as its declared fields allow");
 }
 
 #[test]
@@ -1278,12 +1303,13 @@ fn unknown_backend_is_representable_and_preserved_at_load() {
     // a load-time rejection (that path is gone); build the packet through
     // the typed helpers so the digests are canonical and admission passes.
     let mut section = sample_device_section();
-    section.artifacts.artifact.push(with_computed_digests(
-        FmirDeviceArtifact {
+    section
+        .artifacts
+        .artifact
+        .push(with_computed_digests(FmirDeviceArtifact {
             backend: FmirDeviceBackend::Unknown("rocm".to_owned()),
             ..metal_artifact("rocm kernel")
-        },
-    ));
+        }));
     let image = text_image_with_device(Some(section));
     let text = encode_text_image(&image).expect("encode text image");
     let decoded = decode_text_image(&text, TOOLCHAIN)
@@ -1293,18 +1319,22 @@ fn unknown_backend_is_representable_and_preserved_at_load() {
         .expect("device section present")
         .artifacts
         .artifact[2];
-    assert_eq!(artifact.backend, FmirDeviceBackend::Unknown("rocm".to_owned()));
+    assert_eq!(
+        artifact.backend,
+        FmirDeviceBackend::Unknown("rocm".to_owned())
+    );
 
     // The same unknown-backend ARTIFACT under an explicit unknown SELECTION
     // fails admission at selection resolution.
     let mut section = sample_device_section();
     section.selection = FmirDeviceSelection::Unknown("rocm".to_owned());
-    section.artifacts.artifact.push(with_computed_digests(
-        FmirDeviceArtifact {
+    section
+        .artifacts
+        .artifact
+        .push(with_computed_digests(FmirDeviceArtifact {
             backend: FmirDeviceBackend::Unknown("rocm".to_owned()),
             ..metal_artifact("rocm kernel")
-        },
-    ));
+        }));
     let image = text_image_with_device(Some(section));
     let text = encode_text_image(&image).expect("encode text image");
     assert!(matches!(
@@ -2311,7 +2341,10 @@ fn content_digest_re_verified_over_decoded_bytes() {
     let bytes = encode_binary_image(&image).expect("encode binary image");
     assert!(matches!(
         decode_binary_image(&bytes, TOOLCHAIN),
-        Err(FmirImageError::ArtifactDigestMismatch { field: "content_sha256", .. })
+        Err(FmirImageError::ArtifactDigestMismatch {
+            field: "content_sha256",
+            ..
+        })
     ));
 }
 
@@ -2363,7 +2396,8 @@ fn finalized_artifact_preserves_parent_provenance() {
     section2.artifacts.artifact = vec![with_parent];
     let image2 = binary_image_with_device(Some(section2));
     let bytes2 = encode_binary_image(&image2).expect("encode binary image");
-    decode_binary_image(&bytes2, TOOLCHAIN).expect("finalized artifact with parent provenance admits");
+    decode_binary_image(&bytes2, TOOLCHAIN)
+        .expect("finalized artifact with parent provenance admits");
 }
 
 // ---------------------------------------------------------------------------

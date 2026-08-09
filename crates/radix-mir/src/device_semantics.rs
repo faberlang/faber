@@ -671,7 +671,9 @@ impl DeviceSemantics {
                 .iter()
                 .find(|binding| binding.buffer == edge.buffer)
             else {
-                return Err(DeviceProgramError::UnboundEdgeBuffer { buffer: edge.buffer });
+                return Err(DeviceProgramError::UnboundEdgeBuffer {
+                    buffer: edge.buffer,
+                });
             };
             if !self.generations.iter().any(|generation| {
                 generation.value == binding.value && generation.produced_by == edge.producer
@@ -700,7 +702,11 @@ impl DeviceSemantics {
             if self.roots.contains(launch) {
                 continue;
             }
-            if !self.dependencies.iter().any(|edge| edge.consumer == *launch) {
+            if !self
+                .dependencies
+                .iter()
+                .any(|edge| edge.consumer == *launch)
+            {
                 return Err(DeviceProgramError::DanglingConsumer { launch: *launch });
             }
         }
@@ -1165,9 +1171,7 @@ impl DeviceSemantics {
             }
             // Connectivity: the members form one path-connected group.
             if !self.members_connected(&region.launches) {
-                return Err(DeviceProgramError::RegionMembersDisconnected {
-                    region: region.id,
-                });
+                return Err(DeviceProgramError::RegionMembersDisconnected { region: region.id });
             }
         }
         Ok(())

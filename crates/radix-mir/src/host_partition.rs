@@ -545,12 +545,10 @@ pub fn derive_partition_record(
             .kernels
             .iter()
             .map(|kernel| {
-                program
-                    .function_by_id(*kernel)
-                    .map_or_else(
-                        || format!("kernel{}", kernel.0),
-                        |function| kernel_entry_name(function, interner),
-                    )
+                program.function_by_id(*kernel).map_or_else(
+                    || format!("kernel{}", kernel.0),
+                    |function| kernel_entry_name(function, interner),
+                )
             })
             .collect();
         regions.push(RegionRecord {

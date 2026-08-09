@@ -1020,10 +1020,7 @@ fn lexes_conversio_assign_glyph_as_dedicated_token() {
         result.errors
     );
     assert!(
-        !result
-            .tokens
-            .iter()
-            .any(|t| t.kind == TokenKind::Error),
+        !result.tokens.iter().any(|t| t.kind == TokenKind::Error),
         "U+21A4 must not produce an Error recovery token"
     );
 }
@@ -1043,10 +1040,7 @@ fn conversio_assign_glyph_does_not_scan_as_existing_arrow() {
         assert!(
             !matches!(
                 token.kind,
-                TokenKind::Assign
-                    | TokenKind::Conversio
-                    | TokenKind::ExitArrow
-                    | TokenKind::Arrow
+                TokenKind::Assign | TokenKind::Conversio | TokenKind::ExitArrow | TokenKind::Arrow
             ),
             "U+21A4 must not alias an existing arrow token, got {:?}",
             token.kind
@@ -1139,7 +1133,10 @@ fn conversio_assign_does_not_normalize_neighbor_glyphs() {
     ] {
         let result = lex(src);
         assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
-        assert_eq!(result.tokens[0].kind, expected, "{src} must stay {expected:?}");
+        assert_eq!(
+            result.tokens[0].kind, expected,
+            "{src} must stay {expected:?}"
+        );
     }
 }
 

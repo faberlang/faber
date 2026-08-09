@@ -106,7 +106,9 @@ pub(crate) fn check_artifact_digests(
                 if artifact.compiler_input_packet_sha256.is_some() {
                     return Err(crate::error::FmirImageError::CompilerInputProvenance {
                         backend,
-                        detail: "a compiler-input artifact must not carry a parent packet provenance".to_owned(),
+                        detail:
+                            "a compiler-input artifact must not carry a parent packet provenance"
+                                .to_owned(),
                     });
                 }
             }
@@ -127,11 +129,13 @@ pub(crate) fn check_artifact_abi_versions(
 ) -> Result<(), crate::error::FmirImageError> {
     for artifact in &device.artifacts.artifact {
         if artifact.abi_version != ARTIFACT_ABI_VERSION {
-            return Err(crate::error::FmirImageError::UnsupportedArtifactAbiVersion {
-                backend: artifact.backend.spelling(),
-                actual: artifact.abi_version,
-                accepted: ARTIFACT_ABI_VERSION,
-            });
+            return Err(
+                crate::error::FmirImageError::UnsupportedArtifactAbiVersion {
+                    backend: artifact.backend.spelling(),
+                    actual: artifact.abi_version,
+                    accepted: ARTIFACT_ABI_VERSION,
+                },
+            );
         }
     }
     Ok(())
@@ -212,9 +216,11 @@ pub(crate) fn check_selection_artifacts(
     match &device.selection {
         crate::schema::FmirDeviceSelection::Metal | crate::schema::FmirDeviceSelection::Cuda => {
             let selected = device.selection.spelling();
-            let present = device.artifacts.artifact.iter().any(|artifact| {
-                artifact.backend.spelling() == selected
-            });
+            let present = device
+                .artifacts
+                .artifact
+                .iter()
+                .any(|artifact| artifact.backend.spelling() == selected);
             if !present {
                 return Err(crate::error::FmirImageError::MissingArtifactForSelection {
                     selection: selected,

@@ -542,9 +542,12 @@ pub fn validate_per_output_domains(program: &DeviceProgram) -> Result<(), Device
 /// The total lanes the shared dispatch launches: workgroup count ×
 /// workgroup size across all three axes.
 fn dispatched_lanes(launch: &KernelLaunchPlan) -> u64 {
-    u64::from(launch.workgroup_count.x) * u64::from(launch.workgroup.x)
-        * u64::from(launch.workgroup_count.y) * u64::from(launch.workgroup.y)
-        * u64::from(launch.workgroup_count.z) * u64::from(launch.workgroup.z)
+    u64::from(launch.workgroup_count.x)
+        * u64::from(launch.workgroup.x)
+        * u64::from(launch.workgroup_count.y)
+        * u64::from(launch.workgroup.y)
+        * u64::from(launch.workgroup_count.z)
+        * u64::from(launch.workgroup.z)
 }
 
 /// The recipe's shared-memory footprint in bytes (the host sizes the
