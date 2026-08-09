@@ -109,8 +109,13 @@ faber run --backend auto  <package>   # resolve: exactly one admitted backend
   `E_DEVICE_DESCRIPTOR`, `E_DEVICE_ABI_MISMATCH`, `E_DEVICE_ENTRY_MISMATCH`,
   `E_DEVICE_DTYPE_MISMATCH`, `E_DEVICE_SHAPE_MISMATCH`, `E_NO_DEVICE_PROGRAM`).
 - The `faber targets` rows for `metal-text` / `llvm-text` report `run=yes`
-  for this device-execution surface (`package=no` until the Stage 7 archive
-  gate); `-t metal-text` / `-t llvm-text` remain emit-only.
+  and `package=yes` (RC-local) for this device-execution surface: the faber
+  `1.6.0-rc.1` release-candidate compiled FMIR packages (MLP + BERT-tiny)
+  ran at RC level on the named machines — burgus (Metal, Apple M5 Max) and
+  pharos (CUDA, NVIDIA RTX 5070) — by the Stage 7 E6/E7 receipts (RC binary +
+  clean-room extracted archive, numeric-policy v1.0.0 rows PASS). No E8, no
+  stable-publication, no broad-hardware wording; Stage 8 owns publication.
+  `-t metal-text` / `-t llvm-text` remain emit-only.
 
 ### Native host executables (`faber build/run --target llvm-host`)
 
@@ -150,6 +155,18 @@ against its pinned CPU oracle). The surface also materializes training loops
 end-to-end: a library-backed `train_step` / companion VJP with per-step
 observation cadence (loss), gradient-slot → buffer mapping, and end-of-run value
 readback.
+
+**Stage 7 RC proof (faber `1.6.0-rc.1`, 2026-08-08):** `examples/training/mlp`
+(100-step) and `examples/training/bert-tiny-fragment` (8-step) are the
+release-candidate fixtures. E6 receipts (TR7-U2 burgus Metal, TR7-U3 pharos
+CUDA) ran the RC binary via `faber run --backend metal|cuda .`; E7 receipts
+(TR7-U4/U5) ran the clean-room extracted RC archive via
+`__fmir-run image.fmir --backend metal|cuda` under a temp home, minimal PATH,
+and no sibling checkout. All numeric-policy v1.0.0 rows PASS on both machines
+at the pinned revisions; device output is byte-identical E6↔E7 (except the
+CUDA module/artifact hash — the archive embeds the Stage 0 `ptx87` payload
+while E6's source route recompiled to ptx 7.8; A10 identity, descriptors, and
+trajectories unchanged). RC-local posture: no E8/stable claim.
 
 ## Factory goals
 
