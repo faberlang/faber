@@ -3,7 +3,7 @@
 **Status**: complete (2026-07-30) — package `*.proba` discovery, import boundary, filters, lib harness, and stdlib colocated proof (`norma/src/mathesis.proba`) shipped; cista install publishes `*.fab` only
 **Created**: 2026-07-01
 **Target repo**: `/Users/ianzepp/work/faberlang/faber`
-**Factory artifact dir**: `docs/factory/proba-test-sources/`
+**Factory artifact dir**: `docs/archived/proba-test-sources/`
 **Primary surface**: `faber test`, package discovery/loading, local import
 resolution, stdlib test layout, source extension handling.
 

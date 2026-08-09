@@ -1,6 +1,6 @@
 # Delivery: LIB-MIR — MIR library-import execution
 
-**Goal**: `docs/factory/mir-library-imports/goal.md` (LIB-MIR gate)
+**Goal**: `docs/archived/mir-library-imports/goal.md` (LIB-MIR gate)
 **Status**: in factory — unit lowered 2026-08-01
 **Repo**: faber (`src/package/mir.rs`, `src/package/library.rs`)
 

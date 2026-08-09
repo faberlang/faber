@@ -1,6 +1,6 @@
 # Deck: Autograd-Equivalent Roadmap
 
-**Status**: evidence record — the PyTorch-near autograd-equivalent milestone scoped by this deck on 2026-07-14 has been **met on the compiler/CPU path**. This refresh records the verified shipped evidence, lands/supersedes the 07-14 unit plan, and re-derives the remaining next units on the same lane (autograd-equivalent evidence and sequencing; no public PyTorch parity claim).
+**Status**: active — milestone met on compiler/CPU path; remaining next units re-derived on the same lane (evidence record refreshed 2026-08-08).
 **Created**: 2026-07-14
 **Refreshed**: 2026-07-31
 **Target workspace**: `/Users/ianzepp/work/faberlang`

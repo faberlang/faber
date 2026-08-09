@@ -5,7 +5,7 @@
 **Target repos**:
 - primary: `/Users/ianzepp/work/faberlang/faber` (`faber test` CLI, package load for tests, UX)
 - secondary: `/Users/ianzepp/work/faberlang/radix` (HIR proba inventory, MIR lower of test cases, stepper execution, diagnostics)
-**Factory artifact dir**: `faber/docs/factory/stepper-faber-test/`
+**Factory artifact dir**: `faber/docs/archived/stepper-faber-test/`
 **Primary surfaces**: `faber test`, MIR stepper, `proba` / `probandum` / `adfirma`, package + single-file test load
 
 **Related (do not conflate)**:
@@ -131,7 +131,7 @@ Before implementing, inspect:
 | `radix` MIR lower for `adfirma` + function items with `test` metadata | Execution units |
 | `radix-mir-stepper` / `radix::mir::run_source` | Interpreter |
 | `radix-hir-rust` test emission | **Must no longer be on `faber test` path** |
-| `docs/factory/proba-test-sources/goal.md` | Discovery rules to keep |
+| `docs/archived/proba-test-sources/goal.md` | Discovery rules to keep |
 | Exempla / coreutils packages with inline `proba` | Migration validation samples |
 | `triga/src/math.proba`, `norma/exempla/caelum/*.proba` | Sparse `*.proba` samples |
 

@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-01
 **Target repo**: `/Users/ianzepp/work/faberlang/faber`
-**Factory artifact dir**: `docs/factory/mir-library-imports/`
+**Factory artifact dir**: `docs/archived/mir-library-imports/`
 **Lowers from**: Gradus [`SCOPE.md`](../../../gradus/docs/factory/gradus-ml-foundation/SCOPE.md) gate register + [`train-seam-decision.md`](../../../gradus/docs/factory/gradus-ml-foundation/train-seam-decision.md) (Option C, operator decision 2026-08-01)
 **Companion goal**: sibling [`radix/docs/factory/gradus-consumer-seam/goal.md`](../../../radix/docs/factory/gradus-consumer-seam/goal.md) (SEM004 + SEM010 gates)
 **Process**: `$factory` per [AGENTS.md](../../AGENTS.md)

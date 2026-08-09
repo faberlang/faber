@@ -18,12 +18,12 @@ in [`docs/archived/`](../archived/README.md).
 
 ## Summary
 
-- goals scanned: 21
+- goals scanned: 16
 - active: 7
 - planned: 7
-- done: 5
+- done: 0
 - unknown: 2
-- archived (moved to `docs/archived/`): 1
+- archived (moved to `docs/archived/`): 6
 
 ## Open and in progress
 
@@ -51,13 +51,7 @@ in [`docs/archived/`](../archived/README.md).
 
 ## Archived
 
-| Goal | Status | Done | goal | campaign | delivery | ledger | council | evidence | other |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| [aer-purgatus](aer-purgatus/CAMPAIGN.md) | done | 100% | 0 | 1 | 4 | 0 | 0 | 0 | 0 |
-| [core-support-radix-runtime-contract](core-support-radix-runtime-contract/goal.md) | done | 100% | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
-| [mir-library-imports](mir-library-imports/goal.md) | done | 100% | 1 | 0 | 1 | 0 | 0 | 0 | 0 |
-| [proba-test-sources](proba-test-sources/goal.md) | done | 100% | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
-| [stepper-faber-test](stepper-faber-test/goal.md) | done | 100% | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
+_none_
 
 ## Unknown
 
