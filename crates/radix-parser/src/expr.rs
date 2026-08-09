@@ -67,35 +67,63 @@ impl Parser {
     /// Parse assignment expression (lowest precedence).
     ///
     /// GRAMMAR:
-    ///   assignment := ternary ['←' assignment]
+    ///   assignment := ternary ('←' assignment | '↤' assignment inlineRecovery?)?
+    ///   inlineRecovery := '⇥' unary
     ///
-    /// WHY: Right-associative via recursion on `RHS`. Allows `a ← b ← c`.
+    /// WHY: Right-associative via recursion on `RHS`. Allows `a ← b ← c` and
+    /// `a ↤ b ↤ c`. `↤` is conversion-directed assignment (U+21A4) and sits at
+    /// the same precedence level as `←`; `⇥` inline recovery is legal only on
+    /// `↤` and attaches to the nearest `↤` in a right-associated chain.
     fn parse_assignment(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
         let expr = self.parse_ternary()?;
+        self.parse_assignment_tail(expr, start)
+    }
 
+    /// Continue an assignment whose left operand is already parsed.
+    ///
+    /// Shared by the expression grammar (ternary LHS) and typed declaration
+    /// initializers (binding LHS) so the `↤` contract — same precedence as
+    /// `←`, right-associative, `⇥` recovery on `↤` only — lives in one place.
+    pub(super) fn parse_assignment_tail(&mut self, target: Expr, start: Span) -> Result<Expr, ParseError> {
         let op = match self.peek().kind {
-            TokenKind::Assign => Some(AssignOp::Assign),
-            _ => None,
+            TokenKind::Assign => AssignOp::Assign,
+            TokenKind::ConversioAssign => AssignOp::ConversioAssign,
+            _ => return Ok(target),
         };
 
-        if let Some(op) = op {
-            self.advance();
-            let value = Box::new(self.parse_assignment()?);
-            let span = start.merge(self.previous_span());
-            let id = self.next_id();
-            return Ok(Expr {
-                id,
-                kind: ExprKind::Assign(AssignExpr {
-                    op,
-                    target: Box::new(expr),
-                    value,
-                }),
-                span,
-            });
-        }
+        self.advance();
+        let value = Box::new(self.parse_assignment()?);
 
-        Ok(expr)
+        let recovery = if matches!(op, AssignOp::ConversioAssign) {
+            if self.eat(&TokenKind::ExitArrow) {
+                Some(Box::new(self.parse_unary()?))
+            } else {
+                None
+            }
+        } else {
+            if self.check(&TokenKind::ExitArrow) {
+                return Err(ParseError::structured(
+                    ParseErrorKind::Unexpected,
+                    self.current_span(),
+                )
+                .with_arg("issue", "conversio_recovery_on_assign"));
+            }
+            None
+        };
+
+        let span = start.merge(self.previous_span());
+        let id = self.next_id();
+        Ok(Expr {
+            id,
+            kind: ExprKind::Assign(AssignExpr {
+                op,
+                target: Box::new(target),
+                value,
+                recovery,
+            }),
+            span,
+        })
     }
 
     /// Parse ternary conditional expression.

@@ -3824,3 +3824,51 @@ fn conversio_assign_typed_fixum_and_varia_initializers_parse() {
         );
     }
 }
+
+// =============================================================================
+// CDA-U3 — ↤ (U+21A4): typed-initializer acceptance and structured
+// decl-level rejections
+// =============================================================================
+// The typed `fixum`/`varia` initializer grammar landed in U3; the untargeted
+// forms reject at the parser with stable issue identity (renderer-owned prose).
+// These tags match U2's forward-looking semantic expectations so the same
+// issue flows through the compile pipeline.
+
+#[test]
+fn conversio_assign_untyped_fixum_initializer_rejects_with_concrete_type_issue() {
+    // `fixum _` has no written type → no concrete conversion target.
+    assert_parse_error_issue(
+        "incipit {\n  fixum _ answer ↤ \"42\"\n}",
+        "conversio_assign_requires_concrete_type",
+    );
+}
+
+#[test]
+fn conversio_assign_sit_initializer_rejects_with_concrete_type_issue() {
+    // `sit` is an inferred binding (≡ `fixum _`) → no concrete target.
+    assert_parse_error_issue(
+        "incipit {\n  sit answer ↤ \"42\"\n}",
+        "conversio_assign_requires_concrete_type",
+    );
+}
+
+#[test]
+fn conversio_assign_untyped_destructuring_initializer_rejects_with_concrete_type_issue() {
+    // Untyped destructuring patterns have no concrete conversion target.
+    assert_parse_error_issue(
+        "incipit {\n  fixum { field } ↤ \"x\"\n}",
+        "conversio_assign_requires_concrete_type",
+    );
+}
+
+#[test]
+fn conversio_assign_awaited_binding_initializer_rejects_with_await_issue() {
+    // `figendum`/`variandum` retain `←` (goal decision 6): implicit
+    // conversion plus await ordering needs a separate language decision.
+    for source in [
+        "incipit {\n  figendum numerus n ↤ \"42\"\n}",
+        "incipit {\n  variandum numerus n ↤ \"42\"\n}",
+    ] {
+        assert_parse_error_issue(source, "conversio_assign_await_unsupported");
+    }
+}

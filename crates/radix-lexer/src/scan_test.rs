@@ -1109,6 +1109,40 @@ fn leftwards_pair_arrow_never_scans_as_conversio_assign() {
     }
 }
 
+// =============================================================================
+// CDA-U3 — ↤ (U+21A4): dedicated token kind (U2 red tests turn green)
+// =============================================================================
+
+#[test]
+fn conversio_assign_lexes_as_dedicated_token_kind() {
+    // U3: the U+21A4 scalar scans as its own `ConversioAssign` token kind —
+    // exact scalar mapping, no aliases, no normalization into ←/↦/⇥/→.
+    let result = lex("x ↤ y");
+    assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+    assert!(matches!(result.tokens[0].kind, TokenKind::Ident(_)));
+    assert_eq!(result.tokens[1].kind, TokenKind::ConversioAssign);
+    assert!(matches!(result.tokens[2].kind, TokenKind::Ident(_)));
+    assert_eq!(result.tokens[3].kind, TokenKind::Eof);
+    // 3.1c — span: x at 0..1, ↤ at 2..5 (three UTF-8 bytes)
+    assert_eq!(result.tokens[1].span, crate::Span::new(2, 5));
+}
+
+#[test]
+fn conversio_assign_does_not_normalize_neighbor_glyphs() {
+    // The confusion cluster above pins scalar distinctness; this test proves
+    // the dedicated token does not absorb or normalize any neighbor glyph.
+    for (src, expected) in [
+        ("←", TokenKind::Assign),
+        ("↦", TokenKind::Conversio),
+        ("⇥", TokenKind::ExitArrow),
+        ("→", TokenKind::Arrow),
+    ] {
+        let result = lex(src);
+        assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+        assert_eq!(result.tokens[0].kind, expected, "{src} must stay {expected:?}");
+    }
+}
+
 #[test]
 fn escaped_cr_in_string_literal_rejected() {
     let result = lex("\"salve\\\rfixum x ← 1");

@@ -1161,11 +1161,21 @@ pub struct AssignExpr {
     pub op: AssignOp,
     pub target: Box<Expr>,
     pub value: Box<Expr>,
+    /// `⇥ fallback` inline recovery, legal only on `↤` (conversion-directed
+    /// assignment). The parser attaches the recovery to the nearest `↤` in a
+    /// right-associated chain; the operator and recovery travel through the
+    /// syntax tree so no erasure happens before the destination type is known.
+    pub recovery: Option<Box<Expr>>,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub enum AssignOp {
+    /// Ordinary assignment `←`.
     Assign,
+    /// Conversion-directed assignment `↤` (U+21A4): evaluate the right side,
+    /// convert it to the statically known type of the left place through the
+    /// `↦` route, then assign. Never normalized into [`AssignOp::Assign`].
+    ConversioAssign,
 }
 
 #[derive(Debug)]

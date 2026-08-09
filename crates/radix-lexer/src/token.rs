@@ -282,6 +282,7 @@ pub enum TokenKind {
     // === Comparison ===
     Eq,          // =
     Assign,      // ←
+    ConversioAssign, // ↤ — conversion-directed assignment (U+21A4)
     EqEq,        // ≡
     EqEqEq,      // (reserved for future / internal; no source form)
     ApproxEq,    // ≈

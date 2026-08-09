@@ -148,11 +148,17 @@ impl Parser {
     /// Parse `fixum` and `varia` binding declarations.
     ///
     /// GRAMMAR:
-    ///   var-decl := (`fixum` | `varia`) type pattern ['←' expr]
+    ///   var-decl := (`fixum` | `varia`) type pattern ['←' expr | '↤' expr]
     ///
     /// Simple bindings carry an explicit type slot, including `_` for inference.
     /// Destructuring keeps its historical untyped shape because the binding
     /// pattern itself owns the names and any rest element.
+    ///
+    /// `↤` initializers (conversion-directed assignment) are accepted only when
+    /// the written type is concrete: the destination type must name a
+    /// conversion target before the right side is converted. `fixum _`,
+    /// `sit`, and untyped destructuring have no concrete destination and are
+    /// rejected with a structured diagnostic.
     fn parse_var_decl(&mut self) -> Result<StmtKind, ParseError> {
         let (mutability, is_await) = if self.eat_keyword_ident(TokenKind::Fixum) {
             (AstMutability::Immutable, false)
@@ -176,6 +182,8 @@ impl Parser {
         // Optional initializer
         let init = if self.eat(&TokenKind::Assign) {
             Some(Box::new(self.parse_expression()?))
+        } else if self.check(&TokenKind::ConversioAssign) {
+            Some(Box::new(self.parse_conversio_assign_initializer(&ty, &binding)?))
         } else {
             None
         };
@@ -187,6 +195,55 @@ impl Parser {
             binding,
             init,
         }))
+    }
+
+    /// Parse a `↤` conversion-directed initializer whose binding is already
+    /// parsed. The current token is `↤`.
+    ///
+    /// The binding pattern becomes the assignment target; the operator is
+    /// preserved as `AssignOp::ConversioAssign` through the syntax tree (no
+    /// erasure into `←`). `⇥` recovery is parsed through the shared assignment
+    /// tail so it attaches exactly as it does in expression position.
+    ///
+    /// Rejects every binding form without a concrete conversion destination:
+    /// `fixum _` (inferred type), `sit` (inferred), untyped destructuring, and
+    /// wildcard bindings — all with the stable
+    /// `conversio_assign_requires_concrete_type` issue identity.
+    fn parse_conversio_assign_initializer(
+        &mut self,
+        ty: &Option<TypeExpr>,
+        binding: &BindingPattern,
+    ) -> Result<Expr, ParseError> {
+        let has_concrete_type =
+            ty.as_ref().is_some_and(|t| !matches!(t.kind, TypeExprKind::Infer));
+        let BindingPattern::Ident(ident) = binding else {
+            return Err(ParseError::structured(
+                ParseErrorKind::Unexpected,
+                self.current_span(),
+            )
+            .with_arg("issue", "conversio_assign_requires_concrete_type"));
+        };
+        if !has_concrete_type {
+            return Err(ParseError::structured(
+                ParseErrorKind::Unexpected,
+                self.current_span(),
+            )
+            .with_arg("issue", "conversio_assign_requires_concrete_type"));
+        }
+        // `Ident` is not `Clone`; rebuild the binding name for the target
+        // expression from its Copy fields.
+        let ident_name = ident.name;
+        let ident_span = ident.span;
+        let id = self.next_id();
+        let target = Expr {
+            id,
+            kind: ExprKind::Ident(Ident {
+                name: ident_name,
+                span: ident_span,
+            }),
+            span: ident_span,
+        };
+        self.parse_assignment_tail(target, ident_span)
     }
 
     /// Parse `figendum` / `variandum` awaited binding declarations.
@@ -208,6 +265,16 @@ impl Parser {
 
         let binding = self.parse_binding_pattern()?;
 
+        // `figendum`/`variandum` retain `←` (goal decision 6): combining
+        // implicit conversion and await ordering needs a separate language
+        // decision, so `↤` here is a structured rejection.
+        if self.check(&TokenKind::ConversioAssign) {
+            return Err(ParseError::structured(
+                ParseErrorKind::Unexpected,
+                self.current_span(),
+            )
+            .with_arg("issue", "conversio_assign_await_unsupported"));
+        }
         self.expect(&TokenKind::Assign, "expected '←' after awaited binding")?;
         let init = Some(Box::new(self.parse_expression()?));
 
@@ -276,6 +343,14 @@ impl Parser {
 
         let init = if self.eat(&TokenKind::Assign) {
             Some(Box::new(self.parse_expression()?))
+        } else if self.check(&TokenKind::ConversioAssign) {
+            // `sit` is an inferred binding (≡ `fixum _`): no concrete
+            // destination type, so conversion-directed assignment is rejected.
+            return Err(ParseError::structured(
+                ParseErrorKind::Unexpected,
+                self.current_span(),
+            )
+            .with_arg("issue", "conversio_assign_requires_concrete_type"));
         } else {
             // WHY: `sit x` is the inferred deferred immutable (≡ `fixum _ x`).
             // We do not peek for a trailing identifier here: newlines are not

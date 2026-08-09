@@ -901,12 +901,80 @@ fn conversio_assign_is_right_associative() {
 fn conversio_assign_recovery_attaches_to_nearest_conversio_assign_in_chain() {
     // Contract (AC4/AC9): `a ↤ b ↤ c ⇥ d` must parse with `⇥ d` attached to
     // the NEAREST `↤` in the right-associated chain (the `b ↤ (c ⇥ d)` step),
-    // and `⇥` stays illegal on ordinary `←`. U3 implements the attachment;
-    // today this fails at the lexer with the expected unexpected_character.
+    // and `⇥` stays illegal on ordinary `←`.
     let result = parse_ok("a ↤ b ↤ c ⇥ d");
     let program = result.program.as_ref().expect("program");
     let outer = assign_expr(&expr_stmt(program).expr);
     assert!(matches!(outer.target.kind, ExprKind::Ident(_)));
     let inner = assign_expr(&outer.value);
     assert!(matches!(inner.target.kind, ExprKind::Ident(_)));
+    // Structural recovery assertion: the recovery rides the nearest `↤` in
+    // the right-associated chain, and the outer `↤` does not claim it.
+    assert!(
+        inner.recovery.is_some(),
+        "⇥ d must attach to the nearest ↤ (the inner b ↤ (c ⇥ d) step)"
+    );
+    assert!(
+        outer.recovery.is_none(),
+        "the outer ↤ must not claim the inner recovery"
+    );
+}
+
+#[test]
+fn conversio_assign_recovery_is_legal_on_conversio_assign() {
+    // `a ↤ b ⇥ c` ≡ `a ← (b ↦ T ⇥ c)`: recovery is an inline part of the ↤
+    // form and is carried through the syntax node.
+    let result = parse_ok("a ↤ b ⇥ c");
+    let program = result.program.as_ref().expect("program");
+    let outer = assign_expr(&expr_stmt(program).expr);
+    assert!(
+        !matches!(outer.op, AssignOp::Assign),
+        "the ↤ operator must be preserved as a distinct assign op"
+    );
+    assert!(
+        outer.recovery.is_some(),
+        "⇥ c must attach to the ↤ form"
+    );
+    assert!(matches!(
+        outer.recovery.as_deref().expect("recovery").kind,
+        ExprKind::Ident(_)
+    ));
+}
+
+#[test]
+fn conversio_recovery_is_rejected_on_ordinary_assign() {
+    // `⇥` inline recovery is legal only on `↤` (and after `↦ type`); on an
+    // ordinary `←` assignment it is a structured rejection, not a silent
+    // leftover-token error.
+    crate::test_support::assert_parse_error_issue(
+        "a ← b ⇥ c",
+        "conversio_recovery_on_assign",
+    );
+}
+
+#[test]
+fn conversio_assign_bare_json_right_side_is_grammar_driven_not_type_driven() {
+    // AC9: a bare `{ ... }` right side is JSON under the shipped bare-JSON
+    // grammar. The parser never consults the destination's semantic type —
+    // the destination here is `tabula<textus, numerus>`, which must not
+    // select or change JSON grammar.
+    let result = parse_ok(r#"fixum tabula<textus, numerus> scores ↤ { "alice": 10 }"#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let assign = assign_expr(expr);
+    assert!(
+        !matches!(assign.op, AssignOp::Assign),
+        "the ↤ operator must be preserved as a distinct assign op"
+    );
+    assert!(
+        matches!(
+            assign.value.kind,
+            ExprKind::Literal(Literal::JsonValor(_))
+        ),
+        "bare {{ ... }} must parse as a JSON literal, got {:?}",
+        assign.value.kind
+    );
 }
