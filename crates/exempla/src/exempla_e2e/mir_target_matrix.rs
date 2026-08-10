@@ -43,11 +43,7 @@ const MIR_CAPABLE_FLOOR: usize = 253;
 // package/script boundary burn-up; do not lower this again without a new
 // counted debt row.
 const SCENA_STRUCTURAL_CAPABLE_FLOOR: usize = 205;
-const KNOWN_SCENA_STRUCTURAL_RUN_MISMATCHES: [(&str, &str); 3] = [
-    (
-        "est/est.fab",
-        "runtime assertion in est variant-check exemplar",
-    ),
+const KNOWN_SCENA_STRUCTURAL_RUN_MISMATCHES: [(&str, &str); 2] = [
     (
         "operatores/numerus-overflow.fab",
         "intentional checked numerus overflow trap",
