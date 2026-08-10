@@ -1678,7 +1678,7 @@ fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
             plan: CollectionKernelPlan::Elementwise,
             resources: vec![DeviceResource {
                 buffer: intermediate.clone(),
-                version: version(1, element_ty.clone(), 4),
+                version: version(1, element_ty, 4),
                 binding: Binding {
                     group: 0,
                     binding: 0,
@@ -1694,7 +1694,7 @@ fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
             resources: vec![
                 DeviceResource {
                     buffer: intermediate.clone(),
-                    version: version(1, element_ty.clone(), 4),
+                    version: version(1, element_ty, 4),
                     binding: Binding {
                         group: 0,
                         binding: 0,
@@ -1703,7 +1703,7 @@ fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
                 },
                 DeviceResource {
                     buffer: output.clone(),
-                    version: version(1, element_ty.clone(), 2),
+                    version: version(1, element_ty, 2),
                     binding: Binding {
                         group: 0,
                         binding: 1,
@@ -1730,7 +1730,7 @@ fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
             SemanticValue {
                 id: SemanticValueId(1),
                 name: "intermediate".to_owned(),
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 4,
                 origin: SemanticValueOrigin::MirLocal {
                     function: MirFunctionId(0),
@@ -1740,7 +1740,7 @@ fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
             SemanticValue {
                 id: SemanticValueId(2),
                 name: "output".to_owned(),
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 2,
                 origin: SemanticValueOrigin::Synthetic {
                     label: "chain-output".to_owned(),
@@ -1761,14 +1761,14 @@ fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
             ValueGeneration {
                 value: SemanticValueId(1),
                 generation: 1,
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 4,
                 produced_by: LaunchId(0),
             },
             ValueGeneration {
                 value: SemanticValueId(2),
                 generation: 1,
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 2,
                 produced_by: LaunchId(1),
             },
@@ -1853,7 +1853,7 @@ fn ambiguous_edge_generation_fails_closed() {
     semantics.generations.push(ValueGeneration {
         value: SemanticValueId(1),
         generation: 2,
-        element_ty: semantics.generations[0].element_ty.clone(),
+        element_ty: semantics.generations[0].element_ty,
         element_count: 4,
         produced_by: LaunchId(0),
     });
@@ -2023,7 +2023,7 @@ fn stale_companion_consumption_fails_closed() {
     semantics.generations.push(ValueGeneration {
         value: SemanticValueId(1),
         generation: 2,
-        element_ty: semantics.generations[0].element_ty.clone(),
+        element_ty: semantics.generations[0].element_ty,
         element_count: 8,
         produced_by: LaunchId(0),
     });
@@ -2048,7 +2048,7 @@ fn forward_only_program_never_trips_stale_or_missing_rules() {
     semantics.generations.push(ValueGeneration {
         value: SemanticValueId(1),
         generation: 2,
-        element_ty: semantics.generations[0].element_ty.clone(),
+        element_ty: semantics.generations[0].element_ty,
         element_count: 8,
         produced_by: LaunchId(0),
     });
@@ -2100,7 +2100,7 @@ fn three_chain_program_with_middle_observation() -> (DeviceProgram, DeviceSemant
             plan: CollectionKernelPlan::Elementwise,
             resources: vec![DeviceResource {
                 buffer: b0.clone(),
-                version: version(1, element_ty.clone(), 4),
+                version: version(1, element_ty, 4),
                 binding: Binding {
                     group: 0,
                     binding: 0,
@@ -2116,7 +2116,7 @@ fn three_chain_program_with_middle_observation() -> (DeviceProgram, DeviceSemant
             resources: vec![
                 DeviceResource {
                     buffer: b0,
-                    version: version(1, element_ty.clone(), 4),
+                    version: version(1, element_ty, 4),
                     binding: Binding {
                         group: 0,
                         binding: 0,
@@ -2125,7 +2125,7 @@ fn three_chain_program_with_middle_observation() -> (DeviceProgram, DeviceSemant
                 },
                 DeviceResource {
                     buffer: b1.clone(),
-                    version: version(1, element_ty.clone(), 4),
+                    version: version(1, element_ty, 4),
                     binding: Binding {
                         group: 0,
                         binding: 1,
@@ -2142,7 +2142,7 @@ fn three_chain_program_with_middle_observation() -> (DeviceProgram, DeviceSemant
             resources: vec![
                 DeviceResource {
                     buffer: b1,
-                    version: version(1, element_ty.clone(), 4),
+                    version: version(1, element_ty, 4),
                     binding: Binding {
                         group: 0,
                         binding: 0,
@@ -2151,7 +2151,7 @@ fn three_chain_program_with_middle_observation() -> (DeviceProgram, DeviceSemant
                 },
                 DeviceResource {
                     buffer: b2,
-                    version: version(1, element_ty.clone(), 4),
+                    version: version(1, element_ty, 4),
                     binding: Binding {
                         group: 0,
                         binding: 1,
@@ -2183,7 +2183,7 @@ fn three_chain_program_with_middle_observation() -> (DeviceProgram, DeviceSemant
             BufferRole::InOut,
             BufferLifetime::ObservationPoint,
         ),
-        version: version(1, element_ty.clone(), 4),
+        version: version(1, element_ty, 4),
         role: BufferRole::InOut,
         produced_by: LaunchId(1),
         cadence: ObservationCadence::PerStep,
@@ -2194,7 +2194,7 @@ fn three_chain_program_with_middle_observation() -> (DeviceProgram, DeviceSemant
             SemanticValue {
                 id: SemanticValueId(1),
                 name: "mid0".to_owned(),
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 4,
                 origin: SemanticValueOrigin::MirLocal {
                     function: MirFunctionId(0),
@@ -2204,7 +2204,7 @@ fn three_chain_program_with_middle_observation() -> (DeviceProgram, DeviceSemant
             SemanticValue {
                 id: SemanticValueId(2),
                 name: "mid1".to_owned(),
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 4,
                 origin: SemanticValueOrigin::MirLocal {
                     function: MirFunctionId(1),
@@ -2214,7 +2214,7 @@ fn three_chain_program_with_middle_observation() -> (DeviceProgram, DeviceSemant
             SemanticValue {
                 id: SemanticValueId(3),
                 name: "out".to_owned(),
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 4,
                 origin: SemanticValueOrigin::Synthetic {
                     label: "three-chain-output".to_owned(),
@@ -2239,21 +2239,21 @@ fn three_chain_program_with_middle_observation() -> (DeviceProgram, DeviceSemant
             ValueGeneration {
                 value: SemanticValueId(1),
                 generation: 1,
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 4,
                 produced_by: LaunchId(0),
             },
             ValueGeneration {
                 value: SemanticValueId(2),
                 generation: 1,
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 4,
                 produced_by: LaunchId(1),
             },
             ValueGeneration {
                 value: SemanticValueId(3),
                 generation: 1,
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 4,
                 produced_by: LaunchId(2),
             },

@@ -166,7 +166,6 @@ fn boundary_abi_accepts_exact_scalar_call() {
     let f32_ty = f32(&mut types);
     let mut program = MirProgram {
         functions: vec![kernel(1, vec![param(10, f32_ty)], f32_ty)],
-        ..MirProgram::new()
     };
     program.functions.push(host_with_calls(
         2,

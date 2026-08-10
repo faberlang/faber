@@ -152,7 +152,7 @@ fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
                 plan: CollectionKernelPlan::Elementwise,
                 resources: vec![DeviceResource {
                     buffer: mid.clone(),
-                    version: version(1, element_ty.clone(), 4),
+                    version: version(1, element_ty, 4),
                     binding: Binding {
                         group: 0,
                         binding: 0,
@@ -168,7 +168,7 @@ fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
                 resources: vec![
                     DeviceResource {
                         buffer: mid,
-                        version: version(1, element_ty.clone(), 4),
+                        version: version(1, element_ty, 4),
                         binding: Binding {
                             group: 0,
                             binding: 0,
@@ -177,7 +177,7 @@ fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
                     },
                     DeviceResource {
                         buffer: out.clone(),
-                        version: version(1, element_ty.clone(), 4),
+                        version: version(1, element_ty, 4),
                         binding: Binding {
                             group: 0,
                             binding: 1,
@@ -207,7 +207,7 @@ fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
             SemanticValue {
                 id: SemanticValueId(1),
                 name: "mid".to_owned(),
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 4,
                 origin: SemanticValueOrigin::MirLocal {
                     function: MirFunctionId(0),
@@ -217,7 +217,7 @@ fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
             SemanticValue {
                 id: SemanticValueId(2),
                 name: "out".to_owned(),
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 4,
                 origin: SemanticValueOrigin::Synthetic {
                     label: "chain-out".to_owned(),
@@ -238,14 +238,14 @@ fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
             ValueGeneration {
                 value: SemanticValueId(1),
                 generation: 1,
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 4,
                 produced_by: LaunchId(0),
             },
             ValueGeneration {
                 value: SemanticValueId(2),
                 generation: 1,
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 4,
                 produced_by: LaunchId(1),
             },
@@ -324,7 +324,7 @@ fn oracle_subject() -> (DeviceProgram, DeviceSemantics) {
                 plan: CollectionKernelPlan::Elementwise,
                 resources: vec![DeviceResource {
                     buffer: mid.clone(),
-                    version: version(1, element_ty.clone(), 4),
+                    version: version(1, element_ty, 4),
                     binding: Binding {
                         group: 0,
                         binding: 0,
@@ -340,7 +340,7 @@ fn oracle_subject() -> (DeviceProgram, DeviceSemantics) {
                 resources: vec![
                     DeviceResource {
                         buffer: mid,
-                        version: version(1, element_ty.clone(), 4),
+                        version: version(1, element_ty, 4),
                         binding: Binding {
                             group: 0,
                             binding: 0,
@@ -349,7 +349,7 @@ fn oracle_subject() -> (DeviceProgram, DeviceSemantics) {
                     },
                     DeviceResource {
                         buffer: grad.clone(),
-                        version: version(1, element_ty.clone(), 4),
+                        version: version(1, element_ty, 4),
                         binding: Binding {
                             group: 0,
                             binding: 1,
@@ -373,7 +373,7 @@ fn oracle_subject() -> (DeviceProgram, DeviceSemantics) {
         lifetime: DeviceProgramLifetime::SingleRun,
         results: vec![ResultBuffer {
             buffer: grad,
-            version: version(1, element_ty.clone(), 4),
+            version: version(1, element_ty, 4),
             role: BufferRole::Output,
             produced_by: LaunchId(1),
             cadence: ObservationCadence::EndOfRun,
@@ -385,7 +385,7 @@ fn oracle_subject() -> (DeviceProgram, DeviceSemantics) {
             SemanticValue {
                 id: SemanticValueId(1),
                 name: "mid".to_owned(),
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 4,
                 origin: SemanticValueOrigin::MirLocal {
                     function: MirFunctionId(0),
@@ -395,7 +395,7 @@ fn oracle_subject() -> (DeviceProgram, DeviceSemantics) {
             SemanticValue {
                 id: SemanticValueId(2),
                 name: "grad".to_owned(),
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 4,
                 origin: SemanticValueOrigin::Synthetic {
                     label: "oracle-grad".to_owned(),
@@ -416,14 +416,14 @@ fn oracle_subject() -> (DeviceProgram, DeviceSemantics) {
             ValueGeneration {
                 value: SemanticValueId(1),
                 generation: 1,
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 4,
                 produced_by: LaunchId(0),
             },
             ValueGeneration {
                 value: SemanticValueId(2),
                 generation: 1,
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 4,
                 produced_by: LaunchId(1),
             },
@@ -467,7 +467,6 @@ fn oracle_subject() -> (DeviceProgram, DeviceSemantics) {
                 upstream_gradient_ty: TypeId(1),
             }],
         }],
-        ..DeviceSemantics::default()
     };
 
     program
@@ -512,7 +511,7 @@ fn fixture_1_multi_output_materializes_and_fails_closed_on_domain_conflict() {
             resources: vec![
                 DeviceResource {
                     buffer: input,
-                    version: version(1, element_ty.clone(), 4),
+                    version: version(1, element_ty, 4),
                     binding: Binding {
                         group: 0,
                         binding: 0,
@@ -521,7 +520,7 @@ fn fixture_1_multi_output_materializes_and_fails_closed_on_domain_conflict() {
                 },
                 DeviceResource {
                     buffer: out_a.clone(),
-                    version: version(1, element_ty.clone(), 4),
+                    version: version(1, element_ty, 4),
                     binding: Binding {
                         group: 0,
                         binding: 1,
@@ -530,7 +529,7 @@ fn fixture_1_multi_output_materializes_and_fails_closed_on_domain_conflict() {
                 },
                 DeviceResource {
                     buffer: out_b.clone(),
-                    version: version(1, element_ty.clone(), 2),
+                    version: version(1, element_ty, 2),
                     binding: Binding {
                         group: 0,
                         binding: 2,
@@ -548,14 +547,14 @@ fn fixture_1_multi_output_materializes_and_fails_closed_on_domain_conflict() {
         results: vec![
             ResultBuffer {
                 buffer: out_a,
-                version: version(1, element_ty.clone(), 4),
+                version: version(1, element_ty, 4),
                 role: BufferRole::Output,
                 produced_by: LaunchId(0),
                 cadence: ObservationCadence::PerStep,
             },
             ResultBuffer {
                 buffer: out_b,
-                version: version(1, element_ty.clone(), 2),
+                version: version(1, element_ty, 2),
                 role: BufferRole::Output,
                 produced_by: LaunchId(0),
                 cadence: ObservationCadence::PerStep,
@@ -568,14 +567,14 @@ fn fixture_1_multi_output_materializes_and_fails_closed_on_domain_conflict() {
             SemanticValue {
                 id: SemanticValueId(1),
                 name: "in".to_owned(),
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 4,
                 origin: SemanticValueOrigin::HostInput,
             },
             SemanticValue {
                 id: SemanticValueId(2),
                 name: "out_a".to_owned(),
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 4,
                 origin: SemanticValueOrigin::Synthetic {
                     label: "out-a".to_owned(),
@@ -584,7 +583,7 @@ fn fixture_1_multi_output_materializes_and_fails_closed_on_domain_conflict() {
             SemanticValue {
                 id: SemanticValueId(3),
                 name: "out_b".to_owned(),
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 2,
                 origin: SemanticValueOrigin::Synthetic {
                     label: "out-b".to_owned(),
@@ -609,14 +608,14 @@ fn fixture_1_multi_output_materializes_and_fails_closed_on_domain_conflict() {
             ValueGeneration {
                 value: SemanticValueId(2),
                 generation: 1,
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 4,
                 produced_by: LaunchId(0),
             },
             ValueGeneration {
                 value: SemanticValueId(3),
                 generation: 1,
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 2,
                 produced_by: LaunchId(0),
             },
@@ -696,7 +695,7 @@ fn fixture_2_shape_change_is_new_version_and_rebind_fails_closed() {
                 plan: CollectionKernelPlan::Elementwise,
                 resources: vec![DeviceResource {
                     buffer: resized.clone(),
-                    version: version(1, element_ty.clone(), 8),
+                    version: version(1, element_ty, 8),
                     binding: Binding {
                         group: 0,
                         binding: 0,
@@ -711,7 +710,7 @@ fn fixture_2_shape_change_is_new_version_and_rebind_fails_closed() {
                 plan: CollectionKernelPlan::Elementwise,
                 resources: vec![DeviceResource {
                     buffer: resized,
-                    version: version(2, element_ty.clone(), 16),
+                    version: version(2, element_ty, 16),
                     binding: Binding {
                         group: 0,
                         binding: 0,
@@ -739,7 +738,7 @@ fn fixture_2_shape_change_is_new_version_and_rebind_fails_closed() {
         values: vec![SemanticValue {
             id: SemanticValueId(1),
             name: "resized".to_owned(),
-            element_ty: element_ty.clone(),
+            element_ty,
             element_count: 8,
             origin: SemanticValueOrigin::MirLocal {
                 function: MirFunctionId(0),
@@ -754,14 +753,14 @@ fn fixture_2_shape_change_is_new_version_and_rebind_fails_closed() {
             ValueGeneration {
                 value: SemanticValueId(1),
                 generation: 1,
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 8,
                 produced_by: LaunchId(0),
             },
             ValueGeneration {
                 value: SemanticValueId(1),
                 generation: 2,
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 16,
                 produced_by: LaunchId(1),
             },
@@ -788,7 +787,7 @@ fn fixture_2_shape_change_is_new_version_and_rebind_fails_closed() {
 
     // Fail closed: rebinding the existing version 1 to a different shape.
     let mut rebound = program.clone();
-    rebound.kernels[1].resources[0].version = version(1, element_ty.clone(), 16);
+    rebound.kernels[1].resources[0].version = version(1, element_ty, 16);
     assert!(matches!(
         rebound.validate(),
         Err(DeviceProgramError::VersionShapeConflict { buffer, version, .. })
@@ -860,7 +859,7 @@ fn fixture_4_repeated_step_materializes_and_cadence_mismatch_fails_closed() {
                 resources: vec![
                     DeviceResource {
                         buffer: weights.clone(),
-                        version: version(1, element_ty.clone(), 4),
+                        version: version(1, element_ty, 4),
                         binding: Binding {
                             group: 0,
                             binding: 0,
@@ -869,7 +868,7 @@ fn fixture_4_repeated_step_materializes_and_cadence_mismatch_fails_closed() {
                     },
                     DeviceResource {
                         buffer: trace.clone(),
-                        version: version(1, element_ty.clone(), 1),
+                        version: version(1, element_ty, 1),
                         binding: Binding {
                             group: 0,
                             binding: 1,
@@ -886,7 +885,7 @@ fn fixture_4_repeated_step_materializes_and_cadence_mismatch_fails_closed() {
                 resources: vec![
                     DeviceResource {
                         buffer: trace.clone(),
-                        version: version(1, element_ty.clone(), 1),
+                        version: version(1, element_ty, 1),
                         binding: Binding {
                             group: 0,
                             binding: 0,
@@ -895,7 +894,7 @@ fn fixture_4_repeated_step_materializes_and_cadence_mismatch_fails_closed() {
                     },
                     DeviceResource {
                         buffer: final_forward.clone(),
-                        version: version(1, element_ty.clone(), 4),
+                        version: version(1, element_ty, 4),
                         binding: Binding {
                             group: 0,
                             binding: 1,
@@ -920,14 +919,14 @@ fn fixture_4_repeated_step_materializes_and_cadence_mismatch_fails_closed() {
         results: vec![
             ResultBuffer {
                 buffer: trace.clone(),
-                version: version(1, element_ty.clone(), 1),
+                version: version(1, element_ty, 1),
                 role: BufferRole::InOut,
                 produced_by: LaunchId(0),
                 cadence: ObservationCadence::PerStep,
             },
             ResultBuffer {
                 buffer: final_forward,
-                version: version(1, element_ty.clone(), 4),
+                version: version(1, element_ty, 4),
                 role: BufferRole::Output,
                 produced_by: LaunchId(1),
                 cadence: ObservationCadence::EndOfRun,
@@ -940,14 +939,14 @@ fn fixture_4_repeated_step_materializes_and_cadence_mismatch_fails_closed() {
             SemanticValue {
                 id: SemanticValueId(1),
                 name: "weights".to_owned(),
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 4,
                 origin: SemanticValueOrigin::HostInput,
             },
             SemanticValue {
                 id: SemanticValueId(2),
                 name: "loss_trace".to_owned(),
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 1,
                 origin: SemanticValueOrigin::Synthetic {
                     label: "loss-trace".to_owned(),
@@ -956,7 +955,7 @@ fn fixture_4_repeated_step_materializes_and_cadence_mismatch_fails_closed() {
             SemanticValue {
                 id: SemanticValueId(3),
                 name: "final_forward".to_owned(),
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 4,
                 origin: SemanticValueOrigin::Synthetic {
                     label: "final-forward".to_owned(),
@@ -981,14 +980,14 @@ fn fixture_4_repeated_step_materializes_and_cadence_mismatch_fails_closed() {
             ValueGeneration {
                 value: SemanticValueId(2),
                 generation: 1,
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 1,
                 produced_by: LaunchId(0),
             },
             ValueGeneration {
                 value: SemanticValueId(3),
                 generation: 1,
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: 4,
                 produced_by: LaunchId(1),
             },
@@ -1179,11 +1178,10 @@ fn fixture_7_device_ad_sermo_rejects_and_cpu_host_ad_preserved() {
 // -----------------------------------------------------------------------
 
 /// The pinned GI3 prefill shape-class (gi0-model-contract.md): T = prefill
-/// length, n_embd = 960, n_head 15 / n_head_kv 5 (GQA), head_dim 64, RMSNorm
-/// eps 1e-5, RoPE theta 100k, tied embedding table [960, 49152].
+/// length, `n_embd` = 960, `n_head` 15 / `n_head_kv` 5 (GQA), `head_dim` 64, `RMSNorm`
+/// eps 1e-5, `RoPE` theta 100k, tied embedding table [960, 49152].
 #[test]
 fn pinned_gi3_prefill_shape_class() {
-    const T: u64 = 32;
     const N_EMBD: u64 = 960;
     const N_HEAD: u64 = 15;
     const N_HEAD_KV: u64 = 5;
@@ -1195,8 +1193,6 @@ fn pinned_gi3_prefill_shape_class() {
     // The Q8_0 tied embedding doubles as the output head: [n_embd, vocab].
     assert_eq!(N_EMBD, 960);
     assert_eq!(VOCAB, 49152);
-    // Sanity of the representative prefill length used by the matrix cells.
-    assert!(T > 0);
 }
 
 /// Materialize one recipe kernel: a single-kernel device program carrying
@@ -1220,7 +1216,7 @@ fn materialize_recipe_kernel(
             resources: vec![
                 DeviceResource {
                     buffer: input,
-                    version: version(1, element_ty.clone(), input_count),
+                    version: version(1, element_ty, input_count),
                     binding: Binding {
                         group: 0,
                         binding: 0,
@@ -1229,7 +1225,7 @@ fn materialize_recipe_kernel(
                 },
                 DeviceResource {
                     buffer: output,
-                    version: version(1, element_ty.clone(), output_count),
+                    version: version(1, element_ty, output_count),
                     binding: Binding {
                         group: 0,
                         binding: 1,
@@ -1251,14 +1247,14 @@ fn materialize_recipe_kernel(
             SemanticValue {
                 id: SemanticValueId(1),
                 name: "recipe.in".to_owned(),
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: input_count,
                 origin: SemanticValueOrigin::HostInput,
             },
             SemanticValue {
                 id: SemanticValueId(2),
                 name: "recipe.out".to_owned(),
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: output_count,
                 origin: SemanticValueOrigin::Synthetic {
                     label: "recipe-out".to_owned(),
@@ -1278,7 +1274,7 @@ fn materialize_recipe_kernel(
         generations: vec![ValueGeneration {
             value: SemanticValueId(2),
             generation: 1,
-            element_ty: element_ty.clone(),
+            element_ty,
             element_count: output_count,
             produced_by: LaunchId(0),
         }],
@@ -1353,7 +1349,7 @@ fn whole_recipe_rope_position_head() {
 }
 
 /// **W** cell — `Gather` over the row axis (embedding `[T×960]` from the
-/// Q8_0 tied table `[960, 49152]`).
+/// `Q8_0` tied table `[960, 49152]`).
 #[test]
 fn whole_recipe_gather_row() {
     const T: u64 = 32;
@@ -1438,7 +1434,7 @@ fn causal_masked_softmax_whole_and_decomposed_seam() {
             resources: vec![
                 DeviceResource {
                     buffer: identity(0, "scores", BufferRole::Input, BufferLifetime::PerStep),
-                    version: version(1, signature.input.element_ty.clone(), T * T),
+                    version: version(1, signature.input.element_ty, T * T),
                     binding: Binding {
                         group: 0,
                         binding: 0,
@@ -1449,7 +1445,7 @@ fn causal_masked_softmax_whole_and_decomposed_seam() {
                     buffer: identity(1, "v", BufferRole::Input, BufferLifetime::PerStep),
                     version: version(
                         1,
-                        signature.extra_inputs[0].element_ty.clone(),
+                        signature.extra_inputs[0].element_ty,
                         T * HEAD_DIM,
                     ),
                     binding: Binding {
@@ -1460,7 +1456,7 @@ fn causal_masked_softmax_whole_and_decomposed_seam() {
                 },
                 DeviceResource {
                     buffer: identity(2, "attn_out", BufferRole::Output, BufferLifetime::PerStep),
-                    version: version(1, signature.output.element_ty.clone(), T * HEAD_DIM),
+                    version: version(1, signature.output.element_ty, T * HEAD_DIM),
                     binding: Binding {
                         group: 0,
                         binding: 2,
@@ -1492,14 +1488,14 @@ fn causal_masked_softmax_whole_and_decomposed_seam() {
             SemanticValue {
                 id: SemanticValueId(1),
                 name: "scores".to_owned(),
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: T * T,
                 origin: SemanticValueOrigin::HostInput,
             },
             SemanticValue {
                 id: SemanticValueId(2),
                 name: "v".to_owned(),
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: T * HEAD_DIM,
                 origin: SemanticValueOrigin::MirLocal {
                     function: MirFunctionId(0),
@@ -1509,7 +1505,7 @@ fn causal_masked_softmax_whole_and_decomposed_seam() {
             SemanticValue {
                 id: SemanticValueId(3),
                 name: "attn_out".to_owned(),
-                element_ty: element_ty.clone(),
+                element_ty,
                 element_count: T * HEAD_DIM,
                 origin: SemanticValueOrigin::Synthetic {
                     label: "attn-out".to_owned(),
@@ -1533,7 +1529,7 @@ fn causal_masked_softmax_whole_and_decomposed_seam() {
         generations: vec![ValueGeneration {
             value: SemanticValueId(3),
             generation: 1,
-            element_ty: element_ty.clone(),
+            element_ty,
             element_count: T * HEAD_DIM,
             produced_by: LaunchId(0),
         }],
@@ -1811,7 +1807,7 @@ fn oracle_gate_catches_wrong_generation_not_schema() {
 }
 
 /// Mutation: the gradient is associated with the wrong parameter — the
-/// companion's selected input claims gradient_slot 1 instead of 0.
+/// companion's selected input claims `gradient_slot` 1 instead of 0.
 /// Schema-valid (the row stays well-formed); the independent oracle catches
 /// the wrong association — never the schema.
 #[test]

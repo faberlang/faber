@@ -267,7 +267,7 @@ fn unplannable_collection_op_still_fails_target_entry_gate() {
     );
 }
 
-/// A rank-1 `tf32[D]` tensor type (the RMSNorm gamma row and the rope
+/// A rank-1 `tf32[D]` tensor type (the `RMSNorm` gamma row and the rope
 /// cos/sin table shapes).
 fn tensor_ty_1d(types: &mut TypeTable, dim: u64) -> MirType {
     let f32 = f32_ty(types).semantic_id();
@@ -370,7 +370,7 @@ fn gi3_gather_kernel_function(types: &mut TypeTable, id: u32) -> MirFunction {
     }
 }
 
-/// The GI3-1 RMSNorm kernel shape (mirrors `rms_norm_kernel_program`):
+/// The GI3-1 `RMSNorm` kernel shape (mirrors `rms_norm_kernel_program`):
 /// `out = rms_norm(x, axis, eps, gamma)` — gamma `[D]`, eps from the const
 /// operand.
 fn gi3_rms_norm_kernel_function(types: &mut TypeTable, id: u32) -> MirFunction {
@@ -456,7 +456,7 @@ fn gi3_rms_norm_kernel_function(types: &mut TypeTable, id: u32) -> MirFunction {
     }
 }
 
-/// The GI3-1 RoPE kernel shape (mirrors `rope_kernel_program`): `x` plus
+/// The GI3-1 `RoPE` kernel shape (mirrors `rope_kernel_program`): `x` plus
 /// the two host-precomputed 32-entry cos/sin tables as extra input params.
 fn gi3_rope_kernel_function(types: &mut TypeTable, id: u32) -> MirFunction {
     let tensor = rank2_tensor_ty(types, [9, 64]);

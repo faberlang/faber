@@ -3155,7 +3155,7 @@ fn dual_output_kernel_program() -> DeviceProgram {
         resources: vec![
             resource(
                 first,
-                version(1, element_ty.clone(), 4),
+                version(1, element_ty, 4),
                 1,
                 MirKernelResourceAccess::Write,
             ),
