@@ -223,6 +223,9 @@ pub enum WarningKind {
     /// slot collapsed to one member; the warning makes that cross-shape
     /// explicit.
     UnionHoleSolvedMonomorphically,
+    /// A string-typed `+` chain of 3+ operands contains at least one
+    /// string-literal operand; a `§` string template would read better.
+    PreferStringTemplate,
 }
 
 /// Semantic diagnostic categories used by passes and command policy.
