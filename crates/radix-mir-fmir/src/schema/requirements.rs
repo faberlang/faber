@@ -126,10 +126,7 @@ pub fn default_compatibility_table() -> ArtifactCompatibilityTable {
 /// guessed.
 #[must_use]
 pub fn is_known_target_feature_in(table: &ArtifactCompatibilityTable, feature: &str) -> bool {
-    table
-        .rows
-        .iter()
-        .any(|row| row.features.contains(&feature))
+    table.rows.iter().any(|row| row.features.contains(&feature))
 }
 
 /// Whether a target feature id is known to the FMIR default table (the

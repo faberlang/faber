@@ -661,10 +661,7 @@ fn buffer_slot_name(
 /// have produced several). A direct `Function` or constant-function callee
 /// carries the id itself. Shared by the host-partition boundary derivation
 /// and the boundary-ABI validation gate.
-pub(crate) fn callee_function_ids(
-    callee: &MirCallee,
-    program: &MirProgram,
-) -> Vec<MirFunctionId> {
+pub(crate) fn callee_function_ids(callee: &MirCallee, program: &MirProgram) -> Vec<MirFunctionId> {
     match callee {
         MirCallee::Function(id) => vec![*id],
         MirCallee::Value(MirOperand::Constant(MirConstant::Function(id))) => vec![*id],

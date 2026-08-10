@@ -1443,11 +1443,7 @@ fn causal_masked_softmax_whole_and_decomposed_seam() {
                 },
                 DeviceResource {
                     buffer: identity(1, "v", BufferRole::Input, BufferLifetime::PerStep),
-                    version: version(
-                        1,
-                        signature.extra_inputs[0].element_ty,
-                        T * HEAD_DIM,
-                    ),
+                    version: version(1, signature.extra_inputs[0].element_ty, T * HEAD_DIM),
                     binding: Binding {
                         group: 0,
                         binding: 1,
