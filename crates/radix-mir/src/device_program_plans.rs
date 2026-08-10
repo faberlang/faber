@@ -487,7 +487,7 @@ pub struct PerOutputDomain {
 
 /// Derive each kernel output's own bounds/index domain (DDCP1-U3).
 ///
-/// Output slots are the kernel's Write and ReadWrite resources — each one
+/// Output slots are the kernel's `Write` and `ReadWrite` resources — each one
 /// gets its own extent from its bound version's element count. The derivation
 /// is a pure function over carried program facts (A3: never text).
 #[must_use]
@@ -542,11 +542,11 @@ pub fn validate_per_output_domains(program: &DeviceProgram) -> Result<(), Device
 /// The total lanes the shared dispatch launches: workgroup count ×
 /// workgroup size across all three axes.
 fn dispatched_lanes(launch: &KernelLaunchPlan) -> u64 {
-    u64::from(launch.workgroup_count.x)
+    launch.workgroup_count.x
         * u64::from(launch.workgroup.x)
-        * u64::from(launch.workgroup_count.y)
+        * launch.workgroup_count.y
         * u64::from(launch.workgroup.y)
-        * u64::from(launch.workgroup_count.z)
+        * launch.workgroup_count.z
         * u64::from(launch.workgroup.z)
 }
 

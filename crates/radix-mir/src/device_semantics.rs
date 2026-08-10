@@ -318,7 +318,7 @@ impl DeviceLegalityFacts {
     ///
     /// Returns the first [`DeviceProgramError`] the record violates.
     pub fn validate(&self, launches: &[LaunchId]) -> Result<(), DeviceProgramError> {
-        for fact in &self.device_effects {
+        if let Some(fact) = self.device_effects.first() {
             if !launches.contains(&fact.launch) {
                 return Err(DeviceProgramError::UnknownDeviceEffectLaunch {
                     launch: fact.launch,

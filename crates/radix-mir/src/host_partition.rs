@@ -619,11 +619,10 @@ mod tests;
 /// The target-neutral logical entry name of a kernel function: the function's
 /// source name when it carries one, else the kernel index-based fallback.
 fn kernel_entry_name(function: &MirFunction, interner: &Interner) -> String {
-    function
-        .name
-        .map(|symbol| interner.resolve(symbol))
-        .map(str::to_owned)
-        .unwrap_or_else(|| format!("kernel{}", function.id.0))
+    function.name.map_or_else(
+        || format!("kernel{}", function.id.0),
+        |symbol| interner.resolve(symbol).to_owned(),
+    )
 }
 
 /// The buffer-slot name for one ABI resource: the carried source name when
@@ -662,9 +661,9 @@ fn buffer_slot_name(
 /// have produced several). A direct `Function` or constant-function callee
 /// carries the id itself. Shared by the host-partition boundary derivation
 /// and the boundary-ABI validation gate.
-pub(crate) fn callee_function_ids<'a>(
+pub(crate) fn callee_function_ids(
     callee: &MirCallee,
-    program: &'a MirProgram,
+    program: &MirProgram,
 ) -> Vec<MirFunctionId> {
     match callee {
         MirCallee::Function(id) => vec![*id],

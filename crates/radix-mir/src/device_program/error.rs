@@ -250,7 +250,7 @@ pub enum DeviceProgramError {
     /// applies only where companion outputs are actually referenced (contract
     /// rule 6/7). Graph-direction references (a launch consuming a companion
     /// output with no relation) are proven by the independent oracle
-    /// (G6 KernelSequence).
+    /// (G6 `KernelSequence`).
     MissingCompanionFact { primal: DefId, reason: &'static str },
     // ── DDCP1-U5: prepared submission regions ────────────────────────────
     /// A prepared submission region contains a declared observation point in

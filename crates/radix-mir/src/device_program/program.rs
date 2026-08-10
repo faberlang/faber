@@ -361,8 +361,7 @@ impl DeviceProgram {
                         .launches
                         .iter()
                         .find(|launch| launch.kernel_index == kernel_index)
-                        .map(|launch| launch.id)
-                        .unwrap_or(LaunchId(0));
+                        .map_or(LaunchId(0), |launch| launch.id);
                     return Err(DeviceProgramError::UninitializedBufferRead {
                         buffer: resource.buffer.id,
                         launch,
