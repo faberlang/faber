@@ -2598,10 +2598,11 @@ fn array_mty(types: &mut TypeTable) -> MirType {
     MirType::semantic(types.array(types.primitive(Primitive::Numerus)))
 }
 
-/// A single rounding-op program: one scalar receiver local at local 0 and a
-/// destination local typed with the distinct rounding result type (rounding
-/// maps fractus-family receivers to the plain `numerus` result).
-fn rounding_collection_program(
+/// A single unary scalar collection-op program: one scalar receiver local at
+/// local 0 and a destination local typed with the call's result type (the
+/// rounding ops map fractus-family receivers to plain `numerus`; the
+/// absolute/signum ops return the receiver type unchanged).
+fn unary_scalar_collection_program(
     types: &mut TypeTable,
     op: MirCollectionOp,
     receiver_ty: MirType,
@@ -2794,7 +2795,7 @@ fn test_rounding_f32_receiver_valid_for_all_rounding_ops() {
         let mut types = TypeTable::new();
         let receiver_ty = f32_receiver_mty(&mut types);
         let return_ty = numerus_mty(&mut types);
-        let program = rounding_collection_program(&mut types, op, receiver_ty, return_ty);
+        let program = unary_scalar_collection_program(&mut types, op, receiver_ty, return_ty);
         let errors = validate(&program, &types);
         assert!(
             errors.is_empty(),
@@ -2809,7 +2810,7 @@ fn test_rounding_plain_fractus_receiver_valid_for_all_rounding_ops() {
         let mut types = TypeTable::new();
         let receiver_ty = MirType::semantic(types.primitive(Primitive::Fractus));
         let return_ty = numerus_mty(&mut types);
-        let program = rounding_collection_program(&mut types, op, receiver_ty, return_ty);
+        let program = unary_scalar_collection_program(&mut types, op, receiver_ty, return_ty);
         let errors = validate(&program, &types);
         assert!(
             errors.is_empty(),
@@ -2824,13 +2825,98 @@ fn test_rounding_rejects_numerus_receiver() {
         let mut types = TypeTable::new();
         let receiver_ty = numerus_mty(&mut types);
         let return_ty = numerus_mty(&mut types);
-        let program = rounding_collection_program(&mut types, op, receiver_ty, return_ty);
+        let program = unary_scalar_collection_program(&mut types, op, receiver_ty, return_ty);
         let errors = validate(&program, &types);
         assert!(
             errors
                 .iter()
                 .any(|e| e.contains("numeric rounding receiver is not fractus")),
             "expected the fractus-receiver diagnostic for {op:?}, got: {errors:?}"
+        );
+    }
+}
+
+// ── Absolute/Signum intrinsics: fractus-family receivers ───────────────
+// `absolutum`/`signum` live on the registry's shared Numeric slot (plain
+// `numerus` + `fractus` surface) with a `SameAsReceiver` return kind. The
+// registry deliberately maps sized-fractus receivers (f32/f64) to the
+// `Fractus` family; MIR validation must accept a `SizedNumeric(Fractus, _)`
+// receiver (sibling to the Minimum/Maximum arm) while keeping the plain
+// result checks. The corpus (`intrinseca/numerus-methodi.fab`) relies on the
+// plain `numerus` surface, so it stays accepted; sized-numerus receivers
+// (`i32`) stay rejected.
+
+const ABSOLUTE_SIGNUM_OPS: [MirCollectionOp; 2] = [MirCollectionOp::Absolute, MirCollectionOp::Signum];
+
+fn fractus_mty(types: &mut TypeTable) -> MirType {
+    MirType::semantic(types.primitive(Primitive::Fractus))
+}
+
+fn i32_receiver_mty(types: &mut TypeTable) -> MirType {
+    MirType::semantic(types.sized_numeric(Primitive::Numerus, radix_types::NumericWidth::I32))
+}
+
+#[test]
+fn test_absolute_signum_f32_receiver_valid_for_all_ops() {
+    for op in ABSOLUTE_SIGNUM_OPS {
+        let mut types = TypeTable::new();
+        let receiver_ty = f32_receiver_mty(&mut types);
+        // SameAsReceiver: the result type mirrors the receiver type.
+        let return_ty = receiver_ty;
+        let program = unary_scalar_collection_program(&mut types, op, receiver_ty, return_ty);
+        let errors = validate(&program, &types);
+        assert!(
+            errors.is_empty(),
+            "expected a valid f32 receiver for {op:?}, got: {errors:?}"
+        );
+    }
+}
+
+#[test]
+fn test_absolute_signum_plain_fractus_receiver_valid_for_all_ops() {
+    for op in ABSOLUTE_SIGNUM_OPS {
+        let mut types = TypeTable::new();
+        let receiver_ty = fractus_mty(&mut types);
+        let return_ty = receiver_ty;
+        let program = unary_scalar_collection_program(&mut types, op, receiver_ty, return_ty);
+        let errors = validate(&program, &types);
+        assert!(
+            errors.is_empty(),
+            "expected a valid fractus receiver for {op:?}, got: {errors:?}"
+        );
+    }
+}
+
+#[test]
+fn test_absolute_signum_plain_numerus_receiver_valid_for_all_ops() {
+    // The corpus (`intrinseca/numerus-methodi.fab`) exercises int
+    // `absolutum`/`signum`; the plain `numerus` surface must keep validating.
+    for op in ABSOLUTE_SIGNUM_OPS {
+        let mut types = TypeTable::new();
+        let receiver_ty = numerus_mty(&mut types);
+        let return_ty = receiver_ty;
+        let program = unary_scalar_collection_program(&mut types, op, receiver_ty, return_ty);
+        let errors = validate(&program, &types);
+        assert!(
+            errors.is_empty(),
+            "expected a valid numerus receiver for {op:?}, got: {errors:?}"
+        );
+    }
+}
+
+#[test]
+fn test_absolute_signum_rejects_sized_numerus_receiver() {
+    for op in ABSOLUTE_SIGNUM_OPS {
+        let mut types = TypeTable::new();
+        let receiver_ty = i32_receiver_mty(&mut types);
+        let return_ty = receiver_ty;
+        let program = unary_scalar_collection_program(&mut types, op, receiver_ty, return_ty);
+        let errors = validate(&program, &types);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("numeric intrinsic receiver is not numerus or fractus")),
+            "expected the numerus-or-fractus receiver diagnostic for {op:?}, got: {errors:?}"
         );
     }
 }

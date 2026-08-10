@@ -995,6 +995,7 @@ impl Validator<'_, '_> {
                 if !matches!(
                     self.type_kind(receiver_ty),
                     Type::Primitive(Primitive::Numerus | Primitive::Fractus)
+                        | Type::SizedNumeric(Primitive::Fractus, _)
                 ) {
                     self.error(span, "numeric intrinsic receiver is not numerus or fractus");
                     return;
