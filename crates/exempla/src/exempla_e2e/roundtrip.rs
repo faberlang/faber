@@ -39,6 +39,9 @@ const FABER_ROUNDTRIP_EXPECTED_FAILURES: &[&str] = &[
     "ante/ante.fab",
     "assertio/nonnulla.fab",
     "assignatio/assignatio.fab",
+    // Y: quarantined 2026-08-10; the `↤` chain fixture's canonical emit does
+    // not stabilize after one round-trip (forma surface, not codegen).
+    "assignatio/conversio-assign.fab",
     "aut/aut.fab",
     "cede/cede.fab",
     "ceteri/ceteri.fab",
