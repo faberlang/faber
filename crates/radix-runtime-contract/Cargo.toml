@@ -1,6 +1,6 @@
 [package]
 name = "radix-runtime-contract"
-version = "0.80.0"
+version = "0.81.0"
 edition = "2021"
 description = "Radix-owned runtime contract (display, instans, tensor shape math)"
 license = "MIT"
