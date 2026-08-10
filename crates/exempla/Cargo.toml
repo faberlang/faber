@@ -7,7 +7,7 @@ license = "MIT"
 publish = false
 
 [dependencies]
-radix = { path = "../../../radix/crates/radix" }
+radix = { path = "../../../radix/crates/radix", default-features = false }
 rustc-hash = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -25,3 +25,32 @@ radix-module-boundary = { path = "../../../radix/crates/radix-module-boundary" }
 # product evidence boundary replacing the stub host and external handle maps.
 faber-host-wasm = { path = "../../../hosts/wasm" }
 wat = "1"
+
+[features]
+# Per-lane radix target pass-through, mirroring `faber/Cargo.toml [features]`
+# (delivery per-lane-e2e-validation decision 1). Each backend lane module is
+# `#[cfg(feature = "<lane>")]`-gated in `src/exempla_e2e/mod.rs` and
+# `tests/e2e_harness/mod.rs` so a feature-limited build compiles only its lane.
+# `default = ["full-targets"]` keeps today's full e2e unchanged (additive,
+# never reduced coverage).
+default = ["full-targets"]
+full-targets = [
+    "hir-rust",
+    "hir-go",
+    "hir-ts",
+    "hir-swift",
+    "mir-sexp",
+    "mir-metal",
+    "mir-wasm",
+    "mir-llvm",
+    "mir-fmir",
+]
+hir-rust = ["radix/hir-rust"]
+hir-go = ["radix/hir-go"]
+hir-ts = ["radix/hir-ts"]
+hir-swift = ["radix/hir-swift"]
+mir-sexp = ["radix/mir-sexp"]
+mir-metal = ["radix/mir-metal"]
+mir-wasm = ["radix/mir-wasm"]
+mir-llvm = ["radix/mir-llvm"]
+mir-fmir = ["radix/mir-fmir"]
