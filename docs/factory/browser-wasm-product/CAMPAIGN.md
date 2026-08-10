@@ -1,6 +1,6 @@
 # Campaign: Browser Wasm Product
 
-**Status**: planned pre-implementation — Stage 0 is selected for delivery planning
+**Status**: active — Stage 0 CLOSED (U0–U7 landed, audit clean_pass, phase-close council complete, closeout 1ece368); Stage 1 spec lowered (3b36fb8) pending admission (audit revise 2 P2s + council corrections queued)
 **Mode**: routing artifact — does not implement code directly
 **Date**: 2026-08-09
 **Control-plane repo**: `/Users/ianzepp/work/faberlang/faber`

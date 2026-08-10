@@ -1,6 +1,6 @@
 # Faber Format Pretty Policy — Factory Goal
 
-**Status**: active — delivery admitted (planner-2, `delivery.md`); S1 filed (radix lane, after DDCP3-U5); implementation in flight
+**Status**: active — S1/S3 filed (radix lane, after DDCP3-U5; pending); S2 + S4 delivered (23266e0 normalise-v1 corpus+harness; 1b8f1f6 CLI steady-state surface); A2-P2 guard tests (33320ed/3784a44); SEM016 re-tier done; S5–S6 pending
 **Created**: 2026-08-09
 **Target repo**: `faber` (product surface; goal inventory lives here) + `radix` (`radix::forma` engine)
 **Factory artifact dir**: `docs/factory/faber-format-pretty/`

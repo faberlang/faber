@@ -18,9 +18,9 @@ in [`docs/archived/`](../archived/README.md).
 
 ## Summary
 
-- goals scanned: 17
-- active: 7
-- planned: 8
+- goals scanned: 18
+- active: 9
+- planned: 7
 - done: 0
 - unknown: 2
 - archived (moved to `docs/archived/`): 6
@@ -29,8 +29,10 @@ in [`docs/archived/`](../archived/README.md).
 
 | Goal | Status | Done | goal | campaign | delivery | ledger | council | evidence | other |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| [browser-wasm-product](browser-wasm-product/goal.md) | active | — | 1 | 1 | 2 | 0 | 0 | 7 | 2 |
 | [component-release-streamline](component-release-streamline/CAMPAIGN.md) | active | — | 0 | 1 | 4 | 0 | 0 | 0 | 1 |
-| [direct-device-product-pipeline](direct-device-product-pipeline/CAMPAIGN.md) | active | 0% | 0 | 1 | 1 | 0 | 0 | 1 | 5 |
+| [direct-device-product-pipeline](direct-device-product-pipeline/CAMPAIGN.md) | active | 0% | 0 | 1 | 2 | 0 | 0 | 1 | 5 |
+| [faber-format-pretty](faber-format-pretty/goal.md) | active | 0% | 1 | 0 | 1 | 0 | 0 | 0 | 0 |
 | [faber-onboarding](faber-onboarding/CAMPAIGN.md) | active | — | 0 | 1 | 3 | 1 | 0 | 0 | 5 |
 | [faber-script-e2e-hardening](faber-script-e2e-hardening/goal.md) | active | — | 1 | 0 | 0 | 1 | 0 | 0 | 34 |
 | [native-gpu-application-bundle](native-gpu-application-bundle/CAMPAIGN.md) | active | — | 0 | 1 | 8 | 0 | 0 | 1 | 7 |
@@ -41,7 +43,6 @@ in [`docs/archived/`](../archived/README.md).
 
 | Goal | Status | Done | goal | campaign | delivery | ledger | council | evidence | other |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| [browser-wasm-product](browser-wasm-product/goal.md) | planned | — | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | [faber-format-lossless](faber-format-lossless/goal.md) | planned | — | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | [faber-polish](faber-polish/goal.md) | planned | — | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | [inference-session-boundary](inference-session-boundary/goal.md) | planned | — | 1 | 0 | 0 | 0 | 0 | 0 | 0 |

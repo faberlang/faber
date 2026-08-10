@@ -1,6 +1,6 @@
 # Delivery Spec — BROWSER-WASM-PRODUCT Stage 1: Browser-Minimum MIR-to-Wasm Reachability (compiler surface; shape list S1–S6)
 
-**Status**: planned (delivery lowering complete, 2026-08-09)
+**Status**: active — delivery lowering complete (2026-08-09); admission pending (audit revise 2 P2s + council corrections)
 **Planner**: planner-1 (task `f914c781`)
 **Campaign**: [CAMPAIGN.md](CAMPAIGN.md) · **Goal**: [goal.md](goal.md) ·
 **Predecessor**: [stage0-closeout.md](stage0-closeout.md) (U7 `1ece368` — Stage 0 gate closeout + boundary review)

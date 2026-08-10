@@ -1,6 +1,6 @@
 # Goal: Browser Wasm Product
 
-**Status**: planned pre-implementation — campaign drafted; Stage 0 is ready for delivery planning
+**Status**: active — Stage 0 closed (2026-08-09, closeout 1ece368); Stage 1 delivery lowering complete pending admission
 **Created**: 2026-08-09
 **Target repo**: `/Users/ianzepp/work/faberlang/faber`
 **Campaign**: [CAMPAIGN.md](CAMPAIGN.md)
