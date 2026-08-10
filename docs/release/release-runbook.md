@@ -201,6 +201,29 @@ steps: after `cargo update`, update `release-manifest.yaml` pins (source §4 +
 packs §6), verify them, and commit the manifest in the single bump+lock commit
 (`release-manifest-schema.md` §7).
 
+**Consumer smoke-test gate (U3, the P0 guard):** after packaging, every
+dev-kit archive must pass the consumer smoke test in a clean prefix (fresh
+HOME, minimal PATH, no siblings):
+
+```bash
+# Local proof (checklist step 2) — per triple, against the packaged archive:
+python3 scripta/smoke-test-release-archive \
+  --archive dist/faber-vX.Y.Z-<triple>.tar.gz \
+  --version X.Y.Z --triple <triple>
+# P0 guard on the previous bare-binary shape (must be REJECTED, pack-error class):
+python3 scripta/smoke-test-release-archive \
+  --archive dist/faber-vX.Y.Z-<triple>.tar.gz \
+  --version X.Y.Z --triple <triple> \
+  --expect-fail-class pack-error   # exit 0 only if rejected with pack-error
+```
+
+CI runs the smoke test against the packaged archive after the "Package
+artifact" step (fails fast before upload). Readback (checklist step 7) is
+authoritative: download the public bytes, `shasum -c`, then smoke the
+downloaded archive — either explicitly or via the readback mode
+(`--download-into out/readback`, which downloads + `shasum -c` + smokes).
+Promotion (step 8) is blocked until readback smoke is green.
+
 ### 2.3 Gates that gate each path
 
 `process-local-first.md` §3 is the gate mapping:
