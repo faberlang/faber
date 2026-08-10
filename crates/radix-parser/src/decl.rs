@@ -184,7 +184,7 @@ impl Parser {
             Some(Box::new(self.parse_expression()?))
         } else if self.check(&TokenKind::ConversioAssign) {
             Some(Box::new(
-                self.parse_conversio_assign_initializer(&ty, &binding)?,
+                self.parse_conversio_assign_initializer(ty.as_ref(), &binding)?,
             ))
         } else {
             None
@@ -213,11 +213,10 @@ impl Parser {
     /// `conversio_assign_requires_concrete_type` issue identity.
     fn parse_conversio_assign_initializer(
         &mut self,
-        ty: &Option<TypeExpr>,
+        ty: Option<&TypeExpr>,
         binding: &BindingPattern,
     ) -> Result<Expr, ParseError> {
         let has_concrete_type = ty
-            .as_ref()
             .is_some_and(|t| !matches!(t.kind, TypeExprKind::Infer));
         let BindingPattern::Ident(ident) = binding else {
             return Err(
