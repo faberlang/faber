@@ -2846,7 +2846,8 @@ fn test_rounding_rejects_numerus_receiver() {
 // plain `numerus` surface, so it stays accepted; sized-numerus receivers
 // (`i32`) stay rejected.
 
-const ABSOLUTE_SIGNUM_OPS: [MirCollectionOp; 2] = [MirCollectionOp::Absolute, MirCollectionOp::Signum];
+const ABSOLUTE_SIGNUM_OPS: [MirCollectionOp; 2] =
+    [MirCollectionOp::Absolute, MirCollectionOp::Signum];
 
 fn fractus_mty(types: &mut TypeTable) -> MirType {
     MirType::semantic(types.primitive(Primitive::Fractus))

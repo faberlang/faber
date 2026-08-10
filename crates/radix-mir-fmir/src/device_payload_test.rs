@@ -1438,11 +1438,7 @@ fn amd_artifact(blob: &str) -> FmirDeviceArtifact {
         stage: MaterializationStage::CompilerInput,
         target: DeviceTargetId {
             id: "gfx942".to_owned(),
-            required_features: vec![
-                "amdgpu".to_owned(),
-                "cdna3".to_owned(),
-                "gfx942".to_owned(),
-            ],
+            required_features: vec!["amdgpu".to_owned(), "cdna3".to_owned(), "gfx942".to_owned()],
         },
         ..metal_artifact(blob)
     })
@@ -1458,13 +1454,20 @@ fn amd_artifact_admits_and_round_trips_both_codecs() {
     // variant posture the seed established; no carrier-version bump).
     let mut section = sample_device_section();
     section.selection = FmirDeviceSelection::Amd;
-    section.artifacts.artifact.push(amd_artifact("; amd module"));
+    section
+        .artifacts
+        .artifact
+        .push(amd_artifact("; amd module"));
     let image = text_image_with_device(Some(section));
     let text = encode_text_image(&image).expect("encode text image");
     let decoded = decode_text_image(&text, TOOLCHAIN)
         .expect("the amd artifact is admitted with the gfx942 row");
     let device = decoded.device.expect("device section present");
-    let amd = device.artifacts.artifact.last().expect("amd artifact present");
+    let amd = device
+        .artifacts
+        .artifact
+        .last()
+        .expect("amd artifact present");
     assert_eq!(amd.backend, FmirDeviceBackend::Amd);
     assert_eq!(amd.backend.spelling(), "amd");
     assert_eq!(amd.format, DeviceArtifactFormat::LlvmIr);
@@ -1475,7 +1478,10 @@ fn amd_artifact_admits_and_round_trips_both_codecs() {
     // Binary codec round-trip too.
     let mut section = sample_device_section();
     section.selection = FmirDeviceSelection::Amd;
-    section.artifacts.artifact.push(amd_artifact("; amd module"));
+    section
+        .artifacts
+        .artifact
+        .push(amd_artifact("; amd module"));
     let image = binary_image_with_device(Some(section));
     let bytes = encode_binary_image(&image).expect("encode binary image");
     decode_binary_image(&bytes, TOOLCHAIN)
@@ -1494,11 +1500,7 @@ fn amd_artifact_mismatched_target_fails_closed() {
         stage: MaterializationStage::CompilerInput,
         target: DeviceTargetId {
             id: "sm_120".to_owned(),
-            required_features: vec![
-                "amdgpu".to_owned(),
-                "cdna3".to_owned(),
-                "gfx942".to_owned(),
-            ],
+            required_features: vec!["amdgpu".to_owned(), "cdna3".to_owned(), "gfx942".to_owned()],
         },
         ..metal_artifact("; amd module")
     })];
@@ -1522,11 +1524,7 @@ fn amd_artifact_wrong_format_fails_closed() {
         stage: MaterializationStage::CompilerInput,
         target: DeviceTargetId {
             id: "gfx942".to_owned(),
-            required_features: vec![
-                "amdgpu".to_owned(),
-                "cdna3".to_owned(),
-                "gfx942".to_owned(),
-            ],
+            required_features: vec!["amdgpu".to_owned(), "cdna3".to_owned(), "gfx942".to_owned()],
         },
         ..metal_artifact("; amd module")
     })];

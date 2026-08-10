@@ -1082,10 +1082,7 @@ impl Validator<'_, '_> {
                         Type::Primitive(Primitive::Fractus)
                             | Type::SizedNumeric(Primitive::Fractus, _)
                     ) {
-                        self.error(
-                            span,
-                            "numeric rounding receiver is not fractus",
-                        );
+                        self.error(span, "numeric rounding receiver is not fractus");
                     }
                 }
             }

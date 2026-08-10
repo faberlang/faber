@@ -4,9 +4,9 @@
 //! never silently widened.
 
 use super::{
-    FmirArtifactReflection, FmirReflectedKernel, FmirReflectedResource,
-    WireInputUpdateCadence, WireInvocationMode, WireKvCacheDtype, WireKvCacheLayout,
-    WireKvReservePolicy, WireSessionInput, WireSessionObservationCadence,
+    FmirArtifactReflection, FmirReflectedKernel, FmirReflectedResource, WireInputUpdateCadence,
+    WireInvocationMode, WireKvCacheDtype, WireKvCacheLayout, WireKvReservePolicy, WireSessionInput,
+    WireSessionObservationCadence,
 };
 
 #[test]
