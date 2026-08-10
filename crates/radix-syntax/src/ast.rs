@@ -434,6 +434,8 @@ pub struct EnumDecl {
 
 #[derive(Debug)]
 pub struct EnumMember {
+    /// Comments and newlines before this member at a member boundary.
+    pub leading_trivia: Vec<Trivia>,
     pub name: Ident,
     pub value: Option<EnumValue>,
     pub span: Span,
@@ -454,6 +456,8 @@ pub struct UnionDecl {
 
 #[derive(Debug)]
 pub struct Variant {
+    /// Comments and newlines before this variant at a member boundary.
+    pub leading_trivia: Vec<Trivia>,
     pub name: Ident,
     pub fields: Vec<VariantField>,
     pub span: Span,

@@ -877,6 +877,10 @@ mod comment_preservation_test;
 mod line_start_comment_test;
 
 #[cfg(test)]
+#[path = "enum_union_trivia_test.rs"]
+mod enum_union_trivia_test;
+
+#[cfg(test)]
 #[path = "claim_test.rs"]
 mod claim_test;
 

@@ -935,6 +935,7 @@ impl Parser {
 
         let mut members = Vec::new();
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
+            let leading_trivia = self.parse_leading_trivia();
             let start = self.current_span();
             let member_name = self.parse_ident()?;
 
@@ -1002,6 +1003,7 @@ impl Parser {
 
             let span = start.merge(self.previous_span());
             members.push(EnumMember {
+                leading_trivia,
                 name: member_name,
                 value,
                 span,
@@ -1034,6 +1036,7 @@ impl Parser {
 
         let mut variants = Vec::new();
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
+            let leading_trivia = self.parse_leading_trivia();
             let start = self.current_span();
             let variant_name = self.parse_ident()?;
 
@@ -1059,6 +1062,7 @@ impl Parser {
 
             let span = start.merge(self.previous_span());
             variants.push(Variant {
+                leading_trivia,
                 name: variant_name,
                 fields,
                 span,

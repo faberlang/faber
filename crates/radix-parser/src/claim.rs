@@ -85,10 +85,18 @@ fn claim_stmt(stmt: &Stmt, claimed: &mut HashSet<u32>) {
                 claim_trivia(&method.leading_trivia, claimed);
             }
         }
+        StmtKind::Enum(enum_decl) => {
+            for member in &enum_decl.members {
+                claim_trivia(&member.leading_trivia, claimed);
+            }
+        }
+        StmtKind::Union(union_decl) => {
+            for variant in &union_decl.variants {
+                claim_trivia(&variant.leading_trivia, claimed);
+            }
+        }
         StmtKind::Var(_)
         | StmtKind::TypeAlias(_)
-        | StmtKind::Enum(_)
-        | StmtKind::Union(_)
         | StmtKind::Import(_)
         | StmtKind::Ex(_)
         | StmtKind::Expr(_)
