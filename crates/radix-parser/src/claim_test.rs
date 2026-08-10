@@ -57,10 +57,30 @@ fn comment_between_annotations_is_invalid() {
 }
 
 #[test]
-fn comment_before_genus_close_is_invalid() {
+fn comment_before_genus_close_is_claimed() {
+    // MT-U2: a full-line comment before a genus's closing `}` is legal
+    // ClassDecl.end_trivia (mirrors block-end trivia), so it is claimed and no
+    // invalid-placement diagnostic is reported.
     let source = "genus Canis {\n  textus nomen\n  # before close\n}\n";
     let result = parse_source(source);
-    assert_invalid_comment_placement(&result, " before close");
+    assert!(result.success(), "{:?}", result.errors);
+    assert_eq!(invalid_placement_count(&result), 0);
+
+    use radix_syntax::{StmtKind, Trivia};
+    let program = result.program.as_ref().unwrap();
+    let StmtKind::Class(class) = &program.statements[0].kind else {
+        panic!("expected genus declaration");
+    };
+    let comments: Vec<&str> = class
+        .end_trivia
+        .iter()
+        .filter_map(|item| match item {
+            Trivia::CommentLine(comment) => Some(result.interner.resolve(comment.text)),
+            Trivia::Newline(_) => None,
+        })
+        .collect();
+    assert_eq!(comments, vec![" before close"]);
+    assert_eq!(class.members.len(), 1);
 }
 
 #[test]

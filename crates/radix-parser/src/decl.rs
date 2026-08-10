@@ -770,6 +770,11 @@ impl Parser {
             members.push(member);
         }
 
+        // Trivia immediately before the consuming `}` has no following member
+        // to attach to; retain it on the class-end boundary so the post-parse
+        // completeness check can claim it (mirrors `parse_block`).
+        let end_trivia = self.parse_block_end_trivia();
+
         self.expect(&TokenKind::RBrace, "expected '}' after class body")?;
 
         Ok(StmtKind::Class(ClassDecl {
@@ -779,6 +784,7 @@ impl Parser {
             extends,
             implements,
             members,
+            end_trivia,
         }))
     }
 

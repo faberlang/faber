@@ -367,6 +367,15 @@ pub struct ClassDecl {
     pub extends: Option<Ident>,
     pub implements: Vec<Ident>,
     pub members: Vec<ClassMember>,
+
+    /// Comments and newlines collected immediately before the consuming `}`.
+    ///
+    /// WHY: A `#` comment run directly before a genus body close has no
+    /// following member to attach to; it is retained on the block-end boundary
+    /// (mirroring [`BlockStmt::end_trivia`]) so the post-parse completeness
+    /// check can claim it. Syntax does not manufacture a member for this
+    /// boundary.
+    pub end_trivia: Vec<Trivia>,
 }
 
 #[derive(Debug)]

@@ -73,6 +73,7 @@ fn claim_stmt(stmt: &Stmt, claimed: &mut HashSet<u32>) {
     match &stmt.kind {
         StmtKind::Func(func) => claim_func_decl(func, claimed),
         StmtKind::Class(class) => {
+            claim_trivia(&class.end_trivia, claimed);
             for member in &class.members {
                 claim_trivia(&member.leading_trivia, claimed);
                 if let ClassMemberKind::Method(func) = &member.kind {

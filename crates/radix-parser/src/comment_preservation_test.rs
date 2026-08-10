@@ -350,3 +350,67 @@ secus {
     assert_eq!(result.interner.resolve(comments[0].text), " -- fallback --");
     assert_eq!(newline_count(leading_trivia), 2);
 }
+
+// ── Genus (class) block-end and initializer-entangled boundaries (MT-U2) ──
+
+#[test]
+fn genus_block_end_comment_attaches_to_class_end_trivia() {
+    let source = "genus Canis {\n  textus nomen\n  # before close\n}\n";
+    let result = parse_source(source);
+    assert!(result.success(), "{:?}", result.errors);
+
+    let program = result.program.as_ref().unwrap();
+    let StmtKind::Class(class) = &program.statements[0].kind else {
+        panic!("expected genus declaration");
+    };
+    let comments = comment_lines(&class.end_trivia);
+    assert_eq!(comments.len(), 1);
+    assert_eq!(result.interner.resolve(comments[0].text), " before close");
+}
+
+#[test]
+fn comment_after_field_with_initializer_attaches_to_next_member() {
+    let source = "genus Thing {\n  numerus count = 42\n  # doc\n  bivalens flag\n}\n";
+    let result = parse_source(source);
+    assert!(result.success(), "{:?}", result.errors);
+
+    let program = result.program.as_ref().unwrap();
+    let StmtKind::Class(class) = &program.statements[0].kind else {
+        panic!("expected genus declaration");
+    };
+    assert_eq!(class.members.len(), 2);
+    let comments = comment_lines(&class.members[1].leading_trivia);
+    assert_eq!(comments.len(), 1);
+    assert_eq!(result.interner.resolve(comments[0].text), " doc");
+    // initializer-terminating newline + comment line's terminating newline
+    assert_eq!(newline_count(&class.members[1].leading_trivia), 2);
+}
+
+#[test]
+fn reader_state_shaped_genus_fixture_parses_green() {
+    // The driving fixture from the goal: fields documented in place, the last
+    // one preceded by a full-line comment after a plain field.
+    let source = "\
+genus ReaderState {
+    tabula<textus, textus> reader_keyword_latin_keys
+    tabula<textus, textus> reader_type_latin_keys
+    numerus current_line
+    # True once any non-trivia token has been emitted on the current line.
+    bivalens line_has_code
+}
+";
+    let result = parse_source(source);
+    assert!(result.success(), "{:?}", result.errors);
+
+    let program = result.program.as_ref().unwrap();
+    let StmtKind::Class(class) = &program.statements[0].kind else {
+        panic!("expected genus declaration");
+    };
+    assert_eq!(class.members.len(), 4);
+    let comments = comment_lines(&class.members[3].leading_trivia);
+    assert_eq!(comments.len(), 1);
+    assert_eq!(
+        result.interner.resolve(comments[0].text),
+        " True once any non-trivia token has been emitted on the current line."
+    );
+}
