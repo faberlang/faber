@@ -77,7 +77,7 @@ mod wire_test;
 /// carries the F1–F7 semantic facts (semantic value identity, generations,
 /// roots, dependencies, lossless relation, initialization/observation axes).
 /// `6 → 7` clean break (DDCP2-U2) migrates `FmirDeviceArtifact` to the frozen
-/// **DeviceArtifact packet** (typed backend id with the unknown-representable
+/// **`DeviceArtifact` packet** (typed backend id with the unknown-representable
 /// case, explicit format id, materialization stage, typed target id +
 /// required features, ABI/schema version, canonical raw bytes, explicit
 /// text/binary payload encoding, the entrypoint symbol map, and the
@@ -87,7 +87,7 @@ mod wire_test;
 /// with [`UnsupportedVersion`](crate::error::FmirImageError::UnsupportedVersion).
 pub const PACKAGE_MIR_ARTIFACT_VERSION: u32 = 7;
 
-/// The accepted artifact ABI/schema version of the DeviceArtifact packet
+/// The accepted artifact ABI/schema version of the `DeviceArtifact` packet
 /// (DDCP3-U0 (c) / CTO9-6 c): the **exact-match** admission set for an
 /// artifact's declared `abi_version`. Rides the coordinated boundary with
 /// `HOST_CALL_ABI_VERSION == DEVICE_RUN_PLAN_VERSION` (both 8) — the

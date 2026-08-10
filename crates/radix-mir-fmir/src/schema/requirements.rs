@@ -129,7 +129,7 @@ pub fn is_known_target_feature_in(table: &ArtifactCompatibilityTable, feature: &
     table
         .rows
         .iter()
-        .any(|row| row.features.iter().any(|known| *known == feature))
+        .any(|row| row.features.contains(&feature))
 }
 
 /// Whether a target feature id is known to the FMIR default table (the

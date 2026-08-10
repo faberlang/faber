@@ -4,7 +4,7 @@ use crate::schema::{
 };
 
 /// SHA-256 digest, canonical `sha256:<64-hex>` spelling (DDCP2-U3 / contract
-/// §IdentityDomains digest rules). Digests cover decoded bytes, never the
+/// §`IdentityDomains` digest rules). Digests cover decoded bytes, never the
 /// transport spelling — the base64 spelling, the length prefix, and the
 /// encoding tag are transport, not payload.
 #[must_use]
@@ -14,7 +14,7 @@ pub fn sha256_digest(bytes: &[u8]) -> String {
     format!("sha256:{digest:x}")
 }
 
-/// `content_sha256` (DDCP2-U3 / contract §IdentityDomains rule 1): the
+/// `content_sha256` (DDCP2-U3 / contract §`IdentityDomains` rule 1): the
 /// plain SHA-256 over the **canonical decoded raw payload bytes only** —
 /// never the transport spelling (the unpadded base64 spelling, the length
 /// prefix, and the encoding tag are transport, not payload). This is the
@@ -24,7 +24,7 @@ pub fn content_sha256(bytes: &[u8]) -> String {
     sha256_digest(bytes)
 }
 
-/// `packet_sha256` (DDCP2-U3 / contract §IdentityDomains rule 1): the
+/// `packet_sha256` (DDCP2-U3 / contract §`IdentityDomains` rule 1): the
 /// digest over the **versioned artifact metadata + `content_sha256`** —
 /// ABI/schema version, backend, format, materialization stage, target id +
 /// required features (canonical order), the entrypoint symbol map (canonical
@@ -42,6 +42,7 @@ pub fn content_sha256(bytes: &[u8]) -> String {
 /// identity and a stored packet whose `packet_sha256` was computed over a
 /// non-canonical order fails admission re-verification.
 #[must_use]
+#[allow(clippy::too_many_arguments)] // public packet-identity API — a params struct would change the public hashing surface
 pub fn packet_sha256(
     abi_version: u32,
     backend: &str,
@@ -72,14 +73,15 @@ pub fn packet_sha256(
 /// with `required_features`, `entrypoints`, and the typed `reflection`
 /// (when present) **canonicalized internally before hashing** — canonical
 /// map ordering + ABI-version inputs are normative inputs (contract
-/// §IdentityDomains rule 4). Equivalent sets (differing caller order, no
+/// §`IdentityDomains` rule 4). Equivalent sets (differing caller order, no
 /// duplicates) hash to an **identical** packet identity; a stored packet
 /// whose `packet_sha256` was computed over a non-canonical order fails
 /// admission re-verification. The typed reflection fold completes the frozen
-/// §ArtifactPacket `backend reflection/requirements` field (canonical
+/// §`ArtifactPacket` `backend reflection/requirements` field (canonical
 /// order); a carried `None` folds nothing, so reflection-less packets keep
 /// the DDCP2 identity. **Never semantic identity.**
 #[must_use]
+#[allow(clippy::too_many_arguments)] // public packet-identity API — a params struct would change the public hashing surface
 pub fn packet_sha256_canonical(
     abi_version: u32,
     backend: &str,
@@ -158,6 +160,8 @@ pub fn packet_sha256_canonical(
 /// computed over a non-canonical order must fail re-verification) and the
 /// canonical function's sorted-input substrate. Not the packet identity.
 #[doc(hidden)]
+#[must_use]
+#[allow(clippy::too_many_arguments)] // public packet-identity API — a params struct would change the public hashing surface
 pub fn packet_sha256_in_declared_order(
     abi_version: u32,
     backend: &str,
@@ -190,7 +194,7 @@ pub fn packet_sha256_in_declared_order(
 }
 
 /// Length-prefixed, domain-tagged field of the canonical packet byte stream
-/// (contract §IdentityDomains rule 4: canonical map ordering + domain tags
+/// (contract §`IdentityDomains` rule 4: canonical map ordering + domain tags
 /// are normative inputs; length-prefixing keeps distinct fields
 /// collision-free).
 fn push_field(out: &mut Vec<u8>, tag: &str, bytes: &[u8]) {

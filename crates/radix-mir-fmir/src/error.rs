@@ -43,7 +43,7 @@ pub enum FmirImageError {
     /// (`device:metal`, `device:cuda`). Unknown `device:` requirements fail
     /// admission at package load (N1.7).
     /// A backend artifact's stored identity digest disagrees with the
-    /// recomputed digest (contract §IdentityDomains rule 5; B3): the
+    /// recomputed digest (contract §`IdentityDomains` rule 5; B3): the
     /// `content_sha256` is re-verified against the canonical decoded raw
     /// payload bytes, the `packet_sha256` against the versioned artifact
     /// metadata + `content_sha256`. Provenance is verified, not decorative.

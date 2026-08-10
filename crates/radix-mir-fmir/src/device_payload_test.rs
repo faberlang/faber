@@ -706,7 +706,7 @@ fn decode_rejects_unknown_device_program_key() {
 }
 
 /// The DDCP0-U6 fixture-01 MSL payload text (the canonical UTF-8 text
-/// payload; content_sha256 60b43333… is over these exact bytes).
+/// payload; `content_sha256` `60b43333…` is over these exact bytes).
 const FIXTURE_MSL_TEXT: &str = "// DDCP0-U6 round-trip fixture — canonical UTF-8 text payload
 // Scale kernel MSL source (NGAB0-U11 minimal one-prepared-region fixture:
 // one host call → one prepared submission region containing one kernel).

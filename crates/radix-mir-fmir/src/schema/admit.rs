@@ -60,7 +60,7 @@ pub(crate) fn check_toolchain(
     }
 }
 
-/// Fail-closed artifact digest admission (DDCP2-U3 / contract §IdentityDomains
+/// Fail-closed artifact digest admission (DDCP2-U3 / contract §`IdentityDomains`
 /// rule 5; B3): each artifact's stored `content_sha256` is re-verified
 /// against the canonical decoded raw payload bytes, and its stored
 /// `packet_sha256` against the versioned artifact metadata + `content_sha256`
@@ -159,21 +159,18 @@ pub(crate) fn check_artifact_targets(
     table: &ArtifactCompatibilityTable,
 ) -> Result<(), crate::error::FmirImageError> {
     for artifact in &device.artifacts.artifact {
-        match &artifact.backend {
-            FmirDeviceBackend::Unknown(_) => {
-                validate_duplicate_target_features(&artifact.target)?;
-            }
-            _ => {
-                validate_target_features_in(&artifact.target, table)?;
-                validate_compiled_in_target_in(&artifact.backend, &artifact.target, table)?;
-                validate_artifact_combination(
-                    &artifact.backend,
-                    &artifact.format,
-                    artifact.stage,
-                    &artifact.target,
-                    table,
-                )?;
-            }
+        if let FmirDeviceBackend::Unknown(_) = &artifact.backend {
+            validate_duplicate_target_features(&artifact.target)?;
+        } else {
+            validate_target_features_in(&artifact.target, table)?;
+            validate_compiled_in_target_in(&artifact.backend, &artifact.target, table)?;
+            validate_artifact_combination(
+                &artifact.backend,
+                &artifact.format,
+                artifact.stage,
+                &artifact.target,
+                table,
+            )?;
         }
     }
     Ok(())
@@ -276,6 +273,15 @@ pub(crate) fn check_artifact_encodings(
 /// identity uniqueness (b), the digest re-verification over the **canonical
 /// packet identity** (b — a stored packet hashed over a non-canonical order
 /// fails here), and the backend selection (f).
+///
+/// # Errors
+///
+/// Returns [`FmirImageError::UnsupportedDeviceProgramVersion`] when the
+/// nested device-program wire version is unsupported, and the named
+/// [`FmirImageError`] variant for the first fail-closed rule the section
+/// violates (payload encodings, artifact ABI versions, typed targets +
+/// combinations, entrypoint uniqueness, digest re-verification, backend
+/// selection, and the optional distributed/session sections).
 pub fn admit_device_section_with_compat(
     device: &FmirDeviceSection,
     table: &ArtifactCompatibilityTable,

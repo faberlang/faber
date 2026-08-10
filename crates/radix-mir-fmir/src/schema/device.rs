@@ -13,7 +13,7 @@ use super::wire::{
 /// The optional `device` section on an FMIR image (N1.7). Absent for pure
 /// CPU/FMIR packages. Carries the canonical backend-neutral device program,
 /// the backend selection request, and the declared backend artifacts (each a
-/// versioned DeviceArtifact packet with content/packet identity digests and
+/// versioned `DeviceArtifact` packet with content/packet identity digests and
 /// its typed target features).
 ///
 /// The section is shared verbatim between the text (`fmir-text`, TOML) and
@@ -29,7 +29,7 @@ pub struct FmirDeviceSection {
     /// Backend selection request (from `--backend` / manifest / `auto`).
     pub selection: FmirDeviceSelection,
     /// Declared backend artifacts (Metal MSL, CUDA PTX) — each a versioned
-    /// DeviceArtifact packet with its `content_sha256`/`packet_sha256`
+    /// `DeviceArtifact` packet with its `content_sha256`/`packet_sha256`
     /// identity digests, its typed target identity + required features, and
     /// the entrypoint symbol map. Blobs are **excluded** from the
     /// same-package identity; each artifact carries its own identity
@@ -115,7 +115,7 @@ pub const ARTIFACT_REFLECTION_VERSION: u32 = 1;
 
 /// The versioned typed reflection carrier of a device artifact (DDCP3-U0 (a)
 /// / CTO9-6 a): the FMIR mirror of the radix-mir `MirGpuReflection` surface
-/// (`crates/radix-mir/src/abi/types.rs`) — the frozen §ArtifactPacket
+/// (`crates/radix-mir/src/abi/types.rs`) — the frozen §`ArtifactPacket`
 /// `backend reflection/requirements` field. Backend reflection facts are
 /// canonical structured facts about bindings/layout the backend requires;
 /// the carrier is folded into `packet_sha256` in **canonical order**. This
@@ -245,7 +245,7 @@ pub struct FmirDeviceArtifactsSection {
     pub artifact: Vec<FmirDeviceArtifact>,
 }
 
-/// One declared device artifact: the frozen **DeviceArtifact packet**
+/// One declared device artifact: the frozen **`DeviceArtifact` packet**
 /// (DDCP2-U2). A versioned, encoded, identity-bound artifact fact — typed
 /// backend id (unknown-representable), explicit format id, materialization
 /// stage, typed target + features, ABI/schema version, canonical raw bytes,
@@ -301,7 +301,7 @@ pub struct FmirDeviceArtifact {
     /// rule (`None` for `CompilerInput` artifacts, `Some` canonical spelling
     /// for `FinalizedBinary` artifacts).
     pub compiler_input_packet_sha256: Option<String>,
-    /// Backend reflection/requirements (frozen §ArtifactPacket — the
+    /// Backend reflection/requirements (frozen §`ArtifactPacket` — the
     /// `backend reflection/requirements` field; DDCP3-U0 (a) / CTO9-6 a):
     /// the versioned typed reflection carrier (FMIR mirror of the radix-mir
     /// `MirGpuReflection` surface), folded into `packet_sha256` (canonical
@@ -338,14 +338,14 @@ impl FmirDeviceArtifact {
 
     /// The canonical `content_sha256` over the artifact's canonical decoded
     /// raw payload bytes only — never the transport spelling (DDCP2-U3 /
-    /// contract §IdentityDomains rule 1/3).
+    /// contract §`IdentityDomains` rule 1/3).
     #[must_use]
     pub fn compute_content_sha256(&self) -> String {
         crate::schema::content_sha256(&self.bytes)
     }
 
     /// The canonical `packet_sha256` over the versioned artifact metadata +
-    /// `content_sha256` (DDCP2-U3 / contract §IdentityDomains rule 1/4;
+    /// `content_sha256` (DDCP2-U3 / contract §`IdentityDomains` rule 1/4;
     /// DDCP3-U0 (a)/(b) revision): ABI/schema version, backend, format,
     /// materialization stage, target id + required features (**canonical
     /// order**), the entrypoint symbol map (**canonical order**), the typed
@@ -469,7 +469,7 @@ pub enum FmirDeviceBackend {
     /// NVIDIA CUDA (PTX text).
     Cuda,
     /// AMD GPU via the AMDGPU/HIP variant of the LLVM emitter family
-    /// (AMDGPU LLVM IR compiler input; ROCm clang → HSACO ELF — the third
+    /// (AMDGPU LLVM IR compiler input; `ROCm` clang → HSACO ELF — the third
     /// conformance leaf, goal `amd-gpu-target`). The backend-id spelling is
     /// the OQ1 default **`amd`** (goal open question Q1 — one decision,
     /// recorded; the seed's `amdgpu` id is aligned to it). The variant is
@@ -497,7 +497,7 @@ impl FmirDeviceBackend {
     }
 }
 
-/// The explicit artifact format id (DDCP2-U2 / contract §ArtifactPacket) —
+/// The explicit artifact format id (DDCP2-U2 / contract §`ArtifactPacket`) —
 /// a declared fact, never inferred from blob content. Unknown formats are
 /// representable and rejected honestly, like unknown backends.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -533,7 +533,7 @@ impl DeviceArtifactFormat {
 }
 
 /// The materialization stage of a device artifact (DDCP2-U2 / contract
-/// §ArtifactPacket): `compiler-input` is the materializer's pre-lowering
+/// §`ArtifactPacket`): `compiler-input` is the materializer's pre-lowering
 /// text input; `finalized-binary` is the linked executable artifact.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -614,7 +614,9 @@ impl std::fmt::Display for DevicePayloadEncodingError {
             Self::NonCanonicalUtf8 { detail } => {
                 write!(f, "text payload is not canonical UTF-8: {detail}")
             }
-            Self::Utf8Bom { detail } => write!(f, "{detail}"),
+            Self::Utf8Bom { detail } | Self::NonCanonicalBase64 { detail } => {
+                write!(f, "{detail}")
+            }
             Self::EmptyEncodingTag => {
                 write!(f, "binary payload carries an empty encoding tag")
             }
@@ -622,7 +624,6 @@ impl std::fmt::Display for DevicePayloadEncodingError {
                 f,
                 "binary payload declares {declared} decoded bytes but the artifact carries {actual}"
             ),
-            Self::NonCanonicalBase64 { detail } => write!(f, "{detail}"),
         }
     }
 }
@@ -637,9 +638,9 @@ pub fn canonical_unpadded_base64(bytes: &[u8]) -> String {
     const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {
-        let b0 = chunk[0] as u32;
-        let b1 = chunk.get(1).copied().unwrap_or(0) as u32;
-        let b2 = chunk.get(2).copied().unwrap_or(0) as u32;
+        let b0 = u32::from(chunk[0]);
+        let b1 = u32::from(chunk.get(1).copied().unwrap_or(0));
+        let b2 = u32::from(chunk.get(2).copied().unwrap_or(0));
         let triple = (b0 << 16) | (b1 << 8) | b2;
         out.push(ALPHABET[(triple >> 18) as usize & 0x3f] as char);
         out.push(ALPHABET[(triple >> 12) as usize & 0x3f] as char);
