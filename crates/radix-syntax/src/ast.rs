@@ -1199,9 +1199,15 @@ pub struct VerteExpr {
 
 #[derive(Debug)]
 pub struct FingeExpr {
-    pub variant: Ident,
+    /// Qualified variant path: `[Bonum]` for same-module construction, or
+    /// `[pkg, Bonum]` when the variant is reached through an owning union or
+    /// an import alias (`finge pkg.Bonum { … }`). The terminal segment names
+    /// the variant; a prefix segment names the union (same-module or imported).
+    pub variant: Vec<Ident>,
     pub fields: Vec<FingeFieldInit>,
-    pub cast: Option<Ident>, // ∷ (finge verte form)
+    /// `∷` cast — a full type annotation per the EBNF (`typeAnnotation`), so
+    /// imported unions ascribe through a qualified name (`∷ pkg.Exitus`).
+    pub cast: Option<TypeExpr>,
 }
 
 #[derive(Debug)]

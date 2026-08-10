@@ -969,3 +969,95 @@ fn conversio_assign_bare_json_right_side_is_grammar_driven_not_type_driven() {
         assign.value.kind
     );
 }
+
+// ---------------------------------------------------------------------------
+// Qualified variant construction (uvf-u3): `finge pkg.Bonum { … } ∷ pkg.Exitus`
+// ---------------------------------------------------------------------------
+
+#[test]
+fn qualified_finge_variant_path_and_cast_parse() {
+    // uvf-u3 done_when (b): the qualified construction form parses. The
+    // variant path carries the alias + variant segments and the `∷` cast is a
+    // full type expression (Qualified), so the imported union identity
+    // survives to lowering.
+    let result = parse_ok(
+        r#"functio main() → vacuum {
+    fixum _ e ← finge pkg.Bonum { nuntius = "x" } ∷ pkg.Exitus
+    redde
+}"#,
+    );
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected functio declaration");
+    };
+    let Some(body) = &func.body else {
+        panic!("expected function body");
+    };
+    let StmtKind::Var(var) = &body.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Finge(finge) = &expr.kind else {
+        panic!("expected finge expression, got {:?}", expr.kind);
+    };
+    assert_eq!(
+        finge.variant.len(),
+        2,
+        "qualified path must keep both segments"
+    );
+    let cast = finge.cast.as_ref().expect("qualified cast must parse");
+    assert!(
+        matches!(cast.kind, TypeExprKind::Qualified(ref path, ref params) if path.len() == 2 && params.is_empty()),
+        "cast must be a qualified type with two segments, got {:?}",
+        cast.kind
+    );
+}
+
+#[test]
+fn qualified_finge_cast_alone_parses() {
+    // The qualified form where only the cast is qualified: `finge Bonum { … }
+    // ∷ pkg.Exitus` — variant stays same-module, target type is the imported
+    // union under its alias.
+    let result = parse_ok(r#"fixum _ e ← finge Bonum { nuntius = "x" } ∷ pkg.Exitus"#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Finge(finge) = &expr.kind else {
+        panic!("expected finge expression, got {:?}", expr.kind);
+    };
+    assert_eq!(
+        finge.variant.len(),
+        1,
+        "same-module variant stays a single segment"
+    );
+    let cast = finge.cast.as_ref().expect("cast must parse");
+    assert!(
+        matches!(cast.kind, TypeExprKind::Qualified(ref path, _) if path.len() == 2),
+        "cast must be the qualified type, got {:?}",
+        cast.kind
+    );
+}
+
+#[test]
+fn same_module_finge_construction_unchanged() {
+    // uvf-u3 done_when (c): same-module construction parses exactly as before
+    // — a single-segment variant path and a plain named cast.
+    let result = parse_ok(r#"fixum _ e ← finge Bonum { nuntius = "x" } ∷ Exitus"#);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Finge(finge) = &expr.kind else {
+        panic!("expected finge expression, got {:?}", expr.kind);
+    };
+    assert_eq!(finge.variant.len(), 1);
+    let cast = finge.cast.as_ref().expect("cast must parse");
+    assert!(
+        matches!(cast.kind, TypeExprKind::Named(_, _)),
+        "same-module cast stays a named type, got {:?}",
+        cast.kind
+    );
+}

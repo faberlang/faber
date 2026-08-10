@@ -559,12 +559,14 @@ pub fn walk_expr<V: Visitor>(visitor: &mut V, expr: &Expr) {
             }
         }
         ExprKind::Finge(finge) => {
-            visitor.visit_ident(&finge.variant);
+            for segment in &finge.variant {
+                visitor.visit_ident(segment);
+            }
             for field in &finge.fields {
                 visitor.visit_expr(&field.value);
             }
             if let Some(cast) = &finge.cast {
-                visitor.visit_ident(cast);
+                visitor.visit_type_expr(cast);
             }
         }
         ExprKind::Intervallum(intervallum) => {

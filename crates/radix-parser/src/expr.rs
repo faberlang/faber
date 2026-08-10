@@ -1429,7 +1429,12 @@ impl Parser {
         let start = self.current_span();
         self.expect_keyword_ident(TokenKind::Finge, "expected 'finge'")?;
 
-        let variant = self.parse_ident()?;
+        // Qualified variant path: `finge Bonum { … }` or `finge pkg.Bonum { … }`
+        // (imported union under an alias). Terminal segment names the variant.
+        let mut variant = vec![self.parse_ident()?];
+        while self.eat(&TokenKind::Dot) {
+            variant.push(self.parse_ident()?);
+        }
 
         let fields = if self.check(&TokenKind::LBrace) {
             self.advance();
@@ -1449,8 +1454,11 @@ impl Parser {
             Vec::new()
         };
 
+        // The cast is a full type annotation (`'∷' typeAnnotation` per the
+        // EBNF), so a qualified type (`∷ pkg.Exitus`) parses through the type
+        // grammar rather than a bare identifier.
         let cast = if self.eat_keyword(TokenKind::Verte) {
-            Some(self.parse_ident()?)
+            Some(self.parse_type()?)
         } else {
             None
         };
