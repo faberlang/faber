@@ -18,9 +18,9 @@ in [`docs/archived/`](../archived/README.md).
 
 ## Summary
 
-- goals scanned: 20
+- goals scanned: 21
 - active: 9
-- planned: 9
+- planned: 10
 - done: 0
 - unknown: 2
 - archived (moved to `docs/archived/`): 6
@@ -47,6 +47,7 @@ in [`docs/archived/`](../archived/README.md).
 | [faber-format-lossless](faber-format-lossless/goal.md) | planned | — | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | [faber-polish](faber-polish/goal.md) | planned | — | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | [inference-session-boundary](inference-session-boundary/goal.md) | planned | — | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
+| [per-lane-e2e-validation](per-lane-e2e-validation/goal.md) | planned | — | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | [proba-companion-tests](proba-companion-tests/goal.md) | planned | — | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | [pytorch-session-continuation](pytorch-session-continuation/goal.md) | planned | 0% | 1 | 0 | 2 | 0 | 0 | 0 | 2 |
 | release-and-portable-default | planned | — | 0 | 0 | 1 | 0 | 0 | 0 | 0 |
