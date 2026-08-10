@@ -376,7 +376,7 @@ checklist shells for the current releases:
    b. Regenerate Cargo.lock (cargo update); lockfile must match the tag
    c. Local gate: ./scripta/release-gate --locked-release-build
       (or ./scripta/release-gate if already built) — the only full-workspace
-      nextest required for a release (faber/AGENTS.md:131-133)
+      cargo test required for a release (faber/AGENTS.md:131-133)
    d. Record companion-head commits for the release note (§3.5)
 2. TAG
    a. git tag vX.Y.Z (annotated)

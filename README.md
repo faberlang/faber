@@ -46,13 +46,14 @@ crate from source requires the sibling Radix, Cista, `faber-runtime`, and
 | Command | Cost | Use |
 | --- | --- | --- |
 | `./scripta/test` | cheap | Default agent / day-to-day loop |
-| `cargo nextest run` | cheap | Same as stage 1 nextest (default profile) |
-| `./scripta/test --stage unit` | slow | Explicit: includes `package_test` |
+| `cargo test -p faber --lib` | cheap | Same as stage 1 (lib incl. `package::tests` megasuite) |
+| `./scripta/test --stage unit` | slow | Explicit: the `package::tests` megasuite |
 | `./scripta/test --stage product` | slow | Explicit: integration binaries under `tests/` |
 | `./scripta/release-gate` | **expensive** | **Release prep only** (full workspace + exempla) |
 
-`cargo nextest run` does **not** run the full workspace. Profiles live in
-`.config/nextest.toml` (`default` / `unit` / `product` / `full`).
+`cargo test -p faber --lib` does **not** run the full workspace. Full
+workspace (faber + exempla) is `cargo test --workspace` / `./scripta/release-gate`,
+release/explicit only.
 
 Agents must not run `./scripta/release-gate` or `--profile full` unless the
 operator is preparing a release or explicitly requests that gate. Language

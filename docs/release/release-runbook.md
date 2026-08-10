@@ -114,7 +114,7 @@ cargo update
 
 # 2. Local proof (builder; local)
 cargo build --locked --release -p radix --bin radix   # radix/AGENTS.md:380-381
-#    full workspace at the release boundary (auditor-owned): cargo nextest run;
+#    full workspace at the release boundary (auditor-owned): cargo test --workspace;
 #    the tag run of ci.yml runs ./scripta/test --full (radix/AGENTS.md:388-389)
 
 # 3. Tag (tagger/signer; operator; push = network)

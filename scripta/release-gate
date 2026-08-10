@@ -4,7 +4,7 @@
 # ═══════════════════════════════════════════════════════════════════════════
 #
 # This script is the closeout / release-prep surface for the Faber product
-# workspace. It runs the full nextest profile (faber + exempla + all
+# workspace. It runs `cargo test --workspace` (faber + exempla + all
 # integration binaries) and takes many minutes even when warm.
 #
 # WHEN TO RUN
@@ -18,11 +18,11 @@
 #   • Agent initiative ("I'll just run the full suite to be safe")
 #   • Any session that only needs confidence on a local change
 #
-# AGENTS: do not invoke this script, `cargo nextest run --profile full`, or
-# `cargo nextest run --workspace` unless the operator message explicitly
-# requests release-gate, full-workspace, or release verification. Prefer:
+# AGENTS: do not invoke this script or `cargo test --workspace` unless the
+# operator message explicitly requests release-gate, full-workspace, or
+# release verification. Prefer:
 #   ./scripta/test                  # stage 1 default
-#   cargo nextest run -E 'test(…)'  # single failing test
+#   cargo test -p faber <name>      # single failing test
 #
 # Language corpus matrices and backend e2e remain on the radix ladder:
 #   ../radix/scripta/test --stage 5-6
@@ -43,7 +43,7 @@ ROOT="$(pwd)"
 
 NO_FAIL_FAST=1
 LOCKED_RELEASE_BUILD=0
-EXTRA_NEXTEST=()
+EXTRA_ARGS=()
 
 usage() {
   cat <<'EOF'
@@ -56,12 +56,13 @@ Faber RELEASE GATE — expensive full-workspace verification.
 This is NOT the agent default. For day-to-day work use ./scripta/test.
 
 Flags:
-  --no-fail-fast           keep going after failures (default)
-  --fail-fast              stop on first failure
+  --no-fail-fast           accepted for compatibility (cargo test always runs
+                           the full suite; there is no fail-fast mode)
+  --fail-fast              accepted for compatibility (no-op)
   --locked-release-build   also run cargo build --locked --release --bin faber
   -h, --help               this help
 
-Remaining args are forwarded to cargo nextest.
+Remaining args are forwarded to cargo test.
 EOF
 }
 
@@ -85,18 +86,18 @@ while [[ $# -gt 0 ]]; do
       ;;
     --)
       shift
-      EXTRA_NEXTEST+=("$@")
+      EXTRA_ARGS+=("$@")
       break
       ;;
     *)
-      EXTRA_NEXTEST+=("$1")
+      EXTRA_ARGS+=("$1")
       shift
       ;;
   esac
 done
 
 echo "╔══════════════════════════════════════════════════════════════════════╗"
-echo "║  FABER RELEASE GATE — EXPENSIVE · full workspace nextest             ║"
+echo "║  FABER RELEASE GATE — EXPENSIVE · full workspace cargo test          ║"
 echo "║  Do not run from agent loops unless the operator explicitly asked.   ║"
 echo "╚══════════════════════════════════════════════════════════════════════╝"
 
@@ -108,19 +109,11 @@ fi
 echo "=== release-gate · hygiene ==="
 cargo test --test hygiene --quiet
 
-# nextest-safe applies the macOS archive-signing loader mitigation here too.
-echo "=== release-gate · cargo nextest run --profile full ==="
-NEXTEST_RUN_ARGS=()
-if [[ "$NO_FAIL_FAST" == "1" ]]; then
-  NEXTEST_RUN_ARGS+=(--no-fail-fast)
-fi
-if ((${#EXTRA_NEXTEST[@]} > 0)); then
-  NEXTEST_RUN_ARGS+=("${EXTRA_NEXTEST[@]}")
-fi
-if ((${#NEXTEST_RUN_ARGS[@]} > 0)); then
-  ./scripta/nextest-safe --workspace --profile full -- "${NEXTEST_RUN_ARGS[@]}"
+echo "=== release-gate · cargo test --workspace ==="
+if ((${#EXTRA_ARGS[@]} > 0)); then
+  cargo test --workspace -- "${EXTRA_ARGS[@]}"
 else
-  ./scripta/nextest-safe --workspace --profile full --
+  cargo test --workspace
 fi
 
 echo "=== release-gate · ok ==="

@@ -24,15 +24,15 @@ examples/             app tracks only
 
 ## Run
 
-Exempla is **not** part of the Faber agent default suite. Plain
-`cargo nextest run` in this repo uses a narrow default profile that
-**excludes** this crate. Full-workspace (including exempla) is:
+Exempla is **not** part of the Faber agent default suite. The agent default
+`cargo test -p faber --lib` does **not** build this crate. Full-workspace
+(including exempla) is:
 
 ```bash
 # EXPENSIVE — release / explicit only (see faber/AGENTS.md)
 ./scripta/release-gate
 # or:
-cargo nextest run --profile full
+cargo test --workspace
 ```
 
 Targeted exempla runs (still opt-in):

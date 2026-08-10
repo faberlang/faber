@@ -15,7 +15,6 @@ crates/hygiene-ratchet/ production code hygiene budgets
 tests/                  integration tests (emit, run, hygiene, …)
 scripta/test            cheap progressive ladder (agent default)
 scripta/release-gate    EXPENSIVE full-workspace closeout (release only)
-.config/nextest.toml    nextest profiles (default is narrow)
 build.rs                core-support assembler (reads core-support-manifest.txt)
 core-support-manifest.txt  sibling repo paths relative to faberlang container
 ```
@@ -48,50 +47,51 @@ slugs/options rather than a single all-or-nothing surface enum.
 
 | Surface | Command | When |
 | --- | --- | --- |
-| **Default (agents)** | `./scripta/test` or `cargo nextest run` | Every implementation loop |
-| **Named test** | `cargo nextest run -E 'test(name)'` | Fixing one failure |
-| **Unit + package_test** | `./scripta/test --stage unit` | Explicit need for package_test |
-| **Product integration** | `./scripta/test --stage product` | Explicit need for `tests/*` |
-| **Full workspace** | `./scripta/release-gate` | **Release prep or operator said so** |
+| **Default (agents)** | `./scripta/test` or `cargo test -p faber --lib` | Every implementation loop |
+| **Named test** | `cargo test -p faber <name>` | Fixing one failure |
+| **Megasuite (`package::tests`)** | `cargo test -p faber --lib package::tests` | Explicit need for package_test |
+| **Product integration** | `cargo test -p faber` | Explicit need for `tests/*` |
+| **Full workspace** | `cargo test --workspace` | **Release prep or operator said so** |
 | **Language matrices / e2e** | `../radix/scripta/test --stage 5-6` / `--e2e` | **Release / explicit only** |
 
 **Forbidden for agents without an explicit operator request:**
 
 - `./scripta/release-gate`
-- `cargo nextest run --profile full`
-- `cargo nextest run --workspace` (pulls exempla + every binary)
-- `cargo nextest run --profile product` as a “safety sweep”
+- `cargo test --workspace` (pulls exempla + every binary)
+- `cargo test -p faber` as a “safety sweep” (product integration is explicit opt-in)
 - Re-running the full suite after every single-test fix
 
 After fixing one failure: re-run **that test** (or stage 1). Do **not** run
 release-gate “to make sure nothing else broke” unless the operator asked for
 release/full closeout.
 
-### What `cargo nextest run` means here
+### What `cargo test -p faber --lib` means here
 
-`.config/nextest.toml` makes the **default** profile cheap:
+The megasuite is mounted as `package::tests` **inside** the lib crate, so
+`--lib` is the honest cheap surface (there are no profile filters to exclude
+it):
 
 - package `faber`, library tests only
-- **excludes** `package_test` megasuite
+- **includes** the `package::tests` megasuite (mounted in the lib)
 - **excludes** `tests/*` integration binaries
 - **excludes** `crates/exempla`
 
-Profiles:
+Surfaces:
 
-| Profile | Filter |
+| Surface | Cargo test form |
 | --- | --- |
-| `default` | faber lib minus `package_test` |
-| `unit` | all faber lib (includes `package_test`) |
-| `product` | all faber package tests (lib + integration) |
-| `full` | entire workspace including exempla |
+| `default` (agents) | `cargo test -p faber --lib` |
+| megasuite | `cargo test -p faber --lib package::tests` |
+| product | `cargo test -p faber` (lib + integration) |
+| full workspace | `cargo test --workspace` |
 
 ### Faber ladder (`./scripta/test`)
 
 Progressive stages (default = stage 1 only):
 
-1. **default** — hygiene + nextest `--profile default`
-2. **unit** — nextest `--profile unit` (slow; includes `package_test`)
-3. **product** — nextest `--profile product` (slow; spawns CLI / nested cargo)
+1. **default** — hygiene + `cargo test -p faber --lib`
+2. **unit** — `cargo test -p faber --lib package::tests` (slow; the megasuite)
+3. **product** — `cargo test -p faber` (slow; spawns CLI / nested cargo)
 
 There is **no** progressive stage for full workspace or exempla. That is
 `./scripta/release-gate` only.
@@ -129,7 +129,8 @@ tagged commit, or the build fails. Follow this exact order:
 3. Verify: `cargo build --locked --release --bin faber` passes.
 4. Verify expensive product suite: **`./scripta/release-gate --locked-release-build`**
    (or `./scripta/release-gate` if the release binary was already built).
-   This is the only place full-workspace nextest is required for a release.
+   This is the only place a full-workspace `cargo test --workspace` is
+   required for a release.
    Optional language closeout: `../radix/scripta/test --full` and/or `--e2e`
    when the release includes compiler/corpus claims.
 5. **Single commit** containing both the version bump and the regenerated
