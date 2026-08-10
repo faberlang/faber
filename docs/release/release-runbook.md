@@ -314,6 +314,100 @@ Authority: the **withdraw/revocation** operator role (`authority.md` §1).
 
 ---
 
+## 6. Incident lessons — faber 1.6.0 / radix 0.81.0 (2026-08-10)
+
+Pre-campaign capture of what broke on the 2026-08-10 release pair, the
+fix-forward gate each failure maps to, and where the rework lands. **These
+rows are superseded by the `per-lane-e2e-validation` factory goal**
+(`docs/factory/per-lane-e2e-validation/goal.md`, 2026-08-10), which reworks
+the whole model (tag-only-on-green, scripted pinned-sibling rehearsal, per-lane
+validation grid). Keep this section until that campaign lands; the gates below
+are the minimum for a release in the meantime.
+
+### L1 — Carried-forward sibling pins can exist yet be incompatible
+
+`release-manifest.yaml` carried the rc.1-era faber-runtime (`10d48ea`) and
+hosts (`e066ee0a`) pins into the 1.6.0 manifest. Both SHAs resolved
+(`git cat-file -e` passes), but neither satisfied current faber: the pinned
+faber-runtime lacked the `model_widen`/`model_format` modules (E0432) and the
+pinned hosts lacked `program_graph_hash` on `DeviceExecutionReceipt` (E0609).
+The pinned release build failed; the local build had been green all session
+only because local siblings were newer than the pins.
+
+**Gate:** pin verification is **compatibility**, not existence. The pinned
+locked build (`cargo build --locked --release --bin faber` against the pin
+packet, rehearsal §3 step 3) is the proof; `git cat-file -e` is a necessary
+pre-check only. When carrying forward the last record's companion pins,
+diff each sibling's pinned SHA against the SHA the last green build actually
+used — a carried pin that is *older* than the proven pairing is stale.
+
+### L2 — The lockfile must be generated against the pins, not local siblings
+
+The 1.6.0 `Cargo.lock` was regenerated with `cargo update` in the main tree,
+resolving against local (newer) siblings. CI checks out the **pinned**
+siblings, so the `--locked` build failed there ("cannot update the lock file
+because --locked was passed") even though the local locked build was green.
+The committed lock was in fact correct for the corrected pins — the CI
+failure was pin staleness, not lock drift — but the two can silently disagree.
+
+**Gate:** regenerate the lock **inside the pin packet** (rehearsal §2 step 2),
+never in the main tree. The rehearsed lock is the one that commits. `cargo
+update` output naming *which* path dep each workspace-orphan package
+(`hygiene-ratchet`) resolved from is a cheap consistency signal — verify it
+matches the pin layout.
+
+### L3 — Verify the exact tag tip before creating the tag
+
+The radix `v0.81.0` tag was created on a commit whose stage-1 gate was red
+(stale factory README: `docs(factory)` goals landed after the last green run
+without regenerating the README). CI reported it post-tag; fixing it required
+a post-tag commit and, on faber, tag surgery. The faber tag had to be
+force-moved twice — operator-only, hook-blocked, and confusing under the
+shared-workspace git policy.
+
+**Gate:** run the cheap stage-1 gates (`./scripta/test --check` /
+`generate-factory-readme.py --check` + the goal-status audit) on the **exact
+commit about to be tagged**, after the bump+lock commit, before `git tag -a`.
+A release tip must be green before the tag exists, because moving a pushed tag
+is not ordinary rollback.
+
+### L4 — Keep release git commands granular (shared-workspace policy)
+
+A single chained command containing a blocked destructive op (`git push
+--force`) was denied **wholesale** by the shared-workspace git policy — the
+`git add`, commit, tag, and main push in the same chain never ran, silently.
+The "commit happened" assumption then produced a tag pointing at the old
+commit and an "everything up-to-date" force-push.
+
+**Gate:** release git writes run as **separate commands** — `git add` +
+`git commit`, then `git tag -a`, then `git push origin main`, then the tag
+push — so a blocked op fails loudly and atomically, and its absence is
+visible. Never infer that earlier commands in a chain ran because the final
+error names a later one.
+
+### L5 — Linux leg when bypassing CI (local container build)
+
+The `x86_64-unknown-linux-gnu` artifact was built on burgus in an amd64
+container (the rc.1 recipe): `docker run --rm --platform linux/amd64 -v
+<pin-packet>:/work -w /work/faber -e CARGO_TARGET_DIR=/work/target-linux
+amd64/ubuntu:24.04 bash -lc '… build-essential pkg-config curl … rustup
+--default-toolchain 1.97.1 … cargo build --locked --release --bin faber'`.
+Two gotchas: `--platform linux/amd64` is required on Apple Silicon (the plain
+image has no arm64 manifest), and with `CARGO_TARGET_DIR` set the binary is at
+`$CARGO_TARGET_DIR/release/faber`, not `./target/release/faber`. Verify the
+artifact with `file` (ELF 64-bit x86-64) since the binary cannot run on macOS.
+
+### L6 — Slow gates surfaced latent defects at release time
+
+The e2e harnesses — excluded from the dev cycle because they are slow — were
+the first thing to run the `conversio-assign` exemplar across backends and
+found three real codegen bugs (go `strconv` import, ts typed-init, swift
+double-eval) plus a forma round-trip non-idempotency. That is the core
+failure this campaign fixes: nothing validates between releases, so release
+time is discovery time. See the `per-lane-e2e-validation` goal for the model.
+
+---
+
 ## 5. References
 
 - `process-local-first.md` — the flow §1, gates §3, leakage gate §4.
