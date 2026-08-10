@@ -193,6 +193,23 @@ jobs:
           echo "archive=dist/${archive}" >> "$GITHUB_OUTPUT"
           echo "checksum=dist/${archive}.sha256" >> "$GITHUB_OUTPUT"
 
+      # Consumer smoke-test gate (U3): install the packaged archive into a
+      # clean prefix and prove a fresh consumer can use it (pack-exercising
+      # assertions first, version last, archive-layout proof). Fails fast
+      # before upload — the P0 guard that a bare-binary archive (v1.5.0
+      # shape) must be rejected.
+      - name: Consumer smoke-test gate
+        shell: bash
+        working-directory: faber
+        run: |
+          set -euo pipefail
+          version="${{ steps.source.outputs.version }}"
+          target="${{ matrix.target }}"
+          python3 scripta/smoke-test-release-archive \
+            --archive "${{ steps.package.outputs.archive }}" \
+            --version "$version" \
+            --triple "$target"
+
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:

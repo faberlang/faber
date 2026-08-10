@@ -46,7 +46,12 @@ machine (burgus/pharos), all of the following pass:
 2. the component's release gate (§3);
 3. the pin manifest validates and its pins match live evidence (§1 step 1);
 4. archive + basename-only checksum manifest produced; checksum verifies;
-5. private-radix leakage scan clean (§4).
+5. **consumer smoke-test gate** on the packaged archive
+   (`scripta/smoke-test-release-archive --archive dist/<component>-v<version>-<triple>.tar.gz
+   --version <version> --triple <triple>`) — the P0 guard: a bare-binary
+   archive must be rejected with the `pack-error` class
+   (`--expect-fail-class pack-error`);
+6. private-radix leakage scan clean (§4).
 
 CI is **corroboration**, and the publish leg still needs network — but the
 **proof** that the release is releasable never depends on GitHub Actions
@@ -58,6 +63,7 @@ End State 2).
 | Surface | Gate | When | Evidence |
 | --- | --- | --- | --- |
 | faber product | `./scripta/release-gate --locked-release-build` (only full-workspace gate required) | every faber release | `faber/AGENTS.md:131-133` |
+| faber product archive | `./scripta/smoke-test-release-archive` (consumer smoke-test gate — pack-exercising first, version last, archive-layout proof; negative-mode `--expect-fail-class`) | every faber release, at packaging (CI, before upload) AND readback (step 7, on the downloaded bytes) | `docs/factory/faber-1.5.1-pack-release/delivery.md` §5 U3 / §6 G5; unit test `scripta/smoke-test-release-archive-test.py` |
 | faber compiler/corpus claims | `../radix/scripta/test --full` / `--e2e` | optional, when the release includes compiler/corpus claims | `faber/AGENTS.md:133-134` |
 | radix component | radix ladder `./scripta/test --full` at tag; `--stage 1-4` on main | every radix release (tag) | `radix/AGENTS.md:389`; `radix/.github/workflows/ci.yml` |
 | cista component | smoke: build + `--version` today; test/lint/hygiene/install/package smoke surfaces are a recorded gap (F6) | every cista release | `stage0-baseline.md` §1.2 / F6 — **routed** to cista owner / Stage 8 |
