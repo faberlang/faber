@@ -21,9 +21,9 @@ pinnedInputs:
     - name: cista
       commit: 935528820653f0b3cd28e63c9d21ac7db90add65
     - name: faber-runtime
-      commit: 10d48ea474358e6a6d36e54d56f051ae20b3824f
+      commit: 6d42d8d25886aa5d2bc710d09d864748a5d0583e
     - name: hosts
-      commit: e066ee0ae98afa5c7556e1f765072a6357050149
+      commit: c7f1ff97c4cc37734af2cfb55b2c57fa13b3e073
 
   packs:
     - name: launcher
