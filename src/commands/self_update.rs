@@ -62,6 +62,7 @@ pub(crate) const RECEIPT_REL: &str = "share/faber/install-receipt.json";
 const INSTALLER_SCRIPT: &str = "install-faber";
 
 /// The resolved update operation: what to fetch and how to run it.
+#[derive(Debug)]
 pub(crate) struct SelfUpdatePlan {
     pub prefix: PathBuf,
     pub current_version: String,
@@ -148,9 +149,9 @@ pub(crate) fn resolve_prefix(
     }
     if let Some(exe_path) = exe {
         if let Some(bin_dir) = exe_path.parent() {
-            let candidate = bin_dir.join("../share/faber/install-receipt.json");
-            if candidate.is_file() {
-                if let Some(prefix) = bin_dir.parent() {
+            // `<prefix>/bin/faber` resolves its receipt at `<prefix>/share/faber/`.
+            if let Some(prefix) = bin_dir.parent() {
+                if prefix.join(RECEIPT_REL).is_file() {
                     return Ok(prefix.to_path_buf());
                 }
             }

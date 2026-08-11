@@ -4,6 +4,7 @@
 //! `scripta/install-faber-test.py`; this file covers the wrapper's pure logic.
 
 use super::self_update::*;
+use std::path::Path;
 
 fn args(version: &str) -> SelfUpdateArgs {
     SelfUpdateArgs {
@@ -180,5 +181,24 @@ fn cli_shape_has_update_subcommand() {
     let manage = SelfManageArgs { command };
     match manage.command {
         SelfCommand::Update(inner) => assert_eq!(inner.version, "1.6.0"),
+    }
+}
+
+#[test]
+fn cli_parse_self_update_shape() {
+    // The real user-facing shape: `faber self update --version <v>` parses and
+    // routes to the update handler.
+    use clap::Parser;
+    let cli = crate::cli::Cli::parse_from([
+        "faber", "self", "update", "--version", "1.6.0", "--allow-lane-change",
+    ]);
+    match cli.command {
+        Some(crate::cli::Command::SelfManage(manage)) => match manage.command {
+            SelfCommand::Update(inner) => {
+                assert_eq!(inner.version, "1.6.0");
+                assert!(inner.allow_lane_change);
+            }
+        },
+        _ => panic!("expected `faber self update` to parse as SelfManage"),
     }
 }
