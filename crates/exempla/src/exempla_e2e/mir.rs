@@ -31,8 +31,7 @@ pub(crate) struct MirE2eResult {
     pub reason: String,
 }
 
-const EXPECTED_FRONTEND_ANALYZED_FLOOR: usize = 283;
-const EXPECTED_MIR_LOWERED_FLOOR: usize = 262;
+use super::expectations::mir::{EXPECTED_FRONTEND_ANALYZED_FLOOR, EXPECTED_MIR_LOWERED_FLOOR};
 
 #[test]
 #[ignore = "slow mir e2e; run: cargo test -p exempla --lib exempla_mir_e2e -- --ignored --nocapture"]

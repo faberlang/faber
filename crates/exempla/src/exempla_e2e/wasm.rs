@@ -4,7 +4,6 @@ use super::common::{
     read_expected_stdout,
 };
 use super::wasm_behavior_fixtures::{behavior_matches, expected_wasm_behavior};
-use super::wasm_expectations::WASM_EXPECTED_TIER_FLOORS;
 use super::wasm_external::{
     parse_wat_import_sites, probe_wasm_instantiation_stubless, probe_wasm_with_stub_host,
     run_wasm_entry_with_stub_host, validate_wasm_bytes, WasmInstantiationBucket, WasmRunBucket,
@@ -16,21 +15,12 @@ use radix::Config;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Wasm exempla e2e tiers aligned with the Rust-parity contract (A–D).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum WasmTier {
-    SourceReadable,
-    FrontendAnalyzed,
-    MirLowered,
-    /// Tier A — Wasm bytes emitted in-tree.
-    WasmEmitted,
-    /// Tier B — external `wasm-tools validate` accepts the module.
-    CompileValid,
-    /// Tier C — external stub host runs `incipit` without trap.
-    Runnable,
-    /// Tier D — captured output matches sibling `*.expected` when present.
-    OutputChecked,
-}
+pub(crate) use super::expectations::wasm::{
+    WasmTier, EXPECTED_FRONTEND_ANALYZED_FLOOR, EXPECTED_MIR_LOWERED_FLOOR,
+    EXPECTED_WASM_TIER_A_EMITTED_FLOOR, EXPECTED_WASM_TIER_B_COMPILE_VALID_FLOOR,
+    EXPECTED_WASM_TIER_C_RUNNABLE_FLOOR, EXPECTED_WASM_TIER_D_OUTPUT_CHECKED_FLOOR,
+    WASM_EXPECTED_TIER_FLOORS,
+};
 
 #[derive(Debug)]
 pub(crate) struct WasmE2eResult {
@@ -47,18 +37,6 @@ struct WasmToolchain {
     validator_available: bool,
     stub_host_note: &'static str,
 }
-
-// Aggregate tier floors (minimum ratchets; U6-F raised tiers A–D by the
-// measured delta of the cursor-stream promotion: cede/cede.fab +
-// cursor/cursor.fab reach output-checked through the product-runner boost,
-// +2 on tiers A/B/C/D. Frontend/MIR are unchanged — the rows already counted
-// there; no floor rises by reclassification without its focused proof).
-const EXPECTED_FRONTEND_ANALYZED_FLOOR: usize = 210;
-const EXPECTED_MIR_LOWERED_FLOOR: usize = 194;
-const EXPECTED_WASM_TIER_A_EMITTED_FLOOR: usize = 186;
-const EXPECTED_WASM_TIER_B_COMPILE_VALID_FLOOR: usize = 182;
-const EXPECTED_WASM_TIER_C_RUNNABLE_FLOOR: usize = 159;
-const EXPECTED_WASM_TIER_D_OUTPUT_CHECKED_FLOOR: usize = 14;
 
 #[test]
 #[ignore = "slow wasm e2e; run: cargo test -p exempla --test e2e_harness exempla_wasm_e2e -- --ignored --nocapture"]

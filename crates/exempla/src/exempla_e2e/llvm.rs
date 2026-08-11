@@ -74,21 +74,12 @@ impl LlvmToolchain {
     }
 }
 
-// Tier floors and ceilings are ratcheted by the MIR LLVM baseline ledger.
-const EXPECTED_FRONTEND_ANALYZED_FLOOR: usize = 235;
-const EXPECTED_MIR_LOWERED_FLOOR: usize = 209;
-const EXPECTED_LLVM_EMITTED_FLOOR: usize = 204;
-const EXPECTED_LLVM_VERIFIER_VALID_FLOOR: usize = 204;
-const EXPECTED_LLVM_RUNNABLE_FLOOR: usize = 48;
-const EXPECTED_LLVM_OUTPUT_CHECKED_FLOOR: usize = 8;
-/// Maximum exempla that may still hit explicit unsupported diagnostics (lower is better).
-/// WHY: ratcheted 5 → 6 on 2026-07-02 to admit `conversio/fallibilis.fab`, a new
-/// exemplum hitting the existing `try_call` MIR-to-LLVM gap. Ratcheted 6 → 9 on
-/// 2026-07-05 for indexed GPU core type examples (`f16`, matrix, atomic) that
-/// intentionally document current LLVM target rejection. This is a counted debt
-/// budget, not a fix; Stage 8 (failable-call-cfg) and later GPU core backend
-/// stages own ratcheting it back down. See docs/factory/mir-llvm/baseline-ledger.md.
-const EXPECTED_UNSUPPORTED_DIAGNOSTIC_CEILING: usize = 9;
+use super::expectations::llvm::{
+    EXPECTED_FRONTEND_ANALYZED_FLOOR, EXPECTED_LLVM_EMITTED_FLOOR,
+    EXPECTED_LLVM_OUTPUT_CHECKED_FLOOR, EXPECTED_LLVM_RUNNABLE_FLOOR,
+    EXPECTED_LLVM_VERIFIER_VALID_FLOOR, EXPECTED_MIR_LOWERED_FLOOR,
+    EXPECTED_UNSUPPORTED_DIAGNOSTIC_CEILING,
+};
 
 #[derive(Debug)]
 pub(super) struct LlvmE2eResult {

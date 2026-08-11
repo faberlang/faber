@@ -1,9 +1,36 @@
-//! Per-exemplum minimum Wasm e2e tiers.
+//! Wasm lane expected-outcome tables (per-exemplum expected tier floors + aggregate tier floors, moved verbatim under per-lane ownership).
 //!
-//! These floors ratchet backend coverage without requiring every fixture to be
-//! fully runnable or behavior-checked yet.
+//! Wasm-lane expected-outcome surface (per-lane-e2e-validation EL-4). The
+//! lane harness module consumes only this table via
+//! `super::expectations::wasm::…`; no other lane may absorb these rows.
 
-use super::wasm::WasmTier;
+/// Wasm exempla e2e tiers aligned with the Rust-parity contract (A–D).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum WasmTier {
+    SourceReadable,
+    FrontendAnalyzed,
+    MirLowered,
+    /// Tier A — Wasm bytes emitted in-tree.
+    WasmEmitted,
+    /// Tier B — external `wasm-tools validate` accepts the module.
+    CompileValid,
+    /// Tier C — external stub host runs `incipit` without trap.
+    Runnable,
+    /// Tier D — captured output matches sibling `*.expected` when present.
+    OutputChecked,
+}
+
+// Aggregate tier floors (minimum ratchets; U6-F raised tiers A–D by the
+// measured delta of the cursor-stream promotion: cede/cede.fab +
+// cursor/cursor.fab reach output-checked through the product-runner boost,
+// +2 on tiers A/B/C/D. Frontend/MIR are unchanged — the rows already counted
+// there; no floor rises by reclassification without its focused proof).
+pub(crate) const EXPECTED_FRONTEND_ANALYZED_FLOOR: usize = 210;
+pub(crate) const EXPECTED_MIR_LOWERED_FLOOR: usize = 194;
+pub(crate) const EXPECTED_WASM_TIER_A_EMITTED_FLOOR: usize = 186;
+pub(crate) const EXPECTED_WASM_TIER_B_COMPILE_VALID_FLOOR: usize = 182;
+pub(crate) const EXPECTED_WASM_TIER_C_RUNNABLE_FLOOR: usize = 159;
+pub(crate) const EXPECTED_WASM_TIER_D_OUTPUT_CHECKED_FLOOR: usize = 14;
 
 pub(crate) const WASM_EXPECTED_TIER_FLOORS: &[(&str, WasmTier)] = &[
     ("abstractus/abstractus.fab", WasmTier::CompileValid),

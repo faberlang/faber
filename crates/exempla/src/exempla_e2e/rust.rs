@@ -11,25 +11,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-// Executable-debt budget for rust e2e. KNOWN_FAILURES is the sole accounting
-// mechanism: every listed path must fail, and every observed failure must be
-// listed. Fixes remove rows and ratchet accepted/pass counts upward. Do not
-// raise MAX_KNOWN_FAILURES to absorb drift — reclassify (oracle) or fix.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum KnownFailureKind {
-    FixtureMismatch,
-    BuildFailure,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct KnownFailure {
-    path: &'static str,
-    kind: KnownFailureKind,
-}
-
-// Ceiling held at 13 for historical budget; live rows shrink as debt clears.
-const MAX_KNOWN_FAILURES: usize = 13;
-const KNOWN_FAILURES: &[KnownFailure] = &[];
+use super::expectations::rust::{
+    KnownFailure, KnownFailureKind, KNOWN_FAILURES, MAX_KNOWN_FAILURES,
+};
 
 /// Whether a path is a tracked known Rust build failure (codegen debt).
 ///

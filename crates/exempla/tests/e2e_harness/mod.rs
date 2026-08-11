@@ -14,6 +14,12 @@ pub(crate) mod common;
 #[path = "../../src/exempla_e2e/types.rs"]
 pub(crate) mod types;
 
+// Per-lane expected-outcome tables (EL-4), shared with the lib test tree:
+// each lane harness module below consumes only its own lane's table via
+// `super::expectations::<lane>::…`.
+#[path = "../../src/exempla_e2e/expectations/mod.rs"]
+pub(crate) mod expectations;
+
 #[cfg(feature = "hir-go")]
 #[path = "../../src/exempla_e2e/go.rs"]
 pub mod go;
@@ -54,17 +60,14 @@ pub mod wasm;
 #[path = "../../src/exempla_e2e/wasm_behavior_fixtures.rs"]
 pub(crate) mod wasm_behavior_fixtures;
 #[cfg(feature = "mir-wasm")]
-#[path = "../../src/exempla_e2e/wasm_expectations.rs"]
-pub(crate) mod wasm_expectations;
-#[cfg(feature = "mir-wasm")]
 #[path = "../../src/exempla_e2e/wasm_external.rs"]
 pub(crate) mod wasm_external;
 #[cfg(feature = "mir-wasm")]
 #[path = "../../src/exempla_e2e/wasm_ledger.rs"]
 pub(crate) mod wasm_ledger;
 #[cfg(feature = "mir-wasm")]
-#[path = "../../src/exempla_e2e/wasm_product.rs"]
-pub(crate) mod wasm_product;
-#[cfg(feature = "mir-wasm")]
 #[path = "../../src/exempla_e2e/wasm_package.rs"]
 pub(crate) mod wasm_package;
+#[cfg(feature = "mir-wasm")]
+#[path = "../../src/exempla_e2e/wasm_product.rs"]
+pub(crate) mod wasm_product;

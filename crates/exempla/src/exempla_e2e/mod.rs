@@ -11,6 +11,15 @@
 
 #![allow(dead_code)]
 
+// Per-lane expected-outcome tables (EL-4): each backend lane owns its table in
+// exactly one `expectations/<lane>.rs` module; lane harness modules consume
+// only their own table. Ungated — the submodules are feature-gated.
+mod expectations;
+// Diff-derived lane selection (EL-4): changed-crate path set -> required
+// lanes. Ungated pure helper; tests + dry-run run under `cargo test -p exempla
+// --lib`.
+mod lane_selection;
+
 #[cfg(feature = "mir-llvm")]
 mod cli_parity;
 mod common;
