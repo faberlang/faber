@@ -45,7 +45,16 @@ verified bootstrap installer
     next action; an unwritable prefix fails closed with the typed
     unwritable-prefix class + one next action (never a traceback); an
     incomplete/corrupt core-support cache entry is detected and named
-    missing-or-corrupt-core-support with the launcher's repair path.
+    missing-or-corrupt-core-support with the launcher's repair path;
+  - the uninstall lifecycle (A5): `--uninstall` removes ONLY product-owned
+    files (payload + receipt, every version lane, install rollback leftovers,
+    kit-owned platform-cache entries) and reverses the explicit PATH/shell
+    change; user projects, locks, and the package store survive by default;
+    `--purge` removes them explicitly, never implicitly; the report lists
+    what was removed and what was left; containment applies to removal
+    (a symlinked prefix is refused, removal never follows a symlink);
+    a receipt-less prefix at an explicit --prefix still gets the canonical
+    kit layout removed.
 
 The "release host" is a local directory produced by the real
 `scripta/package-archive` wrapper (the exact published artifact shape:
@@ -179,6 +188,18 @@ class InstallFaberTest(unittest.TestCase):
         ]
         return subprocess.run(
             cmd, env=env or self.env, stdin=subprocess.DEVNULL,
+            check=False, capture_output=True, text=True,
+        )
+
+    def run_uninstaller(self, *args: str, prefix: Path | None = None) -> subprocess.CompletedProcess[str]:
+        cmd = [
+            sys.executable, str(SCRIPT),
+            "--prefix", str(prefix or self.prefix),
+            "--uninstall",
+            *args,
+        ]
+        return subprocess.run(
+            cmd, env=self.env, stdin=subprocess.DEVNULL,
             check=False, capture_output=True, text=True,
         )
 
@@ -926,6 +947,193 @@ class InstallFaberTest(unittest.TestCase):
         self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
         self.assertNotIn("missing-or-corrupt-core-support", res.stdout)
         self.assertIn("result:     already current", res.stdout)
+
+    # -- A5: uninstall -------------------------------------------------------
+
+    def test_uninstall_removes_only_product_files_and_preserves_user_data(self) -> None:
+        # A5 done_when: uninstall removes ONLY product-owned files (prefix
+        # payload + install receipt, kit-owned platform-cache entries); user
+        # projects, locks, and the package store survive byte-identically; the
+        # report lists what was removed and what was left.
+        self.assertEqual(self.run_installer().returncode, 0)
+        before = self.seed_user_data(self.prefix)
+        # A valid, materializer-immutable platform-cache entry (dir 0o555,
+        # file 0o444) must be removable by uninstall.
+        cache = self.core_support_cache()
+        entry = cache / ("ef" * 32)
+        entry.mkdir(parents=True)
+        marker = entry / ".faber-core-support-complete"
+        marker.write_text("format=tar-zst-v1\n", encoding="utf-8")
+        os.chmod(marker, 0o444)
+        os.chmod(entry, 0o555)
+        res = self.run_uninstaller()
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        # payload + receipt gone
+        for rel in PAYLOAD_FILES:
+            self.assertFalse((self.prefix / rel).exists(), f"{rel} survived")
+        self.assertFalse(
+            (self.prefix / "share/faber/install-receipt.json").exists())
+        # kit-owned platform cache gone
+        self.assertFalse(cache.exists(), "platform cache survived")
+        # user data survives byte-identically
+        self.assert_user_data_unchanged(before)
+        # prefix still exists, holding only the user data
+        self.assertEqual(sorted(p.name for p in self.prefix.iterdir()),
+                         ["cistae", "projects"])
+        # report: what was removed and what was left
+        self.assertIn("result:     uninstalled", res.stdout)
+        self.assertIn(f"files:      {len(PAYLOAD_FILES)} removed", res.stdout)
+        self.assertIn("install receipt: removed", res.stdout)
+        self.assertIn("platform cache: removed", res.stdout)
+        self.assertIn("left:", res.stdout)
+        self.assertIn("user projects", res.stdout)
+        self.assertIn("package store", res.stdout)
+        self.assertIn("--purge", res.stdout)
+
+    def test_uninstall_restores_shell_rc(self) -> None:
+        # A5 validation: the explicit PATH/shell change the installer made is
+        # reversed — the export line AND its marker comment leave the rc;
+        # everything else in the rc stays.
+        self.assertEqual(self.run_installer("--add-to-path").returncode, 0)
+        home = self.root / "home"
+        rc = home / (".zshrc" if sys.platform == "darwin" else ".bashrc")
+        expected = f'export PATH="{self.prefix}/bin:$PATH"'
+        original = rc.read_text(encoding="utf-8")
+        self.assertIn(expected, original)
+        self.assertIn("added by faber install-faber", original)
+        res = self.run_uninstaller()
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        text = rc.read_text(encoding="utf-8")
+        self.assertNotIn(expected, text)
+        self.assertNotIn("added by faber install-faber", text)
+        self.assertIn("PATH:       restored", res.stdout)
+
+    def test_uninstall_without_rc_change_reports_nothing_to_reverse(self) -> None:
+        # No --add-to-path was used at install: the uninstall report states
+        # there is no PATH change to reverse (and removes nothing extra).
+        self.assertEqual(self.run_installer().returncode, 0)
+        res = self.run_uninstaller()
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        self.assertIn("PATH:       no PATH change to reverse", res.stdout)
+
+    def test_uninstall_purge_removes_user_data(self) -> None:
+        # `--purge` is the EXPLICIT ask: user projects + the package store are
+        # removed and the prefix itself goes away; never implicit.
+        self.assertEqual(self.run_installer().returncode, 0)
+        self.seed_user_data(self.prefix)
+        res = self.run_uninstaller("--purge")
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        self.assertFalse(self.prefix.exists())
+        self.assertIn("result:     purged", res.stdout)
+        self.assertIn("user data:  purged (projects, cistae)", res.stdout)
+        self.assertIn("left:       nothing", res.stdout)
+
+    def test_uninstall_without_purge_leaves_user_data(self) -> None:
+        # The negative control for --purge: without the explicit flag the same
+        # user data survives.
+        self.assertEqual(self.run_installer().returncode, 0)
+        self.seed_user_data(self.prefix)
+        res = self.run_uninstaller()
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        self.assertTrue((self.prefix / "projects/demo/faber.toml").is_file())
+        self.assertTrue((self.prefix / "cistae/pkgs/demo/p.toml").is_file())
+        self.assertNotIn("purged", res.stdout)
+
+    def test_uninstall_removes_all_version_lanes(self) -> None:
+        # Side-by-side lanes are product-owned installs: a lane'd install
+        # uninstalls cleanly, leaving no versions/ tree behind.
+        self.assertEqual(self.run_installer().returncode, 0)  # 1.5.0
+        host16 = build_release_host(self.root, version="1.6.0")
+        self.assertEqual(self.run_installer("--update", version="1.6.0",
+                                             base=host16).returncode, 0)
+        self.assertTrue((self.prefix / "versions/1.5.0").exists())
+        self.assertTrue((self.prefix / "versions/1.6.0").exists())
+        res = self.run_uninstaller()
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        self.assertFalse((self.prefix / "versions").exists())
+        self.assertFalse((self.prefix / "bin/faber").exists())
+        self.assertIn("version lanes (versions/)", res.stdout)
+
+    def test_uninstall_removes_rollback_leftovers(self) -> None:
+        # Transient install state (a crashed install's rollback dir) is
+        # product-owned and removed with the rest.
+        self.assertEqual(self.run_installer().returncode, 0)
+        leftover = self.prefix / ".faber-install-rollback-12345"
+        leftover.mkdir(parents=True)
+        (leftover / "bin").mkdir()
+        (leftover / "bin" / "faber").write_bytes(b"old")
+        res = self.run_uninstaller()
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        self.assertFalse(leftover.exists())
+        self.assertIn("install rollback leftover", res.stdout)
+
+    def test_uninstall_nothing_to_uninstall_is_idempotent(self) -> None:
+        # No install at the default prefix and an absent explicit prefix are
+        # both "nothing to uninstall" (exit 0, no error, no traceback).
+        res = self.run_uninstaller()
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        self.assertIn("result:     nothing to uninstall", res.stdout)
+        res2 = self.run_uninstaller(prefix=self.root / "missing")
+        self.assertEqual(res2.returncode, 0, res2.stdout + res2.stderr)
+        self.assertIn("result:     nothing to uninstall", res2.stdout)
+        self.assertNotIn("Traceback", res2.stderr)
+
+    def test_uninstall_refuses_symlinked_prefix(self) -> None:
+        # Containment on removal: a symlinked prefix is refused outright; the
+        # real directory is never removed through the link.
+        real = self.root / "real-prefix"
+        (real / "bin").mkdir(parents=True)
+        (real / "bin" / "faber").write_bytes(b"#!/bin/sh\necho hi\n")
+        (real / "bin" / "faber").chmod(0o755)
+        link = self.root / "link-prefix"
+        link.symlink_to(real, target_is_directory=True)
+        res = self.run_uninstaller(prefix=link)
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("symlink", res.stderr)
+        self.assertTrue((real / "bin" / "faber").exists())
+        self.assertIn("echo hi", (real / "bin" / "faber").read_text())
+
+    def test_uninstall_never_removes_through_a_symlinked_parent(self) -> None:
+        # A tampered payload path (`share -> /outside`) must not redirect the
+        # removal outside the prefix: the file is reported as left, never
+        # deleted through the link.
+        self.assertEqual(self.run_installer().returncode, 0)
+        outside = self.root / "outside-share"
+        (outside / "faber" / "reference").mkdir(parents=True)
+        victim = outside / "faber" / "reference" / "PACK.toml"
+        victim.write_bytes(b"outside: byte-identical\n")
+        shutil.rmtree(self.prefix / "share")
+        (self.prefix / "share").symlink_to(outside, target_is_directory=True)
+        res = self.run_uninstaller()
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        self.assertEqual(victim.read_bytes(), b"outside: byte-identical\n")
+        self.assertIn("not followed", res.stdout)
+
+    def test_uninstall_purge_never_follows_symlinked_user_data(self) -> None:
+        # Even --purge never follows a symlink: a symlinked projects/ dir
+        # points outside and must stay byte-identical outside.
+        self.assertEqual(self.run_installer().returncode, 0)
+        outside = self.root / "outside-projects"
+        outside.mkdir()
+        (outside / "faber.toml").write_text("project-data\n", encoding="utf-8")
+        (self.prefix / "projects").symlink_to(outside, target_is_directory=True)
+        res = self.run_uninstaller("--purge")
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        self.assertEqual((outside / "faber.toml").read_text(), "project-data\n")
+        self.assertIn("not followed", res.stdout)
+
+    def test_uninstall_without_receipt_removes_canonical_kit_layout(self) -> None:
+        # The broken-install path (explicit --prefix, lost launcher metadata):
+        # the engine still removes the canonical kit layout — payload, kit
+        # dirs, and the cache — and reports the receipt-less removal.
+        self.assertEqual(self.run_installer().returncode, 0)
+        (self.prefix / "share/faber/install-receipt.json").unlink()
+        res = self.run_uninstaller()
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        for rel in PAYLOAD_FILES:
+            self.assertFalse((self.prefix / rel).exists(), f"{rel} survived")
+        self.assertIn("kit layout (share/faber/, no receipt)", res.stdout)
+        self.assertFalse(self.prefix.exists())
 
 
 if __name__ == "__main__":
