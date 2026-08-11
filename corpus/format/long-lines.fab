@@ -1,4 +1,11 @@
-functio nomina_praefixa(textus possessor, textus nomen, numerus versio, numerus generatio, numerus passus, f32 lentus) → textus {
-    varia textus out ← "optimizer/sgd-state/" + possessor + "/" + nomen + "/" + (versio ↦ textus) + "/" + (generatio ↦ textus) + "/" + (passus ↦ textus) + "/" + (lentus ↦ textus)
+functio nomina_praefixa(
+    textus possessor,
+    textus nomen,
+    numerus versio,
+    numerus generatio,
+    numerus passus,
+    f32 lentus
+) → textus {
+    varia textus out ← (((((((((("optimizer/sgd-state/" + possessor) + "/") + nomen) + "/") + (versio ↦ textus)) + "/") + (generatio ↦ textus)) + "/") + (passus ↦ textus)) + "/") + (lentus ↦ textus)
     redde out
 }
