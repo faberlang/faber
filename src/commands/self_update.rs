@@ -1,12 +1,16 @@
-//! `faber self update` — upgrade the installed faber to a newer released version.
+//! `faber self update` — update the installed faber version (upgrade or
+//! pinned downgrade).
 //!
 //! The update engine is the channel's verified bootstrap (`scripta/install-faber`,
 //! published at the release tag per the R1 interlock): it downloads a FIXED
 //! release payload and verifies SHA-256 before any unpack or execution, installs
-//! the new version as a side-by-side lane (`<prefix>/versions/<version>/`),
+//! the target version as a side-by-side lane (`<prefix>/versions/<version>/`),
 //! preserves the current install as a lane, flips the active launcher/receipt,
 //! and leaves user projects and the package store untouched (faber-onboarding
-//! Stage 3, unit A2). This command locates the install prefix from the running
+//! Stage 3, units A2/A3). An older target is a controlled downgrade through the
+//! same lane machinery; a downgrade that would strand a locked pack of a user
+//! project fails closed with a typed cause + next action (Stage 3 A3). This
+//! command locates the install prefix from the running
 //! binary, reads the install receipt, and re-runs the bootstrap with the update
 //! flags.
 //!
@@ -32,14 +36,16 @@ pub struct SelfManageArgs {
 /// `faber self` subcommands.
 #[derive(clap::Subcommand, Debug)]
 pub enum SelfCommand {
-    /// Update the installed faber to a newer released version
+    /// Update the installed faber (upgrade to a newer released version, or
+    /// pinned downgrade to an older one)
     Update(SelfUpdateArgs),
 }
 
 /// Arguments for `faber self update`.
 #[derive(clap::Args, Debug)]
 pub struct SelfUpdateArgs {
-    /// Target release version to upgrade to (e.g. 1.6.0)
+    /// Target release version (upgrade to a newer, or pinned downgrade to an
+    /// older version; e.g. 1.6.0)
     #[arg(long, value_name = "VERSION")]
     pub version: String,
 

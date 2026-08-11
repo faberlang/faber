@@ -28,16 +28,26 @@ Reinstall idempotency matrix (Stage 3 A2): a same-version re-run reports
 restored and reported; installing a DIFFERENT version over the same prefix
 fails closed and names the upgrade path (`faber self update`).
 
-`--update` performs a versioned upgrade on the existing install (the `faber
-self update` engine): the new version is installed as a side-by-side lane
-(`<prefix>/versions/<version>/`), the current install is preserved as a lane
-first, and the active launcher/packs/receipt flip to the new version with
-rollback. User projects and the package store (`<prefix>/cistae`, per
-package-and-lock-contract.md) are never touched. Update failures fail closed:
-a checksum mismatch aborts before any write, and a failed write rolls back,
-leaving the previously active version unchanged. Downgrades (requesting an
-older version) are not performed here — that is Stage 3 A3 — and cross-lane
-updates (odd development major <-> even LTS major, faber/docs/release/policy.md)
+`--update` performs a versioned install on the existing install (the `faber
+self update` engine): an upgrade to a newer version OR a pinned downgrade to
+an older version runs through the same side-by-side lane machinery
+(`<prefix>/versions/<version>/`). The current install is preserved as a lane
+first, the target version is installed as its own lane, and the active
+launcher/packs/receipt flip to the target version with rollback. User
+projects and the package store (`<prefix>/cistae`, per
+package-and-lock-contract.md) are never touched. Update/downgrade failures
+fail closed: a checksum mismatch aborts before any write, and a failed write
+rolls back, leaving the previously active version unchanged.
+
+Downgrade policy (Stage 3 A3): a pinned downgrade to an older version is
+supported and reversible through the lane layout. It FAILS CLOSED on
+incompatible packs — a downgrade that would strand a locked pack of a user
+project (a `faber.lock` under `<prefix>/projects/` whose locked package's
+`faber_min` compatibility bound the target cannot satisfy, per
+package-and-lock-contract.md OQ3/OQ6) is rejected with a typed cause
+(`incompatible-pack-downgrade`), the dev-kit layer, and ONE next action —
+never a partial or silent mix of versions. Cross-lane version changes (odd
+development major <-> even LTS major, faber/docs/release/policy.md) still
 require the explicit `--allow-lane-change` flag.
 
 Destination-side containment (CTO audit FINDING 1): every write beneath the
@@ -48,10 +58,11 @@ stay byte-identical. The same rule applies to PATH-owned writes (the shell rc
 append must not follow a symlink out of the user's home).
 
 Exit codes:
-  0  installed, updated, or already current (idempotent re-run)
+  0  installed, updated, downgraded, or already current (idempotent re-run)
   1  checksum mismatch, version conflict (cross-version without --update,
-     downgrade, cross-lane), or install/update failure
-     (fail-closed; no partial install)
+     cross-lane without --allow-lane-change), incompatible locked pack set
+     on a downgrade, or install/update failure (fail-closed; no partial
+     install)
   2  usage error (unsupported platform/triple, malformed arguments)
 
 Proxy/offline: downloads go through urllib and honor the standard
@@ -595,6 +606,132 @@ def print_report(*, result: str, version: str, triple: str, prefix: Path,
 
 
 # ---------------------------------------------------------------------------
+# downgrade policy (Stage 3 A3): fail-closed on incompatible packs
+# ---------------------------------------------------------------------------
+
+# Typed cause for a downgrade that would strand a locked pack.
+INCOMPATIBLE_PACK_CAUSE = "incompatible-pack-downgrade"
+# faber.lock locked-package tables; cista.toml package manifest source table.
+LOCK_TABLE_HEADER = "[[package]]"
+PACK_MANIFEST_SOURCE_TABLE = "[source]"
+# Compatibility bound field: launcher<=>package minimum faber version
+# (package-and-lock-contract.md OQ3 lock identity / OQ6 faber_min).
+PACK_COMPAT_BOUND_FIELDS = ("faber_min",)
+
+
+def toml_tables(text: str, header: str) -> list[dict[str, str]]:
+    """Extract the scalar fields of every TOML table whose header matches.
+
+    Minimal, dependency-free reader for the downgrade guard only (the
+    installer runs on a bare python3; no TOML dependency). Returns the flat
+    scalar key/value pairs of each table whose header line equals `header`
+    (e.g. `[[package]]` in faber.lock, `[source]` in cista.toml); values are
+    unquoted strings. A nested table ends the current table. This is not a
+    general TOML parser — tables beyond the flat scalars needed here are
+    ignored.
+    """
+    tables: list[dict[str, str]] = []
+    current: dict[str, str] | None = None
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("["):
+            current = {} if line == header else None
+            if current is not None:
+                tables.append(current)
+            continue
+        if current is None or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        current[key.strip()] = value.strip().strip('"')
+    return tables
+
+
+def locked_pack_compat_bound(entry: dict[str, str], project_root: Path
+                             ) -> tuple[str, str] | None:
+    """The compatibility bound for one locked package: `(bound, where)`.
+
+    The bound comes from the lock entry itself (lock-identity compatibility
+    metadata, package-and-lock-contract.md OQ3) or, when the entry does not
+    record one, from the locked package's `cista.toml` manifest `[source]`
+    section — resolved through the lock's `package_root` field (relative to
+    the project root, the same resolution rule faber's lockfile reader uses;
+    OQ6 faber_min). Returns None when the package records no bound.
+    """
+    for key in PACK_COMPAT_BOUND_FIELDS:
+        if entry.get(key):
+            return entry[key], "lock entry"
+    package_root = entry.get("package_root")
+    if not package_root:
+        return None
+    manifest = project_root / package_root / "cista.toml"
+    try:
+        text = manifest.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    for table in toml_tables(text, PACK_MANIFEST_SOURCE_TABLE):
+        for key in PACK_COMPAT_BOUND_FIELDS:
+            if table.get(key):
+                return table[key], str(manifest)
+    return None
+
+
+def check_downgrade_pack_compatibility(prefix: Path, target_version: str) -> None:
+    """Fail closed when the downgrade would strand a locked pack.
+
+    A downgrade must never strand a version-incompatible pack (dev-kit layer
+    4 — faber libraries; package-and-lock-contract.md compatibility): the
+    older launcher would be unable to consume a locked pack whose
+    `faber_min` bound the target cannot satisfy, silently mixing versions.
+    The trigger is a USER PROJECT's locked pack set — `faber.lock` files
+    under `<prefix>/projects/` (the discoverable project surface recorded in
+    the install prefix). Store packs that no project locks contribute nothing
+    (never ambient store discovery, package-and-lock-contract.md store
+    ownership). Unparseable locks contribute no bounds; the manifest
+    fallback still applies. Runs BEFORE any write, so a conflict leaves the
+    active install byte-identical.
+    """
+    projects_dir = prefix / "projects"
+    if not projects_dir.is_dir():
+        return
+    conflicts: list[tuple[str, str, str, str]] = []
+    max_bound = target_version
+    for lock_path in sorted(projects_dir.glob("*/faber.lock")):
+        try:
+            text = lock_path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        for entry in toml_tables(text, LOCK_TABLE_HEADER):
+            name = entry.get("name", "<unnamed>")
+            version = entry.get("version", "?")
+            bound = locked_pack_compat_bound(entry, lock_path.parent)
+            if not bound:
+                continue
+            bound_text, where = bound
+            if semver_lt(target_version, bound_text):
+                conflicts.append((name, version, bound_text, where))
+                if semver_lt(max_bound, bound_text):
+                    max_bound = bound_text
+    if not conflicts:
+        return
+    summary = "; ".join(
+        f"`{name}`@{version} requires faber >= {bound} ({where})"
+        for name, version, bound, where in conflicts
+    )
+    raise InstallError(
+        f"cannot downgrade faber to {target_version}: incompatible locked pack set\n"
+        f"  cause:  {INCOMPATIBLE_PACK_CAUSE}\n"
+        f"  layer:  faber libraries (dev-kit layer 4; "
+        "package-and-lock-contract.md compatibility — no silent mixing)\n"
+        f"  found:  {summary}\n"
+        f"  next:   keep faber at {max_bound} or newer (`faber self update "
+        f"--version {max_bound}`), update the project's locked pack set for "
+        f"faber {target_version}, or pin {target_version} on a fresh prefix"
+    )
+
+
+# ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
 
@@ -619,9 +756,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
                         help="append the PATH export to the detected shell rc "
                              "(explicit opt-in; reversible)")
     parser.add_argument("--update", action="store_true",
-                        help="perform a versioned upgrade on the existing "
-                             "install at the prefix (side-by-side lanes; the "
-                             "`faber self update` engine)")
+                        help="perform a versioned install (upgrade OR pinned "
+                             "downgrade) on the existing install at the "
+                             "prefix (side-by-side lanes; the `faber self "
+                             "update` engine)")
     parser.add_argument("--allow-lane-change", action="store_true",
                         help="explicitly allow crossing the odd development / "
                              "even LTS version lane (faber/docs/release/policy.md)")
@@ -680,25 +818,24 @@ def main(argv: list[str] | None = None) -> int:
             "--update to install fresh"
         )
     updating = False
+    downgrading = False
     if existing is not None and existing.get("version") != args.version:
         if not args.update:
             fail(
                 f"prefix {prefix} already has faber {existing.get('version')} "
                 f"installed; installing {args.version} over it is a versioned "
                 "reinstall — upgrade via `faber self update` (or "
-                "scripta/install-faber --update), downgrade is faber Stage 3 "
-                "A3 (downgrade policy). Re-run for the installed version or "
-                "choose a fresh prefix"
+                "scripta/install-faber --update), or downgrade with "
+                "`faber self update --version <older>`. Re-run for the "
+                "installed version or choose a fresh prefix"
             )
         old_version = existing.get("version")
         if semver_lt(args.version, old_version):
-            fail(
-                f"downgrade from {old_version} to {args.version} is not "
-                "performed by `faber self update` (upgrades only); downgrade "
-                "policy is faber Stage 3 A3. Pin the older version on a fresh "
-                f"prefix instead: scripta/install-faber --version {args.version} "
-                "--prefix <new-prefix>"
-            )
+            # Downgrade policy (Stage 3 A3): fail closed on incompatible
+            # packs BEFORE any write — the locked pack set of a user project
+            # must survive the downgrade (typed cause + one next action).
+            check_downgrade_pack_compatibility(prefix, args.version)
+            downgrading = True
         if (version_lane(old_version) != version_lane(args.version)
                 and not args.allow_lane_change):
             fail(
@@ -816,6 +953,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if states and all(s == "unchanged" for s in states.values()):
         result = "already current"
+    elif updating and downgrading:
+        result = f"downgraded (from {old_version})"
     elif updating:
         result = f"updated (from {old_version})"
     else:

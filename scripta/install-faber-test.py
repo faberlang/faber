@@ -16,13 +16,21 @@ verified bootstrap installer
   - the reinstall idempotency matrix (A2): same-version reinstall is "already
     current" with no churn; missing/tampered files are restored and reported;
     cross-version installs fail closed;
-  - the `faber self update` engine (A2): `--update` upgrades to a newer
-    released version into side-by-side lanes (`<prefix>/versions/<version>/`),
+  - the `faber self update` engine (A2/A3): `--update` installs a versioned
+    target into side-by-side lanes (`<prefix>/versions/<version>/`),
     preserves the current install as a lane, flips the active launcher/receipt,
     and leaves user projects + the package store byte-identically untouched;
-    update failure paths fail closed (no partial install, version unchanged);
-    cross-lane updates (odd dev <-> even LTS) fail closed without
-    --allow-lane-change; downgrades fail closed (Stage 3 A3 territory);
+    failure paths fail closed (no partial install, version unchanged);
+    cross-lane changes (odd dev <-> even LTS) fail closed without
+    --allow-lane-change;
+  - the downgrade policy (A3): a pinned downgrade to an older version
+    succeeds through the same lane machinery (active-flip + rollback) with
+    user projects/store byte-identical, and re-verifies `--version` +
+    `explain`; a downgrade that would strand a locked pack of a user project
+    (faber_min bound the target cannot satisfy — lock entry or the locked
+    package's cista.toml) fails closed with a typed cause + one next action
+    and NO partial install; a blocked target lane fails closed; mid-flip
+    write failures roll back;
   - rejects residuals and unsafe archive members;
   - destination-side containment (CTO audit FINDING 1): a pre-existing
     `prefix/share -> /outside` symlink is rejected before any write and both
@@ -85,14 +93,26 @@ def build_staging(root: Path) -> Path:
 
 def build_release_host(root: Path, *, version: str = VERSION,
                        triple: str = TRIPLE) -> Path:
-    """Wrap a payload with the real package-archive into a local release host."""
+    """Wrap a payload with the real package-archive into a local release host.
+
+    The fixture launcher answers `--version` (re-verify after a downgrade)
+    and `explain` by printing the ACTIVE reference pack's index.toml (the
+    pack layer flips with the launcher — re-verified after a downgrade).
+    """
     staging_dir = f"dev-kit-{version}-{triple}"
     staging = root / "payload" / staging_dir
     for rel in PAYLOAD_FILES:
         path = staging / rel
         path.parent.mkdir(parents=True, exist_ok=True)
         if rel == "bin/faber":
-            path.write_bytes(f"#!/bin/sh\necho faber {version}\n".encode())
+            path.write_bytes(
+                ("#!/bin/sh\n"
+                 'if [ "$1" = "explain" ]; then\n'
+                 '  d=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\n'
+                 '  exec cat "$d/../share/faber/reference/index.toml"\n'
+                 "fi\n"
+                 f"echo faber {version}\n").encode()
+            )
             path.chmod(0o755)
         else:
             path.write_text(f'[pack]\nname = "fixture {version}"\n', encoding="utf-8")
@@ -456,17 +476,213 @@ class InstallFaberTest(unittest.TestCase):
         receipt = json.loads((self.prefix / "share/faber/install-receipt.json").read_text())
         self.assertEqual(receipt["version"], "2.0.0")
 
-    def test_update_downgrade_fails_closed(self) -> None:
-        # Downgrade policy is Stage 3 A3 (serialized after A2); self update
-        # refuses with one next action and leaves the install unchanged.
+    def test_downgrade_older_version_succeeds_with_lanes_and_survival(self) -> None:
+        # A3: pinned downgrade to an older version succeeds through the A2
+        # lane machinery — preserve current lane, install target lane, flip
+        # active with rollback; user projects + store survive byte-identically.
         host16 = build_release_host(self.root, version="1.6.0")
         res = self.run_installer(version="1.6.0", base=host16)
         self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        before = self.seed_user_data(self.prefix)
         res2 = self.run_installer("--update", version="1.5.0", base=self.host)
-        self.assertEqual(res2.returncode, 1)
-        self.assertIn("downgrade", res2.stderr)
-        self.assertIn("A3", res2.stderr)
+        self.assertEqual(res2.returncode, 0, res2.stdout + res2.stderr)
+        self.assertIn("result:     downgraded (from 1.6.0)", res2.stdout)
+        self.assertIn("lanes:      1.5.0, 1.6.0 (active: 1.5.0)", res2.stdout)
+        # active launcher is the older version; both versions side by side
+        self.assertIn("echo faber 1.5.0", (self.prefix / "bin/faber").read_text())
+        self.assertIn("echo faber 1.6.0",
+                      (self.prefix / "versions/1.6.0/bin/faber").read_text())
+        self.assertIn("echo faber 1.5.0",
+                      (self.prefix / "versions/1.5.0/bin/faber").read_text())
+        # re-verify --version + explain against the flipped active install
+        ver = subprocess.run([str(self.prefix / "bin/faber"), "--version"],
+                             capture_output=True, text=True)
+        self.assertEqual(ver.stdout.strip(), "faber 1.5.0")
+        expl = subprocess.run([str(self.prefix / "bin/faber"), "explain", "loop"],
+                              capture_output=True, text=True)
+        self.assertIn("fixture 1.5.0", expl.stdout)
+        # top-level receipt records the active version + both lanes
+        receipt = json.loads((self.prefix / "share/faber/install-receipt.json").read_text())
+        self.assertEqual(receipt["version"], "1.5.0")
+        self.assertEqual(receipt["laneVersions"], ["1.5.0", "1.6.0"])
+        # user project + package store survive byte-identically
+        self.assert_user_data_unchanged(before)
+
+    def test_downgrade_then_upgrade_round_trips_through_lanes(self) -> None:
+        host16 = build_release_host(self.root, version="1.6.0")
+        self.assertEqual(self.run_installer(version="1.6.0", base=host16).returncode, 0)
+        res = self.run_installer("--update", version="1.5.0", base=self.host)
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        self.assertIn("result:     downgraded (from 1.6.0)", res.stdout)
+        # a second downgrade to the same version is already current
+        res2 = self.run_installer("--update", version="1.5.0", base=self.host)
+        self.assertEqual(res2.returncode, 0, res2.stdout + res2.stderr)
+        self.assertIn("result:     already current", res2.stdout)
+        # upgrade back reuses the preserved 1.6.0 lane (reversible)
+        res3 = self.run_installer("--update", version="1.6.0", base=host16)
+        self.assertEqual(res3.returncode, 0, res3.stdout + res3.stderr)
+        self.assertIn("result:     updated (from 1.5.0)", res3.stdout)
         self.assertIn("echo faber 1.6.0", (self.prefix / "bin/faber").read_text())
+        receipt = json.loads((self.prefix / "share/faber/install-receipt.json").read_text())
+        self.assertEqual(receipt["version"], "1.6.0")
+        self.assertEqual(receipt["laneVersions"], ["1.5.0", "1.6.0"])
+
+    def write_locked_project(self, lock_text: str) -> Path:
+        """Seed a user project under the prefix with the given faber.lock."""
+        lock = self.prefix / "projects" / "demo" / "faber.lock"
+        lock.parent.mkdir(parents=True, exist_ok=True)
+        lock.write_text(lock_text, encoding="utf-8")
+        return lock
+
+    def test_downgrade_with_incompatible_lock_entry_fails_closed(self) -> None:
+        # A locked pack whose faber_min the target cannot satisfy is stranded
+        # by the downgrade (no silent mixing) — the downgrade rejects BEFORE
+        # any write with a typed cause + one next action.
+        host16 = build_release_host(self.root, version="1.6.0")
+        self.assertEqual(self.run_installer(version="1.6.0", base=host16).returncode, 0)
+        lock_text = (
+            '[[package]]\n'
+            'name = "demo"\n'
+            'version = "0.1.0"\n'
+            'source = "fixture"\n'
+            'faber_min = "1.6.0"\n'
+        )
+        lock = self.write_locked_project(lock_text)
+        res = self.run_installer("--update", version="1.5.0", base=self.host)
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("incompatible-pack-downgrade", res.stderr)
+        self.assertIn("faber libraries", res.stderr)
+        self.assertIn("`demo`@0.1.0 requires faber >= 1.6.0", res.stderr)
+        self.assertIn("next:", res.stderr)
+        # fail closed: active version unchanged, no partial downgrade, lock
+        # itself untouched
+        self.assertIn("echo faber 1.6.0", (self.prefix / "bin/faber").read_text())
+        self.assertFalse((self.prefix / "versions").exists())
+        receipt = json.loads((self.prefix / "share/faber/install-receipt.json").read_text())
+        self.assertEqual(receipt["version"], "1.6.0")
+        self.assertEqual(lock.read_text(encoding="utf-8"), lock_text)
+
+    def test_downgrade_incompatible_bound_via_store_manifest_fails_closed(self) -> None:
+        # The lock records the package_root; the compatibility bound lives in
+        # the locked package's cista.toml (package-and-lock-contract.md
+        # OQ3/OQ6) — the same conflict must fail closed.
+        host16 = build_release_host(self.root, version="1.6.0")
+        self.assertEqual(self.run_installer(version="1.6.0", base=host16).returncode, 0)
+        lock_text = (
+            '[[package]]\n'
+            'name = "demo"\n'
+            'version = "0.1.0"\n'
+            'source = "fixture"\n'
+            'package_root = "../../cistae/pkgs/demo"\n'
+        )
+        self.write_locked_project(lock_text)
+        store_pack = self.prefix / "cistae" / "pkgs" / "demo"
+        store_pack.mkdir(parents=True, exist_ok=True)
+        (store_pack / "cista.toml").write_text(
+            '[source]\npackage = "demo"\nversion = "0.1.0"\nfaber_min = "1.6.0"\n',
+            encoding="utf-8",
+        )
+        res = self.run_installer("--update", version="1.5.0", base=self.host)
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("incompatible-pack-downgrade", res.stderr)
+        self.assertIn("cista.toml", res.stderr)
+        self.assertIn("`demo`@0.1.0 requires faber >= 1.6.0", res.stderr)
+        self.assertIn("next:", res.stderr)
+        # nothing was written: no lanes, active + receipt unchanged
+        self.assertIn("echo faber 1.6.0", (self.prefix / "bin/faber").read_text())
+        self.assertFalse((self.prefix / "versions").exists())
+        receipt = json.loads((self.prefix / "share/faber/install-receipt.json").read_text())
+        self.assertEqual(receipt["version"], "1.6.0")
+
+    def test_downgrade_ignores_locked_pack_with_satisfiable_bound(self) -> None:
+        # A locked pack whose faber_min the target SATISFIES is not a conflict:
+        # the downgrade proceeds and the lock survives byte-identically.
+        host16 = build_release_host(self.root, version="1.6.0")
+        self.assertEqual(self.run_installer(version="1.6.0", base=host16).returncode, 0)
+        lock_text = (
+            '[[package]]\n'
+            'name = "demo"\n'
+            'version = "0.1.0"\n'
+            'source = "fixture"\n'
+            'faber_min = "1.4.0"\n'
+        )
+        lock = self.write_locked_project(lock_text)
+        res = self.run_installer("--update", version="1.5.0", base=self.host)
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        self.assertIn("result:     downgraded (from 1.6.0)", res.stdout)
+        self.assertIn("echo faber 1.5.0", (self.prefix / "bin/faber").read_text())
+        self.assertEqual(lock.read_text(encoding="utf-8"), lock_text)
+
+    def test_downgrade_blocked_target_lane_fails_closed_no_partial_flip(self) -> None:
+        # A pre-existing symlink in the target lane's destination is rejected
+        # before the flip (destination-side containment, CTO FINDING 1): the
+        # downgrade fails closed and the active version stays unchanged.
+        host16 = build_release_host(self.root, version="1.6.0")
+        self.assertEqual(self.run_installer(version="1.6.0", base=host16).returncode, 0)
+        before = self.seed_user_data(self.prefix)
+        outside = self.root / "outside-lane"
+        outside.mkdir()
+        victim = outside / "victim.txt"
+        victim.write_bytes(b"outside: byte-identical\n")
+        lane_bin = self.prefix / "versions" / "1.5.0" / "bin"
+        lane_bin.mkdir(parents=True, exist_ok=True)
+        (lane_bin / "faber").symlink_to(victim)
+        res = self.run_installer("--update", version="1.5.0", base=self.host)
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("symlink", res.stderr)
+        # no escape: the outside file was never written through
+        self.assertEqual(victim.read_bytes(), b"outside: byte-identical\n")
+        self.assertTrue((lane_bin / "faber").is_symlink())
+        # fail closed: active version + receipt unchanged, user data untouched
+        self.assertIn("echo faber 1.6.0", (self.prefix / "bin/faber").read_text())
+        receipt = json.loads((self.prefix / "share/faber/install-receipt.json").read_text())
+        self.assertEqual(receipt["version"], "1.6.0")
+        self.assert_user_data_unchanged(before)
+
+    def test_cross_lane_downgrade_fails_closed_without_allow_lane_change(self) -> None:
+        # 2.0.0 is the even LTS lane; 1.5.0 is the odd development lane
+        # (faber/docs/release/policy.md): a downgrade across lanes needs the
+        # explicit opt-in — never a silent lane jump.
+        host20 = build_release_host(self.root, version="2.0.0")
+        self.assertEqual(self.run_installer(version="2.0.0", base=host20).returncode, 0)
+        res = self.run_installer("--update", version="1.5.0", base=self.host)
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("cross-lane", res.stderr)
+        self.assertIn("--allow-lane-change", res.stderr)
+        self.assertIn("echo faber 2.0.0", (self.prefix / "bin/faber").read_text())
+        self.assertFalse((self.prefix / "versions/1.5.0").exists())
+        # explicit opt-in succeeds
+        res2 = self.run_installer("--update", "--allow-lane-change",
+                                  version="1.5.0", base=self.host)
+        self.assertEqual(res2.returncode, 0, res2.stdout + res2.stderr)
+        self.assertIn("result:     downgraded (from 2.0.0)", res2.stdout)
+        receipt = json.loads((self.prefix / "share/faber/install-receipt.json").read_text())
+        self.assertEqual(receipt["version"], "1.5.0")
+
+    def test_downgrade_flip_write_failure_rolls_back_active_unchanged(self) -> None:
+        # A mid-flip write failure (read-only reference dir) must roll back:
+        # the active payload is byte-identical, the receipt still records the
+        # newer version, and no rollback dir is left behind — never a partial
+        # downgrade.
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            self.skipTest("read-only directories do not block root")
+        host16 = build_release_host(self.root, version="1.6.0")
+        self.assertEqual(self.run_installer(version="1.6.0", base=host16).returncode, 0)
+        before = self.installed_files(self.prefix)
+        ref = self.prefix / "share/faber/reference"
+        os.chmod(ref, 0o555)
+        try:
+            res = self.run_installer("--update", version="1.5.0", base=self.host)
+        finally:
+            os.chmod(ref, 0o755)
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("failed to write payload", res.stderr)
+        # rollback: active payload byte-identical, receipt unchanged
+        self.assertEqual(self.installed_files(self.prefix), before)
+        receipt = json.loads((self.prefix / "share/faber/install-receipt.json").read_text())
+        self.assertEqual(receipt["version"], "1.6.0")
+        leftovers = list(self.prefix.glob(".faber-install-rollback-*"))
+        self.assertEqual(leftovers, [])
 
     def test_update_failure_paths_fail_closed_no_partial_install(self) -> None:
         self.assertEqual(self.run_installer().returncode, 0)  # 1.5.0
