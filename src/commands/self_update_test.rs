@@ -1,7 +1,8 @@
-//! Unit tests for `faber self update` planning (prefix discovery, receipt
-//! parsing, asset-base derivation, engine invocation shape). The update engine
-//! itself (checksum-before-exec, lanes, rollback) is proven by
-//! `scripta/install-faber-test.py`; this file covers the wrapper's pure logic.
+//! Unit tests for `faber self update` / `faber self uninstall` planning
+//! (prefix discovery, receipt parsing, asset-base derivation, engine
+//! invocation shape). The engine itself (checksum-before-exec, lanes,
+//! rollback, uninstall removal) is proven by `scripta/install-faber-test.py`;
+//! this file covers the wrapper's pure logic.
 
 use super::self_update::*;
 use std::path::Path;
@@ -215,12 +216,13 @@ fn derive_base_url_keeps_tag_shaped_local_dir() {
 
 #[test]
 fn cli_shape_has_update_subcommand() {
-    // The `faber self` surface exposes exactly the update subcommand for now;
-    // dispatch requires it (A5 adds uninstall later).
+    // The `faber self` surface exposes update and uninstall subcommands;
+    // dispatch requires both (A5).
     let command = SelfCommand::Update(args("1.6.0"));
     let manage = SelfManageArgs { command };
     match manage.command {
         SelfCommand::Update(inner) => assert_eq!(inner.version, "1.6.0"),
+        SelfCommand::Uninstall(_) => panic!("expected Update"),
     }
 }
 
@@ -255,7 +257,158 @@ fn cli_parse_self_update_shape() {
                 assert_eq!(inner.version, "1.6.0");
                 assert!(inner.allow_lane_change);
             }
+            SelfCommand::Uninstall(_) => panic!("expected update"),
         },
         _ => panic!("expected `faber self update` to parse as SelfManage"),
+    }
+}
+
+// -- `faber self uninstall` (Stage 3 A5) ------------------------------------
+
+fn uninstall_args() -> SelfUninstallArgs {
+    SelfUninstallArgs {
+        prefix: None,
+        base_url: None,
+        purge: false,
+    }
+}
+
+#[test]
+fn plan_uninstall_reads_receipt_and_builds_script_url() {
+    // The engine script is fetched from the CURRENT version's asset base
+    // (derived from the release-host source when the receipt records none).
+    let tmp = tempfile::tempdir().expect("tmp");
+    let prefix = tmp.path().join("prefix");
+    let source = format!(
+        "https://github.com/faberlang/releases/releases/download/faber-v1.5.0/faber-v1.5.0-aarch64-apple-darwin.tar.gz"
+    );
+    write_receipt(&prefix, &receipt_json(&source, "1.5.0"));
+    let plan = plan_self_uninstall(&uninstall_args(), Some(&prefix.join("bin/faber")), None)
+        .expect("plan");
+    assert_eq!(plan.prefix, prefix);
+    assert_eq!(plan.current_version, "1.5.0");
+    assert_eq!(plan.triple, "aarch64-apple-darwin");
+    assert!(!plan.purge);
+    assert_eq!(
+        plan.script_url,
+        "https://github.com/faberlang/releases/releases/download/faber-v1.5.0/install-faber"
+    );
+}
+
+#[test]
+fn plan_uninstall_prefers_recorded_asset_base() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let prefix = tmp.path().join("prefix");
+    let mut receipt = receipt_json(
+        "https://host.example/download/faber-v1.5.0/faber-v1.5.0-aarch64-apple-darwin.tar.gz",
+        "1.5.0",
+    );
+    receipt["assetBase"] = serde_json::json!("https://mirror.example/faber");
+    write_receipt(&prefix, &receipt);
+    let plan = plan_self_uninstall(&uninstall_args(), Some(&prefix.join("bin/faber")), None)
+        .expect("plan");
+    assert_eq!(
+        plan.script_url,
+        "https://mirror.example/faber/install-faber"
+    );
+}
+
+#[test]
+fn plan_uninstall_base_url_override_wins() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let prefix = tmp.path().join("prefix");
+    write_receipt(
+        &prefix,
+        &receipt_json(
+            "https://host.example/download/faber-v1.5.0/faber-v1.5.0-aarch64-apple-darwin.tar.gz",
+            "1.5.0",
+        ),
+    );
+    let mut a = uninstall_args();
+    a.base_url = Some("/tmp/local-mirror".to_owned());
+    let plan = plan_self_uninstall(&a, Some(&prefix.join("bin/faber")), None).expect("plan");
+    assert_eq!(plan.script_url, "/tmp/local-mirror/install-faber");
+}
+
+#[test]
+fn plan_uninstall_purge_is_forwarded() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let prefix = tmp.path().join("prefix");
+    write_receipt(
+        &prefix,
+        &receipt_json(
+            "/tmp/local-mirror/faber-v1.5.0-aarch64-apple-darwin.tar.gz",
+            "1.5.0",
+        ),
+    );
+    let mut a = uninstall_args();
+    a.purge = true;
+    let plan = plan_self_uninstall(&a, Some(&prefix.join("bin/faber")), None).expect("plan");
+    assert!(plan.purge);
+}
+
+#[test]
+fn plan_uninstall_explicit_prefix_is_used() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let prefix = tmp.path().join("prefix");
+    write_receipt(
+        &prefix,
+        &receipt_json(
+            "/tmp/local-mirror/faber-v1.5.0-aarch64-apple-darwin.tar.gz",
+            "1.5.0",
+        ),
+    );
+    let mut a = uninstall_args();
+    a.prefix = Some(prefix.clone());
+    let plan = plan_self_uninstall(&a, None, None).expect("plan");
+    assert_eq!(plan.prefix, prefix);
+}
+
+#[test]
+fn plan_uninstall_missing_receipt_fails_closed() {
+    // Lost launcher metadata (A5): the wrapper cannot locate the published
+    // engine without the receipt — typed failure + one next action naming
+    // the direct engine invocation (which also uninstalls a receipt-less
+    // prefix at an explicit --prefix).
+    let tmp = tempfile::tempdir().expect("tmp");
+    let exe = tmp.path().join("bin/faber");
+    let err = plan_self_uninstall(&uninstall_args(), Some(&exe), None).expect_err("no receipt");
+    assert!(err.contains("missing-launcher-metadata"), "{err}");
+    assert!(err.contains("cause:"), "{err}");
+    assert!(err.contains("next:"), "{err}");
+    assert!(err.contains("--uninstall"), "{err}");
+}
+
+#[test]
+fn plan_uninstall_corrupt_receipt_fails_closed() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let prefix = tmp.path().join("prefix");
+    let receipt = prefix.join(RECEIPT_REL);
+    std::fs::create_dir_all(receipt.parent().expect("receipt parent")).expect("mkdir");
+    std::fs::write(&receipt, "{not valid json").expect("write");
+    let err = plan_self_uninstall(&uninstall_args(), Some(&prefix.join("bin/faber")), None)
+        .expect_err("corrupt receipt");
+    assert!(err.contains("not valid JSON"), "{err}");
+    assert!(err.contains("missing-launcher-metadata"), "{err}");
+    assert!(err.contains("--uninstall"), "{err}");
+}
+
+#[test]
+fn cli_parse_self_uninstall_shape() {
+    // The real user-facing shape: `faber self uninstall [--prefix <p>] [--purge]`
+    // parses and routes to the uninstall handler.
+    use clap::Parser;
+    let cli = crate::cli::Cli::parse_from([
+        "faber", "self", "uninstall", "--prefix", "/tmp/x", "--purge",
+    ]);
+    match cli.command {
+        Some(crate::cli::Command::SelfManage(manage)) => match manage.command {
+            SelfCommand::Uninstall(inner) => {
+                assert_eq!(inner.prefix, Some(std::path::PathBuf::from("/tmp/x")));
+                assert!(inner.purge);
+            }
+            SelfCommand::Update(_) => panic!("expected uninstall"),
+        },
+        _ => panic!("expected `faber self uninstall` to parse as SelfManage"),
     }
 }

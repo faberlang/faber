@@ -74,12 +74,28 @@ diagnostics (the Stage 4 doctor consumes the same vocabulary):
 Repairs are reported on stdout as `repairs: <cause>: <detail>` lines and the
 result becomes `repaired` when a re-run restored payload or metadata.
 
+Uninstall (Stage 3 A5): `--uninstall` removes ONLY product-owned files —
+the installed payload and install receipt at the prefix, every side-by-side
+version lane, install rollback leftovers, and the kit-owned platform-cache
+entries the launcher materialized (dev-kit layer 2, E12) — and reverses the
+explicit PATH/shell change the installer made (the
+`export PATH="<prefix>/bin:$PATH"` line it appended to the detected shell
+rc). User projects, locks, and dependency caches (`<prefix>/projects/`, the
+package store `$CISTAE_HOME` / `<prefix>/cistae`,
+package-and-lock-contract.md) SURVIVE by default; removing them requires the
+explicit `--purge` flag, never implicit. The report lists what was removed
+and what was left. A symlinked prefix or user-data path is never followed
+(destination-side containment applies to removal too); a receipt-less
+prefix at an explicit `--prefix` still gets the canonical kit layout removed
+(the broken-install path).
+
 Exit codes:
-  0  installed, updated, downgraded, or already current (idempotent re-run)
+  0  installed, updated, downgraded, already current (idempotent re-run),
+     uninstalled, purged, or nothing to uninstall (idempotent)
   1  checksum mismatch, version conflict (cross-version without --update,
      cross-lane without --allow-lane-change), incompatible locked pack set
-     on a downgrade, or install/update failure (fail-closed; no partial
-     install)
+     on a downgrade, install/update failure (fail-closed; no partial
+     install), or uninstall failure (fail-closed)
   2  usage error (unsupported platform/triple, malformed arguments)
 
 Proxy/offline: downloads go through urllib and honor the standard
@@ -105,6 +121,9 @@ Usage:
         [--triple aarch64-apple-darwin] [--base-url <url|dir>] [--add-to-path]
     scripta/install-faber --version 1.6.1 --prefix ~/.faber --update   # upgrade
     faber self update --version 1.6.1                                  # same engine
+    scripta/install-faber --prefix ~/.faber --uninstall                # uninstall
+    scripta/install-faber --prefix ~/.faber --uninstall --purge        # + user data
+    faber self uninstall                                               # same engine
 """
 
 from __future__ import annotations
@@ -845,6 +864,290 @@ def prefix_has_content(prefix: Path) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# uninstall (Stage 3 A5): product-owned removal only
+# ---------------------------------------------------------------------------
+
+def make_writable_tree(root: Path) -> None:
+    """Make a tree owner-writable so removal can proceed.
+
+    The core-support materializer makes platform-cache entries immutable
+    (directories 0o555, files 0o444); uninstall must be able to remove them.
+    Symlinks are never chmodded (chmod would follow the link) and never
+    descended; removal handles them as symlinks.
+    """
+    for current, dirs, files in os.walk(root, topdown=False):
+        for name in files:
+            path = os.path.join(current, name)
+            if not os.path.islink(path):
+                os.chmod(path, 0o644)
+        for name in dirs:
+            path = os.path.join(current, name)
+            if not os.path.islink(path):
+                os.chmod(path, 0o755)
+    os.chmod(root, 0o755)
+
+
+def remove_from_path(prefix: Path, rc: Path, home: Path) -> bool:
+    """Remove the installer's PATH export + marker comment from the shell rc.
+
+    Returns True when the rc was edited. Only the exact line the installer
+    wrote (`export PATH="<prefix>/bin:$PATH"`) is removed, together with the
+    marker comment line immediately before it; everything else stays
+    byte-identical. A modified or foreign line is left for the user.
+    """
+    guard_home_write(rc, home, "shell rc")
+    line = path_line(prefix)
+    marker = "# added by faber install-faber"
+    try:
+        text = rc.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    kept: list[str] = []
+    edited = False
+    for raw in text.splitlines():
+        if raw == line:
+            if kept and marker in kept[-1]:
+                kept.pop()
+            edited = True
+            continue
+        kept.append(raw)
+    if not edited:
+        return False
+    new_text = "\n".join(kept)
+    if kept and text.endswith("\n"):
+        new_text += "\n"
+    try:
+        rc.write_text(new_text, encoding="utf-8")
+    except OSError:
+        return False
+    return True
+
+
+def symlink_free_chain(path: Path, *, include_last: bool, root: Path) -> bool:
+    """True when no component of `path` below the canonical `root` is a symlink.
+
+    Removal never deletes THROUGH a symlink (destination-side containment,
+    CTO audit FINDING 1 class): a symlinked intermediate (e.g.
+    `prefix/share -> /outside`) must never redirect a removal outside the
+    canonical root. The root itself is already canonical (the install prefix
+    is install-created and symlink-refused; HOME is resolved), so only the
+    components below it are inspected — this also avoids tripping on benign
+    system symlinks above the root (macOS `/var -> /private/var`). With
+    `include_last=False` the FINAL component may be a symlink — unlinking a
+    symlink removes the link itself, never the target, so a symlinked
+    payload/receipt path is safe to unlink.
+    """
+    rel = path.relative_to(root)
+    parts = rel.parts
+    if not include_last and parts:
+        parts = parts[:-1]
+    cur = root
+    for part in parts:
+        cur = cur / part
+        if cur.is_symlink():
+            return False
+    return True
+
+
+def uninstall_main(args: argparse.Namespace) -> int:
+    """`--uninstall` engine: remove ONLY product-owned files and reverse the
+    explicit PATH/shell change the installer made (faber-onboarding Stage 3
+    A5, install-channel-matrix.md prefix rules).
+
+    Removed: the payload files recorded in the install receipt, the receipt
+    itself, every side-by-side version lane, install rollback leftovers, and
+    the kit-owned platform-cache entries. Reversed: the shell rc PATH export
+    line the installer appended. LEFT by default: user projects, locks, and
+    the package store (dependency caches) — `--purge` removes them
+    explicitly, never implicitly. The report lists what was removed and what
+    was left.
+
+    Containment applies to removal: a symlinked prefix is refused outright,
+    removal never follows a symlink (a symlinked destination or user-data
+    path is reported as left, never deleted through), and only paths beneath
+    the canonical prefix are touched.
+    """
+    home = Path(os.environ.get("HOME") or str(Path.home())).resolve()
+    raw_prefix = Path(os.path.expanduser(args.prefix))
+    if raw_prefix.is_symlink():
+        fail(
+            f"refusing to uninstall: prefix {raw_prefix} is a symlink; uninstall "
+            "only removes a real product-owned install prefix — never through "
+            "a symlink (containment)"
+        )
+    prefix = raw_prefix.resolve()
+    removed_files: list[str] = []
+    removed_extra: list[tuple[str, str]] = []
+    purged: list[str] = []
+    left: list[tuple[str, str]] = []
+
+    def note_left(path: Path, reason: str) -> None:
+        left.append((str(path), reason))
+
+    def remove_tree(path: Path, label: str, root: Path, report: bool = True) -> None:
+        """Remove a whole directory tree (or file) at `path`; never through a
+        symlink (every component below the canonical `root` must be a real
+        path). A symlinked path is left in place and reported."""
+        if not symlink_free_chain(path, include_last=True, root=root):
+            note_left(path, "symlinked path; not followed — left in place")
+            return
+        if path.is_dir():
+            make_writable_tree(path)
+            shutil.rmtree(path)
+            if report:
+                removed_extra.append((label, str(path)))
+        elif path.exists():
+            path.unlink()
+            if report:
+                removed_extra.append((label, str(path)))
+
+    def remove_file_rel(rel: str) -> None:
+        """Unlink `prefix / rel` when safe: no symlink in any INTERMEDIATE
+        component (removal never deletes THROUGH a symlink — containment). A
+        symlinked final component is itself removed (the link, never the
+        target)."""
+        target = prefix / rel
+        if not symlink_free_chain(target, include_last=False, root=prefix):
+            note_left(target, "symlinked parent; not followed — left in place")
+            return
+        if target.is_symlink() or target.exists():
+            target.unlink(missing_ok=True)
+            removed_files.append(rel)
+
+    if not prefix.exists() or (prefix.is_symlink()):
+        print("faber uninstall report — faber (unknown) (unknown)")
+        print("  result:     nothing to uninstall")
+        print(f"  prefix:     {prefix}")
+        print("  left:       nothing (prefix does not exist)")
+        return 0
+    if not prefix.is_dir():
+        fail(f"prefix exists and is not a directory: {prefix}")
+
+    receipt = load_receipt(prefix)
+    version = (receipt or {}).get("version", "unknown")
+    triple = (receipt or {}).get("triple", "unknown")
+
+    # 1. Payload files recorded in the receipt (the authoritative kit list).
+    #    A receipt-less prefix (lost launcher metadata) at an explicit prefix
+    #    still gets the canonical kit layout removed (the broken-install
+    #    repair path — `faber self uninstall` fails closed instead).
+    payload = (receipt or {}).get("files")
+    if isinstance(payload, list):
+        for rel in payload:
+            if isinstance(rel, str) and not rel.startswith("/") \
+                    and ".." not in rel.split("/"):
+                remove_file_rel(rel)
+    else:
+        remove_tree(prefix / "share" / "faber", "kit layout (share/faber/, no receipt)", prefix)
+        remove_file_rel("bin/faber")
+    # 2. Side-by-side version lanes (every lane is a product-owned install).
+    if (prefix / "versions").exists() or (prefix / "versions").is_symlink():
+        remove_tree(prefix / "versions", "version lanes (versions/)", prefix)
+    # 3. Install rollback leftovers (transient product state).
+    for leftover in prefix.glob(".faber-install-rollback-*"):
+        remove_tree(leftover, "install rollback leftover", prefix)
+    # 4. The install receipt itself (a symlinked intermediate — a tampered
+    #    `share` — never redirects the removal).
+    receipt_path_ = prefix / RECEIPT_REL
+    if symlink_free_chain(receipt_path_, include_last=False, root=prefix) \
+            and (receipt_path_.is_symlink() or receipt_path_.exists()):
+        receipt_path_.unlink(missing_ok=True)
+        removed_extra.append(("install receipt", str(receipt_path_)))
+    # 5. Prune now-empty product-owned dirs (bin/, share/faber/, share/ and
+    #    any empty leftovers beneath the prefix), bottom-up. User-data
+    #    namespaces (projects/, cistae/) are never pruned — they are reported
+    #    as left.
+    for current, dirs, _files in os.walk(prefix, topdown=False):
+        rel = Path(current).relative_to(prefix)
+        if rel.parts and rel.parts[0] in ("projects", "cistae"):
+            continue
+        try:
+            os.rmdir(current)
+        except OSError:
+            pass
+    # 6. Kit-owned platform-cache entries (dev-kit layer 2, E12): the
+    #    content-hash-keyed materializations the launcher wrote. The cache
+    #    tree is entirely faber-owned; a symlinked cache path is reported,
+    #    never followed.
+    cache = platform_core_support_cache(home)
+    if cache.is_symlink() or cache.exists():
+        if not symlink_free_chain(cache, include_last=True, root=home):
+            note_left(cache, "symlinked path; platform cache left in place")
+        else:
+            make_writable_tree(cache)
+            shutil.rmtree(cache)
+            removed_extra.append(("platform cache", str(cache)))
+            for parent in (cache.parent, cache.parent.parent):
+                try:
+                    parent.rmdir()
+                except OSError:
+                    pass
+    # 7. User data: survives by default; removed ONLY on the explicit --purge.
+    for user_rel, label in (("projects", "user projects"), ("cistae", "package store")):
+        user_path = prefix / user_rel
+        if args.purge and (user_path.exists() or user_path.is_symlink()):
+            remove_tree(user_path, label, prefix, report=False)
+            purged.append(user_rel)
+    # 8. Reverse the explicit PATH/shell change the installer made.
+    rc = shell_rc_path(home)
+    path_restored = False
+    if rc.is_file() and not rc.is_symlink():
+        try:
+            guard_home_write(rc, home, "shell rc")
+        except InstallError:
+            note_left(rc, "shell rc resolves outside home; PATH line left in place")
+        else:
+            path_restored = remove_from_path(prefix, rc, home)
+    # 9. What is left: remaining prefix content (user data or foreign) and
+    #    the prefix itself when it still holds user data.
+    if prefix.is_dir():
+        try:
+            for entry in sorted(prefix.iterdir()):
+                if entry.is_symlink():
+                    note_left(entry, "symlink; not followed — left in place")
+                elif entry.name == "projects":
+                    note_left(entry, "user projects — pass --purge to remove")
+                elif entry.name == "cistae":
+                    note_left(entry, "package store (dependency cache) — pass --purge to remove")
+                else:
+                    note_left(entry, "not product-owned; left in place")
+        except OSError:
+            pass
+        try:
+            prefix.rmdir()
+        except OSError:
+            pass
+
+    if not (removed_files or removed_extra or purged):
+        result = "nothing to uninstall"
+    elif args.purge:
+        result = "purged"
+    else:
+        result = "uninstalled"
+    print(f"faber uninstall report — faber {version} ({triple})")
+    print(f"  result:     {result}")
+    print(f"  prefix:     {prefix}")
+    if removed_files:
+        print(f"  files:      {len(removed_files)} removed")
+        for rel in removed_files:
+            print(f"    {rel}")
+    for label, detail in removed_extra:
+        print(f"  {label}: removed ({detail})")
+    if purged:
+        print(f"  user data:  purged ({', '.join(purged)})")
+    if path_restored:
+        print(f"  PATH:       restored ({rc})")
+    else:
+        print("  PATH:       no PATH change to reverse")
+    if left:
+        for path, reason in left:
+            print(f"  left:       {path} ({reason})")
+    else:
+        print("  left:       nothing")
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
 
@@ -876,11 +1179,26 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--allow-lane-change", action="store_true",
                         help="explicitly allow crossing the odd development / "
                              "even LTS version lane (faber/docs/release/policy.md)")
+    parser.add_argument("--uninstall", action="store_true",
+                        help="remove ONLY product-owned files (prefix payload "
+                             "and receipt, version lanes, install rollback "
+                             "leftovers, kit-owned platform-cache entries) and "
+                             "reverse the explicit PATH/shell change; user "
+                             "projects, locks, and dependency caches survive")
+    parser.add_argument("--purge", action="store_true",
+                        help="with --uninstall, ALSO remove user projects and "
+                             "the package store (dependency caches) — explicit "
+                             "ask, never implicit")
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
+
+    # Uninstall is a local-only operation: no archive fetch, no triple
+    # detection, no checksum verification. Dispatch before any of that.
+    if args.uninstall:
+        return uninstall_main(args)
 
     if not re.fullmatch(SEMVER_RE, args.version):
         fail(f"{args.version!r} is not a semver-shaped version", code=2)
