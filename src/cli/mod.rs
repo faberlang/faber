@@ -109,7 +109,7 @@ pub enum Command {
     Model(ModelArgs),
 
     /// Manage this faber installation (update / uninstall)
-    #[command(name = "self", subcommand)]
+    #[command(name = "self")]
     SelfManage(crate::commands::self_update::SelfManageArgs),
 }
 
