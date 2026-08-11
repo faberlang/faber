@@ -1,7 +1,76 @@
 //! Package-local namespace-call linking and rewrite passes.
 
 use super::*;
-use radix::hir::visit::{HirVisitor, HirVisitorMut, walk_expr_mut};
+use radix::hir::visit::{walk_program_mut, HirVisitor, HirVisitorMut, walk_expr_mut};
+
+/// Post-rewrite pass: recover the function type for synthetic-path call
+/// callees (pkg001-mir-fix).
+///
+/// `rewrite_analysis_namespace_calls` replaces a typed namespace call
+/// (`forma.quantitas(f)`) with `Call(Path(synthetic), …)` whose callee
+/// carries no type. The radix MIR lowerer keys failable-ness by the callee
+/// def's registered error type (`function_errors`); a synthetic def allocated
+/// after analysis is absent there, so a FAILABLE library call would otherwise
+/// lower as a plain `Call` — no try-call edge to the `fac/cape` handler — and
+/// the handler's blocks become orphaned ("block bbN is not reachable from
+/// entry", PKG001). Recovering the callee's function type (with its error
+/// half) lets the lowerer fall back to the callee type and emit the try-call.
+struct SyntheticCalleeTypePass<'a> {
+    method_types: &'a HashMap<radix::hir::DefId, radix_types::TypeId>,
+}
+
+impl HirVisitorMut for SyntheticCalleeTypePass<'_> {
+    fn visit_expr_mut(&mut self, expr: &mut radix::hir::HirExpression) {
+        if let HirExpressionKind::Call(callee, ..) = &mut expr.kind {
+            if let HirExpressionKind::Path(def_id) = callee.kind {
+                if let Some(function_ty) = self.method_types.get(&def_id).copied() {
+                    callee.ty = Some(function_ty);
+                }
+            }
+        }
+        walk_expr_mut(self, expr);
+    }
+}
+
+/// Collect the function type for every synthetic namespace-call target the
+/// caller can reach: the caller's file-interface resolver remaps the linked
+/// library's export signatures into the caller's type table, and the
+/// `targets` table maps (import item, verb) to the synthetic def the rewrite
+/// installed. Generic exports stay untyped (concrete instantiations only).
+fn synthetic_namespace_function_types(
+    unit_path: &Path,
+    analysis: &mut radix::driver::AnalyzedUnit,
+    targets: &NamespaceCallTargets,
+) -> HashMap<radix::hir::DefId, radix_types::TypeId> {
+    let mut method_types = HashMap::new();
+    for import in analysis.hir.items.iter().filter_map(|item| match &item.kind {
+        HirItemKind::Import(import) => Some(import),
+        _ => None,
+    }) {
+        for import_item in &import.items {
+            let binding = import_item.alias.unwrap_or(import_item.name);
+            let exports = analysis.resolver.namespace_file_function_exports(binding);
+            if exports.is_empty() {
+                continue;
+            }
+            for (verb, sig) in exports {
+                if !sig.type_params.is_empty() {
+                    continue;
+                }
+                let verb_name = analysis.interner.resolve(verb);
+                let Some(synthetic) = targets
+                    .get(&(unit_path.to_path_buf(), import_item.def_id, verb_name.to_owned()))
+                    .copied()
+                else {
+                    continue;
+                };
+                let function_ty = analysis.types.function(sig.clone());
+                method_types.insert(synthetic, function_ty);
+            }
+        }
+    }
+    method_types
+}
 
 struct PackageMirLinkAccumulator {
     targets: NamespaceCallTargets,
@@ -858,16 +927,26 @@ pub(super) fn rewrite_analysis_namespace_calls(
             }
         }
     }
-    if diagnostics.is_empty() {
-        Ok(())
-    } else {
-        Err(diagnostics
+
+    // pkg001-mir-fix: recover the callee function type on every synthetic
+    // namespace-call target the rewrites above installed, so the radix MIR
+    // lowerer can emit the try-call for failable library calls (a callee
+    // without a type cannot be distinguished from a non-failable call and the
+    // cape handler's blocks orphan).
+    if !diagnostics.is_empty() {
+        return Err(diagnostics
             .into_iter()
             .map(|message| {
                 crate::package_diagnostic_error(message).with_file(unit_path.display().to_string())
             })
-            .collect())
+            .collect());
     }
+    let method_types = synthetic_namespace_function_types(unit_path, analysis, targets);
+    if !method_types.is_empty() {
+        walk_program_mut(&mut SyntheticCalleeTypePass { method_types: &method_types }, &mut analysis.hir);
+    }
+
+    Ok(())
 }
 
 pub(super) fn rewrite_block(
