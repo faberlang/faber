@@ -30,7 +30,7 @@ fn dev_norma_library_home() -> PathBuf {
             return candidate.to_path_buf();
         }
     }
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("..")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..")
 }
 
 const LOCAL_MAIN: &str = "importa ex \"./util\" privata * ut utilModule\n\nfunctio run() → textus {\n    redde utilModule.salutare()\n}\n\nincipit {\n    nota utilModule.salutare()\n}\n";

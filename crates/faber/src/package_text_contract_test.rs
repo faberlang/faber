@@ -9,14 +9,16 @@ use super::{check_package, config_with_locale};
 use radix::codegen::Target;
 use radix::diagnostics::{Diagnostic, DiagnosticArg};
 use radix::locale::LocalePack;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 const ISSUE_INITIALIZER_ANNOTATION_MISMATCH: &str = "initializer_annotation_mismatch";
 const BIDI_ISOLATE_START: &str = "\u{2068}";
 const BIDI_ISOLATE_END: &str = "\u{2069}";
 
 fn locale_examples_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale")
+    crate::reference_pack_test_support::faberlang_home()
+        .expect("faberlang container root")
+        .join("examples/reader-locale")
 }
 
 fn locale_fault_path(locale: &str, rel: &str) -> PathBuf {

@@ -175,7 +175,7 @@ fn run_args(
 #[test]
 fn interpret_policy_defaults_to_single_fab_file() {
     let fab =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../radix/corpus/incipit/salve-munde.fab");
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus/incipit/salve-munde.fab");
     let args = run_args(
         fab.clone(),
         false,
@@ -271,7 +271,9 @@ fn locale_forces_compiled_run_policy_for_single_fab_file() {
 
 #[test]
 fn run_config_loads_locale_pack_for_go_targets() {
-    let example = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale/th-TH");
+    let example = crate::reference_pack_test_support::faberlang_home()
+        .expect("faberlang container root")
+        .join("examples/reader-locale/th-TH");
 
     let config = run_config(
         Target::HirGo,
@@ -294,7 +296,9 @@ fn run_config_loads_locale_pack_for_go_targets() {
 
 #[test]
 fn run_config_uses_manifest_locale_for_non_rust_targets() {
-    let example = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale/th-TH");
+    let example = crate::reference_pack_test_support::faberlang_home()
+        .expect("faberlang container root")
+        .join("examples/reader-locale/th-TH");
 
     let config = run_config(Target::MirFmir, &example, None, None, WarnPolicy::default())
         .expect("run config");
