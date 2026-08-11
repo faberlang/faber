@@ -1,0 +1,20 @@
+[Unit]
+Description=Faber per-lane e2e grid (Tier 1 report-only, EL-5)
+Documentation=faber/docs/factory/per-lane-e2e-validation/delivery.md
+After=network-online.target
+
+[Service]
+Type=oneshot
+# The lane-grid checkout lives at the provisioned grid root; the runner
+# resolves origin/main (the pharos private mirror, refreshed from burgus by
+# faber/scripta/lane-grid-provision). Receipts + standing status land under
+# the checkout so a provisioned faber docs tree carries the evidence.
+ExecStart=/home/ianzepp/work/lane-grid/faber/scripta/lane-grid-run --root /home/ianzepp/work/lane-grid --status docs/factory/per-lane-e2e-validation/grid-status.md --receipts-dir /home/ianzepp/work/lane-grid/receipts --timeout-min 120
+Environment=PATH=/home/ianzepp/.cargo/bin:/home/ianzepp/.local/bin:/home/ianzepp/swift/usr/bin:/usr/local/bin:/usr/bin:/bin
+Nice=10
+IOSchedulingClass=idle
+
+[Install]
+# User services enable under default.target (multi-user.target is the system
+# equivalent; the timer is the real trigger, this lets `enable` work cleanly).
+WantedBy=default.target

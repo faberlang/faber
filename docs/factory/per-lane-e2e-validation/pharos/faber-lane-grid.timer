@@ -1,0 +1,11 @@
+[Unit]
+Description=Nightly Faber per-lane e2e grid (Tier 1 report-only, EL-5)
+
+[Timer]
+# Nightly at 03:10 host time; persistent catches up after downtime.
+OnCalendar=*-*-* 03:10:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

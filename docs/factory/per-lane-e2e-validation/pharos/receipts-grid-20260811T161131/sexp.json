@@ -1,0 +1,24 @@
+{
+  "duration_s": 189.0,
+  "error": null,
+  "exit_code": 101,
+  "feature": "mir-sexp",
+  "head": "4410b441986c809a8f4301faafb2a9666dd5e6c4",
+  "kind": "e2e",
+  "lane": "sexp",
+  "log": "/home/ianzepp/work/lane-grid-hand6/receipts/grid-20260811T161131/sexp.log",
+  "run": "grid-20260811T161131",
+  "sibling_pins": {
+    "cista": "935528820653f0b3cd28e63c9d21ac7db90add65",
+    "examples": "<absent>",
+    "faber-runtime": "5a525e323b4f34dc2f3c57ce6d78acefee3ffb5d",
+    "hosts": "6ff374b5e0a0ca3dbddde105b1341863a3c1d7d2",
+    "norma": "<absent>",
+    "radix": "9a5085511e68cae0e53a12ab960bc60f256763d1"
+  },
+  "started_at": "2026-08-11T16:21:21.327786+00:00",
+  "status": "red",
+  "test_summary": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 16 filtered out; finished in 186.93s",
+  "tests_ran": 0,
+  "tool_probe": {}
+}
