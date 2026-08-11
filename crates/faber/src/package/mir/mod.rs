@@ -373,6 +373,10 @@ use remap::*;
 use requirements::*;
 use sources::*;
 
+// The LLVM package-emission lane (package/llvm.rs) canonicalizes direct
+// definition callees before the host-partition boundary-ABI gate.
+pub(crate) use lower::canonicalize_direct_definition_callees;
+
 #[cfg(test)]
 pub(crate) use driver::with_interpreted_lowered_package_mir;
 #[allow(unused_imports)] // external backend harnesses consume the public package-MIR callback.

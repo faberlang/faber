@@ -178,6 +178,11 @@ fn prepare_package_mir<R>(
         &cli_plan,
         config.no_fuse,
     )?;
+    // The radix-air lowering emits every call as a `Definition` edge; the
+    // boundary-ABI lane only admits direct-call shapes, so unambiguous
+    // single-target definition edges are canonicalized to `Function` callees
+    // before the final validation gate.
+    canonicalize_direct_definition_callees(&mut lowered, &entry_path)?;
     validate_program(&lowered.program, lowered.validated.validation()).map_err(|errors| {
         errors
             .into_iter()

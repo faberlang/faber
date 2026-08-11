@@ -967,7 +967,7 @@ functio text() → textus {
     assert_eq!(first_manifest, second_manifest);
     assert_eq!(
         first_manifest,
-        r#"version = 6
+        r#"version = 7
 target = "scena"
 entry = "main.fab"
 entry_function = "run_entry"
@@ -1403,7 +1403,7 @@ fn package_fmir_text_image_rejects_bad_version_without_source_fallback() {
     assert!(diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "fmir_text_image_version_unsupported")
             && diagnostic_has_arg(diag, "actual", "999")
-            && diagnostic_has_arg(diag, "expected", "6")
+            && diagnostic_has_arg(diag, "expected", "7")
     }));
     assert!(host.stdout_lines.is_empty());
 }
@@ -1723,7 +1723,7 @@ fn package_fmir_image_rejects_bad_version_without_source_fallback() {
     assert!(diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "fmir_image_version_unsupported")
             && diagnostic_has_arg(diag, "actual", "99")
-            && diagnostic_has_arg(diag, "expected", "6")
+            && diagnostic_has_arg(diag, "expected", "7")
     }));
     assert!(host.stdout_lines.is_empty());
 }
@@ -12361,13 +12361,12 @@ incipit {{
 }
 
 // ---------------------------------------------------------------------------
-// R0 red artifact contract: FMIR text/binary artifact version 4
+// R0 red artifact contract: FMIR text/binary artifact version
 //
-// The device payload (`FmirDeviceSection`, N1.7) is an approved clean
-// artifact version break: `PACKAGE_MIR_ARTIFACT_VERSION` moves 3 → 4,
-// version-4 images round-trip, and version-3 or future images keep failing
-// closed through the existing exact-version gate. These tests compile against
-// the current public crate API and fail until S1-5 lands the version bump.
+// `PACKAGE_MIR_ARTIFACT_VERSION` is the exact-version gate for package MIR
+// images. The version is a clean-break pin: version-7 images round-trip,
+// and older (2) or future (999) images fail closed through the existing
+// exact-version gate with the expected-version diagnostic.
 // ---------------------------------------------------------------------------
 
 fn rewrite_text_image_version(text: &str, version: u32) -> String {
@@ -12377,6 +12376,7 @@ fn rewrite_text_image_version(text: &str, version: u32) -> String {
         "version = 4",
         "version = 5",
         "version = 6",
+        "version = 7",
     ] {
         if text.contains(current) {
             return text.replacen(current, &format!("version = {version}"), 1);
@@ -12389,7 +12389,7 @@ fn rewrite_binary_image_version(bytes: &mut [u8], version: u8) {
     assert!(
         matches!(
             bytes.first(),
-            Some(2) | Some(3) | Some(4) | Some(5) | Some(6)
+            Some(2) | Some(3) | Some(4) | Some(5) | Some(6) | Some(7)
         ),
         "binary image must start with a recognizable artifact version varint"
     );
@@ -12397,10 +12397,10 @@ fn rewrite_binary_image_version(bytes: &mut [u8], version: u8) {
 }
 
 #[test]
-fn package_fmir_text_image_is_artifact_version_6() {
-    let dir = test_temp_dir("package-fmir-text-v6");
+fn package_fmir_text_image_is_artifact_version_7() {
+    let dir = test_temp_dir("package-fmir-text-v7");
     let entry = dir.join("main.fab");
-    fs::write(&entry, "incipit { nota \"v6\" }").expect("write entry");
+    fs::write(&entry, "incipit { nota \"v7\" }").expect("write entry");
 
     let image =
         build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
@@ -12408,16 +12408,16 @@ fn package_fmir_text_image_is_artifact_version_6() {
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
 
     assert!(
-        image_text.contains("version = 6"),
-        "fmir-text image must declare artifact version 6:\n{image_text}"
+        image_text.contains("version = 7"),
+        "fmir-text image must declare artifact version 7:\n{image_text}"
     );
 }
 
 #[test]
-fn package_fmir_image_is_artifact_version_6() {
-    let dir = test_temp_dir("package-fmir-v6");
+fn package_fmir_image_is_artifact_version_7() {
+    let dir = test_temp_dir("package-fmir-v7");
     let entry = dir.join("main.fab");
-    fs::write(&entry, "incipit { nota \"v6\" }").expect("write entry");
+    fs::write(&entry, "incipit { nota \"v7\" }").expect("write entry");
 
     let image = build_package_fmir_image(
         &Config::default().with_target(Target::MirFmirBinary),
@@ -12429,8 +12429,8 @@ fn package_fmir_image_is_artifact_version_6() {
     let summary = fmir_image_test_summary(&bytes, &image.image_path).expect("summarize fmir image");
 
     assert_eq!(
-        summary.version, 6,
-        "fmir image must declare artifact version 6"
+        summary.version, 7,
+        "fmir image must declare artifact version 7"
     );
 }
 
@@ -12453,12 +12453,12 @@ fn package_fmir_text_image_rejects_version_2_images() {
 
     let mut host = BufferHost::default();
     let diagnostics = run_package_fmir_text_image(&image, &mut host)
-        .expect_err("version-2 fmir-text images must fail closed under the version-6 schema");
+        .expect_err("version-2 fmir-text images must fail closed under the version-7 schema");
 
     assert!(diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "fmir_text_image_version_unsupported")
             && diagnostic_has_arg(diag, "actual", "2")
-            && diagnostic_has_arg(diag, "expected", "6")
+            && diagnostic_has_arg(diag, "expected", "7")
     }));
     assert!(host.stdout_lines.is_empty());
 }
@@ -12487,7 +12487,7 @@ fn package_fmir_text_image_rejects_future_versions() {
     assert!(diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "fmir_text_image_version_unsupported")
             && diagnostic_has_arg(diag, "actual", "999")
-            && diagnostic_has_arg(diag, "expected", "6")
+            && diagnostic_has_arg(diag, "expected", "7")
     }));
     assert!(host.stdout_lines.is_empty());
 }
@@ -12511,12 +12511,12 @@ fn package_fmir_image_rejects_version_2_images() {
 
     let mut host = BufferHost::default();
     let diagnostics = run_package_fmir_image(&image, &mut host)
-        .expect_err("version-2 fmir images must fail closed under the version-6 schema");
+        .expect_err("version-2 fmir images must fail closed under the version-7 schema");
 
     assert!(diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "fmir_image_version_unsupported")
             && diagnostic_has_arg(diag, "actual", "2")
-            && diagnostic_has_arg(diag, "expected", "6")
+            && diagnostic_has_arg(diag, "expected", "7")
     }));
     assert!(host.stdout_lines.is_empty());
 }
@@ -12545,7 +12545,7 @@ fn package_fmir_image_rejects_future_versions() {
     assert!(diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "fmir_image_version_unsupported")
             && diagnostic_has_arg(diag, "actual", "99")
-            && diagnostic_has_arg(diag, "expected", "6")
+            && diagnostic_has_arg(diag, "expected", "7")
     }));
     assert!(host.stdout_lines.is_empty());
 }

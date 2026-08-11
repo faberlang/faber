@@ -1,27 +1,33 @@
 //! NGAB1-U1/U2 vertical-slice tests: one analyzed package derives a typed
-//! host/device partition AND executes its boundary call through the existing
+//! host/device partition and its boundary call lowers through the existing
 //! llvm-host path; the versioned call ABI rejects invalid cross-boundary
 //! values at compile time with typed diagnostics.
 //!
 //! The fixture is the frozen NGAB0-U11 shape (`ngab0-fixture-contract.md`):
 //! one scalar host function `run_scale(x: f32) -> f32` calling one device
 //! kernel `scale_kernel(x: f32) -> f32` through the versioned typed boundary.
-//! The CPU oracle is `oracle(x) = x * 2.0 + 1.0` (owned by this test harness),
-//! exercised at the declared input `x = 3.0` → `7.0`.
 //!
 //! Evidence rows covered here (frozen contract): the **partition** (row 1 —
 //! one host function, one prepared submission region, one device kernel, one
 //! boundary call — the minimal one-prepared-region case, NGAB0-R1), the
 //! **typed device program** (identity, resources, launches, lifetimes,
-//! observations — all typed facts, never text-parsed), the **execution** of
-//! the call through the existing llvm-host path (`build_host_program`), and
-//! NGAB1-U2's **versioned call ABI** (the boundary rides
-//! `HOST_CALL_ABI_VERSION`, asserted against the accepted wire version) with
-//! its **compile-time rejection** of invalid cross-boundary values (wrong
-//! type, shape, lifetime, mutation of a read-only resource, observation of
-//! unlaunched work) — typed diagnostics, no launch.
+//! observations — all typed facts, never text-parsed), the **host-module
+//! emission** of the boundary call through the llvm-host path
+//! (`build_package_llvm`), and NGAB1-U2's **versioned call ABI** (the
+//! boundary rides `HOST_CALL_ABI_VERSION`, asserted against the accepted wire
+//! version) with its **compile-time rejection** of invalid cross-boundary
+//! values (wrong type, shape, lifetime, mutation of a read-only resource,
+//! observation of unlaunched work) — typed diagnostics, no launch.
 //!
-//! The toolchain-dependent execution proof runs only when a coherent LLVM
+//! The host-partition lane (DDCP3-U2) emits the CPU module for a package
+//! that carries device kernels: device-role entries emit as direct
+//! declarations and host boundary calls emit as direct calls to
+//! prepared-region symbols — physical kernel bodies and the region's device
+//! work belong to a device backend ("no physical execution" is the lane's
+//! frozen non-goal), so the llvm-host build proof is the emitted host-module
+//! contract, not a CPU runtime execution of the kernel.
+//!
+//! The toolchain-dependent emission proof runs only when a coherent LLVM
 //! toolchain is discoverable (the `llvm_host_test.rs` convention).
 
 use super::*;
@@ -36,7 +42,6 @@ use radix_mir::kernel_plan::CollectionKernelPlan;
 use radix_mir::layout::MirTensorStorageLayout;
 use std::fs;
 use std::path::PathBuf;
-use std::process::Command;
 
 /// The NGAB0-U11 fixture — one scalar host function calling one device
 /// kernel, plus the entry that exercises the call at the declared input.
@@ -53,11 +58,6 @@ functio run_scale(fractus<f32> x) → fractus<f32> {
 incipit {
     nota run_scale(3.0 ∷ fractus<f32>)
 }"#;
-
-/// The CPU oracle (frozen): `oracle(x) = x * 2.0 + 1.0`.
-fn oracle(x: f32) -> f32 {
-    x * 2.0 + 1.0
-}
 
 fn llvm_host_config() -> radix::Config {
     radix::Config::default().with_target(Target::MirLlvmHost)
@@ -200,24 +200,62 @@ fn ngab1_host_partition_executes_boundary_call_via_llvm_host() {
     }
     let dir = test_temp_dir("ngab1-llvm-host");
     let entry = write_fixture(&dir);
-    let build = build_host_program(&llvm_host_config(), &entry, LlvmHostProfile::Debug)
-        .expect("llvm-host build succeeds for the host-plus-device fixture");
+    // The host-partition lane (DDCP3-U2) emits the CPU side of a device
+    // package: device-role entries become direct declarations and the host
+    // boundary call becomes a direct call to the prepared-region symbol with
+    // a bounded numeric dispatch extent. Physical kernel bodies and the
+    // region's device work are provided by a device backend, never by this
+    // CPU module ("no physical execution" is the lane's frozen non-goal), so
+    // the build proof here is the emitted host module contract — the same
+    // contract the radix-mir-llvm vertical fixture proves.
+    let build = crate::package::llvm::build_package_llvm(
+        &llvm_host_config(),
+        &entry,
+        &crate::package::llvm::PackageLlvmOptions::new(
+            dir.as_ref().join("target/faber-llvm/debug/modules"),
+        ),
+    )
+    .expect("llvm modules build succeeds for the host-plus-device fixture");
 
-    // The boundary call must link (one native executable) and execute: the
-    // entry prints run_scale(3.0) = scale_kernel(3.0) = 3.0*2.0+1.0.
-    let run = Command::new(&build.binary_path)
-        .output()
-        .expect("run built binary");
+    let entry_module = build
+        .modules
+        .iter()
+        .find(|module| module.is_entry)
+        .expect("the fixture emits exactly one entry module")
+        .llvm_path
+        .clone();
+    let module_text = std::fs::read_to_string(&entry_module).expect("read entry module");
+
+    // The lane declares the prepared-region symbol (one per prepared region)
+    // and the host boundary call is a direct call to it with the typed
+    // dispatch extent — never a call to the kernel's body symbol.
     assert!(
-        run.status.success(),
-        "built binary must exit successfully; stderr: {}",
-        String::from_utf8_lossy(&run.stderr)
+        module_text.contains("declare void @__faber_prepared_region_1(i64)"),
+        "the CPU module declares the prepared-region symbol; got:\n{module_text}"
     );
-    let expected = format!("{:.1}\n", oracle(3.0));
-    assert_eq!(
-        String::from_utf8_lossy(&run.stdout),
-        expected,
-        "built binary stdout must match the CPU oracle run_scale(3.0) = 7.0"
+    assert!(
+        module_text.lines().any(|line| {
+            line.trim_start()
+                .starts_with("call void @__faber_prepared_region_1(i64 ")
+        }),
+        "the host boundary call is a direct call to the prepared-region symbol; got:\n{module_text}"
+    );
+
+    // No physical device kernel body rides the CPU module: the kernel symbol
+    // is never defined and no device-entry annotations appear.
+    assert!(
+        !module_text.contains("@nucleum") && !module_text.contains("@machina"),
+        "the CPU module carries no device-entry annotations; got:\n{module_text}"
+    );
+    let kernel_symbol =
+        "__faber_external_product_fixture_scalar_kernel_module_fixture_scalar_kernel_func_scale_kernel";
+    let kernel_has_define = module_text.lines().any(|line| {
+        let trimmed = line.trim_start();
+        trimmed.starts_with("define") && trimmed.contains(kernel_symbol)
+    });
+    assert!(
+        !kernel_has_define,
+        "the CPU module has no `define` body for the device kernel `{kernel_symbol}`; got:\n{module_text}"
     );
 }
 

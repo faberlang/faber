@@ -415,6 +415,20 @@ pub(crate) fn library_resolver_for_package(
             );
         }
     }
+    // A package that declares `[library] provider = "X"` is itself the
+    // provider repo for `X:*` self-imports (faber-web imports `web:dom` from
+    // its own source). Resolve them against the package's own source root so
+    // a provider repo whose checkout name differs from its provider name
+    // (`faber-web` vs `web`) still analyzes; a lock entry always wins.
+    if let Some(library) = manifest.library.as_ref() {
+        locked.entry(library.provider.clone()).or_insert_with(|| {
+            crate::library::LockedLibraryPackage {
+                name: manifest.package.name.clone(),
+                version: manifest.package.version.clone(),
+                interface_root: package_root.join(&manifest.paths.source),
+            }
+        });
+    }
     resolver = resolver.with_package_lock(manifest.dependencies, locked);
     Ok(resolver)
 }

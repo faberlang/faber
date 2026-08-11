@@ -176,11 +176,11 @@ pub(super) fn rewrite_place_sources(
 ) {
     for projection in &mut place.projections {
         match projection {
-            MirProjection::VariantField { variant, .. } => {
-                if let Some(rewritten) = rewritten_source(unit_path, *variant, source_rewrites) {
-                    *variant = rewritten;
-                }
-            }
+            // Variant DefIds are not function sources: they ride the nominal
+            // variant remap (`rewrite_lowered_variant_defs`), never the
+            // function-source rewrite — a colliding source id in the rewrite
+            // map would corrupt the variant identity with a synthetic id.
+            MirProjection::VariantField { .. } => {}
             MirProjection::ClosureCapture { source, .. } => {
                 if let Some(rewritten) = rewritten_source(unit_path, *source, source_rewrites) {
                     *source = rewritten;
@@ -278,11 +278,10 @@ pub(super) fn rewrite_option_chain_sources(
     source_rewrites: &SourceRewrites,
 ) {
     match link {
-        MirOptionChainLink::VariantField { variant, .. } => {
-            if let Some(rewritten) = rewritten_source(unit_path, *variant, source_rewrites) {
-                *variant = rewritten;
-            }
-        }
+        // Variant DefIds are not function sources (see
+        // `rewrite_place_sources`); the option-chain variant field stays
+        // identity-mapped like a plain field.
+        MirOptionChainLink::VariantField { .. } | MirOptionChainLink::Field(_) => {}
         MirOptionChainLink::Index(operand) => {
             rewrite_operand_sources(operand, unit_path, source_rewrites)
         }
@@ -292,6 +291,5 @@ pub(super) fn rewrite_option_chain_sources(
                 rewrite_operand_sources(arg, unit_path, source_rewrites);
             }
         }
-        MirOptionChainLink::Field(_) => {}
     }
 }

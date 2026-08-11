@@ -611,15 +611,16 @@ fn record_field_string(
 
 // R0 red artifact contract: the operator-authorized package-seam breaks
 // moved the package MIR artifact version 4 → 5 (typed complete-program wire,
-// S3-A4) and 5 → 6 (the Stage 3R F1–F7 frozen contract: semantic identities,
+// S3-A4), 5 → 6 (the Stage 3R F1–F7 frozen contract: semantic identities,
 // generations, roots/dependencies, relations, and the independent
-// initialization/observation axes, S2). No dual-format reader exists; v5
-// images fail admission closed.
+// initialization/observation axes, S2), and 6 → 7 (the frozen DeviceArtifact
+// packet shape, DDCP2-U2). No dual-format reader exists; non-current images
+// fail admission closed.
 #[test]
-fn package_mir_artifact_version_is_6_for_carried_semantics_schema() {
+fn package_mir_artifact_version_is_7_for_carried_semantics_schema() {
     assert_eq!(
-        PACKAGE_MIR_ARTIFACT_VERSION, 6,
-        "the carried F1–F7 semantics require the FMIR artifact version 6 clean break"
+        PACKAGE_MIR_ARTIFACT_VERSION, 7,
+        "the carried semantics schema require the FMIR artifact version 7 clean break"
     );
 }
 

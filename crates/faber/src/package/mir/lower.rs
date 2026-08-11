@@ -1216,6 +1216,60 @@ pub(super) fn ensure_unique_definition_sources(
     Ok(())
 }
 
+/// Canonicalize direct `Definition` callees into `Function` callees in the
+/// merged program.
+///
+/// The radix-air lowering emits `MirCallee::Definition { source, type_args }`
+/// for every call edge. The boundary-ABI lane (DDCP3-U5) admits exactly the
+/// direct-call shapes — `Function`, function-constant `Value`, and `Closure`
+/// — and rejects `Definition` callees as an unsupported callsite shape before
+/// emission. A definition edge with no type arguments that resolves to
+/// exactly one function in the merged program IS a direct call; rewriting it
+/// to `MirCallee::Function` keeps the boundary lane's single emitted form
+/// while preserving call identity. Generic (typed) or ambiguous edges stay
+/// `Definition` and are still rejected by the gate when they cross a
+/// boundary.
+pub(crate) fn canonicalize_direct_definition_callees(
+    lowered: &mut LoweredMirUnit<'_>,
+    diagnostic_path: &Path,
+) -> Result<(), Vec<Diagnostic>> {
+    let mut direct_sources = HashMap::new();
+    let mut ambiguous = HashSet::new();
+    for function in &lowered.program.functions {
+        let Some(source) = function.source else {
+            continue;
+        };
+        if ambiguous.contains(&source) {
+            continue;
+        }
+        if direct_sources.insert(source, function.id).is_some() {
+            direct_sources.remove(&source);
+            ambiguous.insert(source);
+        }
+    }
+
+    for function in &mut lowered.program.functions {
+        for block in &mut function.blocks {
+            for statement in &mut block.statements {
+                let MirStatementKind::Call { callee, .. } = &mut statement.kind else {
+                    continue;
+                };
+                let MirCallee::Definition { source, type_args } = callee else {
+                    continue;
+                };
+                if !type_args.is_empty() {
+                    continue;
+                }
+                if let Some(id) = direct_sources.get(source) {
+                    *callee = MirCallee::Function(*id);
+                }
+            }
+        }
+    }
+
+    rebuild_merged_validated(lowered, diagnostic_path)
+}
+
 pub(super) fn shift_program_ids(
     program: &mut MirProgram,
     closure_environments: &mut [MirClosureEnvironment],
@@ -1526,8 +1580,211 @@ fn prune_unreachable_library_functions(
             }
             program.functions.retain(|function| keep.contains(&function.id));
             environments.retain(|environment| referenced_environments.contains(&environment.id));
+            // The reachability pruning leaves function-id gaps; the merge
+            // shift assumes each appended program's ids are zero-based and
+            // contiguous, so re-index the kept functions before merging.
+            reindex_function_ids(program, environments);
         }
         break;
+    }
+}
+
+/// Compact a pruned library program's function ids to a contiguous 0..K
+/// range and remap every function-id reference.
+///
+/// `prune_unreachable_library_functions` removes unreachable functions,
+/// leaving id gaps. `append_shifted_parts` later shifts an appended program
+/// by the current merged length and assumes the appended program's ids were
+/// zero-based and contiguous — with gaps, two appended programs can land on
+/// the same shifted id (duplicate MIR function ids in the merged program).
+/// Block/local/temp ids stay per-function-scoped and untouched here; the
+/// merge's uniform shift handles them.
+fn reindex_function_ids(
+    program: &mut MirProgram,
+    environments: &mut [MirClosureEnvironment],
+) {
+    let mut remap = HashMap::new();
+    for (index, function) in program.functions.iter().enumerate() {
+        remap.insert(function.id, MirFunctionId(index as u32));
+    }
+    let contiguous = program
+        .functions
+        .iter()
+        .enumerate()
+        .all(|(index, function)| function.id.0 == index as u32);
+    if contiguous {
+        return;
+    }
+    for function in &mut program.functions {
+        function.id = remap[&function.id];
+        for block in &mut function.blocks {
+            for statement in &mut block.statements {
+                remap_statement_function_ids(statement, &remap);
+            }
+            remap_terminator_function_ids(&mut block.terminator, &remap);
+        }
+    }
+    for environment in environments {
+        environment.function = remap[&environment.function];
+    }
+}
+
+fn remap_function_id(id: &mut MirFunctionId, remap: &HashMap<MirFunctionId, MirFunctionId>) {
+    if let Some(next) = remap.get(id) {
+        *id = *next;
+    }
+}
+
+fn remap_constant_function_ids(constant: &mut MirConstant, remap: &HashMap<MirFunctionId, MirFunctionId>) {
+    if let MirConstant::Function(id) = constant {
+        remap_function_id(id, remap);
+    }
+}
+
+fn remap_callee_function_ids(callee: &mut MirCallee, remap: &HashMap<MirFunctionId, MirFunctionId>) {
+    match callee {
+        MirCallee::Function(id) => remap_function_id(id, remap),
+        MirCallee::Closure(closure) => remap_function_id(&mut closure.function, remap),
+        MirCallee::Value(operand) => remap_operand_function_ids(operand, remap),
+        MirCallee::Definition { .. } => {}
+    }
+}
+
+fn remap_operand_function_ids(operand: &mut MirOperand, remap: &HashMap<MirFunctionId, MirFunctionId>) {
+    if let MirOperand::Constant(constant) = operand {
+        remap_constant_function_ids(constant, remap);
+    }
+}
+
+fn remap_value_function_ids(value: &mut MirValue, remap: &HashMap<MirFunctionId, MirFunctionId>) {
+    match &mut value.kind {
+        MirValueKind::Operand(operand) => remap_operand_function_ids(operand, remap),
+        MirValueKind::Closure(closure) => remap_function_id(&mut closure.function, remap),
+        MirValueKind::Unary { operand, .. } => remap_operand_function_ids(operand, remap),
+        MirValueKind::Binary { lhs, rhs, .. } => {
+            remap_operand_function_ids(lhs, remap);
+            remap_operand_function_ids(rhs, remap);
+        }
+        MirValueKind::Option(op) => remap_option_function_ids(op, remap),
+    }
+}
+
+fn remap_option_function_ids(op: &mut MirOptionOp, remap: &HashMap<MirFunctionId, MirFunctionId>) {
+    match op {
+        MirOptionOp::Some(operand)
+        | MirOptionOp::IsNil(operand)
+        | MirOptionOp::IsNotNil(operand)
+        | MirOptionOp::Unwrap { value: operand, .. } => remap_operand_function_ids(operand, remap),
+        MirOptionOp::Coalesce { value, fallback } => {
+            remap_operand_function_ids(value, remap);
+            remap_operand_function_ids(fallback, remap);
+        }
+        MirOptionOp::Chain { base, link } => {
+            remap_operand_function_ids(base, remap);
+            remap_option_chain_link_function_ids(link, remap);
+        }
+        MirOptionOp::None => {}
+    }
+}
+
+fn remap_option_chain_link_function_ids(
+    link: &mut MirOptionChainLink,
+    remap: &HashMap<MirFunctionId, MirFunctionId>,
+) {
+    match link {
+        MirOptionChainLink::Field(_) | MirOptionChainLink::VariantField { .. } => {}
+        MirOptionChainLink::Index(operand) => remap_operand_function_ids(operand, remap),
+        MirOptionChainLink::Call { callee, args } => {
+            remap_callee_function_ids(callee, remap);
+            for arg in args {
+                remap_operand_function_ids(arg, remap);
+            }
+        }
+    }
+}
+
+fn remap_aggregate_function_ids(
+    aggregate: &mut MirAggregate,
+    remap: &HashMap<MirFunctionId, MirFunctionId>,
+) {
+    match &mut aggregate.fields {
+        MirAggregateFields::Ordered(items) => {
+            for item in items {
+                match item {
+                    MirAggregateItem::Operand(operand) | MirAggregateItem::Spread(operand) => {
+                        remap_operand_function_ids(operand, remap);
+                    }
+                }
+            }
+        }
+        MirAggregateFields::Named(items) => {
+            for item in items {
+                remap_operand_function_ids(&mut item.value, remap);
+            }
+        }
+        MirAggregateFields::Keyed(items) => {
+            for item in items {
+                remap_operand_function_ids(&mut item.key, remap);
+                remap_operand_function_ids(&mut item.value, remap);
+            }
+        }
+    }
+}
+
+fn remap_switch_case_function_ids(
+    case: &mut MirSwitchCase,
+    remap: &HashMap<MirFunctionId, MirFunctionId>,
+) {
+    remap_constant_function_ids(&mut case.value, remap);
+}
+
+fn remap_statement_function_ids(
+    statement: &mut MirStatement,
+    remap: &HashMap<MirFunctionId, MirFunctionId>,
+) {
+    match &mut statement.kind {
+        MirStatementKind::Assign { value, .. } => remap_value_function_ids(value, remap),
+        MirStatementKind::Call { callee, args, .. } => {
+            remap_callee_function_ids(callee, remap);
+            for arg in args {
+                remap_operand_function_ids(arg, remap);
+            }
+        }
+        MirStatementKind::RuntimeCall { call, .. } => {
+            for arg in &mut call.args {
+                remap_operand_function_ids(arg, remap);
+            }
+        }
+        MirStatementKind::Construct { aggregate, .. } => {
+            remap_aggregate_function_ids(aggregate, remap);
+        }
+    }
+}
+
+fn remap_terminator_function_ids(
+    terminator: &mut MirTerminator,
+    remap: &HashMap<MirFunctionId, MirFunctionId>,
+) {
+    match &mut terminator.kind {
+        MirTerminatorKind::Return(Some(operand)) | MirTerminatorKind::ReturnError(operand) => {
+            remap_operand_function_ids(operand, remap);
+        }
+        MirTerminatorKind::TryCall { callee, args, .. } => {
+            remap_callee_function_ids(callee, remap);
+            for arg in args {
+                remap_operand_function_ids(arg, remap);
+            }
+        }
+        MirTerminatorKind::Branch { condition, .. } => remap_operand_function_ids(condition, remap),
+        MirTerminatorKind::Switch { value, cases, .. } => {
+            remap_operand_function_ids(value, remap);
+            for case in cases {
+                remap_switch_case_function_ids(case, remap);
+            }
+        }
+        MirTerminatorKind::Return(None)
+        | MirTerminatorKind::Goto(_)
+        | MirTerminatorKind::Unreachable => {}
     }
 }
 
