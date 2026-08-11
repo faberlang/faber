@@ -1,6 +1,6 @@
 # Decision Ledger — Faber Onboarding Stage 1: Dev Kit And Distribution Contract
 
-**Status**: active — Stage 1 decision records accepted (delivery `f77180e`); Stage 2 delivery lowered ([delivery-stage2.md](delivery-stage2.md)), ready for delivery
+**Status**: active — Stage 1 decision records accepted (delivery `f77180e`); Stage 2 delivered; Stage 3 A6 OQ8 revisit closed **explicitly-deferred-with-owner** (2026-08-11)
 **Campaign**: [faber-onboarding](CAMPAIGN.md) — Stage 1 of 10
 **Delivery spec**: [delivery-stage1.md](delivery-stage1.md) (commit `f77180e`)
 **Evidence base**: [golden-path-inventory.md](golden-path-inventory.md) (commit `36e6880d`), evidence E1–E20, lie list G1–G12, §8 handoff
@@ -33,7 +33,7 @@ Every decision row carries a marking — `accepted` | `explicitly-deferred-with-
 | OQ5 | Default newcomer execution | answered-by-evidence (state) + needs-stage-1-decision (choice) | **accepted** — default target = portable FHIR→FMIR, effective when released; until then the documented default is the released execution path with explicit prerequisites. See gate 3 below. | E4, E10; release-and-portable-default stages 3/6 |
 | OQ6 | Dependency graph | carried-to-stage-1 | **accepted** — manifest declares direct deps; lock records the resolved transitive closure with content identity + compatibility bounds; package manifest carries transitive metadata. See `package-and-lock-contract.md`. | E14; provisional choice 4 |
 | OQ7 | Init language surface | answered-by-evidence | **accepted** — default scaffold stays Latin `Salve, munde!`; locale-parameterized init **explicitly deferred with owner** `default-en-locale` (related campaign) + onboarding Stage 8 documentation. | E1, E4 |
-| OQ8 | macOS-native value | carried-to-stage-1 | **explicitly-deferred-with-owner** — no `.pkg`/`.dmg` in this stage; owner = faber-onboarding Stage 3 (revisit after primary channel lifecycle lands), conditions per provisional choice 2; signing/notarization leg owned by `component-release-streamline`. See `install-channel-matrix.md`. | E3, E17 |
+| OQ8 | macOS-native value | carried-to-stage-1 → Stage 3 A6 revisit | **explicitly-deferred-with-owner** (Stage 3 A6, 2026-08-11) — archive lifecycle A1–A5 landed; no real OS integration beyond the archive installer is named; a drag-a-CLI `.dmg` still has no value; no signing/notarization identity exists (do not invent one). No `.pkg`/`.dmg` artifact; native channel is **not** labeled supported. **Reopen owners:** prerequisite = `component-release-streamline` (controlled signing identity + notarization path per `platform-builder-matrix.md` / release-contract); product acceptance = faber-onboarding only when (1) that signer exists **and** (2) a concrete OS-integration need the archive cannot meet is named, without forking the payload layout or library model. See `install-channel-matrix.md`. | E3, E17; A1–A5 landed; platform-builder-matrix "none today" |
 | OQ9 | Deferred platforms | answered-by-evidence + needs-stage-1-decision (slice) | **accepted** — supported slice = macOS arm64 + Linux x86_64; Windows and macOS Intel are named residuals (no artifact, no clean-room worker). See `platform-matrix.md`. | E3, E17; gate 3 |
 
 ---
@@ -46,7 +46,7 @@ Every decision row carries a marking — `accepted` | `explicitly-deferred-with-
 
 ### Gate decision 2 — Which install channel is primary?
 
-**Accepted: GitHub prebuilt archive is the primary channel; Homebrew is non-authoritative.** Evidence: the GitHub prebuilt archive is the only channel with a current artifact and verified checksums (E1, E3); Homebrew is explicitly non-authoritative on the site and the observed formula is 0.38.0-era (E19). Verified `curl` bootstrap is a convenience installer for the same release payload, never a second release system (CAMPAIGN Stage 3 overlap rule). Homebrew is a secondary presentation of the same payload/version, labeled non-authoritative with a formula-lag policy (G7 → faber Stage 3). macOS-native packaging is deferred (OQ8). See `install-channel-matrix.md`.
+**Accepted: GitHub prebuilt archive is the primary channel; Homebrew is non-authoritative.** Evidence: the GitHub prebuilt archive is the only channel with a current artifact and verified checksums (E1, E3); Homebrew is explicitly non-authoritative on the site and the observed formula is 0.38.0-era (E19). Verified `curl` bootstrap is a convenience installer for the same release payload, never a second release system (CAMPAIGN Stage 3 overlap rule). Homebrew is a secondary presentation of the same payload/version, labeled non-authoritative with a formula-lag policy (G7 → faber Stage 3). macOS-native packaging remains **explicitly deferred** after Stage 3 A6 OQ8 revisit — no `.pkg`/`.dmg`, never "supported" without Gatekeeper/notarization (OQ8). See `install-channel-matrix.md`.
 
 ### Gate decision 3 — Default execution target for newcomers
 
