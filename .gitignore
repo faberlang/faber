@@ -2,6 +2,7 @@
 target/
 .DS_Store
 tmp/
+/dist/
 
 # Swift compiler artifacts (local SC emit/e2e pollution)
 *.swiftmodule
