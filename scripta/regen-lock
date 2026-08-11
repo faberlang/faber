@@ -1,12 +1,24 @@
 #!/usr/bin/env python3
-"""Regenerate and verify the faber Cargo.lock for a release (F2).
+"""Regenerate and verify the faber Cargo.lock for a release (F2 / L2).
 
 The observed failure mode F2 (stage0-baseline.md §5) is tagging a commit
 whose lockfile is stale — `--locked` then fails with "cannot update the lock
-file". This helper closes that gap:
+file". L2 (release-runbook incident lessons) is the sibling trap: `cargo
+update` in the main tree resolves against local (often newer) siblings, while
+CI builds against the release-manifest pins. This helper closes both gaps:
 
-    ./scripta/regen-lock            # cargo update, then verify freshness
-    ./scripta/regen-lock --check    # verify freshness only, never writes
+    ./scripta/regen-lock                       # cargo update, then verify
+    ./scripta/regen-lock --check               # verify freshness only
+    ./scripta/regen-lock --pinned-siblings     # one-command pin-packet regen
+    ./scripta/regen-lock --pinned-siblings --check   # pin-match + freshness
+
+`--pinned-siblings` is the EL-6 one-command pinned-sibling rehearsal. It
+reads `release-manifest.yaml` source pins, verifies each path-dep sibling
+(radix, cista, faber-runtime, hosts) at `../<name>` is detached/checked out
+at the pin SHA, then regenerates (or checks) the lock. Run it **inside a
+pin packet** (worktree-rehearsal-procedure.md) — never against a main-tree
+layout whose siblings have drifted past the pins. The command is
+worktree-scoped via `--root`; it never touches another checkout's lock.
 
 `--offline` caveat: `cargo update --offline` regenerates the lock from the
 local registry cache only. On a cold machine (cache missing the required
@@ -19,13 +31,15 @@ member's `[package] version` must match its Cargo.lock entry. A mismatch
 means the lock is stale versus the manifests and `--locked` would fail.
 
 Stdlib-only python3 (faber scripta convention). Exit codes: 0 = fresh /
-regenerated, 1 = stale or update failure, 2 = usage error.
+regenerated, 1 = stale / pin mismatch / update failure, 2 = usage error.
 """
 
 from __future__ import annotations
 
 import argparse
 import glob
+import json
+import re
 import subprocess
 import sys
 import tomllib
@@ -33,7 +47,12 @@ from pathlib import Path
 
 REPO_NAME = "faber"
 
-# Module-level alias so unit tests can mock the cargo invocation.
+# Path-dep siblings the faber release layout resolves via ../<name>. The
+# faber source pin itself is intentionally excluded: the bump commit lands
+# on top of the pinned faber source, so HEAD may already be past it.
+PATH_DEP_SIBLINGS = ("radix", "cista", "faber-runtime", "hosts")
+
+# Module-level alias so unit tests can mock the cargo / git invocations.
 subprocess_run = subprocess.run
 
 
@@ -123,15 +142,201 @@ def regen(root: Path, cargo: str, offline: bool) -> tuple[int, str]:
     return 0, "ok: Cargo.lock regenerated and fresh"
 
 
+# ---------------------------------------------------------------------------
+# pinned-sibling rehearsal (EL-6)
+# ---------------------------------------------------------------------------
+
+def _strip_yaml_comment(line: str) -> str:
+    in_dq = False
+    in_sq = False
+    for i, ch in enumerate(line):
+        if ch == '"' and not in_sq:
+            in_dq = not in_dq
+        elif ch == "'" and not in_dq:
+            in_sq = not in_sq
+        elif ch == "#" and not in_dq and not in_sq:
+            if i == 0 or line[i - 1].isspace():
+                return line[:i].rstrip()
+    return line.rstrip()
+
+
+def load_source_pins(manifest_path: Path) -> dict[str, str]:
+    """Return {name: commit} from release-manifest.yaml pinnedInputs.source.
+
+    Accepts JSON (full instance) or the documented YAML subset. Only the
+    source pin rows are required; packs / versionSources are ignored.
+    """
+    text = manifest_path.read_text(encoding="utf-8")
+    if text.lstrip().startswith("{"):
+        data = json.loads(text)
+        rows = data.get("pinnedInputs", {}).get("source", [])
+        pins: dict[str, str] = {}
+        for row in rows:
+            if isinstance(row, dict) and "name" in row and "commit" in row:
+                pins[str(row["name"])] = str(row["commit"])
+        if not pins:
+            raise ValueError(
+                f"{manifest_path}: pinnedInputs.source is empty or missing"
+            )
+        return pins
+
+    # YAML subset: walk source rows under pinnedInputs.source.
+    pins = {}
+    in_source = False
+    current_name: str | None = None
+    for raw in text.splitlines():
+        line = _strip_yaml_comment(raw)
+        if not line.strip():
+            continue
+        stripped = line.strip()
+        # Leave the source block on the next top-level-ish key at indent 0/2
+        # that is not a list item under source.
+        if in_source:
+            if re.match(r"^[A-Za-z]", line) or re.match(r"^  [A-Za-z]", line):
+                # packs: / versionSources: / exclusions: end the source list
+                if not stripped.startswith("- ") and ":" in stripped:
+                    key = stripped.split(":", 1)[0].strip()
+                    if key in ("packs", "versionSources", "exclusions",
+                               "releaseIntent", "schemaVersion", "manifestName",
+                               "preparedAt"):
+                        in_source = False
+                        current_name = None
+            if in_source and stripped.startswith("- name:"):
+                current_name = stripped.split(":", 1)[1].strip().strip("\"'")
+            elif in_source and current_name and stripped.startswith("commit:"):
+                commit = stripped.split(":", 1)[1].strip().strip("\"'")
+                pins[current_name] = commit
+                current_name = None
+            continue
+        if re.match(r"^\s*source:\s*$", line) or re.match(
+            r"^\s*source:\s*\[", line
+        ):
+            in_source = True
+            current_name = None
+            continue
+    if not pins:
+        raise ValueError(
+            f"{manifest_path}: pinnedInputs.source is empty or missing"
+        )
+    return pins
+
+
+def git_head(sibling: Path) -> tuple[int, str]:
+    """Return (rc, HEAD sha or error text) for a sibling checkout."""
+    res = subprocess_run(
+        ["git", "-C", str(sibling), "rev-parse", "HEAD"],
+        text=True,
+        capture_output=True,
+    )
+    if res.returncode != 0:
+        detail = (res.stderr or res.stdout or "").strip()
+        return res.returncode, detail or "git rev-parse failed"
+    return 0, res.stdout.strip()
+
+
+def pins_match(live: str, pinned: str) -> bool:
+    """True when live HEAD matches the pin (full or short SHA)."""
+    if not live or not pinned:
+        return False
+    live = live.lower()
+    pinned = pinned.lower()
+    if live == pinned:
+        return True
+    # Short-SHA pins (schema allows 7+ hex) match a live full SHA prefix.
+    if len(pinned) >= 7 and len(pinned) < len(live) and live.startswith(pinned):
+        return True
+    if len(live) >= 7 and len(live) < len(pinned) and pinned.startswith(live):
+        return True
+    return False
+
+
+def check_pinned_siblings(
+    root: Path, pins: dict[str, str]
+) -> list[str]:
+    """Return pin-mismatch issues for path-dep siblings (empty = match).
+
+    Layout: each sibling lives at ``root.parent / <name>`` — the standard
+    faberlang container / release pin-packet layout
+    (worktree-rehearsal-procedure.md §1).
+    """
+    container = root.parent
+    issues: list[str] = []
+    for name in PATH_DEP_SIBLINGS:
+        pinned = pins.get(name)
+        if not pinned:
+            issues.append(
+                f"pin missing: release-manifest has no source pin for {name}"
+            )
+            continue
+        sibling = (container / name).resolve()
+        if not sibling.is_dir():
+            issues.append(
+                f"sibling missing: {name} expected at {sibling} "
+                f"(run inside a pin packet; see worktree-rehearsal-procedure.md)"
+            )
+            continue
+        if not (sibling / ".git").exists() and not (sibling / ".git").is_file():
+            # Detached worktrees use a .git file; plain dirs without git fail.
+            # Still try rev-parse — git handles both; only fail on the result.
+            pass
+        rc, live = git_head(sibling)
+        if rc != 0:
+            issues.append(
+                f"pin unreadable: {name} at {sibling}: {live}"
+            )
+            continue
+        if not pins_match(live, pinned):
+            issues.append(
+                f"pin mismatch: {name} pin={pinned[:12]}… "
+                f"live={live[:12]}… (regen lock only against the pin packet)"
+            )
+    return issues
+
+
+def resolve_manifest(root: Path, explicit: str | None) -> Path:
+    if explicit:
+        path = Path(explicit)
+        if not path.is_absolute():
+            path = (root / path).resolve()
+        else:
+            path = path.resolve()
+    else:
+        path = (root / "release-manifest.yaml").resolve()
+    if not path.exists():
+        raise FileNotFoundError(f"release manifest not found: {path}")
+    return path
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="regen-lock",
-        description=f"Regenerate and verify the {REPO_NAME} Cargo.lock.",
+        description=(
+            f"Regenerate and verify the {REPO_NAME} Cargo.lock. "
+            "With --pinned-siblings, also verify path-dep siblings match "
+            "release-manifest pins (one-command pin-packet rehearsal)."
+        ),
     )
     parser.add_argument(
         "--check",
         action="store_true",
-        help="verify lock freshness only; never writes and never runs cargo",
+        help="verify only; never writes and never runs cargo",
+    )
+    parser.add_argument(
+        "--pinned-siblings",
+        action="store_true",
+        help=(
+            "one-command pinned-sibling rehearsal: require ../radix, "
+            "../cista, ../faber-runtime, ../hosts to match "
+            "release-manifest.yaml source pins before regen/check (L2)"
+        ),
+    )
+    parser.add_argument(
+        "--manifest",
+        default=None,
+        help=(
+            "path to release-manifest.yaml (default: <root>/release-manifest.yaml); "
+            "only used with --pinned-siblings"
+        ),
     )
     network = parser.add_mutually_exclusive_group()
     network.add_argument(
@@ -165,17 +370,47 @@ def main(argv: list[str] | None = None) -> int:
     if not (root / "Cargo.toml").exists():
         print(f"error: {root} is not a Cargo workspace root", file=sys.stderr)
         return 2
+
+    if args.pinned_siblings:
+        try:
+            manifest = resolve_manifest(root, args.manifest)
+            pins = load_source_pins(manifest)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
+        pin_issues = check_pinned_siblings(root, pins)
+        if pin_issues:
+            for issue in pin_issues:
+                print(f"  pin: {issue}", file=sys.stderr)
+            print(
+                "FAIL: pinned siblings do not match release-manifest "
+                "(L2) — run inside a pin packet at the pinned SHAs",
+                file=sys.stderr,
+            )
+            return 1
+        pin_summary = ", ".join(
+            f"{n}={pins[n][:12]}" for n in PATH_DEP_SIBLINGS if n in pins
+        )
+        print(f"ok: pinned siblings match ({pin_summary})")
+
     if args.check:
         issues = check_fresh(root)
         if not issues:
-            print("ok: Cargo.lock is fresh versus the manifests")
+            if args.pinned_siblings:
+                print("ok: Cargo.lock is fresh versus the manifests "
+                      "(pinned-sibling rehearsal)")
+            else:
+                print("ok: Cargo.lock is fresh versus the manifests")
             return 0
         for issue in issues:
             print(f"  stale: {issue}", file=sys.stderr)
         print("FAIL: Cargo.lock is stale (F2) — run ./scripta/regen-lock",
               file=sys.stderr)
         return 1
+
     code, message = regen(root, args.cargo, args.offline)
+    if code == 0 and args.pinned_siblings:
+        message = "ok: Cargo.lock regenerated against pinned siblings and fresh"
     print(message, file=sys.stderr if code != 0 else sys.stdout)
     return code
 
