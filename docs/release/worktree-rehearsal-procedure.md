@@ -1,18 +1,20 @@
 # Worktree release-rehearsal procedure (operationalized dry run)
 
-**Status:** active — Stage 2 delivery (component-release-streamline)
-**Date-stamped:** 2026-08-07
+**Status:** active — EL-6 rewrite (one-command pinned-sibling rehearsal)
+**Date-stamped:** 2026-08-11
 **Purpose:** the **runnable form** of the Stage-1 recipe
 [`worktree-dry-run-recipe.md`](worktree-dry-run-recipe.md) — exact commands,
 the operator checklist, the pin-matrix generation steps, and the receipt
 schema, with **zero public effect**. This procedure operationalizes the recipe;
-it does not rewrite it. Scripts that automate it are Stage 3.
+it does not rewrite it. The **one-command pinned-sibling lock rehearsal** is
+`./scripta/regen-lock --pinned-siblings` (EL-6; extends the F2 helper).
 **Layout authority:** [`radix/docs/factory/worktree-convention.md`](../../../radix/docs/factory/worktree-convention.md)
 (factory worktree packet discipline) — packet lifecycle is **operator-managed**.
 **Invariants (from the recipe §1):** no tag push, no `gh release`, no remote
 ref change, no public metadata change; no ambient credentials (any step needing
 one emits a `would-*` placeholder); everything lands in the packet's `out/`;
-foreign worktrees are never auto-pruned; the rehearsal never merges to main.
+foreign worktrees are never auto-pruned; the rehearsal never merges to main;
+the lock regen never mutates a checkout outside the packet (`--root` scoped).
 
 > **Foreign-worktree rule:** `exact-output-transfer` and `test-lifecycle-split`
 > are foreign worktrees today, as is any pre-existing
@@ -144,24 +146,38 @@ EOF
 
 ```bash
 cd "${PACKET}/faber"
-# version bump + lockfile regen (local; cargo update index fetch = network)
-#   edit Cargo.toml version = "1.5.0"; then:
-cargo update
+# version bump (local):
+#   edit Cargo.toml version = "1.5.0"
 #   update faber/release-manifest.yaml source pins (§4) + packs rows
 #   (consume the faber-onboarding instance; record pending rows per its shape)
 #   draft notes: docs/release/v1.5.0.md (release record)
+
+# ONE-COMMAND pinned-sibling lock rehearsal (EL-6 / L2):
+# verifies ../radix ../cista ../faber-runtime ../hosts match the manifest
+# pins, then regenerates Cargo.lock against those path deps only.
+./scripta/regen-lock --pinned-siblings
+# verify-only form (no write, no cargo):
+# ./scripta/regen-lock --pinned-siblings --check
+
 git add -A && git commit -m "release(wip): faber v1.5.0 bump + lockfile + manifest (dry-run)"
 ```
 
+A pin mismatch is a **hard stop** — fix the packet (re-detach siblings at the
+pinned SHAs) before regenerating. Never fall back to bare `cargo update` in
+the main tree; that is the L2 trap.
+
 The commit is **local to the packet branch** — the rehearsal never merges it
-to main (recipe §1).
+to main (recipe §1). The command is worktree-scoped: it only writes
+`${PACKET}/faber/Cargo.lock`.
 
 ### Step 3 — Local proof
 
 ```bash
 cd "${PACKET}/faber"
 cargo build --locked --release --bin faber
-./scripta/release-gate --locked-release-build
+# product closeout is operator-only at a real release boundary; the dry-run
+# may skip release-gate and record it under skippedClaims (§6).
+# optional: ./scripta/release-gate --locked-release-build
 # optional compiler/corpus claims: ../radix/scripta/test --full
 # leakgate scan (§7 of this procedure) over the staged dist + receipts
 ```
@@ -355,11 +371,13 @@ A Faber **product** dry-run for `v1.5.0` (dev line, per
 2. **Packet.** `release-dry-run-v1.5.0` created per §2.1 with `faber` writable
    on `factory/release-dry-run-v1.5.0` and the four siblings detached at the
    table's SHAs; every `rev-parse HEAD` matched.
-3. **Prepare.** `Cargo.toml` → `1.5.0`, `cargo update`, manifest pins +
-   pack rows recorded, `docs/release/v1.5.0.md` drafted; single local commit on
-   the packet branch.
-4. **Local proof.** `cargo build --locked --release --bin faber` +
-   `./scripta/release-gate --locked-release-build`; leakage scan clean.
+3. **Prepare.** `Cargo.toml` → `1.5.0`, manifest pins + pack rows recorded,
+   `docs/release/v1.5.0.md` drafted; **`./scripta/regen-lock --pinned-siblings`**
+   (one command) regenerates the lock against the detached siblings; single
+   local commit on the packet branch.
+4. **Local proof.** `cargo build --locked --release --bin faber` against the
+   pins; leakage scan clean. (`release-gate` optional for dry-run; record
+   under `skippedClaims` if not run.)
 5. **Package.** `faber-v1.5.0-aarch64-apple-darwin.tar.gz` + basename-only
    `.sha256` into `out/` (one leg; `x86_64-unknown-linux-gnu` second).
 6. **Plan.** `out/release-plan-v1.5.0.md` records
@@ -372,13 +390,34 @@ A Faber **product** dry-run for `v1.5.0` (dev line, per
 
 ---
 
-## 10. References
+## 10. One-command reference (EL-6)
+
+```bash
+# Inside ${PACKET}/faber (siblings detached at pin SHAs):
+./scripta/regen-lock --pinned-siblings              # regen + verify
+./scripta/regen-lock --pinned-siblings --check      # pin-match + freshness only
+./scripta/regen-lock --pinned-siblings --online     # allow registry index fetch
+./scripta/regen-lock --pinned-siblings --manifest PATH
+./scripta/regen-lock --pinned-siblings --root PATH  # worktree-scoped (default: this tree)
+```
+
+Hard stops (exit 1, no lock write): missing sibling, unreadable HEAD, pin
+mismatch, stale lock after update. Usage / missing manifest = exit 2.
+
+Tests: `python3 scripta/regen-lock-test.py` (pin match, mismatch, missing
+sibling, JSON/YAML manifests, short-SHA pins, caller-lock isolation).
+
+---
+
+## 11. References
 
 - `worktree-dry-run-recipe.md` — the Stage-1 recipe this procedure runs.
-- `release-runbook.md` — the flow being rehearsed (§1 steps 1–5).
+- `release-runbook.md` — the flow being rehearsed (§0 green-main + §1 steps).
 - `release-manifest-schema.md` §3/§4/§6 — pins + packs the matrix resolves.
 - `platform-builder-matrix.md` §1–§3 — legs, missing-leg block, builders.
 - `radix/docs/factory/worktree-convention.md` — packet layout + lifecycle.
 - `threat-model.md` — T1/T3 controls this procedure enforces.
+- `docs/factory/per-lane-e2e-validation/` — grid status + EL-6 delivery.
+- `faber/scripta/regen-lock` — the one-command pinned-sibling rehearsal.
 - `faber/docs/factory/faber-onboarding/delivery-stage2.md` +
   `dev-kit-contract.md` — the pack rows' producer (read-only here).

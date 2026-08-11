@@ -121,27 +121,49 @@ steps must be updated to match.
 
 ## Release protocol (Faber)
 
+**Tag only on a main tip the lane grid (or a CI re-run on the exact commit)
+declared green.** Standing status:
+`docs/factory/per-lane-e2e-validation/grid-status.md`. Never tag a tip whose
+grid status is red, skipped, or unknown.
+
+**Local release = bump → pinned-sibling lock regen → commit → tag → push.**
+The slow e2e moved to the nightly per-lane grid (pharos); local release is
+minutes of bookkeeping. Full runbook:
+`docs/release/release-runbook.md` §0 + §2.1.
+
 CI uses `cargo build --locked`. The lockfile must match `Cargo.toml` at the
 tagged commit, or the build fails. Follow this exact order:
 
-1. Bump version in `Cargo.toml` (`version = "X.Y.Z"`).
-2. Run `cargo update` to regenerate `Cargo.lock`.
-3. Verify: `cargo build --locked --release --bin faber` passes.
-4. Verify expensive product suite: **`./scripta/release-gate --locked-release-build`**
-   (or `./scripta/release-gate` if the release binary was already built).
-   This is the only place a full-workspace `cargo test --workspace` is
-   required for a release.
-   Optional language closeout: `../radix/scripta/test --full` and/or `--e2e`
-   when the release includes compiler/corpus claims.
-5. **Single commit** containing both the version bump and the regenerated
-   `Cargo.lock`. Do not commit them separately.
-6. Tag that commit: `git tag vX.Y.Z`.
-7. Push: `git push origin main && git push origin vX.Y.Z`.
-8. Monitor CI: `gh run list -R faberlang/faber --limit 1`.
+1. Confirm the tip is green (grid-status.md or CI re-run on this exact commit).
+2. Bump version in `Cargo.toml` (`version = "X.Y.Z"`); update
+   `release-manifest.yaml` pins + packs; draft `docs/release/vX.Y.Z.md`.
+3. **One-command pinned-sibling lock rehearsal** (inside a pin packet —
+   siblings detached at the manifest pins; never bare `cargo update` on the
+   main tree):
+
+   ```bash
+   ./scripta/regen-lock --pinned-siblings
+   # verify-only: ./scripta/regen-lock --pinned-siblings --check
+   ```
+
+   Hard-stops on pin mismatch (L2). Worktree-scoped via `--root`.
+4. Verify: `cargo build --locked --release --bin faber` against the pins.
+5. **Single commit** containing the version bump, regenerated `Cargo.lock`,
+   and manifest. Do not commit them separately.
+6. Cheap stage-1 on the exact tip: `./scripta/test`.
+7. Tag that commit: `git tag -a vX.Y.Z -m "Faber vX.Y.Z"`.
+8. Push as **separate** commands: `git push origin main`, then
+   `git push origin vX.Y.Z`.
+9. Monitor CI: `gh run list -R faberlang/faber --limit 1`.
 
 **Never** tag a commit that doesn't include the regenerated lockfile. The tag
 freezes the exact source CI will build; a stale lockfile makes `--locked`
 fail with "cannot update the lock file."
+
+`./scripta/release-gate` is the expensive product closeout — operator-only at
+a real release boundary, never an agent default. Optional language closeout
+(`../radix/scripta/test --full` / `--e2e`) only when the release includes
+compiler/corpus claims.
 
 ### CI build script
 

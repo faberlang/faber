@@ -1,25 +1,78 @@
 # Faber release runbook (coordinated operator runbook)
 
-**Status:** active — Stage 2 delivery (component-release-streamline)
-**Date-stamped:** 2026-08-07
+**Status:** active — EL-6 rewrite (per-lane-e2e-validation; tag-only-on-green)
+**Date-stamped:** 2026-08-11
 **Purpose:** the cold-operator runbook for the local-first release process —
 authority role + exact next command + gates + stop conditions for every
 release path, without asking chat.
 **Source of truth:** the seven Stage-1 decision docs in this directory
 (`release-contract.md`, `release-manifest-schema.md`, `platform-builder-matrix.md`,
 `authority.md`, `failure-recovery-matrix.md`, `process-local-first.md`,
-`worktree-dry-run-recipe.md`). This runbook cites and sequences those
-decisions; it does not re-decide.
+`worktree-dry-run-recipe.md`), plus the per-lane e2e grid
+(`docs/factory/per-lane-e2e-validation/`). This runbook cites and sequences
+those decisions; it does not re-decide.
 **Thin component runbooks:** radix/cista thin runbooks under
 `radix/docs/release/` and `cista/docs/release/` are **staged to Stage 3**
 (owner: component-release-streamline Stage 3), because they "point to their
 local scripts" and no scripts exist until Stage 3. This runbook names the
 exact component commands so the campaign Stage 2 gate holds without them.
 
-> **Live-state caveat (2026-08-07):** versions, tags, and workflow shapes cited
+> **Live-state caveat (2026-08-11):** versions, tags, and workflow shapes cited
 > below are the reconciled baseline (`process-versioning-and-deps.md` §2.2,
 > `stage0-baseline.md`, observed workflows). Re-verify any fact that would
 > change a command before executing it.
+
+---
+
+## 0. Release posture (tag only on a green main)
+
+**Tag only on a main tip the lane grid (or a CI re-run on the exact commit)
+declared green.** Standing evidence lives in
+`docs/factory/per-lane-e2e-validation/grid-status.md` (Tier 1 report-only
+grid, EL-5). If the grid has not yet declared the tip green, re-run CI (or
+the relevant per-lane commands) on that exact commit and record the green
+result before tagging. Never tag a tip whose grid status is red, skipped, or
+unknown.
+
+**Local release is short:** bump → pinned-sibling lock regen → commit → tag →
+push. The slow correctness work moved to the nightly per-lane grid on
+pharos; local release is minutes of bookkeeping, not a day of e2e on the
+dev machine.
+
+```bash
+# 0. Green-main gate (operator; read-only)
+#    Confirm grid-status.md (or CI re-run on this exact commit) is green.
+# 1. Prepare on a pin packet (worktree-rehearsal-procedure.md), never main tree:
+#    edit Cargo.toml version = "X.Y.Z"
+#    update release-manifest.yaml pins + packs
+./scripta/regen-lock --pinned-siblings          # ONE command (L2 + F2)
+# 2. Single bump+lock commit (local to the release branch / main tip)
+git add Cargo.toml Cargo.lock release-manifest.yaml docs/release/vX.Y.Z.md
+git commit -m "release: faber vX.Y.Z (version bump + lockfile + manifest pins)"
+# 3. Cheap stage-1 gates on the exact tip about to be tagged (L3)
+./scripta/test                                  # faber stage 1
+# 4. Tag + push as SEPARATE commands (L4)
+git tag -a vX.Y.Z -m "Faber vX.Y.Z"
+git push origin main
+git push origin vX.Y.Z
+```
+
+**One-command pinned-sibling rehearsal** (extends `scripta/regen-lock`):
+
+| Command | Effect |
+| --- | --- |
+| `./scripta/regen-lock --pinned-siblings` | Verify `../radix`, `../cista`, `../faber-runtime`, `../hosts` match `release-manifest.yaml` source pins, then `cargo update` + freshness check. Writes only the `--root` (pin-packet) lock. |
+| `./scripta/regen-lock --pinned-siblings --check` | Pin-match + freshness only; never writes, never runs cargo. |
+
+Run it **inside a pin packet** (siblings detached at the pinned SHAs per
+`worktree-rehearsal-procedure.md`). A pin mismatch is a hard stop — that is
+the L2 trap: regenerating the lock against drifted local siblings produces a
+lock CI cannot build. The command is worktree-scoped (`--root`); it never
+mutates another checkout's lock.
+
+`release-gate` remains the expensive product closeout (operator-only at a
+real release boundary). It is **not** part of the short local path above and
+is forbidden as an agent default.
 
 ---
 
@@ -32,9 +85,10 @@ external effects (`authority.md` §2) and are never reached in a rehearsal.
 
 | # | Step | Classification | Exact command(s) | Gate | Dry-run stop point |
 | --- | --- | --- | --- | --- | --- |
-| 1 | **Prepare** | **local** (lockfile index fetch = **network** unless `--offline`) | version bump (`Cargo.toml`; radix: bulk `perl -pi -e` across `crates/*/Cargo.toml`); `cargo update`; update `faber/release-manifest.yaml` pins + packs (§2.2); draft release notes | manifest validation + pin-vs-live check (`release-manifest-schema.md` §5, §7) | pin matrix + draft plan generated; nothing public |
-| 2 | **Local proof** | **local** | `cargo build --locked --release --bin faber` then `./scripta/release-gate --locked-release-build` (`faber/AGENTS.md:126-133`); component gates §2.3; archive + basename-only `.sha256`; leakage scan (`process-local-first.md` §4) | release gate + version/tag gate + locked build; leakage scan clean | gates pass, leakage scan clean |
-| 3 | **Tag** | **local**; push = **network** | single bump+lock commit; `git tag -a vX.Y.Z -m "<Component> vX.Y.Z"`; `git push origin main && git push origin vX.Y.Z` | never tag a stale lockfile (`faber/AGENTS.md:141-144`); tag == manifest version | **`would-tag`** — plan lists the annotated tag and its commit; no tag created |
+| 0 | **Green-main gate** | **local** (read-only) | confirm `grid-status.md` (or CI re-run on the exact tip) is green for the commit about to be tagged (§0) | tag only on a main tip the lane grid / CI re-run declared green | tip green recorded; nothing public |
+| 1 | **Prepare** | **local** (lockfile index fetch = **network** unless `--offline`) | version bump (`Cargo.toml`; radix: bulk `perl -pi -e` across `crates/*/Cargo.toml`); update `faber/release-manifest.yaml` pins + packs (§2.2); **`./scripta/regen-lock --pinned-siblings`** inside the pin packet (one-command L2+F2; never `cargo update` on the main tree); draft release notes | manifest validation + pin-vs-live check (`release-manifest-schema.md` §5, §7); pin match is compatibility proof, not existence | pin matrix + draft plan generated; nothing public |
+| 2 | **Local proof** | **local** | `cargo build --locked --release --bin faber` **against the pinned siblings** (pin packet); optional `./scripta/release-gate --locked-release-build` at a real product boundary only; component gates §2.3; archive + basename-only `.sha256`; leakage scan (`process-local-first.md` §4) | locked build on pins; leakage scan clean; release-gate only when the product closeout is in scope | gates pass, leakage scan clean |
+| 3 | **Tag** | **local**; push = **network** | single bump+lock commit; cheap stage-1 gates on the exact tip (L3); `git tag -a vX.Y.Z -m "<Component> vX.Y.Z"`; push main then push tag as **separate** commands (L4) | never tag a stale lockfile; tag == manifest version; **tag only on a green main tip** (§0) | **`would-tag`** — plan lists the annotated tag and its commit; no tag created |
 | 4 | **Controlled-builder build** | **controlled-builder** (private radix clone in faber GHA = **network**) | tag push triggers `.github/workflows/release.yml`; monitor `gh run list -R faberlang/faber --limit 1` | matrix legs per `platform-builder-matrix.md` §2 (missing **supported** leg blocks); stable/LTS adds second-builder comparison §3 | **`would-upload`** plan lists the expected matrix legs; nothing runs |
 | 5 | **Package + checksum + sign** | **local** (mirror in CI) | archive per matrix; `(cd dist && shasum -a 256 "<archive>" > "<archive>.sha256")` with **basename-only** content (§5.1); detached Ed25519 signature over the checksum manifest (`release-contract.md` §6); provenance/SBOM for stable/LTS product releases | `.sha256` basename check; signed manifest covers exactly the staged artifacts (`process-local-first.md` §4) | **`would-sign`** — plan names the secret *holder*, never a value |
 | 6 | **Publish candidate** | **public mutation** (operator only) | draft/candidate namespace upload (§2.5); today: manual `gh release create --draft` (workflow path rejects rc tags) | explicit external-write approval (`authority.md` §2); same hashes as readback target | **`would-upload`** — plan lists the release objects + assets; nothing uploaded |
@@ -71,26 +125,32 @@ exact next command(s), the gates that gate that path (`process-local-first.md`
 **Authority:** proposer, builder, verifier may act locally and by default;
 tagger/signer and publisher are **operator-only** (`authority.md` §1–§2).
 
-**Faber surface release** — the faber repo on its own version, the path today's
-protocol already implements (`faber/AGENTS.md:122-139`):
+**Faber surface release** — the faber repo on its own version. Post-EL-6 the
+short path is bump → regen-lock (pinned siblings) → commit → tag → push on a
+green main tip (`faber/AGENTS.md` Release protocol):
 
 ```bash
-# 1. Prepare (proposer; local)
-#    edit Cargo.toml version = "X.Y.Z"; then:
-cargo update
+# 0. Green-main gate (operator; read-only) — §0
+#    grid-status.md (or CI re-run on this exact commit) must be green.
+
+# 1. Prepare (proposer; local; INSIDE the pin packet, never the main tree)
+#    edit Cargo.toml version = "X.Y.Z"
 #    update faber/release-manifest.yaml pins (see §2.2); draft notes in docs/release/vX.Y.Z.md
+./scripta/regen-lock --pinned-siblings          # one-command pinned-sibling rehearsal
 
-# 2. Local proof (builder; local)
+# 2. Local proof (builder; local; against the pinned siblings)
 cargo build --locked --release --bin faber
-./scripta/release-gate --locked-release-build        # only full-workspace gate required
-#    optional, only for compiler/corpus claims:
-#    ../radix/scripta/test --full   and/or  --e2e
+#    product closeout (operator-only real release boundary, not the short path):
+#    ./scripta/release-gate --locked-release-build
+#    optional compiler/corpus claims: ../radix/scripta/test --full and/or --e2e
 
-# 3. Tag (tagger/signer; operator; push = network)
+# 3. Tag (tagger/signer; operator; push = network; SEPARATE commands — L4)
 git add Cargo.toml Cargo.lock release-manifest.yaml docs/release/vX.Y.Z.md
 git commit -m "release: faber vX.Y.Z (version bump + lockfile + manifest pins)"
+./scripta/test                                  # stage-1 on the exact tip (L3)
 git tag -a vX.Y.Z -m "Faber vX.Y.Z"
-git push origin main && git push origin vX.Y.Z
+git push origin main
+git push origin vX.Y.Z
 
 # 4. Controlled builder (network)
 gh run list -R faberlang/faber --limit 1
@@ -316,13 +376,12 @@ Authority: the **withdraw/revocation** operator role (`authority.md` §1).
 
 ## 6. Incident lessons — faber 1.6.0 / radix 0.81.0 (2026-08-10)
 
-Pre-campaign capture of what broke on the 2026-08-10 release pair, the
-fix-forward gate each failure maps to, and where the rework lands. **These
-rows are superseded by the `per-lane-e2e-validation` factory goal**
-(`docs/factory/per-lane-e2e-validation/goal.md`, 2026-08-10), which reworks
-the whole model (tag-only-on-green, scripted pinned-sibling rehearsal, per-lane
-validation grid). Keep this section until that campaign lands; the gates below
-are the minimum for a release in the meantime.
+Pre-campaign capture of what broke on the 2026-08-10 release pair and the
+fix-forward gate each failure maps to. **Superseded in protocol by EL-6**
+(this rewrite): tag-only-on-green (§0), one-command
+`./scripta/regen-lock --pinned-siblings` (L2), and the nightly per-lane grid
+(EL-5). Keep the rows as the evidence base; the gates below remain the
+minimum whenever the grid is unavailable.
 
 ### L1 — Carried-forward sibling pins can exist yet be incompatible
 
@@ -350,11 +409,11 @@ because --locked was passed") even though the local locked build was green.
 The committed lock was in fact correct for the corrected pins — the CI
 failure was pin staleness, not lock drift — but the two can silently disagree.
 
-**Gate:** regenerate the lock **inside the pin packet** (rehearsal §2 step 2),
-never in the main tree. The rehearsed lock is the one that commits. `cargo
-update` output naming *which* path dep each workspace-orphan package
-(`hygiene-ratchet`) resolved from is a cheap consistency signal — verify it
-matches the pin layout.
+**Gate:** regenerate the lock **inside the pin packet** with the one-command
+rehearsal — `./scripta/regen-lock --pinned-siblings` — never `cargo update`
+in the main tree. The rehearsed lock is the one that commits. The command
+hard-stops on a pin mismatch so a drifted sibling layout cannot silently
+produce a CI-failing lock.
 
 ### L3 — Verify the exact tag tip before creating the tag
 
@@ -418,8 +477,13 @@ time is discovery time. See the `per-lane-e2e-validation` goal for the model.
 - `platform-builder-matrix.md` — matrix legs + builder trust.
 - `failure-recovery-matrix.md` — abort/withdraw/supersede/compromise.
 - `worktree-dry-run-recipe.md` + `worktree-rehearsal-procedure.md` — the
-  rehearsal form of this runbook.
+  rehearsal form of this runbook (pin packet + one-command regen-lock).
 - `release-checklist.md` — one-line-per-step operator checklist.
 - `threat-model.md` — the release-process failure/abuse surfaces.
-- `faber/AGENTS.md:122-139`, `radix/AGENTS.md:375-395`, the three `release.yml`
-  workflows — the protocol steps this runbook operationalizes.
+- `docs/factory/per-lane-e2e-validation/grid-status.md` — standing green/red
+  for main (EL-5); the tag-only-on-green gate input.
+- `faber/scripta/regen-lock --pinned-siblings` — one-command pinned-sibling
+  lock rehearsal (EL-6).
+- `faber/AGENTS.md` / `radix/AGENTS.md` Release protocol sections — the
+  short-form protocol this runbook operationalizes.
+- the three `release.yml` workflows — controlled-builder build after tag.
