@@ -37,6 +37,15 @@ verified bootstrap installer
     sides stay byte-identical; the same rule covers the receipt write and
     PATH-owned shell rc writes;
   - honors --add-to-path idempotently.
+  - the repair policy + failure classification (A4): a tampered or missing
+    pack is detected and restored by re-running install/update and classified
+    as missing-or-incompatible-pack (result `repaired`); a lost or corrupt
+    install receipt (launcher metadata) is rewritten on a re-run
+    (missing-launcher-metadata) while `--update` fails closed typed with one
+    next action; an unwritable prefix fails closed with the typed
+    unwritable-prefix class + one next action (never a traceback); an
+    incomplete/corrupt core-support cache entry is detected and named
+    missing-or-corrupt-core-support with the launcher's repair path.
 
 The "release host" is a local directory produced by the real
 `scripta/package-archive` wrapper (the exact published artifact shape:
@@ -750,6 +759,173 @@ class InstallFaberTest(unittest.TestCase):
                 match = line.split(":", 1)[1].strip().strip('"')
                 break
         self.assertEqual(module.DEFAULT_VERSION, match)
+
+    # -- A4: repair policy + failure classification (install-side) -----------
+
+    def core_support_cache(self) -> Path:
+        """Deterministic core-support cache parent under the scratch HOME."""
+        home = self.root / "home"
+        if sys.platform == "darwin":
+            return home / "Library" / "Caches" / "faber" / "core-support" / "tar-zst-v1"
+        return home / ".cache" / "faber" / "core-support" / "tar-zst-v1"
+
+    def test_tampered_pack_rerun_is_classified_repair(self) -> None:
+        # A4 done_when: a tampered pack is detected by the installer and
+        # restored by re-running install, classified as the typed
+        # missing-or-incompatible-pack failure (dev-kit layer 3) with a
+        # `repaired` result.
+        self.assertEqual(self.run_installer().returncode, 0)
+        tampered = self.prefix / "share/faber/reference/PACK.toml"
+        tampered.write_text("# tampered\n", encoding="utf-8")
+        res = self.run_installer()
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        self.assertIn("result:     repaired", res.stdout)
+        self.assertIn("repairs:    missing-or-incompatible-pack", res.stdout)
+        self.assertIn("1 tampered restored", res.stdout)
+        self.assertEqual(
+            tampered.read_bytes(),
+            (self.root / "payload" / f"dev-kit-{VERSION}-{TRIPLE}"
+             / "share/faber/reference/PACK.toml").read_bytes(),
+        )
+
+    def test_missing_pack_rerun_is_classified_repair(self) -> None:
+        # A4 done_when: a missing pack is detected and restored by re-running
+        # install, classified missing-or-incompatible-pack.
+        self.assertEqual(self.run_installer().returncode, 0)
+        missing = self.prefix / "share/faber/locale/la/pack.toml"
+        missing.unlink()
+        res = self.run_installer()
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        self.assertIn("result:     repaired", res.stdout)
+        self.assertIn("repairs:    missing-or-incompatible-pack", res.stdout)
+        self.assertIn("1 missing restored", res.stdout)
+        self.assertTrue(missing.is_file())
+
+    def test_missing_receipt_rerun_repairs_launcher_metadata(self) -> None:
+        # A lost install receipt (launcher metadata, dev-kit layer 1) is
+        # detected and repairable by re-running install: the receipt is
+        # rewritten and classified missing-launcher-metadata.
+        self.assertEqual(self.run_installer().returncode, 0)
+        receipt = self.prefix / "share/faber/install-receipt.json"
+        receipt.unlink()
+        res = self.run_installer()
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        self.assertIn("result:     repaired", res.stdout)
+        self.assertIn("repairs:    missing-launcher-metadata", res.stdout)
+        self.assertTrue(receipt.is_file())
+        data = json.loads(receipt.read_text(encoding="utf-8"))
+        self.assertEqual(data["version"], VERSION)
+        self.assertEqual(data["prefix"], str(self.prefix))
+
+    def test_update_with_missing_receipt_fails_closed_typed(self) -> None:
+        # --update without launcher metadata fails closed with the typed
+        # missing-launcher-metadata class + ONE next action — never a silent
+        # reinstall that would lose lane history.
+        self.assertEqual(self.run_installer().returncode, 0)
+        (self.prefix / "share/faber/install-receipt.json").unlink()
+        res = self.run_installer("--update")
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("missing-launcher-metadata", res.stderr)
+        self.assertIn("cause:", res.stderr)
+        self.assertIn("next:", res.stderr)
+        self.assertIn("without --update", res.stderr)
+
+    def test_corrupt_receipt_is_classified_and_repairable(self) -> None:
+        # A corrupt receipt parses as lost metadata: a re-run install repairs
+        # it (classified missing-launcher-metadata); --update fails closed
+        # typed instead of guessing at lane history.
+        self.assertEqual(self.run_installer().returncode, 0)
+        receipt = self.prefix / "share/faber/install-receipt.json"
+        receipt.write_text("{not valid json", encoding="utf-8")
+        res = self.run_installer()
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        self.assertIn("result:     repaired", res.stdout)
+        self.assertIn("repairs:    missing-launcher-metadata", res.stdout)
+        data = json.loads(receipt.read_text(encoding="utf-8"))
+        self.assertEqual(data["version"], VERSION)
+        receipt.write_text("{not valid json", encoding="utf-8")
+        res2 = self.run_installer("--update")
+        self.assertEqual(res2.returncode, 1)
+        self.assertIn("missing-launcher-metadata", res2.stderr)
+        self.assertIn("next:", res2.stderr)
+
+    def test_unwritable_prefix_parent_fails_closed_typed(self) -> None:
+        # A4 validation: an unwritable prefix fails closed with the typed
+        # unwritable-prefix class + ONE next action — never a Python
+        # traceback.
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            self.skipTest("read-only directories do not block root")
+        ro = self.root / "ro"
+        ro.mkdir()
+        os.chmod(ro, 0o555)
+        try:
+            res = self.run_installer(prefix=ro / "prefix")
+        finally:
+            os.chmod(ro, 0o755)
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("unwritable-prefix", res.stderr)
+        self.assertIn("cause:", res.stderr)
+        self.assertIn("next:", res.stderr)
+        self.assertNotIn("Traceback", res.stderr)
+
+    def test_corrupt_core_support_cache_is_detected(self) -> None:
+        # A4 done_when: an incomplete core-support materialization (no
+        # completion marker — the materializer's commit point) is detected
+        # and classified missing-or-corrupt-core-support with the launcher's
+        # repair path named; the payload itself is intact, so the run stays
+        # `already current`.
+        self.assertEqual(self.run_installer().returncode, 0)
+        cache = self.core_support_cache()
+        entry = cache / ("ab" * 32)
+        entry.mkdir(parents=True)
+        (entry / "faber-runtime").mkdir()
+        res = self.run_installer()
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        self.assertIn("result:     already current", res.stdout)
+        self.assertIn("repairs:    missing-or-corrupt-core-support", res.stdout)
+        self.assertIn("re-materializes", res.stdout)
+
+    def test_symlinked_core_support_marker_is_detected(self) -> None:
+        # A symlinked completion marker is corrupt by the materializer's
+        # definition (regular file required) and must be named.
+        self.assertEqual(self.run_installer().returncode, 0)
+        cache = self.core_support_cache()
+        entry = cache / ("cd" * 32)
+        entry.mkdir(parents=True)
+        outside = self.root / "outside-core"
+        (entry / ".faber-core-support-complete").symlink_to(outside)
+        res = self.run_installer()
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        self.assertIn("repairs:    missing-or-corrupt-core-support", res.stdout)
+        self.assertIn("cd" * 32, res.stdout)
+
+    def test_symlinked_core_support_entry_is_detected(self) -> None:
+        # A symlinked entry directory itself is corrupt and named with the
+        # `(symlink)` detail.
+        self.assertEqual(self.run_installer().returncode, 0)
+        cache = self.core_support_cache()
+        outside = self.root / "outside-core"
+        outside.mkdir(parents=True)
+        cache.mkdir(parents=True)
+        (cache / ("cd" * 32)).symlink_to(outside, target_is_directory=True)
+        res = self.run_installer()
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        self.assertIn("repairs:    missing-or-corrupt-core-support", res.stdout)
+        self.assertIn("(symlink)", res.stdout)
+
+    def test_valid_core_support_cache_is_not_flagged(self) -> None:
+        # A complete entry (real directory + regular completion marker) is
+        # healthy: no missing-or-corrupt-core-support finding on re-run.
+        self.assertEqual(self.run_installer().returncode, 0)
+        cache = self.core_support_cache()
+        entry = cache / ("ef" * 32)
+        entry.mkdir(parents=True)
+        (entry / ".faber-core-support-complete").write_text(
+            "format=tar-zst-v1\n", encoding="utf-8")
+        res = self.run_installer()
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        self.assertNotIn("missing-or-corrupt-core-support", res.stdout)
+        self.assertIn("result:     already current", res.stdout)
 
 
 if __name__ == "__main__":

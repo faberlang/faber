@@ -109,6 +109,46 @@ fn plan_missing_receipt_fails_closed() {
 }
 
 #[test]
+fn plan_missing_receipt_classifies_missing_launcher_metadata() {
+    // A4 repair surface: a missing install receipt (launcher metadata,
+    // dev-kit layer 1) fails closed with the typed failure class + one next
+    // action — re-run the bootstrap without --update, then re-run update.
+    let tmp = tempfile::tempdir().expect("tmp");
+    let exe = tmp.path().join("bin/faber");
+    let err = plan_self_update(&args("1.6.0"), Some(&exe), None).expect_err("no receipt");
+    assert!(err.contains("missing-launcher-metadata"), "{err}");
+    assert!(err.contains("cause:"), "{err}");
+    assert!(err.contains("next:"), "{err}");
+    assert!(err.contains("scripta/install-faber without --update"), "{err}");
+}
+
+#[test]
+fn plan_corrupt_receipt_classifies_missing_launcher_metadata() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let prefix = tmp.path().join("prefix");
+    let receipt = prefix.join(RECEIPT_REL);
+    std::fs::create_dir_all(receipt.parent().expect("receipt parent")).expect("mkdir");
+    std::fs::write(&receipt, "{not valid json").expect("write");
+    let err = plan_self_update(&args("1.6.0"), Some(&prefix.join("bin/faber")), None)
+        .expect_err("corrupt receipt");
+    assert!(err.contains("not valid JSON"), "{err}");
+    assert!(err.contains("missing-launcher-metadata"), "{err}");
+    assert!(err.contains("next:"), "{err}");
+}
+
+#[test]
+fn plan_missing_version_field_classifies_missing_launcher_metadata() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let prefix = tmp.path().join("prefix");
+    write_receipt(&prefix, &serde_json::json!({"prefix": "/tmp/x"}));
+    let err =
+        plan_self_update(&args("1.6.0"), Some(&prefix.join("bin/faber")), None).expect_err("bad");
+    assert!(err.contains("no version"), "{err}");
+    assert!(err.contains("missing-launcher-metadata"), "{err}");
+    assert!(err.contains("next:"), "{err}");
+}
+
+#[test]
 fn plan_missing_version_field_fails_closed() {
     let tmp = tempfile::tempdir().expect("tmp");
     let prefix = tmp.path().join("prefix");
