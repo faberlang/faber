@@ -1,6 +1,6 @@
 # Faber Format Pretty Policy — Factory Goal
 
-**Status**: active — S1/S3 filed (radix lane, after DDCP3-U5; pending); S2 + S4 delivered (23266e0 normalise-v1 corpus+harness; 1b8f1f6 CLI steady-state surface); A2-P2 guard tests (33320ed/3784a44); SEM016 re-tier done; S5–S6 pending
+**Status**: done — product default remains `normalise-v1` (S8 global default flip cancelled 2026-08-11, operator); S2/S4/S5/S6/S7 delivered on faber main; `pretty-v1` stays opt-in (`--policy pretty-v1` or `[format] policy`); no mass reformat. Residual: crypta-sha2 grammar-guard note on factory/hand-8 if needed later.
 **Created**: 2026-08-09
 **Target repo**: `faber` (product surface; goal inventory lives here) + `radix` (`radix::forma` engine)
 **Factory artifact dir**: `docs/factory/faber-format-pretty/`
@@ -15,11 +15,13 @@ source formatter — via **named Faber-owned policies**, not a Prettier-style
 option matrix:
 
 - `normalise-v1` — the exact current normalizer behavior, promoted to an
-  explicit compatibility policy. Stays the default until the corpus and user
-  packages have deliberately migrated.
+  explicit compatibility policy. **Product built-in default** (operator
+  2026-08-11: no global default flip to pretty-v1).
 - `pretty-v1` — the new pretty layout policy (4-space indent, 100-column soft
   width, structural block expansion, delimiter-aware wrapping, bounded
-  blank-line normalization, comment preservation without reflow).
+  blank-line normalization, comment preservation without reflow). **Opt-in
+  only** — explicit operator request for a specific area/package via
+  `--policy pretty-v1` or `[format] policy = "pretty-v1"`.
 
 Policy is selected in `[format]` of the product manifest (`faber.toml`). No
 second config language (`forma.toml` is rejected). Small CLI additions:

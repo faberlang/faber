@@ -1,6 +1,6 @@
 # Delivery — Faber Format Pretty Policy (`faber-format-pretty`)
 
-**Status**: ready — delivery lowering complete (planning artifacts only); awaiting Mind commit + Hand tasking
+**Status**: done — S2–S7 delivered; S8 global default flip **cancelled** (operator 2026-08-11); product default stays `normalise-v1`; `pretty-v1` opt-in only
 **Goal**: [faber-format-pretty](goal.md) (committed as faber `69f2181`; status line is in `goal.md`, owned by Mind)
 **Planner**: planner-2
 **Created**: 2026-08-09
@@ -469,38 +469,36 @@ by the cheap harness only).
 
 ### S8 — default flip to pretty-v1 + product docs + skill currency (faber-owned)
 
-**Entry**: S7 rebaselined; migration window elapsed and operator approved.
+**Status (operator 2026-08-11): CANCELLED as a global product flip.**
 
-**Outcome**: the product default is `pretty-v1`; docs and skill are current.
+Product built-in default remains **`normalise-v1`**. That avoids a mass
+reformat of every package that relies on the default. `pretty-v1` remains a
+fully landed **named** policy for **on-demand** use when the operator
+explicitly requests pretty layout for a specific area or package:
 
-- Flip the built-in `[format]` default to `pretty-v1` (and the no-manifest CLI
-  default). `normalise-v1` remains available as a named policy — the
-  time-limited legacy-normalizer mode is exactly `--policy normalise-v1` for one
-  release if needed; do **not** preserve two permanent formatter products.
-- **No second broad source rebaseline in S8** (head-cto strategy fire-16):
-  S7 owns ALL source + expectation churn in one boundary; S8 flips the default
-  and updates product-facing documentation only. The faber-owned `.fab`
-  fixtures that must read pretty under the new default are rebaselined in S7
-  (S7's scope includes the repo's own pinned fixtures), so `--check` is green
-  after the flip without new mechanical churn — otherwise S7 and S8 create two
-  high-conflict waves for one transition.
-- Product docs: `faber format` help text, CLI reference, and the AGENTS.md
-  direction line ("Faber should own user-facing formatting policy, with rule
-  slugs/options") — now implemented; update `$faber` skill currency per the
-  workspace AGENTS.md skill rule.
-- Corpus pinned to the policy version: `--check` means "matches the current
-  Faber formatter profile". The pre-existing rustfmt/clippy gate debt stays out
-  of scope (goal §Rollout safety step 7).
-- Release-note entry for the minor that carries the flip.
+- CLI: `faber format --policy pretty-v1 …`
+- Manifest: `[format] policy = "pretty-v1"`
 
-**Units**: `faber-format-pretty-s8-default-flip-docs`.
+**Do not merge** hand tip `c32b69b` (`factory/hand-3`, S8 default-flip
+implementation) onto main unless a future operator request re-opens a scoped
+flip. That commit is historical WIP only.
 
-**done_when**: default is pretty-v1; own-fixture rebaseline (mechanical) landed;
-docs + skill current; exempla pinned to the policy version; release-note entry
-present.
+**Original planned entry** (superseded): S7 rebaselined; migration window
+elapsed and operator approved global flip.
 
-**Evidence gate**: `./scripta/test` (default stage 1) once at closeout; the flip
-diff reviewed. No wider suites.
+**Original planned outcome** (superseded): product default becomes
+`pretty-v1`; docs/skill updated for the flip. S7 still owns the only
+mechanical rebaseline boundary; no second broad rebaseline was planned in S8.
+
+**Units**: `faber-format-pretty-s8-default-flip-docs` — **not** for dispatch
+as a global flip. Future work is scoped opt-in adoption only, filed as new
+units under operator request.
+
+**done_when (revised)**: product default remains `normalise-v1` on main; S8
+global flip not merged; disposition recorded here and in `goal.md` Status.
+
+**Evidence gate**: main tip still resolves built-in default to
+`normalise-v1` (no S8 flip on main).
 
 ---
 
