@@ -4,6 +4,7 @@ use std::path::Path;
 
 use radix::codegen::Target;
 use radix::diagnostics::Diagnostic;
+use radix::forma::FormatPolicy;
 use serde::Deserialize;
 
 // DDPP1-U2 (C2 feature isolation): the shared route-selection request type
@@ -46,6 +47,15 @@ pub struct FaberManifest {
     /// break). Sweep marker: `LEGACY_READER_MANIFEST_ALIAS`.
     #[serde(default, alias = "reader")]
     pub locale: ManifestReader,
+
+    /// Formatting-policy selection from `[format]` (FORMAT-PRETTY S5).
+    ///
+    /// The policy slug names a byte-exact output contract from the radix
+    /// rule-slug registry (`normalise-v1` | `pretty-v1`); an unknown slug is
+    /// rejected at manifest validation. Absent → the built-in default
+    /// (`normalise-v1`).
+    #[serde(default)]
+    pub format: ManifestFormat,
 
     /// Target-specific build and binding metadata, e.g. `[target.rust]`.
     #[serde(default)]
@@ -243,6 +253,22 @@ pub struct ManifestReader {
     pub pack: Option<String>,
 }
 
+/// `[format]` metadata for source-formatting policy selection
+/// (FORMAT-PRETTY S5).
+///
+/// Exactly one key, `policy`, naming a slug from the radix rule-slug registry.
+/// There is deliberately no second config language (`[forma]` / `forma.toml`),
+/// no inheritance, and no per-file rule lists in v1. Unknown keys and unknown
+/// slugs fail closed at parse/validation.
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ManifestFormat {
+    /// Format policy slug (`normalise-v1` | `pretty-v1`). Absent → the
+    /// built-in default (`normalise-v1`). Unknown slugs are rejected at
+    /// manifest validation.
+    pub policy: Option<String>,
+}
+
 /// `[target.<name>]` metadata for target-specific implementation data.
 #[derive(Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -387,6 +413,34 @@ pub(crate) fn manifest_build_target_for_input(
         Some(target) => manifest_build_target(Some(target), &layout.manifest_path).map(Some),
         None => Ok(None),
     }
+}
+
+/// Resolve the `[format] policy` declared by the containing package of `input`
+/// (FORMAT-PRETTY S5).
+///
+/// Discovery follows the package rules: a file input walks up to the nearest
+/// `faber.toml`, which is read and validated (an unknown `[format] policy`
+/// slug fails with a clear diagnostic — never a silent built-in fallback).
+/// Returns `Ok(None)` when no package manifest is discoverable (legacy
+/// manifestless input, a file outside any package) or when the manifest
+/// declares no `[format] policy`; the caller falls back to the built-in
+/// default (`normalise-v1`).
+#[allow(dead_code)] // used by the faber binary's `format` command; dead in lib-only builds
+pub(crate) fn manifest_format_policy(
+    input: &Path,
+) -> Result<Option<FormatPolicy>, Box<Diagnostic>> {
+    let spec = super::discovery::discover_package(input)?;
+    let Some(manifest) = manifest_for_spec(&spec)? else {
+        return Ok(None);
+    };
+    let Some(slug) = manifest.format.policy.as_deref() else {
+        return Ok(None);
+    };
+    // `validate_manifest` already rejected unknown slugs during discovery; the
+    // registry conversion is the selection (both derive from `from_slug`).
+    FormatPolicy::from_slug(slug.trim())
+        .map(Some)
+        .map_err(|err| Box::new(crate::package_diagnostic_error(err.to_string())))
 }
 
 /// Map a manifest `[device] backend` value to a backend selection request
@@ -622,6 +676,28 @@ pub(crate) fn validate_manifest(
                     "faber.toml locale.pack requires locale (section [locale] or legacy [reader])",
                 )
                 .with_file(path.display().to_string()),
+            ));
+        }
+    }
+
+    // FORMAT-PRETTY S5: `[format] policy` is a rule-slug registry name — an
+    // unknown or empty slug fails closed at manifest validation, never
+    // silently falling back to the built-in default.
+    if let Some(slug) = manifest.format.policy.as_deref() {
+        let trimmed = slug.trim();
+        if trimmed.is_empty() {
+            return Err(Box::new(
+                crate::package_diagnostic_error("faber.toml format.policy must not be empty")
+                    .with_file(path.display().to_string()),
+            ));
+        }
+        if let Err(err) = FormatPolicy::from_slug(trimmed) {
+            return Err(Box::new(
+                crate::package_diagnostic_error(format!(
+                    "faber.toml format.policy: {err}"
+                ))
+                .with_file(path.display().to_string())
+                .with_arg("issue", "unknown_format_policy"),
             ));
         }
     }

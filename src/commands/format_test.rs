@@ -252,6 +252,33 @@ fn run_faber_format_stdout_with_args(args: &[&str]) -> String {
     normalize_trailing_newline(&stdout)
 }
 
+/// FORMAT-PRETTY S5: source whose layout the pretty-v1 engine expands at the
+/// 100-column soft width while normalise-v1 preserves the line structure — the
+/// distinguishing fixture for the precedence matrix.
+const SOFT_WIDTH_SOURCE: &str = "functio f() → numerus {\n    si this_is_a_very_long_condition_name_that_keeps_going_and_going ergo redde someVeryLongReturnValueIdentifierThatWillNotFit\n    redde 0\n}\n";
+
+/// Semantically valid block source (canonical reader-locale re-emit runs
+/// semantic analysis, so locale regression fixtures must name real
+/// identifiers).
+const VALID_BLOCK_SOURCE: &str = "functio gradus(numerus x) → numerus {\n    si x ≻ 0 {\n        redde x\n    } sin x ≡ 0 {\n        redde 0\n    } secus {\n        redde 0 - x\n    }\n}\n";
+
+/// FORMAT-PRETTY S5: create a temporary package root with a valid
+/// `faber.toml` (carrying `[format] policy = <policy>` when given) and one
+/// source file. Returns the source file path.
+fn temp_format_package(root: &Path, policy: Option<&str>, source: &str) -> PathBuf {
+    fs::create_dir_all(root.join("src")).expect("create package src");
+    let mut manifest = String::from(
+        "[package]\nname = \"format-pkg\"\nversion = \"0.1.0\"\nedition = \"0.1\"\n\n[paths]\nsource = \"src\"\nentry = \"main.fab\"\n",
+    );
+    if let Some(policy) = policy {
+        manifest.push_str(&format!("\n[format]\npolicy = \"{policy}\"\n"));
+    }
+    fs::write(root.join("faber.toml"), manifest).expect("write faber.toml");
+    let source_path = root.join("src").join("main.fab");
+    fs::write(&source_path, source).expect("write source");
+    source_path
+}
+
 /// Verification plan step 5: CLI `format --stdout` on comment fixture re-parses.
 #[test]
 fn format_cli_comment_fixture_reparses() {
@@ -473,6 +500,375 @@ fn format_policy_with_locale_is_rejected() {
     assert!(
         stderr.contains("--locale"),
         "the rejection must name --locale: {stderr}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// FORMAT-PRETTY S5: `[format]` manifest schema + precedence.
+// ---------------------------------------------------------------------------
+
+/// The S5 fixture must genuinely distinguish the two engines, or the
+/// precedence matrix below is vacuous.
+#[test]
+fn format_s5_fixture_distinguishes_policies() {
+    let fixture = std::env::temp_dir().join("faber-format-s5-distinguish.fab");
+    fs::write(&fixture, SOFT_WIDTH_SOURCE).expect("write fixture");
+    let normalise = run_faber_format_stdout_with_args(&[
+        "format",
+        "--policy",
+        "normalise-v1",
+        "--stdout",
+        fixture.to_str().expect("utf8 path"),
+    ]);
+    let pretty = run_faber_format_stdout_with_args(&[
+        "format",
+        "--policy",
+        "pretty-v1",
+        "--stdout",
+        fixture.to_str().expect("utf8 path"),
+    ]);
+    let _ = fs::remove_file(&fixture);
+    assert_ne!(
+        normalise, pretty,
+        "the S5 fixture must distinguish normalise-v1 from pretty-v1"
+    );
+}
+
+/// S5 precedence matrix, row 1: a package with no `[format]` table keeps the
+/// built-in default — byte-identical to `--policy normalise-v1`.
+#[test]
+fn format_manifest_without_policy_uses_builtin_default() {
+    let root = std::env::temp_dir().join("faber-format-s5-default");
+    let _ = fs::remove_dir_all(&root);
+    let fixture = temp_format_package(&root, None, SOFT_WIDTH_SOURCE);
+
+    let default = run_faber_format_stdout(&fixture);
+    let normalise = run_faber_format_stdout_with_args(&[
+        "format",
+        "--policy",
+        "normalise-v1",
+        "--stdout",
+        fixture.to_str().expect("utf8 path"),
+    ]);
+    let _ = fs::remove_dir_all(&root);
+
+    assert_eq!(
+        default, normalise,
+        "a package without [format] must use the built-in default (normalise-v1)"
+    );
+}
+
+/// S5 precedence matrix, row 2a: `[format] policy = "normalise-v1"` is the
+/// built-in baseline — byte-identical to the flagless author pipeline.
+#[test]
+fn format_manifest_policy_normalise_v1_matches_default() {
+    let root = std::env::temp_dir().join("faber-format-s5-normalise");
+    let _ = fs::remove_dir_all(&root);
+    let fixture = temp_format_package(&root, Some("normalise-v1"), SOFT_WIDTH_SOURCE);
+
+    let from_manifest = run_faber_format_stdout(&fixture);
+    let explicit = run_faber_format_stdout_with_args(&[
+        "format",
+        "--policy",
+        "normalise-v1",
+        "--stdout",
+        fixture.to_str().expect("utf8 path"),
+    ]);
+    let _ = fs::remove_dir_all(&root);
+
+    assert_eq!(
+        from_manifest, explicit,
+        "manifest normalise-v1 must select the same output as the explicit flag"
+    );
+}
+
+/// S5 precedence matrix, row 2b: `[format] policy = "pretty-v1"` selects the
+/// pretty engine.
+#[test]
+fn format_manifest_policy_pretty_v1_selected() {
+    let root = std::env::temp_dir().join("faber-format-s5-pretty");
+    let _ = fs::remove_dir_all(&root);
+    let fixture = temp_format_package(&root, Some("pretty-v1"), SOFT_WIDTH_SOURCE);
+
+    let from_manifest = run_faber_format_stdout(&fixture);
+    let explicit = run_faber_format_stdout_with_args(&[
+        "format",
+        "--policy",
+        "pretty-v1",
+        "--stdout",
+        fixture.to_str().expect("utf8 path"),
+    ]);
+    let _ = fs::remove_dir_all(&root);
+
+    assert_eq!(
+        from_manifest, explicit,
+        "manifest pretty-v1 must select the same output as the explicit flag"
+    );
+    assert!(
+        from_manifest.contains("this_is_a_very_long_condition_name_that_keeps_going_and_going {"),
+        "pretty-v1 must expand the over-width ergo arm:\n{from_manifest}"
+    );
+}
+
+/// S5 precedence matrix, row 3a: CLI `--policy normalise-v1` overrides a
+/// package `[format] policy = "pretty-v1"`.
+#[test]
+fn format_cli_policy_overrides_manifest_pretty() {
+    let root = std::env::temp_dir().join("faber-format-s5-override-pretty");
+    let _ = fs::remove_dir_all(&root);
+    let fixture = temp_format_package(&root, Some("pretty-v1"), SOFT_WIDTH_SOURCE);
+
+    let with_cli = run_faber_format_stdout_with_args(&[
+        "format",
+        "--policy",
+        "normalise-v1",
+        "--stdout",
+        fixture.to_str().expect("utf8 path"),
+    ]);
+    let _ = fs::remove_dir_all(&root);
+
+    assert!(
+        with_cli.contains(
+            "si this_is_a_very_long_condition_name_that_keeps_going_and_going ergo redde someVeryLongReturnValueIdentifierThatWillNotFit"
+        ),
+        "CLI normalise-v1 must win over the manifest pretty-v1 (one-line arm survives):\n{with_cli}"
+    );
+    assert!(
+        !with_cli.contains("this_is_a_very_long_condition_name_that_keeps_going_and_going {"),
+        "no pretty expansion when the CLI override is normalise-v1:\n{with_cli}"
+    );
+}
+
+/// S5 precedence matrix, row 3b: CLI `--policy pretty-v1` overrides a package
+/// `[format] policy = "normalise-v1"`.
+#[test]
+fn format_cli_policy_overrides_manifest_normalise() {
+    let root = std::env::temp_dir().join("faber-format-s5-override-normalise");
+    let _ = fs::remove_dir_all(&root);
+    let fixture = temp_format_package(&root, Some("normalise-v1"), SOFT_WIDTH_SOURCE);
+
+    let with_cli = run_faber_format_stdout_with_args(&[
+        "format",
+        "--policy",
+        "pretty-v1",
+        "--stdout",
+        fixture.to_str().expect("utf8 path"),
+    ]);
+    let _ = fs::remove_dir_all(&root);
+
+    assert!(
+        with_cli.contains("this_is_a_very_long_condition_name_that_keeps_going_and_going {"),
+        "CLI pretty-v1 must win over the manifest normalise-v1 (over-width arm expanded):\n{with_cli}"
+    );
+}
+
+/// S5 discovery: a file outside any package falls back to the built-in
+/// default (normalise-v1) — the over-width arm survives, never pretty
+/// expansion.
+#[test]
+fn format_file_outside_package_uses_builtin_default() {
+    let dir = std::env::temp_dir().join("faber-format-s5-nopkg");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).expect("create scratch dir");
+    let fixture = dir.join("main.fab");
+    fs::write(&fixture, SOFT_WIDTH_SOURCE).expect("write fixture");
+
+    let output = run_faber_format_stdout(&fixture);
+    let _ = fs::remove_dir_all(&dir);
+
+    assert!(
+        output.contains(
+            "si this_is_a_very_long_condition_name_that_keeps_going_and_going ergo redde someVeryLongReturnValueIdentifierThatWillNotFit"
+        ),
+        "a file outside any package must use the built-in default (normalise-v1):\n{output}"
+    );
+}
+
+/// S5 discovery: a multi-root invocation spanning two packages resolves each
+/// root's policy per package (per-root resolution, recorded in the CLI docs).
+#[test]
+fn format_multi_root_resolves_per_package() {
+    let base = std::env::temp_dir().join("faber-format-s5-multiroot");
+    let _ = fs::remove_dir_all(&base);
+    let pkg_a = temp_format_package(&base.join("pkg-a"), Some("pretty-v1"), SOFT_WIDTH_SOURCE);
+    let pkg_b = temp_format_package(&base.join("pkg-b"), Some("normalise-v1"), SOFT_WIDTH_SOURCE);
+
+    let a_pretty = run_faber_format_stdout_with_args(&[
+        "format",
+        "--policy",
+        "pretty-v1",
+        "--stdout",
+        pkg_a.to_str().expect("utf8 path"),
+    ]);
+    let b_normalise = run_faber_format_stdout_with_args(&[
+        "format",
+        "--policy",
+        "normalise-v1",
+        "--stdout",
+        pkg_b.to_str().expect("utf8 path"),
+    ]);
+
+    let output = Command::new(faber_binary())
+        .arg("format")
+        .arg(&pkg_a)
+        .arg(&pkg_b)
+        .output()
+        .expect("run faber format across two packages");
+    let a_after = fs::read_to_string(&pkg_a).expect("read pkg-a after");
+    let b_after = fs::read_to_string(&pkg_b).expect("read pkg-b after");
+    let _ = fs::remove_dir_all(&base);
+
+    assert!(
+        output.status.success(),
+        "multi-root format must succeed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        normalize_trailing_newline(&a_after),
+        a_pretty,
+        "pkg-a (pretty-v1) must be formatted with its own policy"
+    );
+    assert_eq!(
+        normalize_trailing_newline(&b_after),
+        b_normalise,
+        "pkg-b (normalise-v1) must be formatted with its own policy"
+    );
+}
+
+/// S5: an unknown manifest `[format] policy` slug fails clearly at
+/// parse/validation time, naming the key, the slug, and the registry.
+#[test]
+fn format_manifest_unknown_policy_slug_fails_clearly() {
+    let root = std::env::temp_dir().join("faber-format-s5-bogus-policy");
+    let _ = fs::remove_dir_all(&root);
+    let fixture = temp_format_package(&root, Some("not-a-policy"), SOFT_WIDTH_SOURCE);
+
+    let output = Command::new(faber_binary())
+        .args(["format", "--stdout"])
+        .arg(&fixture)
+        .output()
+        .expect("run faber format on a bogus-policy package");
+    let _ = fs::remove_dir_all(&root);
+
+    assert!(
+        !output.status.success(),
+        "an unknown manifest format.policy must fail closed"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("format.policy"),
+        "the error must name the manifest key: {stderr}"
+    );
+    assert!(
+        stderr.contains("not-a-policy"),
+        "the error must name the offending slug: {stderr}"
+    );
+    assert!(
+        stderr.contains("registered slugs"),
+        "the error must point at the rule-slug registry: {stderr}"
+    );
+}
+
+/// S5: an empty manifest `[format] policy` fails clearly (never silently
+/// treated as the default).
+#[test]
+fn format_manifest_empty_policy_slug_fails_clearly() {
+    let root = std::env::temp_dir().join("faber-format-s5-empty-policy");
+    let _ = fs::remove_dir_all(&root);
+    let fixture = temp_format_package(&root, Some(""), SOFT_WIDTH_SOURCE);
+
+    let output = Command::new(faber_binary())
+        .args(["format", "--stdout"])
+        .arg(&fixture)
+        .output()
+        .expect("run faber format on an empty-policy package");
+    let _ = fs::remove_dir_all(&root);
+
+    assert!(
+        !output.status.success(),
+        "an empty format.policy must fail closed"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("format.policy must not be empty"),
+        "the error must name the empty policy: {stderr}"
+    );
+}
+
+/// S5 locale regression: a package `[format] policy` must not disturb the
+/// locale path — reader-locale re-emission is canonical HIR output and stays
+/// policy-independent. Output is byte-identical with and without the
+/// `[format]` table, and no new CLI conflict fires (the `--policy` +
+/// `--locale` rejection contract is unchanged).
+#[cfg(feature = "hir-faber")]
+#[test]
+fn format_manifest_policy_does_not_change_locale_reemission() {
+    let root_with = std::env::temp_dir().join("faber-format-s5-locale-with");
+    let root_without = std::env::temp_dir().join("faber-format-s5-locale-without");
+    let _ = fs::remove_dir_all(&root_with);
+    let _ = fs::remove_dir_all(&root_without);
+    let fixture_with = temp_format_package(&root_with, Some("pretty-v1"), VALID_BLOCK_SOURCE);
+    let fixture_without = temp_format_package(&root_without, None, VALID_BLOCK_SOURCE);
+
+    let run = |fixture: &Path| {
+        Command::new(faber_binary())
+            .args(["format", "--locale", "en", "--stdout"])
+            .arg(fixture)
+            .output()
+            .expect("run faber format --locale en")
+    };
+    let with = run(&fixture_with);
+    let without = run(&fixture_without);
+    let stderr_with = String::from_utf8_lossy(&with.stderr);
+    let stderr_without = String::from_utf8_lossy(&without.stderr);
+    let _ = fs::remove_dir_all(&root_with);
+    let _ = fs::remove_dir_all(&root_without);
+
+    assert!(
+        with.status.success(),
+        "manifest policy + --locale must succeed: {stderr_with}"
+    );
+    assert!(
+        without.status.success(),
+        "no-[format] package + --locale must succeed: {stderr_without}"
+    );
+    assert_eq!(
+        with.stdout, without.stdout,
+        "the [format] table must not change locale re-emission (byte-identical)"
+    );
+    assert!(
+        !stderr_with.contains("--policy"),
+        "manifest-declared policy must not trip the CLI --policy/--locale conflict: {stderr_with}"
+    );
+}
+
+/// S5: `--config` stays the deferred warning stub — the flag still parses and
+/// prints the same not-implemented warning; the `[format]` manifest is the
+/// only config surface in v1.
+#[test]
+fn format_config_flag_stays_deferred_warning_stub() {
+    let fixture = std::env::temp_dir().join("faber-format-s5-config.fab");
+    fs::write(&fixture, "incipit {\n  nota \"ok\"\n}\n").expect("write fixture");
+    let config = std::env::temp_dir().join("faber-format-s5-forma.toml");
+    fs::write(&config, "[format]\npolicy = \"pretty-v1\"\n").expect("write forma.toml");
+
+    let output = Command::new(faber_binary())
+        .args(["format", "--config"])
+        .arg(&config)
+        .arg(&fixture)
+        .output()
+        .expect("run faber format --config");
+    let _ = fs::remove_file(&fixture);
+    let _ = fs::remove_file(&config);
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success(),
+        "--config must remain a warning stub, not a failure: {stderr}"
+    );
+    assert!(
+        stderr.contains("--config is not implemented yet"),
+        "the deferred warning must still fire: {stderr}"
     );
 }
 

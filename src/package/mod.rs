@@ -143,6 +143,7 @@ pub(crate) use manifest::validate_manifest;
 // binary commands/run resolves run targets through this crate-visible mapping.
 pub(crate) use manifest::{
     manifest_backend_selection, manifest_build_target, manifest_device_inputs,
+    manifest_format_policy,
 };
 #[allow(unused_imports)] // public package API; used by integration tests and external callers
 pub use manifest::{

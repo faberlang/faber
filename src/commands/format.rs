@@ -1,6 +1,6 @@
 //! `faber format` — author-mode formatter (default) with locale/check/stdout,
 //! the `--write`/`--stdin`/`--policy` steady-state flag surface (FORMAT-PRETTY
-//! S4).
+//! S4) and the `[format]` manifest policy + precedence chain (S5).
 
 use radix::codegen::Target;
 use radix::driver::{peel_raw_source, split_frontmatter, Config, Session};
@@ -28,15 +28,19 @@ pub fn cmd_format(command: &FormatCommand) {
     }
 
     // Policy resolution (rule-slug registry). The built-in default is
-    // `normalise-v1`; the CLI `--policy` override wins over it. An unknown slug
-    // fails clearly before any file is touched, with a message distinct from
-    // formatting-difference output.
-    let policy = match resolve_policy(command.policy.as_deref()) {
-        Ok(policy) => policy,
-        Err(message) => {
-            eprintln!("error: {message}");
-            std::process::exit(1);
-        }
+    // `normalise-v1`; the CLI `--policy` override wins over the package
+    // `[format] policy` and the built-in default (FORMAT-PRETTY S5). An
+    // unknown CLI slug fails clearly before any file is touched, with a
+    // message distinct from formatting-difference output.
+    let cli_policy = match command.policy.as_deref() {
+        None => None,
+        Some(slug) => Some(match resolve_policy(Some(slug)) {
+            Ok(policy) => policy,
+            Err(message) => {
+                eprintln!("error: {message}");
+                std::process::exit(1);
+            }
+        }),
     };
 
     // The locale-interplay contract: reader-locale re-emission is canonical
@@ -52,6 +56,8 @@ pub fn cmd_format(command: &FormatCommand) {
     // --stdin: read exactly one source document from stdin and print the
     // formatted result to stdout (implies stdout; no path arguments — enforced
     // at the CLI parse boundary). The diagnostic source name is `<stdin>`.
+    // A virtual source has no containing package manifest to consult, so the
+    // policy is the CLI override or the built-in default (FORMAT-PRETTY S5).
     if command.stdin {
         let mut source = String::new();
         if let Err(err) = std::io::stdin().read_to_string(&mut source) {
@@ -59,6 +65,7 @@ pub fn cmd_format(command: &FormatCommand) {
             std::process::exit(1);
         }
         let path = Path::new("<stdin>");
+        let policy = cli_policy.unwrap_or_default();
         match format_single_doc(path, command.locale.as_deref(), &source, policy) {
             Ok(formatted) => {
                 print!("{formatted}");
@@ -106,6 +113,18 @@ pub fn cmd_format(command: &FormatCommand) {
             Ok(source) => source,
             Err(err) => {
                 eprintln!("error: failed to read '{}': {err}", path.display());
+                error_count += 1;
+                continue;
+            }
+        };
+
+        // Per-file policy resolution: the CLI override wins; otherwise the
+        // containing package's `[format] policy`; otherwise the built-in
+        // default (FORMAT-PRETTY S5, per-root resolution for multi-root runs).
+        let policy = match resolve_file_policy(path, cli_policy) {
+            Ok(policy) => policy,
+            Err(message) => {
+                eprintln!("error: {message}");
                 error_count += 1;
                 continue;
             }
@@ -162,6 +181,30 @@ fn resolve_policy(slug: Option<&str>) -> Result<FormatPolicy, String> {
     match slug {
         None => Ok(FormatPolicy::default()),
         Some(slug) => FormatPolicy::from_slug(slug).map_err(|err| err.to_string()),
+    }
+}
+
+/// Resolve the effective format policy for ONE input file (FORMAT-PRETTY S5).
+///
+/// Precedence: CLI `--policy` > the containing package's `[format] policy` >
+/// the built-in default (`normalise-v1`). Each root's files resolve the
+/// package that CONTAINS them (nearest `faber.toml`, walking up from the
+/// file), so multi-root invocations spanning packages keep per-package
+/// policies. Files outside any package — legacy manifestless inputs, virtual
+/// sources such as `--stdin` — fall back to the built-in default. A package
+/// manifest naming an unknown `[format] policy` slug fails clearly (never a
+/// silent default).
+fn resolve_file_policy(
+    path: &Path,
+    cli_policy: Option<FormatPolicy>,
+) -> Result<FormatPolicy, String> {
+    if let Some(policy) = cli_policy {
+        return Ok(policy);
+    }
+    match crate::package::manifest_format_policy(path) {
+        Ok(Some(policy)) => Ok(policy),
+        Ok(None) => Ok(FormatPolicy::default()),
+        Err(diag) => Err(diag.message),
     }
 }
 

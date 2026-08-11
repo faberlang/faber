@@ -70,6 +70,28 @@ corpus matrices and backend e2e stay on the radix ladder
 
 See `faber --help` and after-help text for the full surface.
 
+## Formatting policy
+
+`faber format` selects a named format policy: `normalise-v1` (the exact
+current normalizer behavior; the built-in default) or `pretty-v1` (the pretty
+layout policy). Policy precedence: CLI `--policy` > package `[format] policy`
+in `faber.toml` > the built-in default (`normalise-v1`). Each input root
+resolves the package that contains it (nearest `faber.toml`, walking up), so a
+multi-root invocation spanning packages formats each package with its own
+policy; files outside any package (and `--stdin`) fall back to the built-in
+default. Unknown policy slugs fail clearly at parse/validation — never a
+silent fallback.
+
+```toml
+# faber.toml
+[format]
+policy = "pretty-v1"
+```
+
+There is no second config language in v1: `[forma]`, `forma.toml`, global
+dotfile config, inheritance, and per-file rule lists are out of scope, and
+`faber format --config` stays a deferred warning stub.
+
 ## Reader locale
 
 Faber source and diagnostics can render in a reader locale. `faber check`,
