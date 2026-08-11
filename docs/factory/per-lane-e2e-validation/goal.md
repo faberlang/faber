@@ -1,6 +1,6 @@
 # Per-Lane E2E Validation — Feature-Isolated Backend Lanes + Release Without the Wait
 
-**Status**: planned — pre-implementation; discovered 2026-08-10 (radix 0.81.0 / faber 1.6.0 release postmortem + feature-isolation trial)
+**Status**: active — implementation in progress (2026-08-11): EL-1 landed (faber 7cf2e1f); EL-2 applied + REVERTED + escalated (load-bearing facade); EL-2b landed (radix 721acd7f1 — radix-mir-llvm gated like wasm/sexp/wgsl, FMIR core stays per operator ruling); EL-3 in flight (failable_facts_parts leaf ownership); EL-4/EL-5/EL-6 queued. Delivery: docs/factory/per-lane-e2e-validation/delivery.md (Status: active).
 **Created**: 2026-08-10
 **Target repo**: `/Users/ianzepp/work/faberlang/faber`
 **Factory artifact dir**: `docs/factory/per-lane-e2e-validation/`
