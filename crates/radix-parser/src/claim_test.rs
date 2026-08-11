@@ -61,12 +61,12 @@ fn comment_before_genus_close_is_claimed() {
     // MT-U2: a full-line comment before a genus's closing `}` is legal
     // ClassDecl.end_trivia (mirrors block-end trivia), so it is claimed and no
     // invalid-placement diagnostic is reported.
+    use radix_syntax::{StmtKind, Trivia};
     let source = "genus Canis {\n  textus nomen\n  # before close\n}\n";
     let result = parse_source(source);
     assert!(result.success(), "{:?}", result.errors);
     assert_eq!(invalid_placement_count(&result), 0);
 
-    use radix_syntax::{StmtKind, Trivia};
     let program = result.program.as_ref().unwrap();
     let StmtKind::Class(class) = &program.statements[0].kind else {
         panic!("expected genus declaration");
