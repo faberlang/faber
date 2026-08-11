@@ -1,0 +1,554 @@
+#!/usr/bin/env python3
+"""Verified bootstrap installer for the canonical Faber dev-kit payload.
+
+faber-onboarding Stage 3, unit A1 (delivery-stage3.md Batch A). The primary
+channel installs the canonical Stage 2 release payload: the dev-kit archive
+for the platform triple, SHA-256 verified against the published checksum asset
+BEFORE any payload is unpacked or executed (install-channel-matrix.md checksum
+policy). A mismatch aborts with no partial install — nothing under the prefix
+is touched before verification passes.
+
+This is a shell bootstrap, NOT a second release system (CAMPAIGN Stage 3
+overlap rule): it downloads a fixed release payload (archive name
+`faber-v<version>-<triple>.tar.gz` + basename-only `.sha256`, release-contract
+.md §5.1) and installs the dev-kit layout (dev-kit-contract.md):
+
+    <prefix>/bin/faber
+    <prefix>/share/faber/reference/
+    <prefix>/share/faber/locale/<locale>/pack.toml
+
+Prefix rules (install-channel-matrix.md): default is the user-local prefix
+`~/.faber` (no sudo, no hidden writes); explicit `--prefix` covers system and
+agent installs. Agent installs are non-interactive: no prompts ever, stable
+exit codes, human-readable change report (the JSON diagnostics surface is
+faber Stage 9 — labeled staged, not implemented here).
+
+Exit codes:
+  0  installed, or already current (idempotent re-run)
+  1  checksum mismatch, different version already installed, or install failure
+     (fail-closed; no partial install)
+  2  usage error (unsupported platform/triple, malformed arguments)
+
+Proxy/offline: downloads go through urllib and honor the standard
+HTTP_PROXY / HTTPS_PROXY / http_proxy / https_proxy environment variables.
+Offline or missing assets fail closed with exit 1 and a message naming the
+URL. `--base-url` may point at a mirror or a local directory (release-contract
+.md §7 defers mirrors; the checksum is still verified against the .sha256
+fetched from that same source).
+
+Curl convenience path (self-contained; needs only python3 — no repo checkout).
+When the script itself is published at the release tag (release interlock R1):
+
+    curl -fsSL https://github.com/faberlang/releases/releases/download/\\
+        faber-v1.6.0/install-faber | python3 - --version 1.6.0
+
+Verification of the installed kit is a separate step that reuses the Stage 2
+verifier against the installed prefix:
+
+    scripta/verify-dev-kit --payload <prefix> --version <version>
+
+Usage:
+    scripta/install-faber [--version 1.6.0] [--prefix ~/.faber]
+        [--triple aarch64-apple-darwin] [--base-url <url|dir>] [--add-to-path]
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import platform
+import re
+import shutil
+import sys
+import tarfile
+import urllib.error
+import urllib.request
+from datetime import datetime, timezone
+from pathlib import Path
+
+# The current release under test. Keep in sync with
+# `release-manifest.yaml` releaseIntent.version at each release (R1/D1
+# interlock): the installer downloads the exact fixed payload for this
+# version; docs must name the same artifact/version.
+DEFAULT_VERSION = "1.6.0"
+
+RELEASE_HOST = "https://github.com/faberlang/releases"
+
+# Supported platform slice (platform-matrix.md OQ9): macOS arm64 + Linux x86_64.
+SUPPORTED_TRIPLES = ("aarch64-apple-darwin", "x86_64-unknown-linux-gnu")
+
+# Known residuals fail closed even when passed explicitly as --triple
+# (platform-matrix.md: no release artifact / no clean-room worker).
+RESIDUAL_TRIPLES = {
+    "x86_64-apple-darwin": "macOS Intel (no release artifact, no clean-room "
+        "worker — named residual, platform-matrix.md)",
+    "aarch64-unknown-linux-gnu": "Linux arm64 (supported slice is Linux "
+        "x86_64; other variants are named residuals)",
+    "aarch64-pc-windows-msvc": "Windows (named residual)",
+    "x86_64-pc-windows-msvc": "Windows (named residual)",
+}
+
+RECEIPT_REL = "share/faber/install-receipt.json"
+SEMVER_RE = r"^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$"
+
+
+def fail(message: str, code: int = 1) -> "None":
+    print(f"error: {message}", file=sys.stderr)
+    raise SystemExit(code)
+
+
+class InstallError(Exception):
+    """An install failure that aborts cleanly (exit 1)."""
+
+
+# ---------------------------------------------------------------------------
+# platform / artifact identity
+# ---------------------------------------------------------------------------
+
+def detect_triple() -> str:
+    """Auto-detect the platform triple; residuals and unknown hosts fail closed."""
+    system = platform.system().lower()
+    machine = platform.machine().lower()
+    if system == "darwin":
+        if machine in ("arm64", "aarch64"):
+            return "aarch64-apple-darwin"
+        if machine in ("x86_64", "amd64"):
+            fail(
+                "macOS Intel is not supported (named residual, platform-matrix.md); "
+                "no release artifact exists for it",
+                code=2,
+            )
+    if system == "linux":
+        if machine in ("x86_64", "amd64"):
+            return "x86_64-unknown-linux-gnu"
+        fail(
+            f"Linux {machine} is not in the supported slice (Linux x86_64); "
+            "other variants are named residuals (platform-matrix.md)",
+            code=2,
+        )
+    fail(
+        f"unsupported host: {system}/{machine}; the supported slice is "
+        "macOS arm64 and Linux x86_64 (platform-matrix.md)",
+        code=2,
+    )
+    raise AssertionError("unreachable")
+
+
+def archive_name(version: str, triple: str) -> str:
+    return f"faber-v{version}-{triple}.tar.gz"
+
+
+def default_base_url(version: str) -> str:
+    return f"{RELEASE_HOST}/releases/download/faber-v{version}"
+
+
+# ---------------------------------------------------------------------------
+# fetch + checksum verification (BEFORE any unpack or execution)
+# ---------------------------------------------------------------------------
+
+def fetch(url_or_path: str, what: str) -> bytes:
+    """Fetch bytes from a URL or a local path.
+
+    urllib honors HTTP_PROXY/HTTPS_PROXY/http_proxy/https_proxy. A local
+    path (or file:// URL) is read directly — used by tests and mirrors.
+    """
+    if "://" not in url_or_path:
+        path = Path(url_or_path)
+        if not path.is_file():
+            raise InstallError(f"{what} not found: {url_or_path}")
+        return path.read_bytes()
+    try:
+        with urllib.request.urlopen(url_or_path, timeout=60) as response:
+            return response.read()
+    except urllib.error.HTTPError as err:
+        raise InstallError(
+            f"failed to download {what} ({err.code} {err.reason}): {url_or_path}"
+        ) from err
+    except (urllib.error.URLError, OSError) as err:
+        raise InstallError(
+            f"failed to download {what} (offline or unreachable?): {url_or_path}\n"
+            f"  {err}"
+        ) from err
+
+
+def verify_checksum(archive: str, archive_bytes: bytes, checksum_text: str) -> str:
+    """Parse the basename-only .sha256 asset and verify the archive bytes.
+
+    Enforces release-contract.md §5.1: the asset names ONLY the downloaded
+    archive basename (a path-qualified name is rejected — F7), exactly one
+    line, `sha256  <basename>`. Any deviation fails closed.
+    """
+    lines = [line for line in checksum_text.splitlines() if line.strip()]
+    if len(lines) != 1:
+        raise InstallError(
+            f"checksum asset must contain exactly one line, found {len(lines)}"
+        )
+    fields = lines[0].split()
+    if len(fields) != 2 or not re.fullmatch(r"[0-9a-f]{64}", fields[0]):
+        raise InstallError(f"unparseable checksum asset line: {lines[0]!r}")
+    recorded, name = fields
+    if name != archive:
+        raise InstallError(
+            f"checksum asset names {name!r}, expected the archive basename "
+            f"{archive!r} (basename-only rule, release-contract.md §5.1)"
+        )
+    actual = hashlib.sha256(archive_bytes).hexdigest()
+    if actual != recorded:
+        raise InstallError(
+            f"SHA-256 mismatch for {archive}\n"
+            f"  published: {recorded}\n"
+            f"  computed:  {actual}\n"
+            "checksum verified before install; aborting with NO partial install"
+        )
+    return actual
+
+
+# ---------------------------------------------------------------------------
+# safe archive extraction (archive traversal / symlink defenses)
+# ---------------------------------------------------------------------------
+
+def safe_copy_members(tar: tarfile.TarFile, dest: Path) -> list[str]:
+    """Copy regular files + directories from the archive into `dest`.
+
+    Rejects absolute paths, `..` traversal, symlinks/hardlinks/devices
+    (package-and-lock-contract.md integrity: archive traversal/symlink
+    defenses). Files are written by hand so ownership in the archive never
+    causes chown behavior across Python versions; the exec bit is derived
+    from the member mode. Returns the relative paths of the regular files
+    only (directories are created as side effects).
+    """
+    dest_resolved = dest.resolve()
+    relpaths: list[str] = []
+    for member in tar.getmembers():
+        if not (member.isfile() or member.isdir()):
+            raise InstallError(
+                f"archive member {member.name!r} is not a regular file or "
+                "directory; refusing to install"
+            )
+        rel = member.name
+        if rel.startswith("/") or ".." in rel.split("/"):
+            raise InstallError(f"unsafe archive member path {rel!r}")
+        target = (dest_resolved / rel).resolve()
+        try:
+            target.relative_to(dest_resolved)
+        except ValueError:
+            raise InstallError(f"unsafe archive member path {rel!r}")
+        if member.isdir():
+            target.mkdir(parents=True, exist_ok=True)
+        else:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            source = tar.extractfile(member)
+            if source is None:
+                raise InstallError(f"cannot read archive member {member.name!r}")
+            with target.open("wb") as out:
+                shutil.copyfileobj(source, out)
+            os.chmod(target, 0o755 if (member.mode & 0o111) else 0o644)
+            relpaths.append(rel)
+    return relpaths
+
+
+# ---------------------------------------------------------------------------
+# prefix state + change report
+# ---------------------------------------------------------------------------
+
+def receipt_path(prefix: Path) -> Path:
+    return prefix / RECEIPT_REL
+
+
+def load_receipt(prefix: Path) -> dict | None:
+    path = receipt_path(prefix)
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def file_state(target: Path, staging: Path, rel: str) -> str:
+    """'added' | 'updated' | 'unchanged' for one payload file."""
+    if not target.exists():
+        return "added"
+    if target.is_file() and target.read_bytes() == staging.read_bytes():
+        if os.access(target, os.X_OK) == os.access(staging, os.X_OK):
+            return "unchanged"
+    return "updated"
+
+
+def write_payload(staging: Path, prefix: Path, payload_files: list[str]) -> dict[str, str]:
+    """Move payload files into the prefix; per-file added/updated/unchanged.
+
+    Rollback: existing files are backed up before replacement and restored on
+    failure; files added by this run are removed. Interrupted installs never
+    leave a partial payload.
+    """
+    states: dict[str, str] = {}
+    rollback = prefix / f".faber-install-rollback-{os.getpid()}"
+    rollback.mkdir(parents=True, exist_ok=True)
+    added: list[Path] = []
+    try:
+        for rel in payload_files:
+            source = staging / rel
+            target = prefix / rel
+            state = file_state(target, source, rel)
+            states[rel] = state
+            if state == "unchanged":
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if target.exists():
+                backup = rollback / rel
+                backup.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(target, backup)
+            else:
+                added.append(target)
+            tmp = target.with_name(f".{target.name}.install-{os.getpid()}")
+            shutil.copy2(source, tmp)
+            os.chmod(tmp, os.stat(source).st_mode & 0o777)
+            os.replace(tmp, target)
+    except OSError as err:
+        # best-effort rollback: restore overwritten files, drop added ones
+        for backup in rollback.rglob("*"):
+            if backup.is_file():
+                rel = backup.relative_to(rollback).as_posix()
+                dest = prefix / rel
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(backup, dest)
+        for target in added:
+            target.unlink(missing_ok=True)
+        shutil.rmtree(rollback, ignore_errors=True)
+        shutil.rmtree(staging, ignore_errors=True)
+        raise InstallError(f"failed to write payload: {err}")
+    shutil.rmtree(rollback, ignore_errors=True)
+    return states
+
+
+def write_receipt(prefix: Path, *, version: str, triple: str, archive: str,
+                  archive_sha256: str, source: str, payload_files: list[str]) -> Path:
+    data = {
+        "receipt": "faber install receipt (faber-onboarding Stage 3; consumed by Stage 4 doctor)",
+        "prefix": str(prefix),
+        "version": version,
+        "triple": triple,
+        "archive": archive,
+        "archiveSha256": archive_sha256,
+        "source": source,
+        "installedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "files": payload_files,
+    }
+    path = receipt_path(prefix)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
+# ---------------------------------------------------------------------------
+# PATH / shell changes (explicit and reversible)
+# ---------------------------------------------------------------------------
+
+def shell_rc_path(home: Path) -> Path:
+    shell = os.environ.get("SHELL", "")
+    if "zsh" in shell:
+        return home / ".zshrc"
+    if "bash" in shell:
+        return home / ".bashrc"
+    return home / ".zshrc" if sys.platform == "darwin" else home / ".bashrc"
+
+
+def path_line(prefix: Path) -> str:
+    return f'export PATH="{prefix}/bin:$PATH"'
+
+
+def add_to_path(prefix: Path, home: Path) -> tuple[Path, bool]:
+    """Append the PATH export to the shell rc if absent. Returns (rc, edited)."""
+    rc = shell_rc_path(home)
+    line = path_line(prefix)
+    if rc.is_file() and line in rc.read_text(encoding="utf-8", errors="replace"):
+        return rc, False
+    with rc.open("a", encoding="utf-8") as handle:
+        if rc.exists() and rc.stat().st_size > 0:
+            handle.write("\n")
+        handle.write(f"# added by faber install-faber (reversible: faber self uninstall)\n{line}\n")
+    return rc, True
+
+
+def on_path(prefix: Path) -> bool:
+    bin_dir = str(prefix / "bin")
+    return any(os.path.normpath(p) == os.path.normpath(bin_dir)
+               for p in os.environ.get("PATH", "").split(os.pathsep) if p)
+
+
+# ---------------------------------------------------------------------------
+# report
+# ---------------------------------------------------------------------------
+
+def print_report(*, result: str, version: str, triple: str, prefix: Path,
+                 source: str, archive_sha256: str, states: dict[str, str],
+                 receipt: Path, path_edited: bool, rc_path: Path | None) -> None:
+    added = sum(1 for s in states.values() if s == "added")
+    updated = sum(1 for s in states.values() if s == "updated")
+    unchanged = sum(1 for s in states.values() if s == "unchanged")
+    print(f"faber install report — faber {version} ({triple})")
+    print(f"  result:     {result}")
+    print(f"  prefix:     {prefix}")
+    print(f"  source:     {source}")
+    print("  checksum:   sha256 verified before install (basename-only asset)")
+    print(f"  archiveSha256: {archive_sha256}")
+    print(f"  files:      {added} added, {updated} updated, {unchanged} unchanged, 0 removed")
+    for rel in sorted(states):
+        print(f"    {states[rel]:<9} {rel}")
+    print(f"  receipt:    {receipt}")
+    if on_path(prefix):
+        print(f"  PATH:       {prefix}/bin is on PATH")
+    else:
+        print(f"  PATH:       {prefix}/bin is not on PATH")
+        print(f"              add: {path_line(prefix)}")
+        if path_edited:
+            print(f"              appended to {rc_path}")
+        else:
+            print("              (or re-run with --add-to-path to persist it)")
+    print("  proxy:      downloads honor HTTPS_PROXY / HTTP_PROXY env vars")
+    print(f"  verify:     scripta/verify-dev-kit --payload {prefix} --version {version}")
+
+
+# ---------------------------------------------------------------------------
+# main
+# ---------------------------------------------------------------------------
+
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog="install-faber",
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--version", default=DEFAULT_VERSION,
+                        help=f"release version to install (default: {DEFAULT_VERSION})")
+    parser.add_argument("--prefix", default="~/.faber",
+                        help="install prefix (default: ~/.faber, user-local; "
+                             "explicit --prefix for system/agent installs)")
+    parser.add_argument("--triple", default=None,
+                        help="platform triple (default: auto-detect; supported: "
+                             + ", ".join(SUPPORTED_TRIPLES) + ")")
+    parser.add_argument("--base-url", default=None,
+                        help="asset base URL or directory (default: the release "
+                             "tag download URL on the release host)")
+    parser.add_argument("--add-to-path", action="store_true",
+                        help="append the PATH export to the detected shell rc "
+                             "(explicit opt-in; reversible)")
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv or sys.argv[1:])
+
+    if not re.fullmatch(SEMVER_RE, args.version):
+        fail(f"{args.version!r} is not a semver-shaped version", code=2)
+    if not args.prefix.strip():
+        fail("--prefix must not be empty", code=2)
+
+    if args.triple is None:
+        triple = detect_triple()
+    else:
+        triple = args.triple
+        if triple in RESIDUAL_TRIPLES:
+            fail(f"triple {triple!r} is not supported: {RESIDUAL_TRIPLES[triple]}", code=2)
+        if triple not in SUPPORTED_TRIPLES:
+            fail(
+                f"triple {triple!r} is not in the supported slice "
+                f"({', '.join(SUPPORTED_TRIPLES)}; platform-matrix.md)",
+                code=2,
+            )
+
+    prefix = Path(os.path.expanduser(args.prefix)).resolve()
+    archive = archive_name(args.version, triple)
+    base = args.base_url or default_base_url(args.version)
+    if "://" not in base:
+        base = str(Path(base).resolve())
+    source = f"{base}/{archive}"
+
+    # 1. Fetch the archive + the published checksum asset.
+    archive_bytes = fetch(source, "release archive")
+    checksum_text = fetch(f"{source}.sha256", "checksum asset").decode("utf-8", errors="replace")
+
+    # 2. VERIFY BEFORE ANY UNPACK OR EXECUTION (install-channel-matrix.md).
+    #    A mismatch aborts here; nothing under the prefix has been touched.
+    archive_sha256 = verify_checksum(archive, archive_bytes, checksum_text)
+
+    # 3. Prefix state checks (no writes yet).
+    prefix.parent.mkdir(parents=True, exist_ok=True)
+    if prefix.exists() and not prefix.is_dir():
+        fail(f"prefix exists and is not a directory: {prefix}")
+    existing = load_receipt(prefix)
+    if existing and existing.get("version") != args.version:
+        fail(
+            f"prefix {prefix} already has faber {existing.get('version')} "
+            f"installed; installing {args.version} over it is a versioned "
+            "reinstall (upgrade/downgrade), which is faber Stage 3 A2 "
+            "(`faber self update`) territory — re-run for the installed "
+            "version or choose a fresh prefix"
+        )
+
+    # 4. Safe extraction to a sibling staging dir. The prefix itself is NOT
+    #    created until checksum AND archive validation both pass, so a
+    #    tampered checksum or a corrupt/unsafe archive leaves nothing behind
+    #    (fail-closed, no partial install).
+    staging = prefix.parent / f".{prefix.name}.faber-install-stage-{os.getpid()}"
+    try:
+        staging.mkdir(parents=True, exist_ok=True)
+    except OSError as err:
+        raise InstallError(f"cannot create staging dir in {prefix.parent}: {err}")
+    archive_path = staging / archive
+    archive_path.write_bytes(archive_bytes)
+    try:
+        with tarfile.open(archive_path, "r:gz") as tar:
+            payload_files = safe_copy_members(tar, staging / "payload")
+    except (tarfile.TarError, InstallError) as err:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise InstallError(f"invalid release archive: {err}")
+
+    # 5. Create the prefix and write the payload (change report + rollback).
+    try:
+        prefix.mkdir(parents=True, exist_ok=True)
+    except OSError as err:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise InstallError(f"cannot create prefix {prefix}: {err}")
+    try:
+        states = write_payload(staging / "payload", prefix, payload_files)
+    except InstallError:
+        raise
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+
+    # 6. Receipt (prefix record consumed by Stage 4 doctor).
+    receipt = write_receipt(
+        prefix, version=args.version, triple=triple, archive=archive,
+        archive_sha256=archive_sha256, source=source, payload_files=payload_files,
+    )
+
+    # 7. PATH / shell handling.
+    home = Path(os.environ.get("HOME") or str(Path.home()))
+    rc_path = None
+    edited = False
+    if args.add_to_path:
+        rc_path, edited = add_to_path(prefix, home)
+
+    if states and all(s == "unchanged" for s in states.values()):
+        result = "already current"
+    else:
+        result = "installed"
+    print_report(
+        result=result, version=args.version, triple=triple, prefix=prefix,
+        source=source, archive_sha256=archive_sha256, states=states,
+        receipt=receipt, path_edited=edited, rc_path=rc_path,
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except InstallError as err:
+        print(f"error: {err}", file=sys.stderr)
+        raise SystemExit(1)
