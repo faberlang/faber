@@ -1,7 +1,8 @@
 # Logical roots embedded by the Faber RC core-support payload.
-# Paths are relative to the faberlang container (parent of the faber crate).
-# Host libraries live under hosts/crates/; each crate uses explicit path deps
-# so the archive does not need the hosts workspace root.
+# Paths are relative to the faberlang container (three levels above this
+# crate, radix/crates/faber/ — destination-map §6.3). Host libraries live
+# under hosts/crates/; each crate uses explicit path deps so the archive
+# does not need the hosts workspace root.
 faber-runtime
 radix/crates/radix-runtime-contract
 hosts/crates/host-kernel
