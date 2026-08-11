@@ -40,6 +40,13 @@ older version) are not performed here — that is Stage 3 A3 — and cross-lane
 updates (odd development major <-> even LTS major, faber/docs/release/policy.md)
 require the explicit `--allow-lane-change` flag.
 
+Destination-side containment (CTO audit FINDING 1): every write beneath the
+prefix — payload, rollback, receipt — is proven to stay within the canonical
+prefix WITHOUT following a pre-existing symlink. A pre-existing
+`prefix/share -> /outside` symlink is rejected before any write; both sides
+stay byte-identical. The same rule applies to PATH-owned writes (the shell rc
+append must not follow a symlink out of the user's home).
+
 Exit codes:
   0  installed, updated, or already current (idempotent re-run)
   1  checksum mismatch, version conflict (cross-version without --update,
@@ -318,6 +325,67 @@ def load_receipt(prefix: Path) -> dict | None:
     return data if isinstance(data, dict) else None
 
 
+def preflight_destinations(prefix: Path, rels: list[str], what: str) -> None:
+    """Prove every destination in `rels` stays beneath the canonical prefix.
+
+    Destination-side containment (CTO audit FINDING 1): a pre-existing
+    `prefix/share -> /outside` symlink must never redirect a validated
+    payload write outside the install prefix. Every destination is validated
+    BEFORE any write, so a compromised destination fails closed with nothing
+    churned on either side (the archive-extraction defenses cover the staging
+    tree only, not the destination).
+    """
+    for rel in rels:
+        guard_destination(prefix, rel, what)
+
+
+def guard_destination(prefix: Path, rel: str, what: str) -> Path:
+    """Return `prefix / rel` after proving it is symlink-free beneath prefix.
+
+    The canonical prefix must be a real directory (not itself reached through
+    a symlink), and every EXISTING component from `prefix` down — ancestors
+    and the destination file — must be a real directory/file, not a symlink
+    or other reparse point. A missing component is fine: it is created fresh
+    under an already-proven real parent. The installer never creates symlinks
+    under the prefix, so any pre-existing symlink in a destination path is
+    foreign and the write is rejected (fail-closed).
+
+    Bound: this defends against PRE-EXISTING symlinks (the audit finding); a
+    concurrent attacker able to swap paths mid-write is out of scope for the
+    Python-level installer.
+    """
+    try:
+        if prefix.is_symlink() or prefix.resolve() != prefix:
+            raise InstallError(
+                f"refusing to write {what} {rel!r}: {prefix} is reached "
+                "through a symlink; the install prefix must be canonical"
+            )
+        dest = prefix
+        parts = Path(rel).parts
+        for i, part in enumerate(parts):
+            dest = dest / part
+            if dest.is_symlink():
+                raise InstallError(
+                    f"refusing to write {what} {rel!r}: {dest} is a symlink; "
+                    "destination must stay beneath the canonical install "
+                    f"prefix {prefix}"
+                )
+            if i == len(parts) - 1:
+                if dest.exists() and not dest.is_file():
+                    raise InstallError(
+                        f"refusing to write {what} {rel!r}: {dest} is not a "
+                        "regular file"
+                    )
+            elif dest.exists() and not dest.is_dir():
+                raise InstallError(
+                    f"refusing to write {what} {rel!r}: {dest} is not a "
+                    "directory"
+                )
+    except OSError as err:
+        raise InstallError(f"cannot inspect destination {prefix / rel!r}: {err}")
+    return dest
+
+
 def file_state(target: Path, staging: Path, rel: str) -> str:
     """'added' | 'updated' | 'unchanged' for one payload file."""
     if not target.exists():
@@ -331,23 +399,43 @@ def file_state(target: Path, staging: Path, rel: str) -> str:
 def write_payload(staging: Path, prefix: Path, payload_files: list[str]) -> dict[str, str]:
     """Move payload files into the prefix; per-file added/updated/unchanged.
 
+    Destination-side containment (CTO audit FINDING 1): every destination is
+    proven beneath the canonical prefix WITHOUT following a pre-existing
+    symlink, BEFORE any write. A symlinked prefix child (e.g.
+    `prefix/share -> /outside`) fails closed with neither side churned.
+
     Rollback: existing files are backed up before replacement and restored on
     failure; files added by this run are removed. Interrupted installs never
     leave a partial payload.
     """
+    preflight_destinations(prefix, payload_files, "payload file")
     states: dict[str, str] = {}
     rollback = prefix / f".faber-install-rollback-{os.getpid()}"
-    rollback.mkdir(parents=True, exist_ok=True)
+    try:
+        rollback.mkdir(parents=True, exist_ok=True)
+    except OSError as err:
+        raise InstallError(f"cannot create rollback dir in {prefix}: {err}")
+    if rollback.is_symlink() or (rollback.exists() and not rollback.is_dir()):
+        shutil.rmtree(rollback, ignore_errors=True)
+        raise InstallError(
+            f"refusing to install: {rollback} is a symlink; the rollback dir "
+            "must be a real directory"
+        )
     added: list[Path] = []
     try:
         for rel in payload_files:
             source = staging / rel
-            target = prefix / rel
+            target = guard_destination(prefix, rel, "payload file")
             state = file_state(target, source, rel)
             states[rel] = state
             if state == "unchanged":
                 continue
             target.parent.mkdir(parents=True, exist_ok=True)
+            if target.parent.is_symlink():
+                raise InstallError(
+                    f"refusing to write {rel!r}: {target.parent} became a "
+                    "symlink after validation"
+                )
             if target.exists():
                 backup = rollback / rel
                 backup.parent.mkdir(parents=True, exist_ok=True)
@@ -358,12 +446,21 @@ def write_payload(staging: Path, prefix: Path, payload_files: list[str]) -> dict
             shutil.copy2(source, tmp)
             os.chmod(tmp, os.stat(source).st_mode & 0o777)
             os.replace(tmp, target)
+    except InstallError:
+        shutil.rmtree(rollback, ignore_errors=True)
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
     except OSError as err:
-        # best-effort rollback: restore overwritten files, drop added ones
+        # best-effort rollback: restore overwritten files, drop added ones.
+        # Restoration is itself containment-guarded; a destination that is no
+        # longer safe is skipped (fail-closed), never written through.
         for backup in rollback.rglob("*"):
             if backup.is_file():
                 rel = backup.relative_to(rollback).as_posix()
-                dest = prefix / rel
+                try:
+                    dest = guard_destination(prefix, rel, "rollback restore")
+                except InstallError:
+                    continue
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(backup, dest)
         for target in added:
@@ -397,6 +494,7 @@ def write_receipt(prefix: Path, *, version: str, triple: str, archive: str,
     if lane_versions:
         data["laneVersions"] = sorted(lane_versions)
     path = receipt_path(prefix)
+    guard_destination(prefix, RECEIPT_REL, "install receipt")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     return path
@@ -419,9 +517,31 @@ def path_line(prefix: Path) -> str:
     return f'export PATH="{prefix}/bin:$PATH"'
 
 
+def guard_home_write(dest: Path, home: Path, what: str) -> None:
+    """Prove a PATH-owned write target stays inside the user's home.
+
+    Same containment rule as the install prefix, with the home directory as
+    the canonical root: the shell rc append must not follow a pre-existing
+    symlink OUT of the home directory (CTO audit FINDING 1 scope). A symlink
+    that resolves WITHIN home (the dotfiles pattern) is followed — the shell
+    itself follows it when reading the rc.
+    """
+    try:
+        resolved = dest.resolve(strict=False)
+        home_resolved = home.resolve()
+    except OSError as err:
+        raise InstallError(f"cannot resolve {what} {dest}: {err}")
+    if not resolved.is_relative_to(home_resolved):
+        raise InstallError(
+            f"refusing to write {what} {dest}: it resolves outside the home "
+            f"directory ({resolved})"
+        )
+
+
 def add_to_path(prefix: Path, home: Path) -> tuple[Path, bool]:
     """Append the PATH export to the shell rc if absent. Returns (rc, edited)."""
     rc = shell_rc_path(home)
+    guard_home_write(rc, home, "shell rc")
     line = path_line(prefix)
     if rc.is_file() and line in rc.read_text(encoding="utf-8", errors="replace"):
         return rc, False
@@ -548,6 +668,10 @@ def main(argv: list[str] | None = None) -> int:
     prefix.parent.mkdir(parents=True, exist_ok=True)
     if prefix.exists() and not prefix.is_dir():
         fail(f"prefix exists and is not a directory: {prefix}")
+    # 3b. Destination-side containment (CTO audit FINDING 1): the receipt
+    #     destination must stay beneath the canonical prefix WITHOUT following
+    #     a pre-existing symlink; validated BEFORE any read or write.
+    guard_destination(prefix, RECEIPT_REL, "install receipt")
     existing = load_receipt(prefix)
     if args.update and existing is None:
         fail(
@@ -595,6 +719,12 @@ def main(argv: list[str] | None = None) -> int:
         staging.mkdir(parents=True, exist_ok=True)
     except OSError as err:
         raise InstallError(f"cannot create staging dir in {prefix.parent}: {err}")
+    if staging.is_symlink() or (staging.exists() and not staging.is_dir()):
+        shutil.rmtree(staging, ignore_errors=True)
+        raise InstallError(
+            f"refusing to install: {staging} is a symlink; the staging dir "
+            "must be a real directory"
+        )
     archive_path = staging / archive
     archive_path.write_bytes(archive_bytes)
     try:
@@ -610,16 +740,25 @@ def main(argv: list[str] | None = None) -> int:
     except OSError as err:
         shutil.rmtree(staging, ignore_errors=True)
         raise InstallError(f"cannot create prefix {prefix}: {err}")
+    if prefix.is_symlink() or prefix.resolve() != prefix:
+        shutil.rmtree(staging, ignore_errors=True)
+        fail(f"refusing to install: prefix {prefix} is not canonical")
     lane_versions: list[str] = []
     try:
         if updating:
             # (a) preserve the current install as a side-by-side lane (run once).
             old_lane = prefix / "versions" / old_version
             if not old_lane.exists():
-                for rel in existing.get("files") or []:
+                old_files = existing.get("files") or []
+                preflight_destinations(
+                    prefix,
+                    [f"versions/{old_version}/{r}" for r in old_files],
+                    "version lane preserve",
+                )
+                for rel in old_files:
                     src = prefix / rel
                     dst = old_lane / rel
-                    if src.is_file():
+                    if src.is_file() and not src.is_symlink():
                         dst.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(src, dst)
                 write_receipt(

@@ -24,6 +24,10 @@ verified bootstrap installer
     cross-lane updates (odd dev <-> even LTS) fail closed without
     --allow-lane-change; downgrades fail closed (Stage 3 A3 territory);
   - rejects residuals and unsafe archive members;
+  - destination-side containment (CTO audit FINDING 1): a pre-existing
+    `prefix/share -> /outside` symlink is rejected before any write and both
+    sides stay byte-identical; the same rule covers the receipt write and
+    PATH-owned shell rc writes;
   - honors --add-to-path idempotently.
 
 The "release host" is a local directory produced by the real
@@ -245,6 +249,83 @@ class InstallFaberTest(unittest.TestCase):
         self.assertIn("unsafe archive member", res.stderr)
         self.assertFalse((self.root / "escape.txt").exists())
         self.assertFalse(self.prefix.exists())
+
+    # -- destination-side containment (CTO audit FINDING 1) ------------------
+
+    def test_symlinked_prefix_child_fails_closed_no_escape(self) -> None:
+        # A pre-existing `prefix/share -> outside` symlink must never redirect
+        # a validated payload write outside the prefix. The installer rejects
+        # the destination BEFORE any write; BOTH sides stay byte-identical.
+        outside = self.root / "outside"
+        victim = outside / "faber" / "reference" / "PACK.toml"
+        victim.parent.mkdir(parents=True, exist_ok=True)
+        victim.write_bytes(b"outside: byte-identical\n")
+        prefix = self.prefix
+        prefix.mkdir(parents=True, exist_ok=True)
+        (prefix / "share").symlink_to(outside, target_is_directory=True)
+        marker = prefix / ".fixture-marker"
+        marker.write_text("prefix: byte-identical\n", encoding="utf-8")
+        prefix_before = {
+            p.relative_to(prefix).as_posix(): p.read_bytes()
+            for p in prefix.rglob("*") if p.is_file() and not p.is_symlink()
+        }
+        outside_before = {
+            p.relative_to(outside).as_posix(): p.read_bytes()
+            for p in outside.rglob("*") if p.is_file()
+        }
+        res = self.run_installer()
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("symlink", res.stderr)
+        # outside byte-identical: no payload member landed outside the prefix
+        outside_after = {
+            p.relative_to(outside).as_posix(): p.read_bytes()
+            for p in outside.rglob("*") if p.is_file()
+        }
+        self.assertEqual(outside_after, outside_before)
+        self.assertEqual(victim.read_bytes(), b"outside: byte-identical\n")
+        # prefix byte-identical: no payload file, no rollback dir, symlink intact
+        prefix_after = {
+            p.relative_to(prefix).as_posix(): p.read_bytes()
+            for p in prefix.rglob("*") if p.is_file() and not p.is_symlink()
+        }
+        self.assertEqual(prefix_after, prefix_before)
+        # the prefix root holds exactly the fixture marker + the share symlink:
+        # nothing was created inside the prefix (no bin/, no rollback dir)
+        self.assertEqual(sorted(p.name for p in prefix.iterdir()),
+                         [".fixture-marker", "share"])
+        self.assertTrue((prefix / "share").is_symlink())
+
+    def test_symlinked_receipt_fails_closed_no_escape(self) -> None:
+        # The receipt write applies the same containment rule: a pre-existing
+        # symlink at the receipt path must not redirect the receipt write
+        # outside the prefix.
+        prefix = self.prefix
+        (prefix / "share" / "faber").mkdir(parents=True, exist_ok=True)
+        outside_receipt = self.root / "outside-receipt.json"
+        (prefix / "share" / "faber" / "install-receipt.json").symlink_to(
+            outside_receipt)
+        res = self.run_installer()
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("symlink", res.stderr)
+        self.assertFalse(outside_receipt.exists())
+        # no payload was written into the prefix either
+        for rel in PAYLOAD_FILES:
+            self.assertFalse((prefix / rel).exists(),
+                             f"payload file leaked into prefix: {rel}")
+        self.assertTrue(
+            (prefix / "share" / "faber" / "install-receipt.json").is_symlink())
+
+    def test_add_to_path_rejects_rc_symlink_escaping_home(self) -> None:
+        # PATH-owned writes apply the same containment rule: an rc symlink
+        # that resolves OUTSIDE home must not receive the PATH append.
+        home = self.root / "home"
+        rc = home / (".zshrc" if sys.platform == "darwin" else ".bashrc")
+        outside_rc = self.root / "outside-rc"
+        rc.symlink_to(outside_rc)
+        res = self.run_installer("--add-to-path")
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("outside", res.stderr)
+        self.assertFalse(outside_rc.exists())
 
     # -- idempotency ---------------------------------------------------------
 
