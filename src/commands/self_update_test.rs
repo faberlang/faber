@@ -185,6 +185,23 @@ fn cli_shape_has_update_subcommand() {
 }
 
 #[test]
+fn fetch_installer_script_reads_local_path_directly() {
+    // A local base (mirror / test host) is read directly; the engine fetches
+    // local bases the same way.
+    let tmp = tempfile::tempdir().expect("tmp");
+    let script = tmp.path().join("install-faber");
+    std::fs::write(&script, "#!/usr/bin/env python3\nprint('fixture')\n").expect("write");
+    let bytes = fetch_installer_script(script.to_str().expect("utf8")).expect("fetch");
+    assert!(bytes.starts_with(b"#!/usr/bin/env python3"));
+}
+
+#[test]
+fn fetch_installer_script_missing_local_path_fails_closed() {
+    let err = fetch_installer_script("/nonexistent/install-faber").expect_err("missing");
+    assert!(err.contains("cannot read"), "{err}");
+}
+
+#[test]
 fn cli_parse_self_update_shape() {
     // The real user-facing shape: `faber self update --version <v>` parses and
     // routes to the update handler.

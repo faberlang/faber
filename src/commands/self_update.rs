@@ -270,7 +270,7 @@ fn execute_self_update(plan: &SelfUpdatePlan) {
 /// Fetch the published installer script. URL bases go through `curl` (the
 /// channel runtime); local directory bases are read directly, mirroring the
 /// engine's fetch behavior for mirrors and test hosts.
-fn fetch_installer_script(script_url: &str) -> Result<Vec<u8>, String> {
+pub(crate) fn fetch_installer_script(script_url: &str) -> Result<Vec<u8>, String> {
     if !script_url.contains("://") {
         let path = Path::new(script_url);
         return std::fs::read(path)
