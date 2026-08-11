@@ -24,7 +24,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 fn corpus_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("corpus/format")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../product-corpus/format")
 }
 
 /// Fixture sources in the corpus (one `*.fab` per pinned expectation).

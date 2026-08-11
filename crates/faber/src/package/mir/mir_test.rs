@@ -654,11 +654,10 @@ fn copy_package_dir_skipping_target(src: &Path, dest: &Path) {
 #[test]
 fn package_fmir_image_provisions_decomposed_companion_upstream_seed() {
     use radix_mir_fmir::schema::{WireBufferLifetime, WireBufferRole};
-    use std::path::PathBuf;
 
-    let exemplum =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../examples/training/bert-tiny-fragment");
-    let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+    let workspace =
+        crate::reference_pack_test_support::faberlang_home().expect("faberlang container root");
+    let exemplum = workspace.join("examples/training/bert-tiny-fragment");
     let dir = crate::package::test_support::test_temp_dir("bert-tiny-seed");
     copy_package_dir_skipping_target(&exemplum, dir.path());
 

@@ -12,7 +12,7 @@ use super::{
 use radix::driver::Config;
 use radix::Output;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 const PROBA_IMPORT_MESSAGE: &str =
     ".proba files are test sources and cannot be imported; move shared helpers to a .fab module";
@@ -376,7 +376,9 @@ probandum "helpers" {
 
 #[test]
 fn norma_src_proba_is_discovered_beside_product_sources() {
-    let norma_src = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../norma/src");
+    let norma_src = crate::reference_pack_test_support::faberlang_home()
+        .expect("faberlang container root")
+        .join("norma/src");
     assert!(
         norma_src.is_dir(),
         "expected sibling norma/src at {}",
@@ -447,7 +449,9 @@ functio addita(fractus a, fractus b) → fractus {
     )
     .expect("mathesis.fab");
     let proba_body = fs::read_to_string(
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../norma/src/mathesis.proba"),
+        crate::reference_pack_test_support::faberlang_home()
+            .expect("faberlang container root")
+            .join("norma/src/mathesis.proba"),
     )
     .unwrap_or_else(|_| {
         r#"importa ex "./mathesis" privata mathesis

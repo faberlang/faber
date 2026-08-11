@@ -176,7 +176,7 @@ fn dev_norma_library_home() -> PathBuf {
             return candidate.to_path_buf();
         }
     }
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("..")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..")
 }
 
 struct CoreutilsLikePackage {
@@ -1077,7 +1077,8 @@ entry = "main.fab"
 "#,
         )
         .expect("write manifest");
-        let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let workspace_root =
+            crate::reference_pack_test_support::faberlang_home().expect("faberlang container root");
         let touch_source = workspace_root.join("examples/coreutils/packages/touch/src/main.fab");
         fs::write(
             src.join("main.fab"),
@@ -1853,7 +1854,7 @@ fn package_mir_stage4b_instans_emits_verifier_valid_llvm() {
 
 fn assert_package_corpus_llvm_smoke(relative: &str, label: &str) {
     let entry = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../radix/corpus")
+        .join("../../corpus")
         .join(relative);
     let emitted = with_lowered_package_mir(&Config::default(), &entry, |lowered| {
         let interner = lowered
@@ -6894,7 +6895,9 @@ locale = "zh-Hans"
 
 #[test]
 fn installed_reader_locale_reference_examples_compile_from_installed_packs() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale");
+    let root = crate::reference_pack_test_support::faberlang_home()
+        .expect("faberlang container root")
+        .join("examples/reader-locale");
 
     // zh-Hant, ar, hi, vi removed: reader locale changes now
     // produce LOCALE002 lexer warnings before semantic analysis.
@@ -7028,7 +7031,9 @@ locale = "zh-Hans"
 
 #[test]
 fn thai_reader_locale_example_compiles_from_manifest() {
-    let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale/th-TH");
+    let example = crate::reference_pack_test_support::faberlang_home()
+        .expect("faberlang container root")
+        .join("examples/reader-locale/th-TH");
 
     let result = compile_package(&Config::default(), &example);
 
@@ -10919,7 +10924,9 @@ fn go_compile_concurrent_calls_do_not_exchange_modules() {
 // ---------------------------------------------------------------------------
 
 fn sibling_faber_web_lib() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../faber-web")
+    crate::reference_pack_test_support::faberlang_home()
+        .expect("faberlang container root")
+        .join("faber-web")
 }
 
 fn write_web_consumer_app(app: &Path, lib: &Path, entry_body: &str) {

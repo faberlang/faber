@@ -11,13 +11,12 @@ use std::process::{Command, Stdio};
 
 fn exempla(path: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../radix/corpus")
+        .join("../../corpus")
         .join(path)
 }
 
 fn english_pack() -> LocalePack {
-    let path =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../radix/stdlib/locale/en/pack.toml");
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
     LocalePack::from_toml_path(path).expect("load English locale pack")
 }
 
@@ -125,10 +124,8 @@ fn author_format_keeps_ascii_angle_brackets_for_generics() {
 #[test]
 fn format_locale_resolves_imports_in_corpus_fixture() {
     let fixture = exempla("importa/default-minimal.fab");
-    let home = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("faber crate must sit in the faberlang container")
-        .to_path_buf();
+    let home = crate::reference_pack_test_support::faberlang_home()
+        .expect("faber crate must sit in the faberlang container");
     let mut child = Command::new(faber_binary())
         .args(["format", "--locale", "la", "--stdout"])
         .arg(&fixture)
@@ -904,7 +901,9 @@ fn format_write_flag_writes_in_place() {
 
 #[test]
 fn format_locale_thai_localizes_surface() {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale/th-TH");
+    let root = crate::reference_pack_test_support::faberlang_home()
+        .expect("faberlang container root")
+        .join("examples/reader-locale/th-TH");
     let thai = root.join("src/main.fab");
     let latin = root.join("twins/main.la.fab");
 
@@ -1023,7 +1022,9 @@ fn format_locale_preserves_template_application_sugar() {
 fn format_locale_localizes() {
     // A bare --locale=<X> selects the HIR-backed re-emit path with the
     // localized surface (author mode when --locale is absent).
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../examples/reader-locale/th-TH");
+    let root = crate::reference_pack_test_support::faberlang_home()
+        .expect("faberlang container root")
+        .join("examples/reader-locale/th-TH");
     let thai = root.join("src/main.fab");
 
     let output = Command::new(faber_binary())
