@@ -1,0 +1,94 @@
+{
+  "created_at": "2026-08-11T16:11:31.251171+00:00",
+  "host": {
+    "cores": 8,
+    "hostname": "pharos",
+    "platform": "Linux pharos 6.8.0-117-generic"
+  },
+  "lanes": [
+    {
+      "duration_s": 161.5,
+      "exit_code": 101,
+      "lane": "go",
+      "status": "red",
+      "tests_ran": 0
+    },
+    {
+      "duration_s": 162.4,
+      "exit_code": 101,
+      "lane": "ts",
+      "status": "red",
+      "tests_ran": 0
+    },
+    {
+      "duration_s": 113.3,
+      "exit_code": 101,
+      "lane": "wasm",
+      "status": "red",
+      "tests_ran": 2
+    },
+    {
+      "duration_s": 60.1,
+      "exit_code": 0,
+      "lane": "rust",
+      "status": "green",
+      "tests_ran": 2
+    },
+    {
+      "duration_s": 92.8,
+      "exit_code": 101,
+      "lane": "swift",
+      "status": "red",
+      "tests_ran": 1
+    },
+    {
+      "duration_s": 189.0,
+      "exit_code": 101,
+      "lane": "sexp",
+      "status": "red",
+      "tests_ran": 0
+    },
+    {
+      "duration_s": 0.8,
+      "exit_code": 101,
+      "lane": "llvm",
+      "status": "red",
+      "tests_ran": null
+    },
+    {
+      "duration_s": 1.0,
+      "exit_code": 0,
+      "lane": "metal",
+      "status": "green",
+      "tests_ran": 0
+    },
+    {
+      "duration_s": 6.7,
+      "exit_code": 0,
+      "lane": "mir",
+      "status": "green",
+      "tests_ran": 1
+    },
+    {
+      "duration_s": 10.2,
+      "exit_code": 0,
+      "lane": "roundtrip",
+      "status": "green",
+      "tests_ran": 1
+    }
+  ],
+  "root": "/home/ianzepp/work/lane-grid-hand6",
+  "run": "grid-20260811T161131",
+  "sibling_pins": {
+    "cista": "935528820653f0b3cd28e63c9d21ac7db90add65",
+    "examples": "<absent>",
+    "faber-runtime": "5a525e323b4f34dc2f3c57ce6d78acefee3ffb5d",
+    "hosts": "6ff374b5e0a0ca3dbddde105b1341863a3c1d7d2",
+    "norma": "<absent>",
+    "radix": "9a5085511e68cae0e53a12ab960bc60f256763d1"
+  },
+  "target": {
+    "faber": "4410b441986c809a8f4301faafb2a9666dd5e6c4",
+    "ref": "origin/main"
+  }
+}

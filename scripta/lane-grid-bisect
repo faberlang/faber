@@ -1,0 +1,182 @@
+#!/usr/bin/env python3
+"""Lane-scoped bisect for the per-lane grid (delivery per-lane-e2e-validation, EL-5).
+
+Localizes the first commit that turns a single lane red, using lane-only runs
+(one lane command per candidate — never the whole grid). Binary search over
+`git rev-list good..bad` (oldest-first) keeps the proof within ~7 lane runs
+for ranges up to ~128 commits.
+
+The search only moves the faber repo (the grid target); sibling repos stay at
+their provisioned pins. The checkout is restored to the pre-run HEAD on exit
+unless `--keep-checkout`.
+
+Usage:
+    lane-grid-bisect --lane go --good <commit> --bad <commit>
+                     [--root ROOT] [--max-runs N] [--keep-checkout]
+                     [--skip-toolcheck] [--allow-burgus]
+
+Output: the first red commit (sha + subject) and the lane-run count.
+Exit 0 = localized within budget; 3 = not localized (budget exceeded or the
+good/bad labels did not hold); 2 = usage/infra error.
+"""
+
+import argparse
+import datetime
+import os
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+
+import lane_grid_common as lg  # noqa: E402
+
+
+def run_git(repo, args, check=True):
+    proc = subprocess.run(["git", "-C", repo] + args, capture_output=True, text=True, timeout=120)
+    if check and proc.returncode != 0:
+        raise RuntimeError(f"git {args[0]} failed: {proc.stderr.strip()}")
+    return proc.stdout.strip()
+
+
+def is_ancestor(repo, ancestor, descendant):
+    proc = subprocess.run(
+        ["git", "-C", repo, "merge-base", "--is-ancestor", ancestor, descendant],
+        capture_output=True, text=True, timeout=60,
+    )
+    return proc.returncode == 0
+
+
+def lane_status(faber, label, timeout_s, skip_toolcheck):
+    """Run one lane; return ('green'|'red'|'skipped'|'error', summary)."""
+    ok, missing = lg.probe_tools(label)
+    if not ok and not skip_toolcheck:
+        return "skipped", "missing host toolchain: " + ", ".join(missing)
+    cmd = lg.lane_command(label)
+    code, output = lg.run_captured(cmd, cwd=faber, timeout_s=timeout_s)
+    summary = lg.extract_test_summary(output) or ""
+    if code == 0:
+        return "green", summary
+    if code in (-1, -2):
+        return "error", summary
+    return "red", summary
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--lane", required=True, help="lane to bisect (go/ts/wasm/rust/swift/sexp/llvm/metal/mir/roundtrip)")
+    ap.add_argument("--good", required=True, help="green commit (older)")
+    ap.add_argument("--bad", required=True, help="red commit (newer)")
+    ap.add_argument("--root", default=os.path.dirname(HERE), help="container root")
+    ap.add_argument("--max-runs", type=int, default=10, help="max lane-only runs (default 10)")
+    ap.add_argument("--timeout-min", type=float, default=120.0, help="per-lane timeout")
+    ap.add_argument("--keep-checkout", action="store_true", help="leave the checkout at the last candidate")
+    ap.add_argument("--skip-toolcheck", action="store_true", help="ignore missing host tools")
+    ap.add_argument("--allow-burgus", action="store_true", help="allow running on the dev host")
+    args = ap.parse_args(argv)
+
+    if lg.is_dev_host() and not args.allow_burgus:
+        print("error: this looks like the dev machine — run the bisect on grid infra (pharos).",
+              file=sys.stderr)
+        return 3
+
+    if args.lane not in lg.CANONICAL_ORDER:
+        print(f"error: unknown lane {args.lane!r}", file=sys.stderr)
+        return 2
+
+    root = os.path.abspath(args.root)
+    faber = os.path.join(root, "faber")
+    if not os.path.isdir(os.path.join(faber, ".git")):
+        print(f"error: {faber} is not a git checkout", file=sys.stderr)
+        return 2
+
+    # Good must be strictly older than bad and both must exist.
+    try:
+        good = run_git(faber, ["rev-parse", args.good])
+        bad = run_git(faber, ["rev-parse", args.bad])
+    except RuntimeError as err:
+        print(f"error: {err}", file=sys.stderr)
+        return 2
+    if good == bad:
+        print("error: good and bad are the same commit", file=sys.stderr)
+        return 2
+    if not is_ancestor(faber, good, bad):
+        print(f"error: {args.good} is not an ancestor of {args.bad} "
+              "(bisect needs a linear good..bad range)", file=sys.stderr)
+        return 2
+
+    original = run_git(faber, ["rev-parse", "HEAD"])
+    timeout_s = int(args.timeout_min * 60)
+    lo, hi = good, bad
+
+    def checkout(commit):
+        run_git(faber, ["checkout", "--detach", "--quiet", commit])
+        # Drop any stray local modifications so each candidate is a clean tree.
+        run_git(faber, ["reset", "--hard", "--quiet", commit])
+
+    def classify(commit, run_no):
+        checkout(commit)
+        status, summary = lane_status(faber, args.lane, timeout_s, args.skip_toolcheck)
+        print(f"  run {run_no}: {commit[:12]} -> {status}" + (f"  ({summary})" if summary else ""))
+        return status, summary
+
+    # Sanity-check the endpoints (the bisect contract).
+    lo_status, _ = classify(lo, 1)
+    if lo_status != "green":
+        print(f"error: {args.good} classified {lo_status}, expected green — bad endpoint, aborting.",
+              file=sys.stderr)
+        restore(original, faber, args.keep_checkout)
+        return 3
+    runs = 1
+    hi_status, _ = classify(hi, 2)
+    runs += 1
+    if hi_status != "red":
+        print(f"error: {args.bad} classified {hi_status}, expected red — bad endpoint, aborting.",
+              file=sys.stderr)
+        restore(original, faber, args.keep_checkout)
+        return 3
+
+    # Binary search over the commits between lo and hi (oldest-first).
+    # `git rev-list lo..hi` INCLUDES hi, so adjacency is len(candidates) <= 1
+    # (candidates == [hi]); a mid at hi would re-classify forever, so only
+    # probe strict interior commits and terminate at adjacency.
+    while runs < args.max_runs:
+        candidates = run_git(faber, ["rev-list", f"{lo}..{hi}"]).split()
+        candidates.reverse()  # oldest -> newest
+        if len(candidates) <= 1:
+            break  # lo and hi are adjacent; hi is the first red commit
+        mid = candidates[len(candidates) // 2]
+        status, _ = classify(mid, runs + 1)
+        runs += 1
+        if status == "green":
+            lo = mid
+        elif status == "red":
+            hi = mid
+        else:
+            print(f"error: candidate {mid[:12]} classified {status}; bisect cannot continue.",
+                  file=sys.stderr)
+            restore(original, faber, args.keep_checkout)
+            return 3
+
+    restore(original, faber, args.keep_checkout)
+    remaining = run_git(faber, ["rev-list", f"{lo}..{hi}"]).split()
+    if len(remaining) > 1:
+        print(f"error: budget exhausted ({args.max_runs} lane runs) before the red "
+              f"commit was pinned (still {len(remaining)} candidates); raise --max-runs.",
+              file=sys.stderr)
+        return 3
+    first_red = hi
+    subject = run_git(faber, ["log", "-1", "--format=%s", first_red])
+    print(f"first red commit: {first_red}  ({subject})")
+    print(f"lane-only runs used: {runs} (budget {args.max_runs})")
+    return 0
+
+
+def restore(original, faber, keep):
+    if keep:
+        return
+    run_git(faber, ["checkout", "--detach", "--quiet", original])
+
+
+if __name__ == "__main__":
+    sys.exit(main())
