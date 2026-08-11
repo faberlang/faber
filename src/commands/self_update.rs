@@ -209,26 +209,11 @@ fn execute_self_update(plan: &SelfUpdatePlan) {
     println!("  prefix:     {}", plan.prefix.display());
     println!("  engine:     fetching {INSTALLER_SCRIPT} from {}", plan.script_url);
 
-    let fetch = Command::new("curl")
-        .args(["-fsSL", &plan.script_url])
-        .output();
-    let script = match fetch {
-        Ok(output) if output.status.success() => output.stdout,
-        Ok(output) => {
-            eprintln!(
-                "error: failed to download {INSTALLER_SCRIPT} from {} (exit {})",
-                plan.script_url,
-                output.status
-            );
+    let script = match fetch_installer_script(&plan.script_url) {
+        Ok(bytes) => bytes,
+        Err(message) => {
+            eprintln!("error: {message}");
             eprintln!("  offline or unreachable? retry, or use scripta/install-faber directly");
-            std::process::exit(1);
-        }
-        Err(err) => {
-            eprintln!(
-                "error: cannot fetch {INSTALLER_SCRIPT} from {}: {err}",
-                plan.script_url
-            );
-            eprintln!("  hint: `faber self update` needs `curl` (channel runtime)");
             std::process::exit(1);
         }
     };
@@ -280,4 +265,28 @@ fn execute_self_update(plan: &SelfUpdatePlan) {
     if !status.success() {
         std::process::exit(status.code().unwrap_or(1));
     }
+}
+
+/// Fetch the published installer script. URL bases go through `curl` (the
+/// channel runtime); local directory bases are read directly, mirroring the
+/// engine's fetch behavior for mirrors and test hosts.
+fn fetch_installer_script(script_url: &str) -> Result<Vec<u8>, String> {
+    if !script_url.contains("://") {
+        let path = Path::new(script_url);
+        return std::fs::read(path)
+            .map_err(|err| format!("cannot read {INSTALLER_SCRIPT} from {}: {err}", path.display()));
+    }
+    let output = Command::new("curl")
+        .args(["-fsSL", script_url])
+        .output()
+        .map_err(|err| {
+            format!("cannot fetch {INSTALLER_SCRIPT} from {script_url}: {err}")
+        })?;
+    if output.status.success() {
+        return Ok(output.stdout);
+    }
+    Err(format!(
+        "failed to download {INSTALLER_SCRIPT} from {script_url} ({})",
+        output.status
+    ))
 }
