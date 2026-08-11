@@ -5,7 +5,7 @@ use super::{
 };
 use crate::visit::terminator_successors;
 use crate::{
-    MirBlock, MirBlockId, MirFunction, MirFunctionId, MirStatement, MirStatementKind,
+    MirBlock, MirBlockId, MirCallee, MirFunction, MirFunctionId, MirStatement, MirStatementKind,
     MirTerminator, MirTerminatorKind,
 };
 use radix_types::Primitive;
@@ -226,11 +226,23 @@ impl Validator<'_, '_> {
                     &mut generic_bindings,
                 );
                 let error_place_ty = self.validate_place(scope, error_place, terminator.span);
+                // The failable contract is enforced whenever the callee
+                // signature is resolvable HERE. Package-MIR synthetic callees
+                // (`MirCallee::Definition { source }` allocated by the faber
+                // linker after analysis) resolve only in the merged
+                // whole-program validation, where the linked library function
+                // carries the synthetic source; deferring their check to that
+                // stage matches the plain-`Call` treatment of cross-unit
+                // definitions. A never-resolvable def is caught downstream the
+                // same way a plain `Call` to one is: by the stepper/emitter.
                 if sig.is_none() {
-                    self.error(
-                        terminator.span,
-                        "try_call callee does not have a known failable signature",
-                    );
+                    match &callee {
+                        MirCallee::Definition { .. } => {}
+                        _ => self.error(
+                            terminator.span,
+                            "try_call callee does not have a known failable signature",
+                        ),
+                    }
                 }
                 match (sig.as_ref().and_then(|sig| sig.error_ty), error_place_ty) {
                     (Some(error_ty), Some(place_ty)) => {

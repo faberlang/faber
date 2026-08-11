@@ -216,8 +216,7 @@ impl Parser {
         ty: Option<&TypeExpr>,
         binding: &BindingPattern,
     ) -> Result<Expr, ParseError> {
-        let has_concrete_type = ty
-            .is_some_and(|t| !matches!(t.kind, TypeExprKind::Infer));
+        let has_concrete_type = ty.is_some_and(|t| !matches!(t.kind, TypeExprKind::Infer));
         let BindingPattern::Ident(ident) = binding else {
             return Err(
                 ParseError::structured(ParseErrorKind::Unexpected, self.current_span())
