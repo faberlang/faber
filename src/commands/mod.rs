@@ -22,6 +22,10 @@ mod install_test;
 mod model;
 mod run;
 mod script;
+pub(crate) mod self_update;
+#[cfg(test)]
+#[path = "self_update_test.rs"]
+mod self_update_test;
 pub(crate) mod targets;
 mod test;
 
@@ -39,6 +43,7 @@ use install::cmd_install;
 use model::cmd_model;
 use run::{cmd_fmir_run_image, cmd_run};
 use script::{cmd_eval, cmd_repl, cmd_script};
+use self_update::cmd_self;
 use targets::cmd_targets;
 use test::cmd_test;
 
@@ -221,6 +226,7 @@ fn dispatch(command: Command) {
         }),
         Command::Host(args) => cmd_host(args.command),
         Command::Model(args) => cmd_model(args.command),
+        Command::SelfManage(args) => cmd_self(&args),
     }
 }
 

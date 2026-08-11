@@ -97,6 +97,9 @@ pub enum Command {
     Emit(EmitArgs),
 
     /// Format Faber source (author mode by default)
+    #[command(
+        long_about = "Format Faber source. Policy precedence: CLI --policy > package [format] policy (faber.toml) > built-in default (normalise-v1). Each input root resolves the package that contains it, so multi-root runs spanning packages keep per-package policies; files outside any package (and --stdin) use the built-in default. --config (forma.toml) is deferred. Unknown policy slugs fail clearly."
+    )]
     Format(FormatArgs),
 
     /// Script host introspection (kernel manifest)
@@ -104,12 +107,20 @@ pub enum Command {
 
     /// Inspect model file metadata (safetensors)
     Model(ModelArgs),
+
+    /// Manage this faber installation (update / uninstall)
+    #[command(name = "self", subcommand)]
+    SelfManage(crate::commands::self_update::SelfManageArgs),
 }
 
 /// Arguments for `faber format`.
 #[derive(clap::Args, Debug)]
 pub struct FormatArgs {
-    /// Files or directories to format (default: current package directory)
+    /// Files or directories to format (default: current package directory).
+    ///
+    /// Each root resolves the package that CONTAINS it (nearest faber.toml,
+    /// walking up), so a multi-root invocation spanning packages formats each
+    /// package with its own `[format]` policy.
     #[arg(value_name = "PATH")]
     pub paths: Vec<PathBuf>,
 
@@ -140,7 +151,8 @@ pub struct FormatArgs {
     pub stdin: bool,
 
     /// Format policy slug from the rule-slug registry (normalise-v1 |
-    /// pretty-v1); overrides the built-in default
+    /// pretty-v1); overrides the package `[format]` policy and the built-in
+    /// default
     #[arg(long, value_name = "SLUG")]
     pub policy: Option<String>,
 

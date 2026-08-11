@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Fixture tests for faber/scripta/install-faber.
 
-Proves unit A1 of faber-onboarding Stage 3 (delivery-stage3.md): the verified
-bootstrap installer
+Proves units A1 + A2 of faber-onboarding Stage 3 (delivery-stage3.md): the
+verified bootstrap installer
 
   - installs the canonical dev-kit payload to a user-local prefix
     non-interactively, verifying SHA-256 against the published basename-only
@@ -11,8 +11,18 @@ bootstrap installer
   - fails closed on checksum mismatch with NO partial install (nothing under
     the prefix touched);
   - behaves sanely on idempotent re-run (already current, or restores missing
-    files); a different version on the same prefix fails closed (that matrix
-    is unit A2);
+    files); a different version on the same prefix fails closed and names the
+    upgrade path;
+  - the reinstall idempotency matrix (A2): same-version reinstall is "already
+    current" with no churn; missing/tampered files are restored and reported;
+    cross-version installs fail closed;
+  - the `faber self update` engine (A2): `--update` upgrades to a newer
+    released version into side-by-side lanes (`<prefix>/versions/<version>/`),
+    preserves the current install as a lane, flips the active launcher/receipt,
+    and leaves user projects + the package store byte-identically untouched;
+    update failure paths fail closed (no partial install, version unchanged);
+    cross-lane updates (odd dev <-> even LTS) fail closed without
+    --allow-lane-change; downgrades fail closed (Stage 3 A3 territory);
   - rejects residuals and unsafe archive members;
   - honors --add-to-path idempotently.
 
@@ -78,10 +88,10 @@ def build_release_host(root: Path, *, version: str = VERSION,
         path = staging / rel
         path.parent.mkdir(parents=True, exist_ok=True)
         if rel == "bin/faber":
-            path.write_bytes(b"#!/bin/sh\necho faber 1.5.0\n")
+            path.write_bytes(f"#!/bin/sh\necho faber {version}\n".encode())
             path.chmod(0o755)
         else:
-            path.write_text('[pack]\nname = "fixture"\n', encoding="utf-8")
+            path.write_text(f'[pack]\nname = "fixture {version}"\n', encoding="utf-8")
     host = root / "host"
     res = subprocess.run(
         [sys.executable, str(PACKAGE_ARCHIVE),
@@ -269,14 +279,135 @@ class InstallFaberTest(unittest.TestCase):
                           / "share/faber/reference/PACK.toml").read_bytes())
 
     def test_different_version_on_existing_prefix_fails_closed(self) -> None:
-        # Versioned reinstall (upgrade/downgrade) is unit A2; A1 fails closed.
+        # Cross-version installs over the same prefix fail closed and name the
+        # upgrade path (A2 completes the A1 stub: `faber self update` exists).
         self.assertEqual(self.run_installer().returncode, 0)
         binary_before = (self.prefix / "bin/faber").read_bytes()
         host2 = build_release_host(self.root, version="1.6.0")
         res = self.run_installer(version="1.6.0", base=host2)
         self.assertEqual(res.returncode, 1)
         self.assertIn("faber self update", res.stderr)
+        self.assertIn("upgrade", res.stderr)
         self.assertEqual((self.prefix / "bin/faber").read_bytes(), binary_before)
+
+    # -- A2: reinstall matrix + `faber self update` engine -------------------
+
+    def seed_user_data(self, prefix: Path) -> dict[str, bytes]:
+        """User project + package store inside the prefix (byte-identity proof)."""
+        store = prefix / "cistae" / "pkgs" / "demo" / "p.toml"
+        store.parent.mkdir(parents=True, exist_ok=True)
+        store.write_text("store-data v1\n", encoding="utf-8")
+        proj = prefix / "projects" / "demo" / "faber.toml"
+        proj.parent.mkdir(parents=True, exist_ok=True)
+        proj.write_text("project-data v1\n", encoding="utf-8")
+        lock = prefix / "projects" / "demo" / "faber.lock"
+        lock.write_text("lock-data\n", encoding="utf-8")
+        return {str(store): store.read_bytes(), str(proj): proj.read_bytes(),
+                str(lock): lock.read_bytes()}
+
+    def assert_user_data_unchanged(self, before: dict[str, bytes]) -> None:
+        for path, content in before.items():
+            self.assertEqual(Path(path).read_bytes(), content, f"{path} changed")
+
+    def test_update_upgrades_side_by_side_and_preserves_user_data(self) -> None:
+        self.assertEqual(self.run_installer().returncode, 0)  # 1.5.0
+        before = self.seed_user_data(self.prefix)
+        host16 = build_release_host(self.root, version="1.6.0")
+        res = self.run_installer("--update", version="1.6.0", base=host16)
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        self.assertIn("result:     updated (from 1.5.0)", res.stdout)
+        self.assertIn("lanes:      1.5.0, 1.6.0 (active: 1.6.0)", res.stdout)
+        # active launcher is 1.6.0; both versions present side by side
+        self.assertIn("echo faber 1.6.0", (self.prefix / "bin/faber").read_text())
+        self.assertIn("echo faber 1.5.0",
+                      (self.prefix / "versions/1.5.0/bin/faber").read_text())
+        self.assertIn("echo faber 1.6.0",
+                      (self.prefix / "versions/1.6.0/bin/faber").read_text())
+        # per-lane receipts exist for both versions
+        self.assertTrue((self.prefix / "versions/1.5.0/share/faber/install-receipt.json").is_file())
+        self.assertTrue((self.prefix / "versions/1.6.0/share/faber/install-receipt.json").is_file())
+        # top-level receipt records the active version + side-by-side lanes
+        receipt = json.loads((self.prefix / "share/faber/install-receipt.json").read_text())
+        self.assertEqual(receipt["version"], "1.6.0")
+        self.assertEqual(receipt["laneVersions"], ["1.5.0", "1.6.0"])
+        self.assertEqual(receipt["archive"], f"faber-v1.6.0-{TRIPLE}.tar.gz")
+        # user project + package store survive byte-identically
+        self.assert_user_data_unchanged(before)
+        # idempotent re-run of the update: already current, no churn
+        res2 = self.run_installer("--update", version="1.6.0", base=host16)
+        self.assertEqual(res2.returncode, 0, res2.stdout + res2.stderr)
+        self.assertIn("result:     already current", res2.stdout)
+        self.assert_user_data_unchanged(before)
+
+    def test_update_same_version_is_already_current(self) -> None:
+        self.assertEqual(self.run_installer().returncode, 0)
+        res = self.run_installer("--update")
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        self.assertIn("result:     already current", res.stdout)
+        self.assertIn("0 added, 0 updated, 5 unchanged, 0 removed", res.stdout)
+
+    def test_update_restores_tampered_active_file(self) -> None:
+        self.assertEqual(self.run_installer().returncode, 0)
+        tampered = self.prefix / "share/faber/reference/PACK.toml"
+        tampered.write_text("# tampered\n", encoding="utf-8")
+        res = self.run_installer("--update")
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        self.assertIn("updated   share/faber/reference/PACK.toml", res.stdout)
+        self.assertIn("echo faber 1.5.0", (self.prefix / "bin/faber").read_text())
+
+    def test_cross_lane_update_fails_closed_without_allow_lane_change(self) -> None:
+        # 1.5.0 is the odd (development) lane; 2.0.0 is the even (LTS) lane.
+        self.assertEqual(self.run_installer().returncode, 0)
+        host20 = build_release_host(self.root, version="2.0.0")
+        res = self.run_installer("--update", version="2.0.0", base=host20)
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("cross-lane", res.stderr)
+        self.assertIn("--allow-lane-change", res.stderr)
+        # fail closed: active version unchanged, no partial lane installed
+        self.assertIn("echo faber 1.5.0", (self.prefix / "bin/faber").read_text())
+        self.assertFalse((self.prefix / "versions/2.0.0").exists())
+        receipt = json.loads((self.prefix / "share/faber/install-receipt.json").read_text())
+        self.assertEqual(receipt["version"], "1.5.0")
+        # explicit opt-in succeeds (no silent lane jump)
+        res2 = self.run_installer("--update", "--allow-lane-change",
+                                  version="2.0.0", base=host20)
+        self.assertEqual(res2.returncode, 0, res2.stdout + res2.stderr)
+        receipt = json.loads((self.prefix / "share/faber/install-receipt.json").read_text())
+        self.assertEqual(receipt["version"], "2.0.0")
+
+    def test_update_downgrade_fails_closed(self) -> None:
+        # Downgrade policy is Stage 3 A3 (serialized after A2); self update
+        # refuses with one next action and leaves the install unchanged.
+        host16 = build_release_host(self.root, version="1.6.0")
+        res = self.run_installer(version="1.6.0", base=host16)
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        res2 = self.run_installer("--update", version="1.5.0", base=self.host)
+        self.assertEqual(res2.returncode, 1)
+        self.assertIn("downgrade", res2.stderr)
+        self.assertIn("A3", res2.stderr)
+        self.assertIn("echo faber 1.6.0", (self.prefix / "bin/faber").read_text())
+
+    def test_update_failure_paths_fail_closed_no_partial_install(self) -> None:
+        self.assertEqual(self.run_installer().returncode, 0)  # 1.5.0
+        before = self.seed_user_data(self.prefix)
+        host16 = build_release_host(self.root, version="1.6.0")
+        checksum = host16 / (f"faber-v1.6.0-{TRIPLE}.tar.gz" + ".sha256")
+        checksum.write_text(f"{'0' * 64}  faber-v1.6.0-{TRIPLE}.tar.gz\n", encoding="utf-8")
+        res = self.run_installer("--update", version="1.6.0", base=host16)
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("SHA-256 mismatch", res.stderr)
+        self.assertIn("NO partial install", res.stderr)
+        # version unchanged, no lane installed, user data untouched
+        self.assertIn("echo faber 1.5.0", (self.prefix / "bin/faber").read_text())
+        self.assertFalse((self.prefix / "versions").exists())
+        receipt = json.loads((self.prefix / "share/faber/install-receipt.json").read_text())
+        self.assertEqual(receipt["version"], "1.5.0")
+        self.assert_user_data_unchanged(before)
+
+    def test_update_requires_existing_install(self) -> None:
+        res = self.run_installer("--update")
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("receipt", res.stderr)
 
     # -- platform / shell ----------------------------------------------------
 

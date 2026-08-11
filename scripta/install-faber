@@ -23,9 +23,27 @@ agent installs. Agent installs are non-interactive: no prompts ever, stable
 exit codes, human-readable change report (the JSON diagnostics surface is
 faber Stage 9 — labeled staged, not implemented here).
 
+Reinstall idempotency matrix (Stage 3 A2): a same-version re-run reports
+"already current" and changes nothing; missing or tampered payload files are
+restored and reported; installing a DIFFERENT version over the same prefix
+fails closed and names the upgrade path (`faber self update`).
+
+`--update` performs a versioned upgrade on the existing install (the `faber
+self update` engine): the new version is installed as a side-by-side lane
+(`<prefix>/versions/<version>/`), the current install is preserved as a lane
+first, and the active launcher/packs/receipt flip to the new version with
+rollback. User projects and the package store (`<prefix>/cistae`, per
+package-and-lock-contract.md) are never touched. Update failures fail closed:
+a checksum mismatch aborts before any write, and a failed write rolls back,
+leaving the previously active version unchanged. Downgrades (requesting an
+older version) are not performed here — that is Stage 3 A3 — and cross-lane
+updates (odd development major <-> even LTS major, faber/docs/release/policy.md)
+require the explicit `--allow-lane-change` flag.
+
 Exit codes:
-  0  installed, or already current (idempotent re-run)
-  1  checksum mismatch, different version already installed, or install failure
+  0  installed, updated, or already current (idempotent re-run)
+  1  checksum mismatch, version conflict (cross-version without --update,
+     downgrade, cross-lane), or install/update failure
      (fail-closed; no partial install)
   2  usage error (unsupported platform/triple, malformed arguments)
 
@@ -50,6 +68,8 @@ verifier against the installed prefix:
 Usage:
     scripta/install-faber [--version 1.6.0] [--prefix ~/.faber]
         [--triple aarch64-apple-darwin] [--base-url <url|dir>] [--add-to-path]
+    scripta/install-faber --version 1.6.1 --prefix ~/.faber --update   # upgrade
+    faber self update --version 1.6.1                                  # same engine
 """
 
 from __future__ import annotations
@@ -92,6 +112,36 @@ RESIDUAL_TRIPLES = {
 
 RECEIPT_REL = "share/faber/install-receipt.json"
 SEMVER_RE = r"^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$"
+
+
+def parse_version_parts(version: str) -> tuple[int, int, int, str]:
+    """Numeric (major, minor, patch) plus prerelease tag ('' for releases)."""
+    core, _, pre = version.partition("-")
+    parts = core.split(".")
+    while len(parts) < 3:
+        parts.append("0")
+    return int(parts[0]), int(parts[1]), int(parts[2]), pre
+
+
+def semver_lt(a: str, b: str) -> bool:
+    """Strict semver ordering; a prerelease sorts before its release."""
+    core_a, pre_a = parse_version_parts(a)[:3], parse_version_parts(a)[3]
+    core_b, pre_b = parse_version_parts(b)[:3], parse_version_parts(b)[3]
+    if core_a != core_b:
+        return core_a < core_b
+    if pre_a == pre_b:
+        return False
+    if not pre_a:
+        return False  # a is a release, b is a prerelease of the same core
+    if not pre_b:
+        return True   # a is a prerelease, b is its release
+    return pre_a < pre_b
+
+
+def version_lane(version: str) -> str:
+    """Version lane per faber/docs/release/policy.md: odd major = development
+    line, even major = language-locked LTS line."""
+    return "development" if parse_version_parts(version)[0] % 2 else "lts"
 
 
 def fail(message: str, code: int = 1) -> "None":
@@ -326,7 +376,10 @@ def write_payload(staging: Path, prefix: Path, payload_files: list[str]) -> dict
 
 
 def write_receipt(prefix: Path, *, version: str, triple: str, archive: str,
-                  archive_sha256: str, source: str, payload_files: list[str]) -> Path:
+                  archive_sha256: str, source: str, payload_files: list[str],
+                  asset_base: str | None = None, lane_versions: list[str] | None = None,
+                  installed_at: str | None = None, updated_at: str | None = None) -> Path:
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     data = {
         "receipt": "faber install receipt (faber-onboarding Stage 3; consumed by Stage 4 doctor)",
         "prefix": str(prefix),
@@ -335,9 +388,14 @@ def write_receipt(prefix: Path, *, version: str, triple: str, archive: str,
         "archive": archive,
         "archiveSha256": archive_sha256,
         "source": source,
-        "installedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "assetBase": asset_base if asset_base is not None else source.rsplit("/", 1)[0],
+        "installedAt": installed_at or now,
         "files": payload_files,
     }
+    if updated_at is not None:
+        data["updatedAt"] = updated_at
+    if lane_versions:
+        data["laneVersions"] = sorted(lane_versions)
     path = receipt_path(prefix)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
@@ -386,7 +444,8 @@ def on_path(prefix: Path) -> bool:
 
 def print_report(*, result: str, version: str, triple: str, prefix: Path,
                  source: str, archive_sha256: str, states: dict[str, str],
-                 receipt: Path, path_edited: bool, rc_path: Path | None) -> None:
+                 receipt: Path, path_edited: bool, rc_path: Path | None,
+                 lane_versions: list[str] | None = None) -> None:
     added = sum(1 for s in states.values() if s == "added")
     updated = sum(1 for s in states.values() if s == "updated")
     unchanged = sum(1 for s in states.values() if s == "unchanged")
@@ -396,6 +455,8 @@ def print_report(*, result: str, version: str, triple: str, prefix: Path,
     print(f"  source:     {source}")
     print("  checksum:   sha256 verified before install (basename-only asset)")
     print(f"  archiveSha256: {archive_sha256}")
+    if lane_versions:
+        print(f"  lanes:      {', '.join(sorted(lane_versions))} (active: {version})")
     print(f"  files:      {added} added, {updated} updated, {unchanged} unchanged, 0 removed")
     for rel in sorted(states):
         print(f"    {states[rel]:<9} {rel}")
@@ -437,6 +498,13 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--add-to-path", action="store_true",
                         help="append the PATH export to the detected shell rc "
                              "(explicit opt-in; reversible)")
+    parser.add_argument("--update", action="store_true",
+                        help="perform a versioned upgrade on the existing "
+                             "install at the prefix (side-by-side lanes; the "
+                             "`faber self update` engine)")
+    parser.add_argument("--allow-lane-change", action="store_true",
+                        help="explicitly allow crossing the odd development / "
+                             "even LTS version lane (faber/docs/release/policy.md)")
     return parser.parse_args(argv)
 
 
@@ -481,14 +549,42 @@ def main(argv: list[str] | None = None) -> int:
     if prefix.exists() and not prefix.is_dir():
         fail(f"prefix exists and is not a directory: {prefix}")
     existing = load_receipt(prefix)
-    if existing and existing.get("version") != args.version:
+    if args.update and existing is None:
         fail(
-            f"prefix {prefix} already has faber {existing.get('version')} "
-            f"installed; installing {args.version} over it is a versioned "
-            "reinstall (upgrade/downgrade), which is faber Stage 3 A2 "
-            "(`faber self update`) territory — re-run for the installed "
-            "version or choose a fresh prefix"
+            f"--update requires an existing install at {prefix}, but no install "
+            "receipt was found there; run scripta/install-faber without "
+            "--update to install fresh"
         )
+    updating = False
+    if existing is not None and existing.get("version") != args.version:
+        if not args.update:
+            fail(
+                f"prefix {prefix} already has faber {existing.get('version')} "
+                f"installed; installing {args.version} over it is a versioned "
+                "reinstall — upgrade via `faber self update` (or "
+                "scripta/install-faber --update), downgrade is faber Stage 3 "
+                "A3 (downgrade policy). Re-run for the installed version or "
+                "choose a fresh prefix"
+            )
+        old_version = existing.get("version")
+        if semver_lt(args.version, old_version):
+            fail(
+                f"downgrade from {old_version} to {args.version} is not "
+                "performed by `faber self update` (upgrades only); downgrade "
+                "policy is faber Stage 3 A3. Pin the older version on a fresh "
+                f"prefix instead: scripta/install-faber --version {args.version} "
+                "--prefix <new-prefix>"
+            )
+        if (version_lane(old_version) != version_lane(args.version)
+                and not args.allow_lane_change):
+            fail(
+                f"cross-lane update: {old_version} is on the "
+                f"{version_lane(old_version)} lane and {args.version} is on the "
+                f"{version_lane(args.version)} lane "
+                "(faber/docs/release/policy.md version lanes); pass "
+                "--allow-lane-change to jump lanes explicitly"
+            )
+        updating = True
 
     # 4. Safe extraction to a sibling staging dir. The prefix itself is NOT
     #    created until checksum AND archive validation both pass, so a
@@ -514,17 +610,62 @@ def main(argv: list[str] | None = None) -> int:
     except OSError as err:
         shutil.rmtree(staging, ignore_errors=True)
         raise InstallError(f"cannot create prefix {prefix}: {err}")
+    lane_versions: list[str] = []
     try:
-        states = write_payload(staging / "payload", prefix, payload_files)
+        if updating:
+            # (a) preserve the current install as a side-by-side lane (run once).
+            old_lane = prefix / "versions" / old_version
+            if not old_lane.exists():
+                for rel in existing.get("files") or []:
+                    src = prefix / rel
+                    dst = old_lane / rel
+                    if src.is_file():
+                        dst.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(src, dst)
+                write_receipt(
+                    old_lane, version=old_version,
+                    triple=existing.get("triple") or triple,
+                    archive=existing.get("archive") or archive,
+                    archive_sha256=existing.get("archiveSha256") or archive_sha256,
+                    source=existing.get("source") or source,
+                    payload_files=existing.get("files") or [],
+                    asset_base=existing.get("assetBase") or base,
+                    installed_at=existing.get("installedAt"),
+                )
+            # (b) install the new version as its own lane (rollback-protected).
+            new_lane = prefix / "versions" / args.version
+            lane_states = write_payload(staging / "payload", new_lane, payload_files)
+            write_receipt(
+                new_lane, version=args.version, triple=triple, archive=archive,
+                archive_sha256=archive_sha256, source=source,
+                payload_files=payload_files, asset_base=base,
+            )
+            # (c) flip the active install (launcher + packs) to the new version.
+            flip_states = write_payload(staging / "payload", prefix, payload_files)
+            states = {
+                **{f"versions/{args.version}/{rel}": s for rel, s in lane_states.items()},
+                **flip_states,
+            }
+            lane_versions = sorted(
+                p.name for p in (prefix / "versions").glob("*") if p.is_dir()
+            )
+        else:
+            states = write_payload(staging / "payload", prefix, payload_files)
     except InstallError:
         raise
     finally:
         shutil.rmtree(staging, ignore_errors=True)
 
-    # 6. Receipt (prefix record consumed by Stage 4 doctor).
+    # 6. Receipt (prefix record consumed by Stage 4 doctor). On an update the
+    #    top-level receipt records the ACTIVE version and the side-by-side
+    #    lanes; the previous installedAt is preserved.
     receipt = write_receipt(
         prefix, version=args.version, triple=triple, archive=archive,
         archive_sha256=archive_sha256, source=source, payload_files=payload_files,
+        asset_base=base, lane_versions=lane_versions,
+        installed_at=existing.get("installedAt") if updating else None,
+        updated_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        if updating else None,
     )
 
     # 7. PATH / shell handling.
@@ -536,12 +677,15 @@ def main(argv: list[str] | None = None) -> int:
 
     if states and all(s == "unchanged" for s in states.values()):
         result = "already current"
+    elif updating:
+        result = f"updated (from {old_version})"
     else:
         result = "installed"
     print_report(
         result=result, version=args.version, triple=triple, prefix=prefix,
         source=source, archive_sha256=archive_sha256, states=states,
         receipt=receipt, path_edited=edited, rc_path=rc_path,
+        lane_versions=lane_versions or None,
     )
     return 0
 
