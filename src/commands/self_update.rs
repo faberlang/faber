@@ -14,6 +14,14 @@
 //! binary, reads the install receipt, and re-runs the bootstrap with the update
 //! flags.
 //!
+//! Repair surface (Stage 3 A4): a missing, unreadable, or field-incomplete
+//! install receipt — the launcher metadata (dev-kit layer 1) — fails closed
+//! with the `missing-launcher-metadata` failure class (dev-kit-contract.md
+//! diagnostic vocabulary) and ONE next action: re-run the bootstrap without
+//! `--update` to repair, then re-run the update. The engine itself restores
+//! tampered/missing packs and rewrites a lost receipt on re-run; the full
+//! doctor surface is faber Stage 4 (staged).
+//!
 //! This is a channel operation: like the `curl | python3` bootstrap it uses the
 //! release host as its only source (never a second release system, CAMPAIGN
 //! Stage 3 overlap rule) and it needs the channel runtime — `python3` to run
@@ -109,20 +117,38 @@ pub(crate) fn plan_self_update(
     if args.version.trim().is_empty() {
         return Err("--version is required: faber self update --version <version>".to_owned());
     }
-    let prefix = resolve_prefix(args.prefix.as_deref(), exe, cwd)?;
-    let receipt = read_receipt(&prefix)?;
+    let prefix = resolve_prefix(args.prefix.as_deref(), exe, cwd).map_err(|message| {
+        launcher_metadata_error(message, "the install prefix")
+    })?;
+    let receipt = read_receipt(&prefix)
+        .map_err(|message| launcher_metadata_error(message, prefix.display()))?;
     let current_version = receipt
         .get("version")
         .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| format!("install receipt at {} has no version", prefix.display()))?;
+        .ok_or_else(|| {
+            launcher_metadata_error(
+                format!("install receipt at {} has no version", prefix.display()),
+                prefix.display(),
+            )
+        })?;
     let triple = receipt
         .get("triple")
         .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| format!("install receipt at {} has no triple", prefix.display()))?;
+        .ok_or_else(|| {
+            launcher_metadata_error(
+                format!("install receipt at {} has no triple", prefix.display()),
+                prefix.display(),
+            )
+        })?;
     let source = receipt
         .get("source")
         .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| format!("install receipt at {} has no source", prefix.display()))?;
+        .ok_or_else(|| {
+            launcher_metadata_error(
+                format!("install receipt at {} has no source", prefix.display()),
+                prefix.display(),
+            )
+        })?;
     let base_url = if let Some(url) = args.base_url.as_deref() {
         url.to_owned()
     } else {
@@ -141,6 +167,26 @@ pub(crate) fn plan_self_update(
         base_url,
         allow_lane_change: args.allow_lane_change,
     })
+}
+
+/// Attach the install-side failure classification for lost or corrupt
+/// launcher metadata (Stage 3 A4; dev-kit-contract.md diagnostic classes).
+///
+/// The install receipt IS the launcher metadata (dev-kit layer 1): it
+/// records version, triple, and payload. A missing, unreadable, or
+/// field-incomplete receipt is the `missing-launcher-metadata` failure
+/// class with ONE next action — repair by re-running the bootstrap without
+/// `--update` (it rewrites the receipt), then re-run the update. `where`
+/// names the prefix the next action applies to.
+fn launcher_metadata_error(message: impl AsRef<str>, where_: impl std::fmt::Display) -> String {
+    format!(
+        "{}\n  cause:  missing-launcher-metadata\n  layer:  launcher (dev-kit \
+         layer 1; the install receipt records version, triple, and payload)\n  \
+         next:   re-run scripta/install-faber without --update at {} to repair \
+         the install metadata, then re-run `faber self update --version <v>`",
+        message.as_ref(),
+        where_,
+    )
 }
 
 /// Locate the install prefix: explicit `--prefix`, else the receipt found

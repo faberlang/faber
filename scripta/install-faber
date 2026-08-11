@@ -57,6 +57,23 @@ prefix WITHOUT following a pre-existing symlink. A pre-existing
 stay byte-identical. The same rule applies to PATH-owned writes (the shell rc
 append must not follow a symlink out of the user's home).
 
+Repair policy (Stage 3 A4): a broken or tampered install is detected by the
+installer and repairable by re-running install/update — one install-side
+state machine with typed failure classes matching dev-kit-contract.md
+diagnostics (the Stage 4 doctor consumes the same vocabulary):
+
+    missing-launcher-metadata        lost/corrupt install receipt; a re-run
+                                     rewrites it, `--update` fails closed
+    missing-or-incompatible-pack     tampered/missing reference/locale pack;
+                                     a same-version re-run restores it
+    missing-or-corrupt-core-support  incomplete/corrupt platform-cache entry;
+                                     the launcher re-materializes on next use
+    unwritable-prefix                prefix create/write failure; fails
+                                     closed with one next action
+
+Repairs are reported on stdout as `repairs: <cause>: <detail>` lines and the
+result becomes `repaired` when a re-run restored payload or metadata.
+
 Exit codes:
   0  installed, updated, downgraded, or already current (idempotent re-run)
   1  checksum mismatch, version conflict (cross-version without --update,
@@ -425,7 +442,13 @@ def write_payload(staging: Path, prefix: Path, payload_files: list[str]) -> dict
     try:
         rollback.mkdir(parents=True, exist_ok=True)
     except OSError as err:
-        raise InstallError(f"cannot create rollback dir in {prefix}: {err}")
+        raise InstallError(
+            f"cannot create rollback dir in {prefix}: {err}\n"
+            f"  cause:  {CAUSE_UNWRITABLE_PREFIX}\n"
+            f"  layer:  install prefix (dev-kit install root)\n"
+            f"  next:   fix the permissions on {prefix} (or pass a "
+            "writable --prefix) and re-run install/update"
+        )
     if rollback.is_symlink() or (rollback.exists() and not rollback.is_dir()):
         shutil.rmtree(rollback, ignore_errors=True)
         raise InstallError(
@@ -478,7 +501,13 @@ def write_payload(staging: Path, prefix: Path, payload_files: list[str]) -> dict
             target.unlink(missing_ok=True)
         shutil.rmtree(rollback, ignore_errors=True)
         shutil.rmtree(staging, ignore_errors=True)
-        raise InstallError(f"failed to write payload: {err}")
+        raise InstallError(
+            f"failed to write payload: {err}\n"
+            f"  cause:  {CAUSE_UNWRITABLE_PREFIX}\n"
+            f"  layer:  install prefix (dev-kit install root)\n"
+            f"  next:   fix the permissions on {prefix} (or pass a "
+            "writable --prefix) and re-run install/update"
+        )
     shutil.rmtree(rollback, ignore_errors=True)
     return states
 
@@ -576,7 +605,8 @@ def on_path(prefix: Path) -> bool:
 def print_report(*, result: str, version: str, triple: str, prefix: Path,
                  source: str, archive_sha256: str, states: dict[str, str],
                  receipt: Path, path_edited: bool, rc_path: Path | None,
-                 lane_versions: list[str] | None = None) -> None:
+                 lane_versions: list[str] | None = None,
+                 repairs: list[tuple[str, str]] | None = None) -> None:
     added = sum(1 for s in states.values() if s == "added")
     updated = sum(1 for s in states.values() if s == "updated")
     unchanged = sum(1 for s in states.values() if s == "unchanged")
@@ -588,6 +618,9 @@ def print_report(*, result: str, version: str, triple: str, prefix: Path,
     print(f"  archiveSha256: {archive_sha256}")
     if lane_versions:
         print(f"  lanes:      {', '.join(sorted(lane_versions))} (active: {version})")
+    if repairs:
+        for cause, detail in repairs:
+            print(f"  repairs:    {cause}: {detail}")
     print(f"  files:      {added} added, {updated} updated, {unchanged} unchanged, 0 removed")
     for rel in sorted(states):
         print(f"    {states[rel]:<9} {rel}")
@@ -732,6 +765,86 @@ def check_downgrade_pack_compatibility(prefix: Path, target_version: str) -> Non
 
 
 # ---------------------------------------------------------------------------
+# repair policy (Stage 3 A4): install-side failure classification
+# ---------------------------------------------------------------------------
+
+# Typed causes matching dev-kit-contract.md diagnostic classes (the
+# install-side subset of the doctor's failure vocabulary; the Stage 4 doctor
+# consumes the same classes). One repair state machine: detect + restore +
+# classify; repair is re-running install/update (the engine's idempotent
+# restore is the repair path).
+CAUSE_MISSING_LAUNCHER_METADATA = "missing-launcher-metadata"
+CAUSE_MISSING_OR_CORRUPT_CORE_SUPPORT = "missing-or-corrupt-core-support"
+CAUSE_MISSING_OR_INCOMPATIBLE_PACK = "missing-or-incompatible-pack"
+CAUSE_UNWRITABLE_PREFIX = "unwritable-prefix"
+
+# The launcher's core-support commit marker (core_support::materialize writes
+# `.faber-core-support-complete` last). A materialized entry without it is
+# incomplete by definition; the launcher quarantines + re-extracts such
+# entries on the next core-support use.
+CORE_SUPPORT_COMPLETION_MARKER = ".faber-core-support-complete"
+
+
+def platform_core_support_cache(home: Path) -> Path:
+    """Deterministic core-support cache parent (dev-kit layer 2, E12).
+
+    Mirrors core_support::materialize::platform_cache_dir: macOS uses
+    `~/Library/Caches`, other platforms use `$XDG_CACHE_HOME` or `~/.cache`.
+    The cache is content-hash-keyed and immutable; entries are directory
+    names equal to the embedded archive SHA-256.
+    """
+    if sys.platform == "darwin":
+        return home / "Library" / "Caches" / "faber" / "core-support" / "tar-zst-v1"
+    cache_home = os.environ.get("XDG_CACHE_HOME")
+    if cache_home:
+        return Path(cache_home) / "faber" / "core-support" / "tar-zst-v1"
+    return home / ".cache" / "faber" / "core-support" / "tar-zst-v1"
+
+
+def corrupt_core_support_entries(cache: Path) -> list[str]:
+    """Names of archive-hash cache entries that are incomplete or corrupt.
+
+    A valid entry is a real directory carrying a regular, non-symlinked
+    `.faber-core-support-complete` marker (the materializer's commit point).
+    An entry without that marker — an interrupted materialization, tampering,
+    or a partial — or a symlinked entry is corrupt; the launcher quarantines
+    and re-materializes it on the next core-support use. A missing cache
+    (never materialized) is NOT a failure: the launcher materializes on the
+    first core-support use. Returns [] on any scan error (report-only check).
+    """
+    try:
+        if cache.is_symlink() or not cache.is_dir():
+            return []
+        bad: list[str] = []
+        for entry in sorted(cache.iterdir()):
+            if entry.is_symlink():
+                bad.append(f"{entry.name} (symlink)")
+                continue
+            if not entry.is_dir():
+                continue
+            marker = entry / CORE_SUPPORT_COMPLETION_MARKER
+            if marker.is_symlink() or not marker.is_file():
+                bad.append(entry.name)
+        return bad
+    except OSError:
+        return []
+
+
+def prefix_has_content(prefix: Path) -> bool:
+    """True when the prefix is a real, non-empty directory.
+
+    A non-empty prefix with no install receipt means launcher metadata was
+    lost (missing-launcher-metadata): the payload files survived but the
+    record that names version/triple/payload did not. An empty or absent
+    prefix is a fresh-install target, not a metadata loss.
+    """
+    try:
+        return prefix.is_dir() and not prefix.is_symlink() and any(prefix.iterdir())
+    except OSError:
+        return False
+
+
+# ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
 
@@ -802,8 +915,18 @@ def main(argv: list[str] | None = None) -> int:
     #    A mismatch aborts here; nothing under the prefix has been touched.
     archive_sha256 = verify_checksum(archive, archive_bytes, checksum_text)
 
-    # 3. Prefix state checks (no writes yet).
-    prefix.parent.mkdir(parents=True, exist_ok=True)
+    # 3. Prefix state checks (no writes yet). An unwritable prefix parent
+    #    fails closed (A4): typed unwritable-prefix + ONE next action.
+    try:
+        prefix.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as err:
+        raise InstallError(
+            f"cannot create the install prefix {prefix}: {err}\n"
+            f"  cause:  {CAUSE_UNWRITABLE_PREFIX}\n"
+            f"  layer:  install prefix (dev-kit install root)\n"
+            f"  next:   fix the permissions on {prefix.parent} (or pass a "
+            "writable --prefix) and re-run install/update"
+        )
     if prefix.exists() and not prefix.is_dir():
         fail(f"prefix exists and is not a directory: {prefix}")
     # 3b. Destination-side containment (CTO audit FINDING 1): the receipt
@@ -813,10 +936,20 @@ def main(argv: list[str] | None = None) -> int:
     existing = load_receipt(prefix)
     if args.update and existing is None:
         fail(
-            f"--update requires an existing install at {prefix}, but no install "
-            "receipt was found there; run scripta/install-faber without "
-            "--update to install fresh"
+            f"--update requires an existing install at {prefix}, but no "
+            "install receipt was found there (missing launcher metadata)\n"
+            f"  cause:  {CAUSE_MISSING_LAUNCHER_METADATA}\n"
+            f"  layer:  launcher (dev-kit layer 1; the install receipt "
+            "records version, triple, and payload)\n"
+            f"  next:   re-run install-faber without --update at {prefix} to "
+            "repair the install metadata, then re-run `faber self update "
+            "--version <target>`"
         )
+    # A non-empty prefix with no receipt is a metadata-loss repair: the
+    # payload survived but the launcher record did not. The run proceeds as
+    # a same-version reinstall and rewrites the receipt (repair by
+    # re-running install/update).
+    metadata_repair = existing is None and prefix_has_content(prefix)
     updating = False
     downgrading = False
     if existing is not None and existing.get("version") != args.version:
@@ -855,7 +988,13 @@ def main(argv: list[str] | None = None) -> int:
     try:
         staging.mkdir(parents=True, exist_ok=True)
     except OSError as err:
-        raise InstallError(f"cannot create staging dir in {prefix.parent}: {err}")
+        raise InstallError(
+            f"cannot create staging dir in {prefix.parent}: {err}\n"
+            f"  cause:  {CAUSE_UNWRITABLE_PREFIX}\n"
+            f"  layer:  install prefix (dev-kit install root)\n"
+            f"  next:   fix the permissions on {prefix.parent} (or pass a "
+            "writable --prefix) and re-run install/update"
+        )
     if staging.is_symlink() or (staging.exists() and not staging.is_dir()):
         shutil.rmtree(staging, ignore_errors=True)
         raise InstallError(
@@ -876,7 +1015,13 @@ def main(argv: list[str] | None = None) -> int:
         prefix.mkdir(parents=True, exist_ok=True)
     except OSError as err:
         shutil.rmtree(staging, ignore_errors=True)
-        raise InstallError(f"cannot create prefix {prefix}: {err}")
+        raise InstallError(
+            f"cannot create prefix {prefix}: {err}\n"
+            f"  cause:  {CAUSE_UNWRITABLE_PREFIX}\n"
+            f"  layer:  install prefix (dev-kit install root)\n"
+            f"  next:   fix the permissions on {prefix.parent} (or pass a "
+            "writable --prefix) and re-run install/update"
+        )
     if prefix.is_symlink() or prefix.resolve() != prefix:
         shutil.rmtree(staging, ignore_errors=True)
         fail(f"refusing to install: prefix {prefix} is not canonical")
@@ -951,19 +1096,56 @@ def main(argv: list[str] | None = None) -> int:
     if args.add_to_path:
         rc_path, edited = add_to_path(prefix, home)
 
-    if states and all(s == "unchanged" for s in states.values()):
+    # 7b. Repair classification (Stage 3 A4): one install-side state machine.
+    #     Non-updating re-runs that had to restore payload files are
+    #     missing-or-incompatible-pack repairs; a lost receipt that gets
+    #     rewritten is missing-launcher-metadata. Incomplete/corrupt
+    #     core-support cache entries are DETECTED and named (the launcher
+    #     re-materializes them on the next core-support use) but do not
+    #     change the result — the payload itself is intact. Update/downgrade
+    #     runs keep their own result; all findings print as `repairs:` lines
+    #     in the doctor's failure-class vocabulary.
+    added = sum(1 for s in states.values() if s == "added")
+    updated = sum(1 for s in states.values() if s == "updated")
+    repairs: list[tuple[str, str]] = []
+    if metadata_repair:
+        repairs.append((CAUSE_MISSING_LAUNCHER_METADATA,
+                        "install receipt rewritten (lost launcher metadata)"))
+    if (not updating and (added or updated)
+            and (metadata_repair
+                 or (existing is not None and existing.get("version") == args.version))):
+        detail = ", ".join(
+            part for part in (
+                f"{updated} tampered restored" if updated else "",
+                f"{added} missing restored" if added else "",
+            ) if part
+        )
+        repairs.append((CAUSE_MISSING_OR_INCOMPATIBLE_PACK, detail))
+    findings: list[tuple[str, str]] = []
+    core_support_bad = corrupt_core_support_entries(platform_core_support_cache(home))
+    if core_support_bad:
+        findings.append((
+            CAUSE_MISSING_OR_CORRUPT_CORE_SUPPORT,
+            "cache entry " + ", ".join(core_support_bad) + " is incomplete or "
+            "corrupt; the launcher re-materializes core support on the next "
+            "`faber run`/`faber check`",
+        ))
+
+    if states and all(s == "unchanged" for s in states.values()) and not repairs:
         result = "already current"
     elif updating and downgrading:
         result = f"downgraded (from {old_version})"
     elif updating:
         result = f"updated (from {old_version})"
+    elif repairs:
+        result = "repaired"
     else:
         result = "installed"
     print_report(
         result=result, version=args.version, triple=triple, prefix=prefix,
         source=source, archive_sha256=archive_sha256, states=states,
         receipt=receipt, path_edited=edited, rc_path=rc_path,
-        lane_versions=lane_versions or None,
+        lane_versions=lane_versions or None, repairs=repairs + findings,
     )
     return 0
 
