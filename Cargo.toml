@@ -15,8 +15,31 @@ members = [
     "crates/radix-lexer",
     "crates/radix-syntax",
     "crates/radix-types",
+    "crates/faber",
 ]
 resolver = "2"
+
+# Package-selection freeze (destination-map §10.3.3): bare `cargo build` /
+# `cargo check` stay compiler-cheap. The default set is exactly the pre-import
+# 32-member compiler set; the product (faber / exempla / faber-hir-rust) is
+# never a default member and is reached only via explicit `-p` selection.
+default-members = [
+    "crates/hygiene-ratchet",
+    "crates/radix",
+    "crates/radix-codegen-shared",
+    "crates/radix-hir-faber",
+    "crates/radix-mir",
+    "crates/radix-mir-fmir",
+    "crates/radix-parser",
+    "crates/radix-host-abi",
+    "crates/radix-runtime-contract",
+    "crates/radix-diagnostics",
+    "crates/radix-hir",
+    "crates/radix-hir-fhir",
+    "crates/radix-lexer",
+    "crates/radix-syntax",
+    "crates/radix-types",
+]
 
 # Workspace-wide clippy enforcement. Every crate inherits this via
 # `[lints] workspace = true` in its own Cargo.toml. Per-crate overrides
