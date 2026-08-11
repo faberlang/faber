@@ -1,0 +1,17 @@
+genus Punctum {
+    numerus x
+
+    functio dupla() → numerus {
+        redde ego.x * 2
+    }
+}
+
+functio structa(numerus x) → Punctum {
+    redde Punctum { x = x }
+}
+
+functio tabula() → textus {
+    varia Punctum p ← structa(21)
+    nota p.dupla()
+    redde "ok"
+}
