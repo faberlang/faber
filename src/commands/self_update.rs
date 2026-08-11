@@ -22,6 +22,19 @@
 //! tampered/missing packs and rewrites a lost receipt on re-run; the full
 //! doctor surface is faber Stage 4 (staged).
 //!
+//! `faber self uninstall` (Stage 3 A5) removes ONLY product-owned files — the
+//! installed payload and receipt at the prefix, every version lane, install
+//! rollback leftovers, and the kit-owned platform-cache entries — and reverses
+//! the explicit PATH/shell change the installer made. User projects, locks,
+//! and dependency caches survive by default; `--purge` removes them
+//! explicitly, never implicitly. Like the update wrapper it locates the
+//! prefix from the running binary, reads the receipt, and re-runs the
+//! published bootstrap with the `--uninstall` flag (the same single
+//! install-side state machine). The engine also uninstalls a receipt-less
+//! prefix at an explicit `--prefix`; this wrapper fails closed instead
+//! (it needs the receipt to locate the published engine) and names the
+//! direct engine invocation as the next action.
+//!
 //! This is a channel operation: like the `curl | python3` bootstrap it uses the
 //! release host as its only source (never a second release system, CAMPAIGN
 //! Stage 3 overlap rule) and it needs the channel runtime — `python3` to run
@@ -47,6 +60,10 @@ pub enum SelfCommand {
     /// Update the installed faber (upgrade to a newer released version, or
     /// pinned downgrade to an older one)
     Update(SelfUpdateArgs),
+
+    /// Uninstall this faber installation (product-owned files only; user
+    /// projects, locks, and dependency caches survive unless --purge)
+    Uninstall(SelfUninstallArgs),
 }
 
 /// Arguments for `faber self update`.
@@ -70,6 +87,23 @@ pub struct SelfUpdateArgs {
     pub allow_lane_change: bool,
 }
 
+/// Arguments for `faber self uninstall`.
+#[derive(clap::Args, Debug)]
+pub struct SelfUninstallArgs {
+    /// Install prefix (default: discovered from this binary's install receipt)
+    #[arg(long, value_name = "PATH")]
+    pub prefix: Option<PathBuf>,
+
+    /// Asset base URL or directory (default: from the install receipt)
+    #[arg(long = "base-url", value_name = "URL")]
+    pub base_url: Option<String>,
+
+    /// Also remove user projects, locks, and the package store (dependency
+    /// caches). Never implicit: default uninstall leaves them in place.
+    #[arg(long)]
+    pub purge: bool,
+}
+
 /// Installed-receipt path relative to the install prefix.
 pub(crate) const RECEIPT_REL: &str = "share/faber/install-receipt.json";
 /// Name of the published bootstrap script beside the release archives.
@@ -87,10 +121,22 @@ pub(crate) struct SelfUpdatePlan {
     pub allow_lane_change: bool,
 }
 
+/// The resolved uninstall operation: the prefix to remove and the published
+/// engine to run (fetched from the same asset base as the running install).
+#[derive(Debug)]
+pub(crate) struct SelfUninstallPlan {
+    pub prefix: PathBuf,
+    pub current_version: String,
+    pub triple: String,
+    pub script_url: String,
+    pub purge: bool,
+}
+
 /// Dispatch `faber self <subcommand>`.
 pub(super) fn cmd_self(args: &SelfManageArgs) {
     match &args.command {
         SelfCommand::Update(args) => cmd_self_update(args),
+        SelfCommand::Uninstall(args) => cmd_self_uninstall(args),
     }
 }
 
@@ -105,6 +151,19 @@ pub(super) fn cmd_self_update(args: &SelfUpdateArgs) {
         }
     };
     execute_self_update(&plan);
+}
+
+pub(super) fn cmd_self_uninstall(args: &SelfUninstallArgs) {
+    let exe = std::env::current_exe().ok();
+    let cwd = std::env::current_dir().ok();
+    let plan = match plan_self_uninstall(args, exe.as_deref(), cwd.as_deref()) {
+        Ok(plan) => plan,
+        Err(message) => {
+            eprintln!("error: {message}");
+            std::process::exit(1);
+        }
+    };
+    execute_self_uninstall(&plan);
 }
 
 /// Pure resolution core (injectable exe/cwd for tests): locate the prefix,
@@ -167,6 +226,90 @@ pub(crate) fn plan_self_update(
         base_url,
         allow_lane_change: args.allow_lane_change,
     })
+}
+
+/// Pure resolution core for `faber self uninstall` (injectable exe/cwd for
+/// tests): locate the prefix, read the receipt, and derive the published
+/// engine invocation. The engine itself (Stage 3 A5) removes ONLY
+/// product-owned files and reverses the PATH/shell change; this wrapper needs
+/// the receipt to locate the engine's script at the CURRENT version's asset
+/// base.
+pub(crate) fn plan_self_uninstall(
+    args: &SelfUninstallArgs,
+    exe: Option<&Path>,
+    cwd: Option<&Path>,
+) -> Result<SelfUninstallPlan, String> {
+    let prefix = resolve_prefix(args.prefix.as_deref(), exe, cwd).map_err(|message| {
+        uninstall_metadata_error(message, "the install prefix")
+    })?;
+    let receipt = read_receipt(&prefix)
+        .map_err(|message| uninstall_metadata_error(message, prefix.display()))?;
+    let current_version = receipt
+        .get("version")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| {
+            uninstall_metadata_error(
+                format!("install receipt at {} has no version", prefix.display()),
+                prefix.display(),
+            )
+        })?;
+    let triple = receipt
+        .get("triple")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| {
+            uninstall_metadata_error(
+                format!("install receipt at {} has no triple", prefix.display()),
+                prefix.display(),
+            )
+        })?;
+    let source = receipt
+        .get("source")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| {
+            uninstall_metadata_error(
+                format!("install receipt at {} has no source", prefix.display()),
+                prefix.display(),
+            )
+        })?;
+    let base_url = if let Some(url) = args.base_url.as_deref() {
+        url.to_owned()
+    } else {
+        receipt
+            .get("assetBase")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned)
+            // The engine script is published beside the CURRENT version's
+            // assets (the same base that installed this version).
+            .unwrap_or_else(|| derive_base_url(source, current_version))
+    };
+    Ok(SelfUninstallPlan {
+        prefix,
+        current_version: current_version.to_owned(),
+        triple: triple.to_owned(),
+        script_url: format!("{base_url}/{INSTALLER_SCRIPT}"),
+        purge: args.purge,
+    })
+}
+
+/// Uninstall-side failure classification for lost or corrupt launcher
+/// metadata (Stage 3 A5; dev-kit-contract.md diagnostic classes).
+///
+/// The wrapper locates the published uninstall engine THROUGH the receipt;
+/// lost metadata means it cannot. The direct engine invocation is the next
+/// action: `scripta/install-faber --uninstall --prefix <p>` also removes a
+/// receipt-less install at an explicit prefix (the broken-install path).
+fn uninstall_metadata_error(message: impl AsRef<str>, where_: impl std::fmt::Display) -> String {
+    format!(
+        "{}\n  cause:  missing-launcher-metadata\n  layer:  launcher (dev-kit \
+         layer 1; the install receipt records version, triple, and payload)\n  \
+         next:   run `python3 scripta/install-faber --uninstall --prefix {}` \
+         directly (the uninstall engine removes a receipt-less install at an \
+         explicit prefix), or re-run scripta/install-faber without --update at \
+         {} to repair the install metadata first, then uninstall",
+        message.as_ref(),
+        where_,
+        where_,
+    )
 }
 
 /// Attach the install-side failure classification for lost or corrupt
@@ -286,8 +429,16 @@ fn execute_self_update(plan: &SelfUpdatePlan) {
         args_vec.push("--allow-lane-change".to_owned());
     }
 
+    run_installer_engine(&script, &args_vec);
+}
+
+/// Run the published bootstrap under `python3` with `args_vec`, feeding the
+/// script on stdin; the script's stdout/stderr pass through and its exit
+/// code is ours. `python3` is the channel runtime (the bootstrap is
+/// self-contained and needs only python3).
+fn run_installer_engine(script: &[u8], args_vec: &[String]) {
     let mut child = match Command::new("python3")
-        .args(&args_vec)
+        .args(args_vec)
         .stdin(std::process::Stdio::piped())
         .spawn()
     {
@@ -295,14 +446,14 @@ fn execute_self_update(plan: &SelfUpdatePlan) {
         Err(err) => {
             eprintln!(
                 "error: cannot run the faber installer (python3): {err}\n\
-                 hint: the faber install channel runs on python3; the update engine \
-                 is the published scripta/install-faber"
+                 hint: the faber install channel runs on python3; the update \
+                 engine is the published scripta/install-faber"
             );
             std::process::exit(1);
         }
     };
     if let Some(mut stdin) = child.stdin.take() {
-        if let Err(err) = stdin.write_all(&script) {
+        if let Err(err) = stdin.write_all(script) {
             eprintln!("error: cannot feed the installer script: {err}");
         }
         drop(stdin);
@@ -317,6 +468,44 @@ fn execute_self_update(plan: &SelfUpdatePlan) {
     if !status.success() {
         std::process::exit(status.code().unwrap_or(1));
     }
+}
+
+/// Execute `faber self uninstall`: fetch the published engine (the same
+/// script that installed this version) and run it with `--uninstall`. The
+/// engine removes ONLY product-owned files and reverses the PATH/shell
+/// change; its report (what was removed and what was left) passes through.
+fn execute_self_uninstall(plan: &SelfUninstallPlan) {
+    println!(
+        "faber self uninstall — {} ({})",
+        plan.current_version, plan.triple
+    );
+    println!("  prefix:     {}", plan.prefix.display());
+    println!("  engine:     fetching {INSTALLER_SCRIPT} from {}", plan.script_url);
+
+    let script = match fetch_installer_script(&plan.script_url) {
+        Ok(bytes) => bytes,
+        Err(message) => {
+            eprintln!("error: {message}");
+            eprintln!(
+                "  offline or unreachable? retry, or run scripta/install-faber \
+                 --uninstall --prefix {} directly",
+                plan.prefix.display()
+            );
+            std::process::exit(1);
+        }
+    };
+
+    let mut args_vec: Vec<String> = vec![
+        "-".to_owned(),
+        "--prefix".to_owned(),
+        plan.prefix.display().to_string(),
+        "--uninstall".to_owned(),
+    ];
+    if plan.purge {
+        args_vec.push("--purge".to_owned());
+    }
+
+    run_installer_engine(&script, &args_vec);
 }
 
 /// Fetch the published installer script. URL bases go through `curl` (the
