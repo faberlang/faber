@@ -1,9 +1,11 @@
 functio gradus(numerus x) → numerus {
     si x ≻ 0 {
         redde x
-    } sin x ≡ 0 {
+    }
+    sin x ≡ 0 {
         redde 0
-    } secus {
+    }
+    secus {
         redde 0 - x
     }
 }
