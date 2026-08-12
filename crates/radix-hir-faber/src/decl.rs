@@ -76,6 +76,28 @@ impl super::FaberCodegen {
                 writer.write(&self.type_to_faber(a.ty, types, names, interner, surface));
                 writer.newline();
             }
+            HirItemKind::Schema(schema) => {
+                writer.write(surface.keyword(TokenKind::Schema));
+                writer.write(" ");
+                writer.write(&self.symbol_to_string(schema.name, interner));
+                writer.writeln(" {");
+                writer.indented(|writer| {
+                    for column in &schema.columns {
+                        writer.write(surface.keyword(TokenKind::Columna));
+                        writer.write(" ");
+                        writer.write(&self.type_to_faber(column.ty, types, names, interner, surface));
+                        writer.write(" ");
+                        writer.write(&self.symbol_to_string(column.name, interner));
+                        if column.source != column.name {
+                            writer.write(" : ");
+                            writer.write(&self.symbol_to_string(column.source, interner));
+                        }
+                        writer.newline();
+                    }
+                });
+                writer.write("}");
+                writer.newline();
+            }
             HirItemKind::Constant(c) => {
                 writer.write(surface.contextual_keyword("fixum"));
                 writer.write(" ");

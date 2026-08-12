@@ -184,6 +184,9 @@ pub fn walk_item<V: HirVisitor>(visitor: &mut V, item: &HirItem) {
         HirItemKind::TypeAlias(alias) => {
             visitor.visit_def(item.def_id, alias.name);
         }
+        HirItemKind::Schema(schema) => {
+            visitor.visit_def(item.def_id, schema.name);
+        }
         HirItemKind::Constant(const_item) => {
             visitor.visit_def(item.def_id, const_item.name);
             visitor.visit_expr(&const_item.value);
@@ -671,6 +674,9 @@ pub fn walk_item_mut<V: HirVisitorMut>(visitor: &mut V, item: &mut HirItem) {
         }
         HirItemKind::TypeAlias(alias) => {
             visitor.visit_def(item.def_id, alias.name);
+        }
+        HirItemKind::Schema(schema) => {
+            visitor.visit_def(item.def_id, schema.name);
         }
         HirItemKind::Constant(const_item) => {
             visitor.visit_def(item.def_id, const_item.name);

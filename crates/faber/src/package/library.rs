@@ -1210,6 +1210,7 @@ fn hir_item_name_and_kind(
             interner.resolve(konst.name).to_owned(),
             LibraryItemKind::Const,
         )),
+        HirItemKind::Schema(_) => None,
         HirItemKind::Import(_) => None,
     }
 }

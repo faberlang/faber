@@ -124,6 +124,7 @@ pub(crate) fn extract_file_interface_with_identity(
             HirItemKind::Constant(konst) => {
                 FileExportKind::Const(snapshot_const(konst, analysis, file_label, &name, export_identity)?)
             }
+            HirItemKind::Schema(_) => continue,
             HirItemKind::Import(_) => continue,
         };
 
@@ -522,6 +523,7 @@ fn hir_item_name(item: &HirItemKind, analysis: &AnalyzedUnit) -> Option<String> 
         HirItemKind::Enum(enm) => analysis.interner.resolve(enm.name),
         HirItemKind::Interface(interface) => analysis.interner.resolve(interface.name),
         HirItemKind::TypeAlias(alias) => analysis.interner.resolve(alias.name),
+        HirItemKind::Schema(_) => return None,
         HirItemKind::Constant(konst) => analysis.interner.resolve(konst.name),
         HirItemKind::Import(_) => return None,
     };
