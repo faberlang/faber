@@ -1,0 +1,27 @@
+[package]
+name = "faber-runtime"
+version = "0.1.0"
+edition = "2021"
+description = "Faber language runtime types for generated Rust (crate name: faber)"
+license = "MIT"
+
+# S1-U4 package identity (faber-target-runtime inventory §7): the recorded
+# default is the Cargo package at `faber/runtime/rust/`, published optional.
+# The lib target keeps the `faber` crate name so generated-Rust manifests
+# (alias `faber = { package = "faber-runtime", ... }`) resolve unchanged.
+#
+# Standalone workspace root: while the legacy `../faber-runtime` repo is still
+# a path dependency of the faber CLI, a same-named member in the faber root
+# workspace would collide in Cargo resolution. This crate builds on its own;
+# the core-support re-point (S8A) integrates it as the faber runtime path.
+[workspace]
+
+[lib]
+name = "faber"
+path = "src/lib.rs"
+
+[dependencies]
+regex = "1"
+
+[dev-dependencies]
+tempfile = "3"
