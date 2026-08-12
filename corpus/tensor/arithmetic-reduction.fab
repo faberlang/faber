@@ -4,7 +4,7 @@ kind = "method"
 category = "collection"
 canonical = false
 summary = "Tensor reduction methods for summa and media."
-syntax = "tensor.summa() | tensor.media()"
+syntax = "tensor.sum() | tensor.mean()"
 related = ["tensor", "fractus", "lista"]
 locale = "en"
 +++
@@ -46,10 +46,10 @@ main {
         6.0,
     ]
     const tf32[] seed ← vacua
-    var tf32[2, 3] grid ← seed.strue(flat, [2, 3])
+    var tf32[2, 3] grid ← seed.from_flat(flat, [2, 3])
 
-    const f32 total ← grid.summa()
-    const f32 mean ← grid.media()
+    const f32 total ← grid.sum()
+    const f32 mean ← grid.mean()
 
     print total
     print mean

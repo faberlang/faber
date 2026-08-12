@@ -32,12 +32,12 @@ locale = "en"
 main {
     const intervallum<int> morning ← 0‥6
     const intervallum<int> afternoon ← 4‥10
-    const intervallum<int> overlap ← morning.inter(afternoon) coalesce 0‥0
+    const intervallum<int> overlap ← morning.intersect(afternoon) coalesce 0‥0
     const intervallum<int> early ← 0‥5
     const intervallum<int> late ← 5‥10
     const intervallum<int> workday ← early.union(late) coalesce 0‥0
-    const _ overlap_span ← overlap.longitudo()
-    const _ workday_span ← workday.longitudo()
+    const _ overlap_span ← overlap.length()
+    const _ workday_span ← workday.length()
     assert overlap_span ≡ 2
     assert workday_span ≡ 10
 

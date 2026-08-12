@@ -35,5 +35,5 @@ locale = "en"
 main {
     const tf32[2, 2] dense ← vacua
     const sf32[4] sparse ← dense ↦ sf32[4]
-    print sparse.longitudo()
+    print sparse.length()
 }

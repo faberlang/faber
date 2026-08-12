@@ -28,8 +28,8 @@ locale = "en"
 # Compiler-owned copia<T> methodi — adde, habet, dele, longitudo, vacua.
 #
 # GRAMMAR:
-#   copia.adde(x) | copia.habet(x) | copia.dele(x)
-#   copia.longitudo() | copia.vacua()
+#   copia.add(x) | copia.has(x) | copia.delete(x)
+#   copia.length() | copia.is_empty()
 #
 # copia<T> is a set-like collection; vacua with copia<T> creates an empty set.
 #
@@ -41,14 +41,14 @@ locale = "en"
 main {
     var set<int> numeri ← vacua
 
-    numeri.adde(1)
-    numeri.adde(2)
-    numeri.adde(3)
+    numeri.add(1)
+    numeri.add(2)
+    numeri.add(3)
 
-    const _ habetduo ← numeri.habet(2)
-    const _ remotus ← numeri.dele(3)
-    const _ longitudo ← numeri.longitudo()
-    const _ vacuaest ← numeri.vacua()
+    const _ habetduo ← numeri.has(2)
+    const _ remotus ← numeri.delete(3)
+    const _ longitudo ← numeri.length()
+    const _ vacuaest ← numeri.is_empty()
 
     print habetduo, remotus, longitudo, vacuaest
 }

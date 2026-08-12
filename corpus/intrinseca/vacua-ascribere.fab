@@ -50,17 +50,17 @@ main {
     map["secundus"] ← 99
 
     var list<string> res ← vacua
-    res.appende("alpha")
-    res.appende("beta")
+    res.append("alpha")
+    res.append("beta")
 
     var set<int> visi ← vacua
-    visi.adde(1)
-    visi.adde(2)
+    visi.add(1)
+    visi.add(2)
 
     const map<string, int> puncta ← { "aelia": 95, "balbus": 87 }
     const _ numeri ← [1, 2, 3] ∷ list<int>
     const _ claves ← ["primus", "secundus"] ∷ list<string>
 
-    print map["primus"], res.longitudo(), visi.habet(2)
-    print puncta["aelia"], numeri.primus(), claves.ultimus()
+    print map["primus"], res.length(), visi.has(2)
+    print puncta["aelia"], numeri.first(), claves.last()
 }

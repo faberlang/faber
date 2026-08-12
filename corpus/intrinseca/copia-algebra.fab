@@ -17,7 +17,7 @@ locale = "en"
 #   • Related keywords: copia, intrinseca
 #
 # Common mistakes:
-#   • Expecting set operations to modify in-place — `.unio()`, `.intersectio()`, `.differentia()` return new copia values; they do not mutate the receiver.
+#   • Expecting set operations to modify in-place — `.union()`, `.intersection()`, `.difference()` return new copia values; they do not mutate the receiver.
 #
 # See also: copia, intrinseca
 # =============================================================================
@@ -28,8 +28,8 @@ locale = "en"
 # symmetrica, subcopia, supercopia.
 #
 # GRAMMAR:
-#   a.unio(b) | a.intersectio(b) | a.differentia(b) | a.symmetrica(b)
-#   a.subcopia(b) | a.supercopia(b)
+#   a.union(b) | a.intersection(b) | a.difference(b) | a.symmetric_difference(b)
+#   a.is_subset(b) | a.is_superset(b)
 #
 # Set operations return new copia<T> values; operands are not mutated.
 #
@@ -40,21 +40,21 @@ locale = "en"
 
 main {
     var set<int> primi ← vacua
-    primi.adde(1)
-    primi.adde(2)
-    primi.adde(3)
+    primi.add(1)
+    primi.add(2)
+    primi.add(3)
 
     var set<int> pares ← vacua
-    pares.adde(2)
-    pares.adde(4)
-    pares.adde(6)
+    pares.add(2)
+    pares.add(4)
+    pares.add(6)
 
-    const _ omnes ← primi.unio(pares)
-    const _ communia ← primi.intersectio(pares)
-    const _ reliqua ← primi.differentia(pares)
-    const _ disiuncta ← primi.symmetrica(pares)
-    const _ subcopiaest ← communia.subcopia(omnes)
-    const _ supercopiaest ← omnes.supercopia(communia)
+    const _ omnes ← primi.union(pares)
+    const _ communia ← primi.intersection(pares)
+    const _ reliqua ← primi.difference(pares)
+    const _ disiuncta ← primi.symmetric_difference(pares)
+    const _ subcopiaest ← communia.is_subset(omnes)
+    const _ supercopiaest ← omnes.is_superset(communia)
 
     print omnes, communia, reliqua, disiuncta
     print subcopiaest, supercopiaest

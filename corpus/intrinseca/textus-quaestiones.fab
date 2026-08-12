@@ -17,7 +17,7 @@ locale = "en"
 #   • Related keywords: textus, intrinseca
 #
 # Common mistakes:
-#   • Using `textus` query methods on non-text types — `.continet()`, `.initium()`, `.finis()` are textus-only compiler intrinsics.
+#   • Using `textus` query methods on non-text types — `.contains()`, `.starts_with()`, `.ends_with()` are textus-only compiler intrinsics.
 #
 # See also: textus, intrinseca
 # =============================================================================
@@ -27,7 +27,7 @@ locale = "en"
 # Compiler-owned textus methodi — longitudo, continet, initium, finis.
 #
 # GRAMMAR:
-#   s.longitudo() | s.continet(sub) | s.initium(prefix) | s.finis(suffix)
+#   s.length() | s.contains(sub) | s.starts_with(prefix) | s.ends_with(suffix)
 #
 # Predicate methodi return bivalens; Wasm tier Runnable.
 #
@@ -37,10 +37,10 @@ locale = "en"
 main {
     const _ nuntius ← " Ave Roma "
 
-    const _ longitudo ← nuntius.longitudo()
-    const _ habetroma ← nuntius.continet("Roma")
-    const _ initiumest ← nuntius.initium(" Ave")
-    const _ finisest ← nuntius.finis(" ")
+    const _ longitudo ← nuntius.length()
+    const _ habetroma ← nuntius.contains("Roma")
+    const _ initiumest ← nuntius.starts_with(" Ave")
+    const _ finisest ← nuntius.ends_with(" ")
 
     print longitudo, habetroma, initiumest, finisest
 }

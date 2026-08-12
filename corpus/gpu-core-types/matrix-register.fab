@@ -40,5 +40,5 @@ fn keep_matrix(matrix<f32, [2, 2]> m) → matrix<f32, [2, 2]> {
 }
 
 fn add_matrix(mf32[2, 2] left, mf32[2, 2] right) → mf32[2, 2] {
-    return left.addita(right)
+    return left.added(right)
 }

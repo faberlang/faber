@@ -4,7 +4,7 @@ kind = "method"
 category = "collection"
 canonical = false
 summary = "Tensor elementwise arithmetic with addita, subtrahe, and multiplica."
-syntax = "tensor.addita(other) | tensor.subtrahe(other) | tensor.multiplica(other)"
+syntax = "tensor.added(other) | tensor.subtract(other) | tensor.multiply(other)"
 related = ["tensor", "fractus", "lista"]
 locale = "en"
 +++
@@ -39,13 +39,13 @@ main {
     const list<f32> flat_b ← [10.0, 20.0, 30.0, 40.0]
     const tf32[] seed ← vacua
 
-    var tf32[2, 2] a ← seed.strue(flat_a, [2, 2])
-    var tf32[2, 2] b ← seed.strue(flat_b, [2, 2])
+    var tf32[2, 2] a ← seed.from_flat(flat_a, [2, 2])
+    var tf32[2, 2] b ← seed.from_flat(flat_b, [2, 2])
 
-    const tf32[2, 2] sum ← a.addita(b)
-    const tf32[2, 2] diff ← sum.subtrahe(b)
-    const tf32[2, 2] prod ← diff.multiplica(a)
+    const tf32[2, 2] sum ← a.added(b)
+    const tf32[2, 2] diff ← sum.subtract(b)
+    const tf32[2, 2] prod ← diff.multiply(a)
 
-    const list<f32> out ← prod.planata()
+    const list<f32> out ← prod.flatten()
     print out
 }

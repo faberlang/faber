@@ -26,7 +26,7 @@ locale = "en"
 
 # lista<T> mutation intrinsics
 #
-# res.appende(x) | res.decapita() | res.detrahe() | res.inverte() | res.ordina()
+# res.append(x) | res.remove_first() | res.remove_last() | res.reverse() | res.sort()
 #
 # GRAMMAR:
 #   listMethod :← expr '.' ('appende' | 'decapita' | 'detrahe' | 'inverte' | 'ordina') '(' args? ')'
@@ -42,11 +42,11 @@ locale = "en"
 main {
     var _ res ← [3, 1, 2] ∷ list<int>
 
-    res.appende(4)
-    const _ primusremotus ← res.decapita()
-    const _ ultimusremotus ← res.detrahe()
-    res.inverte()
-    res.ordina()
+    res.append(4)
+    const _ primusremotus ← res.remove_first()
+    const _ ultimusremotus ← res.remove_last()
+    res.reverse()
+    res.sort()
 
     print res
     print primusremotus

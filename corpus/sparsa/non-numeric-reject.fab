@@ -33,5 +33,5 @@ locale = "en"
 
 main {
     const sparsa<string, [2]> words ← vacua
-    print words.longitudo()
+    print words.length()
 }

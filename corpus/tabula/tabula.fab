@@ -32,7 +32,7 @@ locale = "en"
 # varia tabula<K,V> nomen ← vacua   -- typed empty map (forma innata)
 # nomen[key] ← value                -- index assignment
 # nomen[key]                        -- keyed accipe
-# nomen.longitudo()                 -- entry count
+# nomen.length()                 -- entry count
 #
 # GRAMMAR:
 #   mapDecl :← 'varia' 'tabula<' type ',' type '>' ident '←' expr
@@ -47,7 +47,7 @@ main {
     puncta["beta"] ← 2
     puncta["gamma"] ← 3
 
-    print puncta.longitudo()
+    print puncta.length()
     print puncta["alpha"]
     print puncta["beta"]
     print puncta["gamma"]

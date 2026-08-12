@@ -18,7 +18,7 @@ locale = "en"
 #   • Related keywords: string, scriptum, ↦
 #
 # Common mistakes:
-#   • Using `textus` transform methods on non-text types — `.sectio()`, `.maiuscula()`, `.minuscula()`, `.recide()`, `.divide()`, `.muta()` are textus-only compiler intrinsics.
+#   • Using `textus` transform methods on non-text types — `.slice()`, `.uppercase()`, `.lowercase()`, `.trim()`, `.split()`, `.replace()` are textus-only compiler intrinsics.
 #
 # See also: string, scriptum, ↦
 # =============================================================================
@@ -29,8 +29,8 @@ locale = "en"
 # divide, muta.
 #
 # GRAMMAR:
-#   s.sectio(lo, hi) | s.maiuscula() | s.minuscula() | s.recide()
-#   s.divide(sep) | s.muta(old, new)
+#   s.slice(lo, hi) | s.uppercase() | s.lowercase() | s.trim()
+#   s.split(sep) | s.replace(old, new)
 #
 # divide returns lista<textus>; pairs with lista/ exempla for collection smoke.
 # Derived locals use sit to avoid repeating fixum _ across the transform chain.
@@ -42,12 +42,12 @@ locale = "en"
 main {
     let nuntius ← " Ave Roma "
 
-    let secta ← nuntius.sectio(1, 4)
-    let magna ← nuntius.maiuscula()
-    let parva ← nuntius.minuscula()
-    let rasa ← nuntius.recide()
-    let partes ← rasa.divide(" ")
-    let mutata ← rasa.muta("Roma", "Munde")
+    let secta ← nuntius.slice(1, 4)
+    let magna ← nuntius.uppercase()
+    let parva ← nuntius.lowercase()
+    let rasa ← nuntius.trim()
+    let partes ← rasa.split(" ")
+    let mutata ← rasa.replace("Roma", "Munde")
 
     print secta, magna, parva
     print rasa, partes, mutata

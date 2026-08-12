@@ -44,7 +44,7 @@ fn accipe() async → string {
 }
 
 fn metire(string datum) async → int {
-    return datum.longitudo()
+    return datum.length()
 }
 
 # Futura entry point

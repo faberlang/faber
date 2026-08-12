@@ -38,26 +38,26 @@ locale = "en"
 main {
     const list<int> xs ← [1, 2, 2, 3]
     const set<int> unique ← xs ↦ set<int>
-    print unique.longitudo()
+    print unique.length()
 
     const list<int> roundtrip ← unique ↦ list<int>
-    print roundtrip.longitudo()
+    print roundtrip.length()
 
     const list<int> tensorSource ← [4, 5, 6]
     const tensor<int, [3]> grid ← tensorSource ↦ tensor<int, [3]>
     const list<int> flat ← grid ↦ list<int>
-    print flat.longitudo()
+    print flat.length()
 
     const map<string, int> scores ← { "alpha": 10, "beta": 20 }
     const list<string> keys ← scores ↦ list<string>
-    print keys.longitudo()
+    print keys.length()
 
     const map<string, int> moreScores ← { "gamma": 30, "delta": 40 }
     const list<int> values ← moreScores ↦ list<int>
-    print values.longitudo()
+    print values.length()
 
     const list<int> cursorSource ← [7, 8, 9]
     const cursor<int> stream ← cursorSource ↦ cursor<int>
     const list<int> materialized ← stream ↦ list<int>
-    print materialized.longitudo()
+    print materialized.length()
 }

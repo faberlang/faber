@@ -56,20 +56,20 @@ main {
     print max
     print zero
 
-    const uint<u64> methodSum ← max.addita(one)
-    const uint<u64> methodShift ← max.sinistrata(64)
+    const uint<u64> methodSum ← max.added(one)
+    const uint<u64> methodShift ← max.shifted_left(64)
     var uint<u64> methodAcc ← 0
-    methodAcc.adde(one)
-    methodAcc.sinistra(64)
+    methodAcc.add(one)
+    methodAcc.shift_left(64)
     print converted
     print methodSum
     print methodShift
     print methodAcc
 
     const list<uint<u64>> words ← [one, max]
-    print words.accipe(1) coalesce (0 ∷ uint<u64>)
+    print words.get(1) coalesce (0 ∷ uint<u64>)
 
     var list<uint<u64>> sorted ← [18446744073709551615, 3, 10, 2]
-    sorted.ordina()
+    sorted.sort()
     print sorted
 }

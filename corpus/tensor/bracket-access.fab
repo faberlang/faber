@@ -42,20 +42,20 @@ locale = "en"
 
 main {
     const tf32[] seed ← vacua
-    var tf32[4] input ← seed.crea(0.0, [4])
-    var tf32[4] output ← seed.crea(0.0, [4])
+    var tf32[4] input ← seed.create(0.0, [4])
+    var tf32[4] output ← seed.create(0.0, [4])
 
     const u32 id ← 1
     input[id] ← 3.0
     const f32 old ← input[id] coalesce 0.0
-    const f32 oldMethod ← input.accipe([id]) coalesce 0.0
+    const f32 oldMethod ← input.get([id]) coalesce 0.0
     output[id] ← old + 1.0
     const f32 updated ← output[id] coalesce 0.0
 
-    var tf32[2, 2] grid ← seed.crea(0.0, [2, 2])
+    var tf32[2, 2] grid ← seed.create(0.0, [2, 2])
     grid[[1, 0]] ← updated
     const f32 cell ← grid[[1, 0]] coalesce 0.0
-    const f32 cellMethod ← grid.accipe([1, 0]) coalesce 0.0
+    const f32 cellMethod ← grid.get([1, 0]) coalesce 0.0
 
     print old
     print oldMethod

@@ -29,8 +29,8 @@ locale = "en"
 
 # tabula<K,V> access and mutation intrinsics
 #
-# puncta.pone(k, v) | puncta.accipe(k) | puncta.habet(k)   -- get/put
-# puncta.dele(k) | puncta.longitudo() | puncta.vacua()      -- delete/size
+# puncta.put(k, v) | puncta.get(k) | puncta.has(k)   -- get/put
+# puncta.delete(k) | puncta.length() | puncta.is_empty()      -- delete/size
 #
 # GRAMMAR:
 #   mapMethod :← expr '.' ('pone' | 'accipe' | 'habet' | 'dele'
@@ -44,16 +44,16 @@ locale = "en"
 
 main {
     var map<string, int> puncta ← vacua
-    puncta.pone("aelia", 95)
-    puncta.pone("balbus", 87)
+    puncta.put("aelia", 95)
+    puncta.put("balbus", 87)
 
-    const _ aelia ← puncta.accipe("aelia")
-    const _ absens ← puncta.accipe("carus")
-    const _ carus ← puncta.accipe("carus") coalesce 0
-    const _ habetbalbum ← puncta.habet("balbus")
-    const _ remotus ← puncta.dele("balbus")
-    const _ longitudo ← puncta.longitudo()
-    const _ vacuaest ← puncta.vacua()
+    const _ aelia ← puncta.get("aelia")
+    const _ absens ← puncta.get("carus")
+    const _ carus ← puncta.get("carus") coalesce 0
+    const _ habetbalbum ← puncta.has("balbus")
+    const _ remotus ← puncta.delete("balbus")
+    const _ longitudo ← puncta.length()
+    const _ vacuaest ← puncta.is_empty()
 
     print aelia, absens, carus, habetbalbum, remotus, longitudo, vacuaest
 }

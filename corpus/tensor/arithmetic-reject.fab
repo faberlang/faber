@@ -4,7 +4,7 @@ kind = "reject"
 category = "collection"
 canonical = false
 summary = "Tensor arithmetic rejects non-numeric elements and mixed numeric widths."
-syntax = "tensor.addita(other)"
+syntax = "tensor.added(other)"
 related = ["tensor", "typus", "conversio"]
 locale = "en"
 +++
@@ -39,11 +39,11 @@ locale = "en"
 main {
     const tensor<string, [2]> words_a ← vacua
     const tensor<string, [2]> words_b ← vacua
-    const tensor<string, [2]> words_sum ← words_a.addita(words_b)
-    print words_sum.longitudo()
+    const tensor<string, [2]> words_sum ← words_a.added(words_b)
+    print words_sum.length()
 
     const tensor<int<i32>, [2]> i32_a ← vacua
     const tensor<int<i64>, [2]> i64_b ← vacua
-    const tensor<int<i32>, [2]> mixed ← i32_a.addita(i64_b)
-    print mixed.longitudo()
+    const tensor<int<i32>, [2]> mixed ← i32_a.added(i64_b)
+    print mixed.length()
 }

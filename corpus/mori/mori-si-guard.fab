@@ -53,7 +53,7 @@ fn clamp(int x, int min, int max) → int {
 
 fn accessus(list<int> res, int index) → int {
     # Unconditional mori — unchanged form
-    if index < 0 or index ≥ res.longitudo() {
+    if index < 0 or index ≥ res.length() {
         panic "index out of bounds"
     }
     return res[index]

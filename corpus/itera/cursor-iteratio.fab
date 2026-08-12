@@ -65,7 +65,7 @@ async_main {
     # Collect all results from cursor function
     var _ effecta ← []
     for from grena(5) const num {
-        effecta.appende(num * 2)
+        effecta.append(num * 2)
     }
     print "Sync collected:"
     print effecta

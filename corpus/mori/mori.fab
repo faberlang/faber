@@ -44,7 +44,7 @@ fn divide(int a, int b) → float {
 
 fn accipe(list<int> res, int index) → int {
     # Bounds check with mori
-    if index < 0 or index ≥ res.longitudo() {
+    if index < 0 or index ≥ res.length() {
         panic "index extra fines"
     }
     return res[index]

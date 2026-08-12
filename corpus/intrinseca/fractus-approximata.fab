@@ -4,7 +4,7 @@ kind = "concept"
 category = "intrinseca"
 canonical = false
 summary = "DEFER-036 tolerance compare on fractus receiver (not ≈)."
-syntax = "x.approximata(aliud, toleratio)"
+syntax = "x.approx(aliud, toleratio)"
 related = ["fractus", "approximata", "DEFER-036"]
 locale = "en"
 +++
@@ -17,7 +17,7 @@ locale = "en"
 #   • Related keywords: fractus, approximata, DEFER-036
 #
 # Common mistakes:
-#   • Using `≡` for floating-point comparison — direct float equality is unreliable; use `.approximata(aliud, toleratio)` instead.
+#   • Using `≡` for floating-point comparison — direct float equality is unreliable; use `.approx(aliud, toleratio)` instead.
 #
 # See also: fractus, approximata, DEFER-036
 # =============================================================================
@@ -32,7 +32,7 @@ main {
     const float a ← 42.145
     const float b ← 42.0
 
-    const bool near ← a.approximata(b, 0.2)
+    const bool near ← a.approx(b, 0.2)
     const bool exact_promo ← a ≈ b
 
     print near

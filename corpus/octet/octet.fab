@@ -29,18 +29,18 @@ locale = "en"
 # name; octeti unifies with lista<numerus<u8>>. See DEFER-029.
 
 fn describe(bytes buf) → int {
-    return buf.longitudo()
+    return buf.length()
 }
 
 fn firstByte(bytes buf) → octet {
-    const octet b ← buf.accipe(0) coalesce (0 ∷ octet)
+    const octet b ← buf.get(0) coalesce (0 ∷ octet)
     return b
 }
 
 main {
     var bytes sig ← |de ad be ef|
     const octet b ← 0x80 ∷ octet
-    sig.appende(b)
+    sig.append(b)
     print describe(sig)
 
     const octet first ← firstByte(sig)

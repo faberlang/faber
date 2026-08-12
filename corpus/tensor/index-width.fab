@@ -4,7 +4,7 @@ kind = "type"
 category = "collection"
 canonical = false
 summary = "Tensor index intrinsics accept integer-width index lists that fit the i64 runtime boundary (lista<u32>, lista<numerus<i32>>, …)."
-syntax = "tensor.accipe(lista<i64-fit integer>) | tensor.ponde(lista<i64-fit integer>, value)"
+syntax = "tensor.get(lista<i64-fit integer>) | tensor.set(lista<i64-fit integer>, value)"
 related = ["tensor", "lista", "accipe", "ponde"]
 locale = "en"
 +++
@@ -48,25 +48,25 @@ locale = "en"
 
 main {
     const tf32[] seed ← vacua
-    var tf32[4] input ← seed.crea(0.0, [4])
+    var tf32[4] input ← seed.create(0.0, [4])
 
     # u32 thread id flowing directly into accipe — no bare-numerus detour.
     const u32 id ← 1
-    const f32 first ← input.accipe([id]) coalesce 0.0
-    input.ponde([id], 9.0)
-    const f32 updated ← input.accipe([id]) coalesce 0.0
+    const f32 first ← input.get([id]) coalesce 0.0
+    input.set([id], 9.0)
+    const f32 updated ← input.get([id]) coalesce 0.0
 
     # A bound lu32 index vector also typechecks (lista width sugar).
     const lu32 idx ← [id]
-    const f32 bound ← input.accipe(idx) coalesce 0.0
+    const f32 bound ← input.get(idx) coalesce 0.0
 
     # Rank-2 grid with a lista<u32> origin index.
-    var tf32[4, 4] grid ← seed.crea(0.0, [4, 4])
+    var tf32[4, 4] grid ← seed.create(0.0, [4, 4])
     const u32 r ← 2
     const u32 c ← 3
     const list<u32> origin ← [r, c]
-    grid.ponde(origin, 7.0)
-    const f32 cell ← grid.accipe(origin) coalesce 0.0
+    grid.set(origin, 7.0)
+    const f32 cell ← grid.get(origin) coalesce 0.0
 
     print first
     print updated

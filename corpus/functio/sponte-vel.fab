@@ -49,7 +49,7 @@ fn pagina(int pagina optional coalesce 1, int quantitas optional coalesce 10) â†
 fn metire(string fons, ref int altitudo optional) â†’ int {
     if altitudo is null {
         # de = shared borrow of fons
-        return fons.longitudo()
+        return fons.length()
     }
     return altitudo
 }

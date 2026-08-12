@@ -41,7 +41,7 @@ locale = "en"
 
 fn validata(string input) → string ⇥ string {
     # Guard: throw if input is empty
-    throw "empty input" if input.longitudo() ≡ 0
+    throw "empty input" if input.length() ≡ 0
 
     return "valid: §"(input)
 }

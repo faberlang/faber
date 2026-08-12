@@ -50,16 +50,16 @@ main {
     print max
     print zero
 
-    const uint<u8> methodSum ← max.addita(one)
-    const uint<u8> methodShift ← max.sinistrata(8)
+    const uint<u8> methodSum ← max.added(one)
+    const uint<u8> methodShift ← max.shifted_left(8)
     var uint<u8> methodAcc ← 0
-    methodAcc.adde(one)
-    methodAcc.sinistra(8)
+    methodAcc.add(one)
+    methodAcc.shift_left(8)
     print converted
     print methodSum
     print methodShift
     print methodAcc
 
     const list<uint<u8>> words ← [one, max]
-    print words.accipe(1) coalesce (0 ∷ uint<u8>)
+    print words.get(1) coalesce (0 ∷ uint<u8>)
 }

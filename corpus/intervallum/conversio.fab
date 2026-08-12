@@ -41,20 +41,20 @@ main {
     const list<int> closed_list ← 0…3 ↦ list<int>
     const tensor<int, [10]> half_grid ← 0‥10 ↦ tensor<int, [10]>
     const tensor<int, [4]> closed_grid ← 0…3 ↦ tensor<int, [4]>
-    const list<int> half_flat ← half_grid.planata()
-    const list<int> closed_flat ← closed_grid.planata()
-    assert half_list.longitudo() ≡ 10
-    assert closed_list.longitudo() ≡ 4
-    assert half_flat.longitudo() ≡ 10
-    assert closed_flat.longitudo() ≡ 4
+    const list<int> half_flat ← half_grid.flatten()
+    const list<int> closed_flat ← closed_grid.flatten()
+    assert half_list.length() ≡ 10
+    assert closed_list.length() ≡ 4
+    assert half_flat.length() ≡ 10
+    assert closed_flat.length() ≡ 4
 
     # --- range-to-range clamp inherits target inclusivity ---
     const intervallum<int> wide ← 0‥100
     const intervallum<int> narrow ← wide ↦ 10…50
-    assert narrow.longitudo() ≡ 41
+    assert narrow.length() ≡ 41
 
     # --- stored containment via continet (intra desugars to the same surface) ---
     const intervallum<int> fines ← 0‥10
-    const _ inside ← fines.continet(5)
+    const _ inside ← fines.contains(5)
     assert inside
 }

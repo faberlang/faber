@@ -27,21 +27,21 @@ locale = "en"
 #
 # WHY: `valor ↔ tensor` has no dedicated codegen arms. Extraction materializes
 # `lista<T>` first; construction uses shipped `lista ↦ tensor` (`structa`) and
-# flatten via `tensor ↦ lista` (`.planata()`), then `lista ↦ valor` boxing.
+# flatten via `tensor ↦ lista` (`.flatten()`), then `lista ↦ valor` boxing.
 
 main {
     const value arr ← [1, 2, 3, 4]
     const list<int> xs ← arr ↦ list<int>
-    assert xs.longitudo() ≡ 4
+    assert xs.length() ≡ 4
 
     const tensor<int, [4]> grid ← xs ↦ tensor<int, [4]>
     const list<int> flat ← grid ↦ list<int>
-    assert flat.longitudo() ≡ 4
+    assert flat.length() ≡ 4
 
     const value roundtrip ← flat ↦ value
     print roundtrip
 
     const value obj ← { "alpha": 10, "beta": 20 } ↦ value
     const map<string, int> scores ← obj ↦ map<string, int>
-    print scores.accipe("alpha") coalesce 0
+    print scores.get("alpha") coalesce 0
 }

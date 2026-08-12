@@ -18,7 +18,7 @@ locale = "en"
 #   • Related keywords: numerus, ↦
 #
 # Common mistakes:
-#   • Using `≡` for direct floating-point equality — float equality is unreliable due to precision; use `.approximata()` for tolerance-based comparison.
+#   • Using `≡` for direct floating-point equality — float equality is unreliable due to precision; use `.approx()` for tolerance-based comparison.
 #
 # See also: numerus, ↦
 # =============================================================================
@@ -28,8 +28,8 @@ locale = "en"
 # Compiler-owned fractus methodi — absolutum, signum, minimus, maximus.
 #
 # GRAMMAR:
-#   valor.absolutum() | valor.signum()
-#   valor.minimus(other) | valor.maximus(other)
+#   valor.abs() | valor.sign()
+#   valor.minimum(other) | valor.maximum(other)
 #
 # Mirrors numerus-methodi.fab for floating-point; Wasm tier Runnable.
 #
@@ -39,10 +39,10 @@ locale = "en"
 main {
     const float value ← -3.75
 
-    const _ absolutus ← value.absolutum()
-    const _ signum ← value.signum()
-    const _ minor ← value.minimus(2.5)
-    const _ maior ← value.maximus(2.5)
+    const _ absolutus ← value.abs()
+    const _ signum ← value.sign()
+    const _ minor ← value.minimum(2.5)
+    const _ maior ← value.maximum(2.5)
 
     print absolutus, signum, minor, maior
 }
