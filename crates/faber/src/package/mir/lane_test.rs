@@ -51,7 +51,7 @@ fn package_mir_shadowed_alias_rewrite_skips_plain_local_method_calls() {
     );
 }
 
-const VERTE_CONST_LIB: &str = "const f32 GELU_ALPHA ← (0.7978845608028654 ∷ f32)\n";
+const VERTE_CONST_LIB: &str = "+++\nlocale = \"en\"\n+++\nconst f32 GELU_ALPHA ← (0.7978845608028654 ∷ f32)\n";
 const VERTE_CONST_MAIN: &str = "importa ex \"verteclib:lib\" privata vals\n\nincipit {\n    nota vals.GELU_ALPHA\n}\n";
 
 /// Write a package under a config library home (`libhome/<lib>/src`) with the
