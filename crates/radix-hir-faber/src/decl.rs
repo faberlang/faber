@@ -85,7 +85,8 @@ impl super::FaberCodegen {
                     for column in &schema.columns {
                         writer.write(surface.keyword(TokenKind::Columna));
                         writer.write(" ");
-                        writer.write(&self.type_to_faber(column.ty, types, names, interner, surface));
+                        writer
+                            .write(&self.type_to_faber(column.ty, types, names, interner, surface));
                         writer.write(" ");
                         writer.write(&self.symbol_to_string(column.name, interner));
                         if column.source != column.name {
