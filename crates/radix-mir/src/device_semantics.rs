@@ -945,14 +945,66 @@ impl DeviceSemantics {
         for component in self.dependency_components(launches) {
             let ordered = self.topological_order(&component);
             for part in split_at_observation_points(&self.observations, ordered) {
-                regions.push(PreparedRegion {
-                    id: RegionId(next_id),
-                    launches: part,
-                });
-                next_id += 1;
+                // The observation split (rule 3) can cut a branched component
+                // so a part's members connect only through launches in an
+                // EARLIER part — a group spanning disconnected launches.
+                // Rule 1: each connected component is its own candidate and
+                // disconnected launches are separate regions, so the part is
+                // re-split into its connected components (member order
+                // preserved).
+                for connected in self.connected_components_in(&part) {
+                    regions.push(PreparedRegion {
+                        id: RegionId(next_id),
+                        launches: connected,
+                    });
+                    next_id += 1;
+                }
             }
         }
         regions
+    }
+
+    /// Split a topologically-ordered launch group into its undirected
+    /// connected components over the carried dependency edges restricted to
+    /// the group's members (rule 1: disconnected launches are separate
+    /// regions). The given member order is preserved within each component;
+    /// components are emitted ordered by their first member, so the returned
+    /// sequence stays deterministic and independent of declaration order
+    /// (rule 4).
+    fn connected_components_in(&self, members: &[LaunchId]) -> Vec<Vec<LaunchId>> {
+        if members.len() <= 1 {
+            return vec![members.to_vec()];
+        }
+        let index: HashMap<LaunchId, usize> = members
+            .iter()
+            .enumerate()
+            .map(|(position, launch)| (*launch, position))
+            .collect();
+        let mut parent: Vec<usize> = (0..members.len()).collect();
+        for edge in &self.dependencies {
+            if let (Some(&producer), Some(&consumer)) =
+                (index.get(&edge.producer), index.get(&edge.consumer))
+            {
+                union_find(&mut parent, producer, consumer);
+            }
+        }
+        // Group member positions by root, tracking each group's first member.
+        let mut groups: HashMap<usize, (usize, Vec<LaunchId>)> = HashMap::new();
+        for (position, launch) in members.iter().enumerate() {
+            let root = find(&mut parent, position);
+            let entry = groups.entry(root).or_insert((position, Vec::new()));
+            entry.0 = entry.0.min(position);
+            entry.1.push(*launch);
+        }
+        let mut components: Vec<Vec<LaunchId>> =
+            groups.into_values().map(|(_, launches)| launches).collect();
+        components.sort_by_key(|component| {
+            members
+                .iter()
+                .position(|member| component.first().copied() == Some(*member))
+                .unwrap_or(usize::MAX)
+        });
+        components
     }
 
     /// DDCP3-U3 (b) — re-derive region formation over the landed

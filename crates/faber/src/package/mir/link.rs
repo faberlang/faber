@@ -1,7 +1,7 @@
 //! Package-local namespace-call linking and rewrite passes.
 
 use super::*;
-use radix::hir::visit::{walk_program_mut, HirVisitor, HirVisitorMut, walk_expr_mut};
+use radix::hir::visit::{walk_expr, walk_program_mut, HirVisitor, HirVisitorMut, walk_expr_mut};
 
 /// Post-rewrite pass: recover the function type for synthetic-path call
 /// callees (pkg001-mir-fix).
@@ -29,6 +29,92 @@ impl HirVisitorMut for SyntheticCalleeTypePass<'_> {
             }
         }
         walk_expr_mut(self, expr);
+    }
+}
+
+/// Post-rewrite pass: recover a cape handler binding whose error type was
+/// typed before the shadowed-alias namespace rewrite resolved its body.
+///
+/// `rewrite_analysis_namespace_calls` resolves a shadowed namespace call
+/// (`forma.quantitas(forma)` where the local param `forma` shadows the
+/// import binding) only AFTER type checking. The cape's binding was therefore
+/// fixed from the unresolved error sink — `ignotum` (`check_cape`'s fallback)
+/// — and the merged program's strict MIR validation rejects passing that
+/// value to a concrete enum/struct param. The recovery walks each `Handled`
+/// expression and re-derives the binding from the body's failable synthetic
+/// calls: when every such call agrees on one error type, the handler receives
+/// that type — exactly what the analysis would have produced had the receiver
+/// resolved. Bindings that are already concrete, or bodies whose failable
+/// calls disagree, are left untouched (fail-closed, no invented types).
+struct SyntheticCapeBindingPass<'a> {
+    method_types: &'a HashMap<radix::hir::DefId, radix_types::TypeId>,
+    types: &'a TypeTable,
+}
+
+impl HirVisitorMut for SyntheticCapeBindingPass<'_> {
+    fn visit_expr_mut(&mut self, expr: &mut radix::hir::HirExpression) {
+        if let HirExpressionKind::Handled { body, catch } = &mut expr.kind {
+            let unresolved = match catch.binding_ty.map(|ty| self.types.get(ty)) {
+                Some(Type::Primitive(Primitive::Ignotum)) | None => true,
+                _ => false,
+            };
+            if unresolved {
+                let mut collector = CapeFailableCollector {
+                    method_types: self.method_types,
+                    types: self.types,
+                    agreed: None,
+                    has_failable: false,
+                    ambiguous: false,
+                };
+                collector.visit_block(body);
+                if collector.has_failable && !collector.ambiguous {
+                    if let Some(error_ty) = collector.agreed {
+                        catch.binding_ty = Some(error_ty);
+                    }
+                }
+            }
+        }
+        walk_expr_mut(self, expr);
+    }
+}
+
+/// Read-only collector over one handled body: the distinct error types of
+/// the failable synthetic namespace calls it contains.
+struct CapeFailableCollector<'a> {
+    method_types: &'a HashMap<radix::hir::DefId, radix_types::TypeId>,
+    types: &'a TypeTable,
+    agreed: Option<TypeId>,
+    has_failable: bool,
+    ambiguous: bool,
+}
+
+impl HirVisitor for CapeFailableCollector<'_> {
+    fn visit_expr(&mut self, expr: &radix::hir::HirExpression) {
+        if let HirExpressionKind::Call(callee, ..) = &expr.kind {
+            if let Some(error_ty) = self.synthetic_callee_error_ty(callee) {
+                self.has_failable = true;
+                match self.agreed {
+                    None => self.agreed = Some(error_ty),
+                    Some(existing) if existing != error_ty => self.ambiguous = true,
+                    _ => {}
+                }
+            }
+        }
+        walk_expr(self, expr);
+    }
+}
+
+impl CapeFailableCollector<'_> {
+    /// The error type carried by a synthetic namespace callee, when failable.
+    fn synthetic_callee_error_ty(&self, callee: &radix::hir::HirExpression) -> Option<TypeId> {
+        let HirExpressionKind::Path(def_id) = callee.kind else {
+            return None;
+        };
+        let function_ty = self.method_types.get(&def_id).copied()?;
+        let Type::Func(sig) = self.types.get(function_ty) else {
+            return None;
+        };
+        sig.err
     }
 }
 
@@ -944,6 +1030,17 @@ pub(super) fn rewrite_analysis_namespace_calls(
     let method_types = synthetic_namespace_function_types(unit_path, analysis, targets);
     if !method_types.is_empty() {
         walk_program_mut(&mut SyntheticCalleeTypePass { method_types: &method_types }, &mut analysis.hir);
+        // The callee type recovery makes failable synthetic calls lower as
+        // try-calls; a cape whose binding was typed before the rewrite can
+        // still carry the unresolved `ignotum` sink — recover it from the
+        // body's failable synthetic callees.
+        walk_program_mut(
+            &mut SyntheticCapeBindingPass {
+                method_types: &method_types,
+                types: &analysis.types,
+            },
+            &mut analysis.hir,
+        );
     }
 
     Ok(())

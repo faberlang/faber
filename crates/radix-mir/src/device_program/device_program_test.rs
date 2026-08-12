@@ -2381,3 +2381,264 @@ fn prepared_region_derivation_is_order_independent() {
         "declaration order never decides region formation or region ids"
     );
 }
+
+/// l0 → l1, l0 → l2, l2 → l3, l0 → l4, l4 → l5: one branched component
+/// rooted at l0, with a declared observation at l1.
+///
+/// Rule 3 splits the component at the observed launch l1 — `[l0, l1]` and
+/// `[l2, l3, l4, l5]`. The remainder is NOT path-connected: {l2, l3} and
+/// {l4, l5} connect only through l0, which already ended the earlier
+/// region. Rule 1 says disconnected launches are separate regions, so the
+/// derivation re-splits the remainder into `[l2, l3]` and `[l4, l5]`.
+fn branched_program_with_disconnecting_middle_observation() -> (DeviceProgram, DeviceSemantics) {
+    let mut types = TypeTable::new();
+    let element_ty = f32_ty(&mut types);
+
+    let launch_plan = |x: u64| KernelLaunchPlan {
+        workgroup: MirWorkgroupSize {
+            x: u32::try_from(x).expect("workgroup fits u32"),
+            y: 1,
+            z: 1,
+        },
+        dispatch_size: MirKernelDispatchSize { x, y: 1, z: 1 },
+        workgroup_count: MirKernelWorkgroupCount { x: 1, y: 1, z: 1 },
+    };
+
+    let b0 = identity(0, "b0", BufferRole::InOut, BufferLifetime::PerStep);
+    let b1 = identity(1, "b1", BufferRole::InOut, BufferLifetime::ObservationPoint);
+    let b2 = identity(2, "b2", BufferRole::InOut, BufferLifetime::PerStep);
+    let b3 = identity(3, "b3", BufferRole::InOut, BufferLifetime::PerStep);
+    let b4 = identity(4, "b4", BufferRole::InOut, BufferLifetime::PerStep);
+    let b5 = identity(5, "b5", BufferRole::Output, BufferLifetime::PerStep);
+
+    let mut program = DeviceProgram::new(DeviceProgramLifetime::SingleRun);
+    program.kernels = vec![
+        // k0 writes b0 (the root).
+        KernelUnit {
+            function: MirFunctionId(0),
+            entry: "k0".to_owned(),
+            plan: CollectionKernelPlan::Elementwise,
+            resources: vec![DeviceResource {
+                buffer: b0.clone(),
+                version: version(1, element_ty, 4),
+                binding: Binding { group: 0, binding: 0 },
+                access: MirKernelResourceAccess::Write,
+            }],
+            launch: launch_plan(4),
+        },
+        // k1 reads b0, writes b1 (the declared observation).
+        KernelUnit {
+            function: MirFunctionId(1),
+            entry: "k1".to_owned(),
+            plan: CollectionKernelPlan::Elementwise,
+            resources: vec![
+                DeviceResource {
+                    buffer: b0.clone(),
+                    version: version(1, element_ty, 4),
+                    binding: Binding { group: 0, binding: 0 },
+                    access: MirKernelResourceAccess::Read,
+                },
+                DeviceResource {
+                    buffer: b1.clone(),
+                    version: version(1, element_ty, 4),
+                    binding: Binding { group: 0, binding: 1 },
+                    access: MirKernelResourceAccess::Write,
+                },
+            ],
+            launch: launch_plan(4),
+        },
+        // k2 reads b0, writes b2.
+        KernelUnit {
+            function: MirFunctionId(2),
+            entry: "k2".to_owned(),
+            plan: CollectionKernelPlan::Elementwise,
+            resources: vec![
+                DeviceResource {
+                    buffer: b0.clone(),
+                    version: version(1, element_ty, 4),
+                    binding: Binding { group: 0, binding: 0 },
+                    access: MirKernelResourceAccess::Read,
+                },
+                DeviceResource {
+                    buffer: b2.clone(),
+                    version: version(1, element_ty, 4),
+                    binding: Binding { group: 0, binding: 1 },
+                    access: MirKernelResourceAccess::Write,
+                },
+            ],
+            launch: launch_plan(4),
+        },
+        // k3 reads b2, writes b3.
+        KernelUnit {
+            function: MirFunctionId(3),
+            entry: "k3".to_owned(),
+            plan: CollectionKernelPlan::Elementwise,
+            resources: vec![
+                DeviceResource {
+                    buffer: b2.clone(),
+                    version: version(1, element_ty, 4),
+                    binding: Binding { group: 0, binding: 0 },
+                    access: MirKernelResourceAccess::Read,
+                },
+                DeviceResource {
+                    buffer: b3.clone(),
+                    version: version(1, element_ty, 4),
+                    binding: Binding { group: 0, binding: 1 },
+                    access: MirKernelResourceAccess::Write,
+                },
+            ],
+            launch: launch_plan(4),
+        },
+        // k4 reads b0, writes b4.
+        KernelUnit {
+            function: MirFunctionId(4),
+            entry: "k4".to_owned(),
+            plan: CollectionKernelPlan::Elementwise,
+            resources: vec![
+                DeviceResource {
+                    buffer: b0.clone(),
+                    version: version(1, element_ty, 4),
+                    binding: Binding { group: 0, binding: 0 },
+                    access: MirKernelResourceAccess::Read,
+                },
+                DeviceResource {
+                    buffer: b4.clone(),
+                    version: version(1, element_ty, 4),
+                    binding: Binding { group: 0, binding: 1 },
+                    access: MirKernelResourceAccess::Write,
+                },
+            ],
+            launch: launch_plan(4),
+        },
+        // k5 reads b4, writes b5.
+        KernelUnit {
+            function: MirFunctionId(5),
+            entry: "k5".to_owned(),
+            plan: CollectionKernelPlan::Elementwise,
+            resources: vec![
+                DeviceResource {
+                    buffer: b4.clone(),
+                    version: version(1, element_ty, 4),
+                    binding: Binding { group: 0, binding: 0 },
+                    access: MirKernelResourceAccess::Read,
+                },
+                DeviceResource {
+                    buffer: b5.clone(),
+                    version: version(1, element_ty, 4),
+                    binding: Binding { group: 0, binding: 1 },
+                    access: MirKernelResourceAccess::Write,
+                },
+            ],
+            launch: launch_plan(4),
+        },
+    ];
+    program.launches = (0..6)
+        .map(|id| LaunchUnit {
+            id: LaunchId(id),
+            kernel_index: id as usize,
+        })
+        .collect();
+    program.results.push(ResultBuffer {
+        buffer: identity(1, "b1", BufferRole::InOut, BufferLifetime::ObservationPoint),
+        version: version(1, element_ty, 4),
+        role: BufferRole::InOut,
+        produced_by: LaunchId(1),
+        cadence: ObservationCadence::PerStep,
+    });
+
+    let values: Vec<SemanticValue> = (0..6)
+        .map(|index| SemanticValue {
+            id: SemanticValueId(index + 1),
+            name: format!("b{index}"),
+            element_ty,
+            element_count: 4,
+            origin: SemanticValueOrigin::Synthetic {
+                label: format!("branched-b{index}"),
+            },
+        })
+        .collect();
+    let bindings: Vec<ValueBinding> = values
+        .iter()
+        .map(|value| ValueBinding {
+            value: value.id,
+            buffer: BufferId(value.id.0 - 1),
+        })
+        .collect();
+    let generations: Vec<ValueGeneration> = (0..6)
+        .map(|index| ValueGeneration {
+            value: SemanticValueId(index + 1),
+            generation: 1,
+            element_ty,
+            element_count: 4,
+            produced_by: LaunchId(index),
+        })
+        .collect();
+    let edge = |producer: u32, consumer: u32, buffer: u32| DependencyEdge {
+        producer: LaunchId(producer),
+        consumer: LaunchId(consumer),
+        buffer: BufferId(buffer),
+        version: 1,
+    };
+    let initializations: Vec<InitializationFact> = (0..6)
+        .map(|buffer| InitializationFact {
+            buffer: BufferId(buffer),
+            policy: InitializationPolicy::KernelInitialized,
+        })
+        .collect();
+
+    let semantics = DeviceSemantics {
+        values,
+        bindings,
+        generations,
+        roots: vec![LaunchId(0)],
+        dependencies: vec![
+            edge(0, 1, 0),
+            edge(0, 2, 0),
+            edge(2, 3, 2),
+            edge(0, 4, 0),
+            edge(4, 5, 4),
+        ],
+        initializations,
+        observations: vec![ObservationFact {
+            buffer: BufferId(1),
+            version: 1,
+            at_launch: LaunchId(1),
+        }],
+        ..DeviceSemantics::default()
+    };
+
+    program
+        .validate_with_semantics(&semantics)
+        .expect("branched program + carried semantics validate together");
+    (program, semantics)
+}
+
+#[test]
+fn prepared_regions_resplit_disconnected_remainder_after_observation() {
+    // Rule 1/3 fixture: the observation at l1 splits the branched component
+    // into [l0, l1] and a remainder [l2, l3, l4, l5] whose two chains
+    // {l2, l3} and {l4, l5} connect only through the earlier region's l0.
+    // Disconnected launches are separate regions, so the remainder must be
+    // re-split — never a failing closed `RegionMembersDisconnected`.
+    let (program, semantics) = branched_program_with_disconnecting_middle_observation();
+    let launches: Vec<LaunchId> = program.launches.iter().map(|launch| launch.id).collect();
+    let regions = semantics.derive_prepared_regions(&launches);
+    assert_eq!(
+        regions,
+        vec![
+            PreparedRegion {
+                id: RegionId(0),
+                launches: vec![LaunchId(0), LaunchId(1)],
+            },
+            PreparedRegion {
+                id: RegionId(1),
+                launches: vec![LaunchId(2), LaunchId(3)],
+            },
+            PreparedRegion {
+                id: RegionId(2),
+                launches: vec![LaunchId(4), LaunchId(5)],
+            },
+        ],
+        "the disconnected remainder splits into its connected components"
+    );
+}
