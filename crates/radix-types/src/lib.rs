@@ -12,6 +12,7 @@ mod index;
 pub mod instans_precision;
 pub mod numeric_width;
 mod schema;
+mod schema_subset;
 mod types;
 
 pub use def_id::DefId;
@@ -42,6 +43,9 @@ pub use numeric_width::{
     TENSOR_INDEX_VECTOR_MSG,
 };
 pub use schema::{SchemaColumnDef, SchemaDef};
+pub use schema_subset::{
+    extra_input_columns, schema_column_count, schema_subset, SchemaSubsetFailure,
+};
 pub use types::{
     collection_type_specs, is_atomic_element_type, is_intervallum_bound_type,
     lookup_collection_type_spec, lookup_primitive_type_spec, lookup_tensor_family_type_spec,
@@ -54,6 +58,10 @@ pub use types::{
 #[cfg(test)]
 #[path = "lattice_property_test.rs"]
 mod lattice_property_tests;
+
+#[cfg(test)]
+#[path = "schema_subset_test.rs"]
+mod schema_subset_tests;
 
 #[cfg(test)]
 mod smoke_tests {
