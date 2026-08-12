@@ -52,6 +52,40 @@ pub use scan::INLINE_COMMENT_ISSUE;
 pub use scan::{Interner, Lexer};
 pub use token::{Span, Symbol, Token, TokenKind};
 
+/// Keyword-claim surface for one lexer run.
+///
+/// The parser gates raw-source keyword claiming on this mode. Under
+/// [`KeywordSurfaceMode::PackAuthoritative`] — a non-`la` reader pack — a word
+/// claims a grammar/owner keyword slot only when the lexer recorded its
+/// pack-declared latin key; an undeclared spelling stays an ordinary
+/// identifier. [`KeywordSurfaceMode::RegistryDirect`] — the `la` pack or no
+/// pack — keeps the historical registry-direct claim with a raw-source
+/// fallback, so tokenless keywords the lexer deliberately does not record
+/// still claim through the registry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeywordSurfaceMode {
+    /// `la` pack or no pack: parser claims by registry identity, with a
+    /// raw-source fallback for spellings the lexer did not record.
+    RegistryDirect,
+    /// Non-`la` reader pack: only pack-declared spellings (recorded latin
+    /// keys) claim grammar/owner keyword slots.
+    PackAuthoritative,
+}
+
+impl KeywordSurfaceMode {
+    /// Derive the effective surface from an active pack id.
+    ///
+    /// `la` is the identity surface (registry-direct); any other pack id is
+    /// pack-authoritative. `None` (no pack) is the plain Latin surface.
+    #[must_use]
+    pub fn from_pack_id(pack_id: Option<&str>) -> Self {
+        match pack_id {
+            None | Some("la") => KeywordSurfaceMode::RegistryDirect,
+            Some(_) => KeywordSurfaceMode::PackAuthoritative,
+        }
+    }
+}
+
 // =============================================================================
 // PUBLIC API
 // =============================================================================
@@ -132,6 +166,9 @@ pub struct LexResult {
 
     /// Exact source spelling → Latin type identity, for parser-owned type slots.
     pub reader_type_latin_keys: HashMap<String, String>,
+
+    /// Keyword-claim surface for this run, derived from the active pack.
+    pub keyword_surface: KeywordSurfaceMode,
 
     /// Symbol table for identifiers, strings, and comments emitted above.
     pub interner: Interner,

@@ -192,6 +192,7 @@ impl Default for Interner {
 pub struct Lexer<'a> {
     cursor: Cursor<'a>,
     locale_pack: Option<&'a dyn KeywordPack>,
+    keyword_surface: crate::KeywordSurfaceMode,
     interner: Interner,
     tokens: Vec<Token>,
     errors: Vec<LexError>,
@@ -210,6 +211,7 @@ impl<'a> Lexer<'a> {
         Self {
             cursor: Cursor::new(source),
             locale_pack: None,
+            keyword_surface: crate::KeywordSurfaceMode::RegistryDirect,
             interner: Interner::new(),
             tokens: Vec::new(),
             errors: Vec::new(),
@@ -225,6 +227,7 @@ impl<'a> Lexer<'a> {
     #[must_use]
     pub fn with_locale_pack(mut self, pack: &'a dyn KeywordPack) -> Self {
         self.locale_pack = Some(pack);
+        self.keyword_surface = crate::KeywordSurfaceMode::from_pack_id(Some(pack.pack_id()));
         self
     }
 
@@ -246,6 +249,7 @@ impl<'a> Lexer<'a> {
             locale_suggestions: self.locale_suggestions,
             reader_keyword_latin_keys: self.reader_keyword_latin_keys,
             reader_type_latin_keys: self.reader_type_latin_keys,
+            keyword_surface: self.keyword_surface,
             interner: self.interner,
         }
     }
