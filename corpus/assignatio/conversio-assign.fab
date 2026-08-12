@@ -7,7 +7,10 @@ summary = "Conversion-directed assignment: evaluate the right side, convert it t
 syntax = "<place> ↤ <expression> [⇥ <recovery>]"
 aliases = ["conversion-directed-assignment", "conversio assign"]
 related = ["←", "↦", "⇥", "fixum", "varia"]
-locale = "en"
+# The body is canonical Latin; the reader-pack resolution treats the
+# frontmatter locale as the SOURCE reader locale, so a Latin body declares
+# `la` (la identity surface) — not `en`, whose pack owns English surfaces.
+locale = "la"
 +++
 
 
