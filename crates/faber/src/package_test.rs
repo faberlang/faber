@@ -275,9 +275,9 @@ incipit = "入口"
 nota = "输出"
 functio = "函数"
 
-[diagnostics.LOCALE001]
-message = "{pack} used Latin {keyword}; prefer {localized}"
-help = "use {localized}"
+[diagnostics.LOCALE002]
+message = "suggestion: {suggestion}"
+help = "use {suggestion}"
 
 [llm]
 system_prompt_snippet = "emit Chinese reader-locale Faber"
@@ -6998,7 +6998,7 @@ locale = "th-TH"
 }
 
 #[test]
-fn compile_package_reports_manifest_reader_locale_latin_fallback_warning() {
+fn compile_package_accepts_inert_latin_fallback_without_notice() {
     let dir = test_temp_dir("manifest-reader-fallback");
     let src = dir.join("src");
     fs::create_dir_all(&src).expect("create src");
@@ -7022,11 +7022,13 @@ locale = "zh-Hans"
 
     let result = compile_package(&Config::default(), &dir);
 
+    // The fallback bridge is inert-but-present (S0-U5): the source compiles and
+    // no retired fallback notice is emitted.
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     assert!(result
         .diagnostics
         .iter()
-        .any(|diagnostic| diagnostic.code == Some("LOCALE001")));
+        .all(|diagnostic| !diagnostic.code.is_some_and(|code| code.starts_with("LOCALE"))));
 }
 
 #[test]
