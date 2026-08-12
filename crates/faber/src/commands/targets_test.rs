@@ -5,12 +5,15 @@ fn small_compiled() -> BTreeSet<&'static str> {
     ["hir-rust"].into_iter().collect()
 }
 
-/// Every feature key the row tables reference (the full-targets surface).
+/// The feature set the default (full-targets) build compiles: every
+/// emit-target feature plus the `host-wasm` capability. `device-runtime` and
+/// `host-macos-arm64` left full-targets at the S3-U2 ordinary-tool cut
+/// (f683d94d0) and are opt-in only.
 fn full_compiled() -> BTreeSet<&'static str> {
     FABER_TARGET_ROWS
         .iter()
         .map(|(_, _, feature)| *feature)
-        .chain(FABER_CAPABILITY_ROWS.iter().map(|(_, feature, _)| *feature))
+        .chain(["host-wasm"])
         .collect()
 }
 
@@ -77,16 +80,20 @@ fn small_build_reports_only_compiled_capabilities() {
 #[test]
 fn default_build_reports_full_surface() {
     let rows = target_rows(&full_compiled());
-    assert_eq!(
-        rows.len(),
-        FABER_TARGET_ROWS.len() + FABER_CAPABILITY_ROWS.len()
-    );
+    // All emit rows plus the one capability row compiled by full-targets
+    // (host-wasm); device-runtime / host-macos-arm64 are opt-in since the
+    // S3-U2 cut and report no row in the default build.
+    assert_eq!(rows.len(), FABER_TARGET_ROWS.len() + 1);
 
     for &(_, name, _) in FABER_TARGET_ROWS {
         assert!(row(&rows, name).available, "{name} must be available");
     }
-    for &(name, _, _) in FABER_CAPABILITY_ROWS {
-        assert!(row(&rows, name).available, "{name} must be available");
+    assert!(row(&rows, "host-wasm").available, "host-wasm must be available");
+    for name in ["device-runtime", "host-macos-arm64"] {
+        assert!(
+            !rows.iter().any(|r| r.name == name),
+            "{name} row must be absent in the default build (feature left full-targets at S3-U2)"
+        );
     }
 
     // FMIR rows are faber package build/run/package targets.
@@ -117,12 +124,17 @@ fn default_build_reports_full_surface() {
 fn rendered_table_contains_capability_rows_under_full_build() {
     let table = rendered_targets_table();
     assert!(table.contains("rust available=yes"), "{table}");
-    for name in ["device-runtime", "host-macos-arm64", "host-wasm"] {
+    // Capability truth under the default build: host-wasm (in full-targets)
+    // shows a row; device-runtime / host-macos-arm64 (opt-in since S3-U2)
+    // report no row for an unbuilt surface.
+    assert!(
+        table.lines().any(|line| line.starts_with("host-wasm ")),
+        "missing host-wasm capability row:\n{table}"
+    );
+    for name in ["device-runtime", "host-macos-arm64"] {
         assert!(
-            table
-                .lines()
-                .any(|line| line.starts_with(&format!("{name} "))),
-            "missing {name} capability row:\n{table}"
+            !table.lines().any(|line| line.starts_with(&format!("{name} "))),
+            "unexpected {name} capability row under the default build (feature left full-targets at S3-U2):\n{table}"
         );
     }
 }

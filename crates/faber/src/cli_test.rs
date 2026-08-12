@@ -45,14 +45,20 @@ fn cli_rejects_install_subcommand() {
     // package acquisition (`cista install`); the product CLI rejects the
     // subcommand as unknown, so no store/temp-checkout side effect is reachable.
     for argv in [
-        ["faber", "install"],
-        ["faber", "install", "norma"],
-        ["faber", "install", "--path", "."],
+        &["faber", "install"][..],
+        &["faber", "install", "norma"][..],
+        &["faber", "install", "--path", "."][..],
     ] {
         let err = Cli::try_parse_from(argv).expect_err("install subcommand is removed");
-        assert_eq!(
-            err.kind(),
-            clap::error::ErrorKind::InvalidSubcommand,
+        // clap reports an unexpected trailing argument (`UnknownArgument`) for
+        // a non-existent subcommand under `args_conflicts_with_subcommands`
+        // with an optional subcommand enum; either kind proves rejection.
+        assert!(
+            matches!(
+                err.kind(),
+                clap::error::ErrorKind::InvalidSubcommand
+                    | clap::error::ErrorKind::UnknownArgument
+            ),
             "argv {argv:?} must reject `faber install` as an unknown subcommand"
         );
     }
@@ -85,19 +91,27 @@ fn cli_parses_targets_subcommand() {
 #[test]
 fn targets_table_reports_capability_truth_for_the_default_build() {
     // The cli_test binary builds under default features (full-targets): the
-    // rust host lane and the compiled device/host-leaf/device-runtime
-    // capability rows must be present (compiled-only capability rows).
+    // rust host lane and the compiled host-leaf capability row must be
+    // present, and the opt-in capability rows absent — `device-runtime` /
+    // `host-macos-arm64` left full-targets at the S3-U2 ordinary-tool cut
+    // (f683d94d0), so capability truth reports no row for an unbuilt surface.
     let table = crate::commands::targets::rendered_targets_table();
     assert!(
         table.contains("rust available=yes"),
         "rust host lane must be reported as available:\n{table}"
     );
-    for row_name in ["device-runtime", "host-macos-arm64", "host-wasm"] {
+    assert!(
+        table
+            .lines()
+            .any(|line| line.starts_with("host-wasm ")),
+        "missing host-wasm capability row under the default build:\n{table}"
+    );
+    for row_name in ["device-runtime", "host-macos-arm64"] {
         assert!(
-            table
+            !table
                 .lines()
                 .any(|line| line.starts_with(&format!("{row_name} "))),
-            "missing {row_name} capability row under the default build:\n{table}"
+            "unexpected {row_name} capability row under the default build (feature left full-targets at S3-U2):\n{table}"
         );
     }
 }
