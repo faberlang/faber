@@ -40,25 +40,22 @@ fn cli_build_help_preserves_single_input_usage() {
 }
 
 #[test]
-fn cli_install_help_names_cista_store_only() {
-    let mut command = Cli::command();
-    let install = command
-        .find_subcommand_mut("install")
-        .expect("install subcommand");
-    let help = install.render_long_help().to_string();
-
-    assert!(help.contains("Cista package store"));
-    assert!(help.contains("requires cista.toml"));
-    assert!(!help.contains("FABER_LIBRARY_HOME"));
-    assert!(!help.contains("--legacy-library-home"));
-    assert!(help.contains("--path <PATH>"));
-}
-
-#[test]
-fn cli_rejects_legacy_library_home_install_flag() {
-    let err = Cli::try_parse_from(["faber", "install", "--legacy-library-home", "norma"])
-        .expect_err("legacy install flag must be removed");
-    assert_eq!(err.kind(), clap::error::ErrorKind::UnknownArgument);
+fn cli_rejects_install_subcommand() {
+    // S2-U2 (faber-radix-recomposition): `faber install` is removed. Cista owns
+    // package acquisition (`cista install`); the product CLI rejects the
+    // subcommand as unknown, so no store/temp-checkout side effect is reachable.
+    for argv in [
+        ["faber", "install"],
+        ["faber", "install", "norma"],
+        ["faber", "install", "--path", "."],
+    ] {
+        let err = Cli::try_parse_from(argv).expect_err("install subcommand is removed");
+        assert_eq!(
+            err.kind(),
+            clap::error::ErrorKind::InvalidSubcommand,
+            "argv {argv:?} must reject `faber install` as an unknown subcommand"
+        );
+    }
 }
 
 #[test]
@@ -821,16 +818,6 @@ fn cli_parses_verify_library_subcommand() {
     };
     assert_eq!(args.target, "rust");
     assert_eq!(args.input, std::path::PathBuf::from("sqlite"));
-}
-
-#[test]
-fn cli_parses_install_subcommand() {
-    let cli = Cli::try_parse_from(["faber", "install", "norma"]).expect("parse install");
-    let Some(crate::cli::Command::Install(args)) = cli.command else {
-        panic!("expected install subcommand");
-    };
-    assert_eq!(args.library.as_deref(), Some("norma"));
-    assert!(args.path.is_none());
 }
 
 #[test]

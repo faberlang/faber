@@ -53,12 +53,6 @@ pub enum Command {
     /// Create a new Faber package
     Init(InitArgs),
 
-    /// Install a Faber library package into the Cista store
-    #[command(
-        long_about = "Install a Faber library package into the Cista package store ($CISTAE_HOME / ~/.faber/cistae) and rewrite faber.lock when a project is present.\n\n`faber install --path <package-root>` installs a local package containing cista.toml. `faber install <git-url>` clones to a temporary checkout, requires cista.toml, and installs the same store path. `faber install <name>@<version>` installs an exact registry pin via Cista using --registry or CISTA_REGISTRY; bare names fail closed."
-    )]
-    Install(InstallArgs),
-
     /// Explain a Faber glyph, keyword, or grammar term
     Explain(ExplainArgs),
 
@@ -251,34 +245,6 @@ pub struct InitArgs {
     /// Target directory for the new package
     #[arg(default_value = ".")]
     pub path: PathBuf,
-}
-
-/// Arguments for `faber install`.
-#[derive(clap::Args, Debug)]
-pub struct InstallArgs {
-    /// Local package root containing `cista.toml` (product path → Cista store)
-    #[arg(long, conflicts_with = "library")]
-    pub path: Option<PathBuf>,
-
-    /// Shared cista package store; falls back to `CISTAE_HOME`, then `~/.faber/cistae`
-    #[arg(long)]
-    pub store: Option<PathBuf>,
-
-    /// Project root for faber.lock rewrite; defaults to cwd when faber.toml exists
-    #[arg(long)]
-    pub project: Option<PathBuf>,
-
-    /// Target language for store install (default: rust)
-    #[arg(long, default_value = "rust")]
-    pub target_language: String,
-
-    /// Local/dev Cista registry root for exact name@version installs; falls back to `CISTA_REGISTRY`
-    #[arg(long)]
-    pub registry: Option<PathBuf>,
-
-    /// Exact registry package pin (name@version) or git URL; default installs into the Cista store
-    #[arg(required_unless_present = "path")]
-    pub library: Option<String>,
 }
 
 /// Arguments for `faber verify-library`.

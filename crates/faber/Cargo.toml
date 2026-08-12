@@ -28,8 +28,6 @@ radix-mir-fmir = { path = "../radix-mir-fmir" }
 # the shared radix-mir surface. Build-time only — never a runtime dependency.
 # DDPP1-U2 (C2 feature isolation): gated `optional`, pulled only by `mir-metal`.
 # DDPP1-U2 (C2 feature isolation): gated `optional`, pulled only by `mir-llvm`.
-# Package-store library: Faber product composition may depend on cista the same
-# way it depends on radix (docs/design/product-composition-radix-cista.md).
 # Differentiable-GPU campaign (S1-5): packaged device runtime types (the
 # `faber::device` surface) and the composite host. Hosts owns the native
 # Metal/CUDA sessions; faber owns the host factory that calls the composite

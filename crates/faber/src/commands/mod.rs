@@ -15,10 +15,6 @@ mod format_test;
 mod format_corpus_test;
 pub mod host;
 mod init;
-mod install;
-#[cfg(test)]
-#[path = "install_test.rs"]
-mod install_test;
 mod model;
 mod run;
 mod script;
@@ -39,7 +35,6 @@ use explain::cmd_explain;
 use format::cmd_format;
 use host::cmd_host;
 use init::cmd_init;
-use install::cmd_install;
 use model::cmd_model;
 use run::{cmd_fmir_run_image, cmd_run};
 use script::{cmd_eval, cmd_repl, cmd_script};
@@ -165,7 +160,6 @@ fn dispatch(command: Command) {
         }
         Command::VerifyLibrary(args) => cmd_verify_library(args),
         Command::Init(args) => cmd_init(args),
-        Command::Install(args) => cmd_install(&args),
         Command::Explain(args) => cmd_explain(args),
         Command::Run(args) => cmd_run(args),
         Command::FmirRun(args) => cmd_fmir_run_image(args),
