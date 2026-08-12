@@ -1,7 +1,7 @@
 //! In-process frame conversation types for expression `ad` and directional views.
 
 use crate::{Instans, InstansPraecisio, Valor};
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::VecDeque;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
