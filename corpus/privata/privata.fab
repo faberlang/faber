@@ -37,7 +37,7 @@ locale = "en"
 #   privata
 
 @ private
-functio privatum() → string {
+fn privatum() → string {
     return "privata"
 }
 
