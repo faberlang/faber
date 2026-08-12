@@ -180,10 +180,10 @@ private `mod autograd;` at line 8). `hosts/llvm` = `faber-host-llvm` crate
 
 | Surface (live source) | Role | Destination (exactly one) | Deletion receipt |
 | --- | --- | --- | --- |
-| `faber/core-support-manifest.txt` (root `faber-runtime`, line 6) | core-support logical roots embedded in the RC payload | reassembly at DDPP8 | the `faber-runtime` root is replaced by the new support destinations' source roots; the other 9 roots (radix-runtime-contract + hosts/crates/*) stay |
+| `radix/crates/faber/core-support-manifest.txt` (root `faber-runtime`, line 6) | core-support logical roots embedded in the RC payload | reassembly at DDPP8 | the `faber-runtime` root is replaced by the new support destinations' source roots; the other 9 roots (radix-runtime-contract + hosts/crates/*) stay |
 | `faber/build.rs:33–41` | assembles `core-support.tar.zst` + `.sha256` + `files.sha256` | reassembly at DDPP8 | `faber-runtime` root removed from `read_roots`; archive reassembled and re-hashed |
-| `faber/src/core_support/materialize.rs:37` | `MaterializedCoreSupport::faber_runtime()` verified extraction root | **GENRUST** | `required_directory("faber-runtime")` re-points to the support crate root |
-| `faber/src/core_support/assembler.rs` | `read_roots`/`assemble` over the manifest | reassembly at DDPP8 | manifest-driven; no code change beyond the manifest |
+| `radix/crates/faber/src/core_support/materialize.rs:37` | `MaterializedCoreSupport::faber_runtime()` verified extraction root | **GENRUST** | `required_directory("faber-runtime")` re-points to the support crate root |
+| `radix/crates/faber/src/core_support/assembler.rs` | `read_roots`/`assemble` over the manifest | reassembly at DDPP8 | manifest-driven; no code change beyond the manifest |
 | `faber/release-manifest.yaml` (`pinnedInputs.source` faber-runtime @ `10d48ea47435`) | release pin schema §4/§7 (single release-manifest schema) | release pin update | the faber-runtime source pin is removed/replaced when the repo is deleted; prepare step regenerates the manifest |
 | `faber/docs/release/release-manifest-schema.md` + `release-manifest.schema.json` | the single release-manifest schema (companion revisions: radix, cista, faber-runtime, hosts) | schema update at DDPP8 | faber-runtime component row removed/re-routed; schema §4 pin set updated |
 | `faber/docs/release/v1.6.0-rc.1-sibling-pins.md` | sibling-pins record (faber-runtime `10d48ea`) | release-notes gate item | release notes and version pins citing faber-runtime updated (§DeletionRule rule 5) |
