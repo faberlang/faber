@@ -652,6 +652,10 @@ fn copy_package_dir_skipping_target(src: &Path, dest: &Path) {
 /// run time: `input_4` is not provided). The seed provisioning must cover
 /// the decomposed kernels regardless of the signature scan: the image's
 /// declared once-init inputs include the 1-element seed with 1.0.
+// S3-U2 cut: this proof requires the device-section builder, which compiles
+// only under `device-runtime` (now opt-in, not in `full-targets`). Gated to
+// the device feature; exercised by the opt-in runner proof (S3-U4).
+#[cfg(feature = "device-runtime")]
 #[test]
 fn package_fmir_image_provisions_decomposed_companion_upstream_seed() {
     use radix_mir_fmir::schema::{WireBufferLifetime, WireBufferRole};
