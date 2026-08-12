@@ -178,13 +178,13 @@ fn duplicate_visible_names_parse_without_error() {
     // names (DUP-RESOLVED) are semantic rejections (S2-U2); the parser surface
     // accepts them so the semantic layer raises the pinned issue. This test
     // locks the surface boundary: both shapes parse cleanly.
-    parse_ok(
+    let _ = parse_ok(
         "schema Duplicata {
             columna numerus id
             columna numerus id
         }",
     );
-    parse_ok(
+    let _ = parse_ok(
         "schema Collidens {
             columna numerus id
             columna textus nomen : plenum
