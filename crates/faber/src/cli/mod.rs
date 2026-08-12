@@ -358,7 +358,7 @@ pub struct RunArgs {
 /// Device backend selection for `faber run --backend` (N1.1).
 ///
 /// Mirrors the frozen FMIR `device.selection` surface
-/// (`faber::device::DeviceSelection: auto | metal | cuda`); the CLI converts
+/// (`DeviceSelection: auto | metal | cuda`); the CLI converts
 /// through [`BackendSelection::selection`].
 #[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BackendSelection {
@@ -372,9 +372,7 @@ pub enum BackendSelection {
 }
 
 impl BackendSelection {
-    /// Convert to the packaged `faber::device` selection request (the shared
-    /// route-selection type; a local equivalent in a build without
-    /// `device-runtime`, DDPP1-U2 / C2 feature isolation).
+    /// Convert to the product-owned route-selection request.
     #[must_use]
     pub fn selection(self) -> crate::package::DeviceSelection {
         match self {

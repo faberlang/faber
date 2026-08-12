@@ -29,15 +29,7 @@ use super::library::{
 use super::library_resolver_from_config;
 use super::LibraryImportBinding;
 use crate::library::LibraryResolver;
-/// Device-selection request used by the route-selection plumbing. With
-/// `device-runtime` compiled in, this is the packaged runtime's
-/// [`faber::device::DeviceSelection`]; without it the small build carries the
-/// same request shape locally so the plumbing compiles without pulling
-/// `faber-runtime` into the build graph (DDPP1-U2 / C2 feature isolation).
-#[cfg(feature = "device-runtime")]
-pub(crate) use faber::device::DeviceSelection;
-
-#[cfg(not(feature = "device-runtime"))]
+/// Product-owned device-selection request used by route plumbing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) enum DeviceSelection {
     /// Resolve against host capability probes; fail closed when the machine
@@ -49,7 +41,6 @@ pub(crate) enum DeviceSelection {
     Cuda,
 }
 
-#[cfg(not(feature = "device-runtime"))]
 impl DeviceSelection {
     /// Parse a selection from its stable spelling (`auto` / `metal` / `cuda`).
     #[must_use]
@@ -59,6 +50,16 @@ impl DeviceSelection {
             "metal" => Some(Self::Metal),
             "cuda" => Some(Self::Cuda),
             _ => None,
+        }
+    }
+
+    /// Stable command and diagnostic spelling.
+    #[must_use]
+    pub(crate) const fn spelling(self) -> &'static str {
+        match self {
+            Self::Auto => "auto",
+            Self::Metal => "metal",
+            Self::Cuda => "cuda",
         }
     }
 }

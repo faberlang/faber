@@ -853,7 +853,7 @@ pub struct WireKvReservePolicy {
 /// five layout facts (`slots`, `context_length`, `layer_count`,
 /// `kv_head_count`, `head_dim`) plus `dtype` and `reserve_policy`. The
 /// storage byte figure is the layout's own authority (consumed, never
-/// re-derived from dims — `faber-runtime/src/partition.rs`).
+/// re-derived from dims — `hosts/crates/host-coordinator/src/partition.rs`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WireKvCacheLayout {

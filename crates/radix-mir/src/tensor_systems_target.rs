@@ -168,7 +168,7 @@ pub const TENSOR_SYSTEMS_TARGET_ROWS: &[TensorSystemsTargetRow] = &[
         rank: TensorSystemsTargetRank::Unselected,
         layout: TensorSystemsTargetLayout::Unselected,
         status: TensorSystemsTargetStatus::NativeSupport,
-        evidence: "faber-runtime/src/tensor.rs::relu, sqrt, gelu, softmax; faber-runtime/src/autograd_reference_test.rs::test_autograd_relu_gradient, test_autograd_sqrt_gradient, test_autograd_gelu_gradient",
+        evidence: "faber/runtime/rust/src/tensor.rs::relu, sqrt, gelu, softmax; crates/radix-air/src/reverse_ad_ops_test.rs activation companion proofs",
     },
     TensorSystemsTargetRow {
         family: TensorOperationFloorFamily::Activations,
@@ -184,7 +184,7 @@ pub const TENSOR_SYSTEMS_TARGET_ROWS: &[TensorSystemsTargetRow] = &[
         rank: TensorSystemsTargetRank::Unselected,
         layout: TensorSystemsTargetLayout::Unselected,
         status: TensorSystemsTargetStatus::NativeSupport,
-        evidence: "faber-runtime/src/tensor.rs::layernorm; faber-runtime/src/autograd_reference_test.rs::test_autograd_layernorm_gradient",
+        evidence: "faber/runtime/rust/src/tensor.rs::layernorm; crates/radix-air/src/reverse_ad_ops_test.rs LayerNorm companion proofs",
     },
     TensorSystemsTargetRow {
         family: TensorOperationFloorFamily::Normalizations,

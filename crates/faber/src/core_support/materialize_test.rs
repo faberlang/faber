@@ -66,14 +66,14 @@ fn symlink_payload() -> (Vec<u8>, String, String) {
     header.set_uid(0);
     header.set_gid(0);
     header.set_mtime(0);
-    header.set_path("faber-runtime/src/lib.rs").unwrap();
+    header.set_path("faber/runtime/rust/src/lib.rs").unwrap();
     header.set_link_name("../../escape").unwrap();
     header.set_cksum();
     tar.append(&header, io::empty()).unwrap();
     let archive = zstd::stream::encode_all(tar.into_inner().unwrap().as_slice(), 19).unwrap();
     let hash = hex(&Sha256::digest(&archive));
     let manifest = format!(
-        "{}  faber-runtime/src/lib.rs\n",
+        "{}  faber/runtime/rust/src/lib.rs\n",
         hex(&Sha256::digest(b"ok"))
     );
     (archive, hash, manifest)
@@ -83,10 +83,10 @@ fn symlink_payload() -> (Vec<u8>, String, String) {
 fn materializes_verified_files_and_reuses_a_completed_entry() {
     let root = test_root("reuse");
     let (archive, hash, manifest) =
-        payload(&[("faber-runtime/src/lib.rs", b"pub fn runtime() {}")]);
+        payload(&[("faber/runtime/rust/src/lib.rs", b"pub fn runtime() {}")]);
     let first = materialize_payload(&root, &archive, &hash, &manifest).unwrap();
     assert_eq!(
-        fs::read(first.root().join("faber-runtime/src/lib.rs")).unwrap(),
+        fs::read(first.root().join("faber/runtime/rust/src/lib.rs")).unwrap(),
         b"pub fn runtime() {}"
     );
     assert!(first.root().join(COMPLETION_FILE).is_file());
@@ -98,16 +98,16 @@ fn materializes_verified_files_and_reuses_a_completed_entry() {
 #[test]
 fn rejects_hash_mismatch_unexpected_duplicate_and_unsafe_paths() {
     let root = test_root("reject");
-    let (archive, _hash, manifest) = payload(&[("faber-runtime/src/lib.rs", b"ok")]);
+    let (archive, _hash, manifest) = payload(&[("faber/runtime/rust/src/lib.rs", b"ok")]);
     assert!(materialize_payload(&root, &archive, &"0".repeat(64), &manifest).is_err());
     let (unexpected, unexpected_hash, _) = payload(&[
-        ("faber-runtime/src/lib.rs", b"ok"),
+        ("faber/runtime/rust/src/lib.rs", b"ok"),
         ("unexpected.rs", b"no"),
     ]);
     assert!(materialize_payload(&root, &unexpected, &unexpected_hash, &manifest).is_err());
     let (duplicate, duplicate_hash, _) = payload(&[
-        ("faber-runtime/src/lib.rs", b"ok"),
-        ("faber-runtime/src/lib.rs", b"ok"),
+        ("faber/runtime/rust/src/lib.rs", b"ok"),
+        ("faber/runtime/rust/src/lib.rs", b"ok"),
     ]);
     assert!(materialize_payload(&root, &duplicate, &duplicate_hash, &manifest).is_err());
     assert!(parse_manifest(&format!("{}  ../escape\n", "0".repeat(64))).is_err());
@@ -121,7 +121,7 @@ fn rejects_hash_mismatch_unexpected_duplicate_and_unsafe_paths() {
 fn rejects_oversized_entries() {
     let root = test_root("oversize");
     let contents = vec![b'x'; (MAX_FILE_BYTES + 1) as usize];
-    let (archive, hash, manifest) = payload(&[("faber-runtime/src/lib.rs", &contents)]);
+    let (archive, hash, manifest) = payload(&[("faber/runtime/rust/src/lib.rs", &contents)]);
     assert!(materialize_payload(&root, &archive, &hash, &manifest).is_err());
     cleanup(&root);
 }
@@ -129,7 +129,7 @@ fn rejects_oversized_entries() {
 #[test]
 fn concurrent_materializations_converge_on_one_completed_entry() {
     let root = Arc::new(test_root("concurrent"));
-    let (archive, hash, manifest) = payload(&[("faber-runtime/src/lib.rs", b"ok")]);
+    let (archive, hash, manifest) = payload(&[("faber/runtime/rust/src/lib.rs", b"ok")]);
     let archive = Arc::new(archive);
     let manifest = Arc::new(manifest);
     let mut workers = Vec::new();
@@ -157,7 +157,7 @@ fn rejects_group_writable_cache_root() {
 
     let root = test_root("group-writable");
     fs::set_permissions(&root, fs::Permissions::from_mode(0o775)).unwrap();
-    let (archive, hash, manifest) = payload(&[("faber-runtime/src/lib.rs", b"ok")]);
+    let (archive, hash, manifest) = payload(&[("faber/runtime/rust/src/lib.rs", b"ok")]);
     let err = materialize_payload(&root, &archive, &hash, &manifest).unwrap_err();
     assert!(matches!(
         err,
@@ -172,7 +172,7 @@ fn rejects_a_symlinked_cache_entry() {
     use std::os::unix::fs::symlink;
 
     let root = test_root("symlink");
-    let (archive, hash, manifest) = payload(&[("faber-runtime/src/lib.rs", b"ok")]);
+    let (archive, hash, manifest) = payload(&[("faber/runtime/rust/src/lib.rs", b"ok")]);
     let parent = root.join("faber/core-support").join(PAYLOAD_FORMAT);
     fs::create_dir_all(&parent).unwrap();
     let outside = root.join("outside");
@@ -185,7 +185,7 @@ fn rejects_a_symlinked_cache_entry() {
 #[test]
 fn repairs_noncompleted_state_but_preserves_completed_corruption() {
     let root = test_root("recovery");
-    let (archive, hash, manifest) = payload(&[("faber-runtime/src/lib.rs", b"ok")]);
+    let (archive, hash, manifest) = payload(&[("faber/runtime/rust/src/lib.rs", b"ok")]);
     let target = root
         .join("faber/core-support")
         .join(PAYLOAD_FORMAT)
@@ -200,7 +200,7 @@ fn repairs_noncompleted_state_but_preserves_completed_corruption() {
         .flatten()
         .any(|entry| entry.file_name().to_string_lossy().contains(".incomplete-")));
 
-    let file = materialized.root().join("faber-runtime/src/lib.rs");
+    let file = materialized.root().join("faber/runtime/rust/src/lib.rs");
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;

@@ -3,7 +3,7 @@
 
 use super::*;
 // S3-U2 cut: resolve through the crate-local selection type (the packaged
-// `faber::device::DeviceSelection` under `device-runtime`, the local
+// product-owned `DeviceSelection` under `device-runtime`, the local
 // equivalent otherwise) so these tests also compile/run in the default build,
 // which no longer enables `device-runtime`.
 use super::DeviceSelection;

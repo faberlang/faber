@@ -58,8 +58,8 @@ Common flows:
     archive; never Rust codegen for the program, never a cc fallback. Artifacts
     land in target/faber-llvm/{debug|release}/ (modules/, link-manifest.toml,
     runtime/identity.toml, binary). Requires a coherent LLVM toolchain
-    (llvm-as + clang, plus opt for release) and a buildable faber-runtime/
-    hosts/llvm staticlib; unsupported host triples fail with a structured
+    (llvm-as + clang, plus opt for release) and a buildable hosts/llvm
+    staticlib; unsupported host triples fail with a structured
     diagnostic. `-t llvm-text` stays emit-only (radix emit).
 
   Test selection (proba cases run on the MIR stepper, not a Cargo harness):

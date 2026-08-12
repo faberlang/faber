@@ -3,7 +3,7 @@
 //! This module is the single source of truth for the host ABI surface Radix
 //! emits: runtime symbol names, wire enum codes, LLVM layout spellings, status
 //! codes, and diagnostic symbol rows. The historical home for these constants
-//! was `faber-runtime/src/host_abi.rs`; Radix now owns them so a published
+//! was the retired runtime repository's `src/host_abi.rs`; Radix now owns them so a published
 //! compiler binary can report its own ABI through `radix abi` without importing
 //! the runtime at compile time.
 //!

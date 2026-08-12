@@ -209,9 +209,7 @@ pub use mir::run_fmir_image_bytes_with_stdio;
 pub(super) use mir::test_support::{fmir_image_test_summary, fmir_text_image_test_summary};
 #[allow(unused_imports)] // External backend harnesses consume the public package-MIR callback.
 pub use mir::with_lowered_package_mir;
-/// Shared device-selection request type for the route-selection plumbing: the
-/// packaged runtime's [`faber::device::DeviceSelection`] under `device-runtime`,
-/// a local equivalent in the small build (DDPP1-U2 / C2 feature isolation).
+/// Product-owned device-selection request used by all route plumbing.
 pub(crate) use mir::DeviceSelection;
 #[allow(unused_imports)] // FMIR stages consume this crate-visible image API.
 pub(crate) use mir::{

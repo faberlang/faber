@@ -17,7 +17,7 @@
 //!    MD2-D1's stable field-ordered substrate). The spelling mirrors
 //!    [`device_identity_hash`](crate::schema::device_identity_hash) (FC17).
 //! 3. **`bound_distributed_plan_hash`** — a **spelling contract frozen
-//!    here**, computed in MD2-B1 (`faber-runtime/src/bound_plan.rs`) over
+//!    here**, computed in MD2-B1 (`hosts/crates/host-coordinator/src/bound_plan.rs`) over
 //!    the `BoundDistributedPlan` canonical bytes (the logical hash + binding
 //!    facts). Physical ids enter THIS bound-plan domain — never A10.
 //!

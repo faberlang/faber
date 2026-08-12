@@ -23,7 +23,7 @@ pub struct PathDep {
 /// source string.
 ///
 /// `manifest_relative` is the path of the Cargo.toml relative to the archive
-/// root (e.g. `"faber-runtime/Cargo.toml"`). The returned `PathDep::raw_path`
+/// root (e.g. `"faber/runtime/rust/Cargo.toml"`). The returned `PathDep::raw_path`
 /// values are the declared path strings, unresolved.
 ///
 /// Uses a line-based scan that handles both `key = { path = "..." }` (inline
@@ -172,13 +172,13 @@ mod tests {
     fn extracts_path_deps_from_simple_manifest() {
         let source = r#"
 [dependencies]
-faber-runtime = { path = "../faber-runtime" }
+faber = { package = "faber-runtime", path = "../../../faber/runtime/rust" }
 tokio = "1"
 radix-runtime-contract = { path = "../radix/crates/radix-runtime-contract" }
 "#;
         let deps = extract_path_deps("hosts/crates/host-kernel/Cargo.toml", source);
         assert_eq!(deps.len(), 2);
-        assert_eq!(deps[0].raw_path, "../faber-runtime");
+        assert_eq!(deps[0].raw_path, "../../../faber/runtime/rust");
         assert_eq!(deps[1].raw_path, "../radix/crates/radix-runtime-contract");
     }
 
@@ -227,7 +227,7 @@ fixture = { path = "../fixture" }
 [target.'cfg(test)'.dev-dependencies]
 target_fixture = { path = "../target-fixture" }
 "#;
-        let deps = extract_path_deps("faber-runtime/Cargo.toml", source);
+        let deps = extract_path_deps("faber/runtime/rust/Cargo.toml", source);
         assert_eq!(deps.len(), 1);
         assert_eq!(deps[0].raw_path, "../runtime");
     }
@@ -235,8 +235,8 @@ target_fixture = { path = "../target-fixture" }
     #[test]
     fn resolves_relative_paths_correctly() {
         let dep = PathDep {
-            manifest: PathBuf::from("faber-runtime/Cargo.toml"),
-            raw_path: "../radix/crates/radix-runtime-contract".to_owned(),
+            manifest: PathBuf::from("faber/runtime/rust/Cargo.toml"),
+            raw_path: "../../../radix/crates/radix-runtime-contract".to_owned(),
         };
         // The fixture path always resolves below the manifest root; assert the
         // full result so a resolution failure reports the observed Option.
@@ -258,7 +258,7 @@ target_fixture = { path = "../target-fixture" }
             Path::new("radix/crates/radix-runtime-contract/src/lib.rs"),
             &roots
         ));
-        assert!(!is_within_roots(Path::new("faber-runtime"), &roots));
+        assert!(!is_within_roots(Path::new("faber/runtime/rust"), &roots));
     }
 
     #[test]

@@ -312,7 +312,7 @@ pub(super) fn package_device_section(
     }
     let selection = prepared
         .device_backend
-        .unwrap_or(faber::device::DeviceSelection::Auto);
+        .unwrap_or(DeviceSelection::Auto);
     let section = super::super::device::device_section_for_program(
         &program,
         &semantics,

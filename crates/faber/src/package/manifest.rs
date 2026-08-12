@@ -8,7 +8,7 @@ use radix::forma::FormatPolicy;
 use serde::Deserialize;
 
 // DDPP1-U2 (C2 feature isolation): the shared route-selection request type
-// (the packaged runtime's `faber::device::DeviceSelection` under
+// (the product-owned `DeviceSelection` under
 // `device-runtime`, a local equivalent in the small build).
 use super::DeviceSelection;
 
