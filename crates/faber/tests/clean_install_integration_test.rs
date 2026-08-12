@@ -152,7 +152,7 @@ fn installed_faber_builds_minimal_package_without_sibling_core_sources() {
     let package = write_package(&root, false);
     fs::write(
         package.join("src/main.fab"),
-        "incipit { nota \"clean minimal\" }\n",
+        "main { print \"clean minimal\" }\n",
     )
     .expect("write source");
 
@@ -182,7 +182,7 @@ fn installed_faber_builds_and_runs_native_provider_using_materialized_sources() 
     fs::write(
         package.join("src/main.fab"),
         format!(
-            "incipit {{\n  fixum textus body ← ad 'solum:lege' ({:?}) ↦ textus\n  nota body\n}}\n",
+            "main {{\n  const string body ← call 'solum:lege' ({:?}) ↦ string\n  print body\n}}\n",
             data.to_string_lossy()
         ),
     )

@@ -179,10 +179,10 @@ entry = "main.fab"
     fs::write(
         src.join("main.fab"),
         r#"
-importa ex "./thing" privata thing
+import from "./thing" private thing
 
-incipit {
-  nota thing.label()
+main {
+  print thing.label()
 }
 "#,
     )
@@ -190,12 +190,12 @@ incipit {
     fs::write(
         src.join("thing.fab"),
         r#"
-incipit {
-  nota "module entry must not run"
+main {
+  print "module entry must not run"
 }
 
-functio label() → numerus {
-  redde 7
+fn label() → int {
+  return 7
 }
 "#,
     )
@@ -345,7 +345,7 @@ fn assert_no_generated_rust(package: &Path) {
 
 #[test]
 fn manifest_fmir_text_build_target_is_used_without_cli_target() {
-    let package = write_basic_package("manifest-fmir-text", "incipit { nota \"manifest\" }");
+    let package = write_basic_package("manifest-fmir-text", "main { print \"manifest\" }");
     fs::write(
         package.join("faber.toml"),
         r#"
@@ -377,8 +377,8 @@ fn build_reader_locale_accepts_direct_entry_file_input() {
     let source = write_single_file(
         "build-reader-locale-single-file",
         r#"
-incipit {
-  nota "salve"
+入口 {
+  显示 "salve"
 }
 "#,
     );
@@ -477,8 +477,8 @@ fn build_reader_locale_accepts_manifest_file_input() {
     let package = write_basic_package(
         "build-reader-locale-manifest",
         r#"
-incipit {
-  nota "salve"
+入口 {
+  显示 "salve"
 }
 "#,
     );
@@ -504,8 +504,8 @@ fn run_reader_locale_accepts_direct_entry_file_input() {
     let source = write_single_file(
         "run-reader-locale-single-file",
         r#"
-incipit {
-  nota "salve"
+入口 {
+  显示 "salve"
 }
 "#,
     );
@@ -526,8 +526,8 @@ fn run_reader_locale_accepts_manifest_file_input() {
     let package = write_basic_package(
         "run-reader-locale-manifest",
         r#"
-incipit {
-  nota "salve"
+入口 {
+  显示 "salve"
 }
 "#,
     );
@@ -549,8 +549,8 @@ fn run_interpret_rejects_reader_locale() {
     let source = write_single_file(
         "run-reader-locale-interpret-reject",
         r#"
-incipit {
-  nota "salve"
+入口 {
+  显示 "salve"
 }
 "#,
     );
@@ -665,8 +665,8 @@ fn test_reader_locale_accepts_direct_entry_file_input() {
     let source = write_single_file(
         "test-reader-locale-single-file",
         r#"
-incipit {
-  nota "salve"
+入口 {
+  显示 "salve"
 }
 "#,
     );
@@ -690,8 +690,8 @@ fn test_reader_locale_accepts_manifest_file_input() {
     let package = write_basic_package(
         "test-reader-locale-manifest",
         r#"
-incipit {
-  nota "salve"
+入口 {
+  显示 "salve"
 }
 "#,
     );
@@ -962,7 +962,7 @@ fn fmir_bin_package_forwards_runtime_arg_after_source_is_removed() {
         "fmir-bin-cli",
         r#"
 @ cli "tool"
-@ operandus textus name
+@ operand string name
 incipit argumenta args {
   nota "fmir-bin §!"(args.name)
 }
@@ -1070,7 +1070,7 @@ functio text(textus name) → textus {
 fn fmir_bin_norma_solum_package_reads_file_after_source_is_removed() {
     let package = write_basic_package(
         "fmir-bin-solum",
-        r#"importa ex "norma:solum" privata fileio
+        r#"import from "norma:solum" private fileio
 
 incipit {
   nota fileio.lege<textus>("__PAYLOAD__")
@@ -1143,10 +1143,10 @@ entry = "main.fab"
         (
             format!("{root}src/main.fab"),
             r#"
-importa ex "./thing" privata thing
+import from "./thing" private thing
 
-incipit {
-  nota thing.label()
+main {
+  print thing.label()
 }
 "#
             .to_owned(),
@@ -1154,8 +1154,8 @@ incipit {
         (
             format!("{root}src/thing.fab"),
             r"
-functio label() → numerus {
-  redde 7
+fn label() → int {
+  return 7
 }
 "
             .to_owned(),
@@ -1178,10 +1178,10 @@ fn script_private_namespace_failure_does_not_emit_rust() {
     fs::write(
         package.join("main.fab"),
         r#"
-importa ex "./auxilium" privata Aux
+import from "./auxilium" private Aux
 
-incipit {
-  nota Aux.secretum()
+main {
+  print Aux.secretum()
 }
 "#,
     )
@@ -1189,9 +1189,9 @@ incipit {
     fs::write(
         package.join("auxilium.fab"),
         r"
-@ privata
-functio secretum() → numerus {
-  redde 1
+@ private
+fn secretum() → int {
+  return 1
 }
 ",
     )
@@ -1220,17 +1220,17 @@ fn script_import_cycle_failure_does_not_emit_rust() {
     let package = temp_dir("import-cycle");
     fs::write(
         package.join("main.fab"),
-        r#"importa ex "./jobs" privata jobs
+        r#"import from "./jobs" private jobs
 
-incipit {}
+main {}
 "#,
     )
     .expect("write entry");
     fs::write(
         package.join("jobs.fab"),
-        r#"importa ex "./main" privata main
+        r#"import from "./main" private main
 
-functio run() → vacuum {}
+fn run() → void {}
 "#,
     )
     .expect("write jobs");
@@ -1262,10 +1262,10 @@ fn script_norma_library_import_executes_without_rust_emit() {
     fs::write(
         package.join("main.fab"),
         r#"
-importa ex "norma:chorda" privata chorda
+import from "norma:chorda" private chorda
 
-incipit {
-  nota chorda.retorta("roma")
+main {
+  print chorda.retorta("roma")
 }
 "#,
     )
@@ -1285,8 +1285,8 @@ fn script_cli_root_package_executes_without_cargo_or_rust_emit() {
         package.join("main.fab"),
         r#"
 @ cli "tool"
-incipit argumenta args {
-  nota "cli root"
+main args args {
+  print "cli root"
 }
 "#,
     )
@@ -1310,9 +1310,9 @@ fn script_cli_root_text_operand_executes_without_cargo_or_rust_emit() {
         package.join("main.fab"),
         r#"
 @ cli "tool"
-@ operandus textus name
-incipit argumenta args {
-  nota args.name
+@ operand string name
+main args args {
+  print args.name
 }
 "#,
     )
@@ -1341,12 +1341,12 @@ fn script_cli_root_rest_text_operand_executes_without_cargo_or_rust_emit() {
         package.join("main.fab"),
         r#"
 @ cli "tool"
-@ operandus textus input
-@ operandus ceteri textus files
-incipit argumenta args {
-  nota args.input
-  fixum lista<textus> files ← args.files
-  nota files.length()
+@ operand string input
+@ operand rest string files
+main args args {
+  print args.input
+  const list<string> files ← args.files
+  print files.length()
 }
 "#,
     )
@@ -1380,8 +1380,8 @@ fn script_cli_root_fixed_exit_uses_process_status_without_rust_emit() {
         package.join("main.fab"),
         r#"
 @ cli "tool"
-incipit argumenta args exitus 7 {
-  nota "done"
+main args args exit 7 {
+  print "done"
 }
 "#,
     )
@@ -1406,9 +1406,9 @@ fn script_cli_root_flag_option_executes_without_cargo_or_rust_emit() {
         package.join("main.fab"),
         r#"
 @ cli "tool"
-@ optio verbose brevis "v" longum "verbose" typus bivalens
-incipit argumenta args {
-  nota args.verbose
+@ option verbose short "v" long "verbose" type bool
+main args args {
+  print args.verbose
 }
 "#,
     )
@@ -1440,9 +1440,9 @@ fn script_cli_root_defaulted_option_executes_without_cargo_or_rust_emit() {
         package.join("main.fab"),
         r#"
 @ cli "tool"
-@ optio name longum "name" typus textus vel "worker"
-incipit argumenta args {
-  nota args.name
+@ option name long "name" type string coalesce "worker"
+main args args {
+  print args.name
 }
 "#,
     )
@@ -1474,9 +1474,9 @@ fn script_cli_root_optional_option_executes_without_cargo_or_rust_emit() {
         package.join("main.fab"),
         r#"
 @ cli "tool"
-@ optio name longum "name" typus textus
-incipit argumenta args {
-  nota args.name vel "worker"
+@ option name long "name" type string
+main args args {
+  print args.name coalesce "worker"
 }
 "#,
     )
@@ -1508,9 +1508,9 @@ fn script_cli_root_global_flag_option_executes_without_cargo_or_rust_emit() {
         package.join("main.fab"),
         r#"
 @ cli "tool"
-@ optio verbose longum "verbose" typus bivalens ubique
-incipit argumenta args {
-  nota args.verbose
+@ option verbose long "verbose" type bool global
+main args args {
+  print args.verbose
 }
 "#,
     )
@@ -1542,9 +1542,9 @@ fn script_cli_root_defaulted_operand_executes_without_cargo_or_rust_emit() {
         package.join("main.fab"),
         r#"
 @ cli "tool"
-@ operandus numerus count vel 9
-incipit argumenta args {
-  nota args.count
+@ operand int count coalesce 9
+main args args {
+  print args.count
 }
 "#,
     )
@@ -1570,20 +1570,20 @@ fn script_cli_mounted_command_executes_without_cargo_or_rust_emit() {
     fs::write(
         package.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         package.join("jobs.fab"),
         r#"
-@ imperium "run"
-functio run() argumenta args {
-  nota "running"
+@ command "run"
+fn run() args args {
+  print "running"
 }
 "#,
     )
@@ -1612,21 +1612,21 @@ fn script_cli_mounted_global_option_executes_without_cargo_or_rust_emit() {
     fs::write(
         package.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
-@ optio verbose longum "verbose" typus bivalens ubique
+@ option verbose long "verbose" type bool global
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         package.join("jobs.fab"),
         r#"
-@ imperium "run"
-functio run() argumenta args {
-  nota args.verbose
+@ command "run"
+fn run() args args {
+  print args.verbose
 }
 "#,
     )
@@ -1659,21 +1659,21 @@ fn script_cli_mounted_global_optional_option_executes_without_cargo_or_rust_emit
     fs::write(
         package.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
-@ optio name longum "name" typus textus ubique
+@ option name long "name" type string global
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         package.join("jobs.fab"),
         r#"
-@ imperium "run"
-functio run() argumenta args {
-  nota args.name vel "worker"
+@ command "run"
+fn run() args args {
+  print args.name coalesce "worker"
 }
 "#,
     )
@@ -1706,22 +1706,22 @@ fn script_cli_mounted_global_text_operand_executes_without_cargo_or_rust_emit() 
     fs::write(
         package.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
-@ operandus textus tenant ubique
+@ operand string tenant global
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         package.join("jobs.fab"),
         r#"
-@ imperium "run"
-@ operandus textus name
-functio run() argumenta args {
-  nota "§:§"(args.tenant, args.name)
+@ command "run"
+@ operand string name
+fn run() args args {
+  print "§:§"(args.tenant, args.name)
 }
 "#,
     )
@@ -1755,21 +1755,21 @@ fn script_cli_mounted_text_operand_executes_without_cargo_or_rust_emit() {
     fs::write(
         package.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         package.join("jobs.fab"),
         r#"
-@ imperium "run"
-@ operandus textus name
-functio run() argumenta args {
-  nota args.name
+@ command "run"
+@ operand string name
+fn run() args args {
+  print args.name
 }
 "#,
     )
@@ -1802,21 +1802,21 @@ fn script_cli_mounted_numerus_operand_executes_without_cargo_or_rust_emit() {
     fs::write(
         package.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         package.join("jobs.fab"),
         r#"
-@ imperium "run"
-@ operandus numerus count
-functio run() argumenta args {
-  nota args.count
+@ command "run"
+@ operand int count
+fn run() args args {
+  print args.count
 }
 "#,
     )
@@ -1849,21 +1849,21 @@ fn script_cli_mounted_defaulted_option_executes_without_cargo_or_rust_emit() {
     fs::write(
         package.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         package.join("jobs.fab"),
         r#"
-@ imperium "run"
-@ optio name longum "name" typus textus vel "worker"
-functio run() argumenta args {
-  nota args.name
+@ command "run"
+@ option name long "name" type string coalesce "worker"
+fn run() args args {
+  print args.name
 }
 "#,
     )
@@ -1896,22 +1896,22 @@ fn script_cli_mounted_alias_text_operand_executes_without_cargo_or_rust_emit() {
     fs::write(
         package.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         package.join("jobs.fab"),
         r#"
-@ imperium "run"
+@ command "run"
 @ alias "start"
-@ operandus textus name
-functio run() argumenta args {
-  nota args.name
+@ operand string name
+fn run() args args {
+  print args.name
 }
 "#,
     )
@@ -1979,18 +1979,18 @@ fn script_archive_manifestless_root_executes_without_cargo_or_rust_emit() {
             (
                 "main.fab",
                 r#"
-importa ex "./thing" privata thing
+import from "./thing" private thing
 
-incipit {
-  nota thing.label()
+main {
+  print thing.label()
 }
 "#,
             ),
             (
                 "thing.fab",
                 r"
-functio label() → numerus {
-  redde 7
+fn label() → int {
+  return 7
 }
 ",
             ),
@@ -2062,19 +2062,19 @@ fn script_archive_package_diagnostic_reports_archive_member_path() {
             (
                 "main.fab",
                 r#"
-importa ex "./auxilium" privata Aux
+import from "./auxilium" private Aux
 
-incipit {
-  nota Aux.secretum()
+main {
+  print Aux.secretum()
 }
 "#,
             ),
             (
                 "auxilium.fab",
                 r"
-@ privata
-functio secretum() → numerus {
-  redde 1
+@ private
+fn secretum() → int {
+  return 1
 }
 ",
             ),
@@ -2103,10 +2103,10 @@ fn script_manifestless_entry_package_executes_without_cargo_or_rust_emit() {
     fs::write(
         package.join("main.fab"),
         r#"
-importa ex "./thing" privata thing
+import from "./thing" private thing
 
-incipit {
-  nota thing.label()
+main {
+  print thing.label()
 }
 "#,
     )
@@ -2114,8 +2114,8 @@ incipit {
     fs::write(
         package.join("thing.fab"),
         r"
-functio label() → numerus {
-  redde 7
+fn label() → int {
+  return 7
 }
 ",
     )
@@ -2177,10 +2177,10 @@ entry = "main.fab"
     fs::write(
         src.join("main.fab"),
         r#"
-importa ex "./thing" privata thing
+import from "./thing" private thing
 
-incipit {
-  nota thing.label()
+main {
+  print thing.label()
 }
 "#,
     )
@@ -2188,8 +2188,8 @@ incipit {
     fs::write(
         src.join("thing.fab"),
         r#"
-functio label() → textus {
-  redde "ok"
+fn label() → string {
+  return "ok"
 }
 "#,
     )
@@ -2210,7 +2210,7 @@ functio label() → textus {
 fn script_manifestless_single_file_uses_single_source_stepper() {
     let dir = temp_dir("single-file");
     let script = dir.join("script.fab");
-    fs::write(&script, "incipit { nota \"single\" }\n").expect("write script");
+    fs::write(&script, "main { print \"single\" }\n").expect("write script");
 
     let (stdout, stderr, ok) = run_faber(&["script", script.to_str().expect("utf8 path")]);
 
@@ -2245,10 +2245,10 @@ entry = "main.fab"
     fs::write(
         src.join("main.fab"),
         format!(
-            r#"importa ex "norma:solum" privata fileio
+            r#"import from "norma:solum" private fileio
 
-incipit {{
-  nota fileio.lege<textus>("{payload_str}")
+main {{
+  print fileio.lege<string>("{payload_str}")
 }}
 "#
         ),
@@ -2285,10 +2285,10 @@ entry = "main.fab"
     .expect("write manifest");
     fs::write(
         src.join("main.fab"),
-        r#"importa ex "norma:solum" privata fileio
+        r#"import from "norma:solum" private fileio
 
-incipit {
-  fixum bivalens readable ← fileio.legibilene("/nonexistent")
+main {
+  const bool readable ← fileio.legibilene("/nonexistent")
 }
 "#,
     )
@@ -2324,10 +2324,10 @@ entry = "main.fab"
     .expect("write manifest");
     fs::write(
         src.join("main.fab"),
-        r#"importa ex "norma:processus" privata processus
+        r#"import from "norma:processus" private processus
 
-incipit argumenta args {
-  nota processus.argumenta()[0]
+main args args {
+  print processus.argumenta()[0]
 }
 "#,
     )

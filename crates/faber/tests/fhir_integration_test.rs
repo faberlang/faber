@@ -107,7 +107,7 @@ entry = "main.fab"
 "#,
     )
     .expect("write manifest");
-    fs::write(src.join("main.fab"), "incipit { nota \"salve\" }\n").expect("write entry");
+    fs::write(src.join("main.fab"), "main { print \"salve\" }\n").expect("write entry");
 
     let (stdout, stderr, ok) = run_faber(&[
         "build",
@@ -148,7 +148,7 @@ entry = "main.fab"
 "#,
     )
     .expect("write manifest");
-    fs::write(src.join("main.fab"), "incipit { nota \"salve\" }\n").expect("write entry");
+    fs::write(src.join("main.fab"), "main { print \"salve\" }\n").expect("write entry");
 
     let (stdout, stderr, ok) = run_faber(&[
         "run",

@@ -188,8 +188,8 @@ fn package_emit_honors_output_path() {
     let package = write_basic_package(
         "package-emit-output",
         r#"
-incipit {
-    nota "package emit"
+main {
+    print "package emit"
 }
 "#,
     );
@@ -225,9 +225,9 @@ fn package_check_normal_diagnostics_uses_coded_compact_headers() {
     let package = write_basic_package(
         "package-check-normal",
         r#"
-incipit {
-    fixum numerus n ← "not a number"
-    nota n
+main {
+    const int n ← "not a number"
+    print n
 }
 "#,
     );
@@ -252,9 +252,9 @@ fn package_check_expanded_diagnostics_includes_phase_and_span() {
     let package = write_basic_package(
         "package-check-expanded",
         r#"
-incipit {
-    fixum numerus n ← "not a number"
-    nota n
+main {
+    const int n ← "not a number"
+    print n
 }
 "#,
     );
