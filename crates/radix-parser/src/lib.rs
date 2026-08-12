@@ -446,6 +446,27 @@ impl Parser {
         }
     }
 
+    /// Whether a raw `Newline` token occurs between the current raw position
+    /// and the next non-trivia token.
+    ///
+    /// WHY: Same-line guards that pair a trivia-skipping keyword peek
+    /// ([`Self::check_keyword_ident`]) with a raw-stream check need to know
+    /// whether the peeked word is still on the current logical line. A
+    /// trailing `#` comment sits between the consumed token and the newline
+    /// it terminates at, so a one-token raw peek sees the comment, not the
+    /// newline; scanning the raw span to the next word sees through it.
+    fn raw_newline_before_next_word(&self) -> bool {
+        let next_word = self.non_trivia_indices.partition_point(|&i| i < self.pos);
+        let end = self
+            .non_trivia_indices
+            .get(next_word)
+            .copied()
+            .unwrap_or(self.tokens.len());
+        self.tokens[self.pos..end]
+            .iter()
+            .any(|token| token.kind == TokenKind::Newline)
+    }
+
     /// Advance and return current token.
     ///
     /// WHY: Consuming tokens moves the parser state forward. Automatic trivia
