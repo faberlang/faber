@@ -11,7 +11,8 @@ use crate::test_support::{
     assert_parse_error_issue, assert_parse_error_matches, parse_ok, parse_program, symbol_name,
     ParseExpectation,
 };
-use crate::ParseErrorKind;
+use crate::{ParseErrorKind, ParseOptions, Parser};
+use radix_lexer::{lex, Span, Token, TokenKind};
 use radix_syntax::{StmtKind, Trivia, TypeExprKind};
 
 /// Owned summary of one parsed schema column, so tests compare content instead
@@ -335,4 +336,53 @@ fn comment_between_columns_is_claimed_as_column_trivia() {
         })
         .collect();
     assert_eq!(comments, vec![" between"]);
+}
+
+#[test]
+fn trailing_comment_after_column_is_not_a_nested_column() {
+    // The lexer rejects a mid-line `#` after code (`inline_hash_after_code`),
+    // so this regression feeds the parser a token stream where a `LineComment`
+    // directly trails the column name — before the newline, with the next
+    // `columna` on a fresh line. The nested-column guard must scan the raw
+    // trivia run (LineComment, Newline) for the newline instead of assuming
+    // the raw next token is the newline.
+    // Regression: `columna numerus id # comment` falsely raised
+    // `schema_nested_column`.
+    let mut lexed = lex("schema S {\n  columna numerus id\n  columna textus nomen\n}\n");
+    let ident_idx = lexed
+        .tokens
+        .iter()
+        .position(|tok| {
+            matches!(tok.kind, TokenKind::Ident(sym) if lexed.interner.resolve(sym) == "id")
+        })
+        .expect("column-name ident in fixture");
+    let comment_sym = lexed.interner.intern_raw(" primary key");
+    let comment_span = Span::new(
+        lexed.tokens[ident_idx].span.end,
+        lexed.tokens[ident_idx + 1].span.start,
+    );
+    lexed.tokens.insert(
+        ident_idx + 1,
+        Token::new(TokenKind::LineComment(comment_sym), comment_span),
+    );
+
+    let mut parser = Parser::new(lexed.tokens, lexed.interner, ParseOptions::default());
+    let result = parser.parse_program();
+    assert!(result.success(), "{:?}", result.errors);
+
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Schema(schema) = &program.statements[0].kind else {
+        panic!("expected schema declaration");
+    };
+    assert_eq!(schema.columns.len(), 2);
+    // The trailing comment is claimed as the next column's leading trivia.
+    let comments: Vec<&str> = schema.columns[1]
+        .leading_trivia
+        .iter()
+        .filter_map(|item| match item {
+            Trivia::CommentLine(comment) => Some(result.interner.resolve(comment.text)),
+            Trivia::Newline(_) => None,
+        })
+        .collect();
+    assert_eq!(comments, vec![" primary key"]);
 }

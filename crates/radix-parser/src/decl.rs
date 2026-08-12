@@ -1006,9 +1006,12 @@ impl Parser {
             // line where the alias row (or the next column) belongs — no column
             // carries a nested column list. A `columna` on a fresh line is the
             // next column, not a nested declaration (newlines are trivia, so
-            // the raw-token check distinguishes the two).
+            // the raw-token scan distinguishes the two). The scan runs from
+            // the raw position through any trailing `#` comment to the next
+            // word, so a comment ending the column's row cannot masquerade as
+            // a same-line `columna`.
             if self.check_keyword_ident(TokenKind::Columna)
-                && self.peek_raw().kind != TokenKind::Newline
+                && !self.raw_newline_before_next_word()
             {
                 return Err(ParseError::structured(
                     ParseErrorKind::InvalidDeclaration,
