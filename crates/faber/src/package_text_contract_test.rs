@@ -16,7 +16,7 @@ const BIDI_ISOLATE_START: &str = "\u{2068}";
 const BIDI_ISOLATE_END: &str = "\u{2069}";
 
 fn locale_examples_root() -> PathBuf {
-    crate::reference_pack_test_support::faberlang_home()
+    radix::paths::faberlang_home()
         .expect("faberlang container root")
         .join("examples/reader-locale")
 }

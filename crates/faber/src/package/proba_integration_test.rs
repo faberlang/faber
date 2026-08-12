@@ -376,7 +376,7 @@ probandum "helpers" {
 
 #[test]
 fn norma_src_proba_is_discovered_beside_product_sources() {
-    let norma_src = crate::reference_pack_test_support::faberlang_home()
+    let norma_src = radix::paths::faberlang_home()
         .expect("faberlang container root")
         .join("norma/src");
     assert!(
@@ -449,7 +449,7 @@ functio addita(fractus a, fractus b) → fractus {
     )
     .expect("mathesis.fab");
     let proba_body = fs::read_to_string(
-        crate::reference_pack_test_support::faberlang_home()
+        radix::paths::faberlang_home()
             .expect("faberlang container root")
             .join("norma/src/mathesis.proba"),
     )

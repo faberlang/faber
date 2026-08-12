@@ -1078,7 +1078,7 @@ entry = "main.fab"
         )
         .expect("write manifest");
         let workspace_root =
-            crate::reference_pack_test_support::faberlang_home().expect("faberlang container root");
+            radix::paths::faberlang_home().expect("faberlang container root");
         let touch_source = workspace_root.join("examples/coreutils/packages/touch/src/main.fab");
         fs::write(
             src.join("main.fab"),
@@ -6895,7 +6895,7 @@ locale = "zh-Hans"
 
 #[test]
 fn installed_reader_locale_reference_examples_compile_from_installed_packs() {
-    let root = crate::reference_pack_test_support::faberlang_home()
+    let root = radix::paths::faberlang_home()
         .expect("faberlang container root")
         .join("examples/reader-locale");
 
@@ -7031,7 +7031,7 @@ locale = "zh-Hans"
 
 #[test]
 fn thai_reader_locale_example_compiles_from_manifest() {
-    let example = crate::reference_pack_test_support::faberlang_home()
+    let example = radix::paths::faberlang_home()
         .expect("faberlang container root")
         .join("examples/reader-locale/th-TH");
 
@@ -10924,7 +10924,7 @@ fn go_compile_concurrent_calls_do_not_exchange_modules() {
 // ---------------------------------------------------------------------------
 
 fn sibling_faber_web_lib() -> PathBuf {
-    crate::reference_pack_test_support::faberlang_home()
+    radix::paths::faberlang_home()
         .expect("faberlang container root")
         .join("faber-web")
 }
