@@ -211,7 +211,10 @@ fn census_schema_and_columna_are_declaration_keywords() {
         assert_eq!(spec.token_kind, Some(identity.clone()));
         assert_eq!(spec.category, KeywordCategory::Declaration);
         assert_eq!(keyword_token_kind(spelling), Some(identity.clone()));
-        assert!(identity.is_keyword(), "{spelling} identity must report is_keyword");
+        assert!(
+            identity.is_keyword(),
+            "{spelling} identity must report is_keyword"
+        );
     }
 
     let schema = lookup_keyword_spec("schema").expect("schema spec");

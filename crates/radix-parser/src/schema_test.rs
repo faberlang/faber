@@ -178,13 +178,13 @@ fn duplicate_visible_names_parse_without_error() {
     // names (DUP-RESOLVED) are semantic rejections (S2-U2); the parser surface
     // accepts them so the semantic layer raises the pinned issue. This test
     // locks the surface boundary: both shapes parse cleanly.
-    parse_ok(
+    let _ = parse_ok(
         "schema Duplicata {
             columna numerus id
             columna numerus id
         }",
     );
-    parse_ok(
+    let _ = parse_ok(
         "schema Collidens {
             columna numerus id
             columna textus nomen : plenum
@@ -213,8 +213,14 @@ fn rejects_inheritance_syntax_on_schema() {
     // `schema_inheritance` issue identity, both in the header and in the body.
     assert_parse_error_issue("schema S sub T { }", "schema_inheritance");
     assert_parse_error_issue("schema S implet T { }", "schema_inheritance");
-    assert_parse_error_issue("schema S { columna numerus id sub T }", "schema_inheritance");
-    assert_parse_error_issue("schema S { columna numerus id implet T }", "schema_inheritance");
+    assert_parse_error_issue(
+        "schema S { columna numerus id sub T }",
+        "schema_inheritance",
+    );
+    assert_parse_error_issue(
+        "schema S { columna numerus id implet T }",
+        "schema_inheritance",
+    );
 }
 
 #[test]
@@ -311,7 +317,8 @@ fn comment_before_schema_close_is_claimed() {
 
 #[test]
 fn comment_between_columns_is_claimed_as_column_trivia() {
-    let source = "schema S {\n  columna numerus id\n  # between\n  columna textus nomen : plenum\n}\n";
+    let source =
+        "schema S {\n  columna numerus id\n  # between\n  columna textus nomen : plenum\n}\n";
     let result = parse_program(source);
     assert!(result.success(), "{:?}", result.errors);
 

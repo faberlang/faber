@@ -7,9 +7,7 @@
 //! so the token→spelling migration cannot silently break slot recognition.
 
 use super::{ParseOptions, Parser};
-use radix_lexer::{
-    lex, lex_with_locale_pack, KeywordPack, LexResult, TokenKind,
-};
+use radix_lexer::{lex, lex_with_locale_pack, KeywordPack, LexResult, TokenKind};
 
 /// Minimal reader pack: localizes `iuncta` to `本地` and `tacebit` to `await`
 /// as tokenless keywords (no token emission), with no Latin fallback declared.

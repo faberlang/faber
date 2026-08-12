@@ -952,8 +952,7 @@ impl Parser {
 
         // Grammar-level rejection: `sub`/`implet` inheritance syntax on a
         // schema is not a header surface (schemas have no inheritance).
-        if self.check_keyword_ident(TokenKind::Sub) || self.check_keyword_ident(TokenKind::Implet)
-        {
+        if self.check_keyword_ident(TokenKind::Sub) || self.check_keyword_ident(TokenKind::Implet) {
             return Err(ParseError::structured(
                 ParseErrorKind::InvalidDeclaration,
                 self.current_span(),

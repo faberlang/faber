@@ -267,7 +267,14 @@ fn nullability_relaxation_is_compatible() {
         name: interner.intern("PersonaO"),
         columns: vec![
             col(&mut interner, "id", "id", numerus, true, 0),
-            col(&mut interner, "email", "electronica", email_optional, false, 1),
+            col(
+                &mut interner,
+                "email",
+                "electronica",
+                email_optional,
+                false,
+                1,
+            ),
         ],
     };
 
@@ -289,7 +296,14 @@ fn nullability_tightening_is_rejected_with_column_identity() {
         name: interner.intern("PersonaI"),
         columns: vec![
             col(&mut interner, "id", "id", numerus, true, 0),
-            col(&mut interner, "email", "electronica", email_optional, false, 1),
+            col(
+                &mut interner,
+                "email",
+                "electronica",
+                email_optional,
+                false,
+                1,
+            ),
         ],
     };
     let o = SchemaDef {
@@ -360,10 +374,7 @@ fn partiality_invariant_schema_carries_exactly_its_declared_columns() {
     assert_eq!(schema_column_count(&o), 2);
 
     // The legal `I \ O` set: `activa` is the source-only predicate column.
-    assert_eq!(
-        extra_input_columns(&o, &i),
-        vec![interner.intern("activa")]
-    );
+    assert_eq!(extra_input_columns(&o, &i), vec![interner.intern("activa")]);
 
     // Extra columns stay invisible and harmless: the subset proof passes and
     // names only the declared columns.

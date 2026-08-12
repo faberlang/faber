@@ -106,9 +106,7 @@ pub fn schema_subset(
 ) -> Result<(), SchemaSubsetFailure> {
     for o_col in &o.columns {
         let Some(i_col) = i.columns.iter().find(|c| c.name == o_col.name) else {
-            return Err(SchemaSubsetFailure::MissingFromInput {
-                column: o_col.name,
-            });
+            return Err(SchemaSubsetFailure::MissingFromInput { column: o_col.name });
         };
         schema_column_compatible(types, i_col, o_col)?;
     }
