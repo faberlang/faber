@@ -10976,6 +10976,177 @@ rustc = ""
     fs::write(app.join("src/main.fab"), entry_body).expect("entry");
 }
 
+/// Like `write_web_consumer_app` but locks the `tela` provider (web-mig U2):
+/// the `WebController` annotation contract and the DOM `Scope` genus come
+/// from `tela:web` / `tela:dom` instead of `web:web` / `web:dom`.
+fn write_tela_consumer_app(app: &Path, lib: &Path, entry_body: &str) {
+    fs::create_dir_all(app.join("src")).expect("app src");
+    let interface_root = lib.join("src");
+    fs::write(
+        app.join("faber.toml"),
+        r#"[package]
+name = "g10-tela-app"
+version = "0.1.0"
+
+[paths]
+entry = "main.fab"
+
+[reader]
+locale = "la"
+
+[build]
+target = "ts"
+kind = "bin"
+
+[product]
+kind = "browser-app"
+emit = "typescript"
+
+[dependencies]
+tela = "0.1.0"
+"#,
+    )
+    .expect("app manifest");
+    fs::write(
+        app.join("faber.lock"),
+        format!(
+            r#"
+[[package]]
+name = "tela"
+version = "0.1.0"
+source = "path"
+package_root = "{package_root}"
+kind = "lib"
+target_language = "ts"
+target_triple = "browser"
+target_manifest = ""
+interface_root = "{interface_root}"
+artifact = ""
+crate = "tela"
+rustc = ""
+"#,
+            package_root = lib.display(),
+            interface_root = interface_root.display(),
+        ),
+    )
+    .expect("lock");
+    fs::write(app.join("src/main.fab"), entry_body).expect("entry");
+}
+
+/// Write a minimal `tela` provider package (web-mig U2 fixture): the
+/// `WebController` annotation contract (`tela:web`) and the DOM `Scope`
+/// genus (`tela:dom`) with a TS binding shim for the dom stem. Consumer
+/// fixtures lock this package as `tela`, so the origin verification runs
+/// against the tela provider identity without pulling the full tela source
+/// tree into the test build (the full tree's library TS emit is out of
+/// scope for U2 — see the U2 closeout residual).
+fn write_synthetic_tela_lib(lib: &Path) {
+    fs::create_dir_all(lib.join("src")).expect("lib src");
+    fs::create_dir_all(lib.join("bindings")).expect("lib bindings");
+    fs::create_dir_all(lib.join("runtime")).expect("lib runtime");
+    fs::write(
+        lib.join("faber.toml"),
+        r#"[package]
+name = "tela"
+version = "0.1.0"
+
+[library]
+provider = "tela"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["ts"]
+
+[target.ts]
+bindings = "bindings/ts.toml"
+
+[reader]
+locale = "la"
+"#,
+    )
+    .expect("tela manifest");
+    fs::write(
+        lib.join("src/web.fab"),
+        r#"# tela:web fixture — the WebController annotation contract (la surface,
+# mirroring faber-web/src/web.fab's shape for the tela provider).
+
+@ annotatio
+genus WebController {
+    textus selector
+}
+"#,
+    )
+    .expect("web.fab");
+    fs::write(
+        lib.join("src/dom.fab"),
+        r#"# tela:dom fixture — the DOM Scope genus (la surface, mirroring
+# faber-web/src/dom.fab's shape for the tela provider).
+
+genus Scope {
+    textus selector = ""
+}
+
+genus Element {
+    textus selector = ""
+}
+
+functio require(Scope scope, textus selector) → Element
+"#,
+    )
+    .expect("dom.fab");
+    fs::write(
+        lib.join("bindings/ts.toml"),
+        r#"[shim]
+path = "runtime/dom.ts"
+
+[functions."tela:dom.scope"]
+symbol = "webDomScope"
+
+[functions."tela:dom.require"]
+symbol = "webDomRequire"
+"#,
+    )
+    .expect("ts.toml");
+    fs::write(
+        lib.join("runtime/dom.ts"),
+        r#"export type WebDomScope = { readonly root: ParentNode; readonly selector: string };
+export type WebDomElement = { readonly selector: string };
+export type WebDomEvent = { readonly kind: string };
+export type WebDomFrameState = { readonly frame: number };
+export type WebDomResizeState = { readonly width: number };
+export type WebDomKeyboardState = { readonly key: string };
+export type WebDomPointerState = { readonly x: number };
+export type WebDomFocusState = { readonly focused: boolean };
+export type WebDomPointerLockState = { readonly locked: boolean };
+export type WebDomSubscription = { unsubscribe(): void };
+export type WebDomSubmitOptions = { readonly disabled: boolean };
+export type WebDomFetchRequest = { readonly url: string };
+export type WebDomFetchResponse = { readonly status: number };
+export type WebDomEventHandler = (event: WebDomEvent) => void;
+export type WebDomInputHandler = (element: WebDomElement, value: string) => void;
+export type WebDomSubmitHandler = (form: WebDomElement) => void;
+export type WebDomFrameHandler = (state: WebDomFrameState) => void;
+export type WebDomResizeHandler = (state: WebDomResizeState) => void;
+export type WebDomKeyboardHandler = (state: WebDomKeyboardState) => void;
+export type WebDomPointerHandler = (state: WebDomPointerState) => void;
+export type WebDomFocusHandler = (state: WebDomFocusState) => void;
+export type WebDomPointerLockHandler = (state: WebDomPointerLockState) => void;
+
+export function webDomScope(selector: string): WebDomScope {
+    return { root: globalThis.document, selector };
+}
+
+export function webDomRequire(scope: WebDomScope, selector: string): WebDomElement {
+    return { selector };
+}
+"#,
+    )
+    .expect("dom shim");
+}
+
 /// Like `write_web_consumer_app` but imports only web:web (not web:dom) and
 /// defines a local Scope genus for shadowing tests.
 fn write_web_consumer_app_with_only_web_import(app: &Path, lib: &Path) {
@@ -11621,6 +11792,125 @@ fn g10_web3_rejects_missing_controllers() {
         r#"
 importa ex "web:web" privata web
 importa ex "web:dom" privata dom
+
+functio helper(dom.Scope scope) → vacuum {
+  nota dom.require(scope, "button")
+}
+"#,
+    );
+    write_static_asset_roots(&app);
+    let manifest = read_manifest(&app.join("faber.toml")).expect("manifest");
+    let err = build_browser_product(
+        &Config::default().with_target(Target::HirTypeScript),
+        &app,
+        manifest.product.as_ref().unwrap(),
+    )
+    .expect_err("browser product without WebController functions must fail closed");
+    assert!(diagnostic_has_issue(&err, "product_controller_missing"));
+}
+
+#[test]
+fn g10_web3_builds_tela_origin_controllers_json_and_browser_esm() {
+    // web-mig U2: a consumer that imports `tela:web` / `tela:dom` (instead of
+    // `web:web` / `web:dom`) must be accepted as a controller origin and
+    // build a browser product that produces `controllers.json`.
+    if Command::new("tsc").arg("--version").output().is_err() {
+        eprintln!("tsc not found on PATH; skipping tela-origin browser ESM test");
+        return;
+    }
+    let root = test_temp_dir("g10-web3-tela-origin-esm");
+    let lib = root.join("tela-lib");
+    write_synthetic_tela_lib(&lib);
+    let app = root.join("app");
+    write_tela_consumer_app(
+        &app,
+        &lib,
+        r#"
+importa ex "tela:web" privata web
+importa ex "tela:dom" privata dom
+
+@ WebController { selector = "[data-faber=shell]" }
+functio shell(dom.Scope scope) → vacuum {
+  nota dom.require(scope, "button")
+}
+"#,
+    );
+    write_static_asset_roots(&app);
+    fs::write(
+        app.join("pages/index.html"),
+        "<main data-faber=shell></main>\n",
+    )
+    .expect("page");
+
+    let manifest = read_manifest(&app.join("faber.toml")).expect("manifest");
+    let build = build_browser_product(
+        &Config::default().with_target(Target::HirTypeScript),
+        &app,
+        manifest.product.as_ref().unwrap(),
+    )
+    .expect("tela-origin browser product build");
+
+    let controllers = fs::read_to_string(&build.controllers_json).expect("controllers.json");
+    assert!(controllers.contains("\"selector\": \"[data-faber=shell]\""));
+    assert!(controllers.contains("\"module\": \"./main.js\""));
+    assert!(build.esm_entry.is_file());
+    assert_eq!(build.controllers.len(), 1);
+}
+
+#[test]
+fn g10_web3_rejects_local_web_controller_shadowing_with_tela_import() {
+    // web-mig U2: a tela-importing package that defines its own local
+    // `@ annotatio WebController` (instead of importing the `tela:web`
+    // contract) must still fail closed — the tela-origin acceptance must not
+    // weaken the no-local-shadowing rejection.
+    let root = test_temp_dir("g10-web3-tela-local-controller");
+    let lib = root.join("tela-lib");
+    write_synthetic_tela_lib(&lib);
+    let app = root.join("app");
+    write_tela_consumer_app(
+        &app,
+        &lib,
+        r##"
+importa ex "tela:dom" privata dom
+
+@ annotatio
+genus WebController {
+    textus selector
+}
+
+@ WebController { selector = "#shell" }
+functio shell(dom.Scope scope) → vacuum {}
+"##,
+    );
+    write_static_asset_roots(&app);
+    let manifest = read_manifest(&app.join("faber.toml")).expect("manifest");
+    let err = build_browser_product(
+        &Config::default().with_target(Target::HirTypeScript),
+        &app,
+        manifest.product.as_ref().unwrap(),
+    )
+    .expect_err("local WebController must fail closed in a tela-importing package");
+    assert!(diagnostic_has_issue(
+        &err,
+        "product_controller_unqualified_origin"
+    ));
+}
+
+#[test]
+fn g10_web3_rejects_missing_controllers_with_tela_import() {
+    // web-mig U2: a package imports tela:web + tela:dom legitimately but
+    // declares no `@ WebController` function at all — controller discovery
+    // must still fail closed with `product_controller_missing`.
+    let root = test_temp_dir("g10-web3-tela-missing-controllers");
+    let lib = root.join("tela-lib");
+    write_synthetic_tela_lib(&lib);
+    let app = root.join("app");
+    write_tela_consumer_app(
+        &app,
+        &lib,
+        r#"
+importa ex "tela:web" privata web
+importa ex "tela:dom" privata dom
 
 functio helper(dom.Scope scope) → vacuum {
   nota dom.require(scope, "button")

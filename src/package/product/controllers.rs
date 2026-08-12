@@ -79,7 +79,8 @@ fn web_controller_selector(
 }
 
 /// Verify the WebController annotation contract originates from the `web`
-/// package's `web` module — not a local shadowing definition.
+/// package's `web` module or the `tela` package's `web` module — not a local
+/// shadowing definition.
 fn validate_controller_origin(
     unit: &super::super::AnalyzedPackageUnit,
     function: &radix::hir::HirFunction,
@@ -97,7 +98,10 @@ fn validate_controller_origin(
         let controller_name = unit.analysis.interner.resolve(function.name);
         match unit.analysis.libraries.items.get(&contract.def_id) {
             Some(item)
-                if matches!(&item.identity.provider, radix::hir::LibraryProvider::Package(name) if name == "web")
+                if matches!(
+                    &item.identity.provider,
+                    radix::hir::LibraryProvider::Package(name) if name == "web" || name == "tela"
+                )
                     && item.identity.module_path == ["web".to_owned()]
                     && item.exported_name == "WebController" =>
             {
@@ -106,7 +110,7 @@ fn validate_controller_origin(
             Some(item) => {
                 return Err(Box::new(
                     product_diag(format!(
-                        "browser controller `{controller_name}` annotation `WebController` must originate from web:web; found `{}`",
+                        "browser controller `{controller_name}` annotation `WebController` must originate from `web:web` or `tela:web`; found `{}`",
                         library_item_display_key(item)
                     ))
                     .with_file(unit.path.display().to_string())
@@ -117,7 +121,7 @@ fn validate_controller_origin(
             None => {
                 return Err(Box::new(
                     product_diag(format!(
-                        "browser controller `{controller_name}` annotation `WebController` must be imported from web:web; local definitions are rejected"
+                        "browser controller `{controller_name}` annotation `WebController` must be imported from `web:web` or `tela:web`; local definitions are rejected"
                     ))
                     .with_file(unit.path.display().to_string())
                     .with_arg("issue", "product_controller_unqualified_origin")
@@ -166,7 +170,7 @@ fn validate_controller_signature(
     if !param_is_dom_scope(unit, &function.params[0]) {
         return Err(Box::new(
             product_diag(format!(
-                "browser controller `{name}` first parameter must be web:dom Scope"
+                "browser controller `{name}` first parameter must be `web:dom` or `tela:dom` Scope"
             ))
             .with_file(unit.path.display().to_string())
             .with_arg("issue", "product_invalid_controller_signature")
@@ -190,11 +194,14 @@ fn param_is_dom_scope(
     if unit.analysis.interner.resolve(symbol.name) != "Scope" {
         return false;
     }
-    // Provenance must originate from web:dom — reject local shadowing.
+    // Provenance must originate from `web:dom` or `tela:dom` — reject local shadowing.
     matches!(
         unit.analysis.libraries.items.get(def_id),
         Some(item)
-            if matches!(&item.identity.provider, radix::hir::LibraryProvider::Package(name) if name == "web")
+            if matches!(
+                &item.identity.provider,
+                radix::hir::LibraryProvider::Package(name) if name == "web" || name == "tela"
+            )
                 && item.identity.module_path == ["dom".to_owned()]
                 && item.exported_name == "Scope"
     )
