@@ -311,8 +311,33 @@ fn resolve_library_interface_locale_pack(
     match file_locale {
         Some(locale) => super::load_locale_pack_for_input(&module.interface_path, Some(locale))
             .map_err(|err| *err),
-        None => super::load_locale_pack_for_input(&module.interface_path, None).map_err(|err| *err),
+        None => match library_declared_reader_locale(&module.interface_path) {
+            Some(locale) => {
+                super::load_locale_pack_for_input(&module.interface_path, Some(&locale))
+                    .map_err(|err| *err)
+            }
+            // The library declares no locale: read the interface under the
+            // Latin identity surface (canonical spellings accepted). The faber
+            // product default (`DEFAULT_CODE_LOCALE = "en"`) applies to
+            // consumer files, never to a library module's own source.
+            None => Ok(None),
+        },
     }
+}
+
+/// The `[reader] locale` the module's own package manifest declares, when any.
+///
+/// Unlike [`super::load_locale_pack_for_input`], this never falls back to the
+/// product default: `None` means the library package declares no locale, so the
+/// interface seam can keep its Latin identity fallback instead of silently
+/// reading the library under the consumer's default locale.
+fn library_declared_reader_locale(interface_path: &Path) -> Option<String> {
+    let spec = super::discovery::discover_package(interface_path).ok()?;
+    let manifest = super::manifest::manifest_for_spec(&spec).ok()?;
+    manifest
+        .and_then(|manifest| manifest.locale.locale)
+        .map(|locale| locale.trim().to_owned())
+        .filter(|locale| !locale.is_empty())
 }
 
 fn read_and_parse_library_interface(

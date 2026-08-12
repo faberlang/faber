@@ -6938,6 +6938,130 @@ fn installed_reader_locale_reference_examples_compile_from_installed_packs() {
 }
 
 #[test]
+fn package_check_reads_la_library_under_its_own_locale() {
+    // SEM004 library-locale propagation (web-mig U4/U5 unblocker): a library
+    // module resolved through a consumer's lock must be checked under the
+    // LIBRARY's own locale — canonical spellings accepted — never the
+    // consumer's `[reader] locale` and never the faber product default
+    // (`DEFAULT_CODE_LOCALE = "en"`). A Latin-surface library with no declared
+    // locale is read under the Latin identity surface, so its canonical-Latin
+    // intrinsic call (`longitudo`) typechecks even when an en consumer
+    // imports it.
+    let dir = test_temp_dir("la-library-en-consumer");
+    let lib_root = dir.join("lib");
+    fs::create_dir_all(lib_root.join("lalib/src")).expect("create library src");
+    fs::write(
+        lib_root.join("lalib/faber.toml"),
+        r#"[package]
+name = "lalib"
+version = "0.1.0"
+edition = "2026"
+
+[library]
+provider = "lalib"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+target = "ts"
+targets = ["ts"]
+"#,
+    )
+    .expect("write library manifest");
+    fs::write(
+        lib_root.join("lalib/src/math.fab"),
+        r#"# Public import: importa ex "lalib:math" privata math
+
+genus Vector3 {
+    lista<numerus> elementa
+
+    functio validum() → bivalens {
+        redde ego.elementa.longitudo() ≡ 3
+    }
+}
+
+functio make_vector() → Vector3 {
+    redde Vector3 { elementa = [1, 2, 3] }
+}
+"#,
+    )
+    .expect("write library module");
+
+    let consumer = dir.join("consumer");
+    fs::create_dir_all(consumer.join("src")).expect("create consumer src");
+    fs::write(
+        consumer.join("faber.toml"),
+        r#"[package]
+name = "la-library-en-consumer"
+version = "0.1.0"
+edition = "2026"
+
+[paths]
+entry = "src/main.fab"
+
+[build]
+target = "ts"
+kind = "bin"
+
+[dependencies]
+lalib = "0.1.0"
+
+[reader]
+locale = "en"
+"#,
+    )
+    .expect("write consumer manifest");
+    fs::write(
+        consumer.join("faber.lock"),
+        format!(
+            r#"
+[[package]]
+name = "lalib"
+version = "0.1.0"
+source = "path"
+package_root = "{}"
+kind = "lib"
+target_language = "ts"
+target_triple = "browser"
+target_manifest = ""
+interface_root = "{}"
+artifact = ""
+crate = "lalib"
+rustc = ""
+"#,
+            lib_root.join("lalib").display(),
+            lib_root.join("lalib/src").display(),
+        ),
+    )
+    .expect("write lock");
+    fs::write(
+        consumer.join("src/main.fab"),
+        r#"import from "lalib:math" private math
+
+fn probe() → bool {
+    return math.make_vector().validum()
+}
+"#,
+    )
+    .expect("write consumer entry");
+
+    let config = Config::default().with_stdlib(lib_root);
+    let diagnostics = check_package(&config, &consumer.join("src/main.fab"));
+
+    assert!(
+        !diagnostics.iter().any(Diagnostic::is_error),
+        "expected the la library to typecheck under its own locale, got {:?}",
+        diagnostics
+            .iter()
+            .filter(|diag| diag.is_error())
+            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn compile_package_uses_manifest_locale_pack_path() {
     let dir = test_temp_dir("manifest-reader-pack");
     let src = dir.join("src");

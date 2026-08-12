@@ -40,7 +40,8 @@ const CONST_MEMBER_MAIN: &str = "importa ex \"./util\" privata * ut utilModule\n
 const CONST_MEMBER_UTIL: &str = "const textus VALUE ← \"salve\"\n";
 
 const LIBRARY_CONST_MAIN: &str = "importa ex \"constlib:vals\" privata vals\n\nfunctio run() → textus {\n    redde vals.LIBRARY_VALUE\n}\n\nincipit {\n    nota vals.LIBRARY_VALUE\n}\n";
-const LIBRARY_CONST_VALS: &str = "const textus LIBRARY_VALUE ← \"salve\"\n";
+const LIBRARY_CONST_VALS: &str =
+    "+++\nlocale = \"en\"\n+++\nconst textus LIBRARY_VALUE ← \"salve\"\n";
 
 /// Entry that CALLS a const data member — an unsupported shape that must
 /// keep the non-function fail-closed diagnostic (U1 done_when 4).
