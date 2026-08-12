@@ -1010,8 +1010,7 @@ impl Parser {
             // the raw position through any trailing `#` comment to the next
             // word, so a comment ending the column's row cannot masquerade as
             // a same-line `columna`.
-            if self.check_keyword_ident(TokenKind::Columna)
-                && !self.raw_newline_before_next_word()
+            if self.check_keyword_ident(TokenKind::Columna) && !self.raw_newline_before_next_word()
             {
                 return Err(ParseError::structured(
                     ParseErrorKind::InvalidDeclaration,

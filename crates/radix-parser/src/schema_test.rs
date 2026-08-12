@@ -352,9 +352,9 @@ fn trailing_comment_after_column_is_not_a_nested_column() {
     let ident_idx = lexed
         .tokens
         .iter()
-        .position(|tok| {
-            matches!(tok.kind, TokenKind::Ident(sym) if lexed.interner.resolve(sym) == "id")
-        })
+        .position(
+            |tok| matches!(tok.kind, TokenKind::Ident(sym) if lexed.interner.resolve(sym) == "id"),
+        )
         .expect("column-name ident in fixture");
     let comment_sym = lexed.interner.intern_raw(" primary key");
     let comment_span = Span::new(
