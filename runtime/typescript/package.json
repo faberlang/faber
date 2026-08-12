@@ -1,0 +1,21 @@
+{
+  "name": "@faber/runtime",
+  "version": "0.1.0",
+  "description": "Faber language runtime package for generated TypeScript: display helpers, FaberDisplayHint value types, and collection formatting.",
+  "license": "MIT",
+  "type": "module",
+  "main": "index.ts",
+  "types": "index.ts",
+  "exports": {
+    ".": {
+      "types": "./index.ts",
+      "default": "./index.ts"
+    }
+  },
+  "files": [
+    "index.ts",
+    "tsconfig.json",
+    "package.json"
+  ],
+  "private": true
+}
