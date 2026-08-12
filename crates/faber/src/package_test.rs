@@ -7127,7 +7127,7 @@ locale = "th-TH"
 }
 
 #[test]
-fn compile_package_accepts_inert_latin_fallback_without_notice() {
+fn compile_package_rejects_undeclared_latin_keyword_in_grammar_position() {
     let dir = test_temp_dir("manifest-reader-fallback");
     let src = dir.join("src");
     fs::create_dir_all(&src).expect("create src");
@@ -7151,13 +7151,29 @@ locale = "zh-Hans"
 
     let result = compile_package(&Config::default(), &dir);
 
-    // The fallback bridge is inert-but-present (S0-U5): the source compiles and
-    // no retired fallback notice is emitted.
-    assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|diagnostic| !diagnostic.code.is_some_and(|code| code.starts_with("LOCALE"))));
+    // S2-U2 pack-authoritative gate: the zh-Hans pack does not declare the
+    // Latin spellings `incipit`/`nota` as claimable surface spellings, so
+    // under the pack they stay ordinary identifiers and a grammar-position
+    // use fails as SEM001 unknown_identifier — no fallback event, no LOCALE
+    // diagnostic. The declared surface (入口/输出) still compiles; see
+    // compile_package_uses_manifest_reader_locale_default_pack.
+    assert!(!result.success(), "diagnostics: {:?}", result.diagnostics);
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.is_error() && diagnostic.code == Some("SEM001")),
+        "expected SEM001 ordinary-identifier failure, got {:?}",
+        result.diagnostics
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|diagnostic| !diagnostic.code.is_some_and(|code| code.starts_with("LOCALE"))),
+        "no LOCALE diagnostic expected, got {:?}",
+        result.diagnostics
+    );
 }
 
 #[test]
