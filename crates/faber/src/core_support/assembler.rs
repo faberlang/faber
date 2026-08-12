@@ -7,7 +7,7 @@ use std::path::{Component, Path, PathBuf};
 use super::path_deps::{extract_path_deps, is_within_roots, resolve_against};
 
 pub const EXPECTED_ROOTS: &[&str] = &[
-    "faber-runtime",
+    "faber/runtime/rust",
     "radix/crates/radix-runtime-contract",
     "hosts/crates/host-kernel",
     "hosts/crates/host-native",

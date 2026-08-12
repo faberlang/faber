@@ -29,13 +29,14 @@ impl MaterializedCoreSupport {
         &self.root
     }
 
-    /// Verified source root for the core runtime crate.
+    /// Verified source root for the generated-Rust support crate
+    /// (`faber/runtime/rust/`, faber-target-runtime inventory §7.1).
     ///
     /// # Errors
-    /// Returns [`MaterializeError`] when the core runtime directory is missing
-    /// or is a symlink.
+    /// Returns [`MaterializeError`] when the support crate directory is
+    /// missing or is a symlink.
     pub fn faber_runtime(&self) -> Result<PathBuf, MaterializeError> {
-        self.required_directory("faber-runtime")
+        self.required_directory("faber/runtime/rust")
     }
 
     /// Verified source root for the native kernel crate.
