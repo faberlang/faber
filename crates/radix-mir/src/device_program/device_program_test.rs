@@ -2421,7 +2421,10 @@ fn branched_program_with_disconnecting_middle_observation() -> (DeviceProgram, D
             resources: vec![DeviceResource {
                 buffer: b0.clone(),
                 version: version(1, element_ty, 4),
-                binding: Binding { group: 0, binding: 0 },
+                binding: Binding {
+                    group: 0,
+                    binding: 0,
+                },
                 access: MirKernelResourceAccess::Write,
             }],
             launch: launch_plan(4),
@@ -2435,13 +2438,19 @@ fn branched_program_with_disconnecting_middle_observation() -> (DeviceProgram, D
                 DeviceResource {
                     buffer: b0.clone(),
                     version: version(1, element_ty, 4),
-                    binding: Binding { group: 0, binding: 0 },
+                    binding: Binding {
+                        group: 0,
+                        binding: 0,
+                    },
                     access: MirKernelResourceAccess::Read,
                 },
                 DeviceResource {
                     buffer: b1.clone(),
                     version: version(1, element_ty, 4),
-                    binding: Binding { group: 0, binding: 1 },
+                    binding: Binding {
+                        group: 0,
+                        binding: 1,
+                    },
                     access: MirKernelResourceAccess::Write,
                 },
             ],
@@ -2456,13 +2465,19 @@ fn branched_program_with_disconnecting_middle_observation() -> (DeviceProgram, D
                 DeviceResource {
                     buffer: b0.clone(),
                     version: version(1, element_ty, 4),
-                    binding: Binding { group: 0, binding: 0 },
+                    binding: Binding {
+                        group: 0,
+                        binding: 0,
+                    },
                     access: MirKernelResourceAccess::Read,
                 },
                 DeviceResource {
                     buffer: b2.clone(),
                     version: version(1, element_ty, 4),
-                    binding: Binding { group: 0, binding: 1 },
+                    binding: Binding {
+                        group: 0,
+                        binding: 1,
+                    },
                     access: MirKernelResourceAccess::Write,
                 },
             ],
@@ -2477,13 +2492,19 @@ fn branched_program_with_disconnecting_middle_observation() -> (DeviceProgram, D
                 DeviceResource {
                     buffer: b2.clone(),
                     version: version(1, element_ty, 4),
-                    binding: Binding { group: 0, binding: 0 },
+                    binding: Binding {
+                        group: 0,
+                        binding: 0,
+                    },
                     access: MirKernelResourceAccess::Read,
                 },
                 DeviceResource {
                     buffer: b3.clone(),
                     version: version(1, element_ty, 4),
-                    binding: Binding { group: 0, binding: 1 },
+                    binding: Binding {
+                        group: 0,
+                        binding: 1,
+                    },
                     access: MirKernelResourceAccess::Write,
                 },
             ],
@@ -2498,13 +2519,19 @@ fn branched_program_with_disconnecting_middle_observation() -> (DeviceProgram, D
                 DeviceResource {
                     buffer: b0.clone(),
                     version: version(1, element_ty, 4),
-                    binding: Binding { group: 0, binding: 0 },
+                    binding: Binding {
+                        group: 0,
+                        binding: 0,
+                    },
                     access: MirKernelResourceAccess::Read,
                 },
                 DeviceResource {
                     buffer: b4.clone(),
                     version: version(1, element_ty, 4),
-                    binding: Binding { group: 0, binding: 1 },
+                    binding: Binding {
+                        group: 0,
+                        binding: 1,
+                    },
                     access: MirKernelResourceAccess::Write,
                 },
             ],
@@ -2519,13 +2546,19 @@ fn branched_program_with_disconnecting_middle_observation() -> (DeviceProgram, D
                 DeviceResource {
                     buffer: b4.clone(),
                     version: version(1, element_ty, 4),
-                    binding: Binding { group: 0, binding: 0 },
+                    binding: Binding {
+                        group: 0,
+                        binding: 0,
+                    },
                     access: MirKernelResourceAccess::Read,
                 },
                 DeviceResource {
                     buffer: b5.clone(),
                     version: version(1, element_ty, 4),
-                    binding: Binding { group: 0, binding: 1 },
+                    binding: Binding {
+                        group: 0,
+                        binding: 1,
+                    },
                     access: MirKernelResourceAccess::Write,
                 },
             ],
