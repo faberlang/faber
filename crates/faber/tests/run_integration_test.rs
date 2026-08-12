@@ -1337,7 +1337,7 @@ fn script_cli_root_rest_text_operand_executes_without_cargo_or_rust_emit() {
 incipit argumenta args {
   nota args.input
   fixum lista<textus> files ← args.files
-  nota files.longitudo()
+  nota files.length()
 }
 "#,
     )
