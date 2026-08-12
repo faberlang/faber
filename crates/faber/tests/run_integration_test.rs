@@ -26,10 +26,19 @@ fn write_plain_file(label: &str, contents: &str) -> TempPath {
     TempPath::new(dir, path)
 }
 
+/// Container `examples/` root: `FABER_EXAMPLES_HOME` override, then the
+/// faberlang container root via `radix::paths::faberlang_home()`.
+fn examples_home() -> PathBuf {
+    if let Ok(home) = std::env::var("FABER_EXAMPLES_HOME") {
+        return PathBuf::from(home);
+    }
+    radix::paths::faberlang_home()
+        .expect("faberlang container root")
+        .join("examples")
+}
+
 fn reader_locale_example_root(locale: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../examples/reader-locale")
-        .join(locale)
+    examples_home().join("reader-locale").join(locale)
 }
 
 fn workspace_root() -> PathBuf {

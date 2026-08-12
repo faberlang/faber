@@ -5,6 +5,13 @@
 //! before the product static-asset hook ran, so the user-facing build never
 //! created dist assets. This test exercises the actual binary to prove the
 //! product-build path is reached.
+//!
+//! The faber-web content root resolves via `FABER_WEB_HOME` (env override),
+//! then the faberlang container root discovered by
+//! `radix::paths::faberlang_home()` (`faber-web` under it). When the content
+//! root is absent the test skips with a recorded message, exactly as it
+//! already does when `tsc` is missing from PATH (both preconditions recorded,
+//! never claimed as coverage).
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -14,8 +21,15 @@ use std::process::{Command, Stdio};
 mod temp;
 use temp::TempDir;
 
+/// faber-web content root: `FABER_WEB_HOME` override, then the faberlang
+/// container root via `radix::paths::faberlang_home()`.
 fn faber_web_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../faber-web")
+    if let Ok(home) = std::env::var("FABER_WEB_HOME") {
+        return PathBuf::from(home);
+    }
+    radix::paths::faberlang_home()
+        .expect("faberlang container root")
+        .join("faber-web")
 }
 
 fn temp_dir(label: &str) -> TempDir {
@@ -111,6 +125,14 @@ functio shell(dom.Scope scope) → vacuum {
 fn faber_build_writes_static_assets_and_manifest_for_browser_product() {
     if Command::new("tsc").arg("--version").output().is_err() {
         eprintln!("tsc not found on PATH; skipping WEB2 CLI regression");
+        return;
+    }
+    let lib = faber_web_root();
+    if !lib.is_dir() {
+        eprintln!(
+            "faber-web content root absent at {}; set FABER_WEB_HOME; skipping WEB2 CLI regression",
+            lib.display()
+        );
         return;
     }
 

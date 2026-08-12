@@ -33,7 +33,7 @@ fn installed_faber(root: &Path) -> PathBuf {
     let executable = bin.join("faber");
     fs::copy(env!("CARGO_BIN_EXE_faber"), &executable).expect("copy installed Faber executable");
 
-    let locale_source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../radix/stdlib/locale");
+    let locale_source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale");
     for locale in ["en", "la"] {
         let destination = prefix.join("share/faber/locale").join(locale);
         copy_tree(&locale_source.join(locale), &destination);

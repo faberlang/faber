@@ -43,13 +43,22 @@ fn run_faber_emit_faber_stdin(source: &str) -> String {
 }
 
 fn corpus_root() -> std::path::PathBuf {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../radix/corpus")
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus")
+}
+
+/// Container `examples/` root: `FABER_EXAMPLES_HOME` override, then the
+/// faberlang container root via `radix::paths::faberlang_home()`.
+fn examples_home() -> PathBuf {
+    if let Ok(home) = std::env::var("FABER_EXAMPLES_HOME") {
+        return PathBuf::from(home);
+    }
+    radix::paths::faberlang_home()
+        .expect("faberlang container root")
+        .join("examples")
 }
 
 fn reader_locale_example_root(locale: &str) -> PathBuf {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../examples/reader-locale")
-        .join(locale)
+    examples_home().join("reader-locale").join(locale)
 }
 
 fn temp_dir(label: &str) -> TempDir {
