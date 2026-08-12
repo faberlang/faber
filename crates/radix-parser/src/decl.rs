@@ -1643,6 +1643,16 @@ impl Parser {
     }
 
     fn parse_annotation_kind(&mut self) -> Result<AnnotationKind, ParseError> {
+        // Capture the annotation-name spelling as authored: the dispatch below
+        // is surface-gated, so it must see the spelling before
+        // `parse_annotation_name` canonicalizes declared spellings to their
+        // latin key.
+        let raw_annotation_name = match self.peek().kind {
+            TokenKind::Ident(sym) | TokenKind::Underscore(sym) => {
+                Some(self.interner.resolve(sym).to_owned())
+            }
+            _ => None,
+        };
         let name = self.parse_annotation_name()?;
 
         if self.check(&TokenKind::LBrace) {
@@ -1651,10 +1661,16 @@ impl Parser {
 
         // Dispatch on the consumed annotation name's keyword identity (any
         // reader locale), not the current token (which is already past it).
-        let annotation_identity = {
-            let latin = self.identifier_text_or_keyword_latin_key(name.name);
-            lookup_keyword_spec(latin).and_then(|spec| spec.token_kind.clone())
-        };
+        // The claim routes through the pack-authoritative surface gate: a
+        // keyword annotation dispatches only for spellings the active surface
+        // declared (registry-direct surfaces resolve every spelling). Token-
+        // shaped keyword tokens (hand-built streams) are declared by
+        // construction.
+        let annotation_identity = match raw_annotation_name.as_deref() {
+            Some(raw) => self.keyword_claim_key_for_text(raw),
+            None => Some(self.interner.resolve(name.name)),
+        }
+        .and_then(|latin| lookup_keyword_spec(latin).and_then(|spec| spec.token_kind.clone()));
         match annotation_identity {
             Some(TokenKind::Cli) => return self.parse_cli_annotation(),
             Some(TokenKind::Imperium) => return self.parse_imperium_annotation(),
@@ -1908,7 +1924,10 @@ impl Parser {
             TokenKind::Ident(sym) | TokenKind::Underscore(sym) => {
                 // Surface → Latin so braced field keys accept pack spellings
                 // (`short` → `brevis`) while HIR keeps Latin field names.
-                let latin = self.identifier_text_or_keyword_latin_key(sym).to_owned();
+                // Declared rows canonicalize; undeclared spellings (including
+                // Latin under a non-`la` pack) stay as authored.
+                let source = self.interner.resolve(sym);
+                let latin = self.keyword_claim_key(sym).unwrap_or(source).to_owned();
                 Ok(self.keyword_ident(&latin, span))
             }
             TokenKind::Ceteri => Ok(self.keyword_ident("ceteri", span)),
@@ -1926,7 +1945,8 @@ impl Parser {
             TokenKind::Ident(sym) | TokenKind::Underscore(sym) => {
                 // Surface → Latin family identity (`kernel` → `nucleum`). Unknown
                 // / user contract names stay as authored spellings.
-                let latin = self.identifier_text_or_keyword_latin_key(sym).to_owned();
+                let source = self.interner.resolve(sym);
+                let latin = self.keyword_claim_key(sym).unwrap_or(source).to_owned();
                 Ok(self.keyword_ident(&latin, span))
             }
             TokenKind::Publica => Ok(self.keyword_ident("publica", span)),
@@ -1960,12 +1980,15 @@ impl Parser {
 
     /// Check the current word against a literal grammar word (not a registry
     /// keyword), e.g. the `lane` marker in `@ radix lane "…"`. Matches the
-    /// source spelling or its resolved latin key.
+    /// source spelling or its resolved latin key. Unlike a keyword claim, a
+    /// literal marker keeps the raw-source fallback: no pack declares `lane`,
+    /// so gating it would break `@ radix lane "…"` under every non-`la` pack.
     fn next_word_is(&self, text: &str) -> bool {
         let TokenKind::Ident(sym) = self.peek().kind else {
             return false;
         };
-        self.identifier_text_or_keyword_latin_key(sym) == text
+        let source = self.interner.resolve(sym);
+        self.keyword_claim_key(sym).unwrap_or(source) == text
     }
 
     fn expect_annotation_ident(
@@ -2121,10 +2144,11 @@ impl Parser {
     fn is_annotation_type_start(&self) -> bool {
         match self.peek().kind {
             TokenKind::Ident(sym) => {
-                let latin = self.identifier_text_or_keyword_latin_key(sym);
-                match lookup_keyword_spec(latin) {
+                match self.keyword_claim_key(sym).and_then(lookup_keyword_spec) {
                     // A keyword ends the annotation type list unless it is a
-                    // type-position word (`modulus`, `iuncta`).
+                    // type-position word (`modulus`, `iuncta`). A spelling not
+                    // declared in the active surface is an ordinary identifier
+                    // and stays a type start.
                     Some(spec) => matches!(
                         spec.scope,
                         KeywordScope::Contextual(owners)
