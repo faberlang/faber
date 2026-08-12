@@ -11,6 +11,7 @@ mod def_id;
 mod index;
 pub mod instans_precision;
 pub mod numeric_width;
+mod schema;
 mod types;
 
 pub use def_id::DefId;
@@ -40,6 +41,7 @@ pub use numeric_width::{
     vector_sugar_width_marker, NumericWidth, WidthError, TENSOR_ELEMENT_NUMERIC_MSG,
     TENSOR_INDEX_VECTOR_MSG,
 };
+pub use schema::{SchemaColumnDef, SchemaDef};
 pub use types::{
     collection_type_specs, is_atomic_element_type, is_intervallum_bound_type,
     lookup_collection_type_spec, lookup_primitive_type_spec, lookup_tensor_family_type_spec,
