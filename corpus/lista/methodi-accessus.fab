@@ -25,8 +25,8 @@ locale = "en"
 
 # lista<T> access and query intrinsics
 #
-# res.primus() | res.ultimus() | res.accipe(i) | res.longitudo()   -- query
-# res.vacua() | res.continet(elem)                                 -- membership
+# res.first() | res.last() | res.get(i) | res.length()   -- query
+# res.is_empty() | res.contains(elem)                                 -- membership
 #
 # GRAMMAR:
 #   listMethod :← expr '.' ('primus' | 'ultimus' | 'accipe' | 'longitudo'
@@ -41,12 +41,12 @@ locale = "en"
 main {
     const _ res ← [1, 2, 3, 4, 5] ∷ list<int>
 
-    const _ primus ← res.primus()
-    const _ ultimus ← res.ultimus()
-    const _ tertius ← res.accipe(2)
-    const _ longitudo ← res.longitudo()
-    const _ vacuaest ← res.vacua()
-    const _ habettres ← res.continet(3)
+    const _ primus ← res.first()
+    const _ ultimus ← res.last()
+    const _ tertius ← res.get(2)
+    const _ longitudo ← res.length()
+    const _ vacuaest ← res.is_empty()
+    const _ habettres ← res.contains(3)
 
     print primus, ultimus, tertius
     print longitudo, vacuaest, habettres

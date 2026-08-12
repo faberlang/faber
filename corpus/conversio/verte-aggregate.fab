@@ -54,7 +54,7 @@ main {
     print civis.nomen
     print civis.regio
     print civis.aetas coalesce 0
-    print numeri.longitudo()
-    print numeri.accipe(1) coalesce 0
-    print puncta.accipe("alpha") coalesce 0
+    print numeri.length()
+    print numeri.get(1) coalesce 0
+    print puncta.get("alpha") coalesce 0
 }

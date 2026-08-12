@@ -4,7 +4,7 @@ kind = "type"
 category = "collection"
 canonical = false
 summary = "Tensor method policy parity for accipe, out-of-bounds reads, and ponde."
-syntax = "tensor.accipe(indices) | tensor.ponde(indices, value)"
+syntax = "tensor.get(indices) | tensor.set(indices, value)"
 related = ["tensor", "accipe", "ponde", "lista"]
 locale = "en"
 +++
@@ -35,13 +35,13 @@ locale = "en"
 
 main {
     const tf32[] seed ← vacua
-    var tf32[3] input ← seed.strue([1.0, 2.0, 3.0], [3])
+    var tf32[3] input ← seed.from_flat([1.0, 2.0, 3.0], [3])
 
-    const f32 in_bounds ← input.accipe([1]) coalesce 0.0
-    const f32 out_of_bounds ← input.accipe([9]) coalesce 99.0
+    const f32 in_bounds ← input.get([1]) coalesce 0.0
+    const f32 out_of_bounds ← input.get([9]) coalesce 99.0
 
-    input.ponde([2], 8.0)
-    const f32 updated ← input.accipe([2]) coalesce 0.0
+    input.set([2], 8.0)
+    const f32 updated ← input.get([2]) coalesce 0.0
 
     print in_bounds
     print out_of_bounds

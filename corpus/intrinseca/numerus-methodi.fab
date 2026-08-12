@@ -18,7 +18,7 @@ locale = "en"
 #   • Related keywords: fractus, ↦
 #
 # Common mistakes:
-#   • Using `numerus` comparison methods on non-numeric types — `.absolutum()`, `.signum()`, `.minimus()`, `.maximus()` are numerus-only intrinsics.
+#   • Using `numerus` comparison methods on non-numeric types — `.abs()`, `.sign()`, `.minimum()`, `.maximum()` are numerus-only intrinsics.
 #
 # See also: fractus, ↦
 # =============================================================================
@@ -28,8 +28,8 @@ locale = "en"
 # Compiler-owned numerus methodi — absolutum, signum, minimus, maximus.
 #
 # GRAMMAR:
-#   valor.absolutum() | valor.signum()
-#   valor.minimus(other) | valor.maximus(other)
+#   valor.abs() | valor.sign()
+#   valor.minimum(other) | valor.maximum(other)
 #
 # Integer counterpart to fractus-comparatio.fab; Wasm tier Runnable.
 #
@@ -38,10 +38,10 @@ locale = "en"
 
 main {
     const int value ← -7
-    const _ absolutus ← value.absolutum()
-    const _ signum ← value.signum()
-    const _ minor ← value.minimus(3)
-    const _ maior ← value.maximus(3)
+    const _ absolutus ← value.abs()
+    const _ signum ← value.sign()
+    const _ minor ← value.minimum(3)
+    const _ maior ← value.maximum(3)
 
     print absolutus, signum, minor, maior
 }

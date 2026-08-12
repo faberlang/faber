@@ -41,7 +41,7 @@ main {
     # textus → octeti (UTF-8 encode)
     const string hi ← "hi"
     const bytes enc ← hi ↦ bytes
-    print enc.longitudo()
+    print enc.length()
 
     # octeti → textus (UTF-8 decode, valid bytes)
     # "hi" in UTF-8
@@ -57,7 +57,7 @@ main {
     # ascii → octeti
     const ascii a ← 'hi'
     const bytes aenc ← a ↦ bytes
-    print aenc.longitudo()
+    print aenc.length()
 
     # octeti → ascii (valid ASCII bytes)
     const ascii adec ← raw ↦ ascii

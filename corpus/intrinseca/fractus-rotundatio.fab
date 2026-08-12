@@ -17,7 +17,7 @@ locale = "en"
 #   • Related keywords: fractus, intrinseca
 #
 # Common mistakes:
-#   • Confusing rounding modes — `.rotunda()` rounds to nearest, `.pavimentum()` floors, `.tectum()` ceilings, `.trunca()` truncates toward zero.
+#   • Confusing rounding modes — `.round()` rounds to nearest, `.floor()` floors, `.ceiling()` ceilings, `.truncate()` truncates toward zero.
 #
 # See also: fractus, intrinseca
 # =============================================================================
@@ -27,7 +27,7 @@ locale = "en"
 # Compiler-owned fractus methodi — rotunda, pavimentum, tectum, trunca.
 #
 # GRAMMAR:
-#   valor.rotunda() | valor.pavimentum() | valor.tectum() | valor.trunca()
+#   valor.round() | valor.floor() | valor.ceiling() | valor.truncate()
 #
 # Rounding modes lower to per-target float intrinsics; Wasm tier Runnable.
 #
@@ -37,10 +37,10 @@ locale = "en"
 main {
     const float value ← -3.75
 
-    const _ rotundus ← value.rotunda()
-    const _ basis ← value.pavimentum()
-    const _ culmen ← value.tectum()
-    const _ truncatus ← value.trunca()
+    const _ rotundus ← value.round()
+    const _ basis ← value.floor()
+    const _ culmen ← value.ceiling()
+    const _ truncatus ← value.truncate()
 
     print rotundus, basis, culmen, truncatus
 }

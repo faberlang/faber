@@ -27,12 +27,12 @@ locale = "en"
 
 main {
     var sf32[2, 3] grid ← vacua
-    grid.ponde([0, 1], 4.0)
+    grid.set([0, 1], 4.0)
 
-    const _ value ← grid.accipe([0, 1])
-    const _ absent ← grid.accipe([1, 2])
-    const _ count ← grid.nonnihil()
+    const _ value ← grid.get([0, 1])
+    const _ absent ← grid.get([1, 2])
+    const _ count ← grid.nonzero_count()
 
-    const tf32[2, 3] dense ← grid.densata()
-    print value, absent, count, dense.longitudo()
+    const tf32[2, 3] dense ← grid.densify()
+    print value, absent, count, dense.length()
 }

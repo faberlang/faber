@@ -33,24 +33,24 @@ locale = "en"
 # typi/sized-numerus.fab (numerus<u8>). See docs/factory/octeti-unify-lista/.
 
 fn describe(bytes buf) → int {
-    return buf.longitudo()
+    return buf.length()
 }
 
 fn firstByte(bytes buf) → int<u8> {
-    const int<u8> b ← buf.accipe(0) coalesce (0 ∷ int<u8>)
+    const int<u8> b ← buf.get(0) coalesce (0 ∷ int<u8>)
     return b
 }
 
 fn appendByte(mut bytes buf, int<u8> b) → bytes {
-    buf.appende(b)
+    buf.append(b)
     return buf
 }
 
 fn fromBytes() → bytes {
     # WHY: lista<numerus<u8>> assigns into octeti bidirectionally.
     var list<int<u8>> bytes ← vacua
-    bytes.appende(0xde ∷ int<u8>)
-    bytes.appende(0xad ∷ int<u8>)
+    bytes.append(0xde ∷ int<u8>)
+    bytes.append(0xad ∷ int<u8>)
     const bytes asBytes ← bytes
     return asBytes
 }
@@ -68,7 +68,7 @@ main {
     # construction + cross-assignment
     const int<u8> marker ← 0xff ∷ int<u8>
     const bytes grown ← appendByte(sig, marker)
-    print grown.longitudo()
+    print grown.length()
     const bytes crossed ← fromBytes()
-    print crossed.longitudo()
+    print crossed.length()
 }

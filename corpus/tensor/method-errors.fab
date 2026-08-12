@@ -4,7 +4,7 @@ kind = "type"
 category = "collection"
 canonical = false
 summary = "Tensor method hard-error policy for structa count mismatch."
-syntax = "tensor.strue(flat, shape)"
+syntax = "tensor.from_flat(flat, shape)"
 related = ["tensor", "structa"]
 locale = "en"
 +++
@@ -33,6 +33,6 @@ locale = "en"
 
 main {
     const tf32[] seed ← vacua
-    const tf32[2, 2] grid ← seed.strue([1.0, 2.0, 3.0], [2, 2])
-    print grid.longitudo()
+    const tf32[2, 2] grid ← seed.from_flat([1.0, 2.0, 3.0], [2, 2])
+    print grid.length()
 }

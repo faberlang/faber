@@ -50,18 +50,18 @@ main {
     const _ coniuncta ← [spread prima, spread secunda]
     const _ aucta ← [0, spread prima, 99]
 
-    print vacuares.longitudo()
-    print numeri.longitudo()
+    print vacuares.length()
+    print numeri.length()
     print numeri[0]
     print numeri[4]
-    print nomina.longitudo()
+    print nomina.length()
     print nomina[1]
     print vexilla[0]
     print vexilla[2]
-    print matrix.longitudo()
+    print matrix.length()
     print matrix[1][0]
-    print coniuncta.longitudo()
-    print aucta.longitudo()
+    print coniuncta.length()
+    print aucta.length()
     print aucta[0]
     print aucta[4]
 }

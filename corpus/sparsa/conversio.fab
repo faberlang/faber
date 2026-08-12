@@ -36,5 +36,5 @@ main {
     const sf32[2, 2] sparse ← dense ↦ sf32[2, 2]
     const tf32[2, 2] roundtrip ← sparse ↦ tf32[2, 2]
 
-    print sparse.nonnihil(), roundtrip.longitudo()
+    print sparse.nonzero_count(), roundtrip.length()
 }

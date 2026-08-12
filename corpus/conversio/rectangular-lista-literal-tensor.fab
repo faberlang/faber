@@ -35,10 +35,10 @@ main {
         [1.0, 2.0, 0.0],
         [0.0, 0.0, 0.0],
     ] ↦ tf32[3, 3]
-    const list<int> dims ← grid.magnitudines()
-    const list<f32> flat ← grid.planata()
+    const list<int> dims ← grid.shape()
+    const list<f32> flat ← grid.flatten()
 
     print dims
-    print grid.longitudo()
-    print flat.longitudo()
+    print grid.length()
+    print flat.length()
 }

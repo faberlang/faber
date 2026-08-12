@@ -54,15 +54,15 @@ main {
     const _ par ← int x → bool ∴ x % 2 ≡ 0
     var list<int> pares ← vacua
     for from numeri const n {
-        duplicati.appende(duplica(n))
+        duplicati.append(duplica(n))
         if par(n) {
-            pares.appende(n)
+            pares.append(n)
         }
     }
-    print duplicati.longitudo()
+    print duplicati.length()
     print duplicati[0]
     print duplicati[2]
-    print pares.longitudo()
+    print pares.length()
     print pares[0]
 
     const _ positivus ← int n → bool ∴ n > 0

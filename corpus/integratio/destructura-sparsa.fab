@@ -26,7 +26,7 @@ locale = "en"
 #
 # fixum [a, b, c] ← lista
 # [sparge expr, …]
-# lista.filtrata(T x ∴ …) | lista.mappata(T x → T ∴ fac { … })
+# lista.filter(T x ∴ …) | lista.map(T x → T ∴ fac { … })
 #
 # GRAMMAR:
 #   bindingStmt :← 'fixum' destructure '←' expr
@@ -55,8 +55,8 @@ main {
     const [initium, alterum, tertium] ← omnes
     print "caput: § § §"(initium, alterum, tertium)
 
-    const _ paria ← omnes.filtrata(int n ∴ n % 2 ≡ 0)
-    const _ aucta ← paria.mappata(int n → int ∴ do {
+    const _ paria ← omnes.filter(int n ∴ n % 2 ≡ 0)
+    const _ aucta ← paria.map(int n → int ∴ do {
         return n + 10
     })
 

@@ -50,7 +50,7 @@ main {
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
     # filtrata returns a new filtered list
-    const _ pares ← res.filtrata(int x ∴ x % 2 ≡ 0)
+    const _ pares ← res.filter(int x ∴ x % 2 ≡ 0)
     print "filtrata nova: §"(pares)
 
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
@@ -58,12 +58,12 @@ main {
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
     # addita returns a new list with an added element
-    const _ aucta ← res.addita(6)
+    const _ aucta ← res.added(6)
     print "addita nova: §"(aucta)
 
     # appende mutates in place
     var _ mutanda ← [1, 2, 3]
-    mutanda.appende(4)
+    mutanda.append(4)
     print "appende mutat: §"(mutanda)
 
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
@@ -71,12 +71,12 @@ main {
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
     # inversa returns a new reversed list
-    const _ versa ← res.inversa()
+    const _ versa ← res.invert()
     print "inversa nova: §"(versa)
 
     # inverte mutates in place
     var _ invertenda ← [1, 2, 3]
-    invertenda.inverte()
+    invertenda.reverse()
     print "inverte mutat: §"(invertenda)
 
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
@@ -84,12 +84,12 @@ main {
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
     # ordinata returns a new sorted list
-    const _ ordinata ← res.ordinata()
+    const _ ordinata ← res.sorted()
     print "ordinata nova: §"(ordinata)
 
     # ordina mutates in place
     var _ ordinanda ← [3, 1, 2]
-    ordinanda.ordina()
+    ordinanda.sort()
     print "ordina mutat: §"(ordinanda)
 
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
@@ -97,7 +97,7 @@ main {
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
     # mappata returns a new mapped list
-    const _ duplicata ← res.mappata(int x ∴ x * 2)
+    const _ duplicata ← res.map(int x ∴ x * 2)
     print "mappata nova: §"(duplicata)
 
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡

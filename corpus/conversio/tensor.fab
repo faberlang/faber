@@ -46,32 +46,32 @@ main {
     const list<int> xs ← [1, 2, 3, 4]
     const tensor<int, [4]> grid ← xs ↦ tensor<int, [4]>
     const list<int> flat ← grid ↦ list<int>
-    print flat.longitudo()
+    print flat.length()
 
     const tensor<float, [4]> floats ← grid ↦ tensor<float, [4]>
     const tensor<int, [4]> ints ← floats ↦ tensor<int, [4]>
-    print ints.longitudo()
+    print ints.length()
 
     const tensor<int<i32>, []> narrow ← vacua
     const tensor<int<i64>, []> wide ← narrow ↦ tensor<int<i64>, []>
     const tensor<int<i32>, []> narrowed ← wide ↦ tensor<int<i32>, []>
-    print narrowed.longitudo()
+    print narrowed.length()
 
     const tensor<int<u8>, []> bytes ← vacua
     const tensor<int<u16>, []> words ← bytes ↦ tensor<int<u16>, []>
     const tensor<int<u8>, []> shrunk ← words ↦ tensor<int<u8>, []>
-    print shrunk.longitudo()
+    print shrunk.length()
 
     const tensor<float<f32>, []> half ← vacua
     const tensor<float, []> full ← half ↦ tensor<float, []>
     const tensor<float<f32>, []> single ← full ↦ tensor<float<f32>, []>
-    print single.longitudo()
+    print single.length()
 
     const tensor<float, []> fromFloat ← vacua
     const tensor<int<i32>, []> fromFractus ← fromFloat ↦ tensor<int<i32>, []>
-    print fromFractus.longitudo()
+    print fromFractus.length()
 
     const tensor<int<i32>, []> signed ← vacua
     const tensor<float, []> promoted ← signed ↦ tensor<float, []>
-    print promoted.longitudo()
+    print promoted.length()
 }

@@ -45,5 +45,5 @@ main {
     const tensor<float<f32>, []> empty ← vacua
     const tensor<float<f32>, []> roundtrip ← identity(empty)
 
-    print roundtrip.longitudo()
+    print roundtrip.length()
 }

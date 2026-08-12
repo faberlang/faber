@@ -26,8 +26,8 @@ locale = "en"
 
 # lista<T> copy, slice, and ordering intrinsics
 #
-# res.addita(x) | res.sectio(lo, hi) | res.prima(n) | res.ultima(n)   -- views
-# res.omissa(n) | res.inversa() | res.ordinata()                      -- reorder
+# res.added(x) | res.slice(lo, hi) | res.take(n) | res.take_last(n)   -- views
+# res.drop(n) | res.invert() | res.sorted()                      -- reorder
 #
 # GRAMMAR:
 #   listMethod :← expr '.' ('addita' | 'sectio' | 'prima' | 'ultima'
@@ -48,13 +48,13 @@ locale = "en"
 main {
     const _ res ← [1, 2, 3, 4, 5] ∷ list<int>
 
-    const _ addita ← res.addita(6)
-    const _ sectio ← res.sectio(1, 4)
-    const _ primaduo ← res.prima(2)
-    const _ ultimaduo ← res.ultima(2)
-    const _ omissaduo ← res.omissa(2)
-    const _ inversa ← res.inversa()
-    const _ ordinata ← [3, 1, 2].ordinata()
+    const _ addita ← res.added(6)
+    const _ sectio ← res.slice(1, 4)
+    const _ primaduo ← res.take(2)
+    const _ ultimaduo ← res.take_last(2)
+    const _ omissaduo ← res.drop(2)
+    const _ inversa ← res.invert()
+    const _ ordinata ← [3, 1, 2].sorted()
 
     print addita
     print sectio

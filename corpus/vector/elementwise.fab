@@ -26,30 +26,30 @@ locale = "en"
 fn addita(float<f32> x) → float<f32> {
     const vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
     const vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
-    const vf32[4] c ← a.addita(b)
-    return c.productum(b)
+    const vf32[4] c ← a.added(b)
+    return c.dot(b)
 }
 
 @ kernel
 fn subtrahe(float<f32> x) → float<f32> {
     const vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
     const vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
-    const vf32[4] c ← a.subtrahe(b)
-    return c.productum(b)
+    const vf32[4] c ← a.subtract(b)
+    return c.dot(b)
 }
 
 @ kernel
 fn multiplica(float<f32> x) → float<f32> {
     const vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
     const vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
-    const vf32[4] c ← a.multiplica(b)
-    return c.productum(b)
+    const vf32[4] c ← a.multiply(b)
+    return c.dot(b)
 }
 
 @ kernel
 fn divida(float<f32> x) → float<f32> {
     const vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
     const vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
-    const vf32[4] c ← a.divida(b)
-    return c.productum(b)
+    const vf32[4] c ← a.divide(b)
+    return c.dot(b)
 }
