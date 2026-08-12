@@ -5382,6 +5382,50 @@ main {
 }
 
 #[test]
+fn check_package_resolves_wildcard_library_import_bindings() {
+    // `public * as <alias>` library imports must resolve in the check path the
+    // same way the driver/emit path handles them (PKG001 regression guard).
+    let dir = test_temp_dir("wildcard-lib-import-check");
+    fs::create_dir_all(dir.join("src")).expect("create src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "wildcard-lib-import-check"
+version = "0.1.0"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("write manifest");
+    let entry = dir.join("src/main.fab");
+    fs::write(
+        &entry,
+        r#"
+import from "norma:solum/path" public * as path
+
+main {
+    const string name ← path.nomen("/usr/bin/faber")
+    print name
+}
+"#,
+    )
+    .expect("write entry");
+
+    let diagnostics = check_package(&Config::default(), &dir.join("faber.toml"));
+    assert!(
+        !diagnostics.iter().any(|diag| diag.is_error()),
+        "expected wildcard library import to resolve in check, got {:?}",
+        diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn compile_package_rejects_faber_kernel_imports() {
     let dir = test_temp_dir("faber-kernel-package");
     let entry = dir.join("main.fab");

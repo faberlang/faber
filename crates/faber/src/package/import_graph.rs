@@ -574,7 +574,15 @@ pub(super) fn library_import_binding(
                 module,
             })
         }
-        ImportKind::Wildcard { .. } => None,
+        ImportKind::Wildcard { alias } => Some(LibraryImportBinding {
+            // Wildcard imports bind the module's full export surface under the
+            // alias (driver/emit parity: `import_binding` + HIR lowering both
+            // name the alias, not the module).
+            binding: interner.resolve(alias.name).to_owned(),
+            visibility: decl.visibility,
+            import_span: decl.span,
+            module,
+        }),
     }
 }
 
