@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "project": "Faber",
+  "website": "https://faberlang.dev/en-US/",
+  "grammar": "https://faberlang.dev/en-US/reference/grammar.html",
+  "releases": "https://github.com/faberlang/releases/releases",
+  "compilerSourceVisibility": "private",
+  "repositories": [
+    {"name": "faber", "role": "language-home-and-target-apis", "visibility": "public"},
+    {"name": "releases", "role": "release-artifacts", "visibility": "public"},
+    {"name": "norma", "role": "standard-library", "visibility": "public"},
+    {"name": "cista", "role": "package-store", "visibility": "public"},
+    {"name": "hosts", "role": "host-implementations", "visibility": "public"},
+    {"name": "examples", "role": "examples-and-applications", "visibility": "public"},
+    {"name": "radix", "role": "compiler-and-faber-cli", "visibility": "private"}
+  ],
+  "targetApis": {
+    "rust": "runtime/rust",
+    "typescript": "runtime/typescript",
+    "go": "runtime/go",
+    "swift": "runtime/swift"
+  }
+}

@@ -1,0 +1,52 @@
+name: Public packages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --locked --manifest-path runtime/rust/Cargo.toml
+      - run: cargo test --locked --manifest-path crates/http-transport/Cargo.toml
+      - run: cargo test --locked --manifest-path packages/http/rust/Cargo.toml
+
+  go:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: runtime/go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: runtime/go/go.mod
+      - run: go test ./...
+
+  swift:
+    runs-on: macos-14
+    defaults:
+      run:
+        working-directory: runtime/swift
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift test
+
+  typescript:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: runtime/typescript
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npx --yes -p typescript@5.9.2 tsc --noEmit
