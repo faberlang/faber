@@ -7,7 +7,10 @@ summary = "Awaits a promissum and discards the success value."
 syntax = "tacebit future"
 aliases = ["await"]
 related = ["figendum", "reddet", "fiet", "promissum"]
-locale = "en"
+# The example code teaches the Latin keyword surface (functio/fiet/…); the
+# frontmatter locale is the SOURCE reader locale, so a Latin example body
+# declares `la` — not `en`, whose pack owns English surfaces.
+locale = "la"
 +++
 
 # =============================================================================

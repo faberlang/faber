@@ -7,7 +7,10 @@ summary = "Callable posture for asynchronous finite functions."
 syntax = "functio name(…) fiet → T"
 aliases = ["async"]
 related = ["futura", "promissum", "figendum", "tacebit"]
-locale = "en"
+# The example code teaches the Latin keyword surface (functio/fiet/…); the
+# frontmatter locale is the SOURCE reader locale, so a Latin example body
+# declares `la` — not `en`, whose pack owns English surfaces.
+locale = "la"
 +++
 
 # =============================================================================

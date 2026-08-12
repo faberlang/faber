@@ -7,7 +7,10 @@ summary = "Callable posture for asynchronous stream functions."
 syntax = "functio name(…) fient → T"
 aliases = ["async_generator"]
 related = ["fiunt", "fiet", "cede"]
-locale = "en"
+# The example code teaches the Latin keyword surface (functio/fiet/…); the
+# frontmatter locale is the SOURCE reader locale, so a Latin example body
+# declares `la` — not `en`, whose pack owns English surfaces.
+locale = "la"
 +++
 
 # =============================================================================

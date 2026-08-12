@@ -7,7 +7,10 @@ summary = "Awaits a promissum and binds a mutable name."
 syntax = "variandum T name ← future"
 aliases = ["await_var"]
 related = ["figendum", "tacebit", "fiet", "promissum"]
-locale = "en"
+# The example code teaches the Latin keyword surface (functio/fiet/…); the
+# frontmatter locale is the SOURCE reader locale, so a Latin example body
+# declares `la` — not `en`, whose pack owns English surfaces.
+locale = "la"
 +++
 
 # =============================================================================
