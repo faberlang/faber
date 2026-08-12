@@ -192,7 +192,7 @@ fn package_mir_training_loop_mlp_runs_on_fmir_lane() {
     // air-lane functions pass the lane policy at analysis instead of tripping
     // `lane_requires_mir_backed_target` under the old default `HirRust`.
     let workspace =
-        crate::reference_pack_test_support::faberlang_home().expect("faberlang container root");
+        radix::paths::faberlang_home().expect("faberlang container root");
     let exemplum = workspace.join("gradus/exempla/training-loop-mlp");
     let dir = crate::package::test_support::test_temp_dir("pml4-lane");
     copy_package_dir_skipping_target(&exemplum, dir.path());

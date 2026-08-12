@@ -271,7 +271,7 @@ fn locale_forces_compiled_run_policy_for_single_fab_file() {
 
 #[test]
 fn run_config_loads_locale_pack_for_go_targets() {
-    let example = crate::reference_pack_test_support::faberlang_home()
+    let example = radix::paths::faberlang_home()
         .expect("faberlang container root")
         .join("examples/reader-locale/th-TH");
 
@@ -296,7 +296,7 @@ fn run_config_loads_locale_pack_for_go_targets() {
 
 #[test]
 fn run_config_uses_manifest_locale_for_non_rust_targets() {
-    let example = crate::reference_pack_test_support::faberlang_home()
+    let example = radix::paths::faberlang_home()
         .expect("faberlang container root")
         .join("examples/reader-locale/th-TH");
 

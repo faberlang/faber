@@ -124,7 +124,7 @@ fn author_format_keeps_ascii_angle_brackets_for_generics() {
 #[test]
 fn format_locale_resolves_imports_in_corpus_fixture() {
     let fixture = exempla("importa/default-minimal.fab");
-    let home = crate::reference_pack_test_support::faberlang_home()
+    let home = radix::paths::faberlang_home()
         .expect("faber crate must sit in the faberlang container");
     let mut child = Command::new(faber_binary())
         .args(["format", "--locale", "la", "--stdout"])
@@ -901,7 +901,7 @@ fn format_write_flag_writes_in_place() {
 
 #[test]
 fn format_locale_thai_localizes_surface() {
-    let root = crate::reference_pack_test_support::faberlang_home()
+    let root = radix::paths::faberlang_home()
         .expect("faberlang container root")
         .join("examples/reader-locale/th-TH");
     let thai = root.join("src/main.fab");
@@ -1022,7 +1022,7 @@ fn format_locale_preserves_template_application_sugar() {
 fn format_locale_localizes() {
     // A bare --locale=<X> selects the HIR-backed re-emit path with the
     // localized surface (author mode when --locale is absent).
-    let root = crate::reference_pack_test_support::faberlang_home()
+    let root = radix::paths::faberlang_home()
         .expect("faberlang container root")
         .join("examples/reader-locale/th-TH");
     let thai = root.join("src/main.fab");

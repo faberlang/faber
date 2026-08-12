@@ -82,6 +82,7 @@ pub mod locale;
 pub mod mir;
 pub mod octeti_literal;
 pub mod parser;
+pub mod paths;
 pub mod proba;
 pub mod runtime_contract;
 pub mod semantic;
