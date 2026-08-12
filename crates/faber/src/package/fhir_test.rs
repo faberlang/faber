@@ -312,7 +312,7 @@ kind = "bin"
     fs::write(dir.join("faber.toml"), manifest).expect("write faber.toml");
     fs::write(
         src.join("main.fab"),
-        "importa ex \"norma:solum\" privata solum\n\nfunctio scinde(textus s) → numerus {\n    fixum lista<textus> partes ← solum.carpe(s)\n    redde partes.longitudo()\n}\n\nincipit {\n    nota scinde(\"a,b,c\")\n}\n",
+        "importa ex \"norma:solum\" privata solum\n\nfunctio scinde(textus s) → numerus {\n    fixum lista<textus> partes ← solum.carpe(s)\n    redde partes.length()\n}\n\nincipit {\n    nota scinde(\"a,b,c\")\n}\n",
     )
     .expect("write main.fab");
     src.join("main.fab")

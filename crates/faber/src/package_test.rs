@@ -2359,7 +2359,7 @@ fn package_mir_cli_root_rest_text_operand_executes_without_rust_emit() {
 incipit argumenta args {
   nota args.input
   fixum lista<textus> files ← args.files
-  nota files.longitudo()
+  nota files.length()
 }
 "#,
     )
@@ -2396,7 +2396,7 @@ fn package_mir_cli_root_lista_numerus_operand_executes_without_rust_emit() {
 @ operandus lista<numerus> counts
 incipit argumenta args {
   fixum lista<numerus> counts ← args.counts
-  nota counts.longitudo()
+  nota counts.length()
 }
 "#,
     )
@@ -2429,7 +2429,7 @@ fn package_mir_cli_root_octeti_operand_executes_without_rust_emit() {
 @ operandus octeti raw
 incipit argumenta args {
   fixum octeti raw ← args.raw
-  nota raw.longitudo()
+  nota raw.length()
 }
 "#,
     )
@@ -2984,7 +2984,7 @@ incipit argumenta args {}
 @ operandus ceteri numerus counts
 functio sum() argumenta args {
   fixum lista<numerus> counts ← args.counts
-  nota counts.longitudo()
+  nota counts.length()
 }
 "#,
     )
@@ -3573,10 +3573,10 @@ incipit argumenta args {
         fixture.common.join("format.fab"),
         r#"
 functio inter_spatia(lista<textus> verba) → textus {
-  si verba.longitudo() ≡ 0 ergo redde ""
+  si verba.length() ≡ 0 ergo redde ""
   varia textus linea ← verba[0]
   varia numerus i ← 1
-  dum i < verba.longitudo() {
+  dum i < verba.length() {
     linea ← linea + " " + verba[i]
     i ← i + 1
   }
@@ -4357,7 +4357,7 @@ steps = 250
         dir.join("src").join("main.fab"),
         r#"@ nucleum
 functio summa(tf32[2] x) → f32 {
-    redde x.summa()
+    redde x.sum()
 }
 "#,
     )
@@ -9043,7 +9043,7 @@ importa ex "norma:nested_lista_probe" privata nested_lista_probe
 
 incipit {
     fixum lista<lista<textus>> grid ← nested_lista_probe.vacua_tabula()
-    nota grid.longitudo()
+    nota grid.length()
 }
 "#,
     )
@@ -9068,7 +9068,7 @@ fn transitive_import_chorda_via_fixture_library_compiles() {
 importa ex "norma:chorda" privata chorda
 
 functio split_fields(textus row) → lista<textus> {
-    redde chorda.discissa(row, ",", row.longitudo() + 1)
+    redde chorda.discissa(row, ",", row.length() + 1)
 }
 "#,
     );
@@ -9082,7 +9082,7 @@ importa ex "norma:transitive_fixture" privata transitive_fixture
 
 incipit {
     fixum lista<textus> fields ← transitive_fixture.split_fields("alpha,beta")
-    nota fields.longitudo()
+    nota fields.length()
 }
 "#,
     )
@@ -9503,7 +9503,7 @@ importa ex "norma:csv" privata csv
 
 incipit {
     fixum lista<lista<textus>> grid ← csv.solve("")
-    nota grid.longitudo()
+    nota grid.length()
 }
 "#,
     )
@@ -9528,7 +9528,7 @@ importa ex "norma:csv" privata csv
 
 incipit {
     fixum lista<lista<textus>> grid ← csv.solve("a,b\n")
-    nota grid.longitudo()
+    nota grid.length()
 }
 "#,
     )
@@ -13082,8 +13082,8 @@ functio simple_loss(
     tensor<f32, [2,2]> x,
     tensor<f32, [2,2]> w
 ) → f32 {
-    fixum tensor<f32, [2,2]> product ← x.multiplica(w)
-    redde product.media()
+    fixum tensor<f32, [2,2]> product ← x.multiply(w)
+    redde product.mean()
 }
 "#,
     )
@@ -13207,8 +13207,8 @@ importa ex "testgrad:gradient" privata gradient
 incipit {
     fixum tensor<f32, []> seed ← vacua
     fixum lista<f32> data ← [1.0, 2.0, 3.0, 4.0]
-    fixum tensor<f32, [2,2]> x ← seed.strue(data, [2, 2])
-    fixum tensor<f32, [2,2]> w ← seed.strue(data, [2, 2])
+    fixum tensor<f32, [2,2]> x ← seed.from_flat(data, [2, 2])
+    fixum tensor<f32, [2,2]> w ← seed.from_flat(data, [2, 2])
     fixum f32 loss ← gradient.simple_loss(x, w)
     nota loss
     fixum f32 upstream ← 1.0
@@ -13463,8 +13463,8 @@ importa ex "testgrad:gradient" privata gradient
 incipit {
     fixum tensor<f32, []> seed ← vacua
     fixum lista<f32> data ← [1.0, 2.0, 3.0, 4.0]
-    fixum tensor<f32, [2,2]> x ← seed.strue(data, [2, 2])
-    fixum tensor<f32, [2,2]> w ← seed.strue(data, [2, 2])
+    fixum tensor<f32, [2,2]> x ← seed.from_flat(data, [2, 2])
+    fixum tensor<f32, [2,2]> w ← seed.from_flat(data, [2, 2])
     fixum f32 loss ← gradient.simple_loss(x, w)
     nota loss
     fixum f32 upstream ← 1.0
@@ -13569,8 +13569,8 @@ importa ex "testgrad:math" privata math
 incipit {
     fixum tensor<f32, []> seed ← vacua
     fixum lista<f32> data ← [1.0, 2.0, 3.0, 4.0]
-    fixum tensor<f32, [2,2]> x ← seed.strue(data, [2, 2])
-    fixum tensor<f32, [2,2]> w ← seed.strue(data, [2, 2])
+    fixum tensor<f32, [2,2]> x ← seed.from_flat(data, [2, 2])
+    fixum tensor<f32, [2,2]> w ← seed.from_flat(data, [2, 2])
     fixum f32 loss ← gradient.simple_loss(x, w)
     nota loss
     fixum f32 upstream ← 1.0
