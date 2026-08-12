@@ -30,7 +30,7 @@
 use super::cursor::Cursor;
 use super::keywords::keyword_token_kind;
 use super::token::{Span, Symbol, Token, TokenKind};
-use super::{LexError, LexErrorKind, LexResult, LocaleFallback, LocaleSuggestion};
+use super::{LexError, LexErrorKind, LexResult, LocaleSuggestion};
 use crate::KeywordPack;
 use radix_diagnostics::DiagnosticArg;
 use rustc_hash::FxHashMap;
@@ -195,7 +195,6 @@ pub struct Lexer<'a> {
     interner: Interner,
     tokens: Vec<Token>,
     errors: Vec<LexError>,
-    locale_fallbacks: Vec<LocaleFallback>,
     locale_suggestions: Vec<LocaleSuggestion>,
     reader_keyword_latin_keys: HashMap<String, String>,
     reader_type_latin_keys: HashMap<String, String>,
@@ -214,7 +213,6 @@ impl<'a> Lexer<'a> {
             interner: Interner::new(),
             tokens: Vec::new(),
             errors: Vec::new(),
-            locale_fallbacks: Vec::new(),
             locale_suggestions: Vec::new(),
             reader_keyword_latin_keys: HashMap::new(),
             reader_type_latin_keys: HashMap::new(),
@@ -245,7 +243,6 @@ impl<'a> Lexer<'a> {
         LexResult {
             tokens: self.tokens,
             errors: self.errors,
-            locale_fallbacks: self.locale_fallbacks,
             locale_suggestions: self.locale_suggestions,
             reader_keyword_latin_keys: self.reader_keyword_latin_keys,
             reader_type_latin_keys: self.reader_type_latin_keys,
@@ -967,18 +964,6 @@ impl<'a> Lexer<'a> {
         // slots) or canonicalized through `reader_type_latin_keys` (types), so
         // it must skip the LOCALE002 suggestion and fallback passes.
         if declared {
-            return TokenKind::Ident(self.interner.intern_normalized(text));
-        }
-
-        if let Some(fallback) = pack.latin_keyword_fallback(text) {
-            self.locale_fallbacks.push(LocaleFallback {
-                pack_id: pack.pack_id().to_owned(),
-                keyword: fallback.keyword,
-                localized: fallback.localized,
-                span,
-            });
-            // The fallback is recorded loudly, but the word lexes as an
-            // identifier; the parser claims it by identity in its grammar slot.
             return TokenKind::Ident(self.interner.intern_normalized(text));
         }
 

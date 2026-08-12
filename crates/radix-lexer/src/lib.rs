@@ -104,23 +104,8 @@ pub trait KeywordPack {
         None
     }
 
-    /// Explicit Latin fallback when the pack declares one.
-    fn latin_keyword_fallback(&self, text: &str) -> Option<LatinKeywordFallback>;
-
     /// Suggested canonical spelling for near-miss identifiers.
     fn keyword_suggestion(&self, text: &str) -> Option<String>;
-}
-
-/// Latin keyword fallback selected by pack-aware lexing.
-///
-/// `token_kind` is `None` for tokenless keywords (migrated rows): the fallback
-/// still fires loudly, but the word lexes as an identifier and the parser
-/// claims it by spelling in its grammar slot.
-#[derive(Debug, Clone, PartialEq)]
-pub struct LatinKeywordFallback {
-    pub token_kind: Option<TokenKind>,
-    pub keyword: String,
-    pub localized: Option<String>,
 }
 
 // =============================================================================
@@ -138,9 +123,6 @@ pub struct LexResult {
 
     /// Lexical diagnostics collected while scanning.
     pub errors: Vec<LexError>,
-
-    /// Non-fatal reader-locale fallback events collected while scanning.
-    pub locale_fallbacks: Vec<LocaleFallback>,
 
     /// Non-fatal reader-locale spelling suggestions collected while scanning.
     pub locale_suggestions: Vec<LocaleSuggestion>,
@@ -189,22 +171,6 @@ pub struct LexError {
 
     /// Named facts for catalog templates and future locale renderers.
     pub args: Vec<DiagnosticArg>,
-}
-
-/// One visible fallback from a reader-locale source spelling to Latin.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LocaleFallback {
-    /// Reader pack id active when fallback occurred.
-    pub pack_id: String,
-
-    /// Latin keyword spelling that was accepted through fallback.
-    pub keyword: String,
-
-    /// Localized canonical spelling from the pack, when the pack declares one.
-    pub localized: Option<String>,
-
-    /// Byte span of the fallback keyword spelling in the original source.
-    pub span: Span,
 }
 
 /// One reader-locale spelling suggestion for an unaccepted keyword-like token.

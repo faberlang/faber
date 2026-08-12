@@ -8,7 +8,7 @@
 
 use super::{ParseOptions, Parser};
 use radix_lexer::{
-    lex, lex_with_locale_pack, KeywordPack, LatinKeywordFallback, LexResult, TokenKind,
+    lex, lex_with_locale_pack, KeywordPack, LexResult, TokenKind,
 };
 
 /// Minimal reader pack: localizes `iuncta` to `本地` and `tacebit` to `await`
@@ -50,10 +50,6 @@ impl KeywordPack for SlotTestPack {
             "string" => Some("textus"),
             _ => None,
         }
-    }
-
-    fn latin_keyword_fallback(&self, _text: &str) -> Option<LatinKeywordFallback> {
-        None
     }
 
     fn keyword_suggestion(&self, _text: &str) -> Option<String> {
