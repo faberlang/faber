@@ -122,6 +122,37 @@ fn package_mir_library_nominal_method_call_runs() {
     );
 }
 
+// CG2-R08: a failable method on a linked nominal (`ok.reciproca()` where the
+// library method is `→ numerus ⇥ textus`) must keep its try-call edge through
+// the LibraryMethodCallRewriter synthetic-path rewrite. Pre-fix the synthetic
+// callee carried `ty: None` (outside the namespace-call recovery map), so the
+// MIR lowerer lowered it as a plain call and the cape handler's blocks
+// orphaned ("block bbN is not reachable from entry", PKG001). The success
+// path (`4`) and the error path (`caught`) both prove handler reachability.
+const FAILABLE_METHOD_LIB: &str = "genus Divisor {\n    numerus x\n\n    functio reciproca() → numerus ⇥ textus {\n        si ego.x ≡ 0 {\n            iace \"division by zero\"\n        }\n        redde 100 / ego.x\n    }\n}\n\nfunctio structa(numerus x) → Divisor {\n    redde Divisor { x = x }\n}\n";
+const FAILABLE_METHOD_MAIN: &str = "importa ex \"failib:lib\" privata lib\n\nincipit {\n    fixum lib.Divisor ok ← lib.structa(25)\n    fac {\n        fixum numerus r ← ok.reciproca()\n        nota r\n    }\n    cape err {\n        nota \"caught\"\n    }\n    fixum lib.Divisor bad ← lib.structa(0)\n    fac {\n        fixum numerus r2 ← bad.reciproca()\n        nota r2\n    }\n    cape err {\n        nota \"caught\"\n    }\n}\n";
+
+#[test]
+fn package_mir_library_nominal_failable_method_preserves_handler_reachability() {
+    // R08 oracle: a linked failable method preserves try-call/handler
+    // reachability. The synthetic-path rewrite must recover the method's
+    // function type (with its error half) so the MIR lowerer emits the
+    // try-call; the success path prints the quotient and the throwing path
+    // reaches the cape handler.
+    let dir = crate::package::test_support::test_temp_dir("cg2-r08-failable-method");
+    let entry = write_library_package(dir.as_ref(), "failib", FAILABLE_METHOD_LIB, FAILABLE_METHOD_MAIN);
+    let config = Config::default().with_stdlib(dir.join("libhome"));
+
+    let mut host = BufferHost::default();
+    run_package_mir(&config, &entry, &mut host)
+        .expect("a failable linked nominal method must keep its try-call edge; the cape handler must be reachable");
+    assert_eq!(
+        host.stdout_lines,
+        vec!["4".to_owned(), "caught".to_owned()],
+        "the success path prints 100/25=4 and the throwing call reaches the cape handler"
+    );
+}
+
 #[test]
 fn package_mir_const_data_member_verte_initializer_transplants() {
     // CTO-1 blocker (ii): a linked library const whose initializer uses a

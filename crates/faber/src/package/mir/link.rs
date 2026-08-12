@@ -158,6 +158,45 @@ fn synthetic_namespace_function_types(
     method_types
 }
 
+/// Collect the function type for every synthetic method-call target the
+/// caller can reach (CG2-R08): the caller's resolver carries the linked
+/// library's struct methods remapped into the caller's type table (canonical
+/// name + consumer-locale surface name + remapped signature), and the
+/// `methods` map keys them by `(receiver nominal struct def, method name)`.
+///
+/// The recovered callee type — with its error half — lets the radix MIR
+/// lowerer emit the try-call for a failable method; a synthetic callee
+/// without a type would otherwise lower as an ordinary call and orphan the
+/// cape handler's blocks ("block bbN is not reachable from entry", PKG001).
+/// Targets whose signature cannot be recovered stay absent and the
+/// [`LibraryMethodCallRewriter`] fails closed at the nominal-method site
+/// instead of installing a silent `ty: None` callee.
+fn synthetic_method_function_types(
+    analysis: &mut radix::driver::AnalyzedUnit,
+    methods: &HashMap<(DefId, String), DefId>,
+) -> HashMap<(DefId, String), radix_types::TypeId> {
+    let mut function_types = HashMap::new();
+    // Group the caller's imported struct methods by receiver nominal def.
+    let mut methods_by_receiver: HashMap<DefId, Vec<_>> = HashMap::new();
+    for (def_id, _fields, struct_methods) in analysis.resolver.imported_file_structs() {
+        methods_by_receiver.insert(def_id, struct_methods);
+    }
+    for ((receiver_def, method_name), _synthetic) in methods {
+        let Some(struct_methods) = methods_by_receiver.get(receiver_def) else {
+            continue;
+        };
+        let Some(method) = struct_methods.iter().find(|m| {
+            analysis.interner.resolve(m.name) == method_name
+                || analysis.interner.resolve(m.surface_name) == method_name
+        }) else {
+            continue;
+        };
+        let function_ty = analysis.types.function(method.sig.clone());
+        function_types.insert((*receiver_def, method_name.clone()), function_ty);
+    }
+    function_types
+}
+
 struct PackageMirLinkAccumulator {
     targets: NamespaceCallTargets,
     data_member_targets: NamespaceDataMemberTargets,
@@ -962,10 +1001,16 @@ pub(super) fn rewrite_analysis_namespace_calls(
     // link explicit before lowering.
     if let Some(methods) = method_targets.get(unit_path) {
         if !methods.is_empty() {
+            // CG2-R08: recover the callee function type for every synthetic
+            // method-call target so a failable linked method keeps its
+            // try-call edge (a ty:None callee would lower as a plain call and
+            // orphan the cape handler's blocks, PKG001).
+            let method_function_types = synthetic_method_function_types(analysis, methods);
             let mut rewriter = LibraryMethodCallRewriter {
                 types: &analysis.types,
                 interner: &analysis.interner,
                 methods,
+                method_function_types: &method_function_types,
                 diagnostics: Vec::new(),
             };
             radix::hir::visit::walk_program_mut(&mut rewriter, &mut analysis.hir);
@@ -1938,6 +1983,12 @@ struct LibraryMethodCallRewriter<'a> {
     types: &'a radix::semantic::TypeTable,
     interner: &'a Interner,
     methods: &'a HashMap<(DefId, String), DefId>,
+    /// CG2-R08: recovered function type (with its error half) per
+    /// `(receiver nominal struct def, method name)`, so a failable linked
+    /// method's synthetic callee keeps its try-call edge. A method absent
+    /// from this map fails closed (diagnostic) instead of installing a
+    /// silent `ty: None` callee.
+    method_function_types: &'a HashMap<(DefId, String), radix_types::TypeId>,
     diagnostics: Vec<String>,
 }
 
@@ -1960,7 +2011,21 @@ impl HirVisitorMut for LibraryMethodCallRewriter<'_> {
         if let HirExpressionKind::MethodCall(receiver, method, type_args, args) = &mut expr.kind {
             if let Some(struct_def) = self.receiver_struct_def(receiver) {
                 let method_name = self.interner.resolve(*method).to_owned();
-                if let Some(synthetic) = self.methods.get(&(struct_def, method_name)).copied() {
+                if let Some(synthetic) = self.methods.get(&(struct_def, method_name.clone())).copied() {
+                    // CG2-R08: recover the callee's function type so the MIR
+                    // lowerer keeps the try-call edge for failable methods;
+                    // a method whose signature cannot be recovered fails
+                    // closed instead of silently emitting a ty:None callee.
+                    let Some(function_ty) = self
+                        .method_function_types
+                        .get(&(struct_def, method_name.clone()))
+                        .copied()
+                    else {
+                        self.diagnostics.push(format!(
+                            "cannot recover function type for linked library method call `{struct_def:?}.{method_name}`; refusing an untyped synthetic callee"
+                        ));
+                        return;
+                    };
                     let mut call_args = std::mem::take(args);
                     let mut new_args = Vec::with_capacity(call_args.len() + 1);
                     new_args.push(HirCallArg {
@@ -1973,7 +2038,7 @@ impl HirVisitorMut for LibraryMethodCallRewriter<'_> {
                     let callee = HirExpression {
                         id: receiver.id,
                         kind: HirExpressionKind::Path(synthetic),
-                        ty: None,
+                        ty: Some(function_ty),
                         span: receiver.span,
                     };
                     *expr = HirExpression {
