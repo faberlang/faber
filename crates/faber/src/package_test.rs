@@ -4323,6 +4323,11 @@ steps = 250
     assert_eq!(manifest.device.steps, Some(250));
 }
 
+// S3-U2 cut: this fail-closed proof exercises the device-section builder,
+// which compiles only under `device-runtime` (now opt-in, not in
+// `full-targets`). Gated to the device feature; exercised by the opt-in
+// runner proof (S3-U4).
+#[cfg(feature = "device-runtime")]
 #[test]
 fn package_fmir_image_rejects_device_steps_on_single_run_program() {
     // S5-U5b fail-closed policy: the `[device] steps` channel applies only
