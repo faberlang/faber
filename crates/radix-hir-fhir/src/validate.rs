@@ -98,6 +98,10 @@ fn collect_def_registry(artifact: &HirArtifact) -> FxHashSet<radix_types::DefId>
                     registry.insert(tp.def_id);
                 }
             }
+            HirItemKind::Schema(_schema) => {
+                // The item def_id is registered above; schema columns carry
+                // symbols and type ids, never def ids of their own.
+            }
             HirItemKind::Constant(c) => {
                 collect_expr_defs(&c.value, &mut registry);
             }
@@ -1076,6 +1080,14 @@ pub(crate) fn validate_referential_integrity(
                     }
                 }
                 check_type(a.ty)?;
+            }
+            HirItemKind::Schema(schema) => {
+                check_symbol(schema.name)?;
+                for col in &schema.columns {
+                    check_symbol(col.name)?;
+                    check_symbol(col.source)?;
+                    check_type(col.ty)?;
+                }
             }
             HirItemKind::Constant(c) => {
                 check_symbol(c.name)?;

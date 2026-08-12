@@ -217,6 +217,9 @@ pub enum HirItemKind {
     /// Alias from a source name to a resolved semantic type.
     TypeAlias(HirTypeAlias),
 
+    /// Relational-view schema declaration: partial, ordered, type-level.
+    Schema(HirSchema),
+
     /// Top-level constant whose value remains an expression for typecheck.
     Constant(HirConst),
 
@@ -699,6 +702,46 @@ pub struct HirTypeAlias {
 
     /// Target type reference.
     pub ty: TypeId,
+}
+
+/// Relational-view schema declaration: `schema Name { columna<T> name [: source] … }`.
+///
+/// A schema is a partial application-owned relational heading
+/// (docs/design/relational-views.md §2): it names only the columns the
+/// application needs, and extra source columns stay invisible. The name is a
+/// type-namespace identity and is **never** lowered to MIR or any backend
+/// leaf. Each column carries the D4 five-field metadata (public name, source
+/// mapping, Faber type, required/nullability, canonical order) as an ordered
+/// row.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HirSchema {
+    /// Schema name (type-namespace identity; never a runtime value).
+    pub name: Symbol,
+
+    /// Ordered per-column D4 metadata in canonical source order.
+    pub columns: Vec<HirSchemaColumn>,
+}
+
+/// One ordered column of a lowered schema — the D4 five-field metadata row.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HirSchemaColumn {
+    /// Schema-facing public name; result rows are keyed by it.
+    pub name: Symbol,
+
+    /// Resolved source-column identity: the `name : source` alias row, or the
+    /// public name when the alias is absent (identity mapping).
+    pub source: Symbol,
+
+    /// Faber type contract as written (`T` or `T ∪ nihil` in the type
+    /// position).
+    pub ty: TypeId,
+
+    /// Whether the column is nullable — derived from `T ∪ nihil` in the type
+    /// position (the lowered type is `Option<T>`).
+    pub nullable: bool,
+
+    /// Canonical column order (source order index).
+    pub order: u32,
 }
 
 /// Top-level constant declaration.
