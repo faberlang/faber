@@ -26,7 +26,7 @@ faber LLVM products. Its product-side contract is:
 
 - **Archive**: `faber-runtime/hosts/llvm` (`faber-host-llvm` crate,
   `crate-type = ["rlib", "staticlib"]`, dependency `faber-runtime`), producing
-  `libfaber_host_llvm.a`. Consumer: `faber/src/package/llvm_host.rs`
+  `libfaber_host_llvm.a`. Consumer: `radix/crates/faber/src/package/llvm_host.rs`
   (`ensure_llvm_runtime_archive` builds the archive from the
   `faber-runtime` support sources and links it; the archive identity is
   recorded in the link manifest).
@@ -90,7 +90,7 @@ conflated with `content_sha256` / `packet_sha256` of artifacts or with the
 2. **Stale last-good archive reuse is forbidden.** No silent reuse of a
    previously produced archive on rebuild failure, on missing sources, or on
    identity mismatch. In particular the current last-good fallback in
-   `faber/src/package/llvm_host.rs` (rebuild failure → "reusing existing
+   `radix/crates/faber/src/package/llvm_host.rs` (rebuild failure → "reusing existing
    archive" warning) is removed; it is the exact behavior this freeze
    prohibits. "Reuse" requires a verified ABI version + content receipt, not
    a fallback path.

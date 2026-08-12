@@ -211,10 +211,10 @@ FNV provenance path "temporarily" as a compatibility fallback.
 | B1 | `radix/crates/radix-mir-fmir/src/schema/hash.rs` | `fnv1a64` + `fnv1a64_blob_hash` definitions; canonical `fnv64:<16-hex>` spelling |
 | B2 | `radix/crates/radix-mir-fmir/src/schema/device.rs` | `FmirDeviceArtifact.hash` — FNV-1a 64-bit provenance hash field |
 | B3 | `radix/crates/radix-mir-fmir/src/schema/admit.rs:87` | admission re-verifies `artifact.hash` vs `artifact.blob` via `fnv1a64_blob_hash` |
-| B4 | `faber/src/package/device/section.rs:131` | Metal artifact FNV-1a provenance carried into the section |
-| B5 | `faber/src/package/device/section.rs:139` | CUDA PTX blob provenance via `radix_mir_fmir::fnv1a64_blob_hash` |
-| B6 | `faber/src/package/device/run.rs:297` | A9 receipt — `module hash fnv64:{:016x} …` provenance line |
-| B7 | `faber/src/package/host_factory.rs:202–204` | `BackendDiscoveryReceipt.artifact_hash` — FNV-1a provenance of the declared artifact |
+| B4 | `radix/crates/faber/src/package/device/section.rs:131` | Metal artifact FNV-1a provenance carried into the section |
+| B5 | `radix/crates/faber/src/package/device/section.rs:139` | CUDA PTX blob provenance via `radix_mir_fmir::fnv1a64_blob_hash` |
+| B6 | `radix/crates/faber/src/package/device/run.rs:297` | A9 receipt — `module hash fnv64:{:016x} …` provenance line |
+| B7 | `radix/crates/faber/src/package/host_factory.rs:202–204` | `BackendDiscoveryReceipt.artifact_hash` — FNV-1a provenance of the declared artifact |
 
 ### Replacement
 
@@ -230,9 +230,9 @@ FNV provenance path "temporarily" as a compatibility fallback.
 
 ### Separate surface (not backend-artifact provenance)
 
-Source-identity FNV sites — `faber/src/package/mir/image.rs:353` (S1,
+Source-identity FNV sites — `radix/crates/faber/src/package/mir/image.rs:353` (S1,
 `fnv64_hex` over package source paths, the A10 identity's source half) and
-`faber/src/package/mir/bin_runner.rs:85,177,193` (S2, embedded-image
+`radix/crates/faber/src/package/mir/bin_runner.rs:85,177,193` (S2, embedded-image
 fingerprint + `FmirTextSourceIdentity.hash`) — are a **separate source-identity
 surface**, not the backend-artifact provenance removed here; they are listed for
 scope completeness (DDCP0-U1 §5) and are outside this unit's removal decision.

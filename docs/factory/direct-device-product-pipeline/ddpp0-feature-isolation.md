@@ -19,7 +19,7 @@ support crate, target-specific name, campaign OQ1); campaign §Development Postu
 **Authority order** (campaign §Repo-Aware Baseline): live source/tests and live `faber
 targets` → accepted artifact schemas + hardware receipts → **this phase's frozen
 contracts** → campaign prose. The current-state rows below are grounded in the live
-`faber/Cargo.toml` and `src/package/mod.rs` as confirmed by DDPP0-U1 (GT-1/GT-2; 18/18
+`radix/crates/faber/Cargo.toml` and `src/package/mod.rs` as confirmed by DDPP0-U1 (GT-1/GT-2; 18/18
 confirmed, 0 drifted, 0 superseded). **The DDPP1 gate proof is a PLAN specified here,
 not a run.** No cargo command in this document is executed by DDPP0; the proof executes
 at the DDPP1 gate.
@@ -40,11 +40,11 @@ Rust-only one.
 
 | Dependency | Role | Declared as |
 | --- | --- | --- |
-| `radix-mir-metal` | GPU emitter — Metal MSL device artifact emitter (S1-6 differentiable-GPU; consumed through the shared radix-mir surface) | `faber/Cargo.toml` plain path dep (`radix-mir-metal = { path = "../radix/crates/radix-mir-metal" }`) — not `optional` |
-| `radix-mir-llvm` | GPU emitter — LLVM/NVVM device artifact emitter (CUDA PTX/NVVM side; `crates/radix-mir-llvm/src/nvvm/`) | `faber/Cargo.toml` plain path dep — not `optional` |
-| `faber-runtime` (package `faber`) | Device-runtime dependency — the `faber::device` / `faber::dequant` / `faber::gguf` / `faber::prefill` surface (plus the generated-Rust carriers the runtime also carries today) | `faber/Cargo.toml` plain path dep (`faber = { package = "faber-runtime", path = "../faber-runtime" }`) — not `optional` |
-| `faber-host-macos-arm64` | Physical Hosts leaf — native Metal/CUDA host (`hosts/macos-arm64`) | `faber/Cargo.toml` plain path dep — not `optional` |
-| `faber-host-wasm` | Physical Hosts leaf — wasm product host (`hosts/wasm`) | `faber/Cargo.toml` plain path dep — not `optional` |
+| `radix-mir-metal` | GPU emitter — Metal MSL device artifact emitter (S1-6 differentiable-GPU; consumed through the shared radix-mir surface) | `radix/crates/faber/Cargo.toml` plain path dep (`radix-mir-metal = { path = "../radix/crates/radix-mir-metal" }`) — not `optional` |
+| `radix-mir-llvm` | GPU emitter — LLVM/NVVM device artifact emitter (CUDA PTX/NVVM side; `crates/radix-mir-llvm/src/nvvm/`) | `radix/crates/faber/Cargo.toml` plain path dep — not `optional` |
+| `faber-runtime` (package `faber`) | Device-runtime dependency — the `faber::device` / `faber::dequant` / `faber::gguf` / `faber::prefill` surface (plus the generated-Rust carriers the runtime also carries today) | `radix/crates/faber/Cargo.toml` plain path dep (`faber = { package = "faber-runtime", path = "../faber-runtime" }`) — not `optional` |
+| `faber-host-macos-arm64` | Physical Hosts leaf — native Metal/CUDA host (`hosts/macos-arm64`) | `radix/crates/faber/Cargo.toml` plain path dep — not `optional` |
+| `faber-host-wasm` | Physical Hosts leaf — wasm product host (`hosts/wasm`) | `radix/crates/faber/Cargo.toml` plain path dep — not `optional` |
 
 > Note: the delivery baseline (snapshot GT-2) also lists `radix-mir-fmir` as an
 > unconditional faber dependency. It is the FMIR device-schema/text crate, **not** a GPU
