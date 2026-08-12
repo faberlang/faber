@@ -70,6 +70,7 @@ fn parser_over_with_pack(source: &str) -> Parser {
         tokens,
         reader_keyword_latin_keys,
         reader_type_latin_keys,
+        keyword_surface,
         interner,
         ..
     } = lex_with_locale_pack(source, &SlotTestPack);
@@ -79,6 +80,7 @@ fn parser_over_with_pack(source: &str) -> Parser {
         ParseOptions::default(),
         reader_keyword_latin_keys,
         reader_type_latin_keys,
+        keyword_surface,
     )
 }
 
@@ -95,12 +97,16 @@ fn slot_helper_matches_legacy_reserved_token_form() {
 }
 
 #[test]
-fn slot_helper_matches_tokenless_ident_by_latin_text() {
-    // The pack does not localize `iuncta`, so it lexes as an `Ident` — the
-    // Latin-fallback shape a migrated keyword takes under a partial pack.
+fn slot_helper_leaves_undeclared_latin_spelling_an_identifier_under_pack() {
+    // The pack does not localize `iuncta`, so it lexes as an `Ident` with no
+    // recorded latin key. Under a non-`la` pack the parser is
+    // pack-authoritative: an undeclared spelling stays an ordinary identifier
+    // and cannot claim the `iuncta` grammar slot (S2-U2). The registry-direct
+    // (`la`/no-pack) claim of the same spelling is pinned by
+    // `slot_helper_matches_legacy_reserved_token_form`.
     let mut parser = parser_over_with_pack("iuncta");
-    assert!(parser.check_keyword_ident(TokenKind::Iuncta));
-    assert!(parser.eat_keyword_ident(TokenKind::Iuncta));
+    assert!(!parser.check_keyword_ident(TokenKind::Iuncta));
+    assert!(!parser.eat_keyword_ident(TokenKind::Iuncta));
 }
 
 #[test]

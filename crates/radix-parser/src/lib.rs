@@ -49,7 +49,7 @@ pub use error::{ParseError, ParseErrorKind};
 use radix_diagnostics::PhaseErrorKind;
 use radix_lexer::{
     keyword_allowed_as_ident, keyword_spelling_for_token, lookup_keyword_spec, Interner,
-    KeywordOwner, KeywordScope, LexResult, Span, Symbol, Token, TokenKind,
+    KeywordOwner, KeywordScope, KeywordSurfaceMode, LexResult, Span, Symbol, Token, TokenKind,
 };
 #[allow(clippy::wildcard_imports)]
 // syntax is a pure re-export barrel from radix-syntax
@@ -108,6 +108,7 @@ pub struct Parser {
     next_node_id: NodeId,
     interner: Interner,
     options: ParseOptions,
+    keyword_surface: KeywordSurfaceMode,
     reader_keyword_latin_keys: HashMap<String, String>,
     reader_type_latin_keys: HashMap<String, String>,
 }
@@ -143,6 +144,7 @@ pub fn parse_with_options(lex_result: LexResult, options: ParseOptions) -> Parse
         errors,
         reader_keyword_latin_keys,
         reader_type_latin_keys,
+        keyword_surface,
         interner,
         ..
     } = lex_result;
@@ -161,6 +163,7 @@ pub fn parse_with_options(lex_result: LexResult, options: ParseOptions) -> Parse
         options,
         reader_keyword_latin_keys,
         reader_type_latin_keys,
+        keyword_surface,
     );
     parser.parse_program()
 }
@@ -188,7 +191,14 @@ impl Parser {
     #[must_use]
     // public constructor: moves tokens/options into parser
     pub fn new(tokens: Vec<Token>, interner: Interner, options: ParseOptions) -> Self {
-        Self::new_with_reader_identities(tokens, interner, options, HashMap::new(), HashMap::new())
+        Self::new_with_reader_identities(
+            tokens,
+            interner,
+            options,
+            HashMap::new(),
+            HashMap::new(),
+            KeywordSurfaceMode::RegistryDirect,
+        )
     }
 
     fn new_with_reader_identities(
@@ -197,6 +207,7 @@ impl Parser {
         options: ParseOptions,
         reader_keyword_latin_keys: HashMap<String, String>,
         reader_type_latin_keys: HashMap<String, String>,
+        keyword_surface: KeywordSurfaceMode,
     ) -> Self {
         let non_trivia_indices: Vec<usize> = tokens
             .iter()
@@ -212,6 +223,7 @@ impl Parser {
             next_node_id: 0,
             interner,
             options,
+            keyword_surface,
             reader_keyword_latin_keys,
             reader_type_latin_keys,
         }
@@ -352,6 +364,26 @@ impl Parser {
         self.peek().kind == kw
     }
 
+    /// Resolve a symbol to the latin key the parser may claim, gated by the
+    /// effective keyword surface.
+    ///
+    /// Registry-direct (`la`/no-pack): the recorded pack key wins, and an
+    /// unrecorded spelling falls back to its raw source so tokenless keywords
+    /// the lexer deliberately leaves unrecorded still claim through the
+    /// registry. Pack-authoritative (non-`la` pack): only pack-declared
+    /// spellings — those the lexer recorded a latin key for — may claim; an
+    /// undeclared spelling stays an ordinary identifier (`None`).
+    fn keyword_claim_key(&self, sym: Symbol) -> Option<&str> {
+        let source = self.interner.resolve(sym);
+        if let Some(latin_key) = self.reader_keyword_latin_keys.get(source) {
+            return Some(latin_key);
+        }
+        match self.keyword_surface {
+            KeywordSurfaceMode::RegistryDirect => Some(source),
+            KeywordSurfaceMode::PackAuthoritative => None,
+        }
+    }
+
     /// Resolve the current word's keyword identity through the registry.
     ///
     /// Returns the locale-independent identity token for a declared keyword in
@@ -361,7 +393,7 @@ impl Parser {
         let TokenKind::Ident(sym) = self.peek().kind else {
             return None;
         };
-        let latin = self.identifier_text_or_keyword_latin_key(sym);
+        let latin = self.keyword_claim_key(sym)?;
         lookup_keyword_spec(latin).and_then(|spec| spec.token_kind.clone())
     }
 
@@ -381,7 +413,9 @@ impl Parser {
         let TokenKind::Ident(sym) = self.peek().kind else {
             return false;
         };
-        let latin = self.identifier_text_or_keyword_latin_key(sym);
+        let Some(latin) = self.keyword_claim_key(sym) else {
+            return false;
+        };
         matches!(
             lookup_keyword_spec(latin),
             Some(spec)
@@ -400,11 +434,13 @@ impl Parser {
         match self.peek_raw().kind {
             TokenKind::Ident(sym) => {
                 let source = self.interner.resolve(sym);
-                source == latin_key
-                    || self
-                        .reader_keyword_latin_keys
-                        .get(source)
-                        .is_some_and(|key| key == latin_key)
+                if let Some(recorded) = self.reader_keyword_latin_keys.get(source) {
+                    return recorded == latin_key;
+                }
+                match self.keyword_surface {
+                    KeywordSurfaceMode::RegistryDirect => source == latin_key,
+                    KeywordSurfaceMode::PackAuthoritative => false,
+                }
             }
             ref kind => keyword_spelling_for_token(kind) == Some(latin_key),
         }
@@ -575,11 +611,14 @@ impl Parser {
             return false;
         };
         let source = self.interner.resolve(sym);
-        let matches_text = source == text
-            || self
-                .reader_keyword_latin_keys
-                .get(source)
-                .is_some_and(|latin_key| latin_key == text);
+        let matches_text = if let Some(latin_key) = self.reader_keyword_latin_keys.get(source) {
+            latin_key == text
+        } else {
+            match self.keyword_surface {
+                KeywordSurfaceMode::RegistryDirect => source == text,
+                KeywordSurfaceMode::PackAuthoritative => false,
+            }
+        };
         if !matches_text {
             return false;
         }
