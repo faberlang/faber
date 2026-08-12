@@ -60,7 +60,7 @@ pinnedInputs:
       digest: sha256:cb1bcfa8a5d880d354f77ef8d43444b27aa31e66eb95f4e1770876b920dec544
       compatibility: "norma 0.1.x (faber_min 0.38.0); release-owned platform package"
       license: MIT
-      destination: "store seeding via faber install (faber-onboarding Stage 6)"
+      destination: "store seeding via cista install --path (faber-onboarding Stage 6)"
 versionSources:
   - component: faber
     manifest: Cargo.toml
