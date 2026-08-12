@@ -93,6 +93,7 @@ pub enum TokenKind {
     OctetiString(Symbol),
 
     // === Keywords: Declarations ===
+    Columna,   // schema column declaration (census-types relational views)
     Discretio, // tagged union
     Fixum,     // const
     Functio,   // function
@@ -106,6 +107,7 @@ pub enum TokenKind {
     Proba,     // test case
     Probandum, // test suite
     Sit,       // inferred immutable local (sugar for fixum _)
+    Schema,    // partial relational heading (census-types relational views)
     Typus,     // type alias
     Varia,     // let/var
     // === Keywords: Modifiers ===
@@ -336,7 +338,8 @@ impl TokenKind {
         use TokenKind::*;
         matches!(
             self,
-            Discretio
+            Columna
+                | Discretio
                 | Fixum
                 | Functio
                 | Genus
@@ -349,6 +352,7 @@ impl TokenKind {
                 | Proba
                 | Probandum
                 | Sit
+                | Schema
                 | Typus
                 | Varia
                 | Abstractus

@@ -6,7 +6,8 @@
 
 use super::{
     keyword_allowed_as_ident, keyword_group_specs, keyword_specs, keyword_spelling_for_token,
-    lookup_keyword_spec, validate_keyword_groups, KeywordCategory, KeywordOwner, KeywordScope,
+    keyword_token_kind, lookup_keyword_spec, validate_keyword_groups, KeywordCategory,
+    KeywordOwner, KeywordScope,
 };
 use crate::TokenKind;
 
@@ -195,6 +196,46 @@ fn keyword_groups_are_static_and_complete_for_latin_surface() {
         .find(|group| group.id == "conditional")
         .expect("conditional group");
     assert_eq!(conditional.members, &["si", "sin", "secus"]);
+}
+
+#[test]
+fn census_schema_and_columna_are_declaration_keywords() {
+    // S2-U1: the two relational-view declaration keywords are registered with
+    // declaration-owner scope, mirroring the genus/typus rows.
+    for (spelling, identity) in [
+        ("schema", TokenKind::Schema),
+        ("columna", TokenKind::Columna),
+    ] {
+        let spec = lookup_keyword_spec(spelling)
+            .unwrap_or_else(|| panic!("{spelling} must be a registered keyword"));
+        assert_eq!(spec.token_kind, Some(identity.clone()));
+        assert_eq!(spec.category, KeywordCategory::Declaration);
+        assert_eq!(keyword_token_kind(spelling), Some(identity.clone()));
+        assert!(identity.is_keyword(), "{spelling} identity must report is_keyword");
+    }
+
+    let schema = lookup_keyword_spec("schema").expect("schema spec");
+    let KeywordScope::Contextual(owners) = schema.scope else {
+        panic!("schema must be contextual");
+    };
+    assert!(
+        owners.contains(&KeywordOwner::DeclarationIntroducer),
+        "schema must claim the declaration-introducer slot"
+    );
+}
+
+#[test]
+fn relational_view_keyword_group_bundles_declaration_keys() {
+    // S2-U1 group-completeness: `schema` and `columna` localize together.
+    let group = keyword_group_specs()
+        .iter()
+        .find(|group| group.id == "relational_view")
+        .expect("relational_view group");
+    assert_eq!(group.members, &["schema", "columna"]);
+    assert!(
+        validate_keyword_groups().is_empty(),
+        "relational_view group must reference live keyword rows"
+    );
 }
 
 #[test]

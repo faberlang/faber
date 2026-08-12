@@ -693,6 +693,7 @@ impl Parser {
                         | TokenKind::Ordo
                         | TokenKind::Sit
                         | TokenKind::Typus
+                        | TokenKind::Schema
                         | TokenKind::Discerne
                         | TokenKind::Dum
                         | TokenKind::Elige
@@ -895,6 +896,10 @@ mod slot_helpers_test;
 #[cfg(test)]
 #[path = "mod_test.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "schema_test.rs"]
+mod schema_test;
 
 #[cfg(test)]
 mod non_trivia_index_tests {

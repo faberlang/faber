@@ -96,6 +96,12 @@ fn claim_stmt(stmt: &Stmt, claimed: &mut HashSet<u32>) {
                 claim_trivia(&variant.leading_trivia, claimed);
             }
         }
+        StmtKind::Schema(schema) => {
+            claim_trivia(&schema.end_trivia, claimed);
+            for column in &schema.columns {
+                claim_trivia(&column.leading_trivia, claimed);
+            }
+        }
         StmtKind::Var(_)
         | StmtKind::TypeAlias(_)
         | StmtKind::Import(_)

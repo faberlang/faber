@@ -363,6 +363,9 @@ const CHOICE_GROUP: &[&str] = &["elige", "casu", "ceterum"];
 const PATTERN_CHOICE_GROUP: &[&str] = &["discerne", "casu", "ceterum"];
 const TRY_RECOVERY_GROUP: &[&str] = &["cape"];
 const LOOP_GROUP: &[&str] = &["dum", "fac", "itera", "perge", "rumpe"];
+// Census-types relational-view declaration surface (S2-U1): the two
+// declaration keywords must be localized together in a complete reader pack.
+const RELATIONAL_VIEW_GROUP: &[&str] = &["schema", "columna"];
 
 /// Complete keyword-group declarations for static Latin source-surface data.
 pub static KEYWORD_GROUP_SPECS: &[KeywordGroupSpec] = &[
@@ -385,6 +388,10 @@ pub static KEYWORD_GROUP_SPECS: &[KeywordGroupSpec] = &[
     KeywordGroupSpec {
         id: "loop",
         members: LOOP_GROUP,
+    },
+    KeywordGroupSpec {
+        id: "relational_view",
+        members: RELATIONAL_VIEW_GROUP,
     },
 ];
 
@@ -454,6 +461,23 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     KeywordSpec {
         text: "typus",
         token_kind: Some(TokenKind::Typus),
+        scope: KeywordScope::Contextual(DECLARATION_INTRODUCER),
+        category: KeywordCategory::Declaration,
+    },
+    // Census-types relational-view declaration keywords (stage2-delivery S2-U1;
+    // docs/design/relational-views.md §7 lexical lock). `schema` introduces a
+    // partial application-owned relational heading; `columna` declares one
+    // column inside a schema. Both are claimed in the statement/body slot by
+    // identity (columna only inside a schema body).
+    KeywordSpec {
+        text: "columna",
+        token_kind: Some(TokenKind::Columna),
+        scope: KeywordScope::Contextual(DECLARATION_INTRODUCER),
+        category: KeywordCategory::Declaration,
+    },
+    KeywordSpec {
+        text: "schema",
+        token_kind: Some(TokenKind::Schema),
         scope: KeywordScope::Contextual(DECLARATION_INTRODUCER),
         category: KeywordCategory::Declaration,
     },

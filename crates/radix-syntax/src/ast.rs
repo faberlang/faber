@@ -101,6 +101,8 @@ pub enum StmtKind {
     Interface(InterfaceDecl),
     /// Type alias: typus
     TypeAlias(TypeAliasDecl),
+    /// Relational schema: schema
+    Schema(SchemaDecl),
     /// Enum: ordo
     Enum(EnumDecl),
     /// Tagged union: discretio
@@ -433,6 +435,58 @@ pub struct TypeAliasDecl {
     pub name: Ident,
     pub type_params: Vec<TypeParam>,
     pub ty: TypeExpr,
+}
+
+/// Relational-view schema declaration: `schema Name { columna<T> name [: source] … }`.
+///
+/// A schema is a partial application-owned relational heading
+/// (docs/design/relational-views.md §2): it names only the columns the
+/// application needs, and extra source columns stay invisible. Per-column
+/// metadata — public name, source alias, Faber type, nullability via
+/// `T ∪ nihil` in the type position, and canonical order — is carried
+/// source-shaped here and resolved semantically in later phases. The schema
+/// name is a type-namespace identity and is never a runtime value.
+#[derive(Debug)]
+pub struct SchemaDecl {
+    /// Schema name (type-namespace identity; never a runtime value).
+    pub name: Ident,
+
+    /// Ordered column declarations in source order (canonical column order).
+    pub columns: Vec<SchemaColumn>,
+
+    /// Comments and newlines collected immediately before the consuming `}`.
+    ///
+    /// WHY: A `#` comment run directly before a schema body close has no
+    /// following column to attach to; it is retained on the block-end boundary
+    /// (mirroring [`ClassDecl::end_trivia`]) so the post-parse completeness
+    /// check can claim it.
+    pub end_trivia: Vec<Trivia>,
+}
+
+/// One `columna<T> publicName [: sourceName]` declaration inside a schema.
+///
+/// `T` is written type syntax (the existing type parser); `T ∪ nihil` spells
+/// nullable columns through the type position (design §2.4.1 field 4). The
+/// optional `publicName : sourceName` alias row is the D4 source-column
+/// mapping (public → source); a missing alias is the identity mapping
+/// (fixture-contract §7).
+#[derive(Debug)]
+pub struct SchemaColumn {
+    /// Comments and newlines before this column at a member boundary.
+    pub leading_trivia: Vec<Trivia>,
+
+    /// Written Faber type contract (`T` or `T ∪ nihil`).
+    pub ty: TypeExpr,
+
+    /// Schema-facing public name; result rows are keyed by it.
+    pub name: Ident,
+
+    /// Optional source-column identity via `name : source`; identity mapping
+    /// when absent.
+    pub source_alias: Option<Ident>,
+
+    /// Full column span for diagnostics.
+    pub span: Span,
 }
 
 #[derive(Debug)]

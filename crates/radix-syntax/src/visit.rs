@@ -297,6 +297,16 @@ pub fn walk_stmt<V: Visitor>(visitor: &mut V, stmt: &Stmt) {
             visitor.visit_ident(&decl.name);
             visitor.visit_type_expr(&decl.ty);
         }
+        StmtKind::Schema(decl) => {
+            visitor.visit_ident(&decl.name);
+            for column in &decl.columns {
+                visitor.visit_type_expr(&column.ty);
+                visitor.visit_ident(&column.name);
+                if let Some(alias) = &column.source_alias {
+                    visitor.visit_ident(alias);
+                }
+            }
+        }
         StmtKind::Enum(decl) => {
             visitor.visit_ident(&decl.name);
         }

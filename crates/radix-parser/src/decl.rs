@@ -70,6 +70,7 @@ impl Parser {
                     Some(TokenKind::Ordo) => self.parse_enum_decl()?,
                     Some(TokenKind::Sit) => self.parse_sit_decl()?,
                     Some(TokenKind::Typus) => self.parse_type_alias_decl()?,
+                    Some(TokenKind::Schema) => self.parse_schema_decl()?,
                     // Statement introducers (previously token-shaped).
                     Some(TokenKind::Abstractus) => self.parse_abstract_class_decl()?,
                     Some(TokenKind::Importa) => self.parse_import_decl()?,
@@ -918,6 +919,134 @@ impl Parser {
             name,
             type_params,
             ty,
+        }))
+    }
+
+    // =============================================================================
+    // SCHEMA DECLARATIONS
+    // =============================================================================
+
+    /// Parse a relational-view schema declaration.
+    ///
+    /// GRAMMAR:
+    ///   schema-decl := `schema` ident '{' schema-column* '}'
+    ///   schema-column := `columna` type ident [':' ident]
+    ///
+    /// A schema is a partial application-owned relational heading
+    /// (docs/design/relational-views.md §2): it names only the columns the
+    /// application needs, and extra source columns stay invisible. Column
+    /// types reuse the ordinary type parser, so `T ∪ nihil` spells nullable
+    /// columns through the type position (design §2.4.1 field 4). The
+    /// optional `publicName : sourceName` alias row is the D4 source-column
+    /// mapping (fixture-contract §7); an absent alias is the identity mapping.
+    ///
+    /// Grammar-level rejections mirror the pinned semantic issue keys
+    /// (stage2-delivery §6): method-like members (`schema_method`),
+    /// `sub`/`implet` inheritance syntax (`schema_inheritance`), and nested
+    /// column declarations (`schema_nested_column`) fail here at parse time
+    /// via a deferred parse-error bridge — the `issue` fact carries the pinned
+    /// semantic identity the semantic unit raises for the same class.
+    fn parse_schema_decl(&mut self) -> Result<StmtKind, ParseError> {
+        self.expect_keyword_ident(TokenKind::Schema, "expected 'schema'")?;
+        let name = self.parse_decl_name()?;
+
+        // Grammar-level rejection: `sub`/`implet` inheritance syntax on a
+        // schema is not a header surface (schemas have no inheritance).
+        if self.check_keyword_ident(TokenKind::Sub) || self.check_keyword_ident(TokenKind::Implet)
+        {
+            return Err(ParseError::structured(
+                ParseErrorKind::InvalidDeclaration,
+                self.current_span(),
+            )
+            .with_arg("issue", "schema_inheritance"));
+        }
+
+        self.expect(&TokenKind::LBrace, "expected '{'")?;
+
+        let mut columns = Vec::new();
+        while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
+            let leading_trivia = self.parse_leading_trivia();
+            let start = self.current_span();
+
+            // Grammar-level rejections, checked before the `columna` slot so a
+            // malformed member fails with the pinned issue key instead of a
+            // generic "expected 'columna'".
+            if self.check_keyword_ident(TokenKind::Functio) {
+                return Err(ParseError::structured(
+                    ParseErrorKind::InvalidDeclaration,
+                    self.current_span(),
+                )
+                .with_arg("issue", "schema_method"));
+            }
+            if self.check_keyword_ident(TokenKind::Sub)
+                || self.check_keyword_ident(TokenKind::Implet)
+            {
+                return Err(ParseError::structured(
+                    ParseErrorKind::InvalidDeclaration,
+                    self.current_span(),
+                )
+                .with_arg("issue", "schema_inheritance"));
+            }
+
+            self.expect_keyword_ident(TokenKind::Columna, "expected 'columna'")?;
+
+            // Nested column declaration: a `columna` keyword in the type slot
+            // (`columna columna …`) means a column nested inside a column.
+            if self.check_keyword_ident(TokenKind::Columna) {
+                return Err(ParseError::structured(
+                    ParseErrorKind::InvalidDeclaration,
+                    self.current_span(),
+                )
+                .with_arg("issue", "schema_nested_column"));
+            }
+
+            let ty = self.parse_type()?;
+            let column_name = self.parse_ident()?;
+
+            // Nested column declaration: a second `columna` on the same logical
+            // line where the alias row (or the next column) belongs — no column
+            // carries a nested column list. A `columna` on a fresh line is the
+            // next column, not a nested declaration (newlines are trivia, so
+            // the raw-token check distinguishes the two).
+            if self.check_keyword_ident(TokenKind::Columna)
+                && self.peek_raw().kind != TokenKind::Newline
+            {
+                return Err(ParseError::structured(
+                    ParseErrorKind::InvalidDeclaration,
+                    self.current_span(),
+                )
+                .with_arg("issue", "schema_nested_column"));
+            }
+
+            // D4 alias row: `publicName : sourceName`. `Colon` is the existing
+            // punctuation token (token.rs), reused as the alias separator.
+            let source_alias = if self.eat(&TokenKind::Colon) {
+                Some(self.parse_ident()?)
+            } else {
+                None
+            };
+
+            let span = start.merge(self.previous_span());
+            columns.push(SchemaColumn {
+                leading_trivia,
+                ty,
+                name: column_name,
+                source_alias,
+                span,
+            });
+        }
+
+        // Trivia immediately before the consuming `}` has no following column
+        // to attach to; retain it on the schema-end boundary so the post-parse
+        // completeness check can claim it (mirrors `parse_class_decl`).
+        let end_trivia = self.parse_block_end_trivia();
+
+        self.expect(&TokenKind::RBrace, "expected '}' after schema body")?;
+
+        Ok(StmtKind::Schema(SchemaDecl {
+            name,
+            columns,
+            end_trivia,
         }))
     }
 
