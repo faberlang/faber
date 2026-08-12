@@ -130,6 +130,7 @@ fn assert_only_materialized_paths(manifest: &str, home: &Path) {
     );
     for forbidden in [
         "/faber-runtime",
+        "/faber/runtime/rust",
         "/hosts/crates/host-kernel",
         "/hosts/crates/host-native",
         "/host-kernel-rs",
