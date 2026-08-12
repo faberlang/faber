@@ -252,7 +252,7 @@ impl HttpTransport {
         let cancel_notify = Arc::new(Notify::new());
         let correlations = Arc::new(CorrelationTable::new());
         let in_flight = Arc::new(AtomicUsize::new(0));
-        let slots = Arc::new(Semaphore::new(config.max_in_flight.max(1)));
+        let slots = Arc::new(Semaphore::new(config.max_in_flight));
         let connections = Arc::new(Mutex::new(ConnectionTasks::default()));
 
         let handler: BoxHandler = Arc::new(move |req| Box::pin(handler(req)));
@@ -488,6 +488,15 @@ async fn handle_connection(
 
     correlations.begin(&request_id, method.as_str(), &path);
     let correlation = CorrelationGuard::new(Arc::clone(&correlations), request_id.clone());
+
+    if config.max_body_bytes == 0 {
+        correlation.complete(StatusCode::PAYLOAD_TOO_LARGE.as_u16());
+        return error_response(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            &request_id,
+            "body exceeds max_body_bytes",
+        );
+    }
 
     let body_result = timeout_at(
         deadline,

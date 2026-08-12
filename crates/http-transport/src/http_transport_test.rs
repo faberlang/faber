@@ -585,7 +585,11 @@ async fn max_in_flight_zero_rejects_every_request() {
     assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(body, "server busy");
     assert!(id.is_some());
-    assert_eq!(hits.load(Ordering::SeqCst), 0, "handler must not run when max_in_flight=0");
+    assert_eq!(
+        hits.load(Ordering::SeqCst),
+        0,
+        "handler must not run when max_in_flight=0"
+    );
 
     transport.shutdown_and_join().await;
 }

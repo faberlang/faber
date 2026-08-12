@@ -10,18 +10,16 @@ license = "MIT"
 # The lib target keeps the `faber` crate name so generated-Rust manifests
 # (alias `faber = { package = "faber-runtime", ... }`) resolve unchanged.
 #
-# Standalone workspace root: while the legacy `../faber-runtime` repo is still
-# a path dependency of the faber CLI, a same-named member in the faber root
-# workspace would collide in Cargo resolution. This crate builds on its own;
-# the core-support re-point (S8A) integrates it as the faber runtime path.
+# This package is a standalone workspace root so each public target package can
+# build without the private compiler workspace.
 [workspace]
 
 [lib]
 name = "faber"
 path = "src/lib.rs"
 
+[features]
+test-support = []
+
 [dependencies]
 regex = "1"
-
-[dev-dependencies]
-tempfile = "3"

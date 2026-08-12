@@ -1,8 +1,0 @@
-[package]
-name = "importa-wasm"
-version = "0.1.0"
-edition = "2026"
-
-[paths]
-source = "."
-entry = "importa.fab"

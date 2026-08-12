@@ -1,197 +1,90 @@
 # Faber
 
-Public Faber project and package tool (`faber` binary).
+Faber is a statically typed programming language with reader-localized source
+vocabulary and shared, locale-independent semantics.
 
-Builds, checks, runs, tests, formats, and interprets Faber packages. The
-compiler engine lives in the private **Radix** workspace; this repository is
-the user-facing product surface.
+This public repository is the language project home and the source home for
+Faber's generated-language support packages. The compiler and `faber` CLI
+implementation are maintained in a private repository. Public binaries,
+checksums, grammar, documentation, examples, and target APIs remain available.
 
-## Local development layout
+## Install
 
-```text
-faberlang/
-  faber/           this repo (public CLI + corpus e2e harness)
-  faber-runtime/   public Rust runtime types (`use faber::…`)
-  radix/           private compiler (formatter is `radix::forma`)
-  hosts/           public host monorepo embedded in core support
-  norma/           public standard library source
-  triga/           optional graphics and geometry library
-  examples/        public application examples (corpus split: radix/corpus + faber/corpus)
-  cista/           public package-store CLI/lib
+Supported release archives are published at
+[faberlang/releases](https://github.com/faberlang/releases/releases).
+
+```sh
+# Select the current version and platform archive from the releases page.
+tar -xzf faber-vX.Y.Z-<target>.tar.gz
+./bin/faber --version
 ```
 
-Path dependencies (not published):
+Supported release platforms are listed with each release. Package acquisition
+is owned by [Cista](https://github.com/faberlang/cista); the Faber CLI consumes
+the resulting project lock.
 
-- `../radix/crates/radix` — compiler library (includes `radix::forma` formatter and MIR stepper)
-- `../cista` — package-store library CLI/lib
-- `crates/hygiene-ratchet` — hygiene budgets for non-test sources (dev-dependency)
-- `crates/exempla` — corpus e2e harness (workspace member; depends on radix + this CLI)
+## Language
 
-Generated packages from `faber build` depend on sibling **`faber-runtime`**
-(package name `faber-runtime`, crate name `faber`), not on this CLI crate.
+- [Documentation and learning paths](https://faberlang.dev/en-US/)
+- [Formal grammar](https://faberlang.dev/en-US/reference/grammar.html)
+- [Examples](https://github.com/faberlang/examples)
+- [Public releases](https://github.com/faberlang/releases/releases)
 
-## Build
+The website grammar is generated from the compiler's versioned grammar source.
+Release notes and manifests record the product version and immutable build
+inputs used for each binary release.
 
-```bash
-cargo build --release
-./target/release/faber --help
-```
+## Target APIs
 
-End users of released binaries do not need sibling checkouts. Building this
-crate from source requires the sibling Radix, Cista, `faber-runtime`, and
-`hosts` checkouts used by the local `faberlang/` layout.
-
-## Tests (cheap-first)
-
-| Command | Cost | Use |
+| Target | Public source | Package identity |
 | --- | --- | --- |
-| `./scripta/test` | cheap | Default agent / day-to-day loop |
-| `cargo test -p faber --lib` | cheap | Same as stage 1 (lib incl. `package::tests` megasuite) |
-| `./scripta/test --stage unit` | slow | Explicit: the `package::tests` megasuite |
-| `./scripta/test --stage product` | slow | Explicit: integration binaries under `tests/` |
-| `./scripta/release-gate` | **expensive** | **Release prep only** (full workspace + exempla) |
+| Rust | [`runtime/rust/`](runtime/rust/) | package `faber-runtime`, crate `faber` |
+| TypeScript | [`runtime/typescript/`](runtime/typescript/) | `@faber/runtime` |
+| Go | [`runtime/go/`](runtime/go/) | `faber/rt` |
+| Swift | [`runtime/swift/`](runtime/swift/) | `FaberRuntime` |
 
-`cargo test -p faber --lib` does **not** run the full workspace. Full
-workspace (faber + exempla) is `cargo test --workspace` / `./scripta/release-gate`,
-release/explicit only.
+The Rust ABI and carrier sources are under
+[`runtime/rust/src/contract/`](runtime/rust/src/contract/). Concrete
+filesystem, process, network, browser, LLVM, and device behavior belongs in
+Hosts, not these generated-language packages.
 
-Agents must not run `./scripta/release-gate` or `--profile full` unless the
-operator is preparing a release or explicitly requests that gate. Language
-corpus matrices and backend e2e stay on the radix ladder
-(`../radix/scripta/test --stage 5-6` / `--e2e`), also explicit-only.
+The [HTTP package](packages/http/) and
+[Rust HTTP transport](crates/http-transport/) are also public here.
 
-## Commands
+## Repository Family
 
-- `faber check` / `build` / `run` / `test`
-- `faber check --deny-warnings`, `faber check --deny <CODE>` — promote warnings
-  or specific diagnostic-catalog codes to hard failures (also on `build`, `run`, `test`)
-- `faber script` — MIR interpret (no Cargo)
-- `faber format`, `faber explain`, `faber targets`
+| Repository | Role | Visibility |
+| --- | --- | --- |
+| `faberlang/faber` | Language home and generated-language APIs | Public |
+| `faberlang/releases` | Signed release objects and checksums | Public |
+| `faberlang/norma` | Standard library source | Public |
+| `faberlang/cista` | Package store and lock writer | Public |
+| `faberlang/hosts` | Concrete host implementations | Public |
+| `faberlang/examples` | Examples and application packages | Public |
+| `faberlang/tree-sitter-faber` | Editor grammar | Public |
+| Radix | Compiler and `faber` CLI implementation | Private |
 
-See `faber --help` and after-help text for the full surface.
+The machine-readable form is [`catalog.json`](catalog.json).
 
-## Formatting policy
+## Issues And Contributions
 
-`faber format` selects a named format policy: `normalise-v1` (the exact
-current normalizer behavior; the built-in default) or `pretty-v1` (the pretty
-layout policy). Policy precedence: CLI `--policy` > package `[format] policy`
-in `faber.toml` > the built-in default (`normalise-v1`). Each input root
-resolves the package that contains it (nearest `faber.toml`, walking up), so a
-multi-root invocation spanning packages formats each package with its own
-policy; files outside any package (and `--stdin`) fall back to the built-in
-default. Unknown policy slugs fail clearly at parse/validation — never a
-silent fallback.
+Use this repository for language reports, public target-package bugs, and
+documentation routing. Compiler implementation patches cannot be accepted
+because that source is private. Reproducible reports should include the Faber
+version, target, source fixture, exact command, and observed output.
 
-```toml
-# faber.toml
-[format]
-policy = "pretty-v1"
-```
+Public package changes are accepted when they preserve the generated-code
+contract and include focused tests. See [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md).
 
-There is no second config language in v1: `[forma]`, `forma.toml`, global
-dotfile config, inheritance, and per-file rule lists are out of scope, and
-`faber format --config` stays a deferred warning stub.
+Report security issues through
+[GitHub private vulnerability reporting](https://github.com/faberlang/faber/security/advisories/new),
+not a public issue.
 
-## Reader locale
+## History
 
-Faber source and diagnostics can render in a reader locale. `faber check`,
-`build`, `run`, and `test` accept `--locale <locale>` for the code locale and
-`--diagnostics-locale <locale>` for the message language (independent of the code
-locale); `faber format --locale la` reproduces the former `--canonical` re-emit
-surface. The manifest equivalent is the `faber.toml` `[locale]` table (legacy
-`[reader]` alias still accepted during the rename sweep). Installed packs live
-in the private Radix `stdlib/locale/` (eight locales: `la`, `ar`, `hi`, `vi`,
-`th-TH`, `zh-Hans`, `zh-Hant`, `en`); a package can override with a local
-`locale/<locale>.toml`.
+Older compiler and CLI source remains available in this repository's Git
+history. It is historical, not the current implementation.
 
-## Device execution (Metal / CUDA)
+## License
 
-`faber run` selects a device backend for device-capable packages (the
-`gpu-training-lowering` campaign, stages 1–6):
-
-```bash
-faber run --backend metal <package>   # Apple Metal (e.g. Apple M5 Max)
-faber run --backend cuda  <package>   # NVIDIA CUDA (e.g. RTX 5070)
-faber run --backend auto  <package>   # resolve: exactly one admitted backend
-```
-
-- Backend selection precedence: CLI `--backend` > manifest `[device] backend`
-  > `auto`.
-- A package carries a device program when its source has an `@ nucleum`
-  compute kernel and its manifest declares a `[device]` section
-  (`backend`, and `inputs` for the kernel's input buffers).
-- The packaged FMIR image's `device` section carries the canonical device
-  program, the Metal MSL + CUDA PTX artifacts (each with a provenance hash),
-  the selection request, and the device runtime requirements; the composite
-  host runs it through a real Metal/CUDA session (load → allocate → copy-in →
-  launch → sync → readback → release) and reports the selected device, the
-  artifact/module hash, and the observed outputs.
-- An explicit GPU request never silently falls back: unavailable backends,
-  bad descriptors, entry/dtype/shape mismatches, and payload-less packages
-  fail closed with a stable structured code (`E_BACKEND_UNAVAILABLE`,
-  `E_DEVICE_DESCRIPTOR`, `E_DEVICE_ABI_MISMATCH`, `E_DEVICE_ENTRY_MISMATCH`,
-  `E_DEVICE_DTYPE_MISMATCH`, `E_DEVICE_SHAPE_MISMATCH`, `E_NO_DEVICE_PROGRAM`).
-- The `faber targets` rows for `metal-text` / `llvm-text` report `run=yes`
-  and `package=yes` (RC-local) for this device-execution surface: the faber
-  `1.6.0-rc.1` release-candidate compiled FMIR packages (MLP + BERT-tiny)
-  ran at RC level on the named machines — burgus (Metal, Apple M5 Max) and
-  pharos (CUDA, NVIDIA RTX 5070) — by the Stage 7 E6/E7 receipts (RC binary +
-  clean-room extracted archive, numeric-policy v1.0.0 rows PASS). No E8, no
-  stable-publication, no broad-hardware wording; Stage 8 owns publication.
-  `-t metal-text` / `-t llvm-text` remain emit-only.
-
-### Native host executables (`faber build/run --target llvm-host`)
-
-Stage 9 product wiring exposes the proven MIR-to-LLVM host lane as a truthful
-Faber product target:
-
-```text
-faber emit  --target llvm-text <input>      → .ll or stdout (emit-only)
-faber build --target llvm-host <input>      → native executable path
-faber run   --target llvm-host <input> -- … → build then execute (args/exit forwarded)
-faber targets                                → distinct llvm-text / llvm-host rows
-```
-
-- `llvm-host` is a distinct target name with **no alias spelling**.
-- The build routes through the shared package-to-LLVM builder (one `.ll` per
-  package unit, exactly like the pairwise exempla harness), then `llvm-as`
-  verify, a pinned `opt -O2` pipeline for release builds, and one `clang` link
-  against the `faber-host-llvm` runtime archive. Never Rust codegen for the
-  program, never a `cc` fallback.
-- Artifacts land in the inspectable `target/faber-llvm/{debug|release}/`
-  layout: `modules/` (one `.ll` per unit), `link-manifest.toml` (host triple,
-  profile, tool paths + versions, module link order, runtime archive identity,
-  native flags, output, opt pipeline), `runtime/identity.toml`, and the binary.
-- Build fails with a structured diagnostic when `llvm-as`/`clang`/`opt`
-  (release) or the runtime archive is unavailable, or when the host triple is
-  unsupported (native host builds only — no cross compile).
-- Tool prerequisites: a coherent LLVM toolchain (`llvm-as` + `clang`, plus
-  `opt` for release) and a buildable `faber-runtime/hosts/llvm` staticlib
-  (built automatically on first use).
-
-Proof fixture: `radix/corpus/incipit/salve-munde.fab` (the two commands above,
-both debug and release).
-
-Proof fixture: `examples/training/device-summa` (one tree-reduction kernel
-through the whole pipeline on both backends, numeric-policy v1.0.0 parity
-against its pinned CPU oracle). The surface also materializes training loops
-end-to-end: a library-backed `train_step` / companion VJP with per-step
-observation cadence (loss), gradient-slot → buffer mapping, and end-of-run value
-readback.
-
-**Stage 7 RC proof (faber `1.6.0-rc.1`, 2026-08-08):** `examples/training/mlp`
-(100-step) and `examples/training/bert-tiny-fragment` (8-step) are the
-release-candidate fixtures. E6 receipts (TR7-U2 burgus Metal, TR7-U3 pharos
-CUDA) ran the RC binary via `faber run --backend metal|cuda .`; E7 receipts
-(TR7-U4/U5) ran the clean-room extracted RC archive via
-`__fmir-run image.fmir --backend metal|cuda` under a temp home, minimal PATH,
-and no sibling checkout. All numeric-policy v1.0.0 rows PASS on both machines
-at the pinned revisions; device output is byte-identical E6↔E7 (except the
-CUDA module/artifact hash — the archive embeds the Stage 0 `ptx87` payload
-while E6's source route recompiled to ptx 7.8; A10 identity, descriptors, and
-trajectories unchanged). RC-local posture: no E8/stable claim.
-
-## Factory goals
-
-Open product-lane factory tracks for this CLI live under
-[`docs/factory/`](docs/factory/) (moved out of private Radix on 2026-07-08).
+MIT. See [`LICENSE`](LICENSE).
