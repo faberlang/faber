@@ -1,9 +1,0 @@
-functio monstra(textus nomen) → textus {
-    nota "salve, §!"(nomen)
-    redde nomen
-}
-
-functio ianua(numerus code) → bivalens {
-    si code ≡ 42 ergo redde verum
-    redde falsum
-}
