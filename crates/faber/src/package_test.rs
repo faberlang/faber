@@ -9,7 +9,7 @@ use super::{
     build_package_fmir_image, build_package_fmir_text_image, build_package_mir_artifact,
     check_package, compile_package, compile_package_go, config_with_locale, discover_build_layout,
     discover_package, emit_generated_crate, emit_generated_crate_with_runtime_plan,
-    invoke_cargo_build, library_cached_file_interface, library_resolver_from_config, load_package,
+    invoke_cargo_build, library_cached_file_interface, library_resolver_from_config,
     load_package_with_locale_pack, package_host_selection_diagnostic, package_rust_runtime_plan,
     read_manifest, run_package_fmir_image, run_package_fmir_text_image, run_package_mir,
     run_package_mir_artifact, sanitize_crate_name, use_package_compiler,
@@ -55,7 +55,7 @@ fn executed_lane_analysis_target_seam_is_single_valued() {
     // ambient and never divergent between analysis and execution.
     let dir = test_temp_dir("lane-seam");
     fs::create_dir_all(dir.join("src")).expect("src");
-    fs::write(dir.join("src/main.fab"), "incipit {}\n").expect("source");
+    fs::write(dir.join("src/main.fab"), "main {}\n").expect("source");
     fs::write(
         dir.join("faber.toml"),
         r#"
@@ -96,7 +96,7 @@ kind = "bin"
     // No manifest target → executed-lane default `fmir`.
     let bare = test_temp_dir("lane-seam-bare");
     fs::create_dir_all(bare.join("src")).expect("src");
-    fs::write(bare.join("src/main.fab"), "incipit {}\n").expect("source");
+    fs::write(bare.join("src/main.fab"), "main {}\n").expect("source");
     fs::write(
         bare.join("faber.toml"),
         r#"
@@ -167,7 +167,6 @@ fn dev_norma_library_home() -> PathBuf {
     {
         return home;
     }
-
     let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .expect("faberlang container root");
@@ -177,6 +176,16 @@ fn dev_norma_library_home() -> PathBuf {
         }
     }
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..")
+}
+
+/// The product-default English code pack (en = authority). The transitive
+/// loader tests below call `load_package`/`load_package_with_locale_pack`
+/// directly; they must pass the same default pack the `compile_package*` /
+/// `analyze_package` routes apply — not the pack-less (registry-direct)
+/// lexing `load_package` would select.
+fn english_pack() -> radix::locale::LocalePack {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    radix::locale::LocalePack::from_toml_path(path).expect("load English locale pack")
 }
 
 struct CoreutilsLikePackage {
@@ -321,7 +330,7 @@ fn compile_package_reports_unresolved_external_imports() {
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
-        "importa ex \"lodash\" privata map\nincipit { nota \"x\" }",
+        "import from \"lodash\" private map\nmain { print \"x\" }",
     )
     .expect("write entry");
 
@@ -366,15 +375,15 @@ entry = "src/main.fab"
     fs::write(
         &entry,
         r#"
-importa ex "norma:json/solve" privata solve ut json_solve
+import from "norma:json/solve" private solve as json_solve
 
-incipit {
-  fac {
-    fixum json parsed ← json_solve.solve("{}")
-    nota parsed
+main {
+  do {
+    const json parsed ← json_solve.solve("{}")
+    print parsed
   }
-  cape err {
-    nota err
+  catch err {
+    print err
   }
 }
 "#,
@@ -407,19 +416,19 @@ fn build_package_resolves_norma_json_facade_roundtrip() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:json" privata json
+import from "norma:json" private json
 
-incipit {
-  fac {
-    fixum json arr ← json.solve("[1]")
-    fixum textus arr_wire ← json.pange(arr)
-    fixum json obj ← json.solve("{\"a\":1}")
-    fixum textus obj_wire ← json.pange(obj)
-    nota arr_wire
-    nota obj_wire
+main {
+  do {
+    const json arr ← json.solve("[1]")
+    const string arr_wire ← json.pange(arr)
+    const json obj ← json.solve("{\"a\":1}")
+    const string obj_wire ← json.pange(obj)
+    print arr_wire
+    print obj_wire
   }
-  cape err {
-    nota err
+  catch err {
+    print err
   }
 }
 "#,
@@ -457,11 +466,11 @@ fn compile_package_rejects_direct_text_json_wire_conversions() {
     fs::write(
         &entry,
         r#"
-incipit {
-  fixum textus wire ← "{}"
-  fixum json parsed ← wire ↦ json
-  fixum textus out ← parsed ↦ textus
-  nota out
+main {
+  const string wire ← "{}"
+  const json parsed ← wire ↦ json
+  const string out ← parsed ↦ string
+  print out
 }
 "#,
     )
@@ -491,31 +500,31 @@ fn run_package_validates_norma_json_object_array_roundtrip() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:json" privata json
+import from "norma:json" private json
 
 @ json
-genus Payload {
-  textus name
-  lista<numerus> counts
+class Payload {
+  string name
+  list<int> counts
 }
 
-incipit {
-  fac {
-    fixum textus original ← "{\"counts\":[1,2],\"name\":\"Ada\"}"
-    fixum json parsed ← json.solve(original)
-    fixum Payload payload ← parsed ↦ Payload
-    fixum json encoded ← json.solve(original)
-    fixum textus wire ← json.pange(encoded)
-    fixum json reparsed ← json.solve(wire)
-    fixum Payload roundtrip ← reparsed ↦ Payload
-    nota payload.name
-    nota payload.counts.longitudo()
-    nota wire
-    nota roundtrip.name
-    nota roundtrip.counts.longitudo()
+main {
+  do {
+    const string original ← "{\"counts\":[1,2],\"name\":\"Ada\"}"
+    const json parsed ← json.solve(original)
+    const Payload payload ← parsed ↦ Payload
+    const json encoded ← json.solve(original)
+    const string wire ← json.pange(encoded)
+    const json reparsed ← json.solve(wire)
+    const Payload roundtrip ← reparsed ↦ Payload
+    print payload.name
+    print payload.counts.longitudo()
+    print wire
+    print roundtrip.name
+    print roundtrip.counts.longitudo()
   }
-  cape err {
-    nota err
+  catch err {
+    print err
   }
 }
 "#,
@@ -596,10 +605,10 @@ functio fallback_label() → textus {
     fs::write(
         &entry,
         r#"
-importa ex "norma:solum/path" privata path
+import from "norma:solum/path" private path
 
-incipit {
-  nota path.locked_label()
+main {
+  print path.locked_label()
 }
 "#,
     )
@@ -629,10 +638,10 @@ fn package_emits_rustfmt_clean_generated_main_for_multifile_package() {
     fs::write(
         &entry,
         r##"
-importa ex "./thing" privata thing
+import from "./thing" private thing
 
-incipit {
-  nota thing.label()
+main {
+  print thing.label()
 }
 "##,
     )
@@ -640,8 +649,8 @@ incipit {
     fs::write(
         dir.join("thing.fab"),
         r#"
-functio label() → textus {
-  redde "ok"
+fn label() → string {
+  return "ok"
 }
 "#,
     )
@@ -684,10 +693,10 @@ fn package_analysis_api_exposes_multifile_units_without_rust_emit() {
     fs::write(
         &entry,
         r##"
-importa ex "./thing" privata thing
+import from "./thing" private thing
 
-incipit {
-  nota thing.label()
+main {
+  print thing.label()
 }
 "##,
     )
@@ -696,8 +705,8 @@ incipit {
     fs::write(
         &module,
         r#"
-functio label() → textus {
-  redde "ok"
+fn label() → string {
+  return "ok"
 }
 "#,
     )
@@ -783,10 +792,10 @@ fn package_mir_linking_executes_two_file_package_without_rust_emit() {
     fs::write(
         &entry,
         r##"
-importa ex "./thing" privata thing
+import from "./thing" private thing
 
-incipit {
-  nota thing.label()
+main {
+  print thing.label()
 }
 "##,
     )
@@ -794,12 +803,12 @@ incipit {
     fs::write(
         dir.join("thing.fab"),
         r#"
-incipit {
-  nota "module entry must not run"
+main {
+  print "module entry must not run"
 }
 
-functio label() → numerus {
-  redde 7
+fn label() → int {
+  return 7
 }
 "#,
     )
@@ -829,8 +838,8 @@ fn package_mir_cli_root_entry_executes_without_rust_emit() {
         &entry,
         r#"
 @ cli "tool"
-incipit argumenta args {
-  nota "cli root"
+main args args {
+  print "cli root"
 }
 "#,
     )
@@ -859,8 +868,8 @@ fn package_mir_artifact_runs_hello_world_without_rust_emit() {
     fs::write(
         &entry,
         r#"
-incipit {
-  nota "Salve, Munde!"
+main {
+  print "Salve, Munde!"
 }
 "#,
     )
@@ -896,13 +905,13 @@ fn package_mir_artifact_manifest_declares_runtime_requirements() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:solum" privata solum
+import from "norma:solum" private solum
 
 @ cli "tool"
-@ operandus textus root
-incipit argumenta args {
-  varia lista<textus> partes ← [args.root, "nested"]
-  nota solum.iunge(partes)
+@ operand string root
+main args args {
+  var list<string> partes ← [args.root, "nested"]
+  print solum.iunge(partes)
 }
 "#,
     )
@@ -937,10 +946,10 @@ fn package_mir_artifact_manifest_layout_is_deterministic() {
     fs::write(
         &entry,
         r#"
-importa ex "./message" privata message
+import from "./message" private message
 
-incipit {
-  nota message.text()
+main {
+  print message.text()
 }
 "#,
     )
@@ -948,8 +957,8 @@ incipit {
     fs::write(
         dir.join("message.fab"),
         r#"
-functio text() → textus {
-  redde "stable"
+fn text() → string {
+  return "stable"
 }
 "#,
     )
@@ -987,7 +996,7 @@ fn package_mir_artifact_harness_hello_world() {
     artifact_harness_run_test("hello-world", |_case| {
         let dir = test_temp_dir("artifact-harness-hello");
         let input = dir.join("main.fab");
-        fs::write(&input, "incipit { nota \"Salve, Munde!\" }").expect("write hello");
+        fs::write(&input, "main { print \"Salve, Munde!\" }").expect("write hello");
         ArtifactHarnessCaseInner {
             _dir: dir,
             name: "hello-world",
@@ -1006,10 +1015,10 @@ fn package_mir_artifact_harness_multifile() {
         fs::write(
             &input,
             r#"
-importa ex "./message" privata message
+import from "./message" private message
 
-incipit {
-  nota message.text()
+main {
+  print message.text()
 }
 "#,
         )
@@ -1017,8 +1026,8 @@ incipit {
         fs::write(
             dir.join("message.fab"),
             r#"
-functio text() → textus {
-  redde "multi"
+fn text() → string {
+  return "multi"
 }
 "#,
         )
@@ -1042,9 +1051,9 @@ fn package_mir_artifact_harness_cli_argv() {
             &input,
             r#"
 @ cli "tool"
-@ operandus textus name
-incipit argumenta args {
-  nota args.name
+@ operand string name
+main args args {
+  print args.name
 }
 "#,
         )
@@ -1161,8 +1170,8 @@ fn package_mir_artifact_rejects_malformed_manifest() {
     fs::write(
         &entry,
         r#"
-incipit {
-  nota "must not run"
+main {
+  print "must not run"
 }
 "#,
     )
@@ -1193,8 +1202,8 @@ fn package_build_scena_target_writes_artifact_without_rust_emit() {
     fs::write(
         &entry,
         r#"
-incipit {
-  nota "Salve, Munde!"
+main {
+  print "Salve, Munde!"
 }
 "#,
     )
@@ -1219,8 +1228,8 @@ fn package_fmir_text_image_runs_after_source_is_removed() {
     fs::write(
         &entry,
         r#"
-incipit {
-  nota "Salve, Munde!"
+main {
+  print "Salve, Munde!"
 }
 "#,
     )
@@ -1263,10 +1272,10 @@ fn package_fmir_text_image_multifile_is_deterministic_and_source_independent() {
     fs::write(
         &entry,
         r#"
-importa ex "./message" privata message
+import from "./message" private message
 
-incipit {
-  nota message.text()
+main {
+  print message.text()
 }
 "#,
     )
@@ -1274,8 +1283,8 @@ incipit {
     fs::write(
         &module,
         r#"
-functio text() → textus {
-  redde "multi"
+fn text() → string {
+  return "multi"
 }
 "#,
     )
@@ -1299,8 +1308,8 @@ functio text() → textus {
         "image:\n{first_image}"
     );
 
-    fs::write(&module, "functio text() → textus { redde \"changed\" }").expect("mutate module");
-    fs::write(&entry, "incipit { nota \"changed\" }").expect("mutate entry");
+    fs::write(&module, "fn text() → string { return \"changed\" }").expect("mutate module");
+    fs::write(&entry, "main { print \"changed\" }").expect("mutate entry");
 
     let mut host = BufferHost::default();
     run_package_fmir_text_image(&first, &mut host).expect("run fmir-text image after mutation");
@@ -1316,10 +1325,10 @@ fn package_fmir_text_image_records_source_hashes() {
     fs::write(
         &entry,
         r#"
-importa ex "./message" privata message
+import from "./message" private message
 
-incipit {
-  nota message.text()
+main {
+  print message.text()
 }
 "#,
     )
@@ -1327,8 +1336,8 @@ incipit {
     fs::write(
         &module,
         r#"
-functio text() → textus {
-  redde "multi"
+fn text() → string {
+  return "multi"
 }
 "#,
     )
@@ -1354,7 +1363,7 @@ functio text() → textus {
 fn package_mir_artifacts_preserve_quoted_source_paths() {
     let dir = test_temp_dir("package-mir-quoted-source");
     let entry = dir.join("main\"quoted.fab");
-    fs::write(&entry, "incipit { nota \"quoted\" }").expect("write quoted entry");
+    fs::write(&entry, "main { print \"quoted\" }").expect("write quoted entry");
 
     let config = Config::default().with_target(Target::MirFmir);
     let artifact = build_package_mir_artifact(&config, &entry, &[]).expect("build manifest");
@@ -1386,7 +1395,7 @@ fn package_mir_artifacts_preserve_quoted_source_paths() {
 fn package_fmir_text_image_rejects_bad_version_without_source_fallback() {
     let dir = test_temp_dir("package-fmir-text-bad-version");
     let entry = dir.join("main.fab");
-    fs::write(&entry, "incipit { nota \"must not run\" }").expect("write entry");
+    fs::write(&entry, "main { print \"must not run\" }").expect("write entry");
 
     let image =
         build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
@@ -1412,7 +1421,7 @@ fn package_fmir_text_image_rejects_bad_version_without_source_fallback() {
 fn package_fmir_text_image_rejects_unknown_records_without_source_fallback() {
     let dir = test_temp_dir("package-fmir-text-unknown-record");
     let entry = dir.join("main.fab");
-    fs::write(&entry, "incipit { nota \"must not run\" }").expect("write entry");
+    fs::write(&entry, "main { print \"must not run\" }").expect("write entry");
 
     let image =
         build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
@@ -1436,7 +1445,7 @@ fn package_fmir_text_image_rejects_unknown_records_without_source_fallback() {
 fn package_fmir_text_image_rejects_unknown_runtime_requirement_without_source_fallback() {
     let dir = test_temp_dir("package-fmir-text-unknown-runtime-requirement");
     let entry = dir.join("main.fab");
-    fs::write(&entry, "incipit { nota \"must not run\" }").expect("write entry");
+    fs::write(&entry, "main { print \"must not run\" }").expect("write entry");
 
     let image =
         build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
@@ -1474,9 +1483,9 @@ fn package_fmir_text_image_rejects_bad_type_metadata_without_source_fallback() {
         &entry,
         r#"
 @ cli "tool"
-@ operandus textus name
-incipit argumenta args {
-  nota args.name
+@ operand string name
+main args args {
+  print args.name
 }
 "#,
     )
@@ -1513,9 +1522,9 @@ fn package_fmir_text_image_cli_operand_uses_runtime_argument_after_source_is_rem
         &entry,
         r#"
 @ cli "tool"
-@ operandus textus name
-incipit argumenta args {
-  nota args.name
+@ operand string name
+main args args {
+  print args.name
 }
 "#,
     )
@@ -1545,9 +1554,9 @@ fn package_fmir_image_cli_operand_uses_runtime_argument_after_source_is_removed(
         &entry,
         r#"
 @ cli "tool"
-@ operandus textus name
-incipit argumenta args {
-  nota args.name
+@ operand string name
+main args args {
+  print args.name
 }
 "#,
     )
@@ -1581,8 +1590,8 @@ fn package_fmir_text_image_preserves_fixed_cli_exit_code() {
         &entry,
         r#"
 @ cli "tool"
-incipit argumenta args exitus 7 {
-  nota "done"
+main args args exit 7 {
+  print "done"
 }
 "#,
     )
@@ -1619,8 +1628,8 @@ fn package_fmir_image_preserves_fixed_cli_exit_code() {
         &entry,
         r#"
 @ cli "tool"
-incipit argumenta args exitus 7 {
-  nota "done"
+main args args exit 7 {
+  print "done"
 }
 "#,
     )
@@ -1658,12 +1667,12 @@ fn package_fmir_image_matches_text_image_core_facts() {
     fs::write(
         &entry,
         r#"
-importa ex "./message" privata message
+import from "./message" private message
 
 @ cli "tool"
-@ operandus textus name
-incipit argumenta args {
-  nota message.text(args.name)
+@ operand string name
+main args args {
+  print message.text(args.name)
 }
 "#,
     )
@@ -1671,8 +1680,8 @@ incipit argumenta args {
     fs::write(
         &module,
         r#"
-functio text(textus name) → textus {
-  redde "Salve, §!"(name)
+fn text(string name) → string {
+  return "Salve, §!"(name)
 }
 "#,
     )
@@ -1703,7 +1712,7 @@ functio text(textus name) → textus {
 fn package_fmir_image_rejects_bad_version_without_source_fallback() {
     let dir = test_temp_dir("package-fmir-bad-version");
     let entry = dir.join("main.fab");
-    fs::write(&entry, "incipit { nota \"must not run\" }").expect("write entry");
+    fs::write(&entry, "main { print \"must not run\" }").expect("write entry");
 
     let image = build_package_fmir_image(
         &Config::default().with_target(Target::MirFmirBinary),
@@ -1742,9 +1751,9 @@ fn package_mir_cli_root_text_operand_executes_without_rust_emit() {
         &entry,
         r#"
 @ cli "tool"
-@ operandus textus name
-incipit argumenta args {
-  nota args.name
+@ operand string name
+main args args {
+  print args.name
 }
 "#,
     )
@@ -1787,9 +1796,9 @@ entry = "main.fab"
         src.join("main.fab"),
         r#"
 @ cli "tool"
-@ operandus textus name
-incipit argumenta args {
-  nota args.name
+@ operand string name
+main args args {
+  print args.name
 }
 "#,
     )
@@ -1818,10 +1827,10 @@ fn package_mir_callback_receives_validated_norma_program() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:solum" privata solum
-importa ex "norma:toml" privata toml
+import from "norma:solum" private solum
+import from "norma:toml" private toml
 
-incipit {
+main {
   solum.scribe("/tmp/faber-package-mir-callback.txt", "salve")
 }
 "#,
@@ -1896,17 +1905,17 @@ fn package_mir_bridges_norma_solum_crea_iunge_exstat_amputa() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:solum" privata solum
+import from "norma:solum" private solum
 
 @ cli "tool"
-@ operandus textus root
-incipit argumenta args {
-  varia lista<textus> partes ← [args.root, "nested"]
-  fixum textus nested ← solum.iunge(partes)
+@ operand string root
+main args args {
+  var list<string> partes ← [args.root, "nested"]
+  const string nested ← solum.iunge(partes)
   solum.crea(nested)
-  nota solum.exstat(nested)
+  print solum.exstat(nested)
   solum.amputa(nested)
-  nota solum.exstat(nested)
+  print solum.exstat(nested)
 }
 "#,
     )
@@ -1943,19 +1952,19 @@ fn package_mir_bridges_norma_solum_tange_scribe_lege() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:solum" privata solum
+import from "norma:solum" private solum
 
 @ cli "tool"
-@ operandus textus root
-incipit argumenta args {
-  varia lista<textus> partes ← [args.root]
-  fixum textus dir ← solum.iunge(partes)
+@ operand string root
+main args args {
+  var list<string> partes ← [args.root]
+  const string dir ← solum.iunge(partes)
   solum.crea(dir)
   partes ← [dir, "target.txt"]
-  fixum textus target ← solum.iunge(partes)
+  const string target ← solum.iunge(partes)
   solum.tange(target)
   solum.scribe(target, "alpha")
-  nota solum.lege<textus>(target)
+  print solum.lege<string>(target)
   solum.dele(target)
   solum.amputa(dir)
 }
@@ -1991,25 +2000,25 @@ fn package_mir_bridges_norma_solum_exscribe_renomina() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:solum" privata solum
+import from "norma:solum" private solum
 
 @ cli "tool"
-@ operandus textus root
-incipit argumenta args {
-  varia lista<textus> partes ← [args.root]
-  fixum textus dir ← solum.iunge(partes)
+@ operand string root
+main args args {
+  var list<string> partes ← [args.root]
+  const string dir ← solum.iunge(partes)
   solum.crea(dir)
   partes ← [dir, "source.txt"]
-  fixum textus source ← solum.iunge(partes)
+  const string source ← solum.iunge(partes)
   partes ← [dir, "copy.txt"]
-  fixum textus copy ← solum.iunge(partes)
+  const string copy ← solum.iunge(partes)
   partes ← [dir, "moved.txt"]
-  fixum textus moved ← solum.iunge(partes)
+  const string moved ← solum.iunge(partes)
   solum.tange(source)
   solum.scribe(source, "alpha")
   solum.exscribe(source, copy)
   solum.renomina(copy, moved)
-  nota solum.lege<textus>(moved)
+  print solum.lege<string>(moved)
   solum.dele(source)
   solum.dele(moved)
   solum.amputa(dir)
@@ -2046,20 +2055,20 @@ fn package_mir_bridges_norma_solum_mensura_regularene_directoriumne() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:solum" privata solum
+import from "norma:solum" private solum
 
 @ cli "tool"
-@ operandus textus root
-incipit argumenta args {
-  varia lista<textus> partes ← [args.root, "nested"]
-  fixum textus nested ← solum.iunge(partes)
+@ operand string root
+main args args {
+  var list<string> partes ← [args.root, "nested"]
+  const string nested ← solum.iunge(partes)
   solum.crea(nested)
   partes ← [nested, "source.bin"]
-  fixum textus source ← solum.iunge(partes)
+  const string source ← solum.iunge(partes)
   solum.tange(source)
-  nota solum.mensura(source)
-  nota solum.regularene(source)
-  nota solum.directoriumne(nested)
+  print solum.mensura(source)
+  print solum.regularene(source)
+  print solum.directoriumne(nested)
   solum.dele(source)
   solum.amputa(nested)
 }
@@ -2099,19 +2108,19 @@ fn package_mir_bridges_norma_solum_modus_mode_verbs() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:solum" privata solum
+import from "norma:solum" private solum
 
 @ cli "tool"
-@ operandus textus root
-incipit argumenta args {
-  varia lista<textus> partes ← [args.root, "nested"]
-  fixum textus nested ← solum.iunge(partes)
+@ operand string root
+main args args {
+  var list<string> partes ← [args.root, "nested"]
+  const string nested ← solum.iunge(partes)
   solum.crea(nested)
   partes ← [nested, "target.bin"]
-  fixum textus target ← solum.iunge(partes)
+  const string target ← solum.iunge(partes)
   solum.tange(target)
   solum.modum(target, 384)
-  nota solum.modus(target)
+  print solum.modus(target)
   solum.dele(target)
   solum.amputa(nested)
 }
@@ -2147,23 +2156,23 @@ fn package_mir_bridges_norma_solum_link_verbs() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:solum" privata solum
+import from "norma:solum" private solum
 
 @ cli "tool"
-@ operandus textus root
-incipit argumenta args {
-  varia lista<textus> partes ← [args.root, "nested"]
-  fixum textus nested ← solum.iunge(partes)
+@ operand string root
+main args args {
+  var list<string> partes ← [args.root, "nested"]
+  const string nested ← solum.iunge(partes)
   solum.crea(nested)
   partes ← [nested, "source.bin"]
-  fixum textus source ← solum.iunge(partes)
+  const string source ← solum.iunge(partes)
   partes ← [nested, "source-link"]
-  fixum textus link ← solum.iunge(partes)
-  fixum octeti payload ← |41 42|
+  const string link ← solum.iunge(partes)
+  const bytes payload ← |41 42|
   solum.funde(source, payload)
   solum.vincula(source, link)
-  nota solum.vinculumne(link)
-  nota solum.sequere(link)
+  print solum.vinculumne(link)
+  print solum.sequere(link)
   solum.dele(link)
   solum.dele(source)
   solum.amputa(nested)
@@ -2205,19 +2214,19 @@ fn package_mir_bridges_norma_solum_funde_octeti() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:solum" privata solum
+import from "norma:solum" private solum
 
 @ cli "tool"
-@ operandus textus root
-incipit argumenta args {
-  varia lista<textus> partes ← [args.root, "dir"]
-  fixum textus dir ← solum.iunge(partes)
+@ operand string root
+main args args {
+  var list<string> partes ← [args.root, "dir"]
+  const string dir ← solum.iunge(partes)
   solum.crea(dir)
   partes ← [dir, "data.bin"]
-  fixum textus target ← solum.iunge(partes)
-  fixum octeti payload ← |41 42 43|
+  const string target ← solum.iunge(partes)
+  const bytes payload ← |41 42 43|
   solum.funde(target, payload)
-  nota solum.mensura(target)
+  print solum.mensura(target)
   solum.dele(target)
   solum.amputa(dir)
 }
@@ -2255,9 +2264,9 @@ fn package_mir_cli_root_text_operand_preserves_literal_backslashes() {
         &entry,
         r#"
 @ cli "tool"
-@ operandus textus name
-incipit argumenta args {
-  nota args.name
+@ operand string name
+main args args {
+  print args.name
 }
 "#,
     )
@@ -2287,9 +2296,9 @@ fn package_mir_cli_root_numerus_operand_executes_without_rust_emit() {
         &entry,
         r#"
 @ cli "tool"
-@ operandus numerus count
-incipit argumenta args {
-  nota args.count
+@ operand int count
+main args args {
+  print args.count
 }
 "#,
     )
@@ -2321,9 +2330,9 @@ fn package_mir_cli_root_numerus_operand_rejects_non_numeric() {
         &entry,
         r#"
 @ cli "tool"
-@ operandus numerus count
-incipit argumenta args {
-  nota args.count
+@ operand int count
+main args args {
+  print args.count
 }
 "#,
     )
@@ -2354,12 +2363,12 @@ fn package_mir_cli_root_rest_text_operand_executes_without_rust_emit() {
         &entry,
         r#"
 @ cli "tool"
-@ operandus textus input
-@ operandus ceteri textus files
-incipit argumenta args {
-  nota args.input
-  fixum lista<textus> files ← args.files
-  nota files.length()
+@ operand string input
+@ operand rest string files
+main args args {
+  print args.input
+  const list<string> files ← args.files
+  print files.length()
 }
 "#,
     )
@@ -2393,10 +2402,10 @@ fn package_mir_cli_root_lista_numerus_operand_executes_without_rust_emit() {
         &entry,
         r#"
 @ cli "tool"
-@ operandus lista<numerus> counts
-incipit argumenta args {
-  fixum lista<numerus> counts ← args.counts
-  nota counts.length()
+@ operand list<int> counts
+main args args {
+  const list<int> counts ← args.counts
+  print counts.length()
 }
 "#,
     )
@@ -2426,10 +2435,10 @@ fn package_mir_cli_root_octeti_operand_executes_without_rust_emit() {
         &entry,
         r#"
 @ cli "tool"
-@ operandus octeti raw
-incipit argumenta args {
-  fixum octeti raw ← args.raw
-  nota raw.length()
+@ operand bytes raw
+main args args {
+  const bytes raw ← args.raw
+  print raw.length()
 }
 "#,
     )
@@ -2459,9 +2468,9 @@ fn package_mir_cli_root_flag_option_executes_without_rust_emit() {
         &entry,
         r#"
 @ cli "tool"
-@ optio verbose brevis "v" longum "verbose" typus bivalens
-incipit argumenta args {
-  nota args.verbose
+@ option verbose short "v" long "verbose" type bool
+main args args {
+  print args.verbose
 }
 "#,
     )
@@ -2498,9 +2507,9 @@ fn package_mir_cli_root_defaulted_text_option_executes_without_rust_emit() {
         &entry,
         r#"
 @ cli "tool"
-@ optio name brevis "n" longum "name" typus textus vel "worker"
-incipit argumenta args {
-  nota args.name
+@ option name short "n" long "name" type string coalesce "worker"
+main args args {
+  print args.name
 }
 "#,
     )
@@ -2537,9 +2546,9 @@ fn package_mir_cli_root_optional_text_option_executes_without_rust_emit() {
         &entry,
         r#"
 @ cli "tool"
-@ optio name longum "name" typus textus
-incipit argumenta args {
-  nota args.name vel "worker"
+@ option name long "name" type string
+main args args {
+  print args.name coalesce "worker"
 }
 "#,
     )
@@ -2574,9 +2583,9 @@ fn package_mir_cli_root_defaulted_numerus_option_executes_without_rust_emit() {
         &entry,
         r#"
 @ cli "tool"
-@ optio count longum "count" typus numerus vel 2
-incipit argumenta args {
-  nota args.count
+@ option count long "count" type int coalesce 2
+main args args {
+  print args.count
 }
 "#,
     )
@@ -2612,9 +2621,9 @@ fn package_mir_cli_root_global_flag_option_executes_without_rust_emit() {
         &entry,
         r#"
 @ cli "tool"
-@ optio verbose longum "verbose" typus bivalens ubique
-incipit argumenta args {
-  nota args.verbose
+@ option verbose long "verbose" type bool global
+main args args {
+  print args.verbose
 }
 "#,
     )
@@ -2649,9 +2658,9 @@ fn package_mir_cli_root_defaulted_numerus_operand_executes_without_rust_emit() {
         &entry,
         r#"
 @ cli "tool"
-@ operandus numerus count vel 9
-incipit argumenta args {
-  nota args.count
+@ operand int count coalesce 9
+main args args {
+  print args.count
 }
 "#,
     )
@@ -2683,8 +2692,8 @@ fn package_mir_cli_rejects_unparsed_arguments_for_root_entry() {
         &entry,
         r#"
 @ cli "tool"
-incipit argumenta args {
-  nota "cli root"
+main args args {
+  print "cli root"
 }
 "#,
     )
@@ -2716,9 +2725,9 @@ fn package_mir_cli_rejects_missing_required_operand() {
         &entry,
         r#"
 @ cli "tool"
-@ operandus textus name
-incipit argumenta args {
-  nota args.name
+@ operand string name
+main args args {
+  print args.name
 }
 "#,
     )
@@ -2749,8 +2758,8 @@ fn package_mir_cli_root_fixed_exit_runs_through_host_exit() {
         &entry,
         r#"
 @ cli "tool"
-incipit argumenta args exitus 7 {
-  nota "done"
+main args args exit 7 {
+  print "done"
 }
 "#,
     )
@@ -2777,9 +2786,9 @@ fn package_mir_cli_dynamic_exit_field_runs_through_host_exit() {
         &entry,
         r#"
 @ cli "tool"
-@ operandus numerus code
-incipit argumenta args exitus args.code {
-  nota "done"
+@ operand int code
+main args args exit args.code {
+  print "done"
 }
 "#,
     )
@@ -2806,9 +2815,9 @@ fn package_mir_cli_rejects_unsupported_option_default() {
         &entry,
         r#"
 @ cli "tool"
-@ optio count longum "count" typus numerus vel "bad"
-incipit argumenta args {
-  nota args.count
+@ option count long "count" type int coalesce "bad"
+main args args {
+  print args.count
 }
 "#,
     )
@@ -2842,20 +2851,20 @@ fn package_mir_cli_mounted_command_executes_without_rust_emit() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         dir.join("jobs.fab"),
         r#"
-@ imperium "run"
-functio run() argumenta args {
-  nota "running"
+@ command "run"
+fn run() args args {
+  print "running"
 }
 "#,
     )
@@ -2883,21 +2892,21 @@ fn package_mir_cli_mounted_text_operand_executes_without_rust_emit() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         dir.join("jobs.fab"),
         r#"
-@ imperium "run"
-@ operandus textus name
-functio run() argumenta args {
-  nota args.name
+@ command "run"
+@ operand string name
+fn run() args args {
+  print args.name
 }
 "#,
     )
@@ -2926,21 +2935,21 @@ fn package_mir_cli_mounted_numerus_operand_executes_without_rust_emit() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         dir.join("jobs.fab"),
         r#"
-@ imperium "run"
-@ operandus numerus count
-functio run() argumenta args {
-  nota args.count
+@ command "run"
+@ operand int count
+fn run() args args {
+  print args.count
 }
 "#,
     )
@@ -2969,22 +2978,22 @@ fn package_mir_cli_mounted_rest_numerus_operand_executes_without_rust_emit() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         dir.join("jobs.fab"),
         r#"
-@ imperium "sum"
-@ operandus ceteri numerus counts
-functio sum() argumenta args {
-  fixum lista<numerus> counts ← args.counts
-  nota counts.length()
+@ command "sum"
+@ operand rest int counts
+fn sum() args args {
+  const list<int> counts ← args.counts
+  print counts.length()
 }
 "#,
     )
@@ -3018,21 +3027,21 @@ fn package_mir_cli_mounted_defaulted_text_operand_executes_without_rust_emit() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         dir.join("jobs.fab"),
         r#"
-@ imperium "run"
-@ operandus textus name vel "worker"
-functio run() argumenta args {
-  nota args.name
+@ command "run"
+@ operand string name coalesce "worker"
+fn run() args args {
+  print args.name
 }
 "#,
     )
@@ -3068,21 +3077,21 @@ fn package_mir_cli_mounted_flag_option_executes_without_rust_emit() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         dir.join("jobs.fab"),
         r#"
-@ imperium "run"
-@ optio verbose brevis "v" longum "verbose" typus bivalens
-functio run() argumenta args {
-  nota args.verbose
+@ command "run"
+@ option verbose short "v" long "verbose" type bool
+fn run() args args {
+  print args.verbose
 }
 "#,
     )
@@ -3122,21 +3131,21 @@ fn package_mir_cli_mounted_defaulted_text_option_executes_without_rust_emit() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         dir.join("jobs.fab"),
         r#"
-@ imperium "run"
-@ optio name brevis "n" longum "name" typus textus vel "worker"
-functio run() argumenta args {
-  nota args.name
+@ command "run"
+@ option name short "n" long "name" type string coalesce "worker"
+fn run() args args {
+  print args.name
 }
 "#,
     )
@@ -3181,21 +3190,21 @@ fn package_mir_cli_mounted_optional_text_option_executes_without_rust_emit() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         dir.join("jobs.fab"),
         r#"
-@ imperium "run"
-@ optio name longum "name" typus textus
-functio run() argumenta args {
-  nota args.name vel "worker"
+@ command "run"
+@ option name long "name" type string
+fn run() args args {
+  print args.name coalesce "worker"
 }
 "#,
     )
@@ -3231,21 +3240,21 @@ fn package_mir_cli_mounted_global_flag_option_executes_without_rust_emit() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
-@ optio verbose longum "verbose" typus bivalens ubique
+@ option verbose long "verbose" type bool global
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         dir.join("jobs.fab"),
         r#"
-@ imperium "run"
-functio run() argumenta args {
-  nota args.verbose
+@ command "run"
+fn run() args args {
+  print args.verbose
 }
 "#,
     )
@@ -3281,21 +3290,21 @@ fn package_mir_cli_mounted_global_defaulted_text_option_executes_without_rust_em
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
-@ optio name longum "name" typus textus vel "worker" ubique
+@ option name long "name" type string coalesce "worker" global
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         dir.join("jobs.fab"),
         r#"
-@ imperium "run"
-functio run() argumenta args {
-  nota args.name
+@ command "run"
+fn run() args args {
+  print args.name
 }
 "#,
     )
@@ -3331,21 +3340,21 @@ fn package_mir_cli_mounted_global_optional_text_option_executes_without_rust_emi
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
-@ optio name longum "name" typus textus ubique
+@ option name long "name" type string global
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         dir.join("jobs.fab"),
         r#"
-@ imperium "run"
-functio run() argumenta args {
-  nota args.name vel "worker"
+@ command "run"
+fn run() args args {
+  print args.name coalesce "worker"
 }
 "#,
     )
@@ -3381,22 +3390,22 @@ fn package_mir_cli_mounted_global_text_operand_executes_without_rust_emit() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
-@ operandus textus tenant ubique
+@ operand string tenant global
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         dir.join("jobs.fab"),
         r#"
-@ imperium "run"
-@ operandus textus name
-functio run() argumenta args {
-  nota "§:§"(args.tenant, args.name)
+@ command "run"
+@ operand string name
+fn run() args args {
+  print "§:§"(args.tenant, args.name)
 }
 "#,
     )
@@ -3429,22 +3438,22 @@ fn package_mir_cli_mounted_alias_text_operand_executes_without_rust_emit() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         dir.join("jobs.fab"),
         r#"
-@ imperium "run"
+@ command "run"
 @ alias "start"
-@ operandus textus name
-functio run() argumenta args {
-  nota args.name
+@ operand string name
+fn run() args args {
+  print args.name
 }
 "#,
     )
@@ -3477,10 +3486,10 @@ fn package_mir_linking_executes_text_returning_local_import() {
     fs::write(
         &entry,
         r##"
-importa ex "./thing" privata thing
+import from "./thing" private thing
 
-incipit {
-  nota thing.label()
+main {
+  print thing.label()
 }
 "##,
     )
@@ -3488,8 +3497,8 @@ incipit {
     fs::write(
         dir.join("thing.fab"),
         r#"
-functio label() → textus {
-  redde "ok"
+fn label() → string {
+  return "ok"
 }
 "#,
     )
@@ -3517,12 +3526,12 @@ fn package_mir_manifest_imports_shared_text_helper_outside_source_root() {
     fs::write(
         fixture.src.join("main.fab"),
         r##"
-importa ex "§gnu/format" privata gnu_format
+import from "§gnu/format" private gnu_format
 
 @ cli "echo"
-@ operandus textus word
-incipit argumenta args {
-  nota gnu_format.identity(args.word)
+@ operand string word
+main args args {
+  print gnu_format.identity(args.word)
 }
 "##,
     )
@@ -3530,8 +3539,8 @@ incipit argumenta args {
     fs::write(
         fixture.common.join("format.fab"),
         r#"
-functio identity(textus word) → textus {
-  redde word
+fn identity(string word) → string {
+  return word
 }
 "#,
     )
@@ -3559,12 +3568,12 @@ fn package_mir_manifest_shared_rest_operand_joiner_executes() {
     fs::write(
         fixture.src.join("main.fab"),
         r##"
-importa ex "§gnu/format" privata gnu_format
+import from "§gnu/format" private gnu_format
 
 @ cli "echo"
-@ operandus ceteri textus words
-incipit argumenta args {
-  nota gnu_format.inter_spatia(args.words)
+@ operand rest string words
+main args args {
+  print gnu_format.inter_spatia(args.words)
 }
 "##,
     )
@@ -3572,15 +3581,15 @@ incipit argumenta args {
     fs::write(
         fixture.common.join("format.fab"),
         r#"
-functio inter_spatia(lista<textus> verba) → textus {
-  si verba.length() ≡ 0 ergo redde ""
-  varia textus linea ← verba[0]
-  varia numerus i ← 1
-  dum i < verba.length() {
+fn inter_spatia(list<string> verba) → string {
+  if verba.length() ≡ 0 then return ""
+  var string linea ← verba[0]
+  var int i ← 1
+  while i < verba.length() {
     linea ← linea + " " + verba[i]
     i ← i + 1
   }
-  redde linea
+  return linea
 }
 "#,
     )
@@ -3608,11 +3617,11 @@ fn package_mir_manifest_shared_import_chain_outside_source_root_executes() {
     fs::write(
         fixture.src.join("main.fab"),
         r##"
-importa ex "§gnu/stdio" privata gnu_stdio
+import from "§gnu/stdio" private gnu_stdio
 
 @ cli "echo"
-@ operandus textus word
-incipit argumenta args {
+@ operand string word
+main args args {
   gnu_stdio.scribe_identity(args.word)
 }
 "##,
@@ -3621,10 +3630,10 @@ incipit argumenta args {
     fs::write(
         fixture.common.join("stdio.fab"),
         r##"
-importa ex "./format" privata format
+import from "./format" private format
 
-functio scribe_identity(textus word) → vacuum {
-  nota format.identity(word)
+fn scribe_identity(string word) → void {
+  print format.identity(word)
 }
 "##,
     )
@@ -3632,8 +3641,8 @@ functio scribe_identity(textus word) → vacuum {
     fs::write(
         fixture.common.join("format.fab"),
         r#"
-functio identity(textus word) → textus {
-  redde word
+fn identity(string word) → string {
+  return word
 }
 "#,
     )
@@ -3661,10 +3670,10 @@ fn package_mir_manifest_shared_import_cycle_reports_cycle() {
     fs::write(
         fixture.src.join("main.fab"),
         r##"
-importa ex "§gnu/a" privata a
+import from "§gnu/a" private a
 
-incipit {
-  nota a.value()
+main {
+  print a.value()
 }
 "##,
     )
@@ -3672,10 +3681,10 @@ incipit {
     fs::write(
         fixture.common.join("a.fab"),
         r##"
-importa ex "./b" privata b
+import from "./b" private b
 
-functio value() → numerus {
-  redde b.value()
+fn value() → int {
+  return b.value()
 }
 "##,
     )
@@ -3683,10 +3692,10 @@ functio value() → numerus {
     fs::write(
         fixture.common.join("b.fab"),
         r##"
-importa ex "./a" privata a
+import from "./a" private a
 
-functio value() → numerus {
-  redde a.value()
+fn value() → int {
+  return a.value()
 }
 "##,
     )
@@ -3715,10 +3724,10 @@ fn package_mir_manifest_shared_private_export_reports_namespace_diagnostic() {
     fs::write(
         fixture.src.join("main.fab"),
         r##"
-importa ex "§gnu/format" privata gnu_format
+import from "§gnu/format" private gnu_format
 
-incipit {
-  nota gnu_format.hidden("salve")
+main {
+  print gnu_format.hidden("salve")
 }
 "##,
     )
@@ -3726,13 +3735,13 @@ incipit {
     fs::write(
         fixture.common.join("format.fab"),
         r#"
-@ privata
-functio hidden(textus word) → textus {
-  redde word
+@ private
+fn hidden(string word) → string {
+  return word
 }
 
-functio identity(textus word) → textus {
-  redde word
+fn identity(string word) → string {
+  return word
 }
 "#,
     )
@@ -3763,9 +3772,9 @@ fn package_mir_linking_executes_non_entry_local_call_chain() {
     fs::write(
         &entry,
         r##"
-importa ex "./service" privata Service
+import from "./service" private Service
 
-incipit {
+main {
   Service.run()
 }
 "##,
@@ -3774,10 +3783,10 @@ incipit {
     fs::write(
         dir.join("service.fab"),
         r#"
-importa ex "./util" privata U
+import from "./util" private U
 
-functio run() → vacuum {
-  nota U.adde(2, 3)
+fn run() → void {
+  print U.adde(2, 3)
 }
 "#,
     )
@@ -3785,8 +3794,8 @@ functio run() → vacuum {
     fs::write(
         dir.join("util.fab"),
         r#"
-functio adde(numerus left, numerus right) → numerus {
-  redde left + right
+fn adde(int left, int right) → int {
+  return left + right
 }
 "#,
     )
@@ -3817,12 +3826,12 @@ fn package_mir_linking_keeps_duplicate_file_stem_functions_path_scoped() {
     fs::write(
         &entry,
         r##"
-importa ex "./a/util" privata A
-importa ex "./b/util" privata B
+import from "./a/util" private A
+import from "./b/util" private B
 
-incipit {
-  nota A.label()
-  nota B.label()
+main {
+  print A.label()
+  print B.label()
 }
 "##,
     )
@@ -3830,8 +3839,8 @@ incipit {
     fs::write(
         dir.join("a").join("util.fab"),
         r#"
-functio label() → numerus {
-  redde 1
+fn label() → int {
+  return 1
 }
 "#,
     )
@@ -3839,8 +3848,8 @@ functio label() → numerus {
     fs::write(
         dir.join("b").join("util.fab"),
         r#"
-functio label() → numerus {
-  redde 2
+fn label() → int {
+  return 2
 }
 "#,
     )
@@ -3869,10 +3878,10 @@ fn package_mir_linking_reports_private_namespace_diagnostic() {
     fs::write(
         &entry,
         r##"
-importa ex "./auxilium" privata Aux
+import from "./auxilium" private Aux
 
-incipit {
-  nota Aux.secretum()
+main {
+  print Aux.secretum()
 }
 "##,
     )
@@ -3880,13 +3889,13 @@ incipit {
     fs::write(
         dir.join("auxilium.fab"),
         r#"
-@ privata
-functio secretum() → numerus {
-  redde 1
+@ private
+fn secretum() → int {
+  return 1
 }
 
-functio publicum() → numerus {
-  redde 2
+fn publicum() → int {
+  return 2
 }
 "#,
     )
@@ -3917,10 +3926,10 @@ fn package_mir_linking_reports_nested_namespace_call_as_unsupported() {
     fs::write(
         &entry,
         r##"
-importa ex "./auxilium" privata Aux
+import from "./auxilium" private Aux
 
-incipit {
-  nota Aux.mathesis.dupla(4)
+main {
+  print Aux.mathesis.dupla(4)
 }
 "##,
     )
@@ -3928,8 +3937,8 @@ incipit {
     fs::write(
         dir.join("auxilium.fab"),
         r#"
-functio dupla(numerus n) → numerus {
-  redde n * 2
+fn dupla(int n) → int {
+  return n * 2
 }
 "#,
     )
@@ -3963,10 +3972,10 @@ fn package_mir_linking_executes_norma_source_library_import() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:chorda" privata chorda
+import from "norma:chorda" private chorda
 
-incipit {
-  nota chorda.retorta("roma")
+main {
+  print chorda.retorta("roma")
 }
 "#,
     )
@@ -3999,13 +4008,13 @@ fn rust_field_names_default_preserves_source_spelling() {
     fs::write(
         &entry,
         r#"
-genus PersonaNova {
-  textus nomenLongum
+class PersonaNova {
+  string nomenLongum
 }
 
-incipit {
-  fixum _ p ← PersonaNova { nomenLongum = "Marcus" }
-  nota p.nomenLongum
+main {
+  const _ p ← PersonaNova { nomenLongum = "Marcus" }
+  print p.nomenLongum
 }
 "#,
     )
@@ -4054,13 +4063,13 @@ rust_field_names = "snake_case"
     fs::write(
         &entry,
         r#"
-genus PersonaNova {
-  textus nomenLongum
+class PersonaNova {
+  string nomenLongum
 }
 
-incipit {
-  fixum _ p ← PersonaNova { nomenLongum = "Marcus" }
-  nota p.nomenLongum
+main {
+  const _ p ← PersonaNova { nomenLongum = "Marcus" }
+  print p.nomenLongum
 }
 "#,
     )
@@ -4111,13 +4120,13 @@ rust_field_names = "snake_case"
     fs::write(
         &entry,
         r#"
-genus Collidens {
-  textus fooBar
-  textus foo_bar
+class Collidens {
+  string fooBar
+  string foo_bar
 }
 
-incipit {
-  nota "x"
+main {
+  print "x"
 }
 "#,
     )
@@ -4158,21 +4167,21 @@ rust_field_names = "snake_case"
     fs::write(
         &entry,
         r#"
-discretio Nuntius {
-  Clavis { textus nomenLongum }
+union Nuntius {
+  Clavis { string nomenLongum }
 }
 
-functio tracta(Nuntius n) → textus {
-  discerne n {
-    casu Clavis fixum nomenLongum ut captum {
-      redde captum
+fn tracta(Nuntius n) → string {
+  match n {
+    case Clavis const nomenLongum as captum {
+      return captum
     }
   }
 }
 
-incipit {
-  fixum Nuntius n ← finge Clavis { nomenLongum = "Julia" } ∷ Nuntius
-  nota tracta(n)
+main {
+  const Nuntius n ← variant Clavis { nomenLongum = "Julia" } ∷ Nuntius
+  print tracta(n)
 }
 "#,
     )
@@ -4214,7 +4223,7 @@ rust_field_names = "camel"
     let src = dir.join("src");
     fs::create_dir_all(&src).expect("create src");
     let entry = src.join("main.fab");
-    fs::write(&entry, "incipit { nota \"x\" }").expect("write entry");
+    fs::write(&entry, "main { print \"x\" }").expect("write entry");
 
     let result = compile_package(&Config::default(), &entry);
     assert!(result.output.is_none());
@@ -4360,9 +4369,9 @@ steps = 250
     .expect("write manifest");
     fs::write(
         dir.join("src").join("main.fab"),
-        r#"@ nucleum
-functio summa(tf32[2] x) → f32 {
-    redde x.sum()
+        r#"@ kernel
+fn summa(tf32[2] x) → f32 {
+    return x.sum()
 }
 "#,
     )
@@ -4388,11 +4397,11 @@ fn compile_package_resolves_builtin_norma_chorda_native_body() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:chorda" privata chorda
+import from "norma:chorda" private chorda
 
-incipit {
-  fixum textus reversed ← chorda.retorta("roma")
-  nota reversed
+main {
+  const string reversed ← chorda.retorta("roma")
+  print reversed
 }
 "#,
     )
@@ -4427,14 +4436,14 @@ fn compile_package_resolves_type_only_norma_file_namespace_import() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:caelum/terminus" privata terminus
+import from "norma:caelum/terminus" private terminus
 
-incipit {
-  fixum terminus.Terminus endpoint ← terminus.Terminus {
+main {
+  const terminus.Terminus endpoint ← terminus.Terminus {
     hospes = "localhost",
     portus = 8080
   }
-  nota endpoint.hospes
+  print endpoint.hospes
 }
 "#,
     )
@@ -4473,11 +4482,11 @@ fn compile_package_resolves_type_only_local_file_namespace_import() {
     fs::write(
         &entry,
         r#"
-importa ex "./thing" privata Alias
+import from "./thing" private Alias
 
-incipit {
-  fixum Alias.Thing item ← Alias.Thing { name = "ok" }
-  nota item.name
+main {
+  const Alias.Thing item ← Alias.Thing { name = "ok" }
+  print item.name
 }
 "#,
     )
@@ -4485,8 +4494,8 @@ incipit {
     fs::write(
         dir.join("thing.fab"),
         r#"
-genus Thing {
-    textus name
+class Thing {
+    string name
 }
 "#,
     )
@@ -4535,11 +4544,11 @@ genus Thing {
     fs::write(
         &entry,
         r#"
-importa ex "norma:Thing" privata alias
+import from "norma:Thing" private alias
 
-incipit {
-    fixum alias.Thing item ← alias.Thing { name = "ok" }
-    nota item.name
+main {
+    const alias.Thing item ← alias.Thing { name = "ok" }
+    print item.name
 }
 "#,
     )
@@ -4573,14 +4582,14 @@ fn compile_package_resolves_builtin_norma_chorda_diducta_native_body() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:chorda" privata chorda
+import from "norma:chorda" private chorda
 
-incipit {
-  fac {
-    fixum [meta, corpus] ← chorda.diducta("+++\na = 1\n+++\nbody", "+++")
-    nota meta, corpus
-  } cape err {
-    mone err
+main {
+  do {
+    const [meta, corpus] ← chorda.diducta("+++\na = 1\n+++\nbody", "+++")
+    print meta, corpus
+  } catch err {
+    warn err
   }
 }
 "#,
@@ -4614,12 +4623,12 @@ fn compile_package_chorda_retenta_filters_codegen() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:chorda" privata chorda
+import from "norma:chorda" private chorda
 
-incipit {
-  nota chorda.retenta("hello7!", "a", "z")
-  nota chorda.retenta_iudicio("hello7!", textus c ∴ c ≥ 'a' et c ≤ 'z')
-  nota chorda.expurgata("hello7!", "0", "9")
+main {
+  print chorda.retenta("hello7!", "a", "z")
+  print chorda.retenta_iudicio("hello7!", string c ∴ c ≥ 'a' and c ≤ 'z')
+  print chorda.expurgata("hello7!", "0", "9")
 }
 "#,
     )
@@ -4663,10 +4672,10 @@ fn compile_package_resolves_builtin_norma_tensor_native_body() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:tensor" privata tensor
+import from "norma:tensor" private tensor
 
-incipit {
-  nota "tensor"
+main {
+  print "tensor"
 }
 "#,
     )
@@ -4700,11 +4709,11 @@ fn compile_package_resolves_builtin_norma_chorda_mixed_native_and_runtime_backed
     fs::write(
         &entry,
         r#"
-importa ex "norma:chorda" privata chorda
+import from "norma:chorda" private chorda
 
-incipit {
-  fixum octeti raw ← chorda.pange("Salve")
-  nota chorda.solve(raw)
+main {
+  const bytes raw ← chorda.pange("Salve")
+  print chorda.solve(raw)
 }
 "#,
     )
@@ -4738,10 +4747,10 @@ fn compile_package_resolves_builtin_norma_toml_library_imports() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:toml" privata toml
+import from "norma:toml" private toml
 
-incipit {
-  fixum _ parsed ← toml.solve("name = \"faber\"")
+main {
+  const _ parsed ← toml.solve("name = \"faber\"")
 }
 "#,
     )
@@ -4773,16 +4782,16 @@ fn compile_package_resolves_builtin_norma_toml_native_navigation_body() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:toml" privata toml
-importa ex "norma:valor" privata valor
+import from "norma:toml" private toml
+import from "norma:valor" private value
 
-incipit {
-  fixum valor doc ← toml.solve("id = \"sample\"")
-  fac {
-    fixum textus id ← valor.exige(doc, "id")
-    nota id
-  } cape err {
-    mone err
+main {
+  const value doc ← toml.solve("id = \"sample\"")
+  do {
+    const string id ← value.exige(doc, "id")
+    print id
+  } catch err {
+    warn err
   }
 }
 "#,
@@ -4816,16 +4825,16 @@ fn compile_package_resolves_builtin_norma_toml_exige_claves_native_body() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:toml" privata toml
-importa ex "norma:valor" privata valor
+import from "norma:toml" private toml
+import from "norma:valor" private value
 
-incipit {
-  fixum valor doc ← toml.solve("id = \"sample\"")
-  fac {
-    valor.exige_claves(doc, ["id", "name"])
-    nota "ok"
-  } cape err {
-    mone err
+main {
+  const value doc ← toml.solve("id = \"sample\"")
+  do {
+    value.exige_claves(doc, ["id", "name"])
+    print "ok"
+  } catch err {
+    warn err
   }
 }
 "#,
@@ -4857,10 +4866,10 @@ fn compile_package_resolves_builtin_norma_solum_explora_contract() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:solum" privata solum
+import from "norma:solum" private solum
 
-incipit {
-  nota "solum"
+main {
+  print "solum"
 }
 "#,
     )
@@ -4891,11 +4900,11 @@ fn compile_package_resolves_builtin_norma_consolum_ad_wrapped_imports() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:consolum" privata consolum
+import from "norma:consolum" private consolum
 
-incipit {
+main {
   consolum.dic("salve")
-  fixum _ tty ← consolum.audit()
+  const _ tty ← consolum.audit()
   consolum.funde(|48 65 6c 6c 6f|)
 }
 "#,
@@ -4935,12 +4944,12 @@ fn compile_package_resolves_builtin_norma_solum_ad_wrapped_imports() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:solum" privata solum ut terra
+import from "norma:solum" private solum as terra
 
-incipiet {
-  fixum _ exists ← terra.exstat(".")
-  fixum _ parent ← terra.parens("a/b")
-  tacebit terra.fundet("fundet.bin", |41 42 43|)
+async_main {
+  const _ exists ← terra.exstat(".")
+  const _ parent ← terra.parens("a/b")
+  await terra.fundet("fundet.bin", |41 42 43|)
 }
 "#,
     )
@@ -4980,12 +4989,12 @@ fn compile_package_resolves_builtin_norma_processus_ad_wrapped_imports() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:processus" privata processus ut proc
+import from "norma:processus" private processus as proc
 
-incipit {
-  fixum _ out ← proc.exsequi("echo hi")
-  fixum _ env ← proc.lege("PATH")
-  fixum _ _ ← proc.genera(["true"])
+main {
+  const _ out ← proc.exsequi("echo hi")
+  const _ env ← proc.lege("PATH")
+  const _ _ ← proc.genera(["true"])
 }
 "#,
     )
@@ -5024,14 +5033,14 @@ fn compile_package_resolves_builtin_norma_tempus_ad_wrapped_imports() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:tempus" privata tempus
+import from "norma:tempus" private tempus
 
-incipiet {
-  fixum _ now ← tempus.nunc()
-  fixum _ mono ← tempus.monotonicum()
-  fixum _ active ← tempus.activum()
-  fixum _ ms ← tempus.MILLISECUNDUM()
-  tacebit tempus.dormiet(0)
+async_main {
+  const _ now ← tempus.nunc()
+  const _ mono ← tempus.monotonicum()
+  const _ active ← tempus.activum()
+  const _ ms ← tempus.MILLISECUNDUM()
+  await tempus.dormiet(0)
 }
 "#,
     )
@@ -5071,13 +5080,13 @@ fn compile_package_resolves_builtin_norma_aleator_ad_wrapped_imports() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:aleator" privata aleator
+import from "norma:aleator" private aleator
 
-incipit {
-  fixum _ f ← aleator.fractum()
-  fixum _ n ← aleator.sortire(1, 6)
-  fixum _ id ← aleator.uuid()
-  fixum _ bytes ← aleator.octetos(8)
+main {
+  const _ f ← aleator.fractum()
+  const _ n ← aleator.sortire(1, 6)
+  const _ id ← aleator.uuid()
+  const _ bytes ← aleator.octetos(8)
   aleator.semina(42)
 }
 "#,
@@ -5118,11 +5127,11 @@ fn compile_package_resolves_builtin_norma_yaml_imports() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:yaml" privata yaml
+import from "norma:yaml" private yaml
 
-incipit {
-  fixum valor doc ← yaml.solve("count: 1")
-  fixum _ text ← yaml.pange(doc)
+main {
+  const value doc ← yaml.solve("count: 1")
+  const _ text ← yaml.pange(doc)
 }
 "#,
     )
@@ -5166,9 +5175,9 @@ fn compile_package_rejects_removed_norma_tempus_method_calls() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:tempus" privata tempus
+import from "norma:tempus" private tempus
 
-incipit {
+main {
   tempus.siste(1)
 }
 "#,
@@ -5191,16 +5200,16 @@ incipit {
 
 #[test]
 fn compile_package_rejects_removed_norma_vector_placeholder_calls() {
-    for (method, args) in [("crea", "[0]"), ("shuffle", "nihil, [0]")] {
+    for (method, args) in [("crea", "[0]"), ("shuffle", "null, [0]")] {
         let dir = test_temp_dir(&format!("norma-vector-removed-{method}"));
         let entry = dir.join("main.fab");
         fs::write(
             &entry,
             format!(
                 r#"
-importa ex "norma:vector" privata vector
+import from "norma:vector" private vector
 
-incipit {{
+main {{
   vector.{method}({args})
 }}
 "#
@@ -5245,16 +5254,16 @@ entry = "main.fab"
     fs::write(
         dir.join("src/main.fab"),
         r#"
-importa ex "norma:http" privata http
+import from "norma:http" private http
 
-incipiet {
-    figendum _ responsum ← http.petet("http://127.0.0.1:9/test")
-    nota responsum.status()
-    fixum _ caput ← responsum.caput("x-faber-test")
-    si caput est nihil { nota "header:missing" } secus { nota "header:present" }
-    nota responsum.corpus()
-    fixum _ data ← responsum.corpus_json()
-    si data.is_nihil() { nota "json:missing" } secus { nota "json:present" }
+async_main {
+    await_const _ responsum ← http.petet("http://127.0.0.1:9/test")
+    print responsum.status()
+    const _ caput ← responsum.caput("x-faber-test")
+    if caput is null { print "header:missing" } else { print "header:present" }
+    print responsum.corpus()
+    const _ data ← responsum.corpus_json()
+    if data.is_nihil() { print "json:missing" } else { print "json:present" }
 }
 "#,
     )
@@ -5356,9 +5365,9 @@ entry = "main.fab"
     fs::write(
         &entry,
         r#"
-importa ex "norma:json/solve" privata solve
+import from "norma:json/solve" private solve
 
-incipit {
+main {
   solve.nonexistent("{}")
 }
 "#,
@@ -5379,8 +5388,8 @@ fn compile_package_rejects_faber_kernel_imports() {
     fs::write(
         &entry,
         r#"
-importa ex "faber:json" privata json
-incipit {}
+import from "faber:json" private json
+main {}
 "#,
     )
     .expect("write entry");
@@ -5400,8 +5409,8 @@ fn compile_package_reports_unknown_library_modules() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:nope" privata nope
-incipit {}
+import from "norma:nope" private nope
+main {}
 "#,
     )
     .expect("write entry");
@@ -5435,8 +5444,8 @@ fn compile_package_rejects_old_norma_slash_library_imports() {
     fs::write(
         &entry,
         r#"
-importa ex "norma/http" privata http
-incipit {}
+import from "norma/http" private http
+main {}
 "#,
     )
     .expect("write entry");
@@ -5457,16 +5466,16 @@ fn compile_package_keeps_relative_norma_paths_as_local_imports() {
     fs::write(
         &entry,
         r#"
-importa ex "./norma/json" privata local
-incipit {}
+import from "./norma/json" private local
+main {}
 "#,
     )
     .expect("write entry");
     fs::write(
         dir.join("norma/json.fab"),
         r#"
-functio salve() → textus {
-    redde "salve"
+fn salve() → string {
+    return "salve"
 }
 "#,
     )
@@ -5491,8 +5500,8 @@ fn compile_package_reports_unknown_provider_without_local_fallback() {
     fs::write(
         &entry,
         r#"
-importa ex "sqlite:client" privata client
-incipit {}
+import from "sqlite:client" private client
+main {}
 "#,
     )
     .expect("write entry");
@@ -5584,20 +5593,20 @@ fn compile_package_preserves_norma_runtime_types_and_failable_calls() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:json" privata json
-importa ex "norma:valor" privata valor
+import from "norma:json" private json
+import from "norma:valor" private value
 
-incipit {
-    fixum json doc ← { "wire_name": "Ada" }
-    fixum textus wire ← json.pange(doc)
-    fixum valor tree ← { "wire_name": "Ada" } ↦ valor
-    fixum valor child ← valor.cape(tree, "wire_name")
-    fac {
-        fixum json parsed ← json.solve(wire)
-        nota parsed, child
+main {
+    const json doc ← { "wire_name": "Ada" }
+    const string wire ← json.pange(doc)
+    const value tree ← { "wire_name": "Ada" } ↦ value
+    const value child ← value.cape(tree, "wire_name")
+    do {
+        const json parsed ← json.solve(wire)
+        print parsed, child
     }
-    cape err {
-        nota err
+    catch err {
+        print err
     }
 }
 "#,
@@ -5635,10 +5644,10 @@ fn aliased_norma_import_preserves_provider_identity_in_analysis() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:http" privata http ut rete
+import from "norma:http" private http as rete
 
-incipiet {
-  figendum _ responsum ← rete.petet("http://127.0.0.1:9")
+async_main {
+  await_const _ responsum ← rete.petet("http://127.0.0.1:9")
 }
 "#,
     )
@@ -5691,10 +5700,10 @@ fn aliased_norma_http_import_lowers_by_provider_identity() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:http" privata http ut rete
+import from "norma:http" private http as rete
 
-incipiet {
-  figendum _ responsum ← rete.petet("http://127.0.0.1:9")
+async_main {
+  await_const _ responsum ← rete.petet("http://127.0.0.1:9")
 }
 "#,
     )
@@ -5745,7 +5754,7 @@ fn compile_package_resolves_relative_input_from_current_working_directory() {
     let dir = test_temp_dir("relative-input");
     let project_dir = dir.join("project");
     fs::create_dir_all(&project_dir).expect("create project dir");
-    fs::write(project_dir.join("main.fab"), "incipit { nota \"salve\" }").expect("write entry");
+    fs::write(project_dir.join("main.fab"), "main { print \"salve\" }").expect("write entry");
 
     let original_cwd = std::env::current_dir().expect("current dir");
     std::env::set_current_dir(&dir).expect("set current dir");
@@ -5766,22 +5775,22 @@ fn compile_package_mounts_wildcard_imported_cli_commands() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         dir.join("jobs.fab"),
         r#"
-@ imperium "config/set"
+@ command "config/set"
 @ alias "set"
-@ operandus textus name
-functio set_config() argumenta args {
-  nota args.name
+@ operand string name
+fn set_config() args args {
+  print args.name
 }
 "#,
     )
@@ -5817,20 +5826,20 @@ fn check_package_validates_mounted_cli_commands_without_emitting() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         dir.join("jobs.fab"),
         r#"
-@ imperium "run"
-functio run() argumenta args {
-  nota "running"
+@ command "run"
+fn run() args args {
+  print "running"
 }
 "#,
     )
@@ -5854,21 +5863,21 @@ fn compile_package_mounted_handlers_can_access_root_globals() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
-@ optio verbose longum "verbose" typus bivalens ubique
+@ option verbose long "verbose" type bool global
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         dir.join("jobs.fab"),
         r#"
-@ imperium "run"
-functio run() argumenta args {
-  nota args.verbose
+@ command "run"
+fn run() args args {
+  print args.verbose
 }
 "#,
     )
@@ -5900,21 +5909,21 @@ fn compile_package_rejects_mounted_local_binding_collision_with_root_global() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
-@ optio verbose longum "verbose" typus bivalens ubique
+@ option verbose long "verbose" type bool global
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         dir.join("jobs.fab"),
         r#"
-@ imperium "run"
-@ optio verbose longum "local-verbose"
-functio run() {}
+@ command "run"
+@ option verbose long "local-verbose"
+fn run() {}
 "#,
     )
     .expect("write jobs");
@@ -5933,17 +5942,17 @@ fn compile_package_rejects_named_import_mount_targets() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./jobs" privata set_config ut jobs
+import from "./jobs" private set_config as jobs
 
 @ cli "tool"
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         dir.join("jobs.fab"),
-        "@ imperium \"run\"\nfunctio set_config() {}",
+        "@ command \"run\"\nfn set_config() {}",
     )
     .expect("write jobs");
 
@@ -5961,17 +5970,17 @@ fn compile_package_rejects_mounted_global_options() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         dir.join("jobs.fab"),
-        "@ imperium \"run\"\n@ optio verbose longum \"verbose\" ubique\nfunctio run() {}",
+        "@ command \"run\"\n@ option verbose long \"verbose\" global\nfn run() {}",
     )
     .expect("write jobs");
 
@@ -5989,18 +5998,18 @@ fn compile_package_rejects_mounted_command_path_collisions() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 
-@ imperium "jobs/run"
-functio root_run() {}
+@ command "jobs/run"
+fn root_run() {}
 "#,
     )
     .expect("write entry");
-    fs::write(dir.join("jobs.fab"), "@ imperium \"run\"\nfunctio run() {}").expect("write jobs");
+    fs::write(dir.join("jobs.fab"), "@ command \"run\"\nfn run() {}").expect("write jobs");
 
     let result = compile_package(&Config::default(), &dir);
     assert!(result.output.is_none());
@@ -6018,24 +6027,24 @@ fn compile_package_rejects_mounted_alias_collisions() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
     fs::write(
         dir.join("jobs.fab"),
         r#"
-@ imperium "one"
+@ command "one"
 @ alias "same"
-functio one() {}
+fn one() {}
 
-@ imperium "two"
+@ command "two"
 @ alias "same"
-functio two() {}
+fn two() {}
 "#,
     )
     .expect("write jobs");
@@ -6058,14 +6067,14 @@ fn compile_package_does_not_expose_unmounted_imported_cli_modules() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
-    fs::write(dir.join("jobs.fab"), "@ imperium \"run\"\nfunctio run() {}").expect("write jobs");
+    fs::write(dir.join("jobs.fab"), "@ command \"run\"\nfn run() {}").expect("write jobs");
 
     let result = compile_package(&Config::default(), &dir);
     assert!(result.success(), "expected package compile success");
@@ -6083,12 +6092,12 @@ fn compile_package_rejects_import_cycles() {
     let dir = test_temp_dir("import-cycle");
     fs::write(
         dir.join("main.fab"),
-        "importa ex \"./jobs\" privata * ut jobs\nincipit {}",
+        "import from \"./jobs\" private * as jobs\nmain {}",
     )
     .expect("write entry");
     fs::write(
         dir.join("jobs.fab"),
-        "importa ex \"./main\" privata * ut main\nfunctio run() {}",
+        "import from \"./main\" private * as main\nfn run() {}",
     )
     .expect("write jobs");
 
@@ -6105,7 +6114,7 @@ fn compile_package_supports_manifest_example() {
     let dir = test_temp_dir("manifest");
     let src = dir.join("src");
     fs::create_dir_all(&src).expect("create src");
-    fs::write(src.join("main.fab"), "incipit {}").expect("write package entry");
+    fs::write(src.join("main.fab"), "main {}").expect("write package entry");
     fs::write(
         dir.join("faber.toml"),
         r#"
@@ -6128,7 +6137,7 @@ entry = "main.fab"
 fn compile_package_rejects_name_only_binary_manifest_without_entry() {
     let dir = test_temp_dir("minimal-valid");
     let entry = dir.join("main.fab");
-    fs::write(&entry, "incipit { nota \"ok\" }").expect("write entry");
+    fs::write(&entry, "main { print \"ok\" }").expect("write entry");
     fs::write(
         dir.join("faber.toml"),
         r#"
@@ -6151,7 +6160,7 @@ fn compile_package_discovers_faber_toml_from_directory() {
     let dir = test_temp_dir("manifest-dir");
     let src = dir.join("src");
     fs::create_dir_all(&src).expect("create src");
-    fs::write(src.join("main.fab"), "incipit { nota \"ok\" }").expect("write package entry");
+    fs::write(src.join("main.fab"), "main { print \"ok\" }").expect("write package entry");
     fs::write(
         dir.join("faber.toml"),
         r#"
@@ -6205,7 +6214,7 @@ rusqlite = "0.32"
     .expect("write manifest");
     fs::write(
         dir.join("src/sqlite.fab"),
-        "functio exsequi(textus via) → textus\nfunctio local() → textus { redde \"ok\" }\n",
+        "fn exsequi(string via) → string\nfn local() → string { return \"ok\" }\n",
     )
     .expect("write source");
     fs::write(
@@ -6257,7 +6266,7 @@ bindings = "bindings/rust.toml"
     .expect("write manifest");
     fs::write(
         dir.join("src/sqlite.fab"),
-        "functio exsequi(textus via) → textus\n",
+        "fn exsequi(string via) → string\n",
     )
     .expect("write source");
     fs::write(dir.join("bindings/rust.toml"), "").expect("write bindings");
@@ -6295,7 +6304,7 @@ bindings = "bindings/rust.toml"
     .expect("write manifest");
     fs::write(
         dir.join("src/sqlite.fab"),
-        "functio local() → textus { redde \"ok\" }\n",
+        "fn local() → string { return \"ok\" }\n",
     )
     .expect("write source");
     fs::write(
@@ -6588,7 +6597,7 @@ entry = "main.fab"
 "#,
     )
     .expect("write manifest");
-    fs::write(dir.join("src/main.fab"), "incipit { }\n").expect("write entry");
+    fs::write(dir.join("src/main.fab"), "main { }\n").expect("write entry");
 
     let spec = discover_package(&dir)
         .expect_err("discovery must reject an unsupported source root before resolution");
@@ -6620,7 +6629,7 @@ entry = "main.fab"
 "#,
     )
     .expect("write manifest");
-    fs::write(dir.join("main.fab"), "incipit { }\n").expect("write entry");
+    fs::write(dir.join("main.fab"), "main { }\n").expect("write entry");
 
     let manifest = read_manifest(&dir.join("faber.toml")).expect("read manifest");
     validate_manifest(&manifest, &dir.join("faber.toml"))
@@ -6660,7 +6669,7 @@ entry = "main.fab"
 "#,
     )
     .expect("write manifest");
-    fs::write(dir.join("src/main.fab"), "incipit { }\n").expect("write entry");
+    fs::write(dir.join("src/main.fab"), "main { }\n").expect("write entry");
 
     let spec = discover_package(&dir).expect("discover validated package");
     assert!(spec.manifest_backed);
@@ -6680,7 +6689,7 @@ fn load_package_with_locale_pack_rejects_malformed_manifest() {
     let dir = test_temp_dir("manifest-malformed-load");
     fs::create_dir_all(dir.join("src")).expect("create src");
     fs::write(dir.join("faber.toml"), "this is not toml [").expect("write malformed manifest");
-    fs::write(dir.join("src/main.fab"), "incipit { }\n").expect("write entry");
+    fs::write(dir.join("src/main.fab"), "main { }\n").expect("write entry");
 
     // Discovery itself fails loudly on a malformed manifest.
     let err = discover_package(&dir).expect_err("malformed manifest must fail at discovery");
@@ -6707,7 +6716,7 @@ fn load_package_with_locale_pack_rejects_malformed_manifest() {
 fn manifestless_legacy_spec_loads_without_manifest() {
     let dir = test_temp_dir("legacy-manifestless-load");
     let entry = dir.join("main.fab");
-    fs::write(&entry, "incipit { }\n").expect("write entry");
+    fs::write(&entry, "main { }\n").expect("write entry");
 
     let spec = discover_package(&entry).expect("discover legacy file input");
     assert!(!spec.manifest_backed);
@@ -7127,7 +7136,7 @@ locale = "th-TH"
 }
 
 #[test]
-fn compile_package_accepts_inert_latin_fallback_without_notice() {
+fn compile_package_rejects_undeclared_latin_keyword_in_grammar_position() {
     let dir = test_temp_dir("manifest-reader-fallback");
     let src = dir.join("src");
     fs::create_dir_all(&src).expect("create src");
@@ -7151,13 +7160,32 @@ locale = "zh-Hans"
 
     let result = compile_package(&Config::default(), &dir);
 
-    // The fallback bridge is inert-but-present (S0-U5): the source compiles and
-    // no retired fallback notice is emitted.
-    assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|diagnostic| !diagnostic.code.is_some_and(|code| code.starts_with("LOCALE"))));
+    // S2-U2 pack-authoritative gate: the zh-Hans pack does not declare the
+    // Latin spellings `incipit`/`nota`, so they must NOT claim their grammar
+    // slots. The undeclared spellings stay ordinary identifiers and the
+    // grammar-position use fails normally — an ordinary undefined-identifier
+    // failure (SEM001), with no fallback event and no LOCALE diagnostic.
+    assert!(
+        !result.success(),
+        "undeclared Latin keyword must not claim the grammar slot: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.is_error() && d.code.as_deref() == Some("SEM001")),
+        "undeclared spelling must fail as an ordinary undefined identifier: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|diagnostic| !diagnostic.code.is_some_and(|code| code.starts_with("LOCALE"))),
+        "no LOCALE diagnostic may be emitted on the flipped path: {:?}",
+        result.diagnostics
+    );
 }
 
 #[test]
@@ -7197,7 +7225,7 @@ fn compile_package_rejects_unsupported_manifest_target() {
     let dir = test_temp_dir("manifest-target");
     let src = dir.join("src");
     fs::create_dir_all(&src).expect("create src");
-    fs::write(src.join("main.fab"), "incipit {}").expect("write package entry");
+    fs::write(src.join("main.fab"), "main {}").expect("write package entry");
     fs::write(
         dir.join("faber.toml"),
         r#"
@@ -7227,7 +7255,7 @@ fn discover_package_accepts_manifest_package_mir_targets() {
         let dir = test_temp_dir(&format!("manifest-target-{}", target.replace('-', "_")));
         let src = dir.join("src");
         fs::create_dir_all(&src).expect("create src");
-        fs::write(src.join("main.fab"), "incipit {}").expect("write package entry");
+        fs::write(src.join("main.fab"), "main {}").expect("write package entry");
         fs::write(
             dir.join("faber.toml"),
             format!(
@@ -7256,11 +7284,11 @@ fn compile_package_rejects_nested_module_mounts() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./jobs" privata * ut jobs
+import from "./jobs" private * as jobs
 
 @ cli "tool"
 @ imperia "jobs" ex jobs
-incipit argumenta args {}
+main args args {}
 "#,
     )
     .expect("write entry");
@@ -7268,8 +7296,8 @@ incipit argumenta args {}
         dir.join("jobs.fab"),
         r#"
 @ imperia "again" ex jobs
-@ imperium "run"
-functio run() {}
+@ command "run"
+fn run() {}
 "#,
     )
     .expect("write jobs");
@@ -7288,10 +7316,10 @@ fn compile_package_exports_imported_module_functions_to_entry() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./auxilium" privata aux
+import from "./auxilium" private aux
 
-incipit {
-    nota aux.saluta("Marcus")
+main {
+    print aux.saluta("Marcus")
 }
 "#,
     )
@@ -7299,8 +7327,8 @@ incipit {
     fs::write(
         dir.join("auxilium.fab"),
         r#"
-functio saluta(textus nomen) → textus {
-    redde "Salve, §!"(nomen)
+fn saluta(string nomen) → string {
+    return "Salve, §!"(nomen)
 }
 "#,
     )
@@ -7340,10 +7368,10 @@ fn compile_package_calls_top_level_function_through_file_namespace_alias() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./auxilium" privata Aux
+import from "./auxilium" private Aux
 
-incipit {
-    nota Aux.adde(2, 3)
+main {
+    print Aux.adde(2, 3)
 }
 "#,
     )
@@ -7351,8 +7379,8 @@ incipit {
     fs::write(
         dir.join("auxilium.fab"),
         r#"
-functio adde(numerus left, numerus right) → numerus {
-    redde left + right
+fn adde(int left, int right) → int {
+    return left + right
 }
 "#,
     )
@@ -7384,11 +7412,11 @@ fn check_package_types_top_level_function_through_file_namespace_alias() {
     fs::write(
         &entry,
         r#"
-importa ex "./auxilium" privata Aux
+import from "./auxilium" private Aux
 
-incipit {
-    fixum textus label ← Aux.label("Marcus")
-    nota label
+main {
+    const string label ← Aux.label("Marcus")
+    print label
 }
 "#,
     )
@@ -7396,8 +7424,8 @@ incipit {
     fs::write(
         dir.join("auxilium.fab"),
         r#"
-functio label(textus nomen) → textus {
-    redde "Salve, §!"(nomen)
+fn label(string nomen) → string {
+    return "Salve, §!"(nomen)
 }
 "#,
     )
@@ -7421,10 +7449,10 @@ fn check_package_rejects_wrong_argument_type_for_file_namespace_alias() {
     fs::write(
         &entry,
         r#"
-importa ex "./auxilium" privata Aux
+import from "./auxilium" private Aux
 
-incipit {
-    nota Aux.label(42)
+main {
+    print Aux.label(42)
 }
 "#,
     )
@@ -7432,8 +7460,8 @@ incipit {
     fs::write(
         dir.join("auxilium.fab"),
         r#"
-functio label(textus nomen) → textus {
-    redde nomen
+fn label(string nomen) → string {
+    return nomen
 }
 "#,
     )
@@ -7459,11 +7487,11 @@ fn check_package_types_norma_solum_path_namespace_call() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:solum/path" privata path
+import from "norma:solum/path" private path
 
-incipit {
-    fixum textus name ← path.nomen("/usr/bin/faber")
-    nota name
+main {
+    const string name ← path.nomen("/usr/bin/faber")
+    print name
 }
 "#,
     )
@@ -7498,11 +7526,11 @@ functio solve(textus json) → valor {
     fs::write(
         &entry,
         r#"
-importa ex "norma:json/solve" privata solve
+import from "norma:json/solve" private solve
 
-incipit {
-    fixum valor doc ← solve.solve("{}")
-    nota doc
+main {
+    const value doc ← solve.solve("{}")
+    print doc
 }
 "#,
     )
@@ -7514,7 +7542,7 @@ incipit {
         "expected typed top-level json/solve namespace call, got {:?}",
         diagnostics
             .iter()
-            .map(|diag| (diag.code, diag.issue()))
+            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
             .collect::<Vec<_>>()
     );
 }
@@ -7528,12 +7556,12 @@ fn build_package_routes_duplicate_stem_file_namespace_imports_by_path() {
     fs::write(
         &entry,
         r#"
-importa ex "./a/util" privata A
-importa ex "./b/util" privata B
+import from "./a/util" private A
+import from "./b/util" private B
 
-incipit {
-    nota A.label()
-    nota B.label()
+main {
+    print A.label()
+    print B.label()
 }
 "#,
     )
@@ -7541,8 +7569,8 @@ incipit {
     fs::write(
         dir.join("a").join("util.fab"),
         r#"
-functio label() → textus {
-    redde "A"
+fn label() → string {
+    return "A"
 }
 "#,
     )
@@ -7550,8 +7578,8 @@ functio label() → textus {
     fs::write(
         dir.join("b").join("util.fab"),
         r#"
-functio label() → textus {
-    redde "B"
+fn label() → string {
+    return "B"
 }
 "#,
     )
@@ -7576,9 +7604,9 @@ fn build_package_supplies_namespace_metadata_to_non_entry_modules() {
     fs::write(
         &entry,
         r#"
-importa ex "./service" privata Service
+import from "./service" private Service
 
-incipit {
+main {
     Service.run()
 }
 "#,
@@ -7587,10 +7615,10 @@ incipit {
     fs::write(
         dir.join("service.fab"),
         r#"
-importa ex "./util" privata U
+import from "./util" private U
 
-functio run() → vacuum {
-    nota U.adde(2, 3)
+fn run() → void {
+    print U.adde(2, 3)
 }
 "#,
     )
@@ -7598,8 +7626,8 @@ functio run() → vacuum {
     fs::write(
         dir.join("util.fab"),
         r#"
-functio adde(numerus left, numerus right) → numerus {
-    redde left + right
+fn adde(int left, int right) → int {
+    return left + right
 }
 "#,
     )
@@ -7626,14 +7654,14 @@ fn build_package_keeps_duplicate_qualified_type_names_namespace_scoped() {
     fs::write(
         &entry,
         r#"
-importa ex "./a/types" privata A
-importa ex "./b/types" privata B
+import from "./a/types" private A
+import from "./b/types" private B
 
-incipit {
-    fixum A.Thing a ← A.Thing { label = "A" }
-    fixum B.Thing b ← B.Thing { label = "B" }
-    nota a.label
-    nota b.label
+main {
+    const A.Thing a ← A.Thing { label = "A" }
+    const B.Thing b ← B.Thing { label = "B" }
+    print a.label
+    print b.label
 }
 "#,
     )
@@ -7641,8 +7669,8 @@ incipit {
     fs::write(
         dir.join("a").join("types.fab"),
         r#"
-genus Thing {
-    textus label
+class Thing {
+    string label
 }
 "#,
     )
@@ -7650,8 +7678,8 @@ genus Thing {
     fs::write(
         dir.join("b").join("types.fab"),
         r#"
-genus Thing {
-    textus label
+class Thing {
+    string label
 }
 "#,
     )
@@ -7675,10 +7703,10 @@ fn compile_package_calls_file_function_through_file_namespace_alias() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./auxilium" privata Aux
+import from "./auxilium" private Aux
 
-incipit {
-    nota Aux.dupla(4)
+main {
+    print Aux.dupla(4)
 }
 "#,
     )
@@ -7686,8 +7714,8 @@ incipit {
     fs::write(
         dir.join("auxilium.fab"),
         r#"
-functio dupla(numerus n) → numerus {
-    redde n * 2
+fn dupla(int n) → int {
+    return n * 2
 }
 "#,
     )
@@ -7718,10 +7746,10 @@ fn compile_package_rejects_private_function_through_file_namespace_alias() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./auxilium" privata Aux
+import from "./auxilium" private Aux
 
-incipit {
-    nota Aux.secretum()
+main {
+    print Aux.secretum()
 }
 "#,
     )
@@ -7729,13 +7757,13 @@ incipit {
     fs::write(
         dir.join("auxilium.fab"),
         r#"
-@ privata
-functio secretum() → textus {
-    redde "hidden"
+@ private
+fn secretum() → string {
+    return "hidden"
 }
 
-functio publicum() → textus {
-    redde secretum()
+fn publicum() → string {
+    return secretum()
 }
 "#,
     )
@@ -7755,10 +7783,10 @@ fn compile_package_exports_publica_function_through_file_namespace_alias() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./auxilium" privata Aux
+import from "./auxilium" private Aux
 
-incipit {
-    nota Aux.publicum()
+main {
+    print Aux.publicum()
 }
 "#,
     )
@@ -7766,9 +7794,9 @@ incipit {
     fs::write(
         dir.join("auxilium.fab"),
         r#"
-@ publica
-functio publicum() → textus {
-    redde "visible"
+@ public
+fn publicum() → string {
+    return "visible"
 }
 "#,
     )
@@ -7788,10 +7816,10 @@ fn compile_package_rejects_private_function_from_parser_file_namespace_alias() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./parser" privata P
+import from "./parser" private P
 
-incipit {
-    nota P.scan("{}")
+main {
+    print P.scan("{}")
 }
 "#,
     )
@@ -7799,13 +7827,13 @@ incipit {
     fs::write(
         dir.join("parser.fab"),
         r#"
-@ privata
-functio scan(textus input) → textus {
-    redde input
+@ private
+fn scan(string input) → string {
+    return input
 }
 
-functio solve(textus input) → textus {
-    redde input
+fn solve(string input) → string {
+    return input
 }
 "#,
     )
@@ -7840,10 +7868,10 @@ genus Publicum {
     fs::write(
         &entry,
         r#"
-importa ex "norma:types" privata types
+import from "norma:types" private types
 
-incipit {
-    fixum types.Secretum secretum ← types.Secretum {}
+main {
+    const types.Secretum secretum ← types.Secretum {}
 }
 "#,
     )
@@ -7880,10 +7908,10 @@ functio publicum() → textus {
     fs::write(
         &entry,
         r#"
-importa ex "norma:helpers" privata helpers
+import from "norma:helpers" private helpers
 
-incipit {
-    nota helpers.secretum()
+main {
+    print helpers.secretum()
 }
 "#,
     )
@@ -7978,7 +8006,7 @@ version = "0.2.0"
 fn discover_build_layout_supports_directory_with_manifest() {
     let dir = test_temp_dir("layout-dir-manifest");
     fs::create_dir_all(dir.join("src")).expect("src");
-    fs::write(dir.join("src/main.fab"), "incipit {}").expect("entry");
+    fs::write(dir.join("src/main.fab"), "main {}").expect("entry");
     fs::write(
         dir.join("faber.toml"),
         r#"
@@ -8001,7 +8029,7 @@ fn direct_entry_file_under_manifest_uses_package_root_and_manifest_name() {
     let dir = test_temp_dir("layout-entry-parent-manifest");
     fs::create_dir_all(dir.join("src")).expect("src");
     let entry = dir.join("src/main.fab");
-    fs::write(&entry, "incipit { nota \"manifest root\" }").expect("entry");
+    fs::write(&entry, "main { print \"manifest root\" }").expect("entry");
     fs::write(
         dir.join("faber.toml"),
         r#"
@@ -8038,8 +8066,8 @@ fn direct_non_manifest_entry_under_manifest_keeps_explicit_entry() {
     fs::create_dir_all(dir.join("src")).expect("src");
     let manifest_entry = dir.join("src/main.fab");
     let explicit_entry = dir.join("src/other.fab");
-    fs::write(&manifest_entry, "incipit { nota \"manifest entry\" }").expect("manifest entry");
-    fs::write(&explicit_entry, "incipit { nota \"explicit entry\" }").expect("explicit entry");
+    fs::write(&manifest_entry, "main { print \"manifest entry\" }").expect("manifest entry");
+    fs::write(&explicit_entry, "main { print \"explicit entry\" }").expect("explicit entry");
     fs::write(
         dir.join("faber.toml"),
         r#"
@@ -8078,7 +8106,7 @@ entry = "main.fab"
 fn discover_build_layout_supports_entry_file_input_and_falls_back_to_dir_name() {
     let dir = test_temp_dir("layout-entry-no-manifest");
     let entry = dir.join("main.fab");
-    fs::write(&entry, "incipit { nota \"x\" }").expect("entry");
+    fs::write(&entry, "main { print \"x\" }").expect("entry");
 
     let layout = discover_build_layout(&entry).expect("discover from entry file");
     // falls back to directory name since no manifest
@@ -8101,7 +8129,7 @@ fn build_layout_never_produces_faber_target_nested_path() {
 fn linked_library_emit_skips_entry_file_layouts_without_manifest() {
     let dir = test_temp_dir("linked-library-no-manifest");
     let entry = dir.join("main.fab");
-    fs::write(&entry, "incipit { nota \"no manifest\" }").expect("entry");
+    fs::write(&entry, "main { print \"no manifest\" }").expect("entry");
 
     let deps = super::artifact_plan::native_library_deps(&dir)
         .expect("entry-file layouts without manifest should not require native deps");
@@ -8124,7 +8152,7 @@ fn emit_generated_crate_writes_cargo_toml_and_main_rs_under_target_faber() {
     fs::create_dir_all(pkg.join("src")).expect("src");
     fs::write(
         pkg.join("src/main.fab"),
-        r#"incipit { nota "writer test" }"#,
+        r#"main { print "writer test" }"#,
     )
     .expect("entry");
     fs::write(
@@ -8195,7 +8223,7 @@ entry = "main.fab"
     .expect("manifest");
     fs::write(
         pkg.join("src/main.fab"),
-        r#"incipit { fixum textus body ← ad 'runtime:echo' ("ok") ↦ textus nota body }"#,
+        r#"main { const string body ← call 'runtime:echo' ("ok") ↦ string print body }"#,
     )
     .expect("entry");
 
@@ -8226,7 +8254,7 @@ entry = "main.fab"
     .expect("manifest");
     fs::write(
         pkg.join("src/main.fab"),
-        r#"incipit { fixum textus body ← ad 'solum:lege' ("data.txt") ↦ textus nota body }"#,
+        r#"main { const string body ← call 'solum:lege' ("data.txt") ↦ string print body }"#,
     )
     .expect("entry");
 
@@ -8267,7 +8295,7 @@ entry = "main.fab"
     .expect("manifest");
     fs::write(
         pkg.join("src/main.fab"),
-        r#"incipit { fixum textus body ← ad 'ignotum:route' ("x") ↦ textus nota body }"#,
+        r#"main { const string body ← call 'ignotum:route' ("x") ↦ string print body }"#,
     )
     .expect("entry");
 
@@ -8311,11 +8339,11 @@ entry = "main.fab"
     fs::write(
         pkg.join("src/main.fab"),
         r#"
-importa ex "norma:aleator" privata aleator
+import from "norma:aleator" private aleator
 
-incipit {
-  fixum _ id ← aleator.uuid()
-  nota id
+main {
+  const _ id ← aleator.uuid()
+  print id
 }
 "#,
     )
@@ -8367,7 +8395,7 @@ providers = ["notaprovider"]
     .expect("manifest");
     fs::write(
         pkg.join("src/main.fab"),
-        r#"incipit { fixum textus body ← ad 'runtime:echo' ("ok") ↦ textus nota body }"#,
+        r#"main { const string body ← call 'runtime:echo' ("ok") ↦ string print body }"#,
     )
     .expect("entry");
 
@@ -8406,7 +8434,7 @@ entry = "main.fab"
     .expect("manifest");
     fs::write(
         pkg.join("src/main.fab"),
-        r#"incipiet { fixum textus body ← ad 'runtime:echo' ("ok") ↦ textus nota body }"#,
+        r#"async_main { const string body ← call 'runtime:echo' ("ok") ↦ string print body }"#,
     )
     .expect("entry");
 
@@ -8463,7 +8491,7 @@ entry = "main.fab"
     .expect("manifest");
     fs::write(
         pkg.join("src/main.fab"),
-        r#"incipiet { fixum textus body ← ad 'runtime:echo' ("ok") ↦ textus nota body }"#,
+        r#"async_main { const string body ← call 'runtime:echo' ("ok") ↦ string print body }"#,
     )
     .expect("entry");
 
@@ -8495,7 +8523,7 @@ entry = "main.fab"
 fn emit_generated_crate_works_without_manifest_using_fallback_name() {
     let pkg = test_temp_dir("emit-no-manifest");
     let entry = pkg.join("main.fab");
-    fs::write(&entry, "incipit {}").expect("entry");
+    fs::write(&entry, "main {}").expect("entry");
 
     let layout = discover_build_layout(&entry).expect("layout");
     // Directly test the emit path with dummy code (no real compile needed for writer coverage)
@@ -8518,9 +8546,9 @@ fn generated_package_ad_avoids_private_host_bridge_dependency() {
         &entry,
         format!(
             r#"
-incipit {{
-    fixum textus body ← ad 'solum:lege' ({path_lit}) ↦ textus
-    nota body
+main {{
+    const string body ← call 'solum:lege' ({path_lit}) ↦ string
+    print body
 }}
 "#
         ),
@@ -8585,9 +8613,9 @@ host = "native"
         pkg.join("src/main.fab"),
         format!(
             r#"
-incipit {{
-    fixum textus body ← ad 'solum:lege' ({path_lit}) ↦ textus
-    nota body
+main {{
+    const string body ← call 'solum:lege' ({path_lit}) ↦ string
+    print body
 }}
 "#
         ),
@@ -8700,9 +8728,9 @@ host = "native"
         pkg.join("src/main.fab"),
         format!(
             r#"
-incipiet {{
-    fixum textus body ← ad 'solum:lege' ({path_lit}) ↦ textus
-    nota body
+async_main {{
+    const string body ← call 'solum:lege' ({path_lit}) ↦ string
+    print body
 }}
 "#
         ),
@@ -8781,7 +8809,7 @@ host = "native"
     .expect("write manifest");
     fs::write(
         pkg.join("src/main.fab"),
-        r#"incipit { fixum textus body ← ad 'ignotum:route' ("x") ↦ textus nota body }"#,
+        r#"main { const string body ← call 'ignotum:route' ("x") ↦ string print body }"#,
     )
     .expect("write entry");
 
@@ -8804,23 +8832,23 @@ fn generated_package_norma_json_facade_defers_runtime_codec() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:json" privata json
+import from "norma:json" private json
 
-incipit {
-    fac {
-        fixum json duplicate ← json.solve("{\"id\": 1, \"id\": 2}")
-        nota duplicate
+main {
+    do {
+        const json duplicate ← json.solve("{\"id\": 1, \"id\": 2}")
+        print duplicate
     }
-    cape err {
-        nota "duplicate rejected"
+    catch err {
+        print "duplicate rejected"
     }
 
-    fac {
-        fixum json unicode ← json.solve("{\"music\": \"\\uD834\\uDD1E\"}")
-        nota json.pange(unicode)
+    do {
+        const json unicode ← json.solve("{\"music\": \"\\uD834\\uDD1E\"}")
+        print json.pange(unicode)
     }
-    cape err {
-        nota err
+    catch err {
+        print err
     }
 }
 "#,
@@ -8921,8 +8949,8 @@ targets = ["rust"]
         fs::write(
             path,
             r#"
-functio label() → textus {
-    redde "installed"
+fn label() → string {
+    return "installed"
 }
 "#,
         )
@@ -8955,10 +8983,10 @@ entry = "main.fab"
     fs::write(
         dir.join("src/main.fab"),
         r#"
-importa ex "altlib:math/add" privata add
+import from "altlib:math/add" private add
 
-incipit {
-    nota add.label()
+main {
+    print add.label()
 }
 "#,
     )
@@ -8997,10 +9025,10 @@ entry = "main.fab"
     fs::write(
         dir.join("src/main.fab"),
         r#"
-importa ex "altlib:math/add" privata add
+import from "altlib:math/add" private add
 
-incipit {
-    nota add.label()
+main {
+    print add.label()
 }
 "#,
     )
@@ -9044,11 +9072,11 @@ functio vacua_tabula() → lista<lista<textus>> {
     fs::write(
         &entry,
         r#"
-importa ex "norma:nested_lista_probe" privata nested_lista_probe
+import from "norma:nested_lista_probe" private nested_lista_probe
 
-incipit {
-    fixum lista<lista<textus>> grid ← nested_lista_probe.vacua_tabula()
-    nota grid.length()
+main {
+    const list<list<string>> grid ← nested_lista_probe.vacua_tabula()
+    print grid.length()
 }
 "#,
     )
@@ -9083,11 +9111,11 @@ functio split_fields(textus row) → lista<textus> {
     fs::write(
         &entry,
         r#"
-importa ex "norma:transitive_fixture" privata transitive_fixture
+import from "norma:transitive_fixture" private transitive_fixture
 
-incipit {
-    fixum lista<textus> fields ← transitive_fixture.split_fields("alpha,beta")
-    nota fields.length()
+main {
+    const list<string> fields ← transitive_fixture.split_fields("alpha,beta")
+    print fields.length()
 }
 "#,
     )
@@ -9140,10 +9168,10 @@ functio label() → textus {
     fs::write(
         &entry,
         r#"
-importa ex "norma:cycle_a" privata cycle_a
+import from "norma:cycle_a" private cycle_a
 
-incipit {
-    nota cycle_a.label()
+main {
+    print cycle_a.label()
 }
 "#,
     )
@@ -9152,7 +9180,8 @@ incipit {
     let config = config_with_library_home(library_home.path());
     let spec = discover_package(&entry).expect("package");
     let resolver = library_resolver_from_config(&config);
-    let files = load_package(&spec, &resolver);
+    let files =
+        load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), false, None);
     assert!(files.is_err(), "cycle should fail package load");
     let err = files.err().expect("diagnostics");
     assert!(err.iter().any(|diag| {
@@ -9175,11 +9204,11 @@ fn transitive_library_conflicting_aliases_are_rejected() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:csv" privata csv
-importa ex "norma:chorda" privata chorda ut ropes
+import from "norma:csv" private csv
+import from "norma:chorda" private chorda as ropes
 
-incipit {
-    nota csv.solve("a,b").longitudo()
+main {
+    print csv.solve("a,b").longitudo()
 }
 "#,
     )
@@ -9246,10 +9275,10 @@ functio both() → textus {
     fs::write(
         &entry,
         r#"
-importa ex "norma:leaf_a" privata leaf_a
+import from "norma:leaf_a" private leaf_a
 
-incipit {
-    nota leaf_a.both()
+main {
+    print leaf_a.both()
 }
 "#,
     )
@@ -9258,7 +9287,8 @@ incipit {
     let config = config_with_library_home(library_home.path());
     let spec = discover_package(&entry).expect("package");
     let resolver = library_resolver_from_config(&config);
-    let files = load_package(&spec, &resolver).expect("load package");
+    let files =
+        load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), false, None).expect("load package");
     let file = files
         .iter()
         .find(|file| file.path == entry)
@@ -9312,10 +9342,10 @@ functio parent_label() → textus {
     fs::write(
         &entry,
         r#"
-importa ex "norma:parent" privata parent
+import from "norma:parent" private parent
 
-incipit {
-    nota parent.label()
+main {
+    print parent.label()
 }
 "#,
     )
@@ -9324,7 +9354,8 @@ incipit {
     let config = config_with_library_home(library_home.path());
     let spec = discover_package(&entry).expect("package");
     let resolver = library_resolver_from_config(&config);
-    let files = load_package(&spec, &resolver).expect("load package");
+    let files =
+        load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), false, None).expect("load package");
     let file = files
         .iter()
         .find(|file| file.path == entry)
@@ -9373,10 +9404,10 @@ functio parent_label() → textus {
     fs::write(
         &entry,
         r#"
-importa ex "norma:parent" privata parent
+import from "norma:parent" private parent
 
-incipit {
-    nota parent.child.label()
+main {
+    print parent.child.label()
 }
 "#,
     )
@@ -9425,10 +9456,10 @@ functio parent_label() → textus {
     fs::write(
         &entry,
         r#"
-importa ex "norma:parent" privata parent
+import from "norma:parent" private parent
 
-incipit {
-    nota parent.child.label()
+main {
+    print parent.child.label()
 }
 "#,
     )
@@ -9449,12 +9480,12 @@ fn transitive_csv_chorda_closure_compiles_with_mixed_provenance() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:csv" privata csv
+import from "norma:csv" private csv
 
-incipit {
-    fixum lista<lista<textus>> grid ← csv.solve("name,count\nalpha,1")
-    fixum textus wire ← csv.pange(grid)
-    nota wire
+main {
+    const list<list<string>> grid ← csv.solve("name,count\nalpha,1")
+    const string wire ← csv.pange(grid)
+    print wire
 }
 "#,
     )
@@ -9463,7 +9494,8 @@ incipit {
     let config = Config::default();
     let spec = discover_package(&entry).expect("package");
     let resolver = library_resolver_from_config(&config);
-    let files = load_package(&spec, &resolver).expect("load package");
+    let files =
+        load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), false, None).expect("load package");
     let file = files
         .iter()
         .find(|file| file.path == entry)
@@ -9504,11 +9536,11 @@ fn transitive_csv_solve_empty_input_returns_vacua() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:csv" privata csv
+import from "norma:csv" private csv
 
-incipit {
-    fixum lista<lista<textus>> grid ← csv.solve("")
-    nota grid.length()
+main {
+    const list<list<string>> grid ← csv.solve("")
+    print grid.length()
 }
 "#,
     )
@@ -9529,11 +9561,11 @@ fn transitive_csv_solve_preserves_trailing_row() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:csv" privata csv
+import from "norma:csv" private csv
 
-incipit {
-    fixum lista<lista<textus>> grid ← csv.solve("a,b\n")
-    nota grid.length()
+main {
+    const list<list<string>> grid ← csv.solve("a,b\n")
+    print grid.length()
 }
 "#,
     )
@@ -9587,7 +9619,7 @@ entry = "main.fab"
 "#,
     )
     .expect("manifest");
-    fs::write(dir.join("src/main.fab"), "incipit { }\n").expect("entry");
+    fs::write(dir.join("src/main.fab"), "main { }\n").expect("entry");
     let package = analyze_package(&Config::default(), &dir).expect("analyze");
     let a = super::artifact_plan::plan_package(&package, Target::HirRust);
     let b = super::artifact_plan::plan_package(&package, Target::HirRust);
@@ -9705,15 +9737,15 @@ fn g8_sqlite_package_verifies_and_links_application() {
         &app,
         &lib,
         r#"
-importa ex "sqlite:sqlite" privata sqlite
+import from "sqlite:sqlite" private sqlite
 
-incipit {
-  fac {
-    fixum valor ∪ nihil cell ← sqlite.scalar(":memory:", "SELECT 1", vacua)
-    nota cell
+main {
+  do {
+    const value ∪ nihil cell ← sqlite.scalar(":memory:", "SELECT 1", vacua)
+    print cell
   }
-  cape err {
-    mone err
+  catch err {
+    warn err
   }
 }
 "#,
@@ -9745,15 +9777,15 @@ fn g8_sqlite_sql_error_is_recoverable() {
         &app,
         &lib,
         r#"
-importa ex "sqlite:sqlite" privata sqlite
+import from "sqlite:sqlite" private sqlite
 
-incipit {
-  fac {
-    fixum valor ∪ nihil _ ← sqlite.scalar(":memory:", "SELECT FROM", vacua)
-    nota "unexpected-ok"
+main {
+  do {
+    const value ∪ nihil _ ← sqlite.scalar(":memory:", "SELECT FROM", vacua)
+    print "unexpected-ok"
   }
-  cape err {
-    mone err
+  catch err {
+    warn err
   }
 }
 "#,
@@ -9786,15 +9818,15 @@ fn g8_sqlite_invalid_path_is_recoverable() {
         &app,
         &lib,
         r#"
-importa ex "sqlite:sqlite" privata sqlite
+import from "sqlite:sqlite" private sqlite
 
-incipit {
-  fac {
-    fixum valor ∪ nihil _ ← sqlite.scalar("/no/such/faber/g8/path.sqlite", "SELECT 1", vacua)
-    nota "unexpected-ok"
+main {
+  do {
+    const value ∪ nihil _ ← sqlite.scalar("/no/such/faber/g8/path.sqlite", "SELECT 1", vacua)
+    print "unexpected-ok"
   }
-  cape err {
-    mone err
+  catch err {
+    warn err
   }
 }
 "#,
@@ -9854,20 +9886,20 @@ fn g8_sqlite_empty_scalar_is_nihil() {
         &app,
         &lib,
         r#"
-importa ex "sqlite:sqlite" privata sqlite
+import from "sqlite:sqlite" private sqlite
 
-incipit {
-  fac {
-    fixum valor ∪ nihil cell ← sqlite.scalar(":memory:", "SELECT 1 WHERE 0", vacua)
-    si cell ≡ nihil {
-      nota "empty-ok"
+main {
+  do {
+    const value ∪ nihil cell ← sqlite.scalar(":memory:", "SELECT 1 WHERE 0", vacua)
+    if cell ≡ nihil {
+      print "empty-ok"
     }
-    secus {
-      nota "unexpected-value"
+    else {
+      print "unexpected-value"
     }
   }
-  cape err {
-    mone err
+  catch err {
+    warn err
   }
 }
 "#,
@@ -9920,7 +9952,7 @@ bindings = "bindings/rust.toml"
     .expect("lib manifest");
     fs::write(
         lib.join("src/math.fab"),
-        "functio double(numerus n) → numerus\n",
+        "fn double(int n) → int\n",
     )
     .expect("lib source");
     fs::write(
@@ -9981,11 +10013,11 @@ rustc = ""
     fs::write(
         app.join("src/main.fab"),
         r#"
-importa ex "libmath:math" privata math
+import from "libmath:math" private math
 
-incipit {
-  fixum numerus n ← math.double(21)
-  nota n
+main {
+  const int n ← math.double(21)
+  print n
 }
 "#,
     )
@@ -10086,7 +10118,7 @@ bindings = "bindings/rust.toml"
     .expect("lib manifest");
     fs::write(
         lib.join("src/math.fab"),
-        "functio double(numerus n) → numerus\n",
+        "fn double(int n) → int\n",
     )
     .expect("lib source");
     fs::write(
@@ -10141,11 +10173,11 @@ rustc = ""
     fs::write(
         app.join("src/main.fab"),
         r#"
-importa ex "libmath:math" privata math
+import from "libmath:math" private math
 
-incipit {
-  fixum numerus n ← math.double(21)
-  nota n
+main {
+  const int n ← math.double(21)
+  print n
 }
 "#,
     )
@@ -10188,13 +10220,13 @@ entry = "main.fab"
     fs::write(
         app.join("src/main.fab"),
         r#"
-importa ex "triga:math" privata triga
+import from "triga:math" private triga
 
-incipit {
-  fixum triga.Color initium ← triga.Color { r = 0.0, g = 0.0, b = 0.0 }
-  fixum triga.Color finis ← triga.Color { r = 1.0, g = 0.5, b = 0.25 }
-  fixum triga.Color midpoint ← triga.color_interpolata(initium, finis, 0.5)
-  adfirma midpoint.r ≡ (0.5 ∷ f32) secus "color call-arg"
+main {
+  const triga.Color initium ← triga.Color { r = 0.0, g = 0.0, b = 0.0 }
+  const triga.Color finis ← triga.Color { r = 1.0, g = 0.5, b = 0.25 }
+  const triga.Color midpoint ← triga.color_interpolata(initium, finis, 0.5)
+  assert midpoint.r ≡ (0.5 ∷ f32) else "color call-arg"
 }
 "#,
     )
@@ -10250,7 +10282,7 @@ entry = "main.fab"
 "#,
     )
     .expect("manifest");
-    fs::write(dir.join("src/main.fab"), "incipit { }\n").expect("entry");
+    fs::write(dir.join("src/main.fab"), "main { }\n").expect("entry");
     // Wasm is now a supported package target (U6-D); wgsl stays a rejected
     // package target for the fail-closed seam.
     let result = compile_package(&Config::default().with_target(Target::MirWgsl), &dir);
@@ -10286,8 +10318,8 @@ entry = "main.fab"
         dir.join("src/main.fab"),
         r#"
 @ cli "true"
-@ operandus ceteri textus ignored
-incipit argumenta args exitus 0 {
+@ operand rest string ignored
+main args args exit 0 {
 }
 "#,
     )
@@ -10350,18 +10382,18 @@ entry = "main.fab"
     .expect("manifest");
     fs::write(
         dir.join("src/helper.fab"),
-        "functio identity(textus s) → textus {\n  redde s\n}\n",
+        "fn identity(string s) → string {\n  return s\n}\n",
     )
     .expect("helper");
     fs::write(
         dir.join("src/main.fab"),
         r#"
-importa ex "./helper" privata helper
+import from "./helper" private helper
 
 @ cli "tool"
-@ operandus ceteri textus ignored
-incipit argumenta args exitus 0 {
-  fixum textus _ ← helper.identity("x")
+@ operand rest string ignored
+main args args exit 0 {
+  const string _ ← helper.identity("x")
 }
 "#,
     )
@@ -10467,9 +10499,9 @@ entry = "main.fab"
     fs::write(
         dir.join("src/helper.fab"),
         r#"
-importa ex "norma:consolum" privata consolum
+import from "norma:consolum" private consolum
 
-functio shout(textus s) → vacuum {
+fn shout(string s) → void {
   consolum.scribe(s)
 }
 "#,
@@ -10478,12 +10510,12 @@ functio shout(textus s) → vacuum {
     fs::write(
         dir.join("src/main.fab"),
         r#"
-importa ex "norma:consolum" privata consolum
-importa ex "./helper" privata helper
+import from "norma:consolum" private consolum
+import from "./helper" private helper
 
 @ cli "tool"
-@ operandus ceteri textus ignored
-incipit argumenta args exitus 0 {
+@ operand rest string ignored
+main args args exit 0 {
   helper.shout("hi")
   consolum.dic("x")
 }
@@ -10540,24 +10572,24 @@ entry = "main.fab"
     // Two non-entry modules export the same function name.
     fs::write(
         dir.join("src/a.fab"),
-        "functio identity(textus s) → textus {\n  redde s\n}\n",
+        "fn identity(string s) → string {\n  return s\n}\n",
     )
     .expect("a");
     fs::write(
         dir.join("src/b.fab"),
-        "functio identity(textus s) → textus {\n  redde s + \"!\"\n}\n",
+        "fn identity(string s) → string {\n  return s + \"!\"\n}\n",
     )
     .expect("b");
     fs::write(
         dir.join("src/main.fab"),
         r#"
-importa ex "./a" privata a
-importa ex "./b" privata b
+import from "./a" private a
+import from "./b" private b
 @ cli "tool"
-@ operandus ceteri textus ignored
-incipit argumenta args exitus 0 {
-  fixum textus _ ← a.identity("x")
-  fixum textus __ ← b.identity("y")
+@ operand rest string ignored
+main args args exit 0 {
+  const string _ ← a.identity("x")
+  const string __ ← b.identity("y")
 }
 "#,
     )
@@ -10668,30 +10700,30 @@ entry = "main.fab"
     fs::write(
         dir.join("src/main.fab"),
         r#"
-importa ex "norma:consolum" privata consolum
+import from "norma:consolum" private consolum
 
 @ cli "tool"
-@ operandus ceteri textus ignored
-incipit argumenta args exitus 0 {
-  si consolum.audit() {
+@ operand rest string ignored
+main args args exit 0 {
+  if consolum.audit() {
     consolum.dic("tty")
   }
-  secus {
+  else {
     consolum.dic("notty")
   }
   consolum.scribet(":")
   consolum.dicet(consolum.leget())
   consolum.scribe("")
-  fixum octeti sync_bytes ← consolum.hauri(4)
+  const bytes sync_bytes ← consolum.hauri(4)
   consolum.fundet(sync_bytes)
-  fixum octeti async_bytes ← consolum.hauriet(4)
+  const bytes async_bytes ← consolum.hauriet(4)
   consolum.funde(async_bytes)
   consolum.monet("warn")
   consolum.videbit("debug")
-  si consolum.loquitur() {
+  if consolum.loquitur() {
     consolum.dic("stdout-tty")
   }
-  si consolum.admonet() {
+  if consolum.admonet() {
     consolum.dic("stderr-tty")
   }
 }
@@ -10809,19 +10841,19 @@ entry = "main.fab"
     .expect("manifest");
     fs::write(
         dir.join("src/helper.fab"),
-        format!("functio {func_name}(textus s) → textus {{\n  redde s\n}}\n"),
+        format!("fn {func_name}(string s) → string {{\n  return s\n}}\n"),
     )
     .expect("helper");
     fs::write(
         dir.join("src/main.fab"),
         format!(
             r#"
-importa ex "./helper" privata helper
+import from "./helper" private helper
 
 @ cli "tool"
-@ operandus ceteri textus ignored
-incipit argumenta args exitus 0 {{
-  fixum textus _ ← helper.{func_name}("x")
+@ operand rest string ignored
+main args args exit 0 {{
+  const string _ ← helper.{func_name}("x")
 }}
 "#
         ),
@@ -10850,24 +10882,24 @@ entry = "main.fab"
     .expect("manifest");
     fs::write(
         bad.join("src/a.fab"),
-        "functio identity(textus s) → textus {\n  redde s\n}\n",
+        "fn identity(string s) → string {\n  return s\n}\n",
     )
     .expect("a");
     fs::write(
         bad.join("src/b.fab"),
-        "functio identity(textus s) → textus {\n  redde s + \"!\"\n}\n",
+        "fn identity(string s) → string {\n  return s + \"!\"\n}\n",
     )
     .expect("b");
     fs::write(
         bad.join("src/main.fab"),
         r#"
-importa ex "./a" privata a
-importa ex "./b" privata b
+import from "./a" private a
+import from "./b" private b
 @ cli "tool"
-@ operandus ceteri textus ignored
-incipit argumenta args exitus 0 {
-  fixum textus _ ← a.identity("x")
-  fixum textus __ ← b.identity("y")
+@ operand rest string ignored
+main args args exit 0 {
+  const string _ ← a.identity("x")
+  const string __ ← b.identity("y")
 }
 "#,
     )
@@ -10978,7 +11010,7 @@ entry = "main.fab"
 "#,
     )
     .expect("manifest");
-    fs::write(rust_dir.join("src/main.fab"), "incipit { }\n").expect("entry");
+    fs::write(rust_dir.join("src/main.fab"), "main { }\n").expect("entry");
     let rust_result = compile_package(&Config::default(), &rust_dir);
     assert!(rust_result.success(), "rust package must compile");
     assert!(
@@ -12449,13 +12481,13 @@ fn g1_c4_imported_annotation_contract_survives_package_graph_extract() {
         &app,
         &lib,
         r#"
-importa ex "http:http" privata http
+import from "http:http" private http
 
 @ HttpApplication { nomen = "demo" }
-functio factory() → vacuum {
+fn factory() → void {
 }
 
-incipit {
+main {
   factory()
 }
 "#,
@@ -12501,19 +12533,19 @@ fn g9_api2_http_package_links_builder_application() {
         &app,
         &lib,
         r#"
-importa ex "http:http" privata http
+import from "http:http" private http
 
 @ HttpApplication { nomen = "demo" }
-functio factory() → vacuum {
+fn factory() → void {
 }
 
-incipit {
+main {
   # Nested free-function builders avoid local type annotations that currently
   # lower to crate::<provider>::Type instead of the path-dep crate.
   factory()
-  nota http.routes_of(http.register_post(http.register_get(http.router(), "/salve"), "/echo"))
-  nota http.identitas_novum()
-  nota http.status_of(http.replicatio(200, "ok"))
+  print http.routes_of(http.register_post(http.register_get(http.router(), "/salve"), "/echo"))
+  print http.identitas_novum()
+  print http.status_of(http.replicatio(200, "ok"))
 }
 "#,
     );
@@ -12566,24 +12598,24 @@ fn g9_api3_http_router_match_links_application() {
         &app,
         &lib,
         r#"
-importa ex "http:http" privata http
+import from "http:http" private http
 
-incipit {
-  fac {
-    fixum valor tab ← http.route_table()
-    fixum valor tab2 ← http.route_add_get(tab, "/users/{id}", "show")
-    fixum valor tab3 ← http.route_add_middleware(tab2, "auth")
-    fixum valor ∪ nihil hit ← http.route_match(tab3, "GET", "/users/7")
-    nota hit
-    fixum textus ∪ nihil q ← http.extract_query_param("id=7&x=1", "id")
-    nota q
-    fixum valor body ← http.extract_json("{\"n\":1}")
-    nota body
-    fixum valor err ← http.map_error(404, "missing")
-    nota err
+main {
+  do {
+    const value tab ← http.route_table()
+    const value tab2 ← http.route_add_get(tab, "/users/{id}", "show")
+    const value tab3 ← http.route_add_middleware(tab2, "auth")
+    const value ∪ nihil hit ← http.route_match(tab3, "GET", "/users/7")
+    print hit
+    const string ∪ nihil q ← http.extract_query_param("id=7&x=1", "id")
+    print q
+    const value body ← http.extract_json("{\"n\":1}")
+    print body
+    const value err ← http.map_error(404, "missing")
+    print err
   }
-  cape e {
-    mone e
+  catch e {
+    warn e
   }
 }
 "#,
@@ -12613,17 +12645,17 @@ fn g9_api3_http_duplicate_route_is_recoverable() {
         &app,
         &lib,
         r#"
-importa ex "http:http" privata http
+import from "http:http" private http
 
-incipit {
-  fac {
-    fixum valor tab ← http.route_table()
-    fixum valor tab2 ← http.route_add_get(tab, "/x", "a")
-    fixum valor _ ← http.route_add_get(tab2, "/x", "b")
-    nota "unexpected-ok"
+main {
+  do {
+    const value tab ← http.route_table()
+    const value tab2 ← http.route_add_get(tab, "/x", "a")
+    const value _ ← http.route_add_get(tab2, "/x", "b")
+    print "unexpected-ok"
   }
-  cape e {
-    mone e
+  catch e {
+    warn e
   }
 }
 "#,
@@ -12669,16 +12701,16 @@ host = "native"
         pkg.join("src/main.fab"),
         format!(
             r#"
-incipit {{
-    fixum lista<valor> options ← [{port} ↦ valor]
-    fixum numerus listener ← ad 'http:listen' (options) ↦ numerus
-    fixum valor request ← ad 'http:accept' (listener) ↦ valor
-    fixum tabula<textus, valor> fields ← request ↦ tabula<textus, valor>
-    fixum valor request_id_value ← fields.accipe("id")
-    fixum textus request_id ← request_id_value ↦ textus
-    fixum lista<valor> headers ← []
-    fixum vacuum _ ← ad 'http:respond' ([request_id ↦ valor, 200 ↦ valor, headers ↦ valor, "salve mundus" ↦ valor]) ↦ vacuum
-    fixum vacuum _ ← ad 'http:stop' (listener) ↦ vacuum
+main {{
+    const list<value> options ← [{port} ↦ value]
+    const int listener ← call 'http:listen' (options) ↦ int
+    const value request ← call 'http:accept' (listener) ↦ value
+    const map<string, value> fields ← request ↦ map<string, value>
+    const value request_id_value ← fields.accipe("id")
+    const string request_id ← request_id_value ↦ string
+    const list<value> headers ← []
+    const void _ ← call 'http:respond' ([request_id ↦ value, 200 ↦ value, headers ↦ value, "salve mundus" ↦ value]) ↦ void
+    const void _ ← call 'http:stop' (listener) ↦ void
 }}
 "#
         ),
@@ -12821,7 +12853,7 @@ fn rewrite_binary_image_version(bytes: &mut [u8], version: u8) {
 fn package_fmir_text_image_is_artifact_version_7() {
     let dir = test_temp_dir("package-fmir-text-v7");
     let entry = dir.join("main.fab");
-    fs::write(&entry, "incipit { nota \"v7\" }").expect("write entry");
+    fs::write(&entry, "main { print \"v7\" }").expect("write entry");
 
     let image =
         build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
@@ -12838,7 +12870,7 @@ fn package_fmir_text_image_is_artifact_version_7() {
 fn package_fmir_image_is_artifact_version_7() {
     let dir = test_temp_dir("package-fmir-v7");
     let entry = dir.join("main.fab");
-    fs::write(&entry, "incipit { nota \"v7\" }").expect("write entry");
+    fs::write(&entry, "main { print \"v7\" }").expect("write entry");
 
     let image = build_package_fmir_image(
         &Config::default().with_target(Target::MirFmirBinary),
@@ -12859,7 +12891,7 @@ fn package_fmir_image_is_artifact_version_7() {
 fn package_fmir_text_image_rejects_version_2_images() {
     let dir = test_temp_dir("package-fmir-text-v2-reject");
     let entry = dir.join("main.fab");
-    fs::write(&entry, "incipit { nota \"must not run\" }").expect("write entry");
+    fs::write(&entry, "main { print \"must not run\" }").expect("write entry");
 
     let image =
         build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
@@ -12888,7 +12920,7 @@ fn package_fmir_text_image_rejects_version_2_images() {
 fn package_fmir_text_image_rejects_future_versions() {
     let dir = test_temp_dir("package-fmir-text-future-reject");
     let entry = dir.join("main.fab");
-    fs::write(&entry, "incipit { nota \"must not run\" }").expect("write entry");
+    fs::write(&entry, "main { print \"must not run\" }").expect("write entry");
 
     let image =
         build_package_fmir_text_image(&Config::default().with_target(Target::MirFmir), &entry, &[])
@@ -12917,7 +12949,7 @@ fn package_fmir_text_image_rejects_future_versions() {
 fn package_fmir_image_rejects_version_2_images() {
     let dir = test_temp_dir("package-fmir-v2-reject");
     let entry = dir.join("main.fab");
-    fs::write(&entry, "incipit { nota \"must not run\" }").expect("write entry");
+    fs::write(&entry, "main { print \"must not run\" }").expect("write entry");
 
     let image = build_package_fmir_image(
         &Config::default().with_target(Target::MirFmirBinary),
@@ -12946,7 +12978,7 @@ fn package_fmir_image_rejects_version_2_images() {
 fn package_fmir_image_rejects_future_versions() {
     let dir = test_temp_dir("package-fmir-future-reject");
     let entry = dir.join("main.fab");
-    fs::write(&entry, "incipit { nota \"must not run\" }").expect("write entry");
+    fs::write(&entry, "main { print \"must not run\" }").expect("write entry");
 
     let image = build_package_fmir_image(
         &Config::default().with_target(Target::MirFmirBinary),
@@ -12982,11 +13014,11 @@ fn package_fmir_text_image_round_trips_upper_half_u64_constants() {
     fs::write(
         &entry,
         r#"
-incipit {
-  fixum numerus<u64> max ← 18446744073709551615
-  fixum numerus<u64> sha ← 9223372036854775808
-  nota max
-  nota sha
+main {
+  const int<u64> max ← 18446744073709551615
+  const int<u64> sha ← 9223372036854775808
+  print max
+  print sha
 }
 "#,
     )
@@ -13016,11 +13048,11 @@ fn package_fmir_image_round_trips_upper_half_u64_constants() {
     fs::write(
         &entry,
         r#"
-incipit {
-  fixum numerus<u64> max ← 18446744073709551615
-  fixum numerus<u64> sha ← 9223372036854775808
-  nota max
-  nota sha
+main {
+  const int<u64> max ← 18446744073709551615
+  const int<u64> sha ← 9223372036854775808
+  print max
+  print sha
 }
 "#,
     )
@@ -13077,18 +13109,18 @@ targets = ["fmir"]
     .expect("write manifest");
     fs::write(
         dir.join("src/gradient.fab"),
-        r#"functio nil() → vacuum {
-    tacet
+        r#"fn nil() → void {
+    pass
 }
 
 @ radix lane "air"
 @ radix backward "loss_backward"
-functio simple_loss(
+fn simple_loss(
     tensor<f32, [2,2]> x,
     tensor<f32, [2,2]> w
 ) → f32 {
-    fixum tensor<f32, [2,2]> product ← x.multiply(w)
-    redde product.mean()
+    const tensor<f32, [2,2]> product ← x.multiply(w)
+    return product.mean()
 }
 "#,
     )
@@ -13207,19 +13239,19 @@ functio simple_loss(
     fs::write(
         &entry,
         r#"
-importa ex "testgrad:gradient" privata gradient
+import from "testgrad:gradient" private gradient
 
-incipit {
-    fixum tensor<f32, []> seed ← vacua
-    fixum lista<f32> data ← [1.0, 2.0, 3.0, 4.0]
-    fixum tensor<f32, [2,2]> x ← seed.from_flat(data, [2, 2])
-    fixum tensor<f32, [2,2]> w ← seed.from_flat(data, [2, 2])
-    fixum f32 loss ← gradient.simple_loss(x, w)
-    nota loss
-    fixum f32 upstream ← 1.0
-    fixum _ grads ← gradient.loss_backward(x, w, gradient.nil(), upstream)
-    fixum [_, gw] ← grads
-    nota gw
+main {
+    const tensor<f32, []> seed ← vacua
+    const list<f32> data ← [1.0, 2.0, 3.0, 4.0]
+    const tensor<f32, [2,2]> x ← seed.from_flat(data, [2, 2])
+    const tensor<f32, [2,2]> w ← seed.from_flat(data, [2, 2])
+    const f32 loss ← gradient.simple_loss(x, w)
+    print loss
+    const f32 upstream ← 1.0
+    const _ grads ← gradient.loss_backward(x, w, gradient.nil(), upstream)
+    const [_, gw] ← grads
+    print gw
 }
 "#,
     )
@@ -13298,11 +13330,11 @@ functio simple_add(numerus a, numerus b) → numerus {
     fs::write(
         &entry,
         r#"
-importa ex "testgrad:gradient" privata gradient
+import from "testgrad:gradient" private gradient
 
-incipit {
-    fixum _ g ← gradient.ghost(gradient.nil(), 5)
-    nota "companion-ran"
+main {
+    const _ g ← gradient.ghost(gradient.nil(), 5)
+    print "companion-ran"
 }
 "#,
     )
@@ -13377,10 +13409,10 @@ functio computa(numerus value) → numerus {
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
-        r#"importa ex "testlib:outer" privata outer
+        r#"import from "testlib:outer" private outer
 
-incipit {
-    nota outer.computa(4)
+main {
+    print outer.computa(4)
 }
 "#,
     )
@@ -13463,19 +13495,19 @@ functio simple_loss(
     fs::write(
         &entry,
         r#"
-importa ex "testgrad:gradient" privata gradient
+import from "testgrad:gradient" private gradient
 
-incipit {
-    fixum tensor<f32, []> seed ← vacua
-    fixum lista<f32> data ← [1.0, 2.0, 3.0, 4.0]
-    fixum tensor<f32, [2,2]> x ← seed.from_flat(data, [2, 2])
-    fixum tensor<f32, [2,2]> w ← seed.from_flat(data, [2, 2])
-    fixum f32 loss ← gradient.simple_loss(x, w)
-    nota loss
-    fixum f32 upstream ← 1.0
-    fixum _ grads ← gradient.loss_backward(x, w, gradient.nil(), upstream)
-    fixum [_, gw] ← grads
-    nota gw
+main {
+    const tensor<f32, []> seed ← vacua
+    const list<f32> data ← [1.0, 2.0, 3.0, 4.0]
+    const tensor<f32, [2,2]> x ← seed.from_flat(data, [2, 2])
+    const tensor<f32, [2,2]> w ← seed.from_flat(data, [2, 2])
+    const f32 loss ← gradient.simple_loss(x, w)
+    print loss
+    const f32 upstream ← 1.0
+    const _ grads ← gradient.loss_backward(x, w, gradient.nil(), upstream)
+    const [_, gw] ← grads
+    print gw
 }
 "#,
     )
@@ -13568,20 +13600,20 @@ functio simple_loss(
     fs::write(
         &entry,
         r#"
-importa ex "testgrad:gradient" privata gradient
-importa ex "testgrad:math" privata math
+import from "testgrad:gradient" private gradient
+import from "testgrad:math" private math
 
-incipit {
-    fixum tensor<f32, []> seed ← vacua
-    fixum lista<f32> data ← [1.0, 2.0, 3.0, 4.0]
-    fixum tensor<f32, [2,2]> x ← seed.from_flat(data, [2, 2])
-    fixum tensor<f32, [2,2]> w ← seed.from_flat(data, [2, 2])
-    fixum f32 loss ← gradient.simple_loss(x, w)
-    nota loss
-    fixum f32 upstream ← 1.0
-    fixum _ grads ← gradient.loss_backward(x, w, gradient.nil(), upstream)
-    fixum [_, gw] ← grads
-    nota gw
+main {
+    const tensor<f32, []> seed ← vacua
+    const list<f32> data ← [1.0, 2.0, 3.0, 4.0]
+    const tensor<f32, [2,2]> x ← seed.from_flat(data, [2, 2])
+    const tensor<f32, [2,2]> w ← seed.from_flat(data, [2, 2])
+    const f32 loss ← gradient.simple_loss(x, w)
+    print loss
+    const f32 upstream ← 1.0
+    const _ grads ← gradient.loss_backward(x, w, gradient.nil(), upstream)
+    const [_, gw] ← grads
+    print gw
 }
 "#,
     )

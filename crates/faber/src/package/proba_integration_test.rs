@@ -6,16 +6,26 @@
 use super::test_support::{diagnostic_has_issue, test_temp_dir};
 use super::{
     compile_package, compile_package_with_test_options, discover_package,
-    library_resolver_from_config, load_package, load_package_with_locale_pack, PackageSpec,
-    TestSourceFilter,
+    library_resolver_from_config, load_package_with_locale_pack, PackageSpec, TestSourceFilter,
 };
 use radix::driver::Config;
+use radix::locale::LocalePack;
 use radix::Output;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 const PROBA_IMPORT_MESSAGE: &str =
     ".proba files are test sources and cannot be imported; move shared helpers to a .fab module";
+
+/// The product-default English code pack (en = authority). The loader-level
+/// tests below drive `load_package_with_locale_pack` directly, so they must
+/// pass the same default pack the `compile_package*`/`analyze_package` routes
+/// apply — not the pack-less (registry-direct) lexing `None` would select.
+fn english_pack() -> LocalePack {
+    let path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    LocalePack::from_toml_path(path).expect("load English locale pack")
+}
 
 fn write_minimal_lib_package(dir: &Path) {
     fs::create_dir_all(dir.join("src")).expect("src");
@@ -40,12 +50,12 @@ targets = ["rust"]
     .expect("manifest");
     fs::write(
         dir.join("src/helpers.fab"),
-        r#"functio double(numerus n) → numerus {
-    redde n * 2
+        r#"fn double(int n) → int {
+    return n * 2
 }
 
-functio identity(numerus n) → numerus {
-    redde n
+fn identity(int n) → int {
+    return n
 }
 "#,
     )
@@ -58,15 +68,15 @@ fn load_with_include_proba_discovers_sibling_proba_and_fab() {
     write_minimal_lib_package(dir.path());
     fs::write(
         dir.join("src/helpers.proba"),
-        r#"importa ex "./helpers" privata helpers
+        r#"import from "./helpers" private helpers
 
-functio local_helper(numerus n) → numerus {
-    redde helpers.double(n)
+fn local_helper(int n) → int {
+    return helpers.double(n)
 }
 
-probandum "helpers" {
-    proba "double via helper" {
-        adfirma local_helper(3) ≡ 6
+describe "helpers" {
+    test "double via helper" {
+        assert local_helper(3) ≡ 6
     }
 }
 "#,
@@ -74,8 +84,8 @@ probandum "helpers" {
     .expect("helpers.proba");
     fs::write(
         dir.join("src/inline.fab"),
-        r#"proba "inline ok" {
-    adfirma 1 ≡ 1
+        r#"test "inline ok" {
+    assert 1 ≡ 1
 }
 "#,
     )
@@ -83,7 +93,8 @@ probandum "helpers" {
 
     let spec = discover_package(dir.path()).expect("discover");
     let resolver = library_resolver_from_config(&Config::default());
-    let files = load_package_with_locale_pack(&spec, &resolver, None, true, None).expect("load");
+    let files = load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), true, None)
+        .expect("load");
     let names: Vec<_> = files
         .iter()
         .map(|f| f.path.file_name().unwrap().to_string_lossy().into_owned())
@@ -108,15 +119,18 @@ fn load_without_include_proba_skips_sibling_proba() {
     write_minimal_lib_package(dir.path());
     fs::write(
         dir.join("src/helpers.proba"),
-        r#"probandum "x" { proba "y" { adfirma 1 ≡ 1 } }
+        r#"describe "x" { test "y" { assert 1 ≡ 1 } }
 "#,
     )
     .expect("helpers.proba");
 
     let spec = discover_package(dir.path()).expect("discover");
     let resolver = library_resolver_from_config(&Config::default());
-    // Production path (include_proba = false) via public load_package.
-    let files = load_package(&spec, &resolver).expect("load");
+    // Production path (include_proba = false): the package loader applies the
+    // product-default en code pack; pass it explicitly (a `None` pack would
+    // select registry-direct lexing instead).
+    let files = load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), false, None)
+        .expect("load");
     let names: Vec<_> = files
         .iter()
         .map(|f| f.path.file_name().unwrap().to_string_lossy().into_owned())
@@ -134,7 +148,7 @@ fn single_file_proba_entry_fails_closed_outside_test_path() {
     let proba = dir.join("solo.proba");
     fs::write(
         &proba,
-        r#"proba "solo" { adfirma 1 ≡ 1 }
+        r#"test "solo" { assert 1 ≡ 1 }
 "#,
     )
     .expect("solo.proba");
@@ -166,20 +180,21 @@ fn product_fab_cannot_import_proba() {
     write_minimal_lib_package(dir.path());
     fs::write(
         dir.join("src/helpers.proba"),
-        r#"probandum "x" { proba "y" { adfirma 1 ≡ 1 } }
+        r#"describe "x" { test "y" { assert 1 ≡ 1 } }
 "#,
     )
     .expect("helpers.proba");
     fs::write(
         dir.join("src/bad.fab"),
-        r#"importa ex "./helpers.proba" privata ht
+        r#"import from "./helpers.proba" private ht
 "#,
     )
     .expect("bad.fab");
 
     let spec = discover_package(dir.path()).expect("discover");
     let resolver = library_resolver_from_config(&Config::default());
-    let Err(err) = load_package_with_locale_pack(&spec, &resolver, None, true, None) else {
+    let Err(err) = load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), true, None)
+    else {
         panic!("import of .proba must fail");
     };
     assert!(
@@ -203,22 +218,24 @@ fn proba_cannot_import_another_proba() {
     write_minimal_lib_package(dir.path());
     fs::write(
         dir.join("src/a.proba"),
-        r#"functio shared() → numerus { redde 1 }
-probandum "a" { proba "ok" { adfirma 1 ≡ 1 } }
+        r#"fn shared() → int { return 1 }
+describe "a" { test "ok" { assert 1 ≡ 1 } }
 "#,
     )
     .expect("a.proba");
     fs::write(
         dir.join("src/b.proba"),
-        r#"importa ex "./a.proba" privata a
-probandum "b" { proba "use a" { adfirma a.shared() ≡ 1 } }
+        r#"import from "./a.proba" private a
+describe "b" { test "use a" { assert a.shared() ≡ 1 } }
 "#,
     )
     .expect("b.proba");
 
     let spec = discover_package(dir.path()).expect("discover");
     let resolver = library_resolver_from_config(&Config::default());
-    let Err(err) = load_package_with_locale_pack(&spec, &resolver, None, true, None) else {
+    let Err(err) =
+        load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), true, None)
+    else {
         panic!("proba→proba import must fail");
     };
     assert!(
@@ -238,11 +255,11 @@ fn proba_may_import_product_fab_helpers() {
     write_minimal_lib_package(dir.path());
     fs::write(
         dir.join("src/helpers.proba"),
-        r#"importa ex "./helpers" privata helpers
+        r#"import from "./helpers" private helpers
 
-probandum "helpers" {
-    proba "double works" {
-        adfirma helpers.double(4) ≡ 8
+describe "helpers" {
+    test "double works" {
+        assert helpers.double(4) ≡ 8
     }
 }
 "#,
@@ -251,7 +268,8 @@ probandum "helpers" {
 
     let spec = discover_package(dir.path()).expect("discover");
     let resolver = library_resolver_from_config(&Config::default());
-    let files = load_package_with_locale_pack(&spec, &resolver, None, true, None).expect("load");
+    let files = load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), true, None)
+        .expect("load");
     assert!(
         files
             .iter()
@@ -272,13 +290,13 @@ fn proba_filter_include_selects_only_matching_proba() {
     write_minimal_lib_package(dir.path());
     fs::write(
         dir.join("src/math.proba"),
-        r#"probandum "math" { proba "ok" { adfirma 1 ≡ 1 } }
+        r#"describe "math" { test "ok" { assert 1 ≡ 1 } }
 "#,
     )
     .expect("math.proba");
     fs::write(
         dir.join("src/scene.proba"),
-        r#"probandum "scene" { proba "ok" { adfirma 1 ≡ 1 } }
+        r#"describe "scene" { test "ok" { assert 1 ≡ 1 } }
 "#,
     )
     .expect("scene.proba");
@@ -331,15 +349,15 @@ fn compile_test_path_includes_proba_with_helpers() {
     write_minimal_lib_package(dir.path());
     fs::write(
         dir.join("src/helpers.proba"),
-        r#"importa ex "./helpers" privata helpers
+        r#"import from "./helpers" private helpers
 
-functio triple(numerus n) → numerus {
-    redde helpers.double(n) + n
+fn triple(int n) → int {
+    return helpers.double(n) + n
 }
 
-probandum "helpers" {
-    proba "triple via helpers" {
-        adfirma triple(3) ≡ 9
+describe "helpers" {
+    test "triple via helpers" {
+        assert triple(3) ≡ 9
     }
 }
 "#,
@@ -347,8 +365,8 @@ probandum "helpers" {
     .expect("helpers.proba");
     fs::write(
         dir.join("src/inline.fab"),
-        r#"proba "inline still works" {
-    adfirma 2 ≡ 2
+        r#"test "inline still works" {
+    assert 2 ≡ 2
 }
 "#,
     )
@@ -438,12 +456,12 @@ targets = ["rust"]
     // Slim pure surface matching mathesis-style catalog helpers.
     fs::write(
         src.join("mathesis.fab"),
-        r#"functio PI() → fractus {
-    redde 3.141592653589793
+        r#"fn PI() → float {
+    return 3.141592653589793
 }
 
-functio addita(fractus a, fractus b) → fractus {
-    redde a + b
+fn addita(float a, float b) → float {
+    return a + b
 }
 "#,
     )
@@ -454,19 +472,19 @@ functio addita(fractus a, fractus b) → fractus {
             .join("norma/src/mathesis.proba"),
     )
     .unwrap_or_else(|_| {
-        r#"importa ex "./mathesis" privata mathesis
+        r#"import from "./mathesis" private mathesis
 
-functio sum_pi(fractus x) → fractus {
-    redde mathesis.addita(mathesis.PI(), x)
+fn sum_pi(float x) → float {
+    return mathesis.addita(mathesis.PI(), x)
 }
 
-probandum "mathesis catalog" {
-    proba "PI is positive" {
-        adfirma mathesis.PI() > 0.0
+describe "mathesis catalog" {
+    test "PI is positive" {
+        assert mathesis.PI() > 0.0
     }
 
-    proba "addita composes with PI helper" {
-        adfirma sum_pi(0.0) ≡ mathesis.PI()
+    test "addita composes with PI helper" {
+        assert sum_pi(0.0) ≡ mathesis.PI()
     }
 }
 "#

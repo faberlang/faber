@@ -11,6 +11,7 @@ use faber_hir_rust::RustFieldNamePolicy;
 use radix::codegen::{generate_from_analyzed, Target};
 use radix::driver::Config;
 use radix::hir::{LibraryItemKind, LibraryProvider};
+use radix::locale::LocalePack;
 use radix::mir::BufferHost;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -33,22 +34,22 @@ fn dev_norma_library_home() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..")
 }
 
-const LOCAL_MAIN: &str = "importa ex \"./util\" privata * ut utilModule\n\nfunctio run() → textus {\n    redde utilModule.salutare()\n}\n\nincipit {\n    nota utilModule.salutare()\n}\n";
-const LOCAL_UTIL: &str = "functio salutare() → textus {\n    redde \"salve\"\n}\n";
+const LOCAL_MAIN: &str = "import from \"./util\" private * as utilModule\n\nfn run() → string {\n    return utilModule.salutare()\n}\n\nmain {\n    print utilModule.salutare()\n}\n";
+const LOCAL_UTIL: &str = "fn salutare() → string {\n    return \"salve\"\n}\n";
 
-const CONST_MEMBER_MAIN: &str = "importa ex \"./util\" privata * ut utilModule\n\nfunctio run() → textus {\n    redde utilModule.VALUE\n}\n\nincipit {\n    nota utilModule.VALUE\n}\n";
-const CONST_MEMBER_UTIL: &str = "const textus VALUE ← \"salve\"\n";
+const CONST_MEMBER_MAIN: &str = "import from \"./util\" private * as utilModule\n\nfn run() → string {\n    return utilModule.VALUE\n}\n\nmain {\n    print utilModule.VALUE\n}\n";
+const CONST_MEMBER_UTIL: &str = "const string VALUE ← \"salve\"\n";
 
-const LIBRARY_CONST_MAIN: &str = "importa ex \"constlib:vals\" privata vals\n\nfunctio run() → textus {\n    redde vals.LIBRARY_VALUE\n}\n\nincipit {\n    nota vals.LIBRARY_VALUE\n}\n";
+const LIBRARY_CONST_MAIN: &str = "import from \"constlib:vals\" private vals\n\nfn run() → string {\n    return vals.LIBRARY_VALUE\n}\n\nmain {\n    print vals.LIBRARY_VALUE\n}\n";
 const LIBRARY_CONST_VALS: &str =
-    "+++\nlocale = \"en\"\n+++\nconst textus LIBRARY_VALUE ← \"salve\"\n";
+    "+++\nlocale = \"en\"\n+++\nconst string LIBRARY_VALUE ← \"salve\"\n";
 
 /// Entry that CALLS a const data member — an unsupported shape that must
 /// keep the non-function fail-closed diagnostic (U1 done_when 4).
-const CONST_MEMBER_CALL_MAIN: &str = "importa ex \"./util\" privata * ut utilModule\n\nincipit {\n    nota utilModule.VALUE()\n}\n";
+const CONST_MEMBER_CALL_MAIN: &str = "import from \"./util\" private * as utilModule\n\nmain {\n    print utilModule.VALUE()\n}\n";
 
-const LOCAL_LOCALE_MAIN: &str = "importa ex \"./util\" privata * ut utilModule\n\nfunctio run() → textus {\n    redde utilModule.greet()\n}\n\nincipit {\n    nota utilModule.greet()\n}\n";
-const LOCAL_LOCALE_UTIL: &str = "functio salutare() → textus {\n    redde \"salve\"\n}\n";
+const LOCAL_LOCALE_MAIN: &str = "import from \"./util\" private * as utilModule\n\nfn run() → string {\n    return utilModule.greet()\n}\n\nmain {\n    print utilModule.greet()\n}\n";
+const LOCAL_LOCALE_UTIL: &str = "fn salutare() → string {\n    return \"salve\"\n}\n";
 
 const EXTERNAL_LIBRARY_LOCALE_MAIN: &str = "import from \"triga:math\" private math\nimport from \"norma:chorda\" private chorda\n\nfn run() → string {\n    const math.Vector3 canonical ← math.vector3(1.0, 0.0, 0.0)\n    const math.Vector3 canonical_shifted ← canonical.addita(math.vector3(0.0, 1.0, 0.0))\n    const float canonical_length ← canonical_shifted.longitudo()\n    const math.Vec3 original ← math.make_vector(1.0, 0.0, 0.0)\n    const math.Vec3 shifted ← original.add(math.make_vector(0.0, 2.0, 0.0))\n    const math.Vec3 normalized ← shifted.normalize()\n    const float length ← normalized.length()\n    const string reversed ← chorda.reverse(\"abc\")\n    print canonical_length\n    print length\n    return reversed\n}\n\nmain {\n    print run()\n}\n";
 const NORMA_LATIN_COMPATIBILITY_MAIN: &str = "importa ex \"norma:chorda\" privata chorda\n\nfunctio run() → textus {\n    redde chorda.retorta(\"abc\")\n}\n\nincipit {\n    nota run()\n}\n";
@@ -181,6 +182,23 @@ id = "en-local-library"
 schema_version = 1
 fallback = ["la"]
 
+# S2-U2 pack-authoritative gate: a non-la reader pack owns its keyword and
+# type surfaces explicitly. The fixtures below use the en surfaces, so the
+# test-local pack declares them (the test's intent is the `[[library_members]]`
+# surface row `salutare` → `greet`, not keyword gating).
+[keywords]
+importa = "import"
+ex = "from"
+privata = "private"
+ut = "as"
+functio = "fn"
+redde = "return"
+incipit = "main"
+nota = "print"
+
+[types]
+textus = "string"
+
 [[library_members]]
 provider = "package"
 package = "local-locale-fixture"
@@ -195,7 +213,7 @@ exemplars = ["local-library.fab"]
 "#,
     )
     .expect("write local library locale pack");
-    fs::write(dir.join("locale/local-library.fab"), "incipit {}\n")
+    fs::write(dir.join("locale/local-library.fab"), "main {}\n")
         .expect("write local library locale exemplar");
     fs::write(src.join("util.fab"), LOCAL_LOCALE_UTIL).expect("write local locale util");
     fs::write(src.join("main.fab"), LOCAL_LOCALE_MAIN).expect("write local locale main");
@@ -252,25 +270,25 @@ kind = "bin"
     .expect("write faber.toml");
     fs::write(
         src.join("main.fab"),
-        r#"discretio Forma {
-    Numerus { numerus v },
-    Textus { textus v }
+        r#"union Forma {
+    Numerus { int v },
+    Textus { string v }
 }
 
-functio describe(Forma f) → textus {
-    discerne f {
-        casu Numerus fixum v { redde "n: §"(v) }
-        casu Textus fixum v { redde "t: §"(v) }
+fn describe(Forma f) → string {
+    match f {
+        case Numerus const v { return "n: §"(v) }
+        case Textus const v { return "t: §"(v) }
     }
 }
 
-functio idem<T>(T x) → T {
-    redde x
+fn idem<T>(T x) → T {
+    return x
 }
 
-incipit {
-    nota describe(finge Numerus { v = 7 } ∷ Forma)
-    nota idem(42)
+main {
+    print describe(variant Numerus { v = 7 } ∷ Forma)
+    print idem(42)
 }
 "#,
     )
@@ -312,7 +330,7 @@ kind = "bin"
     fs::write(dir.join("faber.toml"), manifest).expect("write faber.toml");
     fs::write(
         src.join("main.fab"),
-        "importa ex \"norma:solum\" privata solum\n\nfunctio scinde(textus s) → numerus {\n    fixum lista<textus> partes ← solum.carpe(s)\n    redde partes.length()\n}\n\nincipit {\n    nota scinde(\"a,b,c\")\n}\n",
+        "import from \"norma:solum\" private solum\n\nfn scinde(string s) → int {\n    const list<string> partes ← solum.carpe(s)\n    return partes.length()\n}\n\nmain {\n    print scinde(\"a,b,c\")\n}\n",
     )
     .expect("write main.fab");
     src.join("main.fab")
@@ -479,7 +497,16 @@ fn english_pack_resolves_real_triga_and_norma_library_surfaces() {
 fn latin_norma_consumer_keeps_canonical_surface_compatibility() {
     let dir = test_temp_dir("fhir-norma-latin-compatibility");
     let entry = write_external_library_locale_package(&dir, NORMA_LATIN_COMPATIBILITY_MAIN);
-    let config = Config::default().with_stdlib(dev_norma_library_home());
+    // The fixture is a Latin-identity consumer (canonical `norma:chorda`
+    // surface): compile it under the explicit la code surface — the la pack's
+    // registry-direct Latin authority — mirroring the R3 conversio-assign
+    // precedent (Latin sources declare la identity, they are not en-migrated).
+    let la_pack_path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/la/pack.toml");
+    let la_pack = LocalePack::from_toml_path(la_pack_path).expect("load la locale pack");
+    let config = Config::default()
+        .with_stdlib(dev_norma_library_home())
+        .with_locale_pack(la_pack);
     let package =
         analyze_package(&config, &entry).expect("analyze Latin Norma compatibility consumer");
 

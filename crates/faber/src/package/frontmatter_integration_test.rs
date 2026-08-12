@@ -31,7 +31,7 @@ sectio = "smoke"
 group = "demo.entry"
 +++
 
-incipit { nota "peeled" }
+main { print "peeled" }
 "#,
     )
     .expect("write entry");
@@ -72,7 +72,7 @@ fn load_package_rejects_invalid_frontmatter_toml() {
 sectio = 
 +++
 
-incipit {}
+main {}
 "#,
     )
     .expect("write entry");
@@ -110,7 +110,7 @@ target = "rust"
 target = "ts"
 +++
 
-incipit {}
+main {}
 "#,
     )
     .expect("entry");
@@ -139,10 +139,10 @@ fn compile_package_honors_group_frontmatter_for_module_tree() {
     fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./lib" privata lib
+import from "./lib" private lib
 
-incipit {
-    nota lib.answer()
+main {
+    print lib.answer()
 }
 "#,
     )
@@ -153,8 +153,8 @@ incipit {
 group = "custom.lib"
 +++
 
-functio answer() → numerus {
-    redde 42
+fn answer() → int {
+    return 42
 }
 "#,
     )
@@ -195,23 +195,23 @@ sectio = "outer suite/inner suite"
 tags = ["focus"]
 +++
 
-proba "name match" {
-    adfirma verum
+test "name match" {
+    assert true
 }
 
-probandum "outer suite" {
-    probandum "inner suite" {
-        proba "wrong tag" tag "smoke" {
-            adfirma verum
+describe "outer suite" {
+    describe "inner suite" {
+        test "wrong tag" tag "smoke" {
+            assert true
         }
 
-        proba "combined match" tag "focus" {
-            adfirma verum
+        test "combined match" tag "focus" {
+            assert true
         }
     }
 }
 
-incipit {}
+main {}
 "#,
     )
     .expect("write entry");
@@ -251,15 +251,15 @@ sectio = "outer suite/inner suite"
 tags = ["focus"]
 +++
 
-proba "tag match" tag "smoke" {
-    adfirma verum
+test "tag match" tag "smoke" {
+    assert true
 }
 
-proba "other tag" tag "focus" {
-    adfirma verum
+test "other tag" tag "focus" {
+    assert true
 }
 
-incipit {}
+main {}
 "#,
     )
     .expect("write entry");
@@ -301,7 +301,7 @@ fn load_package_accepts_empty_frontmatter_delimiters() {
         r#"+++
 +++
 
-incipit { nota "empty-frontmatter" }
+main { print "empty-frontmatter" }
 "#,
     )
     .expect("write entry");
@@ -334,7 +334,7 @@ fn load_package_accepts_frontmatter_with_only_comment_fields() {
 # another comment
 +++
 
-incipit { nota "comment-frontmatter" }
+main { print "comment-frontmatter" }
 "#,
     )
     .expect("write entry");
@@ -385,25 +385,25 @@ targets = ["rust"]
     .expect("manifest");
     fs::write(
         src.join("math.fab"),
-        r#"genus Vector3 {
+        r#"class Vector3 {
     f32 x
     f32 y
     f32 z
 }
 
-functio vector3(f32 x, f32 y, f32 z) → Vector3 {
-    redde Vector3 { x = x, y = y, z = z }
+fn vector3(f32 x, f32 y, f32 z) → Vector3 {
+    return Vector3 { x = x, y = y, z = z }
 }
 "#,
     )
     .expect("math.fab");
     fs::write(
         src.join("math.proba"),
-        r#"importa ex "./math" privata math
+        r#"import from "./math" private math
 
-proba "vector3 builds" {
-    fixum math.Vector3 v ← math.vector3(1.0, 2.0, 3.0)
-    adfirma v.x ≡ (1.0 ∷ f32)
+test "vector3 builds" {
+    const math.Vector3 v ← math.vector3(1.0, 2.0, 3.0)
+    assert v.x ≡ (1.0 ∷ f32)
 }
 "#,
     )

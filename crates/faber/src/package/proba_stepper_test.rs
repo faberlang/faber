@@ -4,13 +4,28 @@
 
 use super::test_support::test_temp_dir;
 use super::{
-    analyze_package, analyze_package_for_tests, load_package, load_package_with_locale_pack,
+    analyze_package, analyze_package_for_tests, load_package_with_locale_pack,
 };
 use super::{discover_package, library_resolver_from_config};
 use radix::driver::{Config, Session};
+use radix::locale::LocalePack;
 use radix::proba::{run_proba_source, CaseOutcome, TestSelection};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+/// The product-default English code pack (en = authority). The loader-level
+/// and stepper-level tests below call `load_package_with_locale_pack` /
+/// `run_proba_source` directly, so they must pass the same default pack the
+/// `compile_package*`/`analyze_package` routes apply — not the pack-less
+/// (registry-direct) lexing `None` / `Config::default()` would select.
+fn english_pack() -> LocalePack {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    LocalePack::from_toml_path(path).expect("load English locale pack")
+}
+
+fn english_session() -> Session {
+    Session::new(Config::default().with_locale_pack(english_pack()))
+}
 
 fn write_minimal_lib_package(dir: &Path) {
     fs::create_dir_all(dir.join("src")).expect("src");
@@ -35,8 +50,8 @@ targets = ["rust"]
     .expect("manifest");
     fs::write(
         dir.join("src/lib.fab"),
-        r#"functio identity(numerus n) → numerus {
-    redde n
+        r#"fn identity(int n) → int {
+    return n
 }
 "#,
     )
@@ -50,21 +65,21 @@ fn stepper_pass_fail_skip_on_inline_fixture() {
     fs::write(
         &path,
         r#"
-proba "pass" {
-    adfirma 1 ≡ 1
+test "pass" {
+    assert 1 ≡ 1
 }
-proba "fail" {
-    adfirma 1 ≡ 2
+test "fail" {
+    assert 1 ≡ 2
 }
-proba "skip" omitte "later" {
-    adfirma 0 ≡ 1
+test "skip" skip "later" {
+    assert 0 ≡ 1
 }
 "#,
     )
     .expect("write");
     let source = fs::read_to_string(&path).expect("read");
     let report = run_proba_source(
-        &Session::new(Config::default()),
+        &english_session(),
         path.to_str().unwrap(),
         &source,
         &TestSelection::default(),
@@ -92,8 +107,8 @@ fn analyze_package_for_tests_includes_proba_build_excludes() {
     fs::write(
         dir.join("src/math.proba"),
         r#"
-proba "math ok" {
-    adfirma 2 ≡ 2
+test "math ok" {
+    assert 2 ≡ 2
 }
 "#,
     )
@@ -118,15 +133,19 @@ proba "math ok" {
         "production analysis must exclude .proba"
     );
 
-    // load_package path (build) also omits .proba
+    // load_package path (build) also omits .proba — pass the product-default
+    // en pack explicitly (a `None` pack would select registry-direct lexing).
     let spec = discover_package(dir.path()).expect("discover");
     let resolver = library_resolver_from_config(&config);
-    let files = load_package(&spec, &resolver).expect("load");
+    let files =
+        load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), false, None)
+            .expect("load");
     assert!(files
         .iter()
         .all(|f| f.path.extension().and_then(|e| e.to_str()) != Some("proba")));
     let test_files =
-        load_package_with_locale_pack(&spec, &resolver, None, true, None).expect("load tests");
+        load_package_with_locale_pack(&spec, &resolver, Some(&english_pack()), true, None)
+            .expect("load tests");
     assert!(test_files
         .iter()
         .any(|f| f.path.extension().and_then(|e| e.to_str()) == Some("proba")));
@@ -139,12 +158,12 @@ fn package_inline_proba_runs_on_stepper_after_analyze() {
     fs::write(
         dir.join("src/lib.fab"),
         r#"
-functio identity(numerus n) → numerus {
-    redde n
+fn identity(int n) → int {
+    return n
 }
 
-proba "identity holds" {
-    adfirma identity(4) ≡ 4
+test "identity holds" {
+    assert identity(4) ≡ 4
 }
 "#,
     )
