@@ -1,0 +1,5 @@
+# Prevent CRLF recurrence in the docs tree (fire-21 P2-3, git diff --check class).
+# Binary evidence fixtures under docs/ must be exempt: explicit `text` skips
+# binary detection and would mangle them (CR bytes stripped) on renormalize.
+docs/** text eol=lf
+docs/**/*.bin binary
