@@ -57,9 +57,9 @@ fn interpret_package_input_detects_manifestless_import_entry() {
     let entry = dir.join("main.fab");
     std::fs::write(
         &entry,
-        r#"importa ex "./thing" privata thing
+        r#"import from "./thing" private thing
 
-incipit { nota thing.label() }
+main { print thing.label() }
 "#,
     )
     .expect("write entry");
@@ -73,12 +73,12 @@ fn interpret_package_input_leaves_kernel_imports_as_single_source() {
     for (name, import) in [
         (
             "module.fab",
-            r#"importa ex "faber:processus" privata processus"#,
+            r#"import from "faber:processus" private processus"#,
         ),
-        ("glob.fab", r#"importa ex "faber:*" privata faber"#),
+        ("glob.fab", r#"import from "faber:*" private faber"#),
     ] {
         let entry = dir.join(name);
-        std::fs::write(&entry, format!("{import}\n\nincipit {{ nota 1 }}\n")).expect("write entry");
+        std::fs::write(&entry, format!("{import}\n\nmain {{ print 1 }}\n")).expect("write entry");
 
         assert!(!is_package_interpret_input(&entry));
     }

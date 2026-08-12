@@ -251,13 +251,16 @@ fn run_faber_format_stdout_with_args(args: &[&str]) -> String {
 
 /// FORMAT-PRETTY S5: source whose layout the pretty-v1 engine expands at the
 /// 100-column soft width while normalise-v1 preserves the line structure — the
-/// distinguishing fixture for the precedence matrix.
-const SOFT_WIDTH_SOURCE: &str = "functio f() → numerus {\n    si this_is_a_very_long_condition_name_that_keeps_going_and_going ergo redde someVeryLongReturnValueIdentifierThatWillNotFit\n    redde 0\n}\n";
+/// distinguishing fixture for the precedence matrix. Declares the `la` reader
+/// locale (pack-authority): the fixture is Latin-identity source and must be
+/// read under the la surface, not the product-default `en` pack.
+const SOFT_WIDTH_SOURCE: &str = "+++\nlocale = \"la\"\n+++\nfunctio f() → numerus {\n    si this_is_a_very_long_condition_name_that_keeps_going_and_going ergo redde someVeryLongReturnValueIdentifierThatWillNotFit\n    redde 0\n}\n";
 
 /// Semantically valid block source (canonical reader-locale re-emit runs
 /// semantic analysis, so locale regression fixtures must name real
-/// identifiers).
-const VALID_BLOCK_SOURCE: &str = "functio gradus(numerus x) → numerus {\n    si x ≻ 0 {\n        redde x\n    } sin x ≡ 0 {\n        redde 0\n    } secus {\n        redde 0 - x\n    }\n}\n";
+/// identifiers). Latin-identity surface, read under the la reader (the
+/// product-default en pack is pack-authoritative).
+const VALID_BLOCK_SOURCE: &str = "+++\nlocale = \"la\"\n+++\nfunctio gradus(numerus x) → numerus {\n    si x ≻ 0 {\n        redde x\n    } sin x ≡ 0 {\n        redde 0\n    } secus {\n        redde 0 - x\n    }\n}\n";
 
 /// FORMAT-PRETTY S5: create a temporary package root with a valid
 /// `faber.toml` (carrying `[format] policy = <policy>` when given) and one
@@ -331,7 +334,7 @@ fn run_faber_format_stdin(source: &str) -> (String, String, bool) {
 /// source (the same author pipeline, different input mode).
 #[test]
 fn format_stdin_roundtrip_matches_author_pipeline() {
-    let source = "incipit {\n  nota \"ok\"\n}\n";
+    let source = "+++\nlocale = \"la\"\n+++\nincipit {\n  nota \"ok\"\n}\n";
     let fixture = std::env::temp_dir().join("faber-format-stdin-roundtrip.fab");
     fs::write(&fixture, source).expect("write roundtrip fixture");
     let expected = run_faber_format_stdout(&fixture);
@@ -420,7 +423,7 @@ fn format_unknown_policy_slug_fails_clearly() {
 #[test]
 fn format_policy_normalise_v1_matches_default_output() {
     let fixture = std::env::temp_dir().join("faber-format-policy-normalise.fab");
-    fs::write(&fixture, "functio gradus(numerus x) → numerus {\n    si x ≻ 0 ergo redde x\n    secus ergo redde 0 - x\n}\n")
+    fs::write(&fixture, "+++\nlocale = \"la\"\n+++\nfunctio gradus(numerus x) → numerus {\n    si x ≻ 0 ergo redde x\n    secus ergo redde 0 - x\n}\n")
         .expect("write fixture");
 
     let with_policy = run_faber_format_stdout_with_args(&[
@@ -445,7 +448,7 @@ fn format_policy_normalise_v1_matches_default_output() {
 #[test]
 fn format_policy_pretty_v1_succeeds_on_block_fixture() {
     let fixture = std::env::temp_dir().join("faber-format-policy-pretty.fab");
-    fs::write(&fixture, "incipit {\n    nota \"ok\"\n}\n").expect("write fixture");
+    fs::write(&fixture, "main {\n    print \"ok\"\n}\n").expect("write fixture");
 
     let formatted = run_faber_format_stdout_with_args(&[
         "format",
@@ -990,7 +993,7 @@ fn format_locale_preserves_template_application_sugar() {
     let fixture = std::env::temp_dir().join("faber-format-rl-template-sugar.fab");
     fs::write(
         &fixture,
-        "functio monstra(textus n) {\n  nota \"val § here\"(n)\n}\n",
+        "+++\nlocale = \"la\"\n+++\nfunctio monstra(textus n) {\n  nota \"val § here\"(n)\n}\n",
     )
     .expect("write rl template-sugar fixture");
 

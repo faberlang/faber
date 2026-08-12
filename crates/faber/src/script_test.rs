@@ -51,8 +51,8 @@ fn run_named_uses_diagnostic_identity() {
     let status = run_named(
         "embed.fab",
         r"
-incipit {
-    nota 1
+main {
+    print 1
 }
 ",
         &mut host,
@@ -67,10 +67,10 @@ fn trap_host_forwards_process_env_reads() {
     let mut host = BufferHost::default().with_env("FABER_TRAP_ENV", "via-trap");
     let status = run_source(
         r#"
-importa ex "faber:processus" privata processus
+import from "faber:processus" private processus
 
-incipit {
-    nota processus.lege("FABER_TRAP_ENV")
+main {
+    print processus.lege("FABER_TRAP_ENV")
 }
 "#,
         &mut host,
@@ -85,10 +85,10 @@ fn trap_host_forwards_virtual_cwd() {
     let mut host = BufferHost::default().with_cwd("/trap/sandbox");
     let status = run_source(
         r#"
-importa ex "faber:processus" privata processus
+import from "faber:processus" private processus
 
-incipit {
-    nota processus.sedes()
+main {
+    print processus.sedes()
 }
 "#,
         &mut host,
@@ -103,9 +103,9 @@ fn run_source_returns_explicit_exit_code() {
     let mut host = BufferHost::default();
     let status = run_source(
         r#"
-importa ex "faber:processus" privata processus
+import from "faber:processus" private processus
 
-incipit {
+main {
     processus.exi(7)
 }
 "#,
@@ -146,6 +146,6 @@ fn print_run_source_error_accepts_frontend_failures() {
 fn run_source_surfaces_stepper_errors() {
     let mut host = BufferHost::default();
     let error =
-        run_source("@ futura\nfunctio bad() { }\n", &mut host).expect_err("invalid async fails");
+        run_source("@ future\nfn bad() { }\n", &mut host).expect_err("invalid async fails");
     assert!(matches!(error, RunSourceError::Stepper(_)));
 }

@@ -321,9 +321,9 @@ fn run_scena_package_forwards_argv_through_artifact() {
         &entry,
         r#"
 @ cli "tool"
-@ operandus textus name
-incipit argumenta args {
-  nota args.name
+@ operand string name
+main args args {
+  print args.name
 }
 "#,
     )
