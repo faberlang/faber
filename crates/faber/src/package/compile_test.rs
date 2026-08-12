@@ -16,7 +16,7 @@ entry = "main.fab"
 "#,
     )
     .expect("write manifest");
-    std::fs::write(dir.join("src/main.fab"), "incipit { }\n").expect("write entry");
+    std::fs::write(dir.join("src/main.fab"), "main { }\n").expect("write entry");
 
     let config = Config::default();
     let resolver = crate::package::library_resolver_from_config(&config);
@@ -50,7 +50,7 @@ entry = "main.fab"
     .expect("write manifest");
     std::fs::write(
         dir.join("src/main.fab"),
-        "incipit { fixum numerus unused ← 1 }\n",
+        "main { const int unused ← 1 }\n",
     )
     .expect("write entry");
 
@@ -348,10 +348,10 @@ fn go_multi_unit_local_import_resolves_via_normalized_index() {
     std::fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./lib" privata lib
+import from "./lib" private lib
 
-incipit {
-    nota lib.answer()
+main {
+    print lib.answer()
 }
 "#,
     )
@@ -359,8 +359,8 @@ incipit {
     std::fs::write(
         dir.join("lib.fab"),
         r#"
-functio answer() → numerus {
-    redde 42
+fn answer() → int {
+    return 42
 }
 "#,
     )
@@ -401,10 +401,10 @@ fn rust_multi_unit_sibling_exports_resolve_via_package_index() {
     std::fs::write(
         dir.join("main.fab"),
         r#"
-importa ex "./lib" privata lib
+import from "./lib" private lib
 
-incipit {
-    nota lib.answer()
+main {
+    print lib.answer()
 }
 "#,
     )
@@ -412,8 +412,8 @@ incipit {
     std::fs::write(
         dir.join("lib.fab"),
         r#"
-functio answer() → numerus {
-    redde 42
+fn answer() → int {
+    return 42
 }
 "#,
     )

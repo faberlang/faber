@@ -15,18 +15,18 @@ use super::*;
 use radix::mir::BufferHost;
 use radix::semantic::Type;
 
-const NOMINAL_UTIL: &str = "genus Persona {\n    textus nomen\n}\n\nfunctio saluta(Persona p) → textus {\n    redde p.nomen\n}\n";
-const NOMINAL_MAIN: &str = "importa ex \"./util\" privata * ut utilModule\n\nfunctio run() → textus {\n    fixum utilModule.Persona persona ← utilModule.Persona { nomen = \"salve\" }\n    redde utilModule.saluta(persona)\n}\n\nincipit {\n    nota run()\n}\n";
+const NOMINAL_UTIL: &str = "class Persona {\n    string nomen\n}\n\nfn saluta(Persona p) → string {\n    return p.nomen\n}\n";
+const NOMINAL_MAIN: &str = "import from \"./util\" private * as utilModule\n\nfn run() → string {\n    const utilModule.Persona persona ← utilModule.Persona { nomen = \"salve\" }\n    return utilModule.saluta(persona)\n}\n\nmain {\n    print run()\n}\n";
 
-const NOMINAL_TWO_ALIASES_MAIN: &str = "importa ex \"./util\" privata * ut utilModule\nimporta ex \"./util\" privata * ut aliasModule\n\nfunctio run() → textus {\n    fixum utilModule.Persona persona ← utilModule.Persona { nomen = \"salve\" }\n    redde aliasModule.saluta(persona)\n}\n\nincipit {\n    nota run()\n}\n";
+const NOMINAL_TWO_ALIASES_MAIN: &str = "import from \"./util\" private * as utilModule\nimport from \"./util\" private * as aliasModule\n\nfn run() → string {\n    const utilModule.Persona persona ← utilModule.Persona { nomen = \"salve\" }\n    return aliasModule.saluta(persona)\n}\n\nmain {\n    print run()\n}\n";
 
-const NOMINAL_DISTINCT_UTIL: &str = "genus Persona {\n    textus nomen\n}\n\nfunctio util_nomen(Persona p) → textus {\n    redde p.nomen\n}\n";
-const NOMINAL_DISTINCT_OTHER: &str = "genus Persona {\n    textus titulus\n}\n\nfunctio other_titulus(Persona p) → textus {\n    redde p.titulus\n}\n";
-const NOMINAL_DISTINCT_MAIN: &str = "importa ex \"./util\" privata * ut utilModule\nimporta ex \"./other\" privata * ut otherModule\n\nfunctio run() → textus {\n    fixum utilModule.Persona una ← utilModule.Persona { nomen = \"salve\" }\n    fixum otherModule.Persona altera ← otherModule.Persona { titulus = \"hei\" }\n    redde utilModule.util_nomen(una) + \"-\" + otherModule.other_titulus(altera)\n}\n\nincipit {\n    nota run()\n}\n";
+const NOMINAL_DISTINCT_UTIL: &str = "class Persona {\n    string nomen\n}\n\nfn util_nomen(Persona p) → string {\n    return p.nomen\n}\n";
+const NOMINAL_DISTINCT_OTHER: &str = "class Persona {\n    string titulus\n}\n\nfn other_titulus(Persona p) → string {\n    return p.titulus\n}\n";
+const NOMINAL_DISTINCT_MAIN: &str = "import from \"./util\" private * as utilModule\nimport from \"./other\" private * as otherModule\n\nfn run() → string {\n    const utilModule.Persona una ← utilModule.Persona { nomen = \"salve\" }\n    const otherModule.Persona altera ← otherModule.Persona { titulus = \"hei\" }\n    return utilModule.util_nomen(una) + \"-\" + otherModule.other_titulus(altera)\n}\n\nmain {\n    print run()\n}\n";
 
-const NOMINAL_ENUM_UTIL: &str = "discretio Color {\n    rubrum,\n    caeruleum\n}\n\nfunctio primus() → Color {\n    redde Color.rubrum\n}\n\nfunctio colore_nomen(Color c) → textus {\n    discerne c {\n        casu rubrum {\n            redde \"rubrum\"\n        }\n        casu caeruleum {\n            redde \"caeruleum\"\n        }\n    }\n}\n";
-const NOMINAL_ENUM_MAIN: &str = "importa ex \"./util\" privata * ut utilModule\n\nfunctio run() → textus {\n    redde utilModule.colore_nomen(utilModule.primus())\n}\n\nincipit {\n    nota run()\n}\n";
-const NOMINAL_ENUM_VARIANT_MAIN: &str = "importa ex \"./util\" privata * ut utilModule\n\nfunctio run() → textus {\n    redde utilModule.colore_nomen(utilModule.rubrum)\n}\n\nincipit {\n    nota run()\n}\n";
+const NOMINAL_ENUM_UTIL: &str = "union Color {\n    rubrum,\n    caeruleum\n}\n\nfn primus() → Color {\n    return Color.rubrum\n}\n\nfn colore_nomen(Color c) → string {\n    match c {\n        case rubrum {\n            return \"rubrum\"\n        }\n        case caeruleum {\n            return \"caeruleum\"\n        }\n    }\n}\n";
+const NOMINAL_ENUM_MAIN: &str = "import from \"./util\" private * as utilModule\n\nfn run() → string {\n    return utilModule.colore_nomen(utilModule.primus())\n}\n\nmain {\n    print run()\n}\n";
+const NOMINAL_ENUM_VARIANT_MAIN: &str = "import from \"./util\" private * as utilModule\n\nfn run() → string {\n    return utilModule.colore_nomen(utilModule.rubrum)\n}\n\nmain {\n    print run()\n}\n";
 
 /// Write a two-module package with `util.fab` content `util_source` and entry
 /// `main_source` (both imported through the package manifest).
@@ -335,9 +335,9 @@ fn canonical_nominal_identity_key_shape_is_module_qualified() {
 // fails closed on the unresolved variant (`caeruleum`) with an unknown-identity
 // diagnostic. (The nominal-level check in build_nominal_remap does not fire here
 // because Color IS present in the entry's canonical imported-nominal table.)
-const NOMINAL_VARIANT_OTHER: &str = "genus Weird {\n    numerus gradus\n}\n";
-const NOMINAL_VARIANT_UTIL: &str = "importa ex \"./other\" privata * ut otherModule\n\ngenus Gradus {\n    numerus gradus\n}\n\ndiscretio Color {\n    rubrum,\n    caeruleum { otherModule.Weird gradus }\n}\n\nfunctio primus() → Color {\n    redde Color.rubrum\n}\n";
-const NOMINAL_VARIANT_MAIN: &str = "importa ex \"./util\" privata * ut utilModule\n\nincipit {\n    nota 1\n}\n";
+const NOMINAL_VARIANT_OTHER: &str = "class Weird {\n    int gradus\n}\n";
+const NOMINAL_VARIANT_UTIL: &str = "import from \"./other\" private * as otherModule\n\nclass Gradus {\n    int gradus\n}\n\nunion Color {\n    rubrum,\n    caeruleum { otherModule.Weird gradus }\n}\n\nfn primus() → Color {\n    return Color.rubrum\n}\n";
+const NOMINAL_VARIANT_MAIN: &str = "import from \"./util\" private * as utilModule\n\nmain {\n    print 1\n}\n";
 
 #[test]
 fn identity_bearing_enum_variant_canonical_miss_fails_closed() {

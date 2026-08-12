@@ -49,16 +49,16 @@ fn has_issue(diagnostics: &[radix::diagnostics::Diagnostic], issue: &str) -> boo
 fn compiler_analysis_handles_annotations_multiline_signatures_and_next_line_bodies() {
     let root = test_package(
         "analyzed-layout",
-        r"@ futura
-functio delegata(
-    textus value
-) → textus
+        r"@ future
+fn delegata(
+    string value
+) → string
 
-functio localis(
-    textus value
-) → textus
+fn localis(
+    string value
+) → string
 {
-    redde value
+    return value
 }
 ",
         r#"[functions."fixture:api.delegata"]
@@ -80,9 +80,9 @@ path = "rust/shim.rs"
 fn nested_method_cannot_satisfy_a_top_level_binding() {
     let root = test_package(
         "nested-method",
-        r"genus Capsa {
-    functio abscondita(textus value) → textus {
-        redde value
+        r"class Capsa {
+    fn abscondita(string value) → string {
+        return value
     }
 }
 ",
@@ -105,7 +105,7 @@ path = "rust/shim.rs"
 fn rust_probe_rejects_a_missing_symbol() {
     let root = test_package(
         "missing-symbol",
-        "functio delegata(textus value) → textus\n",
+        "fn delegata(string value) → string\n",
         r#"[functions."fixture:api.delegata"]
 symbol = "crate::shim::delegata"
 
@@ -125,7 +125,7 @@ path = "rust/shim.rs"
 fn rust_probe_rejects_a_signature_mismatch() {
     let root = test_package(
         "wrong-signature",
-        "functio delegata(textus value) → textus\n",
+        "fn delegata(string value) → string\n",
         r#"[functions."fixture:api.delegata"]
 symbol = "crate::shim::delegata"
 
@@ -145,7 +145,7 @@ path = "rust/shim.rs"
 fn rust_probe_rejects_a_sync_symbol_for_an_async_contract() {
     let root = test_package(
         "wrong-async-signature",
-        "@ futura\nfunctio delegata(textus value) → textus\n",
+        "@ future\nfn delegata(string value) → string\n",
         r#"[functions."fixture:api.delegata"]
 symbol = "crate::shim::delegata"
 
@@ -165,7 +165,7 @@ path = "rust/shim.rs"
 fn rust_probe_rejects_a_missing_error_channel() {
     let root = test_package(
         "wrong-error-signature",
-        "functio delegata(textus value) → textus ⇥ textus\n",
+        "fn delegata(string value) → string ⇥ string\n",
         r#"[functions."fixture:api.delegata"]
 symbol = "crate::shim::delegata"
 
@@ -184,7 +184,7 @@ path = "rust/shim.rs"
 fn duplicate_binding_rows_are_rejected_by_manifest_parsing() {
     let root = test_package(
         "duplicate-row",
-        "functio delegata(textus value) → textus\n",
+        "fn delegata(string value) → string\n",
         r#"[functions."fixture:api.delegata"]
 symbol = "crate::shim::delegata"
 
@@ -203,7 +203,7 @@ symbol = "crate::shim::altera"
 fn parent_escaping_source_path_is_rejected() {
     let root = test_package(
         "source-parent",
-        "functio localis() → textus { redde \"ok\" }\n",
+        "fn localis() → string { return \"ok\" }\n",
         "",
         "",
     );
@@ -232,7 +232,7 @@ fn dot_source_library_with_bindings_verifies() {
     // with package_member_empty on the bare `.` member path.
     let root = test_package(
         "dot-source",
-        "functio localis() → textus { redde \"ok\" }\n",
+        "fn localis() → string { return \"ok\" }\n",
         r#"[functions."fixture:api.localis"]
 symbol = "crate::shim::localis"
 
@@ -250,7 +250,7 @@ path = "rust/shim.rs"
     // `.`-source keeps sources at the package root, not under `src/`.
     fs::write(
         root.path().join("api.fab"),
-        "functio localis() → textus { redde \"ok\" }\n",
+        "fn localis() → string { return \"ok\" }\n",
     )
     .expect("write package-root source");
     fs::remove_dir_all(root.path().join("src")).expect("remove default src dir");
@@ -267,7 +267,7 @@ fn src_source_library_with_bindings_still_verifies() {
     // source-root resolution was aligned with discovery's supported set.
     let root = test_package(
         "src-source",
-        "functio localis() → textus { redde \"ok\" }\n",
+        "fn localis() → string { return \"ok\" }\n",
         r#"[functions."fixture:api.localis"]
 symbol = "crate::shim::localis"
 
@@ -287,7 +287,7 @@ path = "rust/shim.rs"
 fn absolute_binding_manifest_path_is_rejected() {
     let root = test_package(
         "binding-absolute",
-        "functio localis() → textus { redde \"ok\" }\n",
+        "fn localis() → string { return \"ok\" }\n",
         "",
         "",
     );
@@ -314,7 +314,7 @@ fn symlinked_shim_escape_is_rejected() {
 
     let root = test_package(
         "shim-symlink",
-        "functio delegata(textus value) → textus\n",
+        "fn delegata(string value) → string\n",
         r#"[functions."fixture:api.delegata"]
 symbol = "crate::shim::delegata"
 
@@ -344,7 +344,7 @@ fn missing_source_below_symlinked_parent_is_rejected() {
 
     let root = test_package(
         "source-missing-symlink",
-        "functio localis() → textus { redde \"ok\" }\n",
+        "fn localis() → string { return \"ok\" }\n",
         "",
         "",
     );
@@ -376,14 +376,14 @@ fn symlinked_faber_source_outside_source_root_is_rejected() {
 
     let root = test_package(
         "source-file-symlink",
-        "functio localis() → textus { redde \"ok\" }\n",
+        "fn localis() → string { return \"ok\" }\n",
         "",
         "",
     );
     let outside = root.path().with_extension("outside.fab");
     fs::write(
         &outside,
-        "functio abscondita() → textus { redde \"outside\" }\n",
+        "fn abscondita() → string { return \"outside\" }\n",
     )
     .expect("write outside source");
     symlink(&outside, root.path().join("src/escape.fab")).expect("symlink escaping source file");
@@ -405,7 +405,7 @@ fn empty_source_has_no_declarations() {
 fn all_local_functions_without_bindings() {
     let root = test_package(
         "local-only",
-        "functio localis() → textus { redde \"ok\" }\n",
+        "fn localis() → string { return \"ok\" }\n",
         "",
         "",
     );
