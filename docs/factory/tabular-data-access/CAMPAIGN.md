@@ -1,140 +1,217 @@
-# Campaign: Tabular Data Access — Census, SQLite, ViviLite
+# Campaign: Typed Relational Data Access
 
-**Status**: proposed — prerequisite facts refreshed; not selected for factory
-**Date**: 2026-07-10
-**Refreshed**: 2026-07-10
-**Mode**: routing artifact — does not implement code directly
+**Status**: planned — architecture refreshed around partial schemas, typed filter plans, and PostgreSQL/SQLite execution; implementation not selected
+**Created**: 2026-07-10
+**Refreshed**: 2026-08-11
+**Mode**: routing artifact — stages lower to delivery before implementation
 **Control-plane repo**: `/Users/ianzepp/work/faberlang/faber`
-**Working repos**: `radix`, `faber`, `faber-runtime`, `norma`, `examples`
+**Working repos**: `radix`, `faber`, `faber-runtime`, `hosts`, `norma`, `examples`
 
-## Summary
+## Purpose
 
-Coordinate typed tabular data in Faber and thin SQL access for application
-packages. Three ordered goals:
+Give Faber applications typed, partial views over relational data without
+making them own the complete database schema, migrations, storage, or SQL
+dialect.
 
-1. **Census types** — compiler/runtime `schema`, `series<S>`, `census<S>` (bare
-   `series` preserved for dynamic interop).
-2. **SQLite library shim** — thin `sqlite:sqlite` package over `rusqlite`; API
-   surface parallel to `norma:arca`; typed returns use census when available.
-3. **ViviLite integration** — regular-Vivi `.vivi/mail.sqlite` read path (then
-   write), oracle parity with `vivi`, file-backed lane retained.
-
-**Not part of aer-purgatus.** Aer Purgatus completed on 2026-07-10 without
-pulling census or SQLite into its scope. Its ViviLite JSON work stayed on the
-file-backed `.vivilite/` lane.
-
-**Board:** want `688cd65` remains open and records the decision to defer
-SQLite/census for ViviLite until this campaign is selected. Its stated
-done-when (opening a separate campaign) is now satisfied; closing or promoting
-the want remains a separate operator action.
-
-## Problem
-
-Application packages need typed rows and SQL execution without duplicating
-untyped `valor` walking, hand-rolled JSON, and incompatible sqlite vs Arca
-surfaces. ViviLite Stage 0–1 proved CLI ergonomics on a file-backed floor;
-regular Vivi storage compatibility and shared developer types belong here.
-
-## Desired End State
-
-- Apps declare column shapes with `schema`; query results materialize as
-  `series<S>` / `census<S>` from both SQLite shim and (later) Arca adapters.
-- `sqlite:sqlite` remains a thin sync binding — no ORM, no mailspace logic, no
-  query DSL in the package.
-- ViviLite reads fixture `.vivi/mail.sqlite` through the shim and matches
-  selected `vivi --json` oracle outputs.
-- Migration from sqlite package to `norma:arca` is manageable: connection +
-  async + import path, not row-shape redesign.
-- `norma:arca` stays the long-term stdlib authority via host gateway; this
-  campaign does not replace Arca — it prepares typed rows both paths can share.
-
-## Development Posture
-
-- **Ordered delivery.** Goal 2 must not require ViviLite; Goal 3 must not start
-  before Goal 2 read API is usable.
-- **Thin sqlite package.** Rusqlite + valor map + `⇥ textus` errors only.
-- **API overlap with Arca.** Shared stems (`quaer-`, `capi-`, `exsequ-`) and
-  parameter/row contracts per sqlite Stage 1 contract.
-- **Census-first typing.** Prefer `census<S>` returns for app-facing SQL APIs
-  once Goal 1 reaches series/census shells.
-- **Clean break from aer-purgatus scope.** The completed remediation campaign
-  did not adopt census or SQLite as prerequisites.
-
-## Implementation Workflow
-
-1. Operator selects this campaign. Aer Purgatus is complete and is no longer a
-   sequencing gate.
-2. Flesh out per-goal delivery specs under this directory or linked factory dirs.
-3. Execute each goal through `factory` in order; update Status here only.
-4. Do not implement from this routing artifact alone.
-
-## Scope Routing
-
-| Surface | Owner | Campaign goal |
-| --- | --- | --- |
-| `schema`, `series<S>`, `census<S>`, EBNF, intrinsics | `radix` | Goal 1 |
-| `faber::Series`, `faber::Census`, schema metadata | `faber-runtime` | Goal 1 |
-| `sqlite:sqlite` package, `bindings/rust.toml`, rusqlite shim | `faber` (+ package tree TBD) | Goal 2 |
-| `examples/vivilite`, fixture mailspaces, oracle tests | `examples` | Goal 3 |
-| `norma:arca` gateway dispatch, sqlx host handler | `norma` / `faber-runtime` / gateway | **out of campaign** (follow-on) |
-
-## Out of Campaign
-
-- aer-purgatus Goals 1–4 and their factory runs
-- Full `norma:arca` implementation and frame-gateway Stages 6–9
-- ORM, query builders, SQLite DDL migrations bound to Faber `schema`
-- Mutating live project `.vivi/` stores (fixture-only gates)
-- census Stage 7 `corpus` / `censet<S>` unless explicitly added later
-
-## Current State
-
-| Goal | State | Factory entry | Next action |
-| --- | --- | --- | --- |
-| 1 — Census types (`schema`, `series<S>`, `census<S>`) | proposed — parked | [`radix/docs/factory/census-types/goal.md`](../../../../radix/docs/factory/census-types/goal.md) | Flesh delivery spec when campaign opens; implement compiler/runtime per census plan |
-| 2 — SQLite library shim (`sqlite:sqlite`) | Stages 1–3 complete; Stage 4 write compatibility partially complete | [`sqlite-library-package/goal.md`](../sqlite-library-package/goal.md) | Continue only the remaining Stage 4 sent-copy parity and mutation-command scope when selected |
-| 3 — ViviLite SQL integration | Stage 0–1 file-backed complete; SQLite read lane present; write lane partially complete | [`examples/docs/factory/vivilite/goal.md`](../../../../examples/docs/factory/vivilite/goal.md) | Finish sent-copy parity and remaining mutation commands through fixture-first gates |
-
-Delivery specs for Goals 1–3 are **not authored yet**. Link existing factory
-goals above; lower to `goal-*-delivery.md` files in this directory when the
-campaign is selected.
-
-## Prerequisite And Status Check — 2026-07-14
-
-| Surface | Verified state | Campaign implication |
-| --- | --- | --- |
-| Aer Purgatus | Complete; Goals 1–4 and residual queue closed | No longer a sequencing prerequisite |
-| Census types | Proposed/parked; no `schema`, typed `series<S>`, or `census<S>` implementation landed | Goal 1 still begins with delivery/spec lock work |
-| Unified manifest Phases 1–2 | Complete | Library manifests, install, and provider-root resolution are available |
-| Unified manifest Phase 4 | Binding-manifest verification complete | Bodyless Faber declarations, binding keys, shim presence, target dependencies, and Rust ABI probes can be verified |
-| Unified manifest Phase 3 | Complete for the Rust native-binding path used by the SQLite packet | The old application-linkage gate is historical evidence, not a current blocker for the shipped SQLite packet |
-| SQLite package | Stage 1 API contract, Stage 2 Rust binding prototype, and Stage 3 ViviLite read consumer complete; Stage 4 write compatibility partially complete | Goal 2 remains active only for sent-copy parity and remaining mutation commands |
-| ViviLite | Stage 0–1 file-backed package and tests landed; SQLite read lane present; write lane partially complete | Goal 3 remains fixture-gated for write parity and remaining mutation commands |
-| Vivi want `688cd65` | Open; stated done-when is satisfied by this campaign artifact | Preserve as sequencing evidence; operator may close/promote separately |
-
-## Dependency Order
+The central product path is:
 
 ```text
-Goal 1 (census types)
-    │
-    ▼
-Goal 2 (sqlite shim — dynamic rows minimum; census<S> returns when ready)
-    │
-    ▼
-Goal 3 (ViviLite tie-in — read oracle, then write compatibility)
+PostgreSQL / SQLite relation
+    + schema I                  partial input contract
+    + filtrum<I,O>              typed relational plan
+    + schema O                  visible result contract, O ⊆ I
+    ↓ provider execution and admission
+census<O>                       finite result
+cursor<series<O>>               streaming result
+series<O> ∪ nihil               optional single result
 ```
 
-Unified package manifest Phase 4 verification is complete and is no longer a
-blocker. The Rust native-binding application linkage path is also proven for
-the SQLite packet, so the former Phase 3 build-graph gate is no longer the Goal
-2 blocker. Remaining work is the Stage 4 write-compatibility scope recorded in
-[`sqlite-library-package/goal.md`](../sqlite-library-package/goal.md).
+The authoritative language architecture is sibling
+[`radix/docs/factory/census-types/goal.md`](../../../../radix/docs/factory/census-types/goal.md).
 
-## Related Artifacts
+## Why this campaign still exists
 
-| Artifact | Role |
-| --- | --- |
-| [`sqlite-library-package/stage-1-api-fixture-contract.md`](../sqlite-library-package/stage-1-api-fixture-contract.md) | API + valor map + ViviLite oracle contract |
-| [`unified-package-manifest/goal.md`](../unified-package-manifest/goal.md) | Authoritative Phase 1–4 package prerequisite state |
-| [`radix/docs/factory/census-types/plan.md`](../../../../radix/docs/factory/census-types/plan.md) | Census stage graph |
-| [`norma/src/arca.fab`](../../../../norma/src/arca.fab) | Long-term async DB device (parallel API vocabulary) |
-| Vivi want `688cd65` | Sequencing policy vs aer-purgatus |
+The original campaign assumed Census must land before SQLite and ViviLite.
+History went another way:
+
+- the SQLite package proved a dynamic `valor`-row floor;
+- ViviLite proved concrete SQLite read/write application paths;
+- typed Census did not land;
+- the dynamic floor exposed the missing architectural layer: a typed,
+  serializable filter/view plan between a source relation and a result schema.
+
+The delivered dynamic work is now evidence and infrastructure for typed views,
+not unfinished work that must be replayed in its original order.
+
+## Architectural vocabulary
+
+| Surface | Meaning | Owner |
+| --- | --- | --- |
+| `schema S` | Application-owned partial relational heading; open to extra source columns | `radix` |
+| `filtrum<I,O>` | Inert typed plan: source, aliases, predicate, order, window, provider requirements | `radix` + provider-neutral runtime encoding |
+| `series<S>` | One row admitted through `S` | `faber-runtime` |
+| `census<S>` | Finite admitted relational result with bag semantics | `faber-runtime` |
+| `cursor<series<S>>` | Resource-bound streaming rows | `norma:arca` + database host/provider |
+| database catalog/execution | Relation metadata, parameter binding, transactions, SQL | PostgreSQL/SQLite host providers |
+| application packaging | Provider selection, dependency assembly, user CLI workflow | `faber` |
+
+The working plan noun is `filtrum`, not noun `filtra`. `filtra` already belongs
+to Faber collection morphology as the imperative partner of copy-returning
+`filtrata`. The final lexical decision belongs to the Census design lock.
+
+## Campaign tracks
+
+### Track 1 — Typed relational language contract
+
+Authority:
+[`radix/docs/factory/census-types/`](../../../../radix/docs/factory/census-types/goal.md)
+
+Deliver:
+
+- partial/open schemas;
+- input/output schema distinction;
+- closed typed predicate AST;
+- checked output projection;
+- provider capability requirements;
+- Series/Census result types;
+- deterministic saved-plan encoding;
+- structured admission errors.
+
+### Track 2 — PostgreSQL and SQLite providers
+
+Deliver two renderers/adapters over one provider-neutral plan:
+
+- parameterized SQL with identifiers separately admitted;
+- catalog/result metadata validation;
+- PostgreSQL type-identity admission;
+- SQLite per-cell storage-class admission;
+- finite, optional-single, and explicit streaming postures;
+- fail-closed provider capability differences;
+- host-owned tenant, ACL, and deletion policy injection.
+
+The existing SQLite package is input evidence. It is not the final owner of a
+second filter AST or competing typed-row system.
+
+### Track 3 — Saved filters
+
+Use the proven shape from the Monk API reference implementation:
+
+```text
+source/model + projection + predicate + order + limit + offset
+```
+
+Faber saves a versioned provider-neutral `filtrum<I,O>`, not generated SQL.
+Loading revalidates source/schema identities and provider requirements before
+execution.
+
+Reference implementation:
+`/Users/ianzepp/work/ianzepp/monk-api/src/lib/filter*.ts` and
+`planning/FILTER_REWORK.md`.
+
+### Track 4 — Application proof
+
+Prove one shared logical plan against PostgreSQL and SQLite fixtures. The proof
+must include:
+
+- extra source columns;
+- an input-only predicate column;
+- explicit aliases;
+- nullable and required cells;
+- deterministic ordering;
+- finite, single, and streaming results;
+- saved-plan round trip and revalidation;
+- exact failure evidence for missing, duplicate, null, incompatible, and
+  unsupported-provider cases.
+
+ViviLite is a candidate consumer because it already exercises SQLite rows, but
+it is not mandatory. A smaller dedicated package is preferred if it gives a
+cleaner cross-provider oracle.
+
+## Current evidence
+
+| Surface | Verified/documented state | Campaign use |
+| --- | --- | --- |
+| Census types | No live `schema`, typed `series<S>`, `census<S>`, or relational plan type | Begin with Census S0/S1 design and evidence freeze. |
+| Bare `series` | Dynamic `tabula<textus, valor>` lowering remains live | Preserve as the untyped interop floor. |
+| SQLite package | Dynamic `valor` query rows and parameterized read/write paths are documented as delivered in substantial part | Reuse fixtures and packaging evidence; reverify exact open closeout scope before execution. |
+| ViviLite read | SQLite read delivery records board/status/list proofs | Candidate typed-view consumer and oracle source. |
+| ViviLite write | Stage-3 delivery says complete while top-level goal/campaign prose contains older partial-state claims | Treat status as doc drift until its owning repo reconciles it; do not block Census design on it. |
+| `norma:arca` | Dynamic bare-Series API vocabulary; typed adapters explicitly out of scope today | Preserve vocabulary; add typed finite/stream adapters only after the shared contract is frozen. |
+| Monk Filter | PostgreSQL/SQLite query descriptor and saved filters; planned typed-AST rework | Architectural reference for plan shape and dialect separation. |
+
+## Dependency and stage order
+
+```text
+T0 Census evidence + design lock
+    ↓
+T1 schema + filtrum semantics
+    ↓
+T2 runtime values + saved-plan encoding
+    ↓
+T3 PostgreSQL provider ──┐
+                        ├─→ T5 cross-provider application proof
+T4 SQLite provider ─────┘                 ↓
+                                      T6 closeout
+```
+
+The existing dynamic SQLite/ViviLite work is a predecessor evidence base, not
+a stage that waits behind T1. PostgreSQL and SQLite implementations may proceed
+in parallel only after the provider-neutral plan and admission contracts are
+frozen.
+
+| Stage | Deliverable | Authority | Gate |
+| --- | --- | --- | --- |
+| T0 | Evidence, fixtures, representation and naming decisions | Census S0 | All design locks decided or explicitly block implementation |
+| T1 | Partial schemas and typed `filtrum<I,O>` | Census S1–S3 | Typed AST; `O ⊆ I`; no provider SQL in semantic layer |
+| T2 | Series/Census runtime, errors, saved-plan encoding | Census S4 | Deterministic round trip and owned finite results |
+| T3 | PostgreSQL vertical | Census S5 | Parameterized execution and precise admission failures |
+| T4 | SQLite vertical | Census S6 | Per-cell validation and fail-closed capability handling |
+| T5 | Same-plan application proof | Census S7 | Semantic parity over shared capability intersection |
+| T6 | Docs/corpus/locale/product closeout | Census S8 | Integrated lane ladder and reproducible receipts |
+
+## Non-goals
+
+- ORM, migrations, DDL ownership, or schema synchronization.
+- Automatic SQL generation from arbitrary Faber closures.
+- Raw SQL as the portable filter representation.
+- Joins, subqueries, or common-table expressions in v1.
+- Aggregation in the first vertical slice; it needs a distinct typed output
+  schema.
+- Automatic writes through Series or Census.
+- Filter-based update/delete without a separate authorization, identity,
+  transaction, and affected-row contract.
+- Silent PostgreSQL/SQLite semantic approximation.
+- `corpus` / `censet<S>` as a v1 prerequisite.
+- Mutating live Vivi mailspaces during fixtures or acceptance.
+
+## Ownership boundaries
+
+- Radix owns semantics, typed plan lowering, and portable serialization. It
+  does not open databases or run SQL.
+- Database hosts/providers own catalog access, parameter binding, execution,
+  transactions, policy injection, and dialect capability truth.
+- `faber-runtime` owns provider-neutral runtime values and admission errors,
+  not database drivers.
+- Norma owns public database verbs and finite/stream posture, not a second
+  schema or filter system.
+- Faber owns package/build workflow, not compiler semantics or provider effects.
+- Examples own disposable proof packages and fixtures, not live data.
+
+## Stop conditions
+
+- Stop if a Faber schema begins to claim complete database ownership.
+- Stop if Census becomes only a renamed list.
+- Stop if `select` strings can disagree with the declared result schema.
+- Stop if hidden predicate/order fields have no typed input contract.
+- Stop if provider-specific SQL enters the portable plan identity.
+- Stop if ACL/tenant/deletion policy becomes editable author filter data.
+- Stop if SQLite approximates unsupported PostgreSQL semantics silently.
+- Stop if a read view implies mutation authority.
+
+## Next action
+
+Lower Census S0 from
+[`plan.md`](../../../../radix/docs/factory/census-types/plan.md). The packet must
+freeze exact live owner paths, PostgreSQL/SQLite fixtures, source-column mapping,
+runtime representation, cursor ownership, saved-plan versioning, and the final
+plan noun before any grammar or implementation unit is filed.
