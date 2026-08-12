@@ -34,7 +34,11 @@ const BUDGETS: Budgets = Budgets {
     // ratchet counts `.expect(` inside inline test modules; all 8 sites are
     // test-only, none in production lowering. Re-baselined at the U4
     // gate-repair checkpoint so `--stage 1-4` turns green.
-    expect: 20,
+    // Re-baselined 20→21: fe4fdf9da (package_identity_facts_for_path
+    // effective-reader-pack) added one fail-closed `.expect(` to the
+    // registry-direct re-parse contract; production-fix tracking per the
+    // llvm/wasm registry re-parse residual.
+    expect: 21,
     // WHY: one guard in emit.rs output_code contract — an internal invariant
     // that callers should not violate for binary wasm output.
     // Additional: hir/lower/annotation.rs exhaustive match guard on Nondum
