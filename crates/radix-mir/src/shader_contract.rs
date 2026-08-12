@@ -1,22 +1,19 @@
-//! Domain-neutral shader contract records (WGSL shader-contract boundary, U1).
+//! Domain-neutral shader contract records.
 //!
-//! This module is the compiler-owned, generic shader-contract surface. A
-//! shader contract is the set of facts a library declares — vertex layout
+//! This module owns the compiler-defined shader-contract surface: vertex-layout
 //! attributes, stage varyings, fragment outputs, resource bindings, and
-//! pipeline state — expressed with canonical fields, explicit stage-I/O
-//! [`ShaderStageIoRole`]s, and provenance (resolved source identity + span) for
+//! pipeline state. Each fact carries canonical fields, an explicit
+//! [`ShaderStageIoRole`], and provenance (resolved source identity + span) for
 //! diagnostics.
 //!
-//! The records are domain-neutral: any library maps its concrete API onto
-//! them, and the driver ingests them (identity-resolved). The roles are
-//! carried on the records and consumed by the WGSL emitter in place of name
-//! spellings (U3+); the legacy name-spelling bridges were retired in U6.
-//! Unknown numeric codes fail closed with [`MirAbiError`] — including the
-//! depth-compare table, which must error rather than degrade to `Never`.
+//! Libraries map their APIs onto these records. Identity-resolved ingestion
+//! lives in the driver. Stage semantics come from the declared role, not from
+//! source-name spelling. Unknown numeric codes fail closed with
+//! [`MirAbiError`] — including the depth-compare table, which must error
+//! rather than degrade to `Never`.
 //!
-//! The builders here produce the existing [`MirKernelReflection`] /
-//! [`MirGraphicsPipelineReflection`] / [`MirGpuReflection`] shapes unchanged,
-//! so the reflection JSON sidecar serializes identically to today.
+//! Builders project the records onto [`MirKernelReflection`] and
+//! [`MirGraphicsPipelineReflection`].
 
 use crate::{
     MirAbiError, MirColorTargetFormat, MirDepthCompareFunction, MirDepthStencilState,
@@ -45,17 +42,17 @@ fn unsupported_code_error(message: &'static str, issue: &'static str, code: u32)
     MirAbiError::with_detail(message, issue, code.to_string())
 }
 
-/// Explicit stage-I/O role carried on shader-contract records and on the MIR
-/// reflection records the builders produce.
+/// Explicit stage-I/O role on contract records and on the reflection records
+/// the builders produce.
 ///
-/// The WGSL emitter consumes the role in place of name spellings:
-/// [`Self::Position`] for the vertex-position input, [`Self::Color`] for
-/// color-valued stage I/O, and [`Self::Transform`] for the transform storage
-/// resource. [`Self::Other`] is the neutral default for attributes with no
-/// special stage semantics (normals, texture coordinates, …).
+/// Stage semantics come from this role, not from source-name spelling.
+/// [`Self::Position`] is the vertex-position attribute, [`Self::Color`] is
+/// color-valued stage I/O, and [`Self::Transform`] is the transform storage
+/// resource. [`Self::Other`] is the default for attributes with no special
+/// stage semantics (normals, texture coordinates, …).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
 pub enum ShaderStageIoRole {
-    /// Vertex position output.
+    /// Vertex position attribute.
     Position,
     /// Color-valued stage input/output.
     Color,
@@ -69,8 +66,7 @@ pub enum ShaderStageIoRole {
 /// # Errors
 /// Returns an error when the numeric code is not a canonical stage-I/O role.
 ///
-/// Role codes are part of the canonical code tables; unknown codes fail
-/// closed. `Other` (the neutral default) is code `4`.
+/// Unknown codes fail closed. `Other` (the default) is code `4`.
 pub fn stage_io_role_from_code(code: u32) -> Result<ShaderStageIoRole, MirAbiError> {
     match code {
         1 => Ok(ShaderStageIoRole::Position),
@@ -96,10 +92,6 @@ pub struct ContractProvenance {
 }
 
 /// Vertex-layout contract: one vertex buffer attribute (shader input).
-///
-/// Canonical fields: the format is the canonical [`MirVertexInputFormat`], the
-/// step mode is the canonical [`MirInputStepMode`], and provenance carries the
-/// resolved source identity + span.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShaderVertexAttribute {
     /// Semantic/source identity of the attribute (source member name).
@@ -336,8 +328,7 @@ pub fn resource_access_from_code(code: u32) -> Result<MirKernelResourceAccess, M
     }
 }
 
-/// Convert a vertex-layout contract attribute into the MIR vertex-input
-/// reflection record, carrying the role.
+/// Project a vertex-layout contract attribute onto [`MirVertexInputReflection`].
 #[must_use]
 pub fn vertex_input_reflection_from_shader_contract(
     attribute: &ShaderVertexAttribute,
@@ -353,8 +344,7 @@ pub fn vertex_input_reflection_from_shader_contract(
     }
 }
 
-/// Convert a varying contract into the MIR varying reflection record, carrying
-/// the role.
+/// Project a varying contract onto [`MirVaryingReflection`].
 #[must_use]
 pub fn varying_reflection_from_shader_contract(varying: &ShaderVarying) -> MirVaryingReflection {
     MirVaryingReflection {
@@ -366,8 +356,7 @@ pub fn varying_reflection_from_shader_contract(varying: &ShaderVarying) -> MirVa
     }
 }
 
-/// Convert a fragment-output contract into the MIR fragment-output reflection
-/// record, carrying the role.
+/// Project a fragment-output contract onto [`MirFragmentOutputReflection`].
 #[must_use]
 pub fn fragment_output_reflection_from_shader_contract(
     output: &ShaderFragmentOutput,
@@ -379,9 +368,9 @@ pub fn fragment_output_reflection_from_shader_contract(
     }
 }
 
-/// Convert a resource-binding contract into the existing
-/// [`MirKernelResourceReflection`] record. The buffer byte length is derived
-/// from the canonical element layout + count.
+/// Project a resource-binding contract onto [`MirKernelResourceReflection`].
+///
+/// Buffer byte length is `element_count * element_byte_width`.
 #[must_use]
 pub fn resource_reflection_from_shader_contract(
     binding: &ShaderResourceBinding,
@@ -406,8 +395,7 @@ pub fn resource_reflection_from_shader_contract(
 }
 
 /// Build a vertex-stage entry [`MirKernelReflection`] from a vertex-layout
-/// contract. Produces the existing reflection shape; the role fields ride on
-/// the vertex-input records.
+/// contract.
 ///
 /// # Errors
 /// Returns an error when the contract has duplicate vertex-input locations.
@@ -435,19 +423,14 @@ pub fn source_vertex_entry_from_shader_contract(
     attributes: &[ShaderVertexAttribute],
     resources: Vec<MirKernelResourceReflection>,
 ) -> Result<MirKernelReflection, MirAbiError> {
-    let vertex_inputs = attributes
-        .iter()
-        .map(vertex_input_reflection_from_shader_contract)
-        .collect::<Vec<_>>();
     let mut entry =
-        MirKernelReflection::vertex_entry(MirFunctionId(0), entry_name, vertex_inputs, resources)?;
+        vertex_entry_from_shader_contract(MirFunctionId(0), entry_name, attributes, resources)?;
     entry.provenance = MirKernelProvenance::SourceFunction(source_def);
     Ok(entry)
 }
 
 /// Build a fragment-stage entry [`MirKernelReflection`] from a varying +
-/// fragment-output contract. Produces the existing reflection shape; the role
-/// fields ride on the varying and output records.
+/// fragment-output contract.
 ///
 /// # Errors
 /// Returns an error when the contract has duplicate varying or output
@@ -509,9 +492,8 @@ pub fn source_fragment_entry_from_shader_contract(
 /// Build a [`MirGraphicsPipelineReflection`] from a vertex + fragment stage
 /// pair and a pipeline-state contract.
 ///
-/// Reuses the existing cross-stage validation (stage kinds, vertex inputs
-/// present, color targets present, varying consistency) and then applies the
-/// contract's topology and depth/stencil state.
+/// Cross-stage validation is the existing kernel reflection check. This
+/// builder then applies the contract's topology and depth/stencil state.
 ///
 /// # Errors
 /// Returns an error when the stage pair or the pipeline contract is invalid
