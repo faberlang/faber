@@ -40,10 +40,15 @@ pub(crate) fn selected_providers_for_routes(
     providers
 }
 
-/// Routes covered by `faber-runtime` `BuiltinRuntimeDispatch` / `builtin_route_frames`.
+/// Plan-time route classification for the builtin runtime dispatch
+/// (dual-backend contract).
 ///
-/// Dual-backend contract: these do **not** require `[target.rust] host = "native"`.
-/// Keep in sync with `faber-runtime/src/frame.rs` `builtin_route_frames` match arms.
+/// These routes do **not** require `[target.rust] host = "native"`: the
+/// builtin runtime covers them, so a native host stays optional. The
+/// runtime-side `builtin_route_frames`/`dispatch_builtin_route` arms were
+/// removed from `faber/runtime/rust/src/frame.rs` (faber-target-runtime S1-U3
+/// split) and move to `hosts/` providers; this mirror is a radix-owned plan
+/// fact and must stay aligned with that provider coverage.
 pub(crate) fn is_builtin_ad_route(route: &str) -> bool {
     matches!(
         route,
