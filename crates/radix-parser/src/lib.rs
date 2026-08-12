@@ -6,16 +6,12 @@
 //! recovery policy shared by the declaration, statement, expression, type, and
 //! pattern subparsers.
 //!
-//! DESIGN PHILOSOPHY
-//! =================
 //! The parser is hand-written and predictive because the language grammar has
 //! several contextual forms where good diagnostics and controlled recovery matter
 //! more than minimizing parser code. Submodules may use bounded lookahead or
 //! rollback for local ambiguities, but the public phase contract is still one
 //! forward pass from token stream to `AST` plus diagnostics.
 //!
-//! INVARIANTS
-//! ==========
 //! - The token stream is expected to end in EOF and parser position never moves
 //!   beyond the stream.
 //! - Comments and newline trivia are syntactically transparent; navigation
@@ -28,8 +24,6 @@
 //! - Node IDs are allocated monotonically in parse order for later compiler
 //!   phases; they are not stable source identifiers.
 //!
-//! ERROR HANDLING
-//! ==============
 //! Lexer errors are terminal because there is no trustworthy token stream to
 //! consume. Parser errors are collected and recovery resumes at statement or
 //! block boundaries so one malformed construct does not erase the rest of the
@@ -51,14 +45,8 @@ use radix_lexer::{
     keyword_allowed_as_ident, keyword_spelling_for_token, lookup_keyword_spec, Interner,
     KeywordOwner, KeywordScope, KeywordSurfaceMode, LexResult, Span, Symbol, Token, TokenKind,
 };
-#[allow(clippy::wildcard_imports)]
-// syntax is a pure re-export barrel from radix-syntax
-use radix_syntax::*;
+use radix_syntax::{CommentLine, Ident, Newline, NodeId, Program, Trivia};
 use std::collections::HashMap;
-
-// =============================================================================
-// TYPES
-// =============================================================================
 
 /// Result of the parsing phase for one compilation unit.
 ///
@@ -78,10 +66,7 @@ pub struct ParseResult {
 }
 
 impl ParseResult {
-    /// Check if parsing succeeded without errors.
-    ///
-    /// WHY: Provides a convenient boolean check for whether compilation can proceed.
-    /// A program is only valid if we produced an `AST` *and* encountered no errors.
+    /// True when an `AST` was produced and no diagnostics were collected.
     #[must_use]
     pub fn success(&self) -> bool {
         self.program.is_some() && self.errors.is_empty()
@@ -102,7 +87,7 @@ pub struct Parser {
     /// via binary search instead of re-walking trivia from `pos` on every call.
     non_trivia_indices: Vec<usize>,
     /// Cursor into `non_trivia_indices` for the first entry with index ≥ `pos`.
-    /// Invalidated and recomputed lazily when `pos` moves backward (restore).
+    /// [`Parser::restore`] resyncs it; [`Parser::peek_at`] binary-searches if stale.
     non_trivia_cursor: usize,
     errors: Vec<ParseError>,
     next_node_id: NodeId,
@@ -120,24 +105,18 @@ pub struct ParseOptions {
     pub allow_bodyless_functions: bool,
 }
 
-// =============================================================================
-// ENTRY POINT
-// =============================================================================
-
 /// Parse lexer output into a syntax tree and parser diagnostics.
 ///
 /// Lexing failure is represented as parser-phase output so the driver can report
 /// one diagnostic stream. Unlike ordinary parse errors, lexer errors stop `AST`
 /// construction because token recovery has already failed upstream.
 #[must_use]
-// public API: consumes lex result
 pub fn parse(lex_result: LexResult) -> ParseResult {
     parse_with_options(lex_result, ParseOptions::default())
 }
 
 /// Parse with explicit frontend policy for contextual declaration forms.
 #[must_use]
-// public API: consumes lex result and options
 pub fn parse_with_options(lex_result: LexResult, options: ParseOptions) -> ParseResult {
     let LexResult {
         tokens,
@@ -148,7 +127,6 @@ pub fn parse_with_options(lex_result: LexResult, options: ParseOptions) -> Parse
         interner,
         ..
     } = lex_result;
-    // EDGE: Lexer errors are terminal - we can't parse without valid tokens
     if !errors.is_empty() {
         return ParseResult {
             program: None,
@@ -168,7 +146,6 @@ pub fn parse_with_options(lex_result: LexResult, options: ParseOptions) -> Parse
     parser.parse_program()
 }
 
-// consumes Vec via into_iter
 fn lex_errors_to_parse_errors(errors: Vec<radix_lexer::LexError>) -> Vec<ParseError> {
     errors
         .into_iter()
@@ -182,14 +159,9 @@ fn lex_errors_to_parse_errors(errors: Vec<radix_lexer::LexError>) -> Vec<ParseEr
         .collect()
 }
 
-// =============================================================================
-// CORE PARSER IMPLEMENTATION
-// =============================================================================
-
 impl Parser {
     /// Create a new parser from tokens and string interner.
     #[must_use]
-    // public constructor: moves tokens/options into parser
     pub fn new(tokens: Vec<Token>, interner: Interner, options: ParseOptions) -> Self {
         Self::new_with_reader_identities(
             tokens,
@@ -273,13 +245,10 @@ impl Parser {
         }
     }
 
-    // =============================================================================
     // TOKEN NAVIGATION
-    // =============================================================================
     //
-    // These helpers abstract token stream navigation with automatic trivia skipping.
-    // WHY: Comments and newlines are syntactically insignificant in expressions,
-    // so parser logic should never need to explicitly handle them outside boundaries.
+    // Comments and newlines are syntactically insignificant in expressions, so
+    // these helpers skip trivia before grammar code sees a current token.
 
     /// Allocate a fresh node ID for `AST` construction.
     ///
@@ -310,7 +279,6 @@ impl Parser {
         self.non_trivia_cursor = self.non_trivia_indices.partition_point(|&i| i < self.pos);
     }
 
-    /// Peek at current token (skipping trivia).
     fn peek(&self) -> &Token {
         self.peek_at(0)
     }
@@ -324,14 +292,13 @@ impl Parser {
         &self.tokens[self.pos]
     }
 
-    /// Peek at token at offset (skipping trivia).
+    /// Peek at the non-trivia token `offset` steps ahead without consuming.
     ///
-    /// WHY: Needed for lookahead decisions like distinguishing `fixum _ name =` from
-    /// `fixum type name =` without consuming tokens.
+    /// WHY: Distinguishes forms such as `fixum _ name ←` from `fixum type name ←`
+    /// without consuming tokens.
     ///
-    /// Uses the precomputed non-trivia index. When `non_trivia_cursor` is stale
-    /// (e.g. after restore without a prior sync under exclusive borrow), falls
-    /// back to binary search from `pos`.
+    /// Uses the precomputed non-trivia index. When `non_trivia_cursor` is stale,
+    /// falls back to binary search from `pos` because this method cannot mutate.
     fn peek_at(&self, offset: usize) -> &Token {
         let start = if self
             .non_trivia_indices
@@ -474,12 +441,7 @@ impl Parser {
             .any(|token| token.kind == TokenKind::Newline)
     }
 
-    /// Advance and return current token.
-    ///
-    /// WHY: Consuming tokens moves the parser state forward. Automatic trivia
-    /// skipping ensures parser logic never sees comment or newline tokens.
     fn advance(&mut self) -> &Token {
-        // Jump to the next non-trivia token via the precomputed index.
         if self.non_trivia_cursor < self.non_trivia_indices.len() {
             let idx = self.non_trivia_indices[self.non_trivia_cursor];
             if idx >= self.pos {
@@ -497,7 +459,6 @@ impl Parser {
         }
         if !self.is_at_end() {
             self.pos += 1;
-            // Consumed one non-trivia token; advance the index cursor.
             if self.non_trivia_cursor < self.non_trivia_indices.len()
                 && self.non_trivia_indices[self.non_trivia_cursor] < self.pos
             {
@@ -561,9 +522,6 @@ impl Parser {
         self.parse_leading_trivia()
     }
 
-    /// Consume token if it matches, return true.
-    ///
-    /// WHY: Optional token consumption for optional syntax elements like commas.
     fn eat(&mut self, kind: &TokenKind) -> bool {
         if self.check(kind) {
             self.advance();
@@ -573,7 +531,6 @@ impl Parser {
         }
     }
 
-    /// Consume token if it matches keyword, return true.
     fn eat_keyword(&mut self, kw: TokenKind) -> bool {
         if self.check_keyword(kw) {
             self.advance();
@@ -612,7 +569,7 @@ impl Parser {
             return true;
         }
         matches!(
-            self.interner.resolve(sym),
+            source,
             "numerus"
                 | "textus"
                 | "bivalens"
@@ -662,10 +619,6 @@ impl Parser {
         self.keyword_ident(&latin_key, ident.span)
     }
 
-    /// Expect a specific token, error if not found.
-    ///
-    /// WHY: Required syntax elements produce errors when missing, allowing the
-    /// caller to handle error recovery.
     fn expect(&mut self, kind: &TokenKind, msg: &str) -> Result<&Token, ParseError> {
         if self.check(kind) {
             Ok(self.advance())
@@ -684,17 +637,14 @@ impl Parser {
         }
     }
 
-    /// Check if at `EOF`.
     fn is_at_end(&self) -> bool {
         matches!(self.peek().kind, TokenKind::Eof)
     }
 
-    /// Get span of current token.
     fn current_span(&self) -> Span {
         self.peek().span
     }
 
-    /// Get span of previous token.
     fn previous_span(&self) -> Span {
         if self.pos > 0 {
             self.tokens[self.pos - 1].span
@@ -703,22 +653,14 @@ impl Parser {
         }
     }
 
-    // =============================================================================
-    // PARSING HELPERS
-    // =============================================================================
-
     fn expected_error(expected: &'static str, span: Span) -> ParseError {
         ParseError::structured(ParseErrorKind::Expected, span).with_arg("expected", expected)
     }
 
     fn expected_message_error(&self, message: &str) -> ParseError {
-        if let Some(expected) = message.strip_prefix("expected ") {
-            ParseError::structured(ParseErrorKind::Expected, self.current_span())
-                .with_arg("expected", expected)
-        } else {
-            ParseError::structured(ParseErrorKind::Expected, self.current_span())
-                .with_arg("expected", message)
-        }
+        let expected = message.strip_prefix("expected ").unwrap_or(message);
+        ParseError::structured(ParseErrorKind::Expected, self.current_span())
+            .with_arg("expected", expected)
     }
 
     fn invalid_expression_error(&self, issue: &'static str) -> ParseError {
@@ -726,13 +668,15 @@ impl Parser {
             .with_arg("issue", issue)
     }
 
+    // ERROR RECOVERY
+
     /// Check whether a token can safely restart statement parsing after an error.
     ///
     /// This list is intentionally coupled to `parse_stmt`: recovery should
     /// stop at the same keyword-led forms that can legally begin a statement,
     /// plus block closure and `EOF`. Drift here changes diagnostic reach.
     ///
-    /// Tokenless declaration introducers (Batch E) arrive as identifiers, so
+    /// Tokenless declaration introducers arrive as identifiers, so
     /// the identifier arm resolves the spelling to its Latin key through the
     /// surface gate and matches the same statement-start set. The other
     /// tokenless statement keywords (`figendum`/`variandum`/`reddet`/`tacebit`,
@@ -819,9 +763,7 @@ impl Parser {
         }
     }
 
-    // =============================================================================
     // IDENTIFIER PARSING
-    // =============================================================================
 
     /// Parse an identifier in expression or binding positions.
     ///
@@ -908,19 +850,11 @@ impl Parser {
         }
     }
 
-    /// Intern a keyword as an identifier.
-    ///
-    /// WHY: Allows keywords to be used as identifiers in specific contexts
-    /// by interning them into the string table.
     fn keyword_ident(&mut self, name: &str, span: Span) -> Ident {
         let sym = self.interner.intern(name);
         Ident { name: sym, span }
     }
 
-    /// Parse a string literal.
-    ///
-    /// GRAMMAR:
-    ///   string := STRING
     fn parse_string(&mut self) -> Result<Symbol, ParseError> {
         let token = self.advance();
         match &token.kind {
