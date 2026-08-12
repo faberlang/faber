@@ -374,12 +374,19 @@ impl Parser {
     /// spellings — those the lexer recorded a latin key for — may claim; an
     /// undeclared spelling stays an ordinary identifier (`None`).
     fn keyword_claim_key(&self, sym: Symbol) -> Option<&str> {
-        let source = self.interner.resolve(sym);
-        if let Some(latin_key) = self.reader_keyword_latin_keys.get(source) {
+        self.keyword_claim_key_for_text(self.interner.resolve(sym))
+    }
+
+    /// [`Self::keyword_claim_key`] over a resolved spelling, without the
+    /// interner hop. Tokenless/contextual keyword claims that hold a source
+    /// string (annotation-name dispatch) must route through this same gate so
+    /// an undeclared Latin spelling cannot claim under a non-`la` pack.
+    fn keyword_claim_key_for_text<'a>(&'a self, text: &'a str) -> Option<&'a str> {
+        if let Some(latin_key) = self.reader_keyword_latin_keys.get(text) {
             return Some(latin_key);
         }
         match self.keyword_surface {
-            KeywordSurfaceMode::RegistryDirect => Some(source),
+            KeywordSurfaceMode::RegistryDirect => Some(text),
             KeywordSurfaceMode::PackAuthoritative => None,
         }
     }
@@ -647,13 +654,6 @@ impl Parser {
         true
     }
 
-    fn identifier_text_or_keyword_latin_key(&self, sym: Symbol) -> &str {
-        let source = self.interner.resolve(sym);
-        self.reader_keyword_latin_keys
-            .get(source)
-            .map_or(source, String::as_str)
-    }
-
     fn canonical_type_ident(&mut self, ident: Ident) -> Ident {
         let source = self.interner.resolve(ident.name);
         let Some(latin_key) = self.reader_type_latin_keys.get(source).cloned() else {
@@ -733,13 +733,18 @@ impl Parser {
     /// plus block closure and `EOF`. Drift here changes diagnostic reach.
     ///
     /// Tokenless declaration introducers (Batch E) arrive as identifiers, so
-    /// the identifier arm resolves the spelling to its Latin key and matches
-    /// the same statement-start set. The other tokenless statement keywords
-    /// (`figendum`/`variandum`/`reddet`/`tacebit`, `nota`/`mone`/`vide`)
-    /// predate this and are intentionally not yet recovery boundaries.
+    /// the identifier arm resolves the spelling to its Latin key through the
+    /// surface gate and matches the same statement-start set. The other
+    /// tokenless statement keywords (`figendum`/`variandum`/`reddet`/`tacebit`,
+    /// `nota`/`mone`/`vide`) predate this and are intentionally not yet
+    /// recovery boundaries.
     fn is_recovery_boundary(&self, kind: &TokenKind) -> bool {
         if let TokenKind::Ident(sym) = kind {
-            let latin = self.identifier_text_or_keyword_latin_key(*sym);
+            let Some(latin) = self.keyword_claim_key(*sym) else {
+                // Undeclared under a pack-authoritative surface: an ordinary
+                // identifier is never a statement-start boundary.
+                return false;
+            };
             let ident = lookup_keyword_spec(latin).and_then(|spec| spec.token_kind.clone());
             return matches!(
                 ident,

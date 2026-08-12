@@ -8,6 +8,7 @@
 
 use super::{ParseOptions, Parser};
 use radix_lexer::{lex, lex_with_locale_pack, KeywordPack, LexResult, TokenKind};
+use radix_syntax::{ExprKind, StmtKind};
 
 /// Minimal reader pack: localizes `iuncta` to `本地` and `tacebit` to `await`
 /// as tokenless keywords (no token emission), with no Latin fallback declared.
@@ -188,5 +189,48 @@ fn statement_terminal_literal_is_not_a_retired_predicate() {
         }),
         "standalone `false <operand>` must still be rejected: {:?}",
         result.errors
+    );
+}
+
+#[test]
+fn vacua_claim_is_surface_gated() {
+    // Registry-direct (`la`/no-pack): the undeclared Latin `vacua` claims the
+    // empty-collection marker through the raw-source fallback (the pack-less
+    // lexer records no key for the tokenless `vacua`).
+    let mut parser = parser_over("varia lista words ← vacua");
+    let result = parser.parse_program();
+    assert!(
+        result.errors.is_empty(),
+        "la `vacua` must parse: {:?}",
+        result.errors
+    );
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let init = var.init.as_deref().expect("initializer");
+    assert!(
+        matches!(init.kind, ExprKind::Vacua(_)),
+        "registry-direct surface must claim the `vacua` marker"
+    );
+
+    // Pack-authoritative (non-`la` pack): the pack does not declare `vacua`,
+    // so the undeclared Latin spelling is an ordinary identifier expression
+    // and must not claim the empty-collection marker.
+    let mut parser = parser_over_with_pack("var lista words ← vacua");
+    let result = parser.parse_program();
+    assert!(
+        result.errors.is_empty(),
+        "pack `vacua` must parse as an ordinary identifier: {:?}",
+        result.errors
+    );
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let init = var.init.as_deref().expect("initializer");
+    assert!(
+        matches!(init.kind, ExprKind::Ident(_)),
+        "undeclared Latin `vacua` must not claim the marker under a non-la pack"
     );
 }

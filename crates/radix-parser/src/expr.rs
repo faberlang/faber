@@ -650,8 +650,7 @@ impl Parser {
     fn peek_at_one_starts_prefix_operand(&self) -> bool {
         match self.peek_at(1).kind {
             TokenKind::Ident(sym) => {
-                let latin_key = self.identifier_text_or_keyword_latin_key(sym);
-                match lookup_keyword_spec(latin_key) {
+                match self.keyword_claim_key(sym).and_then(lookup_keyword_spec) {
                     Some(spec) => matches!(
                         spec.scope,
                         KeywordScope::Contextual(owners)
@@ -1289,14 +1288,14 @@ impl Parser {
                     });
                 }
                 let ident = self.parse_primary_ident()?;
-                // Locale-aware `vacua` claim (R4): route through the keyword
-                // latin-key map so a localized empty-collection spelling (an
-                // owned pack row) resolves to the Latin identity before
-                // semantics. Latin mode has no row, so the helper falls back
-                // to the source text — behavior unchanged. Acceptance is
-                // bounded: only spellings mapped in the active pack are
-                // claimed; unmapped spellings stay ordinary identifiers.
-                if self.identifier_text_or_keyword_latin_key(ident.name) == "vacua" {
+                // Locale-aware `vacua` claim (R4): the empty-collection marker
+                // claims only through the pack-authoritative surface gate.
+                // Under `la`/no-pack the registry-direct fallback lets the
+                // Latin spelling claim; under a non-`la` pack only a spelling
+                // the lexer recorded a latin key for (the pack's own `vacua`
+                // row) claims — an undeclared Latin `vacua` stays an ordinary
+                // identifier.
+                if self.keyword_claim_key(ident.name) == Some("vacua") {
                     ExprKind::Vacua(ident.span)
                 } else if let Some(constructor) =
                     self.try_parse_qualified_typed_constructor(&ident)?
@@ -1595,7 +1594,11 @@ impl Parser {
     /// (`modulus`, `iuncta`) remain material; every other migrated keyword is
     /// structural and must not trigger expression speculation.
     fn ident_is_structure_keyword(&self, sym: Symbol) -> bool {
-        let latin = self.identifier_text_or_keyword_latin_key(sym);
+        let Some(latin) = self.keyword_claim_key(sym) else {
+            // Undeclared under a pack-authoritative surface: an ordinary
+            // identifier is expression material, never structure.
+            return false;
+        };
         matches!(
             lookup_keyword_spec(latin),
             Some(spec)
